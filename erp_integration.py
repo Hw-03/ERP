@@ -194,39 +194,94 @@ def load_file_c() -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-# 매칭 로직
+# 매칭 로직 (v2: 토큰 기반, 규격 우선순위 강화)
 # ---------------------------------------------------------------------------
 
 # 매칭 시 너무 짧으면 오탐이 많은 키워드 차단
 STOPWORDS_NORM = {
     "", "led", "ic", "pcb", "nan", "tube", "box", "can", "pin",
+    "bd", "cover", "top", "bottom", "panel", "panel", "ea", "set",
+    "pad", "kit", "al", "ppm", "flat", "dip", "type",
 }
 
+# 최소 유효 토큰 길이 (2자 이상 한글, 3자 이상 영숫자)
+MIN_TOKEN_LEN = 2
 
-def score_match(a_name_n: str, a_spec_n: str, a_maker_n: str, bc_n: str) -> int:
-    """매칭 점수 계산 (높을수록 강한 매칭)."""
+
+def tokenize(text) -> list[str]:
+    """텍스트를 의미 있는 토큰 리스트로 분리 (정규화된 소문자)."""
+    if text is None or (isinstance(text, float) and pd.isna(text)):
+        return []
+    s = str(text)
+    s = s.replace("\n", " ").replace("\r", " ").replace("\t", " ")
+    # 구분자: 공백, 괄호, 대괄호, 쉼표, 슬래시, 플러스, 하이픈, 언더스코어
+    parts = re.split(r"[\s\[\]\(\),/\+\-_~`:;!?\"'=&]+", s)
+    result = []
+    for p in parts:
+        n = norm_key(p)
+        if not n or n in STOPWORDS_NORM:
+            continue
+        if len(n) < MIN_TOKEN_LEN:
+            continue
+        result.append(n)
+    return result
+
+
+def score_match(
+    a_name_n: str,
+    a_name_tokens: list[str],
+    a_spec_n: str,
+    a_spec_tokens: list[str],
+    a_maker_n: str,
+    a_maker_tokens: list[str],
+    bc_n: str,
+) -> int:
+    """매칭 점수 계산 v2 (높을수록 강한 매칭)."""
     if not bc_n:
         return 0
 
     score = 0
 
-    # 1. MAKER 품번 매칭 (가장 강력) - 3자 이상
+    # 1. MAKER 품번 전체 매칭 (가장 강력)
     if a_maker_n and len(a_maker_n) >= 3 and a_maker_n in bc_n:
+        score += 6
+
+    # 1b. MAKER 품번 토큰 매칭
+    for t in a_maker_tokens:
+        if len(t) >= 3 and t in bc_n:
+            score += 3
+
+    # 2. 규격(spec) 전체 매칭 (강력 - 차별화 신호)
+    if a_spec_n and len(a_spec_n) >= 3 and a_spec_n in bc_n:
         score += 5
 
-    # 2. 품명 매칭
+    # 2b. 규격 토큰 매칭
+    for t in a_spec_tokens:
+        if len(t) >= 3 and t in bc_n:
+            score += 3
+        elif len(t) >= 2 and t in bc_n:  # 2자 한글 토큰도 약하게 반영
+            score += 1
+
+    # 3. 품명 전체 매칭
     if a_name_n and a_name_n not in STOPWORDS_NORM:
-        if len(a_name_n) >= 2 and a_name_n in bc_n:
-            # 길이가 길수록 강한 매칭
-            score += 3 if len(a_name_n) >= 4 else 2
+        if len(a_name_n) >= 4 and a_name_n in bc_n:
+            score += 3
+        elif len(a_name_n) >= 2 and a_name_n in bc_n:
+            score += 2
 
-    # 3. 규격 매칭 (보조)
-    if a_spec_n and len(a_spec_n) >= 3 and a_spec_n in bc_n:
+    # 3b. 품명 토큰 매칭 (한글 복합어 대응)
+    for t in a_name_tokens:
+        if t == a_name_n:
+            continue  # 이미 전체 매칭에서 계산됨
+        if len(t) >= 4 and t in bc_n:
+            score += 2
+        elif len(t) >= 2 and t in bc_n:
+            score += 1
+
+    # 4. 역방향: 짧은 BC 이름이 A 전체(name+spec+maker)에 포함
+    a_full = a_name_n + a_spec_n + a_maker_n
+    if len(bc_n) >= 5 and bc_n in a_full:
         score += 2
-
-    # 4. 역방향: 짧은 BC 이름이 A 이름에 포함
-    if a_name_n and bc_n in a_name_n and len(bc_n) >= 3:
-        score += 1
 
     return score
 
@@ -271,9 +326,14 @@ def match_a_against_bc(df_a: pd.DataFrame, bc_index: list[dict]) -> tuple[list[d
     Returns:
         matches: A 행 → best match 리스트 (dict with a_idx, bc_item, score)
         matched_bc_keys: 매칭된 B/C 항목의 (file, df_idx) 튜플 집합
+                         (여러 A가 동일 BC에 매칭되면 최고 점수 A 기준으로 마크)
     """
     matches = []
-    matched_bc_keys = set()
+    # (file, idx) -> (best_a_score, best_a_idx)
+    bc_best: dict = {}
+
+    # 매칭 임계값 (v2 점수 스케일)
+    SCORE_THRESHOLD = 3
 
     for a_idx, a_row in df_a.iterrows():
         a_name = clean_text(a_row.get("품명", ""))
@@ -284,22 +344,34 @@ def match_a_against_bc(df_a: pd.DataFrame, bc_index: list[dict]) -> tuple[list[d
         a_spec_n = norm_key(a_spec)
         a_maker_n = norm_key(a_maker)
 
+        a_name_tokens = tokenize(a_name)
+        a_spec_tokens = tokenize(a_spec)
+        a_maker_tokens = tokenize(a_maker)
+
         best = None
         best_score = 0
 
         for bc in bc_index:
-            s = score_match(a_name_n, a_spec_n, a_maker_n, bc["norm"])
+            s = score_match(
+                a_name_n, a_name_tokens,
+                a_spec_n, a_spec_tokens,
+                a_maker_n, a_maker_tokens,
+                bc["norm"],
+            )
             if s > best_score:
                 best_score = s
                 best = bc
 
-        if best and best_score >= 2:
+        if best and best_score >= SCORE_THRESHOLD:
             matches.append({
                 "a_idx": a_idx,
                 "bc": best,
                 "score": best_score,
             })
-            matched_bc_keys.add(best["df_index"])
+            key = best["df_index"]
+            prev = bc_best.get(key)
+            if prev is None or best_score > prev[0]:
+                bc_best[key] = (best_score, a_idx)
         else:
             matches.append({
                 "a_idx": a_idx,
@@ -307,6 +379,7 @@ def match_a_against_bc(df_a: pd.DataFrame, bc_index: list[dict]) -> tuple[list[d
                 "score": 0,
             })
 
+    matched_bc_keys = set(bc_best.keys())
     return matches, matched_bc_keys
 
 
@@ -314,13 +387,18 @@ def match_a_against_bc(df_a: pd.DataFrame, bc_index: list[dict]) -> tuple[list[d
 # 카테고리 분류
 # ---------------------------------------------------------------------------
 
-def is_final_model(name: str, model: str = "") -> bool:
-    """최종 완제품 여부: 이름/모델이 회사 제품 모델명과 일치하는가."""
+def is_final_model(name: str) -> bool:
+    """최종 완제품 여부: 이름 자체가 회사 제품 모델명과 일치하는가.
+
+    주의: model 컬럼은 '어느 모델에 적용되는 부품인지'를 의미하므로
+    is_final_model 판정에 사용하지 않는다. name이 모델명 그 자체일 때만 True.
+    """
     n = clean_text(name).upper().replace(" ", "")
-    m = clean_text(model).upper().replace(" ", "")
+    if not n:
+        return False
     for fm in FINAL_MODELS:
         fm_n = fm.upper().replace(" ", "")
-        if n == fm_n or m == fm_n:
+        if n == fm_n:
             return True
     return False
 
@@ -331,22 +409,27 @@ def has_assy_keyword(name: str) -> bool:
 
 
 def classify_bc_only(file: str, dept: str, raw_name: str, model: str) -> str:
-    """파일 B 또는 C 단독 항목의 카테고리 코드 결정."""
-    if is_final_model(raw_name, ""):
+    """파일 B 또는 C 단독 항목의 카테고리 코드 결정.
+
+    기준:
+        FG: 이름이 회사 모델명 그 자체 (최종 완제품)
+        BF/HF/VF: ASS'Y 키워드 포함 (완제품/서브어셈블리)
+        BA/HA/VA: 기본 (반제품/부품)
+    """
+    if is_final_model(raw_name):
         return "FG"
 
+    has_assy = has_assy_keyword(raw_name)
+
     if file == "B":
-        # 조립 부서
-        if has_assy_keyword(raw_name) or is_final_model(raw_name, model):
-            return "BF"
-        return "BA"
+        return "BF" if has_assy else "BA"
 
     # 파일 C
     d = dept.strip() if dept else ""
-    if d in ("고압",):
-        return "HF" if is_final_model(raw_name, model) else "HA"
+    if d == "고압":
+        return "HF" if has_assy else "HA"
     if d in ("진공", "튜닝"):
-        return "VF" if is_final_model(raw_name, model) else "VA"
+        return "VF" if has_assy else "VA"
     # 구버전/미사용/사용중 등 기타는 HA로 디폴트
     return "HA"
 
