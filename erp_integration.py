@@ -236,8 +236,9 @@ def score_match(
     a_maker_n: str,
     a_maker_tokens: list[str],
     bc_n: str,
+    bc_tokens: set,
 ) -> int:
-    """매칭 점수 계산 v2 (높을수록 강한 매칭)."""
+    """매칭 점수 계산 v3 (Jaccard 보너스 + 다중 토큰 매칭)."""
     if not bc_n:
         return 0
 
@@ -284,11 +285,26 @@ def score_match(
     if len(bc_n) >= 5 and bc_n in a_full:
         score += 2
 
+    # 5. 다중 토큰 매칭 보너스 (Jaccard 유사도 기반)
+    #    A의 모든 토큰이 BC와 얼마나 겹치는지
+    a_all_tokens = set(a_name_tokens) | set(a_spec_tokens) | set(a_maker_tokens)
+    if a_all_tokens and bc_tokens:
+        intersection = a_all_tokens & bc_tokens
+        inter_len = len(intersection)
+        if inter_len >= 3:
+            score += 4  # 3개 이상 토큰 공유 = 매우 강함
+        elif inter_len == 2:
+            # 2개 토큰 중 하나가 4자 이상이면 보너스
+            if any(len(t) >= 4 for t in intersection):
+                score += 2
+            else:
+                score += 1
+
     return score
 
 
 def build_bc_index(df_b: pd.DataFrame, df_c: pd.DataFrame) -> list[dict]:
-    """파일 B+C의 품목을 매칭용 인덱스로 변환."""
+    """파일 B+C의 품목을 매칭용 인덱스로 변환 (정규화 키 + 토큰 집합 포함)."""
     index = []
 
     for i, row in df_b.iterrows():
@@ -299,6 +315,7 @@ def build_bc_index(df_b: pd.DataFrame, df_c: pd.DataFrame) -> list[dict]:
             "row": row["_source_row"],
             "raw_name": raw,
             "norm": norm_key(raw),
+            "tokens": set(tokenize(raw)),
             "model": clean_text(row.get("model", "")),
             "department": "조립",
             "df_index": ("B", i),
@@ -313,6 +330,7 @@ def build_bc_index(df_b: pd.DataFrame, df_c: pd.DataFrame) -> list[dict]:
             "row": row["_source_row"],
             "raw_name": raw,
             "norm": norm_key(raw),
+            "tokens": set(tokenize(raw)),
             "model": clean_text(row.get("model", "")),
             "department": dept,
             "df_index": ("C", i),
@@ -321,19 +339,19 @@ def build_bc_index(df_b: pd.DataFrame, df_c: pd.DataFrame) -> list[dict]:
     return index
 
 
-def match_a_against_bc(df_a: pd.DataFrame, bc_index: list[dict]) -> tuple[list[dict], set]:
+def match_a_against_bc(df_a: pd.DataFrame, bc_index: list[dict]) -> tuple[list[dict], set, dict]:
     """
     파일 A의 각 행에 대해 파일 B/C에서 가장 잘 맞는 매칭을 찾는다.
     Returns:
         matches: A 행 → best match 리스트 (dict with a_idx, bc_item, score)
         matched_bc_keys: 매칭된 B/C 항목의 (file, df_idx) 튜플 집합
-                         (여러 A가 동일 BC에 매칭되면 최고 점수 A 기준으로 마크)
+        bc_match_count: BC 항목 키 → 매핑된 A 개수 (다중 매핑 경고용)
     """
     matches = []
-    # (file, idx) -> (best_a_score, best_a_idx)
-    bc_best: dict = {}
+    # (file, idx) -> 매칭된 A 개수
+    bc_match_count: dict = {}
 
-    # 매칭 임계값 (v2 점수 스케일)
+    # 매칭 임계값 (v3 점수 스케일)
     SCORE_THRESHOLD = 3
 
     for a_idx, a_row in df_a.iterrows():
@@ -357,7 +375,7 @@ def match_a_against_bc(df_a: pd.DataFrame, bc_index: list[dict]) -> tuple[list[d
                 a_name_n, a_name_tokens,
                 a_spec_n, a_spec_tokens,
                 a_maker_n, a_maker_tokens,
-                bc["norm"],
+                bc["norm"], bc["tokens"],
             )
             if s > best_score:
                 best_score = s
@@ -370,9 +388,7 @@ def match_a_against_bc(df_a: pd.DataFrame, bc_index: list[dict]) -> tuple[list[d
                 "score": best_score,
             })
             key = best["df_index"]
-            prev = bc_best.get(key)
-            if prev is None or best_score > prev[0]:
-                bc_best[key] = (best_score, a_idx)
+            bc_match_count[key] = bc_match_count.get(key, 0) + 1
         else:
             matches.append({
                 "a_idx": a_idx,
@@ -380,8 +396,8 @@ def match_a_against_bc(df_a: pd.DataFrame, bc_index: list[dict]) -> tuple[list[d
                 "score": 0,
             })
 
-    matched_bc_keys = set(bc_best.keys())
-    return matches, matched_bc_keys
+    matched_bc_keys = set(bc_match_count.keys())
+    return matches, matched_bc_keys, bc_match_count
 
 
 # ---------------------------------------------------------------------------
@@ -488,6 +504,7 @@ def build_master(
     df_c: pd.DataFrame,
     matches: list[dict],
     matched_bc_keys: set,
+    bc_match_count: dict,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     통합 마스터 DB 및 source_links 링크 테이블 생성.
@@ -522,6 +539,10 @@ def build_master(
             model_ref = bc["model"]
             department = bc["department"]
             notes = f"matched to file {bc['file']} row {bc['row']} (score={m['score']})"
+            # 다중 매핑 경고 (동일 BC에 여러 A가 매핑된 경우)
+            dup_count = bc_match_count.get(bc["df_index"], 0)
+            if dup_count > 1:
+                notes += f"; WARN: same BC matched by {dup_count} A-items (review)"
         else:
             # 파일 A 단독 → 원자재지만 B/C에 없음
             cat = "RM"
@@ -764,6 +785,51 @@ def write_report(
     unmapped = df_master[df_master["mapping_status"] == "raw_only"]
     lines.append(f"총 {len(unmapped)}건. (별도 CSV: `ERP_Unmatched_A_Items.csv`)")
     lines.append("")
+    lines.append("### 미매핑 A 항목 (상위 20건)")
+    lines.append("")
+    lines.append("| item_id | 부품종류 | 품명 | 규격 |")
+    lines.append("|---|---|---|---|")
+    for _, r in unmapped.head(20).iterrows():
+        lines.append(
+            f"| `{r['item_id']}` | {_md_cell_safe(r['part_type'])} | "
+            f"{_md_cell_safe(r['original_name_a'])} | {_md_cell_safe(r['std_spec'])} |"
+        )
+    lines.append("")
+    lines.append("대부분 X-ray 튜브 내부 부품 (전극, 필라멘트, 게터, 세라믹 바디 등) 또는 "
+                 "BOM 하위 원자재로, 파일 B/C에 독립 항목으로 등록되지 않은 것이 정상적임.")
+    lines.append("")
+
+    # 다중 매핑 경고 (수동 검토용)
+    multi_mapped = df_master[
+        df_master["notes"].astype(str).str.contains("WARN: same BC matched", na=False)
+    ]
+    if len(multi_mapped) > 0:
+        lines.append("## 다중 매핑 경고 (수동 검토 필요)")
+        lines.append("")
+        lines.append(
+            f"동일한 파일 B/C 항목에 여러 파일 A 항목이 매핑된 경우: **{len(multi_mapped)}건**"
+        )
+        lines.append("")
+        lines.append(
+            "이는 (a) 파일 A에 실제로 동일 부품이 중복 등록되었거나, "
+            "(b) 품명이 범용어("
+            "센서"
+            ", "
+            "NAME PLATE"
+            " 등)여서 매칭이 애매한 경우. 도메인 전문가의 검토 필요."
+        )
+        lines.append("")
+        # 상위 중복 BC 항목 표시
+        dup_bc_items = (
+            multi_mapped.groupby("original_name_bc").size().sort_values(ascending=False).head(10)
+        )
+        lines.append("### 다중 매핑 상위 BC 항목 (Top 10)")
+        lines.append("")
+        lines.append("| 파일 B/C 이름 | 매핑된 A 항목 수 |")
+        lines.append("|---|---|")
+        for bc_name, count in dup_bc_items.items():
+            lines.append(f"| {_md_cell_safe(bc_name)} | {count} |")
+        lines.append("")
 
     OUTPUT_REPORT.write_text("\n".join(lines), encoding="utf-8")
 
@@ -841,6 +907,21 @@ def _md_cell(v) -> str:
     return s.strip() or ""
 
 
+def _md_cell_safe(v) -> str:
+    """None/nan/실수 혼합 대응용 Markdown 셀."""
+    if v is None:
+        return ""
+    try:
+        if pd.isna(v):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    s = str(v).replace("|", "\\|").replace("\n", " ")
+    if s.lower() == "nan":
+        return ""
+    return s.strip()
+
+
 # ---------------------------------------------------------------------------
 # 메인
 # ---------------------------------------------------------------------------
@@ -860,12 +941,16 @@ def main():
 
     print("[4/5] 매칭 수행 (파일 A → 파일 B/C)...")
     bc_index = build_bc_index(df_b, df_c)
-    matches, matched_bc_keys = match_a_against_bc(df_a, bc_index)
+    matches, matched_bc_keys, bc_match_count = match_a_against_bc(df_a, bc_index)
     mapped = sum(1 for m in matches if m["bc"] is not None)
     print(f"    → 매칭 성공: {mapped} / {len(df_a)} ({mapped/len(df_a)*100:.1f}%)")
+    dup_bc = sum(1 for c in bc_match_count.values() if c > 1)
+    print(f"    → 다중 매핑된 BC 항목 수 (review 필요): {dup_bc}")
 
     print("[5/5] 마스터 DB 구축 & 저장...")
-    df_master, df_links = build_master(df_a, df_b, df_c, matches, matched_bc_keys)
+    df_master, df_links = build_master(
+        df_a, df_b, df_c, matches, matched_bc_keys, bc_match_count
+    )
     df_master.to_csv(OUTPUT_MASTER, index=False, encoding="utf-8-sig")
     df_links.to_csv(OUTPUT_LINKS, index=False, encoding="utf-8-sig")
     write_report(df_master, matches, df_a, df_b, df_c)
