@@ -52,6 +52,7 @@ OUTPUT_MASTER = BASE_DIR / "ERP_Master_DB.csv"
 OUTPUT_LINKS = BASE_DIR / "ERP_Source_Links.csv"
 OUTPUT_REPORT = BASE_DIR / "ERP_Integration_Report.md"
 OUTPUT_UNMATCHED = BASE_DIR / "ERP_Unmatched_A_Items.csv"
+OUTPUT_MAPPING_SAMPLE = BASE_DIR / "ERP_Mapping_Sample.md"
 
 # 회사 모델명 (완제품 후보 식별용)
 FINAL_MODELS = {
@@ -770,6 +771,76 @@ def write_report(
     unmapped.to_csv(OUTPUT_UNMATCHED, index=False, encoding="utf-8-sig")
 
 
+def write_mapping_sample(df_master: pd.DataFrame) -> None:
+    """사용자 요청 포맷의 매핑 샘플 30건 (매핑 20 + Ass'y 10) 출력.
+
+    컬럼:
+        표준코드 | 표준품명 | 표준규격 | 파일A의 이름 | 파일B/C의 이름 | 비고
+    """
+    lines = []
+    lines.append("# ERP 자재 매핑 샘플 (30건)")
+    lines.append("")
+    lines.append("매핑 로직 검증을 위한 대표 샘플.")
+    lines.append("")
+    lines.append(
+        "| 표준코드 | 표준품명 | 표준규격 | 파일 A 이름 | 파일 B/C 이름 | 비고 |"
+    )
+    lines.append("|---|---|---|---|---|---|")
+
+    # 1. 매핑 완료 20건 - 파일 A 매칭 중 다양성 있게 샘플링
+    mapped = df_master[df_master["mapping_status"] == "mapped"].copy()
+    sample_mapped = mapped.head(20)
+    for _, r in sample_mapped.iterrows():
+        lines.append(
+            f"| `{r['item_id']}` | {r['std_name']} | {_md_cell(r['std_spec'])} | "
+            f"{_md_cell(r['original_name_a'])} | {_md_cell(r['original_name_bc'])} | 매핑 완료 |"
+        )
+
+    # 2. B 단독 Ass'y 5건
+    b_assy = df_master[
+        (df_master["source_file"] == "B") &
+        (df_master["mapping_status"] == "assy_only")
+    ].head(5)
+    for _, r in b_assy.iterrows():
+        lines.append(
+            f"| `{r['item_id']}` | {r['std_name']} | {_md_cell(r['std_spec'])} | "
+            f"- | {_md_cell(r['original_name_bc'])} | Ass'y 단독 (B) |"
+        )
+
+    # 3. C 단독 Ass'y 5건
+    c_assy = df_master[
+        (df_master["source_file"] == "C") &
+        (df_master["mapping_status"] == "assy_only")
+    ].head(5)
+    for _, r in c_assy.iterrows():
+        lines.append(
+            f"| `{r['item_id']}` | {r['std_name']} | {_md_cell(r['std_spec'])} | "
+            f"- | {_md_cell(r['original_name_bc'])} | Ass'y 단독 (C-{r['department']}) |"
+        )
+
+    lines.append("")
+    lines.append("## 통계")
+    lines.append("")
+    total = len(df_master)
+    mapped_cnt = (df_master["mapping_status"] == "mapped").sum()
+    assy_cnt = (df_master["mapping_status"] == "assy_only").sum()
+    raw_cnt = (df_master["mapping_status"] == "raw_only").sum()
+    lines.append(f"- 전체 마스터 항목: **{total}**")
+    lines.append(f"- 매핑 완료: **{mapped_cnt}**")
+    lines.append(f"- Ass'y 단독 (B/C): **{assy_cnt}**")
+    lines.append(f"- A 단독 (미매핑): **{raw_cnt}**")
+
+    OUTPUT_MAPPING_SAMPLE.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _md_cell(v) -> str:
+    """Markdown 셀용 문자열 정제 (파이프 이스케이프, NaN 제거)."""
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return ""
+    s = str(v).replace("|", "\\|").replace("\n", " ")
+    return s.strip() or ""
+
+
 # ---------------------------------------------------------------------------
 # 메인
 # ---------------------------------------------------------------------------
@@ -798,6 +869,7 @@ def main():
     df_master.to_csv(OUTPUT_MASTER, index=False, encoding="utf-8-sig")
     df_links.to_csv(OUTPUT_LINKS, index=False, encoding="utf-8-sig")
     write_report(df_master, matches, df_a, df_b, df_c)
+    write_mapping_sample(df_master)
 
     print()
     print("=" * 60)
@@ -807,6 +879,7 @@ def main():
     print(f"  - {OUTPUT_LINKS.name}: {len(df_links)} 행")
     print(f"  - {OUTPUT_REPORT.name}")
     print(f"  - {OUTPUT_UNMATCHED.name}")
+    print(f"  - {OUTPUT_MAPPING_SAMPLE.name}")
     print()
     print("카테고리 분포:")
     print(df_master["category_code"].value_counts().to_string())
