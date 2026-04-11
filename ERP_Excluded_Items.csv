@@ -1,0 +1,12 @@
+﻿source_file,source_sheet,source_row,department,sub_class,model,original_name,reason
+C,고압,201,구버전,6000S,A6CB(8핀),V1.1.1,inactive_department
+C,고압,202,구버전,6000,A6CTR(6000 CTR),V1.5,inactive_department
+C,고압,203,구버전,COCOON,COCB(핸들공용 이전),v2.20.5,inactive_department
+C,고압,204,미사용,6000,"INNER_USB_BD
+(6000 커넥터)",V2.1,inactive_department
+C,고압,205,미사용,6000S,"CTR_to_GEN BD
+(8핀 커넥터)",V2.0.0,inactive_department
+C,고압,206,미사용,6000S,"AIM_LIGHT_DRIVER BD
+(9핀 커넥터)",V1.0.0,inactive_department
+C,고압,207,사용중,6000FB,"CTR_to_GEN BD
+(10핀 커넥터)",V2.0.1,inactive_department
