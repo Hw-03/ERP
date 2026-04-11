@@ -20,6 +20,11 @@ env/
 .DS_Store
 Thumbs.db
 
+# SQLite DB (로컬 전용, 커밋 제외)
+*.db
+*.db-shm
+*.db-wal
+
 # 임시/로컬 테스트
 *.tmp
 *.bak
