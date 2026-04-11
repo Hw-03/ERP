@@ -2,28 +2,34 @@
 ERP 자재 마스터 DB 통합 스크립트
 ================================
 
-정밀 X-ray 발생 장치 제조사의 3개 부서별 엑셀 파일을 읽어
+정밀 X-ray 발생 장치 제조사의 4개 공정(튜브/고압/진공/조립) 엑셀 파일을 읽어
 단일 표준 마스터 DB (`ERP_Master_DB.csv`)로 통합한다.
 
 입력:
     - 파일 A: F704-03 (R00) 자재 재고 현황.xlsx       (원자재 마스터, Baseline)
     - 파일 B: 2026.03_생산부 자재_조립,출하파트.xlsx   (조립/출하 부서)
-    - 파일 C: 2026.03_생산부 자재_고압,진공,튜닝파트.xlsx (고압/진공/튜닝 부서)
+    - 파일 C: 2026.03_생산부 자재_고압,진공,튜닝파트.xlsx (고압/진공/튜닝 부서, 튜브 공정 자재 포함)
 
 출력:
     - ERP_Master_DB.csv          : 통합 마스터 (items 테이블)
     - ERP_Source_Links.csv       : 소스-아이템 매핑 (링크 테이블)
     - ERP_Integration_Report.md  : 통합 결과 리포트 (카테고리 분포, 미매핑 리스트)
+    - ERP_Excluded_Items.csv     : 비활성(구버전/미사용/사용중) 항목 분리
 
 카테고리 코드:
     RM : 원자재         (파일 A & B/C 모두에 존재)
     BA : 조립 반제품    (파일 B 단독)
     BF : 조립 완제품    (파일 B 단독 & 모델명/ASS'Y 키워드)
     HA : 고압 반제품    (파일 C, 부서=고압)
-    HF : 고압 완제품    (파일 C, 부서=고압 & 모델명 일치)
+    HF : 고압 완제품    (파일 C, 부서=고압 & ASS'Y 키워드)
     VA : 진공 반제품    (파일 C, 부서=진공/튜닝)
-    VF : 진공 완제품    (파일 C, 부서=진공/튜닝 & 모델명 일치)
+    VF : 진공 완제품    (파일 C, 부서=진공/튜닝 & ASS'Y 키워드)
+    TA : 튜브 반제품    (파일 C, 분류=튜브* 또는 튜브 공정 부품 키워드)
+    TF : 튜브 완제품    (파일 C, 분류=튜브/A,SSY 또는 튜브 어셈블리)
     FG : 최종 완제품    (회사 모델명과 동일)
+
+비활성 부서(`구버전`/`미사용`/`사용중`)에 속한 파일 C 항목은 매칭에서 제외하고
+ERP_Excluded_Items.csv 에 별도 보관한다 (감사용).
 
 향후 SQL ERP 이관을 전제로 정규화된 스키마로 저장한다.
 """
@@ -53,6 +59,7 @@ OUTPUT_LINKS = BASE_DIR / "ERP_Source_Links.csv"
 OUTPUT_REPORT = BASE_DIR / "ERP_Integration_Report.md"
 OUTPUT_UNMATCHED = BASE_DIR / "ERP_Unmatched_A_Items.csv"
 OUTPUT_MAPPING_SAMPLE = BASE_DIR / "ERP_Mapping_Sample.md"
+OUTPUT_EXCLUDED = BASE_DIR / "ERP_Excluded_Items.csv"
 
 # 회사 모델명 (완제품 후보 식별용)
 FINAL_MODELS = {
@@ -64,6 +71,21 @@ FINAL_MODELS = {
 
 # Ass'y 키워드 (반제품 식별용)
 ASSY_KEYWORDS = ["ASS'Y", "ASSY", "ASS`Y", "어셈블리", "어셈", "반제품", "모듈"]
+
+# 비활성 부서 (매칭/마스터 DB에서 분리, ERP_Excluded_Items.csv 로 별도 저장)
+INACTIVE_DEPTS = {"구버전", "미사용", "사용중"}
+
+# 튜브 공정 부품 식별 키워드
+# 파일 C의 `분류` 컬럼이 '튜브'가 아니라 'BD'/'부품'/'고압보드 A,SSY' 등으로 등록되어 있지만,
+# 실제로는 튜브 공정에 들어가는 부품들. 이름 패턴으로 보조 식별.
+TUBE_PART_KEYWORDS = [
+    "튜브 고정",       # 튜브 고정 보드/지지대 (케소드, 에노드)
+    "튜브 하우징",     # 튜브 하우징 파이프
+    "하우징 파이프",   # 하우징 파이프 (HDPE, 베이클라이트)
+    "하우징용 파이프", # 70KV 튜브 하우징용 파이프
+    "고압보드 SMT",    # 튜브용 고압보드 SMT (DXDR-070, D-041, D-0813)
+    "고압베어B/D",     # 고압베어 B/D (D-0813 튜브용)
+]
 
 
 # ---------------------------------------------------------------------------
@@ -165,8 +187,14 @@ def load_file_b() -> pd.DataFrame:
     return df
 
 
-def load_file_c() -> pd.DataFrame:
-    """파일 C (고압/진공/튜닝) 로드 + 부서/분류 forward-fill."""
+def load_file_c() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """파일 C (고압/진공/튜닝) 로드 + 부서/분류 forward-fill.
+
+    Returns:
+        (df_active, df_excluded) 튜플:
+            - df_active: 매칭/마스터 대상 (부서 = 고압/진공/튜닝)
+            - df_excluded: 비활성 (부서 = 구버전/미사용/사용중) → ERP_Excluded_Items.csv
+    """
     df = pd.read_excel(FILE_C, sheet_name="고압", header=1)
 
     # 첫 컬럼은 번호 (빈 헤더)
@@ -187,11 +215,17 @@ def load_file_c() -> pd.DataFrame:
     # 품목이 있는 행만 유지
     df = df[df["item_name"].notna() & (df["item_name"].astype(str).str.strip() != "")].copy()
 
+    # 원본 엑셀 행번호 부여 (active/excluded 분리 전)
     df["_source_file"] = "C"
     df["_source_sheet"] = "고압"
     df["_source_row"] = df.index + 3
-    df = df.reset_index(drop=True)
-    return df
+
+    # 비활성 부서 분리
+    inactive_mask = df["department"].astype(str).isin(INACTIVE_DEPTS)
+    df_excluded = df[inactive_mask].reset_index(drop=True)
+    df_active = df[~inactive_mask].reset_index(drop=True)
+
+    return df_active, df_excluded
 
 
 # ---------------------------------------------------------------------------
@@ -425,11 +459,40 @@ def has_assy_keyword(name: str) -> bool:
     return any(kw in upper for kw in ASSY_KEYWORDS)
 
 
-def classify_bc_only(file: str, dept: str, raw_name: str, model: str) -> str:
+def is_tube_subclass(sub_class: str) -> bool:
+    """파일 C의 분류 컬럼 값이 튜브 패밀리인지 확인.
+
+    실제 분류 값 예: '튜브', '튜브\\nA,SSY' (forward-fill 후 줄바꿈 포함 가능)
+    """
+    if not sub_class:
+        return False
+    s = str(sub_class).replace("\n", " ").strip()
+    return "튜브" in s
+
+
+def is_tube_assy_subclass(sub_class: str) -> bool:
+    """분류 컬럼이 '튜브 A,SSY' 패밀리인지."""
+    if not sub_class:
+        return False
+    s = str(sub_class).replace("\n", " ").upper()
+    return "튜브" in str(sub_class) and ("A,SSY" in s or "ASSY" in s or "A.SSY" in s)
+
+
+def has_tube_part_keyword(raw_name: str) -> bool:
+    """이름에 튜브 공정 부품 키워드가 포함되어 있는지."""
+    if not raw_name:
+        return False
+    name = str(raw_name)
+    return any(kw in name for kw in TUBE_PART_KEYWORDS)
+
+
+def classify_bc_only(file: str, dept: str, raw_name: str, model: str, sub_class: str = "") -> str:
     """파일 B 또는 C 단독 항목의 카테고리 코드 결정.
 
     기준:
         FG: 이름이 회사 모델명 그 자체 (최종 완제품)
+        TF: 분류=튜브/A,SSY 또는 (튜브 + ASS'Y 키워드)
+        TA: 분류=튜브* 또는 이름에 튜브 부품 키워드 포함
         BF/HF/VF: ASS'Y 키워드 포함 (완제품/서브어셈블리)
         BA/HA/VA: 기본 (반제품/부품)
     """
@@ -441,13 +504,24 @@ def classify_bc_only(file: str, dept: str, raw_name: str, model: str) -> str:
     if file == "B":
         return "BF" if has_assy else "BA"
 
-    # 파일 C
+    # 파일 C - 튜브 우선 판정
+    # 1. 분류 컬럼이 '튜브 A,SSY' 또는 (튜브 + 이름에 ASS'Y) → TF
+    if is_tube_assy_subclass(sub_class):
+        return "TF"
+    # 2. 분류 컬럼이 '튜브'면 TA (또는 ASS'Y 키워드 시 TF)
+    if is_tube_subclass(sub_class):
+        return "TF" if has_assy else "TA"
+    # 3. 분류는 다른 거지만 이름이 명백히 튜브 부품이면 TA로 흡수
+    if has_tube_part_keyword(raw_name):
+        return "TF" if has_assy else "TA"
+
+    # 4. 그 외는 부서 기준
     d = dept.strip() if dept else ""
     if d == "고압":
         return "HF" if has_assy else "HA"
     if d in ("진공", "튜닝"):
         return "VF" if has_assy else "VA"
-    # 구버전/미사용/사용중 등 기타는 HA로 디폴트
+    # 도달하지 않는 fallback (INACTIVE_DEPTS는 사전 필터됨)
     return "HA"
 
 
@@ -649,7 +723,7 @@ def build_master(
         model = _str_or_empty(row.get("model"))
         dept = _str_or_empty(row.get("department"))
         sub = _str_or_empty(row.get("sub_class"))
-        cat = classify_bc_only("C", dept, raw, model)
+        cat = classify_bc_only("C", dept, raw, model, sub_class=sub)
 
         item_id = next_item_id(cat)
         rows.append({
@@ -703,6 +777,7 @@ def write_report(
     df_a: pd.DataFrame,
     df_b: pd.DataFrame,
     df_c: pd.DataFrame,
+    df_c_excluded: pd.DataFrame | None = None,
 ) -> None:
     """통합 결과 리포트(Markdown) 작성."""
     total_a = len(df_a)
@@ -712,12 +787,15 @@ def write_report(
 
     cat_dist = df_master["category_code"].value_counts().to_dict()
     status_dist = df_master["mapping_status"].value_counts().to_dict()
+    excluded_count = 0 if df_c_excluded is None else len(df_c_excluded)
 
     lines = []
     lines.append("# ERP 자재 마스터 DB 통합 리포트")
     lines.append("")
     lines.append(f"- **생성 시각**: {datetime.now().isoformat(timespec='seconds')}")
     lines.append(f"- **총 마스터 항목 수**: {len(df_master)}")
+    if excluded_count > 0:
+        lines.append(f"- **비활성 제외 항목**: {excluded_count} (→ `ERP_Excluded_Items.csv`)")
     lines.append("")
     lines.append("## 입력 파일")
     lines.append("")
@@ -725,7 +803,8 @@ def write_report(
     lines.append(f"|---|---|---|")
     lines.append(f"| A (`F704-03`) | 26.03월 | {len(df_a)} |")
     lines.append(f"| B (`조립,출하파트`) | 조립 자재 | {len(df_b)} |")
-    lines.append(f"| C (`고압,진공,튜닝파트`) | 고압 | {len(df_c)} |")
+    c_total = len(df_c) + excluded_count
+    lines.append(f"| C (`고압,진공,튜닝파트`) | 고압 | {len(df_c)} (활성) + {excluded_count} (비활성) = {c_total} |")
     lines.append("")
     lines.append("## 파일 A 매칭 결과")
     lines.append("")
@@ -744,6 +823,8 @@ def write_report(
         "HF": "고압 완제품 (High-voltage Finished)",
         "VA": "진공 반제품 (Vacuum Sub-Assembly)",
         "VF": "진공 완제품 (Vacuum Finished)",
+        "TA": "튜브 반제품 (Tube Sub-Assembly)",
+        "TF": "튜브 완제품 (Tube Finished)",
         "FG": "최종 완제품 (Final Goods)",
     }
     for code, desc in cat_desc.items():
@@ -829,6 +910,34 @@ def write_report(
         lines.append("|---|---|")
         for bc_name, count in dup_bc_items.items():
             lines.append(f"| {_md_cell_safe(bc_name)} | {count} |")
+        lines.append("")
+
+    # 비활성 부서 항목 (감사용)
+    if excluded_count > 0:
+        lines.append("## 비활성 부서 항목 (마스터 DB 제외)")
+        lines.append("")
+        lines.append(
+            f"파일 C에서 부서가 `구버전`/`미사용`/`사용중`인 **{excluded_count}건**은 "
+            f"매칭 대상에서 제외하고 `ERP_Excluded_Items.csv` 에 별도 보관 (감사용)."
+        )
+        lines.append("")
+        ex_dist = df_c_excluded["department"].value_counts().to_dict()
+        lines.append("| 부서 | 건수 |")
+        lines.append("|---|---|")
+        for dept, cnt in ex_dist.items():
+            lines.append(f"| `{dept}` | {cnt} |")
+        lines.append("")
+        lines.append("### 비활성 항목 전체")
+        lines.append("")
+        lines.append("| 부서 | 분류 | 모델 | 품목 |")
+        lines.append("|---|---|---|---|")
+        for _, r in df_c_excluded.iterrows():
+            sub = str(r.get("sub_class", "")).replace("\n", " ")
+            mdl = str(r.get("model", ""))
+            lines.append(
+                f"| {_md_cell_safe(r['department'])} | {_md_cell_safe(sub)} | "
+                f"{_md_cell_safe(mdl)} | {_md_cell_safe(r['item_name'])} |"
+            )
         lines.append("")
 
     OUTPUT_REPORT.write_text("\n".join(lines), encoding="utf-8")
@@ -926,6 +1035,33 @@ def _md_cell_safe(v) -> str:
 # 메인
 # ---------------------------------------------------------------------------
 
+def write_excluded(df_excluded: pd.DataFrame) -> None:
+    """비활성 부서(구버전/미사용/사용중) 항목을 별도 CSV로 저장.
+
+    감사용으로만 보관, 마스터 DB에는 포함되지 않음.
+    """
+    if df_excluded is None or len(df_excluded) == 0:
+        # 빈 파일이라도 헤더만 써둠 (감사 일관성)
+        empty = pd.DataFrame(columns=[
+            "source_file", "source_sheet", "source_row",
+            "department", "sub_class", "model", "original_name", "reason",
+        ])
+        empty.to_csv(OUTPUT_EXCLUDED, index=False, encoding="utf-8-sig")
+        return
+
+    out = pd.DataFrame({
+        "source_file": df_excluded["_source_file"],
+        "source_sheet": df_excluded["_source_sheet"],
+        "source_row": df_excluded["_source_row"].astype(int),
+        "department": df_excluded["department"].astype(str),
+        "sub_class": df_excluded.get("sub_class", "").astype(str).str.replace("\n", " "),
+        "model": df_excluded.get("model", "").astype(str),
+        "original_name": df_excluded["item_name"].astype(str),
+        "reason": "inactive_department",
+    })
+    out.to_csv(OUTPUT_EXCLUDED, index=False, encoding="utf-8-sig")
+
+
 def main():
     print("[1/5] 파일 A 로딩...")
     df_a = load_file_a()
@@ -936,8 +1072,11 @@ def main():
     print(f"    → {len(df_b)} 행")
 
     print("[3/5] 파일 C 로딩...")
-    df_c = load_file_c()
-    print(f"    → {len(df_c)} 행")
+    df_c, df_c_excluded = load_file_c()
+    print(f"    → {len(df_c)} 행 (활성)")
+    if len(df_c_excluded) > 0:
+        excluded_dist = df_c_excluded["department"].value_counts().to_dict()
+        print(f"    → {len(df_c_excluded)} 행 (비활성: {excluded_dist}) → ERP_Excluded_Items.csv")
 
     print("[4/5] 매칭 수행 (파일 A → 파일 B/C)...")
     bc_index = build_bc_index(df_b, df_c)
@@ -953,7 +1092,8 @@ def main():
     )
     df_master.to_csv(OUTPUT_MASTER, index=False, encoding="utf-8-sig")
     df_links.to_csv(OUTPUT_LINKS, index=False, encoding="utf-8-sig")
-    write_report(df_master, matches, df_a, df_b, df_c)
+    write_excluded(df_c_excluded)
+    write_report(df_master, matches, df_a, df_b, df_c, df_c_excluded)
     write_mapping_sample(df_master)
 
     print()
@@ -965,6 +1105,7 @@ def main():
     print(f"  - {OUTPUT_REPORT.name}")
     print(f"  - {OUTPUT_UNMATCHED.name}")
     print(f"  - {OUTPUT_MAPPING_SAMPLE.name}")
+    print(f"  - {OUTPUT_EXCLUDED.name}: {len(df_c_excluded)} 행")
     print()
     print("카테고리 분포:")
     print(df_master["category_code"].value_counts().to_string())

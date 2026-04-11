@@ -21,14 +21,19 @@
 --   HF : High-voltage Final  - 고압 완제품
 --   VA : Vacuum Sub          - 진공 반제품
 --   VF : Vacuum Final        - 진공 완제품
+--   TA : Tube Assembly Sub   - 튜브 반제품 (튜브 공정 부품)
+--   TF : Tube Final          - 튜브 완제품 (하우징 어셈블리 등)
 --   FG : Finished Goods      - 최종 완제품 (고객 출하용)
+--
+-- 공정 흐름:
+--   원자재(RM) → 튜브(TA/TF) → 고압(HA/HF) → 진공(VA/VF) → 조립(BA/BF) → 완제품(FG)
 --
 -- =============================================================================
 
 -- 카테고리 Enum ---------------------------------------------------------------
 DROP TYPE IF EXISTS category_code_enum CASCADE;
 CREATE TYPE category_code_enum AS ENUM (
-    'RM', 'BA', 'BF', 'HA', 'HF', 'VA', 'VF', 'FG'
+    'RM', 'BA', 'BF', 'HA', 'HF', 'VA', 'VF', 'TA', 'TF', 'FG'
 );
 
 -- 매핑 상태 Enum --------------------------------------------------------------
