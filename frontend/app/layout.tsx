@@ -1,0 +1,24 @@
+import type { Metadata } from "next";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "X-Ray ERP | 재고 관리 시스템",
+  description: "정밀 X-ray 장비 제조사 ERP — 11단계 공정 재고 관리",
+  icons: {
+    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>",
+  },
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="ko" className="dark">
+      <body className="bg-slate-950 text-slate-100 antialiased">
+        {children}
+      </body>
+    </html>
+  );
+}

@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #020617;   /* slate-950 */
+    --foreground: #f1f5f9;   /* slate-100 */
+  }
+
+  html {
+    font-family: "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-slate-950 text-slate-100 min-h-screen;
+  }
+
+  /* 스크롤바 스타일 */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-slate-900;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-600 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-500;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-500 text-white font-medium px-4 py-2 rounded-lg
+           transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500;
+  }
+
+  .btn-secondary {
+    @apply bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium px-4 py-2 rounded-lg
+           transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-slate-500;
+  }
+}
+
+/* 카테고리 흐름 화살표 애니메이션 */
+@keyframes flow {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 1; }
+}
+
+.flow-arrow {
+  animation: flow 2s ease-in-out infinite;
+}
