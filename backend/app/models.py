@@ -1,6 +1,6 @@
 """
 ERP System — Database Models
-SQLAlchemy ORM models for PostgreSQL
+SQLAlchemy ORM models (SQLite + PostgreSQL compatible)
 
 제조 공정 흐름:
 RM → TA → TF → HA → HF → VA → VF → BA → BF → FG
@@ -14,12 +14,38 @@ from decimal import Decimal
 
 from sqlalchemy import (
     Column, String, Text, Numeric, DateTime, ForeignKey,
-    Enum as SAEnum, UniqueConstraint, Index, func
+    Enum as SAEnum, UniqueConstraint, Index, func, CHAR,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.types import TypeDecorator
 from sqlalchemy.orm import relationship
 
 from app.database import Base
+
+
+# ---------------------------------------------------------------------------
+# GUID — PostgreSQL UUID + SQLite CHAR(36) 호환 타입
+# ---------------------------------------------------------------------------
+
+class GUID(TypeDecorator):
+    """UUID 타입 (PostgreSQL: native UUID / SQLite: CHAR(36))"""
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            from sqlalchemy.dialects.postgresql import UUID
+            return dialect.type_descriptor(UUID(as_uuid=True))
+        return dialect.type_descriptor(CHAR(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        return str(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
 
 
 # ---------------------------------------------------------------------------
@@ -50,6 +76,11 @@ class TransactionTypeEnum(str, enum.Enum):
     BACKFLUSH = "BACKFLUSH"  # BOM 역전개 자동 차감
 
 
+# SQLite 호환 enum 컬럼 (create_type=False, native_enum=False)
+_category_enum = SAEnum(CategoryEnum, name="category_enum", create_type=False, native_enum=False)
+_tx_type_enum  = SAEnum(TransactionTypeEnum, name="transaction_type_enum", create_type=False, native_enum=False)
+
+
 # ---------------------------------------------------------------------------
 # Item — 품목 마스터
 # ---------------------------------------------------------------------------
@@ -58,7 +89,7 @@ class Item(Base):
     __tablename__ = "items"
 
     item_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         primary_key=True,
         default=uuid.uuid4,
         comment="품목 고유 ID"
@@ -81,7 +112,7 @@ class Item(Base):
         comment="규격/사양"
     )
     category = Column(
-        SAEnum(CategoryEnum, name="category_enum", create_type=True),
+        _category_enum,
         nullable=False,
         default=CategoryEnum.UK,
         index=True,
@@ -143,13 +174,13 @@ class Inventory(Base):
     __tablename__ = "inventory"
 
     inventory_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         primary_key=True,
         default=uuid.uuid4,
         comment="재고 레코드 ID"
     )
     item_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         ForeignKey("items.item_id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
@@ -200,20 +231,20 @@ class BOM(Base):
     __tablename__ = "bom"
 
     bom_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         primary_key=True,
         default=uuid.uuid4,
         comment="BOM 항목 ID"
     )
     parent_item_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         ForeignKey("items.item_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="상위 품목 ID (완성품/반제품)"
     )
     child_item_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         ForeignKey("items.item_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -274,20 +305,20 @@ class TransactionLog(Base):
     __tablename__ = "transaction_logs"
 
     log_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         primary_key=True,
         default=uuid.uuid4,
         comment="트랜잭션 로그 ID"
     )
     item_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         ForeignKey("items.item_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="대상 품목 ID"
     )
     transaction_type = Column(
-        SAEnum(TransactionTypeEnum, name="transaction_type_enum", create_type=True),
+        _tx_type_enum,
         nullable=False,
         index=True,
         comment="트랜잭션 유형"
