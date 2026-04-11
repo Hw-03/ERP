@@ -113,7 +113,7 @@ def production_receipt(
         for comp_item_id, required_qty in merged.items():
             inv = db.query(Inventory).filter(
                 Inventory.item_id == comp_item_id
-            ).with_for_update().first()  # 행 잠금
+            ).first()
 
             comp_item = db.query(Item).filter(Item.item_id == comp_item_id).first()
             qty_before = inv.quantity
@@ -146,7 +146,7 @@ def production_receipt(
         # 4-b. 완성품 재고 PRODUCE 입고
         produced_inv = db.query(Inventory).filter(
             Inventory.item_id == payload.item_id
-        ).with_for_update().first()
+        ).first()
 
         if not produced_inv:
             produced_inv = Inventory(item_id=payload.item_id, quantity=Decimal("0"))

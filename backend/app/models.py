@@ -1,6 +1,6 @@
 """
 ERP System — Database Models
-SQLAlchemy ORM models for PostgreSQL
+SQLAlchemy ORM models — SQLite(로컬) / PostgreSQL(운영) 겸용
 
 제조 공정 흐름:
 RM → TA → TF → HA → HF → VA → VF → BA → BF → FG
@@ -13,13 +13,42 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
-    Column, String, Text, Numeric, DateTime, ForeignKey,
-    Enum as SAEnum, UniqueConstraint, Index, func
+    Column, String, Text, Numeric, DateTime, ForeignKey, CHAR,
+    Enum as SAEnum, UniqueConstraint, Index, func, TypeDecorator
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.database import Base
+
+
+# ---------------------------------------------------------------------------
+# Cross-DB UUID Type  (PostgreSQL: native UUID / SQLite: CHAR(36) 문자열)
+# ---------------------------------------------------------------------------
+
+class GUID(TypeDecorator):
+    """
+    SQLite와 PostgreSQL 모두에서 동작하는 UUID 컬럼 타입.
+    - PostgreSQL: 네이티브 UUID 컬럼 사용
+    - SQLite: CHAR(36) 문자열로 저장
+    """
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            from sqlalchemy.dialects.postgresql import UUID
+            return dialect.type_descriptor(UUID(as_uuid=True))
+        return dialect.type_descriptor(CHAR(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        return str(value) if not isinstance(value, uuid.UUID) else str(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
 
 
 # ---------------------------------------------------------------------------
@@ -30,7 +59,7 @@ class CategoryEnum(str, enum.Enum):
     """11단계 제조 공정 카테고리"""
     RM = "RM"   # Raw Material        원자재
     TA = "TA"   # Tube Ass'y          튜브 조립 반제품
-    TF = "TF"   # Tube Final          완성 튜브
+    TF = "TF"   # Tube Final          완성된 튜브
     HA = "HA"   # High-voltage Ass'y  고압 반제품
     HF = "HF"   # High-voltage Final  고압 완제품
     VA = "VA"   # Vacuum Ass'y        진공 반제품
@@ -43,11 +72,27 @@ class CategoryEnum(str, enum.Enum):
 
 class TransactionTypeEnum(str, enum.Enum):
     """재고 트랜잭션 유형"""
-    RECEIVE   = "RECEIVE"    # 직접 입고
-    PRODUCE   = "PRODUCE"    # 생산 입고 (완성품 재고 증가)
-    SHIP      = "SHIP"       # 출하 (재고 감소)
-    ADJUST    = "ADJUST"     # 재고 조정
-    BACKFLUSH = "BACKFLUSH"  # BOM 역전개 자동 차감
+    RECEIVE   = "RECEIVE"
+    PRODUCE   = "PRODUCE"
+    SHIP      = "SHIP"
+    ADJUST    = "ADJUST"
+    BACKFLUSH = "BACKFLUSH"
+
+
+# SQLAlchemy Enum — create_type=False + native_enum=False 로 SQLite 호환
+_category_enum = SAEnum(
+    CategoryEnum,
+    name="category_enum",
+    create_type=False,   # PostgreSQL CREATE TYPE 구문 생략
+    native_enum=False,   # VARCHAR 기반으로 저장 (SQLite 호환)
+)
+
+_tx_type_enum = SAEnum(
+    TransactionTypeEnum,
+    name="transaction_type_enum",
+    create_type=False,
+    native_enum=False,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -58,7 +103,7 @@ class Item(Base):
     __tablename__ = "items"
 
     item_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         primary_key=True,
         default=uuid.uuid4,
         comment="품목 고유 ID"
@@ -81,7 +126,7 @@ class Item(Base):
         comment="규격/사양"
     )
     category = Column(
-        SAEnum(CategoryEnum, name="category_enum", create_type=True),
+        _category_enum,
         nullable=False,
         default=CategoryEnum.UK,
         index=True,
@@ -143,13 +188,13 @@ class Inventory(Base):
     __tablename__ = "inventory"
 
     inventory_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         primary_key=True,
         default=uuid.uuid4,
         comment="재고 레코드 ID"
     )
     item_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         ForeignKey("items.item_id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
@@ -175,7 +220,6 @@ class Inventory(Base):
         server_default=func.now()
     )
 
-    # Relationships
     item = relationship("Item", back_populates="inventory")
 
     def __repr__(self):
@@ -183,80 +227,40 @@ class Inventory(Base):
 
 
 # ---------------------------------------------------------------------------
-# BOM — Bill of Materials (핵심: 다단계 공정 구조 정의)
+# BOM — Bill of Materials
 # ---------------------------------------------------------------------------
 
 class BOM(Base):
-    """
-    BOM (Bill of Materials) — 자재명세서
-
-    parent_item: 완성품 또는 반제품 (상위)
-    child_item:  소요 부품 또는 원자재 (하위)
-    quantity:    parent 1개 생산 시 child 소요 수량
-
-    예시:
-      BF(Body Final) → HA(High-voltage Ass'y) × 1, VA(Vacuum Ass'y) × 1, RM(나사) × 12
-    """
     __tablename__ = "bom"
 
-    bom_id = Column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        comment="BOM 항목 ID"
-    )
+    bom_id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     parent_item_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         ForeignKey("items.item_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="상위 품목 ID (완성품/반제품)"
     )
     child_item_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         ForeignKey("items.item_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="하위 품목 ID (소요 부품/원자재)"
     )
-    quantity = Column(
-        Numeric(15, 4),
-        nullable=False,
-        comment="parent 1개 생산 시 child 소요 수량"
-    )
-    unit = Column(
-        String(20),
-        nullable=False,
-        default="EA",
-        comment="소요 단위"
-    )
-    notes = Column(
-        Text,
-        nullable=True,
-        comment="비고"
-    )
+    quantity = Column(Numeric(15, 4), nullable=False, comment="소요 수량")
+    unit     = Column(String(20), nullable=False, default="EA")
+    notes    = Column(Text, nullable=True)
 
-    # Constraints
     __table_args__ = (
         UniqueConstraint("parent_item_id", "child_item_id", name="uq_bom_parent_child"),
         Index("ix_bom_parent", "parent_item_id"),
         Index("ix_bom_child", "child_item_id"),
     )
 
-    # Relationships
-    parent_item = relationship(
-        "Item",
-        foreign_keys=[parent_item_id],
-        back_populates="bom_as_parent"
-    )
-    child_item = relationship(
-        "Item",
-        foreign_keys=[child_item_id],
-        back_populates="bom_as_child"
-    )
+    parent_item = relationship("Item", foreign_keys=[parent_item_id], back_populates="bom_as_parent")
+    child_item  = relationship("Item", foreign_keys=[child_item_id],  back_populates="bom_as_child")
 
     def __repr__(self):
-        return f"<BOM parent={self.parent_item_id} → child={self.child_item_id} × {self.quantity}>"
+        return f"<BOM {self.parent_item_id} → {self.child_item_id} × {self.quantity}>"
 
 
 # ---------------------------------------------------------------------------
@@ -264,79 +268,35 @@ class BOM(Base):
 # ---------------------------------------------------------------------------
 
 class TransactionLog(Base):
-    """
-    모든 재고 변동 이력을 추적.
-
-    quantity_change:
-      +양수 = 재고 증가 (입고, 생산 입고)
-      -음수 = 재고 감소 (출하, Backflush 차감)
-    """
     __tablename__ = "transaction_logs"
 
-    log_id = Column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        comment="트랜잭션 로그 ID"
-    )
+    log_id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     item_id = Column(
-        UUID(as_uuid=True),
+        GUID(),
         ForeignKey("items.item_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="대상 품목 ID"
     )
     transaction_type = Column(
-        SAEnum(TransactionTypeEnum, name="transaction_type_enum", create_type=True),
+        _tx_type_enum,
         nullable=False,
         index=True,
-        comment="트랜잭션 유형"
     )
-    quantity_change = Column(
-        Numeric(15, 4),
-        nullable=False,
-        comment="수량 변동 (+입고/-출고)"
-    )
-    quantity_before = Column(
-        Numeric(15, 4),
-        nullable=True,
-        comment="처리 전 재고 수량"
-    )
-    quantity_after = Column(
-        Numeric(15, 4),
-        nullable=True,
-        comment="처리 후 재고 수량"
-    )
-    reference_no = Column(
-        String(100),
-        nullable=True,
-        index=True,
-        comment="참조 번호 (생산지시번호, 발주번호 등)"
-    )
-    produced_by = Column(
-        String(100),
-        nullable=True,
-        comment="처리자"
-    )
-    notes = Column(
-        Text,
-        nullable=True,
-        comment="비고"
-    )
+    quantity_change  = Column(Numeric(15, 4), nullable=False)
+    quantity_before  = Column(Numeric(15, 4), nullable=True)
+    quantity_after   = Column(Numeric(15, 4), nullable=True)
+    reference_no     = Column(String(100), nullable=True, index=True)
+    produced_by      = Column(String(100), nullable=True)
+    notes            = Column(Text, nullable=True)
     created_at = Column(
         DateTime,
         nullable=False,
         default=datetime.utcnow,
         server_default=func.now(),
         index=True,
-        comment="처리 일시"
     )
 
-    # Relationships
     item = relationship("Item", back_populates="transaction_logs")
 
     def __repr__(self):
-        return (
-            f"<TransactionLog {self.transaction_type} "
-            f"item={self.item_id} qty_change={self.quantity_change}>"
-        )
+        return f"<TransactionLog {self.transaction_type} qty={self.quantity_change}>"
