@@ -213,6 +213,20 @@ class ShipPackageItem(Base):
     item = relationship("Item", back_populates="package_items")
 
 
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    setting_key = Column(String(100), primary_key=True)
+    setting_value = Column(Text, nullable=False)
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        server_default=func.now(),
+    )
+
+
 class TransactionLog(Base):
     __tablename__ = "transaction_logs"
 

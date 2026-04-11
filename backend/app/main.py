@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, SessionLocal, engine
 from app.models import DepartmentEnum, Employee, EmployeeLevelEnum
-from app.routers import bom, employees, inventory, items, production, ship_packages
+from app.routers import bom, employees, inventory, items, production, settings, ship_packages
 
 Base.metadata.create_all(bind=engine)
 
@@ -54,6 +54,7 @@ app.add_middleware(
 
 app.include_router(items.router, prefix="/api/items", tags=["Items"])
 app.include_router(employees.router, prefix="/api/employees", tags=["Employees"])
+app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(ship_packages.router, prefix="/api/ship-packages", tags=["Ship Packages"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(bom.router, prefix="/api/bom", tags=["BOM"])

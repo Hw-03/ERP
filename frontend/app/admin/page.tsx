@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Users } from "lucide-react";
+import { Download, KeyRound, Lock, Plus, Trash2, Users } from "lucide-react";
 
 import AppHeader from "@/components/AppHeader";
 import {
@@ -34,6 +34,15 @@ export default function AdminPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [unlocked, setUnlocked] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinForm, setPinForm] = useState({
+    current_pin: "",
+    new_pin: "",
+    confirm_pin: "",
+  });
 
   const [employeeForm, setEmployeeForm] = useState({
     employee_code: "",
@@ -66,10 +75,11 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
+    if (!unlocked) return;
     loadAll().catch((err) => {
       setError(err instanceof Error ? err.message : "관리 데이터를 불러오지 못했습니다.");
     });
-  }, []);
+  }, [unlocked]);
 
   const selectedPackage = useMemo(
     () => packages.find((pkg) => pkg.package_id === selectedPackageId) ?? null,
@@ -82,6 +92,37 @@ export default function AdminPage() {
       !keyword ? true : [item.item_name, item.item_code].join(" ").toLowerCase().includes(keyword),
     );
   }, [items, packageSearch]);
+
+  const handleUnlock = async () => {
+    try {
+      setAuthLoading(true);
+      setAuthError(null);
+      await api.verifyAdminPin(pinInput);
+      setUnlocked(true);
+      setPinInput("");
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : "관리자 인증에 실패했습니다.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handlePinChange = async () => {
+    try {
+      setError(null);
+      if (pinForm.new_pin !== pinForm.confirm_pin) {
+        throw new Error("새 비밀번호와 확인 값이 일치하지 않습니다.");
+      }
+      const response = await api.updateAdminPin({
+        current_pin: pinForm.current_pin,
+        new_pin: pinForm.new_pin,
+      });
+      setMessage(response.message);
+      setPinForm({ current_pin: "", new_pin: "", confirm_pin: "" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "비밀번호 변경에 실패했습니다.");
+    }
+  };
 
   const handleEmployeeCreate = async () => {
     try {
@@ -173,6 +214,59 @@ export default function AdminPage() {
     }
   };
 
+  const handleExport = (url: string) => {
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  if (!unlocked) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100">
+        <AppHeader />
+        <main className="mx-auto flex min-h-[calc(100vh-96px)] max-w-screen-md items-center px-6 py-10">
+          <section className="w-full rounded-[28px] border border-slate-800 bg-slate-900/70 p-8 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl bg-blue-500/15 p-3 text-blue-300">
+                <Lock className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Admin Access
+                </p>
+                <h2 className="mt-1 text-3xl font-black tracking-tight">관리자 인증</h2>
+              </div>
+            </div>
+            <p className="mt-4 text-sm leading-6 text-slate-400">
+              기존 재고관리앱의 관리자 비밀번호 흐름을 현재 ERP에 이식했습니다. 기본 비밀번호는
+              `0000`입니다.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <input
+                type="password"
+                inputMode="numeric"
+                value={pinInput}
+                onChange={(event) => setPinInput(event.target.value)}
+                placeholder="관리자 비밀번호"
+                className="flex-1 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-500"
+              />
+              <button
+                onClick={handleUnlock}
+                disabled={authLoading}
+                className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50"
+              >
+                {authLoading ? "확인 중..." : "인증"}
+              </button>
+            </div>
+            {authError && (
+              <div className="mt-4 rounded-2xl border border-red-800/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+                {authError}
+              </div>
+            )}
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <AppHeader />
@@ -184,7 +278,7 @@ export default function AdminPage() {
           </p>
           <h2 className="mt-3 text-4xl font-black tracking-tight">관리 화면</h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-            직원 마스터와 출하 패키지를 ERP 안에서 직접 관리합니다. 기존 관리자 탭의 핵심 기능을 현재 구조로 옮겼습니다.
+            직원 마스터, 출하 패키지, 관리자 비밀번호, CSV 내보내기를 한곳에서 관리합니다.
           </p>
         </section>
 
@@ -201,51 +295,93 @@ export default function AdminPage() {
         )}
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[0.95fr,1.05fr]">
-          <section className="rounded-[24px] border border-slate-800 bg-slate-900/60 p-5 shadow-xl">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-blue-500/15 p-2 text-blue-300">
-                <Users className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-slate-100">직원 관리</h3>
-                <p className="text-sm text-slate-500">입출고 화면에서 사용하는 직원 마스터입니다.</p>
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-3 md:grid-cols-2">
-              <input value={employeeForm.employee_code} onChange={(event) => setEmployeeForm((current) => ({ ...current, employee_code: event.target.value }))} placeholder="직원 코드" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
-              <input value={employeeForm.name} onChange={(event) => setEmployeeForm((current) => ({ ...current, name: event.target.value }))} placeholder="이름" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
-              <input value={employeeForm.role} onChange={(event) => setEmployeeForm((current) => ({ ...current, role: event.target.value }))} placeholder="직책" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
-              <input value={employeeForm.phone} onChange={(event) => setEmployeeForm((current) => ({ ...current, phone: event.target.value }))} placeholder="전화번호" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
-              <select value={employeeForm.department} onChange={(event) => setEmployeeForm((current) => ({ ...current, department: event.target.value as Department }))} className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
-                {DEPARTMENTS.map((department) => (
-                  <option key={department} value={department}>{department}</option>
-                ))}
-              </select>
-              <select value={employeeForm.level} onChange={(event) => setEmployeeForm((current) => ({ ...current, level: event.target.value as EmployeeLevel }))} className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
-                {LEVELS.map((level) => (
-                  <option key={level} value={level}>{level}</option>
-                ))}
-              </select>
-            </div>
-
-            <button onClick={handleEmployeeCreate} className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500">
-              <Plus className="h-4 w-4" />
-              직원 추가
-            </button>
-
-            <div className="mt-5 space-y-3">
-              {employees.map((employee) => (
-                <div key={employee.employee_id} className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-3">
-                  <div>
-                    <p className="font-medium text-slate-100">{employee.name} · {employee.role}</p>
-                    <p className="mt-1 text-xs text-slate-500">{employee.employee_code} · {employee.department} · {employee.level}</p>
-                  </div>
-                  <button onClick={() => handleEmployeeToggle(employee)} className={`rounded-full px-3 py-1.5 text-xs ${employee.is_active ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
-                    {employee.is_active ? "활성" : "비활성"}
-                  </button>
+          <section className="space-y-6">
+            <div className="rounded-[24px] border border-slate-800 bg-slate-900/60 p-5 shadow-xl">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-blue-500/15 p-2 text-blue-300">
+                  <Users className="h-5 w-5" />
                 </div>
-              ))}
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-100">직원 관리</h3>
+                  <p className="text-sm text-slate-500">입출고 화면에서 사용하는 직원 마스터입니다.</p>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                <input value={employeeForm.employee_code} onChange={(event) => setEmployeeForm((current) => ({ ...current, employee_code: event.target.value }))} placeholder="직원 코드" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
+                <input value={employeeForm.name} onChange={(event) => setEmployeeForm((current) => ({ ...current, name: event.target.value }))} placeholder="이름" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
+                <input value={employeeForm.role} onChange={(event) => setEmployeeForm((current) => ({ ...current, role: event.target.value }))} placeholder="직책" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
+                <input value={employeeForm.phone} onChange={(event) => setEmployeeForm((current) => ({ ...current, phone: event.target.value }))} placeholder="전화번호" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
+                <select value={employeeForm.department} onChange={(event) => setEmployeeForm((current) => ({ ...current, department: event.target.value as Department }))} className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
+                  {DEPARTMENTS.map((department) => (
+                    <option key={department} value={department}>{department}</option>
+                  ))}
+                </select>
+                <select value={employeeForm.level} onChange={(event) => setEmployeeForm((current) => ({ ...current, level: event.target.value as EmployeeLevel }))} className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
+                  {LEVELS.map((level) => (
+                    <option key={level} value={level}>{level}</option>
+                  ))}
+                </select>
+              </div>
+
+              <button onClick={handleEmployeeCreate} className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500">
+                <Plus className="h-4 w-4" />
+                직원 추가
+              </button>
+
+              <div className="mt-5 space-y-3">
+                {employees.map((employee) => (
+                  <div key={employee.employee_id} className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-3">
+                    <div>
+                      <p className="font-medium text-slate-100">{employee.name} · {employee.role}</p>
+                      <p className="mt-1 text-xs text-slate-500">{employee.employee_code} · {employee.department} · {employee.level}</p>
+                    </div>
+                    <button onClick={() => handleEmployeeToggle(employee)} className={`rounded-full px-3 py-1.5 text-xs ${employee.is_active ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
+                      {employee.is_active ? "활성" : "비활성"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-slate-800 bg-slate-900/60 p-5 shadow-xl">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-amber-500/15 p-2 text-amber-300">
+                  <KeyRound className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-100">관리자 비밀번호</h3>
+                  <p className="text-sm text-slate-500">기본값은 0000이며, 여기서 변경할 수 있습니다.</p>
+                </div>
+              </div>
+              <div className="mt-5 grid gap-3">
+                <input type="password" value={pinForm.current_pin} onChange={(event) => setPinForm((current) => ({ ...current, current_pin: event.target.value }))} placeholder="현재 비밀번호" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
+                <input type="password" value={pinForm.new_pin} onChange={(event) => setPinForm((current) => ({ ...current, new_pin: event.target.value }))} placeholder="새 비밀번호" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
+                <input type="password" value={pinForm.confirm_pin} onChange={(event) => setPinForm((current) => ({ ...current, confirm_pin: event.target.value }))} placeholder="새 비밀번호 확인" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
+                <button onClick={handlePinChange} className="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-400">
+                  비밀번호 변경
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-slate-800 bg-slate-900/60 p-5 shadow-xl">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-emerald-500/15 p-2 text-emerald-300">
+                  <Download className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-100">데이터 내보내기</h3>
+                  <p className="text-sm text-slate-500">현재 DB 상태를 CSV로 내려받을 수 있습니다.</p>
+                </div>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button onClick={() => handleExport(api.getItemsExportUrl())} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500">
+                  품목 재고 CSV
+                </button>
+                <button onClick={() => handleExport(api.getTransactionsExportUrl())} className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-slate-600">
+                  거래 이력 CSV
+                </button>
+              </div>
             </div>
           </section>
 

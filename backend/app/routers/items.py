@@ -1,10 +1,13 @@
 """Items router for item master CRUD operations."""
 
 from datetime import UTC, datetime
+import csv
+from io import StringIO
 import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -15,15 +18,17 @@ from app.schemas import ItemCreate, ItemResponse, ItemUpdate, ItemWithInventory
 router = APIRouter()
 
 
+def _build_item_query(db: Session):
+    return db.query(Item).outerjoin(Inventory, Item.item_id == Inventory.item_id)
+
+
 @router.post("/", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
 def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
-    """Create a new item and initialize inventory with zero stock."""
-
     existing = db.query(Item).filter(Item.item_code == payload.item_code).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"품목 코드 '{payload.item_code}'는 이미 존재합니다.",
+            detail=f"품목 코드 '{payload.item_code}'가 이미 존재합니다.",
         )
 
     item = Item(
@@ -52,9 +57,7 @@ def list_items(
     limit: int = Query(100, ge=1, le=2000),
     db: Session = Depends(get_db),
 ):
-    """List items with optional category and search filters."""
-
-    query = db.query(Item).outerjoin(Inventory, Item.item_id == Inventory.item_id)
+    query = _build_item_query(db)
 
     if category:
         query = query.filter(Item.category == category)
@@ -89,10 +92,38 @@ def list_items(
     ]
 
 
+@router.get("/export.csv")
+def export_items_csv(db: Session = Depends(get_db)):
+    rows = _build_item_query(db).order_by(Item.item_code).all()
+
+    buffer = StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["item_code", "item_name", "category", "spec", "unit", "quantity", "location", "updated_at"])
+
+    for item in rows:
+        writer.writerow(
+            [
+                item.item_code,
+                item.item_name,
+                item.category.value,
+                item.spec or "",
+                item.unit,
+                float(item.inventory.quantity) if item.inventory else 0,
+                item.inventory.location if item.inventory else "",
+                item.updated_at.isoformat(),
+            ]
+        )
+
+    buffer.seek(0)
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="items-export.csv"'},
+    )
+
+
 @router.get("/{item_id}", response_model=ItemWithInventory)
 def get_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
-    """Return a single item with inventory fields."""
-
     item = db.query(Item).filter(Item.item_id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
@@ -113,8 +144,6 @@ def get_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
 
 @router.put("/{item_id}", response_model=ItemResponse)
 def update_item(item_id: uuid.UUID, payload: ItemUpdate, db: Session = Depends(get_db)):
-    """Update editable item fields."""
-
     item = db.query(Item).filter(Item.item_id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
@@ -136,8 +165,6 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, db: Session = Depends(g
 
 @router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
-    """Delete an item and cascade to related inventory and BOM rows."""
-
     item = db.query(Item).filter(Item.item_id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")

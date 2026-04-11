@@ -175,6 +175,10 @@ export interface ProductionReceiptResponse {
   transaction_ids: string[];
 }
 
+function toApiUrl(path: string) {
+  return `${API_BASE}${path}`;
+}
+
 async function parseError(res: Response) {
   const text = await res.text();
   try {
@@ -199,7 +203,7 @@ export async function fetcher<T>(url: string): Promise<T> {
 }
 
 export const api = {
-  getInventorySummary: () => fetcher<InventorySummary>(`${API_BASE}/api/inventory/summary`),
+  getInventorySummary: () => fetcher<InventorySummary>(toApiUrl("/api/inventory/summary")),
 
   getItems: (params?: {
     category?: Category;
@@ -212,10 +216,10 @@ export const api = {
     if (params?.search) query.set("search", params.search);
     if (params?.skip !== undefined) query.set("skip", String(params.skip));
     if (params?.limit !== undefined) query.set("limit", String(params.limit));
-    return fetcher<Item[]>(`${API_BASE}/api/items?${query}`);
+    return fetcher<Item[]>(toApiUrl(`/api/items?${query}`));
   },
 
-  getItem: (itemId: string) => fetcher<Item>(`${API_BASE}/api/items/${itemId}`),
+  getItem: (itemId: string) => fetcher<Item>(toApiUrl(`/api/items/${itemId}`)),
 
   updateItem: async (
     itemId: string,
@@ -226,7 +230,7 @@ export const api = {
       unit?: string;
     },
   ) => {
-    const res = await fetch(`${API_BASE}/api/items/${itemId}`, {
+    const res = await fetch(toApiUrl(`/api/items/${itemId}`), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -235,11 +239,31 @@ export const api = {
     return res.json() as Promise<Item>;
   },
 
+  verifyAdminPin: async (pin: string) => {
+    const res = await fetch(toApiUrl("/api/settings/verify-pin"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin }),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<{ message: string }>;
+  },
+
+  updateAdminPin: async (payload: { current_pin: string; new_pin: string }) => {
+    const res = await fetch(toApiUrl("/api/settings/admin-pin"), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<{ message: string }>;
+  },
+
   getEmployees: (params?: { department?: Department; activeOnly?: boolean }) => {
     const query = new URLSearchParams();
     if (params?.department) query.set("department", params.department);
     if (params?.activeOnly !== undefined) query.set("active_only", String(params.activeOnly));
-    return fetcher<Employee[]>(`${API_BASE}/api/employees?${query}`);
+    return fetcher<Employee[]>(toApiUrl(`/api/employees?${query}`));
   },
 
   createEmployee: async (payload: {
@@ -252,7 +276,7 @@ export const api = {
     display_order?: number;
     is_active?: boolean;
   }) => {
-    const res = await fetch(`${API_BASE}/api/employees`, {
+    const res = await fetch(toApiUrl("/api/employees"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -273,7 +297,7 @@ export const api = {
       is_active?: boolean;
     },
   ) => {
-    const res = await fetch(`${API_BASE}/api/employees/${employeeId}`, {
+    const res = await fetch(toApiUrl(`/api/employees/${employeeId}`), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -283,14 +307,14 @@ export const api = {
   },
 
   deleteEmployee: async (employeeId: string) => {
-    const res = await fetch(`${API_BASE}/api/employees/${employeeId}`, { method: "DELETE" });
+    const res = await fetch(toApiUrl(`/api/employees/${employeeId}`), { method: "DELETE" });
     if (!res.ok) throw new Error(await parseError(res));
   },
 
-  getShipPackages: () => fetcher<ShipPackage[]>(`${API_BASE}/api/ship-packages`),
+  getShipPackages: () => fetcher<ShipPackage[]>(toApiUrl("/api/ship-packages")),
 
   createShipPackage: async (payload: { package_code: string; name: string; notes?: string }) => {
-    const res = await fetch(`${API_BASE}/api/ship-packages`, {
+    const res = await fetch(toApiUrl("/api/ship-packages"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -300,7 +324,7 @@ export const api = {
   },
 
   updateShipPackage: async (packageId: string, payload: { name?: string; notes?: string }) => {
-    const res = await fetch(`${API_BASE}/api/ship-packages/${packageId}`, {
+    const res = await fetch(toApiUrl(`/api/ship-packages/${packageId}`), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -310,12 +334,12 @@ export const api = {
   },
 
   deleteShipPackage: async (packageId: string) => {
-    const res = await fetch(`${API_BASE}/api/ship-packages/${packageId}`, { method: "DELETE" });
+    const res = await fetch(toApiUrl(`/api/ship-packages/${packageId}`), { method: "DELETE" });
     if (!res.ok) throw new Error(await parseError(res));
   },
 
   addShipPackageItem: async (packageId: string, payload: { item_id: string; quantity: number }) => {
-    const res = await fetch(`${API_BASE}/api/ship-packages/${packageId}/items`, {
+    const res = await fetch(toApiUrl(`/api/ship-packages/${packageId}/items`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -325,7 +349,7 @@ export const api = {
   },
 
   deleteShipPackageItem: async (packageId: string, packageItemId: string) => {
-    const res = await fetch(`${API_BASE}/api/ship-packages/${packageId}/items/${packageItemId}`, {
+    const res = await fetch(toApiUrl(`/api/ship-packages/${packageId}/items/${packageItemId}`), {
       method: "DELETE",
     });
     if (!res.ok) throw new Error(await parseError(res));
@@ -340,7 +364,7 @@ export const api = {
     produced_by?: string;
     notes?: string;
   }) => {
-    const res = await fetch(`${API_BASE}/api/inventory/receive`, {
+    const res = await fetch(toApiUrl("/api/inventory/receive"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -357,7 +381,7 @@ export const api = {
     produced_by?: string;
     notes?: string;
   }) => {
-    const res = await fetch(`${API_BASE}/api/inventory/ship`, {
+    const res = await fetch(toApiUrl("/api/inventory/ship"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -373,7 +397,7 @@ export const api = {
     produced_by?: string;
     notes?: string;
   }) => {
-    const res = await fetch(`${API_BASE}/api/inventory/ship-package`, {
+    const res = await fetch(toApiUrl("/api/inventory/ship-package"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -395,7 +419,7 @@ export const api = {
     reference_no?: string;
     produced_by?: string;
   }) => {
-    const res = await fetch(`${API_BASE}/api/inventory/adjust`, {
+    const res = await fetch(toApiUrl("/api/inventory/adjust"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -404,9 +428,9 @@ export const api = {
     return res.json() as Promise<InventoryMutationResponse>;
   },
 
-  getBOM: (parentItemId: string) => fetcher<BOMEntry[]>(`${API_BASE}/api/bom/${parentItemId}`),
+  getBOM: (parentItemId: string) => fetcher<BOMEntry[]>(toApiUrl(`/api/bom/${parentItemId}`)),
   getBOMTree: (parentItemId: string) =>
-    fetcher<BOMTreeNode>(`${API_BASE}/api/bom/${parentItemId}/tree`),
+    fetcher<BOMTreeNode>(toApiUrl(`/api/bom/${parentItemId}/tree`)),
 
   createBOM: async (payload: {
     parent_item_id: string;
@@ -415,7 +439,7 @@ export const api = {
     unit: string;
     notes?: string;
   }) => {
-    const res = await fetch(`${API_BASE}/api/bom`, {
+    const res = await fetch(toApiUrl("/api/bom"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -425,7 +449,7 @@ export const api = {
   },
 
   deleteBOM: async (bomId: string) => {
-    const res = await fetch(`${API_BASE}/api/bom/${bomId}`, { method: "DELETE" });
+    const res = await fetch(toApiUrl(`/api/bom/${bomId}`), { method: "DELETE" });
     if (!res.ok) throw new Error(await parseError(res));
   },
 
@@ -436,7 +460,7 @@ export const api = {
     produced_by?: string;
     notes?: string;
   }) => {
-    const res = await fetch(`${API_BASE}/api/production/receipt`, {
+    const res = await fetch(toApiUrl("/api/production/receipt"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -446,9 +470,7 @@ export const api = {
   },
 
   checkProduction: (itemId: string, quantity: number) =>
-    fetcher<ProductionCheckResponse>(
-      `${API_BASE}/api/production/bom-check/${itemId}?quantity=${quantity}`,
-    ),
+    fetcher<ProductionCheckResponse>(toApiUrl(`/api/production/bom-check/${itemId}?quantity=${quantity}`)),
 
   getTransactions: (params?: {
     itemId?: string;
@@ -465,6 +487,9 @@ export const api = {
     if (params?.search) query.set("search", params.search);
     if (params?.limit !== undefined) query.set("limit", String(params.limit));
     if (params?.skip !== undefined) query.set("skip", String(params.skip));
-    return fetcher<TransactionLog[]>(`${API_BASE}/api/inventory/transactions?${query}`);
+    return fetcher<TransactionLog[]>(toApiUrl(`/api/inventory/transactions?${query}`));
   },
+
+  getItemsExportUrl: () => toApiUrl("/api/items/export.csv"),
+  getTransactionsExportUrl: () => toApiUrl("/api/inventory/transactions/export.csv"),
 };

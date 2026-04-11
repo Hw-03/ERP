@@ -1,10 +1,13 @@
 """Inventory router for summary, receipts, shipments, and transaction history."""
 
 import uuid
+import csv
 from decimal import Decimal
+from io import StringIO
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -344,3 +347,69 @@ def list_transactions(
         )
         for log, item in rows
     ]
+
+
+@router.get("/transactions/export.csv")
+def export_transactions_csv(
+    transaction_type: Optional[TransactionTypeEnum] = Query(None),
+    search: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    query = db.query(TransactionLog, Item).join(Item, TransactionLog.item_id == Item.item_id)
+
+    if transaction_type:
+        query = query.filter(TransactionLog.transaction_type == transaction_type)
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                Item.item_name.ilike(pattern),
+                Item.item_code.ilike(pattern),
+                TransactionLog.reference_no.ilike(pattern),
+                TransactionLog.notes.ilike(pattern),
+                TransactionLog.produced_by.ilike(pattern),
+            )
+        )
+
+    rows = query.order_by(TransactionLog.created_at.desc()).all()
+
+    buffer = StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        [
+            "created_at",
+            "transaction_type",
+            "item_code",
+            "item_name",
+            "category",
+            "quantity_change",
+            "quantity_before",
+            "quantity_after",
+            "reference_no",
+            "produced_by",
+            "notes",
+        ]
+    )
+    for log, item in rows:
+        writer.writerow(
+            [
+                log.created_at.isoformat(),
+                log.transaction_type.value,
+                item.item_code,
+                item.item_name,
+                item.category.value,
+                float(log.quantity_change),
+                "" if log.quantity_before is None else float(log.quantity_before),
+                "" if log.quantity_after is None else float(log.quantity_after),
+                log.reference_no or "",
+                log.produced_by or "",
+                log.notes or "",
+            ]
+        )
+
+    buffer.seek(0)
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="transactions-export.csv"'},
+    )

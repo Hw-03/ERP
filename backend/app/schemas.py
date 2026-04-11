@@ -130,6 +130,15 @@ class ShipPackageDetailResponse(ShipPackageResponse):
     items: List[ShipPackageItemDetail]
 
 
+class AdminPinVerifyRequest(BaseModel):
+    pin: str = Field(..., min_length=4, max_length=32)
+
+
+class AdminPinUpdateRequest(BaseModel):
+    current_pin: str = Field(..., min_length=4, max_length=32)
+    new_pin: str = Field(..., min_length=4, max_length=32)
+
+
 class InventoryReceive(BaseModel):
     item_id: uuid.UUID = Field(..., description="입고 대상 품목 ID")
     quantity: Decimal = Field(..., gt=0, description="입고 수량")
