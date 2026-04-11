@@ -23,6 +23,13 @@ class ItemCreate(BaseModel):
     spec: Optional[str] = Field(None, description="규격/사양")
     category: CategoryEnum = Field(CategoryEnum.UK, description="11단계 카테고리")
     unit: str = Field("EA", max_length=20, description="단위")
+    safety_stock: Optional[Decimal] = Field(None, ge=0, description="안전재고 수량")
+    barcode: Optional[str] = Field(None, max_length=100)
+    supplier: Optional[str] = Field(None, max_length=100)
+    legacy_file_type: Optional[str] = Field(None, max_length=30)
+    legacy_part: Optional[str] = Field(None, max_length=50)
+    legacy_item_type: Optional[str] = Field(None, max_length=50)
+    legacy_model: Optional[str] = Field(None, max_length=100)
 
 
 class ItemUpdate(BaseModel):
@@ -30,6 +37,13 @@ class ItemUpdate(BaseModel):
     spec: Optional[str] = None
     category: Optional[CategoryEnum] = None
     unit: Optional[str] = Field(None, max_length=20)
+    safety_stock: Optional[Decimal] = Field(None, ge=0)
+    barcode: Optional[str] = Field(None, max_length=100)
+    supplier: Optional[str] = Field(None, max_length=100)
+    legacy_file_type: Optional[str] = Field(None, max_length=30)
+    legacy_part: Optional[str] = Field(None, max_length=50)
+    legacy_item_type: Optional[str] = Field(None, max_length=50)
+    legacy_model: Optional[str] = Field(None, max_length=100)
 
 
 class ItemResponse(BaseModel):
@@ -41,6 +55,13 @@ class ItemResponse(BaseModel):
     spec: Optional[str]
     category: CategoryEnum
     unit: str
+    safety_stock: Optional[Decimal]
+    barcode: Optional[str]
+    supplier: Optional[str]
+    legacy_file_type: Optional[str]
+    legacy_part: Optional[str]
+    legacy_item_type: Optional[str]
+    legacy_model: Optional[str]
     created_at: datetime
     updated_at: datetime
 
@@ -48,6 +69,7 @@ class ItemResponse(BaseModel):
 class ItemWithInventory(ItemResponse):
     quantity: Optional[Decimal] = Decimal("0")
     location: Optional[str] = None
+    stock_status: str = "normal"  # "normal" | "low" | "out"
 
 
 # ---------------------------------------------------------------------------
@@ -61,6 +83,22 @@ class InventoryReceive(BaseModel):
     reference_no: Optional[str] = Field(None, max_length=100, description="입고 참조번호")
     produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
     notes: Optional[str] = Field(None, description="비고")
+
+
+class InventoryShip(BaseModel):
+    item_id: uuid.UUID = Field(..., description="출하 품목 ID")
+    quantity: Decimal = Field(..., gt=0, description="출하 수량 (양수)")
+    reference_no: Optional[str] = Field(None, max_length=100, description="출하 참조번호")
+    produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
+    notes: Optional[str] = Field(None, description="비고")
+
+
+class InventoryAdjust(BaseModel):
+    item_id: uuid.UUID = Field(..., description="조정 품목 ID")
+    quantity_absolute: Decimal = Field(..., ge=0, description="조정 후 절대 재고량")
+    reference_no: Optional[str] = Field(None, max_length=100, description="조정 참조번호")
+    produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
+    notes: Optional[str] = Field(None, description="조정 사유")
 
 
 class InventoryResponse(BaseModel):
@@ -85,6 +123,8 @@ class InventorySummaryResponse(BaseModel):
     total_items: int
     total_quantity: Decimal
     uk_item_count: int
+    low_stock_count: int = 0
+    out_of_stock_count: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -174,6 +214,95 @@ class TransactionLogResponse(BaseModel):
     produced_by: Optional[str]
     notes: Optional[str]
     created_at: datetime
+
+
+class TransactionLogWithItem(TransactionLogResponse):
+    """거래 이력 + 품목 정보 (목록 조회 시 사용)"""
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    category: Optional[CategoryEnum] = None
+
+
+# ---------------------------------------------------------------------------
+# Employee Schemas
+# ---------------------------------------------------------------------------
+
+class EmployeeCreate(BaseModel):
+    name: str = Field(..., max_length=50, description="이름")
+    department: str = Field(..., max_length=50, description="부서")
+    role: Optional[str] = Field(None, max_length=50, description="직책")
+    phone: Optional[str] = Field(None, max_length=20, description="연락처")
+
+
+class EmployeeUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=50)
+    department: Optional[str] = Field(None, max_length=50)
+    role: Optional[str] = Field(None, max_length=50)
+    phone: Optional[str] = Field(None, max_length=20)
+    is_active: Optional[bool] = None
+
+
+class EmployeeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    employee_id: uuid.UUID
+    name: str
+    department: str
+    role: Optional[str]
+    phone: Optional[str]
+    is_active: bool
+    display_order: Optional[int]
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# ShippingPackage Schemas
+# ---------------------------------------------------------------------------
+
+class ShippingPackageItemCreate(BaseModel):
+    item_id: uuid.UUID = Field(..., description="품목 ID")
+    quantity: Decimal = Field(..., gt=0, description="출하 수량")
+    unit: str = Field("EA", max_length=20)
+
+
+class ShippingPackageCreate(BaseModel):
+    name: str = Field(..., max_length=100, description="묶음 이름")
+    notes: Optional[str] = None
+    items: List[ShippingPackageItemCreate] = []
+
+
+class ShippingPackageUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=100)
+    notes: Optional[str] = None
+
+
+class ShippingPackageItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    package_id: uuid.UUID
+    item_id: uuid.UUID
+    quantity: Decimal
+    unit: str
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+
+
+class ShippingPackageResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    package_id: uuid.UUID
+    name: str
+    notes: Optional[str]
+    created_at: datetime
+    package_items: List[ShippingPackageItemResponse] = []
+
+
+class ShipPackageRequest(BaseModel):
+    package_id: uuid.UUID = Field(..., description="출하할 묶음 ID")
+    reference_no: Optional[str] = Field(None, max_length=100, description="출하 참조번호")
+    produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
+    notes: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

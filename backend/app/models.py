@@ -13,7 +13,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
-    Column, String, Text, Numeric, DateTime, ForeignKey,
+    Column, String, Text, Numeric, DateTime, ForeignKey, Boolean,
     Enum as SAEnum, UniqueConstraint, Index, func, CHAR,
 )
 from sqlalchemy.types import TypeDecorator
@@ -123,6 +123,43 @@ class Item(Base):
         nullable=False,
         default="EA",
         comment="단위 (EA, kg, m 등)"
+    )
+    safety_stock = Column(
+        Numeric(15, 4),
+        nullable=True,
+        comment="안전재고 수량 — 이하 시 부족 경고"
+    )
+    # ── 레거시 UI 표시용 필드 ─────────────────────────────────────
+    barcode = Column(
+        String(100),
+        nullable=True,
+        index=True,
+        comment="바코드 / QR 코드"
+    )
+    supplier = Column(
+        String(100),
+        nullable=True,
+        comment="공급업체"
+    )
+    legacy_file_type = Column(
+        String(30),
+        nullable=True,
+        comment="레거시 파일구분 (원자재/조립자재/발생부자재/완제품/데모)"
+    )
+    legacy_part = Column(
+        String(50),
+        nullable=True,
+        comment="레거시 파트 (자재창고/조립출하/고압파트/진공파트/튜닝파트/출하/데모)"
+    )
+    legacy_item_type = Column(
+        String(50),
+        nullable=True,
+        comment="레거시 품목 유형 (전극/필라멘트 등)"
+    )
+    legacy_model = Column(
+        String(100),
+        nullable=True,
+        comment="레거시 모델 (DX3000/ADX4000W/ADX6000/COCOON/SOLO/공용)"
     )
     created_at = Column(
         DateTime,
@@ -371,3 +408,153 @@ class TransactionLog(Base):
             f"<TransactionLog {self.transaction_type} "
             f"item={self.item_id} qty_change={self.quantity_change}>"
         )
+
+
+# ---------------------------------------------------------------------------
+# Employee — 직원 관리
+# ---------------------------------------------------------------------------
+
+class Employee(Base):
+    """직원 마스터 — 처리자 기록 및 부서별 입출고 추적용"""
+    __tablename__ = "employees"
+
+    employee_id = Column(
+        GUID(),
+        primary_key=True,
+        default=uuid.uuid4,
+        comment="직원 ID"
+    )
+    name = Column(
+        String(50),
+        nullable=False,
+        comment="이름"
+    )
+    department = Column(
+        String(50),
+        nullable=False,
+        comment="부서 (조립파트, 고압파트, 진공파트, 튜닝파트, 자재창고, 출하 등)"
+    )
+    role = Column(
+        String(50),
+        nullable=True,
+        comment="직책"
+    )
+    phone = Column(
+        String(20),
+        nullable=True,
+        comment="연락처"
+    )
+    is_active = Column(
+        Boolean,
+        nullable=False,
+        default=True,
+        comment="재직 여부"
+    )
+    display_order = Column(
+        Numeric(5, 0),
+        nullable=True,
+        comment="표시 순서 (레거시 드래그 정렬)"
+    )
+    created_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        server_default=func.now()
+    )
+
+    def __repr__(self):
+        return f"<Employee {self.name} [{self.department}]>"
+
+
+# ---------------------------------------------------------------------------
+# ShippingPackage — 출하묶음 (반복 출하 템플릿)
+# ---------------------------------------------------------------------------
+
+class ShippingPackage(Base):
+    """
+    출하묶음 — 자주 함께 출하되는 품목 조합을 미리 정의.
+    실제 출하 시 묶음 선택 → 일괄 재고 차감.
+    """
+    __tablename__ = "shipping_packages"
+
+    package_id = Column(
+        GUID(),
+        primary_key=True,
+        default=uuid.uuid4,
+        comment="출하묶음 ID"
+    )
+    name = Column(
+        String(100),
+        nullable=False,
+        unique=True,
+        comment="묶음 이름 (예: COCOON_미국_기본셋)"
+    )
+    notes = Column(
+        Text,
+        nullable=True,
+        comment="비고"
+    )
+    created_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        server_default=func.now()
+    )
+
+    # Relationships
+    package_items = relationship(
+        "ShippingPackageItem",
+        back_populates="package",
+        cascade="all, delete-orphan"
+    )
+
+    def __repr__(self):
+        return f"<ShippingPackage {self.name}>"
+
+
+class ShippingPackageItem(Base):
+    """출하묶음 구성 품목"""
+    __tablename__ = "shipping_package_items"
+
+    id = Column(
+        GUID(),
+        primary_key=True,
+        default=uuid.uuid4,
+        comment="구성 항목 ID"
+    )
+    package_id = Column(
+        GUID(),
+        ForeignKey("shipping_packages.package_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="출하묶음 ID (FK)"
+    )
+    item_id = Column(
+        GUID(),
+        ForeignKey("items.item_id", ondelete="CASCADE"),
+        nullable=False,
+        comment="품목 ID (FK)"
+    )
+    quantity = Column(
+        Numeric(15, 4),
+        nullable=False,
+        comment="출하 수량"
+    )
+    unit = Column(
+        String(20),
+        nullable=False,
+        default="EA",
+        comment="단위"
+    )
+
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint("package_id", "item_id", name="uq_pkg_item"),
+    )
+
+    # Relationships
+    package = relationship("ShippingPackage", back_populates="package_items")
+    item    = relationship("Item")
+
+    def __repr__(self):
+        return f"<ShippingPackageItem pkg={self.package_id} item={self.item_id} qty={self.quantity}>"

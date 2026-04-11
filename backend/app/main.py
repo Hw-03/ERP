@@ -5,15 +5,51 @@ ERP System — FastAPI Application Entry Point
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text, inspect
 
 from app.database import engine, Base
-from app.routers import items, inventory, bom, production
+from app.routers import items, inventory, bom, production, employees, shipping
 
 # ---------------------------------------------------------------------------
 # DB 초기화 — 앱 시작 시 테이블 자동 생성
 # ---------------------------------------------------------------------------
 
 Base.metadata.create_all(bind=engine)
+
+
+def _run_migrations():
+    """
+    경량 마이그레이션 — 기존 DB에 새로 추가된 컬럼을 반영.
+    Alembic 없이 SQLite에서 간단하게 처리.
+    """
+    insp = inspect(engine)
+
+    # items 테이블 신규 컬럼 추가 (v1 → v2)
+    if "items" in insp.get_table_names():
+        cols = [c["name"] for c in insp.get_columns("items")]
+        new_cols = {
+            "safety_stock":      "NUMERIC(15,4)",
+            "barcode":           "VARCHAR(100)",
+            "supplier":          "VARCHAR(100)",
+            "legacy_file_type":  "VARCHAR(30)",
+            "legacy_part":       "VARCHAR(50)",
+            "legacy_item_type":  "VARCHAR(50)",
+            "legacy_model":      "VARCHAR(100)",
+        }
+        with engine.begin() as conn:
+            for col, dtype in new_cols.items():
+                if col not in cols:
+                    conn.execute(text(f"ALTER TABLE items ADD COLUMN {col} {dtype}"))
+
+    # employees 테이블 display_order 컬럼 추가
+    if "employees" in insp.get_table_names():
+        emp_cols = [c["name"] for c in insp.get_columns("employees")]
+        if "display_order" not in emp_cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE employees ADD COLUMN display_order NUMERIC(5,0)"))
+
+
+_run_migrations()
 
 # ---------------------------------------------------------------------------
 # FastAPI 앱 설정
@@ -42,8 +78,11 @@ app = FastAPI(
     ### 핵심 기능
     - **BOM 역전개(Explosion)**: 다단계 공정의 모든 소요 부품 자동 계산
     - **Backflush 자동 차감**: 생산 입고 시 하위 부품 재고 원자적 차감
+    - **안전재고 관리**: 품목별 최소 재고 기준 설정 및 경고
+    - **출하묶음**: 자주 사용하는 출하 조합을 묶음으로 정의하여 일괄 출하
+    - **직원 관리**: 처리자 기록 및 부서별 입출고 추적
     """,
-    version="1.0.0",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -71,6 +110,8 @@ app.include_router(items.router,      prefix="/api/items",      tags=["Items"])
 app.include_router(inventory.router,  prefix="/api/inventory",  tags=["Inventory"])
 app.include_router(bom.router,        prefix="/api/bom",        tags=["BOM"])
 app.include_router(production.router, prefix="/api/production", tags=["Production"])
+app.include_router(employees.router,  prefix="/api/employees",  tags=["Employees"])
+app.include_router(shipping.router,   prefix="/api/shipping",   tags=["Shipping"])
 
 
 # ---------------------------------------------------------------------------
@@ -79,7 +120,7 @@ app.include_router(production.router, prefix="/api/production", tags=["Productio
 
 @app.get("/health", tags=["System"])
 def health_check():
-    return {"status": "ok", "service": "X-Ray ERP API"}
+    return {"status": "ok", "service": "X-Ray ERP API", "version": "2.0.0"}
 
 
 @app.get("/", tags=["System"])
@@ -87,5 +128,5 @@ def root():
     return {
         "message": "X-Ray ERP System API",
         "docs": "/docs",
-        "version": "1.0.0",
+        "version": "2.0.0",
     }
