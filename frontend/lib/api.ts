@@ -16,6 +16,18 @@ export type Category =
   | "UK";
 
 export type TransactionType = "RECEIVE" | "PRODUCE" | "SHIP" | "ADJUST" | "BACKFLUSH";
+export type Department =
+  | "조립"
+  | "고압"
+  | "진공"
+  | "튜닝"
+  | "튜브"
+  | "AS"
+  | "연구"
+  | "영업"
+  | "출하"
+  | "기타";
+export type EmployeeLevel = "admin" | "manager" | "staff";
 
 export interface CategorySummary {
   category: Category;
@@ -42,6 +54,40 @@ export interface Item {
   location: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface Employee {
+  employee_id: string;
+  employee_code: string;
+  name: string;
+  role: string;
+  phone: string | null;
+  department: Department;
+  level: EmployeeLevel;
+  display_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ShipPackageItemDetail {
+  package_item_id: string;
+  item_id: string;
+  item_code: string;
+  item_name: string;
+  item_category: Category;
+  item_unit: string;
+  quantity: number;
+}
+
+export interface ShipPackage {
+  package_id: string;
+  package_code: string;
+  name: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  items: ShipPackageItemDetail[];
 }
 
 export interface InventoryMutationResponse {
@@ -133,7 +179,12 @@ async function parseError(res: Response) {
   const text = await res.text();
   try {
     const json = JSON.parse(text);
-    return json.detail ? String(json.detail) : text;
+    if (typeof json.detail === "string") return json.detail;
+    if (json.detail?.message) {
+      const details = Array.isArray(json.detail.shortages) ? `\n${json.detail.shortages.join("\n")}` : "";
+      return `${json.detail.message}${details}`;
+    }
+    return text || res.statusText;
   } catch {
     return text || res.statusText;
   }
@@ -166,22 +217,6 @@ export const api = {
 
   getItem: (itemId: string) => fetcher<Item>(`${API_BASE}/api/items/${itemId}`),
 
-  createItem: async (payload: {
-    item_code: string;
-    item_name: string;
-    spec?: string;
-    category: Category;
-    unit: string;
-  }) => {
-    const res = await fetch(`${API_BASE}/api/items`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<Item>;
-  },
-
   updateItem: async (
     itemId: string,
     payload: {
@@ -198,6 +233,103 @@ export const api = {
     });
     if (!res.ok) throw new Error(await parseError(res));
     return res.json() as Promise<Item>;
+  },
+
+  getEmployees: (params?: { department?: Department; activeOnly?: boolean }) => {
+    const query = new URLSearchParams();
+    if (params?.department) query.set("department", params.department);
+    if (params?.activeOnly !== undefined) query.set("active_only", String(params.activeOnly));
+    return fetcher<Employee[]>(`${API_BASE}/api/employees?${query}`);
+  },
+
+  createEmployee: async (payload: {
+    employee_code: string;
+    name: string;
+    role: string;
+    phone?: string;
+    department: Department;
+    level?: EmployeeLevel;
+    display_order?: number;
+    is_active?: boolean;
+  }) => {
+    const res = await fetch(`${API_BASE}/api/employees`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<Employee>;
+  },
+
+  updateEmployee: async (
+    employeeId: string,
+    payload: {
+      name?: string;
+      role?: string;
+      phone?: string;
+      department?: Department;
+      level?: EmployeeLevel;
+      display_order?: number;
+      is_active?: boolean;
+    },
+  ) => {
+    const res = await fetch(`${API_BASE}/api/employees/${employeeId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<Employee>;
+  },
+
+  deleteEmployee: async (employeeId: string) => {
+    const res = await fetch(`${API_BASE}/api/employees/${employeeId}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await parseError(res));
+  },
+
+  getShipPackages: () => fetcher<ShipPackage[]>(`${API_BASE}/api/ship-packages`),
+
+  createShipPackage: async (payload: { package_code: string; name: string; notes?: string }) => {
+    const res = await fetch(`${API_BASE}/api/ship-packages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<ShipPackage>;
+  },
+
+  updateShipPackage: async (packageId: string, payload: { name?: string; notes?: string }) => {
+    const res = await fetch(`${API_BASE}/api/ship-packages/${packageId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<ShipPackage>;
+  },
+
+  deleteShipPackage: async (packageId: string) => {
+    const res = await fetch(`${API_BASE}/api/ship-packages/${packageId}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await parseError(res));
+  },
+
+  addShipPackageItem: async (packageId: string, payload: { item_id: string; quantity: number }) => {
+    const res = await fetch(`${API_BASE}/api/ship-packages/${packageId}/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<ShipPackage>;
+  },
+
+  deleteShipPackageItem: async (packageId: string, packageItemId: string) => {
+    const res = await fetch(`${API_BASE}/api/ship-packages/${packageId}/items/${packageItemId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<ShipPackage>;
   },
 
   receiveInventory: async (payload: {
@@ -234,6 +366,27 @@ export const api = {
     return res.json() as Promise<InventoryMutationResponse>;
   },
 
+  shipPackage: async (payload: {
+    package_id: string;
+    quantity: number;
+    reference_no?: string;
+    produced_by?: string;
+    notes?: string;
+  }) => {
+    const res = await fetch(`${API_BASE}/api/inventory/ship-package`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<{
+      message: string;
+      package_name: string;
+      quantity: number;
+      items: { item_id: string; item_code: string; item_name: string; quantity: number; stock_after: number }[];
+    }>;
+  },
+
   adjustInventory: async (payload: {
     item_id: string;
     quantity: number;
@@ -252,7 +405,6 @@ export const api = {
   },
 
   getBOM: (parentItemId: string) => fetcher<BOMEntry[]>(`${API_BASE}/api/bom/${parentItemId}`),
-
   getBOMTree: (parentItemId: string) =>
     fetcher<BOMTreeNode>(`${API_BASE}/api/bom/${parentItemId}/tree`),
 
@@ -273,9 +425,7 @@ export const api = {
   },
 
   deleteBOM: async (bomId: string) => {
-    const res = await fetch(`${API_BASE}/api/bom/${bomId}`, {
-      method: "DELETE",
-    });
+    const res = await fetch(`${API_BASE}/api/bom/${bomId}`, { method: "DELETE" });
     if (!res.ok) throw new Error(await parseError(res));
   },
 
@@ -313,8 +463,8 @@ export const api = {
     if (params?.transactionType) query.set("transaction_type", params.transactionType);
     if (params?.referenceNo) query.set("reference_no", params.referenceNo);
     if (params?.search) query.set("search", params.search);
-    if (params?.limit) query.set("limit", String(params.limit));
-    if (params?.skip) query.set("skip", String(params.skip));
+    if (params?.limit !== undefined) query.set("limit", String(params.limit));
+    if (params?.skip !== undefined) query.set("skip", String(params.skip));
     return fetcher<TransactionLog[]>(`${API_BASE}/api/inventory/transactions?${query}`);
   },
 };

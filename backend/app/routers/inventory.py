@@ -9,7 +9,14 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import CategoryEnum, Inventory, Item, TransactionLog, TransactionTypeEnum
+from app.models import (
+    CategoryEnum,
+    Inventory,
+    Item,
+    ShipPackage,
+    TransactionLog,
+    TransactionTypeEnum,
+)
 from app.schemas import (
     CategorySummary,
     InventoryAdjust,
@@ -17,6 +24,7 @@ from app.schemas import (
     InventoryResponse,
     InventoryShip,
     InventorySummaryResponse,
+    PackageShipRequest,
     TransactionLogResponse,
 )
 
@@ -53,8 +61,6 @@ CATEGORY_ORDER = [
 
 @router.get("/summary", response_model=InventorySummaryResponse)
 def get_inventory_summary(db: Session = Depends(get_db)):
-    """Return category-level inventory totals in manufacturing flow order."""
-
     rows = (
         db.query(
             Item.category,
@@ -80,10 +86,7 @@ def get_inventory_summary(db: Session = Depends(get_db)):
 
     categories = []
     for category in CATEGORY_ORDER:
-        data = summary_map.get(
-            category,
-            {"item_count": 0, "total_quantity": Decimal("0")},
-        )
+        data = summary_map.get(category, {"item_count": 0, "total_quantity": Decimal("0")})
         categories.append(
             CategorySummary(
                 category=category,
@@ -103,8 +106,6 @@ def get_inventory_summary(db: Session = Depends(get_db)):
 
 @router.post("/receive", response_model=InventoryResponse, status_code=status.HTTP_201_CREATED)
 def receive_inventory(payload: InventoryReceive, db: Session = Depends(get_db)):
-    """Apply a direct receipt and record a transaction log entry."""
-
     item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
@@ -120,17 +121,18 @@ def receive_inventory(payload: InventoryReceive, db: Session = Depends(get_db)):
     if payload.location:
         inventory.location = payload.location
 
-    log = TransactionLog(
-        item_id=payload.item_id,
-        transaction_type=TransactionTypeEnum.RECEIVE,
-        quantity_change=payload.quantity,
-        quantity_before=quantity_before,
-        quantity_after=inventory.quantity,
-        reference_no=payload.reference_no,
-        produced_by=payload.produced_by,
-        notes=payload.notes,
+    db.add(
+        TransactionLog(
+            item_id=payload.item_id,
+            transaction_type=TransactionTypeEnum.RECEIVE,
+            quantity_change=payload.quantity,
+            quantity_before=quantity_before,
+            quantity_after=inventory.quantity,
+            reference_no=payload.reference_no,
+            produced_by=payload.produced_by,
+            notes=payload.notes,
+        )
     )
-    db.add(log)
     db.commit()
     db.refresh(inventory)
     return inventory
@@ -138,8 +140,6 @@ def receive_inventory(payload: InventoryReceive, db: Session = Depends(get_db)):
 
 @router.post("/ship", response_model=InventoryResponse, status_code=status.HTTP_200_OK)
 def ship_inventory(payload: InventoryShip, db: Session = Depends(get_db)):
-    """Ship inventory and record a transaction log entry."""
-
     item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
@@ -152,33 +152,98 @@ def ship_inventory(payload: InventoryShip, db: Session = Depends(get_db)):
     if quantity_before < payload.quantity:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"재고가 부족합니다. 현재고 {quantity_before} {item.unit}, 요청 {payload.quantity} {item.unit}",
+            detail=f"재고가 부족합니다. 현재 {quantity_before} {item.unit}, 요청 {payload.quantity} {item.unit}",
         )
 
     inventory.quantity = quantity_before - payload.quantity
     if payload.location is not None:
         inventory.location = payload.location
 
-    log = TransactionLog(
-        item_id=payload.item_id,
-        transaction_type=TransactionTypeEnum.SHIP,
-        quantity_change=-payload.quantity,
-        quantity_before=quantity_before,
-        quantity_after=inventory.quantity,
-        reference_no=payload.reference_no,
-        produced_by=payload.produced_by,
-        notes=payload.notes,
+    db.add(
+        TransactionLog(
+            item_id=payload.item_id,
+            transaction_type=TransactionTypeEnum.SHIP,
+            quantity_change=-payload.quantity,
+            quantity_before=quantity_before,
+            quantity_after=inventory.quantity,
+            reference_no=payload.reference_no,
+            produced_by=payload.produced_by,
+            notes=payload.notes,
+        )
     )
-    db.add(log)
     db.commit()
     db.refresh(inventory)
     return inventory
 
 
+@router.post("/ship-package", status_code=status.HTTP_200_OK)
+def ship_package(payload: PackageShipRequest, db: Session = Depends(get_db)):
+    package = db.query(ShipPackage).filter(ShipPackage.package_id == payload.package_id).first()
+    if not package:
+        raise HTTPException(status_code=404, detail="출하 패키지를 찾을 수 없습니다.")
+
+    if not package.items:
+        raise HTTPException(status_code=400, detail="패키지에 등록된 품목이 없습니다.")
+
+    shortages: list[str] = []
+    for package_item in package.items:
+        inventory = db.query(Inventory).filter(Inventory.item_id == package_item.item_id).first()
+        current_qty = inventory.quantity if inventory else Decimal("0")
+        required_qty = package_item.quantity * payload.quantity
+        if current_qty < required_qty:
+            shortages.append(
+                f"[{package_item.item.item_code}] {package_item.item.item_name}: 필요 {required_qty}, 현재 {current_qty}"
+            )
+
+    if shortages:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "패키지 출고에 필요한 재고가 부족합니다.",
+                "shortages": shortages,
+            },
+        )
+
+    shipped_items = []
+    for package_item in package.items:
+        inventory = db.query(Inventory).filter(Inventory.item_id == package_item.item_id).with_for_update().first()
+        required_qty = package_item.quantity * payload.quantity
+        before_qty = inventory.quantity
+        inventory.quantity = before_qty - required_qty
+
+        db.add(
+            TransactionLog(
+                item_id=package_item.item_id,
+                transaction_type=TransactionTypeEnum.SHIP,
+                quantity_change=-required_qty,
+                quantity_before=before_qty,
+                quantity_after=inventory.quantity,
+                reference_no=payload.reference_no,
+                produced_by=payload.produced_by,
+                notes=payload.notes or f"[출하 패키지] {package.name} x {payload.quantity}",
+            )
+        )
+        shipped_items.append(
+            {
+                "item_id": str(package_item.item_id),
+                "item_code": package_item.item.item_code,
+                "item_name": package_item.item.item_name,
+                "quantity": float(required_qty),
+                "stock_after": float(inventory.quantity),
+            }
+        )
+
+    db.commit()
+    return {
+        "message": f"{package.name} 패키지 {payload.quantity}건 출고 완료",
+        "package_name": package.name,
+        "quantity": float(payload.quantity),
+        "items": shipped_items,
+    }
+
+
 @router.post("/adjust", response_model=InventoryResponse, status_code=status.HTTP_200_OK)
 def adjust_inventory(payload: InventoryAdjust, db: Session = Depends(get_db)):
-    """Adjust current stock to an absolute quantity and keep a transaction log."""
-
     item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
@@ -197,17 +262,18 @@ def adjust_inventory(payload: InventoryAdjust, db: Session = Depends(get_db)):
     if payload.location is not None:
         inventory.location = payload.location
 
-    log = TransactionLog(
-        item_id=payload.item_id,
-        transaction_type=TransactionTypeEnum.ADJUST,
-        quantity_change=quantity_change,
-        quantity_before=quantity_before,
-        quantity_after=quantity_after,
-        reference_no=payload.reference_no,
-        produced_by=payload.produced_by,
-        notes=payload.reason,
+    db.add(
+        TransactionLog(
+            item_id=payload.item_id,
+            transaction_type=TransactionTypeEnum.ADJUST,
+            quantity_change=quantity_change,
+            quantity_before=quantity_before,
+            quantity_after=quantity_after,
+            reference_no=payload.reference_no,
+            produced_by=payload.produced_by,
+            notes=payload.reason,
+        )
     )
-    db.add(log)
     db.commit()
     db.refresh(inventory)
     return inventory
@@ -220,8 +286,6 @@ def list_inventory(
     limit: int = Query(100, ge=1, le=2000),
     db: Session = Depends(get_db),
 ):
-    """List inventory records, optionally filtered by category."""
-
     query = db.query(Inventory).join(Item, Inventory.item_id == Item.item_id)
     if category:
         query = query.filter(Item.category == category)
@@ -239,8 +303,6 @@ def list_transactions(
     limit: int = Query(100, ge=1, le=2000),
     db: Session = Depends(get_db),
 ):
-    """Return transaction history with optional filters and item metadata."""
-
     query = db.query(TransactionLog, Item).join(Item, TransactionLog.item_id == Item.item_id)
 
     if item_id:
@@ -261,12 +323,7 @@ def list_transactions(
             )
         )
 
-    rows = (
-        query.order_by(TransactionLog.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    rows = query.order_by(TransactionLog.created_at.desc()).offset(skip).limit(limit).all()
 
     return [
         TransactionLogResponse(

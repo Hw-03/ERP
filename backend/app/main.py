@@ -3,15 +3,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import Base, engine
-from app.routers import bom, inventory, items, production
+from app.database import Base, SessionLocal, engine
+from app.models import DepartmentEnum, Employee, EmployeeLevelEnum
+from app.routers import bom, employees, inventory, items, production, ship_packages
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="X-Ray ERP System",
     description="""
-    ## 정밀 X-ray 장비 제조 ERP
+    ## 정밀 X-Ray 장비 제조 ERP
 
     ### 11단계 공정 카테고리
     | Code | 명칭 | 설명 |
@@ -31,10 +32,11 @@ app = FastAPI(
     ### 주요 기능
     - 품목 마스터 조회 및 수정
     - 재고 요약, 입고, 출고, 조정, 거래 이력
+    - 직원 마스터 및 출하 패키지 관리
     - BOM 관리와 트리 조회
     - 생산 입고와 BOM 기반 Backflush
     """,
-    version="1.1.0",
+    version="1.2.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -51,9 +53,47 @@ app.add_middleware(
 )
 
 app.include_router(items.router, prefix="/api/items", tags=["Items"])
+app.include_router(employees.router, prefix="/api/employees", tags=["Employees"])
+app.include_router(ship_packages.router, prefix="/api/ship-packages", tags=["Ship Packages"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(bom.router, prefix="/api/bom", tags=["BOM"])
 app.include_router(production.router, prefix="/api/production", tags=["Production"])
+
+
+def ensure_reference_data() -> None:
+    db = SessionLocal()
+    try:
+        if db.query(Employee).count() == 0:
+            seed_rows = [
+                ("E001", "김준우", "조립/출하 리더", DepartmentEnum.ASSEMBLY, EmployeeLevelEnum.MANAGER),
+                ("E002", "박서연", "고압 파트", DepartmentEnum.HIGH_VOLTAGE, EmployeeLevelEnum.STAFF),
+                ("E003", "이도현", "진공 파트", DepartmentEnum.VACUUM, EmployeeLevelEnum.STAFF),
+                ("E004", "최민지", "튜닝 파트", DepartmentEnum.TUNING, EmployeeLevelEnum.STAFF),
+                ("E005", "정하늘", "튜브 파트", DepartmentEnum.TUBE, EmployeeLevelEnum.STAFF),
+                ("E006", "한유진", "출하 담당", DepartmentEnum.SHIPPING, EmployeeLevelEnum.STAFF),
+                ("E007", "오지훈", "연구 지원", DepartmentEnum.RESEARCH, EmployeeLevelEnum.STAFF),
+                ("E008", "윤가은", "AS 지원", DepartmentEnum.AS, EmployeeLevelEnum.STAFF),
+                ("E009", "문현우", "관리자", DepartmentEnum.ETC, EmployeeLevelEnum.ADMIN),
+            ]
+
+            for index, (code, name, role, department, level) in enumerate(seed_rows, start=1):
+                db.add(
+                    Employee(
+                        employee_code=code,
+                        name=name,
+                        role=role,
+                        department=department,
+                        level=level,
+                        display_order=index,
+                        is_active="true",
+                    )
+                )
+            db.commit()
+    finally:
+        db.close()
+
+
+ensure_reference_data()
 
 
 @app.get("/health", tags=["System"])
@@ -66,5 +106,5 @@ def root():
     return {
         "message": "X-Ray ERP System API",
         "docs": "/docs",
-        "version": "1.1.0",
+        "version": "1.2.0",
     }

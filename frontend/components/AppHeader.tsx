@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Factory, PackageSearch, ScrollText, Spline, Zap } from "lucide-react";
+import { Factory, PackageSearch, ScrollText, Settings2, Spline, Truck, Zap } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/", label: "대시보드", icon: Zap },
   { href: "/inventory", label: "품목 리스트", icon: PackageSearch },
+  { href: "/operations", label: "입출고", icon: Truck },
   { href: "/history", label: "거래 이력", icon: ScrollText },
   { href: "/bom", label: "BOM / 생산", icon: Spline },
+  { href: "/admin", label: "관리", icon: Settings2 },
 ];
 
 export default function AppHeader() {

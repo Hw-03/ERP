@@ -33,3 +33,4 @@ Thumbs.db
 *.out
 *.err
 _legacy_import/
+_legacy_zip/

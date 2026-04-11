@@ -7,14 +7,14 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models import CategoryEnum, TransactionTypeEnum
+from app.models import CategoryEnum, DepartmentEnum, EmployeeLevelEnum, TransactionTypeEnum
 
 
 class ItemCreate(BaseModel):
     item_code: str = Field(..., max_length=50, description="품목 코드")
     item_name: str = Field(..., max_length=200, description="품목명")
     spec: Optional[str] = Field(None, description="사양")
-    category: CategoryEnum = Field(CategoryEnum.UK, description="11단계 카테고리")
+    category: CategoryEnum = Field(CategoryEnum.UK, description="11단계 공정 카테고리")
     unit: str = Field("EA", max_length=20, description="단위")
 
 
@@ -43,6 +43,93 @@ class ItemWithInventory(ItemResponse):
     location: Optional[str] = None
 
 
+class EmployeeCreate(BaseModel):
+    employee_code: str = Field(..., max_length=30)
+    name: str = Field(..., max_length=100)
+    role: str = Field(..., max_length=100)
+    phone: Optional[str] = Field(None, max_length=30)
+    department: DepartmentEnum
+    level: EmployeeLevelEnum = EmployeeLevelEnum.STAFF
+    display_order: int = 0
+    is_active: bool = True
+
+
+class EmployeeUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=100)
+    role: Optional[str] = Field(None, max_length=100)
+    phone: Optional[str] = Field(None, max_length=30)
+    department: Optional[DepartmentEnum] = None
+    level: Optional[EmployeeLevelEnum] = None
+    display_order: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+class EmployeeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    employee_id: uuid.UUID
+    employee_code: str
+    name: str
+    role: str
+    phone: Optional[str]
+    department: DepartmentEnum
+    level: EmployeeLevelEnum
+    display_order: int
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class ShipPackageItemCreate(BaseModel):
+    item_id: uuid.UUID
+    quantity: Decimal = Field(..., gt=0)
+
+
+class ShipPackageCreate(BaseModel):
+    package_code: str = Field(..., max_length=40)
+    name: str = Field(..., max_length=200)
+    notes: Optional[str] = None
+
+
+class ShipPackageUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=200)
+    notes: Optional[str] = None
+
+
+class ShipPackageItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    package_item_id: uuid.UUID
+    package_id: uuid.UUID
+    item_id: uuid.UUID
+    quantity: Decimal
+
+
+class ShipPackageResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    package_id: uuid.UUID
+    package_code: str
+    name: str
+    notes: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+
+class ShipPackageItemDetail(BaseModel):
+    package_item_id: uuid.UUID
+    item_id: uuid.UUID
+    item_code: str
+    item_name: str
+    item_category: CategoryEnum
+    item_unit: str
+    quantity: Decimal
+
+
+class ShipPackageDetailResponse(ShipPackageResponse):
+    items: List[ShipPackageItemDetail]
+
+
 class InventoryReceive(BaseModel):
     item_id: uuid.UUID = Field(..., description="입고 대상 품목 ID")
     quantity: Decimal = Field(..., gt=0, description="입고 수량")
@@ -68,6 +155,14 @@ class InventoryAdjust(BaseModel):
     location: Optional[str] = Field(None, max_length=100, description="보관 위치")
     reference_no: Optional[str] = Field(None, max_length=100, description="참조 번호")
     produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
+
+
+class PackageShipRequest(BaseModel):
+    package_id: uuid.UUID
+    quantity: Decimal = Field(..., gt=0)
+    reference_no: Optional[str] = Field(None, max_length=100)
+    produced_by: Optional[str] = Field(None, max_length=100)
+    notes: Optional[str] = None
 
 
 class InventoryResponse(BaseModel):

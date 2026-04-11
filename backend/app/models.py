@@ -1,20 +1,21 @@
-"""
-ERP System — Database Models
-SQLAlchemy ORM models for PostgreSQL
+"""ERP data models for the X-Ray manufacturing workflow."""
 
-제조 공정 흐름:
-RM → TA → TF → HA → HF → VA → VF → BA → BF → FG
-UK: 미분류 안전망
-"""
-
-import uuid
 import enum
+import uuid
 from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
-    Column, String, Text, Numeric, DateTime, ForeignKey,
-    Enum as SAEnum, UniqueConstraint, Index, func
+    Column,
+    DateTime,
+    Enum as SAEnum,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -22,321 +23,218 @@ from sqlalchemy.orm import relationship
 from app.database import Base
 
 
-# ---------------------------------------------------------------------------
-# Enums
-# ---------------------------------------------------------------------------
-
 class CategoryEnum(str, enum.Enum):
-    """11단계 제조 공정 카테고리"""
-    RM = "RM"   # Raw Material        원자재
-    TA = "TA"   # Tube Ass'y          튜브 조립 반제품
-    TF = "TF"   # Tube Final          완성 튜브
-    HA = "HA"   # High-voltage Ass'y  고압 반제품
-    HF = "HF"   # High-voltage Final  고압 완제품
-    VA = "VA"   # Vacuum Ass'y        진공 반제품
-    VF = "VF"   # Vacuum Final        진공 완제품
-    BA = "BA"   # Body Ass'y          조립 반제품
-    BF = "BF"   # Body Final          조립 완제품
-    FG = "FG"   # Finished Good       최종 출하 완제품
-    UK = "UK"   # Unknown             미분류/확인 필요
+    RM = "RM"
+    TA = "TA"
+    TF = "TF"
+    HA = "HA"
+    HF = "HF"
+    VA = "VA"
+    VF = "VF"
+    BA = "BA"
+    BF = "BF"
+    FG = "FG"
+    UK = "UK"
 
 
 class TransactionTypeEnum(str, enum.Enum):
-    """재고 트랜잭션 유형"""
-    RECEIVE   = "RECEIVE"    # 직접 입고
-    PRODUCE   = "PRODUCE"    # 생산 입고 (완성품 재고 증가)
-    SHIP      = "SHIP"       # 출하 (재고 감소)
-    ADJUST    = "ADJUST"     # 재고 조정
-    BACKFLUSH = "BACKFLUSH"  # BOM 역전개 자동 차감
+    RECEIVE = "RECEIVE"
+    PRODUCE = "PRODUCE"
+    SHIP = "SHIP"
+    ADJUST = "ADJUST"
+    BACKFLUSH = "BACKFLUSH"
 
 
-# ---------------------------------------------------------------------------
-# Item — 품목 마스터
-# ---------------------------------------------------------------------------
+class DepartmentEnum(str, enum.Enum):
+    ASSEMBLY = "조립"
+    HIGH_VOLTAGE = "고압"
+    VACUUM = "진공"
+    TUNING = "튜닝"
+    TUBE = "튜브"
+    AS = "AS"
+    RESEARCH = "연구"
+    SALES = "영업"
+    SHIPPING = "출하"
+    ETC = "기타"
+
+
+class EmployeeLevelEnum(str, enum.Enum):
+    ADMIN = "admin"
+    MANAGER = "manager"
+    STAFF = "staff"
+
 
 class Item(Base):
     __tablename__ = "items"
 
-    item_id = Column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        comment="품목 고유 ID"
-    )
-    item_code = Column(
-        String(50),
-        unique=True,
-        nullable=False,
-        index=True,
-        comment="품목 코드 (사내 관리번호)"
-    )
-    item_name = Column(
-        String(200),
-        nullable=False,
-        comment="품명"
-    )
-    spec = Column(
-        Text,
-        nullable=True,
-        comment="규격/사양"
-    )
+    item_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    item_code = Column(String(50), unique=True, nullable=False, index=True)
+    item_name = Column(String(200), nullable=False)
+    spec = Column(Text, nullable=True)
     category = Column(
         SAEnum(CategoryEnum, name="category_enum", create_type=True),
         nullable=False,
         default=CategoryEnum.UK,
         index=True,
-        comment="11단계 공정 카테고리"
     )
-    unit = Column(
-        String(20),
-        nullable=False,
-        default="EA",
-        comment="단위 (EA, kg, m 등)"
-    )
-    created_at = Column(
-        DateTime,
-        nullable=False,
-        default=datetime.utcnow,
-        server_default=func.now()
-    )
+    unit = Column(String(20), nullable=False, default="EA")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
     updated_at = Column(
         DateTime,
         nullable=False,
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
-        server_default=func.now()
+        server_default=func.now(),
     )
 
-    # Relationships
-    inventory = relationship(
-        "Inventory",
-        back_populates="item",
-        uselist=False,
-        cascade="all, delete-orphan"
-    )
+    inventory = relationship("Inventory", back_populates="item", uselist=False, cascade="all, delete-orphan")
     bom_as_parent = relationship(
         "BOM",
         foreign_keys="BOM.parent_item_id",
         back_populates="parent_item",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
-    bom_as_child = relationship(
-        "BOM",
-        foreign_keys="BOM.child_item_id",
-        back_populates="child_item"
-    )
+    bom_as_child = relationship("BOM", foreign_keys="BOM.child_item_id", back_populates="child_item")
     transaction_logs = relationship(
         "TransactionLog",
         back_populates="item",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
+    package_items = relationship("ShipPackageItem", back_populates="item")
 
-    def __repr__(self):
-        return f"<Item {self.item_code} [{self.category}] {self.item_name}>"
-
-
-# ---------------------------------------------------------------------------
-# Inventory — 재고 현황
-# ---------------------------------------------------------------------------
 
 class Inventory(Base):
     __tablename__ = "inventory"
 
-    inventory_id = Column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        comment="재고 레코드 ID"
-    )
+    inventory_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     item_id = Column(
         UUID(as_uuid=True),
         ForeignKey("items.item_id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
         index=True,
-        comment="품목 ID (FK)"
     )
-    quantity = Column(
-        Numeric(15, 4),
-        nullable=False,
-        default=Decimal("0"),
-        comment="현재 재고 수량"
-    )
-    location = Column(
-        String(100),
-        nullable=True,
-        comment="보관 위치 (창고/랙)"
-    )
+    quantity = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
+    location = Column(String(100), nullable=True)
     updated_at = Column(
         DateTime,
         nullable=False,
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
-        server_default=func.now()
+        server_default=func.now(),
     )
 
-    # Relationships
     item = relationship("Item", back_populates="inventory")
 
-    def __repr__(self):
-        return f"<Inventory item_id={self.item_id} qty={self.quantity}>"
-
-
-# ---------------------------------------------------------------------------
-# BOM — Bill of Materials (핵심: 다단계 공정 구조 정의)
-# ---------------------------------------------------------------------------
 
 class BOM(Base):
-    """
-    BOM (Bill of Materials) — 자재명세서
-
-    parent_item: 완성품 또는 반제품 (상위)
-    child_item:  소요 부품 또는 원자재 (하위)
-    quantity:    parent 1개 생산 시 child 소요 수량
-
-    예시:
-      BF(Body Final) → HA(High-voltage Ass'y) × 1, VA(Vacuum Ass'y) × 1, RM(나사) × 12
-    """
     __tablename__ = "bom"
 
-    bom_id = Column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        comment="BOM 항목 ID"
-    )
-    parent_item_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("items.item_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-        comment="상위 품목 ID (완성품/반제품)"
-    )
-    child_item_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("items.item_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-        comment="하위 품목 ID (소요 부품/원자재)"
-    )
-    quantity = Column(
-        Numeric(15, 4),
-        nullable=False,
-        comment="parent 1개 생산 시 child 소요 수량"
-    )
-    unit = Column(
-        String(20),
-        nullable=False,
-        default="EA",
-        comment="소요 단위"
-    )
-    notes = Column(
-        Text,
-        nullable=True,
-        comment="비고"
-    )
+    bom_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    parent_item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
+    child_item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
+    quantity = Column(Numeric(15, 4), nullable=False)
+    unit = Column(String(20), nullable=False, default="EA")
+    notes = Column(Text, nullable=True)
 
-    # Constraints
     __table_args__ = (
         UniqueConstraint("parent_item_id", "child_item_id", name="uq_bom_parent_child"),
         Index("ix_bom_parent", "parent_item_id"),
         Index("ix_bom_child", "child_item_id"),
     )
 
-    # Relationships
-    parent_item = relationship(
-        "Item",
-        foreign_keys=[parent_item_id],
-        back_populates="bom_as_parent"
+    parent_item = relationship("Item", foreign_keys=[parent_item_id], back_populates="bom_as_parent")
+    child_item = relationship("Item", foreign_keys=[child_item_id], back_populates="bom_as_child")
+
+
+class Employee(Base):
+    __tablename__ = "employees"
+
+    employee_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    employee_code = Column(String(30), unique=True, nullable=False, index=True)
+    name = Column(String(100), nullable=False, index=True)
+    role = Column(String(100), nullable=False)
+    phone = Column(String(30), nullable=True)
+    department = Column(
+        SAEnum(DepartmentEnum, name="department_enum", create_type=True),
+        nullable=False,
+        default=DepartmentEnum.ETC,
+        index=True,
     )
-    child_item = relationship(
-        "Item",
-        foreign_keys=[child_item_id],
-        back_populates="bom_as_child"
+    level = Column(
+        SAEnum(EmployeeLevelEnum, name="employee_level_enum", create_type=True),
+        nullable=False,
+        default=EmployeeLevelEnum.STAFF,
+    )
+    display_order = Column(Numeric(10, 0), nullable=False, default=0)
+    is_active = Column(String(5), nullable=False, default="true")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        server_default=func.now(),
     )
 
-    def __repr__(self):
-        return f"<BOM parent={self.parent_item_id} → child={self.child_item_id} × {self.quantity}>"
+
+class ShipPackage(Base):
+    __tablename__ = "ship_packages"
+
+    package_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    package_code = Column(String(40), unique=True, nullable=False, index=True)
+    name = Column(String(200), nullable=False)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        server_default=func.now(),
+    )
+
+    items = relationship("ShipPackageItem", back_populates="package", cascade="all, delete-orphan")
 
 
-# ---------------------------------------------------------------------------
-# TransactionLog — 입출고 및 생산 이력
-# ---------------------------------------------------------------------------
+class ShipPackageItem(Base):
+    __tablename__ = "ship_package_items"
+
+    package_item_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    package_id = Column(UUID(as_uuid=True), ForeignKey("ship_packages.package_id", ondelete="CASCADE"), nullable=False, index=True)
+    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
+    quantity = Column(Numeric(15, 4), nullable=False, default=Decimal("1"))
+
+    __table_args__ = (
+        UniqueConstraint("package_id", "item_id", name="uq_ship_package_item"),
+    )
+
+    package = relationship("ShipPackage", back_populates="items")
+    item = relationship("Item", back_populates="package_items")
+
 
 class TransactionLog(Base):
-    """
-    모든 재고 변동 이력을 추적.
-
-    quantity_change:
-      +양수 = 재고 증가 (입고, 생산 입고)
-      -음수 = 재고 감소 (출하, Backflush 차감)
-    """
     __tablename__ = "transaction_logs"
 
-    log_id = Column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        comment="트랜잭션 로그 ID"
-    )
-    item_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("items.item_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-        comment="대상 품목 ID"
-    )
+    log_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
     transaction_type = Column(
         SAEnum(TransactionTypeEnum, name="transaction_type_enum", create_type=True),
         nullable=False,
         index=True,
-        comment="트랜잭션 유형"
     )
-    quantity_change = Column(
-        Numeric(15, 4),
-        nullable=False,
-        comment="수량 변동 (+입고/-출고)"
-    )
-    quantity_before = Column(
-        Numeric(15, 4),
-        nullable=True,
-        comment="처리 전 재고 수량"
-    )
-    quantity_after = Column(
-        Numeric(15, 4),
-        nullable=True,
-        comment="처리 후 재고 수량"
-    )
-    reference_no = Column(
-        String(100),
-        nullable=True,
-        index=True,
-        comment="참조 번호 (생산지시번호, 발주번호 등)"
-    )
-    produced_by = Column(
-        String(100),
-        nullable=True,
-        comment="처리자"
-    )
-    notes = Column(
-        Text,
-        nullable=True,
-        comment="비고"
-    )
+    quantity_change = Column(Numeric(15, 4), nullable=False)
+    quantity_before = Column(Numeric(15, 4), nullable=True)
+    quantity_after = Column(Numeric(15, 4), nullable=True)
+    reference_no = Column(String(100), nullable=True, index=True)
+    produced_by = Column(String(100), nullable=True)
+    notes = Column(Text, nullable=True)
     created_at = Column(
         DateTime,
         nullable=False,
         default=datetime.utcnow,
         server_default=func.now(),
         index=True,
-        comment="처리 일시"
     )
 
-    # Relationships
     item = relationship("Item", back_populates="transaction_logs")
-
-    def __repr__(self):
-        return (
-            f"<TransactionLog {self.transaction_type} "
-            f"item={self.item_id} qty_change={self.quantity_change}>"
-        )
