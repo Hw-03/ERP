@@ -25,16 +25,16 @@ app = FastAPI(
     | VF | Vacuum Final | 진공 완제품 |
     | BA | Body Ass'y | 조립 반제품 |
     | BF | Body Final | 조립 완제품 |
-    | FG | Finished Good | 최종 출하품 |
-    | UK | Unknown | 미분류 / 확인 필요 |
+    | FG | Finished Good | 완제품 |
+    | UK | Unknown | 미분류 또는 확인 필요 |
 
-    ### 제공 기능
+    ### 주요 기능
     - 품목 마스터 조회 및 수정
-    - 재고 요약, 입고, 조정, 거래 이력
+    - 재고 요약, 입고, 출고, 조정, 거래 이력
     - BOM 관리와 트리 조회
-    - 생산입고 시 BOM 기반 Backflush
+    - 생산 입고와 BOM 기반 Backflush
     """,
-    version="1.0.0",
+    version="1.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -66,5 +66,5 @@ def root():
     return {
         "message": "X-Ray ERP System API",
         "docs": "/docs",
-        "version": "1.0.0",
+        "version": "1.1.0",
     }

@@ -15,6 +15,8 @@ export type Category =
   | "FG"
   | "UK";
 
+export type TransactionType = "RECEIVE" | "PRODUCE" | "SHIP" | "ADJUST" | "BACKFLUSH";
+
 export interface CategorySummary {
   category: Category;
   category_label: string;
@@ -42,6 +44,14 @@ export interface Item {
   updated_at: string;
 }
 
+export interface InventoryMutationResponse {
+  inventory_id: string;
+  item_id: string;
+  quantity: string;
+  location: string | null;
+  updated_at: string;
+}
+
 export interface BOMEntry {
   bom_id: string;
   parent_item_id: string;
@@ -51,10 +61,25 @@ export interface BOMEntry {
   notes: string | null;
 }
 
+export interface BOMTreeNode {
+  item_id: string;
+  item_code: string;
+  item_name: string;
+  category: Category;
+  unit: string;
+  required_quantity: number;
+  current_stock: number;
+  children: BOMTreeNode[];
+}
+
 export interface TransactionLog {
   log_id: string;
   item_id: string;
-  transaction_type: "RECEIVE" | "PRODUCE" | "SHIP" | "ADJUST" | "BACKFLUSH";
+  item_code: string;
+  item_name: string;
+  item_category: Category;
+  item_unit: string;
+  transaction_type: TransactionType;
   quantity_change: number;
   quantity_before: number | null;
   quantity_after: number | null;
@@ -62,6 +87,25 @@ export interface TransactionLog {
   produced_by: string | null;
   notes: string | null;
   created_at: string;
+}
+
+export interface ProductionCheckComponent {
+  item_code: string;
+  item_name: string;
+  category: Category;
+  unit: string;
+  required: number;
+  current_stock: number;
+  shortage: number;
+  ok: boolean;
+}
+
+export interface ProductionCheckResponse {
+  item_id: string;
+  item_name: string;
+  quantity_to_produce: number;
+  can_produce: boolean;
+  components: ProductionCheckComponent[];
 }
 
 export interface BackflushDetail {
@@ -85,11 +129,20 @@ export interface ProductionReceiptResponse {
   transaction_ids: string[];
 }
 
+async function parseError(res: Response) {
+  const text = await res.text();
+  try {
+    const json = JSON.parse(text);
+    return json.detail ? String(json.detail) : text;
+  } catch {
+    return text || res.statusText;
+  }
+}
+
 export async function fetcher<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(JSON.stringify(error));
+    throw new Error(await parseError(res));
   }
   return res.json();
 }
@@ -125,17 +178,25 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) throw new Error(await parseError(res));
     return res.json() as Promise<Item>;
   },
 
-  updateItemCategory: async (itemId: string, category: Category) => {
+  updateItem: async (
+    itemId: string,
+    payload: {
+      item_name?: string;
+      spec?: string;
+      category?: Category;
+      unit?: string;
+    },
+  ) => {
     const res = await fetch(`${API_BASE}/api/items/${itemId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category }),
+      body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) throw new Error(await parseError(res));
     return res.json() as Promise<Item>;
   },
 
@@ -152,8 +213,25 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<InventoryMutationResponse>;
+  },
+
+  shipInventory: async (payload: {
+    item_id: string;
+    quantity: number;
+    location?: string;
+    reference_no?: string;
+    produced_by?: string;
+    notes?: string;
+  }) => {
+    const res = await fetch(`${API_BASE}/api/inventory/ship`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<InventoryMutationResponse>;
   },
 
   adjustInventory: async (payload: {
@@ -169,20 +247,14 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json() as Promise<{
-      inventory_id: string;
-      item_id: string;
-      quantity: string;
-      location: string | null;
-      updated_at: string;
-    }>;
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<InventoryMutationResponse>;
   },
 
   getBOM: (parentItemId: string) => fetcher<BOMEntry[]>(`${API_BASE}/api/bom/${parentItemId}`),
 
   getBOMTree: (parentItemId: string) =>
-    fetcher<unknown>(`${API_BASE}/api/bom/${parentItemId}/tree`),
+    fetcher<BOMTreeNode>(`${API_BASE}/api/bom/${parentItemId}/tree`),
 
   createBOM: async (payload: {
     parent_item_id: string;
@@ -196,8 +268,15 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) throw new Error(await parseError(res));
     return res.json() as Promise<BOMEntry>;
+  },
+
+  deleteBOM: async (bomId: string) => {
+    const res = await fetch(`${API_BASE}/api/bom/${bomId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error(await parseError(res));
   },
 
   productionReceipt: async (payload: {
@@ -212,17 +291,30 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) throw new Error(await parseError(res));
     return res.json() as Promise<ProductionReceiptResponse>;
   },
 
   checkProduction: (itemId: string, quantity: number) =>
-    fetcher<unknown>(`${API_BASE}/api/production/bom-check/${itemId}?quantity=${quantity}`),
+    fetcher<ProductionCheckResponse>(
+      `${API_BASE}/api/production/bom-check/${itemId}?quantity=${quantity}`,
+    ),
 
-  getTransactions: (params?: { item_id?: string; limit?: number }) => {
+  getTransactions: (params?: {
+    itemId?: string;
+    transactionType?: TransactionType;
+    referenceNo?: string;
+    search?: string;
+    limit?: number;
+    skip?: number;
+  }) => {
     const query = new URLSearchParams();
-    if (params?.item_id) query.set("item_id", params.item_id);
+    if (params?.itemId) query.set("item_id", params.itemId);
+    if (params?.transactionType) query.set("transaction_type", params.transactionType);
+    if (params?.referenceNo) query.set("reference_no", params.referenceNo);
+    if (params?.search) query.set("search", params.search);
     if (params?.limit) query.set("limit", String(params.limit));
+    if (params?.skip) query.set("skip", String(params.skip));
     return fetcher<TransactionLog[]>(`${API_BASE}/api/inventory/transactions?${query}`);
   },
 };

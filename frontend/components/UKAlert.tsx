@@ -48,7 +48,7 @@ export default function UKAlert({ count, onDismiss }: UKAlertProps) {
           </p>
 
           <p className="mt-1.5 text-xs text-red-500/70">
-            미분류 품목은 BOM 구성, 생산입고, 재고 분석 흐름에서 오류를 만들 수 있습니다.
+            미분류 품목은 BOM 구성, 생산 입고, 재고 분석 흐름에서 오류를 만들 수 있습니다.
           </p>
 
           <div className="mt-3 flex items-center gap-3">

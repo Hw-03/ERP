@@ -5,6 +5,7 @@ import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -46,14 +47,14 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
 @router.get("/", response_model=List[ItemWithInventory])
 def list_items(
     category: Optional[CategoryEnum] = Query(None, description="카테고리 필터"),
-    search: Optional[str] = Query(None, description="품목명, 품목코드, 사양 검색"),
+    search: Optional[str] = Query(None, description="품목명, 품목코드, 사양, 위치 검색"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=2000),
     db: Session = Depends(get_db),
 ):
     """List items with optional category and search filters."""
 
-    query = db.query(Item)
+    query = db.query(Item).outerjoin(Inventory, Item.item_id == Inventory.item_id)
 
     if category:
         query = query.filter(Item.category == category)
@@ -61,9 +62,12 @@ def list_items(
     if search:
         pattern = f"%{search}%"
         query = query.filter(
-            (Item.item_name.ilike(pattern))
-            | (Item.item_code.ilike(pattern))
-            | (Item.spec.ilike(pattern))
+            or_(
+                Item.item_name.ilike(pattern),
+                Item.item_code.ilike(pattern),
+                Item.spec.ilike(pattern),
+                Inventory.location.ilike(pattern),
+            )
         )
 
     items = query.order_by(Item.category, Item.item_code).offset(skip).limit(limit).all()

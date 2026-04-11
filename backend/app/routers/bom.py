@@ -1,6 +1,4 @@
-"""
-BOM Router — Bill of Materials CRUD + 트리 조회
-"""
+"""BOM router for Bill of Materials CRUD and tree queries."""
 
 import uuid
 from decimal import Decimal
@@ -10,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Item, BOM, Inventory
+from app.models import BOM, Inventory, Item
 from app.schemas import BOMCreate, BOMResponse, BOMTreeNode
 
 router = APIRouter()
@@ -18,14 +16,14 @@ router = APIRouter()
 
 @router.post("/", response_model=BOMResponse, status_code=status.HTTP_201_CREATED)
 def create_bom(payload: BOMCreate, db: Session = Depends(get_db)):
-    """BOM 항목 등록. parent와 child 품목이 모두 존재해야 함."""
+    """Create a BOM row for a parent and child item."""
+
     if payload.parent_item_id == payload.child_item_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="상위 품목과 하위 품목은 동일할 수 없습니다."
+            detail="상위 품목과 하위 품목은 같을 수 없습니다.",
         )
 
-    # 존재 확인
     parent = db.query(Item).filter(Item.item_id == payload.parent_item_id).first()
     if not parent:
         raise HTTPException(status_code=404, detail="상위 품목을 찾을 수 없습니다.")
@@ -34,22 +32,24 @@ def create_bom(payload: BOMCreate, db: Session = Depends(get_db)):
     if not child:
         raise HTTPException(status_code=404, detail="하위 품목을 찾을 수 없습니다.")
 
-    # 중복 확인
-    existing = db.query(BOM).filter(
-        BOM.parent_item_id == payload.parent_item_id,
-        BOM.child_item_id == payload.child_item_id,
-    ).first()
+    existing = (
+        db.query(BOM)
+        .filter(
+            BOM.parent_item_id == payload.parent_item_id,
+            BOM.child_item_id == payload.child_item_id,
+        )
+        .first()
+    )
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="해당 BOM 항목이 이미 존재합니다."
+            detail="동일한 BOM 항목이 이미 존재합니다.",
         )
 
-    # 순환 참조 간단 체크 (child가 parent를 포함하는지)
     if _is_circular(db, payload.parent_item_id, payload.child_item_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="순환 참조가 발생합니다. BOM 구조를 확인하세요."
+            detail="순환 참조가 발생합니다. BOM 구성을 확인해 주세요.",
         )
 
     bom_entry = BOM(
@@ -67,7 +67,8 @@ def create_bom(payload: BOMCreate, db: Session = Depends(get_db)):
 
 @router.get("/{parent_item_id}", response_model=List[BOMResponse])
 def get_bom_flat(parent_item_id: uuid.UUID, db: Session = Depends(get_db)):
-    """특정 품목의 직접 하위 BOM 목록 (1단계)."""
+    """Return direct child BOM rows for a given parent item."""
+
     item = db.query(Item).filter(Item.item_id == parent_item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
@@ -77,7 +78,8 @@ def get_bom_flat(parent_item_id: uuid.UUID, db: Session = Depends(get_db)):
 
 @router.get("/{parent_item_id}/tree", response_model=BOMTreeNode)
 def get_bom_tree(parent_item_id: uuid.UUID, db: Session = Depends(get_db)):
-    """BOM 전체 트리 조회 (다단계 재귀)."""
+    """Return a recursive BOM tree for a given parent item."""
+
     item = db.query(Item).filter(Item.item_id == parent_item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
@@ -90,7 +92,8 @@ def get_bom_tree(parent_item_id: uuid.UUID, db: Session = Depends(get_db)):
 
 @router.delete("/{bom_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_bom(bom_id: uuid.UUID, db: Session = Depends(get_db)):
-    """BOM 항목 삭제."""
+    """Delete a BOM row."""
+
     bom_entry = db.query(BOM).filter(BOM.bom_id == bom_id).first()
     if not bom_entry:
         raise HTTPException(status_code=404, detail="BOM 항목을 찾을 수 없습니다.")
@@ -98,19 +101,16 @@ def delete_bom(bom_id: uuid.UUID, db: Session = Depends(get_db)):
     db.commit()
 
 
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
 def _build_tree(
     db: Session,
     item: Item,
     required_quantity: Decimal,
     current_stock: Decimal,
     depth: int,
-    visited: set = None,
+    visited: set | None = None,
 ) -> BOMTreeNode:
-    """BOM 트리를 재귀적으로 구성."""
+    """Build a recursive BOM tree with current stock."""
+
     if visited is None:
         visited = set()
 
@@ -134,12 +134,11 @@ def _build_tree(
         child_item = db.query(Item).filter(Item.item_id == entry.child_item_id).first()
         if not child_item:
             continue
-        child_inv = db.query(Inventory).filter(
-            Inventory.item_id == entry.child_item_id
-        ).first()
+        child_inv = db.query(Inventory).filter(Inventory.item_id == entry.child_item_id).first()
         child_stock = child_inv.quantity if child_inv else Decimal("0")
         child_node = _build_tree(
-            db, child_item,
+            db,
+            child_item,
             entry.quantity * required_quantity,
             child_stock,
             depth + 1,
@@ -160,7 +159,8 @@ def _build_tree(
 
 
 def _is_circular(db: Session, parent_id: uuid.UUID, new_child_id: uuid.UUID) -> bool:
-    """new_child_id가 이미 parent_id를 하위에 포함하는지 확인 (순환 참조 방지)."""
+    """Check whether adding a child would create a circular BOM reference."""
+
     visited = set()
     stack = [new_child_id]
     while stack:
@@ -170,8 +170,6 @@ def _is_circular(db: Session, parent_id: uuid.UUID, new_child_id: uuid.UUID) -> 
         if current in visited:
             continue
         visited.add(current)
-        children = db.query(BOM.child_item_id).filter(
-            BOM.parent_item_id == current
-        ).all()
-        stack.extend(c[0] for c in children)
+        children = db.query(BOM.child_item_id).filter(BOM.parent_item_id == current).all()
+        stack.extend(child_id for (child_id,) in children)
     return False

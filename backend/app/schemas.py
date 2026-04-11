@@ -47,7 +47,16 @@ class InventoryReceive(BaseModel):
     item_id: uuid.UUID = Field(..., description="입고 대상 품목 ID")
     quantity: Decimal = Field(..., gt=0, description="입고 수량")
     location: Optional[str] = Field(None, max_length=100, description="보관 위치")
-    reference_no: Optional[str] = Field(None, max_length=100, description="참조번호")
+    reference_no: Optional[str] = Field(None, max_length=100, description="참조 번호")
+    produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
+    notes: Optional[str] = Field(None, description="비고")
+
+
+class InventoryShip(BaseModel):
+    item_id: uuid.UUID = Field(..., description="출고 대상 품목 ID")
+    quantity: Decimal = Field(..., gt=0, description="출고 수량")
+    location: Optional[str] = Field(None, max_length=100, description="출고 위치")
+    reference_no: Optional[str] = Field(None, max_length=100, description="참조 번호")
     produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
     notes: Optional[str] = Field(None, description="비고")
 
@@ -57,7 +66,7 @@ class InventoryAdjust(BaseModel):
     quantity: Decimal = Field(..., ge=0, description="조정 후 최종 수량")
     reason: str = Field(..., min_length=1, description="조정 사유")
     location: Optional[str] = Field(None, max_length=100, description="보관 위치")
-    reference_no: Optional[str] = Field(None, max_length=100, description="참조번호")
+    reference_no: Optional[str] = Field(None, max_length=100, description="참조 번호")
     produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
 
 
@@ -89,8 +98,8 @@ class BOMCreate(BaseModel):
     parent_item_id: uuid.UUID = Field(..., description="상위 품목 ID")
     child_item_id: uuid.UUID = Field(..., description="하위 품목 ID")
     quantity: Decimal = Field(..., gt=0, description="필요 수량")
-    unit: str = Field("EA", max_length=20)
-    notes: Optional[str] = None
+    unit: str = Field("EA", max_length=20, description="수량 단위")
+    notes: Optional[str] = Field(None, description="비고")
 
 
 class BOMResponse(BaseModel):
@@ -121,9 +130,9 @@ BOMTreeNode.model_rebuild()
 class ProductionReceiptRequest(BaseModel):
     item_id: uuid.UUID = Field(..., description="생산 입고 대상 품목 ID")
     quantity: Decimal = Field(..., gt=0, description="생산 수량")
-    reference_no: Optional[str] = Field(None, max_length=100, description="참조번호")
+    reference_no: Optional[str] = Field(None, max_length=100, description="참조 번호")
     produced_by: Optional[str] = Field(None, max_length=100, description="작업자")
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, description="비고")
 
 
 class BackflushDetail(BaseModel):
@@ -152,6 +161,10 @@ class TransactionLogResponse(BaseModel):
 
     log_id: uuid.UUID
     item_id: uuid.UUID
+    item_code: str
+    item_name: str
+    item_category: CategoryEnum
+    item_unit: str
     transaction_type: TransactionTypeEnum
     quantity_change: Decimal
     quantity_before: Optional[Decimal]

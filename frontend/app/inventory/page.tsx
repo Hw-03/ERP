@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft,
   Minus,
   PackageSearch,
   Plus,
@@ -12,7 +10,8 @@ import {
   X,
 } from "lucide-react";
 
-import { api, type Category, type Item } from "@/lib/api";
+import AppHeader from "@/components/AppHeader";
+import { api, type Category, type Item, type TransactionLog } from "@/lib/api";
 
 const CATEGORY_OPTIONS: { label: string; value: Category | "ALL" }[] = [
   { label: "전체", value: "ALL" },
@@ -35,6 +34,30 @@ const STOCK_FILTERS = [
   { label: "재고 0", value: "ZERO" },
   { label: "미분류만", value: "UK_ONLY" },
 ] as const;
+
+const CATEGORY_LABELS: Record<Category, string> = {
+  RM: "원자재",
+  TA: "튜브 반제품",
+  TF: "튜브 완제품",
+  HA: "고압 반제품",
+  HF: "고압 완제품",
+  VA: "진공 반제품",
+  VF: "진공 완제품",
+  BA: "조립 반제품",
+  BF: "조립 완제품",
+  FG: "완제품",
+  UK: "미분류",
+};
+
+const TX_TYPE_LABELS = {
+  RECEIVE: "입고",
+  PRODUCE: "생산 입고",
+  SHIP: "출고",
+  ADJUST: "조정",
+  BACKFLUSH: "자동 차감",
+};
+
+type ActionMode = "ADJUST" | "RECEIVE" | "SHIP";
 
 type StockFilter = (typeof STOCK_FILTERS)[number]["value"];
 
@@ -101,40 +124,78 @@ function InventoryDetailModal({
 }: {
   item: Item | null;
   onClose: () => void;
-  onSaved: (itemId: string, quantity: number, location: string | null) => void;
+  onSaved: (updatedItem: Item) => void;
 }) {
   const [quantity, setQuantity] = useState("0");
   const [reason, setReason] = useState("");
   const [location, setLocation] = useState("");
+  const [category, setCategory] = useState<Category>("RM");
+  const [mode, setMode] = useState<ActionMode>("ADJUST");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recentTransactions, setRecentTransactions] = useState<TransactionLog[]>([]);
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
 
   useEffect(() => {
     if (!item) return;
     setQuantity(String(Number(item.quantity)));
     setReason("");
     setLocation(item.location ?? "");
+    setCategory(item.category);
+    setMode("ADJUST");
     setError(null);
+    setLoadingTransactions(true);
+    api
+      .getTransactions({ itemId: item.item_id, limit: 10 })
+      .then(setRecentTransactions)
+      .catch(() => setRecentTransactions([]))
+      .finally(() => setLoadingTransactions(false));
   }, [item]);
 
   if (!item) return null;
 
   const bumpQuantity = (delta: number) => {
     const current = Number(quantity || 0);
-    const next = Math.max(0, current + delta);
+    const minimum = mode === "ADJUST" ? 0 : 1;
+    const next = Math.max(minimum, current + delta);
     setQuantity(String(next));
+  };
+
+  const handleModeChange = (nextMode: ActionMode) => {
+    setMode(nextMode);
+    setError(null);
+    if (nextMode === "ADJUST") {
+      setQuantity(String(Number(item.quantity)));
+    } else {
+      setQuantity("1");
+    }
   };
 
   const handleSave = async () => {
     const nextQuantity = Number(quantity);
+    const changedQuantity = nextQuantity !== Number(item.quantity);
+    const changedLocation = location !== (item.location ?? "");
+    const changedCategory = category !== item.category;
 
     if (Number.isNaN(nextQuantity) || nextQuantity < 0) {
       setError("수량은 0 이상의 숫자로 입력해 주세요.");
       return;
     }
 
-    if (!reason.trim()) {
-      setError("조정 사유를 입력해 주세요.");
+    if (mode !== "ADJUST" && nextQuantity <= 0) {
+      setError("입고와 출고 수량은 1 이상이어야 합니다.");
+      return;
+    }
+
+    if ((mode === "ADJUST" && (changedQuantity || changedLocation)) || mode !== "ADJUST") {
+      if (!reason.trim()) {
+        setError("처리 사유를 입력해 주세요.");
+        return;
+      }
+    }
+
+    if (mode === "ADJUST" && !changedQuantity && !changedLocation && !changedCategory) {
+      setError("변경된 내용이 없습니다.");
       return;
     }
 
@@ -142,18 +203,70 @@ function InventoryDetailModal({
       setSaving(true);
       setError(null);
 
-      const response = await api.adjustInventory({
-        item_id: item.item_id,
-        quantity: nextQuantity,
-        reason,
-        location: location || undefined,
-      });
+      let updatedItem = item;
 
-      onSaved(item.item_id, Number(response.quantity), response.location);
+      if (changedCategory) {
+        const updatedMaster = await api.updateItem(item.item_id, { category });
+        updatedItem = {
+          ...updatedItem,
+          category: updatedMaster.category,
+          updated_at: updatedMaster.updated_at,
+        };
+      }
+
+      if (mode === "ADJUST" && (changedQuantity || changedLocation)) {
+        const response = await api.adjustInventory({
+          item_id: item.item_id,
+          quantity: nextQuantity,
+          reason,
+          location: location || undefined,
+        });
+
+        updatedItem = {
+          ...updatedItem,
+          quantity: Number(response.quantity),
+          location: response.location,
+          updated_at: response.updated_at,
+        };
+      }
+
+      if (mode === "RECEIVE") {
+        const response = await api.receiveInventory({
+          item_id: item.item_id,
+          quantity: nextQuantity,
+          location: location || undefined,
+          notes: reason,
+        });
+
+        updatedItem = {
+          ...updatedItem,
+          quantity: Number(response.quantity),
+          location: response.location,
+          updated_at: response.updated_at,
+        };
+      }
+
+      if (mode === "SHIP") {
+        const response = await api.shipInventory({
+          item_id: item.item_id,
+          quantity: nextQuantity,
+          location: location || undefined,
+          notes: reason,
+        });
+
+        updatedItem = {
+          ...updatedItem,
+          quantity: Number(response.quantity),
+          location: response.location,
+          updated_at: response.updated_at,
+        };
+      }
+
+      onSaved(updatedItem);
       onClose();
     } catch (err) {
       setError(
-        err instanceof Error ? `재고 조정 실패: ${err.message}` : "재고 조정에 실패했습니다.",
+        err instanceof Error ? `변경 사항 저장 실패: ${err.message}` : "변경 사항 저장에 실패했습니다.",
       );
     } finally {
       setSaving(false);
@@ -162,13 +275,13 @@ function InventoryDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-4xl rounded-[28px] border border-slate-800 bg-slate-950 shadow-2xl">
+      <div className="w-full max-w-5xl rounded-[28px] border border-slate-800 bg-slate-950 shadow-2xl">
         <div className="flex items-start justify-between border-b border-slate-800 px-6 py-5">
           <div>
             <p className="font-mono text-xs text-blue-400">{item.item_code}</p>
             <h2 className="mt-1 text-2xl font-semibold text-slate-100">{item.item_name}</h2>
             <p className="mt-2 text-sm text-slate-400">
-              카테고리 {item.category} · 단위 {item.unit}
+              {CATEGORY_LABELS[item.category]} · 단위 {item.unit}
             </p>
           </div>
           <button
@@ -180,7 +293,7 @@ function InventoryDetailModal({
           </button>
         </div>
 
-        <div className="grid gap-4 px-6 py-5 md:grid-cols-[1.1fr,0.9fr]">
+        <div className="grid gap-4 px-6 py-5 xl:grid-cols-[1.05fr,0.95fr]">
           <div className="space-y-4">
             <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -209,24 +322,75 @@ function InventoryDetailModal({
             </div>
 
             <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                사용 가이드
-              </p>
-              <ul className="mt-4 space-y-2 text-sm text-slate-400">
-                <li>현재 화면은 레거시 `inventory_v2.html`의 즉시 조정 흐름을 현재 ERP에 이식한 화면입니다.</li>
-                <li>수량은 절대값 기준으로 저장됩니다. 입력한 수량이 최종 현재고가 됩니다.</li>
-                <li>조정 사유는 거래 이력에 함께 남습니다.</li>
-              </ul>
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  최근 거래 이력
+                </p>
+                <span className="text-xs text-slate-600">최대 10건</span>
+              </div>
+              <div className="mt-4 space-y-3">
+                {loadingTransactions ? (
+                  <p className="text-sm text-slate-500">거래 이력을 불러오는 중입니다.</p>
+                ) : recentTransactions.length === 0 ? (
+                  <p className="text-sm text-slate-500">표시할 이력이 없습니다.</p>
+                ) : (
+                  recentTransactions.map((tx) => (
+                    <div
+                      key={tx.log_id}
+                      className="rounded-2xl border border-slate-800 bg-slate-950/70 p-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-slate-100">
+                          {TX_TYPE_LABELS[tx.transaction_type]}
+                        </p>
+                        <p
+                          className={`font-mono text-sm ${
+                            tx.quantity_change >= 0 ? "text-emerald-300" : "text-red-300"
+                          }`}
+                        >
+                          {tx.quantity_change >= 0 ? "+" : ""}
+                          {Number(tx.quantity_change).toLocaleString()}
+                        </p>
+                      </div>
+                      <p className="mt-2 text-xs text-slate-500">
+                        {new Date(tx.created_at).toLocaleString("ko-KR")}
+                        {tx.notes ? ` · ${tx.notes}` : ""}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
 
           <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              재고 조정
+              재고 및 분류 조정
             </p>
 
             <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-              <p className="text-xs text-slate-500">최종 수량</p>
+              <div className="mb-3 flex flex-wrap gap-2">
+                {[
+                  { key: "ADJUST", label: "절대값 조정" },
+                  { key: "RECEIVE", label: "입고" },
+                  { key: "SHIP", label: "출고" },
+                ].map((option) => (
+                  <button
+                    key={option.key}
+                    onClick={() => handleModeChange(option.key as ActionMode)}
+                    className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                      mode === option.key
+                        ? "border-blue-500 bg-blue-500 text-white"
+                        : "border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500">
+                {mode === "ADJUST" ? "조정 후 최종 수량" : "처리 수량"}
+              </p>
               <div className="mt-3 flex items-center gap-3">
                 <button
                   onClick={() => bumpQuantity(-1)}
@@ -261,20 +425,42 @@ function InventoryDetailModal({
 
             <div className="mt-4 space-y-3">
               <label className="block">
-                <span className="mb-2 block text-xs text-slate-500">조정 사유</span>
-                <input
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                  placeholder="예: 실사 반영, 분실 처리, 위치 정정"
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-500"
-                />
+                <span className="mb-2 block text-xs text-slate-500">카테고리</span>
+                <select
+                  value={category}
+                  onChange={(event) => setCategory(event.target.value as Category)}
+                  className="w-full rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none"
+                >
+                  {CATEGORY_OPTIONS.filter((option) => option.value !== "ALL").map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </label>
+
               <label className="block">
                 <span className="mb-2 block text-xs text-slate-500">위치</span>
                 <input
                   value={location}
                   onChange={(event) => setLocation(event.target.value)}
                   placeholder="보관 위치"
+                  className="w-full rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-500"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-xs text-slate-500">
+                  {mode === "ADJUST" ? "조정 사유" : "처리 메모"}
+                </span>
+                <input
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder={
+                    mode === "ADJUST"
+                      ? "실사 반영, 위치 변경, 카운트 보정"
+                      : "입고 또는 출고 사유"
+                  }
                   className="w-full rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-500"
                 />
               </label>
@@ -291,7 +477,13 @@ function InventoryDetailModal({
               disabled={saving}
               className="mt-5 w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50"
             >
-              {saving ? "저장 중..." : "재고 조정 저장"}
+              {saving
+                ? "처리 중..."
+                : mode === "ADJUST"
+                  ? "변경 사항 저장"
+                  : mode === "RECEIVE"
+                    ? "입고 처리"
+                    : "출고 처리"}
             </button>
           </div>
         </div>
@@ -312,9 +504,7 @@ export default function InventoryPage() {
   const deferredSearch = useDeferredValue(search);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const category = params.get("category");
-
+    const category = new URLSearchParams(window.location.search).get("category");
     if (category && CATEGORY_OPTIONS.some((option) => option.value === category)) {
       setSelectedCategory(category as Category);
     }
@@ -377,7 +567,7 @@ export default function InventoryPage() {
         item.item_name,
         item.spec ?? "",
         item.location ?? "",
-        item.category,
+        CATEGORY_LABELS[item.category],
       ]
         .join(" ")
         .toLowerCase();
@@ -404,61 +594,42 @@ export default function InventoryPage() {
     [filteredItems],
   );
 
-  const handleSaved = (itemId: string, quantity: number, location: string | null) => {
-    const updatedAt = new Date().toISOString();
-
+  const handleSaved = (updatedItem: Item) => {
     setItems((current) =>
-      current.map((item) =>
-        item.item_id === itemId
-          ? { ...item, quantity, location, updated_at: updatedAt }
-          : item,
-      ),
+      current.map((item) => (item.item_id === updatedItem.item_id ? updatedItem : item)),
     );
-
-    setSelectedItem((current) =>
-      current && current.item_id === itemId
-        ? { ...current, quantity, location, updated_at: updatedAt }
-        : current,
-    );
+    setSelectedItem(updatedItem);
   };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <main className="mx-auto max-w-screen-2xl px-6 py-8">
-        <div className="mb-6 flex items-center gap-3">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/50 px-4 py-2 text-sm text-slate-300 transition hover:border-slate-700 hover:text-slate-100"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            대시보드
-          </Link>
-        </div>
+      <AppHeader />
 
-        <section className="mb-8 rounded-[28px] border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 shadow-2xl">
+      <main className="mx-auto max-w-screen-2xl px-6 py-8">
+        <section className="rounded-[28px] border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 shadow-2xl">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                Warehouse Inventory
+                Inventory Control
               </p>
-              <h1 className="mt-3 text-4xl font-black tracking-tight">전체 품목 리스트</h1>
+              <h2 className="mt-3 text-4xl font-black tracking-tight">전체 품목 리스트</h2>
               <p className="mt-3 text-sm leading-6 text-slate-400">
-                이전 버전 `inventory_v2.html`의 어두운 리스트 레이아웃과 빠른 검색 흐름을
-                현재 Next.js ERP 구조로 이식했습니다. 971개 부품을 실시간으로 검색하고
-                카테고리별로 좁혀 보며, 상세 모달에서 바로 재고를 조정할 수 있습니다.
+                레거시 재고관리앱의 검색 중심 테이블 구조를 현재 ERP에 맞게 이식했습니다.
+                품목명, 코드, 사양, 위치를 빠르게 검색하고 카테고리·재고 상태별로 필터링할 수
+                있습니다. 행을 클릭하면 상세 이력과 재고 조정 시트가 열립니다.
               </p>
             </div>
 
             <div className="grid min-w-[320px] gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-4">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                  표시 품목 수
+                  현재 표시 품목
                 </p>
                 <p className="mt-2 text-3xl font-bold text-slate-100">{totals.count}</p>
               </div>
               <div className="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-4">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                  표시 재고 합계
+                  현재 표시 재고
                 </p>
                 <p className="mt-2 text-3xl font-bold text-cyan-300">
                   {formatQuantity(totals.quantity)}
@@ -486,7 +657,7 @@ export default function InventoryPage() {
 
             <div className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/50 px-4 py-3 text-sm text-slate-300">
               <SlidersHorizontal className="h-4 w-4 text-slate-500" />
-              <span>레거시 스타일 필터</span>
+              <span>빠른 필터</span>
             </div>
           </div>
 
@@ -497,22 +668,22 @@ export default function InventoryPage() {
         </section>
 
         {error ? (
-          <div className="rounded-2xl border border-red-800/60 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+          <div className="mt-6 rounded-2xl border border-red-800/60 bg-red-950/30 px-4 py-3 text-sm text-red-300">
             {error}
           </div>
         ) : loading ? (
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-10 text-center text-sm text-slate-400">
+          <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-10 text-center text-sm text-slate-400">
             품목 데이터를 불러오는 중입니다.
           </div>
         ) : (
-          <section className="overflow-hidden rounded-[24px] border border-slate-800 bg-slate-900/60 shadow-xl">
+          <section className="mt-6 overflow-hidden rounded-[24px] border border-slate-800 bg-slate-900/60 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Inventory Table
                 </p>
                 <p className="mt-1 text-sm text-slate-400">
-                  행을 클릭하면 상세 정보와 재고 조정 폼이 열립니다.
+                  행을 클릭하면 상세 정보와 최근 거래 이력이 열립니다.
                 </p>
               </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/80 px-3 py-2 text-xs text-slate-400">
@@ -522,7 +693,7 @@ export default function InventoryPage() {
             </div>
 
             <div className="max-h-[70vh] overflow-auto">
-              <table className="w-full min-w-[980px] text-sm">
+              <table className="w-full min-w-[1080px] text-sm">
                 <thead className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur">
                   <tr className="border-b border-slate-800">
                     <th className="px-5 py-3 text-left text-slate-500">품목코드</th>
@@ -531,6 +702,7 @@ export default function InventoryPage() {
                     <th className="px-5 py-3 text-left text-slate-500">카테고리</th>
                     <th className="px-5 py-3 text-left text-slate-500">위치</th>
                     <th className="px-5 py-3 text-right text-slate-500">현재고</th>
+                    <th className="px-5 py-3 text-left text-slate-500">단위</th>
                     <th className="px-5 py-3 text-right text-slate-500">최근 수정</th>
                   </tr>
                 </thead>
@@ -548,13 +720,14 @@ export default function InventoryPage() {
                       <td className="px-5 py-4 text-slate-400">{item.spec || "-"}</td>
                       <td className="px-5 py-4">
                         <span className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1 text-xs text-slate-300">
-                          {item.category}
+                          {CATEGORY_LABELS[item.category]}
                         </span>
                       </td>
                       <td className="px-5 py-4 text-slate-400">{item.location || "-"}</td>
                       <td className="px-5 py-4 text-right font-mono text-cyan-300">
                         {formatQuantity(item.quantity)}
                       </td>
+                      <td className="px-5 py-4 text-slate-400">{item.unit}</td>
                       <td className="px-5 py-4 text-right text-xs text-slate-500">
                         {new Date(item.updated_at).toLocaleDateString("ko-KR")}
                       </td>

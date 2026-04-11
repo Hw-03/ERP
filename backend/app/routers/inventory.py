@@ -1,11 +1,11 @@
-"""Inventory router for summary, direct receipts, and transaction history."""
+"""Inventory router for summary, receipts, shipments, and transaction history."""
 
 import uuid
 from decimal import Decimal
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -15,6 +15,7 @@ from app.schemas import (
     InventoryAdjust,
     InventoryReceive,
     InventoryResponse,
+    InventoryShip,
     InventorySummaryResponse,
     TransactionLogResponse,
 )
@@ -22,17 +23,17 @@ from app.schemas import (
 router = APIRouter()
 
 CATEGORY_LABELS = {
-    CategoryEnum.RM: "원자재 (Raw Material)",
-    CategoryEnum.TA: "튜브 반제품 (Tube Ass'y)",
-    CategoryEnum.TF: "튜브 완제품 (Tube Final)",
-    CategoryEnum.HA: "고압 반제품 (High-voltage Ass'y)",
-    CategoryEnum.HF: "고압 완제품 (High-voltage Final)",
-    CategoryEnum.VA: "진공 반제품 (Vacuum Ass'y)",
-    CategoryEnum.VF: "진공 완제품 (Vacuum Final)",
-    CategoryEnum.BA: "조립 반제품 (Body Ass'y)",
-    CategoryEnum.BF: "조립 완제품 (Body Final)",
-    CategoryEnum.FG: "최종 출하품 (Finished Good)",
-    CategoryEnum.UK: "미분류 품목 (Unknown)",
+    CategoryEnum.RM: "원자재",
+    CategoryEnum.TA: "튜브 반제품",
+    CategoryEnum.TF: "튜브 완제품",
+    CategoryEnum.HA: "고압 반제품",
+    CategoryEnum.HF: "고압 완제품",
+    CategoryEnum.VA: "진공 반제품",
+    CategoryEnum.VF: "진공 완제품",
+    CategoryEnum.BA: "조립 반제품",
+    CategoryEnum.BF: "조립 완제품",
+    CategoryEnum.FG: "완제품",
+    CategoryEnum.UK: "미분류 품목",
 }
 
 CATEGORY_ORDER = [
@@ -135,6 +136,45 @@ def receive_inventory(payload: InventoryReceive, db: Session = Depends(get_db)):
     return inventory
 
 
+@router.post("/ship", response_model=InventoryResponse, status_code=status.HTTP_200_OK)
+def ship_inventory(payload: InventoryShip, db: Session = Depends(get_db)):
+    """Ship inventory and record a transaction log entry."""
+
+    item = db.query(Item).filter(Item.item_id == payload.item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
+
+    inventory = db.query(Inventory).filter(Inventory.item_id == payload.item_id).first()
+    if not inventory:
+        raise HTTPException(status_code=404, detail="출고할 재고가 존재하지 않습니다.")
+
+    quantity_before = inventory.quantity
+    if quantity_before < payload.quantity:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"재고가 부족합니다. 현재고 {quantity_before} {item.unit}, 요청 {payload.quantity} {item.unit}",
+        )
+
+    inventory.quantity = quantity_before - payload.quantity
+    if payload.location is not None:
+        inventory.location = payload.location
+
+    log = TransactionLog(
+        item_id=payload.item_id,
+        transaction_type=TransactionTypeEnum.SHIP,
+        quantity_change=-payload.quantity,
+        quantity_before=quantity_before,
+        quantity_after=inventory.quantity,
+        reference_no=payload.reference_no,
+        produced_by=payload.produced_by,
+        notes=payload.notes,
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(inventory)
+    return inventory
+
+
 @router.post("/adjust", response_model=InventoryResponse, status_code=status.HTTP_200_OK)
 def adjust_inventory(payload: InventoryAdjust, db: Session = Depends(get_db)):
     """Adjust current stock to an absolute quantity and keep a transaction log."""
@@ -194,13 +234,14 @@ def list_transactions(
     item_id: Optional[uuid.UUID] = Query(None),
     transaction_type: Optional[TransactionTypeEnum] = Query(None),
     reference_no: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(100, ge=1, le=2000),
     db: Session = Depends(get_db),
 ):
-    """Return transaction history with optional filters."""
+    """Return transaction history with optional filters and item metadata."""
 
-    query = db.query(TransactionLog)
+    query = db.query(TransactionLog, Item).join(Item, TransactionLog.item_id == Item.item_id)
 
     if item_id:
         query = query.filter(TransactionLog.item_id == item_id)
@@ -208,10 +249,41 @@ def list_transactions(
         query = query.filter(TransactionLog.transaction_type == transaction_type)
     if reference_no:
         query = query.filter(TransactionLog.reference_no == reference_no)
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                Item.item_name.ilike(pattern),
+                Item.item_code.ilike(pattern),
+                TransactionLog.reference_no.ilike(pattern),
+                TransactionLog.notes.ilike(pattern),
+                TransactionLog.produced_by.ilike(pattern),
+            )
+        )
 
-    return (
+    rows = (
         query.order_by(TransactionLog.created_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
     )
+
+    return [
+        TransactionLogResponse(
+            log_id=log.log_id,
+            item_id=log.item_id,
+            item_code=item.item_code,
+            item_name=item.item_name,
+            item_category=item.category,
+            item_unit=item.unit,
+            transaction_type=log.transaction_type,
+            quantity_change=log.quantity_change,
+            quantity_before=log.quantity_before,
+            quantity_after=log.quantity_after,
+            reference_no=log.reference_no,
+            produced_by=log.produced_by,
+            notes=log.notes,
+            created_at=log.created_at,
+        )
+        for log, item in rows
+    ]
