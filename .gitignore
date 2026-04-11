@@ -29,3 +29,7 @@ Thumbs.db
 *.tmp
 *.bak
 ~$*.xlsx
+*.log
+*.out
+*.err
+_legacy_import/

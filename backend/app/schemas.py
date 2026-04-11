@@ -1,26 +1,19 @@
-"""
-ERP System — Pydantic Schemas
-Request / Response models for FastAPI endpoints
-"""
+"""Pydantic schemas for the X-Ray ERP API."""
 
-import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, List
+from typing import List, Optional
+import uuid
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import CategoryEnum, TransactionTypeEnum
 
 
-# ---------------------------------------------------------------------------
-# Item Schemas
-# ---------------------------------------------------------------------------
-
 class ItemCreate(BaseModel):
     item_code: str = Field(..., max_length=50, description="품목 코드")
-    item_name: str = Field(..., max_length=200, description="품명")
-    spec: Optional[str] = Field(None, description="규격/사양")
+    item_name: str = Field(..., max_length=200, description="품목명")
+    spec: Optional[str] = Field(None, description="사양")
     category: CategoryEnum = Field(CategoryEnum.UK, description="11단계 카테고리")
     unit: str = Field("EA", max_length=20, description="단위")
 
@@ -50,17 +43,22 @@ class ItemWithInventory(ItemResponse):
     location: Optional[str] = None
 
 
-# ---------------------------------------------------------------------------
-# Inventory Schemas
-# ---------------------------------------------------------------------------
-
 class InventoryReceive(BaseModel):
-    item_id: uuid.UUID = Field(..., description="입고 품목 ID")
-    quantity: Decimal = Field(..., gt=0, description="입고 수량 (양수)")
+    item_id: uuid.UUID = Field(..., description="입고 대상 품목 ID")
+    quantity: Decimal = Field(..., gt=0, description="입고 수량")
     location: Optional[str] = Field(None, max_length=100, description="보관 위치")
-    reference_no: Optional[str] = Field(None, max_length=100, description="입고 참조번호")
+    reference_no: Optional[str] = Field(None, max_length=100, description="참조번호")
     produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
     notes: Optional[str] = Field(None, description="비고")
+
+
+class InventoryAdjust(BaseModel):
+    item_id: uuid.UUID = Field(..., description="재고 조정 대상 품목 ID")
+    quantity: Decimal = Field(..., ge=0, description="조정 후 최종 수량")
+    reason: str = Field(..., min_length=1, description="조정 사유")
+    location: Optional[str] = Field(None, max_length=100, description="보관 위치")
+    reference_no: Optional[str] = Field(None, max_length=100, description="참조번호")
+    produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
 
 
 class InventoryResponse(BaseModel):
@@ -87,14 +85,10 @@ class InventorySummaryResponse(BaseModel):
     uk_item_count: int
 
 
-# ---------------------------------------------------------------------------
-# BOM Schemas
-# ---------------------------------------------------------------------------
-
 class BOMCreate(BaseModel):
-    parent_item_id: uuid.UUID = Field(..., description="상위 품목 ID (완성품)")
-    child_item_id: uuid.UUID = Field(..., description="하위 품목 ID (소요 부품)")
-    quantity: Decimal = Field(..., gt=0, description="소요 수량")
+    parent_item_id: uuid.UUID = Field(..., description="상위 품목 ID")
+    child_item_id: uuid.UUID = Field(..., description="하위 품목 ID")
+    quantity: Decimal = Field(..., gt=0, description="필요 수량")
     unit: str = Field("EA", max_length=20)
     notes: Optional[str] = None
 
@@ -111,7 +105,6 @@ class BOMResponse(BaseModel):
 
 
 class BOMTreeNode(BaseModel):
-    """BOM 트리 뷰 — 재귀 구조"""
     item_id: uuid.UUID
     item_code: str
     item_name: str
@@ -121,17 +114,14 @@ class BOMTreeNode(BaseModel):
     current_stock: Decimal = Decimal("0")
     children: List["BOMTreeNode"] = []
 
+
 BOMTreeNode.model_rebuild()
 
 
-# ---------------------------------------------------------------------------
-# Production / Backflush Schemas
-# ---------------------------------------------------------------------------
-
 class ProductionReceiptRequest(BaseModel):
-    item_id: uuid.UUID = Field(..., description="생산 입고 품목 ID (완성품/반제품)")
+    item_id: uuid.UUID = Field(..., description="생산 입고 대상 품목 ID")
     quantity: Decimal = Field(..., gt=0, description="생산 수량")
-    reference_no: Optional[str] = Field(None, max_length=100, description="생산지시번호")
+    reference_no: Optional[str] = Field(None, max_length=100, description="참조번호")
     produced_by: Optional[str] = Field(None, max_length=100, description="작업자")
     notes: Optional[str] = None
 
@@ -157,10 +147,6 @@ class ProductionReceiptResponse(BaseModel):
     transaction_ids: List[uuid.UUID]
 
 
-# ---------------------------------------------------------------------------
-# TransactionLog Schemas
-# ---------------------------------------------------------------------------
-
 class TransactionLogResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -176,12 +162,9 @@ class TransactionLogResponse(BaseModel):
     created_at: datetime
 
 
-# ---------------------------------------------------------------------------
-# Common
-# ---------------------------------------------------------------------------
-
 class MessageResponse(BaseModel):
     message: str
+
 
 class ErrorResponse(BaseModel):
     detail: str

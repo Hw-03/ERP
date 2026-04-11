@@ -1,19 +1,40 @@
 import os
-from sqlalchemy import create_engine
+from pathlib import Path
+
+from dotenv import load_dotenv
+from sqlalchemy import create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://erp_user:erp_pass@localhost:5432/erp_db")
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+DEFAULT_SQLITE_PATH = BACKEND_DIR / "erp.db"
+
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    f"sqlite:///{DEFAULT_SQLITE_PATH.as_posix()}",
+)
+
+_is_sqlite = DATABASE_URL.startswith("sqlite")
+
+connect_args = {"check_same_thread": False} if _is_sqlite else {}
 
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    connect_args=connect_args,
+    **({} if _is_sqlite else {"pool_pre_ping": True, "pool_size": 10, "max_overflow": 20}),
 )
+
+
+if _is_sqlite:
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_conn, _):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

@@ -1,30 +1,34 @@
 """
-ERP Master DB — Data Seeding Script
-ERP_Master_DB.csv → SQLite (erp.db)
+Seed SQLite ERP data from ERP_Master_DB.csv.
 
-실행:
-    cd backend
-    python seed.py
+Usage:
+    python backend/seed.py
+    cd backend && python seed.py
 """
+
+from __future__ import annotations
 
 import csv
 import os
 import sys
+from collections import Counter
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
-from datetime import datetime
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(__file__))
 
-# SQLite 기본값 사용 (DATABASE_URL 미설정 시)
-os.environ.setdefault("DATABASE_URL", "sqlite:///./erp.db")
+BACKEND_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BACKEND_DIR.parent
+CSV_PATH = PROJECT_ROOT / "ERP_Master_DB.csv"
+SQLITE_PATH = BACKEND_DIR / "erp.db"
 
-from app.database import SessionLocal, engine, Base
-from app.models import Item, Inventory, CategoryEnum
+# Ensure imports and database target are stable no matter where the script is run from.
+sys.path.insert(0, str(BACKEND_DIR))
+os.environ["DATABASE_URL"] = f"sqlite:///{SQLITE_PATH.as_posix()}"
 
-# ---------------------------------------------------------------------------
-# 경로: backend/ 한 단계 위의 ERP_Master_DB.csv
-# ---------------------------------------------------------------------------
-CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "ERP_Master_DB.csv")
+from app.database import Base, SessionLocal, engine
+from app.models import CategoryEnum, Inventory, Item
+
 
 CATEGORY_MAP = {
     "RM": CategoryEnum.RM,
@@ -40,77 +44,83 @@ CATEGORY_MAP = {
     "UK": CategoryEnum.UK,
 }
 
-DEFAULT_STOCK = Decimal("100")  # stock_current 없을 때 기본값
+DEFAULT_STOCK_QTY = Decimal("100")
 
 
-def parse_qty(val: str) -> Decimal:
-    if not val or val.strip() in ("", "None", "N/A", "-"):
-        return Decimal("0")
+def parse_decimal(value: str | None) -> Decimal | None:
+    if value is None:
+        return None
+
+    text = str(value).strip()
+    if text in {"", "None", "N/A", "-"}:
+        return None
+
     try:
-        return Decimal(str(val).strip().replace(",", ""))
+        return Decimal(text.replace(",", ""))
     except InvalidOperation:
-        return Decimal("0")
+        return None
 
 
-def run():
-    if not os.path.exists(CSV_PATH):
-        print(f"❌ CSV 파일을 찾을 수 없습니다: {os.path.abspath(CSV_PATH)}")
-        sys.exit(1)
+def get_category(code: str | None) -> CategoryEnum:
+    if not code:
+        return CategoryEnum.UK
+    return CATEGORY_MAP.get(str(code).strip().upper(), CategoryEnum.UK)
+
+
+def seed() -> None:
+    if not CSV_PATH.exists():
+        raise FileNotFoundError(f"CSV file not found: {CSV_PATH}")
 
     Base.metadata.create_all(bind=engine)
+
+    with CSV_PATH.open("r", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        rows = list(reader)
+
+    if not rows:
+        print("Seed skipped: CSV is empty.")
+        return
+
     db = SessionLocal()
 
+    inserted = 0
+    skipped = 0
+    defaulted_stock = 0
+    category_counts: Counter[str] = Counter()
+    errors: list[str] = []
+
     try:
-        existing = db.query(Item).count()
-        if existing > 0:
-            print(f"⚠️  이미 {existing}개 품목이 있습니다. 전체 삭제 후 재임포트합니다.")
-            db.query(Inventory).delete()
-            db.query(Item).delete()
-            db.commit()
+        # Reset for deterministic re-runs.
+        db.query(Inventory).delete()
+        db.query(Item).delete()
+        db.commit()
 
-        with open(CSV_PATH, encoding="utf-8-sig", newline="") as f:
-            rows = list(csv.DictReader(f))
+        now = datetime.now(UTC).replace(tzinfo=None)
 
-        print(f"📂 {len(rows)}개 항목 임포트 시작...\n")
-
-        inserted = 0
-        defaulted = 0
-        cat_counts: dict[str, int] = {}
-
-        for idx, row in enumerate(rows, 2):
+        for csv_row_number, row in enumerate(rows, start=2):
             item_code = (row.get("item_id") or "").strip()
             item_name = (row.get("std_name") or "").strip()
+
             if not item_name:
+                skipped += 1
+                errors.append(f"row {csv_row_number}: missing std_name")
                 continue
+
             if not item_code:
-                item_code = f"AUTO-{idx:05d}"
+                item_code = f"AUTO-{csv_row_number:05d}"
 
-            category = CATEGORY_MAP.get(
-                (row.get("category_code") or "UK").strip().upper(),
-                CategoryEnum.UK,
-            )
-
-            # 규격: std_spec 없으면 part_type / maker / model_ref 로 보강
+            category = get_category(row.get("category_code"))
             spec = (row.get("std_spec") or "").strip() or None
-            if not spec:
-                parts = [
-                    row.get("part_type", "").strip(),
-                    f"MAKER:{row['maker'].strip()}" if row.get("maker", "").strip() else "",
-                    f"MODEL:{row['model_ref'].strip()}" if row.get("model_ref", "").strip() else "",
-                ]
-                spec = " / ".join(p for p in parts if p) or None
+            unit = (row.get("std_unit") or "").strip() or "EA"
+            location = (row.get("department") or "").strip() or None
 
-            unit = (row.get("std_unit") or "EA").strip() or "EA"
+            stock_current = parse_decimal(row.get("stock_current"))
+            if stock_current is None or stock_current == 0:
+                quantity = DEFAULT_STOCK_QTY
+                defaulted_stock += 1
+            else:
+                quantity = stock_current
 
-            # 재고: stock_current → stock_prev → 기본값 100
-            qty = parse_qty(row.get("stock_current", ""))
-            if qty == 0:
-                qty = parse_qty(row.get("stock_prev", ""))
-            if qty == 0:
-                qty = DEFAULT_STOCK
-                defaulted += 1
-
-            now = datetime.utcnow()
             item = Item(
                 item_code=item_code,
                 item_name=item_name,
@@ -123,55 +133,42 @@ def run():
             db.add(item)
             db.flush()
 
-            db.add(Inventory(
+            inventory = Inventory(
                 item_id=item.item_id,
-                quantity=qty,
-                location=(row.get("department") or "").strip() or None,
+                quantity=quantity,
+                location=location,
                 updated_at=now,
-            ))
+            )
+            db.add(inventory)
 
             inserted += 1
-            key = category.value
-            cat_counts[key] = cat_counts.get(key, 0) + 1
+            category_counts[category.value] += 1
 
-            if inserted % 100 == 0:
+            if inserted % 200 == 0:
                 db.commit()
-                print(f"  ... {inserted}건 처리중")
 
         db.commit()
 
-        # ── 결과 출력 ─────────────────────────────────────────────────────
-        order  = ["RM","TA","TF","HA","HF","VA","VF","BA","BF","FG","UK"]
-        labels = {
-            "RM":"원자재","TA":"튜브반제품","TF":"완성튜브",
-            "HA":"고압반제품","HF":"고압완제품","VA":"진공반제품",
-            "VF":"진공완제품","BA":"조립반제품","BF":"조립완제품",
-            "FG":"출하완제품","UK":"미분류",
-        }
+        print(f"Seed complete for SQLite database: {SQLITE_PATH}")
+        print(f"CSV rows read: {len(rows)}")
+        print(f"Items inserted: {inserted}")
+        print(f"Rows skipped: {skipped}")
+        print(f"Default stock=100 applied: {defaulted_stock}")
+        print("Category counts:")
+        for code in ["RM", "TA", "TF", "HA", "HF", "VA", "VF", "BA", "BF", "FG", "UK"]:
+            print(f"  {code}: {category_counts.get(code, 0)}")
 
-        print("\n" + "="*52)
-        print("  ✅  임포트 완료!")
-        print("="*52)
-        print(f"  성공:         {inserted:>5,} 건")
-        print(f"  기본재고(100) 적용: {defaulted:>4,} 건")
-        print()
-        print("  [ 카테고리별 ]")
-        for c in order:
-            n = cat_counts.get(c, 0)
-            if n:
-                bar = "█" * (n // 10)
-                print(f"    {c} {labels[c]:>6} : {n:>4}건  {bar}")
-        print("="*52)
-        print(f"\n  DB 파일: {os.path.abspath('erp.db')}")
+        if errors:
+            print("Sample skipped rows:")
+            for message in errors[:10]:
+                print(f"  - {message}")
 
-    except Exception as e:
+    except Exception:
         db.rollback()
-        print(f"\n❌ 오류: {e}")
-        import traceback; traceback.print_exc()
-        sys.exit(1)
+        raise
     finally:
         db.close()
 
 
 if __name__ == "__main__":
-    run()
+    seed()

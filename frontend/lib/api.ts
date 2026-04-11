@@ -1,22 +1,19 @@
-/**
- * ERP API Client
- * FastAPI 백엔드와 통신하는 타입 안전 클라이언트
- */
-
 const API_BASE = process.env.NEXT_PUBLIC_API_URL
   ? `${process.env.NEXT_PUBLIC_API_URL}`
-  : "";  // Next.js rewrites "/api/*" → backend
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+  : "";
 
 export type Category =
-  | "RM" | "TA" | "TF"
-  | "HA" | "HF"
-  | "VA" | "VF"
-  | "BA" | "BF"
-  | "FG" | "UK";
+  | "RM"
+  | "TA"
+  | "TF"
+  | "HA"
+  | "HF"
+  | "VA"
+  | "VF"
+  | "BA"
+  | "BF"
+  | "FG"
+  | "UK";
 
 export interface CategorySummary {
   category: Category;
@@ -88,10 +85,6 @@ export interface ProductionReceiptResponse {
   transaction_ids: string[];
 }
 
-// ---------------------------------------------------------------------------
-// Fetcher (SWR 호환)
-// ---------------------------------------------------------------------------
-
 export async function fetcher<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) {
@@ -101,21 +94,24 @@ export async function fetcher<T>(url: string): Promise<T> {
   return res.json();
 }
 
-// ---------------------------------------------------------------------------
-// API Functions
-// ---------------------------------------------------------------------------
-
 export const api = {
-  // Inventory
-  getInventorySummary: () =>
-    fetcher<InventorySummary>(`${API_BASE}/api/inventory/summary`),
+  getInventorySummary: () => fetcher<InventorySummary>(`${API_BASE}/api/inventory/summary`),
 
-  getItems: (params?: { category?: Category; search?: string }) => {
+  getItems: (params?: {
+    category?: Category;
+    search?: string;
+    skip?: number;
+    limit?: number;
+  }) => {
     const query = new URLSearchParams();
     if (params?.category) query.set("category", params.category);
-    if (params?.search)   query.set("search", params.search);
+    if (params?.search) query.set("search", params.search);
+    if (params?.skip !== undefined) query.set("skip", String(params.skip));
+    if (params?.limit !== undefined) query.set("limit", String(params.limit));
     return fetcher<Item[]>(`${API_BASE}/api/items?${query}`);
   },
+
+  getItem: (itemId: string) => fetcher<Item>(`${API_BASE}/api/items/${itemId}`),
 
   createItem: async (payload: {
     item_code: string;
@@ -133,8 +129,8 @@ export const api = {
     return res.json() as Promise<Item>;
   },
 
-  updateItemCategory: async (item_id: string, category: Category) => {
-    const res = await fetch(`${API_BASE}/api/items/${item_id}`, {
+  updateItemCategory: async (itemId: string, category: Category) => {
+    const res = await fetch(`${API_BASE}/api/items/${itemId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ category }),
@@ -160,12 +156,33 @@ export const api = {
     return res.json();
   },
 
-  // BOM
-  getBOM: (parent_item_id: string) =>
-    fetcher<BOMEntry[]>(`${API_BASE}/api/bom/${parent_item_id}`),
+  adjustInventory: async (payload: {
+    item_id: string;
+    quantity: number;
+    reason: string;
+    location?: string;
+    reference_no?: string;
+    produced_by?: string;
+  }) => {
+    const res = await fetch(`${API_BASE}/api/inventory/adjust`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json() as Promise<{
+      inventory_id: string;
+      item_id: string;
+      quantity: string;
+      location: string | null;
+      updated_at: string;
+    }>;
+  },
 
-  getBOMTree: (parent_item_id: string) =>
-    fetcher<unknown>(`${API_BASE}/api/bom/${parent_item_id}/tree`),
+  getBOM: (parentItemId: string) => fetcher<BOMEntry[]>(`${API_BASE}/api/bom/${parentItemId}`),
+
+  getBOMTree: (parentItemId: string) =>
+    fetcher<unknown>(`${API_BASE}/api/bom/${parentItemId}/tree`),
 
   createBOM: async (payload: {
     parent_item_id: string;
@@ -183,7 +200,6 @@ export const api = {
     return res.json() as Promise<BOMEntry>;
   },
 
-  // Production
   productionReceipt: async (payload: {
     item_id: string;
     quantity: number;
@@ -200,18 +216,13 @@ export const api = {
     return res.json() as Promise<ProductionReceiptResponse>;
   },
 
-  checkProduction: (item_id: string, quantity: number) =>
-    fetcher<unknown>(
-      `${API_BASE}/api/production/bom-check/${item_id}?quantity=${quantity}`
-    ),
+  checkProduction: (itemId: string, quantity: number) =>
+    fetcher<unknown>(`${API_BASE}/api/production/bom-check/${itemId}?quantity=${quantity}`),
 
-  // Transactions
   getTransactions: (params?: { item_id?: string; limit?: number }) => {
     const query = new URLSearchParams();
     if (params?.item_id) query.set("item_id", params.item_id);
-    if (params?.limit)   query.set("limit", String(params.limit));
-    return fetcher<TransactionLog[]>(
-      `${API_BASE}/api/inventory/transactions?${query}`
-    );
+    if (params?.limit) query.set("limit", String(params.limit));
+    return fetcher<TransactionLog[]>(`${API_BASE}/api/inventory/transactions?${query}`);
   },
 };

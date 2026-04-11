@@ -1,6 +1,4 @@
-"""
-Inventory Router — 재고 현황 조회 및 직접 입고
-"""
+"""Inventory router for summary, direct receipts, and transaction history."""
 
 import uuid
 from decimal import Decimal
@@ -11,20 +9,22 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Item, Inventory, TransactionLog, CategoryEnum, TransactionTypeEnum
+from app.models import CategoryEnum, Inventory, Item, TransactionLog, TransactionTypeEnum
 from app.schemas import (
-    InventoryReceive, InventoryResponse,
-    CategorySummary, InventorySummaryResponse,
+    CategorySummary,
+    InventoryAdjust,
+    InventoryReceive,
+    InventoryResponse,
+    InventorySummaryResponse,
     TransactionLogResponse,
 )
 
 router = APIRouter()
 
-# 카테고리 한글 라벨 (제조 흐름 순서)
 CATEGORY_LABELS = {
     CategoryEnum.RM: "원자재 (Raw Material)",
     CategoryEnum.TA: "튜브 반제품 (Tube Ass'y)",
-    CategoryEnum.TF: "완성 튜브 (Tube Final)",
+    CategoryEnum.TF: "튜브 완제품 (Tube Final)",
     CategoryEnum.HA: "고압 반제품 (High-voltage Ass'y)",
     CategoryEnum.HF: "고압 완제품 (High-voltage Final)",
     CategoryEnum.VA: "진공 반제품 (Vacuum Ass'y)",
@@ -32,26 +32,28 @@ CATEGORY_LABELS = {
     CategoryEnum.BA: "조립 반제품 (Body Ass'y)",
     CategoryEnum.BF: "조립 완제품 (Body Final)",
     CategoryEnum.FG: "최종 출하품 (Finished Good)",
-    CategoryEnum.UK: "미분류 자재 (Unknown)",
+    CategoryEnum.UK: "미분류 품목 (Unknown)",
 }
 
-# 제조 흐름 순서
 CATEGORY_ORDER = [
-    CategoryEnum.RM, CategoryEnum.TA, CategoryEnum.TF,
-    CategoryEnum.HA, CategoryEnum.HF,
-    CategoryEnum.VA, CategoryEnum.VF,
-    CategoryEnum.BA, CategoryEnum.BF,
-    CategoryEnum.FG, CategoryEnum.UK,
+    CategoryEnum.RM,
+    CategoryEnum.TA,
+    CategoryEnum.TF,
+    CategoryEnum.HA,
+    CategoryEnum.HF,
+    CategoryEnum.VA,
+    CategoryEnum.VF,
+    CategoryEnum.BA,
+    CategoryEnum.BF,
+    CategoryEnum.FG,
+    CategoryEnum.UK,
 ]
 
 
 @router.get("/summary", response_model=InventorySummaryResponse)
 def get_inventory_summary(db: Session = Depends(get_db)):
-    """
-    카테고리별 재고 현황 집계 — 대시보드 메인 데이터.
-    제조 흐름 순서(RM→...→FG→UK)로 반환.
-    """
-    # 카테고리별 품목 수 및 총 재고량 집계
+    """Return category-level inventory totals in manufacturing flow order."""
+
     rows = (
         db.query(
             Item.category,
@@ -63,7 +65,6 @@ def get_inventory_summary(db: Session = Depends(get_db)):
         .all()
     )
 
-    # dict로 변환
     summary_map = {
         row.category: {
             "item_count": row.item_count,
@@ -72,21 +73,24 @@ def get_inventory_summary(db: Session = Depends(get_db)):
         for row in rows
     }
 
-    # 전체 통계
-    total_items = sum(v["item_count"] for v in summary_map.values())
-    total_quantity = sum(v["total_quantity"] for v in summary_map.values())
+    total_items = sum(value["item_count"] for value in summary_map.values())
+    total_quantity = sum(value["total_quantity"] for value in summary_map.values())
     uk_count = summary_map.get(CategoryEnum.UK, {}).get("item_count", 0)
 
-    # 순서에 맞게 카테고리 요약 생성 (데이터 없는 카테고리도 0으로 포함)
     categories = []
-    for cat in CATEGORY_ORDER:
-        data = summary_map.get(cat, {"item_count": 0, "total_quantity": Decimal("0")})
-        categories.append(CategorySummary(
-            category=cat,
-            category_label=CATEGORY_LABELS[cat],
-            item_count=data["item_count"],
-            total_quantity=data["total_quantity"],
-        ))
+    for category in CATEGORY_ORDER:
+        data = summary_map.get(
+            category,
+            {"item_count": 0, "total_quantity": Decimal("0")},
+        )
+        categories.append(
+            CategorySummary(
+                category=category,
+                category_label=CATEGORY_LABELS[category],
+                item_count=data["item_count"],
+                total_quantity=data["total_quantity"],
+            )
+        )
 
     return InventorySummaryResponse(
         categories=categories,
@@ -98,7 +102,8 @@ def get_inventory_summary(db: Session = Depends(get_db)):
 
 @router.post("/receive", response_model=InventoryResponse, status_code=status.HTTP_201_CREATED)
 def receive_inventory(payload: InventoryReceive, db: Session = Depends(get_db)):
-    """직접 입고 처리. 재고를 즉시 증가시키고 TransactionLog에 기록."""
+    """Apply a direct receipt and record a transaction log entry."""
+
     item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
@@ -109,8 +114,8 @@ def receive_inventory(payload: InventoryReceive, db: Session = Depends(get_db)):
         db.add(inventory)
         db.flush()
 
-    qty_before = inventory.quantity
-    inventory.quantity = qty_before + payload.quantity
+    quantity_before = inventory.quantity
+    inventory.quantity = quantity_before + payload.quantity
     if payload.location:
         inventory.location = payload.location
 
@@ -118,7 +123,7 @@ def receive_inventory(payload: InventoryReceive, db: Session = Depends(get_db)):
         item_id=payload.item_id,
         transaction_type=TransactionTypeEnum.RECEIVE,
         quantity_change=payload.quantity,
-        quantity_before=qty_before,
+        quantity_before=quantity_before,
         quantity_after=inventory.quantity,
         reference_no=payload.reference_no,
         produced_by=payload.produced_by,
@@ -130,18 +135,58 @@ def receive_inventory(payload: InventoryReceive, db: Session = Depends(get_db)):
     return inventory
 
 
+@router.post("/adjust", response_model=InventoryResponse, status_code=status.HTTP_200_OK)
+def adjust_inventory(payload: InventoryAdjust, db: Session = Depends(get_db)):
+    """Adjust current stock to an absolute quantity and keep a transaction log."""
+
+    item = db.query(Item).filter(Item.item_id == payload.item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
+
+    inventory = db.query(Inventory).filter(Inventory.item_id == payload.item_id).first()
+    if not inventory:
+        inventory = Inventory(item_id=payload.item_id, quantity=Decimal("0"))
+        db.add(inventory)
+        db.flush()
+
+    quantity_before = inventory.quantity
+    quantity_after = payload.quantity
+    quantity_change = quantity_after - quantity_before
+
+    inventory.quantity = quantity_after
+    if payload.location is not None:
+        inventory.location = payload.location
+
+    log = TransactionLog(
+        item_id=payload.item_id,
+        transaction_type=TransactionTypeEnum.ADJUST,
+        quantity_change=quantity_change,
+        quantity_before=quantity_before,
+        quantity_after=quantity_after,
+        reference_no=payload.reference_no,
+        produced_by=payload.produced_by,
+        notes=payload.reason,
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(inventory)
+    return inventory
+
+
 @router.get("/", response_model=List[InventoryResponse])
 def list_inventory(
     category: Optional[CategoryEnum] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(100, ge=1, le=2000),
     db: Session = Depends(get_db),
 ):
-    """전체 재고 목록 조회."""
+    """List inventory records, optionally filtered by category."""
+
     query = db.query(Inventory).join(Item, Inventory.item_id == Item.item_id)
     if category:
         query = query.filter(Item.category == category)
-    return query.offset(skip).limit(limit).all()
+
+    return query.order_by(Item.item_code).offset(skip).limit(limit).all()
 
 
 @router.get("/transactions", response_model=List[TransactionLogResponse])
@@ -153,7 +198,8 @@ def list_transactions(
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
-    """거래 이력 조회. 품목/유형/참조번호로 필터링."""
+    """Return transaction history with optional filters."""
+
     query = db.query(TransactionLog)
 
     if item_id:
