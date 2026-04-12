@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { href: "/operations", label: "입출고", icon: Truck },
   { href: "/history", label: "거래 이력", icon: ScrollText },
   { href: "/bom", label: "BOM / 생산", icon: Spline },
-  { href: "/admin", label: "관리", icon: Settings2 },
+  { href: "/admin", label: "관리자", icon: Settings2 },
 ];
 
 export default function AppHeader() {
