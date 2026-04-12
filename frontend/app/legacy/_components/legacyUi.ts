@@ -23,7 +23,7 @@ export const DEPARTMENT_LABELS: Record<string, string> = {
   조립: "조립",
   고압: "고압",
   진공: "진공",
-  셋팅: "셋팅",
+  튜닝: "튜닝",
   튜브: "튜브",
   AS: "AS",
   연구: "연구",
@@ -36,13 +36,13 @@ export const DEPARTMENT_ICONS: Record<string, string> = {
   조립: "🔧",
   고압: "⚡",
   진공: "🧪",
-  셋팅: "🪛",
-  튜브: "🧫",
+  튜닝: "🛠",
+  튜브: "🧵",
   AS: "🩺",
-  연구: "🧬",
-  영업: "📦",
+  연구: "🧫",
+  영업: "📈",
   출하: "🚚",
-  기타: "📁",
+  기타: "📦",
 };
 
 export const FILE_TYPE_BADGES: Record<string, { label: string; bg: string; color: string }> = {
@@ -72,7 +72,7 @@ export function employeeColor(value?: string | null) {
       return LEGACY_COLORS.yellow;
     case "진공":
       return LEGACY_COLORS.purple;
-    case "셋팅":
+    case "튜닝":
       return LEGACY_COLORS.cyan;
     case "튜브":
       return LEGACY_COLORS.green;
@@ -151,7 +151,7 @@ export function firstEmployeeLetter(name?: string | null) {
 }
 
 export function buildItemSearchLabel(item: Item) {
-  return `${item.item_code} · ${item.item_name}`;
+  return `${item.item_code} / ${item.item_name}`;
 }
 
 export function normalizeModel(value?: string | null) {

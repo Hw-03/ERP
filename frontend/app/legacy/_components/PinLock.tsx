@@ -48,7 +48,7 @@ export function PinLock({ onUnlocked }: { onUnlocked: () => void }) {
         <div className="mb-2 text-3xl">🔐</div>
         <div className="text-lg font-black">관리자 잠금</div>
         <div className="mt-1 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-          관리자 PIN을 입력하세요
+          관리자 PIN을 입력해 주세요.
         </div>
       </div>
 
@@ -75,7 +75,7 @@ export function PinLock({ onUnlocked }: { onUnlocked: () => void }) {
             color: LEGACY_COLORS.red,
           }}
         >
-          PIN이 올바르지 않습니다
+          PIN이 올바르지 않습니다.
         </div>
       ) : null}
 

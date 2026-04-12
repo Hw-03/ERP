@@ -12,8 +12,8 @@ import { DesktopLegacyShell } from "./_components/DesktopLegacyShell";
 
 const TAB_TITLES: Record<TabId, { subtitle: string; title: string }> = {
   inventory: { subtitle: "Inventory", title: "재고" },
-  warehouse: { subtitle: "Warehouse", title: "창고 입출고" },
-  dept: { subtitle: "Department", title: "부서 입출고" },
+  warehouse: { subtitle: "Warehouse", title: "창고입출고" },
+  dept: { subtitle: "Department", title: "부서입출고" },
   admin: { subtitle: "Admin", title: "관리자" },
 };
 
@@ -27,7 +27,7 @@ export default function LegacyPage() {
 
   const title = useMemo(() => {
     if (showHistory) {
-      return { subtitle: "History", title: "입출고 내역" };
+      return { subtitle: "History", title: "입출고 이력" };
     }
     return TAB_TITLES[activeTab];
   }, [activeTab, showHistory]);
