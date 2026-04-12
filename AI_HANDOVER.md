@@ -134,11 +134,20 @@
 - [v] `cd frontend && npm run build`
 - [v] `/api/inventory/summary` 기준 `total_items = 971`
 
+### 5-6. Desktop UI Density (ERP Parity)
+- [v] Topbar 압축: 88px → 56px (`py-3` + `text-xl`)
+- [v] Sidebar 압축: 250px → 220px, 아이콘/탭 크기 감소, 레이아웃 카드 → 시스템 상태 뱃지
+- [v] InventoryView: flex 레이아웃, 필터 패널 290→195px, 테이블 행 `py-4`→`py-2`, `h-[calc]` → `min-h-0 flex-1`, 선택 행 하이라이트
+- [v] WarehouseView: 동일 압축 패턴 적용
+- [v] DeptView: 동일 압축 패턴 적용
+- [v] RightPanel: 360px → 340px, 타이포그래피 압축
+- [v] 빌드 검증 통과 (`npm run build` ✓)
+
 ## 7. 현재 가장 중요한 TODO
-1. 카메라 기반 QR / 바코드 스캔 실제 연결
-2. `/legacy` 데스크톱 레이아웃의 간격, 아이콘, 애니메이션을 원본 감성에 더 가깝게 미세 조정
-3. 거래 이력 notes 인라인 편집 API + UI
-4. 남아 있는 한글 깨짐 구간 추가 정리
+1. 카메라 기반 QR / 바코드 스캔 실제 연결 (현재 text input 대체)
+2. 거래 이력 notes 인라인 편집 — 백엔드 `PUT /api/inventory/transactions/{log_id}` + 프론트 HistoryTab UI
+3. DesktopAdminView 동일 압축 패턴 적용 (rounded-3xl, py-4 행 등 아직 미적용)
+4. 남아 있는 한글 레이블 검토
 5. 테스트 코드 보강
 
 ## 8. 실행 메모
