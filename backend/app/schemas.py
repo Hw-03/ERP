@@ -281,6 +281,10 @@ class ProductionReceiptResponse(BaseModel):
     transaction_ids: List[uuid.UUID]
 
 
+class TransactionLogUpdate(BaseModel):
+    notes: Optional[str] = Field(None, description="비고 수정")
+
+
 class TransactionLogResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
