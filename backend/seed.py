@@ -22,7 +22,6 @@ PROJECT_ROOT = BACKEND_DIR.parent
 CSV_PATH = PROJECT_ROOT / "ERP_Master_DB.csv"
 SQLITE_PATH = BACKEND_DIR / "erp.db"
 
-# Ensure imports and database target are stable no matter where the script is run from.
 sys.path.insert(0, str(BACKEND_DIR))
 os.environ["DATABASE_URL"] = f"sqlite:///{SQLITE_PATH.as_posix()}"
 
@@ -44,7 +43,6 @@ CATEGORY_MAP = {
     "UK": CategoryEnum.UK,
 }
 
-# Legacy UI filter field mappings derived from category
 CATEGORY_TO_FILE_TYPE: dict[str, str] = {
     "RM": "원자재",
     "TA": "조립자재",
@@ -95,7 +93,6 @@ def get_category(code: str | None) -> CategoryEnum:
 
 
 def run_seed() -> None:
-    """Public entry point callable from the reset API endpoint."""
     seed()
 
 
@@ -106,8 +103,7 @@ def seed() -> None:
     Base.metadata.create_all(bind=engine)
 
     with CSV_PATH.open("r", encoding="utf-8-sig", newline="") as handle:
-        reader = csv.DictReader(handle)
-        rows = list(reader)
+        rows = list(csv.DictReader(handle))
 
     if not rows:
         print("Seed skipped: CSV is empty.")
@@ -122,7 +118,6 @@ def seed() -> None:
     errors: list[str] = []
 
     try:
-        # Reset for deterministic re-runs.
         db.query(Inventory).delete()
         db.query(Item).delete()
         db.commit()
@@ -147,8 +142,7 @@ def seed() -> None:
             unit = (row.get("std_unit") or "").strip() or "EA"
             location = (row.get("department") or "").strip() or None
 
-            # Legacy metadata fields
-            barcode = item_code  # default barcode = item_code
+            barcode = item_code
             legacy_file_type = CATEGORY_TO_FILE_TYPE.get(raw_category_code, "미분류")
             legacy_part = CATEGORY_TO_PART.get(raw_category_code, "자재창고")
             legacy_item_type = (row.get("part_type") or "").strip() or None

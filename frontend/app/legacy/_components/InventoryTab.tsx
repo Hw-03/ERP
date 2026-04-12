@@ -180,15 +180,15 @@ export function InventoryTab({
           color: LEGACY_COLORS.muted2,
         }}
       >
-        📋 입출고 내역 확인
+        입출고 이력 확인
       </button>
 
       <div className="mb-[10px] flex items-center gap-2 rounded-[11px] border px-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-        <span>🔍</span>
+        <span>🔎</span>
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="품명·모델·공급처·ID"
+          placeholder="품목명, 모델, 공급처, 코드 검색"
           className="w-full bg-transparent py-[10px] text-sm outline-none"
           style={{ color: LEGACY_COLORS.text }}
         />
@@ -229,7 +229,7 @@ export function InventoryTab({
 
       <div className="mb-[6px] flex items-center justify-between px-[2px]">
         <div className="text-[10px] font-mono" style={{ color: LEGACY_COLORS.muted2 }}>
-          {displayRows.length}개 품목 · 총 재고 {formatNumber(totals.totalQuantity)}
+          {displayRows.length}개 품목 / 총 재고 {formatNumber(totals.totalQuantity)}
         </div>
         <div className="flex items-center gap-2">
           <FilterPills options={KPI_OPTIONS} value={kpi} onChange={setKpi} activeColor={LEGACY_COLORS.purple} />
@@ -253,7 +253,7 @@ export function InventoryTab({
         </div>
       ) : loading && items.length === 0 ? (
         <div className="py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-          불러오는 중...
+          데이터를 불러오는 중입니다...
         </div>
       ) : displayRows.length === 0 ? (
         <div className="py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -313,27 +313,21 @@ export function InventoryTab({
                   <div className="truncate text-sm font-semibold">{item.item_name}</div>
                   <div className="mt-0.5 truncate text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
                     {item.item_code}
-                    {item.legacy_part ? ` · ${item.legacy_part}` : ""}
-                    {normalizeModel(item.legacy_model) !== "공용" ? ` · ${normalizeModel(item.legacy_model)}` : ""}
-                    {item.supplier ? ` · ${item.supplier}` : ""}
+                    {item.legacy_part ? ` / ${item.legacy_part}` : ""}
+                    {normalizeModel(item.legacy_model) !== "공용" ? ` / ${normalizeModel(item.legacy_model)}` : ""}
+                    {item.supplier ? ` / ${item.supplier}` : ""}
                   </div>
                   <div className="mt-2 h-[6px] rounded-full" style={{ background: LEGACY_COLORS.s3 }}>
-                    <div
-                      className="h-[6px] rounded-full"
-                      style={{
-                        width: `${fillWidth}%`,
-                        background: stockState.color,
-                      }}
-                    />
+                    <div className="h-full rounded-full" style={{ width: `${fillWidth}%`, background: stockState.color }} />
                   </div>
                 </div>
-
-                <div className="shrink-0 text-right">
-                  <div className="font-mono text-lg font-bold" style={{ color: stockState.color }}>
+                <div className="text-right">
+                  <div className="text-lg font-bold" style={{ color: LEGACY_COLORS.text }}>
                     {formatNumber(row.quantity)}
                   </div>
                   <div className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
                     {item.unit}
+                    {item.min_stock != null ? ` / 안전 ${formatNumber(item.min_stock)}` : ""}
                   </div>
                 </div>
               </button>
@@ -347,22 +341,25 @@ export function InventoryTab({
           onClick={() => {
             const nextPage = page + 1;
             setPage(nextPage);
-            void fetchItems(nextPage * PAGE_SIZE - PAGE_SIZE, true);
+            void fetchItems((nextPage - 1) * PAGE_SIZE, true);
           }}
-          className="mt-3 w-full py-[14px] text-center text-[13px] font-bold"
-          style={{ color: LEGACY_COLORS.blue }}
+          className="mt-3 w-full rounded-xl border py-3 text-sm font-semibold"
+          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
         >
-          100개 더보기
+          100개 더 보기
         </button>
       ) : null}
 
       <ItemDetailSheet
         item={selectedItem}
         onClose={() => setSelectedItem(null)}
-        onSaved={(updated) => {
-          setItems((current) => current.map((item) => (item.item_id === updated.item_id ? updated : item)));
+        onSaved={async (updated) => {
+          showToast({
+            type: "success",
+            message: `${updated.item_name} 재고를 반영했습니다.`,
+          });
+          await fetchItems(0, false);
           setSelectedItem(updated);
-          showToast({ message: "재고가 업데이트되었습니다.", type: "success" });
         }}
       />
     </div>

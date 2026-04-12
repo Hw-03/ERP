@@ -35,14 +35,14 @@ export const DEPARTMENT_LABELS: Record<string, string> = {
 export const DEPARTMENT_ICONS: Record<string, string> = {
   조립: "🔧",
   고압: "⚡",
-  진공: "🧪",
-  튜닝: "🛠",
+  진공: "🌀",
+  튜닝: "🧪",
   튜브: "🧵",
-  AS: "🩺",
-  연구: "🧫",
-  영업: "📈",
-  출하: "🚚",
-  기타: "📦",
+  AS: "🛠",
+  연구: "📘",
+  영업: "💼",
+  출하: "📦",
+  기타: "🏷",
 };
 
 export const FILE_TYPE_BADGES: Record<string, { label: string; bg: string; color: string }> = {

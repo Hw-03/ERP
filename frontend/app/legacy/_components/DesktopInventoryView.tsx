@@ -260,155 +260,132 @@ export function DesktopInventoryView({
             </div>
             <button
               onClick={() => setGrouped((current) => !current)}
-              className="flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-sm font-semibold"
+              className="w-full rounded-2xl border px-3 py-2 text-xs font-semibold"
               style={{
-                background: grouped ? "rgba(244,185,66,.14)" : LEGACY_COLORS.s1,
+                background: grouped ? "rgba(244,185,66,.18)" : LEGACY_COLORS.s1,
                 borderColor: grouped ? LEGACY_COLORS.yellow : LEGACY_COLORS.border,
                 color: grouped ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2,
               }}
             >
-              고급 보기: 같은 품목 묶기
-              <span>{grouped ? "ON" : "OFF"}</span>
+              {grouped ? "묶음 보기 켜짐" : "묶음 보기"}
             </button>
           </PanelCard>
 
           <PanelCard title="요약">
-            <div className="space-y-3">
-              {[
-                { label: "조회 품목", value: formatNumber(rows.length), color: LEGACY_COLORS.blue },
-                { label: "총 재고", value: formatNumber(summary.totalQuantity), color: LEGACY_COLORS.green },
-                { label: "부족", value: formatNumber(summary.lowCount), color: LEGACY_COLORS.yellow },
-                { label: "품절", value: formatNumber(summary.zeroCount), color: LEGACY_COLORS.red },
-              ].map((entry) => (
-                <div key={entry.label} className="rounded-2xl px-4 py-3" style={{ background: LEGACY_COLORS.s1 }}>
-                  <div className="mb-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {entry.label}
-                  </div>
-                  <div className="font-mono text-xl font-black" style={{ color: entry.color }}>
-                    {entry.value}
-                  </div>
-                </div>
-              ))}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border p-3" style={{ borderColor: LEGACY_COLORS.border }}>
+                <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>품목 수</div>
+                <div className="mt-1 text-2xl font-black">{formatNumber(rows.length)}</div>
+              </div>
+              <div className="rounded-2xl border p-3" style={{ borderColor: LEGACY_COLORS.border }}>
+                <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>총 재고</div>
+                <div className="mt-1 text-2xl font-black">{formatNumber(summary.totalQuantity)}</div>
+              </div>
+              <div className="rounded-2xl border p-3" style={{ borderColor: LEGACY_COLORS.border }}>
+                <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>부족</div>
+                <div className="mt-1 text-2xl font-black" style={{ color: LEGACY_COLORS.yellow }}>{formatNumber(summary.lowCount)}</div>
+              </div>
+              <div className="rounded-2xl border p-3" style={{ borderColor: LEGACY_COLORS.border }}>
+                <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>품절</div>
+                <div className="mt-1 text-2xl font-black" style={{ color: LEGACY_COLORS.red }}>{formatNumber(summary.zeroCount)}</div>
+              </div>
             </div>
           </PanelCard>
         </div>
 
-        <div className="min-h-0 rounded-[28px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+        <div className="min-h-0 overflow-hidden rounded-[28px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
           <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: LEGACY_COLORS.border }}>
-            <div>
-              <div className="text-lg font-black">재고 작업대</div>
-              <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                좌측에서 조건을 고르고, 중앙 표에서 품목을 선택한 뒤, 우측 패널에서 바로 처리합니다.
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl p-2" style={{ background: "rgba(79,142,247,.15)", color: LEGACY_COLORS.blue }}>
+                <Boxes size={18} />
+              </div>
+              <div>
+                <div className="text-lg font-black">재고 현황</div>
+                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                  상태, 모델, 파트 기준으로 실시간 필터링됩니다.
+                </div>
               </div>
             </div>
             <button
               onClick={() => void loadItems()}
-              className="flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold"
-              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+              className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold"
+              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw size={14} />
               새로고침
             </button>
           </div>
 
-          {loading ? (
-            <div className="flex h-[calc(100vh-220px)] items-center justify-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-              재고 데이터를 불러오는 중입니다...
-            </div>
-          ) : error ? (
-            <div className="flex h-[calc(100vh-220px)] items-center justify-center px-8 text-center text-sm" style={{ color: LEGACY_COLORS.red }}>
-              {error}
-            </div>
+          {error ? (
+            <div className="p-8 text-sm" style={{ color: LEGACY_COLORS.red }}>{error}</div>
+          ) : loading ? (
+            <div className="p-8 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>재고 데이터를 불러오는 중입니다...</div>
           ) : (
-            <div className="h-[calc(100vh-220px)] overflow-auto">
-              <table className="min-w-full text-left">
-                <thead className="sticky top-0 z-10" style={{ background: LEGACY_COLORS.s2 }}>
-                  <tr className="text-xs uppercase tracking-[0.16em]" style={{ color: LEGACY_COLORS.muted2 }}>
-                    <th className="px-4 py-3">상태</th>
-                    <th className="px-4 py-3">품목명</th>
-                    <th className="px-4 py-3">코드</th>
-                    <th className="px-4 py-3">위치</th>
-                    <th className="px-4 py-3 text-right">현재고</th>
-                    <th className="px-4 py-3 text-right">안전재고</th>
-                    <th className="px-4 py-3">모델 / 파트</th>
+            <div className="min-h-0 overflow-auto">
+              <table className="min-w-full border-separate border-spacing-0 text-sm">
+                <thead className="sticky top-0 z-10">
+                  <tr style={{ background: LEGACY_COLORS.s2 }}>
+                    {["상태", "품목명", "코드", "위치", "현재고", "안전재고", "모델/파트"].map((head) => (
+                      <th
+                        key={head}
+                        className="border-b px-4 py-3 text-left text-[11px] font-bold"
+                        style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+                      >
+                        {head}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((row) => {
-                    const stockState = getStockState(
-                      row.quantity,
-                      row.representative.min_stock == null ? null : Number(row.representative.min_stock),
-                    );
-                    const badge = fileTypeBadge(row.representative.legacy_file_type);
-                    const active = selectedItem?.item_id === row.representative.item_id;
+                    const item = row.representative;
+                    const stock = getStockState(row.quantity, item.min_stock == null ? null : Number(item.min_stock));
+                    const badge = fileTypeBadge(item.legacy_file_type);
+                    const selected = selectedItem?.item_id === item.item_id;
+
                     return (
                       <tr
                         key={row.key}
-                        onClick={() => setSelectedItem(row.representative)}
-                        className="cursor-pointer border-b transition hover:bg-white/5"
-                        style={{
-                          borderColor: LEGACY_COLORS.border,
-                          background: active ? "rgba(79,142,247,.08)" : undefined,
-                          boxShadow: active ? `inset 3px 0 0 ${LEGACY_COLORS.blue}` : undefined,
-                        }}
+                        onClick={() => setSelectedItem(item)}
+                        className="cursor-pointer"
+                        style={{ background: selected ? "rgba(79,142,247,.08)" : "transparent" }}
                       >
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1.5">
-                            <span
-                              className="rounded-full px-2 py-0.5 text-[11px] font-bold"
-                              style={{
-                                background:
-                                  stockState.label === "정상"
-                                    ? "rgba(31,209,122,.16)"
-                                    : stockState.label === "부족"
-                                      ? "rgba(244,185,66,.16)"
-                                      : "rgba(242,95,92,.16)",
-                                color: stockState.color,
-                              }}
-                            >
-                              {stockState.label}
+                        <td className="border-b px-4 py-3 align-top" style={{ borderColor: LEGACY_COLORS.border }}>
+                          <div className="flex flex-col gap-1">
+                            <span className="inline-flex w-fit rounded-full px-2 py-1 text-[10px] font-bold" style={{ color: stock.color, background: `${stock.color}22` }}>
+                              {stock.label}
                             </span>
-                            <span
-                              className="rounded-full px-2 py-0.5 text-[11px] font-bold"
-                              style={{ background: badge.bg, color: badge.color }}
-                            >
+                            <span className="inline-flex w-fit rounded-full px-2 py-1 text-[10px] font-bold" style={{ color: badge.color, background: badge.bg }}>
                               {badge.label}
                             </span>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="text-sm font-semibold">{row.representative.item_name}</div>
-                          {grouped && row.count > 1 ? (
-                            <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                        <td className="border-b px-4 py-3 align-top" style={{ borderColor: LEGACY_COLORS.border }}>
+                          <div className="font-semibold">{item.item_name}</div>
+                          {row.count > 1 ? (
+                            <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.cyan }}>
                               동일 품목 {row.count}건 묶음
                             </div>
                           ) : null}
                         </td>
-                        <td className="px-4 py-3 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-                          {row.representative.item_code}
+                        <td className="border-b px-4 py-3 align-top font-mono text-[12px]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                          {item.item_code}
                         </td>
-                        <td className="px-4 py-3 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-                          {row.representative.legacy_part || row.representative.location || "-"}
+                        <td className="border-b px-4 py-3 align-top" style={{ borderColor: LEGACY_COLORS.border }}>
+                          {item.location ?? "-"}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono text-sm font-black" style={{ color: stockState.color }}>
+                        <td className="border-b px-4 py-3 align-top text-right font-mono text-[13px] font-bold" style={{ borderColor: LEGACY_COLORS.border }}>
                           {formatNumber(row.quantity)}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-                          {row.representative.min_stock != null ? formatNumber(row.representative.min_stock) : "-"}
+                        <td className="border-b px-4 py-3 align-top text-right font-mono text-[13px]" style={{ borderColor: LEGACY_COLORS.border }}>
+                          {item.min_stock == null ? "-" : formatNumber(item.min_stock)}
                         </td>
-                        <td className="px-4 py-3 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-                          {normalizeModel(row.representative.legacy_model)} / {row.representative.legacy_part || "-"}
+                        <td className="border-b px-4 py-3 align-top text-[12px]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                          {normalizeModel(item.legacy_model)} / {item.legacy_part ?? "-"}
                         </td>
                       </tr>
                     );
                   })}
-                  {rows.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-5 py-16 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-                        조건에 맞는 품목이 없습니다.
-                      </td>
-                    </tr>
-                  ) : null}
                 </tbody>
               </table>
             </div>
@@ -417,195 +394,130 @@ export function DesktopInventoryView({
       </div>
 
       <DesktopRightPanel
-        title={selectedItem ? selectedItem.item_name : "품목 상세"}
+        title={selectedItem ? selectedItem.item_name : "품목을 선택해 주세요"}
         subtitle={
           selectedItem
-            ? `${selectedItem.item_code} / ${selectedItem.legacy_part || "미지정"} / ${normalizeModel(selectedItem.legacy_model)}`
-            : "중앙 목록에서 품목을 선택하면 현재고, 최근 이력, 실행 패널이 표시됩니다."
+            ? `${selectedItem.item_code} / ${selectedItem.location ?? "위치 미지정"} / 현재고 ${formatNumber(selectedItem.quantity)}`
+            : "가운데 표에서 품목을 선택하면 상세 정보와 재고 처리를 바로 할 수 있습니다."
         }
       >
-        {selectedItem ? (
+        {!selectedItem ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+            <div className="rounded-3xl p-4" style={{ background: "rgba(79,142,247,.12)", color: LEGACY_COLORS.blue }}>
+              <PackageSearch size={26} />
+            </div>
+            <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+              재고를 확인할 품목을 선택해 주세요.
+            </div>
+          </div>
+        ) : (
           <div className="space-y-4">
-            <section className="rounded-3xl border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-              <div className="mb-3 flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl" style={{ background: "rgba(79,142,247,.16)", color: LEGACY_COLORS.blue }}>
-                  <Boxes className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="text-sm font-bold">{selectedItem.item_name}</div>
-                  <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {selectedItem.spec || "사양 미입력"}
-                  </div>
-                </div>
+            <section className="rounded-3xl border p-4" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
+              <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                현재 선택
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  ["현재고", `${formatNumber(selectedItem.quantity)} ${selectedItem.unit}`],
-                  ["바코드", selectedItem.barcode || "-"],
-                  ["공급처", selectedItem.supplier || "-"],
-                  ["안전재고", selectedItem.min_stock != null ? formatNumber(selectedItem.min_stock) : "-"],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-2xl px-3 py-3" style={{ background: LEGACY_COLORS.s1 }}>
-                    <div className="mb-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                      {label}
-                    </div>
-                    <div className="text-sm font-semibold">{value}</div>
-                  </div>
-                ))}
+              <div className="space-y-2 text-sm">
+                <div>품목명: <span className="font-semibold">{selectedItem.item_name}</span></div>
+                <div>품목코드: <span className="font-mono">{selectedItem.item_code}</span></div>
+                <div>현재고: <span className="font-mono">{formatNumber(selectedItem.quantity)}</span></div>
+                <div>안전재고: <span className="font-mono">{selectedItem.min_stock == null ? "-" : formatNumber(selectedItem.min_stock)}</span></div>
+                <div>위치: {selectedItem.location ?? "-"}</div>
+                <div>모델/파트: {normalizeModel(selectedItem.legacy_model)} / {selectedItem.legacy_part ?? "-"}</div>
               </div>
             </section>
 
-            <section className="rounded-3xl border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+            <section className="rounded-3xl border p-4" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
               <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
-                실행 방식
+                처리 유형
               </div>
-              <div className="mb-3 grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {[
                   ["ADJUST", "조정"],
                   ["RECEIVE", "입고"],
                   ["SHIP", "출고"],
-                ].map(([id, label]) => (
+                ].map(([value, label]) => (
                   <button
-                    key={id}
-                    onClick={() => {
-                      setAction(id as DesktopInventoryAction);
-                      setQuantity(id === "ADJUST" ? String(Number(selectedItem.quantity)) : "1");
-                    }}
-                    className="rounded-2xl px-3 py-2 text-sm font-semibold"
+                    key={value}
+                    onClick={() => setAction(value as DesktopInventoryAction)}
+                    className="rounded-2xl border px-3 py-2 text-xs font-semibold"
                     style={{
-                      background: action === id ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
-                      color: action === id ? "#fff" : LEGACY_COLORS.muted2,
+                      borderColor: action === value ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+                      background: action === value ? "rgba(79,142,247,.14)" : LEGACY_COLORS.s1,
+                      color: action === value ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
                     }}
                   >
                     {label}
                   </button>
                 ))}
               </div>
-
-              <div className="mb-3 rounded-2xl border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                <div className="mb-2 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  현재 선택 요약
-                </div>
-                <div className="space-y-1 text-sm">
-                  <div>처리 유형: {action === "ADJUST" ? "조정" : action === "RECEIVE" ? "입고" : "출고"}</div>
-                  <div>현재고: {formatNumber(selectedItem.quantity)} {selectedItem.unit}</div>
-                  <div>변경 수량: {formatNumber(numericQty)}</div>
-                  <div>처리 후 예상 재고: {expectedQuantity == null ? "-" : formatNumber(expectedQuantity)}</div>
-                </div>
-              </div>
-
-              <div className="mb-3">
-                <div className="mb-2 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {action === "ADJUST" ? "조정 후 재고" : "처리 수량"}
-                </div>
+              <div className="mt-4 space-y-3">
                 <input
                   value={quantity}
                   onChange={(event) => setQuantity(event.target.value)}
-                  inputMode="numeric"
-                  className="w-full rounded-2xl border px-4 py-3 text-center font-mono text-xl font-black outline-none"
-                  style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                  className="w-full rounded-2xl border px-4 py-3 text-sm outline-none"
+                  style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
+                  placeholder={action === "ADJUST" ? "바꿀 현재고 수량" : "처리 수량"}
+                />
+                <textarea
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  className="min-h-[88px] w-full rounded-2xl border px-4 py-3 text-sm outline-none"
+                  style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
+                  placeholder="처리 사유 또는 메모"
                 />
               </div>
+            </section>
 
-              <div className="mb-3 grid grid-cols-4 gap-2">
-                {[-10, -1, 1, 10].map((delta) => (
-                  <button
-                    key={delta}
-                    onClick={() =>
-                      setQuantity((current) => {
-                        const base = Number(current || 0);
-                        const minimum = action === "ADJUST" ? 0 : 1;
-                        return String(Math.max(minimum, base + delta));
-                      })
-                    }
-                    className="rounded-2xl px-3 py-2 text-sm font-bold"
-                    style={{
-                      background: delta < 0 ? "rgba(242,95,92,.14)" : "rgba(31,209,122,.14)",
-                      color: delta < 0 ? LEGACY_COLORS.red : LEGACY_COLORS.green,
-                    }}
-                  >
-                    {delta > 0 ? `+${delta}` : delta}
-                  </button>
-                ))}
+            <section className="rounded-3xl border p-4" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
+              <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                실행 요약
               </div>
-
-              <textarea
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="처리 사유나 메모를 입력해 주세요."
-                className="min-h-[96px] w-full rounded-2xl border px-4 py-3 text-sm outline-none"
-                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-              />
-
-              {error ? (
-                <div className="mt-3 rounded-2xl border px-3 py-2 text-sm" style={{ background: "rgba(242,95,92,.12)", borderColor: "rgba(242,95,92,.25)", color: LEGACY_COLORS.red }}>
-                  {error}
-                </div>
-              ) : null}
-
+              <div className="space-y-2 text-sm">
+                <div>처리 유형: {action === "ADJUST" ? "조정" : action === "RECEIVE" ? "입고" : "출고"}</div>
+                <div>변경 수량: <span className="font-mono">{formatNumber(quantity)}</span></div>
+                <div>처리 후 예상 재고: <span className="font-mono">{expectedQuantity == null ? "-" : formatNumber(expectedQuantity)}</span></div>
+              </div>
               <button
                 onClick={() => void submitInventoryAction()}
                 disabled={saving}
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold disabled:opacity-50"
+                className="mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold text-white disabled:opacity-60"
                 style={{
-                  background: action === "SHIP" ? LEGACY_COLORS.red : LEGACY_COLORS.blue,
-                  color: "#fff",
+                  background:
+                    action === "SHIP"
+                      ? LEGACY_COLORS.red
+                      : action === "RECEIVE"
+                        ? LEGACY_COLORS.green
+                        : LEGACY_COLORS.blue,
                 }}
               >
-                {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <PackageSearch className="h-4 w-4" />}
-                {saving
-                  ? "처리 중..."
-                  : action === "ADJUST"
-                    ? "재고 조정 적용"
-                    : action === "RECEIVE"
-                      ? "입고 실행"
-                      : "출고 실행"}
+                {saving ? "처리 중..." : action === "SHIP" ? "출고 실행" : action === "RECEIVE" ? "입고 실행" : "재고 조정 적용"}
               </button>
             </section>
 
-            <section className="rounded-3xl border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+            <section className="rounded-3xl border p-4" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
               <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
-                최근 이력 10건
+                최근 이력
               </div>
               <div className="space-y-2">
                 {itemLogs.length === 0 ? (
-                  <div className="rounded-2xl px-3 py-4 text-sm" style={{ background: LEGACY_COLORS.s1, color: LEGACY_COLORS.muted2 }}>
-                    최근 거래 이력이 없습니다.
-                  </div>
+                  <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>최근 이력이 없습니다.</div>
                 ) : (
                   itemLogs.map((log) => (
-                    <div key={log.log_id} className="rounded-2xl px-3 py-3" style={{ background: LEGACY_COLORS.s1 }}>
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <span
-                          className="rounded-full px-2.5 py-1 text-[11px] font-bold"
-                          style={{ background: "rgba(79,142,247,.14)", color: transactionColor(log.transaction_type) }}
-                        >
+                    <div key={log.log_id} className="rounded-2xl border p-3" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold" style={{ color: transactionColor(log.transaction_type) }}>
                           {transactionLabel(log.transaction_type)}
                         </span>
-                        <span className="font-mono text-sm font-bold" style={{ color: transactionColor(log.transaction_type) }}>
-                          {log.quantity_change >= 0 ? "+" : ""}
-                          {formatNumber(log.quantity_change)}
-                        </span>
+                        <span className="font-mono text-xs">{formatNumber(log.quantity_change)}</span>
                       </div>
-                      <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                        {new Date(log.created_at).toLocaleString("ko-KR")}
+                      <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                        {log.notes || "메모 없음"}
                       </div>
-                      {log.produced_by ? (
-                        <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                          담당자: {log.produced_by}
-                        </div>
-                      ) : null}
-                      {log.notes ? <div className="mt-1 text-sm">{log.notes}</div> : null}
                     </div>
                   ))
                 )}
               </div>
             </section>
-          </div>
-        ) : (
-          <div className="rounded-3xl border px-4 py-5 text-sm leading-6" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-            품목을 선택하면 현재고, 안전재고, 공급처, 바코드와 함께 즉시 재고 조정, 입고,
-            출고를 처리할 수 있습니다.
           </div>
         )}
       </DesktopRightPanel>

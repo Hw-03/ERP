@@ -19,7 +19,7 @@ router = APIRouter()
 
 
 def _build_item_query(db: Session):
-    return db.query(Item).outerjoin(Inventory, Item.item_id == Inventory.item_id)
+    return db.query(Item, Inventory).outerjoin(Inventory, Item.item_id == Inventory.item_id)
 
 
 @router.post("/", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
@@ -60,7 +60,7 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
 def list_items(
     category: Optional[CategoryEnum] = Query(None, description="카테고리 필터"),
     search: Optional[str] = Query(None, description="품목명, 품목코드, 사양, 위치, 바코드 검색"),
-    legacy_file_type: Optional[str] = Query(None, description="레거시 파일 타입 필터"),
+    legacy_file_type: Optional[str] = Query(None, description="레거시 파일 구분 필터"),
     legacy_part: Optional[str] = Query(None, description="레거시 파트 필터"),
     legacy_model: Optional[str] = Query(None, description="레거시 모델 필터"),
     legacy_item_type: Optional[str] = Query(None, description="레거시 품목 유형 필터"),
@@ -101,7 +101,7 @@ def list_items(
             )
         )
 
-    items = query.order_by(Item.category, Item.item_code).offset(skip).limit(limit).all()
+    rows = query.order_by(Item.category, Item.item_code).offset(skip).limit(limit).all()
 
     return [
         ItemWithInventory(
@@ -120,10 +120,10 @@ def list_items(
             min_stock=item.min_stock,
             created_at=item.created_at,
             updated_at=item.updated_at,
-            quantity=item.inventory.quantity if item.inventory else 0,
-            location=item.inventory.location if item.inventory else None,
+            quantity=inventory.quantity if inventory else 0,
+            location=inventory.location if inventory else None,
         )
-        for item in items
+        for item, inventory in rows
     ]
 
 
@@ -135,7 +135,7 @@ def export_items_csv(db: Session = Depends(get_db)):
     writer = csv.writer(buffer)
     writer.writerow(["item_code", "item_name", "category", "spec", "unit", "quantity", "location", "updated_at"])
 
-    for item in rows:
+    for item, inventory in rows:
         writer.writerow(
             [
                 item.item_code,
@@ -143,8 +143,8 @@ def export_items_csv(db: Session = Depends(get_db)):
                 item.category.value,
                 item.spec or "",
                 item.unit,
-                float(item.inventory.quantity) if item.inventory else 0,
-                item.inventory.location if item.inventory else "",
+                float(inventory.quantity) if inventory else 0,
+                inventory.location if inventory else "",
                 item.updated_at.isoformat(),
             ]
         )
@@ -159,10 +159,11 @@ def export_items_csv(db: Session = Depends(get_db)):
 
 @router.get("/{item_id}", response_model=ItemWithInventory)
 def get_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.item_id == item_id).first()
-    if not item:
+    row = _build_item_query(db).filter(Item.item_id == item_id).first()
+    if not row:
         raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
 
+    item, inventory = row
     return ItemWithInventory(
         item_id=item.item_id,
         item_code=item.item_code,
@@ -179,8 +180,8 @@ def get_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
         min_stock=item.min_stock,
         created_at=item.created_at,
         updated_at=item.updated_at,
-        quantity=item.inventory.quantity if item.inventory else 0,
-        location=item.inventory.location if item.inventory else None,
+        quantity=inventory.quantity if inventory else 0,
+        location=inventory.location if inventory else None,
     )
 
 
@@ -217,13 +218,3 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, db: Session = Depends(g
     db.commit()
     db.refresh(item)
     return item
-
-
-@router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.item_id == item_id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
-
-    db.delete(item)
-    db.commit()
