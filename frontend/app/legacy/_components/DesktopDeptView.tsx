@@ -148,13 +148,13 @@ export function DesktopDeptView({
 
   return (
     <div className="flex min-h-0 flex-1">
-      <div className="grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)] gap-5 px-6 py-6">
-        <section className="space-y-4 rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+      <div className="grid min-h-0 flex-1 grid-cols-[260px_minmax(0,1fr)] gap-4 px-5 py-5">
+        <section className="flex flex-col gap-3 overflow-y-auto rounded-2xl border p-4" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
           <div>
-            <div className="mb-1 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div className="mb-1.5 text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
               부서 선택
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-1.5">
               {DEPARTMENT_OPTIONS.map((entry) => (
                 <button
                   key={entry}
@@ -162,30 +162,30 @@ export function DesktopDeptView({
                     setDepartment(entry);
                     setEmployeeId("");
                   }}
-                  className="rounded-2xl border px-3 py-3 text-left"
+                  className="rounded-xl border px-2.5 py-2 text-left transition"
                   style={{
                     background: department === entry ? "rgba(79,142,247,.16)" : LEGACY_COLORS.s2,
                     borderColor: department === entry ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
                   }}
                 >
-                  <div className="mb-1 text-lg">{DEPARTMENT_ICONS[entry]}</div>
-                  <div className="text-sm font-bold">{entry}</div>
+                  <div className="mb-0.5 text-base">{DEPARTMENT_ICONS[entry]}</div>
+                  <div className="text-[12px] font-bold">{entry}</div>
                 </button>
               ))}
             </div>
           </div>
 
           <div>
-            <div className="mb-1 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div className="mb-1.5 text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
               작업 방식
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-1.5">
               <button
                 onClick={() => {
                   setMode("in");
                   setUsePackage(false);
                 }}
-                className="rounded-2xl border px-3 py-3 text-sm font-semibold"
+                className="rounded-xl border px-3 py-2 text-xs font-semibold transition"
                 style={{
                   background: mode === "in" ? "rgba(31,209,122,.16)" : LEGACY_COLORS.s2,
                   borderColor: mode === "in" ? LEGACY_COLORS.green : LEGACY_COLORS.border,
@@ -196,7 +196,7 @@ export function DesktopDeptView({
               </button>
               <button
                 onClick={() => setMode("out")}
-                className="rounded-2xl border px-3 py-3 text-sm font-semibold"
+                className="rounded-xl border px-3 py-2 text-xs font-semibold transition"
                 style={{
                   background: mode === "out" ? "rgba(242,95,92,.16)" : LEGACY_COLORS.s2,
                   borderColor: mode === "out" ? LEGACY_COLORS.red : LEGACY_COLORS.border,
@@ -210,13 +210,13 @@ export function DesktopDeptView({
 
           {mode === "out" ? (
             <div>
-              <div className="mb-1 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="mb-1.5 text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
                 처리 대상
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-1.5">
                 <button
                   onClick={() => setUsePackage(false)}
-                  className="rounded-2xl border px-3 py-3 text-sm font-semibold"
+                  className="rounded-xl border px-3 py-2 text-xs font-semibold transition"
                   style={{
                     background: !usePackage ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
                     borderColor: !usePackage ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
@@ -227,7 +227,7 @@ export function DesktopDeptView({
                 </button>
                 <button
                   onClick={() => setUsePackage(true)}
-                  className="rounded-2xl border px-3 py-3 text-sm font-semibold"
+                  className="rounded-xl border px-3 py-2 text-xs font-semibold transition"
                   style={{
                     background: usePackage ? LEGACY_COLORS.purple : LEGACY_COLORS.s2,
                     borderColor: usePackage ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
@@ -241,29 +241,29 @@ export function DesktopDeptView({
           ) : null}
 
           <div>
-            <div className="mb-1 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div className="mb-1.5 text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
               담당 직원
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {visibleEmployees.map((employee) => (
                 <button
                   key={employee.employee_id}
                   onClick={() => setEmployeeId(employee.employee_id)}
-                  className="flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left"
+                  className="flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition"
                   style={{
                     background: employeeId === employee.employee_id ? "rgba(79,142,247,.16)" : LEGACY_COLORS.s2,
                     borderColor: employeeId === employee.employee_id ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
                   }}
                 >
                   <div
-                    className="flex h-10 w-10 items-center justify-center rounded-full font-black text-white"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black text-white"
                     style={{ background: employeeColor(employee.department) }}
                   >
                     {firstEmployeeLetter(employee.name)}
                   </div>
                   <div>
-                    <div className="text-sm font-semibold">{employee.name}</div>
-                    <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                    <div className="text-[13px] font-semibold">{employee.name}</div>
+                    <div className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
                       {normalizeDepartment(employee.department)} · {employee.role}
                     </div>
                   </div>
@@ -273,35 +273,35 @@ export function DesktopDeptView({
           </div>
         </section>
 
-        <section className="min-h-0 rounded-[28px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-          <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: LEGACY_COLORS.border }}>
+        <section className="flex min-h-0 flex-col rounded-2xl border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+          <div className="flex shrink-0 items-center justify-between border-b px-4 py-2.5" style={{ borderColor: LEGACY_COLORS.border }}>
             <div>
-              <div className="text-lg font-black">부서입출고 작업대</div>
-              <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+              <span className="text-[13px] font-bold">부서입출고 작업대</span>
+              <span className="ml-2 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
                 부서별 담당자, 개별 품목, 출하 패키지를 한 화면에서 처리합니다.
-              </div>
+              </span>
             </div>
-            <div className="flex items-center gap-2 rounded-2xl px-4 py-2" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}>
-              <Building2 className="h-4 w-4" />
+            <div className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}>
+              <Building2 className="h-3 w-3" />
               {department}
             </div>
           </div>
 
           {usePackage ? (
-            <div className="h-[calc(100vh-220px)] overflow-auto px-5 py-5">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
+              <div className="grid grid-cols-2 gap-3">
                 {packages.map((pkg) => (
                   <button
                     key={pkg.package_id}
                     onClick={() => setPackageId(pkg.package_id)}
-                    className="rounded-3xl border px-4 py-4 text-left"
+                    className="rounded-2xl border px-3 py-3 text-left transition"
                     style={{
                       background: packageId === pkg.package_id ? "rgba(124,58,237,.16)" : LEGACY_COLORS.s2,
                       borderColor: packageId === pkg.package_id ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
                     }}
                   >
-                    <div className="text-sm font-bold">{pkg.name}</div>
-                    <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                    <div className="text-[13px] font-bold">{pkg.name}</div>
+                    <div className="mt-0.5 text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
                       {pkg.package_code} · {pkg.items.length}종 구성
                     </div>
                   </button>
@@ -310,50 +310,63 @@ export function DesktopDeptView({
             </div>
           ) : (
             <>
-              <div className="border-b px-5 py-4" style={{ borderColor: LEGACY_COLORS.border }}>
+              <div className="shrink-0 border-b px-4 py-2.5" style={{ borderColor: LEGACY_COLORS.border }}>
                 <input
                   value={localSearch}
                   onChange={(event) => setLocalSearch(event.target.value)}
                   placeholder="품목명, 코드, 바코드 검색"
-                  className="w-full rounded-2xl border px-4 py-3 text-sm outline-none"
+                  className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
                   style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
                 />
               </div>
 
-              <div className="h-[calc(100vh-296px)] overflow-auto">
+              <div className="min-h-0 flex-1 overflow-auto">
                 <table className="min-w-full text-left">
                   <thead className="sticky top-0 z-10" style={{ background: LEGACY_COLORS.s2 }}>
-                    <tr className="text-xs uppercase tracking-[0.16em]" style={{ color: LEGACY_COLORS.muted2 }}>
-                      <th className="px-5 py-3">품목</th>
-                      <th className="px-5 py-3">바코드</th>
-                      <th className="px-5 py-3 text-right">현재고</th>
+                    <tr className="text-[10px] uppercase tracking-[0.16em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                      <th className="px-4 py-2 font-semibold">품목</th>
+                      <th className="px-4 py-2 font-semibold">바코드</th>
+                      <th className="px-4 py-2 text-right font-semibold">현재고</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleItems.map((item) => (
-                      <tr
-                        key={item.item_id}
-                        onClick={() => {
-                          setItemId(item.item_id);
-                          setLocalSearch(buildItemSearchLabel(item));
-                        }}
-                        className="cursor-pointer border-b transition hover:bg-white/5"
-                        style={{ borderColor: LEGACY_COLORS.border }}
-                      >
-                        <td className="px-5 py-4">
-                          <div className="text-sm font-semibold">{item.item_name}</div>
-                          <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                            {item.item_code}
-                          </div>
-                        </td>
-                        <td className="px-5 py-4 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-                          {item.barcode || "-"}
-                        </td>
-                        <td className="px-5 py-4 text-right font-mono text-sm font-bold" style={{ color: LEGACY_COLORS.blue }}>
-                          {formatNumber(item.quantity)}
-                        </td>
-                      </tr>
-                    ))}
+                    {visibleItems.map((item) => {
+                      const isSelected = itemId === item.item_id;
+                      return (
+                        <tr
+                          key={item.item_id}
+                          onClick={() => {
+                            setItemId(item.item_id);
+                            setLocalSearch(buildItemSearchLabel(item));
+                          }}
+                          className="cursor-pointer border-b"
+                          style={{
+                            borderColor: LEGACY_COLORS.border,
+                            background: isSelected ? "rgba(79,142,247,.10)" : undefined,
+                            transition: "background 0.1s",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSelected) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,.04)";
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSelected) (e.currentTarget as HTMLElement).style.background = "";
+                          }}
+                        >
+                          <td className="px-4 py-2">
+                            <div className="text-[13px] font-semibold">{item.item_name}</div>
+                            <div className="mt-0.5 text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                              {item.item_code}
+                            </div>
+                          </td>
+                          <td className="px-4 py-2 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                            {item.barcode || "-"}
+                          </td>
+                          <td className="px-4 py-2 text-right font-mono text-sm font-bold" style={{ color: LEGACY_COLORS.blue }}>
+                            {formatNumber(item.quantity)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
