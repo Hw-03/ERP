@@ -20,35 +20,32 @@ export const LEGACY_COLORS = {
 } as const;
 
 export const DEPARTMENT_LABELS: Record<string, string> = {
-  "議곕┰": "조립",
-  "怨좎븬": "고압",
-  "吏꾧났": "진공",
-  "?쒕떇": "튜닝",
-  "?쒕툕": "튜브",
+  조립: "조립",
+  고압: "고압",
+  진공: "진공",
+  셋팅: "셋팅",
+  튜브: "튜브",
   AS: "AS",
-  "?곌뎄": "연구",
-  "?곸뾽": "영업",
-  "異쒗븯": "출하",
-  "湲고?": "기타",
+  연구: "연구",
+  영업: "영업",
+  출하: "출하",
+  기타: "기타",
 };
 
 export const DEPARTMENT_ICONS: Record<string, string> = {
   조립: "🔧",
   고압: "⚡",
-  진공: "🔩",
-  튜닝: "🎛",
-  튜브: "🧪",
-  AS: "🛠",
+  진공: "🧪",
+  셋팅: "🪛",
+  튜브: "🧫",
+  AS: "🩺",
   연구: "🧬",
-  영업: "💼",
-  출하: "📦",
+  영업: "📦",
+  출하: "🚚",
   기타: "📁",
 };
 
-export const FILE_TYPE_BADGES: Record<
-  string,
-  { label: string; bg: string; color: string }
-> = {
+export const FILE_TYPE_BADGES: Record<string, { label: string; bg: string; color: string }> = {
   원자재: { label: "원자재", bg: "rgba(79,142,247,.15)", color: LEGACY_COLORS.blue },
   조립자재: { label: "조립자재", bg: "rgba(31,209,122,.15)", color: LEGACY_COLORS.green },
   발생부자재: { label: "발생부자재", bg: "rgba(244,185,66,.15)", color: LEGACY_COLORS.yellow },
@@ -56,6 +53,11 @@ export const FILE_TYPE_BADGES: Record<
   데모: { label: "데모", bg: "rgba(6,182,212,.15)", color: LEGACY_COLORS.cyan },
   미분류: { label: "미분류", bg: "rgba(136,144,170,.15)", color: LEGACY_COLORS.muted2 },
 };
+
+export const LEGACY_FILE_TYPES = ["전체", "원자재", "조립자재", "발생부자재", "완제품", "미분류"] as const;
+export const LEGACY_PARTS = ["전체", "자재창고", "조립출하", "고압파트", "진공파트", "튜닝파트", "출하"] as const;
+export const LEGACY_MODELS = ["전체", "공용", "DX3000", "ADX4000W", "ADX6000", "COCOON", "SOLO"] as const;
+export const KPI_FILTERS = ["전체", "정상", "부족", "품절"] as const;
 
 export function normalizeDepartment(value?: string | null) {
   if (!value) return "기타";
@@ -70,7 +72,7 @@ export function employeeColor(value?: string | null) {
       return LEGACY_COLORS.yellow;
     case "진공":
       return LEGACY_COLORS.purple;
-    case "튜닝":
+    case "셋팅":
       return LEGACY_COLORS.cyan;
     case "튜브":
       return LEGACY_COLORS.green;
@@ -94,24 +96,12 @@ export function fileTypeBadge(value?: string | null) {
 
 export function getStockState(quantity: number, minStock?: number | null) {
   if (quantity <= 0) {
-    return {
-      label: "품절",
-      className: "szero",
-      color: LEGACY_COLORS.red,
-    };
+    return { label: "품절", color: LEGACY_COLORS.red };
   }
   if (minStock != null && quantity < minStock) {
-    return {
-      label: "부족",
-      className: "slow",
-      color: LEGACY_COLORS.yellow,
-    };
+    return { label: "부족", color: LEGACY_COLORS.yellow };
   }
-  return {
-    label: "정상",
-    className: "sok",
-    color: LEGACY_COLORS.green,
-  };
+  return { label: "정상", color: LEGACY_COLORS.green };
 }
 
 export function formatNumber(value: number | string | null | undefined) {
@@ -166,4 +156,43 @@ export function buildItemSearchLabel(item: Item) {
 
 export function normalizeModel(value?: string | null) {
   return value && value.trim() ? value : "공용";
+}
+
+export function itemMatchesKpi(item: Item, kpi: string) {
+  const qty = Number(item.quantity);
+  const min = item.min_stock == null ? null : Number(item.min_stock);
+  if (kpi === "정상") return qty > 0 && !(min != null && qty < min);
+  if (kpi === "부족") return qty > 0 && min != null && qty < min;
+  if (kpi === "품절") return qty <= 0;
+  return true;
+}
+
+export function groupedItems(items: Item[]) {
+  const map = new Map<
+    string,
+    {
+      key: string;
+      representative: Item;
+      quantity: number;
+      count: number;
+    }
+  >();
+
+  for (const item of items) {
+    const key = item.item_name.trim().toLowerCase();
+    const current = map.get(key);
+    if (current) {
+      current.quantity += Number(item.quantity);
+      current.count += 1;
+    } else {
+      map.set(key, {
+        key,
+        representative: item,
+        quantity: Number(item.quantity),
+        count: 1,
+      });
+    }
+  }
+
+  return Array.from(map.values());
 }

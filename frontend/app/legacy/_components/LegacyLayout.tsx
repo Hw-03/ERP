@@ -5,7 +5,7 @@ import { LEGACY_COLORS } from "./legacyUi";
 export type TabId = "inventory" | "warehouse" | "dept" | "admin";
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id: "inventory", label: "재고", icon: "🏷" },
+  { id: "inventory", label: "재고", icon: "🏷️" },
   { id: "warehouse", label: "창고입출고", icon: "🏭" },
   { id: "dept", label: "부서입출고", icon: "🔧" },
   { id: "admin", label: "관리자", icon: "🔐" },

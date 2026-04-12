@@ -8,9 +8,10 @@ import { WarehouseIOTab } from "./_components/WarehouseIOTab";
 import { DeptIOTab } from "./_components/DeptIOTab";
 import { HistoryTab } from "./_components/HistoryTab";
 import { AdminTab } from "./_components/AdminTab";
+import { DesktopLegacyShell } from "./_components/DesktopLegacyShell";
 
 const TAB_TITLES: Record<TabId, { subtitle: string; title: string }> = {
-  inventory: { subtitle: "Inventory", title: "재고 관리" },
+  inventory: { subtitle: "Inventory", title: "재고" },
   warehouse: { subtitle: "Warehouse", title: "창고 입출고" },
   dept: { subtitle: "Department", title: "부서 입출고" },
   admin: { subtitle: "Admin", title: "관리자" },
@@ -33,32 +34,36 @@ export default function LegacyPage() {
 
   return (
     <>
-      <LegacyLayout
-        activeTab={activeTab}
-        onTabChange={(tab) => {
-          setActiveTab(tab);
-          setShowHistory(false);
-        }}
-        subtitle={title.subtitle}
-        title={title.title}
-      >
-        {showHistory ? (
-          <HistoryTab onClose={() => setShowHistory(false)} />
-        ) : (
-          <>
-            {activeTab === "inventory" && (
-              <InventoryTab showToast={showToast} onOpenHistory={() => setShowHistory(true)} />
-            )}
-            {activeTab === "warehouse" && (
-              <WarehouseIOTab showToast={showToast} onOpenHistory={() => setShowHistory(true)} />
-            )}
-            {activeTab === "dept" && (
-              <DeptIOTab showToast={showToast} onOpenHistory={() => setShowHistory(true)} />
-            )}
-            {activeTab === "admin" && <AdminTab showToast={showToast} />}
-          </>
-        )}
-      </LegacyLayout>
+      <div className="lg:hidden">
+        <LegacyLayout
+          activeTab={activeTab}
+          onTabChange={(tab) => {
+            setActiveTab(tab);
+            setShowHistory(false);
+          }}
+          subtitle={title.subtitle}
+          title={title.title}
+        >
+          {showHistory ? (
+            <HistoryTab onClose={() => setShowHistory(false)} />
+          ) : (
+            <>
+              {activeTab === "inventory" && (
+                <InventoryTab showToast={showToast} onOpenHistory={() => setShowHistory(true)} />
+              )}
+              {activeTab === "warehouse" && (
+                <WarehouseIOTab showToast={showToast} onOpenHistory={() => setShowHistory(true)} />
+              )}
+              {activeTab === "dept" && (
+                <DeptIOTab showToast={showToast} onOpenHistory={() => setShowHistory(true)} />
+              )}
+              {activeTab === "admin" && <AdminTab showToast={showToast} />}
+            </>
+          )}
+        </LegacyLayout>
+      </div>
+
+      <DesktopLegacyShell />
 
       <Toast toast={toast} onClose={clearToast} />
     </>
