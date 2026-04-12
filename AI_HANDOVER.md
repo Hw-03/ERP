@@ -114,6 +114,22 @@
 - [v] 실행 전 요약, 예상 재고, 위험 액션 구분을 강화
 - [v] `AI_HANDOVER.md` 자체를 UTF-8 기준으로 복구
 
+### 5-7. /inventory Zero-Modal Master-Detail 전면 개편
+- [v] `frontend/app/inventory/page.tsx` 전면 재작성
+- [v] 모달 기반 UX → Zero-Modal, Master-Detail 지휘 통제실 구조로 전환
+- [v] KPI Bar 추가 (총 운영 자산 / ⚠️ 발주 주의 / 🔴 생산 중단 위기)
+  - KPI 카드 클릭 → 좌측 테이블 필터 직접 연결
+- [v] StockFilter에 "LOW" (재고 1~10, 발주 주의) 추가
+- [v] Master Panel (좌): 검색 + 카테고리 select + 재고 상태 칩 + 초기화
+  - 테이블 내부 스크롤, 상태 뱃지 (정상/부족/품절)
+  - 선택 행 하이라이트 (bg-blue-900/30, border-l-blue-500)
+  - tabIndex + ArrowDown/Up 키보드 내비게이션 + scrollIntoView
+- [v] Detail Panel (우): 빈 상태 → 품목 선택 시 상세 + 액션 + 타임라인
+  - 조정 / 입고 / 출고 탭 모드
+  - 기존 handleSave / bumpQuantity / handleModeChange 로직 그대로 이식
+  - 성공 시 Toast (3초 auto-dismiss), 모달 완전 제거
+- [v] Toast 컴포넌트: fixed bottom-6 right-6 z-50
+
 ## 6. 검증 상태
 - [ ] `python -m compileall backend`
 - [ ] `cd frontend && npx tsc --noEmit`
