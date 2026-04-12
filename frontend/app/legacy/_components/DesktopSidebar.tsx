@@ -22,7 +22,7 @@ export function DesktopSidebar({
 }) {
   return (
     <aside
-      className="flex h-full w-[250px] shrink-0 flex-col border-r px-5 py-6"
+      className="sticky top-0 flex h-screen w-[250px] shrink-0 flex-col border-r px-5 py-6"
       style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
     >
       <div className="mb-8 flex items-center gap-3">

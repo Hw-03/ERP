@@ -24,7 +24,7 @@ export function DesktopTopbar({
 }) {
   return (
     <header
-      className="flex items-center gap-4 border-b px-8 py-5"
+      className="sticky top-0 z-20 flex items-center gap-4 border-b px-8 py-5"
       style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
     >
       <div className="min-w-0 flex-1">

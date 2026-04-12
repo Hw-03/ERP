@@ -55,12 +55,12 @@ export function DesktopLegacyShell() {
   return (
     <div className="hidden min-h-screen bg-black lg:block">
       <div
-        className="relative flex h-screen overflow-hidden"
+        className="relative flex min-h-screen"
         style={{ background: LEGACY_COLORS.bg, color: LEGACY_COLORS.text }}
       >
         <DesktopSidebar activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab)} />
 
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="min-w-0 flex-1">
           <DesktopTopbar
             title={activeMeta.title}
             subtitle={activeMeta.subtitle}
@@ -71,12 +71,12 @@ export function DesktopLegacyShell() {
             historyOpen={historyOpen}
             statusText={status}
           />
-          <div className="min-h-0 flex-1 overflow-hidden">{content}</div>
+          <div className="min-h-[calc(100vh-108px)]">{content}</div>
         </div>
 
         {historyOpen ? (
           <div
-            className="absolute inset-y-0 right-0 z-30 w-[420px] border-l px-5 py-5 shadow-2xl"
+            className="sticky top-0 z-30 h-screen w-[420px] shrink-0 overflow-hidden border-l px-5 py-5 shadow-2xl"
             style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
           >
             <div className="mb-4 flex items-center justify-between">
@@ -119,7 +119,7 @@ export function DesktopLegacyShell() {
               </div>
             </div>
 
-            <div className="space-y-2 overflow-y-auto pb-6" style={{ height: "calc(100vh - 180px)" }}>
+            <div className="h-[calc(100vh-180px)] space-y-2 overflow-y-auto pb-6">
               {history.map((log) => (
                 <div
                   key={log.log_id}
