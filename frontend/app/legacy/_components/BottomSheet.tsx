@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
+import { LEGACY_COLORS } from "./legacyUi";
 
 export function BottomSheet({
   open,
@@ -13,14 +14,8 @@ export function BottomSheet({
   title?: string;
   children: React.ReactNode;
 }) {
-  const sheetRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    document.body.style.overflow = open ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
@@ -29,47 +24,42 @@ export function BottomSheet({
   if (!open) return null;
 
   return (
-    <>
-      {/* Backdrop */}
+    <div
+      className="fixed inset-0 z-[200] flex items-end justify-center"
+      style={{ background: "rgba(0,0,0,.6)" }}
+      onClick={onClose}
+    >
       <div
-        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Sheet */}
-      <div
-        ref={sheetRef}
-        className="fixed bottom-0 left-1/2 z-50 w-full max-w-[430px] -translate-x-1/2 rounded-t-3xl border border-slate-700 bg-slate-900 shadow-2xl"
-        style={{ maxHeight: "90vh", overflowY: "auto" }}
+        className="w-full max-w-[430px] overflow-y-auto rounded-t-[22px] border-t"
+        style={{
+          background: LEGACY_COLORS.s1,
+          borderColor: LEGACY_COLORS.border,
+          maxHeight: "92vh",
+          paddingBottom: "calc(env(safe-area-inset-bottom, 16px) + 20px)",
+          animation: "sheetUp .25s cubic-bezier(.32,1.2,.6,1)",
+        }}
+        onClick={(event) => event.stopPropagation()}
       >
-        {/* Handle bar */}
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="h-1 w-10 rounded-full bg-slate-600" />
-        </div>
-
-        {title && (
-          <div className="flex items-center justify-between border-b border-slate-700 px-5 py-3">
-            <h3 className="text-base font-semibold text-slate-100">{title}</h3>
-            <button
-              onClick={onClose}
-              className="rounded-xl p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-slate-100"
-              aria-label="닫기"
-            >
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+        <style jsx>{`
+          @keyframes sheetUp {
+            from {
+              transform: translateY(60px);
+              opacity: 0;
+            }
+            to {
+              transform: none;
+              opacity: 1;
+            }
+          }
+        `}</style>
+        <div className="mx-auto my-3 h-1 w-[34px] rounded-full" style={{ background: LEGACY_COLORS.s3 }} />
+        {title ? (
+          <div className="mb-[14px] px-5">
+            <div className="text-lg font-black">{title}</div>
           </div>
-        )}
-
-        <div className="pb-safe">{children}</div>
+        ) : null}
+        {children}
       </div>
-    </>
+    </div>
   );
 }

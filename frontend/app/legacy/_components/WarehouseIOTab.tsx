@@ -1,94 +1,127 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type Employee, type Item } from "@/lib/api";
 import { BottomSheet } from "./BottomSheet";
 import type { ToastState } from "./Toast";
+import {
+  LEGACY_COLORS,
+  buildItemSearchLabel,
+  employeeColor,
+  firstEmployeeLetter,
+  formatNumber,
+  normalizeDepartment,
+} from "./legacyUi";
 
-type WMode = "whin" | "wh2d" | "d2wh";
+type WMode = "wh2d" | "d2wh" | "whin";
 
-const MODE_LABELS: Record<WMode, string> = {
-  whin: "창고 입고",
-  wh2d: "창고→부서",
-  d2wh: "부서→창고",
-};
+const MODES: { id: WMode; icon: string; label: string }[] = [
+  { id: "wh2d", icon: "🏭→🔧", label: "창고→생산부" },
+  { id: "d2wh", icon: "🔧→🏭", label: "생산부→창고" },
+  { id: "whin", icon: "📥", label: "창고 입고" },
+];
 
-export function WarehouseIOTab({ showToast }: { showToast: (t: ToastState) => void }) {
-  const [mode, setMode] = useState<WMode>("whin");
+function previewFlow(mode: WMode) {
+  if (mode === "wh2d") return { from: "🏭 창고", to: "🔧 생산부" };
+  if (mode === "d2wh") return { from: "🔧 생산부", to: "🏭 창고" };
+  return { from: "🚚 외부", to: "🏭 창고" };
+}
+
+export function WarehouseIOTab({
+  showToast,
+  onOpenHistory,
+}: {
+  showToast: (toast: ToastState) => void;
+  onOpenHistory: () => void;
+}) {
+  const [mode, setMode] = useState<WMode>("wh2d");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [employeeId, setEmployeeId] = useState("");
   const [itemSearch, setItemSearch] = useState("");
   const [itemId, setItemId] = useState("");
   const [qty, setQty] = useState("1");
-  const [refNo, setRefNo] = useState("");
   const [note, setNote] = useState("");
-
+  const [referenceNo, setReferenceNo] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     Promise.all([api.getEmployees({ activeOnly: true }), api.getItems({ limit: 2000 })]).then(
-      ([emps, its]) => {
-        setEmployees(emps);
-        setItems(its);
+      ([nextEmployees, nextItems]) => {
+        setEmployees(nextEmployees);
+        setItems(nextItems);
         setLoading(false);
       },
     );
   }, []);
 
   const filteredItems = useMemo(() => {
-    const kw = itemSearch.trim().toLowerCase();
-    if (!kw) return items.slice(0, 50);
+    const keyword = itemSearch.trim().toLowerCase();
+    if (!keyword) return items.slice(0, 30);
     return items
-      .filter(
-        (i) =>
-          i.item_name.toLowerCase().includes(kw) ||
-          i.item_code.toLowerCase().includes(kw) ||
-          (i.barcode ?? "").toLowerCase().includes(kw),
-      )
+      .filter((item) => {
+        const haystack = `${item.item_name} ${item.item_code} ${item.barcode ?? ""}`.toLowerCase();
+        return haystack.includes(keyword);
+      })
       .slice(0, 50);
-  }, [items, itemSearch]);
+  }, [itemSearch, items]);
 
-  const selectedEmployee = employees.find((e) => e.employee_id === employeeId);
-  const selectedItem = items.find((i) => i.item_id === itemId);
+  const selectedEmployee = employees.find((employee) => employee.employee_id === employeeId) ?? null;
+  const selectedItem = items.find((item) => item.item_id === itemId) ?? null;
+  const flow = previewFlow(mode);
+  const previewQty = Number(qty || 0);
 
-  const resetForm = () => {
-    setItemId("");
+  const expectedQuantity =
+    selectedItem && previewQty > 0
+      ? mode === "wh2d"
+        ? Number(selectedItem.quantity) - previewQty
+        : Number(selectedItem.quantity) + previewQty
+      : null;
+
+  function resetForm() {
     setItemSearch("");
+    setItemId("");
     setQty("1");
-    setRefNo("");
     setNote("");
-    setFormError(null);
-  };
+    setReferenceNo("");
+    setError(null);
+  }
 
-  const handleSubmit = () => {
-    if (!employeeId) { setFormError("직원을 선택해 주세요."); return; }
-    if (!itemId) { setFormError("품목을 선택해 주세요."); return; }
-    if (!Number(qty) || Number(qty) <= 0) { setFormError("수량을 확인해 주세요."); return; }
-    setFormError(null);
-    setConfirmOpen(true);
-  };
+  function validate() {
+    if (!employeeId) {
+      setError("담당 직원을 선택해 주세요.");
+      return false;
+    }
+    if (!itemId) {
+      setError("품목을 선택해 주세요.");
+      return false;
+    }
+    if (!Number(qty) || Number(qty) <= 0) {
+      setError("수량을 확인해 주세요.");
+      return false;
+    }
+    setError(null);
+    return true;
+  }
 
-  const handleConfirm = async () => {
-    if (!selectedEmployee || !itemId) return;
+  async function submit() {
+    if (!selectedEmployee || !selectedItem) return;
     try {
       setSubmitting(true);
-      const producedBy = `${selectedEmployee.name} (${selectedEmployee.department})`;
       const payload = {
-        item_id: itemId,
+        item_id: selectedItem.item_id,
         quantity: Number(qty),
-        reference_no: refNo || undefined,
-        produced_by: producedBy,
+        reference_no: referenceNo || undefined,
+        produced_by: `${selectedEmployee.name} (${normalizeDepartment(selectedEmployee.department)})`,
         notes: note || undefined,
       };
 
-      if (mode === "whin") {
-        await api.receiveInventory(payload);
-      } else if (mode === "wh2d") {
+      if (mode === "wh2d") {
         await api.shipInventory(payload);
       } else {
         await api.receiveInventory(payload);
@@ -97,187 +130,336 @@ export function WarehouseIOTab({ showToast }: { showToast: (t: ToastState) => vo
       setConfirmOpen(false);
       resetForm();
       showToast({
-        message: `${MODE_LABELS[mode]} 처리 완료: ${selectedItem?.item_name ?? ""} ${qty}${selectedItem?.unit ?? ""}`,
+        message: `${MODES.find((entry) => entry.id === mode)?.label} 처리 완료`,
         type: "success",
       });
-    } catch (e) {
-      setFormError(e instanceof Error ? e.message : "처리 실패");
+    } catch (nextError) {
+      const message = nextError instanceof Error ? nextError.message : "처리하지 못했습니다.";
+      setError(message);
+      showToast({ message, type: "error" });
       setConfirmOpen(false);
     } finally {
       setSubmitting(false);
     }
-  };
+  }
 
   if (loading) {
-    return <p className="px-4 py-6 text-sm text-slate-500">데이터 로딩 중...</p>;
+    return <div className="py-8 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>데이터를 불러오는 중...</div>;
   }
 
   return (
-    <div className="flex flex-col gap-4 px-4 py-4">
-      {/* Mode tabs */}
-      <div className="grid grid-cols-3 gap-2 rounded-2xl border border-slate-700 bg-slate-800/40 p-1">
-        {(["whin", "wh2d", "d2wh"] as WMode[]).map((m) => (
+    <div className="pb-4">
+      <button
+        onClick={onOpenHistory}
+        className="mb-3 flex w-full items-center justify-center rounded-xl border px-4 py-[13px] text-[15px] font-bold"
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+      >
+        📋 입출고 내역 확인
+      </button>
+
+      <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted }}>
+        이동 유형
+      </div>
+      <div className="mb-[14px] grid grid-cols-3 gap-2">
+        {MODES.map((entry) => (
           <button
-            key={m}
-            onClick={() => { setMode(m); resetForm(); }}
-            className={`rounded-xl py-2 text-xs font-semibold transition ${
-              mode === m ? "bg-blue-600 text-white shadow" : "text-slate-400 hover:text-slate-200"
-            }`}
+            key={entry.id}
+            onClick={() => {
+              setMode(entry.id);
+              resetForm();
+            }}
+            className="rounded-[14px] border px-2 py-3 text-center"
+            style={{
+              background: mode === entry.id ? "rgba(79,142,247,.12)" : LEGACY_COLORS.s2,
+              borderColor: mode === entry.id ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+            }}
           >
-            {MODE_LABELS[m]}
+            <div className="mb-1 text-[22px]">{entry.icon}</div>
+            <div
+              className="text-xs font-bold"
+              style={{ color: mode === entry.id ? LEGACY_COLORS.blue : LEGACY_COLORS.text }}
+            >
+              {entry.label}
+            </div>
           </button>
         ))}
       </div>
 
-      {/* Employee select */}
-      <div>
-        <label className="mb-1.5 block text-xs font-semibold text-slate-400">
-          담당 직원 <span className="text-red-400">*</span>
-        </label>
-        <select
-          value={employeeId}
-          onChange={(e) => setEmployeeId(e.target.value)}
-          className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-slate-100 outline-none"
-        >
-          <option value="">-- 직원 선택 --</option>
-          {employees.map((emp) => (
-            <option key={emp.employee_id} value={emp.employee_id}>
-              {emp.name} ({emp.department})
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Item search */}
-      <div>
-        <label className="mb-1.5 block text-xs font-semibold text-slate-400">
-          품목 검색 <span className="text-red-400">*</span>
-        </label>
-        <input
-          value={itemSearch}
-          onChange={(e) => { setItemSearch(e.target.value); setItemId(""); }}
-          placeholder="품목명, 코드, 바코드 검색"
-          className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500"
-        />
-        {itemSearch && !itemId && (
-          <div className="mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 shadow-lg">
-            {filteredItems.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-slate-500">검색 결과 없음</p>
-            ) : (
-              filteredItems.map((item) => (
-                <button
-                  key={item.item_id}
-                  onClick={() => { setItemId(item.item_id); setItemSearch(`${item.item_code} · ${item.item_name}`); }}
-                  className="flex w-full items-center justify-between px-3 py-2.5 text-sm hover:bg-slate-800"
-                >
-                  <span className="text-slate-200">{item.item_name}</span>
-                  <span className="font-mono text-xs text-cyan-300">
-                    {Number(item.quantity).toLocaleString()} {item.unit}
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
-        )}
-        {selectedItem && (
-          <p className="mt-1 text-xs text-slate-500">
-            현재고: <span className="font-mono text-cyan-300">{Number(selectedItem.quantity).toLocaleString()} {selectedItem.unit}</span>
-          </p>
-        )}
-      </div>
-
-      {/* Quantity */}
-      <div>
-        <label className="mb-1.5 block text-xs font-semibold text-slate-400">수량</label>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setQty((q) => String(Math.max(1, Number(q) - 1)))}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-300"
-          >
-            −
-          </button>
-          <input
-            value={qty}
-            onChange={(e) => setQty(e.target.value)}
-            inputMode="numeric"
-            className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-center font-mono text-lg text-slate-100 outline-none"
-          />
-          <button
-            onClick={() => setQty((q) => String(Number(q) + 1))}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-300"
-          >
-            +
-          </button>
+      <div
+        className="mb-[14px] flex items-center gap-2 rounded-xl border px-[14px] py-[10px]"
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      >
+        <div className="flex-1 rounded-lg px-3 py-[5px] text-center text-[13px] font-bold" style={{ background: LEGACY_COLORS.s3 }}>
+          {flow.from}
+        </div>
+        <div className="text-xl" style={{ color: LEGACY_COLORS.blue }}>
+          →
+        </div>
+        <div className="flex-1 rounded-lg px-3 py-[5px] text-center text-[13px] font-bold" style={{ background: LEGACY_COLORS.s3 }}>
+          {flow.to}
         </div>
       </div>
 
-      {/* Reference & notes */}
-      <div className="space-y-2">
+      <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted }}>
+        담당 직원
+      </div>
+      <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+        {employees.map((employee) => {
+          const active = employee.employee_id === employeeId;
+          const color = employeeColor(employee.department);
+          return (
+            <button
+              key={employee.employee_id}
+              onClick={() => setEmployeeId(employee.employee_id)}
+              className="shrink-0 px-1"
+            >
+              <div className="mb-1 flex justify-center">
+                <div
+                  className="flex h-11 w-11 items-center justify-center rounded-full border-[2.5px] text-base font-black text-white"
+                  style={{
+                    background: color,
+                    borderColor: active ? LEGACY_COLORS.blue : "transparent",
+                    boxShadow: active ? "0 0 0 3px rgba(79,142,247,.2)" : "none",
+                    opacity: employeeId && !active ? 0.35 : 1,
+                  }}
+                >
+                  {firstEmployeeLetter(employee.name)}
+                </div>
+              </div>
+              <div
+                className="max-w-[48px] truncate text-[9px] font-semibold"
+                style={{ color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
+              >
+                {employee.name}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <button
+        onClick={() => {
+          searchRef.current?.focus();
+          showToast({ message: "카메라 스캔은 다음 단계에서 연결합니다. 검색창으로 바로 이동했습니다.", type: "info" });
+        }}
+        className="mb-[10px] flex w-full items-center gap-3 rounded-xl border px-[14px] py-3 text-left"
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      >
+        <div
+          className="flex h-11 w-11 items-center justify-center rounded-[10px] text-[22px]"
+          style={{ background: "rgba(79,142,247,.15)" }}
+        >
+          📷
+        </div>
+        <div>
+          <div className="text-sm font-bold">QR 스캔</div>
+          <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+            카메라로 상품 인식
+          </div>
+        </div>
+        <div className="ml-auto text-[22px]" style={{ color: LEGACY_COLORS.muted }}>
+          ›
+        </div>
+      </button>
+
+      <div className="mb-[10px] flex items-center gap-[10px]">
+        <div className="h-px flex-1" style={{ background: LEGACY_COLORS.border }} />
+        <span className="text-[10px] font-semibold" style={{ color: LEGACY_COLORS.muted }}>
+          또는 직접 선택
+        </span>
+        <div className="h-px flex-1" style={{ background: LEGACY_COLORS.border }} />
+      </div>
+
+      <div className="mb-2 flex items-center gap-2 rounded-[11px] border px-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <span>🔍</span>
         <input
-          value={refNo}
-          onChange={(e) => setRefNo(e.target.value)}
-          placeholder="참조번호 (선택)"
-          className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500"
-        />
-        <input
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="메모 (선택)"
-          className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500"
+          ref={searchRef}
+          value={itemSearch}
+          onChange={(event) => {
+            setItemSearch(event.target.value);
+            setItemId("");
+          }}
+          placeholder="품명 검색.."
+          className="w-full bg-transparent py-[10px] text-sm outline-none"
+          style={{ color: LEGACY_COLORS.text }}
         />
       </div>
 
-      {formError && (
-        <p className="rounded-xl border border-red-800/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
-          {formError}
-        </p>
-      )}
+      <div
+        className="mb-3 max-h-[200px] overflow-y-auto rounded-[14px] border"
+        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+      >
+        {filteredItems.map((item, index) => (
+          <button
+            key={item.item_id}
+            onClick={() => {
+              setItemId(item.item_id);
+              setItemSearch(buildItemSearchLabel(item));
+            }}
+            className="flex w-full items-center justify-between px-[14px] py-3 text-left"
+            style={{
+              borderBottom: index === filteredItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
+            }}
+          >
+            <div>
+              <div className="text-sm font-semibold">{item.item_name}</div>
+              <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                {item.item_code}
+              </div>
+            </div>
+            <div className="font-mono text-xs" style={{ color: LEGACY_COLORS.cyan }}>
+              {formatNumber(item.quantity)} {item.unit}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {selectedItem ? (
+        <div className="mb-3">
+          <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted }}>
+            선택된 품목
+          </div>
+          <div className="rounded-[14px] border px-[14px] py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+            <div className="text-sm font-bold">{selectedItem.item_name}</div>
+            <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+              {selectedItem.item_code} · {selectedItem.spec || "-"}
+            </div>
+            <div className="mt-3 flex gap-5">
+              <div>
+                <div className="text-[9px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  현재 재고
+                </div>
+                <div className="font-mono text-[22px] font-black" style={{ color: LEGACY_COLORS.blue }}>
+                  {formatNumber(selectedItem.quantity)}
+                </div>
+              </div>
+              <div>
+                <div className="text-[9px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  처리 후 예상
+                </div>
+                <div className="font-mono text-[22px] font-black" style={{ color: LEGACY_COLORS.green }}>
+                  {expectedQuantity == null ? "-" : formatNumber(expectedQuantity)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mb-3">
+        <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted }}>
+          수량
+        </div>
+        <input
+          value={qty}
+          onChange={(event) => setQty(event.target.value)}
+          inputMode="numeric"
+          className="mb-[7px] w-full rounded-[11px] border px-[13px] py-[11px] text-center text-[22px] font-bold outline-none"
+          style={{
+            background: LEGACY_COLORS.s2,
+            borderColor: LEGACY_COLORS.border,
+            color: LEGACY_COLORS.text,
+            fontFamily: 'Menlo, "Courier New", monospace',
+          }}
+        />
+        <div className="grid grid-cols-4 gap-[7px]">
+          {[-10, -1, 1, 10].map((delta) => (
+            <button
+              key={delta}
+              onClick={() => setQty((current) => String(Math.max(1, Number(current || 0) + delta)))}
+              className="rounded-[10px] py-[11px] text-sm font-bold"
+              style={{
+                background: delta < 0 ? "rgba(242,95,92,.15)" : "rgba(31,209,122,.12)",
+                color: delta < 0 ? LEGACY_COLORS.red : LEGACY_COLORS.green,
+              }}
+            >
+              {delta > 0 ? `+${delta}` : delta}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-3">
+        <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted }}>
+          비고
+        </div>
+        <input
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder="메모 (선택)"
+          className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
+          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+        />
+      </div>
+
+      <div className="mb-3">
+        <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted }}>
+          참조번호
+        </div>
+        <input
+          value={referenceNo}
+          onChange={(event) => setReferenceNo(event.target.value)}
+          placeholder="예: LOT-240412"
+          className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
+          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+        />
+      </div>
+
+      {selectedItem ? (
+        <div className="mb-3 rounded-[11px] border px-[14px] py-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+          <div className="text-sm font-semibold">{MODES.find((entry) => entry.id === mode)?.label}</div>
+          <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+            {selectedEmployee ? `${selectedEmployee.name} · ` : ""}
+            {selectedItem.item_name} · {formatNumber(qty)} {selectedItem.unit}
+          </div>
+        </div>
+      ) : null}
+
+      {error ? (
+        <div className="mb-3 rounded-xl border px-3 py-2 text-xs" style={{ background: "rgba(242,95,92,.12)", borderColor: "rgba(242,95,92,.25)", color: LEGACY_COLORS.red }}>
+          {error}
+        </div>
+      ) : null}
 
       <button
-        onClick={handleSubmit}
-        className="rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white transition hover:bg-blue-500"
+        onClick={() => {
+          if (validate()) setConfirmOpen(true);
+        }}
+        className="w-full rounded-xl py-[13px] text-[15px] font-bold text-white"
+        style={{ background: LEGACY_COLORS.green, color: "#000" }}
       >
-        {MODE_LABELS[mode]} 처리
+        처리하기
       </button>
 
-      {/* Confirm sheet */}
-      <BottomSheet open={confirmOpen} onClose={() => setConfirmOpen(false)} title="처리 확인">
-        <div className="space-y-3 px-5 pb-6 pt-3">
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-slate-400">유형</dt>
-              <dd className="font-semibold text-blue-300">{MODE_LABELS[mode]}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-slate-400">직원</dt>
-              <dd className="text-slate-200">{selectedEmployee?.name} ({selectedEmployee?.department})</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-slate-400">품목</dt>
-              <dd className="text-right text-slate-200">{selectedItem?.item_name}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-slate-400">수량</dt>
-              <dd className="font-mono text-cyan-300">{Number(qty).toLocaleString()} {selectedItem?.unit}</dd>
-            </div>
-            {refNo && (
-              <div className="flex justify-between">
-                <dt className="text-slate-400">참조번호</dt>
-                <dd className="font-mono text-slate-300">{refNo}</dd>
+      <BottomSheet open={confirmOpen} onClose={() => setConfirmOpen(false)} title="이동 확인">
+        <div className="space-y-2 px-5 pb-6">
+          {[
+            ["유형", MODES.find((entry) => entry.id === mode)?.label || "-"],
+            ["직원", selectedEmployee ? `${selectedEmployee.name} (${normalizeDepartment(selectedEmployee.department)})` : "-"],
+            ["품목", selectedItem?.item_name || "-"],
+            ["수량", selectedItem ? `${formatNumber(qty)} ${selectedItem.unit}` : "-"],
+            ["참조번호", referenceNo || "-"],
+          ].map(([label, value]) => (
+            <div key={label} className="flex items-center justify-between gap-3 rounded-xl px-3 py-2" style={{ background: LEGACY_COLORS.s2 }}>
+              <div className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+                {label}
               </div>
-            )}
-          </dl>
-          <div className="grid grid-cols-2 gap-2">
+              <div className="text-right text-sm">{value}</div>
+            </div>
+          ))}
+          <div className="grid grid-cols-2 gap-2 pt-2">
             <button
               onClick={() => setConfirmOpen(false)}
-              className="rounded-xl border border-slate-700 py-3 text-sm text-slate-300"
+              className="rounded-xl border py-3 text-sm"
+              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
             >
               취소
             </button>
             <button
-              onClick={handleConfirm}
+              onClick={() => void submit()}
               disabled={submitting}
-              className="rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white disabled:opacity-50"
+              className="rounded-xl py-3 text-sm font-bold text-white disabled:opacity-50"
+              style={{ background: LEGACY_COLORS.blue }}
             >
               {submitting ? "처리 중..." : "확인"}
             </button>

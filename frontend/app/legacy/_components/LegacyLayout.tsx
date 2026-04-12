@@ -1,72 +1,96 @@
 "use client";
 
-import React from "react";
+import { LEGACY_COLORS } from "./legacyUi";
 
-export type TabId = "inventory" | "warehouse" | "dept" | "history" | "admin";
+export type TabId = "inventory" | "warehouse" | "dept" | "admin";
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id: "inventory", label: "재고", icon: "📦" },
+  { id: "inventory", label: "재고", icon: "🏷" },
   { id: "warehouse", label: "창고입출고", icon: "🏭" },
-  { id: "dept", label: "부서입출고", icon: "🔄" },
-  { id: "history", label: "히스토리", icon: "📋" },
-  { id: "admin", label: "관리자", icon: "⚙️" },
+  { id: "dept", label: "부서입출고", icon: "🔧" },
+  { id: "admin", label: "관리자", icon: "🔐" },
 ];
 
 export function LegacyLayout({
   activeTab,
   onTabChange,
-  topContent,
+  subtitle,
+  title,
   children,
 }: {
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
-  topContent?: React.ReactNode;
+  subtitle: string;
+  title: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="relative mx-auto flex min-h-screen max-w-[430px] flex-col bg-slate-950 text-slate-100">
-      {/* Top bar */}
-      <header className="fixed left-1/2 top-0 z-30 w-full max-w-[430px] -translate-x-1/2 border-b border-slate-800 bg-slate-950/95 backdrop-blur-sm">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <span className="text-base font-bold text-slate-100">X-Ray ERP</span>
-          <span className="ml-auto rounded-full bg-slate-800 px-2.5 py-0.5 text-[10px] font-semibold text-blue-400">
-            {TABS.find((t) => t.id === activeTab)?.label}
-          </span>
-        </div>
-        {topContent && <div className="border-t border-slate-800">{topContent}</div>}
-      </header>
-
-      {/* Scrollable content */}
-      <main
-        className="flex-1 overflow-y-auto"
-        style={{ paddingTop: topContent ? "96px" : "52px", paddingBottom: "72px" }}
+    <div className="min-h-screen bg-black">
+      <div
+        className="mx-auto flex min-h-screen max-w-[430px] flex-col overflow-hidden"
+        style={{
+          background: LEGACY_COLORS.bg,
+          color: LEGACY_COLORS.text,
+          boxShadow: "0 0 60px rgba(0,0,0,.8)",
+        }}
       >
-        {children}
-      </main>
+        <div
+          className="shrink-0"
+          style={{ height: "env(safe-area-inset-top, 18px)", background: LEGACY_COLORS.s1 }}
+        />
 
-      {/* Bottom navigation */}
-      <nav className="fixed bottom-0 left-1/2 z-30 w-full max-w-[430px] -translate-x-1/2 border-t border-slate-800 bg-slate-950/95 backdrop-blur-sm">
-        <div className="flex">
-          {TABS.map((tab) => {
-            const active = tab.id === activeTab;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => onTabChange(tab.id)}
-                className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] font-semibold transition ${
-                  active ? "text-blue-400" : "text-slate-500 hover:text-slate-300"
-                }`}
-              >
-                <span className="text-lg leading-none">{tab.icon}</span>
-                <span className="leading-tight">{tab.label}</span>
-                {active && (
-                  <span className="mt-0.5 h-0.5 w-5 rounded-full bg-blue-400" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+        <header
+          className="shrink-0 border-b px-[18px] pb-3 pt-[10px]"
+          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+        >
+          <div
+            className="mb-[3px] text-[10px] font-bold uppercase tracking-[2px]"
+            style={{ color: LEGACY_COLORS.muted2 }}
+          >
+            {subtitle}
+          </div>
+          <div className="text-2xl font-black">{title}</div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto px-[14px] py-[14px]">{children}</main>
+
+        <nav
+          className="shrink-0 border-t px-0 pt-[6px]"
+          style={{
+            background: LEGACY_COLORS.s1,
+            borderColor: LEGACY_COLORS.border,
+            paddingBottom: "calc(env(safe-area-inset-bottom, 18px) + 6px)",
+          }}
+        >
+          <div className="flex">
+            {TABS.map((tab) => {
+              const active = tab.id === activeTab;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => onTabChange(tab.id)}
+                  className="flex flex-1 flex-col items-center gap-[3px] border-none bg-transparent px-1 py-1"
+                >
+                  <div className="text-[20px] leading-none">{tab.icon}</div>
+                  <div
+                    className="text-[9px] font-bold"
+                    style={{ color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted }}
+                  >
+                    {tab.label}
+                  </div>
+                  <div
+                    className="h-1 w-1 rounded-full"
+                    style={{
+                      background: LEGACY_COLORS.blue,
+                      opacity: active ? 1 : 0,
+                    }}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      </div>
     </div>
   );
 }

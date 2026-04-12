@@ -5,6 +5,13 @@ import { api, type Item } from "@/lib/api";
 import { FilterPills } from "./FilterPills";
 import { ItemDetailSheet } from "./ItemDetailSheet";
 import type { ToastState } from "./Toast";
+import {
+  LEGACY_COLORS,
+  fileTypeBadge,
+  formatNumber,
+  getStockState,
+  normalizeModel,
+} from "./legacyUi";
 
 const FILE_TYPE_OPTIONS = [
   { label: "전체", value: "ALL" },
@@ -37,34 +44,44 @@ const MODEL_OPTIONS = [
 
 const KPI_OPTIONS = [
   { label: "전체", value: "ALL" },
-  { label: "재고있음", value: "IN_STOCK" },
-  { label: "재고0", value: "ZERO" },
+  { label: "정상", value: "OK" },
+  { label: "부족", value: "LOW" },
+  { label: "품절", value: "ZERO" },
 ];
 
 const PAGE_SIZE = 100;
 
-export function InventoryTab({ showToast }: { showToast: (t: ToastState) => void }) {
-  const [items, setItems] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
+type DisplayRow = {
+  key: string;
+  representative: Item;
+  quantity: number;
+  count: number;
+};
 
+export function InventoryTab({
+  showToast,
+  onOpenHistory,
+}: {
+  showToast: (toast: ToastState) => void;
+  onOpenHistory: () => void;
+}) {
+  const [items, setItems] = useState<Item[]>([]);
   const [search, setSearch] = useState("");
   const [fileType, setFileType] = useState("ALL");
   const [part, setPart] = useState("ALL");
   const [model, setModel] = useState("ALL");
   const [kpi, setKpi] = useState("ALL");
   const [grouped, setGrouped] = useState(false);
-
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const deferredSearch = useDeferredValue(search);
 
-  const loadItems = async (reset = false) => {
+  async function fetchItems(skip = 0, append = false) {
     try {
       setLoading(true);
-      const skip = reset ? 0 : (page - 1) * PAGE_SIZE;
       const params: Parameters<typeof api.getItems>[0] = {
         limit: PAGE_SIZE,
         skip,
@@ -75,201 +92,275 @@ export function InventoryTab({ showToast }: { showToast: (t: ToastState) => void
       if (deferredSearch.trim()) params.search = deferredSearch.trim();
 
       const data = await api.getItems(params);
-      if (reset) {
-        setItems(data);
-        setPage(1);
-      } else {
-        setItems((prev) => (skip === 0 ? data : [...prev, ...data]));
-      }
-      setTotal(data.length < PAGE_SIZE ? skip + data.length : skip + data.length + 1);
+      setItems((current) => (append ? [...current, ...data] : data));
       setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "품목을 불러오지 못했습니다.");
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "품목을 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   useEffect(() => {
     setPage(1);
-    loadItems(true);
+    void fetchItems(0, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileType, part, model, deferredSearch]);
 
-  const filteredItems = useMemo(() => {
+  const filtered = useMemo(() => {
     return items.filter((item) => {
-      if (kpi === "IN_STOCK" && Number(item.quantity) <= 0) return false;
-      if (kpi === "ZERO" && Number(item.quantity) !== 0) return false;
+      const qty = Number(item.quantity);
+      const min = item.min_stock == null ? null : Number(item.min_stock);
+      if (kpi === "OK") {
+        return qty > 0 && !(min != null && qty < min);
+      }
+      if (kpi === "LOW") {
+        return qty > 0 && min != null && qty < min;
+      }
+      if (kpi === "ZERO") {
+        return qty <= 0;
+      }
       return true;
     });
   }, [items, kpi]);
 
-  const displayItems = useMemo(() => {
-    if (!grouped) return filteredItems;
-    const seen = new Set<string>();
-    return filteredItems.filter((item) => {
-      if (seen.has(item.item_name)) return false;
-      seen.add(item.item_name);
-      return true;
-    });
-  }, [filteredItems, grouped]);
+  const displayRows = useMemo<DisplayRow[]>(() => {
+    if (!grouped) {
+      return filtered.map((item) => ({
+        key: item.item_id,
+        representative: item,
+        quantity: Number(item.quantity),
+        count: 1,
+      }));
+    }
 
-  const handleLoadMore = () => {
-    const nextPage = page + 1;
-    setPage(nextPage);
-    const skip = nextPage * PAGE_SIZE - PAGE_SIZE;
-    const params: Parameters<typeof api.getItems>[0] = { limit: PAGE_SIZE, skip };
-    if (fileType !== "ALL") params.legacyFileType = fileType;
-    if (part !== "ALL") params.legacyPart = part;
-    if (model !== "ALL") params.legacyModel = model;
-    if (deferredSearch.trim()) params.search = deferredSearch.trim();
-    api.getItems(params).then((data) => {
-      setItems((prev) => [...prev, ...data]);
+    const groupedMap = new Map<string, DisplayRow>();
+    filtered.forEach((item) => {
+      const key = item.item_name.trim().toLowerCase();
+      const existing = groupedMap.get(key);
+      if (existing) {
+        existing.quantity += Number(item.quantity);
+        existing.count += 1;
+      } else {
+        groupedMap.set(key, {
+          key,
+          representative: item,
+          quantity: Number(item.quantity),
+          count: 1,
+        });
+      }
     });
-  };
+    return Array.from(groupedMap.values());
+  }, [filtered, grouped]);
+
+  const totals = useMemo(() => {
+    const totalQuantity = displayRows.reduce((sum, row) => sum + row.quantity, 0);
+    const normalCount = displayRows.filter((row) => {
+      const min = row.representative.min_stock == null ? null : Number(row.representative.min_stock);
+      return getStockState(row.quantity, min).label === "정상";
+    }).length;
+    const lowCount = displayRows.filter((row) => {
+      const min = row.representative.min_stock == null ? null : Number(row.representative.min_stock);
+      return getStockState(row.quantity, min).label === "부족";
+    }).length;
+    const zeroCount = displayRows.filter((row) => row.quantity <= 0).length;
+    return { totalQuantity, normalCount, lowCount, zeroCount };
+  }, [displayRows]);
 
   const canLoadMore = items.length >= page * PAGE_SIZE;
 
   return (
-    <div className="flex flex-col">
-      {/* Filters bar */}
-      <div className="space-y-2 bg-slate-900/60 px-4 pb-3 pt-3">
-        {/* Search */}
-        <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-2">
-          <span className="text-slate-500">🔍</span>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="품목명, 코드, 사양, 바코드 검색"
-            className="w-full bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
-          />
-          {search && (
-            <button onClick={() => setSearch("")} className="text-slate-500">
-              ✕
-            </button>
-          )}
-        </div>
+    <div className="pb-4">
+      <button
+        onClick={onOpenHistory}
+        className="mb-[10px] flex w-full items-center justify-center rounded-xl border px-4 py-[13px] text-[15px] font-bold"
+        style={{
+          background: LEGACY_COLORS.s2,
+          borderColor: LEGACY_COLORS.border,
+          color: LEGACY_COLORS.muted2,
+        }}
+      >
+        📋 입출고 내역 확인
+      </button>
 
-        <FilterPills options={FILE_TYPE_OPTIONS} value={fileType} onChange={setFileType} />
-        <FilterPills
-          options={PART_OPTIONS}
-          value={part}
-          onChange={setPart}
-          colorActive="bg-purple-600 border-purple-500 text-white"
+      <div className="mb-[10px] flex items-center gap-2 rounded-[11px] border px-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <span>🔍</span>
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="품명·모델·공급처·ID"
+          className="w-full bg-transparent py-[10px] text-sm outline-none"
+          style={{ color: LEGACY_COLORS.text }}
         />
-        <div className="flex gap-2">
-          <div className="flex-1 overflow-x-auto">
-            <FilterPills
-              options={MODEL_OPTIONS}
-              value={model}
-              onChange={setModel}
-              colorActive="bg-teal-600 border-teal-500 text-white"
-            />
-          </div>
-        </div>
-        <div className="flex items-center justify-between">
-          <FilterPills
-            options={KPI_OPTIONS}
-            value={kpi}
-            onChange={setKpi}
-            colorActive="bg-emerald-600 border-emerald-500 text-white"
-          />
+      </div>
+
+      <FilterPills options={FILE_TYPE_OPTIONS} value={fileType} onChange={setFileType} />
+      <FilterPills options={PART_OPTIONS} value={part} onChange={setPart} activeColor={LEGACY_COLORS.green} />
+      <FilterPills options={MODEL_OPTIONS} value={model} onChange={setModel} activeColor={LEGACY_COLORS.cyan} />
+
+      <div className="mb-[10px] grid grid-cols-4 gap-2">
+        {[
+          { label: "전체 품목", value: displayRows.length, color: LEGACY_COLORS.blue },
+          { label: "정상", value: totals.normalCount, color: LEGACY_COLORS.green },
+          { label: "부족", value: totals.lowCount, color: LEGACY_COLORS.yellow },
+          { label: "품절", value: totals.zeroCount, color: LEGACY_COLORS.red },
+        ].map((card) => (
           <button
-            onClick={() => setGrouped((g) => !g)}
-            className={`shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-semibold transition ${
-              grouped
-                ? "border-amber-500 bg-amber-600 text-white"
-                : "border-slate-700 text-slate-500"
-            }`}
+            key={card.label}
+            onClick={() => {
+              if (card.label === "전체 품목") setKpi("ALL");
+              if (card.label === "정상") setKpi("OK");
+              if (card.label === "부족") setKpi("LOW");
+              if (card.label === "품절") setKpi("ZERO");
+            }}
+            className="relative overflow-hidden rounded-xl border px-2 py-[10px] text-left"
+            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
           >
-            그룹
+            <div className="mb-1 text-[8px] font-bold uppercase tracking-[0.8px]" style={{ color: LEGACY_COLORS.muted }}>
+              {card.label}
+            </div>
+            <div className="font-mono text-lg font-bold" style={{ color: card.color }}>
+              {formatNumber(card.value)}
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{ background: card.color }} />
+          </button>
+        ))}
+      </div>
+
+      <div className="mb-[6px] flex items-center justify-between px-[2px]">
+        <div className="text-[10px] font-mono" style={{ color: LEGACY_COLORS.muted2 }}>
+          {displayRows.length}개 품목 · 총 재고 {formatNumber(totals.totalQuantity)}
+        </div>
+        <div className="flex items-center gap-2">
+          <FilterPills options={KPI_OPTIONS} value={kpi} onChange={setKpi} activeColor={LEGACY_COLORS.purple} />
+          <button
+            onClick={() => setGrouped((current) => !current)}
+            className="rounded-full border px-[11px] py-1 text-[10px] font-semibold"
+            style={{
+              background: grouped ? LEGACY_COLORS.yellow : LEGACY_COLORS.s2,
+              borderColor: grouped ? LEGACY_COLORS.yellow : LEGACY_COLORS.border,
+              color: grouped ? "#111" : LEGACY_COLORS.muted2,
+            }}
+          >
+            묶음 보기
           </button>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="flex gap-3 border-b border-slate-800 px-4 py-2">
-        <span className="text-xs text-slate-500">
-          표시 <strong className="text-slate-200">{displayItems.length}</strong>
-        </span>
-        <span className="text-xs text-slate-500">
-          재고합{" "}
-          <strong className="font-mono text-cyan-300">
-            {displayItems.reduce((s, i) => s + Number(i.quantity), 0).toLocaleString()}
-          </strong>
-        </span>
-        <span className="text-xs text-slate-500">
-          재고0{" "}
-          <strong className="text-amber-300">
-            {displayItems.filter((i) => Number(i.quantity) === 0).length}
-          </strong>
-        </span>
-      </div>
-
-      {/* Item list */}
       {error ? (
-        <p className="px-4 py-6 text-sm text-red-400">{error}</p>
+        <div className="py-6 text-center text-sm" style={{ color: LEGACY_COLORS.red }}>
+          {error}
+        </div>
       ) : loading && items.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-slate-500">로딩 중...</p>
-      ) : displayItems.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-slate-500">조건에 맞는 품목이 없습니다.</p>
+        <div className="py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+          불러오는 중...
+        </div>
+      ) : displayRows.length === 0 ? (
+        <div className="py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+          조건에 맞는 품목이 없습니다.
+        </div>
       ) : (
-        <>
-          <div className="divide-y divide-slate-800/60">
-            {displayItems.map((item) => {
-              const qty = Number(item.quantity);
-              const isLow = item.min_stock != null && qty < Number(item.min_stock);
-              return (
-                <button
-                  key={item.item_id}
-                  onClick={() => setSelectedItem(item)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-800/40 active:bg-slate-800/70"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-100">{item.item_name}</p>
-                    <p className="mt-0.5 truncate text-[11px] text-slate-500">
-                      {item.item_code}
-                      {item.legacy_part ? ` · ${item.legacy_part}` : ""}
-                      {item.legacy_model && item.legacy_model !== "공용"
-                        ? ` · ${item.legacy_model}`
-                        : ""}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p
-                      className={`font-mono text-base font-bold ${
-                        qty === 0
-                          ? "text-red-400"
-                          : isLow
-                            ? "text-amber-400"
-                            : "text-cyan-300"
-                      }`}
-                    >
-                      {qty.toLocaleString()}
-                    </p>
-                    <p className="text-[10px] text-slate-500">{item.unit}</p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+        <div className="overflow-hidden rounded-[14px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+          {displayRows.map((row, index) => {
+            const item = row.representative;
+            const stockState = getStockState(
+              row.quantity,
+              item.min_stock == null ? null : Number(item.min_stock),
+            );
+            const badge = fileTypeBadge(item.legacy_file_type);
+            const fillWidth = Math.max(10, Math.min(100, row.quantity > 0 ? (row.quantity / Math.max(1, Number(item.min_stock ?? row.quantity))) * 100 : 6));
 
-          {canLoadMore && (
-            <button
-              onClick={handleLoadMore}
-              className="mx-4 my-3 rounded-xl border border-slate-700 py-2.5 text-sm text-slate-400 transition hover:bg-slate-800/50"
-            >
-              100개 더 보기
-            </button>
-          )}
-        </>
+            return (
+              <button
+                key={row.key}
+                onClick={() => setSelectedItem(item)}
+                className="flex w-full items-center gap-[10px] px-[14px] py-3 text-left"
+                style={{
+                  borderBottom: index === displayRows.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
+                }}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex flex-wrap items-center gap-[6px]">
+                    <span
+                      className="inline-flex rounded-full px-[7px] py-[2px] text-[9px] font-bold"
+                      style={{
+                        background:
+                          stockState.label === "정상"
+                            ? "rgba(31,209,122,.15)"
+                            : stockState.label === "부족"
+                              ? "rgba(244,185,66,.15)"
+                              : "rgba(242,95,92,.15)",
+                        color: stockState.color,
+                      }}
+                    >
+                      {stockState.label}
+                    </span>
+                    <span
+                      className="inline-flex rounded-full px-[7px] py-[2px] text-[9px] font-bold"
+                      style={{ background: badge.bg, color: badge.color }}
+                    >
+                      {badge.label}
+                    </span>
+                    {row.count > 1 ? (
+                      <span
+                        className="inline-flex rounded-full px-[7px] py-[2px] text-[9px] font-bold"
+                        style={{ background: "rgba(6,182,212,.15)", color: LEGACY_COLORS.cyan }}
+                      >
+                        {row.count}개 품목 묶음
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="truncate text-sm font-semibold">{item.item_name}</div>
+                  <div className="mt-0.5 truncate text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                    {item.item_code}
+                    {item.legacy_part ? ` · ${item.legacy_part}` : ""}
+                    {normalizeModel(item.legacy_model) !== "공용" ? ` · ${normalizeModel(item.legacy_model)}` : ""}
+                    {item.supplier ? ` · ${item.supplier}` : ""}
+                  </div>
+                  <div className="mt-2 h-[6px] rounded-full" style={{ background: LEGACY_COLORS.s3 }}>
+                    <div
+                      className="h-[6px] rounded-full"
+                      style={{
+                        width: `${fillWidth}%`,
+                        background: stockState.color,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="shrink-0 text-right">
+                  <div className="font-mono text-lg font-bold" style={{ color: stockState.color }}>
+                    {formatNumber(row.quantity)}
+                  </div>
+                  <div className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                    {item.unit}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       )}
+
+      {canLoadMore ? (
+        <button
+          onClick={() => {
+            const nextPage = page + 1;
+            setPage(nextPage);
+            void fetchItems(nextPage * PAGE_SIZE - PAGE_SIZE, true);
+          }}
+          className="mt-3 w-full py-[14px] text-center text-[13px] font-bold"
+          style={{ color: LEGACY_COLORS.blue }}
+        >
+          100개 더보기
+        </button>
+      ) : null}
 
       <ItemDetailSheet
         item={selectedItem}
         onClose={() => setSelectedItem(null)}
         onSaved={(updated) => {
-          setItems((prev) => prev.map((i) => (i.item_id === updated.item_id ? updated : i)));
+          setItems((current) => current.map((item) => (item.item_id === updated.item_id ? updated : item)));
           setSelectedItem(updated);
           showToast({ message: "재고가 업데이트되었습니다.", type: "success" });
         }}

@@ -1,31 +1,45 @@
 "use client";
 
+import { LEGACY_COLORS } from "./legacyUi";
+
 export function FilterPills({
   options,
   value,
   onChange,
-  colorActive = "bg-blue-600 border-blue-500 text-white",
+  activeColor = LEGACY_COLORS.blue,
 }: {
   options: { label: string; value: string }[];
   value: string;
   onChange: (v: string) => void;
-  colorActive?: string;
+  activeColor?: string;
 }) {
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          onClick={() => onChange(opt.value)}
-          className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${
-            opt.value === value
-              ? colorActive
-              : "border-slate-700 bg-slate-800/60 text-slate-400 hover:border-slate-600 hover:text-slate-200"
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
+    <div className="mb-2 flex gap-[6px] overflow-x-auto pb-[2px]">
+      {options.map((option) => {
+        const active = option.value === value;
+        return (
+          <button
+            key={option.value}
+            onClick={() => onChange(option.value)}
+            className="shrink-0 rounded-full border px-[11px] py-1 text-[10px] font-semibold"
+            style={
+              active
+                ? {
+                    background: activeColor,
+                    borderColor: activeColor,
+                    color: "#fff",
+                  }
+                : {
+                    background: LEGACY_COLORS.s2,
+                    borderColor: LEGACY_COLORS.border,
+                    color: LEGACY_COLORS.muted2,
+                  }
+            }
+          >
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
