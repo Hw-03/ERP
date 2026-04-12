@@ -37,6 +37,13 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
         spec=payload.spec,
         category=payload.category,
         unit=payload.unit,
+        barcode=payload.barcode,
+        legacy_file_type=payload.legacy_file_type,
+        legacy_part=payload.legacy_part,
+        legacy_item_type=payload.legacy_item_type,
+        legacy_model=payload.legacy_model,
+        supplier=payload.supplier,
+        min_stock=payload.min_stock,
     )
     db.add(item)
     db.flush()
@@ -52,7 +59,12 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
 @router.get("/", response_model=List[ItemWithInventory])
 def list_items(
     category: Optional[CategoryEnum] = Query(None, description="카테고리 필터"),
-    search: Optional[str] = Query(None, description="품목명, 품목코드, 사양, 위치 검색"),
+    search: Optional[str] = Query(None, description="품목명, 품목코드, 사양, 위치, 바코드 검색"),
+    legacy_file_type: Optional[str] = Query(None, description="레거시 파일 타입 필터"),
+    legacy_part: Optional[str] = Query(None, description="레거시 파트 필터"),
+    legacy_model: Optional[str] = Query(None, description="레거시 모델 필터"),
+    legacy_item_type: Optional[str] = Query(None, description="레거시 품목 유형 필터"),
+    barcode: Optional[str] = Query(None, description="바코드 검색"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=2000),
     db: Session = Depends(get_db),
@@ -62,6 +74,21 @@ def list_items(
     if category:
         query = query.filter(Item.category == category)
 
+    if legacy_file_type:
+        query = query.filter(Item.legacy_file_type == legacy_file_type)
+
+    if legacy_part:
+        query = query.filter(Item.legacy_part == legacy_part)
+
+    if legacy_model:
+        query = query.filter(Item.legacy_model == legacy_model)
+
+    if legacy_item_type:
+        query = query.filter(Item.legacy_item_type == legacy_item_type)
+
+    if barcode:
+        query = query.filter(Item.barcode == barcode)
+
     if search:
         pattern = f"%{search}%"
         query = query.filter(
@@ -69,6 +96,7 @@ def list_items(
                 Item.item_name.ilike(pattern),
                 Item.item_code.ilike(pattern),
                 Item.spec.ilike(pattern),
+                Item.barcode.ilike(pattern),
                 Inventory.location.ilike(pattern),
             )
         )
@@ -156,6 +184,20 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, db: Session = Depends(g
         item.category = payload.category
     if payload.unit is not None:
         item.unit = payload.unit
+    if payload.barcode is not None:
+        item.barcode = payload.barcode
+    if payload.legacy_file_type is not None:
+        item.legacy_file_type = payload.legacy_file_type
+    if payload.legacy_part is not None:
+        item.legacy_part = payload.legacy_part
+    if payload.legacy_item_type is not None:
+        item.legacy_item_type = payload.legacy_item_type
+    if payload.legacy_model is not None:
+        item.legacy_model = payload.legacy_model
+    if payload.supplier is not None:
+        item.supplier = payload.supplier
+    if payload.min_stock is not None:
+        item.min_stock = payload.min_stock
 
     item.updated_at = datetime.now(UTC).replace(tzinfo=None)
     db.commit()

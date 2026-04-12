@@ -16,6 +16,13 @@ class ItemCreate(BaseModel):
     spec: Optional[str] = Field(None, description="사양")
     category: CategoryEnum = Field(CategoryEnum.UK, description="11단계 공정 카테고리")
     unit: str = Field("EA", max_length=20, description="단위")
+    barcode: Optional[str] = Field(None, max_length=100)
+    legacy_file_type: Optional[str] = Field(None, max_length=50)
+    legacy_part: Optional[str] = Field(None, max_length=50)
+    legacy_item_type: Optional[str] = Field(None, max_length=50)
+    legacy_model: Optional[str] = Field(None, max_length=50)
+    supplier: Optional[str] = Field(None, max_length=200)
+    min_stock: Optional[Decimal] = None
 
 
 class ItemUpdate(BaseModel):
@@ -23,6 +30,13 @@ class ItemUpdate(BaseModel):
     spec: Optional[str] = None
     category: Optional[CategoryEnum] = None
     unit: Optional[str] = Field(None, max_length=20)
+    barcode: Optional[str] = Field(None, max_length=100)
+    legacy_file_type: Optional[str] = Field(None, max_length=50)
+    legacy_part: Optional[str] = Field(None, max_length=50)
+    legacy_item_type: Optional[str] = Field(None, max_length=50)
+    legacy_model: Optional[str] = Field(None, max_length=50)
+    supplier: Optional[str] = Field(None, max_length=200)
+    min_stock: Optional[Decimal] = None
 
 
 class ItemResponse(BaseModel):
@@ -34,6 +48,13 @@ class ItemResponse(BaseModel):
     spec: Optional[str]
     category: CategoryEnum
     unit: str
+    barcode: Optional[str] = None
+    legacy_file_type: Optional[str] = None
+    legacy_part: Optional[str] = None
+    legacy_item_type: Optional[str] = None
+    legacy_model: Optional[str] = None
+    supplier: Optional[str] = None
+    min_stock: Optional[Decimal] = None
     created_at: datetime
     updated_at: datetime
 

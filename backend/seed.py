@@ -44,6 +44,33 @@ CATEGORY_MAP = {
     "UK": CategoryEnum.UK,
 }
 
+# Legacy UI filter field mappings derived from category
+CATEGORY_TO_FILE_TYPE: dict[str, str] = {
+    "RM": "원자재",
+    "TA": "조립자재",
+    "TF": "조립자재",
+    "HA": "발생부자재",
+    "HF": "발생부자재",
+    "VA": "발생부자재",
+    "VF": "발생부자재",
+    "BA": "조립자재",
+    "BF": "조립자재",
+    "FG": "완제품",
+}
+
+CATEGORY_TO_PART: dict[str, str] = {
+    "RM": "자재창고",
+    "TA": "튜닝파트",
+    "TF": "튜닝파트",
+    "HA": "고압파트",
+    "HF": "고압파트",
+    "VA": "진공파트",
+    "VF": "진공파트",
+    "BA": "조립출하",
+    "BF": "조립출하",
+    "FG": "출하",
+}
+
 DEFAULT_STOCK_QTY = Decimal("100")
 
 
@@ -65,6 +92,11 @@ def get_category(code: str | None) -> CategoryEnum:
     if not code:
         return CategoryEnum.UK
     return CATEGORY_MAP.get(str(code).strip().upper(), CategoryEnum.UK)
+
+
+def run_seed() -> None:
+    """Public entry point callable from the reset API endpoint."""
+    seed()
 
 
 def seed() -> None:
@@ -109,10 +141,21 @@ def seed() -> None:
             if not item_code:
                 item_code = f"AUTO-{csv_row_number:05d}"
 
-            category = get_category(row.get("category_code"))
+            raw_category_code = (row.get("category_code") or "").strip().upper()
+            category = get_category(raw_category_code)
             spec = (row.get("std_spec") or "").strip() or None
             unit = (row.get("std_unit") or "").strip() or "EA"
             location = (row.get("department") or "").strip() or None
+
+            # Legacy metadata fields
+            barcode = item_code  # default barcode = item_code
+            legacy_file_type = CATEGORY_TO_FILE_TYPE.get(raw_category_code, "미분류")
+            legacy_part = CATEGORY_TO_PART.get(raw_category_code, "자재창고")
+            legacy_item_type = (row.get("part_type") or "").strip() or None
+            legacy_model_raw = (row.get("model_ref") or "").strip()
+            legacy_model = legacy_model_raw if legacy_model_raw else "공용"
+            supplier = (row.get("supplier") or "").strip() or None
+            min_stock = parse_decimal(row.get("safety_stock"))
 
             stock_current = parse_decimal(row.get("stock_current"))
             if stock_current is None or stock_current == 0:
@@ -127,6 +170,13 @@ def seed() -> None:
                 spec=spec,
                 category=category,
                 unit=unit,
+                barcode=barcode,
+                legacy_file_type=legacy_file_type,
+                legacy_part=legacy_part,
+                legacy_item_type=legacy_item_type,
+                legacy_model=legacy_model,
+                supplier=supplier,
+                min_stock=min_stock,
                 created_at=now,
                 updated_at=now,
             )

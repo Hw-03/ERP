@@ -87,6 +87,15 @@ class Item(Base):
         server_default=func.now(),
     )
 
+    # Legacy UI display fields (populated from ERP_Master_DB.csv or rule-based defaults)
+    barcode = Column(String(100), nullable=True, index=True)
+    legacy_file_type = Column(String(50), nullable=True, index=True)  # 원자재/조립자재/발생부자재/완제품/미분류
+    legacy_part = Column(String(50), nullable=True, index=True)       # 자재창고/조립출하/고압파트/진공파트/튜닝파트/출하
+    legacy_item_type = Column(String(50), nullable=True)              # part_type from CSV
+    legacy_model = Column(String(50), nullable=True, index=True)      # DX3000/ADX4000W/ADX6000/COCOON/SOLO/공용
+    supplier = Column(String(200), nullable=True)
+    min_stock = Column(Numeric(15, 4), nullable=True)
+
     inventory = relationship("Inventory", back_populates="item", uselist=False, cascade="all, delete-orphan")
     bom_as_parent = relationship(
         "BOM",
