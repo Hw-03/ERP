@@ -79,7 +79,10 @@
 - [v] 직원 선택 기반 입출고 흐름 이식
 - [v] 출하 묶음 패키지 관리 흐름 이식
 - [v] 관리자 비밀번호 인증 / 변경 흐름 이식
-- [~] QR 스캔, 바코드 기반 조회는 아직 미이식
+- [v] `/legacy` 경로에 레거시 동형 모바일 UI 신규 구현 (섹션 10 참고)
+- [v] Item 모델에 레거시 메타 필드 7개 추가 및 시드 적재
+- [v] 바코드 텍스트 검색 지원 (카메라 QR은 추후)
+- [v] 안전 초기화 API (`POST /api/settings/reset`) 추가
 
 ### 5-5. 검증 상태
 - [v] `python -m compileall backend` 통과
@@ -137,3 +140,42 @@
 - 모든 파일은 반드시 UTF-8 형식으로 저장해야 한다.
 - 시드 스크립트 실행 시 `items`, `inventory` 데이터는 재생성된다.
 - 레거시 분석용 압축 해제 폴더 `_legacy_zip/`는 커밋 대상이 아니다.
+
+## 10. Legacy UI Parity Initiative
+
+### 목표
+사용자 표면은 `inventory_v2.html` 모바일 앱과 거의 동일하게 재현하되, 내부 로직은 현재 FastAPI + SQLite 백엔드를 그대로 사용한다.
+
+### 구현 상태
+- [v] 새 대표 UI: `/legacy` 경로 (Next.js)
+- [v] 하단 5탭 구조: 재고 / 창고입출고 / 부서입출고 / 히스토리 / 관리자
+- [v] 430px 모바일 프레임, 고정 상단/하단 바, 바텀시트, 토스트
+- [v] 재고 탭: fileType/part/model/KPI 필터 pills, 바코드 검색, 더보기, 그룹핑 토글, ItemDetailSheet
+- [v] 창고입출고 탭: whin/wh2d/d2wh 모드, 직원 선택 필수, 확인 시트
+- [v] 부서입출고 탭: 부서 선택, 직원 필수, 출하 패키지 연동
+- [v] 히스토리 탭: 타입/기간 필터, 더보기
+- [v] 관리자 탭: PIN 잠금, 상품/직원/출하묶음/설정 섹션
+- [v] 설정 섹션: PIN 변경, CSV 내보내기, 안전 초기화 (PIN 재확인 후 재시드)
+- [v] 기존 경로 (`/inventory`, `/operations`, `/history`, `/admin`, `/bom`) 유지
+
+### Item 모델 확장 필드 (7개)
+| 필드 | 설명 | 시드 출처 |
+|------|------|----------|
+| `barcode` | 바코드 | item_code 기본값 |
+| `legacy_file_type` | 원자재/조립자재/발생부자재/완제품/미분류 | category_code 규칙 |
+| `legacy_part` | 자재창고/조립출하/고압파트/진공파트/튜닝파트/출하 | category_code 규칙 |
+| `legacy_item_type` | 세부 품목 유형 | CSV part_type |
+| `legacy_model` | DX3000/ADX4000W/ADX6000/COCOON/SOLO/공용 | CSV model_ref |
+| `supplier` | 공급사 | CSV supplier |
+| `min_stock` | 안전재고 | CSV safety_stock |
+
+### 신규 API 엔드포인트
+- `GET /api/items?legacy_file_type=&legacy_part=&legacy_model=&barcode=` — 레거시 필터
+- `POST /api/settings/reset` — PIN 인증 후 시드 재적재 (안전 초기화)
+
+### 남은 작업
+- [ ] 카메라 QR/바코드 스캔 (현재 텍스트 입력으로 대체됨)
+- [ ] 히스토리 비고(notes) 인라인 편집
+- [ ] BOM 관리를 관리자 탭 내 섹션으로 통합
+- [ ] 날짜 직접 수정 기능
+- [ ] 품목 그룹핑 시 동일 품목 재고 합산 표시

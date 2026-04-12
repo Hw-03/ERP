@@ -2,12 +2,36 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.database import Base, SessionLocal, engine
 from app.models import DepartmentEnum, Employee, EmployeeLevelEnum
 from app.routers import bom, employees, inventory, items, production, settings, ship_packages
 
 Base.metadata.create_all(bind=engine)
+
+
+def run_migrations() -> None:
+    """Add new columns to existing SQLite database without losing data."""
+    new_columns = [
+        "ALTER TABLE items ADD COLUMN barcode VARCHAR(100)",
+        "ALTER TABLE items ADD COLUMN legacy_file_type VARCHAR(50)",
+        "ALTER TABLE items ADD COLUMN legacy_part VARCHAR(50)",
+        "ALTER TABLE items ADD COLUMN legacy_item_type VARCHAR(50)",
+        "ALTER TABLE items ADD COLUMN legacy_model VARCHAR(50)",
+        "ALTER TABLE items ADD COLUMN supplier VARCHAR(200)",
+        "ALTER TABLE items ADD COLUMN min_stock NUMERIC(15,4)",
+    ]
+    with engine.connect() as conn:
+        for sql in new_columns:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                pass  # column already exists
+
+
+run_migrations()
 
 app = FastAPI(
     title="X-Ray ERP System",

@@ -52,6 +52,13 @@ export interface Item {
   unit: string;
   quantity: number;
   location: string | null;
+  barcode: string | null;
+  legacy_file_type: string | null;
+  legacy_part: string | null;
+  legacy_item_type: string | null;
+  legacy_model: string | null;
+  supplier: string | null;
+  min_stock: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -210,12 +217,22 @@ export const api = {
     search?: string;
     skip?: number;
     limit?: number;
+    legacyFileType?: string;
+    legacyPart?: string;
+    legacyModel?: string;
+    legacyItemType?: string;
+    barcode?: string;
   }) => {
     const query = new URLSearchParams();
     if (params?.category) query.set("category", params.category);
     if (params?.search) query.set("search", params.search);
     if (params?.skip !== undefined) query.set("skip", String(params.skip));
     if (params?.limit !== undefined) query.set("limit", String(params.limit));
+    if (params?.legacyFileType) query.set("legacy_file_type", params.legacyFileType);
+    if (params?.legacyPart) query.set("legacy_part", params.legacyPart);
+    if (params?.legacyModel) query.set("legacy_model", params.legacyModel);
+    if (params?.legacyItemType) query.set("legacy_item_type", params.legacyItemType);
+    if (params?.barcode) query.set("barcode", params.barcode);
     return fetcher<Item[]>(toApiUrl(`/api/items?${query}`));
   },
 
@@ -228,6 +245,13 @@ export const api = {
       spec?: string;
       category?: Category;
       unit?: string;
+      barcode?: string;
+      legacy_file_type?: string;
+      legacy_part?: string;
+      legacy_item_type?: string;
+      legacy_model?: string;
+      supplier?: string;
+      min_stock?: number;
     },
   ) => {
     const res = await fetch(toApiUrl(`/api/items/${itemId}`), {
@@ -241,6 +265,16 @@ export const api = {
 
   verifyAdminPin: async (pin: string) => {
     const res = await fetch(toApiUrl("/api/settings/verify-pin"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin }),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<{ message: string }>;
+  },
+
+  resetDatabase: async (pin: string) => {
+    const res = await fetch(toApiUrl("/api/settings/reset"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pin }),
