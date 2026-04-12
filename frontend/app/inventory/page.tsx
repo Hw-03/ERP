@@ -8,6 +8,7 @@ import {
   Boxes,
   Minus,
   PackageSearch,
+  Pencil,
   Plus,
   RotateCcw,
   Search,
@@ -54,16 +55,17 @@ const TX_TYPE_LABELS: Record<string, string> = {
 };
 
 type ActionMode = "ADJUST" | "RECEIVE" | "SHIP";
-type StockFilter = "ALL" | "IN_STOCK" | "LOW" | "ZERO" | "UK_ONLY";
+type StockFilter = "ALL" | "SAFETY" | "ZERO" | "UK_ONLY";
 type ToastState = { message: string; type: "success" | "error" } | null;
 
 function formatQuantity(value: number | string | null | undefined) {
   return Number(value ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
-function getStatusMeta(quantity: number) {
+function getStatusMeta(quantity: number, minStock: number | null | undefined) {
+  const threshold = minStock ? Number(minStock) : 10;
   if (quantity <= 0) return { label: "품절", tone: "border-red-500/30 bg-red-500/15 text-red-200", dot: "bg-red-400" };
-  if (quantity <= 10) return { label: "부족", tone: "border-amber-500/30 bg-amber-500/15 text-amber-100", dot: "bg-amber-400" };
+  if (quantity < threshold) return { label: "발주필요", tone: "border-amber-500/30 bg-amber-500/15 text-amber-100", dot: "bg-amber-400" };
   return { label: "정상", tone: "border-emerald-500/30 bg-emerald-500/15 text-emerald-100", dot: "bg-emerald-400" };
 }
 
@@ -97,7 +99,7 @@ function KpiBar({
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-300/80">발주 주의</p>
           <p className="mt-1 text-xl font-semibold text-slate-50">{formatQuantity(lowCount)}개 품목</p>
-          <p className="text-sm text-slate-400">현재고 1~10 품목</p>
+          <p className="text-sm text-slate-400">안전재고 이하 품목</p>
         </div>
       </button>
       <button type="button" onClick={onSelectZero} className="flex h-[88px] min-w-[240px] flex-1 items-center gap-4 rounded-3xl border border-red-500/20 bg-slate-950/70 px-5 text-left transition hover:border-red-400/40 hover:bg-slate-900">
@@ -127,6 +129,8 @@ export default function InventoryPage() {
   const [stockFilter, setStockFilter] = useState<StockFilter>("ALL");
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [mode, setMode] = useState<ActionMode>("ADJUST");
+  const [editingMinStock, setEditingMinStock] = useState(false);
+  const [minStockInput, setMinStockInput] = useState("");
   const [quantity, setQuantity] = useState("0");
   const [reason, setReason] = useState("");
   const [location, setLocation] = useState("");
@@ -182,6 +186,7 @@ export default function InventoryPage() {
     setCategory(selectedItem.category);
     setReason("");
     setQuantity(mode === "ADJUST" ? String(Number(selectedItem.quantity)) : "1");
+    setEditingMinStock(false);
   }, [selectedItem, mode]);
 
   const filteredItems = useMemo(() => {
@@ -191,10 +196,10 @@ export default function InventoryPage() {
       const haystack = [item.item_code, item.item_name, item.spec ?? "", item.location ?? "", item.barcode ?? ""].join(" ").toLowerCase();
       const matchesCategory = categoryFilter === "ALL" || item.category === categoryFilter;
       const matchesKeyword = !keyword || haystack.includes(keyword);
+      const minStock = item.min_stock ? Number(item.min_stock) : 10;
       const matchesStock =
         stockFilter === "ALL" ||
-        (stockFilter === "IN_STOCK" && qty > 0) ||
-        (stockFilter === "LOW" && qty > 0 && qty <= 10) ||
+        (stockFilter === "SAFETY" && qty > 0 && qty < minStock) ||
         (stockFilter === "ZERO" && qty <= 0) ||
         (stockFilter === "UK_ONLY" && item.category === "UK");
       return matchesCategory && matchesKeyword && matchesStock;
@@ -204,7 +209,11 @@ export default function InventoryPage() {
   const kpis = useMemo(() => ({
     itemCount: items.length,
     totalQuantity: items.reduce((sum, item) => sum + Number(item.quantity), 0),
-    lowCount: items.filter((item) => Number(item.quantity) > 0 && Number(item.quantity) <= 10).length,
+    lowCount: items.filter((item) => {
+      const qty = Number(item.quantity);
+      const min = item.min_stock ? Number(item.min_stock) : 10;
+      return qty > 0 && qty < min;
+    }).length,
     zeroCount: items.filter((item) => Number(item.quantity) <= 0).length,
   }), [items]);
 
@@ -304,6 +313,24 @@ export default function InventoryPage() {
     }
   };
 
+  const handleSaveMinStock = async () => {
+    if (!selectedItem) return;
+    const value = Number(minStockInput);
+    if (Number.isNaN(value) || value < 0) {
+      showToast("안전재고는 0 이상의 숫자로 입력해 주세요.", "error");
+      return;
+    }
+    try {
+      const updated = await api.updateItem(selectedItem.item_id, { min_stock: value });
+      setItems((current) => current.map((item) => (item.item_id === updated.item_id ? { ...item, min_stock: updated.min_stock } : item)));
+      setSelectedItem((prev) => prev ? { ...prev, min_stock: updated.min_stock } : prev);
+      setEditingMinStock(false);
+      showToast("안전재고가 업데이트되었습니다.", "success");
+    } catch {
+      showToast("안전재고 저장에 실패했습니다.", "error");
+    }
+  };
+
   const handleKeyboardNavigation = (event: KeyboardEvent<HTMLDivElement>) => {
     if (filteredItems.length === 0) return;
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
@@ -327,7 +354,7 @@ export default function InventoryPage() {
         totalQuantity={kpis.totalQuantity}
         lowCount={kpis.lowCount}
         zeroCount={kpis.zeroCount}
-        onSelectLow={() => setStockFilter("LOW")}
+        onSelectLow={() => setStockFilter("SAFETY")}
         onSelectZero={() => setStockFilter("ZERO")}
       />
 
@@ -352,7 +379,7 @@ export default function InventoryPage() {
                 <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value as Category | "ALL")} className="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-blue-500">
                   {CATEGORY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
-                <button type="button" onClick={() => setStockFilter("LOW")} className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${stockFilter === "LOW" ? "border-amber-400 bg-amber-400/15 text-amber-200" : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-600 hover:text-white"}`}>발주 필요</button>
+                <button type="button" onClick={() => setStockFilter("SAFETY")} className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${stockFilter === "SAFETY" ? "border-amber-400 bg-amber-400/15 text-amber-200" : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-600 hover:text-white"}`}>발주 필요</button>
                 <button type="button" onClick={() => setStockFilter("ZERO")} className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${stockFilter === "ZERO" ? "border-red-400 bg-red-400/15 text-red-200" : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-600 hover:text-white"}`}>품절</button>
                 <button type="button" onClick={() => { setSearch(""); setCategoryFilter("ALL"); setStockFilter("ALL"); }} className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-700 bg-slate-900 text-slate-300 transition hover:border-slate-600 hover:text-white" aria-label="필터 초기화" title="필터 초기화"><RotateCcw className="h-4 w-4" /></button>
               </div>
@@ -361,25 +388,31 @@ export default function InventoryPage() {
             <div className="grid grid-cols-4 gap-3 border-b border-slate-800 px-5 py-4">
               <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">현재 표시 품목</p><p className="mt-2 text-2xl font-semibold text-slate-50">{formatQuantity(filteredItems.length)}</p></div>
               <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">현재 표시 재고</p><p className="mt-2 text-2xl font-semibold text-slate-50">{formatQuantity(filteredItems.reduce((sum, item) => sum + Number(item.quantity), 0))}</p></div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">발주 주의</p><p className="mt-2 text-2xl font-semibold text-amber-300">{formatQuantity(filteredItems.filter((item) => Number(item.quantity) > 0 && Number(item.quantity) <= 10).length)}</p></div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">발주 주의</p><p className="mt-2 text-2xl font-semibold text-amber-300">{formatQuantity(filteredItems.filter((item) => { const qty = Number(item.quantity); const min = item.min_stock ? Number(item.min_stock) : 10; return qty > 0 && qty < min; }).length)}</p></div>
               <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">품절</p><p className="mt-2 text-2xl font-semibold text-red-300">{formatQuantity(filteredItems.filter((item) => Number(item.quantity) <= 0).length)}</p></div>
             </div>
 
             <div tabIndex={0} onKeyDown={handleKeyboardNavigation} className="flex min-h-0 flex-1 flex-col outline-none">
-              <div className="grid grid-cols-[140px_minmax(220px,1.2fr)_minmax(220px,1fr)_120px_180px_140px] border-b border-slate-800 bg-slate-900/60 px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                <span>코드</span><span>품목명</span><span>사양</span><span>카테고리</span><span>현재고</span><span>위치</span>
+              <div className="grid grid-cols-[130px_minmax(180px,1.2fr)_minmax(160px,1fr)_100px_minmax(180px,1.1fr)_120px_110px] border-b border-slate-800 bg-slate-900/60 px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                <span>코드</span><span>품목명</span><span>사양</span><span>카테고리</span><span>현재고 / 안전재고</span><span>공급사</span><span>위치</span>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {loading ? <div className="flex h-full items-center justify-center text-sm text-slate-400">재고 데이터를 불러오는 중입니다.</div> : fetchError ? <div className="flex h-full items-center justify-center px-6 text-center text-sm text-red-300">{fetchError}</div> : filteredItems.length === 0 ? <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-400">조건에 맞는 품목이 없습니다. 검색어 또는 필터를 조정해 주세요.</div> : filteredItems.map((item, index) => {
-                  const statusMeta = getStatusMeta(Number(item.quantity));
+                  const statusMeta = getStatusMeta(Number(item.quantity), item.min_stock);
                   const isSelected = selectedItem?.item_id === item.item_id;
+                  const qty = Number(item.quantity);
+                  const minS = item.min_stock ? Number(item.min_stock) : null;
                   return (
-                    <button key={item.item_id} ref={(node) => { rowRefs.current[index] = node; }} type="button" onClick={() => { setFocusedIndex(index); setSelectedItem(item); }} className={`grid w-full grid-cols-[140px_minmax(220px,1.2fr)_minmax(220px,1fr)_120px_180px_140px] items-center border-b border-slate-900 px-5 py-3 text-left transition ${isSelected ? "border-l-2 border-l-blue-500 bg-blue-900/30" : "border-l-2 border-l-transparent hover:bg-slate-900/70"}`}>
+                    <button key={item.item_id} ref={(node) => { rowRefs.current[index] = node; }} type="button" onClick={() => { setFocusedIndex(index); setSelectedItem(item); }} className={`grid w-full grid-cols-[130px_minmax(180px,1.2fr)_minmax(160px,1fr)_100px_minmax(180px,1.1fr)_120px_110px] items-center border-b border-slate-900 px-5 py-3 text-left transition ${isSelected ? "border-l-2 border-l-blue-500 bg-blue-900/30" : "border-l-2 border-l-transparent hover:bg-slate-900/70"}`}>
                       <span className="font-mono text-sm text-blue-300">{item.item_code}</span>
                       <span className="pr-4 text-sm font-medium text-slate-50">{item.item_name}</span>
                       <span className="pr-4 text-sm text-slate-400">{item.spec || "-"}</span>
                       <span className="text-sm text-slate-300">{CATEGORY_LABELS[item.category]}</span>
-                      <span className="flex items-center justify-end gap-3 pr-4"><span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${statusMeta.tone}`}><span className={`h-2 w-2 rounded-full ${statusMeta.dot}`} />{statusMeta.label}</span><span className="min-w-[58px] text-right font-mono text-sm text-slate-100">{formatQuantity(item.quantity)}</span></span>
+                      <span className="flex items-center gap-2 pr-2">
+                        <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusMeta.tone}`}><span className={`h-1.5 w-1.5 rounded-full ${statusMeta.dot}`} />{statusMeta.label}</span>
+                        <span className="font-mono text-sm text-slate-100">{formatQuantity(qty)}{minS !== null ? <span className="text-slate-500"> / {formatQuantity(minS)}</span> : null} <span className="text-xs text-slate-500">{item.unit || "EA"}</span></span>
+                      </span>
+                      <span className="truncate pr-2 text-sm text-slate-400">{item.supplier || "—"}</span>
                       <span className="text-sm text-slate-400">{item.location || "-"}</span>
                     </button>
                   );
@@ -396,11 +429,25 @@ export default function InventoryPage() {
             </div>
             {!selectedItem ? <div className="flex flex-1 flex-col items-center justify-center px-8 text-center"><div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-blue-500/10 text-blue-300"><PackageSearch className="h-9 w-9" /></div><h3 className="mt-5 text-lg font-semibold text-slate-100">품목을 선택해 주세요</h3><p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">좌측 테이블에서 품목을 선택하면 상세 정보와 재고 처리, 최근 거래 이력을 여기에서 바로 확인할 수 있습니다.</p></div> : <>
               <div className="border-b border-slate-800 px-5 py-5">
-                <div className="flex items-start justify-between gap-4"><div><p className="font-mono text-sm font-semibold text-blue-300">{selectedItem.item_code}</p><h3 className="mt-2 text-2xl font-bold text-slate-50">{selectedItem.item_name}</h3><p className="mt-2 text-sm text-slate-400">{selectedItem.spec || "사양 정보 없음"}</p></div><span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold text-slate-200">{CATEGORY_LABELS[selectedItem.category]}</span></div>
+                <div className="flex items-start justify-between gap-4"><div><p className="font-mono text-sm font-semibold text-blue-300">{selectedItem.item_code}</p><h3 className="mt-2 text-2xl font-bold text-slate-50">{selectedItem.item_name}</h3><p className="mt-2 text-sm text-slate-400">{selectedItem.spec || "사양 정보 없음"}</p>{selectedItem.supplier ? <p className="mt-1 text-xs text-slate-500">공급사: <span className="text-slate-300">{selectedItem.supplier}</span></p> : null}</div><span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold text-slate-200">{CATEGORY_LABELS[selectedItem.category]}</span></div>
                 <div className="mt-5 grid grid-cols-3 gap-3">
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">현재고</p><p className="mt-2 text-3xl font-semibold text-slate-50">{formatQuantity(selectedItem.quantity)}</p></div>
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">현재고</p><p className="mt-2 text-3xl font-semibold text-slate-50">{formatQuantity(selectedItem.quantity)} <span className="text-base text-slate-500">{selectedItem.unit || "EA"}</span></p></div>
                   <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">위치</p><p className="mt-2 text-sm font-medium text-slate-200">{selectedItem.location || "-"}</p></div>
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">안전재고</p><p className="mt-2 text-sm font-medium text-slate-200">{selectedItem.min_stock ? formatQuantity(selectedItem.min_stock) : "-"}</p></div>
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">안전재고</p>
+                      {!editingMinStock && <button type="button" onClick={() => { setMinStockInput(selectedItem.min_stock ? String(Number(selectedItem.min_stock)) : ""); setEditingMinStock(true); }} className="text-slate-500 hover:text-slate-300" title="안전재고 편집"><Pencil className="h-3.5 w-3.5" /></button>}
+                    </div>
+                    {editingMinStock ? (
+                      <div className="mt-2 flex items-center gap-1">
+                        <input autoFocus value={minStockInput} onChange={(e) => setMinStockInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void handleSaveMinStock(); if (e.key === "Escape") setEditingMinStock(false); }} className="w-full rounded-lg border border-blue-500 bg-slate-950 px-2 py-1 text-sm text-slate-50 outline-none" inputMode="numeric" placeholder="0" />
+                        <button type="button" onClick={() => void handleSaveMinStock()} className="shrink-0 rounded-lg bg-blue-500 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-400">저장</button>
+                        <button type="button" onClick={() => setEditingMinStock(false)} className="shrink-0 rounded-lg border border-slate-700 px-2 py-1 text-xs text-slate-400 hover:text-white">취소</button>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm font-medium text-slate-200">{selectedItem.min_stock ? formatQuantity(selectedItem.min_stock) : "-"}</p>
+                    )}
+                  </div>
                 </div>
               </div>
 
