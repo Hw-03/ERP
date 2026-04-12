@@ -134,12 +134,37 @@
 - [v] `cd frontend && npm run build`
 - [v] `/api/inventory/summary` 기준 `total_items = 971`
 
+### 5-6. Desktop UI Density (ERP Parity)
+- [v] Topbar 압축: 88px → 56px (`py-3` + `text-xl`)
+- [v] Sidebar 압축: 250px → 220px, 아이콘/탭 크기 감소, 레이아웃 카드 → 시스템 상태 뱃지
+- [v] InventoryView: flex 레이아웃, 필터 패널 290→195px, 테이블 행 `py-4`→`py-2`, `h-[calc]` → `min-h-0 flex-1`, 선택 행 하이라이트
+- [v] WarehouseView: 동일 압축 패턴 적용
+- [v] DeptView: 동일 압축 패턴 적용
+- [v] RightPanel: 360px → 340px, 타이포그래피 압축
+- [v] AdminView: 동일 압축 패턴 적용 (`rounded-2xl`, `py-2` 행, flex 높이, 선택 행 하이라이트)
+- [v] 빌드 검증 통과 (`npm run build` ✓)
+
+### 5-7. 거래 이력 Notes 인라인 편집
+- [v] 백엔드: `PUT /api/inventory/transactions/{log_id}` — notes 필드 수정
+- [v] `TransactionLogUpdate` 스키마 추가 (`backend/app/schemas.py`)
+- [v] 프론트: `api.updateTransactionNotes()` 추가 (`frontend/lib/api.ts`)
+- [v] 히스토리 패널 인라인 편집 UI — 클릭 → input 전환, Enter 저장, Esc 취소
+
+### 5-8. 카메라 바코드 / QR 스캔
+- [v] `BarcodeScannerModal.tsx` 신규 — BarcodeDetector API (Chrome/Edge 83+) 기반
+  - `getUserMedia` 카메라 스트림 연결
+  - `requestAnimationFrame` 루프로 프레임마다 감지
+  - QR코드, Code128, EAN-13/8, UPC-A, DataMatrix 지원
+  - 브라우저 미지원 시 안내 메시지 fallback
+  - 인식 성공 시 600ms 시각 피드백 후 자동 닫힘
+- [v] Topbar 검색창 우측 카메라 버튼 추가 — 스캔 값 → 전역 검색에 자동 입력
+- [v] Tailwind에 `scan` 키프레임 추가 (스캔 라인 애니메이션)
+
 ## 7. 현재 가장 중요한 TODO
-1. 카메라 기반 QR / 바코드 스캔 실제 연결
-2. `/legacy` 데스크톱 레이아웃의 간격, 아이콘, 애니메이션을 원본 감성에 더 가깝게 미세 조정
-3. 거래 이력 notes 인라인 편집 API + UI
-4. 남아 있는 한글 깨짐 구간 추가 정리
-5. 테스트 코드 보강
+1. 남아 있는 한글 레이블 검토 (모바일 탭 컴포넌트)
+2. 테스트 코드 보강
+3. 모바일 탭에도 바코드 스캔 연결 (`InventoryTab`, `WarehouseIOTab`, `DeptIOTab`)
+4. 거래 이력 `produced_by` 인라인 편집 (선택적 확장)
 
 ## 8. 실행 메모
 - 시드 실행

@@ -13,13 +13,13 @@ export function DesktopRightPanel({
 }) {
   return (
     <aside
-      className="flex h-full min-h-0 w-[360px] shrink-0 flex-col border-l px-5 py-5"
+      className="flex h-full min-h-0 w-[340px] shrink-0 flex-col border-l px-4 py-4"
       style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
     >
-      <div className="mb-4">
-        <div className="text-lg font-black">{title}</div>
+      <div className="mb-3">
+        <div className="truncate text-[15px] font-black">{title}</div>
         {subtitle ? (
-          <div className="mt-1 text-xs leading-5" style={{ color: LEGACY_COLORS.muted2 }}>
+          <div className="mt-0.5 text-[10px] leading-4" style={{ color: LEGACY_COLORS.muted2 }}>
             {subtitle}
           </div>
         ) : null}

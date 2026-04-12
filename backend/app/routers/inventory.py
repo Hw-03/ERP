@@ -29,6 +29,7 @@ from app.schemas import (
     InventorySummaryResponse,
     PackageShipRequest,
     TransactionLogResponse,
+    TransactionLogUpdate,
 )
 
 router = APIRouter()
@@ -412,4 +413,40 @@ def export_transactions_csv(
         iter([buffer.getvalue()]),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="transactions-export.csv"'},
+    )
+
+
+@router.put("/transactions/{log_id}", response_model=TransactionLogResponse)
+def update_transaction_notes(
+    log_id: uuid.UUID,
+    payload: TransactionLogUpdate,
+    db: Session = Depends(get_db),
+):
+    """Update the notes field of a transaction log entry."""
+    log = db.query(TransactionLog).filter(TransactionLog.log_id == log_id).first()
+    if not log:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+    item = db.query(Item).filter(Item.item_id == log.item_id).first()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+
+    log.notes = payload.notes
+    db.commit()
+    db.refresh(log)
+
+    return TransactionLogResponse(
+        log_id=log.log_id,
+        item_id=log.item_id,
+        item_code=item.item_code,
+        item_name=item.item_name,
+        item_category=item.category,
+        item_unit=item.unit,
+        transaction_type=log.transaction_type,
+        quantity_change=log.quantity_change,
+        quantity_before=log.quantity_before,
+        quantity_after=log.quantity_after,
+        reference_no=log.reference_no,
+        produced_by=log.produced_by,
+        notes=log.notes,
+        created_at=log.created_at,
     )

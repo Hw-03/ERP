@@ -524,6 +524,16 @@ export const api = {
     return fetcher<TransactionLog[]>(toApiUrl(`/api/inventory/transactions?${query}`));
   },
 
+  updateTransactionNotes: async (logId: string, notes: string | null): Promise<TransactionLog> => {
+    const res = await fetch(toApiUrl(`/api/inventory/transactions/${logId}`), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes }),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<TransactionLog>;
+  },
+
   getItemsExportUrl: () => toApiUrl("/api/items/export.csv"),
   getTransactionsExportUrl: () => toApiUrl("/api/inventory/transactions/export.csv"),
 };
