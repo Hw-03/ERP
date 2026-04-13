@@ -308,11 +308,20 @@ export function DesktopWarehouseView({
             </div>
 
             <div className="flex flex-wrap gap-x-3 gap-y-3">
-              {employees.slice(0, 14).map((employee) => {
+              {employees.map((employee) => {
                 const active = employee.employee_id === employeeId;
+                const deptColor = employeeColor(employee.department);
                 return (
                   <button key={employee.employee_id} onClick={() => setEmployeeId(employee.employee_id)} className="flex w-[58px] flex-col items-center text-center transition">
-                    <span className="flex h-[40px] w-[40px] items-center justify-center rounded-full text-[16px] font-black text-white" style={{ background: active ? LEGACY_COLORS.blue : "rgba(79,142,247,.85)", boxShadow: active ? "0 0 0 3px rgba(79,142,247,.14)" : "none" }}>
+                    <span
+                      className="flex h-[40px] w-[40px] items-center justify-center rounded-full text-[16px] font-black text-white"
+                      style={{
+                        background: deptColor,
+                        opacity: active ? 1 : 0.55,
+                        boxShadow: active ? `0 0 0 3px ${deptColor}44` : "none",
+                        border: active ? `2.5px solid ${deptColor}` : "2.5px solid transparent",
+                      }}
+                    >
                       {firstEmployeeLetter(employee.name)}
                     </span>
                     <span className="mt-1 text-[11px] font-bold" style={{ color: active ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}>
