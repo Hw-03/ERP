@@ -11,15 +11,15 @@ import { DesktopAdminView } from "./DesktopAdminView";
 import { LEGACY_COLORS, formatNumber, transactionColor, transactionLabel } from "./legacyUi";
 
 const TAB_META: Record<DesktopTabId, { title: string; subtitle: string }> = {
-  inventory: { title: "재고", subtitle: "Inventory Workspace" },
-  warehouse: { title: "입출고 처리", subtitle: "Operations Workspace" },
+  inventory: { title: "", subtitle: "" },
+  warehouse: { title: "", subtitle: "" },
   admin: { title: "관리자", subtitle: "Admin Workspace" },
 };
 
 export function DesktopLegacyShell() {
   const [activeTab, setActiveTab] = useState<DesktopTabId>("inventory");
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("데스크톱 작업대를 준비했습니다.");
+  const [status, setStatus] = useState("데스크톱 작업 화면을 준비했습니다.");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<TransactionLog[]>([]);
   const [refreshNonce, setRefreshNonce] = useState(0);
@@ -133,7 +133,7 @@ export function DesktopLegacyShell() {
                   </div>
                   {log.produced_by ? (
                     <div className="mt-2 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                      담당자: {log.produced_by}
+                      담당자 {log.produced_by}
                     </div>
                   ) : null}
                   {log.notes ? <div className="mt-2 text-sm">{log.notes}</div> : null}

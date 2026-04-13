@@ -50,6 +50,9 @@ This section summarizes the latest state so Claude can continue work without re-
 - Assets:
   - `frontend/public/dexcowin-logo.png`
   - `frontend/app/legacy/_components/DesktopSidebar.tsx`
+- 2026-04-14 batch 1-2:
+  - sidebar logo presentation was adjusted to show the DEXCOWIN image more directly on a white logo plate
+  - duplicate page titles were reduced by hiding topbar titles for the desktop `inventory` and `warehouse` tabs so the in-content title remains the single visible title
 
 ### Sample data / seed
 - `backend/seed.py` can seed from the legacy HTML sample dataset.
@@ -61,9 +64,17 @@ This section summarizes the latest state so Claude can continue work without re-
   - `_archive/reference/files.zip`
 - Archived unused desktop component:
   - `frontend/_archive/legacy-unused/DesktopDeptView.tsx`
+- Archived previous standalone app-router frontends:
+  - `frontend/_archive/standalone-app-routes/admin`
+  - `frontend/_archive/standalone-app-routes/bom`
+  - `frontend/_archive/standalone-app-routes/history`
+  - `frontend/_archive/standalone-app-routes/inventory`
+  - `frontend/_archive/standalone-app-routes/operations`
+- Their original routes now redirect to `/` so the current legacy shell stays the single main frontend.
 - Archive guidance files added:
   - `_archive/README.md`
   - `frontend/_archive/legacy-unused/README.md`
+  - `frontend/_archive/standalone-app-routes/README.md`
 - `frontend/tsconfig.json` excludes `_archive` so archived files do not affect build/typecheck.
 
 ### Important cleanup caution

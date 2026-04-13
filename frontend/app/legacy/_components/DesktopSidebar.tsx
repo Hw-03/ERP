@@ -25,8 +25,8 @@ export function DesktopSidebar({
       className="sticky top-0 flex h-screen w-[250px] shrink-0 flex-col border-r px-5 py-6"
       style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
     >
-      <div className="mb-8 rounded-[20px] border px-3 py-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-        <Image src="/dexcowin-logo.png" alt="DEXCOWIN" width={210} height={45} className="h-auto w-full rounded-[12px]" priority />
+      <div className="mb-8 overflow-hidden rounded-[18px] bg-white px-2 py-2 shadow-[0_8px_24px_rgba(0,0,0,.24)]">
+        <Image src="/dexcowin-logo.png" alt="DEXCOWIN" width={230} height={50} className="h-auto w-full" priority />
       </div>
 
       <nav className="space-y-2">

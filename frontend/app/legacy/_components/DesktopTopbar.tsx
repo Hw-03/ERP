@@ -28,13 +28,12 @@ export function DesktopTopbar({
       style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
     >
       <div className="min-w-0 flex-1">
-        <div
-          className="mb-1 text-[11px] font-bold uppercase tracking-[0.24em]"
-          style={{ color: LEGACY_COLORS.muted2 }}
-        >
-          {subtitle}
-        </div>
-        <div className="text-[28px] font-black">{title}</div>
+        {subtitle ? (
+          <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.24em]" style={{ color: LEGACY_COLORS.muted2 }}>
+            {subtitle}
+          </div>
+        ) : null}
+        {title ? <div className="text-[28px] font-black">{title}</div> : null}
       </div>
 
       <div
@@ -45,7 +44,7 @@ export function DesktopTopbar({
         <input
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="품목명, 코드, 바코드, 비고 검색"
+          placeholder="품명, 코드, 바코드, 비고 검색"
           className="w-full bg-transparent text-sm outline-none"
           style={{ color: LEGACY_COLORS.text }}
         />
