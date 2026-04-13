@@ -3,9 +3,9 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "X-Ray ERP | 재고 관리 시스템",
-  description: "정밀 X-ray 장비 제조를 위한 ERP와 11단계 공정 재고 관리 시스템",
+  description: "정밀 X-Ray 제조 공정을 위한 ERP 및 11단계 재고 관리 시스템",
   icons: {
-    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>",
+    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏭</text></svg>",
   },
 };
 

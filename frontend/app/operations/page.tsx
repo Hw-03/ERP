@@ -6,28 +6,46 @@ import { ArrowRightLeft, PackageCheck, Truck } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import { api, type Department, type Employee, type Item, type ShipPackage } from "@/lib/api";
 
-const DEPARTMENTS: Department[] = [
-  "조립",
-  "고압",
-  "진공",
-  "튜닝",
-  "튜브",
-  "AS",
-  "연구",
-  "영업",
-  "출하",
-  "기타",
-];
-
 type WarehouseMode = "whin" | "wh2d" | "d2wh";
 type DepartmentMode = "in" | "out";
+type ShipmentMode = "package" | "custom";
+
+const DEPARTMENT_OPTIONS: Array<{ value: Department; label: string }> = [
+  { value: "議곕┰" as Department, label: "조립" },
+  { value: "怨좎븬" as Department, label: "고압" },
+  { value: "吏꾧났" as Department, label: "진공" },
+  { value: "?쒕떇" as Department, label: "세척" },
+  { value: "?쒕툕" as Department, label: "튜브" },
+  { value: "AS", label: "AS" },
+  { value: "?곌뎄" as Department, label: "연구" },
+  { value: "?곸뾽" as Department, label: "영업" },
+  { value: "異쒗븯" as Department, label: "출하" },
+  { value: "湲고?" as Department, label: "기타" },
+];
+
+const SHIPPING_DEPARTMENT = "異쒗븯" as Department;
+
+function departmentLabel(value: Department) {
+  return DEPARTMENT_OPTIONS.find((option) => option.value === value)?.label ?? value;
+}
 
 function employeeLabel(employee: Employee) {
-  return `${employee.employee_code} · ${employee.name} (${employee.department})`;
+  return `${employee.employee_code} · ${employee.name} (${departmentLabel(employee.department)})`;
 }
 
 function itemLabel(item: Item) {
   return `${item.item_code} · ${item.item_name}`;
+}
+
+function filterItems(items: Item[], keyword: string) {
+  const normalized = keyword.trim().toLowerCase();
+  if (!normalized) return items;
+  return items.filter((item) =>
+    [item.item_code, item.item_name, item.spec ?? "", item.barcode ?? ""]
+      .join(" ")
+      .toLowerCase()
+      .includes(normalized),
+  );
 }
 
 export default function OperationsPage() {
@@ -39,17 +57,20 @@ export default function OperationsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [warehouseMode, setWarehouseMode] = useState<WarehouseMode>("whin");
-  const [warehouseDepartment, setWarehouseDepartment] = useState<Department>("조립");
+  const [warehouseDepartment, setWarehouseDepartment] = useState<Department>("議곕┰" as Department);
   const [warehouseEmployeeId, setWarehouseEmployeeId] = useState("");
   const [warehouseItemId, setWarehouseItemId] = useState("");
+  const [warehouseItemSearch, setWarehouseItemSearch] = useState("");
   const [warehouseQty, setWarehouseQty] = useState("1");
   const [warehouseRef, setWarehouseRef] = useState("");
   const [warehouseNote, setWarehouseNote] = useState("");
 
-  const [deptDepartment, setDeptDepartment] = useState<Department>("조립");
+  const [deptDepartment, setDeptDepartment] = useState<Department>("議곕┰" as Department);
   const [deptMode, setDeptMode] = useState<DepartmentMode>("in");
+  const [deptShipmentMode, setDeptShipmentMode] = useState<ShipmentMode>("package");
   const [deptEmployeeId, setDeptEmployeeId] = useState("");
   const [deptItemId, setDeptItemId] = useState("");
+  const [deptItemSearch, setDeptItemSearch] = useState("");
   const [deptPackageId, setDeptPackageId] = useState("");
   const [deptQty, setDeptQty] = useState("1");
   const [deptRef, setDeptRef] = useState("");
@@ -68,6 +89,7 @@ export default function OperationsPage() {
           setEmployees(employeeRows);
           setItems(itemRows);
           setPackages(packageRows);
+          setError(null);
         }
       })
       .catch((err) => {
@@ -86,20 +108,74 @@ export default function OperationsPage() {
     };
   }, []);
 
-  const filteredEmployees = useMemo(
+  useEffect(() => {
+    if (!(deptDepartment === SHIPPING_DEPARTMENT && deptMode === "out")) {
+      setDeptShipmentMode("package");
+      setDeptPackageId("");
+    }
+  }, [deptDepartment, deptMode]);
+
+  const warehouseEmployees = useMemo(
     () => employees.filter((employee) => employee.department === warehouseDepartment),
     [employees, warehouseDepartment],
   );
 
-  const deptEmployees = useMemo(
+  const departmentEmployees = useMemo(
     () => employees.filter((employee) => employee.department === deptDepartment),
     [employees, deptDepartment],
+  );
+
+  const filteredWarehouseItems = useMemo(
+    () => filterItems(items, warehouseItemSearch),
+    [items, warehouseItemSearch],
+  );
+
+  const filteredDepartmentItems = useMemo(
+    () => filterItems(items, deptItemSearch),
+    [items, deptItemSearch],
+  );
+
+  const selectedWarehouseItem = useMemo(
+    () => items.find((item) => item.item_id === warehouseItemId) ?? null,
+    [items, warehouseItemId],
+  );
+
+  const selectedDepartmentItem = useMemo(
+    () => items.find((item) => item.item_id === deptItemId) ?? null,
+    [items, deptItemId],
   );
 
   const selectedDeptPackage = useMemo(
     () => packages.find((pkg) => pkg.package_id === deptPackageId) ?? null,
     [deptPackageId, packages],
   );
+
+  const warehouseSummary = useMemo(() => {
+    if (!selectedWarehouseItem) return "품목을 선택하면 현재고와 처리 방향을 요약해드립니다.";
+    const qty = Number(warehouseQty || 0);
+    const current = Number(selectedWarehouseItem.quantity ?? 0);
+    const next = warehouseMode === "wh2d" ? current - qty : current + qty;
+    const modeLabel =
+      warehouseMode === "whin"
+        ? "창고 입고"
+        : warehouseMode === "wh2d"
+          ? "창고 → 부서 출고"
+          : "부서 → 창고 반납";
+    return `${modeLabel} · ${selectedWarehouseItem.item_name} · 현재 ${current.toLocaleString()} → 처리 후 ${next.toLocaleString()}`;
+  }, [selectedWarehouseItem, warehouseMode, warehouseQty]);
+
+  const departmentSummary = useMemo(() => {
+    const qty = Number(deptQty || 0);
+    if (deptDepartment === SHIPPING_DEPARTMENT && deptMode === "out" && deptShipmentMode === "package") {
+      if (!selectedDeptPackage) return "출하 패키지를 선택하면 실행 요약을 보여드립니다.";
+      return `출하 패키지 · ${selectedDeptPackage.name} · 수량 ${qty.toLocaleString()}`;
+    }
+    if (!selectedDepartmentItem) return "부서 처리 대상 품목을 선택하면 실행 요약을 보여드립니다.";
+    const current = Number(selectedDepartmentItem.quantity ?? 0);
+    const next = deptMode === "in" ? current + qty : current - qty;
+    const modeLabel = deptMode === "in" ? "부서 입고" : "부서 출고";
+    return `${departmentLabel(deptDepartment)} · ${modeLabel} · ${selectedDepartmentItem.item_name} · 현재 ${current.toLocaleString()} → 처리 후 ${next.toLocaleString()}`;
+  }, [deptDepartment, deptMode, deptQty, deptShipmentMode, selectedDepartmentItem, selectedDeptPackage]);
 
   const runWarehouseAction = async () => {
     try {
@@ -109,8 +185,11 @@ export default function OperationsPage() {
       const employee = employees.find((row) => row.employee_id === warehouseEmployeeId);
       const operator = employee ? `${employee.employee_code} ${employee.name}` : undefined;
 
+      if (!warehouseEmployeeId) {
+        throw new Error("담당 직원을 먼저 선택해 주세요.");
+      }
       if (!warehouseItemId || !qty || qty <= 0) {
-        throw new Error("품목과 수량을 정확히 선택해 주세요.");
+        throw new Error("품목과 수량을 정확히 입력해 주세요.");
       }
 
       if (warehouseMode === "whin" || warehouseMode === "d2wh") {
@@ -122,8 +201,8 @@ export default function OperationsPage() {
           location: warehouseMode === "d2wh" ? "창고" : warehouseDepartment,
           notes:
             warehouseMode === "whin"
-              ? `[창고 입고] ${warehouseDepartment} · ${warehouseNote}`.trim()
-              : `[부서 반납] ${warehouseDepartment} → 창고 · ${warehouseNote}`.trim(),
+              ? `[창고 입고] ${departmentLabel(warehouseDepartment)} · ${warehouseNote}`.trim()
+              : `[부서 반납] ${departmentLabel(warehouseDepartment)} → 창고 · ${warehouseNote}`.trim(),
         });
       } else {
         await api.shipInventory({
@@ -132,7 +211,7 @@ export default function OperationsPage() {
           reference_no: warehouseRef || undefined,
           produced_by: operator,
           location: warehouseDepartment,
-          notes: `[창고 출고] 창고 → ${warehouseDepartment} · ${warehouseNote}`.trim(),
+          notes: `[창고 출고] 창고 → ${departmentLabel(warehouseDepartment)} · ${warehouseNote}`.trim(),
         });
       }
 
@@ -153,11 +232,21 @@ export default function OperationsPage() {
       const employee = employees.find((row) => row.employee_id === deptEmployeeId);
       const operator = employee ? `${employee.employee_code} ${employee.name}` : undefined;
 
+      if (!deptEmployeeId) {
+        throw new Error("담당 직원을 먼저 선택해 주세요.");
+      }
       if (!qty || qty <= 0) {
         throw new Error("수량을 정확히 입력해 주세요.");
       }
 
-      if (deptDepartment === "출하" && deptMode === "out" && deptPackageId) {
+      const usePackageShipment =
+        deptDepartment === SHIPPING_DEPARTMENT && deptMode === "out" && deptShipmentMode === "package";
+
+      if (usePackageShipment) {
+        if (!deptPackageId) {
+          throw new Error("출하 패키지를 선택해 주세요.");
+        }
+
         await api.shipPackage({
           package_id: deptPackageId,
           quantity: qty,
@@ -177,7 +266,7 @@ export default function OperationsPage() {
             reference_no: deptRef || undefined,
             produced_by: operator,
             location: deptDepartment,
-            notes: `[부서 입고] ${deptDepartment} · ${deptNote}`.trim(),
+            notes: `[부서 입고] ${departmentLabel(deptDepartment)} · ${deptNote}`.trim(),
           });
         } else {
           await api.shipInventory({
@@ -186,7 +275,7 @@ export default function OperationsPage() {
             reference_no: deptRef || undefined,
             produced_by: operator,
             location: deptDepartment,
-            notes: `[부서 출고] ${deptDepartment} · ${deptNote}`.trim(),
+            notes: `[부서 출고] ${departmentLabel(deptDepartment)} · ${deptNote}`.trim(),
           });
         }
       }
@@ -207,11 +296,12 @@ export default function OperationsPage() {
       <main className="mx-auto max-w-screen-2xl px-6 py-8">
         <section className="rounded-[28px] border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 shadow-2xl">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-            Operations
+            Operations Workspace
           </p>
           <h2 className="mt-3 text-4xl font-black tracking-tight">입출고 운영 화면</h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-            기존 재고관리앱의 창고 입출고, 부서 입출고, 직원 선택, 출하 패키지 흐름을 현재 ERP 구조에 맞춰 재구성했습니다.
+            창고 이동, 부서 입출고, 패키지 출하를 한 화면에서 처리하는 운영 콘솔입니다.
+            담당자 선택과 실행 요약을 함께 보여줘서 실수를 줄이는 데 집중했습니다.
           </p>
         </section>
 
@@ -235,8 +325,14 @@ export default function OperationsPage() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-slate-100">창고 입출고</h3>
-                <p className="text-sm text-slate-500">창고 기준 이동과 반납을 처리합니다.</p>
+                <p className="text-sm text-slate-500">
+                  창고 입고, 창고에서 부서로 이동, 부서 반납을 처리합니다.
+                </p>
               </div>
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-300">
+              {warehouseSummary}
             </div>
 
             <div className="mt-5 grid gap-3">
@@ -246,25 +342,26 @@ export default function OperationsPage() {
                 <option value="d2wh">부서 → 창고 반납</option>
               </select>
               <select value={warehouseDepartment} onChange={(event) => setWarehouseDepartment(event.target.value as Department)} className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
-                {DEPARTMENTS.map((department) => (
-                  <option key={department} value={department}>{department}</option>
+                {DEPARTMENT_OPTIONS.map((department) => (
+                  <option key={department.value} value={department.value}>{department.label}</option>
                 ))}
               </select>
               <select value={warehouseEmployeeId} onChange={(event) => setWarehouseEmployeeId(event.target.value)} className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
-                <option value="">직원 선택</option>
-                {filteredEmployees.map((employee) => (
+                <option value="">담당 직원 선택</option>
+                {warehouseEmployees.map((employee) => (
                   <option key={employee.employee_id} value={employee.employee_id}>{employeeLabel(employee)}</option>
                 ))}
               </select>
+              <input value={warehouseItemSearch} onChange={(event) => setWarehouseItemSearch(event.target.value)} placeholder="품목 코드, 이름, 바코드 검색" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
               <select value={warehouseItemId} onChange={(event) => setWarehouseItemId(event.target.value)} className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
-                <option value="">품목 선택</option>
-                {items.map((item) => (
+                <option value="">처리할 품목 선택</option>
+                {filteredWarehouseItems.map((item) => (
                   <option key={item.item_id} value={item.item_id}>{itemLabel(item)}</option>
                 ))}
               </select>
               <input value={warehouseQty} onChange={(event) => setWarehouseQty(event.target.value)} placeholder="수량" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
-              <input value={warehouseRef} onChange={(event) => setWarehouseRef(event.target.value)} placeholder="참조 번호" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
-              <textarea value={warehouseNote} onChange={(event) => setWarehouseNote(event.target.value)} placeholder="메모" className="min-h-[96px] rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
+              <input value={warehouseRef} onChange={(event) => setWarehouseRef(event.target.value)} placeholder="참조번호" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
+              <textarea value={warehouseNote} onChange={(event) => setWarehouseNote(event.target.value)} placeholder="처리 사유 또는 메모" className="min-h-[96px] rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
               <button onClick={runWarehouseAction} disabled={loading} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50">
                 창고 입출고 실행
               </button>
@@ -278,14 +375,20 @@ export default function OperationsPage() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-slate-100">부서 입출고</h3>
-                <p className="text-sm text-slate-500">직원 선택과 출하 패키지 처리를 포함합니다.</p>
+                <p className="text-sm text-slate-500">
+                  부서 입고, 부서 출고, 출하 패키지 출고를 단계형으로 처리합니다.
+                </p>
               </div>
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-300">
+              {departmentSummary}
             </div>
 
             <div className="mt-5 grid gap-3">
               <select value={deptDepartment} onChange={(event) => setDeptDepartment(event.target.value as Department)} className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
-                {DEPARTMENTS.map((department) => (
-                  <option key={department} value={department}>{department}</option>
+                {DEPARTMENT_OPTIONS.map((department) => (
+                  <option key={department.value} value={department.value}>{department.label}</option>
                 ))}
               </select>
               <select value={deptMode} onChange={(event) => setDeptMode(event.target.value as DepartmentMode)} className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
@@ -293,13 +396,24 @@ export default function OperationsPage() {
                 <option value="out">부서 출고</option>
               </select>
               <select value={deptEmployeeId} onChange={(event) => setDeptEmployeeId(event.target.value)} className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
-                <option value="">직원 선택</option>
-                {deptEmployees.map((employee) => (
+                <option value="">담당 직원 선택</option>
+                {departmentEmployees.map((employee) => (
                   <option key={employee.employee_id} value={employee.employee_id}>{employeeLabel(employee)}</option>
                 ))}
               </select>
 
-              {deptDepartment === "출하" && deptMode === "out" ? (
+              {deptDepartment === SHIPPING_DEPARTMENT && deptMode === "out" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <button type="button" onClick={() => setDeptShipmentMode("package")} className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${deptShipmentMode === "package" ? "border-blue-500 bg-blue-500/15 text-blue-200" : "border-slate-800 bg-slate-950 text-slate-400"}`}>
+                    패키지 출하
+                  </button>
+                  <button type="button" onClick={() => setDeptShipmentMode("custom")} className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${deptShipmentMode === "custom" ? "border-blue-500 bg-blue-500/15 text-blue-200" : "border-slate-800 bg-slate-950 text-slate-400"}`}>
+                    개별 품목 출하
+                  </button>
+                </div>
+              )}
+
+              {deptDepartment === SHIPPING_DEPARTMENT && deptMode === "out" && deptShipmentMode === "package" ? (
                 <>
                   <select value={deptPackageId} onChange={(event) => setDeptPackageId(event.target.value)} className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
                     <option value="">출하 패키지 선택</option>
@@ -325,17 +439,20 @@ export default function OperationsPage() {
                   )}
                 </>
               ) : (
-                <select value={deptItemId} onChange={(event) => setDeptItemId(event.target.value)} className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
-                  <option value="">품목 선택</option>
-                  {items.map((item) => (
-                    <option key={item.item_id} value={item.item_id}>{itemLabel(item)}</option>
-                  ))}
-                </select>
+                <>
+                  <input value={deptItemSearch} onChange={(event) => setDeptItemSearch(event.target.value)} placeholder="품목 코드, 이름, 바코드 검색" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
+                  <select value={deptItemId} onChange={(event) => setDeptItemId(event.target.value)} className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
+                    <option value="">처리할 품목 선택</option>
+                    {filteredDepartmentItems.map((item) => (
+                      <option key={item.item_id} value={item.item_id}>{itemLabel(item)}</option>
+                    ))}
+                  </select>
+                </>
               )}
 
               <input value={deptQty} onChange={(event) => setDeptQty(event.target.value)} placeholder="수량" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
-              <input value={deptRef} onChange={(event) => setDeptRef(event.target.value)} placeholder="참조 번호" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
-              <textarea value={deptNote} onChange={(event) => setDeptNote(event.target.value)} placeholder="메모" className="min-h-[96px] rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
+              <input value={deptRef} onChange={(event) => setDeptRef(event.target.value)} placeholder="참조번호" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
+              <textarea value={deptNote} onChange={(event) => setDeptNote(event.target.value)} placeholder="처리 사유 또는 메모" className="min-h-[96px] rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
               <button onClick={runDepartmentAction} disabled={loading} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500 disabled:opacity-50">
                 부서 입출고 실행
               </button>
