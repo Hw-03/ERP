@@ -117,7 +117,8 @@ export default function BomPage() {
               .join(" ")
               .toLowerCase()
               .includes(keyword),
-      );
+      )
+      .slice(0, 12);
   }, [items, parentSearch]);
 
   const filteredChildren = useMemo(() => {
@@ -131,7 +132,8 @@ export default function BomPage() {
               .join(" ")
               .toLowerCase()
               .includes(keyword),
-      );
+      )
+      .slice(0, 12);
   }, [childSearch, items, selectedParent]);
 
   const refreshBom = async () => {

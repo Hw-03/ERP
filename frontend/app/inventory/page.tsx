@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { Suspense, useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   ArrowDownUp,
@@ -114,7 +115,9 @@ function KpiBar({
   );
 }
 
-export default function InventoryPage() {
+function InventoryPageInner() {
+  const searchParams = useSearchParams();
+
   const [items, setItems] = useState<Item[]>([]);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [transactions, setTransactions] = useState<TransactionLog[]>([]);
@@ -126,7 +129,11 @@ export default function InventoryPage() {
   const [toast, setToast] = useState<ToastState>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<Category | "ALL">("ALL");
-  const [stockFilter, setStockFilter] = useState<StockFilter>("ALL");
+  const [stockFilter, setStockFilter] = useState<StockFilter>(() => {
+    const f = searchParams.get("filter");
+    if (f === "ZERO" || f === "SAFETY") return f;
+    return "ALL";
+  });
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [mode, setMode] = useState<ActionMode>("ADJUST");
   const [editingMinStock, setEditingMinStock] = useState(false);
@@ -158,6 +165,14 @@ export default function InventoryPage() {
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     };
   }, []);
+  // Auto-select item from ?item= URL param once items are loaded
+  const itemIdParam = searchParams.get("item");
+  useEffect(() => {
+    if (!itemIdParam || items.length === 0) return;
+    const target = items.find((i) => i.item_id === itemIdParam);
+    if (target) setSelectedItem(target);
+  }, [itemIdParam, items]);
+
   useEffect(() => {
     if (!selectedItem) {
       setTransactions([]);
@@ -474,5 +489,13 @@ export default function InventoryPage() {
 
       {toast ? <div className="fixed bottom-6 right-6 z-50"><div className={`rounded-2xl border px-5 py-4 shadow-2xl ${toast.type === "success" ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-50" : "border-red-500/30 bg-red-500/15 text-red-50"}`}><p className="text-sm font-semibold">{toast.message}</p></div></div> : null}
     </div>
+  );
+}
+
+export default function InventoryPage() {
+  return (
+    <Suspense>
+      <InventoryPageInner />
+    </Suspense>
   );
 }
