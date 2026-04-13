@@ -703,8 +703,8 @@ export function DesktopInventoryView({
         }
       >
         {!selectedItem ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-            <div className="rounded-3xl p-4" style={{ background: "rgba(79,142,247,.12)", color: LEGACY_COLORS.blue }}>
+          <div className="flex min-h-[560px] h-full flex-col items-center justify-center gap-4 rounded-[28px] border p-8 text-center" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+            <div className="rounded-3xl p-5" style={{ background: "rgba(79,142,247,.12)", color: LEGACY_COLORS.blue }}>
               <PackageSearch size={26} />
             </div>
             <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -713,7 +713,7 @@ export function DesktopInventoryView({
           </div>
         ) : (
           <div className="space-y-4">
-            <section className="rounded-3xl border p-4" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
+            <section className="rounded-[28px] border p-5" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
               <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
                 현재 선택
               </div>
@@ -740,7 +740,7 @@ export function DesktopInventoryView({
               </div>
             </section>
 
-            <section className="rounded-3xl border p-4" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
+            <section className="rounded-[28px] border p-5" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
               <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
                 처리 유형
               </div>
@@ -782,7 +782,7 @@ export function DesktopInventoryView({
               </div>
             </section>
 
-            <section className="rounded-3xl border p-4" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
+            <section className="rounded-[28px] border p-5" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
               <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
                 실행 요약
               </div>
@@ -813,7 +813,7 @@ export function DesktopInventoryView({
               </button>
             </section>
 
-            <section className="rounded-3xl border p-4" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
+            <section className="rounded-[28px] border p-5" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
               <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
                 최근 이력
               </div>

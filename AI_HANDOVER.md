@@ -77,6 +77,13 @@ This section summarizes the latest state so Claude can continue work without re-
   - `frontend/_archive/standalone-app-routes/README.md`
 - `frontend/tsconfig.json` excludes `_archive` so archived files do not affect build/typecheck.
 
+### 2026-04-14 batch 3-4
+- `frontend/app/legacy/_components/DesktopRightPanel.tsx`
+  - desktop right panel was widened and changed to a sticky/fixed-feel card so it stays visually anchored while the main list scrolls
+- `frontend/app/legacy/_components/DesktopInventoryView.tsx`
+  - empty selection state was enlarged to match the larger right panel
+  - selected item detail sections were also expanded with larger card radius/padding to fit the new panel proportion
+
 ### Important cleanup caution
 - Mobile legacy UI still uses the older component tree through `frontend/app/legacy/page.tsx`.
 - Do not archive/delete these without replacing mobile `/legacy` behavior:
