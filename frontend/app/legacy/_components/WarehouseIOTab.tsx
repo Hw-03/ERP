@@ -6,6 +6,7 @@ import { BottomSheet } from "./BottomSheet";
 import type { ToastState } from "./Toast";
 import {
   LEGACY_COLORS,
+  LEGACY_SHADOWS,
   buildItemSearchLabel,
   employeeColor,
   firstEmployeeLetter,
@@ -144,23 +145,30 @@ export function WarehouseIOTab({
   }
 
   if (loading) {
-    return <div className="py-8 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>데이터를 불러오는 중...</div>;
+    return <div className="py-10 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>데이터를 불러오는 중...</div>;
   }
 
   return (
-    <div className="pb-4">
+    <div className="pb-6">
+      {/* 이력 확인 버튼 */}
       <button
         onClick={onOpenHistory}
-        className="mb-3 flex w-full items-center justify-center rounded-xl border px-4 py-[13px] text-[15px] font-bold"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+        className="mb-5 flex w-full items-center justify-center rounded-2xl border px-4 py-4 text-sm font-semibold"
+        style={{
+          background: LEGACY_COLORS.s2,
+          borderColor: LEGACY_COLORS.border,
+          color: LEGACY_COLORS.muted2,
+          boxShadow: LEGACY_SHADOWS.sm,
+        }}
       >
         📋 입출고 내역 확인
       </button>
 
-      <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted }}>
+      {/* 이동 유형 */}
+      <div className="mb-2 text-xs font-semibold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted }}>
         이동 유형
       </div>
-      <div className="mb-[14px] grid grid-cols-3 gap-2">
+      <div className="mb-5 grid grid-cols-3 gap-2">
         {MODES.map((entry) => (
           <button
             key={entry.id}
@@ -168,13 +176,14 @@ export function WarehouseIOTab({
               setMode(entry.id);
               resetForm();
             }}
-            className="rounded-[14px] border px-2 py-3 text-center"
+            className="rounded-2xl border px-2 py-4 text-center"
             style={{
               background: mode === entry.id ? "rgba(79,142,247,.12)" : LEGACY_COLORS.s2,
               borderColor: mode === entry.id ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+              boxShadow: mode === entry.id ? LEGACY_SHADOWS.md : LEGACY_SHADOWS.sm,
             }}
           >
-            <div className="mb-1 text-[22px]">{entry.icon}</div>
+            <div className="mb-1.5 text-2xl">{entry.icon}</div>
             <div
               className="text-xs font-bold"
               style={{ color: mode === entry.id ? LEGACY_COLORS.blue : LEGACY_COLORS.text }}
@@ -185,25 +194,25 @@ export function WarehouseIOTab({
         ))}
       </div>
 
+      {/* 방향 표시 */}
       <div
-        className="mb-[14px] flex items-center gap-2 rounded-xl border px-[14px] py-[10px]"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+        className="mb-5 flex items-center gap-3 rounded-2xl border px-5 py-4"
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, boxShadow: LEGACY_SHADOWS.sm }}
       >
-        <div className="flex-1 rounded-lg px-3 py-[5px] text-center text-[13px] font-bold" style={{ background: LEGACY_COLORS.s3 }}>
+        <div className="flex-1 rounded-xl px-3 py-2 text-center text-sm font-bold" style={{ background: LEGACY_COLORS.s3 }}>
           {flow.from}
         </div>
-        <div className="text-xl" style={{ color: LEGACY_COLORS.blue }}>
-          →
-        </div>
-        <div className="flex-1 rounded-lg px-3 py-[5px] text-center text-[13px] font-bold" style={{ background: LEGACY_COLORS.s3 }}>
+        <div className="text-xl" style={{ color: LEGACY_COLORS.blue }}>→</div>
+        <div className="flex-1 rounded-xl px-3 py-2 text-center text-sm font-bold" style={{ background: LEGACY_COLORS.s3 }}>
           {flow.to}
         </div>
       </div>
 
-      <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted }}>
+      {/* 담당 직원 */}
+      <div className="mb-2 text-xs font-semibold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted }}>
         담당 직원
       </div>
-      <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+      <div className="mb-5 flex gap-3 overflow-x-auto pb-1">
         {employees.map((employee) => {
           const active = employee.employee_id === employeeId;
           const color = employeeColor(employee.department);
@@ -213,13 +222,13 @@ export function WarehouseIOTab({
               onClick={() => setEmployeeId(employee.employee_id)}
               className="shrink-0 px-1"
             >
-              <div className="mb-1 flex justify-center">
+              <div className="mb-1.5 flex justify-center">
                 <div
-                  className="flex h-11 w-11 items-center justify-center rounded-full border-[2.5px] text-base font-black text-white"
+                  className="flex h-12 w-12 items-center justify-center rounded-full border-[2.5px] text-base font-black text-white"
                   style={{
                     background: color,
                     borderColor: active ? LEGACY_COLORS.blue : "transparent",
-                    boxShadow: active ? "0 0 0 3px rgba(79,142,247,.2)" : "none",
+                    boxShadow: active ? `0 0 0 3px rgba(79,142,247,.25), ${LEGACY_SHADOWS.md}` : LEGACY_SHADOWS.sm,
                     opacity: employeeId && !active ? 0.35 : 1,
                   }}
                 >
@@ -227,7 +236,7 @@ export function WarehouseIOTab({
                 </div>
               </div>
               <div
-                className="max-w-[48px] truncate text-[9px] font-semibold"
+                className="max-w-[52px] truncate text-xs font-semibold"
                 style={{ color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
               >
                 {employee.name}
@@ -237,40 +246,42 @@ export function WarehouseIOTab({
         })}
       </div>
 
+      {/* QR 스캔 */}
       <button
         onClick={() => {
           searchRef.current?.focus();
           showToast({ message: "카메라 스캔은 다음 단계에서 연결합니다. 검색창으로 바로 이동했습니다.", type: "info" });
         }}
-        className="mb-[10px] flex w-full items-center gap-3 rounded-xl border px-[14px] py-3 text-left"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+        className="mb-4 flex w-full items-center gap-3 rounded-2xl border px-5 py-4 text-left"
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, boxShadow: LEGACY_SHADOWS.sm }}
       >
         <div
-          className="flex h-11 w-11 items-center justify-center rounded-[10px] text-[22px]"
+          className="flex h-11 w-11 items-center justify-center rounded-xl text-2xl"
           style={{ background: "rgba(79,142,247,.15)" }}
         >
           📷
         </div>
         <div>
           <div className="text-sm font-bold">QR 스캔</div>
-          <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+          <div className="mt-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
             카메라로 상품 인식
           </div>
         </div>
-        <div className="ml-auto text-[22px]" style={{ color: LEGACY_COLORS.muted }}>
-          ›
-        </div>
+        <div className="ml-auto text-xl" style={{ color: LEGACY_COLORS.muted }}>›</div>
       </button>
 
-      <div className="mb-[10px] flex items-center gap-[10px]">
+      {/* 구분선 */}
+      <div className="mb-4 flex items-center gap-3">
         <div className="h-px flex-1" style={{ background: LEGACY_COLORS.border }} />
-        <span className="text-[10px] font-semibold" style={{ color: LEGACY_COLORS.muted }}>
-          또는 직접 선택
-        </span>
+        <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted }}>또는 직접 선택</span>
         <div className="h-px flex-1" style={{ background: LEGACY_COLORS.border }} />
       </div>
 
-      <div className="mb-2 flex items-center gap-2 rounded-[11px] border px-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      {/* 품목 검색 */}
+      <div
+        className="mb-3 flex items-center gap-2 rounded-xl border px-4"
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      >
         <span>🔍</span>
         <input
           ref={searchRef}
@@ -280,14 +291,15 @@ export function WarehouseIOTab({
             setItemId("");
           }}
           placeholder="품명 검색.."
-          className="w-full bg-transparent py-[10px] text-sm outline-none"
+          className="w-full bg-transparent py-3 text-sm outline-none"
           style={{ color: LEGACY_COLORS.text }}
         />
       </div>
 
+      {/* 품목 목록 */}
       <div
-        className="mb-3 max-h-[200px] overflow-y-auto rounded-[14px] border"
-        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+        className="mb-5 max-h-[220px] overflow-y-auto rounded-2xl border"
+        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, boxShadow: LEGACY_SHADOWS.sm }}
       >
         {filteredItems.map((item, index) => (
           <button
@@ -296,48 +308,48 @@ export function WarehouseIOTab({
               setItemId(item.item_id);
               setItemSearch(buildItemSearchLabel(item));
             }}
-            className="flex w-full items-center justify-between px-[14px] py-3 text-left"
+            className="flex w-full items-center justify-between px-5 py-4 text-left"
             style={{
               borderBottom: index === filteredItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
             }}
           >
             <div>
               <div className="text-sm font-semibold">{item.item_name}</div>
-              <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="mt-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                 {item.item_code}
               </div>
             </div>
-            <div className="font-mono text-xs" style={{ color: LEGACY_COLORS.cyan }}>
+            <div className="font-mono text-sm font-bold" style={{ color: LEGACY_COLORS.cyan }}>
               {formatNumber(item.quantity)} {item.unit}
             </div>
           </button>
         ))}
       </div>
 
+      {/* 선택된 품목 */}
       {selectedItem ? (
-        <div className="mb-3">
-          <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted }}>
+        <div className="mb-5">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted }}>
             선택된 품목
           </div>
-          <div className="rounded-[14px] border px-[14px] py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+          <div
+            className="rounded-2xl border p-5"
+            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, boxShadow: LEGACY_SHADOWS.md }}
+          >
             <div className="text-sm font-bold">{selectedItem.item_name}</div>
-            <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
               {selectedItem.item_code} · {selectedItem.spec || "-"}
             </div>
-            <div className="mt-3 flex gap-5">
+            <div className="mt-4 flex gap-8">
               <div>
-                <div className="text-[9px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  현재 재고
-                </div>
-                <div className="font-mono text-[22px] font-black" style={{ color: LEGACY_COLORS.blue }}>
+                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>현재 재고</div>
+                <div className="mt-1 font-mono text-2xl font-black" style={{ color: LEGACY_COLORS.blue }}>
                   {formatNumber(selectedItem.quantity)}
                 </div>
               </div>
               <div>
-                <div className="text-[9px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  처리 후 예상
-                </div>
-                <div className="font-mono text-[22px] font-black" style={{ color: LEGACY_COLORS.green }}>
+                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>처리 후 예상</div>
+                <div className="mt-1 font-mono text-2xl font-black" style={{ color: LEGACY_COLORS.green }}>
                   {expectedQuantity == null ? "-" : formatNumber(expectedQuantity)}
                 </div>
               </div>
@@ -346,15 +358,16 @@ export function WarehouseIOTab({
         </div>
       ) : null}
 
-      <div className="mb-3">
-        <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted }}>
+      {/* 수량 */}
+      <div className="mb-5">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted }}>
           수량
         </div>
         <input
           value={qty}
           onChange={(event) => setQty(event.target.value)}
           inputMode="numeric"
-          className="mb-[7px] w-full rounded-[11px] border px-[13px] py-[11px] text-center text-[22px] font-bold outline-none"
+          className="mb-2 w-full rounded-xl border px-4 py-3 text-center text-2xl font-bold outline-none"
           style={{
             background: LEGACY_COLORS.s2,
             borderColor: LEGACY_COLORS.border,
@@ -362,12 +375,12 @@ export function WarehouseIOTab({
             fontFamily: 'Menlo, "Courier New", monospace',
           }}
         />
-        <div className="grid grid-cols-4 gap-[7px]">
+        <div className="grid grid-cols-4 gap-2">
           {[-10, -1, 1, 10].map((delta) => (
             <button
               key={delta}
               onClick={() => setQty((current) => String(Math.max(1, Number(current || 0) + delta)))}
-              className="rounded-[10px] py-[11px] text-sm font-bold"
+              className="rounded-xl py-3 text-sm font-bold"
               style={{
                 background: delta < 0 ? "rgba(242,95,92,.15)" : "rgba(31,209,122,.12)",
                 color: delta < 0 ? LEGACY_COLORS.red : LEGACY_COLORS.green,
@@ -379,34 +392,40 @@ export function WarehouseIOTab({
         </div>
       </div>
 
-      <div className="mb-3">
-        <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted }}>
+      {/* 비고 */}
+      <div className="mb-4">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted }}>
           비고
         </div>
         <input
           value={note}
           onChange={(event) => setNote(event.target.value)}
           placeholder="메모 (선택)"
-          className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
+          className="w-full rounded-xl border px-4 py-3 text-sm outline-none"
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
         />
       </div>
 
-      <div className="mb-3">
-        <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted }}>
+      {/* 참조번호 */}
+      <div className="mb-5">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-widest" style={{ color: LEGACY_COLORS.muted }}>
           참조번호
         </div>
         <input
           value={referenceNo}
           onChange={(event) => setReferenceNo(event.target.value)}
           placeholder="예: LOT-240412"
-          className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
+          className="w-full rounded-xl border px-4 py-3 text-sm outline-none"
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
         />
       </div>
 
+      {/* 요약 미리보기 */}
       {selectedItem ? (
-        <div className="mb-3 rounded-[11px] border px-[14px] py-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <div
+          className="mb-5 rounded-2xl border px-5 py-4"
+          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, boxShadow: LEGACY_SHADOWS.sm }}
+        >
           <div className="text-sm font-semibold">{MODES.find((entry) => entry.id === mode)?.label}</div>
           <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
             {selectedEmployee ? `${selectedEmployee.name} · ` : ""}
@@ -415,24 +434,29 @@ export function WarehouseIOTab({
         </div>
       ) : null}
 
+      {/* 에러 */}
       {error ? (
-        <div className="mb-3 rounded-xl border px-3 py-2 text-xs" style={{ background: "rgba(242,95,92,.12)", borderColor: "rgba(242,95,92,.25)", color: LEGACY_COLORS.red }}>
+        <div
+          className="mb-4 rounded-xl border px-4 py-3 text-sm"
+          style={{ background: "rgba(242,95,92,.12)", borderColor: "rgba(242,95,92,.3)", color: LEGACY_COLORS.red }}
+        >
           {error}
         </div>
       ) : null}
 
+      {/* 처리 버튼 */}
       <button
         onClick={() => {
           if (validate()) setConfirmOpen(true);
         }}
-        className="w-full rounded-xl py-[13px] text-[15px] font-bold text-white"
-        style={{ background: LEGACY_COLORS.green, color: "#000" }}
+        className="w-full rounded-2xl py-4 text-base font-bold"
+        style={{ background: LEGACY_COLORS.green, color: "#000", boxShadow: LEGACY_SHADOWS.md }}
       >
         처리하기
       </button>
 
       <BottomSheet open={confirmOpen} onClose={() => setConfirmOpen(false)} title="이동 확인">
-        <div className="space-y-2 px-5 pb-6">
+        <div className="space-y-2 px-5 pb-8">
           {[
             ["유형", MODES.find((entry) => entry.id === mode)?.label || "-"],
             ["직원", selectedEmployee ? `${selectedEmployee.name} (${normalizeDepartment(selectedEmployee.department)})` : "-"],
@@ -440,17 +464,19 @@ export function WarehouseIOTab({
             ["수량", selectedItem ? `${formatNumber(qty)} ${selectedItem.unit}` : "-"],
             ["참조번호", referenceNo || "-"],
           ].map(([label, value]) => (
-            <div key={label} className="flex items-center justify-between gap-3 rounded-xl px-3 py-2" style={{ background: LEGACY_COLORS.s2 }}>
-              <div className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                {label}
-              </div>
-              <div className="text-right text-sm">{value}</div>
+            <div
+              key={label}
+              className="flex items-center justify-between gap-3 rounded-xl px-4 py-3"
+              style={{ background: LEGACY_COLORS.s2 }}
+            >
+              <div className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
+              <div className="text-right text-sm font-medium">{value}</div>
             </div>
           ))}
-          <div className="grid grid-cols-2 gap-2 pt-2">
+          <div className="grid grid-cols-2 gap-3 pt-3">
             <button
               onClick={() => setConfirmOpen(false)}
-              className="rounded-xl border py-3 text-sm"
+              className="rounded-xl border py-4 text-sm font-semibold"
               style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
             >
               취소
@@ -458,8 +484,8 @@ export function WarehouseIOTab({
             <button
               onClick={() => void submit()}
               disabled={submitting}
-              className="rounded-xl py-3 text-sm font-bold text-white disabled:opacity-50"
-              style={{ background: LEGACY_COLORS.blue }}
+              className="rounded-xl py-4 text-sm font-bold text-white disabled:opacity-50"
+              style={{ background: LEGACY_COLORS.blue, boxShadow: LEGACY_SHADOWS.sm }}
             >
               {submitting ? "처리 중..." : "확인"}
             </button>

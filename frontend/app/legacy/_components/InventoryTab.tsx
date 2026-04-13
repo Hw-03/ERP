@@ -7,6 +7,7 @@ import { ItemDetailSheet } from "./ItemDetailSheet";
 import type { ToastState } from "./Toast";
 import {
   LEGACY_COLORS,
+  LEGACY_SHADOWS,
   fileTypeBadge,
   formatNumber,
   getStockState,
@@ -76,8 +77,15 @@ export function InventoryTab({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [showFilters, setShowFilters] = useState(false);
 
   const deferredSearch = useDeferredValue(search);
+
+  const activeFilterCount = [
+    fileType !== "ALL",
+    part !== "ALL",
+    model !== "ALL",
+  ].filter(Boolean).length;
 
   async function fetchItems(skip = 0, append = false) {
     try {
@@ -170,37 +178,81 @@ export function InventoryTab({
   const canLoadMore = items.length >= page * PAGE_SIZE;
 
   return (
-    <div className="pb-4">
+    <div className="pb-6">
+      {/* 이력 확인 버튼 */}
       <button
         onClick={onOpenHistory}
-        className="mb-[10px] flex w-full items-center justify-center rounded-xl border px-4 py-[13px] text-[15px] font-bold"
+        className="mb-5 flex w-full items-center justify-center rounded-2xl border px-4 py-4 text-sm font-semibold"
         style={{
           background: LEGACY_COLORS.s2,
           borderColor: LEGACY_COLORS.border,
           color: LEGACY_COLORS.muted2,
+          boxShadow: LEGACY_SHADOWS.sm,
         }}
       >
         입출고 이력 확인
       </button>
 
-      <div className="mb-[10px] flex items-center gap-2 rounded-[11px] border px-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      {/* 검색 */}
+      <div
+        className="mb-4 flex items-center gap-2 rounded-xl border px-4"
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      >
         <span>🔎</span>
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="품목명, 모델, 공급처, 코드 검색"
-          className="w-full bg-transparent py-[10px] text-sm outline-none"
+          className="w-full bg-transparent py-3 text-sm outline-none"
           style={{ color: LEGACY_COLORS.text }}
         />
       </div>
 
-      <FilterPills options={FILE_TYPE_OPTIONS} value={fileType} onChange={setFileType} />
-      <FilterPills options={PART_OPTIONS} value={part} onChange={setPart} activeColor={LEGACY_COLORS.green} />
-      <FilterPills options={MODEL_OPTIONS} value={model} onChange={setModel} activeColor={LEGACY_COLORS.cyan} />
+      {/* 필터 + KPI 한 줄 */}
+      <div className="mb-4 flex items-center gap-2">
+        <button
+          onClick={() => setShowFilters((v) => !v)}
+          className="flex shrink-0 items-center gap-1.5 rounded-xl border px-4 py-2 text-xs font-semibold"
+          style={{
+            background: activeFilterCount > 0 ? "rgba(79,142,247,.12)" : LEGACY_COLORS.s2,
+            borderColor: activeFilterCount > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+            color: activeFilterCount > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
+          }}
+        >
+          🔽 필터{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+        </button>
+        <div className="flex-1 overflow-x-auto">
+          <FilterPills options={KPI_OPTIONS} value={kpi} onChange={setKpi} activeColor={LEGACY_COLORS.purple} />
+        </div>
+        <button
+          onClick={() => setGrouped((current) => !current)}
+          className="shrink-0 rounded-xl border px-3 py-2 text-xs font-semibold"
+          style={{
+            background: grouped ? LEGACY_COLORS.yellow : LEGACY_COLORS.s2,
+            borderColor: grouped ? LEGACY_COLORS.yellow : LEGACY_COLORS.border,
+            color: grouped ? "#111" : LEGACY_COLORS.muted2,
+          }}
+        >
+          묶음
+        </button>
+      </div>
 
-      <div className="mb-[10px] grid grid-cols-4 gap-2">
+      {/* 접기/펼치기 필터 패널 */}
+      {showFilters && (
+        <div
+          className="mb-4 rounded-2xl border p-4"
+          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, boxShadow: LEGACY_SHADOWS.sm }}
+        >
+          <FilterPills options={FILE_TYPE_OPTIONS} value={fileType} onChange={setFileType} />
+          <FilterPills options={PART_OPTIONS} value={part} onChange={setPart} activeColor={LEGACY_COLORS.green} />
+          <FilterPills options={MODEL_OPTIONS} value={model} onChange={setModel} activeColor={LEGACY_COLORS.cyan} />
+        </div>
+      )}
+
+      {/* KPI 카드 */}
+      <div className="mb-5 grid grid-cols-4 gap-2">
         {[
-          { label: "전체 품목", value: displayRows.length, color: LEGACY_COLORS.blue },
+          { label: "전체", value: displayRows.length, color: LEGACY_COLORS.blue },
           { label: "정상", value: totals.normalCount, color: LEGACY_COLORS.green },
           { label: "부족", value: totals.lowCount, color: LEGACY_COLORS.yellow },
           { label: "품절", value: totals.zeroCount, color: LEGACY_COLORS.red },
@@ -208,59 +260,48 @@ export function InventoryTab({
           <button
             key={card.label}
             onClick={() => {
-              if (card.label === "전체 품목") setKpi("ALL");
+              if (card.label === "전체") setKpi("ALL");
               if (card.label === "정상") setKpi("OK");
               if (card.label === "부족") setKpi("LOW");
               if (card.label === "품절") setKpi("ZERO");
             }}
-            className="relative overflow-hidden rounded-xl border px-2 py-[10px] text-left"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+            className="relative overflow-hidden rounded-2xl border px-3 py-3 text-left"
+            style={{
+              background: LEGACY_COLORS.s1,
+              borderColor: LEGACY_COLORS.border,
+              boxShadow: LEGACY_SHADOWS.sm,
+            }}
           >
-            <div className="mb-1 text-[8px] font-bold uppercase tracking-[0.8px]" style={{ color: LEGACY_COLORS.muted }}>
+            <div className="mb-1.5 text-xs font-semibold" style={{ color: LEGACY_COLORS.muted }}>
               {card.label}
             </div>
             <div className="font-mono text-lg font-bold" style={{ color: card.color }}>
               {formatNumber(card.value)}
             </div>
-            <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{ background: card.color }} />
+            <div className="absolute bottom-0 left-0 right-0 h-[3px]" style={{ background: card.color }} />
           </button>
         ))}
       </div>
 
-      <div className="mb-[6px] flex items-center justify-between px-[2px]">
-        <div className="text-[10px] font-mono" style={{ color: LEGACY_COLORS.muted2 }}>
-          {displayRows.length}개 품목 / 총 재고 {formatNumber(totals.totalQuantity)}
-        </div>
-        <div className="flex items-center gap-2">
-          <FilterPills options={KPI_OPTIONS} value={kpi} onChange={setKpi} activeColor={LEGACY_COLORS.purple} />
-          <button
-            onClick={() => setGrouped((current) => !current)}
-            className="rounded-full border px-[11px] py-1 text-[10px] font-semibold"
-            style={{
-              background: grouped ? LEGACY_COLORS.yellow : LEGACY_COLORS.s2,
-              borderColor: grouped ? LEGACY_COLORS.yellow : LEGACY_COLORS.border,
-              color: grouped ? "#111" : LEGACY_COLORS.muted2,
-            }}
-          >
-            묶음 보기
-          </button>
+      {/* 목록 헤더 */}
+      <div className="mb-3 flex items-center justify-between px-1">
+        <div className="text-xs font-mono" style={{ color: LEGACY_COLORS.muted2 }}>
+          {displayRows.length}개 품목 · 총 {formatNumber(totals.totalQuantity)}
         </div>
       </div>
 
+      {/* 품목 목록 */}
       {error ? (
-        <div className="py-6 text-center text-sm" style={{ color: LEGACY_COLORS.red }}>
-          {error}
-        </div>
+        <div className="py-6 text-center text-sm" style={{ color: LEGACY_COLORS.red }}>{error}</div>
       ) : loading && items.length === 0 ? (
-        <div className="py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-          데이터를 불러오는 중입니다...
-        </div>
+        <div className="py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>데이터를 불러오는 중입니다...</div>
       ) : displayRows.length === 0 ? (
-        <div className="py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-          조건에 맞는 품목이 없습니다.
-        </div>
+        <div className="py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>조건에 맞는 품목이 없습니다.</div>
       ) : (
-        <div className="overflow-hidden rounded-[14px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+        <div
+          className="overflow-hidden rounded-2xl border"
+          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, boxShadow: LEGACY_SHADOWS.sm }}
+        >
           {displayRows.map((row, index) => {
             const item = row.representative;
             const stockState = getStockState(
@@ -274,15 +315,15 @@ export function InventoryTab({
               <button
                 key={row.key}
                 onClick={() => setSelectedItem(item)}
-                className="flex w-full items-center gap-[10px] px-[14px] py-3 text-left"
+                className="flex w-full items-center gap-3 px-5 py-4 text-left"
                 style={{
                   borderBottom: index === displayRows.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
                 }}
               >
                 <div className="min-w-0 flex-1">
-                  <div className="mb-1 flex flex-wrap items-center gap-[6px]">
+                  <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                     <span
-                      className="inline-flex rounded-full px-[7px] py-[2px] text-[9px] font-bold"
+                      className="inline-flex rounded-full px-2 py-0.5 text-xs font-bold"
                       style={{
                         background:
                           stockState.label === "정상"
@@ -296,28 +337,28 @@ export function InventoryTab({
                       {stockState.label}
                     </span>
                     <span
-                      className="inline-flex rounded-full px-[7px] py-[2px] text-[9px] font-bold"
+                      className="inline-flex rounded-full px-2 py-0.5 text-xs font-bold"
                       style={{ background: badge.bg, color: badge.color }}
                     >
                       {badge.label}
                     </span>
                     {row.count > 1 ? (
                       <span
-                        className="inline-flex rounded-full px-[7px] py-[2px] text-[9px] font-bold"
+                        className="inline-flex rounded-full px-2 py-0.5 text-xs font-bold"
                         style={{ background: "rgba(6,182,212,.15)", color: LEGACY_COLORS.cyan }}
                       >
-                        {row.count}개 품목 묶음
+                        {row.count}개 묶음
                       </span>
                     ) : null}
                   </div>
                   <div className="truncate text-sm font-semibold">{item.item_name}</div>
-                  <div className="mt-0.5 truncate text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <div className="mt-0.5 truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                     {item.item_code}
                     {item.legacy_part ? ` / ${item.legacy_part}` : ""}
                     {normalizeModel(item.legacy_model) !== "공용" ? ` / ${normalizeModel(item.legacy_model)}` : ""}
                     {item.supplier ? ` / ${item.supplier}` : ""}
                   </div>
-                  <div className="mt-2 h-[6px] rounded-full" style={{ background: LEGACY_COLORS.s3 }}>
+                  <div className="mt-2 h-1.5 rounded-full" style={{ background: LEGACY_COLORS.s3 }}>
                     <div className="h-full rounded-full" style={{ width: `${fillWidth}%`, background: stockState.color }} />
                   </div>
                 </div>
@@ -325,7 +366,7 @@ export function InventoryTab({
                   <div className="text-lg font-bold" style={{ color: LEGACY_COLORS.text }}>
                     {formatNumber(row.quantity)}
                   </div>
-                  <div className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                     {item.unit}
                     {item.min_stock != null ? ` / 안전 ${formatNumber(item.min_stock)}` : ""}
                   </div>
@@ -336,6 +377,7 @@ export function InventoryTab({
         </div>
       )}
 
+      {/* 더 보기 */}
       {canLoadMore ? (
         <button
           onClick={() => {
@@ -343,8 +385,13 @@ export function InventoryTab({
             setPage(nextPage);
             void fetchItems((nextPage - 1) * PAGE_SIZE, true);
           }}
-          className="mt-3 w-full rounded-xl border py-3 text-sm font-semibold"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+          className="mt-4 w-full rounded-2xl border py-4 text-sm font-semibold"
+          style={{
+            background: LEGACY_COLORS.s2,
+            borderColor: LEGACY_COLORS.border,
+            color: LEGACY_COLORS.text,
+            boxShadow: LEGACY_SHADOWS.sm,
+          }}
         >
           100개 더 보기
         </button>
