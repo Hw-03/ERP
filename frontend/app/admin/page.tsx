@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Download, KeyRound, Lock, PackagePlus, Plus, Trash2, Users } from "lucide-react";
+import { Download, KeyRound, Lock, Plus, Trash2, Users } from "lucide-react";
 
 import AppHeader from "@/components/AppHeader";
 import {
@@ -13,24 +13,20 @@ import {
   type ShipPackage,
 } from "@/lib/api";
 
-const DEPARTMENT_OPTIONS: Array<{ value: Department; label: string }> = [
-  { value: "議곕┰" as Department, label: "조립" },
-  { value: "怨좎븬" as Department, label: "고압" },
-  { value: "吏꾧났" as Department, label: "진공" },
-  { value: "?쒕떇" as Department, label: "세척" },
-  { value: "?쒕툕" as Department, label: "튜브" },
-  { value: "AS", label: "AS" },
-  { value: "?곌뎄" as Department, label: "연구" },
-  { value: "?곸뾽" as Department, label: "영업" },
-  { value: "異쒗븯" as Department, label: "출하" },
-  { value: "湲고?" as Department, label: "기타" },
+const DEPARTMENTS: Department[] = [
+  "조립",
+  "고압",
+  "진공",
+  "튜닝",
+  "튜브",
+  "AS",
+  "연구",
+  "영업",
+  "출하",
+  "기타",
 ];
 
 const LEVELS: EmployeeLevel[] = ["staff", "manager", "admin"];
-
-function departmentLabel(value: Department) {
-  return DEPARTMENT_OPTIONS.find((option) => option.value === value)?.label ?? value;
-}
 
 export default function AdminPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -53,7 +49,7 @@ export default function AdminPage() {
     name: "",
     role: "",
     phone: "",
-    department: "議곕┰" as Department,
+    department: "조립" as Department,
     level: "staff" as EmployeeLevel,
   });
 
@@ -93,12 +89,7 @@ export default function AdminPage() {
   const filteredItems = useMemo(() => {
     const keyword = packageSearch.trim().toLowerCase();
     return items.filter((item) =>
-      !keyword
-        ? true
-        : [item.item_name, item.item_code, item.barcode ?? ""]
-            .join(" ")
-            .toLowerCase()
-            .includes(keyword),
+      !keyword ? true : [item.item_name, item.item_code].join(" ").toLowerCase().includes(keyword),
     );
   }, [items, packageSearch]);
 
@@ -147,7 +138,7 @@ export default function AdminPage() {
         name: "",
         role: "",
         phone: "",
-        department: "議곕┰" as Department,
+        department: "조립",
         level: "staff",
       });
       await loadAll();
@@ -181,7 +172,7 @@ export default function AdminPage() {
 
   const handlePackageAddItem = async () => {
     if (!selectedPackageId || !selectedItemId) {
-      setError("패키지와 품목을 먼저 선택해 주세요.");
+      setError("패키지와 품목을 선택해 주세요.");
       return;
     }
     try {
@@ -245,7 +236,8 @@ export default function AdminPage() {
               </div>
             </div>
             <p className="mt-4 text-sm leading-6 text-slate-400">
-              관리자 화면은 PIN 인증 후에 열립니다. 기본 관리자 PIN은 <span className="font-semibold text-slate-200">0000</span> 입니다.
+              기존 재고관리앱의 관리자 비밀번호 흐름을 현재 ERP에 이식했습니다. 기본 비밀번호는
+              `0000`입니다.
             </p>
             <div className="mt-6 flex gap-3">
               <input
@@ -253,7 +245,7 @@ export default function AdminPage() {
                 inputMode="numeric"
                 value={pinInput}
                 onChange={(event) => setPinInput(event.target.value)}
-                placeholder="관리자 PIN 입력"
+                placeholder="관리자 비밀번호"
                 className="flex-1 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-500"
               />
               <button
@@ -284,9 +276,9 @@ export default function AdminPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
             Administration
           </p>
-          <h2 className="mt-3 text-4xl font-black tracking-tight">관리자 화면</h2>
+          <h2 className="mt-3 text-4xl font-black tracking-tight">관리 화면</h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-            직원 마스터, 출하 패키지, 관리자 PIN, CSV 내보내기를 한 화면에서 관리합니다.
+            직원 마스터, 출하 패키지, 관리자 비밀번호, CSV 내보내기를 한곳에서 관리합니다.
           </p>
         </section>
 
@@ -311,7 +303,7 @@ export default function AdminPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-slate-100">직원 관리</h3>
-                  <p className="text-sm text-slate-500">운영 화면에 사용하는 직원 마스터입니다.</p>
+                  <p className="text-sm text-slate-500">입출고 화면에서 사용하는 직원 마스터입니다.</p>
                 </div>
               </div>
 
@@ -321,8 +313,8 @@ export default function AdminPage() {
                 <input value={employeeForm.role} onChange={(event) => setEmployeeForm((current) => ({ ...current, role: event.target.value }))} placeholder="직책" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
                 <input value={employeeForm.phone} onChange={(event) => setEmployeeForm((current) => ({ ...current, phone: event.target.value }))} placeholder="전화번호" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
                 <select value={employeeForm.department} onChange={(event) => setEmployeeForm((current) => ({ ...current, department: event.target.value as Department }))} className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
-                  {DEPARTMENT_OPTIONS.map((department) => (
-                    <option key={department.value} value={department.value}>{department.label}</option>
+                  {DEPARTMENTS.map((department) => (
+                    <option key={department} value={department}>{department}</option>
                   ))}
                 </select>
                 <select value={employeeForm.level} onChange={(event) => setEmployeeForm((current) => ({ ...current, level: event.target.value as EmployeeLevel }))} className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm">
@@ -342,7 +334,7 @@ export default function AdminPage() {
                   <div key={employee.employee_id} className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-3">
                     <div>
                       <p className="font-medium text-slate-100">{employee.name} · {employee.role}</p>
-                      <p className="mt-1 text-xs text-slate-500">{employee.employee_code} · {departmentLabel(employee.department)} · {employee.level}</p>
+                      <p className="mt-1 text-xs text-slate-500">{employee.employee_code} · {employee.department} · {employee.level}</p>
                     </div>
                     <button onClick={() => handleEmployeeToggle(employee)} className={`rounded-full px-3 py-1.5 text-xs ${employee.is_active ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
                       {employee.is_active ? "활성" : "비활성"}
@@ -358,16 +350,16 @@ export default function AdminPage() {
                   <KeyRound className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-100">관리자 PIN</h3>
-                  <p className="text-sm text-slate-500">기본값은 0000이며 여기에서 변경할 수 있습니다.</p>
+                  <h3 className="text-lg font-semibold text-slate-100">관리자 비밀번호</h3>
+                  <p className="text-sm text-slate-500">기본값은 0000이며, 여기서 변경할 수 있습니다.</p>
                 </div>
               </div>
               <div className="mt-5 grid gap-3">
-                <input type="password" value={pinForm.current_pin} onChange={(event) => setPinForm((current) => ({ ...current, current_pin: event.target.value }))} placeholder="현재 PIN" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
-                <input type="password" value={pinForm.new_pin} onChange={(event) => setPinForm((current) => ({ ...current, new_pin: event.target.value }))} placeholder="새 PIN" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
-                <input type="password" value={pinForm.confirm_pin} onChange={(event) => setPinForm((current) => ({ ...current, confirm_pin: event.target.value }))} placeholder="새 PIN 확인" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
+                <input type="password" value={pinForm.current_pin} onChange={(event) => setPinForm((current) => ({ ...current, current_pin: event.target.value }))} placeholder="현재 비밀번호" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
+                <input type="password" value={pinForm.new_pin} onChange={(event) => setPinForm((current) => ({ ...current, new_pin: event.target.value }))} placeholder="새 비밀번호" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
+                <input type="password" value={pinForm.confirm_pin} onChange={(event) => setPinForm((current) => ({ ...current, confirm_pin: event.target.value }))} placeholder="새 비밀번호 확인" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
                 <button onClick={handlePinChange} className="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-400">
-                  PIN 변경
+                  비밀번호 변경
                 </button>
               </div>
             </div>
@@ -394,15 +386,7 @@ export default function AdminPage() {
           </section>
 
           <section className="rounded-[24px] border border-slate-800 bg-slate-900/60 p-5 shadow-xl">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-violet-500/15 p-2 text-violet-300">
-                <PackagePlus className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-slate-100">출하 패키지 관리</h3>
-                <p className="text-sm text-slate-500">자주 출고하는 묶음을 저장해 출하 화면에서 바로 쓸 수 있습니다.</p>
-              </div>
-            </div>
+            <h3 className="text-lg font-semibold text-slate-100">출하 패키지 관리</h3>
 
             <div className="mt-5 grid gap-3 md:grid-cols-[160px,1fr]">
               <input value={packageForm.package_code} onChange={(event) => setPackageForm((current) => ({ ...current, package_code: event.target.value }))} placeholder="패키지 코드" className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm" />
@@ -410,7 +394,7 @@ export default function AdminPage() {
               <textarea value={packageForm.notes} onChange={(event) => setPackageForm((current) => ({ ...current, notes: event.target.value }))} placeholder="메모" className="min-h-[88px] rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm md:col-span-2" />
             </div>
 
-            <button onClick={handlePackageCreate} className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-500">
+            <button onClick={handlePackageCreate} className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500">
               <Plus className="h-4 w-4" />
               패키지 생성
             </button>
