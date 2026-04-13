@@ -92,6 +92,13 @@ This section summarizes the latest state so Claude can continue work without re-
 - `frontend/app/legacy/_components/DesktopWarehouseView.tsx`
   - item selection and package selection now both support click-again-to-deselect behavior
 
+### 2026-04-14 batch 7-8
+- `frontend/app/legacy/_components/DesktopInventoryView.tsx`
+  - removed the old bottleneck insight card from the top insight row
+  - top insight row is now focused on `즉시생산` and `최대생산`
+  - both cards now open a model-based production-capacity modal instead of showing a single highlighted item
+  - current modal values are intentionally placeholder/prep values until BOM and finished-goods data are complete
+
 ### Important cleanup caution
 - Mobile legacy UI still uses the older component tree through `frontend/app/legacy/page.tsx`.
 - Do not archive/delete these without replacing mobile `/legacy` behavior:
