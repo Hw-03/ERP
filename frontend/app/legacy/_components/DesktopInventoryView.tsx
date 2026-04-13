@@ -586,41 +586,18 @@ export function DesktopInventoryView({
       </DesktopRightPanel>
 
       {capacityMode ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-6">
-          <div className="w-full max-w-[860px] rounded-[32px] border p-6" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  Capacity Preview
-                </div>
-                <div className="mt-1 text-2xl font-black">{capacityMode === "FAST" ? "즉시생산" : "최대생산"}</div>
-                <div className="mt-2 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-                  제품 데이터와 BOM이 완성되면 이 목록이 실제 계산값으로 바뀌도록 준비해 둔 화면입니다.
-                </div>
-              </div>
-              <button onClick={() => setCapacityMode(null)} className="rounded-2xl border px-4 py-2 text-sm font-semibold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-                닫기
-              </button>
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-6" onClick={() => setCapacityMode(null)}>
+          <div className="w-full max-w-[480px] rounded-[32px] border p-8 text-center" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }} onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 inline-flex rounded-2xl px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em]" style={{ background: capacityMode === "FAST" ? "rgba(79,142,247,.14)" : "rgba(6,182,212,.14)", color: capacityMode === "FAST" ? LEGACY_COLORS.blue : LEGACY_COLORS.cyan }}>
+              {capacityMode === "FAST" ? "즉시생산" : "최대생산"}
             </div>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              {capacityRows.map((entry) => (
-                <div key={entry.model} className="rounded-3xl border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <div className="text-base font-bold">{entry.model}</div>
-                    <div className="rounded-full px-2.5 py-1 text-[10px] font-bold" style={{ background: "rgba(79,142,247,.16)", color: capacityMode === "FAST" ? LEGACY_COLORS.blue : LEGACY_COLORS.cyan }}>
-                      준비형 UI
-                    </div>
-                  </div>
-                  <div className="font-mono text-3xl font-black" style={{ color: capacityMode === "FAST" ? LEGACY_COLORS.blue : LEGACY_COLORS.cyan }}>
-                    {capacityMode === "FAST" ? formatNumber(entry.fastTrack) : formatNumber(entry.maxTrack)}
-                  </div>
-                  <div className="mt-2 text-xs leading-5" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {entry.note}
-                  </div>
-                </div>
-              ))}
+            <div className="mt-2 text-2xl font-black">BOM 세팅 후 표시</div>
+            <div className="mt-3 text-sm leading-6" style={{ color: LEGACY_COLORS.muted2 }}>
+              제품 BOM과 완제품 데이터가 등록되면<br />모델별 생산 가능 수량이 이 자리에 표시됩니다.
             </div>
+            <button onClick={() => setCapacityMode(null)} className="mt-6 rounded-2xl border px-6 py-2.5 text-sm font-semibold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+              닫기
+            </button>
           </div>
         </div>
       ) : null}

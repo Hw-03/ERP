@@ -13,6 +13,8 @@ import {
 import { api, type Employee, type Item, type ShipPackage } from "@/lib/api";
 import {
   LEGACY_COLORS,
+  LEGACY_FILE_TYPES,
+  LEGACY_MODELS,
   employeeColor,
   firstEmployeeLetter,
   formatNumber,
@@ -85,6 +87,7 @@ export function DesktopWarehouseView({
   const [itemId, setItemId] = useState("");
   const [packageId, setPackageId] = useState("");
   const [localSearch, setLocalSearch] = useState("");
+  const [fileType, setFileType] = useState("전체");
   const [modelFilter, setModelFilter] = useState("전체");
   const [quantity, setQuantity] = useState("0");
   const [referenceNo, setReferenceNo] = useState("");
@@ -116,20 +119,14 @@ export function DesktopWarehouseView({
   const searchKeyword = `${globalSearch} ${localSearch}`.trim().toLowerCase();
   const numericQty = Number(quantity || 0);
 
-  const modelOptions = useMemo(() => {
-    const models = Array.from(
-      new Set(items.map((item) => item.legacy_model?.trim()).filter((value): value is string => Boolean(value))),
-    );
-    return ["전체", ...models.slice(0, 10)];
-  }, [items]);
-
   const filteredItems = useMemo(
     () =>
       items
+        .filter((item) => (fileType === "전체" ? true : item.legacy_file_type === fileType))
         .filter((item) => (modelFilter === "전체" ? true : item.legacy_model === modelFilter))
         .filter((item) => matchesWarehouseSearch(item, searchKeyword))
         .slice(0, 200),
-    [items, modelFilter, searchKeyword],
+    [items, fileType, modelFilter, searchKeyword],
   );
 
   const filteredPackages = useMemo(
@@ -308,11 +305,20 @@ export function DesktopWarehouseView({
             </div>
 
             <div className="flex flex-wrap gap-x-3 gap-y-3">
-              {employees.slice(0, 14).map((employee) => {
+              {employees.map((employee) => {
                 const active = employee.employee_id === employeeId;
+                const deptColor = employeeColor(employee.department);
                 return (
                   <button key={employee.employee_id} onClick={() => setEmployeeId(employee.employee_id)} className="flex w-[58px] flex-col items-center text-center transition">
-                    <span className="flex h-[40px] w-[40px] items-center justify-center rounded-full text-[16px] font-black text-white" style={{ background: active ? LEGACY_COLORS.blue : "rgba(79,142,247,.85)", boxShadow: active ? "0 0 0 3px rgba(79,142,247,.14)" : "none" }}>
+                    <span
+                      className="flex h-[40px] w-[40px] items-center justify-center rounded-full text-[16px] font-black text-white"
+                      style={{
+                        background: deptColor,
+                        opacity: active ? 1 : 0.55,
+                        boxShadow: active ? `0 0 0 3px ${deptColor}44` : "none",
+                        border: active ? `2.5px solid ${deptColor}` : "2.5px solid transparent",
+                      }}
+                    >
                       {firstEmployeeLetter(employee.name)}
                     </span>
                     <span className="mt-1 text-[11px] font-bold" style={{ color: active ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}>
@@ -330,22 +336,40 @@ export function DesktopWarehouseView({
             </div>
 
             {workType !== "package-out" ? (
-              <div className="mb-2 flex flex-wrap gap-2">
-                {modelOptions.map((model) => (
-                  <button
-                    key={model}
-                    onClick={() => setModelFilter(model)}
-                    className="rounded-full border px-3 py-1.5 text-xs font-semibold transition"
-                    style={{
-                      background: modelFilter === model ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
-                      borderColor: modelFilter === model ? "rgba(120,167,255,.42)" : LEGACY_COLORS.border,
-                      color: modelFilter === model ? "#fff" : LEGACY_COLORS.muted2,
-                    }}
-                  >
-                    {model}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {LEGACY_FILE_TYPES.map((entry) => (
+                    <button
+                      key={entry}
+                      onClick={() => setFileType(entry)}
+                      className="rounded-full border px-3 py-1.5 text-xs font-semibold transition"
+                      style={{
+                        background: fileType === entry ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
+                        borderColor: fileType === entry ? "rgba(120,167,255,.42)" : LEGACY_COLORS.border,
+                        color: fileType === entry ? "#fff" : LEGACY_COLORS.muted2,
+                      }}
+                    >
+                      {entry}
+                    </button>
+                  ))}
+                </div>
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {LEGACY_MODELS.map((entry) => (
+                    <button
+                      key={entry}
+                      onClick={() => setModelFilter(entry)}
+                      className="rounded-full border px-3 py-1.5 text-xs font-semibold transition"
+                      style={{
+                        background: modelFilter === entry ? LEGACY_COLORS.cyan : LEGACY_COLORS.s2,
+                        borderColor: modelFilter === entry ? LEGACY_COLORS.cyan : LEGACY_COLORS.border,
+                        color: modelFilter === entry ? "#fff" : LEGACY_COLORS.muted2,
+                      }}
+                    >
+                      {entry}
+                    </button>
+                  ))}
+                </div>
+              </>
             ) : null}
 
             <div className="mb-2 flex items-center gap-3 rounded-[16px] border px-4 py-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>

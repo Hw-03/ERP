@@ -64,28 +64,29 @@ export function normalizeDepartment(value?: string | null) {
   return DEPARTMENT_LABELS[value] ?? value;
 }
 
+// HTML inventory_v2.html DEPT_COLOR 기준
 export function employeeColor(value?: string | null) {
   switch (normalizeDepartment(value)) {
     case "조립":
-      return LEGACY_COLORS.blue;
+      return "#4f8ef7";
     case "고압":
-      return LEGACY_COLORS.yellow;
+      return "#f4b942";
     case "진공":
-      return LEGACY_COLORS.purple;
+      return "#9b72f8";
     case "튜닝":
-      return LEGACY_COLORS.cyan;
+      return "#06b6d4";
     case "튜브":
-      return LEGACY_COLORS.green;
-    case "출하":
-      return LEGACY_COLORS.red;
-    case "연구":
-      return "#8b5cf6";
-    case "영업":
-      return "#ec4899";
+      return "#1fd17a";
     case "AS":
+      return "#e879f9";
+    case "연구":
       return "#f97316";
+    case "영업":
+      return "#f25f5c";
+    case "출하":
+      return "#64748b";
     default:
-      return LEGACY_COLORS.muted2;
+      return "#5a5f75";
   }
 }
 
