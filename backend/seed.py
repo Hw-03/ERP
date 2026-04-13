@@ -9,8 +9,11 @@ Usage:
 from __future__ import annotations
 
 import csv
+import json
 import os
+import re
 import sys
+from argparse import ArgumentParser
 from collections import Counter
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
@@ -21,12 +24,24 @@ BACKEND_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BACKEND_DIR.parent
 CSV_PATH = PROJECT_ROOT / "ERP_Master_DB.csv"
 SQLITE_PATH = BACKEND_DIR / "erp.db"
+LEGACY_HTML_PATH = PROJECT_ROOT / "_legacy_import" / "inventory_v2.html"
 
 sys.path.insert(0, str(BACKEND_DIR))
 os.environ["DATABASE_URL"] = f"sqlite:///{SQLITE_PATH.as_posix()}"
 
 from app.database import Base, SessionLocal, engine
-from app.models import CategoryEnum, Inventory, Item
+from app.models import (
+    BOM,
+    CategoryEnum,
+    DepartmentEnum,
+    Employee,
+    EmployeeLevelEnum,
+    Inventory,
+    Item,
+    ShipPackage,
+    ShipPackageItem,
+    TransactionLog,
+)
 
 
 CATEGORY_MAP = {
@@ -71,6 +86,19 @@ CATEGORY_TO_PART: dict[str, str] = {
 
 DEFAULT_STOCK_QTY = Decimal("100")
 
+LEGACY_DEPARTMENT_MAP = {
+    "조립": DepartmentEnum.ASSEMBLY,
+    "고압": DepartmentEnum.HIGH_VOLTAGE,
+    "진공": DepartmentEnum.VACUUM,
+    "튜닝": DepartmentEnum.TUNING,
+    "튜브": DepartmentEnum.TUBE,
+    "AS": DepartmentEnum.AS,
+    "연구소": DepartmentEnum.RESEARCH,
+    "영업": DepartmentEnum.SALES,
+    "출하": DepartmentEnum.SHIPPING,
+    "기타": DepartmentEnum.ETC,
+}
+
 
 def parse_decimal(value: str | None) -> Decimal | None:
     if value is None:
@@ -90,6 +118,139 @@ def get_category(code: str | None) -> CategoryEnum:
     if not code:
         return CategoryEnum.UK
     return CATEGORY_MAP.get(str(code).strip().upper(), CategoryEnum.UK)
+
+
+def infer_legacy_category(file_type: str | None, part: str | None) -> CategoryEnum:
+    file_type = (file_type or "").strip()
+    part = (part or "").strip()
+
+    if file_type == "원자재":
+        return CategoryEnum.RM
+    if file_type == "완제품" or part == "출하":
+        return CategoryEnum.FG
+    if file_type == "조립자재":
+        return CategoryEnum.BA
+    if file_type == "발생부자재":
+        if "고압" in part:
+            return CategoryEnum.HA
+        if "진공" in part:
+            return CategoryEnum.VA
+        if "튜닝" in part or "튜브" in part:
+            return CategoryEnum.TA
+    return CategoryEnum.UK
+
+
+def infer_employee_level(role: str) -> EmployeeLevelEnum:
+    if "대표" in role:
+        return EmployeeLevelEnum.ADMIN
+    if any(keyword in role for keyword in ("부장", "과장", "책임")):
+        return EmployeeLevelEnum.MANAGER
+    return EmployeeLevelEnum.STAFF
+
+
+def extract_legacy_init_db() -> dict:
+    if not LEGACY_HTML_PATH.exists():
+        raise FileNotFoundError(f"Legacy HTML file not found: {LEGACY_HTML_PATH}")
+
+    text = LEGACY_HTML_PATH.read_text(encoding="utf-8")
+    match = re.search(r"var INIT_DB=(\{.*?\});</script>", text, re.S)
+    if not match:
+        raise ValueError("Could not locate INIT_DB in legacy HTML.")
+    return json.loads(match.group(1))
+
+
+def reset_core_tables(db) -> None:
+    db.query(ShipPackageItem).delete()
+    db.query(ShipPackage).delete()
+    db.query(BOM).delete()
+    db.query(TransactionLog).delete()
+    db.query(Inventory).delete()
+    db.query(Item).delete()
+    db.query(Employee).delete()
+    db.commit()
+
+
+def seed_from_legacy_html() -> None:
+    Base.metadata.create_all(bind=engine)
+    init_db = extract_legacy_init_db()
+    employees = init_db.get("employees", [])
+    products = init_db.get("products", [])
+    db = SessionLocal()
+
+    try:
+        reset_core_tables(db)
+        now = datetime.now(UTC).replace(tzinfo=None)
+
+        for order, employee in enumerate(employees):
+            role = str(employee.get("role") or "").strip() or "사원"
+            department = LEGACY_DEPARTMENT_MAP.get(
+                str(employee.get("category") or "").strip(),
+                DepartmentEnum.ETC,
+            )
+            db.add(
+                Employee(
+                    employee_code=str(employee.get("id") or f"EMP-{order + 1:03d}").strip(),
+                    name=str(employee.get("name") or f"직원 {order + 1}").strip(),
+                    role=role,
+                    phone=None,
+                    department=department,
+                    level=infer_employee_level(role),
+                    display_order=order,
+                    is_active="true",
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+
+        for product in products:
+            item_code = str(product.get("id") or "").strip()
+            item_name = str(product.get("name") or "").strip()
+            if not item_code or not item_name:
+                continue
+
+            file_type = str(product.get("fileType") or "").strip() or None
+            part = str(product.get("part") or "").strip() or None
+            model = str(product.get("model") or "").strip() or "공용"
+            quantity = parse_decimal(product.get("stock"))
+            min_stock = parse_decimal(product.get("minStock"))
+
+            item = Item(
+                item_code=item_code,
+                item_name=item_name,
+                spec=str(product.get("spec") or "").strip() or None,
+                category=infer_legacy_category(file_type, part),
+                unit="EA",
+                barcode=str(product.get("barcode") or "").strip() or item_code,
+                legacy_file_type=file_type,
+                legacy_part=part,
+                legacy_item_type=str(product.get("itemType") or "").strip() or None,
+                legacy_model=model,
+                supplier=str(product.get("supplier") or "").strip() or None,
+                min_stock=min_stock,
+                created_at=now,
+                updated_at=now,
+            )
+            db.add(item)
+            db.flush()
+
+            db.add(
+                Inventory(
+                    item_id=item.item_id,
+                    quantity=quantity or Decimal("0"),
+                    location=part,
+                    updated_at=now,
+                )
+            )
+
+        db.commit()
+        print(f"Legacy HTML seed complete: {LEGACY_HTML_PATH}")
+        print(f"Employees inserted: {len(employees)}")
+        print(f"Items inserted: {len(products)}")
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 def run_seed() -> None:
@@ -215,4 +376,16 @@ def seed() -> None:
 
 
 if __name__ == "__main__":
-    seed()
+    parser = ArgumentParser()
+    parser.add_argument(
+        "--source",
+        choices=["csv", "legacy-html"],
+        default="csv",
+        help="Select the seed source.",
+    )
+    args = parser.parse_args()
+
+    if args.source == "legacy-html":
+        seed_from_legacy_html()
+    else:
+        seed()

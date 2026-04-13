@@ -1,15 +1,15 @@
 "use client";
 
+import Image from "next/image";
 import type { ElementType } from "react";
-import { Boxes, Factory, PackagePlus, Settings2, Warehouse } from "lucide-react";
+import { Boxes, Settings2, Warehouse } from "lucide-react";
 import { LEGACY_COLORS } from "./legacyUi";
 
-export type DesktopTabId = "inventory" | "warehouse" | "dept" | "admin";
+export type DesktopTabId = "inventory" | "warehouse" | "admin";
 
 const TABS: { id: DesktopTabId; label: string; subtitle: string; icon: ElementType }[] = [
   { id: "inventory", label: "재고", subtitle: "조회와 확인", icon: Boxes },
-  { id: "warehouse", label: "창고입출고", subtitle: "창고 기준 이동", icon: Warehouse },
-  { id: "dept", label: "부서입출고", subtitle: "부서 기준 처리", icon: PackagePlus },
+  { id: "warehouse", label: "입출고 처리", subtitle: "창고와 부서 통합", icon: Warehouse },
   { id: "admin", label: "관리자", subtitle: "마스터와 설정", icon: Settings2 },
 ];
 
@@ -25,19 +25,8 @@ export function DesktopSidebar({
       className="sticky top-0 flex h-screen w-[250px] shrink-0 flex-col border-r px-5 py-6"
       style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
     >
-      <div className="mb-8 flex items-center gap-3">
-        <div
-          className="flex h-12 w-12 items-center justify-center rounded-2xl"
-          style={{ background: "rgba(79,142,247,.18)", color: LEGACY_COLORS.blue }}
-        >
-          <Factory className="h-6 w-6" />
-        </div>
-        <div>
-          <div className="text-xs font-bold uppercase tracking-[0.22em]" style={{ color: LEGACY_COLORS.muted2 }}>
-            Adaptive Workspace
-          </div>
-          <div className="text-lg font-black">X-Ray ERP</div>
-        </div>
+      <div className="mb-8 rounded-[20px] border px-3 py-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <Image src="/dexcowin-logo.png" alt="DEXCOWIN" width={210} height={45} className="h-auto w-full rounded-[12px]" priority />
       </div>
 
       <nav className="space-y-2">
@@ -81,8 +70,7 @@ export function DesktopSidebar({
           Layout Mode
         </div>
         <div className="text-sm leading-6" style={{ color: LEGACY_COLORS.text }}>
-          모바일에서는 레거시 화면을 유지하고, PC에서는 같은 기능을 더 넓고 빠른 작업대로
-          자동 전환합니다.
+          모바일에서는 재고 화면을 유지하고, PC에서는 같은 기능을 더 넓고 빠른 작업대로 전환합니다.
         </div>
       </div>
     </aside>

@@ -7,14 +7,12 @@ import { DesktopSidebar, type DesktopTabId } from "./DesktopSidebar";
 import { DesktopTopbar } from "./DesktopTopbar";
 import { DesktopInventoryView } from "./DesktopInventoryView";
 import { DesktopWarehouseView } from "./DesktopWarehouseView";
-import { DesktopDeptView } from "./DesktopDeptView";
 import { DesktopAdminView } from "./DesktopAdminView";
 import { LEGACY_COLORS, formatNumber, transactionColor, transactionLabel } from "./legacyUi";
 
 const TAB_META: Record<DesktopTabId, { title: string; subtitle: string }> = {
   inventory: { title: "재고", subtitle: "Inventory Workspace" },
-  warehouse: { title: "창고입출고", subtitle: "Warehouse Workspace" },
-  dept: { title: "부서입출고", subtitle: "Department Workspace" },
+  warehouse: { title: "입출고 처리", subtitle: "Operations Workspace" },
   admin: { title: "관리자", subtitle: "Admin Workspace" },
 };
 
@@ -46,18 +44,12 @@ export function DesktopLegacyShell() {
     if (activeTab === "warehouse") {
       return <DesktopWarehouseView key={key} globalSearch={search} onStatusChange={setStatus} />;
     }
-    if (activeTab === "dept") {
-      return <DesktopDeptView key={key} globalSearch={search} onStatusChange={setStatus} />;
-    }
     return <DesktopAdminView key={key} globalSearch={search} onStatusChange={setStatus} />;
   }, [activeTab, refreshNonce, search]);
 
   return (
     <div className="hidden min-h-screen bg-black lg:block">
-      <div
-        className="relative flex min-h-screen"
-        style={{ background: LEGACY_COLORS.bg, color: LEGACY_COLORS.text }}
-      >
+      <div className="relative flex min-h-screen" style={{ background: LEGACY_COLORS.bg, color: LEGACY_COLORS.text }}>
         <DesktopSidebar activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab)} />
 
         <div className="min-w-0 flex-1">
@@ -95,10 +87,7 @@ export function DesktopLegacyShell() {
               </button>
             </div>
 
-            <div
-              className="mb-4 rounded-3xl border p-4"
-              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-            >
+            <div className="mb-4 rounded-3xl border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
               <div className="mb-2 flex items-center gap-2 text-sm font-bold">
                 <History className="h-4 w-4" />
                 최근 요약
