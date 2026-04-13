@@ -360,23 +360,6 @@ export function DesktopInventoryView({
             ))}
           </div>
 
-          <div className="mb-4 flex flex-wrap gap-2">
-            {KPI_OPTIONS.map((entry) => (
-              <button
-                key={entry.value}
-                onClick={() => setKpi(entry.value)}
-                className="rounded-full border px-3 py-1.5 text-xs font-semibold transition"
-                style={{
-                  background: kpi === entry.value ? "rgba(124,58,237,.18)" : LEGACY_COLORS.s1,
-                  borderColor: kpi === entry.value ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
-                  color: kpi === entry.value ? "#fff" : LEGACY_COLORS.muted2,
-                }}
-              >
-                {entry.label}
-              </button>
-            ))}
-          </div>
-
           <div className="grid gap-3 xl:grid-cols-4">
             <SummaryCard label="전체" value={summary.totalCount} hint={`총 재고 ${formatNumber(summary.totalQuantity)}`} color={LEGACY_COLORS.blue} active={kpi === "ALL"} onClick={() => setKpi("ALL")} />
             <SummaryCard label="정상" value={summary.normalCount} hint="운영 가능 품목" color={LEGACY_COLORS.green} active={kpi === "NORMAL"} onClick={() => setKpi("NORMAL")} />
