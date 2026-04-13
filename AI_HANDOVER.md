@@ -84,6 +84,14 @@ This section summarizes the latest state so Claude can continue work without re-
   - empty selection state was enlarged to match the larger right panel
   - selected item detail sections were also expanded with larger card radius/padding to fit the new panel proportion
 
+### 2026-04-14 batch 5-6
+- `frontend/app/legacy/_components/DesktopInventoryView.tsx`
+  - inventory row selection now toggles off when the already-selected row is clicked again
+  - the desktop filter strip was simplified toward the legacy HTML shape by removing the visible part-filter row
+  - grouped-view toggle was hidden from the main filter area
+- `frontend/app/legacy/_components/DesktopWarehouseView.tsx`
+  - item selection and package selection now both support click-again-to-deselect behavior
+
 ### Important cleanup caution
 - Mobile legacy UI still uses the older component tree through `frontend/app/legacy/page.tsx`.
 - Do not archive/delete these without replacing mobile `/legacy` behavior:

@@ -469,18 +469,6 @@ export function DesktopInventoryView({
             ))}
           </div>
 
-          <div className="mb-3 flex flex-wrap gap-2">
-            {LEGACY_PARTS.map((entry) => (
-              <FilterChip
-                key={entry}
-                active={part === entry}
-                color={LEGACY_COLORS.green}
-                label={entry}
-                onClick={() => setPart(entry)}
-              />
-            ))}
-          </div>
-
           <div className="mb-4 flex flex-wrap gap-2">
             {LEGACY_MODELS.map((entry) => (
               <FilterChip
@@ -513,7 +501,7 @@ export function DesktopInventoryView({
 
             <button
               onClick={() => setGrouped((current) => !current)}
-              className="rounded-full border px-4 py-1.5 text-xs font-semibold transition"
+              className="hidden rounded-full border px-4 py-1.5 text-xs font-semibold transition"
               style={{
                 background: grouped ? "rgba(244,185,66,.18)" : LEGACY_COLORS.s1,
                 borderColor: grouped ? LEGACY_COLORS.yellow : LEGACY_COLORS.border,
@@ -630,7 +618,7 @@ export function DesktopInventoryView({
                   return (
                     <tr
                       key={row.key}
-                      onClick={() => setSelectedItem(item)}
+                      onClick={() => setSelectedItem((current) => (current?.item_id === item.item_id ? null : item))}
                       className="cursor-pointer"
                       style={{ background: selected ? "rgba(79,142,247,.08)" : "transparent" }}
                     >

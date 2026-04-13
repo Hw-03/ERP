@@ -373,7 +373,7 @@ export function DesktopWarehouseView({
                     return (
                       <button
                         key={pkg.package_id}
-                        onClick={() => setPackageId(pkg.package_id)}
+                        onClick={() => setPackageId((current) => (current === pkg.package_id ? "" : pkg.package_id))}
                         className="flex w-full items-center justify-between px-4 py-4 text-left transition"
                         style={{ borderBottom: index === filteredPackages.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`, background: active ? "rgba(124,92,255,.14)" : "transparent" }}
                       >
@@ -400,7 +400,7 @@ export function DesktopWarehouseView({
                     return (
                       <button
                         key={item.item_id}
-                        onClick={() => setItemId(item.item_id)}
+                        onClick={() => setItemId((current) => (current === item.item_id ? "" : item.item_id))}
                         className="flex w-full items-center justify-between px-4 py-3 text-left transition"
                         style={{ borderBottom: index === filteredItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`, background: active ? "rgba(79,142,247,.12)" : "transparent" }}
                       >
