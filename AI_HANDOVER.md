@@ -1,5 +1,87 @@
 # AI_HANDOVER
 
+## 0. Latest Codex Update (2026-04-14)
+
+This section summarizes the latest state so Claude can continue work without re-discovering the current desktop structure.
+
+### Desktop legacy shell
+- Active desktop tabs are intentionally reduced to 3:
+  - `inventory`
+  - `warehouse`
+  - `admin`
+- Source: `frontend/app/legacy/_components/DesktopLegacyShell.tsx`
+- A dedicated desktop department tab is not part of the active desktop shell anymore.
+
+### Desktop inventory view
+- Source: `frontend/app/legacy/_components/DesktopInventoryView.tsx`
+- The old stacked left filter sidebar was removed from the desktop inventory layout.
+- The top area now follows the legacy HTML style more closely:
+  - search
+  - chip filters
+  - KPI cards
+  - insight cards
+- KPI behavior was corrected:
+  - `전체 / 정상 / 부족 / 품절` changes only the list below
+  - top KPI totals should not change just because the status filter is selected
+- Top insight cards now include:
+  - 생산 중단 위기
+  - 발주 필요
+  - 정상
+  - 즉시생산
+  - 최대생산
+  - 병목 원인
+
+### Desktop operations / warehouse view
+- Source: `frontend/app/legacy/_components/DesktopWarehouseView.tsx`
+- Current top-level operation groups are:
+  - `원자재 입출고`
+  - `창고 입출고`
+  - `부서 입출고`
+  - `패키지 출하`
+- The screen is now organized as:
+  - left operations pane
+  - right confirm/execute pane
+- Detail direction buttons are shown below the selected operation group.
+- Quantity controls were moved into the confirm/execute side panel.
+- Upper sections were compressed vertically so the item list can stay visibly longer.
+
+### Branding
+- Sidebar branding now uses the company logo image instead of the old text lockup.
+- Assets:
+  - `frontend/public/dexcowin-logo.png`
+  - `frontend/app/legacy/_components/DesktopSidebar.tsx`
+
+### Sample data / seed
+- `backend/seed.py` can seed from the legacy HTML sample dataset.
+- This is useful for demo/sample UX testing, but it should not be treated as guaranteed live production truth.
+
+### Repo cleanup performed
+- This cleanup was non-destructive and archive-first.
+- Archived reference zip:
+  - `_archive/reference/files.zip`
+- Archived unused desktop component:
+  - `frontend/_archive/legacy-unused/DesktopDeptView.tsx`
+- Archive guidance files added:
+  - `_archive/README.md`
+  - `frontend/_archive/legacy-unused/README.md`
+- `frontend/tsconfig.json` excludes `_archive` so archived files do not affect build/typecheck.
+
+### Important cleanup caution
+- Mobile legacy UI still uses the older component tree through `frontend/app/legacy/page.tsx`.
+- Do not archive/delete these without replacing mobile `/legacy` behavior:
+  - `InventoryTab.tsx`
+  - `WarehouseIOTab.tsx`
+  - `DeptIOTab.tsx`
+  - `HistoryTab.tsx`
+  - `AdminTab.tsx`
+  - `LegacyLayout.tsx`
+  - `Toast.tsx`
+
+### Validation
+- Frontend validation after cleanup:
+  - `cd frontend && npx tsc --noEmit`
+- Local backend `__pycache__/*.pyc` changes are runtime artifacts, not meaningful source edits.
+
 이 문서는 Codex와 Claude가 번갈아 작업할 때 프로젝트의 비즈니스 로직,
 현재 구현 상태, 다음 우선순위를 빠르게 공유하기 위한 작전 지도다.
 
