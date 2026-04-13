@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Factory, PackageSearch, ScrollText, Settings2, Spline, Truck, Zap } from "lucide-react";
+import { PackageSearch, ScrollText, Settings2, Spline, Truck, Zap } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/", label: "대시보드", icon: Zap },
@@ -13,23 +13,48 @@ const NAV_ITEMS = [
   { href: "/admin", label: "관리자", icon: Settings2 },
 ];
 
+function DexcowinLogo() {
+  return (
+    <svg viewBox="0 0 260 46" className="h-8 w-auto" fill="currentColor" aria-label="Dexcowin">
+      <defs>
+        <mask id="dexcowin-d">
+          <rect width="42" height="46" fill="white" />
+          {/* inner hollow of D bowl */}
+          <path d="M11 10 Q27 10 27 23 Q27 36 11 36 Z" fill="black" />
+          {/* triangular notch — creates the angular arrow cutout */}
+          <path d="M14 12 L42 23 L14 34 Z" fill="black" />
+        </mask>
+      </defs>
+      {/* D outer shape */}
+      <path d="M0 0 L11 0 Q42 0 42 23 Q42 46 11 46 L0 46 Z" mask="url(#dexcowin-d)" />
+      {/* EXCOWIN text */}
+      <text
+        x="50"
+        y="37"
+        fontFamily="'Arial Black', 'Arial', sans-serif"
+        fontWeight="900"
+        fontSize="36"
+        letterSpacing="-0.5"
+      >
+        EXCOWIN
+      </text>
+      {/* ® mark */}
+      <text x="242" y="16" fontFamily="Arial, sans-serif" fontSize="13">
+        ®
+      </text>
+    </svg>
+  );
+}
+
 export default function AppHeader() {
   const pathname = usePathname();
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/95 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-screen-2xl flex-col gap-4 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-900/40">
-            <Factory className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Precision Manufacturing ERP
-            </p>
-            <h1 className="text-lg font-semibold text-slate-100">X-Ray 제조 ERP</h1>
-          </div>
-        </div>
+      <div className="mx-auto flex max-w-screen-2xl flex-col gap-3 px-6 py-3 lg:flex-row lg:items-center lg:justify-between">
+        <Link href="/" className="flex items-center text-white hover:opacity-80 transition-opacity">
+          <DexcowinLogo />
+        </Link>
 
         <nav className="flex flex-wrap gap-2">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
