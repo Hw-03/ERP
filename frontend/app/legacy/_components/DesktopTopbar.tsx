@@ -1,13 +1,11 @@
 "use client";
 
-import { Activity, Clock3, RefreshCw, Search } from "lucide-react";
+import { Activity, Clock3, RefreshCw } from "lucide-react";
 import { LEGACY_COLORS } from "./legacyUi";
 
 export function DesktopTopbar({
   title,
   subtitle,
-  search,
-  onSearchChange,
   onRefresh,
   onToggleHistory,
   historyOpen,
@@ -15,8 +13,6 @@ export function DesktopTopbar({
 }: {
   title: string;
   subtitle: string;
-  search: string;
-  onSearchChange: (value: string) => void;
   onRefresh: () => void;
   onToggleHistory: () => void;
   historyOpen: boolean;
@@ -34,20 +30,6 @@ export function DesktopTopbar({
           </div>
         ) : null}
         {title ? <div className="text-[28px] font-black">{title}</div> : null}
-      </div>
-
-      <div
-        className="flex min-w-[320px] items-center gap-3 rounded-2xl border px-4 py-3"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-      >
-        <Search className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
-        <input
-          value={search}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="품명, 코드, 바코드, 비고 검색"
-          className="w-full bg-transparent text-sm outline-none"
-          style={{ color: LEGACY_COLORS.text }}
-        />
       </div>
 
       <div className="hidden items-center gap-2 rounded-2xl px-4 py-3 xl:flex" style={{ background: LEGACY_COLORS.s2 }}>

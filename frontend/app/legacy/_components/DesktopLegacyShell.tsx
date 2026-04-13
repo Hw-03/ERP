@@ -18,7 +18,6 @@ const TAB_META: Record<DesktopTabId, { title: string; subtitle: string }> = {
 
 export function DesktopLegacyShell() {
   const [activeTab, setActiveTab] = useState<DesktopTabId>("inventory");
-  const [search, setSearch] = useState("");
   const [status, setStatus] = useState("데스크톱 작업 화면을 준비했습니다.");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<TransactionLog[]>([]);
@@ -39,13 +38,13 @@ export function DesktopLegacyShell() {
   const content = useMemo(() => {
     const key = `${activeTab}-${refreshNonce}`;
     if (activeTab === "inventory") {
-      return <DesktopInventoryView key={key} globalSearch={search} onStatusChange={setStatus} />;
+      return <DesktopInventoryView key={key} globalSearch="" onStatusChange={setStatus} />;
     }
     if (activeTab === "warehouse") {
-      return <DesktopWarehouseView key={key} globalSearch={search} onStatusChange={setStatus} />;
+      return <DesktopWarehouseView key={key} globalSearch="" onStatusChange={setStatus} />;
     }
-    return <DesktopAdminView key={key} globalSearch={search} onStatusChange={setStatus} />;
-  }, [activeTab, refreshNonce, search]);
+    return <DesktopAdminView key={key} globalSearch="" onStatusChange={setStatus} />;
+  }, [activeTab, refreshNonce]);
 
   return (
     <div className="hidden min-h-screen bg-black lg:block">
@@ -56,8 +55,6 @@ export function DesktopLegacyShell() {
           <DesktopTopbar
             title={activeMeta.title}
             subtitle={activeMeta.subtitle}
-            search={search}
-            onSearchChange={setSearch}
             onRefresh={() => setRefreshNonce((current) => current + 1)}
             onToggleHistory={() => setHistoryOpen((current) => !current)}
             historyOpen={historyOpen}

@@ -99,6 +99,14 @@ This section summarizes the latest state so Claude can continue work without re-
   - both cards now open a model-based production-capacity modal instead of showing a single highlighted item
   - current modal values are intentionally placeholder/prep values until BOM and finished-goods data are complete
 
+### 2026-04-14 batch 9-10
+- `frontend/app/legacy/_components/DesktopTopbar.tsx`
+  - removed the top-right desktop search box from the global header
+- `frontend/app/legacy/_components/DesktopLegacyShell.tsx`
+  - removed the now-unused shared header search state and stopped passing a global search value into the desktop tabs
+- `frontend/app/legacy/_components/DesktopInventoryView.tsx`
+  - the inventory-panel internal refresh button had already been removed during the inventory view cleanup, so the tab no longer shows its own duplicate refresh control
+
 ### Important cleanup caution
 - Mobile legacy UI still uses the older component tree through `frontend/app/legacy/page.tsx`.
 - Do not archive/delete these without replacing mobile `/legacy` behavior:
