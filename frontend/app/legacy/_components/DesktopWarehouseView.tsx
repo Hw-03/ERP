@@ -304,24 +304,25 @@ export function DesktopWarehouseView({
               담당 직원
             </div>
 
-            <div className="flex flex-wrap gap-x-3 gap-y-3">
+            <div className="flex gap-4 overflow-x-auto pb-1">
               {employees.map((employee) => {
                 const active = employee.employee_id === employeeId;
                 const deptColor = employeeColor(employee.department);
                 return (
-                  <button key={employee.employee_id} onClick={() => setEmployeeId(employee.employee_id)} className="flex w-[58px] flex-col items-center text-center transition">
+                  <button key={employee.employee_id} onClick={() => setEmployeeId(employee.employee_id)} className="flex shrink-0 flex-col items-center gap-[6px] text-center transition">
                     <span
-                      className="flex h-[40px] w-[40px] items-center justify-center rounded-full text-[16px] font-black text-white"
+                      className="flex h-[52px] w-[52px] items-center justify-center rounded-full text-[20px] font-black text-white"
                       style={{
                         background: deptColor,
-                        opacity: active ? 1 : 0.55,
-                        boxShadow: active ? `0 0 0 3px ${deptColor}44` : "none",
-                        border: active ? `2.5px solid ${deptColor}` : "2.5px solid transparent",
+                        opacity: active ? 1 : 0.5,
+                        boxShadow: active ? `0 0 0 3px ${deptColor}, 0 0 16px ${deptColor}55` : "none",
+                        outline: active ? `3px solid ${deptColor}` : "3px solid transparent",
+                        outlineOffset: "3px",
                       }}
                     >
                       {firstEmployeeLetter(employee.name)}
                     </span>
-                    <span className="mt-1 text-[11px] font-bold" style={{ color: active ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}>
+                    <span className="text-[11px] font-semibold" style={{ color: active ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}>
                       {employee.name}
                     </span>
                   </button>
