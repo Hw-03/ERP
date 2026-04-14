@@ -170,6 +170,40 @@ def reset_core_tables(db) -> None:
     db.commit()
 
 
+DEFAULT_EMPLOYEES = [
+    {"code": "EMP-001", "name": "김준우", "role": "조립 부장", "department": DepartmentEnum.ASSEMBLY},
+    {"code": "EMP-002", "name": "박서연", "role": "진공 사원", "department": DepartmentEnum.VACUUM},
+    {"code": "EMP-003", "name": "이도현", "role": "튜닝 사원", "department": DepartmentEnum.TUNING},
+    {"code": "EMP-004", "name": "최민지", "role": "고압 사원", "department": DepartmentEnum.HIGH_VOLTAGE},
+    {"code": "EMP-005", "name": "정하늘", "role": "튜브 사원", "department": DepartmentEnum.TUBE},
+    {"code": "EMP-006", "name": "한유진", "role": "출하 사원", "department": DepartmentEnum.SHIPPING},
+    {"code": "EMP-007", "name": "오지훈", "role": "연구 사원", "department": DepartmentEnum.RESEARCH},
+    {"code": "EMP-008", "name": "윤은",   "role": "AS 사원",   "department": DepartmentEnum.AS},
+    {"code": "EMP-009", "name": "문현우", "role": "영업 사원", "department": DepartmentEnum.SALES},
+]
+
+
+def seed_employees(db, now) -> None:
+    """직원 테이블이 비어있을 때 기본 직원 목록을 삽입한다."""
+    if db.query(Employee).count() > 0:
+        return
+    for order, emp in enumerate(DEFAULT_EMPLOYEES):
+        db.add(Employee(
+            employee_code=emp["code"],
+            name=emp["name"],
+            role=emp["role"],
+            phone=None,
+            department=emp["department"],
+            level=infer_employee_level(emp["role"]),
+            display_order=order,
+            is_active="true",
+            created_at=now,
+            updated_at=now,
+        ))
+    db.commit()
+    print(f"Default employees inserted: {len(DEFAULT_EMPLOYEES)}")
+
+
 def seed_from_legacy_html() -> None:
     Base.metadata.create_all(bind=engine)
     init_db = extract_legacy_init_db()
@@ -271,6 +305,8 @@ def seed() -> None:
         return
 
     db = SessionLocal()
+    now = datetime.now(UTC).replace(tzinfo=None)
+    seed_employees(db, now)
 
     inserted = 0
     skipped = 0
@@ -282,8 +318,6 @@ def seed() -> None:
         db.query(Inventory).delete()
         db.query(Item).delete()
         db.commit()
-
-        now = datetime.now(UTC).replace(tzinfo=None)
 
         for csv_row_number, row in enumerate(rows, start=2):
             item_code = (row.get("item_id") or "").strip()
