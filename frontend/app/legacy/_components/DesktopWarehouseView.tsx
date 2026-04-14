@@ -25,11 +25,11 @@ type WorkType = "raw-io" | "warehouse-io" | "dept-io" | "package-out";
 type Direction = "in" | "out";
 type TransferDirection = "wh-to-dept" | "dept-to-wh";
 
-const WORK_TYPES: { id: WorkType; label: string; subtitle: string; icon: React.ReactNode; tone: string }[] = [
-  { id: "raw-io", label: "원자재 입출고", subtitle: "외부 <-> 창고", icon: <Boxes className="h-4 w-4" />, tone: "rgba(31,209,122,.16)" },
-  { id: "warehouse-io", label: "창고 입출고", subtitle: "창고 <-> 부서", icon: <ArrowLeftRight className="h-4 w-4" />, tone: "rgba(79,142,247,.16)" },
-  { id: "dept-io", label: "부서 입출고", subtitle: "공정 내부 처리", icon: <Workflow className="h-4 w-4" />, tone: "rgba(124,92,255,.18)" },
-  { id: "package-out", label: "패키지 출하", subtitle: "묶음 출하 처리", icon: <PackageCheck className="h-4 w-4" />, tone: "rgba(255,180,48,.16)" },
+const WORK_TYPES: { id: WorkType; label: string; subtitle: string; icon: React.ReactNode; tone: string; accent: string }[] = [
+  { id: "raw-io", label: "원자재 입출고", subtitle: "외부 ↔ 창고", icon: <Boxes className="h-4 w-4" />, tone: "color-mix(in srgb, var(--c-green) 16%, transparent)", accent: "var(--c-green)" },
+  { id: "warehouse-io", label: "창고 입출고", subtitle: "창고 ↔ 부서", icon: <ArrowLeftRight className="h-4 w-4" />, tone: "color-mix(in srgb, var(--c-blue) 16%, transparent)", accent: "var(--c-blue)" },
+  { id: "dept-io", label: "부서 입출고", subtitle: "공정 내부 처리", icon: <Workflow className="h-4 w-4" />, tone: "color-mix(in srgb, var(--c-purple) 18%, transparent)", accent: "var(--c-purple)" },
+  { id: "package-out", label: "패키지 출하", subtitle: "묶음 출하 처리", icon: <PackageCheck className="h-4 w-4" />, tone: "color-mix(in srgb, var(--c-yellow) 16%, transparent)", accent: "var(--c-yellow)" },
 ];
 
 const QUICK_STEPS = [-10, -1, 1, 10];
@@ -198,18 +198,38 @@ export function DesktopWarehouseView({
 
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[minmax(820px,1.45fr)_minmax(420px,0.88fr)] gap-4 px-6 py-6">
-      <section className="flex min-h-0 flex-col overflow-hidden rounded-[28px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+      <section
+        className="flex min-h-0 flex-col overflow-hidden rounded-[28px] border"
+        style={{
+          background: LEGACY_COLORS.s1,
+          borderColor: LEGACY_COLORS.border,
+          boxShadow: "var(--c-elev-2), var(--c-inner-hl)",
+        }}
+      >
         <div className="border-b px-5 py-4" style={{ borderColor: LEGACY_COLORS.border }}>
-          <div className="text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: LEGACY_COLORS.muted2 }}>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
             Operations
           </div>
-          <div className="mt-1 text-xl font-black">입출고 처리</div>
+          <div className="mt-1 text-xl font-bold tracking-[-0.02em]">입출고 처리</div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-          <div className="rounded-[30px] border px-5 py-5" style={{ background: "linear-gradient(180deg, rgba(14,18,31,.96) 0%, rgba(10,14,24,.94) 100%)", borderColor: LEGACY_COLORS.border }}>
+          <div
+            className="rounded-[30px] border px-5 py-5"
+            style={{
+              background: "linear-gradient(180deg, color-mix(in srgb, var(--c-s2) 92%, transparent) 0%, color-mix(in srgb, var(--c-bg) 88%, transparent) 100%)",
+              borderColor: LEGACY_COLORS.border,
+              boxShadow: "var(--c-inner-hl)",
+            }}
+          >
             <div className="mb-3 flex items-center gap-2 text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
-              <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-black text-white" style={{ background: LEGACY_COLORS.blue }}>
+              <span
+                className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                style={{
+                  background: "linear-gradient(135deg, var(--c-blue) 0%, color-mix(in srgb, var(--c-blue) 78%, #000 22%) 100%)",
+                  boxShadow: "var(--c-glow-blue)",
+                }}
+              >
                 1
               </span>
               작업 유형 선택
@@ -225,16 +245,21 @@ export function DesktopWarehouseView({
                       setWorkType(entry.id);
                       setError(null);
                     }}
-                    className="rounded-[16px] border px-4 py-5 text-center transition"
+                    className="rounded-[16px] border px-4 py-5 text-center transition-all duration-200 ease-out hover:-translate-y-0.5"
                     style={{
                       background: active ? entry.tone : LEGACY_COLORS.s2,
-                      borderColor: active ? "rgba(120,167,255,.32)" : LEGACY_COLORS.border,
-                      color: active ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
+                      borderColor: active ? `color-mix(in srgb, ${entry.accent} 45%, transparent)` : LEGACY_COLORS.border,
+                      color: active ? entry.accent : LEGACY_COLORS.muted2,
+                      boxShadow: active
+                        ? `0 0 0 1px color-mix(in srgb, ${entry.accent} 28%, transparent), 0 10px 24px -10px color-mix(in srgb, ${entry.accent} 55%, transparent), var(--c-inner-hl)`
+                        : "var(--c-inner-hl)",
                     }}
                   >
                     <div className="mb-2 flex justify-center">{entry.icon}</div>
-                    <div className="text-lg font-bold">{entry.label}</div>
-                    <div className="mt-1 text-xs" style={{ color: active ? "#cbd9ff" : LEGACY_COLORS.muted }}>
+                    <div className="text-lg font-bold tracking-[-0.01em]" style={{ color: active ? "var(--c-text)" : "var(--c-text)" }}>
+                      {entry.label}
+                    </div>
+                    <div className="mt-1 text-xs" style={{ color: active ? entry.accent : LEGACY_COLORS.muted }}>
                       {entry.subtitle}
                     </div>
                   </button>
@@ -248,16 +273,19 @@ export function DesktopWarehouseView({
                   setWorkType("package-out");
                   setError(null);
                 }}
-                className="w-full rounded-[16px] border px-4 py-5 text-center transition"
+                className="w-full rounded-[16px] border px-4 py-5 text-center transition-all duration-200 ease-out hover:-translate-y-0.5"
                 style={{
                   background: workType === "package-out" ? WORK_TYPES[3].tone : LEGACY_COLORS.s2,
-                  borderColor: workType === "package-out" ? "rgba(255,206,112,.32)" : LEGACY_COLORS.border,
-                  color: workType === "package-out" ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
+                  borderColor: workType === "package-out" ? `color-mix(in srgb, ${WORK_TYPES[3].accent} 45%, transparent)` : LEGACY_COLORS.border,
+                  color: workType === "package-out" ? "var(--c-text)" : LEGACY_COLORS.muted2,
+                  boxShadow: workType === "package-out"
+                    ? `0 0 0 1px color-mix(in srgb, ${WORK_TYPES[3].accent} 28%, transparent), 0 10px 24px -10px color-mix(in srgb, ${WORK_TYPES[3].accent} 55%, transparent), var(--c-inner-hl)`
+                    : "var(--c-inner-hl)",
                 }}
               >
                 <div className="mb-2 flex justify-center">{WORK_TYPES[3].icon}</div>
-                <div className="text-lg font-bold">{WORK_TYPES[3].label}</div>
-                <div className="mt-1 text-xs" style={{ color: workType === "package-out" ? "#fff2d0" : LEGACY_COLORS.muted }}>
+                <div className="text-lg font-bold tracking-[-0.01em]">{WORK_TYPES[3].label}</div>
+                <div className="mt-1 text-xs" style={{ color: workType === "package-out" ? WORK_TYPES[3].accent : LEGACY_COLORS.muted }}>
                   {WORK_TYPES[3].subtitle}
                 </div>
               </button>
@@ -283,15 +311,16 @@ export function DesktopWarehouseView({
                   <button
                     key={entry.id}
                     onClick={entry.onClick}
-                    className="rounded-[14px] border px-4 py-3 text-center transition"
+                    className="rounded-[14px] border px-4 py-3 text-center transition-all duration-200 ease-out"
                     style={{
                       background: entry.active ? entry.tone : LEGACY_COLORS.s2,
-                      borderColor: entry.active ? "rgba(255,255,255,.14)" : LEGACY_COLORS.border,
+                      borderColor: entry.active ? "var(--c-accent-strong)" : LEGACY_COLORS.border,
                       color: entry.active ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
+                      boxShadow: entry.active ? "var(--c-elev-1), var(--c-inner-hl)" : "var(--c-inner-hl)",
                     }}
                   >
-                    <div className="text-base font-bold">{entry.label}</div>
-                    <div className="mt-1 text-[11px]" style={{ color: entry.active ? entry.color : LEGACY_COLORS.muted }}>
+                    <div className="text-base font-bold tracking-[-0.01em]">{entry.label}</div>
+                    <div className="mt-1 text-[11px]" style={{ color: entry.active ? LEGACY_COLORS.muted2 : LEGACY_COLORS.muted }}>
                       {entry.subtitle}
                     </div>
                   </button>
@@ -309,20 +338,28 @@ export function DesktopWarehouseView({
                 const active = employee.employee_id === employeeId;
                 const deptColor = employeeColor(employee.department);
                 return (
-                  <button key={employee.employee_id} onClick={() => setEmployeeId(employee.employee_id)} className="flex shrink-0 flex-col items-center gap-[6px] text-center transition">
+                  <button
+                    key={employee.employee_id}
+                    onClick={() => setEmployeeId(employee.employee_id)}
+                    className="flex shrink-0 flex-col items-center gap-[6px] text-center transition-all duration-200 ease-out hover:-translate-y-0.5"
+                  >
                     <span
-                      className="flex h-[52px] w-[52px] items-center justify-center rounded-full text-[20px] font-black text-white"
+                      className="flex h-[52px] w-[52px] items-center justify-center rounded-full text-[20px] font-bold text-white transition-all duration-200 ease-out"
                       style={{
-                        background: deptColor,
-                        opacity: active ? 1 : 0.5,
-                        boxShadow: active ? `0 0 0 3px ${deptColor}, 0 0 16px ${deptColor}55` : "none",
-                        outline: active ? `3px solid ${deptColor}` : "3px solid transparent",
-                        outlineOffset: "3px",
+                        background: `linear-gradient(135deg, ${deptColor} 0%, color-mix(in srgb, ${deptColor} 78%, #000 22%) 100%)`,
+                        opacity: employeeId && !active ? 0.45 : 1,
+                        boxShadow: active
+                          ? `0 0 0 2px ${deptColor}, 0 0 24px -4px color-mix(in srgb, ${deptColor} 60%, transparent)`
+                          : "var(--c-elev-1), var(--c-inner-hl)",
+                        outline: "none",
                       }}
                     >
                       {firstEmployeeLetter(employee.name)}
                     </span>
-                    <span className="text-[11px] font-semibold" style={{ color: active ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}>
+                    <span
+                      className="text-[11px] font-semibold tracking-[-0.005em]"
+                      style={{ color: active ? deptColor : LEGACY_COLORS.muted2 }}
+                    >
                       {employee.name}
                     </span>
                   </button>
@@ -400,7 +437,7 @@ export function DesktopWarehouseView({
                         key={pkg.package_id}
                         onClick={() => setPackageId((current) => (current === pkg.package_id ? "" : pkg.package_id))}
                         className="flex w-full items-center justify-between px-4 py-4 text-left transition"
-                        style={{ borderBottom: index === filteredPackages.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`, background: active ? "rgba(124,92,255,.14)" : "transparent" }}
+                        style={{ borderBottom: index === filteredPackages.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`, background: active ? "color-mix(in srgb, var(--c-purple) 14%, transparent)" : "transparent" }}
                       >
                         <div className="min-w-0">
                           <div className="truncate text-sm font-semibold">{pkg.name}</div>
@@ -427,7 +464,7 @@ export function DesktopWarehouseView({
                         key={item.item_id}
                         onClick={() => setItemId((current) => (current === item.item_id ? "" : item.item_id))}
                         className="flex w-full items-center justify-between px-4 py-3 text-left transition"
-                        style={{ borderBottom: index === filteredItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`, background: active ? "rgba(79,142,247,.12)" : "transparent" }}
+                        style={{ borderBottom: index === filteredItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`, background: active ? "var(--c-accent-soft)" : "transparent" }}
                       >
                         <div className="min-w-0">
                           <div className="truncate text-sm font-semibold">{item.item_name}</div>
@@ -451,12 +488,19 @@ export function DesktopWarehouseView({
         </div>
       </section>
 
-      <section className="flex min-h-0 flex-col overflow-hidden rounded-[28px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+      <section
+        className="flex min-h-0 flex-col overflow-hidden rounded-[28px] border"
+        style={{
+          background: LEGACY_COLORS.s1,
+          borderColor: LEGACY_COLORS.border,
+          boxShadow: "var(--c-elev-2), var(--c-inner-hl)",
+        }}
+      >
         <div className="border-b px-5 py-4" style={{ borderColor: LEGACY_COLORS.border }}>
-          <div className="text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: LEGACY_COLORS.muted2 }}>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
             Confirm & Execute
           </div>
-          <div className="mt-1 text-xl font-black">실행 확인</div>
+          <div className="mt-1 text-xl font-bold tracking-[-0.02em]">실행 확인</div>
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col justify-between">
@@ -536,8 +580,15 @@ export function DesktopWarehouseView({
                           <button
                             key={step}
                             onClick={() => setQuantity((current) => sanitizeQuantity(Number(current || 0) + step))}
-                            className="rounded-[12px] px-3 py-3 text-lg font-black transition"
-                            style={{ background: positive ? "rgba(5,87,54,.72)" : "rgba(86,32,39,.72)", color: positive ? "#2ff0a1" : "#ff6a73" }}
+                            className="rounded-[12px] px-3 py-3 text-lg font-bold tabular-nums transition-all duration-200 ease-out hover:-translate-y-0.5"
+                            style={{
+                              background: positive
+                                ? "color-mix(in srgb, var(--c-green) 14%, var(--c-s2))"
+                                : "color-mix(in srgb, var(--c-red) 14%, var(--c-s2))",
+                              color: positive ? "var(--c-green)" : "var(--c-red)",
+                              border: `1px solid ${positive ? "color-mix(in srgb, var(--c-green) 28%, transparent)" : "color-mix(in srgb, var(--c-red) 28%, transparent)"}`,
+                              boxShadow: "var(--c-inner-hl)",
+                            }}
                           >
                             {step > 0 ? `+${step}` : step}
                           </button>
@@ -564,7 +615,14 @@ export function DesktopWarehouseView({
                 </div>
 
                 {error ? (
-                  <div className="rounded-2xl border px-4 py-3 text-sm" style={{ background: "rgba(242,95,92,.12)", borderColor: "rgba(242,95,92,.24)", color: LEGACY_COLORS.red }}>
+                  <div
+                    className="rounded-2xl border px-4 py-3 text-sm"
+                    style={{
+                      background: "color-mix(in srgb, var(--c-red) 12%, transparent)",
+                      borderColor: "color-mix(in srgb, var(--c-red) 28%, transparent)",
+                      color: LEGACY_COLORS.red,
+                    }}
+                  >
                     {error}
                   </div>
                 ) : null}
@@ -574,8 +632,13 @@ export function DesktopWarehouseView({
                 <button
                   onClick={() => void submit()}
                   disabled={submitting || (!selectedItem && !selectedPackage)}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
-                  style={{ background: isOutbound ? LEGACY_COLORS.red : LEGACY_COLORS.blue }}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white transition-all duration-200 ease-out hover:brightness-110 disabled:opacity-50 disabled:hover:brightness-100"
+                  style={{
+                    background: isOutbound
+                      ? "linear-gradient(135deg, var(--c-red) 0%, color-mix(in srgb, var(--c-red) 75%, #000 25%) 100%)"
+                      : "linear-gradient(135deg, var(--c-blue) 0%, color-mix(in srgb, var(--c-blue) 78%, #000 22%) 100%)",
+                    boxShadow: "var(--c-elev-2), var(--c-inner-hl)",
+                  }}
                 >
                   {submitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <PackageCheck className="h-4 w-4" />}
                   {submitting ? "처리 중..." : `${effectiveLabel} 실행`}

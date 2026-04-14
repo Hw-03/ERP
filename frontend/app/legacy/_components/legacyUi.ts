@@ -46,12 +46,12 @@ export const DEPARTMENT_ICONS: Record<string, string> = {
 };
 
 export const FILE_TYPE_BADGES: Record<string, { label: string; bg: string; color: string }> = {
-  원자재: { label: "원자재", bg: "rgba(79,142,247,.15)", color: LEGACY_COLORS.blue },
-  조립자재: { label: "조립자재", bg: "rgba(31,209,122,.15)", color: LEGACY_COLORS.green },
-  발생부자재: { label: "발생부자재", bg: "rgba(244,185,66,.15)", color: LEGACY_COLORS.yellow },
-  완제품: { label: "완제품", bg: "rgba(155,114,248,.15)", color: LEGACY_COLORS.purple },
-  데모: { label: "데모", bg: "rgba(6,182,212,.15)", color: LEGACY_COLORS.cyan },
-  미분류: { label: "미분류", bg: "rgba(136,144,170,.15)", color: LEGACY_COLORS.muted2 },
+  원자재: { label: "원자재", bg: "rgba(91,141,239,.14)", color: LEGACY_COLORS.blue },
+  조립자재: { label: "조립자재", bg: "rgba(52,211,153,.14)", color: LEGACY_COLORS.green },
+  발생부자재: { label: "발생부자재", bg: "rgba(250,204,21,.14)", color: LEGACY_COLORS.yellow },
+  완제품: { label: "완제품", bg: "rgba(167,139,250,.14)", color: LEGACY_COLORS.purple },
+  데모: { label: "데모", bg: "rgba(34,211,238,.14)", color: LEGACY_COLORS.cyan },
+  미분류: { label: "미분류", bg: "rgba(144,153,184,.14)", color: LEGACY_COLORS.muted2 },
 };
 
 export const LEGACY_FILE_TYPES = ["전체", "원자재", "조립자재", "발생부자재", "완제품", "미분류"] as const;
@@ -64,29 +64,29 @@ export function normalizeDepartment(value?: string | null) {
   return DEPARTMENT_LABELS[value] ?? value;
 }
 
-// HTML inventory_v2.html DEPT_COLOR 기준
+// 리파인된 부서 컬러 — Tailwind 400 톤 기준으로 통일 (다크/라이트 양쪽에서 충분한 대비)
 export function employeeColor(value?: string | null) {
   switch (normalizeDepartment(value)) {
     case "조립":
-      return "#4f8ef7";
+      return "#5b8def";
     case "고압":
-      return "#f4b942";
+      return "#facc15";
     case "진공":
-      return "#9b72f8";
+      return "#a78bfa";
     case "튜닝":
-      return "#06b6d4";
+      return "#22d3ee";
     case "튜브":
-      return "#1fd17a";
+      return "#34d399";
     case "AS":
       return "#e879f9";
     case "연구":
-      return "#f97316";
+      return "#fb923c";
     case "영업":
-      return "#f25f5c";
+      return "#f87171";
     case "출하":
-      return "#64748b";
+      return "#94a3b8";
     default:
-      return "#5a5f75";
+      return "#9099b8";
   }
 }
 

@@ -30,11 +30,12 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      className="flex items-center justify-center rounded-2xl px-3 py-3 transition-colors"
+      className="flex items-center justify-center rounded-2xl px-3 py-3 transition-all duration-200 ease-out hover:brightness-110"
       style={{
         background: LEGACY_COLORS.s2,
         color: isLight ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2,
         border: `1px solid ${LEGACY_COLORS.border}`,
+        boxShadow: "var(--c-inner-hl)",
       }}
       title={isLight ? "다크 모드로 전환" : "라이트 모드로 전환"}
     >

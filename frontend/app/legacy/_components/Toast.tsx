@@ -35,11 +35,13 @@ export function Toast({
       <div
         className="rounded-xl border px-[14px] py-[10px] text-xs font-semibold"
         style={{
-          background: LEGACY_COLORS.s3,
+          background: LEGACY_COLORS.s1,
           borderColor: LEGACY_COLORS.border,
           borderLeftWidth: 3,
           borderLeftColor: borderColor,
           color: LEGACY_COLORS.text,
+          boxShadow: `var(--c-elev-3), 0 0 0 1px color-mix(in srgb, ${borderColor} 18%, transparent)`,
+          backdropFilter: "blur(8px)",
         }}
       >
         {toast.message}

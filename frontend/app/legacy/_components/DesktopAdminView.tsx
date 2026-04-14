@@ -133,7 +133,14 @@ export function DesktopAdminView({
   if (!unlocked) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center px-6 py-6">
-        <div className="w-full max-w-[420px] rounded-[32px] border p-6" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+        <div
+          className="w-full max-w-[420px] rounded-[32px] border p-6"
+          style={{
+            background: LEGACY_COLORS.s1,
+            borderColor: LEGACY_COLORS.border,
+            boxShadow: "var(--c-elev-3), var(--c-inner-hl)",
+          }}
+        >
           <PinLock onUnlocked={() => setUnlocked(true)} />
         </div>
       </div>
@@ -143,34 +150,75 @@ export function DesktopAdminView({
   return (
     <div className="flex min-h-0 flex-1">
       <div className="grid min-h-0 flex-1 grid-cols-[240px_minmax(0,1fr)] gap-5 px-6 py-6">
-        <section className="space-y-4 rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+        <section
+          className="space-y-4 rounded-[28px] border p-5"
+          style={{
+            background: LEGACY_COLORS.s1,
+            borderColor: LEGACY_COLORS.border,
+            boxShadow: "var(--c-elev-2), var(--c-inner-hl)",
+          }}
+        >
           {SECTIONS.map((entry) => {
             const Icon = entry.icon;
+            const active = section === entry.id;
             return (
               <button
                 key={entry.id}
                 onClick={() => setSection(entry.id)}
-                className="flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left"
+                className="flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-all duration-200 ease-out"
                 style={{
-                  background: section === entry.id ? "rgba(124,58,237,.16)" : LEGACY_COLORS.s2,
-                  borderColor: section === entry.id ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
+                  background: active ? "color-mix(in srgb, var(--c-purple) 14%, transparent)" : LEGACY_COLORS.s2,
+                  borderColor: active ? "color-mix(in srgb, var(--c-purple) 38%, transparent)" : LEGACY_COLORS.border,
+                  boxShadow: active
+                    ? "0 0 0 1px color-mix(in srgb, var(--c-purple) 28%, transparent), 0 8px 24px -10px color-mix(in srgb, var(--c-purple) 50%, transparent), var(--c-inner-hl)"
+                    : "var(--c-inner-hl)",
                 }}
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl" style={{ background: section === entry.id ? LEGACY_COLORS.purple : LEGACY_COLORS.s1, color: section === entry.id ? "#fff" : LEGACY_COLORS.muted2 }}>
+                <div
+                  className="flex h-10 w-10 items-center justify-center rounded-2xl transition-all duration-200 ease-out"
+                  style={{
+                    background: active
+                      ? "linear-gradient(135deg, var(--c-purple) 0%, color-mix(in srgb, var(--c-purple) 78%, #000 22%) 100%)"
+                      : LEGACY_COLORS.s1,
+                    color: active ? "#fff" : LEGACY_COLORS.muted2,
+                    boxShadow: active ? "var(--c-elev-1), var(--c-inner-hl)" : "var(--c-inner-hl)",
+                  }}
+                >
                   <Icon className="h-5 w-5" />
                 </div>
-                <span className="text-sm font-semibold">{entry.label}</span>
+                <span
+                  className="text-sm font-semibold tracking-[-0.005em]"
+                  style={{ color: active ? "var(--c-purple)" : "var(--c-text)" }}
+                >
+                  {entry.label}
+                </span>
               </button>
             );
           })}
-          <button onClick={() => setUnlocked(false)} className="w-full rounded-2xl border px-4 py-3 text-sm font-semibold" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+          <button
+            onClick={() => setUnlocked(false)}
+            className="w-full rounded-2xl border px-4 py-3 text-sm font-semibold transition-all duration-200 ease-out hover:brightness-110"
+            style={{
+              background: LEGACY_COLORS.s2,
+              borderColor: LEGACY_COLORS.border,
+              color: LEGACY_COLORS.muted2,
+              boxShadow: "var(--c-inner-hl)",
+            }}
+          >
             관리자 잠금
           </button>
         </section>
 
-        <section className="min-h-0 rounded-[28px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+        <section
+          className="min-h-0 rounded-[28px] border"
+          style={{
+            background: LEGACY_COLORS.s1,
+            borderColor: LEGACY_COLORS.border,
+            boxShadow: "var(--c-elev-2), var(--c-inner-hl)",
+          }}
+        >
           <div className="border-b px-5 py-4" style={{ borderColor: LEGACY_COLORS.border }}>
-            <div className="text-lg font-black">관리자 작업대</div>
+            <div className="text-lg font-bold tracking-[-0.02em]">관리자 작업대</div>
             <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
               상품, 직원, BOM, 출하묶음, 설정을 한 화면에서 관리합니다.
             </div>
