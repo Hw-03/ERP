@@ -2,6 +2,7 @@
 
 import { Activity, Clock3, RefreshCw } from "lucide-react";
 import { LEGACY_COLORS } from "./legacyUi";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function DesktopTopbar({
   title,
@@ -51,6 +52,8 @@ export function DesktopTopbar({
         <Activity className="h-4 w-4" />
         입출고 이력
       </button>
+
+      <ThemeToggle />
 
       <button
         onClick={onRefresh}

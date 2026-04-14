@@ -3,20 +3,20 @@
 import type { Item, TransactionType } from "@/lib/api";
 
 export const LEGACY_COLORS = {
-  bg: "#080a10",
-  s1: "#10121a",
-  s2: "#181b26",
-  s3: "#1f2333",
-  border: "rgba(255,255,255,.07)",
-  blue: "#4f8ef7",
-  green: "#1fd17a",
-  red: "#f25f5c",
-  yellow: "#f4b942",
-  purple: "#9b72f8",
-  cyan: "#06b6d4",
-  text: "#eef0f8",
-  muted: "#5a5f75",
-  muted2: "#8890aa",
+  bg:     "var(--c-bg)",
+  s1:     "var(--c-s1)",
+  s2:     "var(--c-s2)",
+  s3:     "var(--c-s3)",
+  border: "var(--c-border)",
+  blue:   "var(--c-blue)",
+  green:  "var(--c-green)",
+  red:    "var(--c-red)",
+  yellow: "var(--c-yellow)",
+  purple: "var(--c-purple)",
+  cyan:   "var(--c-cyan)",
+  text:   "var(--c-text)",
+  muted:  "var(--c-muted)",
+  muted2: "var(--c-muted2)",
 } as const;
 
 export const DEPARTMENT_LABELS: Record<string, string> = {

@@ -4,8 +4,41 @@
 
 @layer base {
   :root {
-    --background: #020617;   /* slate-950 */
-    --foreground: #f1f5f9;   /* slate-100 */
+    --background: #020617;
+    --foreground: #f1f5f9;
+
+    /* Dark theme (default) */
+    --c-bg:     #080a10;
+    --c-s1:     #10121a;
+    --c-s2:     #181b26;
+    --c-s3:     #1f2333;
+    --c-border: rgba(255,255,255,.07);
+    --c-blue:   #4f8ef7;
+    --c-green:  #1fd17a;
+    --c-red:    #f25f5c;
+    --c-yellow: #f4b942;
+    --c-purple: #9b72f8;
+    --c-cyan:   #06b6d4;
+    --c-text:   #eef0f8;
+    --c-muted:  #5a5f75;
+    --c-muted2: #8890aa;
+  }
+
+  :root[data-theme="light"] {
+    --c-bg:     #f0f3f9;
+    --c-s1:     #ffffff;
+    --c-s2:     #eaecf5;
+    --c-s3:     #dde1ef;
+    --c-border: rgba(0,0,0,.09);
+    --c-blue:   #2b6de8;
+    --c-green:  #12a058;
+    --c-red:    #d93a37;
+    --c-yellow: #b87c08;
+    --c-purple: #6b3fd4;
+    --c-cyan:   #0789a8;
+    --c-text:   #0e1120;
+    --c-muted:  #7a8099;
+    --c-muted2: #545b78;
   }
 
   html {
@@ -14,7 +47,9 @@
   }
 
   body {
-    @apply bg-slate-950 text-slate-100 min-h-screen;
+    background: var(--c-bg);
+    color: var(--c-text);
+    min-height: 100vh;
   }
 
   /* 스크롤바 스타일 */
@@ -23,19 +58,22 @@
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    @apply bg-slate-900;
+    background: var(--c-s2);
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-slate-600 rounded-full;
+    background: var(--c-s3);
+    border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-500;
+    background: var(--c-muted);
   }
 }
 
 @layer components {
   .card {
-    @apply bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg;
+    @apply rounded-xl p-5 shadow-lg border;
+    background: var(--c-s1);
+    border-color: var(--c-border);
   }
 
   .badge {
@@ -43,13 +81,14 @@
   }
 
   .btn-primary {
-    @apply bg-blue-600 hover:bg-blue-500 text-white font-medium px-4 py-2 rounded-lg
-           transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500;
+    background: var(--c-blue);
+    @apply text-white font-medium px-4 py-2 rounded-lg transition-colors duration-150 focus:outline-none;
   }
 
   .btn-secondary {
-    @apply bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium px-4 py-2 rounded-lg
-           transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-slate-500;
+    background: var(--c-s2);
+    color: var(--c-text);
+    @apply font-medium px-4 py-2 rounded-lg transition-colors duration-150 focus:outline-none;
   }
 }
 
