@@ -19,13 +19,6 @@ export const LEGACY_COLORS = {
   muted2: "#8890aa",
 } as const;
 
-// Elevation shadow system (3 levels)
-export const LEGACY_SHADOWS = {
-  sm: "0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.5)",
-  md: "0 4px 16px rgba(0,0,0,.55), 0 1px 4px rgba(0,0,0,.4)",
-  lg: "0 16px 48px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.05)",
-} as const;
-
 export const DEPARTMENT_LABELS: Record<string, string> = {
   조립: "조립",
   고압: "고압",

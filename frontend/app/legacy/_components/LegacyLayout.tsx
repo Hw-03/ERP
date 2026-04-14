@@ -69,11 +69,11 @@ export function LegacyLayout({
                 <button
                   key={tab.id}
                   onClick={() => onTabChange(tab.id)}
-                  className="flex flex-1 flex-col items-center gap-1 border-none bg-transparent px-2 py-3"
+                  className="flex flex-1 flex-col items-center gap-[3px] border-none bg-transparent px-1 py-1"
                 >
-                  <div className="text-2xl leading-none">{tab.icon}</div>
+                  <div className="text-[20px] leading-none">{tab.icon}</div>
                   <div
-                    className="text-xs font-bold"
+                    className="text-[9px] font-bold"
                     style={{ color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted }}
                   >
                     {tab.label}
