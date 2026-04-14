@@ -71,11 +71,14 @@ function FilterChip({
   return (
     <button
       onClick={onClick}
-      className="rounded-full border px-3 py-1.5 text-xs font-semibold transition"
+      className="rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 ease-out"
       style={{
         background: active ? color : LEGACY_COLORS.s1,
         borderColor: active ? color : LEGACY_COLORS.border,
         color: active ? "#fff" : LEGACY_COLORS.muted2,
+        boxShadow: active
+          ? `0 0 0 1px ${color}33, 0 6px 16px -6px ${color}66`
+          : "var(--c-inner-hl)",
       }}
     >
       {label}
@@ -101,22 +104,31 @@ function SummaryCard({
   return (
     <button
       onClick={onClick}
-      className="relative overflow-hidden rounded-2xl border px-4 py-4 text-left transition hover:opacity-95"
+      className="group relative overflow-hidden rounded-2xl border px-4 py-4 text-left transition-all duration-200 ease-out hover:-translate-y-0.5"
       style={{
-        background: active ? `${color}1a` : LEGACY_COLORS.s1,
-        borderColor: active ? color : LEGACY_COLORS.border,
+        background: active ? `color-mix(in srgb, ${color} 12%, transparent)` : LEGACY_COLORS.s1,
+        borderColor: active ? `color-mix(in srgb, ${color} 50%, transparent)` : LEGACY_COLORS.border,
+        boxShadow: active
+          ? `0 0 0 1px ${color}33, 0 12px 28px -12px ${color}66, var(--c-inner-hl)`
+          : "var(--c-elev-1), var(--c-inner-hl)",
       }}
     >
-      <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: LEGACY_COLORS.muted2 }}>
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: LEGACY_COLORS.muted2 }}>
         {label}
       </div>
-      <div className="font-mono text-[30px] font-black leading-none" style={{ color }}>
+      <div className="font-mono text-[30px] font-bold tabular-nums leading-none tracking-[-0.02em]" style={{ color }}>
         {formatNumber(value)}
       </div>
       <div className="mt-2 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
         {hint}
       </div>
-      <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{ background: color }} />
+      <div
+        className="absolute bottom-0 left-0 right-0 h-[3px] rounded-full"
+        style={{
+          background: `linear-gradient(90deg, transparent 0%, ${color} 50%, transparent 100%)`,
+          opacity: active ? 1 : 0.55,
+        }}
+      />
     </button>
   );
 }
@@ -137,14 +149,18 @@ function InsightCard({
   return (
     <button
       onClick={onClick}
-      className="rounded-3xl border px-5 py-4 text-left transition hover:opacity-95"
-      style={{ borderColor: `${color}44`, background: "rgba(7,12,28,.88)" }}
+      className="rounded-3xl border px-5 py-4 text-left transition-all duration-200 ease-out hover:-translate-y-0.5"
+      style={{
+        borderColor: `color-mix(in srgb, ${color} 35%, transparent)`,
+        background: `linear-gradient(135deg, color-mix(in srgb, ${color} 10%, var(--c-s2)) 0%, var(--c-s2) 100%)`,
+        boxShadow: `var(--c-elev-1), inset 0 1px 0 color-mix(in srgb, ${color} 18%, transparent)`,
+      }}
     >
-      <div className="mb-2 flex items-center gap-2 text-[11px] font-bold" style={{ color }}>
+      <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color }}>
         {icon}
         {title}
       </div>
-      <div className="text-sm font-bold">모델별 생산 가능 수량 보기</div>
+      <div className="text-sm font-bold tracking-[-0.01em]">모델별 생산 가능 수량 보기</div>
       <div className="mt-1 text-xs leading-5" style={{ color: LEGACY_COLORS.muted2 }}>
         {description}
       </div>
@@ -326,9 +342,29 @@ export function DesktopInventoryView({
 
   return (
     <div className="flex min-h-0 flex-1 gap-5 px-6 py-6">
-      <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-[28px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-        <div className="border-b px-5 py-4" style={{ borderColor: LEGACY_COLORS.border, background: "rgba(8,10,16,.74)" }}>
-          <div className="mb-3 flex items-center gap-2 rounded-2xl border px-4 py-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      <div
+        className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-[28px] border"
+        style={{
+          background: LEGACY_COLORS.s1,
+          borderColor: LEGACY_COLORS.border,
+          boxShadow: "var(--c-elev-2), var(--c-inner-hl)",
+        }}
+      >
+        <div
+          className="border-b px-5 py-4"
+          style={{
+            borderColor: LEGACY_COLORS.border,
+            background: "color-mix(in srgb, var(--c-bg) 60%, var(--c-s1) 40%)",
+          }}
+        >
+          <div
+            className="mb-3 flex items-center gap-2 rounded-2xl border px-4 py-3 transition-all duration-200 ease-out focus-within:border-[color:var(--c-accent-strong)]"
+            style={{
+              background: LEGACY_COLORS.s2,
+              borderColor: LEGACY_COLORS.border,
+              boxShadow: "var(--c-inner-hl)",
+            }}
+          >
             <Search size={15} style={{ color: LEGACY_COLORS.blue }} />
             <input
               value={localSearch}
@@ -415,8 +451,8 @@ export function DesktopInventoryView({
                     <tr
                       key={item.item_id}
                       onClick={() => setSelectedItem((current) => (current?.item_id === item.item_id ? null : item))}
-                      className="cursor-pointer"
-                      style={{ background: selected ? "rgba(79,142,247,.08)" : "transparent" }}
+                      className="cursor-pointer transition-colors duration-150 hover:bg-[color:var(--c-accent-soft)]"
+                      style={{ background: selected ? "var(--c-accent-soft)" : "transparent" }}
                     >
                       <td className="border-b px-4 py-3 align-top" style={{ borderColor: LEGACY_COLORS.border }}>
                         <div className="flex flex-col gap-1">
@@ -505,11 +541,12 @@ export function DesktopInventoryView({
                   <button
                     key={value}
                     onClick={() => setAction(value as DesktopInventoryAction)}
-                    className="rounded-2xl border px-3 py-2 text-xs font-semibold"
+                    className="rounded-2xl border px-3 py-2 text-xs font-semibold transition-all duration-200 ease-out"
                     style={{
-                      borderColor: action === value ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                      background: action === value ? "rgba(79,142,247,.14)" : LEGACY_COLORS.s1,
+                      borderColor: action === value ? "var(--c-accent-strong)" : LEGACY_COLORS.border,
+                      background: action === value ? "var(--c-accent-soft)" : LEGACY_COLORS.s1,
                       color: action === value ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
+                      boxShadow: action === value ? "var(--c-glow-blue)" : "var(--c-inner-hl)",
                     }}
                   >
                     {label}
@@ -546,9 +583,15 @@ export function DesktopInventoryView({
               <button
                 onClick={() => void submitInventoryAction()}
                 disabled={saving}
-                className="mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold text-white disabled:opacity-60"
+                className="mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold text-white transition-all duration-200 ease-out hover:brightness-110 disabled:opacity-60 disabled:hover:brightness-100"
                 style={{
-                  background: action === "SHIP" ? LEGACY_COLORS.red : action === "RECEIVE" ? LEGACY_COLORS.green : LEGACY_COLORS.blue,
+                  background:
+                    action === "SHIP"
+                      ? "linear-gradient(135deg, var(--c-red) 0%, color-mix(in srgb, var(--c-red) 75%, #000 25%) 100%)"
+                      : action === "RECEIVE"
+                        ? "linear-gradient(135deg, var(--c-green) 0%, color-mix(in srgb, var(--c-green) 75%, #000 25%) 100%)"
+                        : "linear-gradient(135deg, var(--c-blue) 0%, color-mix(in srgb, var(--c-blue) 78%, #000 22%) 100%)",
+                  boxShadow: "var(--c-elev-2), var(--c-inner-hl)",
                 }}
               >
                 {saving ? "처리 중..." : action === "SHIP" ? "출고 실행" : action === "RECEIVE" ? "입고 실행" : "재고 조정 적용"}
@@ -586,12 +629,31 @@ export function DesktopInventoryView({
       </DesktopRightPanel>
 
       {capacityMode ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-6" onClick={() => setCapacityMode(null)}>
-          <div className="w-full max-w-[480px] rounded-[32px] border p-8 text-center" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }} onClick={(e) => e.stopPropagation()}>
-            <div className="mb-4 inline-flex rounded-2xl px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em]" style={{ background: capacityMode === "FAST" ? "rgba(79,142,247,.14)" : "rgba(6,182,212,.14)", color: capacityMode === "FAST" ? LEGACY_COLORS.blue : LEGACY_COLORS.cyan }}>
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center px-6 backdrop-blur-md"
+          style={{ background: "var(--c-overlay)" }}
+          onClick={() => setCapacityMode(null)}
+        >
+          <div
+            className="w-full max-w-[480px] rounded-[32px] border p-8 text-center"
+            style={{
+              background: LEGACY_COLORS.s1,
+              borderColor: LEGACY_COLORS.border,
+              boxShadow: "var(--c-elev-3), var(--c-inner-hl)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="mb-4 inline-flex rounded-2xl px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]"
+              style={{
+                background: capacityMode === "FAST" ? "var(--c-accent-soft)" : "color-mix(in srgb, var(--c-cyan) 14%, transparent)",
+                color: capacityMode === "FAST" ? LEGACY_COLORS.blue : LEGACY_COLORS.cyan,
+                border: `1px solid ${capacityMode === "FAST" ? "var(--c-accent-strong)" : "color-mix(in srgb, var(--c-cyan) 30%, transparent)"}`,
+              }}
+            >
               {capacityMode === "FAST" ? "즉시생산" : "최대생산"}
             </div>
-            <div className="mt-2 text-2xl font-black">BOM 세팅 후 표시</div>
+            <div className="mt-2 text-2xl font-bold tracking-[-0.02em]">BOM 세팅 후 표시</div>
             <div className="mt-3 text-sm leading-6" style={{ color: LEGACY_COLORS.muted2 }}>
               제품 BOM과 완제품 데이터가 등록되면<br />모델별 생산 가능 수량이 이 자리에 표시됩니다.
             </div>

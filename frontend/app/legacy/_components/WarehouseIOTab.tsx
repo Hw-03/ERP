@@ -16,15 +16,15 @@ import {
 type WMode = "wh2d" | "d2wh" | "whin";
 
 const MODES: { id: WMode; icon: string; label: string }[] = [
-  { id: "wh2d", icon: "🏭→🔧", label: "창고→생산부" },
-  { id: "d2wh", icon: "🔧→🏭", label: "생산부→창고" },
-  { id: "whin", icon: "📥", label: "창고 입고" },
+  { id: "wh2d", icon: "창고 → 생산부", label: "창고→생산부" },
+  { id: "d2wh", icon: "생산부 → 창고", label: "생산부→창고" },
+  { id: "whin", icon: "외부 → 창고", label: "창고 입고" },
 ];
 
 function previewFlow(mode: WMode) {
-  if (mode === "wh2d") return { from: "🏭 창고", to: "🔧 생산부" };
-  if (mode === "d2wh") return { from: "🔧 생산부", to: "🏭 창고" };
-  return { from: "🚚 외부", to: "🏭 창고" };
+  if (mode === "wh2d") return { from: "창고", to: "생산부" };
+  if (mode === "d2wh") return { from: "생산부", to: "창고" };
+  return { from: "외부", to: "창고" };
 }
 
 export function WarehouseIOTab({
@@ -161,28 +161,37 @@ export function WarehouseIOTab({
         이동 유형
       </div>
       <div className="mb-[14px] grid grid-cols-3 gap-2">
-        {MODES.map((entry) => (
-          <button
-            key={entry.id}
-            onClick={() => {
-              setMode(entry.id);
-              resetForm();
-            }}
-            className="rounded-[14px] border px-2 py-3 text-center"
-            style={{
-              background: mode === entry.id ? "rgba(79,142,247,.12)" : LEGACY_COLORS.s2,
-              borderColor: mode === entry.id ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-            }}
-          >
-            <div className="mb-1 text-[22px]">{entry.icon}</div>
-            <div
-              className="text-xs font-bold"
-              style={{ color: mode === entry.id ? LEGACY_COLORS.blue : LEGACY_COLORS.text }}
+        {MODES.map((entry) => {
+          const active = mode === entry.id;
+          return (
+            <button
+              key={entry.id}
+              onClick={() => {
+                setMode(entry.id);
+                resetForm();
+              }}
+              className="rounded-[14px] border px-2 py-3 text-center transition-all duration-200 ease-out"
+              style={{
+                background: active ? "var(--c-accent-soft)" : LEGACY_COLORS.s2,
+                borderColor: active ? "var(--c-accent-strong)" : LEGACY_COLORS.border,
+                boxShadow: active ? "var(--c-glow-blue)" : "var(--c-inner-hl)",
+              }}
             >
-              {entry.label}
-            </div>
-          </button>
-        ))}
+              <div
+                className="mb-1 text-[10px] font-semibold tracking-[0.04em]"
+                style={{ color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
+              >
+                {entry.icon}
+              </div>
+              <div
+                className="text-xs font-bold tracking-[-0.005em]"
+                style={{ color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.text }}
+              >
+                {entry.label}
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       <div
@@ -363,19 +372,26 @@ export function WarehouseIOTab({
           }}
         />
         <div className="grid grid-cols-4 gap-[7px]">
-          {[-10, -1, 1, 10].map((delta) => (
-            <button
-              key={delta}
-              onClick={() => setQty((current) => String(Math.max(1, Number(current || 0) + delta)))}
-              className="rounded-[10px] py-[11px] text-sm font-bold"
-              style={{
-                background: delta < 0 ? "rgba(242,95,92,.15)" : "rgba(31,209,122,.12)",
-                color: delta < 0 ? LEGACY_COLORS.red : LEGACY_COLORS.green,
-              }}
-            >
-              {delta > 0 ? `+${delta}` : delta}
-            </button>
-          ))}
+          {[-10, -1, 1, 10].map((delta) => {
+            const positive = delta > 0;
+            return (
+              <button
+                key={delta}
+                onClick={() => setQty((current) => String(Math.max(1, Number(current || 0) + delta)))}
+                className="rounded-[10px] py-[11px] text-sm font-bold tabular-nums transition-all duration-200 ease-out hover:-translate-y-0.5"
+                style={{
+                  background: positive
+                    ? "color-mix(in srgb, var(--c-green) 14%, var(--c-s2))"
+                    : "color-mix(in srgb, var(--c-red) 14%, var(--c-s2))",
+                  color: positive ? "var(--c-green)" : "var(--c-red)",
+                  border: `1px solid ${positive ? "color-mix(in srgb, var(--c-green) 28%, transparent)" : "color-mix(in srgb, var(--c-red) 28%, transparent)"}`,
+                  boxShadow: "var(--c-inner-hl)",
+                }}
+              >
+                {delta > 0 ? `+${delta}` : delta}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -425,8 +441,12 @@ export function WarehouseIOTab({
         onClick={() => {
           if (validate()) setConfirmOpen(true);
         }}
-        className="w-full rounded-xl py-[13px] text-[15px] font-bold text-white"
-        style={{ background: LEGACY_COLORS.green, color: "#000" }}
+        className="w-full rounded-xl py-[13px] text-[15px] font-bold transition-all duration-200 ease-out hover:brightness-110"
+        style={{
+          background: "linear-gradient(135deg, var(--c-green) 0%, color-mix(in srgb, var(--c-green) 75%, #000 25%) 100%)",
+          color: "#fff",
+          boxShadow: "var(--c-elev-2), var(--c-inner-hl)",
+        }}
       >
         처리하기
       </button>

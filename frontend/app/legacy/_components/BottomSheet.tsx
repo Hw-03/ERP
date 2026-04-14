@@ -25,8 +25,8 @@ export function BottomSheet({
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-end justify-center"
-      style={{ background: "rgba(0,0,0,.6)" }}
+      className="fixed inset-0 z-[200] flex items-end justify-center backdrop-blur-md"
+      style={{ background: "var(--c-overlay)" }}
       onClick={onClose}
     >
       <div
@@ -37,6 +37,7 @@ export function BottomSheet({
           maxHeight: "92vh",
           paddingBottom: "calc(env(safe-area-inset-bottom, 16px) + 20px)",
           animation: "sheetUp .25s cubic-bezier(.32,1.2,.6,1)",
+          boxShadow: "var(--c-elev-3), var(--c-inner-hl)",
         }}
         onClick={(event) => event.stopPropagation()}
       >
