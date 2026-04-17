@@ -19,7 +19,7 @@
 | M    | 항목                                | 상태   | 커밋 |
 | ---- | ----------------------------------- | ------ | ---- |
 | M1   | 데이터 모델 확장 + 신규 테이블      | ✅     | `M1 (git log 참조)` |
-| M2   | 코드 체계 서비스 + 라우터           | ⬜     | -    |
+| M2   | 코드 체계 서비스 + 라우터           | ✅     | M2 (git log 참조) |
 | M3   | Pending/Available 분리              | ⬜     | -    |
 | M4   | Queue 배치 (생산/분해/반품)         | ⬜     | -    |
 | M5   | Scrap / Loss / Variance             | ⬜     | -    |
@@ -62,6 +62,31 @@
 - seed: 100 symbols, 3 options, 11 process types, 6 flow rules 모두 정상 삽입
 
 **커밋**: `M1 (git log 참조)` — push: origin/claude/inventory-management-system-UBtbx
+
+#### M2 — 코드 체계 서비스 + 라우터 (2026-04-17)
+
+**변경 파일**
+- `backend/app/services/__init__.py` (신규)
+- `backend/app/services/codes.py` (신규) — `ErpCode` dataclass, parse/format/validate/generate
+- `backend/app/routers/codes.py` (신규) — `/api/codes` 라우터
+- `backend/app/schemas.py` — 코드 마스터/코드 연산 응답 스키마 7종 추가
+- `backend/app/main.py` — 라우터 등록
+
+**API 엔드포인트**
+- `GET /api/codes/symbols` — 100슬롯 제품기호 조회
+- `PUT /api/codes/symbols/{slot}` — 슬롯 배정/수정 (uniqueness 검증)
+- `GET /api/codes/options` — BG/WM/SV 옵션 조회
+- `GET /api/codes/process-types` — 11개 공정 코드 (stage_order 정렬)
+- `GET /api/codes/process-flows` — 6개 흐름 규칙
+- `POST /api/codes/parse` — 4-파트 코드 파싱 + 검증. compact/zero-padded 모두 허용
+- `POST /api/codes/generate` — symbol + process + option → 자동 serial 발번
+
+**검증**
+- 정상: `3-PA-0012-BG`, `3-PA-12-BG`, `376-TR-0001` 모두 파싱 성공
+- 오류 검출: `376-PA-*` → PA 단일슬롯 위반, `3-PA-*-XX` → 미정의 옵션, `9-PA-*` → 예약 슬롯
+- `format_erp_code(compact=True)` → 앞 0 제거 확인 (`3-PA-0001-WM` → `3-PA-1-WM`)
+
+**커밋**: M2 (git log 참조)
 
 ---
 

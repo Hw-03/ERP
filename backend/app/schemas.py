@@ -310,3 +310,77 @@ class MessageResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str
+
+
+# =============================================================================
+# M2: Code master schemas (product symbols, process types, options, 4-part code)
+# =============================================================================
+
+
+class ProductSymbolResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    slot: int
+    symbol: Optional[str]
+    model_name: Optional[str]
+    is_finished_good: bool
+    is_reserved: bool
+    notes: Optional[str] = None
+
+
+class ProductSymbolUpdate(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    symbol: Optional[str] = Field(None, max_length=5)
+    model_name: Optional[str] = Field(None, max_length=50)
+    is_finished_good: Optional[bool] = None
+    is_reserved: Optional[bool] = None
+    notes: Optional[str] = None
+
+
+class OptionCodeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    label_ko: str
+    label_en: Optional[str]
+    color_hex: Optional[str]
+
+
+class ProcessTypeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    prefix: str
+    suffix: str
+    stage_order: int
+    description: Optional[str]
+
+
+class ProcessFlowRuleResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    rule_id: int
+    from_type: str
+    to_type: str
+    consumes_codes: Optional[str]
+
+
+class ErpCodeParseRequest(BaseModel):
+    code: str = Field(..., description="4-part ERP code string")
+
+
+class ErpCodeGenerateRequest(BaseModel):
+    symbol: str = Field(..., min_length=1, max_length=5)
+    process_type: str = Field(..., min_length=2, max_length=2)
+    option: Optional[str] = Field(None, min_length=2, max_length=2)
+
+
+class ErpCodeResponse(BaseModel):
+    symbol: str
+    process_type: str
+    serial: int
+    option: Optional[str] = None
+    symbol_slots: List[int]
+    formatted_full: str       # zero-padded: "3-PA-0012-BG"
+    formatted_compact: str    # leading zeros stripped: "3-PA-12-BG"

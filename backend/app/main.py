@@ -14,7 +14,7 @@ from app.models import (
     ProcessType,
     ProductSymbol,
 )
-from app.routers import bom, employees, inventory, items, production, settings, ship_packages
+from app.routers import bom, codes, employees, inventory, items, production, settings, ship_packages
 
 Base.metadata.create_all(bind=engine)
 
@@ -103,6 +103,7 @@ app.include_router(ship_packages.router, prefix="/api/ship-packages", tags=["Shi
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(bom.router, prefix="/api/bom", tags=["BOM"])
 app.include_router(production.router, prefix="/api/production", tags=["Production"])
+app.include_router(codes.router, prefix="/api/codes", tags=["Codes"])
 
 
 def ensure_reference_data() -> None:
