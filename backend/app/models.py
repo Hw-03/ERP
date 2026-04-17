@@ -6,12 +6,15 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     Enum as SAEnum,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -43,6 +46,36 @@ class TransactionTypeEnum(str, enum.Enum):
     SHIP = "SHIP"
     ADJUST = "ADJUST"
     BACKFLUSH = "BACKFLUSH"
+    SCRAP = "SCRAP"
+    LOSS = "LOSS"
+    DISASSEMBLE = "DISASSEMBLE"
+    RETURN = "RETURN"
+    RESERVE = "RESERVE"
+    RESERVE_RELEASE = "RESERVE_RELEASE"
+
+
+class QueueBatchTypeEnum(str, enum.Enum):
+    PRODUCE = "PRODUCE"
+    DISASSEMBLE = "DISASSEMBLE"
+    RETURN = "RETURN"
+
+
+class QueueBatchStatusEnum(str, enum.Enum):
+    OPEN = "OPEN"
+    CONFIRMED = "CONFIRMED"
+    CANCELLED = "CANCELLED"
+
+
+class QueueLineDirectionEnum(str, enum.Enum):
+    IN = "IN"            # Into inventory (disassembly reuse, return intake)
+    OUT = "OUT"          # Consumed from inventory (production backflush)
+    SCRAP = "SCRAP"      # Discard / defective
+    LOSS = "LOSS"        # Missing on return
+
+
+class AlertKindEnum(str, enum.Enum):
+    SAFETY = "SAFETY"
+    COUNT_VARIANCE = "COUNT_VARIANCE"
 
 
 class DepartmentEnum(str, enum.Enum):
@@ -96,6 +129,13 @@ class Item(Base):
     supplier = Column(String(200), nullable=True)
     min_stock = Column(Numeric(15, 4), nullable=True)
 
+    # 4-part ERP code ([제품기호]-[구분코드]-[일련번호]-[옵션코드])
+    erp_code = Column(String(40), nullable=True, unique=True, index=True)
+    symbol_slot = Column(SmallInteger, ForeignKey("product_symbols.slot"), nullable=True, index=True)
+    process_type_code = Column(String(2), ForeignKey("process_types.code"), nullable=True, index=True)
+    option_code = Column(String(2), ForeignKey("option_codes.code"), nullable=True)
+    serial_no = Column(Integer, nullable=True)
+
     inventory = relationship("Inventory", back_populates="item", uselist=False, cascade="all, delete-orphan")
     bom_as_parent = relationship(
         "BOM",
@@ -124,6 +164,14 @@ class Inventory(Base):
         index=True,
     )
     quantity = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
+    # Quantity currently reserved by open queue batches (Available = quantity - pending_quantity)
+    pending_quantity = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
+    last_reserver_employee_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    last_reserver_name = Column(String(100), nullable=True)
     location = Column(String(100), nullable=True)
     updated_at = Column(
         DateTime,
@@ -252,6 +300,13 @@ class TransactionLog(Base):
     reference_no = Column(String(100), nullable=True, index=True)
     produced_by = Column(String(100), nullable=True)
     notes = Column(Text, nullable=True)
+    # Optional link to the queue batch that generated this log
+    batch_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("queue_batches.batch_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at = Column(
         DateTime,
         nullable=False,
@@ -261,3 +316,205 @@ class TransactionLog(Base):
     )
 
     item = relationship("Item", back_populates="transaction_logs")
+    batch = relationship("QueueBatch", back_populates="transaction_logs")
+
+
+# =============================================================================
+# Code master tables (100-slot product symbols, 2-char process, 2-char option)
+# =============================================================================
+
+
+class ProductSymbol(Base):
+    __tablename__ = "product_symbols"
+
+    slot = Column(SmallInteger, primary_key=True)  # 1 ~ 100
+    symbol = Column(String(5), nullable=True, unique=True, index=True)
+    model_name = Column(String(50), nullable=True)
+    # Finished goods (PA/AA) must use a single-slot symbol; this flag marks it
+    is_finished_good = Column(Boolean, nullable=False, default=False)
+    is_reserved = Column(Boolean, nullable=False, default=True)
+    notes = Column(Text, nullable=True)
+
+
+class OptionCode(Base):
+    __tablename__ = "option_codes"
+
+    code = Column(String(2), primary_key=True)
+    label_ko = Column(String(50), nullable=False)
+    label_en = Column(String(50), nullable=True)
+    color_hex = Column(String(7), nullable=True)
+
+
+class ProcessType(Base):
+    __tablename__ = "process_types"
+
+    code = Column(String(2), primary_key=True)   # TR, TA, HR, HA, VR, VA, NA, AR, AA, PR, PA
+    prefix = Column(String(1), nullable=False)   # T / H / V / N / A / P
+    suffix = Column(String(1), nullable=False)   # R(Raw) / A(Assembly)
+    stage_order = Column(SmallInteger, nullable=False, default=0)
+    description = Column(Text, nullable=True)
+
+
+class ProcessFlowRule(Base):
+    __tablename__ = "process_flow_rules"
+
+    rule_id = Column(Integer, primary_key=True, autoincrement=True)
+    from_type = Column(String(2), ForeignKey("process_types.code"), nullable=False)
+    to_type = Column(String(2), ForeignKey("process_types.code"), nullable=False)
+    # Additional input codes that must be consumed (comma separated). 예: TA+HR->HA => "HR"
+    consumes_codes = Column(String(200), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("from_type", "to_type", name="uq_flow_rule"),
+    )
+
+
+# =============================================================================
+# Queue (예약/확정) workflow tables
+# =============================================================================
+
+
+class QueueBatch(Base):
+    __tablename__ = "queue_batches"
+
+    batch_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    batch_type = Column(
+        SAEnum(QueueBatchTypeEnum, name="queue_batch_type_enum", create_type=True),
+        nullable=False,
+    )
+    status = Column(
+        SAEnum(QueueBatchStatusEnum, name="queue_batch_status_enum", create_type=True),
+        nullable=False,
+        default=QueueBatchStatusEnum.OPEN,
+        index=True,
+    )
+    owner_employee_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    owner_name = Column(String(100), nullable=True)  # denormalized for display
+    parent_item_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("items.item_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    parent_quantity = Column(Numeric(15, 4), nullable=True)
+    reference_no = Column(String(100), nullable=True, index=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
+    confirmed_at = Column(DateTime, nullable=True)
+    cancelled_at = Column(DateTime, nullable=True)
+
+    lines = relationship("QueueLine", back_populates="batch", cascade="all, delete-orphan")
+    transaction_logs = relationship("TransactionLog", back_populates="batch")
+
+
+class QueueLine(Base):
+    __tablename__ = "queue_lines"
+
+    line_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    batch_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("queue_batches.batch_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    item_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("items.item_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    direction = Column(
+        SAEnum(QueueLineDirectionEnum, name="queue_line_direction_enum", create_type=True),
+        nullable=False,
+    )
+    quantity = Column(Numeric(15, 4), nullable=False)
+    bom_expected = Column(Numeric(15, 4), nullable=True)  # Original BOM expected qty (for variance)
+    reason = Column(Text, nullable=True)
+    process_stage = Column(String(2), ForeignKey("process_types.code"), nullable=True)
+    included = Column(Boolean, nullable=False, default=True)  # Selective inclusion toggle
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
+
+    batch = relationship("QueueBatch", back_populates="lines")
+    item = relationship("Item")
+
+
+# =============================================================================
+# Scrap / Loss / Variance history
+# =============================================================================
+
+
+class ScrapLog(Base):
+    __tablename__ = "scrap_logs"
+
+    scrap_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
+    quantity = Column(Numeric(15, 4), nullable=False)
+    process_stage = Column(String(2), ForeignKey("process_types.code"), nullable=True)
+    reason = Column(String(200), nullable=False)
+    batch_id = Column(UUID(as_uuid=True), ForeignKey("queue_batches.batch_id", ondelete="SET NULL"), nullable=True, index=True)
+    operator = Column(String(100), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
+
+
+class LossLog(Base):
+    __tablename__ = "loss_logs"
+
+    loss_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
+    quantity = Column(Numeric(15, 4), nullable=False)
+    batch_id = Column(UUID(as_uuid=True), ForeignKey("queue_batches.batch_id", ondelete="SET NULL"), nullable=True, index=True)
+    reason = Column(String(200), nullable=False)
+    operator = Column(String(100), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
+
+
+class VarianceLog(Base):
+    __tablename__ = "variance_logs"
+
+    var_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    batch_id = Column(UUID(as_uuid=True), ForeignKey("queue_batches.batch_id", ondelete="CASCADE"), nullable=False, index=True)
+    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
+    bom_expected = Column(Numeric(15, 4), nullable=False)
+    actual_used = Column(Numeric(15, 4), nullable=False)
+    diff = Column(Numeric(15, 4), nullable=False)
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
+
+
+# =============================================================================
+# Advanced inventory management: alerts, physical counts
+# =============================================================================
+
+
+class StockAlert(Base):
+    __tablename__ = "stock_alerts"
+
+    alert_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
+    kind = Column(
+        SAEnum(AlertKindEnum, name="alert_kind_enum", create_type=True),
+        nullable=False,
+        index=True,
+    )
+    threshold = Column(Numeric(15, 4), nullable=True)
+    observed_value = Column(Numeric(15, 4), nullable=True)
+    message = Column(Text, nullable=True)
+    triggered_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
+    acknowledged_at = Column(DateTime, nullable=True)
+    acknowledged_by = Column(String(100), nullable=True)
+
+
+class PhysicalCount(Base):
+    __tablename__ = "physical_counts"
+
+    count_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
+    counted_qty = Column(Numeric(15, 4), nullable=False)
+    system_qty = Column(Numeric(15, 4), nullable=False)
+    diff = Column(Numeric(15, 4), nullable=False)
+    reason = Column(String(200), nullable=True)
+    operator = Column(String(100), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)

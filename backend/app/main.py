@@ -5,7 +5,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.database import Base, SessionLocal, engine
-from app.models import DepartmentEnum, Employee, EmployeeLevelEnum
+from app.models import (
+    DepartmentEnum,
+    Employee,
+    EmployeeLevelEnum,
+    OptionCode,
+    ProcessFlowRule,
+    ProcessType,
+    ProductSymbol,
+)
 from app.routers import bom, employees, inventory, items, production, settings, ship_packages
 
 Base.metadata.create_all(bind=engine)
@@ -21,6 +29,18 @@ def run_migrations() -> None:
         "ALTER TABLE items ADD COLUMN legacy_model VARCHAR(50)",
         "ALTER TABLE items ADD COLUMN supplier VARCHAR(200)",
         "ALTER TABLE items ADD COLUMN min_stock NUMERIC(15,4)",
+        # M1: 4-part ERP code fields on items
+        "ALTER TABLE items ADD COLUMN erp_code VARCHAR(40)",
+        "ALTER TABLE items ADD COLUMN symbol_slot SMALLINT",
+        "ALTER TABLE items ADD COLUMN process_type_code VARCHAR(2)",
+        "ALTER TABLE items ADD COLUMN option_code VARCHAR(2)",
+        "ALTER TABLE items ADD COLUMN serial_no INTEGER",
+        # M1: Pending/reservation on inventory
+        "ALTER TABLE inventory ADD COLUMN pending_quantity NUMERIC(15,4) NOT NULL DEFAULT 0",
+        "ALTER TABLE inventory ADD COLUMN last_reserver_employee_id CHAR(36)",
+        "ALTER TABLE inventory ADD COLUMN last_reserver_name VARCHAR(100)",
+        # M1: Batch link on transaction log
+        "ALTER TABLE transaction_logs ADD COLUMN batch_id CHAR(36)",
     ]
     with engine.connect() as conn:
         for sql in new_columns:
@@ -114,6 +134,79 @@ def ensure_reference_data() -> None:
                     )
                 )
             db.commit()
+
+        # ------ Product symbols (100 slots, first 5 assigned) ------
+        if db.query(ProductSymbol).count() == 0:
+            assigned = [
+                (1, "3", "DX3000"),
+                (2, "7", "COCOON"),
+                (3, "8", "SOLO"),
+                (4, "4", "ADX4000W"),
+                (5, "6", "ADX6000FB"),
+            ]
+            for slot, symbol, model in assigned:
+                db.add(
+                    ProductSymbol(
+                        slot=slot,
+                        symbol=symbol,
+                        model_name=model,
+                        is_finished_good=True,
+                        is_reserved=False,
+                    )
+                )
+            for slot in range(6, 101):
+                db.add(ProductSymbol(slot=slot, symbol=None, model_name=None, is_reserved=True))
+            db.commit()
+
+        # ------ Option codes ------
+        if db.query(OptionCode).count() == 0:
+            options = [
+                ("BG", "블랙 유광", "Black Glossy", "#111111"),
+                ("WM", "화이트 무광", "White Matte", "#F7F7F7"),
+                ("SV", "실버", "Silver", "#C0C0C0"),
+            ]
+            for code, ko, en, color in options:
+                db.add(OptionCode(code=code, label_ko=ko, label_en=en, color_hex=color))
+            db.commit()
+
+        # ------ Process types (2-char) ------
+        if db.query(ProcessType).count() == 0:
+            types = [
+                ("TR", "T", "R", 10, "튜브 원자재"),
+                ("TA", "T", "A", 20, "튜브 조립체"),
+                ("HR", "H", "R", 15, "고압 원자재"),
+                ("HA", "H", "A", 30, "고압 조립체"),
+                ("VR", "V", "R", 25, "진공 원자재"),
+                ("VA", "V", "A", 40, "진공 조립체"),
+                ("NA", "N", "A", 50, "튜닝 조립체 (출력값 최적화)"),
+                ("AR", "A", "R", 45, "조립 원자재"),
+                ("AA", "A", "A", 60, "최종 조립체"),
+                ("PR", "P", "R", 55, "포장 원자재"),
+                ("PA", "P", "A", 70, "완제품 (최종 패키징)"),
+            ]
+            for code, prefix, suffix, order, desc in types:
+                db.add(
+                    ProcessType(code=code, prefix=prefix, suffix=suffix, stage_order=order, description=desc)
+                )
+            db.commit()
+
+        # ------ Process flow rules ------
+        if db.query(ProcessFlowRule).count() == 0:
+            flows = [
+                ("TR", "TA", None),           # TR -> TA
+                ("TA", "HA", "HR"),           # TA + HR -> HA
+                ("HA", "VA", "VR"),           # HA + VR -> VA
+                ("VA", "NA", None),           # VA -> NA
+                ("NA", "AA", "AR"),           # NA + AR -> AA
+                ("AA", "PA", "PR"),           # AA + PR -> PA
+            ]
+            for src, dst, consumes in flows:
+                db.add(ProcessFlowRule(from_type=src, to_type=dst, consumes_codes=consumes))
+            db.commit()
+
+        # ------ Backfill pending_quantity default for existing rows ------
+        db.execute(text("UPDATE inventory SET pending_quantity = 0 WHERE pending_quantity IS NULL"))
+        db.commit()
     finally:
         db.close()
 
