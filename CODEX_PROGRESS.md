@@ -21,7 +21,7 @@
 | M1   | 데이터 모델 확장 + 신규 테이블      | ✅     | `M1 (git log 참조)` |
 | M2   | 코드 체계 서비스 + 라우터           | ✅     | M2 (git log 참조) |
 | M3   | Pending/Available 분리              | ✅     | M3 (git log 참조) |
-| M4   | Queue 배치 (생산/분해/반품)         | ⬜     | -    |
+| M4   | Queue 배치 (생산/분해/반품)         | ✅     | M4 (git log 참조) |
 | M5   | Scrap / Loss / Variance             | ⬜     | -    |
 | M6   | 안전재고 알림 + 실사                | ⬜     | -    |
 | M7   | 프론트 UX                           | ⬜     | -    |
@@ -110,6 +110,44 @@
 - release 30 → pending=0; consume_pending 20 → total-20, pending-20 동시 차감 확인
 
 **커밋**: M3 (git log 참조)
+
+#### M4 — Queue 배치 (생산/분해/반품) (2026-04-17)
+
+**변경 파일**
+- `backend/app/services/bom.py` (신규) — `explode_bom` / `merge_requirements` / `direct_children` 유틸. production.py가 쓰던 재귀 로직을 서비스 레이어로 이동.
+- `backend/app/services/queue.py` (신규) — 배치 생명주기(`create_batch`/`override_line_quantity`/`toggle_line`/`add_line`/`remove_line`/`confirm_batch`/`cancel_batch`). PRODUCE/DISASSEMBLE/RETURN 3종 타입 지원.
+- `backend/app/routers/queue.py` (신규) — `/api/queue` REST 라우터 (생성/목록/상세/라인 CRUD/confirm/cancel, 총 9개 엔드포인트).
+- `backend/app/routers/production.py` — `_explode_bom`을 `services/bom.py` 위임으로 축소.
+- `backend/app/schemas.py` — Queue 요청/응답 6종 추가 (`QueueBatchCreateRequest`, `QueueLineOverrideRequest`, `QueueLineToggleRequest`, `QueueLineAddRequest`, `QueueLineResponse`, `QueueBatchResponse`).
+- `backend/app/main.py` — queue 라우터 등록.
+
+**구현 원칙**
+- **PRODUCE**: 상위 품목의 BOM을 leaf까지 재귀 전개 → 자식 품목을 OUT 라인(즉시 Pending 예약), 상위 품목을 IN 라인(예약 없음). Confirm 시 OUT은 Pending/Total 동시 차감, IN은 Total 증가.
+- **DISASSEMBLE**: 상위 품목을 OUT(Pending 예약), 직접 자식을 IN(예약 없음)으로 시드. 사용자는 `toggle_line`으로 자식을 SCRAP/LOSS로 재분류하거나 `add_line`으로 수동 추가 가능.
+- **RETURN**: 상위 품목 IN + 직접 자식들 IN으로 시드. 누락된 부품은 `toggle_line(..., new_direction=LOSS)`로 표시 → Confirm 시 LossLog만 생성 (재고 변동 없음).
+- **Variance 로그**: Confirm 시 `bom_expected ≠ quantity`인 included 라인마다 `variance_logs` 레코드 생성. 제외된 라인은 `actual_used=0`으로 diff 기록.
+- **TransactionLog**: 모든 Confirm 시 `batch_id` FK 심음. 추적/회계 연동 기반.
+- **Cancel**: OPEN 상태에서만 가능. OUT 라인 Pending을 즉시 해제 → Available 복구.
+
+**API 엔드포인트 (9)**
+- `POST /api/queue` — 배치 생성 (OPEN, BOM 자동 로드)
+- `GET /api/queue?status=OPEN` — 목록 + 점유자
+- `GET /api/queue/{id}` — 상세
+- `PUT /api/queue/{id}/lines/{lid}` — 수량 Override (Pending 증감 자동 반영)
+- `POST /api/queue/{id}/lines/{lid}/toggle` — 포함/제외 + direction 재분류
+- `POST /api/queue/{id}/lines` — 수동 라인 추가 (SCRAP/LOSS/IN/OUT)
+- `DELETE /api/queue/{id}/lines/{lid}` — 라인 제거 (Pending 롤백 포함)
+- `POST /api/queue/{id}/confirm` — 원자 커밋
+- `POST /api/queue/{id}/cancel` — OPEN 상태 취소
+
+**검증** (TestClient 기반, 임시 SQLite DB)
+- **PRODUCE lifecycle**: 100/100 재고 + BOM(2/3) 상위 5개 생산 요청 → Pending 10/15 예약 → Override 10→8 → Confirm → Total 92/85, 상위 0→5, Pending 0/0.
+- **CANCEL**: 생성 직후 취소 → Pending 0/0 복귀.
+- **DISASSEMBLE with LOSS**: 상위 5개 중 2개 분해, 자식 C1은 IN 유지, C2는 LOSS로 전환 → 상위 5→3, C1 92→96, C2 불변, LossLog 1건.
+- **RETURN with LOSS**: 반품 1개 + C2 누락 LOSS → 상위 3→4, C1 96→98, C2 불변, LossLog 누적.
+- 최종: TransactionLog 9, LossLog 2, VarianceLog 1 (override 8 vs expected 10).
+
+**커밋**: M4 (git log 참조)
 
 ---
 

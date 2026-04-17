@@ -7,7 +7,15 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models import CategoryEnum, DepartmentEnum, EmployeeLevelEnum, TransactionTypeEnum
+from app.models import (
+    CategoryEnum,
+    DepartmentEnum,
+    EmployeeLevelEnum,
+    QueueBatchStatusEnum,
+    QueueBatchTypeEnum,
+    QueueLineDirectionEnum,
+    TransactionTypeEnum,
+)
 
 
 class ItemCreate(BaseModel):
@@ -396,3 +404,72 @@ class ErpCodeResponse(BaseModel):
     symbol_slots: List[int]
     formatted_full: str       # zero-padded: "3-PA-0012-BG"
     formatted_compact: str    # leading zeros stripped: "3-PA-12-BG"
+
+
+# =============================================================================
+# Queue batch schemas (생산/분해/반품 2-단계 워크플로)
+# =============================================================================
+
+
+class QueueBatchCreateRequest(BaseModel):
+    batch_type: QueueBatchTypeEnum
+    parent_item_id: Optional[uuid.UUID] = None
+    parent_quantity: Optional[Decimal] = None
+    owner_employee_id: Optional[uuid.UUID] = None
+    owner_name: Optional[str] = None
+    reference_no: Optional[str] = None
+    notes: Optional[str] = None
+    load_bom: bool = True
+
+
+class QueueLineOverrideRequest(BaseModel):
+    quantity: Decimal = Field(..., ge=0)
+
+
+class QueueLineToggleRequest(BaseModel):
+    included: bool
+    new_direction: Optional[QueueLineDirectionEnum] = None
+
+
+class QueueLineAddRequest(BaseModel):
+    item_id: uuid.UUID
+    direction: QueueLineDirectionEnum
+    quantity: Decimal = Field(..., gt=0)
+    reason: Optional[str] = None
+    process_stage: Optional[str] = Field(None, max_length=2)
+
+
+class QueueLineResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    line_id: uuid.UUID
+    batch_id: uuid.UUID
+    item_id: uuid.UUID
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    direction: QueueLineDirectionEnum
+    quantity: Decimal
+    bom_expected: Optional[Decimal] = None
+    reason: Optional[str] = None
+    process_stage: Optional[str] = None
+    included: bool
+    created_at: datetime
+
+
+class QueueBatchResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    batch_id: uuid.UUID
+    batch_type: QueueBatchTypeEnum
+    status: QueueBatchStatusEnum
+    owner_employee_id: Optional[uuid.UUID] = None
+    owner_name: Optional[str] = None
+    parent_item_id: Optional[uuid.UUID] = None
+    parent_item_name: Optional[str] = None
+    parent_quantity: Optional[Decimal] = None
+    reference_no: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: datetime
+    confirmed_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
+    lines: List[QueueLineResponse] = []

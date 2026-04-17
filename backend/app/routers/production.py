@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models import BOM, Inventory, Item, TransactionLog, TransactionTypeEnum
 from app.schemas import BackflushDetail, ProductionReceiptRequest, ProductionReceiptResponse
 from app.services import inventory as inventory_svc
+from app.services.bom import explode_bom as _explode_bom_svc
 
 router = APIRouter()
 
@@ -222,24 +223,5 @@ def _explode_bom(
     depth: int = 0,
     visited: frozenset = frozenset(),
 ) -> List[Tuple[uuid.UUID, Decimal]]:
-    """Expand a BOM recursively and return leaf component requirements."""
-
-    if depth > 10 or parent_item_id in visited:
-        return []
-
-    visited = visited | {parent_item_id}
-    bom_entries = db.query(BOM).filter(BOM.parent_item_id == parent_item_id).all()
-    result = []
-
-    for entry in bom_entries:
-        required_qty = entry.quantity * qty_to_produce
-        child_bom_exists = db.query(BOM).filter(BOM.parent_item_id == entry.child_item_id).first()
-
-        if child_bom_exists:
-            result.extend(
-                _explode_bom(db, entry.child_item_id, required_qty, depth + 1, visited)
-            )
-        else:
-            result.append((entry.child_item_id, required_qty))
-
-    return result
+    """Thin wrapper kept for backward compatibility; delegates to services/bom."""
+    return _explode_bom_svc(db, parent_item_id, qty_to_produce, depth, visited)
