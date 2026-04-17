@@ -7,7 +7,16 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models import CategoryEnum, DepartmentEnum, EmployeeLevelEnum, TransactionTypeEnum
+from app.models import (
+    AlertKindEnum,
+    CategoryEnum,
+    DepartmentEnum,
+    EmployeeLevelEnum,
+    QueueBatchStatusEnum,
+    QueueBatchTypeEnum,
+    QueueLineDirectionEnum,
+    TransactionTypeEnum,
+)
 
 
 class ItemCreate(BaseModel):
@@ -55,12 +64,21 @@ class ItemResponse(BaseModel):
     legacy_model: Optional[str] = None
     supplier: Optional[str] = None
     min_stock: Optional[Decimal] = None
+    # M1: 4-part ERP code fields
+    erp_code: Optional[str] = None
+    symbol_slot: Optional[int] = None
+    process_type_code: Optional[str] = None
+    option_code: Optional[str] = None
+    serial_no: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
 
 class ItemWithInventory(ItemResponse):
     quantity: Optional[Decimal] = Decimal("0")
+    pending_quantity: Decimal = Decimal("0")
+    available_quantity: Decimal = Decimal("0")
+    last_reserver_name: Optional[str] = None
     location: Optional[str] = None
 
 
@@ -200,7 +218,10 @@ class InventoryResponse(BaseModel):
 
     inventory_id: uuid.UUID
     item_id: uuid.UUID
-    quantity: Decimal
+    quantity: Decimal                      # Total (실재고)
+    pending_quantity: Decimal = Decimal("0")
+    available_quantity: Decimal = Decimal("0")   # computed: quantity - pending
+    last_reserver_name: Optional[str] = None
     location: Optional[str]
     updated_at: datetime
 
@@ -310,3 +331,257 @@ class MessageResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str
+
+
+# =============================================================================
+# M2: Code master schemas (product symbols, process types, options, 4-part code)
+# =============================================================================
+
+
+class ProductSymbolResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    slot: int
+    symbol: Optional[str]
+    model_name: Optional[str]
+    is_finished_good: bool
+    is_reserved: bool
+    notes: Optional[str] = None
+
+
+class ProductSymbolUpdate(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    symbol: Optional[str] = Field(None, max_length=5)
+    model_name: Optional[str] = Field(None, max_length=50)
+    is_finished_good: Optional[bool] = None
+    is_reserved: Optional[bool] = None
+    notes: Optional[str] = None
+
+
+class OptionCodeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    label_ko: str
+    label_en: Optional[str]
+    color_hex: Optional[str]
+
+
+class ProcessTypeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    prefix: str
+    suffix: str
+    stage_order: int
+    description: Optional[str]
+
+
+class ProcessFlowRuleResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    rule_id: int
+    from_type: str
+    to_type: str
+    consumes_codes: Optional[str]
+
+
+class ErpCodeParseRequest(BaseModel):
+    code: str = Field(..., description="4-part ERP code string")
+
+
+class ErpCodeGenerateRequest(BaseModel):
+    symbol: str = Field(..., min_length=1, max_length=5)
+    process_type: str = Field(..., min_length=2, max_length=2)
+    option: Optional[str] = Field(None, min_length=2, max_length=2)
+
+
+class ErpCodeResponse(BaseModel):
+    symbol: str
+    process_type: str
+    serial: int
+    option: Optional[str] = None
+    symbol_slots: List[int]
+    formatted_full: str       # zero-padded: "3-PA-0012-BG"
+    formatted_compact: str    # leading zeros stripped: "3-PA-12-BG"
+
+
+# =============================================================================
+# Queue batch schemas (생산/분해/반품 2-단계 워크플로)
+# =============================================================================
+
+
+class QueueBatchCreateRequest(BaseModel):
+    batch_type: QueueBatchTypeEnum
+    parent_item_id: Optional[uuid.UUID] = None
+    parent_quantity: Optional[Decimal] = None
+    owner_employee_id: Optional[uuid.UUID] = None
+    owner_name: Optional[str] = None
+    reference_no: Optional[str] = None
+    notes: Optional[str] = None
+    load_bom: bool = True
+
+
+class QueueLineOverrideRequest(BaseModel):
+    quantity: Decimal = Field(..., ge=0)
+
+
+class QueueLineToggleRequest(BaseModel):
+    included: bool
+    new_direction: Optional[QueueLineDirectionEnum] = None
+
+
+class QueueLineAddRequest(BaseModel):
+    item_id: uuid.UUID
+    direction: QueueLineDirectionEnum
+    quantity: Decimal = Field(..., gt=0)
+    reason: Optional[str] = None
+    process_stage: Optional[str] = Field(None, max_length=2)
+
+
+class QueueLineResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    line_id: uuid.UUID
+    batch_id: uuid.UUID
+    item_id: uuid.UUID
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    direction: QueueLineDirectionEnum
+    quantity: Decimal
+    bom_expected: Optional[Decimal] = None
+    reason: Optional[str] = None
+    process_stage: Optional[str] = None
+    included: bool
+    created_at: datetime
+
+
+class QueueBatchResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    batch_id: uuid.UUID
+    batch_type: QueueBatchTypeEnum
+    status: QueueBatchStatusEnum
+    owner_employee_id: Optional[uuid.UUID] = None
+    owner_name: Optional[str] = None
+    parent_item_id: Optional[uuid.UUID] = None
+    parent_item_name: Optional[str] = None
+    parent_quantity: Optional[Decimal] = None
+    reference_no: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: datetime
+    confirmed_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
+    lines: List[QueueLineResponse] = []
+
+
+# =============================================================================
+# Scrap / Loss / Variance logs
+# =============================================================================
+
+
+class ScrapLogCreateRequest(BaseModel):
+    item_id: uuid.UUID
+    quantity: Decimal = Field(..., gt=0)
+    reason: str = Field(..., max_length=200)
+    process_stage: Optional[str] = Field(None, max_length=2)
+    operator: Optional[str] = Field(None, max_length=100)
+
+
+class ScrapLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    scrap_id: uuid.UUID
+    item_id: uuid.UUID
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    quantity: Decimal
+    process_stage: Optional[str] = None
+    reason: str
+    batch_id: Optional[uuid.UUID] = None
+    operator: Optional[str] = None
+    created_at: datetime
+
+
+class LossLogCreateRequest(BaseModel):
+    item_id: uuid.UUID
+    quantity: Decimal = Field(..., gt=0)
+    reason: str = Field(..., max_length=200)
+    operator: Optional[str] = Field(None, max_length=100)
+
+
+class LossLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    loss_id: uuid.UUID
+    item_id: uuid.UUID
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    quantity: Decimal
+    batch_id: Optional[uuid.UUID] = None
+    reason: str
+    operator: Optional[str] = None
+    created_at: datetime
+
+
+class VarianceLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    var_id: uuid.UUID
+    batch_id: uuid.UUID
+    item_id: uuid.UUID
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    bom_expected: Decimal
+    actual_used: Decimal
+    diff: Decimal
+    note: Optional[str] = None
+    created_at: datetime
+
+
+# =============================================================================
+# Stock alerts + Physical counts (M6)
+# =============================================================================
+
+
+class StockAlertResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    alert_id: uuid.UUID
+    item_id: uuid.UUID
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    kind: AlertKindEnum
+    threshold: Optional[Decimal] = None
+    observed_value: Optional[Decimal] = None
+    message: Optional[str] = None
+    triggered_at: datetime
+    acknowledged_at: Optional[datetime] = None
+    acknowledged_by: Optional[str] = None
+
+
+class StockAlertAcknowledgeRequest(BaseModel):
+    acknowledged_by: Optional[str] = Field(None, max_length=100)
+
+
+class PhysicalCountCreateRequest(BaseModel):
+    item_id: uuid.UUID
+    counted_qty: Decimal = Field(..., ge=0)
+    reason: Optional[str] = Field(None, max_length=200)
+    operator: Optional[str] = Field(None, max_length=100)
+
+
+class PhysicalCountResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    count_id: uuid.UUID
+    item_id: uuid.UUID
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    counted_qty: Decimal
+    system_qty: Decimal
+    diff: Decimal
+    reason: Optional[str] = None
+    operator: Optional[str] = None
+    created_at: datetime

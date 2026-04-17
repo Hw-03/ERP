@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import BOM, Inventory, Item, TransactionLog, TransactionTypeEnum
 from app.schemas import BackflushDetail, ProductionReceiptRequest, ProductionReceiptResponse
+from app.services import inventory as inventory_svc
+from app.services.bom import explode_bom as _explode_bom_svc
 
 router = APIRouter()
 
@@ -49,12 +51,12 @@ def production_receipt(
     shortage_errors = []
     for comp_item_id, required_qty in merged.items():
         inv = db.query(Inventory).filter(Inventory.item_id == comp_item_id).first()
-        current_qty = inv.quantity if inv else Decimal("0")
-        if current_qty < required_qty:
+        current_avail = inventory_svc.available(inv) if inv else Decimal("0")
+        if current_avail < required_qty:
             comp_item = db.query(Item).filter(Item.item_id == comp_item_id).first()
             shortage_errors.append(
                 f"[{comp_item.item_code}] {comp_item.item_name}: 필요 {required_qty} {comp_item.unit}, "
-                f"현재고 {current_qty} {comp_item.unit}, 부족 {required_qty - current_qty}"
+                f"가용 {current_avail} {comp_item.unit}, 부족 {required_qty - current_avail}"
             )
 
     if shortage_errors:
@@ -184,8 +186,10 @@ def check_production_feasibility(
     for comp_item_id, required_qty in merged.items():
         inv = db.query(Inventory).filter(Inventory.item_id == comp_item_id).first()
         comp_item = db.query(Item).filter(Item.item_id == comp_item_id).first()
-        current = inv.quantity if inv else Decimal("0")
-        ok = current >= required_qty
+        current_total = inv.quantity if inv else Decimal("0")
+        current_pending = (inv.pending_quantity if inv else None) or Decimal("0")
+        current_avail = current_total - current_pending
+        ok = current_avail >= required_qty
         if not ok:
             all_ok = False
         result.append(
@@ -195,8 +199,10 @@ def check_production_feasibility(
                 "category": comp_item.category,
                 "unit": comp_item.unit,
                 "required": float(required_qty),
-                "current_stock": float(current),
-                "shortage": float(max(required_qty - current, Decimal("0"))),
+                "current_stock": float(current_total),
+                "pending": float(current_pending),
+                "available": float(current_avail),
+                "shortage": float(max(required_qty - current_avail, Decimal("0"))),
                 "ok": ok,
             }
         )
@@ -217,24 +223,5 @@ def _explode_bom(
     depth: int = 0,
     visited: frozenset = frozenset(),
 ) -> List[Tuple[uuid.UUID, Decimal]]:
-    """Expand a BOM recursively and return leaf component requirements."""
-
-    if depth > 10 or parent_item_id in visited:
-        return []
-
-    visited = visited | {parent_item_id}
-    bom_entries = db.query(BOM).filter(BOM.parent_item_id == parent_item_id).all()
-    result = []
-
-    for entry in bom_entries:
-        required_qty = entry.quantity * qty_to_produce
-        child_bom_exists = db.query(BOM).filter(BOM.parent_item_id == entry.child_item_id).first()
-
-        if child_bom_exists:
-            result.extend(
-                _explode_bom(db, entry.child_item_id, required_qty, depth + 1, visited)
-            )
-        else:
-            result.append((entry.child_item_id, required_qty))
-
-    return result
+    """Thin wrapper kept for backward compatibility; delegates to services/bom."""
+    return _explode_bom_svc(db, parent_item_id, qty_to_produce, depth, visited)
