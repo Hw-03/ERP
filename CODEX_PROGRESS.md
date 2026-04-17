@@ -23,7 +23,7 @@
 | M3   | Pending/Available 분리              | ✅     | M3 (git log 참조) |
 | M4   | Queue 배치 (생산/분해/반품)         | ✅     | M4 (git log 참조) |
 | M5   | Scrap / Loss / Variance             | ✅     | M5 (git log 참조) |
-| M6   | 안전재고 알림 + 실사                | ⬜     | -    |
+| M6   | 안전재고 알림 + 실사                | ✅     | M6 (git log 참조) |
 | M7   | 프론트 UX                           | ⬜     | -    |
 
 상태 범례: ⬜ 대기 / 🟨 진행 중 / ✅ 완료 / ⚠️ 차단
@@ -178,6 +178,35 @@
 - List 필터 (item_id/batch_id) 정상 작동
 
 **커밋**: M5 (git log 참조)
+
+#### M6 — 안전재고 알림 + 실사 (2026-04-17)
+
+**변경 파일**
+- `backend/app/routers/alerts.py` (신규) — `/api/alerts` 3개 엔드포인트
+- `backend/app/routers/counts.py` (신규) — `/api/counts` 2개 엔드포인트
+- `backend/app/main.py` — alerts/counts 라우터 등록
+
+**구현 원칙**
+- **SAFETY 알림**: on-demand `POST /api/alerts/scan`. `items.min_stock`이 설정된 품목만 스캔하고 `available < min_stock`이면 미확인 알림이 없을 때 신규 생성 (중복 방지).
+- **COUNT_VARIANCE 알림**: `/api/counts` 제출 시 diff ≠ 0이면 자동 생성. 별도 스캔 불필요.
+- **실사 검증**: `counted_qty < pending_quantity`이면 422 (예약된 수량보다 적게 셀 수 없음).
+- **강제 조정**: diff ≠ 0이면 `inventory.quantity = counted_qty`로 즉시 맞추고 ADJUST TransactionLog에 count_id 참조 심음.
+
+**API 엔드포인트 (5)**
+- `POST /api/alerts/scan` — 안전재고 미달 스캔
+- `GET /api/alerts?kind&include_acknowledged` — 조회 (기본: 미확인)
+- `POST /api/alerts/{id}/acknowledge` — 확인 처리
+- `POST /api/counts` — 실사 등록 + 강제 조정 + 편차 알림
+- `GET /api/counts?item_id` — 이력 조회
+
+**검증**
+- 3개 품목(A: 15<min20, B: 25>min10, C: no min_stock) 환경에서 scan → 알림 1건만 생성
+- 재스캔 시 중복 방지 OK
+- Acknowledge 후 default 쿼리에서 사라지고, include_acknowledged=true로는 조회됨
+- 실사 15→12 제출 → 재고 12로 맞추고 COUNT_VARIANCE 알림 자동 생성
+- 실사량(3) < pending(5) → 422
+
+**커밋**: M6 (git log 참조)
 
 ---
 

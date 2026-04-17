@@ -15,8 +15,10 @@ from app.models import (
     ProductSymbol,
 )
 from app.routers import (
+    alerts,
     bom,
     codes,
+    counts,
     employees,
     inventory,
     items,
@@ -121,6 +123,8 @@ app.include_router(queue.router, prefix="/api/queue", tags=["Queue"])
 app.include_router(scrap.router, prefix="/api/scrap", tags=["Scrap"])
 app.include_router(loss.router, prefix="/api/loss", tags=["Loss"])
 app.include_router(variance.router, prefix="/api/variance", tags=["Variance"])
+app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
+app.include_router(counts.router, prefix="/api/counts", tags=["Counts"])
 
 
 def ensure_reference_data() -> None:
