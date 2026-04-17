@@ -20,10 +20,13 @@ from app.routers import (
     employees,
     inventory,
     items,
+    loss,
     production,
     queue,
+    scrap,
     settings,
     ship_packages,
+    variance,
 )
 
 Base.metadata.create_all(bind=engine)
@@ -115,6 +118,9 @@ app.include_router(bom.router, prefix="/api/bom", tags=["BOM"])
 app.include_router(production.router, prefix="/api/production", tags=["Production"])
 app.include_router(codes.router, prefix="/api/codes", tags=["Codes"])
 app.include_router(queue.router, prefix="/api/queue", tags=["Queue"])
+app.include_router(scrap.router, prefix="/api/scrap", tags=["Scrap"])
+app.include_router(loss.router, prefix="/api/loss", tags=["Loss"])
+app.include_router(variance.router, prefix="/api/variance", tags=["Variance"])
 
 
 def ensure_reference_data() -> None:

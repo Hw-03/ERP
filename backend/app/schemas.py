@@ -8,6 +8,7 @@ import uuid
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import (
+    AlertKindEnum,
     CategoryEnum,
     DepartmentEnum,
     EmployeeLevelEnum,
@@ -473,3 +474,114 @@ class QueueBatchResponse(BaseModel):
     confirmed_at: Optional[datetime] = None
     cancelled_at: Optional[datetime] = None
     lines: List[QueueLineResponse] = []
+
+
+# =============================================================================
+# Scrap / Loss / Variance logs
+# =============================================================================
+
+
+class ScrapLogCreateRequest(BaseModel):
+    item_id: uuid.UUID
+    quantity: Decimal = Field(..., gt=0)
+    reason: str = Field(..., max_length=200)
+    process_stage: Optional[str] = Field(None, max_length=2)
+    operator: Optional[str] = Field(None, max_length=100)
+
+
+class ScrapLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    scrap_id: uuid.UUID
+    item_id: uuid.UUID
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    quantity: Decimal
+    process_stage: Optional[str] = None
+    reason: str
+    batch_id: Optional[uuid.UUID] = None
+    operator: Optional[str] = None
+    created_at: datetime
+
+
+class LossLogCreateRequest(BaseModel):
+    item_id: uuid.UUID
+    quantity: Decimal = Field(..., gt=0)
+    reason: str = Field(..., max_length=200)
+    operator: Optional[str] = Field(None, max_length=100)
+
+
+class LossLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    loss_id: uuid.UUID
+    item_id: uuid.UUID
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    quantity: Decimal
+    batch_id: Optional[uuid.UUID] = None
+    reason: str
+    operator: Optional[str] = None
+    created_at: datetime
+
+
+class VarianceLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    var_id: uuid.UUID
+    batch_id: uuid.UUID
+    item_id: uuid.UUID
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    bom_expected: Decimal
+    actual_used: Decimal
+    diff: Decimal
+    note: Optional[str] = None
+    created_at: datetime
+
+
+# =============================================================================
+# Stock alerts + Physical counts (M6)
+# =============================================================================
+
+
+class StockAlertResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    alert_id: uuid.UUID
+    item_id: uuid.UUID
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    kind: AlertKindEnum
+    threshold: Optional[Decimal] = None
+    observed_value: Optional[Decimal] = None
+    message: Optional[str] = None
+    triggered_at: datetime
+    acknowledged_at: Optional[datetime] = None
+    acknowledged_by: Optional[str] = None
+
+
+class StockAlertAcknowledgeRequest(BaseModel):
+    acknowledged_by: Optional[str] = Field(None, max_length=100)
+
+
+class PhysicalCountCreateRequest(BaseModel):
+    item_id: uuid.UUID
+    counted_qty: Decimal = Field(..., ge=0)
+    reason: Optional[str] = Field(None, max_length=200)
+    operator: Optional[str] = Field(None, max_length=100)
+
+
+class PhysicalCountResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    count_id: uuid.UUID
+    item_id: uuid.UUID
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    counted_qty: Decimal
+    system_qty: Decimal
+    diff: Decimal
+    reason: Optional[str] = None
+    operator: Optional[str] = None
+    created_at: datetime

@@ -22,7 +22,7 @@
 | M2   | 코드 체계 서비스 + 라우터           | ✅     | M2 (git log 참조) |
 | M3   | Pending/Available 분리              | ✅     | M3 (git log 참조) |
 | M4   | Queue 배치 (생산/분해/반품)         | ✅     | M4 (git log 참조) |
-| M5   | Scrap / Loss / Variance             | ⬜     | -    |
+| M5   | Scrap / Loss / Variance             | ✅     | M5 (git log 참조) |
 | M6   | 안전재고 알림 + 실사                | ⬜     | -    |
 | M7   | 프론트 UX                           | ⬜     | -    |
 
@@ -148,6 +148,36 @@
 - 최종: TransactionLog 9, LossLog 2, VarianceLog 1 (override 8 vs expected 10).
 
 **커밋**: M4 (git log 참조)
+
+#### M5 — Scrap / Loss / Variance 라우터 (2026-04-17)
+
+**변경 파일**
+- `backend/app/routers/scrap.py` (신규) — `POST /api/scrap`(재고 차감 포함), `GET /api/scrap`
+- `backend/app/routers/loss.py` (신규) — `POST /api/loss?deduct=bool`, `GET /api/loss`
+- `backend/app/routers/variance.py` (신규) — `GET /api/variance` (읽기 전용)
+- `backend/app/schemas.py` — 7종 스키마 추가 (Scrap/Loss/Variance 요청·응답)
+- `backend/app/main.py` — 3개 라우터 등록
+
+**구현 원칙**
+- **SCRAP**: 재고 available에서 차감 → ScrapLog + TransactionLog(SCRAP) 동시 기록. 422 if 부족.
+- **LOSS**: 기본은 **기록만** (반품 누락처럼 애초에 재고에 없던 경우). `?deduct=true`로 available 차감 함께 수행.
+- **VARIANCE**: Queue confirm 시 자동 생성된 로그를 조회. 배치별/품목별 필터.
+- 모두 `batch_id` 필터 지원 → 배치 사후 분석에서 한 배치의 scrap/loss/variance 조회 가능.
+
+**API 엔드포인트 (5)**
+- `POST /api/scrap` — 수동 폐기 + 재고 차감
+- `GET /api/scrap?item_id&batch_id` — 조회
+- `POST /api/loss?deduct=bool` — 분실 기록 (± 재고 차감)
+- `GET /api/loss?item_id&batch_id` — 조회
+- `GET /api/variance?item_id&batch_id` — 조회
+
+**검증**
+- Scrap 3개 → 재고 50→47, Over-scrap 100 → 422
+- Loss 5개 (deduct=false) → 재고 47 유지 / Loss 2개 (deduct=true) → 재고 47→45
+- Queue PRODUCE 확정 시 override 8 vs expected 10 → variance_logs diff=-2 자동 기록
+- List 필터 (item_id/batch_id) 정상 작동
+
+**커밋**: M5 (git log 참조)
 
 ---
 
