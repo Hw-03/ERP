@@ -22,6 +22,41 @@ def _build_item_query(db: Session):
     return db.query(Item, Inventory).outerjoin(Inventory, Item.item_id == Inventory.item_id)
 
 
+def _to_item_with_inventory(item: Item, inventory: Optional[Inventory]) -> ItemWithInventory:
+    """Build ItemWithInventory dto including computed Available."""
+    from decimal import Decimal as _D
+
+    total = (inventory.quantity if inventory else None) or _D("0")
+    pending = (inventory.pending_quantity if inventory else None) or _D("0")
+    return ItemWithInventory(
+        item_id=item.item_id,
+        item_code=item.item_code,
+        item_name=item.item_name,
+        spec=item.spec,
+        category=item.category,
+        unit=item.unit,
+        barcode=item.barcode,
+        legacy_file_type=item.legacy_file_type,
+        legacy_part=item.legacy_part,
+        legacy_item_type=item.legacy_item_type,
+        legacy_model=item.legacy_model,
+        supplier=item.supplier,
+        min_stock=item.min_stock,
+        erp_code=item.erp_code,
+        symbol_slot=item.symbol_slot,
+        process_type_code=item.process_type_code,
+        option_code=item.option_code,
+        serial_no=item.serial_no,
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+        quantity=total,
+        pending_quantity=pending,
+        available_quantity=total - pending,
+        last_reserver_name=inventory.last_reserver_name if inventory else None,
+        location=inventory.location if inventory else None,
+    )
+
+
 @router.post("/", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
 def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
     existing = db.query(Item).filter(Item.item_code == payload.item_code).first()
@@ -102,29 +137,7 @@ def list_items(
         )
 
     rows = query.order_by(Item.category, Item.item_code).offset(skip).limit(limit).all()
-
-    return [
-        ItemWithInventory(
-            item_id=item.item_id,
-            item_code=item.item_code,
-            item_name=item.item_name,
-            spec=item.spec,
-            category=item.category,
-            unit=item.unit,
-            barcode=item.barcode,
-            legacy_file_type=item.legacy_file_type,
-            legacy_part=item.legacy_part,
-            legacy_item_type=item.legacy_item_type,
-            legacy_model=item.legacy_model,
-            supplier=item.supplier,
-            min_stock=item.min_stock,
-            created_at=item.created_at,
-            updated_at=item.updated_at,
-            quantity=inventory.quantity if inventory else 0,
-            location=inventory.location if inventory else None,
-        )
-        for item, inventory in rows
-    ]
+    return [_to_item_with_inventory(item, inv) for item, inv in rows]
 
 
 @router.get("/export.csv")
@@ -164,25 +177,7 @@ def get_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
 
     item, inventory = row
-    return ItemWithInventory(
-        item_id=item.item_id,
-        item_code=item.item_code,
-        item_name=item.item_name,
-        spec=item.spec,
-        category=item.category,
-        unit=item.unit,
-        barcode=item.barcode,
-        legacy_file_type=item.legacy_file_type,
-        legacy_part=item.legacy_part,
-        legacy_item_type=item.legacy_item_type,
-        legacy_model=item.legacy_model,
-        supplier=item.supplier,
-        min_stock=item.min_stock,
-        created_at=item.created_at,
-        updated_at=item.updated_at,
-        quantity=inventory.quantity if inventory else 0,
-        location=inventory.location if inventory else None,
-    )
+    return _to_item_with_inventory(item, inventory)
 
 
 @router.put("/{item_id}", response_model=ItemResponse)

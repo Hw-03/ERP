@@ -31,6 +31,23 @@ from app.schemas import (
     TransactionLogResponse,
     TransactionLogUpdate,
 )
+from app.services import inventory as inventory_svc
+
+
+def _to_response(inv: Inventory) -> InventoryResponse:
+    """Build InventoryResponse including computed available_quantity."""
+    pending = inv.pending_quantity or Decimal("0")
+    total = inv.quantity or Decimal("0")
+    return InventoryResponse(
+        inventory_id=inv.inventory_id,
+        item_id=inv.item_id,
+        quantity=total,
+        pending_quantity=pending,
+        available_quantity=total - pending,
+        last_reserver_name=inv.last_reserver_name,
+        location=inv.location,
+        updated_at=inv.updated_at,
+    )
 
 router = APIRouter()
 
@@ -139,7 +156,7 @@ def receive_inventory(payload: InventoryReceive, db: Session = Depends(get_db)):
     )
     db.commit()
     db.refresh(inventory)
-    return inventory
+    return _to_response(inventory)
 
 
 @router.post("/ship", response_model=InventoryResponse, status_code=status.HTTP_200_OK)
@@ -153,10 +170,15 @@ def ship_inventory(payload: InventoryShip, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="출고할 재고가 존재하지 않습니다.")
 
     quantity_before = inventory.quantity
-    if quantity_before < payload.quantity:
+    available = inventory_svc.available(inventory)
+    if available < payload.quantity:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"재고가 부족합니다. 현재 {quantity_before} {item.unit}, 요청 {payload.quantity} {item.unit}",
+            detail=(
+                f"가용 재고가 부족합니다. Total {quantity_before} / Pending "
+                f"{inventory.pending_quantity or 0} / Available {available} "
+                f"{item.unit}, 요청 {payload.quantity} {item.unit}"
+            ),
         )
 
     inventory.quantity = quantity_before - payload.quantity
@@ -177,7 +199,7 @@ def ship_inventory(payload: InventoryShip, db: Session = Depends(get_db)):
     )
     db.commit()
     db.refresh(inventory)
-    return inventory
+    return _to_response(inventory)
 
 
 @router.post("/ship-package", status_code=status.HTTP_200_OK)
@@ -192,11 +214,11 @@ def ship_package(payload: PackageShipRequest, db: Session = Depends(get_db)):
     shortages: list[str] = []
     for package_item in package.items:
         inventory = db.query(Inventory).filter(Inventory.item_id == package_item.item_id).first()
-        current_qty = inventory.quantity if inventory else Decimal("0")
+        current_avail = inventory_svc.available(inventory) if inventory else Decimal("0")
         required_qty = package_item.quantity * payload.quantity
-        if current_qty < required_qty:
+        if current_avail < required_qty:
             shortages.append(
-                f"[{package_item.item.item_code}] {package_item.item.item_name}: 필요 {required_qty}, 현재 {current_qty}"
+                f"[{package_item.item.item_code}] {package_item.item.item_name}: 필요 {required_qty}, 가용 {current_avail}"
             )
 
     if shortages:
@@ -280,7 +302,7 @@ def adjust_inventory(payload: InventoryAdjust, db: Session = Depends(get_db)):
     )
     db.commit()
     db.refresh(inventory)
-    return inventory
+    return _to_response(inventory)
 
 
 @router.get("/", response_model=List[InventoryResponse])
@@ -294,7 +316,8 @@ def list_inventory(
     if category:
         query = query.filter(Item.category == category)
 
-    return query.order_by(Item.item_code).offset(skip).limit(limit).all()
+    rows = query.order_by(Item.item_code).offset(skip).limit(limit).all()
+    return [_to_response(inv) for inv in rows]
 
 
 @router.get("/transactions", response_model=List[TransactionLogResponse])

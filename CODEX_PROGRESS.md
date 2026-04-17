@@ -20,7 +20,7 @@
 | ---- | ----------------------------------- | ------ | ---- |
 | M1   | 데이터 모델 확장 + 신규 테이블      | ✅     | `M1 (git log 참조)` |
 | M2   | 코드 체계 서비스 + 라우터           | ✅     | M2 (git log 참조) |
-| M3   | Pending/Available 분리              | ⬜     | -    |
+| M3   | Pending/Available 분리              | ✅     | M3 (git log 참조) |
 | M4   | Queue 배치 (생산/분해/반품)         | ⬜     | -    |
 | M5   | Scrap / Loss / Variance             | ⬜     | -    |
 | M6   | 안전재고 알림 + 실사                | ⬜     | -    |
@@ -87,6 +87,29 @@
 - `format_erp_code(compact=True)` → 앞 0 제거 확인 (`3-PA-0001-WM` → `3-PA-1-WM`)
 
 **커밋**: M2 (git log 참조)
+
+#### M3 — Pending/Available 분리 (2026-04-17)
+
+**변경 파일**
+- `backend/app/services/inventory.py` (신규) — reserve / release / consume_pending / receive_confirmed 헬퍼
+- `backend/app/schemas.py` — InventoryResponse, ItemWithInventory, ItemResponse에 pending/available/reserver/erp_code 노출
+- `backend/app/routers/inventory.py` — `_to_response()` 헬퍼 도입, 모든 /receive /ship /adjust /ship-package 응답 통일, ship 검증을 available 기준으로 전환
+- `backend/app/routers/items.py` — `_to_item_with_inventory()` 헬퍼 도입, list/detail 응답 통일
+- `backend/app/routers/production.py` — BOM 체크 및 receipt를 available 기준으로 전환, 체크 응답에 pending/available 추가
+
+**구현 원칙**
+- `Total = Available + Pending` (invariant)
+- Reserve 시 Available → Pending 이동, 점유자(last_reserver_name) 노출
+- Confirm 시 `consume_pending`으로 Total과 Pending 동시 차감
+- 단순 ship 출고도 available 기준으로 검증 (Pending 수량은 점유자 우선)
+
+**검증**
+- receive 100 → reserve 30 (by 김철수) → list에 available=70, pending=30
+- ship 80 요청 → 422 (available=70), ship 50 성공 → total=50, pending=30, available=20
+- item detail도 동일 숫자 + reserver='김철수' 표시
+- release 30 → pending=0; consume_pending 20 → total-20, pending-20 동시 차감 확인
+
+**커밋**: M3 (git log 참조)
 
 ---
 

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import BOM, Inventory, Item, TransactionLog, TransactionTypeEnum
 from app.schemas import BackflushDetail, ProductionReceiptRequest, ProductionReceiptResponse
+from app.services import inventory as inventory_svc
 
 router = APIRouter()
 
@@ -49,12 +50,12 @@ def production_receipt(
     shortage_errors = []
     for comp_item_id, required_qty in merged.items():
         inv = db.query(Inventory).filter(Inventory.item_id == comp_item_id).first()
-        current_qty = inv.quantity if inv else Decimal("0")
-        if current_qty < required_qty:
+        current_avail = inventory_svc.available(inv) if inv else Decimal("0")
+        if current_avail < required_qty:
             comp_item = db.query(Item).filter(Item.item_id == comp_item_id).first()
             shortage_errors.append(
                 f"[{comp_item.item_code}] {comp_item.item_name}: 필요 {required_qty} {comp_item.unit}, "
-                f"현재고 {current_qty} {comp_item.unit}, 부족 {required_qty - current_qty}"
+                f"가용 {current_avail} {comp_item.unit}, 부족 {required_qty - current_avail}"
             )
 
     if shortage_errors:
@@ -184,8 +185,10 @@ def check_production_feasibility(
     for comp_item_id, required_qty in merged.items():
         inv = db.query(Inventory).filter(Inventory.item_id == comp_item_id).first()
         comp_item = db.query(Item).filter(Item.item_id == comp_item_id).first()
-        current = inv.quantity if inv else Decimal("0")
-        ok = current >= required_qty
+        current_total = inv.quantity if inv else Decimal("0")
+        current_pending = (inv.pending_quantity if inv else None) or Decimal("0")
+        current_avail = current_total - current_pending
+        ok = current_avail >= required_qty
         if not ok:
             all_ok = False
         result.append(
@@ -195,8 +198,10 @@ def check_production_feasibility(
                 "category": comp_item.category,
                 "unit": comp_item.unit,
                 "required": float(required_qty),
-                "current_stock": float(current),
-                "shortage": float(max(required_qty - current, Decimal("0"))),
+                "current_stock": float(current_total),
+                "pending": float(current_pending),
+                "available": float(current_avail),
+                "shortage": float(max(required_qty - current_avail, Decimal("0"))),
                 "ok": ok,
             }
         )

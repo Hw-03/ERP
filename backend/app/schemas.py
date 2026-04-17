@@ -55,12 +55,21 @@ class ItemResponse(BaseModel):
     legacy_model: Optional[str] = None
     supplier: Optional[str] = None
     min_stock: Optional[Decimal] = None
+    # M1: 4-part ERP code fields
+    erp_code: Optional[str] = None
+    symbol_slot: Optional[int] = None
+    process_type_code: Optional[str] = None
+    option_code: Optional[str] = None
+    serial_no: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
 
 class ItemWithInventory(ItemResponse):
     quantity: Optional[Decimal] = Decimal("0")
+    pending_quantity: Decimal = Decimal("0")
+    available_quantity: Decimal = Decimal("0")
+    last_reserver_name: Optional[str] = None
     location: Optional[str] = None
 
 
@@ -200,7 +209,10 @@ class InventoryResponse(BaseModel):
 
     inventory_id: uuid.UUID
     item_id: uuid.UUID
-    quantity: Decimal
+    quantity: Decimal                      # Total (실재고)
+    pending_quantity: Decimal = Decimal("0")
+    available_quantity: Decimal = Decimal("0")   # computed: quantity - pending
+    last_reserver_name: Optional[str] = None
     location: Optional[str]
     updated_at: datetime
 
