@@ -24,7 +24,7 @@
 | M4   | Queue 배치 (생산/분해/반품)         | ✅     | M4 (git log 참조) |
 | M5   | Scrap / Loss / Variance             | ✅     | M5 (git log 참조) |
 | M6   | 안전재고 알림 + 실사                | ✅     | M6 (git log 참조) |
-| M7   | 프론트 UX                           | ⬜     | -    |
+| M7   | 프론트 UX                           | ✅     | M7 (git log 참조) |
 
 상태 범례: ⬜ 대기 / 🟨 진행 중 / ✅ 완료 / ⚠️ 차단
 
@@ -207,6 +207,32 @@
 - 실사량(3) < pending(5) → 422
 
 **커밋**: M6 (git log 참조)
+
+#### M7 — 프론트 UX (2026-04-18)
+
+**변경 파일**
+- `frontend/lib/api.ts` — `Item`/`Inventory` 타입 확장 (available/pending/reserver/erp_code/symbol_slot/process_type_code/option_code/serial_no), Queue/Scrap/Loss/Variance/Alerts/PhysicalCount 타입 추가, API 메서드 19종 신규
+- `frontend/app/legacy/_components/legacyUi.ts` — `transactionLabel`에 SCRAP/LOSS/DISASSEMBLE/RETURN/RESERVE/RESERVE_RELEASE 추가, `formatErpCode`/`processStageLabel`/`optionColor` 헬퍼 추가
+- `frontend/app/legacy/_components/InventoryTab.tsx` — DisplayRow에 available/pending/reserver, KPI/stockState를 available 기준으로 전환, 🔒 점유자 표시
+- `frontend/app/legacy/_components/ItemDetailSheet.tsx` — ERP 코드, 총재고/가용/예약/점유자 row 추가, stockState를 available 기준으로
+- `frontend/app/legacy/_components/AlertsBanner.tsx` (신규) — 60초 폴링으로 미확인 알림 표시, `/alerts` 로 링크
+- `frontend/app/legacy/_components/LegacyLayout.tsx` — AlertsBanner + Queue/알림/실사 링크 pill 마운트
+- `frontend/app/alerts/page.tsx` (신규) — 알림 목록 + 스캔 + 확인 처리 UI
+- `frontend/app/queue/page.tsx` (신규) — Queue 배치 목록 + 상태 필터 + 확정/취소 + 라인 상세 (direction 색상 + BOM variance 표시)
+- `frontend/app/counts/page.tsx` (신규) — 실사 제출 폼(품목 선택, 실사량, 담당자, 사유) + 이력 리스트(±diff 컬러)
+
+**구현 원칙**
+- 레거시 mobile shell(max-w-430px)은 그대로 유지, 상단에 알림 배너 + 3개 pill 링크로 신규 기능 진입
+- 모든 재고 표시는 Available 기준 (기존 quantity 표시는 "총재고"로 보조)
+- Queue/Alerts/Counts는 `max-w-700px` 데스크톱-지향 페이지 (레거시 팔레트 재사용)
+- 모든 API 오류는 사용자에게 한국어 문구로 표시, 저장 중 disable 패턴 유지
+
+**검증**
+- 코드 레벨: 모든 새 페이지가 기존 legacy 팔레트와 api 클라이언트를 재사용, 새 API 메서드 모두 `/api/*` prefix로 백엔드 경로 일치
+- 타입: `Item.available_quantity` / `pending_quantity` 옵셔널로 두어 기존 API 응답도 fallback 가능
+- UX: LegacyLayout에서 AlertsBanner가 `/api/alerts`(미확인)를 60초 폴링하여 상단 고정
+
+**커밋**: M7 (git log 참조)
 
 ---
 

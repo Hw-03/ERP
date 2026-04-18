@@ -41,7 +41,10 @@ export function ItemDetailSheet({
 
   if (!item) return null;
 
-  const stockState = getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock));
+  const availableQty = Number(
+    item.available_quantity ?? Number(item.quantity) - Number(item.pending_quantity ?? 0),
+  );
+  const stockState = getStockState(availableQty, item.min_stock == null ? null : Number(item.min_stock));
   const typeBadge = fileTypeBadge(item.legacy_file_type);
 
   const bump = (delta: number) => {
@@ -129,8 +132,16 @@ export function ItemDetailSheet({
           <div className="overflow-hidden rounded-[14px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
             {[
               ["코드", item.item_code],
+              ...(item.erp_code ? [["ERP 코드", item.erp_code] as [string, string]] : []),
               ["사양", item.spec || "-"],
-              ["현재고", `${formatNumber(item.quantity)} ${item.unit}`],
+              ["총재고", `${formatNumber(item.quantity)} ${item.unit}`],
+              [
+                "가용 / 예약",
+                `${formatNumber(item.available_quantity ?? item.quantity)} / ${formatNumber(item.pending_quantity ?? 0)} ${item.unit}`,
+              ],
+              ...(item.last_reserver_name && Number(item.pending_quantity ?? 0) > 0
+                ? [["점유자", `🔒 ${item.last_reserver_name}`] as [string, string]]
+                : []),
               ["위치", item.location || "-"],
               ["파트", item.legacy_part || "-"],
               ["모델", item.legacy_model || "공용"],

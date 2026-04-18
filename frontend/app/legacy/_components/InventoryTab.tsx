@@ -55,6 +55,9 @@ type DisplayRow = {
   key: string;
   representative: Item;
   quantity: number;
+  pending: number;
+  available: number;
+  reserver: string | null;
   count: number;
 };
 
@@ -109,16 +112,16 @@ export function InventoryTab({
 
   const filtered = useMemo(() => {
     return items.filter((item) => {
-      const qty = Number(item.quantity);
+      const avail = Number(item.available_quantity ?? item.quantity);
       const min = item.min_stock == null ? null : Number(item.min_stock);
       if (kpi === "OK") {
-        return qty > 0 && !(min != null && qty < min);
+        return avail > 0 && !(min != null && avail < min);
       }
       if (kpi === "LOW") {
-        return qty > 0 && min != null && qty < min;
+        return avail > 0 && min != null && avail < min;
       }
       if (kpi === "ZERO") {
-        return qty <= 0;
+        return avail <= 0;
       }
       return true;
     });
@@ -126,26 +129,42 @@ export function InventoryTab({
 
   const displayRows = useMemo<DisplayRow[]>(() => {
     if (!grouped) {
-      return filtered.map((item) => ({
-        key: item.item_id,
-        representative: item,
-        quantity: Number(item.quantity),
-        count: 1,
-      }));
+      return filtered.map((item) => {
+        const quantity = Number(item.quantity);
+        const pending = Number(item.pending_quantity ?? 0);
+        const available = Number(item.available_quantity ?? quantity - pending);
+        return {
+          key: item.item_id,
+          representative: item,
+          quantity,
+          pending,
+          available,
+          reserver: item.last_reserver_name,
+          count: 1,
+        };
+      });
     }
 
     const groupedMap = new Map<string, DisplayRow>();
     filtered.forEach((item) => {
+      const quantity = Number(item.quantity);
+      const pending = Number(item.pending_quantity ?? 0);
+      const available = Number(item.available_quantity ?? quantity - pending);
       const key = item.item_name.trim().toLowerCase();
       const existing = groupedMap.get(key);
       if (existing) {
-        existing.quantity += Number(item.quantity);
+        existing.quantity += quantity;
+        existing.pending += pending;
+        existing.available += available;
         existing.count += 1;
       } else {
         groupedMap.set(key, {
           key,
           representative: item,
-          quantity: Number(item.quantity),
+          quantity,
+          pending,
+          available,
+          reserver: item.last_reserver_name,
           count: 1,
         });
       }
@@ -155,16 +174,17 @@ export function InventoryTab({
 
   const totals = useMemo(() => {
     const totalQuantity = displayRows.reduce((sum, row) => sum + row.quantity, 0);
+    const totalPending = displayRows.reduce((sum, row) => sum + row.pending, 0);
     const normalCount = displayRows.filter((row) => {
       const min = row.representative.min_stock == null ? null : Number(row.representative.min_stock);
-      return getStockState(row.quantity, min).label === "정상";
+      return getStockState(row.available, min).label === "정상";
     }).length;
     const lowCount = displayRows.filter((row) => {
       const min = row.representative.min_stock == null ? null : Number(row.representative.min_stock);
-      return getStockState(row.quantity, min).label === "부족";
+      return getStockState(row.available, min).label === "부족";
     }).length;
-    const zeroCount = displayRows.filter((row) => row.quantity <= 0).length;
-    return { totalQuantity, normalCount, lowCount, zeroCount };
+    const zeroCount = displayRows.filter((row) => row.available <= 0).length;
+    return { totalQuantity, totalPending, normalCount, lowCount, zeroCount };
   }, [displayRows]);
 
   const canLoadMore = items.length >= page * PAGE_SIZE;
@@ -264,11 +284,15 @@ export function InventoryTab({
           {displayRows.map((row, index) => {
             const item = row.representative;
             const stockState = getStockState(
-              row.quantity,
+              row.available,
               item.min_stock == null ? null : Number(item.min_stock),
             );
             const badge = fileTypeBadge(item.legacy_file_type);
-            const fillWidth = Math.max(10, Math.min(100, row.quantity > 0 ? (row.quantity / Math.max(1, Number(item.min_stock ?? row.quantity))) * 100 : 6));
+            const fillBase = Math.max(1, Number(item.min_stock ?? row.quantity));
+            const fillWidth = Math.max(
+              10,
+              Math.min(100, row.available > 0 ? (row.available / fillBase) * 100 : 6),
+            );
 
             return (
               <button
@@ -323,12 +347,21 @@ export function InventoryTab({
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold" style={{ color: LEGACY_COLORS.text }}>
-                    {formatNumber(row.quantity)}
+                    {formatNumber(row.available)}
                   </div>
                   <div className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
                     {item.unit}
+                    {row.pending > 0 ? ` · 예약 ${formatNumber(row.pending)}` : ""}
                     {item.min_stock != null ? ` / 안전 ${formatNumber(item.min_stock)}` : ""}
                   </div>
+                  {row.reserver && row.pending > 0 ? (
+                    <div
+                      className="mt-1 inline-flex rounded-full px-[6px] py-[1px] text-[9px] font-semibold"
+                      style={{ background: "rgba(6,182,212,.15)", color: LEGACY_COLORS.cyan }}
+                    >
+                      🔒 {row.reserver}
+                    </div>
+                  ) : null}
                 </div>
               </button>
             );
