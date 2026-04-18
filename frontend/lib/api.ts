@@ -51,6 +51,9 @@ export interface Item {
   category: Category;
   unit: string;
   quantity: number;
+  pending_quantity: number;
+  available_quantity: number;
+  last_reserver_name: string | null;
   location: string | null;
   barcode: string | null;
   legacy_file_type: string | null;
@@ -59,8 +62,120 @@ export interface Item {
   legacy_model: string | null;
   supplier: string | null;
   min_stock: number | null;
+  erp_code: string | null;
+  symbol_slot: number | null;
+  process_type_code: string | null;
+  option_code: string | null;
+  serial_no: number | null;
   created_at: string;
   updated_at: string;
+}
+
+// =============================================================================
+// Queue / Scrap / Loss / Variance / Alerts / Counts (M4-M6)
+// =============================================================================
+
+export type QueueBatchType = "PRODUCE" | "DISASSEMBLE" | "RETURN";
+export type QueueBatchStatus = "OPEN" | "CONFIRMED" | "CANCELLED";
+export type QueueLineDirection = "IN" | "OUT" | "SCRAP" | "LOSS";
+
+export interface QueueLine {
+  line_id: string;
+  batch_id: string;
+  item_id: string;
+  item_code: string | null;
+  item_name: string | null;
+  direction: QueueLineDirection;
+  quantity: number;
+  bom_expected: number | null;
+  reason: string | null;
+  process_stage: string | null;
+  included: boolean;
+  created_at: string;
+}
+
+export interface QueueBatch {
+  batch_id: string;
+  batch_type: QueueBatchType;
+  status: QueueBatchStatus;
+  owner_employee_id: string | null;
+  owner_name: string | null;
+  parent_item_id: string | null;
+  parent_item_name: string | null;
+  parent_quantity: number | null;
+  reference_no: string | null;
+  notes: string | null;
+  created_at: string;
+  confirmed_at: string | null;
+  cancelled_at: string | null;
+  lines: QueueLine[];
+}
+
+export type AlertKind = "SAFETY" | "COUNT_VARIANCE";
+
+export interface StockAlert {
+  alert_id: string;
+  item_id: string;
+  item_code: string | null;
+  item_name: string | null;
+  kind: AlertKind;
+  threshold: number | null;
+  observed_value: number | null;
+  message: string | null;
+  triggered_at: string;
+  acknowledged_at: string | null;
+  acknowledged_by: string | null;
+}
+
+export interface PhysicalCount {
+  count_id: string;
+  item_id: string;
+  item_code: string | null;
+  item_name: string | null;
+  counted_qty: number;
+  system_qty: number;
+  diff: number;
+  reason: string | null;
+  operator: string | null;
+  created_at: string;
+}
+
+export interface ScrapLogRow {
+  scrap_id: string;
+  item_id: string;
+  item_code: string | null;
+  item_name: string | null;
+  quantity: number;
+  process_stage: string | null;
+  reason: string;
+  batch_id: string | null;
+  operator: string | null;
+  created_at: string;
+}
+
+export interface LossLogRow {
+  loss_id: string;
+  item_id: string;
+  item_code: string | null;
+  item_name: string | null;
+  quantity: number;
+  batch_id: string | null;
+  reason: string;
+  operator: string | null;
+  created_at: string;
+}
+
+export interface VarianceLogRow {
+  var_id: string;
+  batch_id: string;
+  item_id: string;
+  item_code: string | null;
+  item_name: string | null;
+  bom_expected: number;
+  actual_used: number;
+  diff: number;
+  note: string | null;
+  created_at: string;
 }
 
 export interface Employee {
@@ -536,4 +651,199 @@ export const api = {
 
   getItemsExportUrl: () => toApiUrl("/api/items/export.csv"),
   getTransactionsExportUrl: () => toApiUrl("/api/inventory/transactions/export.csv"),
+
+  // Queue batches ------------------------------------------------------------
+  createQueueBatch: async (payload: {
+    batch_type: QueueBatchType;
+    parent_item_id?: string;
+    parent_quantity?: number;
+    owner_employee_id?: string;
+    owner_name?: string;
+    reference_no?: string;
+    notes?: string;
+    load_bom?: boolean;
+  }) => {
+    const res = await fetch(toApiUrl("/api/queue/"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<QueueBatch>;
+  },
+
+  listQueueBatches: (params?: { status?: QueueBatchStatus; ownerEmployeeId?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.status) query.set("status", params.status);
+    if (params?.ownerEmployeeId) query.set("owner_employee_id", params.ownerEmployeeId);
+    return fetcher<QueueBatch[]>(toApiUrl(`/api/queue/?${query}`));
+  },
+
+  getQueueBatch: (batchId: string) => fetcher<QueueBatch>(toApiUrl(`/api/queue/${batchId}`)),
+
+  overrideQueueLine: async (batchId: string, lineId: string, quantity: number) => {
+    const res = await fetch(toApiUrl(`/api/queue/${batchId}/lines/${lineId}`), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quantity }),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<QueueBatch>;
+  },
+
+  toggleQueueLine: async (
+    batchId: string,
+    lineId: string,
+    payload: { included: boolean; new_direction?: QueueLineDirection },
+  ) => {
+    const res = await fetch(toApiUrl(`/api/queue/${batchId}/lines/${lineId}/toggle`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<QueueBatch>;
+  },
+
+  addQueueLine: async (
+    batchId: string,
+    payload: {
+      item_id: string;
+      direction: QueueLineDirection;
+      quantity: number;
+      reason?: string;
+      process_stage?: string;
+    },
+  ) => {
+    const res = await fetch(toApiUrl(`/api/queue/${batchId}/lines`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<QueueBatch>;
+  },
+
+  deleteQueueLine: async (batchId: string, lineId: string) => {
+    const res = await fetch(toApiUrl(`/api/queue/${batchId}/lines/${lineId}`), {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<QueueBatch>;
+  },
+
+  confirmQueueBatch: async (batchId: string) => {
+    const res = await fetch(toApiUrl(`/api/queue/${batchId}/confirm`), { method: "POST" });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<QueueBatch>;
+  },
+
+  cancelQueueBatch: async (batchId: string) => {
+    const res = await fetch(toApiUrl(`/api/queue/${batchId}/cancel`), { method: "POST" });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<QueueBatch>;
+  },
+
+  // Scrap / Loss / Variance --------------------------------------------------
+  recordScrap: async (payload: {
+    item_id: string;
+    quantity: number;
+    reason: string;
+    process_stage?: string;
+    operator?: string;
+  }) => {
+    const res = await fetch(toApiUrl("/api/scrap/"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<ScrapLogRow>;
+  },
+
+  listScrap: (params?: { itemId?: string; batchId?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.itemId) query.set("item_id", params.itemId);
+    if (params?.batchId) query.set("batch_id", params.batchId);
+    return fetcher<ScrapLogRow[]>(toApiUrl(`/api/scrap/?${query}`));
+  },
+
+  recordLoss: async (
+    payload: { item_id: string; quantity: number; reason: string; operator?: string },
+    deduct = false,
+  ) => {
+    const res = await fetch(toApiUrl(`/api/loss/?deduct=${deduct}`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<LossLogRow>;
+  },
+
+  listLoss: (params?: { itemId?: string; batchId?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.itemId) query.set("item_id", params.itemId);
+    if (params?.batchId) query.set("batch_id", params.batchId);
+    return fetcher<LossLogRow[]>(toApiUrl(`/api/loss/?${query}`));
+  },
+
+  listVariance: (params?: { itemId?: string; batchId?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.itemId) query.set("item_id", params.itemId);
+    if (params?.batchId) query.set("batch_id", params.batchId);
+    return fetcher<VarianceLogRow[]>(toApiUrl(`/api/variance/?${query}`));
+  },
+
+  // Alerts -------------------------------------------------------------------
+  scanSafetyAlerts: async () => {
+    const res = await fetch(toApiUrl("/api/alerts/scan"), { method: "POST" });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<StockAlert[]>;
+  },
+
+  listAlerts: (params?: {
+    kind?: AlertKind;
+    includeAcknowledged?: boolean;
+    itemId?: string;
+  }) => {
+    const query = new URLSearchParams();
+    if (params?.kind) query.set("kind", params.kind);
+    if (params?.includeAcknowledged !== undefined)
+      query.set("include_acknowledged", String(params.includeAcknowledged));
+    if (params?.itemId) query.set("item_id", params.itemId);
+    return fetcher<StockAlert[]>(toApiUrl(`/api/alerts/?${query}`));
+  },
+
+  acknowledgeAlert: async (alertId: string, acknowledgedBy?: string) => {
+    const res = await fetch(toApiUrl(`/api/alerts/${alertId}/acknowledge`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ acknowledged_by: acknowledgedBy ?? null }),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<StockAlert>;
+  },
+
+  // Physical counts ---------------------------------------------------------
+  submitPhysicalCount: async (payload: {
+    item_id: string;
+    counted_qty: number;
+    reason?: string;
+    operator?: string;
+  }) => {
+    const res = await fetch(toApiUrl("/api/counts/"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<PhysicalCount>;
+  },
+
+  listPhysicalCounts: (itemId?: string) => {
+    const query = new URLSearchParams();
+    if (itemId) query.set("item_id", itemId);
+    return fetcher<PhysicalCount[]>(toApiUrl(`/api/counts/?${query}`));
+  },
 };

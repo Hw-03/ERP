@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { AlertsBanner } from "./AlertsBanner";
 import { LEGACY_COLORS } from "./legacyUi";
 
 export type TabId = "inventory" | "warehouse" | "dept" | "admin";
@@ -52,7 +54,35 @@ export function LegacyLayout({
           <div className="text-2xl font-black">{title}</div>
         </header>
 
-        <main className="flex-1 overflow-y-auto px-[14px] py-[14px]">{children}</main>
+        <main className="flex-1 overflow-y-auto px-[14px] py-[14px]">
+          <div className="mb-3 space-y-2">
+            <AlertsBanner />
+            <div className="flex gap-2 text-[10px] font-bold">
+              <Link
+                href="/queue"
+                className="rounded-full px-[10px] py-[4px]"
+                style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.blue }}
+              >
+                🔁 Queue
+              </Link>
+              <Link
+                href="/alerts"
+                className="rounded-full px-[10px] py-[4px]"
+                style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.yellow }}
+              >
+                ⚠️ 알림
+              </Link>
+              <Link
+                href="/counts"
+                className="rounded-full px-[10px] py-[4px]"
+                style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.cyan }}
+              >
+                📋 실사
+              </Link>
+            </div>
+          </div>
+          {children}
+        </main>
 
         <nav
           className="shrink-0 border-t px-0 pt-[6px]"

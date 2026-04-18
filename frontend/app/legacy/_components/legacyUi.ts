@@ -112,7 +112,7 @@ export function formatNumber(value: number | string | null | undefined) {
   return numeric.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
 }
 
-export function transactionLabel(type: TransactionType) {
+export function transactionLabel(type: TransactionType | string) {
   switch (type) {
     case "RECEIVE":
       return "입고";
@@ -124,9 +124,61 @@ export function transactionLabel(type: TransactionType) {
       return "생산입고";
     case "BACKFLUSH":
       return "자동차감";
+    case "SCRAP":
+      return "폐기";
+    case "LOSS":
+      return "분실";
+    case "DISASSEMBLE":
+      return "분해";
+    case "RETURN":
+      return "반품";
+    case "RESERVE":
+      return "예약";
+    case "RESERVE_RELEASE":
+      return "예약해제";
     default:
       return type;
   }
+}
+
+// 4-part ERP code: "3-PA-0012-BG" → compact "3-PA-12-BG"
+export function formatErpCode(code?: string | null, compact = true): string | null {
+  if (!code) return null;
+  if (!compact) return code;
+  const parts = code.split("-");
+  if (parts.length < 3) return code;
+  const stripped = [...parts];
+  // Strip leading zeros on the serial (3rd segment)
+  stripped[2] = stripped[2].replace(/^0+(\d)/, "$1") || "0";
+  return stripped.join("-");
+}
+
+const PROCESS_LABEL: Record<string, string> = {
+  TR: "Tube Raw",
+  TA: "Tube Ass'y",
+  HR: "High-v Raw",
+  HA: "High-v Ass'y",
+  VR: "Vacuum Raw",
+  VA: "Vacuum Ass'y",
+  NA: "Neck Ass'y",
+  AR: "Assembly Raw",
+  AA: "Assembly",
+  PR: "Pack Raw",
+  PA: "Packaging",
+};
+export function processStageLabel(code?: string | null): string {
+  if (!code) return "-";
+  return PROCESS_LABEL[code] ?? code;
+}
+
+const OPTION_COLOR: Record<string, string> = {
+  BG: "#60a5fa", // bag
+  WM: "#f97316", // warmer (orange)
+  SV: "#a3a3a3", // silver
+};
+export function optionColor(code?: string | null): string {
+  if (!code) return LEGACY_COLORS.muted2;
+  return OPTION_COLOR[code] ?? LEGACY_COLORS.muted2;
 }
 
 export function transactionColor(type: TransactionType) {
