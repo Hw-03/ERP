@@ -1,1 +1,1 @@
-export { default } from "./legacy/page";
+export { default } from "@/legacy/page";

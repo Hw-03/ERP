@@ -42,14 +42,22 @@
   }
 
   html {
+    height: 100%;
     font-family: "Inter", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
+    overflow: hidden;
   }
 
   body {
+    height: 100dvh;
     background: var(--c-bg);
     color: var(--c-text);
-    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  body > * {
+    height: 100%;
   }
 
   /* 스크롤바 스타일 */

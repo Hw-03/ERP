@@ -25,7 +25,7 @@ def _to_response(db: Session, log: VarianceLog) -> VarianceLogResponse:
         var_id=log.var_id,
         batch_id=log.batch_id,
         item_id=log.item_id,
-        item_code=item.item_code if item else None,
+        item_code=(item.erp_code or item.item_code) if item else None,
         item_name=item.item_name if item else None,
         bom_expected=log.bom_expected,
         actual_used=log.actual_used,

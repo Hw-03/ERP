@@ -344,6 +344,7 @@ def list_transactions(
             or_(
                 Item.item_name.ilike(pattern),
                 Item.item_code.ilike(pattern),
+                Item.erp_code.ilike(pattern),
                 TransactionLog.reference_no.ilike(pattern),
                 TransactionLog.notes.ilike(pattern),
                 TransactionLog.produced_by.ilike(pattern),
@@ -356,7 +357,7 @@ def list_transactions(
         TransactionLogResponse(
             log_id=log.log_id,
             item_id=log.item_id,
-            item_code=item.item_code,
+            item_code=item.erp_code or item.item_code,
             item_name=item.item_name,
             item_category=item.category,
             item_unit=item.unit,
@@ -389,6 +390,7 @@ def export_transactions_csv(
             or_(
                 Item.item_name.ilike(pattern),
                 Item.item_code.ilike(pattern),
+                Item.erp_code.ilike(pattern),
                 TransactionLog.reference_no.ilike(pattern),
                 TransactionLog.notes.ilike(pattern),
                 TransactionLog.produced_by.ilike(pattern),
@@ -419,7 +421,7 @@ def export_transactions_csv(
             [
                 log.created_at.isoformat(),
                 log.transaction_type.value,
-                item.item_code,
+                item.erp_code or item.item_code,
                 item.item_name,
                 item.category.value,
                 float(log.quantity_change),
@@ -460,7 +462,7 @@ def update_transaction_notes(
     return TransactionLogResponse(
         log_id=log.log_id,
         item_id=log.item_id,
-        item_code=item.item_code,
+        item_code=item.erp_code or item.item_code,
         item_name=item.item_name,
         item_category=item.category,
         item_unit=item.unit,

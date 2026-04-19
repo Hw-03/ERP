@@ -16,7 +16,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko" className="dark">
-      <body className="bg-slate-950 text-slate-100 antialiased">{children}</body>
+      <body className="h-dvh overflow-hidden bg-slate-950 text-slate-100 antialiased">{children}</body>
     </html>
   );
 }

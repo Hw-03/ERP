@@ -15,7 +15,18 @@ export type Category =
   | "FG"
   | "UK";
 
-export type TransactionType = "RECEIVE" | "PRODUCE" | "SHIP" | "ADJUST" | "BACKFLUSH";
+export type TransactionType =
+  | "RECEIVE"
+  | "PRODUCE"
+  | "SHIP"
+  | "ADJUST"
+  | "BACKFLUSH"
+  | "SCRAP"
+  | "LOSS"
+  | "DISASSEMBLE"
+  | "RETURN"
+  | "RESERVE"
+  | "RESERVE_RELEASE";
 export type Department =
   | "조립"
   | "고압"

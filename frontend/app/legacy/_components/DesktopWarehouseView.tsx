@@ -199,11 +199,8 @@ export function DesktopWarehouseView({
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[minmax(820px,1.45fr)_minmax(420px,0.88fr)] gap-4 px-6 py-6">
       <section className="flex min-h-0 flex-col overflow-hidden rounded-[28px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-        <div className="border-b px-5 py-4" style={{ borderColor: LEGACY_COLORS.border }}>
-          <div className="text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: LEGACY_COLORS.muted2 }}>
-            Operations
-          </div>
-          <div className="mt-1 text-xl font-black">입출고 처리</div>
+        <div className="border-b px-5 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
+          <div className="text-base font-black leading-none">입출고 처리</div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
@@ -215,8 +212,8 @@ export function DesktopWarehouseView({
               작업 유형 선택
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              {WORK_TYPES.slice(0, 3).map((entry) => {
+            <div className="grid grid-cols-4 gap-2">
+              {WORK_TYPES.map((entry) => {
                 const active = workType === entry.id;
                 return (
                   <button
@@ -225,42 +222,36 @@ export function DesktopWarehouseView({
                       setWorkType(entry.id);
                       setError(null);
                     }}
-                    className="rounded-[16px] border px-4 py-5 text-center transition"
+                    className="rounded-[14px] border px-1 py-1.5 text-center transition"
                     style={{
                       background: active ? entry.tone : LEGACY_COLORS.s2,
-                      borderColor: active ? "rgba(120,167,255,.32)" : LEGACY_COLORS.border,
+                      borderColor:
+                        active && entry.id === "package-out"
+                          ? "rgba(255,206,112,.32)"
+                          : active
+                            ? "rgba(120,167,255,.32)"
+                            : LEGACY_COLORS.border,
                       color: active ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
                     }}
                   >
-                    <div className="mb-2 flex justify-center">{entry.icon}</div>
-                    <div className="text-lg font-bold">{entry.label}</div>
-                    <div className="mt-1 text-xs" style={{ color: active ? "#cbd9ff" : LEGACY_COLORS.muted }}>
+                    <div className="mb-0.5 flex justify-center">{entry.icon}</div>
+                    <div className="text-[13px] font-bold leading-tight">{entry.label}</div>
+                    <div
+                      className="mt-0.5 text-[9px] leading-tight"
+                      style={{
+                        color:
+                          active && entry.id === "package-out"
+                            ? "#fff2d0"
+                            : active
+                              ? "#cbd9ff"
+                              : LEGACY_COLORS.muted,
+                      }}
+                    >
                       {entry.subtitle}
                     </div>
                   </button>
                 );
               })}
-            </div>
-
-            <div className="mt-2">
-              <button
-                onClick={() => {
-                  setWorkType("package-out");
-                  setError(null);
-                }}
-                className="w-full rounded-[16px] border px-4 py-5 text-center transition"
-                style={{
-                  background: workType === "package-out" ? WORK_TYPES[3].tone : LEGACY_COLORS.s2,
-                  borderColor: workType === "package-out" ? "rgba(255,206,112,.32)" : LEGACY_COLORS.border,
-                  color: workType === "package-out" ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
-                }}
-              >
-                <div className="mb-2 flex justify-center">{WORK_TYPES[3].icon}</div>
-                <div className="text-lg font-bold">{WORK_TYPES[3].label}</div>
-                <div className="mt-1 text-xs" style={{ color: workType === "package-out" ? "#fff2d0" : LEGACY_COLORS.muted }}>
-                  {WORK_TYPES[3].subtitle}
-                </div>
-              </button>
             </div>
 
             {workType !== "package-out" ? (
@@ -283,15 +274,15 @@ export function DesktopWarehouseView({
                   <button
                     key={entry.id}
                     onClick={entry.onClick}
-                    className="rounded-[14px] border px-4 py-3 text-center transition"
+                    className="rounded-[14px] border px-1 py-1.5 text-center transition"
                     style={{
                       background: entry.active ? entry.tone : LEGACY_COLORS.s2,
                       borderColor: entry.active ? "rgba(255,255,255,.14)" : LEGACY_COLORS.border,
                       color: entry.active ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
                     }}
                   >
-                    <div className="text-base font-bold">{entry.label}</div>
-                    <div className="mt-1 text-[11px]" style={{ color: entry.active ? entry.color : LEGACY_COLORS.muted }}>
+                    <div className="text-[13px] font-bold leading-tight">{entry.label}</div>
+                    <div className="mt-0.5 text-[9px] leading-tight" style={{ color: entry.active ? entry.color : LEGACY_COLORS.muted }}>
                       {entry.subtitle}
                     </div>
                   </button>
@@ -451,17 +442,17 @@ export function DesktopWarehouseView({
         </div>
       </section>
 
-      <section className="flex min-h-0 flex-col overflow-hidden rounded-[28px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-        <div className="border-b px-5 py-4" style={{ borderColor: LEGACY_COLORS.border }}>
-          <div className="text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: LEGACY_COLORS.muted2 }}>
-            Confirm & Execute
-          </div>
-          <div className="mt-1 text-xl font-black">실행 확인</div>
+      <section
+        className="sticky top-6 flex h-[calc(100vh-48px)] min-h-0 flex-col overflow-hidden rounded-[28px] border"
+        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+      >
+        <div className="border-b px-5 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
+          <div className="text-sm font-black leading-none">실행 확인</div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col justify-between">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {!selectedItem && !selectedPackage ? (
-            <>
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-5">
               <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
                 <div className="mb-5 rounded-3xl p-4" style={{ background: "rgba(79,142,247,.10)", color: LEGACY_COLORS.blue }}>
                   <PackageCheck className="h-8 w-8" />
@@ -471,117 +462,111 @@ export function DesktopWarehouseView({
                   작업 유형을 고른 뒤 담당 직원과 품목을 선택하면 실행 확인 내용이 표시됩니다.
                 </div>
               </div>
-              <div className="border-t px-5 py-5" style={{ borderColor: LEGACY_COLORS.border }}>
-                <button disabled className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white opacity-40" style={{ background: LEGACY_COLORS.blue }}>
-                  <PackageCheck className="h-4 w-4" />
-                  {effectiveLabel} 실행
-                </button>
-              </div>
-            </>
+              <button disabled className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-base font-bold text-white opacity-40" style={{ background: LEGACY_COLORS.blue }}>
+                <PackageCheck className="h-4 w-4" />
+                {effectiveLabel} 실행
+              </button>
+            </div>
           ) : (
-            <>
-              <div className="space-y-4 px-5 py-5">
-                <div className="rounded-[24px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                  <div className="mb-3 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full font-black text-white" style={{ background: selectedEmployee ? employeeColor(selectedEmployee.department) : LEGACY_COLORS.muted }}>
-                      {selectedEmployee ? firstEmployeeLetter(selectedEmployee.name) : <UserRound className="h-4 w-4" />}
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
-                        담당 직원
-                      </div>
-                      <div className="text-sm font-bold">{selectedEmployee?.name || "미선택"}</div>
-                    </div>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
+              <div className="rounded-[24px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full font-black text-white" style={{ background: selectedEmployee ? employeeColor(selectedEmployee.department) : LEGACY_COLORS.muted }}>
+                    {selectedEmployee ? firstEmployeeLetter(selectedEmployee.name) : <UserRound className="h-4 w-4" />}
                   </div>
-
-                  <div className="space-y-3 text-sm">
-                    <div className="rounded-[18px] border p-4" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                      <div className="mb-2 text-xs font-bold uppercase tracking-[0.16em]" style={{ color: LEGACY_COLORS.muted2 }}>
-                        {effectiveLabel}
-                      </div>
-                      {workType === "package-out" && selectedPackage ? (
-                        <>
-                          <div className="font-semibold">{selectedPackage.name}</div>
-                          <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{selectedPackage.package_code}</div>
-                        </>
-                      ) : selectedItem ? (
-                        <>
-                          <div className="font-semibold">{selectedItem.item_name}</div>
-                          <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{selectedItem.item_code}</div>
-                          <div className="mt-4 grid grid-cols-2 gap-3">
-                            <div>
-                              <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>현재고</div>
-                              <div className="font-mono text-xl font-black">{formatNumber(selectedItem.quantity)}</div>
-                            </div>
-                            <div>
-                              <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>예상 재고</div>
-                              <div className="font-mono text-xl font-black">{expectedQuantity == null ? "-" : formatNumber(expectedQuantity)}</div>
-                            </div>
-                          </div>
-                        </>
-                      ) : null}
+                  <div>
+                    <div className="text-xs font-bold tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                      담당 직원
                     </div>
-
-                    <input
-                      value={quantity}
-                      onChange={(event) => setQuantity(sanitizeQuantity(Number(event.target.value.replace(/[^\d-]/g, ""))))}
-                      className="w-full rounded-[18px] border px-4 py-4 text-center font-mono text-[34px] font-black outline-none"
-                      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                    />
-
-                    <div className="grid grid-cols-4 gap-2">
-                      {QUICK_STEPS.map((step) => {
-                        const positive = step > 0;
-                        return (
-                          <button
-                            key={step}
-                            onClick={() => setQuantity((current) => sanitizeQuantity(Number(current || 0) + step))}
-                            className="rounded-[12px] px-3 py-3 text-lg font-black transition"
-                            style={{ background: positive ? "rgba(5,87,54,.72)" : "rgba(86,32,39,.72)", color: positive ? "#2ff0a1" : "#ff6a73" }}
-                          >
-                            {step > 0 ? `+${step}` : step}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <input
-                      value={referenceNo}
-                      onChange={(event) => setReferenceNo(event.target.value)}
-                      placeholder="참조 번호"
-                      className="w-full rounded-[14px] border px-4 py-3 text-sm outline-none"
-                      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                    />
-
-                    <textarea
-                      value={notes}
-                      onChange={(event) => setNotes(event.target.value)}
-                      placeholder="비고"
-                      className="min-h-[92px] w-full rounded-[14px] border px-4 py-3 text-sm outline-none"
-                      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                    />
+                    <div className="text-sm font-bold">{selectedEmployee?.name || "미선택"}</div>
                   </div>
                 </div>
 
-                {error ? (
-                  <div className="rounded-2xl border px-4 py-3 text-sm" style={{ background: "rgba(242,95,92,.12)", borderColor: "rgba(242,95,92,.24)", color: LEGACY_COLORS.red }}>
-                    {error}
+                <div className="space-y-3 text-sm">
+                  <div className="rounded-[18px] border p-4" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+                    <div className="mb-2 text-xs font-bold tracking-[0.16em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                      {effectiveLabel}
+                    </div>
+                    {workType === "package-out" && selectedPackage ? (
+                      <>
+                        <div className="font-semibold">{selectedPackage.name}</div>
+                        <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{selectedPackage.package_code}</div>
+                      </>
+                    ) : selectedItem ? (
+                      <>
+                        <div className="font-semibold">{selectedItem.item_name}</div>
+                        <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{selectedItem.item_code}</div>
+                        <div className="mt-4 grid grid-cols-2 gap-3">
+                          <div>
+                            <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>현재고</div>
+                            <div className="font-mono text-xl font-black">{formatNumber(selectedItem.quantity)}</div>
+                          </div>
+                          <div>
+                            <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>예상 재고</div>
+                            <div className="font-mono text-xl font-black">{expectedQuantity == null ? "-" : formatNumber(expectedQuantity)}</div>
+                          </div>
+                        </div>
+                      </>
+                    ) : null}
                   </div>
-                ) : null}
+
+                  <input
+                    value={quantity}
+                    onChange={(event) => setQuantity(sanitizeQuantity(Number(event.target.value.replace(/[^\d-]/g, ""))))}
+                    className="w-full rounded-[18px] border px-4 py-4 text-center font-mono text-[34px] font-black outline-none"
+                    style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                  />
+
+                  <div className="grid grid-cols-4 gap-2">
+                    {QUICK_STEPS.map((step) => {
+                      const positive = step > 0;
+                      return (
+                        <button
+                          key={step}
+                          onClick={() => setQuantity((current) => sanitizeQuantity(Number(current || 0) + step))}
+                          className="rounded-[12px] px-3 py-3 text-lg font-black transition"
+                          style={{ background: positive ? "rgba(5,87,54,.72)" : "rgba(86,32,39,.72)", color: positive ? "#2ff0a1" : "#ff6a73" }}
+                        >
+                          {step > 0 ? `+${step}` : step}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <input
+                    value={referenceNo}
+                    onChange={(event) => setReferenceNo(event.target.value)}
+                    placeholder="참조 번호"
+                    className="w-full rounded-[14px] border px-4 py-3 text-sm outline-none"
+                    style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                  />
+
+                  <textarea
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
+                    placeholder="비고"
+                    className="min-h-[92px] w-full rounded-[14px] border px-4 py-3 text-sm outline-none"
+                    style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                  />
+                </div>
               </div>
 
-              <div className="border-t px-5 py-5" style={{ borderColor: LEGACY_COLORS.border }}>
-                <button
-                  onClick={() => void submit()}
-                  disabled={submitting || (!selectedItem && !selectedPackage)}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
-                  style={{ background: isOutbound ? LEGACY_COLORS.red : LEGACY_COLORS.blue }}
-                >
-                  {submitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <PackageCheck className="h-4 w-4" />}
-                  {submitting ? "처리 중..." : `${effectiveLabel} 실행`}
-                </button>
-              </div>
-            </>
+              {error ? (
+                <div className="rounded-2xl border px-4 py-3 text-sm" style={{ background: "rgba(242,95,92,.12)", borderColor: "rgba(242,95,92,.24)", color: LEGACY_COLORS.red }}>
+                  {error}
+                </div>
+              ) : null}
+
+              <button
+                onClick={() => void submit()}
+                disabled={submitting || (!selectedItem && !selectedPackage)}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-base font-bold text-white disabled:opacity-50"
+                style={{ background: isOutbound ? LEGACY_COLORS.red : LEGACY_COLORS.blue }}
+              >
+                {submitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <PackageCheck className="h-4 w-4" />}
+                {submitting ? "처리 중..." : `${effectiveLabel} 실행`}
+              </button>
+            </div>
           )}
         </div>
       </section>
