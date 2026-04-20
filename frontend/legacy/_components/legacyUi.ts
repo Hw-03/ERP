@@ -32,42 +32,42 @@ export const LEGACY_COLORS = {
 } as const;
 
 export const DEPARTMENT_LABELS: Record<string, string> = {
-  "조립": "조립",
-  "고압": "고압",
-  "진공": "진공",
-  "시트": "시트",
-  "튜닝": "튜닝",
-  "AS": "AS",
-  "연구": "연구",
-  "영업": "영업",
-  "출하": "출하",
-  "기타": "기타",
+  조립: "조립",
+  고압: "고압",
+  진공: "진공",
+  튜닝: "튜닝",
+  튜브: "튜브",
+  AS: "AS",
+  연구: "연구",
+  영업: "영업",
+  출하: "출하",
+  기타: "기타",
 };
 
 export const DEPARTMENT_ICONS: Record<string, string> = {
-  "조립": "조",
-  "고압": "고",
-  "진공": "진",
-  "시트": "시",
-  "튜닝": "튜",
-  "AS": "A",
-  "연구": "연",
-  "영업": "영",
-  "출하": "출",
-  "기타": "기",
+  조립: "조",
+  고압: "고",
+  진공: "진",
+  튜닝: "튜",
+  튜브: "브",
+  AS: "A",
+  연구: "연",
+  영업: "영",
+  출하: "출",
+  기타: "기",
 };
 
 export const FILE_TYPE_BADGES: Record<string, { label: string; bg: string; color: string }> = {
-  "원자재": { label: "원자재", bg: "rgba(79, 142, 247, 0.16)", color: LEGACY_COLORS.blue },
-  "조립자재": { label: "조립자재", bg: "rgba(31, 209, 122, 0.16)", color: LEGACY_COLORS.green },
-  "발생부자재": { label: "발생부자재", bg: "rgba(244, 185, 66, 0.16)", color: LEGACY_COLORS.yellow },
-  "완제품": { label: "완제품", bg: "rgba(155, 114, 248, 0.16)", color: LEGACY_COLORS.purple },
-  "대모": { label: "대모", bg: "rgba(6, 182, 212, 0.16)", color: LEGACY_COLORS.cyan },
-  "미분류": { label: "미분류", bg: "rgba(136, 144, 170, 0.16)", color: LEGACY_COLORS.muted2 },
+  원자재: { label: "원자재", bg: "rgba(37, 99, 235, 0.16)", color: LEGACY_COLORS.blue },
+  조립자재: { label: "조립자재", bg: "rgba(34, 197, 94, 0.16)", color: LEGACY_COLORS.green },
+  발생부자재: { label: "발생부자재", bg: "rgba(245, 158, 11, 0.16)", color: LEGACY_COLORS.yellow },
+  완제품: { label: "완제품", bg: "rgba(139, 92, 246, 0.16)", color: LEGACY_COLORS.purple },
+  소모품: { label: "소모품", bg: "rgba(6, 182, 212, 0.16)", color: LEGACY_COLORS.cyan },
+  미분류: { label: "미분류", bg: "rgba(148, 163, 184, 0.16)", color: LEGACY_COLORS.muted2 },
 };
 
 export const LEGACY_FILE_TYPES = ["전체", "원자재", "조립자재", "발생부자재", "완제품", "미분류"] as const;
-export const LEGACY_PARTS = ["전체", "자재창고", "조립출하", "고압파트", "진공파트", "시트파트", "출하"] as const;
+export const LEGACY_PARTS = ["전체", "자재창고", "조립출하", "고압파트", "진공파트", "튜닝파트", "출하"] as const;
 export const LEGACY_MODELS = ["전체", "공용", "DX3000", "ADX4000W", "ADX6000", "COCOON", "SOLO"] as const;
 export const KPI_FILTERS = ["전체", "정상", "부족", "품절"] as const;
 
@@ -79,25 +79,25 @@ export function normalizeDepartment(value?: string | null) {
 export function employeeColor(value?: string | null) {
   switch (normalizeDepartment(value)) {
     case "조립":
-      return "#4f8ef7";
+      return "#2563eb";
     case "고압":
-      return "#f4b942";
+      return "#f59e0b";
     case "진공":
-      return "#9b72f8";
-    case "시트":
-      return "#06b6d4";
+      return "#8b5cf6";
     case "튜닝":
-      return "#1fd17a";
+      return "#06b6d4";
+    case "튜브":
+      return "#22c55e";
     case "AS":
-      return "#e879f9";
+      return "#ec4899";
     case "연구":
       return "#f97316";
     case "영업":
-      return "#f25f5c";
+      return "#ef4444";
     case "출하":
       return "#64748b";
     default:
-      return "#5a5f75";
+      return "#475569";
   }
 }
 

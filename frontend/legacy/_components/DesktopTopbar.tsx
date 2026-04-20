@@ -21,16 +21,16 @@ export function DesktopTopbar({
 }) {
   return (
     <header
-      className="sticky top-0 z-20 flex items-center gap-4 border-b px-8 py-5 backdrop-blur-sm"
-      style={{ background: LEGACY_COLORS.panel, borderColor: LEGACY_COLORS.border }}
+      className="sticky top-0 z-20 flex items-center gap-3 border-b px-6 py-4"
+      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
     >
       <div className="min-w-0 flex-1">
         <div className="desktop-section-label mb-1">{subtitle || "Desktop Workspace"}</div>
-        <div className="truncate text-[29px] font-black leading-none">{title || "운영 대시보드"}</div>
+        <div className="truncate text-[24px] font-black leading-none">{title || "운영 대시보드"}</div>
       </div>
 
       <div
-        className="hidden max-w-[420px] items-center gap-3 rounded-2xl border px-4 py-3 xl:flex"
+        className="hidden max-w-[360px] items-center gap-3 rounded-xl border px-4 py-3 xl:flex"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
         <Clock3 className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
@@ -41,7 +41,7 @@ export function DesktopTopbar({
 
       <button
         onClick={onToggleHistory}
-        className="flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition"
+        className="flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition"
         style={{
           background: historyOpen ? LEGACY_COLORS.blueSoft : LEGACY_COLORS.s2,
           borderColor: historyOpen ? LEGACY_COLORS.borderStrong : LEGACY_COLORS.border,

@@ -7,33 +7,32 @@
     --background: #0d111b;
     --foreground: #e8eefc;
 
-    --c-bg: #0d111b;
-    --c-surface: radial-gradient(circle at top left, rgba(84, 120, 255, 0.12), transparent 30%),
-      linear-gradient(180deg, #121726 0%, #0d111b 48%, #0a0d15 100%);
-    --c-s1: #151b29;
-    --c-s2: #1b2233;
-    --c-s3: #222c42;
-    --c-panel: rgba(18, 24, 38, 0.82);
-    --c-border: rgba(148, 163, 184, 0.18);
-    --c-border-strong: rgba(191, 219, 254, 0.24);
-    --c-blue: #63a2ff;
-    --c-green: #33d694;
-    --c-red: #ff7375;
-    --c-yellow: #ffcb52;
-    --c-purple: #a58bff;
-    --c-cyan: #1fc8e7;
-    --c-text: #edf2ff;
-    --c-text-soft: #d5ddf4;
-    --c-muted: #7f89a6;
-    --c-muted2: #a0acc9;
-    --c-soft-blue: rgba(99, 162, 255, 0.16);
-    --c-soft-green: rgba(51, 214, 148, 0.16);
-    --c-soft-red: rgba(255, 115, 117, 0.14);
-    --c-soft-yellow: rgba(255, 203, 82, 0.16);
-    --c-soft-purple: rgba(165, 139, 255, 0.16);
-    --c-soft-cyan: rgba(31, 200, 231, 0.16);
-    --c-shadow: 0 28px 60px rgba(1, 6, 19, 0.36);
-    --c-shadow-sm: 0 14px 32px rgba(1, 6, 19, 0.22);
+    --c-bg: #0a0e1a;
+    --c-surface: linear-gradient(180deg, #0a0e1a 0%, #0c111d 100%);
+    --c-s1: #111827;
+    --c-s2: #182132;
+    --c-s3: #202a3e;
+    --c-panel: rgba(13, 18, 31, 0.94);
+    --c-border: rgba(148, 163, 184, 0.16);
+    --c-border-strong: rgba(96, 165, 250, 0.42);
+    --c-blue: #2563eb;
+    --c-green: #22c55e;
+    --c-red: #ef4444;
+    --c-yellow: #f59e0b;
+    --c-purple: #8b5cf6;
+    --c-cyan: #06b6d4;
+    --c-text: #f8fafc;
+    --c-text-soft: #cbd5e1;
+    --c-muted: #64748b;
+    --c-muted2: #94a3b8;
+    --c-soft-blue: rgba(37, 99, 235, 0.16);
+    --c-soft-green: rgba(34, 197, 94, 0.16);
+    --c-soft-red: rgba(239, 68, 68, 0.14);
+    --c-soft-yellow: rgba(245, 158, 11, 0.16);
+    --c-soft-purple: rgba(139, 92, 246, 0.16);
+    --c-soft-cyan: rgba(6, 182, 212, 0.16);
+    --c-shadow: 0 18px 40px rgba(2, 6, 23, 0.22);
+    --c-shadow-sm: 0 8px 18px rgba(2, 6, 23, 0.18);
   }
 
   :root[data-theme="light"] {
@@ -70,7 +69,7 @@
     height: 100%;
     font-family: "Inter", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
-    overflow: hidden;
+    overflow-x: hidden;
   }
 
   body {
@@ -78,11 +77,11 @@
     background: var(--c-surface);
     color: var(--c-text);
     min-height: 100dvh;
-    overflow: hidden;
+    overflow-x: hidden;
   }
 
   body > * {
-    height: 100%;
+    min-height: 100%;
   }
 
   /* 스크롤바 스타일 */
@@ -110,17 +109,17 @@
   }
 
   .desktop-shell-panel {
-    @apply rounded-[30px] border backdrop-blur-sm;
+    @apply rounded-2xl border;
     background: var(--c-panel);
     border-color: var(--c-border);
     box-shadow: var(--c-shadow);
   }
 
   .desktop-shell-subpanel {
-    @apply rounded-[24px] border;
+    @apply rounded-xl border;
     background: var(--c-s2);
     border-color: var(--c-border);
-    box-shadow: var(--c-shadow-sm);
+    box-shadow: none;
   }
 
   .desktop-section-label {
@@ -129,22 +128,56 @@
   }
 
   .desktop-action-primary {
-    @apply rounded-2xl px-4 py-3 text-sm font-semibold text-white transition;
-    background: linear-gradient(135deg, var(--c-blue) 0%, color-mix(in srgb, var(--c-blue) 74%, white) 100%);
-    box-shadow: 0 16px 32px rgba(51, 101, 214, 0.26);
+    @apply rounded-xl px-4 py-3 text-sm font-semibold text-white transition;
+    background: var(--c-blue);
+    box-shadow: none;
   }
 
   .desktop-action-secondary {
-    @apply rounded-2xl border px-4 py-3 text-sm font-semibold transition;
+    @apply rounded-xl border px-4 py-3 text-sm font-semibold transition;
     background: var(--c-s2);
     border-color: var(--c-border);
     color: var(--c-text);
   }
 
   .desktop-action-danger {
-    @apply rounded-2xl px-4 py-3 text-sm font-semibold text-white transition;
-    background: linear-gradient(135deg, var(--c-red) 0%, color-mix(in srgb, var(--c-red) 76%, black) 100%);
-    box-shadow: 0 16px 32px rgba(177, 45, 61, 0.18);
+    @apply rounded-xl px-4 py-3 text-sm font-semibold text-white transition;
+    background: var(--c-red);
+    box-shadow: none;
+  }
+
+  .desktop-input {
+    @apply rounded-xl border px-4 py-3 text-sm outline-none transition;
+    background: var(--c-s1);
+    border-color: var(--c-border);
+    color: var(--c-text);
+  }
+
+  .desktop-input::placeholder {
+    color: var(--c-muted2);
+  }
+
+  .desktop-chip {
+    @apply rounded-lg border px-3 py-2 text-xs font-semibold transition;
+    background: var(--c-s2);
+    border-color: var(--c-border);
+    color: var(--c-muted2);
+  }
+
+  .desktop-chip-active {
+    border-color: var(--c-border-strong);
+    color: var(--c-text);
+  }
+
+  .desktop-table-wrap {
+    @apply overflow-hidden rounded-2xl border;
+    background: var(--c-s2);
+    border-color: var(--c-border);
+  }
+
+  .desktop-table-header {
+    background: rgba(148, 163, 184, 0.06);
+    color: var(--c-muted2);
   }
 
   .badge {
