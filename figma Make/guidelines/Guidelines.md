@@ -1,33 +1,61 @@
-# ERP Desktop UI Sync Guidelines
+**Add your own guidelines here**
+<!--
 
-이 폴더의 로컬 목업은 `frontend/app/legacy/_components` 기준 구현과 같은 구조를 유지합니다.
+System Guidelines
 
-## 공통 원칙
-- 데스크톱 기준 3단 구조를 유지합니다.
-- 좌측은 제품/섹션 전환용 사이드바입니다.
-- 상단은 상태 배지, 이력, 테마, 새로고침 액션을 둡니다.
-- 우측은 상세 정보와 실행 패널 역할을 맡습니다.
-- 톤은 기존 다크 기반을 유지하되 조금 더 밝고 현대적인 대비를 사용합니다.
+Use this file to provide the AI with rules and guidelines you want it to follow.
+This template outlines a few examples of things you can add. You can add your own sections and format it to suit your needs
 
-## 공통 컴포넌트 기준
-- 패널 모서리는 24px~30px 범위를 사용합니다.
-- 버튼 위계는 `Primary`, `Secondary`, `Danger` 세 가지를 우선 사용합니다.
-- 필터는 둥근 칩 형태를 기본으로 합니다.
-- KPI 카드는 상단 라벨, 큰 숫자, 하단 설명, 하단 액센트 라인 구조를 사용합니다.
+TIP: More context isn't always better. It can confuse the LLM. Try and add the most important rules you need
 
-## 화면별 기준
-### 재고
-- 상단 검색, 2단 필터, KPI, 생산 인사이트 카드, 표, 우측 실행 패널 순서
-- 우측 패널은 선택 전 안내와 선택 후 재고 처리 폼을 같은 자리에서 전환
+# General guidelines
 
-### 입출고 처리
-- 작업 유형 선택, 담당 직원 선택, 탐색/필터, 리스트, 실행 확인 패널 순서
-- 실행 버튼은 우측 패널 하단 고정 영역에 배치
+Any general rules you want the AI to follow.
+For example:
 
-### 관리자
-- 좌측 섹션 네비, 중앙 작업대, 우측 메모 구조 유지
-- 위험 작업은 일반 관리 작업과 색상 및 경고 톤을 분리
+* Only use absolute positioning when necessary. Opt for responsive and well structured layouts that use flexbox and grid by default
+* Refactor code as you go to keep code clean
+* Keep file sizes small and put helper functions and components in their own files.
 
-## 동기화 메모
-- 코드가 먼저 변경되면 이 가이드와 로컬 목업도 같은 구조로 업데이트합니다.
-- 실제 Figma 캔버스 편집 도구가 연결되면 이 가이드를 기준으로 공통 셸, 재고, 입출고, 관리자 4개 화면을 동기화합니다.
+--------------
+
+# Design system guidelines
+Rules for how the AI should make generations look like your company's design system
+
+Additionally, if you select a design system to use in the prompt box, you can reference
+your design system's components, tokens, variables and components.
+For example:
+
+* Use a base font-size of 14px
+* Date formats should always be in the format “Jun 10”
+* The bottom toolbar should only ever have a maximum of 4 items
+* Never use the floating action button with the bottom toolbar
+* Chips should always come in sets of 3 or more
+* Don't use a dropdown if there are 2 or fewer options
+
+You can also create sub sections and add more specific details
+For example:
+
+
+## Button
+The Button component is a fundamental interactive element in our design system, designed to trigger actions or navigate
+users through the application. It provides visual feedback and clear affordances to enhance user experience.
+
+### Usage
+Buttons should be used for important actions that users need to take, such as form submissions, confirming choices,
+or initiating processes. They communicate interactivity and should have clear, action-oriented labels.
+
+### Variants
+* Primary Button
+  * Purpose : Used for the main action in a section or page
+  * Visual Style : Bold, filled with the primary brand color
+  * Usage : One primary button per section to guide users toward the most important action
+* Secondary Button
+  * Purpose : Used for alternative or supporting actions
+  * Visual Style : Outlined with the primary color, transparent background
+  * Usage : Can appear alongside a primary button for less important actions
+* Tertiary Button
+  * Purpose : Used for the least important actions
+  * Visual Style : Text-only with no border, using primary color
+  * Usage : For actions that should be available but not emphasized
+-->

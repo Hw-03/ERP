@@ -21,32 +21,33 @@ export function DesktopTopbar({
 }) {
   return (
     <header
-      className="sticky top-0 z-20 flex items-center gap-3 border-b px-6 py-4"
+      className="sticky top-0 z-20 flex items-center gap-4 border-b px-6 py-4"
       style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
     >
       <div className="min-w-0 flex-1">
-        <div className="desktop-section-label mb-1">{subtitle || "Desktop Workspace"}</div>
-        <div className="truncate text-[24px] font-black leading-none">{title || "운영 대시보드"}</div>
+        <div className="text-[12px] font-semibold" style={{ color: LEGACY_COLORS.textSoft }}>
+          {subtitle || "Desktop Workspace"}
+        </div>
+        <div className="mt-1 text-[18px] font-bold" style={{ color: LEGACY_COLORS.text }}>
+          {title || "작업 화면"}
+        </div>
       </div>
 
       <div
-        className="hidden max-w-[360px] items-center gap-3 rounded-xl border px-4 py-3 xl:flex"
+        className="hidden max-w-[320px] items-center gap-3 rounded-full border px-4 py-2.5 xl:flex"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
         <Clock3 className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
-        <div className="truncate text-xs" style={{ color: LEGACY_COLORS.textSoft }}>
+        <div className="truncate text-sm" style={{ color: LEGACY_COLORS.textSoft }}>
           {statusText}
         </div>
       </div>
 
       <button
+        type="button"
         onClick={onToggleHistory}
-        className="flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition"
-        style={{
-          background: historyOpen ? LEGACY_COLORS.blueSoft : LEGACY_COLORS.s2,
-          borderColor: historyOpen ? LEGACY_COLORS.borderStrong : LEGACY_COLORS.border,
-          color: historyOpen ? LEGACY_COLORS.blue : LEGACY_COLORS.text,
-        }}
+        className="flex items-center gap-2 px-2 py-2 text-sm font-semibold"
+        style={{ color: LEGACY_COLORS.text }}
       >
         <Activity className="h-4 w-4" />
         입출고 이력
@@ -54,7 +55,12 @@ export function DesktopTopbar({
 
       <ThemeToggle />
 
-      <button onClick={onRefresh} className="desktop-action-primary flex items-center gap-2">
+      <button
+        type="button"
+        onClick={onRefresh}
+        className="flex items-center gap-2 px-2 py-2 text-sm font-semibold"
+        style={{ color: LEGACY_COLORS.text }}
+      >
         <RefreshCw className="h-4 w-4" />
         새로고침
       </button>

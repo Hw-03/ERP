@@ -60,7 +60,7 @@ export function DesktopLegacyShell() {
             historyOpen={historyOpen}
             statusText={status}
           />
-          <div className="min-h-[calc(100vh-88px)]">{content}</div>
+          <div className="min-h-[calc(100vh-78px)]">{content}</div>
         </div>
 
         {historyOpen ? (
@@ -75,16 +75,20 @@ export function DesktopLegacyShell() {
               className="absolute inset-y-4 right-4 z-30 w-[360px] overflow-hidden border"
               style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
             >
-              <div className="desktop-shell-panel flex h-full min-h-0 flex-col rounded-none border-0 px-5 py-5" style={{ background: LEGACY_COLORS.panel }}>
+              <div
+                className="desktop-shell-panel flex h-full min-h-0 flex-col rounded-none border-0 px-5 py-5"
+                style={{ background: LEGACY_COLORS.panel }}
+              >
                 <div className="mb-4 flex items-start justify-between border-b pb-4" style={{ borderColor: LEGACY_COLORS.border }}>
                   <div>
                     <div className="desktop-section-label mb-2">Activity Feed</div>
                     <div className="text-[22px] font-black">입출고 이력</div>
                     <div className="mt-2 text-sm leading-6" style={{ color: LEGACY_COLORS.muted2 }}>
-                      최근 40건의 거래 로그를 같은 화면 안에서 빠르게 확인합니다.
+                      최근 40건의 거래 기록을 같은 화면 안에서 빠르게 확인합니다.
                     </div>
                   </div>
                   <button
+                    type="button"
                     onClick={() => setHistoryOpen(false)}
                     className="rounded-xl border p-2 transition"
                     style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
@@ -106,7 +110,11 @@ export function DesktopLegacyShell() {
 
                 <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                   {history.map((log) => (
-                    <div key={log.log_id} className="rounded-xl border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                    <div
+                      key={log.log_id}
+                      className="rounded-xl border p-4"
+                      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+                    >
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <span
                           className="inline-flex items-center gap-2 rounded-md px-3 py-1 text-[11px] font-bold"
@@ -132,6 +140,7 @@ export function DesktopLegacyShell() {
                       {log.notes ? <div className="mt-3 text-sm">{log.notes}</div> : null}
                     </div>
                   ))}
+
                   {history.length === 0 ? (
                     <div
                       className="flex h-full min-h-[280px] flex-col items-center justify-center rounded-xl border px-6 py-8 text-center"
