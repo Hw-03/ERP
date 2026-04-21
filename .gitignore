@@ -1,36 +1,31 @@
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-
-# Virtual envs
-.venv/
+*.pyc
+*.pyo
+.env
+.venv
 venv/
-env/
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Node
+node_modules/
+.next/
+out/
+build/
+npm-debug.log*
+
+# TypeScript build
+tsconfig.tsbuildinfo
 
 # OS
 .DS_Store
 Thumbs.db
 
-# SQLite DB (로컬 전용, 커밋 제외)
-*.db
-*.db-shm
-*.db-wal
-
-# 임시/로컬 테스트
-*.tmp
-*.bak
-~$*.xlsx
-*.log
-*.out
-*.err
-_legacy_import/
-_legacy_zip/
+# IDE
+.vscode/
+.idea/
+.claude/
