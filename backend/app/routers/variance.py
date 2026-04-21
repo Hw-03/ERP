@@ -35,7 +35,7 @@ def _to_response(db: Session, log: VarianceLog) -> VarianceLogResponse:
     )
 
 
-@router.get("/", response_model=List[VarianceLogResponse], summary="Variance 로그 조회")
+@router.get("", response_model=List[VarianceLogResponse], summary="Variance 로그 조회")
 def list_variance(
     item_id: Optional[uuid.UUID] = Query(None),
     batch_id: Optional[uuid.UUID] = Query(None),

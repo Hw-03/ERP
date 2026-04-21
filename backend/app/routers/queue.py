@@ -110,7 +110,7 @@ def _get_line_or_404(db: Session, batch_id: uuid.UUID, line_id: uuid.UUID) -> Qu
 
 
 @router.post(
-    "/",
+    "",
     response_model=QueueBatchResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Queue 배치 생성 (OPEN, BOM 자동 로드)",
@@ -157,7 +157,7 @@ def create_batch(payload: QueueBatchCreateRequest, db: Session = Depends(get_db)
 
 
 @router.get(
-    "/",
+    "",
     response_model=List[QueueBatchResponse],
     summary="Queue 배치 목록 (점유자/상태 필터)",
 )

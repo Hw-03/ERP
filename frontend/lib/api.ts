@@ -681,7 +681,7 @@ export const api = {
     notes?: string;
     load_bom?: boolean;
   }) => {
-    const res = await fetch(toApiUrl("/api/queue/"), {
+    const res = await fetch(toApiUrl("/api/queue"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

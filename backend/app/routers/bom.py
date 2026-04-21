@@ -14,7 +14,7 @@ from app.schemas import BOMCreate, BOMResponse, BOMTreeNode
 router = APIRouter()
 
 
-@router.post("/", response_model=BOMResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=BOMResponse, status_code=status.HTTP_201_CREATED)
 def create_bom(payload: BOMCreate, db: Session = Depends(get_db)):
     """Create a BOM row for a parent and child item."""
 

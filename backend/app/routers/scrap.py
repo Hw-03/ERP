@@ -40,7 +40,7 @@ def _to_response(db: Session, log: ScrapLog) -> ScrapLogResponse:
 
 
 @router.post(
-    "/",
+    "",
     response_model=ScrapLogResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Scrap(폐기) 기록 + 재고 차감",
@@ -87,7 +87,7 @@ def create_scrap(payload: ScrapLogCreateRequest, db: Session = Depends(get_db)):
     return _to_response(db, log)
 
 
-@router.get("/", response_model=List[ScrapLogResponse], summary="Scrap 로그 조회")
+@router.get("", response_model=List[ScrapLogResponse], summary="Scrap 로그 조회")
 def list_scrap(
     item_id: Optional[uuid.UUID] = Query(None),
     batch_id: Optional[uuid.UUID] = Query(None),

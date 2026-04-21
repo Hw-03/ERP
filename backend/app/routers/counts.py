@@ -49,7 +49,7 @@ def _to_response(db: Session, count: PhysicalCount) -> PhysicalCountResponse:
 
 
 @router.post(
-    "/",
+    "",
     response_model=PhysicalCountResponse,
     status_code=status.HTTP_201_CREATED,
     summary="실사 등록 + 강제 조정",
@@ -118,7 +118,7 @@ def submit_count(
     return _to_response(db, count)
 
 
-@router.get("/", response_model=List[PhysicalCountResponse], summary="실사 이력")
+@router.get("", response_model=List[PhysicalCountResponse], summary="실사 이력")
 def list_counts(
     item_id: Optional[uuid.UUID] = Query(None),
     skip: int = Query(0, ge=0),

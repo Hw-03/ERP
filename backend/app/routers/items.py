@@ -57,7 +57,7 @@ def _to_item_with_inventory(item: Item, inventory: Optional[Inventory]) -> ItemW
     )
 
 
-@router.post("/", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
 def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
     existing = db.query(Item).filter(Item.item_code == payload.item_code).first()
     if existing:
@@ -91,7 +91,7 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
     return item
 
 
-@router.get("/", response_model=List[ItemWithInventory])
+@router.get("", response_model=List[ItemWithInventory])
 def list_items(
     category: Optional[CategoryEnum] = Query(None, description="카테고리 필터"),
     search: Optional[str] = Query(None, description="품목명, 품목코드, 사양, 위치, 바코드 검색"),

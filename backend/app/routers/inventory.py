@@ -305,7 +305,7 @@ def adjust_inventory(payload: InventoryAdjust, db: Session = Depends(get_db)):
     return _to_response(inventory)
 
 
-@router.get("/", response_model=List[InventoryResponse])
+@router.get("", response_model=List[InventoryResponse])
 def list_inventory(
     category: Optional[CategoryEnum] = Query(None),
     skip: int = Query(0, ge=0),

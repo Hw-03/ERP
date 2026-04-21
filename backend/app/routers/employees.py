@@ -14,7 +14,7 @@ from app.schemas import EmployeeCreate, EmployeeResponse, EmployeeUpdate
 router = APIRouter()
 
 
-@router.get("/", response_model=List[EmployeeResponse])
+@router.get("", response_model=List[EmployeeResponse])
 def list_employees(
     department: Optional[DepartmentEnum] = Query(None),
     active_only: bool = Query(True),
@@ -30,7 +30,7 @@ def list_employees(
     return [_to_response(employee) for employee in employees]
 
 
-@router.post("/", response_model=EmployeeResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=EmployeeResponse, status_code=status.HTTP_201_CREATED)
 def create_employee(payload: EmployeeCreate, db: Session = Depends(get_db)):
     existing = db.query(Employee).filter(Employee.employee_code == payload.employee_code).first()
     if existing:

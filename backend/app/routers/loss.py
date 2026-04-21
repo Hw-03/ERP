@@ -38,7 +38,7 @@ def _to_response(db: Session, log: LossLog) -> LossLogResponse:
 
 
 @router.post(
-    "/",
+    "",
     response_model=LossLogResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Loss(분실) 기록 + (옵션) 재고 차감",
@@ -91,7 +91,7 @@ def create_loss(
     return _to_response(db, log)
 
 
-@router.get("/", response_model=List[LossLogResponse], summary="Loss 로그 조회")
+@router.get("", response_model=List[LossLogResponse], summary="Loss 로그 조회")
 def list_loss(
     item_id: Optional[uuid.UUID] = Query(None),
     batch_id: Optional[uuid.UUID] = Query(None),

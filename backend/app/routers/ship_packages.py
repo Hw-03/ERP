@@ -20,13 +20,13 @@ from app.schemas import (
 router = APIRouter()
 
 
-@router.get("/", response_model=List[ShipPackageDetailResponse])
+@router.get("", response_model=List[ShipPackageDetailResponse])
 def list_packages(db: Session = Depends(get_db)):
     packages = db.query(ShipPackage).order_by(ShipPackage.updated_at.desc()).all()
     return [_to_detail_response(package) for package in packages]
 
 
-@router.post("/", response_model=ShipPackageResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ShipPackageResponse, status_code=status.HTTP_201_CREATED)
 def create_package(payload: ShipPackageCreate, db: Session = Depends(get_db)):
     existing = db.query(ShipPackage).filter(ShipPackage.package_code == payload.package_code).first()
     if existing:
