@@ -28,7 +28,7 @@ def _to_response(db: Session, log: ScrapLog) -> ScrapLogResponse:
     return ScrapLogResponse(
         scrap_id=log.scrap_id,
         item_id=log.item_id,
-        item_code=(item.erp_code or item.item_code) if item else None,
+        item_code=item.item_code if item else None,
         item_name=item.item_name if item else None,
         quantity=log.quantity,
         process_stage=log.process_stage,

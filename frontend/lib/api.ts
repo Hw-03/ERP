@@ -1,6 +1,8 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL
+const SERVER_API_BASE = process.env.NEXT_PUBLIC_API_URL
   ? `${process.env.NEXT_PUBLIC_API_URL}`
   : "";
+
+const FALLBACK_SERVER_API_BASE = "http://127.0.0.1:8000";
 
 export type Category =
   | "RM"
@@ -15,18 +17,7 @@ export type Category =
   | "FG"
   | "UK";
 
-export type TransactionType =
-  | "RECEIVE"
-  | "PRODUCE"
-  | "SHIP"
-  | "ADJUST"
-  | "BACKFLUSH"
-  | "SCRAP"
-  | "LOSS"
-  | "DISASSEMBLE"
-  | "RETURN"
-  | "RESERVE"
-  | "RESERVE_RELEASE";
+export type TransactionType = "RECEIVE" | "PRODUCE" | "SHIP" | "ADJUST" | "BACKFLUSH";
 export type Department =
   | "조립"
   | "고압"
@@ -309,7 +300,14 @@ export interface ProductionReceiptResponse {
 }
 
 function toApiUrl(path: string) {
-  return `${API_BASE}${path}`;
+  // When an explicit API base is configured, always honor it.
+  if (SERVER_API_BASE) {
+    return `${SERVER_API_BASE}${path}`;
+  }
+
+  // Use relative path so Next.js rewrites forward to backend.
+  // Works on LAN, NAS, and external access without hardcoding ports.
+  return path;
 }
 
 async function parseError(res: Response) {
@@ -328,7 +326,16 @@ async function parseError(res: Response) {
 }
 
 export async function fetcher<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch (error) {
+    throw new Error(
+      error instanceof Error
+        ? `API 연결에 실패했습니다. ${url} 주소에 접근할 수 있는지 확인해 주세요.`
+        : "API 연결에 실패했습니다.",
+    );
+  }
   if (!res.ok) {
     throw new Error(await parseError(res));
   }

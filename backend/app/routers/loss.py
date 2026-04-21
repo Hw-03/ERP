@@ -27,7 +27,7 @@ def _to_response(db: Session, log: LossLog) -> LossLogResponse:
     return LossLogResponse(
         loss_id=log.loss_id,
         item_id=log.item_id,
-        item_code=(item.erp_code or item.item_code) if item else None,
+        item_code=item.item_code if item else None,
         item_name=item.item_name if item else None,
         quantity=log.quantity,
         batch_id=log.batch_id,

@@ -130,7 +130,6 @@ def list_items(
             or_(
                 Item.item_name.ilike(pattern),
                 Item.item_code.ilike(pattern),
-                Item.erp_code.ilike(pattern),
                 Item.spec.ilike(pattern),
                 Item.barcode.ilike(pattern),
                 Inventory.location.ilike(pattern),

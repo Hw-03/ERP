@@ -38,74 +38,11 @@ from app.models import (
     EmployeeLevelEnum,
     Inventory,
     Item,
-    OptionCode,
-    ProcessType,
-    ProductSymbol,
     ShipPackage,
     ShipPackageItem,
     TransactionLog,
 )
 
-
-# Category → 4-part ERP process type code
-CATEGORY_TO_PROCESS_TYPE: dict[str, str] = {
-    "RM": "NR",  # General raw material
-    "TA": "TR",  # Tuning raw input
-    "TF": "TA",  # Tuning assembly output
-    "HA": "HR",  # High-pressure raw input
-    "HF": "HA",  # High-pressure assembly output
-    "VA": "VR",  # Vacuum raw input
-    "VF": "VA",  # Vacuum assembly output
-    "BA": "AR",  # Assembly raw input
-    "BF": "AA",  # Assembly output
-    "FG": "PA",  # Finished product
-    "UK": "NR",  # Unknown → general raw
-}
-
-# Legacy model name → ERP product symbol (single digit = slot number)
-MODEL_TO_SYMBOL: dict[str, str] = {
-    "DX3000":   "1",
-    "ADX4000W": "2",
-    "ADX6000":  "3",
-    "COCOON":   "4",
-    "SOLO":     "5",
-}
-SHARED_SYMBOL = "12345"  # 공용 – shared across all models
-
-DEFAULT_PROCESS_TYPES = [
-    {"code": "NR", "prefix": "N", "suffix": "R", "stage_order": 1, "description": "일반 원자재"},
-    {"code": "TR", "prefix": "T", "suffix": "R", "stage_order": 2, "description": "튜닝 원자재"},
-    {"code": "TA", "prefix": "T", "suffix": "A", "stage_order": 3, "description": "튜닝 조립체"},
-    {"code": "HR", "prefix": "H", "suffix": "R", "stage_order": 2, "description": "고압 원자재"},
-    {"code": "HA", "prefix": "H", "suffix": "A", "stage_order": 3, "description": "고압 조립체"},
-    {"code": "VR", "prefix": "V", "suffix": "R", "stage_order": 2, "description": "진공 원자재"},
-    {"code": "VA", "prefix": "V", "suffix": "A", "stage_order": 3, "description": "진공 조립체"},
-    {"code": "AR", "prefix": "A", "suffix": "R", "stage_order": 2, "description": "조립 원자재"},
-    {"code": "AA", "prefix": "A", "suffix": "A", "stage_order": 3, "description": "조립체"},
-    {"code": "PA", "prefix": "P", "suffix": "A", "stage_order": 5, "description": "완제품"},
-]
-
-DEFAULT_PRODUCT_SYMBOLS = (
-    [
-        {"slot": 1, "symbol": "1", "model_name": "DX3000",   "is_finished_good": True,  "is_reserved": False},
-        {"slot": 2, "symbol": "2", "model_name": "ADX4000W", "is_finished_good": True,  "is_reserved": False},
-        {"slot": 3, "symbol": "3", "model_name": "ADX6000",  "is_finished_good": True,  "is_reserved": False},
-        {"slot": 4, "symbol": "4", "model_name": "COCOON",   "is_finished_good": True,  "is_reserved": False},
-        {"slot": 5, "symbol": "5", "model_name": "SOLO",     "is_finished_good": True,  "is_reserved": False},
-    ]
-    + [
-        {"slot": i, "symbol": None, "model_name": None, "is_finished_good": False, "is_reserved": True}
-        for i in range(6, 101)
-    ]
-)
-
-DEFAULT_OPTION_CODES = [
-    {"code": "BG", "label_ko": "베이지",     "label_en": "Beige",       "color_hex": "#E8D5B7"},
-    {"code": "WM", "label_ko": "화이트매트", "label_en": "White Matte", "color_hex": "#F5F5F0"},
-    {"code": "BK", "label_ko": "블랙",       "label_en": "Black",       "color_hex": "#1C1C1C"},
-    {"code": "WH", "label_ko": "화이트",     "label_en": "White",       "color_hex": "#FFFFFF"},
-    {"code": "GD", "label_ko": "골드",       "label_en": "Gold",        "color_hex": "#D4AF37"},
-]
 
 CATEGORY_MAP = {
     "RM": CategoryEnum.RM,
@@ -263,39 +200,6 @@ DEFAULT_EMPLOYEES = [
 ]
 
 
-def seed_code_masters(db) -> None:
-    """Seed process_types, product_symbols, option_codes if the tables are empty."""
-    if db.query(ProcessType).count() == 0:
-        for pt in DEFAULT_PROCESS_TYPES:
-            db.add(ProcessType(**pt))
-        db.commit()
-        print(f"Process types inserted: {len(DEFAULT_PROCESS_TYPES)}")
-
-    if db.query(ProductSymbol).count() == 0:
-        for ps in DEFAULT_PRODUCT_SYMBOLS:
-            db.add(ProductSymbol(**ps))
-        db.commit()
-        print(f"Product symbols inserted: {len(DEFAULT_PRODUCT_SYMBOLS)}")
-
-    if db.query(OptionCode).count() == 0:
-        for oc in DEFAULT_OPTION_CODES:
-            db.add(OptionCode(**oc))
-        db.commit()
-        print(f"Option codes inserted: {len(DEFAULT_OPTION_CODES)}")
-
-
-def _build_erp_code(raw_category: str, legacy_model: str, serial_counters: dict) -> tuple[str, str, int, int | None]:
-    """Return (erp_code, process_type_code, serial_no, symbol_slot)."""
-    process_type = CATEGORY_TO_PROCESS_TYPE.get(raw_category, "NR")
-    symbol = MODEL_TO_SYMBOL.get(legacy_model, SHARED_SYMBOL)
-    key = f"{symbol}-{process_type}"
-    serial_counters[key] = serial_counters.get(key, 0) + 1
-    serial = serial_counters[key]
-    erp_code = f"{symbol}-{process_type}-{serial:04d}"
-    symbol_slot = int(symbol) if len(symbol) == 1 else None
-    return erp_code, process_type, serial, symbol_slot
-
-
 def seed_employees(db, now) -> None:
     """직원 테이블이 비어있을 때 기본 직원 목록을 삽입한다."""
     if db.query(Employee).count() > 0:
@@ -327,8 +231,6 @@ def seed_from_legacy_html() -> None:
     try:
         reset_core_tables(db)
         now = datetime.now(UTC).replace(tzinfo=None)
-        seed_code_masters(db)
-        serial_counters: dict[str, int] = {}
 
         for order, employee in enumerate(employees):
             role = str(employee.get("role") or "").strip() or "사원"
@@ -363,16 +265,11 @@ def seed_from_legacy_html() -> None:
             quantity = parse_decimal(product.get("stock"))
             min_stock = parse_decimal(product.get("minStock"))
 
-            inferred_cat = infer_legacy_category(file_type, part)
-            erp_code, process_type_code, serial_no, symbol_slot = _build_erp_code(
-                inferred_cat.value, model, serial_counters
-            )
-
             item = Item(
                 item_code=item_code,
                 item_name=item_name,
                 spec=str(product.get("spec") or "").strip() or None,
-                category=inferred_cat,
+                category=infer_legacy_category(file_type, part),
                 unit="EA",
                 barcode=str(product.get("barcode") or "").strip() or item_code,
                 legacy_file_type=file_type,
@@ -381,10 +278,6 @@ def seed_from_legacy_html() -> None:
                 legacy_model=model,
                 supplier=str(product.get("supplier") or "").strip() or None,
                 min_stock=min_stock,
-                erp_code=erp_code,
-                process_type_code=process_type_code,
-                serial_no=serial_no,
-                symbol_slot=symbol_slot,
                 created_at=now,
                 updated_at=now,
             )
@@ -431,14 +324,12 @@ def seed() -> None:
     db = SessionLocal()
     now = datetime.now(UTC).replace(tzinfo=None)
     seed_employees(db, now)
-    seed_code_masters(db)
 
     inserted = 0
     skipped = 0
     defaulted_stock = 0
     category_counts: Counter[str] = Counter()
     errors: list[str] = []
-    serial_counters: dict[str, int] = {}
 
     try:
         db.query(Inventory).delete()
@@ -479,10 +370,6 @@ def seed() -> None:
             else:
                 quantity = stock_current
 
-            erp_code, process_type_code, serial_no, symbol_slot = _build_erp_code(
-                raw_category_code, legacy_model, serial_counters
-            )
-
             item = Item(
                 item_code=item_code,
                 item_name=item_name,
@@ -496,10 +383,6 @@ def seed() -> None:
                 legacy_model=legacy_model,
                 supplier=supplier,
                 min_stock=min_stock,
-                erp_code=erp_code,
-                process_type_code=process_type_code,
-                serial_no=serial_no,
-                symbol_slot=symbol_slot,
                 created_at=now,
                 updated_at=now,
             )

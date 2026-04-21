@@ -4,84 +4,79 @@
 
 @layer base {
   :root {
-    --background: #0d111b;
-    --foreground: #e8eefc;
-
-    --c-bg: #0a0e1a;
-    --c-surface: linear-gradient(180deg, #0a0e1a 0%, #0c111d 100%);
-    --c-s1: #111827;
-    --c-s2: #182132;
-    --c-s3: #202a3e;
-    --c-panel: rgba(13, 18, 31, 0.94);
-    --c-border: rgba(148, 163, 184, 0.16);
-    --c-border-strong: rgba(96, 165, 250, 0.42);
-    --c-blue: #2563eb;
-    --c-green: #22c55e;
-    --c-red: #ef4444;
-    --c-yellow: #f59e0b;
-    --c-purple: #8b5cf6;
-    --c-cyan: #06b6d4;
-    --c-text: #f8fafc;
-    --c-text-soft: #cbd5e1;
-    --c-muted: #64748b;
-    --c-muted2: #94a3b8;
-    --c-soft-blue: rgba(37, 99, 235, 0.16);
-    --c-soft-green: rgba(34, 197, 94, 0.16);
-    --c-soft-red: rgba(239, 68, 68, 0.14);
-    --c-soft-yellow: rgba(245, 158, 11, 0.16);
-    --c-soft-purple: rgba(139, 92, 246, 0.16);
-    --c-soft-cyan: rgba(6, 182, 212, 0.16);
-    --c-shadow: 0 18px 40px rgba(2, 6, 23, 0.22);
-    --c-shadow-sm: 0 8px 18px rgba(2, 6, 23, 0.18);
+    --background: #08111f;
+    --foreground: #edf2fb;
+    --c-bg: #07101d;
+    --c-s1: rgba(11, 21, 36, 0.92);
+    --c-s2: rgba(18, 31, 51, 0.92);
+    --c-s3: rgba(28, 44, 68, 0.9);
+    --c-s4: rgba(39, 58, 87, 0.88);
+    --c-border: rgba(165, 190, 220, 0.12);
+    --c-border-strong: rgba(149, 197, 255, 0.28);
+    --c-blue: #65a9ff;
+    --c-green: #43d39d;
+    --c-red: #ff7b7b;
+    --c-yellow: #f6c667;
+    --c-purple: #8e7dff;
+    --c-cyan: #4ec9f5;
+    --c-text: #edf2fb;
+    --c-muted: #72829a;
+    --c-muted2: #9badc7;
+    --c-panel-glow: radial-gradient(circle at top right, rgba(101, 169, 255, 0.16), transparent 32%);
+    --c-card-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+    --c-radius-xl: 32px;
+    --c-radius-lg: 24px;
+    --c-radius-md: 18px;
+    --pill-hover-mix: 55%;
+    --pill-glow-strength: 75%;
+    --pill-glow-blur: 24px;
+    --pill-inset-ring: 1;
+    --kpi-hover-mix: 28%;
+    --kpi-glow-strength: 65%;
+    --kpi-glow-blur: 32px;
+    --sidebar-hover-mix: 50%;
+    --sidebar-glow-strength: 55%;
   }
 
   :root[data-theme="light"] {
-    --c-bg: #eff4ff;
-    --c-surface: radial-gradient(circle at top left, rgba(44, 108, 246, 0.12), transparent 28%),
-      linear-gradient(180deg, #f8fbff 0%, #eef3fb 54%, #e7edf8 100%);
-    --c-s1: #ffffff;
-    --c-s2: #f4f7fd;
-    --c-s3: #e6edf9;
-    --c-panel: rgba(255, 255, 255, 0.88);
-    --c-border: rgba(71, 85, 105, 0.14);
-    --c-border-strong: rgba(44, 108, 246, 0.2);
-    --c-blue: #2c6cf6;
-    --c-green: #159f63;
-    --c-red: #d95b61;
-    --c-yellow: #b78416;
-    --c-purple: #7b5cf2;
-    --c-cyan: #1296b7;
-    --c-text: #152033;
-    --c-text-soft: #243146;
-    --c-muted: #7b859b;
-    --c-muted2: #556079;
-    --c-soft-blue: rgba(44, 108, 246, 0.12);
-    --c-soft-green: rgba(21, 159, 99, 0.12);
-    --c-soft-red: rgba(217, 91, 97, 0.12);
-    --c-soft-yellow: rgba(183, 132, 22, 0.12);
-    --c-soft-purple: rgba(123, 92, 242, 0.12);
-    --c-soft-cyan: rgba(18, 150, 183, 0.12);
-    --c-shadow: 0 24px 54px rgba(15, 23, 42, 0.09);
-    --c-shadow-sm: 0 12px 26px rgba(15, 23, 42, 0.06);
+    --c-bg: #eff4fb;
+    --c-s1: rgba(255, 255, 255, 0.92);
+    --c-s2: rgba(244, 247, 252, 0.96);
+    --c-s3: rgba(230, 236, 245, 0.96);
+    --c-s4: rgba(214, 224, 237, 0.98);
+    --c-border: rgba(76, 97, 130, 0.1);
+    --c-border-strong: rgba(70, 122, 222, 0.22);
+    --c-blue: #2f74e7;
+    --c-green: #179f72;
+    --c-red: #d95a5a;
+    --c-yellow: #b98619;
+    --c-purple: #6f59e8;
+    --c-cyan: #078db0;
+    --c-text: #101a2b;
+    --c-muted: #72829a;
+    --c-muted2: #56657e;
+    --c-panel-glow: radial-gradient(circle at top right, rgba(47, 116, 231, 0.08), transparent 36%);
+    --c-card-shadow: 0 24px 64px rgba(45, 70, 106, 0.12);
+    --pill-hover-mix: 14%;
+    --pill-glow-strength: 0%;
+    --pill-glow-blur: 0px;
+    --pill-inset-ring: 0;
+    --kpi-hover-mix: 18%;
+    --kpi-glow-strength: 0%;
+    --kpi-glow-blur: 0px;
+    --sidebar-hover-mix: 18%;
+    --sidebar-glow-strength: 0%;
   }
 
   html {
-    height: 100%;
-    font-family: "Inter", system-ui, sans-serif;
+    font-family: "Pretendard", "Noto Sans KR", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
   }
 
   body {
-    height: 100dvh;
-    background: var(--c-surface);
+    background: var(--c-bg);
     color: var(--c-text);
-    min-height: 100dvh;
-    overflow-x: hidden;
-  }
-
-  body > * {
-    min-height: 100%;
+    min-height: 100vh;
   }
 
   /* 스크롤바 스타일 */
@@ -90,7 +85,7 @@
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: var(--c-s2);
+    background: transparent;
   }
   ::-webkit-scrollbar-thumb {
     background: var(--c-s3);
@@ -103,81 +98,12 @@
 
 @layer components {
   .card {
-    @apply rounded-xl p-5 shadow-lg border;
+    @apply border p-5;
     background: var(--c-s1);
     border-color: var(--c-border);
-  }
-
-  .desktop-shell-panel {
-    @apply rounded-2xl border;
-    background: var(--c-panel);
-    border-color: var(--c-border);
-    box-shadow: var(--c-shadow);
-  }
-
-  .desktop-shell-subpanel {
-    @apply rounded-xl border;
-    background: var(--c-s2);
-    border-color: var(--c-border);
-    box-shadow: none;
-  }
-
-  .desktop-section-label {
-    @apply text-[11px] font-bold uppercase tracking-[0.18em];
-    color: var(--c-muted2);
-  }
-
-  .desktop-action-primary {
-    @apply rounded-xl px-4 py-3 text-sm font-semibold text-white transition;
-    background: var(--c-blue);
-    box-shadow: none;
-  }
-
-  .desktop-action-secondary {
-    @apply rounded-xl border px-4 py-3 text-sm font-semibold transition;
-    background: var(--c-s2);
-    border-color: var(--c-border);
-    color: var(--c-text);
-  }
-
-  .desktop-action-danger {
-    @apply rounded-xl px-4 py-3 text-sm font-semibold text-white transition;
-    background: var(--c-red);
-    box-shadow: none;
-  }
-
-  .desktop-input {
-    @apply rounded-xl border px-4 py-3 text-sm outline-none transition;
-    background: var(--c-s1);
-    border-color: var(--c-border);
-    color: var(--c-text);
-  }
-
-  .desktop-input::placeholder {
-    color: var(--c-muted2);
-  }
-
-  .desktop-chip {
-    @apply rounded-lg border px-3 py-2 text-xs font-semibold transition;
-    background: var(--c-s2);
-    border-color: var(--c-border);
-    color: var(--c-muted2);
-  }
-
-  .desktop-chip-active {
-    border-color: var(--c-border-strong);
-    color: var(--c-text);
-  }
-
-  .desktop-table-wrap {
-    @apply overflow-hidden rounded-2xl border;
-    background: var(--c-s2);
-    border-color: var(--c-border);
-  }
-
-  .desktop-table-header {
-    background: rgba(148, 163, 184, 0.06);
-    color: var(--c-muted2);
+    border-radius: var(--c-radius-lg);
+    box-shadow: var(--c-card-shadow);
+    background-image: var(--c-panel-glow);
   }
 
   .badge {
@@ -186,91 +112,23 @@
 
   .btn-primary {
     background: var(--c-blue);
-    @apply text-white font-medium px-4 py-2 rounded-lg transition-colors duration-150 focus:outline-none;
+    @apply rounded-xl px-4 py-2 font-medium text-white transition-colors duration-150 focus:outline-none;
   }
 
   .btn-secondary {
     background: var(--c-s2);
     color: var(--c-text);
-    @apply font-medium px-4 py-2 rounded-lg transition-colors duration-150 focus:outline-none;
+    @apply rounded-xl px-4 py-2 font-medium transition-colors duration-150 focus:outline-none;
   }
+}
 
-  .legacy-panel {
-    @apply rounded-[28px] border overflow-hidden;
-    background: var(--c-s2);
-    border-color: rgba(255,255,255,.09);
-    box-shadow: 0 10px 24px rgba(0,0,0,.16);
-  }
-
-  .legacy-card {
-    @apply rounded-[24px] border overflow-hidden;
-    background: var(--c-s3);
-    border-color: rgba(255,255,255,.09);
-    box-shadow: 0 8px 18px rgba(0,0,0,.14);
-  }
-
-  .legacy-subcard {
-    @apply rounded-[24px] border overflow-hidden;
-    background: var(--c-s1);
-    border-color: rgba(255,255,255,.08);
-  }
-
-  .legacy-input {
-    @apply rounded-[22px] border px-4 py-3 text-sm outline-none transition-all duration-150;
-    background: var(--c-s1);
-    border-color: rgba(255,255,255,.08);
-    color: var(--c-text);
-  }
-
-  .legacy-input::placeholder {
-    color: var(--c-muted2);
-  }
-
-  .legacy-input:focus {
-    border-color: var(--c-blue);
-    box-shadow: 0 0 0 3px var(--c-soft-blue);
-  }
-
-  .legacy-chip {
-    @apply rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-150;
-    background: var(--c-s1);
-    border-color: rgba(255,255,255,.08);
-    color: var(--c-muted2);
-  }
-
-  .legacy-button-secondary {
-    @apply rounded-[24px] border px-4 py-3 text-sm font-semibold transition-all duration-150 hover:-translate-y-0.5;
-    background: var(--c-s2);
-    border-color: rgba(255,255,255,.1);
-    color: var(--c-text);
-  }
-
-  .legacy-button-primary {
-    @apply rounded-[24px] px-4 py-3 text-sm font-semibold text-white transition-all duration-150 hover:-translate-y-0.5;
-    background: var(--c-blue);
-    box-shadow: 0 8px 18px rgba(79,142,247,.22);
-  }
-
-  .legacy-empty-state {
-    @apply rounded-[24px] border p-6 text-center;
-    background: var(--c-s3);
-    border-color: rgba(255,255,255,.09);
-  }
-
-  .legacy-soft-blue {
-    background: var(--c-soft-blue);
-    color: var(--c-blue);
-  }
-
-  .legacy-soft-purple {
-    background: var(--c-soft-purple);
-    color: var(--c-purple);
-  }
-
-  .legacy-soft-red {
-    background: var(--c-soft-red);
-    color: var(--c-red);
-  }
+/* 스크롤바 숨김 (스크롤은 유지) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
 /* 카테고리 흐름 화살표 애니메이션 */
