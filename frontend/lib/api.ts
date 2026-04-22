@@ -17,7 +17,29 @@ export type Category =
   | "FG"
   | "UK";
 
-export type TransactionType = "RECEIVE" | "PRODUCE" | "SHIP" | "ADJUST" | "BACKFLUSH";
+export type TransactionType =
+  | "RECEIVE"
+  | "PRODUCE"
+  | "SHIP"
+  | "ADJUST"
+  | "BACKFLUSH"
+  | "SCRAP"
+  | "LOSS"
+  | "DISASSEMBLE"
+  | "RETURN"
+  | "TRANSFER_TO_PROD"
+  | "TRANSFER_TO_WH"
+  | "TRANSFER_DEPT"
+  | "MARK_DEFECTIVE"
+  | "SUPPLIER_RETURN";
+
+export type LocationStatus = "PRODUCTION" | "DEFECTIVE";
+
+export interface InventoryLocationRow {
+  department: Department;
+  status: LocationStatus;
+  quantity: number;
+}
 export type Department =
   | "조립"
   | "고압"
@@ -36,6 +58,9 @@ export interface CategorySummary {
   category_label: string;
   item_count: number;
   total_quantity: number;
+  warehouse_qty_sum?: number;
+  production_qty_sum?: number;
+  defective_qty_sum?: number;
 }
 
 export interface InventorySummary {
@@ -53,10 +78,14 @@ export interface Item {
   category: Category;
   unit: string;
   quantity: number;
+  warehouse_qty: number;
+  production_total: number;
+  defective_total: number;
   pending_quantity: number;
   available_quantity: number;
   last_reserver_name: string | null;
   location: string | null;
+  locations: InventoryLocationRow[];
   barcode: string | null;
   legacy_file_type: string | null;
   legacy_part: string | null;
@@ -371,6 +400,26 @@ export const api = {
 
   getItem: (itemId: string) => fetcher<Item>(toApiUrl(`/api/items/${itemId}`)),
 
+  createItem: async (payload: {
+    item_name: string;
+    category: Category;
+    spec?: string;
+    unit?: string;
+    legacy_model?: string;
+    legacy_item_type?: string;
+    supplier?: string;
+    min_stock?: number;
+    initial_quantity?: number;
+  }) => {
+    const res = await fetch(toApiUrl("/api/items"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<Item>;
+  },
+
   updateItem: async (
     itemId: string,
     payload: {
@@ -594,6 +643,96 @@ export const api = {
     if (!res.ok) throw new Error(await parseError(res));
     return res.json() as Promise<InventoryMutationResponse>;
   },
+
+  transferToProduction: async (payload: {
+    item_id: string;
+    quantity: number;
+    department: Department;
+    notes?: string;
+    reference_no?: string;
+    produced_by?: string;
+  }) => {
+    const res = await fetch(toApiUrl("/api/inventory/transfer-to-production"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<InventoryMutationResponse>;
+  },
+
+  transferToWarehouse: async (payload: {
+    item_id: string;
+    quantity: number;
+    department: Department;
+    notes?: string;
+    reference_no?: string;
+    produced_by?: string;
+  }) => {
+    const res = await fetch(toApiUrl("/api/inventory/transfer-to-warehouse"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<InventoryMutationResponse>;
+  },
+
+  transferBetweenDepts: async (payload: {
+    item_id: string;
+    quantity: number;
+    from_department: Department;
+    to_department: Department;
+    notes?: string;
+    reference_no?: string;
+    produced_by?: string;
+  }) => {
+    const res = await fetch(toApiUrl("/api/inventory/transfer-between-depts"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<InventoryMutationResponse>;
+  },
+
+  markDefective: async (payload: {
+    item_id: string;
+    quantity: number;
+    source: "warehouse" | "production";
+    source_department?: Department;
+    target_department: Department;
+    reason?: string;
+    operator?: string;
+  }) => {
+    const res = await fetch(toApiUrl("/api/inventory/mark-defective"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<InventoryMutationResponse>;
+  },
+
+  returnToSupplier: async (payload: {
+    item_id: string;
+    quantity: number;
+    from_department: Department;
+    reference_no?: string;
+    notes?: string;
+    operator?: string;
+  }) => {
+    const res = await fetch(toApiUrl("/api/inventory/return-to-supplier"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<InventoryMutationResponse>;
+  },
+
+  getItemLocations: (itemId: string) =>
+    fetcher<InventoryLocationRow[]>(toApiUrl(`/api/inventory/locations/${itemId}`)),
 
   getBOM: (parentItemId: string) => fetcher<BOMEntry[]>(toApiUrl(`/api/bom/${parentItemId}`)),
   getBOMTree: (parentItemId: string) =>

@@ -58,6 +58,8 @@ def run_migrations() -> None:
         "ALTER TABLE inventory ADD COLUMN last_reserver_name VARCHAR(100)",
         # M1: Batch link on transaction log
         "ALTER TABLE transaction_logs ADD COLUMN batch_id CHAR(36)",
+        # M8: 재고 이원화 — 창고 컬럼 (production/defective는 inventory_locations 테이블)
+        "ALTER TABLE inventory ADD COLUMN warehouse_qty NUMERIC(15,4) NOT NULL DEFAULT 0",
     ]
     with engine.connect() as conn:
         for sql in new_columns:
@@ -66,6 +68,16 @@ def run_migrations() -> None:
                 conn.commit()
             except Exception:
                 pass  # column already exists
+
+        # 기존 quantity → warehouse_qty 1회 이관 (warehouse_qty가 0인 행만)
+        try:
+            conn.execute(text(
+                "UPDATE inventory SET warehouse_qty = quantity "
+                "WHERE warehouse_qty = 0 AND quantity > 0"
+            ))
+            conn.commit()
+        except Exception:
+            pass
 
 
 run_migrations()

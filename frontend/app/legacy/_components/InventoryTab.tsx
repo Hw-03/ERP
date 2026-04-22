@@ -55,6 +55,9 @@ type DisplayRow = {
   key: string;
   representative: Item;
   quantity: number;
+  warehouse: number;
+  production: number;
+  defective: number;
   pending: number;
   available: number;
   reserver: string | null;
@@ -131,12 +134,18 @@ export function InventoryTab({
     if (!grouped) {
       return filtered.map((item) => {
         const quantity = Number(item.quantity);
+        const warehouse = Number(item.warehouse_qty ?? 0);
+        const production = Number(item.production_total ?? 0);
+        const defective = Number(item.defective_total ?? 0);
         const pending = Number(item.pending_quantity ?? 0);
-        const available = Number(item.available_quantity ?? quantity - pending);
+        const available = Number(item.available_quantity ?? warehouse + production - pending);
         return {
           key: item.item_id,
           representative: item,
           quantity,
+          warehouse,
+          production,
+          defective,
           pending,
           available,
           reserver: item.last_reserver_name,
@@ -148,12 +157,18 @@ export function InventoryTab({
     const groupedMap = new Map<string, DisplayRow>();
     filtered.forEach((item) => {
       const quantity = Number(item.quantity);
+      const warehouse = Number(item.warehouse_qty ?? 0);
+      const production = Number(item.production_total ?? 0);
+      const defective = Number(item.defective_total ?? 0);
       const pending = Number(item.pending_quantity ?? 0);
-      const available = Number(item.available_quantity ?? quantity - pending);
+      const available = Number(item.available_quantity ?? warehouse + production - pending);
       const key = item.item_name.trim().toLowerCase();
       const existing = groupedMap.get(key);
       if (existing) {
         existing.quantity += quantity;
+        existing.warehouse += warehouse;
+        existing.production += production;
+        existing.defective += defective;
         existing.pending += pending;
         existing.available += available;
         existing.count += 1;
@@ -162,6 +177,9 @@ export function InventoryTab({
           key,
           representative: item,
           quantity,
+          warehouse,
+          production,
+          defective,
           pending,
           available,
           reserver: item.last_reserver_name,
@@ -353,6 +371,31 @@ export function InventoryTab({
                     {item.unit}
                     {row.pending > 0 ? ` · 예약 ${formatNumber(row.pending)}` : ""}
                     {item.min_stock != null ? ` / 안전 ${formatNumber(item.min_stock)}` : ""}
+                  </div>
+                  <div className="mt-1 flex justify-end gap-1">
+                    <span
+                      className="inline-flex rounded-full px-[6px] py-[1px] text-[9px] font-semibold"
+                      style={{ background: "rgba(101,169,255,.15)", color: LEGACY_COLORS.blue }}
+                      title="창고"
+                    >
+                      창 {formatNumber(row.warehouse)}
+                    </span>
+                    <span
+                      className="inline-flex rounded-full px-[6px] py-[1px] text-[9px] font-semibold"
+                      style={{ background: "rgba(31,209,122,.15)", color: LEGACY_COLORS.green }}
+                      title="생산(부서 합)"
+                    >
+                      생 {formatNumber(row.production)}
+                    </span>
+                    {row.defective > 0 ? (
+                      <span
+                        className="inline-flex rounded-full px-[6px] py-[1px] text-[9px] font-semibold"
+                        style={{ background: "rgba(242,95,92,.18)", color: LEGACY_COLORS.red }}
+                        title="불량(부서 합)"
+                      >
+                        불 {formatNumber(row.defective)}
+                      </span>
+                    ) : null}
                   </div>
                   {row.reserver && row.pending > 0 ? (
                     <div

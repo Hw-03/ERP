@@ -343,7 +343,18 @@ def confirm_batch(db: Session, batch: QueueBatch) -> QueueBatch:
                 )
             )
         elif line.direction == QueueLineDirectionEnum.IN:
-            inv = inv_svc.receive_confirmed(db, line.item_id, line.quantity)
+            # PRODUCE 결과는 카테고리 매핑 부서의 PRODUCTION으로, 그 외(분해/반품)는 창고로
+            if batch.batch_type == QueueBatchTypeEnum.PRODUCE:
+                target_dept = inv_svc.dept_for_category(item.category)
+                if target_dept is not None:
+                    inv = inv_svc.receive_confirmed(
+                        db, line.item_id, line.quantity,
+                        bucket="production", dept=target_dept,
+                    )
+                else:
+                    inv = inv_svc.receive_confirmed(db, line.item_id, line.quantity)
+            else:
+                inv = inv_svc.receive_confirmed(db, line.item_id, line.quantity)
             db.add(
                 TransactionLog(
                     item_id=line.item_id,

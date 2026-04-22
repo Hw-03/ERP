@@ -57,7 +57,7 @@ def scan_safety_alerts(db: Session = Depends(get_db)):
     )
     for item in items:
         inv = db.query(Inventory).filter(Inventory.item_id == item.item_id).first()
-        avail = inv_svc.available(inv) if inv else Decimal("0")
+        avail = inv_svc.available(inv, db=db) if inv else Decimal("0")
         min_stock = item.min_stock or Decimal("0")
         if avail >= min_stock:
             continue
@@ -87,7 +87,7 @@ def scan_safety_alerts(db: Session = Depends(get_db)):
 
 
 @router.get(
-    "/",
+    "",
     response_model=List[StockAlertResponse],
     summary="알림 조회 (미확인 기본)",
 )

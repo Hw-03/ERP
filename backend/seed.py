@@ -288,6 +288,7 @@ def seed_from_legacy_html() -> None:
                 Inventory(
                     item_id=item.item_id,
                     quantity=quantity or Decimal("0"),
+                    warehouse_qty=quantity or Decimal("0"),
                     location=part,
                     updated_at=now,
                 )
@@ -392,6 +393,7 @@ def seed() -> None:
             inventory = Inventory(
                 item_id=item.item_id,
                 quantity=quantity,
+                warehouse_qty=quantity,
                 location=location,
                 updated_at=now,
             )

@@ -12,6 +12,7 @@ from app.models import (
     CategoryEnum,
     DepartmentEnum,
     EmployeeLevelEnum,
+    LocationStatusEnum,
     QueueBatchStatusEnum,
     QueueBatchTypeEnum,
     QueueLineDirectionEnum,
@@ -20,7 +21,7 @@ from app.models import (
 
 
 class ItemCreate(BaseModel):
-    item_code: str = Field(..., max_length=50, description="품목 코드")
+    item_code: Optional[str] = Field(None, max_length=50, description="품목 코드 (비우면 자동 부여)")
     item_name: str = Field(..., max_length=200, description="품목명")
     spec: Optional[str] = Field(None, description="사양")
     category: CategoryEnum = Field(CategoryEnum.UK, description="11단계 공정 카테고리")
@@ -32,6 +33,7 @@ class ItemCreate(BaseModel):
     legacy_model: Optional[str] = Field(None, max_length=50)
     supplier: Optional[str] = Field(None, max_length=200)
     min_stock: Optional[Decimal] = None
+    initial_quantity: Optional[Decimal] = Field(None, description="초기 재고 수량 (기본 0)")
 
 
 class ItemUpdate(BaseModel):
@@ -74,12 +76,23 @@ class ItemResponse(BaseModel):
     updated_at: datetime
 
 
+class InventoryLocationResponse(BaseModel):
+    """부서×상태(생산/불량) 단위 재고 분포."""
+    department: DepartmentEnum
+    status: LocationStatusEnum
+    quantity: Decimal
+
+
 class ItemWithInventory(ItemResponse):
     quantity: Optional[Decimal] = Decimal("0")
+    warehouse_qty: Decimal = Decimal("0")
+    production_total: Decimal = Decimal("0")
+    defective_total: Decimal = Decimal("0")
     pending_quantity: Decimal = Decimal("0")
     available_quantity: Decimal = Decimal("0")
     last_reserver_name: Optional[str] = None
     location: Optional[str] = None
+    locations: List[InventoryLocationResponse] = []
 
 
 class EmployeeCreate(BaseModel):
@@ -218,12 +231,63 @@ class InventoryResponse(BaseModel):
 
     inventory_id: uuid.UUID
     item_id: uuid.UUID
-    quantity: Decimal                      # Total (실재고)
+    quantity: Decimal                              # 총합 (= warehouse + production_total + defective_total)
+    warehouse_qty: Decimal = Decimal("0")
+    production_total: Decimal = Decimal("0")
+    defective_total: Decimal = Decimal("0")
     pending_quantity: Decimal = Decimal("0")
-    available_quantity: Decimal = Decimal("0")   # computed: quantity - pending
+    available_quantity: Decimal = Decimal("0")     # warehouse + production - pending (defective 제외)
     last_reserver_name: Optional[str] = None
     location: Optional[str]
     updated_at: datetime
+    locations: List[InventoryLocationResponse] = []
+
+
+class TransferRequest(BaseModel):
+    """창고↔부서 이동 (transfer-to-production / transfer-to-warehouse 공용)."""
+    item_id: uuid.UUID
+    quantity: Decimal = Field(..., gt=0)
+    department: DepartmentEnum
+    notes: Optional[str] = Field(None, description="비고")
+    reference_no: Optional[str] = Field(None, max_length=100)
+    produced_by: Optional[str] = Field(None, max_length=100)
+
+
+class DeptTransferRequest(BaseModel):
+    """부서간 이동."""
+    item_id: uuid.UUID
+    quantity: Decimal = Field(..., gt=0)
+    from_department: DepartmentEnum
+    to_department: DepartmentEnum
+    notes: Optional[str] = None
+    reference_no: Optional[str] = Field(None, max_length=100)
+    produced_by: Optional[str] = Field(None, max_length=100)
+
+
+class MarkDefectiveRequest(BaseModel):
+    """불량 등록.
+
+    source: 'warehouse' 또는 'production'
+    source=production 일 때 source_department 필수 (어느 부서에서 발견됐는지)
+    target_department: 격리될 부서
+    """
+    item_id: uuid.UUID
+    quantity: Decimal = Field(..., gt=0)
+    source: str = Field(..., description="warehouse | production")
+    source_department: Optional[DepartmentEnum] = None
+    target_department: DepartmentEnum
+    reason: Optional[str] = Field(None, description="불량 사유")
+    operator: Optional[str] = Field(None, max_length=100)
+
+
+class SupplierReturnRequest(BaseModel):
+    """공급업체 반품: 부서별 DEFECTIVE 차감."""
+    item_id: uuid.UUID
+    quantity: Decimal = Field(..., gt=0)
+    from_department: DepartmentEnum
+    reference_no: Optional[str] = Field(None, max_length=100)
+    notes: Optional[str] = None
+    operator: Optional[str] = Field(None, max_length=100)
 
 
 class CategorySummary(BaseModel):
@@ -231,6 +295,9 @@ class CategorySummary(BaseModel):
     category_label: str
     item_count: int
     total_quantity: Decimal
+    warehouse_qty_sum: Decimal = Decimal("0")
+    production_qty_sum: Decimal = Decimal("0")
+    defective_qty_sum: Decimal = Decimal("0")
 
 
 class InventorySummaryResponse(BaseModel):

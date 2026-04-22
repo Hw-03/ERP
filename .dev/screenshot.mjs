@@ -2,11 +2,25 @@ import { chromium } from 'playwright';
 import { mkdirSync, rmSync } from 'fs';
 
 const BASE = 'http://localhost:3000';
-const OUT = 'C:/ERP/.dev/screenshots';
+// MODE=light|dark (기본 light). dark 재생성 시 MODE=dark 로 실행.
+const MODE = (process.env.MODE || 'light').toLowerCase();
+const OUT = `C:/ERP/.dev/screenshots/${MODE}`;
 
-// 잔여 파일 전부 제거 후 재생성
+// 해당 모드 폴더만 비우고 재생성 (다른 모드는 보존)
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
+
+// 라이트 모드: 페이지 로딩 전 localStorage + data-theme 을 세팅
+async function applyTheme(ctx) {
+  if (MODE === 'light') {
+    await ctx.addInitScript(() => {
+      try { localStorage.setItem('theme', 'light'); } catch {}
+      const setAttr = () => document.documentElement?.setAttribute('data-theme', 'light');
+      setAttr();
+      document.addEventListener('DOMContentLoaded', setAttr);
+    });
+  }
+}
 
 async function shot(page, name) {
   await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: false });
@@ -125,8 +139,9 @@ async function goto(page, url) {
   // ══════════════════════════════════════════
   // 데스크톱 (1440×900)
   // ══════════════════════════════════════════
-  console.log('\n[데스크톱]');
+  console.log(`\n[데스크톱 / ${MODE}]`);
   const desk = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await applyTheme(desk);
 
   // ── 대시보드 ──
   {
@@ -266,8 +281,9 @@ async function goto(page, url) {
   // ══════════════════════════════════════════
   // 모바일 (390×844)
   // ══════════════════════════════════════════
-  console.log('\n[모바일]');
+  console.log(`\n[모바일 / ${MODE}]`);
   const mob = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await applyTheme(mob);
 
   // ── 재고 ──
   {

@@ -52,6 +52,16 @@ class TransactionTypeEnum(str, enum.Enum):
     RETURN = "RETURN"
     RESERVE = "RESERVE"
     RESERVE_RELEASE = "RESERVE_RELEASE"
+    TRANSFER_TO_PROD = "TRANSFER_TO_PROD"
+    TRANSFER_TO_WH = "TRANSFER_TO_WH"
+    TRANSFER_DEPT = "TRANSFER_DEPT"
+    MARK_DEFECTIVE = "MARK_DEFECTIVE"
+    SUPPLIER_RETURN = "SUPPLIER_RETURN"
+
+
+class LocationStatusEnum(str, enum.Enum):
+    PRODUCTION = "PRODUCTION"
+    DEFECTIVE = "DEFECTIVE"
 
 
 class QueueBatchTypeEnum(str, enum.Enum):
@@ -163,8 +173,11 @@ class Inventory(Base):
         unique=True,
         index=True,
     )
+    # quantity = warehouse_qty + Σ(InventoryLocation.quantity). 서비스 레이어가 동기화 보장.
     quantity = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
-    # Quantity currently reserved by open queue batches (Available = quantity - pending_quantity)
+    # 창고 보관량. 가용 재고 계산에 포함.
+    warehouse_qty = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
+    # 큐 배치 예약분 (warehouse_qty 대비). Available = warehouse + production_total − pending.
     pending_quantity = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
     last_reserver_employee_id = Column(
         UUID(as_uuid=True),
@@ -182,6 +195,45 @@ class Inventory(Base):
     )
 
     item = relationship("Item", back_populates="inventory")
+
+
+class InventoryLocation(Base):
+    """부서×상태(생산/불량) 단위 재고 분포. (item_id, department, status)당 1행.
+
+    Inventory와는 item_id로 매칭되며 직접 쿼리로 접근한다 (관계 매핑 없음)."""
+    __tablename__ = "inventory_locations"
+
+    location_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    item_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("items.item_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    department = Column(
+        SAEnum(DepartmentEnum, name="department_enum", create_type=False),
+        nullable=False,
+        index=True,
+    )
+    status = Column(
+        SAEnum(LocationStatusEnum, name="location_status_enum", create_type=True),
+        nullable=False,
+        index=True,
+    )
+    quantity = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("item_id", "department", "status", name="uq_invloc_item_dept_status"),
+        Index("ix_invloc_item", "item_id"),
+        Index("ix_invloc_dept", "department"),
+    )
 
 
 class BOM(Base):

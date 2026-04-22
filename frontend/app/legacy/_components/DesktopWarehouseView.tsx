@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeftRight, Boxes, PackageCheck, Search, Sparkles, TrendingUp, UserRound, Workflow } from "lucide-react";
-import { api, type Employee, type Item, type ShipPackage, type TransactionLog } from "@/lib/api";
+import { AlertTriangle, ArrowLeftRight, Boxes, PackageCheck, RotateCcw, Search, Sparkles, TrendingUp, UserRound, Workflow } from "lucide-react";
+import { api, type Department, type Employee, type Item, type ShipPackage, type TransactionLog } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import {
   LEGACY_COLORS,
@@ -20,15 +20,26 @@ import {
   transactionLabel,
 } from "./legacyUi";
 
-type WorkType = "raw-io" | "warehouse-io" | "dept-io" | "package-out";
+type WorkType =
+  | "raw-io"
+  | "warehouse-io"
+  | "dept-io"
+  | "package-out"
+  | "defective-register"
+  | "supplier-return";
 type Direction = "in" | "out";
 type TransferDirection = "wh-to-dept" | "dept-to-wh";
+type DefectiveSource = "warehouse" | "production";
+
+const PROD_DEPTS: Department[] = ["조립", "고압", "진공", "튜닝", "튜브", "출하"];
 
 const WORK_TYPES: { id: WorkType; label: string; icon: React.ElementType }[] = [
   { id: "raw-io", label: "원자재 입출고", icon: Boxes },
   { id: "warehouse-io", label: "창고 이동", icon: ArrowLeftRight },
   { id: "dept-io", label: "부서 입출고", icon: Workflow },
   { id: "package-out", label: "패키지 출고", icon: PackageCheck },
+  { id: "defective-register", label: "불량 등록", icon: AlertTriangle },
+  { id: "supplier-return", label: "공급업체 반품", icon: RotateCcw },
 ];
 
 function matchesSearch(item: Item, keyword: string) {
@@ -86,6 +97,8 @@ export function DesktopWarehouseView({
   const [rawDirection, setRawDirection] = useState<Direction>("in");
   const [warehouseDirection, setWarehouseDirection] = useState<TransferDirection>("wh-to-dept");
   const [deptDirection, setDeptDirection] = useState<Direction>("in");
+  const [selectedDept, setSelectedDept] = useState<Department>("조립");
+  const [defectiveSource, setDefectiveSource] = useState<DefectiveSource>("warehouse");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [packages, setPackages] = useState<ShipPackage[]>([]);
@@ -147,18 +160,26 @@ export function DesktopWarehouseView({
         ? warehouseDirection === "wh-to-dept"
         : workType === "dept-io"
           ? deptDirection === "out"
-          : true;
+          : workType === "defective-register"
+            ? true
+            : workType === "supplier-return"
+              ? true
+              : true;
 
   const effectiveLabel =
     workType === "raw-io"
       ? `원자재 ${rawDirection === "in" ? "입고" : "출고"}`
       : workType === "warehouse-io"
         ? warehouseDirection === "wh-to-dept"
-          ? "창고→부서 이동"
-          : "부서→창고 반납"
+          ? `창고→${selectedDept} 이동`
+          : `${selectedDept}→창고 복귀`
         : workType === "dept-io"
-          ? `부서 ${deptDirection === "in" ? "입고" : "출고"}`
-          : "패키지 출고";
+          ? `${selectedDept} ${deptDirection === "in" ? "입고" : "출고"}`
+          : workType === "defective-register"
+            ? `불량 등록 (${defectiveSource === "warehouse" ? "창고" : selectedDept} → ${selectedDept} 격리)`
+            : workType === "supplier-return"
+              ? `공급업체 반품 (${selectedDept} 불량)`
+              : "패키지 출고";
 
   const filteredItems = useMemo(
     () =>
@@ -187,8 +208,10 @@ export function DesktopWarehouseView({
     [packages, searchKeyword],
   );
 
+  // 총량이 실제로 변하는 작업: raw-io, supplier-return. 그 외는 위치 이동만.
+  const changesTotal = workType === "raw-io" || workType === "supplier-return";
   const expectedQuantity =
-    selectedItem && numericQty > 0 && workType !== "package-out"
+    selectedItem && numericQty > 0 && changesTotal
       ? isOutbound
         ? Number(selectedItem.quantity) - numericQty
         : Number(selectedItem.quantity) + numericQty
@@ -232,15 +255,65 @@ export function DesktopWarehouseView({
           notes: notes || undefined,
         });
       } else if (selectedItem) {
-        const payload = {
-          item_id: selectedItem.item_id,
-          quantity: numericQty,
-          reference_no: referenceNo || undefined,
-          produced_by: producedBy,
-          notes: notes || undefined,
-        };
-        if (isOutbound) await api.shipInventory(payload);
-        else await api.receiveInventory(payload);
+        const baseRef = referenceNo || undefined;
+        const baseNotes = notes || undefined;
+        if (workType === "raw-io") {
+          const payload = {
+            item_id: selectedItem.item_id,
+            quantity: numericQty,
+            reference_no: baseRef,
+            produced_by: producedBy,
+            notes: baseNotes,
+          };
+          if (rawDirection === "out") await api.shipInventory(payload);
+          else await api.receiveInventory(payload);
+        } else if (workType === "warehouse-io") {
+          const payload = {
+            item_id: selectedItem.item_id,
+            quantity: numericQty,
+            department: selectedDept,
+            reference_no: baseRef,
+            produced_by: producedBy,
+            notes: baseNotes,
+          };
+          if (warehouseDirection === "wh-to-dept") {
+            await api.transferToProduction(payload);
+          } else {
+            await api.transferToWarehouse(payload);
+          }
+        } else if (workType === "dept-io") {
+          // 부서 입고 = 창고에서 해당 부서로 이동.
+          // 부서 출고 = 해당 부서에서 창고로 복귀 (외부 출하는 raw-io 출고).
+          const payload = {
+            item_id: selectedItem.item_id,
+            quantity: numericQty,
+            department: selectedDept,
+            reference_no: baseRef,
+            produced_by: producedBy,
+            notes: baseNotes,
+          };
+          if (deptDirection === "in") await api.transferToProduction(payload);
+          else await api.transferToWarehouse(payload);
+        } else if (workType === "defective-register") {
+          await api.markDefective({
+            item_id: selectedItem.item_id,
+            quantity: numericQty,
+            source: defectiveSource,
+            source_department: defectiveSource === "production" ? selectedDept : undefined,
+            target_department: selectedDept,
+            reason: notes || undefined,
+            operator: producedBy,
+          });
+        } else if (workType === "supplier-return") {
+          await api.returnToSupplier({
+            item_id: selectedItem.item_id,
+            quantity: numericQty,
+            from_department: selectedDept,
+            reference_no: baseRef,
+            notes: baseNotes,
+            operator: producedBy,
+          });
+        }
       }
 
       setReferenceNo("");
@@ -489,6 +562,70 @@ export function DesktopWarehouseView({
                     {btn.label}
                   </button>
                 ))}
+              </div>
+            )}
+
+            {/* 부서 선택 — warehouse-io / dept-io / defective-register / supplier-return */}
+            {(workType === "warehouse-io"
+              || workType === "dept-io"
+              || workType === "defective-register"
+              || workType === "supplier-return") && (
+              <div className="mt-3">
+                <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  {workType === "supplier-return"
+                    ? "반품할 부서 (불량 보관 위치)"
+                    : workType === "defective-register"
+                      ? "불량 격리 부서"
+                      : "대상 부서"}
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {PROD_DEPTS.map((dept) => {
+                    const active = dept === selectedDept;
+                    return (
+                      <button
+                        key={dept}
+                        onClick={() => setSelectedDept(dept)}
+                        className="rounded-[14px] border px-2 py-2 text-xs font-semibold transition-all hover:brightness-110"
+                        style={{
+                          background: active ? "rgba(142,125,255,.14)" : LEGACY_COLORS.s1,
+                          borderColor: active ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
+                          color: active ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2,
+                        }}
+                      >
+                        {dept}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 불량 source 토글 */}
+            {workType === "defective-register" && (
+              <div className="mt-3">
+                <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  불량 발견 위치
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["warehouse", "production"] as DefectiveSource[]).map((src) => {
+                    const active = src === defectiveSource;
+                    const label = src === "warehouse" ? "창고에서 발견" : `${selectedDept}에서 발견`;
+                    return (
+                      <button
+                        key={src}
+                        onClick={() => setDefectiveSource(src)}
+                        className="rounded-[14px] border px-3 py-2 text-xs font-semibold transition-all hover:brightness-110"
+                        style={{
+                          background: active ? "rgba(255,123,123,.14)" : LEGACY_COLORS.s1,
+                          borderColor: active ? LEGACY_COLORS.red : LEGACY_COLORS.border,
+                          color: active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2,
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </section>

@@ -63,7 +63,8 @@ def submit_count(
         raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
 
     inv = inv_svc.get_or_create_inventory(db, payload.item_id)
-    system_qty = inv.quantity or Decimal("0")
+    # 실사는 창고(warehouse) 단위로 수행 (생산/불량 위치는 별도 실사 흐름 추후)
+    system_qty = inv.warehouse_qty or Decimal("0")
     pending = inv.pending_quantity or Decimal("0")
     diff = payload.counted_qty - system_qty
 
@@ -89,7 +90,8 @@ def submit_count(
     db.flush()
 
     if diff != 0:
-        inv.quantity = payload.counted_qty
+        inv.warehouse_qty = payload.counted_qty
+        inv_svc._sync_total(db, payload.item_id)
         db.add(
             TransactionLog(
                 item_id=payload.item_id,

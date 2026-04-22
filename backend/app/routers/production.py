@@ -51,7 +51,11 @@ def production_receipt(
     shortage_errors = []
     for comp_item_id, required_qty in merged.items():
         inv = db.query(Inventory).filter(Inventory.item_id == comp_item_id).first()
-        current_avail = inventory_svc.available(inv) if inv else Decimal("0")
+        # 생산 BACKFLUSH는 창고 가용분 기준으로 사전 검사 (warehouse - pending)
+        current_avail = (
+            (inv.warehouse_qty or Decimal("0")) - (inv.pending_quantity or Decimal("0"))
+            if inv else Decimal("0")
+        )
         if current_avail < required_qty:
             comp_item = db.query(Item).filter(Item.item_id == comp_item_id).first()
             shortage_errors.append(
@@ -81,8 +85,10 @@ def production_receipt(
             )
 
             comp_item = db.query(Item).filter(Item.item_id == comp_item_id).first()
-            qty_before = inv.quantity
-            inv.quantity = qty_before - required_qty
+            qty_before = inv.quantity or Decimal("0")
+            wh = inv.warehouse_qty or Decimal("0")
+            inv.warehouse_qty = wh - required_qty
+            inventory_svc._sync_total(db, comp_item_id)
 
             log = TransactionLog(
                 item_id=comp_item_id,
@@ -110,20 +116,17 @@ def production_receipt(
                 )
             )
 
-        produced_inv = (
-            db.query(Inventory)
-            .filter(Inventory.item_id == payload.item_id)
-            .with_for_update()
-            .first()
-        )
-
-        if not produced_inv:
-            produced_inv = Inventory(item_id=payload.item_id, quantity=Decimal("0"))
-            db.add(produced_inv)
-            db.flush()
-
-        prod_qty_before = produced_inv.quantity
-        produced_inv.quantity = prod_qty_before + payload.quantity
+        # 생산 결과: 카테고리 매핑 부서의 PRODUCTION으로 적재 (없으면 창고)
+        target_dept = inventory_svc.dept_for_category(produced_item.category)
+        produced_inv = inventory_svc.get_or_create_inventory(db, payload.item_id)
+        prod_qty_before = produced_inv.quantity or Decimal("0")
+        if target_dept is not None:
+            inventory_svc.receive_confirmed(
+                db, payload.item_id, payload.quantity,
+                bucket="production", dept=target_dept,
+            )
+        else:
+            inventory_svc.receive_confirmed(db, payload.item_id, payload.quantity)
 
         produce_log = TransactionLog(
             item_id=payload.item_id,

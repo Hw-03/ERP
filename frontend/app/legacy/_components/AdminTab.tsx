@@ -59,11 +59,38 @@ function SectionTabs({
   );
 }
 
+const CATEGORY_OPTIONS = [
+  { value: "RM", label: "RM — 원자재" },
+  { value: "TA", label: "TA — 튜브 조립" },
+  { value: "HA", label: "HA — 고압 조립" },
+  { value: "VA", label: "VA — 진공 조립" },
+  { value: "BA", label: "BA — 최종 조립" },
+  { value: "FG", label: "FG — 완제품" },
+  { value: "UK", label: "UK — 미분류" },
+];
+
+const MODEL_OPTIONS = ["공용", "DX3000", "ADX4000W", "ADX6000", "COCOON", "SOLO"];
+const UNIT_OPTIONS = ["EA", "SET", "kg", "g", "m", "mm", "L", "box"];
+
+const EMPTY_ADD_FORM = {
+  item_name: "",
+  category: "RM" as Item["category"],
+  spec: "",
+  unit: "EA",
+  legacy_model: "공용",
+  legacy_item_type: "",
+  supplier: "",
+  min_stock: "",
+  initial_quantity: "",
+};
+
 function ItemsSection({ showToast }: { showToast: (toast: ToastState) => void }) {
   const [items, setItems] = useState<Item[]>([]);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Item | null>(null);
-  const [form, setForm] = useState({
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState(EMPTY_ADD_FORM);
+  const [editForm, setEditForm] = useState({
     item_name: "",
     spec: "",
     unit: "",
@@ -86,9 +113,9 @@ function ItemsSection({ showToast }: { showToast: (toast: ToastState) => void })
     return items.filter((item) => `${item.item_name} ${item.item_code}`.toLowerCase().includes(keyword)).slice(0, 120);
   }, [items, search]);
 
-  function open(item: Item) {
+  function openEdit(item: Item) {
     setSelected(item);
-    setForm({
+    setEditForm({
       item_name: item.item_name,
       spec: item.spec || "",
       unit: item.unit,
@@ -106,16 +133,16 @@ function ItemsSection({ showToast }: { showToast: (toast: ToastState) => void })
     if (!selected) return;
     try {
       const updated = await api.updateItem(selected.item_id, {
-        item_name: form.item_name,
-        spec: form.spec || undefined,
-        unit: form.unit,
-        barcode: form.barcode || undefined,
-        legacy_file_type: form.legacy_file_type || undefined,
-        legacy_part: form.legacy_part || undefined,
-        legacy_item_type: form.legacy_item_type || undefined,
-        legacy_model: form.legacy_model || undefined,
-        supplier: form.supplier || undefined,
-        min_stock: form.min_stock ? Number(form.min_stock) : undefined,
+        item_name: editForm.item_name,
+        spec: editForm.spec || undefined,
+        unit: editForm.unit,
+        barcode: editForm.barcode || undefined,
+        legacy_file_type: editForm.legacy_file_type || undefined,
+        legacy_part: editForm.legacy_part || undefined,
+        legacy_item_type: editForm.legacy_item_type || undefined,
+        legacy_model: editForm.legacy_model || undefined,
+        supplier: editForm.supplier || undefined,
+        min_stock: editForm.min_stock ? Number(editForm.min_stock) : undefined,
       });
       setItems((current) => current.map((item) => (item.item_id === selected.item_id ? { ...item, ...updated } : item)));
       setSelected(null);
@@ -125,15 +152,55 @@ function ItemsSection({ showToast }: { showToast: (toast: ToastState) => void })
     }
   }
 
+  async function addItem() {
+    if (!addForm.item_name.trim()) {
+      showToast({ message: "품목명을 입력하세요.", type: "error" });
+      return;
+    }
+    try {
+      const created = await api.createItem({
+        item_name: addForm.item_name.trim(),
+        category: addForm.category,
+        spec: addForm.spec || undefined,
+        unit: addForm.unit || "EA",
+        legacy_model: addForm.legacy_model || undefined,
+        legacy_item_type: addForm.legacy_item_type || undefined,
+        supplier: addForm.supplier || undefined,
+        min_stock: addForm.min_stock ? Number(addForm.min_stock) : undefined,
+        initial_quantity: addForm.initial_quantity ? Number(addForm.initial_quantity) : undefined,
+      });
+      setItems((current) => [created, ...current]);
+      setAddOpen(false);
+      setAddForm(EMPTY_ADD_FORM);
+      showToast({ message: `'${created.item_name}' 품목이 추가됐습니다. (${created.item_code})`, type: "success" });
+    } catch (error) {
+      showToast({ message: error instanceof Error ? error.message : "품목 추가에 실패했습니다.", type: "error" });
+    }
+  }
+
+  const inputStyle = { background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text };
+  const labelStyle = { color: LEGACY_COLORS.muted2 };
+
   return (
     <>
+      <button
+        onClick={() => setAddOpen(true)}
+        className="mb-3 w-full rounded-xl border border-dashed py-[13px] text-sm font-bold transition-colors hover:bg-white/[0.08]"
+        style={{ borderColor: LEGACY_COLORS.green, color: LEGACY_COLORS.green }}
+      >
+        + 품목 추가
+      </button>
+
       <div className="mb-2 flex items-center gap-2 rounded-[11px] border px-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
         <span>🔍</span>
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="상품 검색" className="w-full bg-transparent py-[10px] text-sm outline-none" style={{ color: LEGACY_COLORS.text }} />
       </div>
       <div className="overflow-hidden rounded-[14px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+        {visibleItems.length === 0 && (
+          <div className="px-4 py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>품목이 없습니다.</div>
+        )}
         {visibleItems.map((item, index) => (
-          <button key={item.item_id} onClick={() => open(item)} className="flex w-full items-center justify-between px-[14px] py-3 text-left transition-colors hover:bg-white/[0.12]" style={{ borderBottom: index === visibleItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}` }}>
+          <button key={item.item_id} onClick={() => openEdit(item)} className="flex w-full items-center justify-between px-[14px] py-3 text-left transition-colors hover:bg-white/[0.12]" style={{ borderBottom: index === visibleItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}` }}>
             <div>
               <div className="text-sm font-semibold">{item.item_name}</div>
               <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -147,6 +214,133 @@ function ItemsSection({ showToast }: { showToast: (toast: ToastState) => void })
         ))}
       </div>
 
+      {/* 품목 추가 BottomSheet */}
+      <BottomSheet open={addOpen} onClose={() => { setAddOpen(false); setAddForm(EMPTY_ADD_FORM); }} title="새 품목 추가">
+        <div className="space-y-3 px-5 pb-6">
+          <div>
+            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>품목명 *</div>
+            <input
+              value={addForm.item_name}
+              onChange={(e) => setAddForm((f) => ({ ...f, item_name: e.target.value }))}
+              placeholder="예: 텅스텐 필라멘트"
+              className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>카테고리 *</div>
+            <select
+              value={addForm.category}
+              onChange={(e) => setAddForm((f) => ({ ...f, category: e.target.value as Item["category"] }))}
+              className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
+              style={inputStyle}
+            >
+              {CATEGORY_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>현재 수량</div>
+            <input
+              type="number"
+              min={0}
+              value={addForm.initial_quantity}
+              onChange={(e) => setAddForm((f) => ({ ...f, initial_quantity: e.target.value }))}
+              placeholder="0"
+              className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>규격</div>
+            <input
+              value={addForm.spec}
+              onChange={(e) => setAddForm((f) => ({ ...f, spec: e.target.value }))}
+              placeholder="예: Ø0.3 × L50"
+              className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
+              style={inputStyle}
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>단위</div>
+              <select
+                value={addForm.unit}
+                onChange={(e) => setAddForm((f) => ({ ...f, unit: e.target.value }))}
+                className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
+                style={inputStyle}
+              >
+                {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+            <div className="flex-1">
+              <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>모델</div>
+              <select
+                value={addForm.legacy_model}
+                onChange={(e) => setAddForm((f) => ({ ...f, legacy_model: e.target.value }))}
+                className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
+                style={inputStyle}
+              >
+                {MODEL_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>자재분류</div>
+            <input
+              value={addForm.legacy_item_type}
+              onChange={(e) => setAddForm((f) => ({ ...f, legacy_item_type: e.target.value }))}
+              placeholder="예: 필라멘트, 애자"
+              className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>공급사</div>
+            <input
+              value={addForm.supplier}
+              onChange={(e) => setAddForm((f) => ({ ...f, supplier: e.target.value }))}
+              placeholder="예: 삼성특수금속"
+              className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>안전재고</div>
+            <input
+              type="number"
+              min={0}
+              value={addForm.min_stock}
+              onChange={(e) => setAddForm((f) => ({ ...f, min_stock: e.target.value }))}
+              placeholder="0"
+              className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
+              style={inputStyle}
+            />
+          </div>
+
+          <div className="pt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+            품번은 카테고리 기반으로 자동 부여됩니다. (예: RM-00972)
+          </div>
+
+          <button
+            onClick={() => void addItem()}
+            className="w-full rounded-xl py-[13px] text-[15px] font-bold text-white transition-all hover:brightness-110"
+            style={{ background: LEGACY_COLORS.green }}
+          >
+            추가
+          </button>
+        </div>
+      </BottomSheet>
+
+      {/* 품목 편집 BottomSheet */}
       <BottomSheet open={!!selected} onClose={() => setSelected(null)} title={selected?.item_name || "상품 편집"}>
         <div className="space-y-3 px-5 pb-6">
           {(
@@ -161,17 +355,17 @@ function ItemsSection({ showToast }: { showToast: (toast: ToastState) => void })
               ["legacy_model", "모델"],
               ["supplier", "공급처"],
               ["min_stock", "안전재고"],
-            ] as [keyof typeof form, string][]
+            ] as [keyof typeof editForm, string][]
           ).map(([key, label]) => (
             <div key={key}>
-              <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>
                 {label}
               </div>
               <input
-                value={form[key]}
-                onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))}
+                value={editForm[key]}
+                onChange={(event) => setEditForm((current) => ({ ...current, [key]: event.target.value }))}
                 className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
-                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                style={inputStyle}
               />
             </div>
           ))}

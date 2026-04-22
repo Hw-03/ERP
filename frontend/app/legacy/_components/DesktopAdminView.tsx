@@ -10,6 +10,30 @@ import { DEPARTMENT_LABELS, LEGACY_COLORS, buildItemSearchLabel, formatNumber, n
 
 type AdminSection = "items" | "employees" | "bom" | "packages" | "settings";
 
+const CATEGORY_OPTIONS = [
+  { value: "RM", label: "RM — 원자재" },
+  { value: "TA", label: "TA — 튜브 조립" },
+  { value: "HA", label: "HA — 고압 조립" },
+  { value: "VA", label: "VA — 진공 조립" },
+  { value: "BA", label: "BA — 최종 조립" },
+  { value: "FG", label: "FG — 완제품" },
+  { value: "UK", label: "UK — 미분류" },
+];
+const MODEL_OPTIONS = ["공용", "DX3000", "ADX4000W", "ADX6000", "COCOON", "SOLO"];
+const UNIT_OPTIONS = ["EA", "SET", "kg", "g", "m", "mm", "L", "box"];
+
+const EMPTY_ADD_FORM = {
+  item_name: "",
+  category: "RM" as Item["category"],
+  spec: "",
+  unit: "EA",
+  legacy_model: "공용",
+  legacy_item_type: "",
+  supplier: "",
+  min_stock: "",
+  initial_quantity: "",
+};
+
 const SECTIONS: { id: AdminSection; label: string; description: string; icon: ElementType }[] = [
   { id: "items", label: "품목", description: "품목 기본 정보 수정", icon: PackagePlus },
   { id: "employees", label: "직원", description: "직원 활성 상태 관리", icon: Users },
@@ -31,6 +55,8 @@ export function DesktopAdminView({
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [packages, setPackages] = useState<ShipPackage[]>([]);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [addMode, setAddMode] = useState(false);
+  const [addForm, setAddForm] = useState(EMPTY_ADD_FORM);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<ShipPackage | null>(null);
   const [parentId, setParentId] = useState("");
@@ -71,6 +97,33 @@ export function DesktopAdminView({
   }, [globalSearch, itemSearch, items]);
 
   const quickItems = useMemo(() => items.slice(0, 40), [items]);
+
+  async function addItem() {
+    if (!addForm.item_name.trim()) {
+      setMessage("품목명을 입력하세요.");
+      return;
+    }
+    try {
+      const created = await api.createItem({
+        item_name: addForm.item_name.trim(),
+        category: addForm.category,
+        spec: addForm.spec || undefined,
+        unit: addForm.unit || "EA",
+        legacy_model: addForm.legacy_model || undefined,
+        legacy_item_type: addForm.legacy_item_type || undefined,
+        supplier: addForm.supplier || undefined,
+        min_stock: addForm.min_stock ? Number(addForm.min_stock) : undefined,
+        initial_quantity: addForm.initial_quantity ? Number(addForm.initial_quantity) : undefined,
+      });
+      setItems((current) => [created, ...current]);
+      setSelectedItem(created);
+      setAddMode(false);
+      setAddForm(EMPTY_ADD_FORM);
+      onStatusChange(`'${created.item_name}' 품목이 추가됐습니다. (${created.item_code})`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "품목 추가에 실패했습니다.");
+    }
+  }
 
   async function saveItemField(field: keyof Pick<Item, "item_name" | "spec" | "barcode" | "legacy_model" | "supplier">, value: string) {
     if (!selectedItem) return;
@@ -220,8 +273,15 @@ export function DesktopAdminView({
                         style={{ color: LEGACY_COLORS.text }}
                       />
                     </div>
-                    <div className="mt-2 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                      {formatNumber(visibleItems.length)}건
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{formatNumber(visibleItems.length)}건</span>
+                      <button
+                        onClick={() => { setAddMode(true); setSelectedItem(null); }}
+                        className="rounded-full px-3 py-1 text-[11px] font-bold"
+                        style={{ background: "rgba(67,211,157,.18)", color: LEGACY_COLORS.green }}
+                      >
+                        + 품목 추가
+                      </button>
                     </div>
                   </div>
                   <div className="min-h-0 flex-1 overflow-y-auto">
@@ -242,9 +302,80 @@ export function DesktopAdminView({
                   </div>
                 </div>
 
-                {/* 품목 편집 (독립 스크롤) */}
+                {/* 품목 추가 / 편집 패널 (독립 스크롤) */}
                 <div className="overflow-y-auto rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                  {selectedItem ? (
+                  {addMode ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="text-base font-bold">새 품목 추가</div>
+                        <button onClick={() => { setAddMode(false); setAddForm(EMPTY_ADD_FORM); }} className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>취소</button>
+                      </div>
+                      {[
+                        { key: "item_name", label: "품목명 *", type: "text", placeholder: "예: 텅스텐 필라멘트" },
+                        { key: "spec", label: "규격", type: "text", placeholder: "예: Ø0.3 × L50" },
+                        { key: "initial_quantity", label: "현재 수량", type: "number", placeholder: "0" },
+                        { key: "legacy_item_type", label: "자재분류", type: "text", placeholder: "예: 필라멘트, 애자" },
+                        { key: "supplier", label: "공급사", type: "text", placeholder: "예: 삼성특수금속" },
+                        { key: "min_stock", label: "안전재고", type: "number", placeholder: "0" },
+                      ].map(({ key, label, type, placeholder }) => (
+                        <div key={key}>
+                          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
+                          <input
+                            type={type}
+                            min={type === "number" ? 0 : undefined}
+                            value={(addForm as Record<string, string>)[key]}
+                            onChange={(e) => setAddForm((f) => ({ ...f, [key]: e.target.value }))}
+                            placeholder={placeholder}
+                            className="w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
+                            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                          />
+                        </div>
+                      ))}
+                      <div>
+                        <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>카테고리 *</div>
+                        <select
+                          value={addForm.category}
+                          onChange={(e) => setAddForm((f) => ({ ...f, category: e.target.value as Item["category"] }))}
+                          className="w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
+                          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                        >
+                          {CATEGORY_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex gap-3">
+                        <div className="flex-1">
+                          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>단위</div>
+                          <select
+                            value={addForm.unit}
+                            onChange={(e) => setAddForm((f) => ({ ...f, unit: e.target.value }))}
+                            className="w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
+                            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                          >
+                            {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
+                          </select>
+                        </div>
+                        <div className="flex-1">
+                          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>모델</div>
+                          <select
+                            value={addForm.legacy_model}
+                            onChange={(e) => setAddForm((f) => ({ ...f, legacy_model: e.target.value }))}
+                            className="w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
+                            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                          >
+                            {MODEL_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>품번은 카테고리 기반으로 자동 부여됩니다. (예: RM-00972)</div>
+                      <button
+                        onClick={() => void addItem()}
+                        className="w-full rounded-[18px] py-3 text-sm font-bold text-white"
+                        style={{ background: LEGACY_COLORS.green }}
+                      >
+                        추가
+                      </button>
+                    </div>
+                  ) : selectedItem ? (
                     <div className="space-y-4">
                       <div className="mb-2 text-base font-bold">{selectedItem.item_name}</div>
                       {([

@@ -14,10 +14,17 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import CategoryEnum, Inventory, Item
-from app.schemas import ItemCreate, ItemResponse, ItemUpdate, ItemWithInventory
+from app.models import CategoryEnum, Inventory, InventoryLocation, Item, LocationStatusEnum
+from app.schemas import (
+    InventoryLocationResponse,
+    ItemCreate,
+    ItemResponse,
+    ItemUpdate,
+    ItemWithInventory,
+)
 from app.utils.erp_code import infer_process_type, infer_symbol_slot, make_erp_code
 from app.models import ProductSymbol
+from app.services import inventory as inventory_svc
 
 router = APIRouter()
 
@@ -26,12 +33,34 @@ def _build_item_query(db: Session):
     return db.query(Item, Inventory).outerjoin(Inventory, Item.item_id == Inventory.item_id)
 
 
-def _to_item_with_inventory(item: Item, inventory: Optional[Inventory]) -> ItemWithInventory:
-    """Build ItemWithInventory dto including computed Available."""
+def _to_item_with_inventory(
+    db: Session, item: Item, inventory: Optional[Inventory]
+) -> ItemWithInventory:
+    """Build ItemWithInventory dto with bucket breakdown."""
     from decimal import Decimal as _D
 
-    total = (inventory.quantity if inventory else None) or _D("0")
     pending = (inventory.pending_quantity if inventory else None) or _D("0")
+    wh = (inventory.warehouse_qty if inventory else None) or _D("0")
+    prod = inventory_svc.production_total(db, item.item_id) if inventory else _D("0")
+    defect = inventory_svc.defective_total(db, item.item_id) if inventory else _D("0")
+    total = wh + prod + defect
+
+    locations: list[InventoryLocationResponse] = []
+    if inventory:
+        loc_rows = (
+            db.query(InventoryLocation)
+            .filter(InventoryLocation.item_id == item.item_id, InventoryLocation.quantity > 0)
+            .all()
+        )
+        locations = [
+            InventoryLocationResponse(
+                department=row.department,
+                status=row.status,
+                quantity=row.quantity or _D("0"),
+            )
+            for row in loc_rows
+        ]
+
     return ItemWithInventory(
         item_id=item.item_id,
         item_code=item.item_code,
@@ -54,23 +83,45 @@ def _to_item_with_inventory(item: Item, inventory: Optional[Inventory]) -> ItemW
         created_at=item.created_at,
         updated_at=item.updated_at,
         quantity=total,
+        warehouse_qty=wh,
+        production_total=prod,
+        defective_total=defect,
         pending_quantity=pending,
-        available_quantity=total - pending,
+        available_quantity=wh + prod - pending,
         last_reserver_name=inventory.last_reserver_name if inventory else None,
         location=inventory.location if inventory else None,
+        locations=locations,
     )
+
+
+def _auto_item_code(category_val: str, db: Session) -> str:
+    """카테고리 기반 품번 자동 부여: {CATEGORY}-{최대일련번호+1:05d}"""
+    prefix = category_val.upper()
+    import re as _re
+    pattern = f"^{_re.escape(prefix)}-([0-9]+)$"
+    existing_codes = [r[0] for r in db.query(Item.item_code).all() if r[0]]
+    max_serial = 0
+    for code in existing_codes:
+        m = _re.match(pattern, code)
+        if m:
+            max_serial = max(max_serial, int(m.group(1)))
+    return f"{prefix}-{max_serial + 1:05d}"
 
 
 @router.post("", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
 def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
-    existing = db.query(Item).filter(Item.item_code == payload.item_code).first()
+    category_val = payload.category.value if payload.category else "UK"
+
+    # 품번 자동 부여
+    item_code = (payload.item_code or "").strip() or _auto_item_code(category_val, db)
+
+    existing = db.query(Item).filter(Item.item_code == item_code).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"품목 코드 '{payload.item_code}'가 이미 존재합니다.",
+            detail=f"품목 코드 '{item_code}'가 이미 존재합니다.",
         )
 
-    category_val = payload.category.value if payload.category else "UK"
     pt = infer_process_type(category_val, payload.legacy_part)
     slot = infer_symbol_slot(payload.legacy_model)
 
@@ -78,7 +129,6 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
     erp_code = None
     opt = None
     if pt:
-        # 같은 그룹 내 최대 serial_no + 1
         max_serial = (
             db.query(func.max(Item.serial_no))
             .filter(Item.symbol_slot == slot, Item.process_type_code == pt)
@@ -92,12 +142,12 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
         erp_code = make_erp_code(symbol, pt, serial, opt)
 
     item = Item(
-        item_code=payload.item_code,
+        item_code=item_code,
         item_name=payload.item_name,
         spec=payload.spec,
         category=payload.category,
         unit=payload.unit,
-        barcode=payload.barcode,
+        barcode=payload.barcode or item_code,
         legacy_file_type=payload.legacy_file_type,
         legacy_part=payload.legacy_part,
         legacy_item_type=payload.legacy_item_type,
@@ -113,7 +163,8 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
     db.add(item)
     db.flush()
 
-    inventory = Inventory(item_id=item.item_id, quantity=0)
+    init_qty = payload.initial_quantity if payload.initial_quantity is not None else 0
+    inventory = Inventory(item_id=item.item_id, quantity=init_qty, warehouse_qty=init_qty)
     db.add(inventory)
 
     db.commit()
@@ -167,7 +218,7 @@ def list_items(
         )
 
     rows = query.order_by(Item.category, Item.item_code).offset(skip).limit(limit).all()
-    return [_to_item_with_inventory(item, inv) for item, inv in rows]
+    return [_to_item_with_inventory(db, item, inv) for item, inv in rows]
 
 
 @router.get("/export.csv")
@@ -298,7 +349,7 @@ def get_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
 
     item, inventory = row
-    return _to_item_with_inventory(item, inventory)
+    return _to_item_with_inventory(db, item, inventory)
 
 
 @router.put("/{item_id}", response_model=ItemResponse)

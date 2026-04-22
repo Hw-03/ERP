@@ -51,17 +51,20 @@ def create_scrap(payload: ScrapLogCreateRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
 
     inv = inv_svc.get_or_create_inventory(db, payload.item_id)
-    if inv_svc.available(inv) < payload.quantity:
+    wh = inv.warehouse_qty or Decimal("0")
+    pending = inv.pending_quantity or Decimal("0")
+    if wh - pending < payload.quantity:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=(
-                f"가용 재고 부족 (Available {inv_svc.available(inv)}, "
+                f"창고 가용 재고 부족 (창고 {wh}, 예약중 {pending}, "
                 f"요청 {payload.quantity})."
             ),
         )
 
     qty_before = inv.quantity or Decimal("0")
-    inv.quantity = qty_before - payload.quantity
+    inv.warehouse_qty = wh - payload.quantity
+    inv_svc._sync_total(db, payload.item_id)
 
     log = ScrapLog(
         item_id=payload.item_id,
