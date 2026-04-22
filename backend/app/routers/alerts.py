@@ -29,7 +29,7 @@ def _to_response(db: Session, alert: StockAlert) -> StockAlertResponse:
     return StockAlertResponse(
         alert_id=alert.alert_id,
         item_id=alert.item_id,
-        item_code=item.item_code if item else None,
+        erp_code=item.erp_code if item else None,
         item_name=item.item_name if item else None,
         kind=alert.kind,
         threshold=alert.threshold,

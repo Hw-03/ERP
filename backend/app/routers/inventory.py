@@ -281,7 +281,7 @@ def ship_package(payload: PackageShipRequest, db: Session = Depends(get_db)):
         required_qty = package_item.quantity * payload.quantity
         if current < required_qty:
             shortages.append(
-                f"[{package_item.item.item_code}] {package_item.item.item_name}: "
+                f"[{package_item.item.erp_code}] {package_item.item.item_name}: "
                 f"필요 {required_qty}, 출하부 보유 {current}"
             )
 
@@ -320,7 +320,7 @@ def ship_package(payload: PackageShipRequest, db: Session = Depends(get_db)):
         shipped_items.append(
             {
                 "item_id": str(package_item.item_id),
-                "item_code": package_item.item.item_code,
+                "erp_code": package_item.item.erp_code,
                 "item_name": package_item.item.item_name,
                 "quantity": float(required_qty),
                 "stock_after": float(inventory.quantity if inventory else 0),
@@ -571,7 +571,7 @@ def list_inventory(
     if category:
         query = query.filter(Item.category == category)
 
-    rows = query.order_by(Item.item_code).offset(skip).limit(limit).all()
+    rows = query.order_by(Item.erp_code).offset(skip).limit(limit).all()
     return [_to_response(db, inv) for inv in rows]
 
 
@@ -598,7 +598,7 @@ def list_transactions(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.item_code.ilike(pattern),
+                Item.erp_code.ilike(pattern),
                 TransactionLog.reference_no.ilike(pattern),
                 TransactionLog.notes.ilike(pattern),
                 TransactionLog.produced_by.ilike(pattern),
@@ -611,7 +611,7 @@ def list_transactions(
         TransactionLogResponse(
             log_id=log.log_id,
             item_id=log.item_id,
-            item_code=item.item_code,
+            erp_code=item.erp_code,
             item_name=item.item_name,
             item_category=item.category,
             item_unit=item.unit,
@@ -643,7 +643,7 @@ def export_transactions_csv(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.item_code.ilike(pattern),
+                Item.erp_code.ilike(pattern),
                 TransactionLog.reference_no.ilike(pattern),
                 TransactionLog.notes.ilike(pattern),
                 TransactionLog.produced_by.ilike(pattern),
@@ -658,7 +658,7 @@ def export_transactions_csv(
         [
             "created_at",
             "transaction_type",
-            "item_code",
+            "erp_code",
             "item_name",
             "category",
             "quantity_change",
@@ -674,7 +674,7 @@ def export_transactions_csv(
             [
                 log.created_at.isoformat(),
                 log.transaction_type.value,
-                item.item_code,
+                item.erp_code or "",
                 item.item_name,
                 item.category.value,
                 float(log.quantity_change),
@@ -727,7 +727,7 @@ def export_transactions_xlsx(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.item_code.ilike(pattern),
+                Item.erp_code.ilike(pattern),
                 TransactionLog.reference_no.ilike(pattern),
                 TransactionLog.notes.ilike(pattern),
                 TransactionLog.produced_by.ilike(pattern),
@@ -749,7 +749,7 @@ def export_transactions_xlsx(
     }
 
     columns = [
-        "일시", "유형", "품목코드", "품목명", "카테고리", "ERP코드",
+        "일시", "유형", "ERP코드", "품목명", "카테고리",
         "수량변화", "이전재고", "이후재고", "참조번호", "담당자", "메모",
     ]
     apply_header(ws, columns)
@@ -762,10 +762,9 @@ def export_transactions_xlsx(
         row_data = [
             log.created_at.strftime("%Y-%m-%d %H:%M") if log.created_at else "",
             tx_label.get(tx_val, tx_val),
-            item.item_code,
+            item.erp_code or "",
             item.item_name,
             item.category.value,
-            item.erp_code or "",
             float(log.quantity_change),
             float(log.quantity_before) if log.quantity_before is not None else "",
             float(log.quantity_after) if log.quantity_after is not None else "",
@@ -781,7 +780,7 @@ def export_transactions_xlsx(
         for cell in ws[row_idx]:
             cell.fill = row_fill
 
-        qty_change_cell = ws.cell(row=row_idx, column=7)
+        qty_change_cell = ws.cell(row=row_idx, column=6)
         if isinstance(qty_change_cell.value, float):
             qty_change_cell.font = positive_font if qty_change_cell.value >= 0 else negative_font
 
@@ -811,7 +810,7 @@ def update_transaction_notes(
     return TransactionLogResponse(
         log_id=log.log_id,
         item_id=log.item_id,
-        item_code=item.item_code,
+        erp_code=item.erp_code,
         item_name=item.item_name,
         item_category=item.category,
         item_unit=item.unit,

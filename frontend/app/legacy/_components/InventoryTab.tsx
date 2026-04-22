@@ -13,22 +13,14 @@ import {
   normalizeModel,
 } from "./legacyUi";
 
-const FILE_TYPE_OPTIONS = [
+const DEPT_OPTIONS = [
   { label: "전체", value: "ALL" },
-  { label: "원자재", value: "원자재" },
-  { label: "조립자재", value: "조립자재" },
-  { label: "발생부자재", value: "발생부자재" },
-  { label: "완제품", value: "완제품" },
-  { label: "미분류", value: "미분류" },
-];
-
-const PART_OPTIONS = [
-  { label: "전체", value: "ALL" },
-  { label: "자재창고", value: "자재창고" },
-  { label: "조립출하", value: "조립출하" },
-  { label: "고압파트", value: "고압파트" },
-  { label: "진공파트", value: "진공파트" },
-  { label: "튜닝파트", value: "튜닝파트" },
+  { label: "창고", value: "창고" },
+  { label: "조립", value: "조립" },
+  { label: "고압", value: "고압" },
+  { label: "진공", value: "진공" },
+  { label: "튜닝", value: "튜닝" },
+  { label: "튜브", value: "튜브" },
   { label: "출하", value: "출하" },
 ];
 
@@ -73,8 +65,7 @@ export function InventoryTab({
 }) {
   const [items, setItems] = useState<Item[]>([]);
   const [search, setSearch] = useState("");
-  const [fileType, setFileType] = useState("ALL");
-  const [part, setPart] = useState("ALL");
+  const [dept, setDept] = useState("ALL");
   const [model, setModel] = useState("ALL");
   const [kpi, setKpi] = useState("ALL");
   const [grouped, setGrouped] = useState(false);
@@ -92,8 +83,7 @@ export function InventoryTab({
         limit: PAGE_SIZE,
         skip,
       };
-      if (fileType !== "ALL") params.legacyFileType = fileType;
-      if (part !== "ALL") params.legacyPart = part;
+      if (dept !== "ALL") params.department = dept;
       if (model !== "ALL") params.legacyModel = model;
       if (deferredSearch.trim()) params.search = deferredSearch.trim();
 
@@ -111,7 +101,7 @@ export function InventoryTab({
     setPage(1);
     void fetchItems(0, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileType, part, model, deferredSearch]);
+  }, [dept, model, deferredSearch]);
 
   const filtered = useMemo(() => {
     return items.filter((item) => {
@@ -232,8 +222,7 @@ export function InventoryTab({
         />
       </div>
 
-      <FilterPills options={FILE_TYPE_OPTIONS} value={fileType} onChange={setFileType} />
-      <FilterPills options={PART_OPTIONS} value={part} onChange={setPart} activeColor={LEGACY_COLORS.green} />
+      <FilterPills options={DEPT_OPTIONS} value={dept} onChange={setDept} activeColor={LEGACY_COLORS.green} />
       <FilterPills options={MODEL_OPTIONS} value={model} onChange={setModel} activeColor={LEGACY_COLORS.cyan} />
 
       <div className="mb-[10px] grid grid-cols-4 gap-2">
@@ -306,11 +295,6 @@ export function InventoryTab({
               item.min_stock == null ? null : Number(item.min_stock),
             );
             const badge = fileTypeBadge(item.legacy_file_type);
-            const fillBase = Math.max(1, Number(item.min_stock ?? row.quantity));
-            const fillWidth = Math.max(
-              10,
-              Math.min(100, row.available > 0 ? (row.available / fillBase) * 100 : 6),
-            );
 
             return (
               <button
@@ -361,14 +345,34 @@ export function InventoryTab({
                     )}
                   </div>
                   <div className="mt-0.5 truncate text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {item.item_code}
+                    {item.erp_code}
                     {item.legacy_part ? ` / ${item.legacy_part}` : ""}
                     {normalizeModel(item.legacy_model) !== "공용" ? ` / ${normalizeModel(item.legacy_model)}` : ""}
                     {item.location ? ` · 📍${item.location}` : ""}
                   </div>
-                  <div className="mt-2 h-[6px] rounded-full" style={{ background: LEGACY_COLORS.s3 }}>
-                    <div className="h-full rounded-full" style={{ width: `${fillWidth}%`, background: stockState.color }} />
-                  </div>
+                  {(() => {
+                    const totalForGauge = Math.max(row.quantity, row.available, 1);
+                    const whPct = Math.min(100, (row.warehouse / totalForGauge) * 100);
+                    const prodPct = Math.min(100 - whPct, (row.production / totalForGauge) * 100);
+                    const defPct = Math.min(100 - whPct - prodPct, (row.defective / totalForGauge) * 100);
+                    return (
+                      <div
+                        className="mt-2 flex h-[6px] overflow-hidden rounded-full"
+                        style={{ background: LEGACY_COLORS.s3 }}
+                        title={`창고 ${formatNumber(row.warehouse)} / 부서 ${formatNumber(row.production)}${row.defective > 0 ? ` / 불량 ${formatNumber(row.defective)}` : ""}`}
+                      >
+                        {whPct > 0 && (
+                          <div className="h-full shrink-0" style={{ width: `${whPct}%`, background: "var(--c-blue)" }} />
+                        )}
+                        {prodPct > 0 && (
+                          <div className="h-full shrink-0" style={{ width: `${prodPct}%`, background: "var(--c-green)" }} />
+                        )}
+                        {defPct > 0 && (
+                          <div className="h-full shrink-0" style={{ width: `${defPct}%`, background: "var(--c-red)" }} />
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold" style={{ color: LEGACY_COLORS.text }}>

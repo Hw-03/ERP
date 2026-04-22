@@ -129,7 +129,7 @@ def _to_detail_response(package: ShipPackage) -> ShipPackageDetailResponse:
             {
                 "package_item_id": item.package_item_id,
                 "item_id": item.item_id,
-                "item_code": item.item.item_code,
+                "erp_code": item.item.erp_code,
                 "item_name": item.item.item_name,
                 "item_category": item.item.category,
                 "item_unit": item.item.unit,

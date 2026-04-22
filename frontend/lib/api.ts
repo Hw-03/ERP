@@ -72,7 +72,6 @@ export interface InventorySummary {
 
 export interface Item {
   item_id: string;
-  item_code: string;
   item_name: string;
   spec: string | null;
   category: Category;
@@ -116,7 +115,7 @@ export interface QueueLine {
   line_id: string;
   batch_id: string;
   item_id: string;
-  item_code: string | null;
+  erp_code: string | null;
   item_name: string | null;
   direction: QueueLineDirection;
   quantity: number;
@@ -149,7 +148,7 @@ export type AlertKind = "SAFETY" | "COUNT_VARIANCE";
 export interface StockAlert {
   alert_id: string;
   item_id: string;
-  item_code: string | null;
+  erp_code: string | null;
   item_name: string | null;
   kind: AlertKind;
   threshold: number | null;
@@ -163,7 +162,7 @@ export interface StockAlert {
 export interface PhysicalCount {
   count_id: string;
   item_id: string;
-  item_code: string | null;
+  erp_code: string | null;
   item_name: string | null;
   counted_qty: number;
   system_qty: number;
@@ -176,7 +175,7 @@ export interface PhysicalCount {
 export interface ScrapLogRow {
   scrap_id: string;
   item_id: string;
-  item_code: string | null;
+  erp_code: string | null;
   item_name: string | null;
   quantity: number;
   process_stage: string | null;
@@ -189,7 +188,7 @@ export interface ScrapLogRow {
 export interface LossLogRow {
   loss_id: string;
   item_id: string;
-  item_code: string | null;
+  erp_code: string | null;
   item_name: string | null;
   quantity: number;
   batch_id: string | null;
@@ -202,7 +201,7 @@ export interface VarianceLogRow {
   var_id: string;
   batch_id: string;
   item_id: string;
-  item_code: string | null;
+  erp_code: string | null;
   item_name: string | null;
   bom_expected: number;
   actual_used: number;
@@ -228,7 +227,7 @@ export interface Employee {
 export interface ShipPackageItemDetail {
   package_item_id: string;
   item_id: string;
-  item_code: string;
+  erp_code: string;
   item_name: string;
   item_category: Category;
   item_unit: string;
@@ -264,7 +263,7 @@ export interface BOMEntry {
 
 export interface BOMTreeNode {
   item_id: string;
-  item_code: string;
+  erp_code: string;
   item_name: string;
   category: Category;
   unit: string;
@@ -276,7 +275,7 @@ export interface BOMTreeNode {
 export interface TransactionLog {
   log_id: string;
   item_id: string;
-  item_code: string;
+  erp_code: string;
   item_name: string;
   item_category: Category;
   item_unit: string;
@@ -291,7 +290,7 @@ export interface TransactionLog {
 }
 
 export interface ProductionCheckComponent {
-  item_code: string;
+  erp_code: string;
   item_name: string;
   category: Category;
   unit: string;
@@ -311,7 +310,7 @@ export interface ProductionCheckResponse {
 
 export interface BackflushDetail {
   item_id: string;
-  item_code: string;
+  erp_code: string;
   item_name: string;
   category: Category;
   required_quantity: number;
@@ -386,6 +385,7 @@ export const api = {
     legacyModel?: string;
     legacyItemType?: string;
     barcode?: string;
+    department?: string;
   }) => {
     const query = new URLSearchParams();
     if (params?.category) query.set("category", params.category);
@@ -397,6 +397,7 @@ export const api = {
     if (params?.legacyModel) query.set("legacy_model", params.legacyModel);
     if (params?.legacyItemType) query.set("legacy_item_type", params.legacyItemType);
     if (params?.barcode) query.set("barcode", params.barcode);
+    if (params?.department) query.set("department", params.department);
     return fetcher<Item[]>(toApiUrl(`/api/items?${query}`));
   },
 
@@ -627,7 +628,7 @@ export const api = {
       message: string;
       package_name: string;
       quantity: number;
-      items: { item_id: string; item_code: string; item_name: string; quantity: number; stock_after: number }[];
+      items: { item_id: string; erp_code: string; item_name: string; quantity: number; stock_after: number }[];
     }>;
   },
 

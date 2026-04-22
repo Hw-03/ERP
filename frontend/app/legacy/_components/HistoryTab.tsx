@@ -102,7 +102,7 @@ export function HistoryTab({ onClose }: { onClose: () => void }) {
       if (start && new Date(log.created_at) < start) return false;
       if (search.trim()) {
         const keyword = search.trim().toLowerCase();
-        const haystack = `${log.item_name} ${log.item_code} ${log.reference_no ?? ""} ${log.notes ?? ""}`.toLowerCase();
+        const haystack = `${log.item_name} ${log.erp_code} ${log.reference_no ?? ""} ${log.notes ?? ""}`.toLowerCase();
         if (!haystack.includes(keyword)) return false;
       }
       return true;
@@ -283,7 +283,7 @@ export function HistoryTab({ onClose }: { onClose: () => void }) {
                   {new Date(log.created_at).toLocaleString("ko-KR")}
                 </div>
                 <div className="mt-1 flex items-center gap-1.5 text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
-                  <span>{log.item_code}</span>
+                  <span>{log.erp_code}</span>
                   {log.reference_no ? (
                     <button
                       onClick={(e) => { e.stopPropagation(); copyRef(log.reference_no!); }}

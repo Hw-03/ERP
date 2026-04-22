@@ -21,7 +21,6 @@ from app.models import (
 
 
 class ItemCreate(BaseModel):
-    item_code: Optional[str] = Field(None, max_length=50, description="품목 코드 (비우면 자동 부여)")
     item_name: str = Field(..., max_length=200, description="품목명")
     spec: Optional[str] = Field(None, description="사양")
     category: CategoryEnum = Field(CategoryEnum.UK, description="11단계 공정 카테고리")
@@ -56,7 +55,6 @@ class ItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     item_id: uuid.UUID
-    item_code: str
     item_name: str
     spec: Optional[str]
     category: CategoryEnum
@@ -175,7 +173,7 @@ class ShipPackageResponse(BaseModel):
 class ShipPackageItemDetail(BaseModel):
     package_item_id: uuid.UUID
     item_id: uuid.UUID
-    item_code: str
+    erp_code: str
     item_name: str
     item_category: CategoryEnum
     item_unit: str
@@ -332,7 +330,7 @@ class BOMResponse(BaseModel):
 
 class BOMTreeNode(BaseModel):
     item_id: uuid.UUID
-    item_code: str
+    erp_code: str
     item_name: str
     category: CategoryEnum
     unit: str
@@ -354,7 +352,7 @@ class ProductionReceiptRequest(BaseModel):
 
 class BackflushDetail(BaseModel):
     item_id: uuid.UUID
-    item_code: str
+    erp_code: str
     item_name: str
     category: CategoryEnum
     required_quantity: Decimal
@@ -382,7 +380,7 @@ class TransactionLogResponse(BaseModel):
 
     log_id: uuid.UUID
     item_id: uuid.UUID
-    item_code: str
+    erp_code: str
     item_name: str
     item_category: CategoryEnum
     item_unit: str
@@ -517,7 +515,7 @@ class QueueLineResponse(BaseModel):
     line_id: uuid.UUID
     batch_id: uuid.UUID
     item_id: uuid.UUID
-    item_code: Optional[str] = None
+    erp_code: Optional[str] = None
     item_name: Optional[str] = None
     direction: QueueLineDirectionEnum
     quantity: Decimal
@@ -565,7 +563,7 @@ class ScrapLogResponse(BaseModel):
 
     scrap_id: uuid.UUID
     item_id: uuid.UUID
-    item_code: Optional[str] = None
+    erp_code: Optional[str] = None
     item_name: Optional[str] = None
     quantity: Decimal
     process_stage: Optional[str] = None
@@ -587,7 +585,7 @@ class LossLogResponse(BaseModel):
 
     loss_id: uuid.UUID
     item_id: uuid.UUID
-    item_code: Optional[str] = None
+    erp_code: Optional[str] = None
     item_name: Optional[str] = None
     quantity: Decimal
     batch_id: Optional[uuid.UUID] = None
@@ -602,7 +600,7 @@ class VarianceLogResponse(BaseModel):
     var_id: uuid.UUID
     batch_id: uuid.UUID
     item_id: uuid.UUID
-    item_code: Optional[str] = None
+    erp_code: Optional[str] = None
     item_name: Optional[str] = None
     bom_expected: Decimal
     actual_used: Decimal
@@ -621,7 +619,7 @@ class StockAlertResponse(BaseModel):
 
     alert_id: uuid.UUID
     item_id: uuid.UUID
-    item_code: Optional[str] = None
+    erp_code: Optional[str] = None
     item_name: Optional[str] = None
     kind: AlertKindEnum
     threshold: Optional[Decimal] = None
@@ -648,7 +646,7 @@ class PhysicalCountResponse(BaseModel):
 
     count_id: uuid.UUID
     item_id: uuid.UUID
-    item_code: Optional[str] = None
+    erp_code: Optional[str] = None
     item_name: Optional[str] = None
     counted_qty: Decimal
     system_qty: Decimal

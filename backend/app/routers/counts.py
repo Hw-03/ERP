@@ -37,7 +37,7 @@ def _to_response(db: Session, count: PhysicalCount) -> PhysicalCountResponse:
     return PhysicalCountResponse(
         count_id=count.count_id,
         item_id=count.item_id,
-        item_code=item.item_code if item else None,
+        erp_code=item.erp_code if item else None,
         item_name=item.item_name if item else None,
         counted_qty=count.counted_qty,
         system_qty=count.system_qty,

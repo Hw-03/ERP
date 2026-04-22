@@ -7,9 +7,7 @@ import { DesktopRightPanel } from "./DesktopRightPanel";
 import { SelectedItemsPanel } from "./SelectedItemsPanel";
 import {
   LEGACY_COLORS,
-  LEGACY_FILE_TYPES,
   LEGACY_MODELS,
-  displayFileType,
   employeeColor,
   fileTypeBadge,
   firstEmployeeLetter,
@@ -20,6 +18,17 @@ import {
   transactionColor,
   transactionLabel,
 } from "./legacyUi";
+
+const DEPT_OPTIONS = [
+  { label: "전체", value: "ALL" },
+  { label: "창고", value: "창고" },
+  { label: "조립", value: "조립" },
+  { label: "고압", value: "고압" },
+  { label: "진공", value: "진공" },
+  { label: "튜닝", value: "튜닝" },
+  { label: "튜브", value: "튜브" },
+  { label: "출하", value: "출하" },
+];
 
 type WorkType =
   | "raw-io"
@@ -46,7 +55,7 @@ const WORK_TYPES: { id: WorkType; label: string; icon: React.ElementType }[] = [
 function matchesSearch(item: Item, keyword: string) {
   if (!keyword) return true;
   const haystack = [
-    item.item_code,
+    item.erp_code,
     item.item_name,
     item.barcode ?? "",
     item.spec ?? "",
@@ -108,7 +117,7 @@ export function DesktopWarehouseView({
   const [selectedPackage, setSelectedPackage] = useState<ShipPackage | null>(null);
   const [itemLogs, setItemLogs] = useState<TransactionLog[]>([]);
   const [localSearch, setLocalSearch] = useState("");
-  const [fileType, setFileType] = useState("전체");
+  const [dept, setDept] = useState("ALL");
   const [modelFilter, setModelFilter] = useState("전체");
   const [referenceNo, setReferenceNo] = useState("");
   const [notes, setNotes] = useState("");
@@ -189,11 +198,15 @@ export function DesktopWarehouseView({
   const filteredItems = useMemo(
     () =>
       items
-        .filter((item) => fileType === "전체" || item.legacy_file_type === fileType)
+        .filter((item) => {
+          if (dept === "ALL") return true;
+          if (dept === "창고") return (item.warehouse_qty ?? 0) > 0;
+          return item.locations?.some((loc) => loc.department === dept && loc.quantity > 0) ?? false;
+        })
         .filter((item) => modelFilter === "전체" || item.legacy_model === modelFilter)
         .filter((item) => matchesSearch(item, searchKeyword))
         .slice(0, 300),
-    [items, fileType, modelFilter, searchKeyword],
+    [items, dept, modelFilter, searchKeyword],
   );
 
   useEffect(() => {
@@ -322,17 +335,17 @@ export function DesktopWarehouseView({
               <div className="grid gap-3 xl:grid-cols-2">
                 <div className="rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
                   <div className="mb-3 flex items-center gap-2 text-sm font-bold">
-                    <Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
-                    파일 구분
+                    <Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />
+                    부서 구분
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {LEGACY_FILE_TYPES.map((entry) => (
+                    {DEPT_OPTIONS.map((opt) => (
                       <Chip
-                        key={entry}
-                        active={fileType === entry}
-                        label={entry === "전체" ? "전체" : displayFileType(entry)}
-                        onClick={() => setFileType(entry)}
-                        tone={LEGACY_COLORS.blue}
+                        key={opt.value}
+                        active={dept === opt.value}
+                        label={opt.label}
+                        onClick={() => setDept(opt.value)}
+                        tone={LEGACY_COLORS.green}
                       />
                     ))}
                   </div>
@@ -478,10 +491,10 @@ export function DesktopWarehouseView({
                             <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{item.spec || "-"}</div>
                           </td>
                           <td className="border-b px-4 py-3 align-top whitespace-nowrap font-mono text-[12px]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-                            {item.item_code}
+                            {item.erp_code}
                           </td>
                           <td className="border-b px-4 py-3 align-top whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>
-                            {displayFileType(item.legacy_file_type)}
+                            {item.legacy_file_type ?? "-"}
                           </td>
                           <td
                             className="border-b px-4 py-3 text-right align-top whitespace-nowrap font-mono text-[13px] font-bold"
@@ -516,7 +529,7 @@ export function DesktopWarehouseView({
         }
         subtitle={
           selectedEntries.length === 1 && workType !== "package-out"
-            ? `${selectedEntries[0].item.item_code} / 현재고 ${formatNumber(selectedEntries[0].item.quantity)}`
+            ? `${selectedEntries[0].item.erp_code} / 현재고 ${formatNumber(selectedEntries[0].item.quantity)}`
             : undefined
         }
       >

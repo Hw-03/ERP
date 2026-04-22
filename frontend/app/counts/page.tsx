@@ -103,7 +103,7 @@ export default function CountsPage() {
             <option value="">품목 선택...</option>
             {items.map((i) => (
               <option key={i.item_id} value={i.item_id}>
-                [{i.item_code}] {i.item_name}
+                [{i.erp_code}] {i.item_name}
               </option>
             ))}
           </select>

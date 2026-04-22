@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import CategoryEnum, Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
+from app.models import CategoryEnum, DepartmentEnum, Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
 from app.schemas import (
     InventoryLocationResponse,
     ItemCreate,
@@ -67,7 +67,6 @@ def _to_item_with_inventory(
 
     return ItemWithInventory(
         item_id=item.item_id,
-        item_code=item.item_code,
         item_name=item.item_name,
         spec=item.spec,
         category=item.category,
@@ -100,33 +99,9 @@ def _to_item_with_inventory(
     )
 
 
-def _auto_item_code(category_val: str, db: Session) -> str:
-    """카테고리 기반 품번 자동 부여: {CATEGORY}-{최대일련번호+1:05d}"""
-    prefix = category_val.upper()
-    import re as _re
-    pattern = f"^{_re.escape(prefix)}-([0-9]+)$"
-    existing_codes = [r[0] for r in db.query(Item.item_code).all() if r[0]]
-    max_serial = 0
-    for code in existing_codes:
-        m = _re.match(pattern, code)
-        if m:
-            max_serial = max(max_serial, int(m.group(1)))
-    return f"{prefix}-{max_serial + 1:05d}"
-
-
 @router.post("", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
 def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
     category_val = payload.category.value if payload.category else "UK"
-
-    # 품번 자동 부여
-    item_code = (payload.item_code or "").strip() or _auto_item_code(category_val, db)
-
-    existing = db.query(Item).filter(Item.item_code == item_code).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"품목 코드 '{item_code}'가 이미 존재합니다.",
-        )
 
     pt = infer_process_type(category_val, payload.legacy_part)
     model_slots = payload.model_slots or []
@@ -143,12 +118,11 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
     legacy_slot = infer_symbol_slot(payload.legacy_model) if not model_slots else (model_slots[0] if len(model_slots) == 1 else None)
 
     item = Item(
-        item_code=item_code,
         item_name=payload.item_name,
         spec=payload.spec,
         category=payload.category,
         unit=payload.unit,
-        barcode=payload.barcode or item_code,
+        barcode=payload.barcode or None,
         legacy_file_type=payload.legacy_file_type,
         legacy_part=payload.legacy_part,
         legacy_item_type=payload.legacy_item_type,
@@ -184,6 +158,7 @@ def list_items(
     legacy_file_type: Optional[str] = Query(None, description="레거시 파일 구분 필터"),
     legacy_part: Optional[str] = Query(None, description="레거시 파트 필터"),
     legacy_model: Optional[str] = Query(None, description="레거시 모델 필터"),
+    department: Optional[str] = Query(None, description="부서 필터 (창고|조립|고압|진공|튜닝|튜브|출하|…)"),
     legacy_item_type: Optional[str] = Query(None, description="레거시 품목 유형 필터"),
     barcode: Optional[str] = Query(None, description="바코드 검색"),
     skip: int = Query(0, ge=0),
@@ -202,7 +177,26 @@ def list_items(
         query = query.filter(Item.legacy_part == legacy_part)
 
     if legacy_model:
-        query = query.filter(Item.legacy_model == legacy_model)
+        query = query.filter(Item.legacy_model.ilike(f"%{legacy_model}%"))
+
+    if department:
+        if department == "창고":
+            # 창고 재고가 1 이상인 품목
+            query = query.filter(Inventory.warehouse_qty > 0)
+        else:
+            try:
+                dept_enum = DepartmentEnum(department)
+                dept_item_ids = (
+                    db.query(InventoryLocation.item_id)
+                    .filter(
+                        InventoryLocation.department == dept_enum,
+                        InventoryLocation.quantity > 0,
+                    )
+                    .subquery()
+                )
+                query = query.filter(Item.item_id.in_(dept_item_ids))
+            except ValueError:
+                pass
 
     if legacy_item_type:
         query = query.filter(Item.legacy_item_type == legacy_item_type)
@@ -215,29 +209,29 @@ def list_items(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.item_code.ilike(pattern),
+                Item.erp_code.ilike(pattern),
                 Item.spec.ilike(pattern),
                 Item.barcode.ilike(pattern),
                 Inventory.location.ilike(pattern),
             )
         )
 
-    rows = query.order_by(Item.category, Item.item_code).offset(skip).limit(limit).all()
+    rows = query.order_by(Item.category, Item.erp_code).offset(skip).limit(limit).all()
     return [_to_item_with_inventory(db, item, inv) for item, inv in rows]
 
 
 @router.get("/export.csv")
 def export_items_csv(db: Session = Depends(get_db)):
-    rows = _build_item_query(db).order_by(Item.item_code).all()
+    rows = _build_item_query(db).order_by(Item.erp_code).all()
 
     buffer = StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["item_code", "item_name", "category", "spec", "unit", "quantity", "location", "updated_at"])
+    writer.writerow(["erp_code", "item_name", "category", "spec", "unit", "quantity", "location", "updated_at"])
 
     for item, inventory in rows:
         writer.writerow(
             [
-                item.item_code,
+                item.erp_code or "",
                 item.item_name,
                 item.category.value,
                 item.spec or "",
@@ -287,20 +281,20 @@ def export_items_xlsx(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.item_code.ilike(pattern),
+                Item.erp_code.ilike(pattern),
                 Item.spec.ilike(pattern),
                 Item.barcode.ilike(pattern),
                 Inventory.location.ilike(pattern),
             )
         )
-    rows = query.order_by(Item.category, Item.item_code).all()
+    rows = query.order_by(Item.category, Item.erp_code).all()
 
     wb = Workbook()
     ws = wb.active
     ws.title = "품목 마스터"
 
     columns = [
-        "품목코드", "품목명", "카테고리", "ERP코드", "사양", "단위",
+        "ERP코드", "품목명", "카테고리", "사양", "단위",
         "재고수량", "가용수량", "예약수량", "위치", "공급업체", "안전재고", "바코드", "수정일",
     ]
     apply_header(ws, columns)
@@ -314,10 +308,9 @@ def export_items_xlsx(
         min_stock = float(item.min_stock) if item.min_stock else None
 
         row_data = [
-            item.item_code,
+            item.erp_code or "",
             item.item_name,
             item.category.value,
-            item.erp_code or "",
             item.spec or "",
             item.unit,
             qty,
@@ -338,7 +331,7 @@ def export_items_xlsx(
             cell.fill = row_fill
 
         # 재고수량 < 안전재고이면 빨간 글씨
-        qty_cell = ws.cell(row=row_idx, column=7)
+        qty_cell = ws.cell(row=row_idx, column=6)
         if min_stock and qty < min_stock:
             qty_cell.font = red_font
 

@@ -117,7 +117,7 @@ function ItemsSection({ showToast }: { showToast: (toast: ToastState) => void })
   const visibleItems = useMemo(() => {
     const keyword = search.trim().toLowerCase();
     if (!keyword) return items.slice(0, 120);
-    return items.filter((item) => `${item.item_name} ${item.item_code}`.toLowerCase().includes(keyword)).slice(0, 120);
+    return items.filter((item) => `${item.item_name} ${item.erp_code}`.toLowerCase().includes(keyword)).slice(0, 120);
   }, [items, search]);
 
   function openEdit(item: Item) {
@@ -180,7 +180,7 @@ function ItemsSection({ showToast }: { showToast: (toast: ToastState) => void })
       setItems((current) => [created, ...current]);
       setAddOpen(false);
       setAddForm(EMPTY_ADD_FORM);
-      showToast({ message: `'${created.item_name}' 품목이 추가됐습니다. (${created.item_code})`, type: "success" });
+      showToast({ message: `'${created.item_name}' 품목이 추가됐습니다. (${created.erp_code})`, type: "success" });
     } catch (error) {
       showToast({ message: error instanceof Error ? error.message : "품목 추가에 실패했습니다.", type: "error" });
     }
@@ -212,7 +212,7 @@ function ItemsSection({ showToast }: { showToast: (toast: ToastState) => void })
             <div>
               <div className="text-sm font-semibold">{item.item_name}</div>
               <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                {item.item_code} · {item.legacy_part || "-"} · {item.legacy_model || "공용"}
+                {item.erp_code} · {item.legacy_part || "-"} · {item.legacy_model || "공용"}
               </div>
             </div>
             <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>
@@ -569,7 +569,7 @@ function BomSection({ showToast }: { showToast: (toast: ToastState) => void }) {
   const filteredChildren = useMemo(() => {
     const keyword = childSearch.trim().toLowerCase();
     if (!keyword) return items.slice(0, 30);
-    return items.filter((item) => `${item.item_name} ${item.item_code}`.toLowerCase().includes(keyword)).slice(0, 30);
+    return items.filter((item) => `${item.item_name} ${item.erp_code}`.toLowerCase().includes(keyword)).slice(0, 30);
   }, [childSearch, items]);
 
   async function addRow() {
@@ -605,7 +605,7 @@ function BomSection({ showToast }: { showToast: (toast: ToastState) => void }) {
         <select value={parentId} onChange={(event) => setParentId(event.target.value)} className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
           {items.map((item) => (
             <option key={item.item_id} value={item.item_id}>
-              {item.item_code} · {item.item_name}
+              {item.erp_code} · {item.item_name}
             </option>
           ))}
         </select>
@@ -653,7 +653,7 @@ function BomSection({ showToast }: { showToast: (toast: ToastState) => void }) {
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold">{childItem?.item_name || row.child_item_id}</div>
                     <div className="flex items-center gap-1.5 text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                      <span>{childItem?.item_code}</span>
+                      <span>{childItem?.erp_code}</span>
                       <button onClick={() => void removeRow(row.bom_id)} className="font-bold" style={{ color: LEGACY_COLORS.red }}>삭제</button>
                     </div>
                   </div>
@@ -690,7 +690,7 @@ function PackagesSection({ showToast }: { showToast: (toast: ToastState) => void
   const filteredItems = useMemo(() => {
     const keyword = itemSearch.trim().toLowerCase();
     if (!keyword) return items.slice(0, 30);
-    return items.filter((item) => `${item.item_name} ${item.item_code}`.toLowerCase().includes(keyword)).slice(0, 30);
+    return items.filter((item) => `${item.item_name} ${item.erp_code}`.toLowerCase().includes(keyword)).slice(0, 30);
   }, [itemSearch, items]);
 
   async function createPackage() {

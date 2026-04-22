@@ -43,7 +43,7 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
                   </span>
                 </div>
                 <div className="mt-0.5 font-mono text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {item.item_code}
+                  {item.erp_code}
                 </div>
               </div>
               <button

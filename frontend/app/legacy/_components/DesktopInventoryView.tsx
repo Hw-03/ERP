@@ -8,10 +8,7 @@ import { api, type Item, type TransactionLog } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import {
   LEGACY_COLORS,
-  LEGACY_FILE_TYPES,
   LEGACY_MODELS,
-  displayFileType,
-  displayPart,
   fileTypeBadge,
   formatNumber,
   getStockState,
@@ -19,6 +16,17 @@ import {
   transactionColor,
   transactionLabel,
 } from "./legacyUi";
+
+const DEPT_OPTIONS = [
+  { label: "전체", value: "ALL" },
+  { label: "창고", value: "창고" },
+  { label: "조립", value: "조립" },
+  { label: "고압", value: "고압" },
+  { label: "진공", value: "진공" },
+  { label: "튜닝", value: "튜닝" },
+  { label: "튜브", value: "튜브" },
+  { label: "출하", value: "출하" },
+];
 
 type KpiFilter = "ALL" | "NORMAL" | "LOW" | "ZERO";
 
@@ -36,7 +44,7 @@ function getMinStock(item: Item) {
 function matchesSearch(item: Item, keyword: string) {
   if (!keyword) return true;
   const haystack = [
-    item.item_code,
+    item.erp_code,
     item.item_name,
     item.spec ?? "",
     item.location ?? "",
@@ -98,7 +106,7 @@ export function DesktopInventoryView({
   const [itemLogs, setItemLogs] = useState<TransactionLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [fileType, setFileType] = useState("전체");
+  const [dept, setDept] = useState("ALL");
   const [model, setModel] = useState("전체");
   const [kpi, setKpi] = useState<KpiFilter>("ALL");
   const [localSearch, setLocalSearch] = useState("");
@@ -118,7 +126,7 @@ export function DesktopInventoryView({
       const nextItems = await api.getItems({
         limit: 2000,
         search: globalSearch.trim() || undefined,
-        legacyFileType: fileType === "전체" ? undefined : fileType,
+        department: dept === "ALL" ? undefined : dept,
         legacyModel: model === "전체" ? undefined : model,
       });
       setItems(nextItems);
@@ -136,7 +144,7 @@ export function DesktopInventoryView({
   useEffect(() => {
     void loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [globalSearch, fileType, model]);
+  }, [globalSearch, dept, model]);
 
   useEffect(() => {
     if (!selectedItem) {
@@ -239,12 +247,12 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
               <div className="mt-3 grid gap-3 xl:grid-cols-2">
                 <div className="rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
                   <div className="mb-3 flex items-center gap-2 text-sm font-bold">
-                    <Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
-                    파일 구분
+                    <Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />
+                    부서 구분
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {LEGACY_FILE_TYPES.map((entry) => (
-                      <Chip key={entry} active={fileType === entry} label={entry === "전체" ? "전체" : displayFileType(entry)} onClick={() => setFileType(entry)} tone={LEGACY_COLORS.blue} />
+                    {DEPT_OPTIONS.map((opt) => (
+                      <Chip key={opt.value} active={dept === opt.value} label={opt.label} onClick={() => setDept(opt.value)} tone={LEGACY_COLORS.green} />
                     ))}
                   </div>
                 </div>
@@ -409,13 +417,13 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                             {item.erp_code ?? "-"}
                           </td>
                           <td className={`border-b px-4 ${py} align-top whitespace-nowrap font-mono text-[12px]`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-                            {item.item_code}
+                            {item.erp_code}
                           </td>
                           <td className={`border-b px-4 ${py} align-top whitespace-nowrap`} style={{ borderColor: LEGACY_COLORS.border }}>
-                            {displayFileType(item.legacy_file_type)}
+                            {item.legacy_file_type ?? "-"}
                           </td>
                           <td className={`border-b px-4 ${py} align-top whitespace-nowrap`} style={{ borderColor: LEGACY_COLORS.border }}>
-                            {displayPart(item.legacy_part)}
+                            {item.legacy_part ?? "-"}
                           </td>
                           <td className={`border-b px-4 ${py} text-right align-top whitespace-nowrap font-mono text-[13px] font-bold`} style={{ borderColor: LEGACY_COLORS.border }}>
                             {formatNumber(item.quantity)}
@@ -458,7 +466,7 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
       {/* ── 우측: 품목 상세 패널 ── */}
       <DesktopRightPanel
         title={selectedItem ? selectedItem.item_name : "품목을 선택해 주세요"}
-        subtitle={selectedItem ? `${selectedItem.item_code} · ${displayPart(selectedItem.legacy_part)}` : undefined}
+        subtitle={selectedItem ? `${selectedItem.erp_code} · ${selectedItem.legacy_part ?? "-"}` : undefined}
       >
         {!selectedItem ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 rounded-[28px] border p-8 text-center" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>

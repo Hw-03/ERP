@@ -58,8 +58,8 @@ export const FILE_TYPE_BADGES: Record<string, { label: string; bg: string; color
   "미분류":     { label: "미분류",     bg: "rgba(157,173,199,.16)", color: LEGACY_COLORS.muted2 },
 };
 
-export const LEGACY_FILE_TYPES = ["전체", "원자재", "조립자재", "발생부자재", "완제품", "미분류"] as const;
-export const LEGACY_PARTS = ["전체", "자재창고", "조립출하", "고압파트", "진공파트", "튜닝파트", "출하"] as const;
+export const LEGACY_FILE_TYPES = ["전체", "원자재", "조립자재", "발생부자재"] as const;
+export const LEGACY_PARTS = ["전체", "자재창고", "조립출하", "고압파트", "진공파트", "튜닝파트"] as const;
 export const LEGACY_MODELS = ["전체", "DX3000", "ADX4000W", "ADX6000", "COCOON", "SOLO"] as const;
 
 export function normalizeDepartment(value?: string | null) {
@@ -225,7 +225,7 @@ export function firstEmployeeLetter(name?: string | null) {
 }
 
 export function buildItemSearchLabel(item: Item) {
-  return `${item.item_code} / ${item.item_name}`;
+  return `${item.erp_code} / ${item.item_name}`;
 }
 
 export function normalizeModel(value?: string | null) {

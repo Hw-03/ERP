@@ -52,7 +52,7 @@ def _line_to_response(db: Session, line: QueueLine) -> QueueLineResponse:
         line_id=line.line_id,
         batch_id=line.batch_id,
         item_id=line.item_id,
-        item_code=item.item_code if item else None,
+        erp_code=item.erp_code if item else None,
         item_name=item.item_name if item else None,
         direction=line.direction,
         quantity=line.quantity,

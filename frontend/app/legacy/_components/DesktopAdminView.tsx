@@ -101,7 +101,7 @@ export function DesktopAdminView({
   const visibleItems = useMemo(() => {
     const keyword = `${globalSearch} ${itemSearch}`.trim().toLowerCase();
     if (!keyword) return items.slice(0, 200);
-    return items.filter((item) => `${item.item_name} ${item.item_code}`.toLowerCase().includes(keyword)).slice(0, 200);
+    return items.filter((item) => `${item.item_name} ${item.erp_code}`.toLowerCase().includes(keyword)).slice(0, 200);
   }, [globalSearch, itemSearch, items]);
 
   const quickItems = useMemo(() => items.slice(0, 40), [items]);
@@ -128,7 +128,7 @@ export function DesktopAdminView({
       setSelectedItem(created);
       setAddMode(false);
       setAddForm(EMPTY_ADD_FORM);
-      onStatusChange(`'${created.item_name}' 품목이 추가됐습니다. (${created.item_code})`);
+      onStatusChange(`'${created.item_name}' 품목이 추가됐습니다. (${created.erp_code})`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "품목 추가에 실패했습니다.");
     }
@@ -323,7 +323,7 @@ export function DesktopAdminView({
                         }}
                       >
                         <div className="text-sm font-semibold">{item.item_name}</div>
-                        <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{item.item_code}</div>
+                        <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
                       </button>
                     ))}
                   </div>
@@ -545,7 +545,7 @@ export function DesktopAdminView({
                   >
                     {items.map((item) => (
                       <option key={item.item_id} value={item.item_id}>
-                        {item.item_code} / {item.item_name}
+                        {item.erp_code} / {item.item_name}
                       </option>
                     ))}
                   </select>
@@ -587,7 +587,7 @@ export function DesktopAdminView({
                       >
                         <div>
                           <div className="text-sm font-semibold">{childItem?.item_name || row.child_item_id}</div>
-                          <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{childItem?.item_code}</div>
+                          <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{childItem?.erp_code}</div>
                         </div>
                         <div className="text-right font-mono text-sm">{formatNumber(row.quantity)} {row.unit}</div>
                         <div className="text-right font-mono text-sm" style={{ color: stock > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red }}>{formatNumber(stock)}</div>

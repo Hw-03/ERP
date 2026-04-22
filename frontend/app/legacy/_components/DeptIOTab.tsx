@@ -75,7 +75,7 @@ export function DeptIOTab({
     const keyword = search.trim().toLowerCase();
     if (!keyword) return items.slice(0, 40);
     return items
-      .filter((item) => `${item.item_name} ${item.item_code} ${item.barcode ?? ""}`.toLowerCase().includes(keyword))
+      .filter((item) => `${item.item_name} ${item.erp_code} ${item.barcode ?? ""}`.toLowerCase().includes(keyword))
       .slice(0, 50);
   }, [items, search]);
 
@@ -353,7 +353,7 @@ export function DeptIOTab({
                 <div>
                   <div className="text-sm font-semibold">{item.item_name}</div>
                   <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {item.item_code}
+                    {item.erp_code}
                   </div>
                 </div>
                 <div className="font-mono text-xs" style={{ color: LEGACY_COLORS.cyan }}>

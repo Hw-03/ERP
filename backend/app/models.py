@@ -111,7 +111,7 @@ class Item(Base):
     __tablename__ = "items"
 
     item_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    item_code = Column(String(50), unique=True, nullable=False, index=True)
+    item_code = Column(String(50), unique=True, nullable=True, index=True)  # 레거시 CSV 코드 — erp_code로 교체 후 DROP 예정
     item_name = Column(String(200), nullable=False)
     spec = Column(Text, nullable=True)
     category = Column(

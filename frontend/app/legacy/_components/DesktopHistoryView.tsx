@@ -155,7 +155,7 @@ export function DesktopHistoryView() {
       if (start && new Date(log.created_at) < start) return false;
       if (search.trim()) {
         const kw = search.trim().toLowerCase();
-        const hay = `${log.item_name} ${log.item_code} ${log.reference_no ?? ""} ${log.notes ?? ""}`.toLowerCase();
+        const hay = `${log.item_name} ${log.erp_code} ${log.reference_no ?? ""} ${log.notes ?? ""}`.toLowerCase();
         if (!hay.includes(kw)) return false;
       }
       return true;
@@ -409,7 +409,7 @@ export function DesktopHistoryView() {
 
                           {/* 코드 */}
                           <td className="whitespace-nowrap border-b px-4 py-3 font-mono text-[12px]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-                            {log.item_code}
+                            {log.erp_code}
                           </td>
 
                           {/* 분류 */}
@@ -492,7 +492,7 @@ export function DesktopHistoryView() {
       {/* ── 우측: 상세 패널 ── */}
       <DesktopRightPanel
         title={selected ? selected.item_name : "항목을 선택하세요"}
-        subtitle={selected ? `${selected.item_code} · ${formatDate(selected.created_at)}` : undefined}
+        subtitle={selected ? `${selected.erp_code} · ${formatDate(selected.created_at)}` : undefined}
       >
         {selected ? (
           <div className="space-y-4">
@@ -524,7 +524,7 @@ export function DesktopHistoryView() {
               {(
                 [
                   ["품목명", selected.item_name],
-                  ["품목코드", selected.item_code],
+                  ["ERP코드", selected.erp_code],
                   ["분류", (CATEGORY_META[selected.item_category] ?? { label: selected.item_category }).label],
                   ["단위", selected.item_unit],
                   ["담당자", selected.produced_by ?? "-"],

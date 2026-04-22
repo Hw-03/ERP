@@ -117,7 +117,7 @@ def _build_tree(
     if item.item_id in visited or depth > 10:
         return BOMTreeNode(
             item_id=item.item_id,
-            item_code=item.item_code,
+            erp_code=item.erp_code,
             item_name=item.item_name,
             category=item.category,
             unit=item.unit,
@@ -148,7 +148,7 @@ def _build_tree(
 
     return BOMTreeNode(
         item_id=item.item_id,
-        item_code=item.item_code,
+        erp_code=item.erp_code,
         item_name=item.item_name,
         category=item.category,
         unit=item.unit,
