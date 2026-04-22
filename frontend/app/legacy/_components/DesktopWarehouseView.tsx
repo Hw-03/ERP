@@ -9,7 +9,7 @@ import {
   LEGACY_COLORS,
   LEGACY_MODELS,
   employeeColor,
-  fileTypeBadge,
+  erpCodeDeptBadge,
   firstEmployeeLetter,
   formatNumber,
   getStockState,
@@ -22,11 +22,11 @@ import {
 const DEPT_OPTIONS = [
   { label: "전체", value: "ALL" },
   { label: "창고", value: "창고" },
-  { label: "조립", value: "조립" },
+  { label: "튜브", value: "튜브" },
   { label: "고압", value: "고압" },
   { label: "진공", value: "진공" },
   { label: "튜닝", value: "튜닝" },
-  { label: "튜브", value: "튜브" },
+  { label: "조립", value: "조립" },
   { label: "출하", value: "출하" },
 ];
 
@@ -353,7 +353,7 @@ export function DesktopWarehouseView({
                 <div className="rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
                   <div className="mb-3 flex items-center gap-2 text-sm font-bold">
                     <TrendingUp className="h-4 w-4" style={{ color: LEGACY_COLORS.cyan }} />
-                    모델 필터
+                    모델 구분
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {LEGACY_MODELS.map((entry) => (
@@ -438,7 +438,6 @@ export function DesktopWarehouseView({
                         { label: "상태", nowrap: true, width: "80px" },
                         { label: "품목명", nowrap: false, minWidth: "160px" },
                         { label: "코드", nowrap: true, width: "90px" },
-                        { label: "구분", nowrap: true, width: "68px" },
                         { label: "현재고", nowrap: true, width: "72px" },
                         { label: "모델", nowrap: true, width: "80px" },
                       ] as { label: string; nowrap: boolean; width?: string; minWidth?: string }[]).map(({ label, nowrap, width, minWidth }) => (
@@ -451,7 +450,7 @@ export function DesktopWarehouseView({
                   <tbody>
                     {filteredItems.map((item) => {
                       const stock = getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock));
-                      const badge = fileTypeBadge(item.legacy_file_type);
+                      const deptBadge = erpCodeDeptBadge(item.erp_code);
                       const active = selectedItems.has(item.item_id);
                       return (
                         <tr
@@ -481,9 +480,11 @@ export function DesktopWarehouseView({
                               <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ color: stock.color, background: `${stock.color}20` }}>
                                 {stock.label}
                               </span>
-                              <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ color: badge.color, background: badge.bg }}>
-                                {badge.label}
-                              </span>
+                              {deptBadge && (
+                                <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ color: deptBadge.color, background: deptBadge.bg }}>
+                                  {deptBadge.label}
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="border-b px-4 py-3 align-top" style={{ borderColor: LEGACY_COLORS.border }}>
@@ -492,9 +493,6 @@ export function DesktopWarehouseView({
                           </td>
                           <td className="border-b px-4 py-3 align-top whitespace-nowrap font-mono text-[12px]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                             {item.erp_code}
-                          </td>
-                          <td className="border-b px-4 py-3 align-top whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>
-                            {item.legacy_file_type ?? "-"}
                           </td>
                           <td
                             className="border-b px-4 py-3 text-right align-top whitespace-nowrap font-mono text-[13px] font-bold"

@@ -5,7 +5,7 @@ import { api, type Item, type TransactionLog } from "@/lib/api";
 import { BottomSheet } from "./BottomSheet";
 import {
   LEGACY_COLORS,
-  fileTypeBadge,
+  erpCodeDeptBadge,
   formatNumber,
   getStockState,
   transactionColor,
@@ -45,7 +45,7 @@ export function ItemDetailSheet({
     item.available_quantity ?? Number(item.quantity) - Number(item.pending_quantity ?? 0),
   );
   const stockState = getStockState(availableQty, item.min_stock == null ? null : Number(item.min_stock));
-  const typeBadge = fileTypeBadge(item.legacy_file_type);
+  const deptBadge = erpCodeDeptBadge(item.erp_code);
 
   const bump = (delta: number) => {
     const minimum = mode === "ADJUST" ? 0 : 1;
@@ -121,12 +121,14 @@ export function ItemDetailSheet({
             >
               {stockState.label}
             </span>
-            <span
-              className="rounded-full px-[7px] py-[2px] text-[9px] font-bold"
-              style={{ background: typeBadge.bg, color: typeBadge.color }}
-            >
-              {typeBadge.label}
-            </span>
+            {deptBadge && (
+              <span
+                className="rounded-full px-[7px] py-[2px] text-[9px] font-bold"
+                style={{ background: deptBadge.bg, color: deptBadge.color }}
+              >
+                {deptBadge.label}
+              </span>
+            )}
           </div>
 
           <div className="overflow-hidden rounded-[14px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>

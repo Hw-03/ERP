@@ -49,16 +49,7 @@ export const DEPARTMENT_ICONS: Record<string, string> = {
   "기타": "기",
 };
 
-// DB에 저장된 실제 UTF-8 값 기준 (seed.py CATEGORY_TO_FILE_TYPE 참조)
-export const FILE_TYPE_BADGES: Record<string, { label: string; bg: string; color: string }> = {
-  "원자재":     { label: "원자재",     bg: "rgba(101,169,255,.16)", color: LEGACY_COLORS.blue },
-  "조립자재":   { label: "조립자재",   bg: "rgba(67,211,157,.16)",  color: LEGACY_COLORS.green },
-  "발생부자재": { label: "발생부자재", bg: "rgba(246,198,103,.16)", color: LEGACY_COLORS.yellow },
-  "완제품":     { label: "완제품",     bg: "rgba(142,125,255,.16)", color: LEGACY_COLORS.purple },
-  "미분류":     { label: "미분류",     bg: "rgba(157,173,199,.16)", color: LEGACY_COLORS.muted2 },
-};
-
-export const LEGACY_FILE_TYPES = ["전체", "원자재", "조립자재", "발생부자재"] as const;
+export const LEGACY_FILE_TYPES = ["전체"] as const;
 export const LEGACY_PARTS = ["전체", "자재창고", "조립출하", "고압파트", "진공파트", "튜닝파트"] as const;
 export const LEGACY_MODELS = ["전체", "DX3000", "ADX4000W", "ADX6000", "COCOON", "SOLO"] as const;
 
@@ -92,15 +83,6 @@ export function employeeColor(value?: string | null) {
     default:
       return "#72829a";
   }
-}
-
-export function fileTypeBadge(value?: string | null) {
-  if (!value) return FILE_TYPE_BADGES["미분류"];
-  return FILE_TYPE_BADGES[value] ?? FILE_TYPE_BADGES["미분류"];
-}
-
-export function displayFileType(value?: string | null) {
-  return fileTypeBadge(value).label;
 }
 
 export function displayPart(value?: string | null) {
@@ -189,6 +171,29 @@ const PROCESS_LABEL: Record<string, string> = {
 export function processStageLabel(code?: string | null): string {
   if (!code) return "-";
   return PROCESS_LABEL[code] ?? code;
+}
+
+const PROCESS_TO_DEPT: Record<string, string> = {
+  TR: "튜브", TA: "튜브",
+  HR: "고압", HA: "고압",
+  VR: "진공", VA: "진공",
+  NA: "튜닝",
+  AR: "조립", AA: "조립",
+  PR: "출하", PA: "출하",
+};
+
+export function erpCodeDept(erp_code?: string | null): string | null {
+  if (!erp_code) return null;
+  const parts = erp_code.split("-");
+  if (parts.length < 2) return null;
+  return PROCESS_TO_DEPT[parts[1]] ?? null;
+}
+
+export function erpCodeDeptBadge(erp_code?: string | null): { label: string; color: string; bg: string } | null {
+  const dept = erpCodeDept(erp_code);
+  if (!dept) return null;
+  const color = employeeColor(dept);
+  return { label: dept, color, bg: `${color}20` };
 }
 
 const OPTION_COLOR: Record<string, string> = {

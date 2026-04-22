@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 import { type Item } from "@/lib/api";
-import { LEGACY_COLORS, fileTypeBadge, formatNumber, getStockState } from "./legacyUi";
+import { LEGACY_COLORS, erpCodeDeptBadge, formatNumber, getStockState } from "./legacyUi";
 
 export type SelectedEntry = { item: Item; quantity: number };
 
@@ -20,7 +20,7 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
     <div className="space-y-2">
       {entries.map(({ item, quantity }) => {
         const stock = getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock));
-        const badge = fileTypeBadge(item.legacy_file_type);
+        const deptBadge = erpCodeDeptBadge(item.erp_code);
         const expected = outgoing
           ? Number(item.quantity) - quantity
           : Number(item.quantity) + quantity;
@@ -38,9 +38,11 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
                   <span className="text-[12px] font-bold truncate" style={{ color: LEGACY_COLORS.text }}>
                     {item.item_name}
                   </span>
-                  <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ color: badge.color, background: badge.bg }}>
-                    {badge.label}
-                  </span>
+                  {deptBadge && (
+                    <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ color: deptBadge.color, background: deptBadge.bg }}>
+                      {deptBadge.label}
+                    </span>
+                  )}
                 </div>
                 <div className="mt-0.5 font-mono text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
                   {item.erp_code}

@@ -10,7 +10,6 @@ import {
   LEGACY_COLORS,
   LEGACY_MODELS,
   employeeColor,
-  fileTypeBadge,
   formatNumber,
   getStockState,
   normalizeModel,
@@ -21,11 +20,11 @@ import {
 const DEPT_OPTIONS = [
   { label: "전체", value: "ALL" },
   { label: "창고", value: "창고" },
-  { label: "조립", value: "조립" },
+  { label: "튜브", value: "튜브" },
   { label: "고압", value: "고압" },
   { label: "진공", value: "진공" },
   { label: "튜닝", value: "튜닝" },
-  { label: "튜브", value: "튜브" },
+  { label: "조립", value: "조립" },
   { label: "출하", value: "출하" },
 ];
 
@@ -260,7 +259,7 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                 <div className="rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
                   <div className="mb-3 flex items-center gap-2 text-sm font-bold">
                     <TrendingUp className="h-4 w-4" style={{ color: LEGACY_COLORS.cyan }} />
-                    모델 필터
+                    모델 구분
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {LEGACY_MODELS.map((entry) => (
@@ -349,8 +348,6 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                         { label: "부서", nowrap: true, width: "120px" },
                         { label: "현재고", nowrap: true, width: "72px" },
                         { label: "안전재고", nowrap: true, width: "72px" },
-                        { label: "모델", nowrap: true, width: "80px" },
-                        { label: "위치", nowrap: true, width: "80px" },
                       ] as { label: string; nowrap: boolean; width?: string; minWidth?: string }[]).map(({ label, nowrap, width, minWidth }) => (
                         <th key={label} className={`border-b px-4 py-3 text-left text-[11px] font-bold${nowrap ? " whitespace-nowrap" : ""}`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth }}>
                           {label}
@@ -361,7 +358,6 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                   <tbody>
                     {filteredItems.slice(0, displayLimit).map((item) => {
                       const stock = getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock));
-                      const badge = fileTypeBadge(item.legacy_file_type);
                       const selected = selectedItem?.item_id === item.item_id;
                       const py = "py-3";
                       return (
@@ -372,14 +368,9 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                           style={{ background: selected ? "rgba(101,169,255,.08)" : "transparent" }}
                         >
                           <td className={`border-b px-4 ${py} align-top whitespace-nowrap`} style={{ borderColor: LEGACY_COLORS.border }}>
-                            <div className="flex flex-col gap-1.5">
-                              <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ color: stock.color, background: `${stock.color}20` }}>
-                                {stock.label}
-                              </span>
-                              <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ color: badge.color, background: badge.bg }}>
-                                {badge.label}
-                              </span>
-                            </div>
+                            <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ color: stock.color, background: `${stock.color}20` }}>
+                              {stock.label}
+                            </span>
                           </td>
                           <td className={`border-b px-4 ${py} align-top`} style={{ borderColor: LEGACY_COLORS.border }}>
                             <div className="font-semibold">{item.item_name}</div>
@@ -388,19 +379,30 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                             </div>
                             {(() => {
                               const total = Math.max(Number(item.quantity), 1);
-                              const whPct = Math.min(100, (Number(item.warehouse_qty) / total) * 100);
-                              const prPct = Math.min(100 - whPct, (Number(item.production_total) / total) * 100);
-                              const dfPct = Math.min(100 - whPct - prPct, (Number(item.defective_total) / total) * 100);
-                              if (whPct + prPct + dfPct <= 0) return null;
+                              const wh = Number(item.warehouse_qty);
+                              const depts = (item.locations ?? []).filter((l) => Number(l.quantity) > 0);
+                              const segments: { pct: number; color: string; label: string }[] = [];
+                              let used = 0;
+                              if (wh > 0) {
+                                const pct = Math.min(100, (wh / total) * 100);
+                                segments.push({ pct, color: LEGACY_COLORS.muted2, label: `창고 ${formatNumber(wh)}` });
+                                used += pct;
+                              }
+                              for (const loc of depts) {
+                                const pct = Math.min(100 - used, (Number(loc.quantity) / total) * 100);
+                                if (pct <= 0) break;
+                                segments.push({ pct, color: employeeColor(loc.department), label: `${loc.department} ${formatNumber(loc.quantity)}` });
+                                used += pct;
+                              }
                               return (
                                 <div
                                   className="mt-2 flex h-[5px] overflow-hidden rounded-full"
                                   style={{ background: LEGACY_COLORS.s3 }}
-                                  title={`창고 ${formatNumber(item.warehouse_qty)} / 부서 ${formatNumber(item.production_total)}${Number(item.defective_total) > 0 ? ` / 불량 ${formatNumber(item.defective_total)}` : ""}`}
+                                  title={segments.map((s) => s.label).join(" / ")}
                                 >
-                                  {whPct > 0 && <div className="h-full shrink-0" style={{ width: `${whPct}%`, background: LEGACY_COLORS.blue }} />}
-                                  {prPct > 0 && <div className="h-full shrink-0" style={{ width: `${prPct}%`, background: LEGACY_COLORS.green }} />}
-                                  {dfPct > 0 && <div className="h-full shrink-0" style={{ width: `${dfPct}%`, background: LEGACY_COLORS.red }} />}
+                                  {segments.map((s, i) => (
+                                    <div key={i} className="h-full shrink-0" style={{ width: `${s.pct}%`, background: s.color }} />
+                                  ))}
                                 </div>
                               );
                             })()}
@@ -425,12 +427,6 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                           </td>
                           <td className={`border-b px-4 ${py} text-right align-top whitespace-nowrap font-mono text-[13px]`} style={{ borderColor: LEGACY_COLORS.border }}>
                             {item.min_stock == null ? "-" : formatNumber(item.min_stock)}
-                          </td>
-                          <td className={`border-b px-4 ${py} align-top whitespace-nowrap text-[12px]`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-                            {normalizeModel(item.legacy_model)}
-                          </td>
-                          <td className={`border-b px-4 ${py} align-top whitespace-nowrap text-[12px]`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-                            {item.location ?? "-"}
                           </td>
                         </tr>
                       );
@@ -478,14 +474,10 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
             {/* 재고 상태 배지 */}
             {(() => {
               const stock = getStockState(Number(selectedItem.quantity), selectedItem.min_stock == null ? null : Number(selectedItem.min_stock));
-              const badge = fileTypeBadge(selectedItem.legacy_file_type);
               return (
                 <div className="flex flex-wrap gap-2">
                   <span className="inline-flex rounded-full px-3 py-1 text-sm font-bold" style={{ color: stock.color, background: `${stock.color}20` }}>
                     {stock.label}
-                  </span>
-                  <span className="inline-flex rounded-full px-3 py-1 text-sm font-bold" style={{ color: badge.color, background: badge.bg }}>
-                    {badge.label}
                   </span>
                 </div>
               );
@@ -513,15 +505,9 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                     <div className="mt-1 font-mono text-xl font-black">{selectedItem.min_stock == null ? "-" : formatNumber(selectedItem.min_stock)}</div>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                    <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>위치</div>
-                    <div className="mt-1 text-sm truncate">{selectedItem.location ?? "-"}</div>
-                  </div>
-                  <div className="rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                    <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>모델</div>
-                    <div className="mt-1 text-sm">{normalizeModel(selectedItem.legacy_model)}</div>
-                  </div>
+                <div className="rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+                  <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>모델</div>
+                  <div className="mt-1 text-sm">{normalizeModel(selectedItem.legacy_model)}</div>
                 </div>
                 {(selectedItem.unit || selectedItem.supplier) && (
                   <div className="grid grid-cols-2 gap-3">
@@ -543,6 +529,31 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                 )}
               </div>
             </section>
+
+            {/* 위치별 재고 */}
+            {(Number(selectedItem.warehouse_qty) > 0 || (selectedItem.locations ?? []).some((l) => Number(l.quantity) > 0)) && (
+              <section className="rounded-[28px] border p-5" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
+                <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  위치별 재고
+                </div>
+                <div className="space-y-2">
+                  {Number(selectedItem.warehouse_qty) > 0 && (
+                    <div className="flex items-center gap-3 rounded-[14px] border px-3 py-2.5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+                      <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.muted2 }} />
+                      <span className="flex-1 text-sm font-semibold">창고</span>
+                      <span className="font-mono text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>{formatNumber(selectedItem.warehouse_qty)}</span>
+                    </div>
+                  )}
+                  {(selectedItem.locations ?? []).filter((l) => Number(l.quantity) > 0).map((l) => (
+                    <div key={l.department} className="flex items-center gap-3 rounded-[14px] border px-3 py-2.5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+                      <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: employeeColor(l.department) }} />
+                      <span className="flex-1 text-sm font-semibold">{l.department}</span>
+                      <span className="font-mono text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>{formatNumber(l.quantity)}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* 입출고 이동 버튼 */}
             <button

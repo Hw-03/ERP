@@ -7,7 +7,7 @@ import { ItemDetailSheet } from "./ItemDetailSheet";
 import type { ToastState } from "./Toast";
 import {
   LEGACY_COLORS,
-  fileTypeBadge,
+  erpCodeDeptBadge,
   formatNumber,
   getStockState,
   normalizeModel,
@@ -16,11 +16,11 @@ import {
 const DEPT_OPTIONS = [
   { label: "전체", value: "ALL" },
   { label: "창고", value: "창고" },
-  { label: "조립", value: "조립" },
+  { label: "튜브", value: "튜브" },
   { label: "고압", value: "고압" },
   { label: "진공", value: "진공" },
   { label: "튜닝", value: "튜닝" },
-  { label: "튜브", value: "튜브" },
+  { label: "조립", value: "조립" },
   { label: "출하", value: "출하" },
 ];
 
@@ -294,7 +294,7 @@ export function InventoryTab({
               row.available,
               item.min_stock == null ? null : Number(item.min_stock),
             );
-            const badge = fileTypeBadge(item.legacy_file_type);
+            const deptBadge = erpCodeDeptBadge(item.erp_code);
 
             return (
               <button
@@ -321,12 +321,14 @@ export function InventoryTab({
                     >
                       {stockState.label}
                     </span>
-                    <span
-                      className="inline-flex rounded-full px-[7px] py-[2px] text-[9px] font-bold"
-                      style={{ background: badge.bg, color: badge.color }}
-                    >
-                      {badge.label}
-                    </span>
+                    {deptBadge && (
+                      <span
+                        className="inline-flex rounded-full px-[7px] py-[2px] text-[9px] font-bold"
+                        style={{ background: deptBadge.bg, color: deptBadge.color }}
+                      >
+                        {deptBadge.label}
+                      </span>
+                    )}
                     {row.count > 1 ? (
                       <span
                         className="inline-flex rounded-full px-[7px] py-[2px] text-[9px] font-bold"
