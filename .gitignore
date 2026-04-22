@@ -29,3 +29,6 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/
+
+# Dev-only generated assets
+.dev/screenshots/

@@ -21,7 +21,8 @@ from openpyxl import load_workbook
 
 BACKEND_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BACKEND_DIR.parent
-CSV_PATH = PROJECT_ROOT / "ERP_Master_DB.csv"
+DATA_DIR = PROJECT_ROOT / "data"
+CSV_PATH = DATA_DIR / "ERP_Master_DB.csv"
 SQLITE_PATH = BACKEND_DIR / "erp.db"
 
 sys.path.insert(0, str(BACKEND_DIR))
@@ -165,7 +166,7 @@ def load_stock_updates(rows: list[dict[str, str]]) -> list[tuple[str, float, str
     by_name_spec, by_name = queue_rows(rows)
     used: set[str] = set()
 
-    f704 = next((path for path in PROJECT_ROOT.iterdir() if path.suffix.lower() == ".xlsx" and path.name.startswith("F704")), None)
+    f704 = next((path for path in DATA_DIR.iterdir() if path.suffix.lower() == ".xlsx" and path.name.startswith("F704")), None)
     if f704 is not None:
         workbook = load_workbook(f704, read_only=True, data_only=True)
         sheet = workbook["26.03월"] if "26.03월" in workbook.sheetnames else workbook[workbook.sheetnames[-1]]
@@ -185,7 +186,7 @@ def load_stock_updates(rows: list[dict[str, str]]) -> list[tuple[str, float, str
             if item_code:
                 updates.append((item_code, quantity, f704.name))
 
-    for path in PROJECT_ROOT.iterdir():
+    for path in DATA_DIR.iterdir():
         if path.suffix.lower() != ".xlsx" or path.name.startswith("F704"):
             continue
 

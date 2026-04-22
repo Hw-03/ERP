@@ -48,18 +48,20 @@ import pandas as pd
 # 경로 & 상수
 # ---------------------------------------------------------------------------
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "data"
+DOCS_DIR = BASE_DIR / "docs"
 
-FILE_A = BASE_DIR / "F704-03 (R00) 자재 재고 현황.xlsx"
-FILE_B = BASE_DIR / "2026.03_생산부 자재_조립,출하파트.xlsx"
-FILE_C = BASE_DIR / "2026.03_생산부 자재_고압,진공,튜닝파트.xlsx"
+FILE_A = DATA_DIR / "F704-03 (R00) 자재 재고 현황.xlsx"
+FILE_B = DATA_DIR / "2026.03_생산부 자재_조립,출하파트.xlsx"
+FILE_C = DATA_DIR / "2026.03_생산부 자재_고압,진공,튜닝파트.xlsx"
 
-OUTPUT_MASTER = BASE_DIR / "ERP_Master_DB.csv"
-OUTPUT_LINKS = BASE_DIR / "ERP_Source_Links.csv"
-OUTPUT_REPORT = BASE_DIR / "ERP_Integration_Report.md"
-OUTPUT_UNMATCHED = BASE_DIR / "ERP_Unmatched_A_Items.csv"
-OUTPUT_MAPPING_SAMPLE = BASE_DIR / "ERP_Mapping_Sample.md"
-OUTPUT_EXCLUDED = BASE_DIR / "ERP_Excluded_Items.csv"
+OUTPUT_MASTER = DATA_DIR / "ERP_Master_DB.csv"
+OUTPUT_LINKS = DATA_DIR / "ERP_Source_Links.csv"
+OUTPUT_REPORT = DOCS_DIR / "ERP_Integration_Report.md"
+OUTPUT_UNMATCHED = DATA_DIR / "ERP_Unmatched_A_Items.csv"
+OUTPUT_MAPPING_SAMPLE = DOCS_DIR / "ERP_Mapping_Sample.md"
+OUTPUT_EXCLUDED = DATA_DIR / "ERP_Excluded_Items.csv"
 
 # 회사 모델명 (완제품 후보 식별용)
 FINAL_MODELS = {

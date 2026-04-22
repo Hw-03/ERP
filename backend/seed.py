@@ -22,7 +22,7 @@ from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BACKEND_DIR.parent
-CSV_PATH = PROJECT_ROOT / "ERP_Master_DB.csv"
+CSV_PATH = PROJECT_ROOT / "data" / "ERP_Master_DB.csv"
 SQLITE_PATH = BACKEND_DIR / "erp.db"
 LEGACY_HTML_PATH = PROJECT_ROOT / "_legacy_import" / "inventory_v2.html"
 
