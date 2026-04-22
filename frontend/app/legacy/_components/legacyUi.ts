@@ -30,7 +30,7 @@ export const DEPARTMENT_LABELS: Record<string, string> = {
   "튜닝": "튜닝",
   "튜브": "튜브",
   "AS": "AS",
-  "연구": "연구",
+  "연구": "연구소",
   "영업": "영업",
   "출하": "출하",
   "기타": "기타",

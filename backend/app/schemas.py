@@ -317,6 +317,11 @@ class BOMCreate(BaseModel):
     notes: Optional[str] = Field(None, description="비고")
 
 
+class BOMUpdate(BaseModel):
+    quantity: Optional[Decimal] = Field(None, gt=0)
+    unit: Optional[str] = Field(None, max_length=20)
+
+
 class BOMResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

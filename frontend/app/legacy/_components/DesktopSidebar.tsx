@@ -44,8 +44,9 @@ export function DesktopSidebar({
         <div className="flex h-12 items-center justify-center py-1">
           {/* 축소 상태: 작은 아이콘 */}
           <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-white shadow-sm transition-[opacity,transform] duration-200"
+            className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[14px] transition-[opacity,transform] duration-200"
             style={{
+              background: LEGACY_COLORS.s1,
               opacity: expanded ? 0 : 1,
               transform: expanded ? "scale(0.8)" : "scale(1)",
               pointerEvents: expanded ? "none" : "auto",

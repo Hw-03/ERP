@@ -2,13 +2,13 @@
 
 import type { ElementType } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, DatabaseBackup, FileDown, KeyRound, PackagePlus, Search, Settings2, ShieldCheck, Users } from "lucide-react";
+import { DatabaseBackup, FileDown, KeyRound, PackagePlus, Search, Settings2, ShieldCheck, Users, X } from "lucide-react";
 import { api, type BOMEntry, type Employee, type Item, type ShipPackage } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import { PinLock } from "./PinLock";
 import { DEPARTMENT_LABELS, LEGACY_COLORS, buildItemSearchLabel, formatNumber, normalizeDepartment } from "./legacyUi";
 
-type AdminSection = "items" | "employees" | "bom" | "packages" | "settings";
+type AdminSection = "items" | "employees" | "bom" | "packages" | "export" | "settings";
 
 const CATEGORY_OPTIONS = [
   { value: "RM", label: "RM — 원자재" },
@@ -46,6 +46,7 @@ const SECTIONS: { id: AdminSection; label: string; description: string; icon: El
   { id: "employees", label: "직원", description: "직원 활성 상태 관리", icon: Users },
   { id: "bom", label: "BOM", description: "부모-자식 자재 구성", icon: Settings2 },
   { id: "packages", label: "출하묶음", description: "패키지 구성 관리", icon: ShieldCheck },
+  { id: "export", label: "내보내기", description: "엑셀 데이터 내보내기", icon: FileDown },
   { id: "settings", label: "설정", description: "PIN, CSV, 초기화", icon: KeyRound },
 ];
 
@@ -58,7 +59,7 @@ export function DesktopAdminView({
 }) {
   const [unlocked, setUnlocked] = useState(false);
   const [section, setSection] = useState<AdminSection>("items");
-  const [navCollapsed, setNavCollapsed] = useState(false);
+
   const [items, setItems] = useState<Item[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [packages, setPackages] = useState<ShipPackage[]>([]);
@@ -66,9 +67,19 @@ export function DesktopAdminView({
   const [addMode, setAddMode] = useState(false);
   const [addForm, setAddForm] = useState(EMPTY_ADD_FORM);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [empAddMode, setEmpAddMode] = useState(false);
+  const [empAddForm, setEmpAddForm] = useState({ employee_code: "", name: "", role: "", phone: "", department: "조립" });
   const [selectedPackage, setSelectedPackage] = useState<ShipPackage | null>(null);
   const [parentId, setParentId] = useState("");
   const [bomRows, setBomRows] = useState<BOMEntry[]>([]);
+  const [bomParentSearch, setBomParentSearch] = useState("");
+  const [bomParentCat, setBomParentCat] = useState("ALL");
+  const [bomChildSearch, setBomChildSearch] = useState("");
+  const [bomChildId, setBomChildId] = useState("");
+  const [bomChildQty, setBomChildQty] = useState("1");
+  const [bomChildUnit, setBomChildUnit] = useState("EA");
+  const [editingBomId, setEditingBomId] = useState<string | null>(null);
+  const [editingQty, setEditingQty] = useState("");
   const [message, setMessage] = useState("");
   const [pinForm, setPinForm] = useState({ current_pin: "", new_pin: "", confirm_pin: "" });
   const [resetPin, setResetPin] = useState("");
@@ -106,6 +117,25 @@ export function DesktopAdminView({
 
   const quickItems = useMemo(() => items.slice(0, 40), [items]);
 
+  const BOM_PARENT_CATS = ["ALL", "BA", "BF", "TA", "HA", "VA"];
+  const bomParentItems = useMemo(() => {
+    let pool = items;
+    if (bomParentCat !== "ALL") pool = pool.filter((i) => i.category === bomParentCat);
+    const kw = bomParentSearch.trim().toLowerCase();
+    if (kw) pool = pool.filter((i) => `${i.item_name} ${i.erp_code ?? ""}`.toLowerCase().includes(kw));
+    return pool.slice(0, 60);
+  }, [items, bomParentSearch, bomParentCat]);
+
+  const bomChildItems = useMemo(() => {
+    const kw = bomChildSearch.trim().toLowerCase();
+    const existingIds = new Set(bomRows.map((r) => r.child_item_id));
+    return items
+      .filter((i) => i.item_id !== parentId)
+      .filter((i) => !kw || `${i.item_name} ${i.erp_code ?? ""}`.toLowerCase().includes(kw))
+      .slice(0, 40)
+      .map((i) => ({ ...i, alreadyIn: existingIds.has(i.item_id) }));
+  }, [items, parentId, bomChildSearch, bomRows]);
+
   async function addItem() {
     if (!addForm.item_name.trim()) {
       setMessage("품목명을 입력하세요.");
@@ -142,6 +172,30 @@ export function DesktopAdminView({
     onStatusChange(`${updated.item_name} 정보를 저장했습니다.`);
   }
 
+  async function addEmployee() {
+    if (!empAddForm.employee_code.trim() || !empAddForm.name.trim()) {
+      setMessage("직원코드와 이름은 필수입니다.");
+      return;
+    }
+    try {
+      const created = await api.createEmployee({
+        employee_code: empAddForm.employee_code.trim(),
+        name: empAddForm.name.trim(),
+        role: empAddForm.role.trim(),
+        department: empAddForm.department as Employee["department"],
+        phone: empAddForm.phone.trim() || undefined,
+        display_order: employees.length + 1,
+      });
+      setEmployees((current) => [...current, created]);
+      setEmpAddMode(false);
+      setEmpAddForm({ employee_code: "", name: "", role: "", phone: "", department: "조립" });
+      setSelectedEmployee(created);
+      onStatusChange(`'${created.name}' 직원을 추가했습니다.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "직원 추가에 실패했습니다.");
+    }
+  }
+
   async function toggleEmployee(employee: Employee) {
     const updated = await api.updateEmployee(employee.employee_id, { is_active: !employee.is_active });
     setEmployees((current) => current.map((entry) => (entry.employee_id === employee.employee_id ? updated : entry)));
@@ -167,11 +221,32 @@ export function DesktopAdminView({
     onStatusChange(`${updated.name}에 품목을 추가했습니다.`);
   }
 
-  async function addBomRow(childId: string) {
-    if (!parentId) return;
-    const created = await api.createBOM({ parent_item_id: parentId, child_item_id: childId, quantity: 1, unit: "EA" });
-    setBomRows((current) => [...current, created]);
-    onStatusChange("BOM 항목을 추가했습니다.");
+  async function addBomRow() {
+    if (!parentId || !bomChildId) return;
+    const qty = parseFloat(bomChildQty) || 1;
+    try {
+      const created = await api.createBOM({ parent_item_id: parentId, child_item_id: bomChildId, quantity: qty, unit: bomChildUnit });
+      setBomRows((current) => [...current, created]);
+      setBomChildId("");
+      setBomChildSearch("");
+      setBomChildQty("1");
+      onStatusChange("BOM 항목을 추가했습니다.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "추가에 실패했습니다.");
+    }
+  }
+
+  async function saveBomQty(row: BOMEntry) {
+    const qty = parseFloat(editingQty);
+    setEditingBomId(null);
+    if (!qty || qty === row.quantity) return;
+    try {
+      const updated = await api.updateBOM(row.bom_id, { quantity: qty });
+      setBomRows((current) => current.map((r) => (r.bom_id === updated.bom_id ? updated : r)));
+      onStatusChange("수량을 변경했습니다.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "수량 변경에 실패했습니다.");
+    }
   }
 
   async function changePin() {
@@ -206,19 +281,17 @@ export function DesktopAdminView({
   const activeSection = SECTIONS.find((entry) => entry.id === section);
 
   return (
-    <div className="flex min-h-0 flex-1 gap-4 px-6">
-      <div className="grid min-h-0 flex-1 gap-4" style={{ gridTemplateColumns: `${navCollapsed ? "64px" : "220px"} minmax(0,1fr)`, transition: "grid-template-columns 0.2s ease" }}>
+    <div className="flex min-h-0 flex-1 gap-4 pl-0 pr-4">
+      <div className="grid min-h-0 flex-1 gap-4" style={{ gridTemplateColumns: "220px minmax(0,1fr)", transition: "grid-template-columns 0.2s ease" }}>
 
         {/* ── 섹션 메뉴 사이드바 ── */}
         <section className="card flex min-h-0 flex-col overflow-hidden">
-          {!navCollapsed && (
-            <div className="mb-3 shrink-0">
-              <div className="text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: LEGACY_COLORS.muted2 }}>
-                Admin Menu
-              </div>
-              <div className="mt-1 text-xl font-black">운영 관리</div>
+          <div className="mb-3 shrink-0">
+            <div className="text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: LEGACY_COLORS.muted2 }}>
+              Admin Menu
             </div>
-          )}
+            <div className="mt-1 text-xl font-black">운영 관리</div>
+          </div>
           <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
             {SECTIONS.map((entry) => {
               const Icon = entry.icon;
@@ -227,42 +300,30 @@ export function DesktopAdminView({
                 <button
                   key={entry.id}
                   onClick={() => setSection(entry.id)}
-                  className={`flex w-full items-center rounded-[20px] border text-left transition-colors hover:bg-white/[0.12] ${navCollapsed ? "justify-center px-0 py-3" : "gap-3 px-3 py-3"}`}
+                  className="flex w-full items-center gap-3 rounded-[20px] border px-3 py-3 text-left transition-colors hover:bg-white/[0.12]"
                   style={{
                     background: active ? "rgba(142,125,255,.16)" : LEGACY_COLORS.s2,
                     borderColor: active ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
                   }}
-                  title={navCollapsed ? entry.label : undefined}
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px]" style={{ background: active ? LEGACY_COLORS.purple : LEGACY_COLORS.s1, color: active ? "#fff" : LEGACY_COLORS.muted2 }}>
                     <Icon className="h-4 w-4" />
                   </div>
-                  {!navCollapsed && (
-                    <div className="min-w-0">
-                      <div className="text-sm font-bold truncate">{entry.label}</div>
-                      <div className="mt-0.5 text-[11px] leading-4 truncate" style={{ color: LEGACY_COLORS.muted2 }}>{entry.description}</div>
-                    </div>
-                  )}
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold truncate">{entry.label}</div>
+                    <div className="mt-0.5 text-[11px] leading-4 truncate" style={{ color: LEGACY_COLORS.muted2 }}>{entry.description}</div>
+                  </div>
                 </button>
               );
             })}
           </div>
-          <div className="mt-3 shrink-0 space-y-2">
-            <button
-              onClick={() => setNavCollapsed((v) => !v)}
-              className="flex w-full items-center justify-center rounded-[16px] border py-2.5 text-[11px] font-semibold transition-colors hover:bg-white/10"
-              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-              title={navCollapsed ? "메뉴 펼치기" : "메뉴 접기"}
-            >
-              {navCollapsed ? <ChevronRight className="h-4 w-4" /> : <><ChevronLeft className="h-3.5 w-3.5 mr-1" /><span>접기</span></>}
-            </button>
+          <div className="mt-3 shrink-0">
             <button
               onClick={() => setUnlocked(false)}
-              className={`w-full rounded-[16px] border py-2.5 text-[11px] font-semibold transition-colors hover:bg-white/10 ${navCollapsed ? "px-0" : "px-3"}`}
+              className="w-full rounded-[16px] border px-3 py-2.5 text-[11px] font-semibold transition-colors hover:bg-white/10"
               style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-              title={navCollapsed ? "관리자 잠금" : undefined}
             >
-              {navCollapsed ? "🔒" : "관리자 잠금"}
+              관리자 잠금
             </button>
           </div>
         </section>
@@ -335,7 +396,7 @@ export function DesktopAdminView({
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="text-base font-bold">새 품목 추가</div>
-                        <button onClick={() => { setAddMode(false); setAddForm(EMPTY_ADD_FORM); }} className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>취소</button>
+                        <button onClick={() => { setAddMode(false); setAddForm(EMPTY_ADD_FORM); }} className="flex items-center justify-center rounded-full p-1 hover:bg-red-500/10" style={{ color: LEGACY_COLORS.red }}><X className="h-4 w-4" /></button>
                       </div>
                       {[
                         { key: "item_name", label: "품목명 *", type: "text", placeholder: "예: 텅스텐 필라멘트" },
@@ -480,38 +541,94 @@ export function DesktopAdminView({
             {/* ── 직원 관리 ── */}
             {section === "employees" ? (
               <div className="grid h-full gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-                <div className="overflow-y-auto rounded-[28px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                  {employees.map((employee, index) => (
+                <div className="flex flex-col overflow-hidden rounded-[28px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                  <div className="shrink-0 border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
                     <button
-                      key={employee.employee_id}
-                      onClick={() => setSelectedEmployee(employee)}
-                      className="flex w-full items-center justify-between px-4 py-4 text-left transition-colors hover:bg-white/[0.12]"
-                      style={{
-                        borderBottom: index === employees.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
-                        background: selectedEmployee?.employee_id === employee.employee_id ? "rgba(142,125,255,.10)" : "transparent",
-                      }}
+                      onClick={() => { setEmpAddMode(true); setSelectedEmployee(null); }}
+                      className="w-full rounded-[14px] border border-dashed py-2.5 text-sm font-bold"
+                      style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
                     >
-                      <div>
-                        <div className="text-sm font-semibold">{employee.name}</div>
-                        <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                          {employee.employee_code} / {normalizeDepartment(employee.department)}
-                        </div>
-                      </div>
-                      <span
-                        className="inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold"
+                      + 직원 추가
+                    </button>
+                  </div>
+                  <div className="overflow-y-auto">
+                    {employees.map((employee, index) => (
+                      <button
+                        key={employee.employee_id}
+                        onClick={() => { setSelectedEmployee(employee); setEmpAddMode(false); }}
+                        className="flex w-full items-center justify-between px-4 py-4 text-left transition-colors hover:bg-white/[0.12]"
                         style={{
-                          background: employee.is_active ? "rgba(67,211,157,.16)" : "rgba(255,123,123,.14)",
-                          color: employee.is_active ? LEGACY_COLORS.green : LEGACY_COLORS.red,
+                          borderBottom: index === employees.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
+                          background: selectedEmployee?.employee_id === employee.employee_id ? "rgba(142,125,255,.10)" : "transparent",
                         }}
                       >
-                        {employee.is_active ? "활성" : "비활성"}
-                      </span>
-                    </button>
-                  ))}
+                        <div>
+                          <div className="text-sm font-semibold">{employee.name}</div>
+                          <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                            {employee.employee_code} / {normalizeDepartment(employee.department)}
+                          </div>
+                        </div>
+                        <span
+                          className="inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold"
+                          style={{
+                            background: employee.is_active ? "rgba(67,211,157,.16)" : "rgba(255,123,123,.14)",
+                            color: employee.is_active ? LEGACY_COLORS.green : LEGACY_COLORS.red,
+                          }}
+                        >
+                          {employee.is_active ? "활성" : "비활성"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="overflow-y-auto rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                  {selectedEmployee ? (
+                  {empAddMode ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="text-base font-bold">직원 추가</div>
+                        <button onClick={() => { setEmpAddMode(false); setEmpAddForm({ employee_code: "", name: "", role: "", phone: "", department: "조립" }); }} className="flex items-center justify-center rounded-full p-1 hover:bg-red-500/10" style={{ color: LEGACY_COLORS.red }}><X className="h-4 w-4" /></button>
+                      </div>
+                      {([
+                        { key: "employee_code", label: "직원 코드 *", placeholder: "예: E27" },
+                        { key: "name", label: "이름 *", placeholder: "예: 홍길동" },
+                        { key: "role", label: "역할", placeholder: "예: 조립/사원" },
+                        { key: "phone", label: "연락처", placeholder: "예: 010-0000-0000" },
+                      ] as { key: keyof typeof empAddForm; label: string; placeholder: string }[]).map(({ key, label, placeholder }) => (
+                        <div key={key}>
+                          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
+                          <input
+                            type="text"
+                            value={empAddForm[key]}
+                            onChange={(e) => setEmpAddForm((f) => ({ ...f, [key]: e.target.value }))}
+                            placeholder={placeholder}
+                            className="w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
+                            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                          />
+                        </div>
+                      ))}
+                      <div>
+                        <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>부서</div>
+                        <select
+                          value={empAddForm.department}
+                          onChange={(e) => setEmpAddForm((f) => ({ ...f, department: e.target.value }))}
+                          className="w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
+                          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                        >
+                          {Object.keys(DEPARTMENT_LABELS).map((value) => (
+                            <option key={value} value={value}>{DEPARTMENT_LABELS[value]}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        onClick={() => void addEmployee()}
+                        className="w-full rounded-[18px] px-4 py-3 text-sm font-bold text-white"
+                        style={{ background: LEGACY_COLORS.blue }}
+                      >
+                        추가
+                      </button>
+                    </div>
+                  ) : selectedEmployee ? (
                     <>
                       <div className="text-xl font-black">{selectedEmployee.name}</div>
                       <div className="mt-1 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -535,76 +652,196 @@ export function DesktopAdminView({
             {/* ── BOM 관리 ── */}
             {section === "bom" ? (
               <div className="grid h-full gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-                <div className="overflow-y-auto rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                  <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>상위 품목 선택</div>
-                  <select
-                    value={parentId}
-                    onChange={(event) => setParentId(event.target.value)}
-                    className="mb-4 w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
-                    style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                  >
-                    {items.map((item) => (
-                      <option key={item.item_id} value={item.item_id}>
-                        {item.erp_code} / {item.item_name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>하위 자재 추가</div>
-                  <div className="space-y-2">
-                    {quickItems.map((item) => (
-                      <button
-                        key={item.item_id}
-                        onClick={() => void addBomRow(item.item_id)}
-                        className="block w-full rounded-[18px] border px-4 py-3 text-left text-sm"
-                        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+                {/* 좌측: 상위 품목 선택 + 하위 자재 추가 폼 */}
+                <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">
+                  {/* 상위 품목 선택 */}
+                  <div className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                    <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>상위 품목 선택</div>
+                    <input
+                      value={bomParentSearch}
+                      onChange={(e) => setBomParentSearch(e.target.value)}
+                      placeholder="품목명 / ERP 코드 검색"
+                      className="mb-2 w-full rounded-[14px] border px-3 py-2 text-sm outline-none"
+                      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                    />
+                    <div className="mb-2 flex flex-wrap gap-1">
+                      {BOM_PARENT_CATS.map((cat) => (
+                        <button
+                          key={cat}
+                          onClick={() => setBomParentCat(cat)}
+                          className="rounded-full px-2.5 py-0.5 text-[11px] font-bold"
+                          style={{
+                            background: bomParentCat === cat ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
+                            color: bomParentCat === cat ? "#fff" : LEGACY_COLORS.muted2,
+                            border: `1px solid ${LEGACY_COLORS.border}`,
+                          }}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="max-h-52 overflow-y-auto rounded-[14px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+                      {bomParentItems.map((item, index) => (
+                        <button
+                          key={item.item_id}
+                          onClick={() => { setParentId(item.item_id); setBomChildId(""); setBomChildSearch(""); }}
+                          className="block w-full px-3 py-2.5 text-left text-sm"
+                          style={{
+                            background: parentId === item.item_id ? "rgba(142,125,255,.12)" : "transparent",
+                            borderBottom: index === bomParentItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
+                            color: parentId === item.item_id ? LEGACY_COLORS.text : LEGACY_COLORS.text,
+                            fontWeight: parentId === item.item_id ? 700 : 400,
+                          }}
+                        >
+                          <span className="text-[11px] font-mono" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</span>
+                          <span className="ml-2">{item.item_name}</span>
+                        </button>
+                      ))}
+                      {bomParentItems.length === 0 && (
+                        <div className="px-3 py-3 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>검색 결과 없음</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 하위 자재 추가 폼 */}
+                  <div className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                    <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>하위 자재 추가</div>
+                    <input
+                      value={bomChildSearch}
+                      onChange={(e) => { setBomChildSearch(e.target.value); setBomChildId(""); }}
+                      placeholder="품목명 / ERP 코드 검색"
+                      className="mb-2 w-full rounded-[14px] border px-3 py-2 text-sm outline-none"
+                      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                    />
+                    {bomChildSearch && (
+                      <div className="mb-2 max-h-40 overflow-y-auto rounded-[14px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+                        {bomChildItems.map((item, index) => (
+                          <button
+                            key={item.item_id}
+                            disabled={item.alreadyIn}
+                            onClick={() => { setBomChildId(item.item_id); setBomChildSearch(`${item.erp_code ?? ""} ${item.item_name}`); }}
+                            className="block w-full px-3 py-2 text-left text-sm"
+                            style={{
+                              background: bomChildId === item.item_id ? "rgba(142,125,255,.12)" : "transparent",
+                              borderBottom: index === bomChildItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
+                              color: item.alreadyIn ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
+                              opacity: item.alreadyIn ? 0.5 : 1,
+                            }}
+                          >
+                            <span className="text-[11px] font-mono" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</span>
+                            <span className="ml-2">{item.item_name}</span>
+                            {item.alreadyIn && <span className="ml-1 text-[10px]">(이미 추가됨)</span>}
+                          </button>
+                        ))}
+                        {bomChildItems.length === 0 && (
+                          <div className="px-3 py-3 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>검색 결과 없음</div>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min="0.001"
+                        step="1"
+                        value={bomChildQty}
+                        onChange={(e) => setBomChildQty(e.target.value)}
+                        className="w-20 rounded-[14px] border px-3 py-2 text-right text-sm outline-none"
+                        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                      />
+                      <select
+                        value={bomChildUnit}
+                        onChange={(e) => setBomChildUnit(e.target.value)}
+                        className="rounded-[14px] border px-2 py-2 text-sm outline-none"
+                        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
                       >
-                        {buildItemSearchLabel(item)}
+                        {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                      <button
+                        onClick={() => void addBomRow()}
+                        disabled={!bomChildId}
+                        className="flex-1 rounded-[14px] py-2 text-sm font-bold text-white"
+                        style={{ background: bomChildId ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2, opacity: bomChildId ? 1 : 0.5 }}
+                      >
+                        추가
                       </button>
-                    ))}
+                    </div>
                   </div>
                 </div>
 
-                <div className="overflow-y-auto rounded-[28px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                {/* 우측: BOM 목록 */}
+                <div className="flex min-h-0 flex-col overflow-hidden rounded-[28px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                  {/* 헤더 */}
+                  <div className="flex shrink-0 items-center justify-between border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+                    <div>
+                      <span className="text-sm font-bold">{items.find((i) => i.item_id === parentId)?.item_name ?? "상위 품목 선택"}</span>
+                      {parentId && <span className="ml-2 text-[11px] font-mono" style={{ color: LEGACY_COLORS.muted2 }}>{items.find((i) => i.item_id === parentId)?.erp_code}</span>}
+                    </div>
+                    <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>총 {bomRows.length}개 자재</span>
+                  </div>
                   {bomRows.length === 0 ? (
                     <div className="p-5 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>BOM 항목이 없습니다. 왼쪽에서 자재를 추가하세요.</div>
                   ) : (
-                    <>
-                      <div className="grid grid-cols-[1fr_80px_80px_60px] border-b px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                    <div className="overflow-y-auto">
+                      <div className="grid grid-cols-[1fr_100px_80px_60px_40px] border-b px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                         <span>자재명</span>
                         <span className="text-right">소요수량</span>
                         <span className="text-right">현재고</span>
                         <span className="text-right">가능</span>
+                        <span />
                       </div>
-                    {bomRows.map((row, index) => {
-                      const childItem = items.find((item) => item.item_id === row.child_item_id);
-                      const stock = Number(childItem?.quantity ?? 0);
-                      const capacity = row.quantity > 0 ? Math.floor(stock / row.quantity) : 0;
-                      return (
-                      <div
-                        key={row.bom_id}
-                        className="grid grid-cols-[1fr_80px_80px_60px] items-center px-4 py-3"
-                        style={{ borderBottom: index === bomRows.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}` }}
-                      >
-                        <div>
-                          <div className="text-sm font-semibold">{childItem?.item_name || row.child_item_id}</div>
-                          <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{childItem?.erp_code}</div>
-                        </div>
-                        <div className="text-right font-mono text-sm">{formatNumber(row.quantity)} {row.unit}</div>
-                        <div className="text-right font-mono text-sm" style={{ color: stock > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red }}>{formatNumber(stock)}</div>
-                        <div className="flex items-center justify-end gap-2">
-                          <span className="font-mono text-sm font-bold" style={{ color: capacity > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}>{formatNumber(capacity)}</span>
-                          <button
-                            onClick={() => void api.deleteBOM(row.bom_id).then(() => setBomRows((current) => current.filter((entry) => entry.bom_id !== row.bom_id)))}
-                            className="text-xs font-semibold"
-                            style={{ color: LEGACY_COLORS.red }}
+                      {bomRows.map((row, index) => {
+                        const childItem = items.find((item) => item.item_id === row.child_item_id);
+                        const stock = Number(childItem?.quantity ?? 0);
+                        const capacity = row.quantity > 0 ? Math.floor(stock / row.quantity) : 0;
+                        return (
+                          <div
+                            key={row.bom_id}
+                            className="grid grid-cols-[1fr_100px_80px_60px_40px] items-center px-4 py-3"
+                            style={{ borderBottom: index === bomRows.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}` }}
                           >
-                            삭제
-                          </button>
-                        </div>
-                      </div>
-                    );
-                    })}
-                    </>
+                            <div>
+                              <div className="text-sm font-semibold">{childItem?.item_name || row.child_item_id}</div>
+                              <div className="mt-0.5 font-mono text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{childItem?.erp_code}</div>
+                            </div>
+                            <div className="flex items-center justify-end gap-1">
+                              {editingBomId === row.bom_id ? (
+                                <input
+                                  autoFocus
+                                  type="number"
+                                  value={editingQty}
+                                  onChange={(e) => setEditingQty(e.target.value)}
+                                  onBlur={() => void saveBomQty(row)}
+                                  onKeyDown={(e) => e.key === "Enter" && void saveBomQty(row)}
+                                  className="w-14 rounded border bg-transparent px-1 text-right font-mono text-sm outline-none"
+                                  style={{ borderColor: LEGACY_COLORS.blue, color: LEGACY_COLORS.text }}
+                                />
+                              ) : (
+                                <span
+                                  title="클릭하여 수량 편집"
+                                  onClick={() => { setEditingBomId(row.bom_id); setEditingQty(String(row.quantity)); }}
+                                  className="cursor-pointer font-mono text-sm hover:underline"
+                                  style={{ color: LEGACY_COLORS.text }}
+                                >
+                                  {formatNumber(row.quantity)}
+                                </span>
+                              )}
+                              <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{row.unit}</span>
+                            </div>
+                            <div className="text-right font-mono text-sm" style={{ color: stock > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red }}>{formatNumber(stock)}</div>
+                            <div className="text-right font-mono text-sm font-bold" style={{ color: capacity > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}>{formatNumber(capacity)}</div>
+                            <div className="flex justify-end">
+                              <button
+                                onClick={() => void api.deleteBOM(row.bom_id).then(() => setBomRows((current) => current.filter((entry) => entry.bom_id !== row.bom_id)))}
+                                className="flex items-center justify-center rounded-full p-1 hover:bg-red-500/10"
+                                style={{ color: LEGACY_COLORS.red }}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               </div>
@@ -672,6 +909,32 @@ export function DesktopAdminView({
               </div>
             ) : null}
 
+            {/* ── 내보내기 ── */}
+            {section === "export" ? (
+              <div className="overflow-y-auto">
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <div className="rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                    <div className="mb-4 flex items-center gap-2 text-sm font-bold">
+                      <FileDown className="h-4 w-4" /> 품목 엑셀
+                    </div>
+                    <p className="mb-4 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>현재 등록된 전체 품목을 엑셀 파일로 내보냅니다.</p>
+                    <a href={api.getItemsExportUrl()} download className="block w-full rounded-[18px] border px-4 py-3 text-center text-sm font-semibold" style={{ borderColor: LEGACY_COLORS.border }}>
+                      품목 다운로드
+                    </a>
+                  </div>
+                  <div className="rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                    <div className="mb-4 flex items-center gap-2 text-sm font-bold">
+                      <FileDown className="h-4 w-4" /> 거래 엑셀
+                    </div>
+                    <p className="mb-4 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>전체 입출고 거래 내역을 엑셀 파일로 내보냅니다.</p>
+                    <a href={api.getTransactionsExportUrl()} download className="block w-full rounded-[18px] border px-4 py-3 text-center text-sm font-semibold" style={{ borderColor: LEGACY_COLORS.border }}>
+                      거래 내역 다운로드
+                    </a>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             {/* ── 설정 ── */}
             {section === "settings" ? (
               <div className="overflow-y-auto">
@@ -700,41 +963,25 @@ export function DesktopAdminView({
                     </button>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                      <div className="mb-4 flex items-center gap-2 text-sm font-bold">
-                        <FileDown className="h-4 w-4" /> 엑셀 내보내기
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <a href={api.getItemsExportUrl()} download className="rounded-[18px] border px-4 py-3 text-center text-sm font-semibold" style={{ borderColor: LEGACY_COLORS.border }}>
-                          품목 엑셀
-                        </a>
-                        <a href={api.getTransactionsExportUrl()} download className="rounded-[18px] border px-4 py-3 text-center text-sm font-semibold" style={{ borderColor: LEGACY_COLORS.border }}>
-                          거래 엑셀
-                        </a>
-                      </div>
+                  <div className="rounded-[28px] border p-5" style={{ background: "rgba(255,123,123,.08)", borderColor: "rgba(255,123,123,.24)" }}>
+                    <div className="mb-4 flex items-center gap-2 text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>
+                      <DatabaseBackup className="h-4 w-4" /> 안전 초기화
                     </div>
-
-                    <div className="rounded-[28px] border p-5" style={{ background: "rgba(255,123,123,.08)", borderColor: "rgba(255,123,123,.24)" }}>
-                      <div className="mb-4 flex items-center gap-2 text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>
-                        <DatabaseBackup className="h-4 w-4" /> 안전 초기화
-                      </div>
-                      <input
-                        type="password"
-                        value={resetPin}
-                        onChange={(event) => setResetPin(event.target.value)}
-                        placeholder="관리자 PIN"
-                        className="mb-3 w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
-                        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                      />
-                      <button
-                        onClick={() => void resetDatabase()}
-                        className="w-full rounded-[18px] px-4 py-3 text-sm font-bold text-white"
-                        style={{ background: LEGACY_COLORS.red }}
-                      >
-                        시드 기준으로 다시 적재
-                      </button>
-                    </div>
+                    <input
+                      type="password"
+                      value={resetPin}
+                      onChange={(event) => setResetPin(event.target.value)}
+                      placeholder="관리자 PIN"
+                      className="mb-3 w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
+                      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                    />
+                    <button
+                      onClick={() => void resetDatabase()}
+                      className="w-full rounded-[18px] px-4 py-3 text-sm font-bold text-white"
+                      style={{ background: LEGACY_COLORS.red }}
+                    >
+                      시드 기준으로 다시 적재
+                    </button>
                   </div>
                 </div>
               </div>
@@ -750,7 +997,8 @@ export function DesktopAdminView({
             {section === "employees" && "직원 섹션에서는 직원의 운영 상태를 빠르게 전환할 수 있습니다."}
             {section === "bom" && "BOM 섹션에서는 상위 품목을 기준으로 하위 자재를 추가하거나 제거할 수 있습니다."}
             {section === "packages" && "출하묶음 섹션에서는 패키지를 만들고 구성 품목을 빠르게 추가할 수 있습니다."}
-            {section === "settings" && "설정 섹션에서는 관리자 PIN 변경, CSV 내보내기, 초기화를 관리합니다."}
+            {section === "export" && "엑셀 내보내기 섹션에서 품목·거래 데이터를 엑셀 파일로 다운로드할 수 있습니다."}
+            {section === "settings" && "설정 섹션에서는 관리자 PIN 변경, 초기화를 관리합니다."}
           </div>
           <div className="rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
             <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>

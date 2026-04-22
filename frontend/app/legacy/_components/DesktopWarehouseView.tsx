@@ -9,12 +9,10 @@ import {
   LEGACY_COLORS,
   LEGACY_MODELS,
   employeeColor,
-  erpCodeDeptBadge,
   firstEmployeeLetter,
   formatNumber,
   getStockState,
   normalizeDepartment,
-  normalizeModel,
   transactionColor,
   transactionLabel,
 } from "./legacyUi";
@@ -82,7 +80,7 @@ function Chip({
   return (
     <button
       onClick={onClick}
-      className="rounded-full border px-3 py-1.5 text-xs font-semibold transition-all hover:brightness-110"
+      className="w-full rounded-full border px-4 py-2 text-sm font-semibold transition-all hover:brightness-110"
       style={{
         background: active ? `${tone}22` : LEGACY_COLORS.s2,
         borderColor: active ? tone : LEGACY_COLORS.border,
@@ -338,7 +336,7 @@ export function DesktopWarehouseView({
                     <Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />
                     부서 구분
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-4 gap-2">
                     {DEPT_OPTIONS.map((opt) => (
                       <Chip
                         key={opt.value}
@@ -355,7 +353,7 @@ export function DesktopWarehouseView({
                     <TrendingUp className="h-4 w-4" style={{ color: LEGACY_COLORS.cyan }} />
                     모델 구분
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     {LEGACY_MODELS.map((entry) => (
                       <Chip key={entry} active={modelFilter === entry} label={entry} onClick={() => setModelFilter(entry)} tone={LEGACY_COLORS.cyan} />
                     ))}
@@ -437,9 +435,10 @@ export function DesktopWarehouseView({
                       {([
                         { label: "상태", nowrap: true, width: "80px" },
                         { label: "품목명", nowrap: false, minWidth: "160px" },
-                        { label: "코드", nowrap: true, width: "90px" },
+                        { label: "ERP코드", nowrap: true, width: "90px" },
+                        { label: "부서", nowrap: true, width: "120px" },
                         { label: "현재고", nowrap: true, width: "72px" },
-                        { label: "모델", nowrap: true, width: "80px" },
+                        { label: "안전재고", nowrap: true, width: "72px" },
                       ] as { label: string; nowrap: boolean; width?: string; minWidth?: string }[]).map(({ label, nowrap, width, minWidth }) => (
                         <th key={label} className={`border-b px-4 py-3 text-left text-[11px] font-bold${nowrap ? " whitespace-nowrap" : ""}`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth }}>
                           {label}
@@ -450,7 +449,6 @@ export function DesktopWarehouseView({
                   <tbody>
                     {filteredItems.map((item) => {
                       const stock = getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock));
-                      const deptBadge = erpCodeDeptBadge(item.erp_code);
                       const active = selectedItems.has(item.item_id);
                       return (
                         <tr
@@ -470,38 +468,72 @@ export function DesktopWarehouseView({
                             borderLeft: active ? `2px solid ${LEGACY_COLORS.blue}` : "2px solid transparent",
                           }}
                         >
-                          <td className="border-b px-4 py-3 align-top whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className="border-b px-4 py-3 align-middle whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>
                             <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: active ? LEGACY_COLORS.blue : "rgba(255,255,255,.08)", border: `1.5px solid ${active ? LEGACY_COLORS.blue : LEGACY_COLORS.border}` }}>
                               {active && <Check className="h-3.5 w-3.5 text-white" />}
                             </div>
                           </td>
-                          <td className="border-b px-4 py-3 align-top whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>
-                            <div className="flex flex-col gap-1">
-                              <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ color: stock.color, background: `${stock.color}20` }}>
-                                {stock.label}
-                              </span>
-                              {deptBadge && (
-                                <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ color: deptBadge.color, background: deptBadge.bg }}>
-                                  {deptBadge.label}
-                                </span>
-                              )}
-                            </div>
+                          <td className="border-b px-4 py-3 align-middle whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>
+                            <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ color: stock.color, background: `${stock.color}20` }}>
+                              {stock.label}
+                            </span>
                           </td>
-                          <td className="border-b px-4 py-3 align-top" style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className="border-b px-4 py-3 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
                             <div className="font-semibold">{item.item_name}</div>
                             <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{item.spec || "-"}</div>
+                            {(() => {
+                              const total = Math.max(Number(item.quantity), 1);
+                              const wh = Number(item.warehouse_qty);
+                              const depts = (item.locations ?? []).filter((l) => Number(l.quantity) > 0);
+                              const segments: { pct: number; color: string; label: string }[] = [];
+                              let used = 0;
+                              if (wh > 0) {
+                                const pct = Math.min(100, (wh / total) * 100);
+                                segments.push({ pct, color: "#3ac4b0", label: `창고 ${formatNumber(wh)}` });
+                                used += pct;
+                              }
+                              for (const loc of depts) {
+                                const pct = Math.min(100 - used, (Number(loc.quantity) / total) * 100);
+                                if (pct <= 0) break;
+                                segments.push({ pct, color: employeeColor(loc.department), label: `${loc.department} ${formatNumber(loc.quantity)}` });
+                                used += pct;
+                              }
+                              return (
+                                <div
+                                  className="mt-2 flex h-[5px] overflow-hidden rounded-full"
+                                  style={{ background: LEGACY_COLORS.s3 }}
+                                  title={segments.map((s) => s.label).join(" / ")}
+                                >
+                                  {segments.map((s, i) => (
+                                    <div key={i} className="h-full shrink-0" style={{ width: `${s.pct}%`, background: s.color }} />
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </td>
-                          <td className="border-b px-4 py-3 align-top whitespace-nowrap font-mono text-[12px]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-                            {item.erp_code}
+                          <td className="border-b px-4 py-3 align-middle whitespace-nowrap font-mono text-[12px] font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
+                            {item.erp_code ?? "-"}
+                          </td>
+                          <td className="border-b px-4 py-3 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
+                            <div className="flex flex-wrap gap-1">
+                              {Number(item.warehouse_qty) > 0 && (
+                                <span className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ color: "#3ac4b0" }}>창고</span>
+                              )}
+                              {(item.locations ?? []).filter((l) => Number(l.quantity) > 0).map((l) => (
+                                <span key={l.department} className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ color: employeeColor(l.department) }}>
+                                  {l.department}
+                                </span>
+                              ))}
+                            </div>
                           </td>
                           <td
-                            className="border-b px-4 py-3 text-right align-top whitespace-nowrap font-mono text-[13px] font-bold"
+                            className="border-b px-4 py-3 text-right align-middle whitespace-nowrap font-mono text-[13px] font-bold"
                             style={{ borderColor: LEGACY_COLORS.border, color: Number(item.quantity) > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red }}
                           >
                             {formatNumber(item.quantity)}
                           </td>
-                          <td className="border-b px-4 py-3 align-top whitespace-nowrap text-[12px]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-                            {normalizeModel(item.legacy_model)}
+                          <td className="border-b px-4 py-3 text-right align-middle whitespace-nowrap font-mono text-[13px]" style={{ borderColor: LEGACY_COLORS.border }}>
+                            {item.min_stock == null ? "-" : formatNumber(item.min_stock)}
                           </td>
                         </tr>
                       );
@@ -648,7 +680,7 @@ export function DesktopWarehouseView({
               <UserRound className="h-3.5 w-3.5" />
               담당 직원
             </div>
-            <div className="flex gap-3 overflow-x-auto pb-1">
+            <div className="flex gap-3 overflow-x-auto py-2 px-1">
               {employees.map((emp) => {
                 const active = emp.employee_id === employeeId;
                 const tone = employeeColor(emp.department);

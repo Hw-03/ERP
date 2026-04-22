@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import BOM, Inventory, Item
-from app.schemas import BOMCreate, BOMResponse, BOMTreeNode
+from app.schemas import BOMCreate, BOMResponse, BOMTreeNode, BOMUpdate
 
 router = APIRouter()
 
@@ -60,6 +60,21 @@ def create_bom(payload: BOMCreate, db: Session = Depends(get_db)):
         notes=payload.notes,
     )
     db.add(bom_entry)
+    db.commit()
+    db.refresh(bom_entry)
+    return bom_entry
+
+
+@router.patch("/{bom_id}", response_model=BOMResponse)
+def update_bom(bom_id: uuid.UUID, payload: BOMUpdate, db: Session = Depends(get_db)):
+    """Update quantity or unit of an existing BOM row."""
+    bom_entry = db.query(BOM).filter(BOM.bom_id == bom_id).first()
+    if not bom_entry:
+        raise HTTPException(status_code=404, detail="BOM 항목을 찾을 수 없습니다.")
+    if payload.quantity is not None:
+        bom_entry.quantity = payload.quantity
+    if payload.unit is not None:
+        bom_entry.unit = payload.unit
     db.commit()
     db.refresh(bom_entry)
     return bom_entry

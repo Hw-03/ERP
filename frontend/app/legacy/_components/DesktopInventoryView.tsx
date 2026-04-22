@@ -71,16 +71,22 @@ function Chip({
   label,
   onClick,
   tone,
+  fluid,
 }: {
   active: boolean;
   label: string;
   onClick: () => void;
   tone: string;
+  fluid?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className="rounded-full border px-3 py-2 text-xs font-semibold transition-all hover:brightness-110"
+      className={
+        fluid
+          ? "rounded-full border px-4 py-2.5 text-sm font-semibold transition-all hover:brightness-110 text-center"
+          : "rounded-full border px-3 py-2 text-xs font-semibold transition-all hover:brightness-110"
+      }
       style={{
         background: active ? `${tone}22` : LEGACY_COLORS.s2,
         borderColor: active ? tone : LEGACY_COLORS.border,
@@ -168,6 +174,8 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
     return { totalCount: scopedItems.length, totalQuantity, normalCount, lowCount, zeroCount };
   }, [scopedItems]);
 
+  const isFiltered = dept !== "ALL" || model !== "전체";
+
 
   return (
     <>
@@ -206,24 +214,26 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
               {/* KPI 카드 */}
               <div className="mt-4 grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
                 {[
-                  { label: "전체 품목", value: summary.totalCount, hint: `총 재고 ${formatNumber(summary.totalQuantity)}`, tone: LEGACY_COLORS.blue, key: "ALL" as KpiFilter },
+                  { label: isFiltered ? "조회 품목" : "전체 품목", value: summary.totalCount, hint: isFiltered ? "필터 적용 결과" : `총 재고 ${formatNumber(summary.totalQuantity)}`, tone: LEGACY_COLORS.blue, key: "ALL" as KpiFilter },
                   { label: "정상", value: summary.normalCount, hint: "운영 가능 품목", tone: LEGACY_COLORS.green, key: "NORMAL" as KpiFilter },
                   { label: "부족", value: summary.lowCount, hint: "안전재고 이하", tone: LEGACY_COLORS.yellow, key: "LOW" as KpiFilter },
                   { label: "품절", value: summary.zeroCount, hint: "즉시 확인 필요", tone: LEGACY_COLORS.red, key: "ZERO" as KpiFilter },
                 ].map((card) => (
                   <button
-                    key={card.label}
+                    key={card.key}
                     onClick={() => setKpi(card.key)}
                     onMouseEnter={() => setHoveredKpi(card.key)}
                     onMouseLeave={() => setHoveredKpi(null)}
                     className="rounded-[20px] border px-4 py-4 text-left transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5"
                     style={{
                       background: hoveredKpi === card.key
-                        ? `color-mix(in srgb, ${card.tone} var(--kpi-hover-mix, 18%), transparent)`
+                        ? `color-mix(in srgb, ${card.tone} var(--kpi-hover-mix, 28%), transparent)`
                         : kpi === card.key
-                        ? `color-mix(in srgb, ${card.tone} 10%, transparent)`
-                        : LEGACY_COLORS.s2,
-                      borderColor: (hoveredKpi === card.key || kpi === card.key) ? card.tone : LEGACY_COLORS.border,
+                        ? `color-mix(in srgb, ${card.tone} 22%, transparent)`
+                        : `color-mix(in srgb, ${card.tone} 10%, transparent)`,
+                      borderColor: hoveredKpi === card.key || kpi === card.key
+                        ? card.tone
+                        : `color-mix(in srgb, ${card.tone} 40%, transparent)`,
                       boxShadow: hoveredKpi === card.key
                         ? `0 8px 20px rgba(0,0,0,0.35), 0 0 var(--kpi-glow-blur, 20px) color-mix(in srgb, ${card.tone} var(--kpi-glow-strength, 0%), transparent), inset 0 0 0 1px color-mix(in srgb, ${card.tone} var(--kpi-glow-strength, 0%), transparent)`
                         : undefined,
@@ -249,9 +259,9 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                     <Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />
                     부서 구분
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex justify-between">
                     {DEPT_OPTIONS.map((opt) => (
-                      <Chip key={opt.value} active={dept === opt.value} label={opt.label} onClick={() => setDept(opt.value)} tone={LEGACY_COLORS.green} />
+                      <Chip key={opt.value} active={dept === opt.value} label={opt.label} onClick={() => setDept(opt.value)} tone={LEGACY_COLORS.green} fluid />
                     ))}
                   </div>
                 </div>
@@ -261,9 +271,9 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                     <TrendingUp className="h-4 w-4" style={{ color: LEGACY_COLORS.cyan }} />
                     모델 구분
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex justify-between">
                     {LEGACY_MODELS.map((entry) => (
-                      <Chip key={entry} active={model === entry} label={entry} onClick={() => setModel(entry)} tone={LEGACY_COLORS.cyan} />
+                      <Chip key={entry} active={model === entry} label={entry} onClick={() => setModel(entry)} tone={LEGACY_COLORS.cyan} fluid />
                     ))}
                   </div>
                 </div>
@@ -367,12 +377,12 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                           className="cursor-pointer transition-colors hover:bg-white/[0.12]"
                           style={{ background: selected ? "rgba(101,169,255,.08)" : "transparent" }}
                         >
-                          <td className={`border-b px-4 ${py} align-top whitespace-nowrap`} style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className={`border-b px-4 ${py} align-middle whitespace-nowrap`} style={{ borderColor: LEGACY_COLORS.border }}>
                             <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ color: stock.color, background: `${stock.color}20` }}>
                               {stock.label}
                             </span>
                           </td>
-                          <td className={`border-b px-4 ${py} align-top`} style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className={`border-b px-4 ${py} align-middle`} style={{ borderColor: LEGACY_COLORS.border }}>
                             <div className="font-semibold">{item.item_name}</div>
                             <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
                               {item.spec || "-"}
@@ -385,7 +395,7 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                               let used = 0;
                               if (wh > 0) {
                                 const pct = Math.min(100, (wh / total) * 100);
-                                segments.push({ pct, color: LEGACY_COLORS.muted2, label: `창고 ${formatNumber(wh)}` });
+                                segments.push({ pct, color: "#3ac4b0", label: `창고 ${formatNumber(wh)}` });
                                 used += pct;
                               }
                               for (const loc of depts) {
@@ -407,25 +417,25 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                               );
                             })()}
                           </td>
-                          <td className={`border-b px-4 ${py} align-top whitespace-nowrap font-mono text-[12px] font-bold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
+                          <td className={`border-b px-4 ${py} align-middle whitespace-nowrap font-mono text-[12px] font-bold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
                             {item.erp_code ?? "-"}
                           </td>
-                          <td className={`border-b px-4 ${py} align-top`} style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className={`border-b px-4 ${py} align-middle`} style={{ borderColor: LEGACY_COLORS.border }}>
                             <div className="flex flex-wrap gap-1">
                               {Number(item.warehouse_qty) > 0 && (
-                                <span className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: "rgba(255,255,255,.08)", color: LEGACY_COLORS.muted }}>창고</span>
+                                <span className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ color: "#3ac4b0" }}>창고</span>
                               )}
                               {item.locations.filter((l) => Number(l.quantity) > 0).map((l) => (
-                                <span key={l.department} className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: `${employeeColor(l.department)}20`, color: employeeColor(l.department) }}>
+                                <span key={l.department} className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ color: employeeColor(l.department) }}>
                                   {l.department}
                                 </span>
                               ))}
                             </div>
                           </td>
-                          <td className={`border-b px-4 ${py} text-right align-top whitespace-nowrap font-mono text-[13px] font-bold`} style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className={`border-b px-4 ${py} text-right align-middle whitespace-nowrap font-mono text-[13px] font-bold`} style={{ borderColor: LEGACY_COLORS.border }}>
                             {formatNumber(item.quantity)}
                           </td>
-                          <td className={`border-b px-4 ${py} text-right align-top whitespace-nowrap font-mono text-[13px]`} style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className={`border-b px-4 ${py} text-right align-middle whitespace-nowrap font-mono text-[13px]`} style={{ borderColor: LEGACY_COLORS.border }}>
                             {item.min_stock == null ? "-" : formatNumber(item.min_stock)}
                           </td>
                         </tr>

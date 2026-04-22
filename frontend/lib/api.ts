@@ -764,6 +764,16 @@ export const api = {
     if (!res.ok) throw new Error(await parseError(res));
   },
 
+  updateBOM: async (bomId: string, payload: { quantity?: number; unit?: string }) => {
+    const res = await fetch(toApiUrl(`/api/bom/${bomId}`), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<BOMEntry>;
+  },
+
   productionReceipt: async (payload: {
     item_id: string;
     quantity: number;

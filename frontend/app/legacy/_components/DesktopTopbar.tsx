@@ -1,15 +1,18 @@
 "use client";
 
+import type { ElementType } from "react";
 import { Clock3, RefreshCw } from "lucide-react";
 import { LEGACY_COLORS } from "./legacyUi";
 import { ThemeToggle } from "./ThemeToggle";
 
 export function DesktopTopbar({
   title,
+  icon: Icon,
   onRefresh,
   statusText,
 }: {
   title: string;
+  icon?: ElementType;
   subtitle?: string;
   onRefresh: () => void;
   statusText: string;
@@ -21,7 +24,14 @@ export function DesktopTopbar({
         style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
       >
         <div className="min-w-0 flex-1">
-          <div className="text-[24px] font-black tracking-[-0.02em]">{title}</div>
+          <div className="flex items-center gap-3">
+            {Icon && (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px]" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.blue }}>
+                <Icon className="h-5 w-5" />
+              </div>
+            )}
+            <div className="text-[24px] font-black tracking-[-0.02em]">{title}</div>
+          </div>
         </div>
 
         <div className="hidden min-w-[260px] items-center gap-3 rounded-[20px] border px-4 py-2.5 xl:flex" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>

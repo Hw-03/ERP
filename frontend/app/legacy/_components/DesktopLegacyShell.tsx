@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import type { ElementType } from "react";
+import { Boxes, History, Settings2, Warehouse } from "lucide-react";
 import { DesktopSidebar, type DesktopTabId } from "./DesktopSidebar";
 import { DesktopTopbar } from "./DesktopTopbar";
 import { DesktopInventoryView } from "./DesktopInventoryView";
@@ -10,11 +12,11 @@ import { DesktopHistoryView } from "./DesktopHistoryView";
 import { LEGACY_COLORS } from "./legacyUi";
 import type { Item } from "@/lib/api";
 
-const TAB_META: Record<DesktopTabId, { title: string }> = {
-  inventory: { title: "📊 대시보드" },
-  warehouse: { title: "입출고 워크스테이션" },
-  history: { title: "입출고 내역" },
-  admin: { title: "관리자 워크스페이스" },
+const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
+  inventory: { title: "대시보드", icon: Boxes },
+  warehouse: { title: "입출고", icon: Warehouse },
+  history: { title: "입출고 내역", icon: History },
+  admin: { title: "관리자", icon: Settings2 },
 };
 
 export function DesktopLegacyShell() {
@@ -52,6 +54,7 @@ export function DesktopLegacyShell() {
         <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
           <DesktopTopbar
             title={activeMeta.title}
+            icon={activeMeta.icon}
             onRefresh={() => setRefreshNonce((current) => current + 1)}
             statusText={status}
           />

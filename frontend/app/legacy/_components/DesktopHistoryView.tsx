@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Activity, Calendar, ChevronDown, Download, Search, TrendingDown, TrendingUp } from "lucide-react";
+import { Activity, Calendar, ChevronDown, Search, TrendingDown, TrendingUp } from "lucide-react";
 import { api, type TransactionLog, type TransactionType } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import {
@@ -74,8 +74,12 @@ function rowTint(type: string) {
   }
 }
 
+function parseUtc(iso: string) {
+  return new Date(iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z");
+}
+
 function formatDate(iso: string) {
-  const d = new Date(iso);
+  const d = parseUtc(iso);
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   const hh = String(d.getHours()).padStart(2, "0");
@@ -152,7 +156,7 @@ export function DesktopHistoryView() {
     const start = getPeriodStart(dateFilter);
     return logs.filter((log) => {
       if (typeFilter !== "ALL" && log.transaction_type !== (typeFilter as TransactionType)) return false;
-      if (start && new Date(log.created_at) < start) return false;
+      if (start && parseUtc(log.created_at) < start) return false;
       if (search.trim()) {
         const kw = search.trim().toLowerCase();
         const hay = `${log.item_name} ${log.erp_code} ${log.reference_no ?? ""} ${log.notes ?? ""}`.toLowerCase();
@@ -175,7 +179,7 @@ export function DesktopHistoryView() {
       if (log.transaction_type === "SHIP" || log.transaction_type === "BACKFLUSH") {
         shipSum += Math.abs(Number(log.quantity_change));
       }
-      if (new Date(log.created_at) >= todayStart) todayCount++;
+      if (parseUtc(log.created_at) >= todayStart) todayCount++;
     }
     return { total: filteredLogs.length, receiveSum, shipSum, todayCount };
   }, [filteredLogs]);
@@ -294,18 +298,6 @@ export function DesktopHistoryView() {
                     <button onClick={() => setSearch("")} className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>✕</button>
                   )}
                 </div>
-                <a
-                  href={api.getTransactionsExportUrl({
-                    transaction_type: typeFilter !== "ALL" ? typeFilter : undefined,
-                    search: search || undefined,
-                  })}
-                  download
-                  className="flex shrink-0 items-center gap-2 rounded-[14px] border px-4 py-2.5 text-xs font-bold transition-all hover:brightness-110"
-                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.green }}
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  엑셀
-                </a>
               </div>
 
               {/* 유형 필터 */}
@@ -529,7 +521,7 @@ export function DesktopHistoryView() {
                   ["단위", selected.item_unit],
                   ["담당자", selected.produced_by ?? "-"],
                   ["참조번호", selected.reference_no ?? "-"],
-                  ["일시", new Date(selected.created_at).toLocaleString("ko-KR")],
+                  ["일시", parseUtc(selected.created_at).toLocaleString("ko-KR")],
                 ] as [string, string][]
               ).map(([label, value]) => (
                 <div key={label} className="flex items-start justify-between gap-3">
