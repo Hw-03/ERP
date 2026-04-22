@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowLeftRight, Boxes, PackageCheck, RotateCcw, Search, Sparkles, TrendingUp, UserRound, Workflow } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, Boxes, Check, PackageCheck, RotateCcw, Search, Sparkles, TrendingUp, UserRound, Workflow } from "lucide-react";
 import { api, type Department, type Employee, type Item, type ShipPackage, type TransactionLog } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
+import { SelectedItemsPanel } from "./SelectedItemsPanel";
 import {
   LEGACY_COLORS,
   LEGACY_FILE_TYPES,
@@ -103,13 +104,12 @@ export function DesktopWarehouseView({
   const [items, setItems] = useState<Item[]>([]);
   const [packages, setPackages] = useState<ShipPackage[]>([]);
   const [employeeId, setEmployeeId] = useState("");
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [selectedItems, setSelectedItems] = useState<Map<string, number>>(new Map());
   const [selectedPackage, setSelectedPackage] = useState<ShipPackage | null>(null);
   const [itemLogs, setItemLogs] = useState<TransactionLog[]>([]);
   const [localSearch, setLocalSearch] = useState("");
   const [fileType, setFileType] = useState("전체");
   const [modelFilter, setModelFilter] = useState("전체");
-  const [quantity, setQuantity] = useState("1");
   const [referenceNo, setReferenceNo] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -136,22 +136,31 @@ export function DesktopWarehouseView({
 
   useEffect(() => {
     if (preselectedItem) {
-      setSelectedItem(preselectedItem);
+      setSelectedItems(new Map([[preselectedItem.item_id, 1]]));
       setPendingScrollId(preselectedItem.item_id);
     }
   }, [preselectedItem]);
 
+  const selectedEntries = useMemo(
+    () =>
+      Array.from(selectedItems.entries())
+        .map(([id, qty]) => ({ item: items.find((i) => i.item_id === id)!, quantity: qty }))
+        .filter((e) => e.item != null),
+    [selectedItems, items],
+  );
+
+  const singleSelectedItem = selectedEntries.length === 1 ? selectedEntries[0].item : null;
+
   useEffect(() => {
-    if (!selectedItem) {
+    if (!singleSelectedItem) {
       setItemLogs([]);
       return;
     }
-    void api.getTransactions({ itemId: selectedItem.item_id, limit: 8 }).then(setItemLogs).catch(() => setItemLogs([]));
-  }, [selectedItem]);
+    void api.getTransactions({ itemId: singleSelectedItem.item_id, limit: 8 }).then(setItemLogs).catch(() => setItemLogs([]));
+  }, [singleSelectedItem]);
 
   const selectedEmployee = employees.find((e) => e.employee_id === employeeId) ?? null;
   const searchKeyword = `${globalSearch} ${localSearch}`.trim().toLowerCase();
-  const numericQty = Number(quantity || 0);
 
   const isOutbound =
     workType === "raw-io"
@@ -160,11 +169,7 @@ export function DesktopWarehouseView({
         ? warehouseDirection === "wh-to-dept"
         : workType === "dept-io"
           ? deptDirection === "out"
-          : workType === "defective-register"
-            ? true
-            : workType === "supplier-return"
-              ? true
-              : true;
+          : true;
 
   const effectiveLabel =
     workType === "raw-io"
@@ -208,15 +213,6 @@ export function DesktopWarehouseView({
     [packages, searchKeyword],
   );
 
-  // 총량이 실제로 변하는 작업: raw-io, supplier-return. 그 외는 위치 이동만.
-  const changesTotal = workType === "raw-io" || workType === "supplier-return";
-  const expectedQuantity =
-    selectedItem && numericQty > 0 && changesTotal
-      ? isOutbound
-        ? Number(selectedItem.quantity) - numericQty
-        : Number(selectedItem.quantity) + numericQty
-      : null;
-
   const directionButtons =
     workType === "raw-io"
       ? [
@@ -235,11 +231,41 @@ export function DesktopWarehouseView({
             ]
           : [];
 
+  async function dispatchSingleItem(item: Item, qty: number, producedBy: string) {
+    const baseRef = referenceNo || undefined;
+    const baseNotes = notes || undefined;
+    if (workType === "raw-io") {
+      const payload = { item_id: item.item_id, quantity: qty, reference_no: baseRef, produced_by: producedBy, notes: baseNotes };
+      if (rawDirection === "out") await api.shipInventory(payload);
+      else await api.receiveInventory(payload);
+    } else if (workType === "warehouse-io") {
+      const payload = { item_id: item.item_id, quantity: qty, department: selectedDept, reference_no: baseRef, produced_by: producedBy, notes: baseNotes };
+      if (warehouseDirection === "wh-to-dept") await api.transferToProduction(payload);
+      else await api.transferToWarehouse(payload);
+    } else if (workType === "dept-io") {
+      const payload = { item_id: item.item_id, quantity: qty, department: selectedDept, reference_no: baseRef, produced_by: producedBy, notes: baseNotes };
+      if (deptDirection === "in") await api.transferToProduction(payload);
+      else await api.transferToWarehouse(payload);
+    } else if (workType === "defective-register") {
+      await api.markDefective({
+        item_id: item.item_id,
+        quantity: qty,
+        source: defectiveSource,
+        source_department: defectiveSource === "production" ? selectedDept : undefined,
+        target_department: selectedDept,
+        reason: baseNotes,
+        operator: producedBy,
+      });
+    } else if (workType === "supplier-return") {
+      await api.returnToSupplier({ item_id: item.item_id, quantity: qty, from_department: selectedDept, reference_no: baseRef, notes: baseNotes, operator: producedBy });
+    }
+  }
+
   async function submit() {
     if (!selectedEmployee) return setError("담당 직원을 먼저 선택해 주세요.");
-    if (!numericQty || numericQty <= 0) return setError("수량은 1 이상이어야 합니다.");
     if (workType === "package-out" && !selectedPackage) return setError("출고할 패키지를 선택해 주세요.");
-    if (workType !== "package-out" && !selectedItem) return setError("품목을 먼저 선택해 주세요.");
+    if (workType !== "package-out" && selectedEntries.length === 0) return setError("품목을 먼저 선택해 주세요.");
+    if (workType !== "package-out" && selectedEntries.some((e) => e.quantity <= 0)) return setError("모든 선택 품목의 수량은 1 이상이어야 합니다.");
 
     try {
       setSubmitting(true);
@@ -249,83 +275,32 @@ export function DesktopWarehouseView({
       if (workType === "package-out" && selectedPackage) {
         await api.shipPackage({
           package_id: selectedPackage.package_id,
-          quantity: numericQty,
+          quantity: 1,
           reference_no: referenceNo || undefined,
           produced_by: producedBy,
           notes: notes || undefined,
         });
-      } else if (selectedItem) {
-        const baseRef = referenceNo || undefined;
-        const baseNotes = notes || undefined;
-        if (workType === "raw-io") {
-          const payload = {
-            item_id: selectedItem.item_id,
-            quantity: numericQty,
-            reference_no: baseRef,
-            produced_by: producedBy,
-            notes: baseNotes,
-          };
-          if (rawDirection === "out") await api.shipInventory(payload);
-          else await api.receiveInventory(payload);
-        } else if (workType === "warehouse-io") {
-          const payload = {
-            item_id: selectedItem.item_id,
-            quantity: numericQty,
-            department: selectedDept,
-            reference_no: baseRef,
-            produced_by: producedBy,
-            notes: baseNotes,
-          };
-          if (warehouseDirection === "wh-to-dept") {
-            await api.transferToProduction(payload);
-          } else {
-            await api.transferToWarehouse(payload);
+      } else {
+        const failures: string[] = [];
+        for (const entry of selectedEntries) {
+          try {
+            await dispatchSingleItem(entry.item, entry.quantity, producedBy);
+          } catch {
+            failures.push(entry.item.item_name);
           }
-        } else if (workType === "dept-io") {
-          // 부서 입고 = 창고에서 해당 부서로 이동.
-          // 부서 출고 = 해당 부서에서 창고로 복귀 (외부 출하는 raw-io 출고).
-          const payload = {
-            item_id: selectedItem.item_id,
-            quantity: numericQty,
-            department: selectedDept,
-            reference_no: baseRef,
-            produced_by: producedBy,
-            notes: baseNotes,
-          };
-          if (deptDirection === "in") await api.transferToProduction(payload);
-          else await api.transferToWarehouse(payload);
-        } else if (workType === "defective-register") {
-          await api.markDefective({
-            item_id: selectedItem.item_id,
-            quantity: numericQty,
-            source: defectiveSource,
-            source_department: defectiveSource === "production" ? selectedDept : undefined,
-            target_department: selectedDept,
-            reason: notes || undefined,
-            operator: producedBy,
-          });
-        } else if (workType === "supplier-return") {
-          await api.returnToSupplier({
-            item_id: selectedItem.item_id,
-            quantity: numericQty,
-            from_department: selectedDept,
-            reference_no: baseRef,
-            notes: baseNotes,
-            operator: producedBy,
-          });
+        }
+        if (failures.length > 0) {
+          setError(`처리 실패 품목: ${failures.join(", ")}`);
+          return;
         }
       }
 
       setReferenceNo("");
       setNotes("");
-      setQuantity("1");
-      onStatusChange(`${effectiveLabel} 처리를 완료했습니다.`);
-
-      if (selectedItem) {
-        const refreshed = await api.getItem(selectedItem.item_id);
-        setSelectedItem(refreshed);
-        setItemLogs(await api.getTransactions({ itemId: selectedItem.item_id, limit: 8 }));
-      }
+      setSelectedItems(new Map());
+      const refreshed = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
+      setItems(refreshed);
+      onStatusChange(`${effectiveLabel} ${workType !== "package-out" ? selectedEntries.length + "건 " : ""}처리를 완료했습니다.`);
     } catch (nextError) {
       const message = nextError instanceof Error ? nextError.message : "입출고 처리를 완료하지 못했습니다.";
       setError(message);
@@ -439,15 +414,22 @@ export function DesktopWarehouseView({
                 <table className="min-w-full border-separate border-spacing-0 text-sm">
                   <thead className="sticky top-0 z-10">
                     <tr style={{ background: LEGACY_COLORS.s2 }}>
+                      <th className="border-b px-4 py-3 text-left text-[11px] font-bold whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue, width: "72px" }}>
+                        {selectedItems.size > 0 ? (
+                          <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-black" style={{ background: "rgba(101,169,255,.18)", color: LEGACY_COLORS.blue }}>
+                            선택 {selectedItems.size}건
+                          </span>
+                        ) : "선택"}
+                      </th>
                       {([
-                        { label: "상태", nowrap: true },
-                        { label: "품목명", nowrap: false },
-                        { label: "코드", nowrap: true },
-                        { label: "구분", nowrap: true },
-                        { label: "현재고", nowrap: true },
-                        { label: "모델", nowrap: true },
-                      ] as { label: string; nowrap: boolean }[]).map(({ label, nowrap }) => (
-                        <th key={label} className={`border-b px-4 py-3 text-left text-[11px] font-bold${nowrap ? " whitespace-nowrap" : ""}`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                        { label: "상태", nowrap: true, width: "80px" },
+                        { label: "품목명", nowrap: false, minWidth: "160px" },
+                        { label: "코드", nowrap: true, width: "90px" },
+                        { label: "구분", nowrap: true, width: "68px" },
+                        { label: "현재고", nowrap: true, width: "72px" },
+                        { label: "모델", nowrap: true, width: "80px" },
+                      ] as { label: string; nowrap: boolean; width?: string; minWidth?: string }[]).map(({ label, nowrap, width, minWidth }) => (
+                        <th key={label} className={`border-b px-4 py-3 text-left text-[11px] font-bold${nowrap ? " whitespace-nowrap" : ""}`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth }}>
                           {label}
                         </th>
                       ))}
@@ -457,15 +439,30 @@ export function DesktopWarehouseView({
                     {filteredItems.map((item) => {
                       const stock = getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock));
                       const badge = fileTypeBadge(item.legacy_file_type);
-                      const active = selectedItem?.item_id === item.item_id;
+                      const active = selectedItems.has(item.item_id);
                       return (
                         <tr
                           key={item.item_id}
                           data-item-id={item.item_id}
-                          onClick={() => setSelectedItem((c) => (c?.item_id === item.item_id ? null : item))}
+                          onClick={() => {
+                            setSelectedItems((prev) => {
+                              const next = new Map(prev);
+                              if (next.has(item.item_id)) next.delete(item.item_id);
+                              else next.set(item.item_id, 1);
+                              return next;
+                            });
+                          }}
                           className="cursor-pointer transition-colors hover:bg-white/[0.12]"
-                          style={{ background: active ? "rgba(101,169,255,.08)" : "transparent" }}
+                          style={{
+                            background: active ? "rgba(101,169,255,.08)" : "transparent",
+                            borderLeft: active ? `2px solid ${LEGACY_COLORS.blue}` : "2px solid transparent",
+                          }}
                         >
+                          <td className="border-b px-4 py-3 align-top whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: active ? LEGACY_COLORS.blue : "rgba(255,255,255,.08)", border: `1.5px solid ${active ? LEGACY_COLORS.blue : LEGACY_COLORS.border}` }}>
+                              {active && <Check className="h-3.5 w-3.5 text-white" />}
+                            </div>
+                          </td>
                           <td className="border-b px-4 py-3 align-top whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>
                             <div className="flex flex-col gap-1">
                               <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ color: stock.color, background: `${stock.color}20` }}>
@@ -511,11 +508,15 @@ export function DesktopWarehouseView({
         title={
           workType === "package-out"
             ? (selectedPackage ? selectedPackage.name : "패키지를 선택하세요")
-            : (selectedItem ? selectedItem.item_name : "품목을 선택하세요")
+            : selectedEntries.length === 0
+              ? "품목을 선택하세요"
+              : selectedEntries.length === 1
+                ? selectedEntries[0].item.item_name
+                : `${selectedEntries.length}건 선택됨`
         }
         subtitle={
-          selectedItem && workType !== "package-out"
-            ? `${selectedItem.item_code} / 현재고 ${formatNumber(selectedItem.quantity)}`
+          selectedEntries.length === 1 && workType !== "package-out"
+            ? `${selectedEntries[0].item.item_code} / 현재고 ${formatNumber(selectedEntries[0].item.quantity)}`
             : undefined
         }
       >
@@ -657,62 +658,75 @@ export function DesktopWarehouseView({
             </div>
           </section>
 
-          {/* 수량 입력 */}
-          <section className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-            <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
-              수량 및 메모
-            </div>
-            <input
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value.replace(/[^\d]/g, ""))}
-              className="w-full rounded-[18px] border px-4 py-4 text-center font-mono text-[34px] font-black outline-none"
-              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-              placeholder="0"
-            />
-            <div className="mt-2 grid grid-cols-4 gap-2">
-              {[-10, -1, 1, 10].map((step) => (
-                <button
-                  key={step}
-                  onClick={() => setQuantity(String(Math.max(0, Number(quantity || 0) + step)))}
-                  className="rounded-[14px] px-2 py-2.5 text-sm font-bold"
-                  style={{
-                    background: step > 0 ? "rgba(67,211,157,.16)" : "rgba(255,123,123,.14)",
-                    color: step > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red,
-                  }}
-                >
-                  {step > 0 ? `+${step}` : step}
-                </button>
-              ))}
-            </div>
-
-            {selectedItem && numericQty > 0 && workType !== "package-out" && (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <div className="rounded-[16px] border px-3 py-2.5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                  <div className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>현재고</div>
-                  <div className="font-mono font-black">{formatNumber(selectedItem.quantity)}</div>
-                </div>
-                <div className="rounded-[16px] border px-3 py-2.5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                  <div className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>예상 재고</div>
-                  <div className="font-mono font-black">{expectedQuantity == null ? "-" : formatNumber(expectedQuantity)}</div>
-                </div>
+          {/* 선택 품목 + 수량 스테퍼 */}
+          {workType !== "package-out" && (
+            <section className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+              <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                선택 품목 및 수량
               </div>
-            )}
+              {selectedEntries.length === 0 ? (
+                <div className="rounded-[18px] border py-6 text-center text-sm" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                  좌측 목록에서 품목을 선택하세요
+                </div>
+              ) : (
+                <SelectedItemsPanel
+                  entries={selectedEntries}
+                  outgoing={isOutbound}
+                  onQuantityChange={(itemId, qty) => {
+                    setSelectedItems((prev) => {
+                      const next = new Map(prev);
+                      next.set(itemId, qty);
+                      return next;
+                    });
+                  }}
+                  onRemove={(itemId) => {
+                    setSelectedItems((prev) => {
+                      const next = new Map(prev);
+                      next.delete(itemId);
+                      return next;
+                    });
+                  }}
+                />
+              )}
+              <input
+                value={referenceNo}
+                onChange={(e) => setReferenceNo(e.target.value)}
+                placeholder="참조 번호"
+                className="mt-3 w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
+                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+              />
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="메모"
+                className="mt-2 min-h-[80px] w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
+                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+              />
+            </section>
+          )}
 
-            <input
-              value={referenceNo}
-              onChange={(e) => setReferenceNo(e.target.value)}
-              placeholder="참조 번호"
-              className="mt-3 w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
-              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-            />
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="메모"
-              className="mt-2 min-h-[80px] w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
-              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-            />
-          </section>
+          {/* 패키지 출고: 참조번호/메모만 */}
+          {workType === "package-out" && (
+            <section className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+              <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                메모
+              </div>
+              <input
+                value={referenceNo}
+                onChange={(e) => setReferenceNo(e.target.value)}
+                placeholder="참조 번호"
+                className="w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
+                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+              />
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="메모"
+                className="mt-2 min-h-[80px] w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
+                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+              />
+            </section>
+          )}
 
           {error && (
             <div className="rounded-[18px] border px-4 py-3 text-sm" style={{ background: "rgba(255,123,123,.10)", borderColor: "rgba(255,123,123,.24)", color: LEGACY_COLORS.red }}>
@@ -722,11 +736,15 @@ export function DesktopWarehouseView({
 
           <button
             onClick={() => void submit()}
-            disabled={submitting || (!selectedItem && !selectedPackage)}
+            disabled={submitting || (workType !== "package-out" && selectedEntries.length === 0) || (workType === "package-out" && !selectedPackage)}
             className="w-full rounded-[18px] px-4 py-4 text-sm font-bold text-white disabled:opacity-50"
             style={{ background: isOutbound ? LEGACY_COLORS.red : LEGACY_COLORS.blue }}
           >
-            {submitting ? "처리 중..." : `${effectiveLabel} 실행`}
+            {submitting
+              ? "처리 중..."
+              : workType !== "package-out" && selectedEntries.length > 1
+                ? `${effectiveLabel} ${selectedEntries.length}건 실행`
+                : `${effectiveLabel} 실행`}
           </button>
 
           {/* 선택 품목 최근 이력 */}

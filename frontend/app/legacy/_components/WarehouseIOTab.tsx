@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Check } from "lucide-react";
 import { api, type Employee, type Item } from "@/lib/api";
 import { BottomSheet } from "./BottomSheet";
 import type { ToastState } from "./Toast";
@@ -40,8 +41,7 @@ export function WarehouseIOTab({
   const [loading, setLoading] = useState(true);
   const [employeeId, setEmployeeId] = useState("");
   const [itemSearch, setItemSearch] = useState("");
-  const [itemId, setItemId] = useState("");
-  const [qty, setQty] = useState("1");
+  const [selectedItems, setSelectedItems] = useState<Map<string, number>>(new Map());
   const [note, setNote] = useState("");
   const [referenceNo, setReferenceNo] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -71,22 +71,38 @@ export function WarehouseIOTab({
       .slice(0, 50);
   }, [itemSearch, items]);
 
-  const selectedEmployee = employees.find((employee) => employee.employee_id === employeeId) ?? null;
-  const selectedItem = items.find((item) => item.item_id === itemId) ?? null;
-  const flow = previewFlow(mode);
-  const previewQty = Number(qty || 0);
+  const selectedEntries = useMemo(
+    () =>
+      Array.from(selectedItems.entries())
+        .map(([id, qty]) => ({ item: items.find((i) => i.item_id === id)!, quantity: qty }))
+        .filter((e) => e.item != null),
+    [selectedItems, items],
+  );
 
-  const expectedQuantity =
-    selectedItem && previewQty > 0
-      ? mode === "wh2d"
-        ? Number(selectedItem.quantity) - previewQty
-        : Number(selectedItem.quantity) + previewQty
-      : null;
+  const selectedEmployee = employees.find((employee) => employee.employee_id === employeeId) ?? null;
+  const flow = previewFlow(mode);
+
+  function toggleItem(item: Item) {
+    setSelectedItems((prev) => {
+      const next = new Map(prev);
+      if (next.has(item.item_id)) next.delete(item.item_id);
+      else next.set(item.item_id, 1);
+      return next;
+    });
+  }
+
+  function setItemQty(itemId: string, qty: number) {
+    setSelectedItems((prev) => {
+      const next = new Map(prev);
+      if (qty <= 0) { next.delete(itemId); return next; }
+      next.set(itemId, qty);
+      return next;
+    });
+  }
 
   function resetForm() {
     setItemSearch("");
-    setItemId("");
-    setQty("1");
+    setSelectedItems(new Map());
     setNote("");
     setReferenceNo("");
     setError(null);
@@ -97,11 +113,11 @@ export function WarehouseIOTab({
       setError("담당 직원을 선택해 주세요.");
       return false;
     }
-    if (!itemId) {
+    if (selectedEntries.length === 0) {
       setError("품목을 선택해 주세요.");
       return false;
     }
-    if (!Number(qty) || Number(qty) <= 0) {
+    if (selectedEntries.some((e) => e.quantity <= 0)) {
       setError("수량을 확인해 주세요.");
       return false;
     }
@@ -110,29 +126,40 @@ export function WarehouseIOTab({
   }
 
   async function submit() {
-    if (!selectedEmployee || !selectedItem) return;
+    if (!selectedEmployee) return;
     try {
       setSubmitting(true);
-      const payload = {
-        item_id: selectedItem.item_id,
-        quantity: Number(qty),
-        reference_no: referenceNo || undefined,
-        produced_by: `${selectedEmployee.name} (${normalizeDepartment(selectedEmployee.department)})`,
-        notes: note || undefined,
-      };
+      const producedBy = `${selectedEmployee.name} (${normalizeDepartment(selectedEmployee.department)})`;
+      const failures: string[] = [];
 
-      if (mode === "wh2d") {
-        await api.shipInventory(payload);
-      } else {
-        await api.receiveInventory(payload);
+      for (const entry of selectedEntries) {
+        const payload = {
+          item_id: entry.item.item_id,
+          quantity: entry.quantity,
+          reference_no: referenceNo || undefined,
+          produced_by: producedBy,
+          notes: note || undefined,
+        };
+        try {
+          if (mode === "wh2d") await api.shipInventory(payload);
+          else await api.receiveInventory(payload);
+        } catch {
+          failures.push(entry.item.item_name);
+        }
       }
 
       setConfirmOpen(false);
-      resetForm();
-      showToast({
-        message: `${MODES.find((entry) => entry.id === mode)?.label} 처리 완료`,
-        type: "success",
-      });
+      if (failures.length > 0) {
+        const msg = `처리 실패: ${failures.join(", ")}`;
+        setError(msg);
+        showToast({ message: msg, type: "error" });
+      } else {
+        resetForm();
+        showToast({
+          message: `${MODES.find((e) => e.id === mode)?.label} ${selectedEntries.length}건 처리 완료`,
+          type: "success",
+        });
+      }
     } catch (nextError) {
       const message = nextError instanceof Error ? nextError.message : "처리하지 못했습니다.";
       setError(message);
@@ -192,9 +219,7 @@ export function WarehouseIOTab({
         <div className="flex-1 rounded-lg px-3 py-[5px] text-center text-[13px] font-bold" style={{ background: LEGACY_COLORS.s3 }}>
           {flow.from}
         </div>
-        <div className="text-xl" style={{ color: LEGACY_COLORS.blue }}>
-          →
-        </div>
+        <div className="text-xl" style={{ color: LEGACY_COLORS.blue }}>→</div>
         <div className="flex-1 rounded-lg px-3 py-[5px] text-center text-[13px] font-bold" style={{ background: LEGACY_COLORS.s3 }}>
           {flow.to}
         </div>
@@ -245,40 +270,44 @@ export function WarehouseIOTab({
         className="mb-[10px] flex w-full items-center gap-3 rounded-xl border px-[14px] py-3 text-left transition-all hover:brightness-110"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
-        <div
-          className="flex h-11 w-11 items-center justify-center rounded-[10px] text-[22px]"
-          style={{ background: "rgba(79,142,247,.15)" }}
-        >
+        <div className="flex h-11 w-11 items-center justify-center rounded-[10px] text-[22px]" style={{ background: "rgba(79,142,247,.15)" }}>
           📷
         </div>
         <div>
           <div className="text-sm font-bold">QR 스캔</div>
-          <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-            카메라로 상품 인식
-          </div>
+          <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>카메라로 상품 인식</div>
         </div>
-        <div className="ml-auto text-[22px]" style={{ color: LEGACY_COLORS.muted }}>
-          ›
-        </div>
+        <div className="ml-auto text-[22px]" style={{ color: LEGACY_COLORS.muted }}>›</div>
       </button>
 
       <div className="mb-[10px] flex items-center gap-[10px]">
         <div className="h-px flex-1" style={{ background: LEGACY_COLORS.border }} />
-        <span className="text-[10px] font-semibold" style={{ color: LEGACY_COLORS.muted }}>
-          또는 직접 선택
-        </span>
+        <span className="text-[10px] font-semibold" style={{ color: LEGACY_COLORS.muted }}>또는 직접 선택</span>
         <div className="h-px flex-1" style={{ background: LEGACY_COLORS.border }} />
       </div>
+
+      {/* 선택 카운터 */}
+      {selectedItems.size > 0 && (
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[11px] font-bold" style={{ color: LEGACY_COLORS.blue }}>
+            선택 {selectedItems.size}건
+          </span>
+          <button
+            onClick={() => setSelectedItems(new Map())}
+            className="text-[11px]"
+            style={{ color: LEGACY_COLORS.muted2 }}
+          >
+            전체 해제
+          </button>
+        </div>
+      )}
 
       <div className="mb-2 flex items-center gap-2 rounded-[11px] border px-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
         <span>🔍</span>
         <input
           ref={searchRef}
           value={itemSearch}
-          onChange={(event) => {
-            setItemSearch(event.target.value);
-            setItemId("");
-          }}
+          onChange={(event) => setItemSearch(event.target.value)}
           placeholder="품명 검색.."
           className="w-full bg-transparent py-[10px] text-sm outline-none"
           style={{ color: LEGACY_COLORS.text }}
@@ -286,97 +315,83 @@ export function WarehouseIOTab({
       </div>
 
       <div
-        className="mb-3 max-h-[200px] overflow-y-auto rounded-[14px] border"
+        className="mb-3 max-h-[260px] overflow-y-auto rounded-[14px] border"
         style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
       >
-        {filteredItems.map((item, index) => (
-          <button
-            key={item.item_id}
-            onClick={() => {
-              setItemId(item.item_id);
-              setItemSearch(buildItemSearchLabel(item));
-            }}
-            className="flex w-full items-center justify-between px-[14px] py-3 text-left transition-colors hover:bg-white/[0.12]"
-            style={{
-              borderBottom: index === filteredItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
-            }}
-          >
-            <div>
-              <div className="text-sm font-semibold">{item.item_name}</div>
-              <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                {item.item_code}
-              </div>
-            </div>
-            <div className="font-mono text-xs" style={{ color: LEGACY_COLORS.cyan }}>
-              {formatNumber(item.quantity)} {item.unit}
-            </div>
-          </button>
-        ))}
-      </div>
-
-      {selectedItem ? (
-        <div className="mb-3">
-          <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted }}>
-            선택된 품목
-          </div>
-          <div className="rounded-[14px] border px-[14px] py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-            <div className="text-sm font-bold">{selectedItem.item_name}</div>
-            <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-              {selectedItem.item_code} · {selectedItem.spec || "-"}
-            </div>
-            <div className="mt-3 flex gap-5">
-              <div>
-                <div className="text-[9px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  현재 재고
-                </div>
-                <div className="font-mono text-[22px] font-black" style={{ color: LEGACY_COLORS.blue }}>
-                  {formatNumber(selectedItem.quantity)}
-                </div>
-              </div>
-              <div>
-                <div className="text-[9px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  처리 후 예상
-                </div>
-                <div className="font-mono text-[22px] font-black" style={{ color: LEGACY_COLORS.green }}>
-                  {expectedQuantity == null ? "-" : formatNumber(expectedQuantity)}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="mb-3">
-        <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted }}>
-          수량
-        </div>
-        <input
-          value={qty}
-          onChange={(event) => setQty(event.target.value)}
-          inputMode="numeric"
-          className="mb-[7px] w-full rounded-[11px] border px-[13px] py-[11px] text-center text-[22px] font-bold outline-none"
-          style={{
-            background: LEGACY_COLORS.s2,
-            borderColor: LEGACY_COLORS.border,
-            color: LEGACY_COLORS.text,
-            fontFamily: 'Menlo, "Courier New", monospace',
-          }}
-        />
-        <div className="grid grid-cols-4 gap-[7px]">
-          {[-10, -1, 1, 10].map((delta) => (
-            <button
-              key={delta}
-              onClick={() => setQty((current) => String(Math.max(1, Number(current || 0) + delta)))}
-              className="rounded-[10px] py-[11px] text-sm font-bold"
+        {filteredItems.map((item, index) => {
+          const isSelected = selectedItems.has(item.item_id);
+          const qty = selectedItems.get(item.item_id) ?? 1;
+          return (
+            <div
+              key={item.item_id}
               style={{
-                background: delta < 0 ? "rgba(242,95,92,.15)" : "rgba(31,209,122,.12)",
-                color: delta < 0 ? LEGACY_COLORS.red : LEGACY_COLORS.green,
+                borderBottom: index === filteredItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
+                borderLeft: isSelected ? `3px solid ${LEGACY_COLORS.blue}` : "3px solid transparent",
+                background: isSelected ? "rgba(101,169,255,.06)" : "transparent",
               }}
             >
-              {delta > 0 ? `+${delta}` : delta}
-            </button>
-          ))}
-        </div>
+              <button
+                onClick={() => toggleItem(item)}
+                className="flex w-full items-center gap-3 px-[12px] py-3 text-left transition-colors"
+              >
+                <div
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
+                  style={{
+                    background: isSelected ? LEGACY_COLORS.blue : "rgba(255,255,255,.08)",
+                    border: `1.5px solid ${isSelected ? LEGACY_COLORS.blue : LEGACY_COLORS.border}`,
+                  }}
+                >
+                  {isSelected && <Check className="h-3 w-3 text-white" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold truncate">{item.item_name}</div>
+                  <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{item.item_code}</div>
+                </div>
+                <div className="font-mono text-xs shrink-0" style={{ color: LEGACY_COLORS.cyan }}>
+                  {formatNumber(item.quantity)} {item.unit}
+                </div>
+              </button>
+
+              {/* 수량 스테퍼 (선택 시 표시) */}
+              {isSelected && (
+                <div className="flex items-center gap-1.5 px-[12px] pb-2.5">
+                  {([-1, 1] as const).map((delta) => (
+                    <button
+                      key={delta}
+                      onClick={() => setItemQty(item.item_id, Math.max(1, qty + delta))}
+                      className="rounded-[8px] px-2.5 py-1 text-[11px] font-bold"
+                      style={{
+                        background: delta < 0 ? "rgba(242,95,92,.14)" : "rgba(31,209,122,.12)",
+                        color: delta < 0 ? LEGACY_COLORS.red : LEGACY_COLORS.green,
+                      }}
+                    >
+                      {delta > 0 ? "+1" : "-1"}
+                    </button>
+                  ))}
+                  <div
+                    className="flex-1 rounded-[8px] border py-1 text-center font-mono text-sm font-black"
+                    style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                  >
+                    {qty}
+                  </div>
+                  {([-10, 10] as const).map((delta) => (
+                    <button
+                      key={delta}
+                      onClick={() => setItemQty(item.item_id, Math.max(1, qty + delta))}
+                      className="rounded-[8px] px-2 py-1 text-[11px] font-bold"
+                      style={{
+                        background: delta < 0 ? "rgba(242,95,92,.14)" : "rgba(31,209,122,.12)",
+                        color: delta < 0 ? LEGACY_COLORS.red : LEGACY_COLORS.green,
+                      }}
+                    >
+                      {delta > 0 ? "+10" : "-10"}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className="mb-3">
@@ -405,16 +420,6 @@ export function WarehouseIOTab({
         />
       </div>
 
-      {selectedItem ? (
-        <div className="mb-3 rounded-[11px] border px-[14px] py-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          <div className="text-sm font-semibold">{MODES.find((entry) => entry.id === mode)?.label}</div>
-          <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            {selectedEmployee ? `${selectedEmployee.name} · ` : ""}
-            {selectedItem.item_name} · {formatNumber(qty)} {selectedItem.unit}
-          </div>
-        </div>
-      ) : null}
-
       {error ? (
         <div className="mb-3 rounded-xl border px-3 py-2 text-xs" style={{ background: "rgba(242,95,92,.12)", borderColor: "rgba(242,95,92,.25)", color: LEGACY_COLORS.red }}>
           {error}
@@ -428,25 +433,45 @@ export function WarehouseIOTab({
         className="w-full rounded-xl py-[13px] text-[15px] font-bold text-white"
         style={{ background: LEGACY_COLORS.green, color: "#000" }}
       >
-        처리하기
+        {selectedEntries.length > 0 ? `${selectedEntries.length}건 처리하기` : "처리하기"}
       </button>
 
       <BottomSheet open={confirmOpen} onClose={() => setConfirmOpen(false)} title="이동 확인">
         <div className="space-y-2 px-5 pb-6">
-          {[
-            ["유형", MODES.find((entry) => entry.id === mode)?.label || "-"],
-            ["직원", selectedEmployee ? `${selectedEmployee.name} (${normalizeDepartment(selectedEmployee.department)})` : "-"],
-            ["품목", selectedItem?.item_name || "-"],
-            ["수량", selectedItem ? `${formatNumber(qty)} ${selectedItem.unit}` : "-"],
-            ["참조번호", referenceNo || "-"],
-          ].map(([label, value]) => (
-            <div key={label} className="flex items-center justify-between gap-3 rounded-xl px-3 py-2" style={{ background: LEGACY_COLORS.s2 }}>
-              <div className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                {label}
-              </div>
-              <div className="text-right text-sm">{value}</div>
+          <div className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: LEGACY_COLORS.s2 }}>
+            <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>유형</span>
+            <span className="text-sm">{MODES.find((e) => e.id === mode)?.label}</span>
+          </div>
+          <div className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: LEGACY_COLORS.s2 }}>
+            <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>직원</span>
+            <span className="text-sm">{selectedEmployee ? `${selectedEmployee.name} (${normalizeDepartment(selectedEmployee.department)})` : "-"}</span>
+          </div>
+          {referenceNo && (
+            <div className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: LEGACY_COLORS.s2 }}>
+              <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>참조번호</span>
+              <span className="text-sm font-mono">{referenceNo}</span>
             </div>
-          ))}
+          )}
+
+          {/* 선택 품목 목록 (스크롤 가능) */}
+          <div className="max-h-[50vh] overflow-y-auto rounded-xl" style={{ background: LEGACY_COLORS.s2 }}>
+            {selectedEntries.map((entry, i) => (
+              <div
+                key={entry.item.item_id}
+                className="flex items-center justify-between px-3 py-2.5"
+                style={{ borderBottom: i === selectedEntries.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}` }}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold truncate">{entry.item.item_name}</div>
+                  <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{entry.item.item_code}</div>
+                </div>
+                <div className="ml-3 font-mono text-sm font-bold shrink-0" style={{ color: LEGACY_COLORS.blue }}>
+                  {formatNumber(entry.quantity)} {entry.item.unit}
+                </div>
+              </div>
+            ))}
+          </div>
+
           <div className="grid grid-cols-2 gap-2 pt-2">
             <button
               onClick={() => setConfirmOpen(false)}

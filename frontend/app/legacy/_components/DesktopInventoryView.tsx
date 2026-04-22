@@ -3,7 +3,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 const DESKTOP_PAGE_SIZE = 100;
-import { PackageSearch, Search, Sparkles, TrendingUp } from "lucide-react";
+import { AlignJustify, PackageSearch, Search, Sparkles, TrendingUp } from "lucide-react";
 import { api, type Item, type TransactionLog } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import {
@@ -105,6 +105,7 @@ export function DesktopInventoryView({
   const [displayLimit, setDisplayLimit] = useState(DESKTOP_PAGE_SIZE);
   const [capacityModal, setCapacityModal] = useState(false);
   const [hoveredKpi, setHoveredKpi] = useState<KpiFilter | null>(null);
+  const [density, setDensity] = useState<"compact" | "cozy" | "comfortable">("cozy");
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -323,6 +324,23 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                   <Chip key={option.key} active={kpi === option.key} label={option.label} onClick={() => setKpi(option.key)} tone={option.tone} />
                 ))}
               </div>
+              {/* 행 밀도 선택기 */}
+              <div className="flex shrink-0 items-center gap-1 rounded-[12px] border p-1" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                <AlignJustify className="h-3.5 w-3.5 mx-1" style={{ color: LEGACY_COLORS.muted2 }} />
+                {(["compact", "cozy", "comfortable"] as const).map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setDensity(d)}
+                    className="rounded-[9px] px-2 py-1 text-[10px] font-semibold transition-all"
+                    style={{
+                      background: density === d ? LEGACY_COLORS.blue : "transparent",
+                      color: density === d ? "#fff" : LEGACY_COLORS.muted2,
+                    }}
+                  >
+                    {d === "compact" ? "좁게" : d === "cozy" ? "보통" : "넓게"}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {error ? (
@@ -339,17 +357,18 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                   <thead className="sticky top-0 z-10">
                     <tr style={{ background: LEGACY_COLORS.s2 }}>
                       {([
-                        { label: "상태", nowrap: true },
-                        { label: "품목명", nowrap: false },
-                        { label: "ERP코드", nowrap: true },
-                        { label: "코드", nowrap: true },
-                        { label: "구분", nowrap: true },
-                        { label: "파트", nowrap: true },
-                        { label: "현재고", nowrap: true },
-                        { label: "안전재고", nowrap: true },
-                        { label: "모델", nowrap: true },
-                      ] as { label: string; nowrap: boolean }[]).map(({ label, nowrap }) => (
-                        <th key={label} className={`border-b px-4 py-3 text-left text-[11px] font-bold${nowrap ? " whitespace-nowrap" : ""}`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                        { label: "상태", nowrap: true, width: "80px" },
+                        { label: "품목명", nowrap: false, minWidth: "180px" },
+                        { label: "ERP코드", nowrap: true, width: "88px" },
+                        { label: "코드", nowrap: true, width: "90px" },
+                        { label: "구분", nowrap: true, width: "68px" },
+                        { label: "파트", nowrap: true, width: "68px" },
+                        { label: "현재고", nowrap: true, width: "72px" },
+                        { label: "안전재고", nowrap: true, width: "72px" },
+                        { label: "모델", nowrap: true, width: "80px" },
+                        { label: "위치", nowrap: true, width: "80px" },
+                      ] as { label: string; nowrap: boolean; width?: string; minWidth?: string }[]).map(({ label, nowrap, width, minWidth }) => (
+                        <th key={label} className={`border-b px-4 py-3 text-left text-[11px] font-bold${nowrap ? " whitespace-nowrap" : ""}`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth }}>
                           {label}
                         </th>
                       ))}
@@ -360,6 +379,7 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                       const stock = getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock));
                       const badge = fileTypeBadge(item.legacy_file_type);
                       const selected = selectedItem?.item_id === item.item_id;
+                      const py = density === "compact" ? "py-1.5" : density === "comfortable" ? "py-5" : "py-3";
                       return (
                         <tr
                           key={item.item_id}
@@ -367,8 +387,8 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                           className="cursor-pointer transition-colors hover:bg-white/[0.12]"
                           style={{ background: selected ? "rgba(101,169,255,.08)" : "transparent" }}
                         >
-                          <td className="border-b px-4 py-3 align-top whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>
-                            <div className="flex flex-col gap-2">
+                          <td className={`border-b px-4 ${py} align-top whitespace-nowrap`} style={{ borderColor: LEGACY_COLORS.border }}>
+                            <div className="flex flex-col gap-1.5">
                               <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ color: stock.color, background: `${stock.color}20` }}>
                                 {stock.label}
                               </span>
@@ -377,32 +397,37 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                               </span>
                             </div>
                           </td>
-                          <td className="border-b px-4 py-3 align-top" style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className={`border-b px-4 ${py} align-top`} style={{ borderColor: LEGACY_COLORS.border }}>
                             <div className="font-semibold">{item.item_name}</div>
-                            <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                              {item.spec || "-"}
-                            </div>
+                            {density !== "compact" && (
+                              <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                                {item.spec || "-"}
+                              </div>
+                            )}
                           </td>
-                          <td className="border-b px-4 py-3 align-top whitespace-nowrap font-mono text-[12px] font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
+                          <td className={`border-b px-4 ${py} align-top whitespace-nowrap font-mono text-[12px] font-bold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
                             {item.erp_code ?? "-"}
                           </td>
-                          <td className="border-b px-4 py-3 align-top whitespace-nowrap font-mono text-[12px]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                          <td className={`border-b px-4 ${py} align-top whitespace-nowrap font-mono text-[12px]`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                             {item.item_code}
                           </td>
-                          <td className="border-b px-4 py-3 align-top whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className={`border-b px-4 ${py} align-top whitespace-nowrap`} style={{ borderColor: LEGACY_COLORS.border }}>
                             {displayFileType(item.legacy_file_type)}
                           </td>
-                          <td className="border-b px-4 py-3 align-top whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className={`border-b px-4 ${py} align-top whitespace-nowrap`} style={{ borderColor: LEGACY_COLORS.border }}>
                             {displayPart(item.legacy_part)}
                           </td>
-                          <td className="border-b px-4 py-3 text-right align-top whitespace-nowrap font-mono text-[13px] font-bold" style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className={`border-b px-4 ${py} text-right align-top whitespace-nowrap font-mono text-[13px] font-bold`} style={{ borderColor: LEGACY_COLORS.border }}>
                             {formatNumber(item.quantity)}
                           </td>
-                          <td className="border-b px-4 py-3 text-right align-top whitespace-nowrap font-mono text-[13px]" style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className={`border-b px-4 ${py} text-right align-top whitespace-nowrap font-mono text-[13px]`} style={{ borderColor: LEGACY_COLORS.border }}>
                             {item.min_stock == null ? "-" : formatNumber(item.min_stock)}
                           </td>
-                          <td className="border-b px-4 py-3 align-top whitespace-nowrap text-[12px]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                          <td className={`border-b px-4 ${py} align-top whitespace-nowrap text-[12px]`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                             {normalizeModel(item.legacy_model)}
+                          </td>
+                          <td className={`border-b px-4 ${py} align-top whitespace-nowrap text-[12px]`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                            {item.location ?? "-"}
                           </td>
                         </tr>
                       );

@@ -333,7 +333,12 @@ export function DesktopHistoryView() {
               style={{ background: LEGACY_COLORS.bg, backgroundImage: "linear-gradient(rgba(101,169,255,.04), rgba(101,169,255,.04))" }}
             >
               <div className="shrink-0 text-base font-bold">입출고 내역</div>
-              <span className="font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{filteredLogs.length}건</span>
+              <span className="font-mono text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{filteredLogs.length}건</span>
+              {filteredLogs.length > 0 && (
+                <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  {formatDate(filteredLogs[filteredLogs.length - 1].created_at)} ~ {formatDate(filteredLogs[0].created_at)}
+                </span>
+              )}
             </div>
 
             {loading ? (
@@ -345,13 +350,24 @@ export function DesktopHistoryView() {
                 <table className="min-w-full border-separate border-spacing-0 text-sm">
                   <thead className="sticky top-0 z-10">
                     <tr style={{ background: LEGACY_COLORS.s2 }}>
-                      {["일시", "구분", "품목명", "코드", "분류", "수량", "재고 변화", "담당자", "참조번호", "메모"].map((h) => (
+                      {([
+                        { label: "일시", width: "140px" },
+                        { label: "구분", width: "80px" },
+                        { label: "품목명", minWidth: "160px" },
+                        { label: "코드", width: "90px" },
+                        { label: "분류", width: "60px" },
+                        { label: "수량", width: "70px" },
+                        { label: "재고 변화", width: "80px" },
+                        { label: "담당자", width: "90px" },
+                        { label: "참조번호", width: "90px" },
+                        { label: "메모", minWidth: "120px" },
+                      ] as { label: string; width?: string; minWidth?: string }[]).map(({ label, width, minWidth }) => (
                         <th
-                          key={h}
+                          key={label}
                           className="whitespace-nowrap border-b px-4 py-3 text-left text-[11px] font-bold"
-                          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+                          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth }}
                         >
-                          {h}
+                          {label}
                         </th>
                       ))}
                     </tr>
