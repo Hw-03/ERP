@@ -9,6 +9,7 @@ import { DesktopRightPanel } from "./DesktopRightPanel";
 import {
   LEGACY_COLORS,
   LEGACY_MODELS,
+  employeeColor,
   fileTypeBadge,
   formatNumber,
   getStockState,
@@ -368,8 +369,7 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                         { label: "상태", nowrap: true, width: "80px" },
                         { label: "품목명", nowrap: false, minWidth: "180px" },
                         { label: "ERP코드", nowrap: true, width: "88px" },
-                        { label: "구분", nowrap: true, width: "68px" },
-                        { label: "파트", nowrap: true, width: "68px" },
+                        { label: "부서", nowrap: true, width: "120px" },
                         { label: "현재고", nowrap: true, width: "72px" },
                         { label: "안전재고", nowrap: true, width: "72px" },
                         { label: "모델", nowrap: true, width: "80px" },
@@ -415,11 +415,17 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                           <td className={`border-b px-4 ${py} align-top whitespace-nowrap font-mono text-[12px] font-bold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
                             {item.erp_code ?? "-"}
                           </td>
-                          <td className={`border-b px-4 ${py} align-top whitespace-nowrap`} style={{ borderColor: LEGACY_COLORS.border }}>
-                            {item.legacy_file_type ?? "-"}
-                          </td>
-                          <td className={`border-b px-4 ${py} align-top whitespace-nowrap`} style={{ borderColor: LEGACY_COLORS.border }}>
-                            {item.legacy_part ?? "-"}
+                          <td className={`border-b px-4 ${py} align-top`} style={{ borderColor: LEGACY_COLORS.border }}>
+                            <div className="flex flex-wrap gap-1">
+                              {Number(item.warehouse_qty) > 0 && (
+                                <span className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: "rgba(255,255,255,.08)", color: LEGACY_COLORS.muted }}>창고</span>
+                              )}
+                              {item.locations.filter((l) => Number(l.quantity) > 0).map((l) => (
+                                <span key={l.department} className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: `${employeeColor(l.department)}20`, color: employeeColor(l.department) }}>
+                                  {l.department}
+                                </span>
+                              ))}
+                            </div>
                           </td>
                           <td className={`border-b px-4 ${py} text-right align-top whitespace-nowrap font-mono text-[13px] font-bold`} style={{ borderColor: LEGACY_COLORS.border }}>
                             {formatNumber(item.quantity)}
