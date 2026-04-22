@@ -3,7 +3,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 const DESKTOP_PAGE_SIZE = 100;
-import { AlignJustify, PackageSearch, Search, Sparkles, TrendingUp } from "lucide-react";
+import { PackageSearch, Search, Sparkles, TrendingUp } from "lucide-react";
 import { api, type Item, type TransactionLog } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import {
@@ -114,7 +114,6 @@ export function DesktopInventoryView({
   const [displayLimit, setDisplayLimit] = useState(DESKTOP_PAGE_SIZE);
   const [capacityModal, setCapacityModal] = useState(false);
   const [hoveredKpi, setHoveredKpi] = useState<KpiFilter | null>(null);
-  const [density, setDensity] = useState<"compact" | "cozy" | "comfortable">("cozy");
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -328,28 +327,6 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                   {formatNumber(filteredItems.length)}
                 </span>
               </div>
-              <div className="flex shrink-0 flex-wrap gap-1.5">
-                {KPI_OPTIONS.map((option) => (
-                  <Chip key={option.key} active={kpi === option.key} label={option.label} onClick={() => setKpi(option.key)} tone={option.tone} />
-                ))}
-              </div>
-              {/* 행 밀도 선택기 */}
-              <div className="flex shrink-0 items-center gap-1 rounded-[12px] border p-1" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                <AlignJustify className="h-3.5 w-3.5 mx-1" style={{ color: LEGACY_COLORS.muted2 }} />
-                {(["compact", "cozy", "comfortable"] as const).map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => setDensity(d)}
-                    className="rounded-[9px] px-2 py-1 text-[10px] font-semibold transition-all"
-                    style={{
-                      background: density === d ? LEGACY_COLORS.blue : "transparent",
-                      color: density === d ? "#fff" : LEGACY_COLORS.muted2,
-                    }}
-                  >
-                    {d === "compact" ? "좁게" : d === "cozy" ? "보통" : "넓게"}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {error ? (
@@ -386,7 +363,7 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                       const stock = getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock));
                       const badge = fileTypeBadge(item.legacy_file_type);
                       const selected = selectedItem?.item_id === item.item_id;
-                      const py = density === "compact" ? "py-1.5" : density === "comfortable" ? "py-5" : "py-3";
+                      const py = "py-3";
                       return (
                         <tr
                           key={item.item_id}
@@ -406,11 +383,27 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                           </td>
                           <td className={`border-b px-4 ${py} align-top`} style={{ borderColor: LEGACY_COLORS.border }}>
                             <div className="font-semibold">{item.item_name}</div>
-                            {density !== "compact" && (
-                              <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                                {item.spec || "-"}
-                              </div>
-                            )}
+                            <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                              {item.spec || "-"}
+                            </div>
+                            {(() => {
+                              const total = Math.max(Number(item.quantity), 1);
+                              const whPct = Math.min(100, (Number(item.warehouse_qty) / total) * 100);
+                              const prPct = Math.min(100 - whPct, (Number(item.production_total) / total) * 100);
+                              const dfPct = Math.min(100 - whPct - prPct, (Number(item.defective_total) / total) * 100);
+                              if (whPct + prPct + dfPct <= 0) return null;
+                              return (
+                                <div
+                                  className="mt-2 flex h-[5px] overflow-hidden rounded-full"
+                                  style={{ background: LEGACY_COLORS.s3 }}
+                                  title={`창고 ${formatNumber(item.warehouse_qty)} / 부서 ${formatNumber(item.production_total)}${Number(item.defective_total) > 0 ? ` / 불량 ${formatNumber(item.defective_total)}` : ""}`}
+                                >
+                                  {whPct > 0 && <div className="h-full shrink-0" style={{ width: `${whPct}%`, background: LEGACY_COLORS.blue }} />}
+                                  {prPct > 0 && <div className="h-full shrink-0" style={{ width: `${prPct}%`, background: LEGACY_COLORS.green }} />}
+                                  {dfPct > 0 && <div className="h-full shrink-0" style={{ width: `${dfPct}%`, background: LEGACY_COLORS.red }} />}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className={`border-b px-4 ${py} align-top whitespace-nowrap font-mono text-[12px] font-bold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
                             {item.erp_code ?? "-"}
