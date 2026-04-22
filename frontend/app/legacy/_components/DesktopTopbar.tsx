@@ -39,7 +39,7 @@ export function DesktopTopbar({
             <Clock3 className="h-3.5 w-3.5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div className="truncate text-base" style={{ color: LEGACY_COLORS.muted2 }}>
               {statusText}
             </div>
           </div>
@@ -49,7 +49,7 @@ export function DesktopTopbar({
 
         <button
           onClick={onRefresh}
-          className="flex items-center gap-2 rounded-[20px] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          className="flex items-center gap-2 rounded-[20px] px-4 py-2.5 text-base font-semibold text-white transition-opacity hover:opacity-90"
           style={{ background: LEGACY_COLORS.blue }}
         >
           <RefreshCw className="h-4 w-4" />

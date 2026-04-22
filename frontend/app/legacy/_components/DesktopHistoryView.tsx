@@ -101,7 +101,7 @@ function Chip({
   return (
     <button
       onClick={onClick}
-      className="whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition-all hover:brightness-110"
+      className="whitespace-nowrap rounded-full border px-3 py-1 text-sm font-semibold transition-all hover:brightness-110"
       style={{
         background: active ? `${tone}22` : LEGACY_COLORS.s2,
         borderColor: active ? tone : LEGACY_COLORS.border,
@@ -291,11 +291,11 @@ export function DesktopHistoryView() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="품명·코드·참조번호·메모 검색"
-                    className="flex-1 bg-transparent text-sm outline-none"
+                    className="flex-1 bg-transparent text-base outline-none"
                     style={{ color: LEGACY_COLORS.text }}
                   />
                   {search && (
-                    <button onClick={() => setSearch("")} className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>✕</button>
+                    <button onClick={() => setSearch("")} className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>✕</button>
                   )}
                 </div>
               </div>
@@ -325,7 +325,7 @@ export function DesktopHistoryView() {
               style={{ background: LEGACY_COLORS.bg, backgroundImage: "linear-gradient(rgba(101,169,255,.04), rgba(101,169,255,.04))" }}
             >
               <div className="shrink-0 text-base font-bold">입출고 내역</div>
-              <span className="font-mono text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{filteredLogs.length}건</span>
+              <span className="font-mono text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{filteredLogs.length}건</span>
               {filteredLogs.length > 0 && (
                 <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
                   {formatDate(filteredLogs[filteredLogs.length - 1].created_at)} ~ {formatDate(filteredLogs[0].created_at)}
@@ -334,9 +334,9 @@ export function DesktopHistoryView() {
             </div>
 
             {loading ? (
-              <div className="py-16 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>내역을 불러오는 중...</div>
+              <div className="py-16 text-center text-base" style={{ color: LEGACY_COLORS.muted2 }}>내역을 불러오는 중...</div>
             ) : filteredLogs.length === 0 ? (
-              <div className="py-16 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>거래 이력이 없습니다.</div>
+              <div className="py-16 text-center text-base" style={{ color: LEGACY_COLORS.muted2 }}>거래 이력이 없습니다.</div>
             ) : (
               <div className="overflow-x-auto rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
                 <table className="min-w-full border-separate border-spacing-0 text-sm">
@@ -470,7 +470,7 @@ export function DesktopHistoryView() {
               <button
                 onClick={() => void loadMore()}
                 disabled={loadingMore}
-                className="mt-4 flex w-full items-center justify-center gap-2 py-3 text-sm font-bold disabled:opacity-50"
+                className="mt-4 flex w-full items-center justify-center gap-2 py-3 text-base font-bold disabled:opacity-50"
                 style={{ color: LEGACY_COLORS.blue }}
               >
                 <ChevronDown className="h-4 w-4" />
@@ -494,7 +494,7 @@ export function DesktopHistoryView() {
               style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
             >
               <span
-                className="inline-flex rounded-full px-4 py-1.5 text-xs font-bold"
+                className="inline-flex rounded-full px-4 py-1.5 text-sm font-bold"
                 style={{ background: `${transactionColor(selected.transaction_type)}22`, color: transactionColor(selected.transaction_type) }}
               >
                 {transactionLabel(selected.transaction_type)}
@@ -504,7 +504,7 @@ export function DesktopHistoryView() {
                 {formatNumber(selected.quantity_change)}
                 <span className="ml-2 text-base font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>{selected.item_unit}</span>
               </div>
-              <div className="mt-2 font-mono text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="mt-2 font-mono text-base" style={{ color: LEGACY_COLORS.muted2 }}>
                 {selected.quantity_before != null ? formatNumber(selected.quantity_before) : "-"}
                 <span className="mx-2">→</span>
                 {selected.quantity_after != null ? formatNumber(selected.quantity_after) : "-"}
@@ -526,7 +526,7 @@ export function DesktopHistoryView() {
               ).map(([label, value]) => (
                 <div key={label} className="flex items-start justify-between gap-3">
                   <span className="shrink-0 text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{label}</span>
-                  <span className="text-right text-sm font-semibold break-all" style={{ color: LEGACY_COLORS.text }}>{value}</span>
+                  <span className="text-right text-base font-semibold break-all" style={{ color: LEGACY_COLORS.text }}>{value}</span>
                 </div>
               ))}
             </div>
@@ -538,13 +538,13 @@ export function DesktopHistoryView() {
                 value={editingNotes}
                 onChange={(e) => setEditingNotes(e.target.value)}
                 placeholder="메모를 입력하세요..."
-                className="min-h-[80px] w-full rounded-[14px] border px-3 py-2.5 text-sm outline-none"
+                className="min-h-[80px] w-full rounded-[14px] border px-3 py-2.5 text-base outline-none"
                 style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
               />
               <button
                 onClick={() => void saveNotes()}
                 disabled={savingNotes || editingNotes === (selected.notes ?? "")}
-                className="mt-2 w-full rounded-[14px] py-2.5 text-sm font-bold text-white disabled:opacity-40"
+                className="mt-2 w-full rounded-[14px] py-2.5 text-base font-bold text-white disabled:opacity-40"
                 style={{ background: LEGACY_COLORS.blue }}
               >
                 {savingNotes ? "저장 중..." : "메모 저장"}
@@ -576,7 +576,7 @@ export function DesktopHistoryView() {
                           {formatDate(log.created_at)}
                         </div>
                       </div>
-                      <div className="font-mono text-sm font-bold" style={{ color: transactionColor(log.transaction_type) }}>
+                      <div className="font-mono text-base font-bold" style={{ color: transactionColor(log.transaction_type) }}>
                         {Number(log.quantity_change) >= 0 ? "+" : ""}{formatNumber(log.quantity_change)}
                       </div>
                     </button>
@@ -589,7 +589,7 @@ export function DesktopHistoryView() {
           <div className="flex h-full items-center justify-center">
             <div className="text-center" style={{ color: LEGACY_COLORS.muted2 }}>
               <Activity className="mx-auto mb-3 h-10 w-10 opacity-30" />
-              <div className="text-sm">테이블에서 항목을 클릭하면<br />상세 내용이 표시됩니다</div>
+              <div className="text-base">테이블에서 항목을 클릭하면<br />상세 내용이 표시됩니다</div>
             </div>
           </div>
         )}

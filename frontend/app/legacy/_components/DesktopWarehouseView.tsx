@@ -332,7 +332,7 @@ export function DesktopWarehouseView({
             <section className="card">
               <div className="grid gap-3 xl:grid-cols-2">
                 <div className="rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                  <div className="mb-3 flex items-center gap-2 text-sm font-bold">
+                  <div className="mb-3 flex items-center gap-2 text-base font-bold">
                     <Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />
                     부서 구분
                   </div>
@@ -349,7 +349,7 @@ export function DesktopWarehouseView({
                   </div>
                 </div>
                 <div className="rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                  <div className="mb-3 flex items-center gap-2 text-sm font-bold">
+                  <div className="mb-3 flex items-center gap-2 text-base font-bold">
                     <TrendingUp className="h-4 w-4" style={{ color: LEGACY_COLORS.cyan }} />
                     모델 구분
                   </div>
@@ -378,10 +378,10 @@ export function DesktopWarehouseView({
                   value={localSearch}
                   onChange={(e) => setLocalSearch(e.target.value)}
                   placeholder={workType === "package-out" ? "패키지명 또는 코드 검색" : "품목명, 코드, 바코드 검색"}
-                  className="flex-1 bg-transparent text-sm outline-none"
+                  className="flex-1 bg-transparent text-base outline-none"
                   style={{ color: LEGACY_COLORS.text }}
                 />
-                <span className="shrink-0 font-mono text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                <span className="shrink-0 font-mono text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                   {workType === "package-out" ? formatNumber(filteredPackages.length) : formatNumber(filteredItems.length)}
                 </span>
               </div>
@@ -577,7 +577,7 @@ export function DesktopWarehouseView({
                   <button
                     key={entry.id}
                     onClick={() => { setWorkType(entry.id); setError(null); }}
-                    className="flex items-center gap-2 rounded-[18px] border px-3 py-3 text-left text-xs font-semibold transition-all hover:brightness-110"
+                    className="flex items-center gap-2 rounded-[18px] border px-3 py-3 text-left text-sm font-semibold transition-all hover:brightness-110"
                     style={{
                       background: active ? "rgba(101,169,255,.14)" : LEGACY_COLORS.s1,
                       borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
@@ -596,7 +596,7 @@ export function DesktopWarehouseView({
                   <button
                     key={btn.id}
                     onClick={btn.onClick}
-                    className="rounded-[16px] border px-3 py-2.5 text-xs font-semibold transition-all hover:brightness-110"
+                    className="rounded-[16px] border px-3 py-2.5 text-sm font-semibold transition-all hover:brightness-110"
                     style={{
                       background: btn.active ? "rgba(78,201,245,.12)" : LEGACY_COLORS.s1,
                       borderColor: btn.active ? LEGACY_COLORS.cyan : LEGACY_COLORS.border,
@@ -629,7 +629,7 @@ export function DesktopWarehouseView({
                       <button
                         key={dept}
                         onClick={() => setSelectedDept(dept)}
-                        className="rounded-[14px] border px-2 py-2 text-xs font-semibold transition-all hover:brightness-110"
+                        className="rounded-[14px] border px-2 py-2 text-sm font-semibold transition-all hover:brightness-110"
                         style={{
                           background: active ? "rgba(142,125,255,.14)" : LEGACY_COLORS.s1,
                           borderColor: active ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
@@ -658,7 +658,7 @@ export function DesktopWarehouseView({
                       <button
                         key={src}
                         onClick={() => setDefectiveSource(src)}
-                        className="rounded-[14px] border px-3 py-2 text-xs font-semibold transition-all hover:brightness-110"
+                        className="rounded-[14px] border px-3 py-2 text-sm font-semibold transition-all hover:brightness-110"
                         style={{
                           background: active ? "rgba(255,123,123,.14)" : LEGACY_COLORS.s1,
                           borderColor: active ? LEGACY_COLORS.red : LEGACY_COLORS.border,
@@ -708,7 +708,7 @@ export function DesktopWarehouseView({
                 선택 품목 및 수량
               </div>
               {selectedEntries.length === 0 ? (
-                <div className="rounded-[18px] border py-6 text-center text-sm" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                <div className="rounded-[18px] border py-6 text-center text-base" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                   좌측 목록에서 품목을 선택하세요
                 </div>
               ) : (
@@ -735,14 +735,14 @@ export function DesktopWarehouseView({
                 value={referenceNo}
                 onChange={(e) => setReferenceNo(e.target.value)}
                 placeholder="참조 번호"
-                className="mt-3 w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
+                className="mt-3 w-full rounded-[18px] border px-4 py-3 text-base outline-none"
                 style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
               />
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="메모"
-                className="mt-2 min-h-[80px] w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
+                className="mt-2 min-h-[80px] w-full rounded-[18px] border px-4 py-3 text-base outline-none"
                 style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
               />
             </section>
@@ -758,21 +758,21 @@ export function DesktopWarehouseView({
                 value={referenceNo}
                 onChange={(e) => setReferenceNo(e.target.value)}
                 placeholder="참조 번호"
-                className="w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
+                className="w-full rounded-[18px] border px-4 py-3 text-base outline-none"
                 style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
               />
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="메모"
-                className="mt-2 min-h-[80px] w-full rounded-[18px] border px-4 py-3 text-sm outline-none"
+                className="mt-2 min-h-[80px] w-full rounded-[18px] border px-4 py-3 text-base outline-none"
                 style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
               />
             </section>
           )}
 
           {error && (
-            <div className="rounded-[18px] border px-4 py-3 text-sm" style={{ background: "rgba(255,123,123,.10)", borderColor: "rgba(255,123,123,.24)", color: LEGACY_COLORS.red }}>
+            <div className="rounded-[18px] border px-4 py-3 text-base" style={{ background: "rgba(255,123,123,.10)", borderColor: "rgba(255,123,123,.24)", color: LEGACY_COLORS.red }}>
               {error}
             </div>
           )}
@@ -780,7 +780,7 @@ export function DesktopWarehouseView({
           <button
             onClick={() => void submit()}
             disabled={submitting || (workType !== "package-out" && selectedEntries.length === 0) || (workType === "package-out" && !selectedPackage)}
-            className="w-full rounded-[18px] px-4 py-4 text-sm font-bold text-white disabled:opacity-50"
+            className="w-full rounded-[18px] px-4 py-4 text-base font-bold text-white disabled:opacity-50"
             style={{ background: isOutbound ? LEGACY_COLORS.red : LEGACY_COLORS.blue }}
           >
             {submitting
@@ -800,10 +800,10 @@ export function DesktopWarehouseView({
                 {itemLogs.map((log) => (
                   <div key={log.log_id} className="rounded-[16px] border p-3" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold" style={{ color: transactionColor(log.transaction_type) }}>
+                      <span className="text-sm font-bold" style={{ color: transactionColor(log.transaction_type) }}>
                         {transactionLabel(log.transaction_type)}
                       </span>
-                      <span className="font-mono text-xs">{formatNumber(log.quantity_change)}</span>
+                      <span className="font-mono text-sm">{formatNumber(log.quantity_change)}</span>
                     </div>
                     <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
                       {log.notes || "메모 없음"}
