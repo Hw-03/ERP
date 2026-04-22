@@ -352,12 +352,19 @@ export function InventoryTab({
                       </span>
                     ) : null}
                   </div>
-                  <div className="truncate text-sm font-semibold">{item.item_name}</div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="truncate text-sm font-semibold">{item.item_name}</div>
+                    {item.erp_code && (
+                      <span className="shrink-0 font-mono text-[10px] font-black" style={{ color: LEGACY_COLORS.blue }}>
+                        {item.erp_code}
+                      </span>
+                    )}
+                  </div>
                   <div className="mt-0.5 truncate text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
                     {item.item_code}
                     {item.legacy_part ? ` / ${item.legacy_part}` : ""}
                     {normalizeModel(item.legacy_model) !== "공용" ? ` / ${normalizeModel(item.legacy_model)}` : ""}
-                    {item.supplier ? ` / ${item.supplier}` : ""}
+                    {item.location ? ` · 📍${item.location}` : ""}
                   </div>
                   <div className="mt-2 h-[6px] rounded-full" style={{ background: LEGACY_COLORS.s3 }}>
                     <div className="h-full rounded-full" style={{ width: `${fillWidth}%`, background: stockState.color }} />

@@ -27,9 +27,9 @@ export function LegacyLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-black">
+    <div className="h-screen overflow-hidden bg-black">
       <div
-        className="mx-auto flex min-h-screen max-w-[430px] flex-col overflow-hidden"
+        className="mx-auto flex h-full max-w-[430px] flex-col overflow-hidden"
         style={{
           background: LEGACY_COLORS.bg,
           color: LEGACY_COLORS.text,

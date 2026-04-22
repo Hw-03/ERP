@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Copy } from "lucide-react";
 import { api, type Item, type TransactionLog, type TransactionType } from "@/lib/api";
 import { FilterPills } from "./FilterPills";
 import {
@@ -110,6 +111,36 @@ export function HistoryTab({ onClose }: { onClose: () => void }) {
 
   const canLoadMore = logs.length >= page * PAGE_SIZE;
 
+  const summary = useMemo(() => {
+    const total = filteredLogs.length;
+    const inSum = filteredLogs
+      .filter((l) => l.transaction_type === "RECEIVE" || l.transaction_type === "PRODUCE")
+      .reduce((acc, l) => acc + Math.abs(Number(l.quantity_change)), 0);
+    const outSum = filteredLogs
+      .filter((l) => l.transaction_type === "SHIP" || l.transaction_type === "BACKFLUSH")
+      .reduce((acc, l) => acc + Math.abs(Number(l.quantity_change)), 0);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayCount = filteredLogs.filter((l) => new Date(l.created_at) >= todayStart).length;
+    return { total, inSum, outSum, todayCount };
+  }, [filteredLogs]);
+
+  const dateRange = useMemo(() => {
+    if (filteredLogs.length === 0) return null;
+    const oldest = filteredLogs[filteredLogs.length - 1].created_at;
+    const newest = filteredLogs[0].created_at;
+    const fmt = (d: string) => new Date(d).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" });
+    return oldest === newest ? fmt(oldest) : `${fmt(oldest)} ~ ${fmt(newest)}`;
+  }, [filteredLogs]);
+
+  const [copiedRef, setCopiedRef] = useState<string | null>(null);
+  function copyRef(ref: string) {
+    void navigator.clipboard.writeText(ref).then(() => {
+      setCopiedRef(ref);
+      setTimeout(() => setCopiedRef(null), 1500);
+    });
+  }
+
   return (
     <div className="pb-4">
       <button
@@ -193,8 +224,27 @@ export function HistoryTab({ onClose }: { onClose: () => void }) {
 
       <FilterPills options={DATE_OPTIONS} value={dateFilter} onChange={setDateFilter} activeColor={LEGACY_COLORS.purple} />
 
-      <div className="mb-[6px] px-[2px] text-[10px] font-mono" style={{ color: LEGACY_COLORS.muted2 }}>
-        {filteredLogs.length}건
+      {/* 요약 통계 */}
+      <div className="mb-3 grid grid-cols-4 gap-1.5">
+        {[
+          { label: "전체", value: summary.total, color: LEGACY_COLORS.blue },
+          { label: "입고합", value: summary.inSum, color: LEGACY_COLORS.green },
+          { label: "출고합", value: summary.outSum, color: LEGACY_COLORS.red },
+          { label: "오늘", value: summary.todayCount, color: LEGACY_COLORS.cyan },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="rounded-[14px] border p-2 text-center" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+            <div className="text-[9px] font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
+            <div className="mt-1 font-mono text-[15px] font-black" style={{ color }}>{formatNumber(value)}</div>
+          </div>
+        ))}
+      </div>
+      <div className="mb-2 flex items-center justify-between px-[2px]">
+        <span className="text-[10px] font-mono font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+          {filteredLogs.length}건
+        </span>
+        {dateRange && (
+          <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{dateRange}</span>
+        )}
       </div>
 
       {loading ? (
@@ -232,9 +282,18 @@ export function HistoryTab({ onClose }: { onClose: () => void }) {
                 <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
                   {new Date(log.created_at).toLocaleString("ko-KR")}
                 </div>
-                <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
-                  {log.item_code}
-                  {log.reference_no ? ` · ref:${log.reference_no}` : ""}
+                <div className="mt-1 flex items-center gap-1.5 text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
+                  <span>{log.item_code}</span>
+                  {log.reference_no ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); copyRef(log.reference_no!); }}
+                      className="flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-white/10"
+                      style={{ color: copiedRef === log.reference_no ? LEGACY_COLORS.green : LEGACY_COLORS.blue }}
+                    >
+                      <Copy className="h-2.5 w-2.5" />
+                      <span className="font-mono">{copiedRef === log.reference_no ? "복사됨" : log.reference_no}</span>
+                    </button>
+                  ) : null}
                 </div>
                 {log.produced_by ? (
                   <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted }}>

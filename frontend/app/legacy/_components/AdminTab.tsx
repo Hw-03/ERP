@@ -495,10 +495,11 @@ function EmployeesSection({ showToast }: { showToast: (toast: ToastState) => voi
               </div>
               <button
                 onClick={() => void toggleActive(employee)}
-                className="rounded-full px-[11px] py-1 text-[10px] font-bold"
+                className="inline-flex shrink-0 rounded-full px-[11px] py-1 text-[10px] font-bold transition-colors"
                 style={{
-                  background: employee.is_active ? "rgba(31,209,122,.15)" : LEGACY_COLORS.s2,
-                  color: employee.is_active ? LEGACY_COLORS.green : LEGACY_COLORS.muted2,
+                  background: employee.is_active ? "rgba(67,211,157,.16)" : "rgba(255,123,123,.14)",
+                  color: employee.is_active ? LEGACY_COLORS.green : LEGACY_COLORS.red,
+                  border: `1px solid ${employee.is_active ? "rgba(67,211,157,.3)" : "rgba(255,123,123,.3)"}`,
                 }}
               >
                 {employee.is_active ? "활성" : "비활성"}
@@ -636,21 +637,33 @@ function BomSection({ showToast }: { showToast: (toast: ToastState) => void }) {
             등록된 BOM이 없습니다.
           </div>
         ) : (
-          bomRows.map((row, index) => (
-            <div key={row.bom_id} className="flex items-center justify-between gap-3 px-[14px] py-3" style={{ borderBottom: index === bomRows.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}` }}>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold">
-                  {items.find((item) => item.item_id === row.child_item_id)?.item_name || row.child_item_id}
-                </div>
-                <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {formatNumber(row.quantity)} {row.unit}
-                </div>
-              </div>
-              <button onClick={() => void removeRow(row.bom_id)} className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
-                삭제
-              </button>
+          <>
+            <div className="grid grid-cols-[1fr_56px_56px_52px] border-b px-[14px] py-2 text-[10px] font-bold uppercase tracking-[0.12em]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+              <span>자재명</span>
+              <span className="text-right">소요</span>
+              <span className="text-right">현재고</span>
+              <span className="text-right">가능</span>
             </div>
-          ))
+            {bomRows.map((row, index) => {
+              const childItem = items.find((item) => item.item_id === row.child_item_id);
+              const stock = Number(childItem?.quantity ?? 0);
+              const capacity = row.quantity > 0 ? Math.floor(stock / row.quantity) : 0;
+              return (
+                <div key={row.bom_id} className="grid grid-cols-[1fr_56px_56px_52px] items-center px-[14px] py-3" style={{ borderBottom: index === bomRows.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}` }}>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold">{childItem?.item_name || row.child_item_id}</div>
+                    <div className="flex items-center gap-1.5 text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                      <span>{childItem?.item_code}</span>
+                      <button onClick={() => void removeRow(row.bom_id)} className="font-bold" style={{ color: LEGACY_COLORS.red }}>삭제</button>
+                    </div>
+                  </div>
+                  <div className="text-right font-mono text-xs">{formatNumber(row.quantity)}</div>
+                  <div className="text-right font-mono text-xs font-bold" style={{ color: stock > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red }}>{formatNumber(stock)}</div>
+                  <div className="text-right font-mono text-xs font-bold" style={{ color: capacity > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}>{formatNumber(capacity)}</div>
+                </div>
+              );
+            })}
+          </>
         )}
       </div>
     </div>
