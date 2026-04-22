@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import CategoryEnum, Inventory, InventoryLocation, Item, LocationStatusEnum
+from app.models import CategoryEnum, Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
 from app.schemas import (
     InventoryLocationResponse,
     ItemCreate,
@@ -22,7 +22,7 @@ from app.schemas import (
     ItemUpdate,
     ItemWithInventory,
 )
-from app.utils.erp_code import infer_process_type, infer_symbol_slot, make_erp_code
+from app.utils.erp_code import infer_process_type, infer_symbol_slot, make_erp_code, next_serial_no, slots_to_model_symbol
 from app.models import ProductSymbol
 from app.services import inventory as inventory_svc
 
@@ -61,6 +61,10 @@ def _to_item_with_inventory(
             for row in loc_rows
         ]
 
+    item_model_slots = [
+        row.slot for row in db.query(ItemModel).filter(ItemModel.item_id == item.item_id).all()
+    ]
+
     return ItemWithInventory(
         item_id=item.item_id,
         item_code=item.item_code,
@@ -76,6 +80,8 @@ def _to_item_with_inventory(
         supplier=item.supplier,
         min_stock=item.min_stock,
         erp_code=item.erp_code,
+        model_symbol=item.model_symbol,
+        model_slots=item_model_slots,
         symbol_slot=item.symbol_slot,
         process_type_code=item.process_type_code,
         option_code=item.option_code,
@@ -123,23 +129,18 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
         )
 
     pt = infer_process_type(category_val, payload.legacy_part)
-    slot = infer_symbol_slot(payload.legacy_model)
+    model_slots = payload.model_slots or []
+    model_sym = slots_to_model_symbol(model_slots) if model_slots else ""
+    opt = payload.option_code or None
 
     serial = None
     erp_code = None
-    opt = None
-    if pt:
-        max_serial = (
-            db.query(func.max(Item.serial_no))
-            .filter(Item.symbol_slot == slot, Item.process_type_code == pt)
-            .scalar()
-        ) or 0
-        serial = max_serial + 1
+    if pt and model_sym:
+        serial = next_serial_no(model_sym, pt, db)
+        erp_code = make_erp_code(model_sym, pt, serial, opt)
 
-        ps = db.query(ProductSymbol).filter(ProductSymbol.slot == slot).first() if slot else None
-        symbol = ps.symbol if ps else "공"
-        opt = "BG" if pt == "PA" else None
-        erp_code = make_erp_code(symbol, pt, serial, opt)
+    # legacy symbol_slot: 단일 모델 지정 시 이전 호환용으로 유지
+    legacy_slot = infer_symbol_slot(payload.legacy_model) if not model_slots else (model_slots[0] if len(model_slots) == 1 else None)
 
     item = Item(
         item_code=item_code,
@@ -155,13 +156,17 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
         supplier=payload.supplier,
         min_stock=payload.min_stock,
         process_type_code=pt,
-        symbol_slot=slot,
+        model_symbol=model_sym or None,
+        symbol_slot=legacy_slot,
         serial_no=serial,
         option_code=opt,
         erp_code=erp_code,
     )
     db.add(item)
     db.flush()
+
+    for slot in model_slots:
+        db.add(ItemModel(item_id=item.item_id, slot=slot))
 
     init_qty = payload.initial_quantity if payload.initial_quantity is not None else 0
     inventory = Inventory(item_id=item.item_id, quantity=init_qty, warehouse_qty=init_qty)

@@ -139,11 +139,12 @@ class Item(Base):
     supplier = Column(String(200), nullable=True)
     min_stock = Column(Numeric(15, 4), nullable=True)
 
-    # 4-part ERP code ([제품기호]-[구분코드]-[일련번호]-[옵션코드])
+    # 4-part ERP code ([모델기호조합]-[구분코드]-[일련번호]-[옵션코드])
     erp_code = Column(String(40), nullable=True, unique=True, index=True)
-    symbol_slot = Column(SmallInteger, ForeignKey("product_symbols.slot"), nullable=True, index=True)
+    model_symbol = Column(String(20), nullable=True, index=True)  # 예: "346", "3", "34678"
+    symbol_slot = Column(SmallInteger, ForeignKey("product_symbols.slot"), nullable=True, index=True)  # deprecated
     process_type_code = Column(String(2), ForeignKey("process_types.code"), nullable=True, index=True)
-    option_code = Column(String(2), ForeignKey("option_codes.code"), nullable=True)
+    option_code = Column(String(10), nullable=True)  # 자유 텍스트 (FK 제거)
     serial_no = Column(Integer, nullable=True)
 
     inventory = relationship("Inventory", back_populates="item", uselist=False, cascade="all, delete-orphan")
@@ -386,6 +387,18 @@ class ProductSymbol(Base):
     is_finished_good = Column(Boolean, nullable=False, default=False)
     is_reserved = Column(Boolean, nullable=False, default=True)
     notes = Column(Text, nullable=True)
+
+
+class ItemModel(Base):
+    """품목-제품 다대다 연결 테이블. 품목이 어떤 제품에 사용되는지 기록."""
+    __tablename__ = "item_models"
+
+    item_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("items.item_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    slot = Column(SmallInteger, ForeignKey("product_symbols.slot"), primary_key=True)
 
 
 class OptionCode(Base):

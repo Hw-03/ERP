@@ -69,7 +69,13 @@ const CATEGORY_OPTIONS = [
   { value: "UK", label: "UK — 미분류" },
 ];
 
-const MODEL_OPTIONS = ["공용", "DX3000", "ADX4000W", "ADX6000", "COCOON", "SOLO"];
+const MODEL_SLOTS = [
+  { slot: 1, label: "DX3000",   symbol: "3" },
+  { slot: 2, label: "COCOON",   symbol: "7" },
+  { slot: 3, label: "SOLO",     symbol: "8" },
+  { slot: 4, label: "ADX4000W", symbol: "4" },
+  { slot: 5, label: "ADX6000",  symbol: "6" },
+];
 const UNIT_OPTIONS = ["EA", "SET", "kg", "g", "m", "mm", "L", "box"];
 
 const EMPTY_ADD_FORM = {
@@ -77,7 +83,8 @@ const EMPTY_ADD_FORM = {
   category: "RM" as Item["category"],
   spec: "",
   unit: "EA",
-  legacy_model: "공용",
+  model_slots: [] as number[],
+  option_code: "",
   legacy_item_type: "",
   supplier: "",
   min_stock: "",
@@ -163,7 +170,8 @@ function ItemsSection({ showToast }: { showToast: (toast: ToastState) => void })
         category: addForm.category,
         spec: addForm.spec || undefined,
         unit: addForm.unit || "EA",
-        legacy_model: addForm.legacy_model || undefined,
+        model_slots: addForm.model_slots.length > 0 ? addForm.model_slots : undefined,
+        option_code: addForm.option_code || undefined,
         legacy_item_type: addForm.legacy_item_type || undefined,
         supplier: addForm.supplier || undefined,
         min_stock: addForm.min_stock ? Number(addForm.min_stock) : undefined,
@@ -266,29 +274,63 @@ function ItemsSection({ showToast }: { showToast: (toast: ToastState) => void })
             />
           </div>
 
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>단위</div>
-              <select
-                value={addForm.unit}
-                onChange={(e) => setAddForm((f) => ({ ...f, unit: e.target.value }))}
-                className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
-                style={inputStyle}
-              >
-                {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
-              </select>
+          <div>
+            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>단위</div>
+            <select
+              value={addForm.unit}
+              onChange={(e) => setAddForm((f) => ({ ...f, unit: e.target.value }))}
+              className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
+              style={inputStyle}
+            >
+              {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>사용 제품 (ERP 기호)</div>
+            <div className="flex flex-wrap gap-2">
+              {MODEL_SLOTS.map(({ slot, label, symbol }) => {
+                const checked = addForm.model_slots.includes(slot);
+                return (
+                  <button
+                    key={slot}
+                    type="button"
+                    onClick={() => setAddForm((f) => ({
+                      ...f,
+                      model_slots: checked
+                        ? f.model_slots.filter((s) => s !== slot)
+                        : [...f.model_slots, slot].sort(),
+                    }))}
+                    className="rounded-full border px-3 py-1.5 text-xs font-bold transition-colors"
+                    style={{
+                      background: checked ? LEGACY_COLORS.purple : LEGACY_COLORS.s2,
+                      borderColor: checked ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
+                      color: checked ? "#fff" : LEGACY_COLORS.muted2,
+                    }}
+                  >
+                    {label} ({symbol})
+                  </button>
+                );
+              })}
             </div>
-            <div className="flex-1">
-              <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>모델</div>
-              <select
-                value={addForm.legacy_model}
-                onChange={(e) => setAddForm((f) => ({ ...f, legacy_model: e.target.value }))}
-                className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
-                style={inputStyle}
-              >
-                {MODEL_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
+            {addForm.model_slots.length > 0 && (
+              <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.purple }}>
+                ERP 기호: {MODEL_SLOTS.filter((m) => addForm.model_slots.includes(m.slot)).map((m) => m.symbol).sort().join("")}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>옵션/스펙 코드</div>
+            <input
+              type="text"
+              value={addForm.option_code}
+              onChange={(e) => setAddForm((f) => ({ ...f, option_code: e.target.value.toUpperCase() }))}
+              placeholder="예: BG (블랙 유광)"
+              maxLength={10}
+              className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
+              style={inputStyle}
+            />
           </div>
 
           <div>

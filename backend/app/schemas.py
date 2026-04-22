@@ -34,6 +34,8 @@ class ItemCreate(BaseModel):
     supplier: Optional[str] = Field(None, max_length=200)
     min_stock: Optional[Decimal] = None
     initial_quantity: Optional[Decimal] = Field(None, description="초기 재고 수량 (기본 0)")
+    model_slots: List[int] = Field(default=[], description="사용 제품 슬롯 목록 (1=DX3000, 2=COCOON, 3=SOLO, 4=ADX4000W, 5=ADX6000)")
+    option_code: Optional[str] = Field(None, max_length=10, description="옵션/스펙 코드 (예: BG)")
 
 
 class ItemUpdate(BaseModel):
@@ -66,8 +68,10 @@ class ItemResponse(BaseModel):
     legacy_model: Optional[str] = None
     supplier: Optional[str] = None
     min_stock: Optional[Decimal] = None
-    # M1: 4-part ERP code fields
+    # ERP code fields
     erp_code: Optional[str] = None
+    model_symbol: Optional[str] = None
+    model_slots: List[int] = []
     symbol_slot: Optional[int] = None
     process_type_code: Optional[str] = None
     option_code: Optional[str] = None

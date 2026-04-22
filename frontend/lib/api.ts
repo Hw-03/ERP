@@ -94,6 +94,8 @@ export interface Item {
   supplier: string | null;
   min_stock: number | null;
   erp_code: string | null;
+  model_symbol: string | null;
+  model_slots: number[];
   symbol_slot: number | null;
   process_type_code: string | null;
   option_code: string | null;
@@ -410,6 +412,8 @@ export const api = {
     supplier?: string;
     min_stock?: number;
     initial_quantity?: number;
+    model_slots?: number[];
+    option_code?: string;
   }) => {
     const res = await fetch(toApiUrl("/api/items"), {
       method: "POST",
