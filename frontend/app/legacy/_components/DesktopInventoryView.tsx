@@ -368,7 +368,6 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                         { label: "상태", nowrap: true, width: "80px" },
                         { label: "품목명", nowrap: false, minWidth: "180px" },
                         { label: "ERP코드", nowrap: true, width: "88px" },
-                        { label: "코드", nowrap: true, width: "90px" },
                         { label: "구분", nowrap: true, width: "68px" },
                         { label: "파트", nowrap: true, width: "68px" },
                         { label: "현재고", nowrap: true, width: "72px" },
@@ -415,9 +414,6 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                           </td>
                           <td className={`border-b px-4 ${py} align-top whitespace-nowrap font-mono text-[12px] font-bold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
                             {item.erp_code ?? "-"}
-                          </td>
-                          <td className={`border-b px-4 ${py} align-top whitespace-nowrap font-mono text-[12px]`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-                            {item.erp_code}
                           </td>
                           <td className={`border-b px-4 ${py} align-top whitespace-nowrap`} style={{ borderColor: LEGACY_COLORS.border }}>
                             {item.legacy_file_type ?? "-"}
