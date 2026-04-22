@@ -476,14 +476,14 @@ export function DesktopAdminView({
                   <div className="space-y-4">
                     <div className="rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
                       <div className="mb-4 flex items-center gap-2 text-sm font-bold">
-                        <FileDown className="h-4 w-4" /> CSV 내보내기
+                        <FileDown className="h-4 w-4" /> 엑셀 내보내기
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <a href={api.getItemsExportUrl()} download className="rounded-[18px] border px-4 py-3 text-center text-sm font-semibold" style={{ borderColor: LEGACY_COLORS.border }}>
-                          품목 CSV
+                          품목 엑셀
                         </a>
                         <a href={api.getTransactionsExportUrl()} download className="rounded-[18px] border px-4 py-3 text-center text-sm font-semibold" style={{ borderColor: LEGACY_COLORS.border }}>
-                          거래 CSV
+                          거래 엑셀
                         </a>
                       </div>
                     </div>

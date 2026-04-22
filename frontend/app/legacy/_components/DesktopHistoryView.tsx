@@ -295,13 +295,16 @@ export function DesktopHistoryView() {
                   )}
                 </div>
                 <a
-                  href={api.getTransactionsExportUrl()}
+                  href={api.getTransactionsExportUrl({
+                    transaction_type: typeFilter !== "ALL" ? typeFilter : undefined,
+                    search: search || undefined,
+                  })}
                   download
                   className="flex shrink-0 items-center gap-2 rounded-[14px] border px-4 py-2.5 text-xs font-bold transition-all hover:brightness-110"
                   style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.green }}
                 >
                   <Download className="h-3.5 w-3.5" />
-                  CSV
+                  엑셀
                 </a>
               </div>
 

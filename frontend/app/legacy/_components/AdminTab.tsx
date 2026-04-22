@@ -597,13 +597,13 @@ function SettingsSection({ showToast }: { showToast: (toast: ToastState) => void
       </div>
 
       <div className="rounded-[14px] border px-[14px] py-4" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-        <div className="mb-3 text-xs font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>CSV 내보내기</div>
+        <div className="mb-3 text-xs font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>엑셀 내보내기</div>
         <div className="grid grid-cols-2 gap-2">
           <a href={api.getItemsExportUrl()} download className="rounded-xl border py-[13px] text-center text-sm font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-            품목 CSV
+            품목 엑셀
           </a>
           <a href={api.getTransactionsExportUrl()} download className="rounded-xl border py-[13px] text-center text-sm font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-            거래 CSV
+            거래 엑셀
           </a>
         </div>
       </div>

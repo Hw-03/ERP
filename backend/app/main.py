@@ -9,11 +9,13 @@ from app.models import (
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
+    Item,
     OptionCode,
     ProcessFlowRule,
     ProcessType,
     ProductSymbol,
 )
+from app.utils.erp_code import infer_process_type, infer_symbol_slot, make_erp_code
 from app.routers import (
     alerts,
     bom,
@@ -235,7 +237,56 @@ def ensure_reference_data() -> None:
         db.close()
 
 
+def populate_erp_codes() -> None:
+    """erp_code가 없는 품목에 ERP 4-part 코드를 자동 부여한다."""
+    db = SessionLocal()
+    try:
+        items_without_code = db.query(Item).filter(Item.erp_code.is_(None)).all()
+        if not items_without_code:
+            return
+
+        symbol_map: dict[int, str] = {
+            ps.slot: ps.symbol
+            for ps in db.query(ProductSymbol).all()
+            if ps.symbol
+        }
+
+        # 그룹별 현재 최대 serial_no 파악 (기존 데이터와 충돌 방지)
+        serial_counter: dict[tuple, int] = {}
+        for item in db.query(Item).filter(Item.serial_no.isnot(None)).all():
+            key = (item.symbol_slot, item.process_type_code)
+            serial_counter[key] = max(serial_counter.get(key, 0), item.serial_no or 0)
+
+        count = 0
+        for item in items_without_code:
+            pt = infer_process_type(item.category.value, item.legacy_part)
+            if pt is None:
+                continue
+
+            slot = infer_symbol_slot(item.legacy_model)
+            symbol = symbol_map.get(slot, "공") if slot else "공"
+            opt = "BG" if pt == "PA" else None
+
+            key = (slot, pt)
+            serial_counter[key] = serial_counter.get(key, 0) + 1
+            serial = serial_counter[key]
+
+            item.process_type_code = pt
+            item.symbol_slot = slot
+            item.serial_no = serial
+            item.option_code = opt
+            item.erp_code = make_erp_code(symbol, pt, serial, opt)
+            count += 1
+
+        db.commit()
+        if count:
+            print(f"[ERP] 코드 부여 완료: {count}개")
+    finally:
+        db.close()
+
+
 ensure_reference_data()
+populate_erp_codes()
 
 
 @app.get("/health", tags=["System"])

@@ -11,9 +11,13 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from sqlalchemy import func
+
 from app.database import get_db
 from app.models import CategoryEnum, Inventory, Item
 from app.schemas import ItemCreate, ItemResponse, ItemUpdate, ItemWithInventory
+from app.utils.erp_code import infer_process_type, infer_symbol_slot, make_erp_code
+from app.models import ProductSymbol
 
 router = APIRouter()
 
@@ -66,6 +70,27 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
             detail=f"품목 코드 '{payload.item_code}'가 이미 존재합니다.",
         )
 
+    category_val = payload.category.value if payload.category else "UK"
+    pt = infer_process_type(category_val, payload.legacy_part)
+    slot = infer_symbol_slot(payload.legacy_model)
+
+    serial = None
+    erp_code = None
+    opt = None
+    if pt:
+        # 같은 그룹 내 최대 serial_no + 1
+        max_serial = (
+            db.query(func.max(Item.serial_no))
+            .filter(Item.symbol_slot == slot, Item.process_type_code == pt)
+            .scalar()
+        ) or 0
+        serial = max_serial + 1
+
+        ps = db.query(ProductSymbol).filter(ProductSymbol.slot == slot).first() if slot else None
+        symbol = ps.symbol if ps else "공"
+        opt = "BG" if pt == "PA" else None
+        erp_code = make_erp_code(symbol, pt, serial, opt)
+
     item = Item(
         item_code=payload.item_code,
         item_name=payload.item_name,
@@ -79,6 +104,11 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
         legacy_model=payload.legacy_model,
         supplier=payload.supplier,
         min_stock=payload.min_stock,
+        process_type_code=pt,
+        symbol_slot=slot,
+        serial_no=serial,
+        option_code=opt,
+        erp_code=erp_code,
     )
     db.add(item)
     db.flush()
@@ -168,6 +198,97 @@ def export_items_csv(db: Session = Depends(get_db)):
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="items-export.csv"'},
     )
+
+
+_CATEGORY_ROW_COLOR = {
+    "RM": "D6E8FF",
+    "TA": "D6F5F5", "TF": "D6F5F5",
+    "HA": "FFF8D6", "HF": "FFF8D6",
+    "VA": "EAD6FF", "VF": "EAD6FF",
+    "BA": "FFE8D6", "BF": "FFE8D6",
+    "FG": "D6F5E0",
+    "UK": "EBEBEB",
+}
+
+
+@router.get("/export.xlsx")
+def export_items_xlsx(
+    category: Optional[CategoryEnum] = Query(None),
+    search: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    from datetime import date as _date
+    from decimal import Decimal as _D
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from app.utils.excel import apply_header, auto_width, make_xlsx_response
+
+    query = _build_item_query(db)
+    if category:
+        query = query.filter(Item.category == category)
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                Item.item_name.ilike(pattern),
+                Item.item_code.ilike(pattern),
+                Item.spec.ilike(pattern),
+                Item.barcode.ilike(pattern),
+                Inventory.location.ilike(pattern),
+            )
+        )
+    rows = query.order_by(Item.category, Item.item_code).all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "품목 마스터"
+
+    columns = [
+        "품목코드", "품목명", "카테고리", "ERP코드", "사양", "단위",
+        "재고수량", "가용수량", "예약수량", "위치", "공급업체", "안전재고", "바코드", "수정일",
+    ]
+    apply_header(ws, columns)
+
+    red_font = Font(color="CC0000", bold=True)
+
+    for item, inventory in rows:
+        qty = float((inventory.quantity if inventory else None) or _D("0"))
+        pending = float((inventory.pending_quantity if inventory else None) or _D("0"))
+        available = qty - pending
+        min_stock = float(item.min_stock) if item.min_stock else None
+
+        row_data = [
+            item.item_code,
+            item.item_name,
+            item.category.value,
+            item.erp_code or "",
+            item.spec or "",
+            item.unit,
+            qty,
+            available,
+            pending,
+            inventory.location if inventory else "",
+            item.supplier or "",
+            min_stock or "",
+            item.barcode or "",
+            item.updated_at.strftime("%Y-%m-%d %H:%M") if item.updated_at else "",
+        ]
+        ws.append(row_data)
+
+        row_idx = ws.max_row
+        hex_color = _CATEGORY_ROW_COLOR.get(item.category.value, "FFFFFF")
+        row_fill = PatternFill("solid", fgColor=hex_color)
+        for cell in ws[row_idx]:
+            cell.fill = row_fill
+
+        # 재고수량 < 안전재고이면 빨간 글씨
+        qty_cell = ws.cell(row=row_idx, column=7)
+        if min_stock and qty < min_stock:
+            qty_cell.font = red_font
+
+    auto_width(ws)
+    filename = f"items-{_date.today().strftime('%Y%m%d')}.xlsx"
+    return make_xlsx_response(wb, filename)
 
 
 @router.get("/{item_id}", response_model=ItemWithInventory)

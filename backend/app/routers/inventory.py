@@ -439,6 +439,94 @@ def export_transactions_csv(
     )
 
 
+_TX_ROW_COLOR = {
+    "RECEIVE":   "D4EDDA",
+    "PRODUCE":   "CCE5FF",
+    "SHIP":      "F8D7DA",
+    "ADJUST":    "FFF3CD",
+    "BACKFLUSH": "FFE5B4",
+}
+
+
+@router.get("/transactions/export.xlsx")
+def export_transactions_xlsx(
+    transaction_type: Optional[TransactionTypeEnum] = Query(None),
+    search: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    from datetime import date as _date
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from app.utils.excel import apply_header, auto_width, make_xlsx_response
+
+    query = db.query(TransactionLog, Item).join(Item, TransactionLog.item_id == Item.item_id)
+    if transaction_type:
+        query = query.filter(TransactionLog.transaction_type == transaction_type)
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                Item.item_name.ilike(pattern),
+                Item.item_code.ilike(pattern),
+                TransactionLog.reference_no.ilike(pattern),
+                TransactionLog.notes.ilike(pattern),
+                TransactionLog.produced_by.ilike(pattern),
+            )
+        )
+
+    rows = query.order_by(TransactionLog.created_at.desc()).all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "거래 이력"
+
+    tx_label = {
+        "RECEIVE": "입고", "PRODUCE": "생산입고", "SHIP": "출고",
+        "ADJUST": "재고조정", "BACKFLUSH": "자동차감",
+    }
+
+    columns = [
+        "일시", "유형", "품목코드", "품목명", "카테고리", "ERP코드",
+        "수량변화", "이전재고", "이후재고", "참조번호", "담당자", "메모",
+    ]
+    apply_header(ws, columns)
+
+    positive_font = Font(color="1A7C3C", bold=True)
+    negative_font = Font(color="CC0000", bold=True)
+
+    for log, item in rows:
+        tx_val = log.transaction_type.value
+        row_data = [
+            log.created_at.strftime("%Y-%m-%d %H:%M") if log.created_at else "",
+            tx_label.get(tx_val, tx_val),
+            item.item_code,
+            item.item_name,
+            item.category.value,
+            item.erp_code or "",
+            float(log.quantity_change),
+            float(log.quantity_before) if log.quantity_before is not None else "",
+            float(log.quantity_after) if log.quantity_after is not None else "",
+            log.reference_no or "",
+            log.produced_by or "",
+            log.notes or "",
+        ]
+        ws.append(row_data)
+
+        row_idx = ws.max_row
+        hex_color = _TX_ROW_COLOR.get(tx_val, "FFFFFF")
+        row_fill = PatternFill("solid", fgColor=hex_color)
+        for cell in ws[row_idx]:
+            cell.fill = row_fill
+
+        qty_change_cell = ws.cell(row=row_idx, column=7)
+        if isinstance(qty_change_cell.value, float):
+            qty_change_cell.font = positive_font if qty_change_cell.value >= 0 else negative_font
+
+    auto_width(ws)
+    filename = f"transactions-{_date.today().strftime('%Y%m%d')}.xlsx"
+    return make_xlsx_response(wb, filename)
+
+
 @router.put("/transactions/{log_id}", response_model=TransactionLogResponse)
 def update_transaction_notes(
     log_id: uuid.UUID,

@@ -667,8 +667,20 @@ export const api = {
     return res.json() as Promise<TransactionLog>;
   },
 
-  getItemsExportUrl: () => toApiUrl("/api/items/export.csv"),
-  getTransactionsExportUrl: () => toApiUrl("/api/inventory/transactions/export.csv"),
+  getItemsExportUrl: (params?: { category?: string; search?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.category) qs.set("category", params.category);
+    if (params?.search) qs.set("search", params.search);
+    const suffix = qs.toString() ? `?${qs}` : "";
+    return toApiUrl(`/api/items/export.xlsx${suffix}`);
+  },
+  getTransactionsExportUrl: (params?: { transaction_type?: string; search?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.transaction_type) qs.set("transaction_type", params.transaction_type);
+    if (params?.search) qs.set("search", params.search);
+    const suffix = qs.toString() ? `?${qs}` : "";
+    return toApiUrl(`/api/inventory/transactions/export.xlsx${suffix}`);
+  },
 
   // Queue batches ------------------------------------------------------------
   createQueueBatch: async (payload: {

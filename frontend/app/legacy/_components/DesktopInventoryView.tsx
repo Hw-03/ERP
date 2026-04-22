@@ -341,6 +341,7 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                       {([
                         { label: "상태", nowrap: true },
                         { label: "품목명", nowrap: false },
+                        { label: "ERP코드", nowrap: true },
                         { label: "코드", nowrap: true },
                         { label: "구분", nowrap: true },
                         { label: "파트", nowrap: true },
@@ -381,6 +382,9 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                             <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
                               {item.spec || "-"}
                             </div>
+                          </td>
+                          <td className="border-b px-4 py-3 align-top whitespace-nowrap font-mono text-[12px] font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
+                            {item.erp_code ?? "-"}
                           </td>
                           <td className="border-b px-4 py-3 align-top whitespace-nowrap font-mono text-[12px]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                             {item.item_code}
@@ -465,6 +469,12 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                 품목 정보
               </div>
               <div className="grid gap-3 text-sm">
+                {selectedItem.erp_code && (
+                  <div className="rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+                    <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>ERP 코드</div>
+                    <div className="mt-1 font-mono text-base font-bold" style={{ color: LEGACY_COLORS.blue }}>{selectedItem.erp_code}</div>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
                     <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>현재고</div>
