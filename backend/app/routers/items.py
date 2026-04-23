@@ -25,17 +25,9 @@ from app.schemas import (
 from app.utils.erp_code import infer_process_type, infer_symbol_slot, make_erp_code, next_serial_no, slots_to_model_symbol
 from app.models import ProductSymbol
 from app.services import inventory as inventory_svc
+from app.services import stock_math
 
 router = APIRouter()
-
-_PROCESS_TO_DEPT: dict[str, str] = {
-    "TR": "튜브", "TA": "튜브", "TF": "튜브",
-    "HR": "고압", "HA": "고압", "HF": "고압",
-    "VR": "진공", "VA": "진공", "VF": "진공",
-    "NR": "튜닝", "NA": "튜닝", "NF": "튜닝",
-    "AR": "조립", "AA": "조립", "AF": "조립",
-    "PR": "출하", "PA": "출하", "PF": "출하",
-}
 
 
 def _build_item_query(db: Session):
@@ -43,38 +35,44 @@ def _build_item_query(db: Session):
 
 
 def _to_item_with_inventory(
-    db: Session, item: Item, inventory: Optional[Inventory]
+    db: Session,
+    item: Item,
+    inventory: Optional[Inventory],
+    *,
+    figures: Optional[stock_math.StockFigures] = None,
+    locations: Optional[list[InventoryLocationResponse]] = None,
+    model_slots: Optional[list[int]] = None,
 ) -> ItemWithInventory:
-    """Build ItemWithInventory dto with bucket breakdown."""
+    """ItemWithInventory DTO 조립.
+
+    성능 모드 (Phase C bulk prefetch 용): 호출측이 figures / locations / model_slots 를
+    미리 채워 넣으면 DB 쿼리를 추가로 발생시키지 않는다. 인자를 생략하면 기존처럼
+    단건 쿼리를 수행한다 (단건 상세 조회용).
+    """
     from decimal import Decimal as _D
 
-    pending = (inventory.pending_quantity if inventory else None) or _D("0")
-    wh = (inventory.warehouse_qty if inventory else None) or _D("0")
-    prod = inventory_svc.production_total(db, item.item_id) if inventory else _D("0")
-    defect = inventory_svc.defective_total(db, item.item_id) if inventory else _D("0")
-    total = wh + prod + defect
+    fig = figures if figures is not None else stock_math.compute_for(db, item.item_id)
 
-    loc_rows = (
-        db.query(InventoryLocation)
-        .filter(InventoryLocation.item_id == item.item_id)
-        .all()
-    )
-    locations: list[InventoryLocationResponse] = [
-        InventoryLocationResponse(
-            department=row.department,
-            status=row.status,
-            quantity=row.quantity or _D("0"),
+    if locations is None:
+        loc_rows = (
+            db.query(InventoryLocation)
+            .filter(InventoryLocation.item_id == item.item_id, InventoryLocation.quantity > 0)
+            .all()
         )
-        for row in loc_rows
-    ]
+        locations = [
+            InventoryLocationResponse(
+                department=row.department,
+                status=row.status,
+                quantity=row.quantity or _D("0"),
+            )
+            for row in loc_rows
+        ]
 
-    item_model_slots = [
-        row.slot for row in db.query(ItemModel).filter(ItemModel.item_id == item.item_id).all()
-    ]
-
-    dept = _PROCESS_TO_DEPT.get(item.process_type_code or "", None)
-    if dept is None and any(loc.department.value == "AS" for loc in loc_rows):
-        dept = "AS"
+    if model_slots is None:
+        model_slots = [
+            row.slot
+            for row in db.query(ItemModel).filter(ItemModel.item_id == item.item_id).all()
+        ]
 
     return ItemWithInventory(
         item_id=item.item_id,
@@ -91,23 +89,22 @@ def _to_item_with_inventory(
         min_stock=item.min_stock,
         erp_code=item.erp_code,
         model_symbol=item.model_symbol,
-        model_slots=item_model_slots,
+        model_slots=model_slots,
         symbol_slot=item.symbol_slot,
         process_type_code=item.process_type_code,
         option_code=item.option_code,
         serial_no=item.serial_no,
         created_at=item.created_at,
         updated_at=item.updated_at,
-        quantity=total,
-        warehouse_qty=wh,
-        production_total=prod,
-        defective_total=defect,
-        pending_quantity=pending,
-        available_quantity=wh + prod - pending,
+        quantity=fig.total,
+        warehouse_qty=fig.warehouse_qty,
+        production_total=fig.production_total,
+        defective_total=fig.defective_total,
+        pending_quantity=fig.pending,
+        available_quantity=fig.available,
         last_reserver_name=inventory.last_reserver_name if inventory else None,
         location=inventory.location if inventory else None,
         locations=locations,
-        department=dept,
     )
 
 
@@ -229,7 +226,46 @@ def list_items(
         )
 
     rows = query.order_by(Item.category, Item.erp_code).offset(skip).limit(limit).all()
-    return [_to_item_with_inventory(db, item, inv) for item, inv in rows]
+    if not rows:
+        return []
+
+    # bulk prefetch — N+1 제거. 기존에는 item 1건당 4 쿼리씩 나갔음.
+    item_ids = [it.item_id for it, _ in rows]
+    figures_map = stock_math.bulk_compute(db, item_ids)
+
+    from decimal import Decimal as _D
+
+    loc_rows = (
+        db.query(InventoryLocation)
+        .filter(InventoryLocation.item_id.in_(item_ids), InventoryLocation.quantity > 0)
+        .all()
+    )
+    locations_by_item: dict = {}
+    for row in loc_rows:
+        locations_by_item.setdefault(row.item_id, []).append(
+            InventoryLocationResponse(
+                department=row.department,
+                status=row.status,
+                quantity=row.quantity or _D("0"),
+            )
+        )
+
+    model_rows = db.query(ItemModel).filter(ItemModel.item_id.in_(item_ids)).all()
+    slots_by_item: dict = {}
+    for row in model_rows:
+        slots_by_item.setdefault(row.item_id, []).append(row.slot)
+
+    return [
+        _to_item_with_inventory(
+            db,
+            item,
+            inv,
+            figures=figures_map.get(item.item_id),
+            locations=locations_by_item.get(item.item_id, []),
+            model_slots=slots_by_item.get(item.item_id, []),
+        )
+        for item, inv in rows
+    ]
 
 
 @router.get("/export.csv")
@@ -267,7 +303,7 @@ _CATEGORY_ROW_COLOR = {
     "TA": "D6F5F5", "TF": "D6F5F5",
     "HA": "FFF8D6", "HF": "FFF8D6",
     "VA": "EAD6FF", "VF": "EAD6FF",
-    "BA": "FFE8D6", "AF": "FFE8D6",
+    "BA": "FFE8D6", "BF": "FFE8D6",
     "FG": "D6F5E0",
     "UK": "EBEBEB",
 }
@@ -301,6 +337,9 @@ def export_items_xlsx(
         )
     rows = query.order_by(Item.category, Item.erp_code).all()
 
+    # 가용수량 계산: stock_math 를 한 번 bulk 로 불러 경로별 재구현을 피한다.
+    figures_map = stock_math.bulk_compute(db, [it.item_id for it, _ in rows])
+
     wb = Workbook()
     ws = wb.active
     ws.title = "품목 마스터"
@@ -314,9 +353,10 @@ def export_items_xlsx(
     red_font = Font(color="CC0000", bold=True)
 
     for item, inventory in rows:
-        qty = float((inventory.quantity if inventory else None) or _D("0"))
-        pending = float((inventory.pending_quantity if inventory else None) or _D("0"))
-        available = qty - pending
+        fig = figures_map.get(item.item_id) or stock_math.StockFigures()
+        qty = float(fig.total)
+        pending = float(fig.pending)
+        available = float(fig.available)
         min_stock = float(item.min_stock) if item.min_stock else None
 
         row_data = [
@@ -350,14 +390,6 @@ def export_items_xlsx(
     auto_width(ws)
     filename = f"items-{_date.today().strftime('%Y%m%d')}.xlsx"
     return make_xlsx_response(wb, filename)
-
-
-@router.get("/{item_id}/debug-locs")
-def debug_locs(item_id: uuid.UUID, db: Session = Depends(get_db)):
-    from sqlalchemy import text
-    raw = db.execute(text("SELECT item_id, department, quantity FROM inventory_locations WHERE item_id = :id"), {"id": item_id.hex}).fetchall()
-    orm = db.query(InventoryLocation).filter(InventoryLocation.item_id == item_id).all()
-    return {"raw_sql": [dict(r._mapping) for r in raw], "orm_count": len(orm), "item_id_hex": item_id.hex}
 
 
 @router.get("/{item_id}", response_model=ItemWithInventory)

@@ -133,7 +133,12 @@ def available(inv: Inventory, *, db: Optional[Session] = None) -> Decimal:
 
 
 def _sync_total(db: Session, item_id: uuid.UUID) -> None:
-    """Inventory.quantity를 warehouse + 모든 location 합으로 동기화."""
+    """Inventory.quantity 를 warehouse + 모든 location 합으로 동기화.
+
+    SessionLocal 이 autoflush=False 이므로 SUM 쿼리 전에 명시적으로 flush 한다.
+    wh/loc 양쪽을 동시에 수정하는 경로(transfer 등) 에서도 최신 값을 읽도록 보장.
+    """
+    db.flush()
     inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
     if inv is None:
         return
@@ -389,3 +394,52 @@ def consume_from_department(
     loc.quantity = cur - qty
     _sync_total(db, item_id)
     return inv
+
+
+# ---------------------------------------------------------------------------
+# 창고 전용 헬퍼 (라우터가 warehouse_qty 를 직접 건드리지 않도록)
+# ---------------------------------------------------------------------------
+def adjust_warehouse(
+    db: Session,
+    item_id: uuid.UUID,
+    new_warehouse_qty: Decimal,
+    *,
+    location: Optional[str] = None,
+) -> tuple[Inventory, Decimal, Decimal]:
+    """창고 재고를 절대값으로 지정 (ADJUST 용).
+
+    Returns:
+        (inventory, qty_before, delta) — qty_before 는 조정 전 Inventory.quantity (총량),
+        delta 는 warehouse_qty 변화량. 라우터가 TransactionLog 에 사용.
+    """
+    if new_warehouse_qty < 0:
+        raise ValueError("창고 수량은 음수일 수 없습니다.")
+    inv = get_or_create_inventory(db, item_id)
+    qty_before = inv.quantity or Decimal("0")
+    wh_before = inv.warehouse_qty or Decimal("0")
+    delta = new_warehouse_qty - wh_before
+    inv.warehouse_qty = new_warehouse_qty
+    if location is not None:
+        inv.location = location
+    _sync_total(db, item_id)
+    return inv, qty_before, delta
+
+
+def consume_warehouse(db: Session, item_id: uuid.UUID, qty: Decimal) -> tuple[Inventory, Decimal]:
+    """창고에서 qty 만큼 차감 (BACKFLUSH / 비예약 창고 출고용).
+
+    Pending 과 무관하게 warehouse_qty 만 건드린다 (사전 feasibility 는 호출측 책임).
+
+    Returns:
+        (inventory, qty_before) — qty_before 는 차감 전 Inventory.quantity (총량).
+    """
+    if qty <= 0:
+        raise ValueError("차감 수량은 0보다 커야 합니다.")
+    inv = get_or_create_inventory(db, item_id)
+    qty_before = inv.quantity or Decimal("0")
+    wh = inv.warehouse_qty or Decimal("0")
+    if wh < qty:
+        raise ValueError(f"창고 재고 부족 (창고 {wh}, 차감 요청 {qty}).")
+    inv.warehouse_qty = wh - qty
+    _sync_total(db, item_id)
+    return inv, qty_before

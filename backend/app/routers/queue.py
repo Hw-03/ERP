@@ -18,7 +18,7 @@ import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.models import (
@@ -46,14 +46,22 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-def _line_to_response(db: Session, line: QueueLine) -> QueueLineResponse:
-    item = db.query(Item).filter(Item.item_id == line.item_id).first()
+def _line_to_response(
+    db: Session,
+    line: QueueLine,
+    *,
+    item: Optional[Item] = None,
+) -> QueueLineResponse:
+    """item 을 주입하면 per-line Item 쿼리를 건너뛴다 (list_batches 경로 N+1 방지)."""
+    resolved_item = item
+    if resolved_item is None and line.item_id is not None:
+        resolved_item = db.query(Item).filter(Item.item_id == line.item_id).first()
     return QueueLineResponse(
         line_id=line.line_id,
         batch_id=line.batch_id,
         item_id=line.item_id,
-        erp_code=item.erp_code if item else None,
-        item_name=item.item_name if item else None,
+        erp_code=resolved_item.erp_code if resolved_item else None,
+        item_name=resolved_item.item_name if resolved_item else None,
         direction=line.direction,
         quantity=line.quantity,
         bom_expected=line.bom_expected,
@@ -64,10 +72,19 @@ def _line_to_response(db: Session, line: QueueLine) -> QueueLineResponse:
     )
 
 
-def _batch_to_response(db: Session, batch: QueueBatch) -> QueueBatchResponse:
+def _batch_to_response(
+    db: Session,
+    batch: QueueBatch,
+    *,
+    items_by_id: Optional[dict] = None,
+) -> QueueBatchResponse:
+    """items_by_id 를 주입하면 parent / line item 쿼리를 생략한다."""
     parent = None
     if batch.parent_item_id:
-        parent = db.query(Item).filter(Item.item_id == batch.parent_item_id).first()
+        if items_by_id is not None:
+            parent = items_by_id.get(batch.parent_item_id)
+        if parent is None:
+            parent = db.query(Item).filter(Item.item_id == batch.parent_item_id).first()
     return QueueBatchResponse(
         batch_id=batch.batch_id,
         batch_type=batch.batch_type,
@@ -82,8 +99,32 @@ def _batch_to_response(db: Session, batch: QueueBatch) -> QueueBatchResponse:
         created_at=batch.created_at,
         confirmed_at=batch.confirmed_at,
         cancelled_at=batch.cancelled_at,
-        lines=[_line_to_response(db, ln) for ln in batch.lines],
+        lines=[
+            _line_to_response(
+                db,
+                ln,
+                item=(items_by_id.get(ln.item_id) if items_by_id else None),
+            )
+            for ln in batch.lines
+        ],
     )
+
+
+def _prefetch_items_for_batches(db: Session, batches: list[QueueBatch]) -> dict:
+    """list_batches bulk 경로용 — parent + 모든 라인의 item_id 를 한 번에 fetch."""
+    item_ids: set = set()
+    for b in batches:
+        if b.parent_item_id:
+            item_ids.add(b.parent_item_id)
+        for ln in b.lines:
+            if ln.item_id:
+                item_ids.add(ln.item_id)
+    if not item_ids:
+        return {}
+    return {
+        it.item_id: it
+        for it in db.query(Item).filter(Item.item_id.in_(item_ids)).all()
+    }
 
 
 def _get_batch_or_404(db: Session, batch_id: uuid.UUID) -> QueueBatch:
@@ -168,7 +209,7 @@ def list_batches(
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
-    q = db.query(QueueBatch)
+    q = db.query(QueueBatch).options(selectinload(QueueBatch.lines))
     if status_filter is not None:
         q = q.filter(QueueBatch.status == status_filter)
     if owner_employee_id is not None:
@@ -176,7 +217,8 @@ def list_batches(
     batches = (
         q.order_by(QueueBatch.created_at.desc()).offset(skip).limit(limit).all()
     )
-    return [_batch_to_response(db, b) for b in batches]
+    items_by_id = _prefetch_items_for_batches(db, batches)
+    return [_batch_to_response(db, b, items_by_id=items_by_id) for b in batches]
 
 
 @router.get(

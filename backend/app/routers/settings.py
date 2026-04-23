@@ -1,19 +1,29 @@
-"""System settings router."""
+"""System settings router.
+
+관리자 PIN 인증 엔드포인트와 DB 재시드(안전 초기화), 재고 불변식 점검/복구 엔드포인트.
+무결성 점검 · 복구는 운영자가 명시적으로 호출하는 관리자 도구이며 프론트엔드는 사용하지 않는다.
+"""
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from pydantic import BaseModel, Field
 
 from app.database import get_db
-from app.models import SystemSetting
+from app.models import Inventory, SystemSetting
 from app.schemas import AdminPinUpdateRequest, AdminPinVerifyRequest, MessageResponse
+from app.services import integrity as integrity_svc
 
 
 class ResetRequest(BaseModel):
     pin: str = Field(..., min_length=4, max_length=32, description="현재 관리자 PIN")
+
+
+class IntegrityRepairRequest(BaseModel):
+    pin: str = Field(..., min_length=4, max_length=32)
+    dry_run: bool = True
 
 router = APIRouter()
 
@@ -56,9 +66,48 @@ def update_admin_pin(payload: AdminPinUpdateRequest, db: Session = Depends(get_d
     return MessageResponse(message="관리자 비밀번호를 변경했습니다.")
 
 
+def _require_admin(db: Session, pin: str) -> None:
+    setting = ensure_admin_pin(db)
+    if pin != setting.setting_value:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="관리자 비밀번호가 올바르지 않습니다.")
+
+
+@router.get("/integrity/inventory")
+def check_inventory_integrity(
+    pin: str = Query(..., min_length=4, max_length=32, description="관리자 PIN"),
+    limit: int = Query(100, ge=1, le=1000),
+    db: Session = Depends(get_db),
+):
+    """재고 불변식(quantity == warehouse + Σ locations) 미스매치 목록.
+
+    관리자 PIN 필요. 프론트에서 사용하지 않는 운영 도구.
+    """
+    _require_admin(db, pin)
+    mismatches = integrity_svc.check_inventory_consistency(db)
+    return {
+        "checked": db.query(Inventory).count(),
+        "mismatched_count": len(mismatches),
+        "samples": [m.to_dict() for m in mismatches[:limit]],
+    }
+
+
+@router.post("/integrity/repair")
+def repair_inventory_integrity(
+    payload: IntegrityRepairRequest,
+    db: Session = Depends(get_db),
+):
+    """Inventory.quantity 를 warehouse + Σ locations 로 재계산해 복구.
+
+    `dry_run=True` (기본) 로 먼저 확인 후 실제 적용 시 false 로 호출.
+    """
+    _require_admin(db, payload.pin)
+    report = integrity_svc.repair_inventory_totals(db, dry_run=payload.dry_run)
+    return report.to_dict()
+
+
 @router.post("/reset", response_model=MessageResponse)
 def reset_database(payload: ResetRequest, db: Session = Depends(get_db)):
-    """PIN 검증 후 시드 데이터 재적재 (안전 초기화)."""
+    """PIN 검증 후 시드 데이터 재적재 (안전 초기화). 관리자 도구."""
     setting = ensure_admin_pin(db)
     if payload.pin != setting.setting_value:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="관리자 비밀번호가 올바르지 않습니다.")

@@ -22,8 +22,37 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from sqlalchemy.types import TypeDecorator
 
 from app.database import Base
+
+
+class BoolAsString(TypeDecorator):
+    """DB 에는 'true'/'false' 문자열로, 애플리케이션에서는 bool 로 다룬다.
+
+    기존 Employee.is_active 가 VARCHAR(5) 로 저장되는 관성을 유지하면서 ORM 레이어에서만
+    bool 로 정규화. 스키마 변경 필요 없음.
+    """
+
+    impl = String(5)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        # 기존 문자열/정수 입력 호환
+        if isinstance(value, str):
+            return "true" if value.lower() in ("true", "1", "yes", "t") else "false"
+        return "true" if bool(value) else "false"
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return value
+        return str(value).lower() in ("true", "1", "yes", "t")
 
 
 class CategoryEnum(str, enum.Enum):
@@ -276,8 +305,8 @@ class Employee(Base):
         nullable=False,
         default=EmployeeLevelEnum.STAFF,
     )
-    display_order = Column(Numeric(10, 0), nullable=False, default=0)
-    is_active = Column(String(5), nullable=False, default="true")
+    display_order = Column(Integer, nullable=False, default=0)
+    is_active = Column(BoolAsString, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
     updated_at = Column(
         DateTime,
@@ -457,6 +486,7 @@ class QueueBatch(Base):
         UUID(as_uuid=True),
         ForeignKey("employees.employee_id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
     owner_name = Column(String(100), nullable=True)  # denormalized for display
     parent_item_id = Column(
@@ -467,7 +497,13 @@ class QueueBatch(Base):
     parent_quantity = Column(Numeric(15, 4), nullable=True)
     reference_no = Column(String(100), nullable=True, index=True)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
+    created_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        server_default=func.now(),
+        index=True,
+    )
     confirmed_at = Column(DateTime, nullable=True)
     cancelled_at = Column(DateTime, nullable=True)
 

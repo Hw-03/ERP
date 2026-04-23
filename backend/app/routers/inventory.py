@@ -40,6 +40,7 @@ from app.schemas import (
     TransferRequest,
 )
 from app.services import inventory as inventory_svc
+from app.services import stock_math
 
 
 def _list_locations(db: Session, item_id: uuid.UUID) -> List[InventoryLocationResponse]:
@@ -59,21 +60,17 @@ def _list_locations(db: Session, item_id: uuid.UUID) -> List[InventoryLocationRe
 
 
 def _to_response(db: Session, inv: Inventory) -> InventoryResponse:
-    """Build InventoryResponse with bucket breakdown."""
-    pending = inv.pending_quantity or Decimal("0")
-    wh = inv.warehouse_qty or Decimal("0")
-    prod = inventory_svc.production_total(db, inv.item_id)
-    defect = inventory_svc.defective_total(db, inv.item_id)
-    total = wh + prod + defect
+    """Build InventoryResponse with bucket breakdown. 계산은 stock_math 통일."""
+    fig = stock_math.compute_for(db, inv.item_id)
     return InventoryResponse(
         inventory_id=inv.inventory_id,
         item_id=inv.item_id,
-        quantity=total,
-        warehouse_qty=wh,
-        production_total=prod,
-        defective_total=defect,
-        pending_quantity=pending,
-        available_quantity=wh + prod - pending,
+        quantity=fig.total,
+        warehouse_qty=fig.warehouse_qty,
+        production_total=fig.production_total,
+        defective_total=fig.defective_total,
+        pending_quantity=fig.pending,
+        available_quantity=fig.available,
         last_reserver_name=inv.last_reserver_name,
         location=inv.location,
         updated_at=inv.updated_at,
@@ -345,15 +342,12 @@ def adjust_inventory(payload: InventoryAdjust, db: Session = Depends(get_db)):
     if not item:
         raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
 
-    inventory = inventory_svc.get_or_create_inventory(db, payload.item_id)
-    qty_before = inventory.quantity or Decimal("0")
-    wh_before = inventory.warehouse_qty or Decimal("0")
-    delta = payload.quantity - wh_before
-
-    inventory.warehouse_qty = payload.quantity
-    inventory_svc._sync_total(db, payload.item_id)
-    if payload.location is not None:
-        inventory.location = payload.location
+    try:
+        inventory, qty_before, delta = inventory_svc.adjust_warehouse(
+            db, payload.item_id, payload.quantity, location=payload.location
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
     db.add(
         TransactionLog(

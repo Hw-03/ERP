@@ -90,8 +90,7 @@ def submit_count(
     db.flush()
 
     if diff != 0:
-        inv.warehouse_qty = payload.counted_qty
-        inv_svc._sync_total(db, payload.item_id)
+        inv_svc.adjust_warehouse(db, payload.item_id, payload.counted_qty)
         db.add(
             TransactionLog(
                 item_id=payload.item_id,

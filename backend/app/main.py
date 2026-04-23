@@ -1,21 +1,29 @@
-"""FastAPI application entry point for the X-Ray ERP backend."""
+"""FastAPI application entry point for the X-Ray ERP backend.
 
-from fastapi import FastAPI
+Startup 부작용 (create_all / run_migrations / seed / ERP 백필) 은 모두
+`backend/bootstrap_db.py` 로 옮겼다. 서버 기동만으로는 DB 가 변하지 않는다.
+
+초기 설치 / 스키마 변경 / 시드 재적용은 명시적으로:
+    cd backend
+    python bootstrap_db.py --all
+"""
+
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import or_, text
+from sqlalchemy import func, text
+from sqlalchemy.orm import Session
 
-from app.database import Base, SessionLocal, engine
+from app.database import get_db
 from app.models import (
-    DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
+    Inventory,
     Item,
-    OptionCode,
-    ProcessFlowRule,
-    ProcessType,
-    ProductSymbol,
+    QueueBatch,
+    QueueBatchStatusEnum,
+    TransactionLog,
 )
-from app.utils.erp_code import infer_process_type, infer_symbol_slot, make_erp_code
+from app.services import integrity as integrity_svc
+
 from app.routers import (
     alerts,
     bom,
@@ -25,7 +33,6 @@ from app.routers import (
     inventory,
     items,
     loss,
-    models as models_router,
     production,
     queue,
     scrap,
@@ -34,54 +41,6 @@ from app.routers import (
     variance,
 )
 
-Base.metadata.create_all(bind=engine)
-
-
-def run_migrations() -> None:
-    """Add new columns to existing SQLite database without losing data."""
-    new_columns = [
-        "ALTER TABLE items ADD COLUMN barcode VARCHAR(100)",
-        "ALTER TABLE items ADD COLUMN legacy_file_type VARCHAR(50)",
-        "ALTER TABLE items ADD COLUMN legacy_part VARCHAR(50)",
-        "ALTER TABLE items ADD COLUMN legacy_item_type VARCHAR(50)",
-        "ALTER TABLE items ADD COLUMN legacy_model VARCHAR(50)",
-        "ALTER TABLE items ADD COLUMN supplier VARCHAR(200)",
-        "ALTER TABLE items ADD COLUMN min_stock NUMERIC(15,4)",
-        # M1: 4-part ERP code fields on items
-        "ALTER TABLE items ADD COLUMN erp_code VARCHAR(40)",
-        "ALTER TABLE items ADD COLUMN symbol_slot SMALLINT",
-        "ALTER TABLE items ADD COLUMN process_type_code VARCHAR(2)",
-        "ALTER TABLE items ADD COLUMN option_code VARCHAR(2)",
-        "ALTER TABLE items ADD COLUMN serial_no INTEGER",
-        # M1: Pending/reservation on inventory
-        "ALTER TABLE inventory ADD COLUMN pending_quantity NUMERIC(15,4) NOT NULL DEFAULT 0",
-        "ALTER TABLE inventory ADD COLUMN last_reserver_employee_id CHAR(36)",
-        "ALTER TABLE inventory ADD COLUMN last_reserver_name VARCHAR(100)",
-        # M1: Batch link on transaction log
-        "ALTER TABLE transaction_logs ADD COLUMN batch_id CHAR(36)",
-        # M8: 재고 이원화 — 창고 컬럼 (production/defective는 inventory_locations 테이블)
-        "ALTER TABLE inventory ADD COLUMN warehouse_qty NUMERIC(15,4) NOT NULL DEFAULT 0",
-    ]
-    with engine.connect() as conn:
-        for sql in new_columns:
-            try:
-                conn.execute(text(sql))
-                conn.commit()
-            except Exception:
-                pass  # column already exists
-
-        # 기존 quantity → warehouse_qty 1회 이관 (warehouse_qty가 0인 행만)
-        try:
-            conn.execute(text(
-                "UPDATE inventory SET warehouse_qty = quantity "
-                "WHERE warehouse_qty = 0 AND quantity > 0"
-            ))
-            conn.commit()
-        except Exception:
-            pass
-
-
-run_migrations()
 
 app = FastAPI(
     title="X-Ray ERP System",
@@ -99,7 +58,7 @@ app = FastAPI(
     | VA | Vacuum Ass'y | 진공 반제품 |
     | VF | Vacuum Final | 진공 완제품 |
     | BA | Body Ass'y | 조립 반제품 |
-    | AF | Assembly Final | 조립 완제품 |
+    | BF | Body Final | 조립 완제품 |
     | FG | Finished Good | 완제품 |
     | UK | Unknown | 미분류 또는 확인 필요 |
 
@@ -142,251 +101,61 @@ app.include_router(loss.router, prefix="/api/loss", tags=["Loss"])
 app.include_router(variance.router, prefix="/api/variance", tags=["Variance"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 app.include_router(counts.router, prefix="/api/counts", tags=["Counts"])
-app.include_router(models_router.router, prefix="/api/models", tags=["Models"])
-
-
-def ensure_reference_data() -> None:
-    db = SessionLocal()
-    try:
-        if db.query(Employee).count() == 0:
-            seed_rows = [
-                ("E04",  "김건호",   "조립/과장",    DepartmentEnum.ASSEMBLY,     EmployeeLevelEnum.MANAGER),
-                ("E01",  "김민재",   "조립/대리",    DepartmentEnum.ASSEMBLY,     EmployeeLevelEnum.STAFF),
-                ("E02",  "김종숙",   "조립/주임",    DepartmentEnum.ASSEMBLY,     EmployeeLevelEnum.STAFF),
-                ("E06",  "김현우",   "조립/사원",    DepartmentEnum.ASSEMBLY,     EmployeeLevelEnum.STAFF),
-                ("E05",  "남재원",   "조립/사원",    DepartmentEnum.ASSEMBLY,     EmployeeLevelEnum.STAFF),
-                ("E03",  "이계숙",   "조립/주임",    DepartmentEnum.ASSEMBLY,     EmployeeLevelEnum.STAFF),
-                ("E22",  "이필욱",   "조립/부장",    DepartmentEnum.ASSEMBLY,     EmployeeLevelEnum.MANAGER),
-                ("E07",  "이형진",   "조립/사원",    DepartmentEnum.ASSEMBLY,     EmployeeLevelEnum.STAFF),
-                ("E09",  "김재현",   "진공/사원",    DepartmentEnum.VACUUM,       EmployeeLevelEnum.STAFF),
-                ("E10",  "이지훈",   "진공/대리",    DepartmentEnum.VACUUM,       EmployeeLevelEnum.STAFF),
-                ("E08",  "허동현",   "진공/사원",    DepartmentEnum.VACUUM,       EmployeeLevelEnum.STAFF),
-                ("E11",  "김지현",   "고압/주임",    DepartmentEnum.HIGH_VOLTAGE, EmployeeLevelEnum.STAFF),
-                ("E12",  "민애경",   "고압/주임",    DepartmentEnum.HIGH_VOLTAGE, EmployeeLevelEnum.STAFF),
-                ("E13",  "오세현",   "튜닝/사원",    DepartmentEnum.TUNING,       EmployeeLevelEnum.STAFF),
-                ("E14",  "이지현",   "튜닝/사원",    DepartmentEnum.TUNING,       EmployeeLevelEnum.STAFF),
-                ("E15",  "김도영",   "튜브/주임",    DepartmentEnum.TUBE,         EmployeeLevelEnum.STAFF),
-                ("E21",  "문종현",   "AS/대리",      DepartmentEnum.AS,           EmployeeLevelEnum.STAFF),
-                ("E16",  "이성민",   "연구소/책임",  DepartmentEnum.RESEARCH,     EmployeeLevelEnum.MANAGER),
-                ("E17",  "오성식",   "연구소/주임",  DepartmentEnum.RESEARCH,     EmployeeLevelEnum.STAFF),
-                ("E18",  "류승범",   "기타/대표",    DepartmentEnum.ETC,          EmployeeLevelEnum.ADMIN),
-                ("E19",  "최윤영",   "기타/과장",    DepartmentEnum.ETC,          EmployeeLevelEnum.MANAGER),
-                ("E20",  "박성현",   "기타/부장",    DepartmentEnum.ETC,          EmployeeLevelEnum.MANAGER),
-                ("E23",  "양승규",   "영업/부장",    DepartmentEnum.SALES,        EmployeeLevelEnum.MANAGER),
-                ("E24",  "김예진",   "영업/대리",    DepartmentEnum.SALES,        EmployeeLevelEnum.STAFF),
-                ("E25",  "심이리나", "영업/과장",    DepartmentEnum.SALES,        EmployeeLevelEnum.MANAGER),
-                ("E26",  "드미트리", "영업/사원",    DepartmentEnum.SALES,        EmployeeLevelEnum.STAFF),
-            ]
-
-            for index, (code, name, role, department, level) in enumerate(seed_rows, start=1):
-                db.add(
-                    Employee(
-                        employee_code=code,
-                        name=name,
-                        role=role,
-                        department=department,
-                        level=level,
-                        display_order=index,
-                        is_active="true",
-                    )
-                )
-            db.commit()
-
-        # ------ Product symbols (100 slots, first 5 assigned) ------
-        if db.query(ProductSymbol).count() == 0:
-            assigned = [
-                (1, "3", "DX3000"),
-                (2, "7", "COCOON"),
-                (3, "8", "SOLO"),
-                (4, "4", "ADX4000W"),
-                (5, "6", "ADX6000FB"),
-            ]
-            for slot, symbol, model in assigned:
-                db.add(
-                    ProductSymbol(
-                        slot=slot,
-                        symbol=symbol,
-                        model_name=model,
-                        is_finished_good=True,
-                        is_reserved=False,
-                    )
-                )
-            for slot in range(6, 101):
-                db.add(ProductSymbol(slot=slot, symbol=None, model_name=None, is_reserved=True))
-            db.commit()
-
-        # ------ Option codes ------
-        if db.query(OptionCode).count() == 0:
-            options = [
-                ("BG", "블랙 유광", "Black Glossy", "#111111"),
-                ("WM", "화이트 무광", "White Matte", "#F7F7F7"),
-                ("SV", "실버", "Silver", "#C0C0C0"),
-            ]
-            for code, ko, en, color in options:
-                db.add(OptionCode(code=code, label_ko=ko, label_en=en, color_hex=color))
-            db.commit()
-
-        # ------ Process types (2-char) ------
-        if db.query(ProcessType).count() == 0:
-            types = [
-                ("TR", "T", "R", 10, "튜브 원자재"),
-                ("TA", "T", "A", 20, "튜브 조립체"),
-                ("TF", "T", "F", 22, "튜브 F타입"),
-                ("HR", "H", "R", 15, "고압 원자재"),
-                ("HA", "H", "A", 30, "고압 조립체"),
-                ("HF", "H", "F", 32, "고압 F타입"),
-                ("VR", "V", "R", 25, "진공 원자재"),
-                ("VA", "V", "A", 40, "진공 조립체"),
-                ("VF", "V", "F", 42, "진공 F타입"),
-                ("NR", "N", "R", 48, "튜닝 원자재"),
-                ("NA", "N", "A", 50, "튜닝 조립체 (출력값 최적화)"),
-                ("NF", "N", "F", 52, "튜닝 F타입"),
-                ("AR", "A", "R", 45, "조립 원자재"),
-                ("AA", "A", "A", 60, "최종 조립체"),
-                ("AF", "A", "F", 62, "조립 F타입"),
-                ("PR", "P", "R", 55, "포장 원자재"),
-                ("PA", "P", "A", 70, "완제품 (최종 패키징)"),
-                ("PF", "P", "F", 72, "출하 F타입"),
-            ]
-            for code, prefix, suffix, order, desc in types:
-                db.add(
-                    ProcessType(code=code, prefix=prefix, suffix=suffix, stage_order=order, description=desc)
-                )
-            db.commit()
-        else:
-            # F타입 추가 (기존 DB에 없을 경우 삽입)
-            f_types = [
-                ("TF", "T", "F", 22, "튜브 F타입"),
-                ("HF", "H", "F", 32, "고압 F타입"),
-                ("VF", "V", "F", 42, "진공 F타입"),
-                ("NR", "N", "R", 48, "튜닝 원자재"),
-                ("NF", "N", "F", 52, "튜닝 F타입"),
-                ("AF", "A", "F", 62, "조립 F타입"),
-                ("PF", "P", "F", 72, "출하 F타입"),
-            ]
-            for code, prefix, suffix, order, desc in f_types:
-                if not db.query(ProcessType).filter(ProcessType.code == code).first():
-                    db.add(ProcessType(code=code, prefix=prefix, suffix=suffix, stage_order=order, description=desc))
-            db.commit()
-
-        # ------ Process flow rules ------
-        if db.query(ProcessFlowRule).count() == 0:
-            flows = [
-                ("TR", "TA", None),           # TR -> TA
-                ("TA", "HA", "HR"),           # TA + HR -> HA
-                ("HA", "VA", "VR"),           # HA + VR -> VA
-                ("VA", "NA", None),           # VA -> NA
-                ("NA", "AA", "AR"),           # NA + AR -> AA
-                ("AA", "PA", "PR"),           # AA + PR -> PA
-            ]
-            for src, dst, consumes in flows:
-                db.add(ProcessFlowRule(from_type=src, to_type=dst, consumes_codes=consumes))
-            db.commit()
-
-        # ------ Backfill pending_quantity default for existing rows ------
-        db.execute(text("UPDATE inventory SET pending_quantity = 0 WHERE pending_quantity IS NULL"))
-        db.commit()
-    finally:
-        db.close()
-
-
-def populate_erp_codes() -> None:
-    """erp_code가 없는 품목에 ERP 4-part 코드를 자동 부여한다."""
-    db = SessionLocal()
-    try:
-        items_without_code = db.query(Item).filter(Item.erp_code.is_(None)).all()
-        if not items_without_code:
-            return
-
-        symbol_map: dict[int, str] = {
-            ps.slot: ps.symbol
-            for ps in db.query(ProductSymbol).all()
-            if ps.symbol
-        }
-
-        # 그룹별 현재 최대 serial_no 파악 (기존 데이터와 충돌 방지)
-        serial_counter: dict[tuple, int] = {}
-        for item in db.query(Item).filter(Item.serial_no.isnot(None)).all():
-            key = (item.symbol_slot, item.process_type_code)
-            serial_counter[key] = max(serial_counter.get(key, 0), item.serial_no or 0)
-
-        count = 0
-        for item in items_without_code:
-            pt = infer_process_type(item.category.value, item.legacy_part)
-            if pt is None:
-                continue
-
-            slot = infer_symbol_slot(item.legacy_model)
-            symbol = symbol_map.get(slot, "공") if slot else "공"
-            opt = "BG" if pt == "PA" else None
-
-            key = (slot, pt)
-            serial_counter[key] = serial_counter.get(key, 0) + 1
-            serial = serial_counter[key]
-
-            item.process_type_code = pt
-            item.symbol_slot = slot
-            item.serial_no = serial
-            item.option_code = opt
-            item.erp_code = make_erp_code(symbol, pt, serial, opt)
-            count += 1
-
-        db.commit()
-        if count:
-            print(f"[ERP] 코드 부여 완료: {count}개")
-    finally:
-        db.close()
-
-
-def migrate_f_type_erp_codes() -> None:
-    """TF/HF/VF/AF 카테고리 품목의 process_type_code를 고유 F타입 코드로 재부여한다."""
-    REMAP = {"TF": "TF", "HF": "HF", "VF": "VF", "AF": "AF"}
-    db = SessionLocal()
-    try:
-        symbol_map: dict[int, str] = {
-            ps.slot: ps.symbol
-            for ps in db.query(ProductSymbol).all()
-            if ps.symbol
-        }
-        serial_counter: dict[tuple, int] = {}
-        for item in db.query(Item).filter(Item.serial_no.isnot(None)).all():
-            key = (item.symbol_slot, item.process_type_code)
-            serial_counter[key] = max(serial_counter.get(key, 0), item.serial_no or 0)
-
-        count = 0
-        for cat_val, new_pt in REMAP.items():
-            f_items = (
-                db.query(Item)
-                .filter(Item.category == cat_val)
-                .filter(or_(Item.process_type_code != new_pt, Item.process_type_code.is_(None)))
-                .all()
-            )
-            for item in f_items:
-                slot = item.symbol_slot
-                symbol = symbol_map.get(slot, "공") if slot else "공"
-                key = (slot, new_pt)
-                serial_counter[key] = serial_counter.get(key, 0) + 1
-                serial = serial_counter[key]
-                item.process_type_code = new_pt
-                item.serial_no = serial
-                item.erp_code = make_erp_code(symbol, new_pt, serial, item.option_code)
-                count += 1
-
-        if count:
-            db.commit()
-            print(f"[ERP] F타입 코드 재부여: {count}개")
-    finally:
-        db.close()
-
-
-ensure_reference_data()
-populate_erp_codes()
-migrate_f_type_erp_codes()
 
 
 @app.get("/health", tags=["System"])
 def health_check():
     return {"status": "ok", "service": "X-Ray ERP API"}
+
+
+@app.get("/health/detailed", tags=["System"])
+def health_detailed(db: Session = Depends(get_db)):
+    """운영 점검용 상세 헬스. 프론트엔드는 /health 만 사용.
+
+    - DB ping
+    - 주요 테이블 row count
+    - inventory mismatch count (불변식 위반)
+    - open queue batch count
+    - 최근 transaction_log created_at
+    """
+    # 1) DB ping
+    db_ok = True
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        db_ok = False
+
+    # 2) Row counts
+    rows = {
+        "items": db.query(Item).count(),
+        "employees": db.query(Employee).count(),
+        "inventory": db.query(Inventory).count(),
+        "transaction_logs": db.query(TransactionLog).count(),
+        "queue_batches": db.query(QueueBatch).count(),
+    }
+
+    # 3) inventory mismatch — 가벼운 검사
+    mismatches = integrity_svc.check_inventory_consistency(db)
+    mismatch_count = len(mismatches)
+
+    # 4) open queue batches
+    open_batches = (
+        db.query(QueueBatch).filter(QueueBatch.status == QueueBatchStatusEnum.OPEN).count()
+    )
+
+    # 5) 최근 transaction log 시간
+    last_tx = (
+        db.query(func.max(TransactionLog.created_at)).scalar()
+    )
+
+    return {
+        "status": "ok" if db_ok and mismatch_count == 0 else "degraded",
+        "db": {"ok": db_ok},
+        "rows": rows,
+        "inventory_mismatch_count": mismatch_count,
+        "open_queue_batches": open_batches,
+        "last_transaction_at": last_tx.isoformat() if last_tx else None,
+    }
 
 
 @app.get("/", tags=["System"])

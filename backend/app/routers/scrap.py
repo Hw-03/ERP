@@ -62,9 +62,7 @@ def create_scrap(payload: ScrapLogCreateRequest, db: Session = Depends(get_db)):
             ),
         )
 
-    qty_before = inv.quantity or Decimal("0")
-    inv.warehouse_qty = wh - payload.quantity
-    inv_svc._sync_total(db, payload.item_id)
+    inv, qty_before = inv_svc.consume_warehouse(db, payload.item_id, payload.quantity)
 
     log = ScrapLog(
         item_id=payload.item_id,

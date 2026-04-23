@@ -66,9 +66,7 @@ def create_loss(
                     f"요청 {payload.quantity})."
                 ),
             )
-        qty_before = inv.quantity or Decimal("0")
-        inv.warehouse_qty = wh - payload.quantity
-        inv_svc._sync_total(db, payload.item_id)
+        inv, qty_before = inv_svc.consume_warehouse(db, payload.item_id, payload.quantity)
         qty_after = inv.quantity
 
     log = LossLog(

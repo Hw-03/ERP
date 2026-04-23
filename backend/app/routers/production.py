@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models import BOM, CategoryEnum, Inventory, Item, TransactionLog, TransactionTypeEnum
 from app.schemas import BackflushDetail, ProductionReceiptRequest, ProductionReceiptResponse
 from app.services import inventory as inventory_svc
+from app.services import stock_math
 from app.services.bom import explode_bom as _explode_bom_svc
 
 router = APIRouter()
@@ -77,18 +78,10 @@ def production_receipt(
 
     try:
         for comp_item_id, required_qty in merged.items():
-            inv = (
-                db.query(Inventory)
-                .filter(Inventory.item_id == comp_item_id)
-                .with_for_update()
-                .first()
-            )
-
             comp_item = db.query(Item).filter(Item.item_id == comp_item_id).first()
-            qty_before = inv.quantity or Decimal("0")
-            wh = inv.warehouse_qty or Decimal("0")
-            inv.warehouse_qty = wh - required_qty
-            inventory_svc._sync_total(db, comp_item_id)
+
+            # 재고 변경은 서비스 레이어로 위임 (창고 차감 + _sync_total 은 내부 책임)
+            inv, qty_before = inventory_svc.consume_warehouse(db, comp_item_id, required_qty)
 
             log = TransactionLog(
                 item_id=comp_item_id,
@@ -186,12 +179,24 @@ def check_production_feasibility(
     result = []
     all_ok = True
 
+    # bulk 로 전 품목 재고 수치 한 번에 확보 (N+1 제거)
+    comp_ids = list(merged.keys())
+    figures_map = stock_math.bulk_compute(db, comp_ids)
+    comps_map = {
+        c.item_id: c
+        for c in db.query(Item).filter(Item.item_id.in_(comp_ids)).all()
+    }
+
     for comp_item_id, required_qty in merged.items():
-        inv = db.query(Inventory).filter(Inventory.item_id == comp_item_id).first()
-        comp_item = db.query(Item).filter(Item.item_id == comp_item_id).first()
-        current_total = inv.quantity if inv else Decimal("0")
-        current_pending = (inv.pending_quantity if inv else None) or Decimal("0")
-        current_avail = current_total - current_pending
+        comp_item = comps_map.get(comp_item_id)
+        if comp_item is None:
+            continue
+        fig = figures_map.get(comp_item_id) or stock_math.StockFigures()
+        # Backflush 는 창고만 소비하므로 feasibility 도 warehouse_available (wh - pending) 기준.
+        # 이렇게 해야 production_receipt 의 실제 검사식과 일치.
+        current_total = fig.total
+        current_pending = fig.pending
+        current_avail = fig.warehouse_available
         ok = current_avail >= required_qty
         if not ok:
             all_ok = False
