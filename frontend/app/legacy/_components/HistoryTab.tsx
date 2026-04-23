@@ -51,8 +51,12 @@ function getPeriodStart(value: string) {
   return null;
 }
 
+function parseUtc(iso: string) {
+  return new Date(iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z");
+}
+
 function toDateKey(dateStr: string) {
-  const d = new Date(dateStr);
+  const d = parseUtc(dateStr);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
@@ -160,7 +164,7 @@ export function HistoryTab({ onClose }: { onClose: () => void }) {
     if (viewMode !== "calendar") return;
     setCalendarLoading(true);
     setSelectedDay(null);
-    api.getTransactions({ limit: 5000, skip: 0 }).then((nextLogs) => {
+    api.getTransactions({ limit: 2000, skip: 0 }).then((nextLogs) => {
       setCalendarLogs(nextLogs);
       setCalendarLoading(false);
     });
@@ -230,7 +234,7 @@ export function HistoryTab({ onClose }: { onClose: () => void }) {
   const calendarDayMap = useMemo(() => {
     const map = new Map<string, TransactionLog[]>();
     for (const log of calendarLogs) {
-      const d = new Date(log.created_at);
+      const d = parseUtc(log.created_at);
       if (d.getFullYear() !== calendarYear || d.getMonth() !== calendarMonth) continue;
       const key = toDateKey(log.created_at);
       if (!map.has(key)) map.set(key, []);

@@ -381,7 +381,7 @@ export function DesktopAdminView({
         {/* ── 섹션 메뉴 사이드바 ── */}
         <section className="card flex min-h-0 flex-col overflow-hidden">
           <div className="mb-3 shrink-0">
-            <div className="text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div className="text-xs font-bold uppercase tracking-[0.22em]" style={{ color: LEGACY_COLORS.muted2 }}>
               Admin Menu
             </div>
             <div className="mt-1 text-xl font-black">운영 관리</div>
@@ -405,7 +405,7 @@ export function DesktopAdminView({
                   </div>
                   <div className="min-w-0">
                     <div className="text-base font-bold truncate">{entry.label}</div>
-                    <div className="mt-0.5 text-[11px] leading-4 truncate" style={{ color: LEGACY_COLORS.muted2 }}>{entry.description}</div>
+                    <div className="mt-0.5 text-xs leading-4 truncate" style={{ color: LEGACY_COLORS.muted2 }}>{entry.description}</div>
                   </div>
                 </button>
               );
@@ -425,12 +425,12 @@ export function DesktopAdminView({
               </div>
               <div className="min-w-0">
                 <div className="text-base font-bold truncate">설정</div>
-                <div className="mt-0.5 text-[11px] leading-4 truncate" style={{ color: LEGACY_COLORS.muted2 }}>PIN, CSV, 초기화</div>
+                <div className="mt-0.5 text-xs leading-4 truncate" style={{ color: LEGACY_COLORS.muted2 }}>PIN, CSV, 초기화</div>
               </div>
             </button>
             <button
               onClick={() => setUnlocked(false)}
-              className="w-full rounded-[16px] border px-3 py-2.5 text-[11px] font-semibold transition-colors hover:bg-white/10"
+              className="w-full rounded-[16px] border px-3 py-2.5 text-xs font-semibold transition-colors hover:bg-white/10"
               style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
             >
               관리자 잠금
@@ -442,7 +442,7 @@ export function DesktopAdminView({
         <section className="card flex min-h-0 flex-col overflow-hidden">
           {/* 고정 헤더 */}
           <div className="mb-4 shrink-0">
-            <div className="text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div className="text-xs font-bold uppercase tracking-[0.22em]" style={{ color: LEGACY_COLORS.muted2 }}>
               Workspace
             </div>
             <div className="mt-1 text-2xl font-black">{activeSection?.label} 관리</div>
@@ -472,10 +472,10 @@ export function DesktopAdminView({
                       />
                     </div>
                     <div className="mt-2 flex items-center justify-between">
-                      <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{formatNumber(visibleItems.length)}건</span>
+                      <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{formatNumber(visibleItems.length)}건</span>
                       <button
                         onClick={() => { setAddMode(true); setSelectedItem(null); }}
-                        className="rounded-full px-3 py-1 text-[11px] font-bold"
+                        className="rounded-full px-3 py-1 text-xs font-bold"
                         style={{ background: "rgba(67,211,157,.18)", color: LEGACY_COLORS.green }}
                       >
                         + 품목 추가
@@ -517,7 +517,7 @@ export function DesktopAdminView({
                         { key: "min_stock", label: "안전재고", type: "number", placeholder: "0" },
                       ].map(({ key, label, type, placeholder }) => (
                         <div key={key}>
-                          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
+                          <div className="mb-2 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
                           <input
                             type={type}
                             min={type === "number" ? 0 : undefined}
@@ -530,7 +530,7 @@ export function DesktopAdminView({
                         </div>
                       ))}
                       <div>
-                        <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>카테고리 *</div>
+                        <div className="mb-2 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>카테고리 *</div>
                         <select
                           value={addForm.category}
                           onChange={(e) => setAddForm((f) => ({ ...f, category: e.target.value as Item["category"] }))}
@@ -541,7 +541,7 @@ export function DesktopAdminView({
                         </select>
                       </div>
                       <div>
-                        <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>단위</div>
+                        <div className="mb-2 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>단위</div>
                         <select
                           value={addForm.unit}
                           onChange={(e) => setAddForm((f) => ({ ...f, unit: e.target.value }))}
@@ -552,7 +552,7 @@ export function DesktopAdminView({
                         </select>
                       </div>
                       <div>
-                        <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                        <div className="mb-2 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
                           사용 제품 <span style={{ color: LEGACY_COLORS.muted2, fontWeight: 400 }}>(ERP 기호)</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -581,13 +581,13 @@ export function DesktopAdminView({
                           })}
                         </div>
                         {addForm.model_slots.length > 0 && (
-                          <div className="mt-1.5 text-[11px]" style={{ color: LEGACY_COLORS.purple }}>
+                          <div className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.purple }}>
                             ERP 기호: {MODEL_SLOTS.filter((m) => addForm.model_slots.includes(m.slot)).map((m) => m.symbol).sort().join("")}
                           </div>
                         )}
                       </div>
                       <div>
-                        <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>옵션/스펙 코드</div>
+                        <div className="mb-2 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>옵션/스펙 코드</div>
                         <input
                           type="text"
                           value={addForm.option_code}
@@ -598,7 +598,7 @@ export function DesktopAdminView({
                           style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
                         />
                       </div>
-                      <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>품번은 카테고리 기반으로 자동 부여됩니다. (예: RM-00972)</div>
+                      <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>품번은 카테고리 기반으로 자동 부여됩니다. (예: RM-00972)</div>
                       <button
                         onClick={() => void addItem()}
                         className="w-full rounded-[18px] py-3 text-base font-bold text-white"
@@ -612,10 +612,10 @@ export function DesktopAdminView({
                       <div className="mb-2 text-base font-bold">{selectedItem.item_name}</div>
                       {selectedItem.erp_code && (
                         <div className="rounded-[14px] border px-4 py-3" style={{ background: "rgba(142,125,255,.08)", borderColor: LEGACY_COLORS.purple }}>
-                          <div className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.purple }}>ERP 코드</div>
+                          <div className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.purple }}>ERP 코드</div>
                           <div className="mt-1 font-mono text-base font-bold" style={{ color: LEGACY_COLORS.text }}>{selectedItem.erp_code}</div>
                           {selectedItem.model_slots.length > 0 && (
-                            <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                            <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                               {MODEL_SLOTS.filter((m) => selectedItem.model_slots.includes(m.slot)).map((m) => m.label).join(" · ")}
                             </div>
                           )}
@@ -629,7 +629,7 @@ export function DesktopAdminView({
                         ["supplier", selectedItem.supplier || "", "공급처"],
                       ] as [keyof Pick<Item, "item_name" | "spec" | "barcode" | "legacy_model" | "supplier">, string, string][]).map(([field, value, label]) => (
                         <div key={field}>
-                          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
+                          <div className="mb-2 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
                           <input
                             defaultValue={value}
                             onBlur={(event) => void saveItemField(field, event.target.value)}
@@ -679,7 +679,7 @@ export function DesktopAdminView({
                           </div>
                         </div>
                         <span
-                          className="inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold"
+                          className="inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-bold"
                           style={{
                             background: employee.is_active ? "rgba(67,211,157,.16)" : "rgba(255,123,123,.14)",
                             color: employee.is_active ? LEGACY_COLORS.green : LEGACY_COLORS.red,
@@ -706,7 +706,7 @@ export function DesktopAdminView({
                         { key: "phone", label: "연락처", placeholder: "예: 010-0000-0000" },
                       ] as { key: keyof typeof empAddForm; label: string; placeholder: string }[]).map(({ key, label, placeholder }) => (
                         <div key={key}>
-                          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
+                          <div className="mb-2 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
                           <input
                             type="text"
                             value={empAddForm[key]}
@@ -718,7 +718,7 @@ export function DesktopAdminView({
                         </div>
                       ))}
                       <div>
-                        <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>부서</div>
+                        <div className="mb-2 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>부서</div>
                         <select
                           value={empAddForm.department}
                           onChange={(e) => setEmpAddForm((f) => ({ ...f, department: e.target.value }))}
@@ -766,8 +766,8 @@ export function DesktopAdminView({
                 {/* 좌측: 상위 품목 선택 */}
                 <div className="flex min-h-0 flex-col overflow-hidden rounded-[28px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
                   <div className="shrink-0 border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-                    <div className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>상위 품목 선택</div>
-                    <div className="mt-1 text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>RM 제외 · {bomParentItems.length}건 표시</div>
+                    <div className="text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>상위 품목 선택</div>
+                    <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>RM 제외 · {bomParentItems.length}건 표시</div>
                   </div>
                   <div className="shrink-0 px-3 pt-3">
                     <input
@@ -782,7 +782,7 @@ export function DesktopAdminView({
                         <button
                           key={cat}
                           onClick={() => setBomParentCat(cat)}
-                          className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                          className="rounded-full px-2 py-0.5 text-xs font-bold"
                           style={{
                             background: bomParentCat === cat ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
                             color: bomParentCat === cat ? "#fff" : LEGACY_COLORS.muted2,
@@ -806,10 +806,10 @@ export function DesktopAdminView({
                         }}
                       >
                         <div className="flex items-center gap-2">
-                          <span className="shrink-0 rounded px-1 py-0.5 font-mono text-[9px] font-bold" style={{ background: "rgba(79,142,247,.12)", color: LEGACY_COLORS.blue }}>{item.category}</span>
+                          <span className="shrink-0 rounded px-1 py-0.5 font-mono text-xs font-bold" style={{ background: "rgba(79,142,247,.12)", color: LEGACY_COLORS.blue }}>{item.category}</span>
                           <div className="truncate text-sm font-medium" style={{ color: parentId === item.item_id ? LEGACY_COLORS.blue : LEGACY_COLORS.text }}>{item.item_name}</div>
                         </div>
-                        <div className="mt-0.5 font-mono text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
+                        <div className="mt-0.5 font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
                       </button>
                     ))}
                     {bomParentItems.length === 0 && (
@@ -829,16 +829,16 @@ export function DesktopAdminView({
                       <>
                         <div className="flex items-center justify-between border-b px-5 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
                           <div>
-                            <span className="mr-2 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold" style={{ background: "rgba(79,142,247,.12)", color: LEGACY_COLORS.blue }}>
+                            <span className="mr-2 rounded px-1.5 py-0.5 font-mono text-xs font-bold" style={{ background: "rgba(79,142,247,.12)", color: LEGACY_COLORS.blue }}>
                               {items.find((i) => i.item_id === parentId)?.category}
                             </span>
                             <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>{items.find((i) => i.item_id === parentId)?.item_name ?? "-"}</span>
-                            <span className="ml-2 font-mono text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{items.find((i) => i.item_id === parentId)?.erp_code}</span>
+                            <span className="ml-2 font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{items.find((i) => i.item_id === parentId)?.erp_code}</span>
                           </div>
                           <span className="text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>하위 {bomRows.length}개</span>
                         </div>
                         <div className="px-4 pb-3 pt-3">
-                          <div className="text-[10px] font-bold uppercase tracking-[0.15em] mb-2" style={{ color: LEGACY_COLORS.muted2 }}>하위 품목 추가</div>
+                          <div className="text-xs font-bold uppercase tracking-[0.15em] mb-2" style={{ color: LEGACY_COLORS.muted2 }}>하위 품목 추가</div>
                           <div className="flex items-center gap-2 mb-2">
                             <input
                               value={bomChildSearch}
@@ -852,7 +852,7 @@ export function DesktopAdminView({
                                 <button
                                   key={cat}
                                   onClick={() => setBomChildCat(cat)}
-                                  className="rounded-full px-2 py-1 text-[10px] font-bold"
+                                  className="rounded-full px-2 py-1 text-xs font-bold"
                                   style={{
                                     background: bomChildCat === cat ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
                                     color: bomChildCat === cat ? "#fff" : LEGACY_COLORS.muted2,
@@ -879,12 +879,12 @@ export function DesktopAdminView({
                                       opacity: item.alreadyIn ? 0.45 : 1,
                                     }}
                                   >
-                                    <span className="shrink-0 rounded px-1 py-0.5 font-mono text-[9px] font-bold" style={{ background: "rgba(79,142,247,.10)", color: LEGACY_COLORS.blue }}>{item.category}</span>
+                                    <span className="shrink-0 rounded px-1 py-0.5 font-mono text-xs font-bold" style={{ background: "rgba(79,142,247,.10)", color: LEGACY_COLORS.blue }}>{item.category}</span>
                                     <div className="min-w-0 flex-1">
                                       <div className="truncate text-sm" style={{ color: LEGACY_COLORS.text }}>{item.item_name}</div>
-                                      <div className="font-mono text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
+                                      <div className="font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
                                     </div>
-                                    {item.alreadyIn && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ background: "rgba(31,209,122,.15)", color: LEGACY_COLORS.green }}>추가됨</span>}
+                                    {item.alreadyIn && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-xs font-bold" style={{ background: "rgba(31,209,122,.15)", color: LEGACY_COLORS.green }}>추가됨</span>}
                                   </button>
                                   {pendingChildId === item.item_id && (
                                     <div className="flex items-center gap-2 bg-blue-500/5 px-3 py-2">
@@ -930,14 +930,14 @@ export function DesktopAdminView({
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
                     {parentId ? (
                       <>
-                        <div className="shrink-0 border-b px-5 py-3 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                        <div className="shrink-0 border-b px-5 py-3 text-xs font-bold uppercase tracking-[0.18em]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                           구성 자재 목록
                         </div>
                         {bomRows.length === 0 ? (
                           <div className="p-5 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>등록된 BOM 항목이 없습니다.</div>
                         ) : (
                           <div className="min-h-0 overflow-y-auto">
-                            <div className="grid items-center border-b px-5 py-2 text-[10px] font-bold uppercase tracking-[0.15em]"
+                            <div className="grid items-center border-b px-5 py-2 text-xs font-bold uppercase tracking-[0.15em]"
                               style={{ gridTemplateColumns: "36px 1fr 120px 100px 80px 80px 40px", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                               <span>구분</span>
                               <span>자재명</span>
@@ -957,11 +957,11 @@ export function DesktopAdminView({
                                   className="grid items-center px-5 py-3"
                                   style={{ gridTemplateColumns: "36px 1fr 120px 100px 80px 80px 40px", borderBottom: index === bomRows.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}` }}
                                 >
-                                  <span className="rounded px-1 py-0.5 font-mono text-[9px] font-bold w-fit" style={{ background: "rgba(79,142,247,.10)", color: LEGACY_COLORS.blue }}>{childItem?.category}</span>
+                                  <span className="rounded px-1 py-0.5 font-mono text-xs font-bold w-fit" style={{ background: "rgba(79,142,247,.10)", color: LEGACY_COLORS.blue }}>{childItem?.category}</span>
                                   <div>
                                     <div className="truncate text-sm font-medium" style={{ color: LEGACY_COLORS.text }}>{childItem?.item_name || row.child_item_id}</div>
                                   </div>
-                                  <div className="text-right font-mono text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{childItem?.erp_code ?? "-"}</div>
+                                  <div className="text-right font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{childItem?.erp_code ?? "-"}</div>
                                   <div className="flex items-center justify-end gap-1">
                                     {editingBomId === row.bom_id ? (
                                       <input
@@ -984,7 +984,7 @@ export function DesktopAdminView({
                                         ×{formatNumber(row.quantity)}
                                       </span>
                                     )}
-                                    <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{row.unit}</span>
+                                    <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{row.unit}</span>
                                   </div>
                                   <div className="text-right font-mono text-sm" style={{ color: stock > 0 ? LEGACY_COLORS.text : LEGACY_COLORS.red }}>{formatNumber(stock)}</div>
                                   <div className="text-right font-mono text-sm font-bold" style={{ color: capacity > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}>{formatNumber(capacity)}</div>
@@ -1006,14 +1006,14 @@ export function DesktopAdminView({
                     ) : (
                       <>
                         <div className="flex shrink-0 items-center justify-between border-b px-5 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-                          <span className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>전체 BOM 현황</span>
+                          <span className="text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>전체 BOM 현황</span>
                           <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{allBomRows.length}개 관계</span>
                         </div>
                         {allBomRows.length === 0 ? (
                           <div className="p-5 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>등록된 BOM이 없습니다.</div>
                         ) : (
                           <div className="min-h-0 overflow-y-auto">
-                            <div className="grid grid-cols-[80px_1fr_1fr_80px] border-b px-5 py-2 text-[10px] font-bold uppercase tracking-[0.15em]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                            <div className="grid grid-cols-[80px_1fr_1fr_80px] border-b px-5 py-2 text-xs font-bold uppercase tracking-[0.15em]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                               <span>구분</span>
                               <span>상위 품목</span>
                               <span>하위 품목</span>
@@ -1026,20 +1026,20 @@ export function DesktopAdminView({
                                 style={{ borderBottom: index === allBomRows.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}` }}
                               >
                                 <div className="flex gap-1">
-                                  <span className="rounded px-1 py-0.5 font-mono text-[9px] font-bold" style={{ background: "rgba(79,142,247,.10)", color: LEGACY_COLORS.blue }}>
+                                  <span className="rounded px-1 py-0.5 font-mono text-xs font-bold" style={{ background: "rgba(79,142,247,.10)", color: LEGACY_COLORS.blue }}>
                                     {row.parent_erp_code?.split("-")[1] ?? "?"}
                                   </span>
                                 </div>
                                 <div>
                                   <div className="truncate text-sm">{row.parent_item_name}</div>
-                                  <div className="font-mono text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{row.parent_erp_code}</div>
+                                  <div className="font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{row.parent_erp_code}</div>
                                 </div>
                                 <div>
                                   <div className="truncate text-sm">{row.child_item_name}</div>
-                                  <div className="font-mono text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{row.child_erp_code}</div>
+                                  <div className="font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{row.child_erp_code}</div>
                                 </div>
                                 <div className="text-right font-mono text-sm" style={{ color: LEGACY_COLORS.text }}>
-                                  ×{formatNumber(row.quantity)}<span className="ml-0.5 text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{row.unit}</span>
+                                  ×{formatNumber(row.quantity)}<span className="ml-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{row.unit}</span>
                                 </div>
                               </div>
                             ))}
@@ -1082,7 +1082,7 @@ export function DesktopAdminView({
                           className="min-w-0 flex-1 text-left"
                         >
                           <div className="truncate text-sm font-semibold">{pkg.name}</div>
-                          <div className="mt-0.5 font-mono text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{pkg.package_code} · {pkg.items.length}종</div>
+                          <div className="mt-0.5 font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{pkg.package_code} · {pkg.items.length}종</div>
                         </button>
                         <button
                           onClick={() => { if (window.confirm(`'${pkg.name}' 묶음을 삭제할까요?`)) void deletePackage(pkg.package_id); }}
@@ -1126,7 +1126,7 @@ export function DesktopAdminView({
                             </div>
                             <button
                               onClick={() => { setPkgNameDraft(selectedPackage.name); setPkgRenaming(true); }}
-                              className="rounded-[14px] border px-3 py-1.5 text-[11px] font-bold transition-colors hover:bg-white/10"
+                              className="rounded-[14px] border px-3 py-1.5 text-xs font-bold transition-colors hover:bg-white/10"
                               style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
                             >
                               이름 변경
@@ -1137,7 +1137,7 @@ export function DesktopAdminView({
 
                       {/* 현재 구성 품목 */}
                       <div className="rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                        <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>구성 품목 ({selectedPackage.items.length}종)</div>
+                        <div className="mb-3 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>구성 품목 ({selectedPackage.items.length}종)</div>
                         {selectedPackage.items.length === 0 ? (
                           <div className="py-3 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>아직 품목이 없습니다.</div>
                         ) : (
@@ -1146,7 +1146,7 @@ export function DesktopAdminView({
                               <div key={item.package_item_id} className="flex items-center gap-3 rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
                                 <div className="min-w-0 flex-1">
                                   <div className="truncate text-sm font-semibold">{item.item_name}</div>
-                                  <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{formatNumber(item.quantity)} {item.item_unit}</div>
+                                  <div className="mt-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{formatNumber(item.quantity)} {item.item_unit}</div>
                                 </div>
                                 <button
                                   onClick={() => void removePackageItem(item.package_item_id)}
@@ -1162,7 +1162,7 @@ export function DesktopAdminView({
 
                       {/* 품목 추가 */}
                       <div className="rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                        <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>품목 추가</div>
+                        <div className="mb-3 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>품목 추가</div>
                         <div className="mb-2 flex flex-wrap gap-1.5">
                           {PKG_CATEGORY_OPTIONS.map((opt) => (
                             <button
@@ -1204,7 +1204,7 @@ export function DesktopAdminView({
                               />
                               <button
                                 onClick={() => void addPackageItem(item.item_id)}
-                                className="shrink-0 rounded-[10px] px-3 py-1.5 text-[11px] font-bold text-white"
+                                className="shrink-0 rounded-[10px] px-3 py-1.5 text-xs font-bold text-white"
                                 style={{ background: LEGACY_COLORS.blue }}
                               >
                                 추가
@@ -1234,7 +1234,7 @@ export function DesktopAdminView({
                     </div>
                     <div className="space-y-2">
                       <div>
-                        <label className="mb-1 block text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>모델명 *</label>
+                        <label className="mb-1 block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>모델명 *</label>
                         <input
                           value={modelAddName}
                           onChange={(e) => setModelAddName(e.target.value)}
@@ -1244,7 +1244,7 @@ export function DesktopAdminView({
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>기호 (1자, 선택)</label>
+                        <label className="mb-1 block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>기호 (1자, 선택)</label>
                         <input
                           value={modelAddSymbol}
                           onChange={(e) => setModelAddSymbol(e.target.value.slice(0, 5))}
@@ -1280,7 +1280,7 @@ export function DesktopAdminView({
                       <div className="flex items-center gap-2 text-base font-bold">
                         <Layers className="h-4 w-4" /> 등록된 모델
                       </div>
-                      <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{productModels.length}개</span>
+                      <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{productModels.length}개</span>
                     </div>
                     {productModels.length === 0 ? (
                       <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>등록된 모델이 없습니다.</div>
@@ -1301,7 +1301,7 @@ export function DesktopAdminView({
                               </div>
                               <div>
                                 <div className="text-base font-bold">{model.model_name}</div>
-                                <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>슬롯 {model.slot} · 기호 {model.symbol}</div>
+                                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>슬롯 {model.slot} · 기호 {model.symbol}</div>
                               </div>
                             </div>
                             <button
@@ -1420,7 +1420,7 @@ export function DesktopAdminView({
             {section === "settings" && "설정 섹션에서는 관리자 PIN 변경, 초기화를 관리합니다."}
           </div>
           <div className="rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-            <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div className="mb-3 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
               현재 상태
             </div>
             <div className="space-y-2 text-base">

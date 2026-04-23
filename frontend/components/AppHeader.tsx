@@ -24,7 +24,7 @@ export default function AppHeader() {
             <Factory className="h-5 w-5 text-white" />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
               Precision Manufacturing ERP
             </p>
             <h1 className="text-lg font-semibold text-slate-100">X-Ray 제조 ERP</h1>

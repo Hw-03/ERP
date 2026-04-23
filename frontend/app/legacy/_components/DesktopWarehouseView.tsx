@@ -401,7 +401,7 @@ export function DesktopWarehouseView({
                         { label: "코드", nowrap: true },
                         { label: "구성 품목", nowrap: true },
                       ] as { label: string; nowrap: boolean }[]).map(({ label, nowrap }) => (
-                        <th key={label} className={`border-b px-4 py-3 text-left text-[11px] font-bold${nowrap ? " whitespace-nowrap" : ""}`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                        <th key={label} className={`border-b px-4 py-3 text-left text-xs font-bold${nowrap ? " whitespace-nowrap" : ""}`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                           {label}
                         </th>
                       ))}
@@ -418,7 +418,7 @@ export function DesktopWarehouseView({
                           style={{ background: active ? "rgba(142,125,255,.08)" : "transparent" }}
                         >
                           <td className="border-b px-4 py-3 font-semibold" style={{ borderColor: LEGACY_COLORS.border }}>{pkg.name}</td>
-                          <td className="border-b px-4 py-3 whitespace-nowrap font-mono text-[12px]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>{pkg.package_code}</td>
+                          <td className="border-b px-4 py-3 whitespace-nowrap font-mono text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>{pkg.package_code}</td>
                           <td className="border-b px-4 py-3 whitespace-nowrap font-mono" style={{ borderColor: LEGACY_COLORS.border }}>{formatNumber(pkg.items.length)}종</td>
                         </tr>
                       );
@@ -429,9 +429,9 @@ export function DesktopWarehouseView({
                 <table className="min-w-full border-separate border-spacing-0 text-sm">
                   <thead className="sticky top-0 z-10">
                     <tr style={{ background: LEGACY_COLORS.s2 }}>
-                      <th className="border-b px-4 py-3 text-left text-[11px] font-bold whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue, width: "72px" }}>
+                      <th className="border-b px-4 py-3 text-left text-xs font-bold whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue, width: "72px" }}>
                         {selectedItems.size > 0 ? (
-                          <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-black" style={{ background: "rgba(101,169,255,.18)", color: LEGACY_COLORS.blue }}>
+                          <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-black" style={{ background: "rgba(101,169,255,.18)", color: LEGACY_COLORS.blue }}>
                             선택 {selectedItems.size}건
                           </span>
                         ) : "선택"}
@@ -444,7 +444,7 @@ export function DesktopWarehouseView({
                         { label: "현재고", nowrap: true, width: "72px" },
                         { label: "안전재고", nowrap: true, width: "72px" },
                       ] as { label: string; nowrap: boolean; width?: string; minWidth?: string }[]).map(({ label, nowrap, width, minWidth }) => (
-                        <th key={label} className={`border-b px-4 py-3 text-left text-[11px] font-bold${nowrap ? " whitespace-nowrap" : ""}`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth }}>
+                        <th key={label} className={`border-b px-4 py-3 text-left text-xs font-bold${nowrap ? " whitespace-nowrap" : ""}`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth }}>
                           {label}
                         </th>
                       ))}
@@ -478,13 +478,13 @@ export function DesktopWarehouseView({
                             </div>
                           </td>
                           <td className="border-b px-4 py-3 align-middle whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>
-                            <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ color: stock.color, background: `${stock.color}20` }}>
+                            <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold" style={{ color: stock.color, background: `${stock.color}20` }}>
                               {stock.label}
                             </span>
                           </td>
                           <td className="border-b px-4 py-3 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
                             <div className="font-semibold">{item.item_name}</div>
-                            <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{item.spec || "-"}</div>
+                            <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{item.spec || "-"}</div>
                             {(() => {
                               const total = Math.max(Number(item.quantity), 1);
                               const wh = Number(item.warehouse_qty);
@@ -515,28 +515,28 @@ export function DesktopWarehouseView({
                               );
                             })()}
                           </td>
-                          <td className="border-b px-4 py-3 align-middle whitespace-nowrap font-mono text-[12px] font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
+                          <td className="border-b px-4 py-3 align-middle whitespace-nowrap font-mono text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
                             {item.erp_code ?? "-"}
                           </td>
                           <td className="border-b px-4 py-3 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
                             <div className="flex flex-wrap gap-1">
                               {Number(item.warehouse_qty) > 0 && (
-                                <span className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ color: "#3ac4b0" }}>창고</span>
+                                <span className="inline-flex rounded-full px-1.5 py-0.5 text-xs font-bold" style={{ color: "#3ac4b0" }}>창고</span>
                               )}
                               {(item.locations ?? []).filter((l) => Number(l.quantity) > 0).map((l) => (
-                                <span key={l.department} className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ color: employeeColor(l.department) }}>
+                                <span key={l.department} className="inline-flex rounded-full px-1.5 py-0.5 text-xs font-bold" style={{ color: employeeColor(l.department) }}>
                                   {l.department}
                                 </span>
                               ))}
                             </div>
                           </td>
                           <td
-                            className="border-b px-4 py-3 text-right align-middle whitespace-nowrap font-mono text-[13px] font-bold"
+                            className="border-b px-4 py-3 text-right align-middle whitespace-nowrap font-mono text-sm font-bold"
                             style={{ borderColor: LEGACY_COLORS.border, color: Number(item.quantity) > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red }}
                           >
                             {formatNumber(item.quantity)}
                           </td>
-                          <td className="border-b px-4 py-3 text-right align-middle whitespace-nowrap font-mono text-[13px]" style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className="border-b px-4 py-3 text-right align-middle whitespace-nowrap font-mono text-sm" style={{ borderColor: LEGACY_COLORS.border }}>
                             {item.min_stock == null ? "-" : formatNumber(item.min_stock)}
                           </td>
                         </tr>
@@ -570,7 +570,7 @@ export function DesktopWarehouseView({
         <div className="space-y-4">
           {/* 작업 유형 */}
           <section className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-            <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div className="mb-3 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
               작업 유형
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -619,7 +619,7 @@ export function DesktopWarehouseView({
               || workType === "defective-register"
               || workType === "supplier-return") && (
               <div className="mt-3">
-                <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                <div className="mb-2 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
                   {workType === "supplier-return"
                     ? "반품할 부서 (불량 보관 위치)"
                     : workType === "defective-register"
@@ -651,7 +651,7 @@ export function DesktopWarehouseView({
             {/* 불량 source 토글 */}
             {workType === "defective-register" && (
               <div className="mt-3">
-                <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                <div className="mb-2 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
                   불량 발견 위치
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -680,7 +680,7 @@ export function DesktopWarehouseView({
 
           {/* 담당 직원 */}
           <section className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-            <div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
               <UserRound className="h-3.5 w-3.5" />
               담당 직원
             </div>
@@ -696,7 +696,7 @@ export function DesktopWarehouseView({
                     >
                       {firstEmployeeLetter(emp.name)}
                     </span>
-                    <span className="text-[11px] font-semibold" style={{ color: active ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}>
+                    <span className="text-xs font-semibold" style={{ color: active ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}>
                       {emp.name}
                     </span>
                   </button>
@@ -708,7 +708,7 @@ export function DesktopWarehouseView({
           {/* 선택 품목 + 수량 스테퍼 */}
           {workType !== "package-out" && (
             <section className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-              <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="mb-3 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
                 선택 품목 및 수량
               </div>
               {selectedEntries.length === 0 ? (
@@ -755,7 +755,7 @@ export function DesktopWarehouseView({
           {/* 패키지 출고: 참조번호/메모만 */}
           {workType === "package-out" && (
             <section className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-              <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="mb-3 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
                 메모
               </div>
               <input
@@ -797,7 +797,7 @@ export function DesktopWarehouseView({
           {/* 선택 품목 최근 이력 */}
           {itemLogs.length > 0 && (
             <section className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-              <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="mb-3 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
                 최근 이력
               </div>
               <div className="space-y-2">
@@ -809,7 +809,7 @@ export function DesktopWarehouseView({
                       </span>
                       <span className="font-mono text-sm">{formatNumber(log.quantity_change)}</span>
                     </div>
-                    <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                    <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                       {log.notes || "메모 없음"}
                     </div>
                   </div>

@@ -171,13 +171,8 @@ export function DesktopHistoryView() {
     if (viewMode !== "calendar") return;
     setCalendarLoading(true);
     setSelectedDay(null);
-    void api.getTransactions({ limit: 5000, skip: 0 }).then((data) => {
+    void api.getTransactions({ limit: 2000, skip: 0 }).then((data) => {
       setCalendarLogs(data);
-      if (data.length > 0) {
-        const d = parseUtc(data[0].created_at);
-        setCalendarYear(d.getFullYear());
-        setCalendarMonth(d.getMonth());
-      }
       setCalendarLoading(false);
     }).catch(() => setCalendarLoading(false));
   }, [viewMode]);
@@ -299,45 +294,45 @@ export function DesktopHistoryView() {
                 className="flex flex-col gap-1 rounded-[20px] border p-4"
                 style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
               >
-                <div className="text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>전체 건수</div>
+                <div className="text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>전체 건수</div>
                 <div className="font-mono text-2xl font-black">{formatNumber(stats.total)}</div>
-                <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>필터 기준</div>
+                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>필터 기준</div>
               </div>
 
               <div
                 className="flex flex-col gap-1 rounded-[20px] border p-4"
                 style={{ background: "rgba(67,211,157,.06)", borderColor: "rgba(67,211,157,.22)" }}
               >
-                <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.green }}>
+                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.green }}>
                   <TrendingUp className="h-3.5 w-3.5" />
                   입고 합계
                 </div>
                 <div className="font-mono text-2xl font-black" style={{ color: LEGACY_COLORS.green }}>+{formatNumber(stats.receiveSum)}</div>
-                <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>RECEIVE · PRODUCE</div>
+                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>RECEIVE · PRODUCE</div>
               </div>
 
               <div
                 className="flex flex-col gap-1 rounded-[20px] border p-4"
                 style={{ background: "rgba(255,123,123,.06)", borderColor: "rgba(255,123,123,.22)" }}
               >
-                <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.red }}>
+                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.red }}>
                   <TrendingDown className="h-3.5 w-3.5" />
                   출고 합계
                 </div>
                 <div className="font-mono text-2xl font-black" style={{ color: LEGACY_COLORS.red }}>-{formatNumber(stats.shipSum)}</div>
-                <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>SHIP · BACKFLUSH</div>
+                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>SHIP · BACKFLUSH</div>
               </div>
 
               <div
                 className="flex flex-col gap-1 rounded-[20px] border p-4"
                 style={{ background: "rgba(101,169,255,.06)", borderColor: "rgba(101,169,255,.22)" }}
               >
-                <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.blue }}>
+                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.blue }}>
                   <Calendar className="h-3.5 w-3.5" />
                   오늘 건수
                 </div>
                 <div className="font-mono text-2xl font-black" style={{ color: LEGACY_COLORS.blue }}>{formatNumber(stats.todayCount)}</div>
-                <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>금일 거래</div>
+                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>금일 거래</div>
               </div>
             </div>
           </section>
@@ -384,7 +379,7 @@ export function DesktopHistoryView() {
 
               {/* 유형 필터 */}
               <div className="flex flex-wrap items-center gap-2">
-                <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>유형</span>
+                <span className="shrink-0 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>유형</span>
                 {TYPE_OPTIONS.map((opt) => (
                   <Chip key={opt.value} active={typeFilter === opt.value} label={opt.label} onClick={() => setTypeFilter(opt.value)} />
                 ))}
@@ -392,7 +387,7 @@ export function DesktopHistoryView() {
 
               {/* 기간 필터 */}
               <div className="flex flex-wrap items-center gap-2">
-                <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>기간</span>
+                <span className="shrink-0 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>기간</span>
                 {DATE_OPTIONS.map((opt) => (
                   <Chip key={opt.value} active={dateFilter === opt.value} label={opt.label} onClick={() => setDateFilter(opt.value)} tone={LEGACY_COLORS.purple} />
                 ))}
@@ -421,7 +416,7 @@ export function DesktopHistoryView() {
                   {/* 요일 헤더 */}
                   <div className="mb-1 grid grid-cols-7">
                     {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
-                      <div key={d} className="py-1 text-center text-[11px] font-bold"
+                      <div key={d} className="py-1 text-center text-xs font-bold"
                         style={{ color: i === 0 ? "#f25f5c" : i === 6 ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}>
                         {d}
                       </div>
@@ -454,7 +449,7 @@ export function DesktopHistoryView() {
                         >
                           <span className="text-sm font-bold" style={{ color: isToday ? LEGACY_COLORS.blue : LEGACY_COLORS.text }}>{day}</span>
                           {dayLogs.length > 0 && (
-                            <span className="mt-1 rounded-full px-1.5 py-0.5 font-mono text-[10px] font-bold" style={{ background: "rgba(101,169,255,.2)", color: LEGACY_COLORS.blue }}>
+                            <span className="mt-1 rounded-full px-1.5 py-0.5 font-mono text-xs font-bold" style={{ background: "rgba(101,169,255,.2)", color: LEGACY_COLORS.blue }}>
                               {dayLogs.length}
                             </span>
                           )}
@@ -488,14 +483,14 @@ export function DesktopHistoryView() {
                                   borderColor: selected?.log_id === log.log_id ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
                                 }}
                               >
-                                <span className="inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: `${tcolor}22`, color: tcolor }}>
+                                <span className="inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: `${tcolor}22`, color: tcolor }}>
                                   {transactionLabel(log.transaction_type)}
                                 </span>
                                 <span className="min-w-0 flex-1 truncate text-sm">{log.item_name}</span>
                                 <span className="shrink-0 font-mono text-sm font-bold" style={{ color: tcolor }}>
                                   {Number(log.quantity_change) >= 0 ? "+" : ""}{formatNumber(log.quantity_change)}
                                 </span>
-                                <span className="shrink-0 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{formatDate(log.created_at).split(" ")[1]}</span>
+                                <span className="shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{formatDate(log.created_at).split(" ")[1]}</span>
                               </button>
                             );
                           })}
@@ -518,7 +513,7 @@ export function DesktopHistoryView() {
               <div className="shrink-0 text-base font-bold">입출고 내역</div>
               <span className="font-mono text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{filteredLogs.length}건</span>
               {filteredLogs.length > 0 && (
-                <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                   {formatDate(filteredLogs[filteredLogs.length - 1].created_at)} ~ {formatDate(filteredLogs[0].created_at)}
                 </span>
               )}
@@ -547,7 +542,7 @@ export function DesktopHistoryView() {
                       ] as { label: string; width?: string; minWidth?: string }[]).map(({ label, width, minWidth }) => (
                         <th
                           key={label}
-                          className="whitespace-nowrap border-b px-4 py-3 text-left text-[11px] font-bold"
+                          className="whitespace-nowrap border-b px-4 py-3 text-left text-xs font-bold"
                           style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth }}
                         >
                           {label}
@@ -571,14 +566,14 @@ export function DesktopHistoryView() {
                           }}
                         >
                           {/* 일시 */}
-                          <td className="whitespace-nowrap border-b px-4 py-3 font-mono text-[12px]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                          <td className="whitespace-nowrap border-b px-4 py-3 font-mono text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                             {formatDate(log.created_at)}
                           </td>
 
                           {/* 구분 */}
                           <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
                             <span
-                              className="inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold"
+                              className="inline-flex rounded-full px-2.5 py-1 text-xs font-bold"
                               style={{ background: `${tcolor}22`, color: tcolor }}
                             >
                               {transactionLabel(log.transaction_type)}
@@ -591,14 +586,14 @@ export function DesktopHistoryView() {
                           </td>
 
                           {/* 코드 */}
-                          <td className="whitespace-nowrap border-b px-4 py-3 font-mono text-[12px]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                          <td className="whitespace-nowrap border-b px-4 py-3 font-mono text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                             {log.erp_code}
                           </td>
 
                           {/* 분류 */}
                           <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
                             <span
-                              className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold"
+                              className="inline-flex rounded-full px-2 py-0.5 text-xs font-bold"
                               style={{ background: cat.bg, color: cat.color }}
                             >
                               {cat.label}
@@ -614,14 +609,14 @@ export function DesktopHistoryView() {
                           </td>
 
                           {/* 재고 변화 */}
-                          <td className="whitespace-nowrap border-b px-4 py-3 font-mono text-[12px]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                          <td className="whitespace-nowrap border-b px-4 py-3 font-mono text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                             {log.quantity_before != null ? formatNumber(log.quantity_before) : "-"}
                             <span className="mx-1">→</span>
                             {log.quantity_after != null ? formatNumber(log.quantity_after) : "-"}
                           </td>
 
                           {/* 담당자 */}
-                          <td className="whitespace-nowrap border-b px-4 py-3 text-[12px]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                          <td className="whitespace-nowrap border-b px-4 py-3 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                             {log.produced_by?.split("(")[0]?.trim() ?? "-"}
                           </td>
 
@@ -630,7 +625,7 @@ export function DesktopHistoryView() {
                             {log.reference_no ? (
                               <button
                                 onClick={(e) => copyRef(log.reference_no!, e)}
-                                className="rounded border px-2 py-0.5 font-mono text-[12px] transition-all hover:brightness-110"
+                                className="rounded border px-2 py-0.5 font-mono text-xs transition-all hover:brightness-110"
                                 style={{
                                   background: copiedRef === log.reference_no ? "rgba(67,211,157,.2)" : LEGACY_COLORS.s2,
                                   borderColor: LEGACY_COLORS.border,
@@ -647,7 +642,7 @@ export function DesktopHistoryView() {
 
                           {/* 메모 */}
                           <td className="max-w-[160px] border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-                            <div className="truncate text-[12px]">{log.notes || "-"}</div>
+                            <div className="truncate text-xs">{log.notes || "-"}</div>
                           </td>
                         </tr>
                       );
@@ -717,7 +712,7 @@ export function DesktopHistoryView() {
                 ] as [string, string][]
               ).map(([label, value]) => (
                 <div key={label} className="flex items-start justify-between gap-3">
-                  <span className="shrink-0 text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{label}</span>
+                  <span className="shrink-0 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{label}</span>
                   <span className="text-right text-base font-semibold break-all" style={{ color: LEGACY_COLORS.text }}>{value}</span>
                 </div>
               ))}
@@ -725,7 +720,7 @@ export function DesktopHistoryView() {
 
             {/* 메모 편집 */}
             <div className="rounded-[24px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-              <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>메모</div>
+              <div className="mb-2 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>메모</div>
               <textarea
                 value={editingNotes}
                 onChange={(e) => setEditingNotes(e.target.value)}
@@ -746,7 +741,7 @@ export function DesktopHistoryView() {
             {/* 이 품목의 최근 거래 */}
             {itemRecentLogs.length > 0 && (
               <div className="rounded-[24px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                <div className="mb-3 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
                   이 품목의 최근 거래
                 </div>
                 <div className="space-y-2">
@@ -759,12 +754,12 @@ export function DesktopHistoryView() {
                     >
                       <div>
                         <span
-                          className="inline-flex rounded px-2 py-0.5 text-[10px] font-bold"
+                          className="inline-flex rounded px-2 py-0.5 text-xs font-bold"
                           style={{ background: `${transactionColor(log.transaction_type)}22`, color: transactionColor(log.transaction_type) }}
                         >
                           {transactionLabel(log.transaction_type)}
                         </span>
-                        <div className="mt-1 font-mono text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                        <div className="mt-1 font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                           {formatDate(log.created_at)}
                         </div>
                       </div>

@@ -63,12 +63,12 @@ export default function AlertsPage() {
         <div className="mb-4 flex gap-2">
           <button
             onClick={scan}
-            className="rounded-xl px-3 py-2 text-xs font-bold"
+            className="rounded-xl px-3 py-2 text-sm font-bold"
             style={{ background: LEGACY_COLORS.blue, color: "#fff" }}
           >
             안전재고 스캔
           </button>
-          <label className="inline-flex items-center gap-2 text-xs">
+          <label className="inline-flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               checked={includeAcked}
@@ -80,7 +80,7 @@ export default function AlertsPage() {
 
         {error && (
           <div
-            className="mb-3 rounded-xl border px-3 py-2 text-xs"
+            className="mb-3 rounded-xl border px-3 py-2 text-sm"
             style={{ background: "rgba(242,95,92,.1)", borderColor: LEGACY_COLORS.red, color: LEGACY_COLORS.red }}
           >
             {error}
@@ -105,7 +105,7 @@ export default function AlertsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span
-                      className="rounded-full px-2 py-[2px] text-[10px] font-bold"
+                      className="rounded-full px-2 py-[2px] text-xs font-bold"
                       style={{
                         background:
                           a.kind === "SAFETY"
@@ -118,10 +118,10 @@ export default function AlertsPage() {
                     </span>
                     <div className="truncate text-sm font-semibold">{a.item_name}</div>
                   </div>
-                  <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                     {a.message}
                   </div>
-                  <div className="mt-1 text-[10px]" style={{ color: LEGACY_COLORS.muted }}>
+                  <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted }}>
                     {new Date(a.triggered_at).toLocaleString("ko-KR")}
                     {a.acknowledged_at ? ` · 확인: ${a.acknowledged_by ?? ""}` : ""}
                   </div>
@@ -129,7 +129,7 @@ export default function AlertsPage() {
                 {!a.acknowledged_at && (
                   <button
                     onClick={() => ack(a.alert_id)}
-                    className="rounded-lg px-3 py-1 text-[10px] font-bold"
+                    className="rounded-lg px-3 py-1 text-xs font-bold"
                     style={{ background: LEGACY_COLORS.s3, color: LEGACY_COLORS.text }}
                   >
                     확인

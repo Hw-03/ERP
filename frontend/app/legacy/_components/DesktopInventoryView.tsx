@@ -225,11 +225,11 @@ const selectedSlots = useMemo(
             <>
               <div className="mb-4 grid grid-cols-2 gap-3">
                 <div className="rounded-[18px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>즉시 생산 가능</div>
+                  <div className="text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>즉시 생산 가능</div>
                   <div className="mt-1 font-mono text-[22px] font-black" style={{ color: LEGACY_COLORS.cyan }}>{formatNumber(capacityData.immediate)}</div>
                 </div>
                 <div className="rounded-[18px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>최대 생산 가능</div>
+                  <div className="text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>최대 생산 가능</div>
                   <div className="mt-1 font-mono text-[22px] font-black" style={{ color: LEGACY_COLORS.blue }}>{formatNumber(capacityData.maximum)}</div>
                 </div>
               </div>
@@ -239,7 +239,7 @@ const selectedSlots = useMemo(
                 </div>
               )}
               <div className="max-h-52 overflow-y-auto rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }}>
-                <div className="grid grid-cols-[1fr_80px_80px] border-b px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                <div className="grid grid-cols-[1fr_80px_80px] border-b px-4 py-2 text-xs font-bold uppercase tracking-[0.15em]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                   <span>품목</span>
                   <span className="text-right">즉시</span>
                   <span className="text-right">최대</span>
@@ -249,7 +249,7 @@ const selectedSlots = useMemo(
                     style={{ borderBottom: i === capacityData.top_items.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}` }}>
                     <div>
                       <div className="truncate text-sm" style={{ color: LEGACY_COLORS.text }}>{item.item_name}</div>
-                      <div className="font-mono text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
+                      <div className="font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
                     </div>
                     <div className="text-right font-mono text-sm font-bold" style={{ color: LEGACY_COLORS.cyan }}>{formatNumber(item.immediate)}</div>
                     <div className="text-right font-mono text-sm" style={{ color: LEGACY_COLORS.blue }}>{formatNumber(item.maximum)}</div>
@@ -307,13 +307,13 @@ const selectedSlots = useMemo(
                         : undefined,
                     }}
                   >
-                    <div className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                    <div className="text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
                       {card.label}
                     </div>
                     <div className="mt-2.5 font-mono text-[30px] font-black leading-none" style={{ color: card.tone }}>
                       {formatNumber(card.value)}
                     </div>
-                    <div className="mt-2 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                    <div className="mt-2 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
                       {card.hint}
                     </div>
                   </button>
@@ -356,13 +356,13 @@ const selectedSlots = useMemo(
                   style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
                   onClick={() => setCapacityModal(true)}
                 >
-                  <div className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <div className="text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
                     즉시 생산 가능수량
                   </div>
                   <div className="mt-2 font-mono text-[24px] font-black leading-none" style={{ color: LEGACY_COLORS.cyan }}>
                     {capacityData == null ? "…" : capacityData.immediate === 0 && capacityData.top_items.length === 0 ? "미등록" : formatNumber(capacityData.immediate)}
                   </div>
-                  <div className="mt-2 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <div className="mt-2 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                     현 재고로 즉시 생산 가능한 수량
                   </div>
                 </button>
@@ -372,13 +372,13 @@ const selectedSlots = useMemo(
                   style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
                   onClick={() => setCapacityModal(true)}
                 >
-                  <div className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <div className="text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
                     최대 생산 가능수량
                   </div>
                   <div className="mt-2 font-mono text-[24px] font-black leading-none" style={{ color: LEGACY_COLORS.blue }}>
                     {capacityData == null ? "…" : capacityData.maximum === 0 && capacityData.top_items.length === 0 ? "미등록" : formatNumber(capacityData.maximum)}
                   </div>
-                  <div className="mt-2 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <div className="mt-2 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                     전체 BOM 기준 최대 생산 가능 수량
                   </div>
                 </button>
@@ -429,7 +429,7 @@ const selectedSlots = useMemo(
                         { label: "현재고", nowrap: true, width: "72px" },
                         { label: "안전재고", nowrap: true, width: "72px" },
                       ] as { label: string; nowrap: boolean; width?: string; minWidth?: string }[]).map(({ label, nowrap, width, minWidth }) => (
-                        <th key={label} className={`border-b px-4 py-3 text-left text-[11px] font-bold${nowrap ? " whitespace-nowrap" : ""}`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth }}>
+                        <th key={label} className={`border-b px-4 py-3 text-left text-xs font-bold${nowrap ? " whitespace-nowrap" : ""}`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth }}>
                           {label}
                         </th>
                       ))}
@@ -448,13 +448,13 @@ const selectedSlots = useMemo(
                           style={{ background: selected ? "rgba(101,169,255,.08)" : "transparent" }}
                         >
                           <td className={`border-b px-4 ${py} align-middle whitespace-nowrap`} style={{ borderColor: LEGACY_COLORS.border }}>
-                            <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ color: stock.color, background: `${stock.color}20` }}>
+                            <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold" style={{ color: stock.color, background: `${stock.color}20` }}>
                               {stock.label}
                             </span>
                           </td>
                           <td className={`border-b px-4 ${py} align-middle`} style={{ borderColor: LEGACY_COLORS.border }}>
                             <div className="font-semibold">{item.item_name}</div>
-                            <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                            <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                               {item.spec || "-"}
                             </div>
                             {(() => {
@@ -492,25 +492,25 @@ const selectedSlots = useMemo(
                               );
                             })()}
                           </td>
-                          <td className={`border-b px-4 ${py} align-middle whitespace-nowrap font-mono text-[12px] font-bold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
+                          <td className={`border-b px-4 ${py} align-middle whitespace-nowrap font-mono text-xs font-bold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
                             {item.erp_code ?? "-"}
                           </td>
                           <td className={`border-b px-4 ${py} align-middle`} style={{ borderColor: LEGACY_COLORS.border }}>
                             <div className="flex flex-wrap gap-1">
                               {Number(item.warehouse_qty) > 0 && (
-                                <span className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ color: "#3ac4b0" }}>창고</span>
+                                <span className="inline-flex rounded-full px-1.5 py-0.5 text-xs font-bold" style={{ color: "#3ac4b0" }}>창고</span>
                               )}
                               {item.locations.filter((l) => Number(l.quantity) > 0).map((l) => (
-                                <span key={l.department} className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ color: employeeColor(l.department) }}>
+                                <span key={l.department} className="inline-flex rounded-full px-1.5 py-0.5 text-xs font-bold" style={{ color: employeeColor(l.department) }}>
                                   {l.department}
                                 </span>
                               ))}
                             </div>
                           </td>
-                          <td className={`border-b px-4 ${py} text-right align-middle whitespace-nowrap font-mono text-[13px] font-bold`} style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className={`border-b px-4 ${py} text-right align-middle whitespace-nowrap font-mono text-sm font-bold`} style={{ borderColor: LEGACY_COLORS.border }}>
                             {formatNumber(item.quantity)}
                           </td>
-                          <td className={`border-b px-4 ${py} text-right align-middle whitespace-nowrap font-mono text-[13px]`} style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className={`border-b px-4 ${py} text-right align-middle whitespace-nowrap font-mono text-sm`} style={{ borderColor: LEGACY_COLORS.border }}>
                             {item.min_stock == null ? "-" : formatNumber(item.min_stock)}
                           </td>
                         </tr>
@@ -531,7 +531,7 @@ const selectedSlots = useMemo(
               </button>
             )}
             {filteredItems.length > 0 && (
-              <div className="mt-2 text-center text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
+              <div className="mt-2 text-center text-xs" style={{ color: LEGACY_COLORS.muted }}>
                 {formatNumber(Math.min(displayLimit, filteredItems.length))} / {formatNumber(filteredItems.length)}개 표시
               </div>
             )}
@@ -570,45 +570,45 @@ const selectedSlots = useMemo(
 
             {/* 품목 정보 */}
             <section className="rounded-[28px] border p-5" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
-              <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
                 품목 정보
               </div>
               <div className="grid gap-3 text-base">
                 {selectedItem.erp_code && (
                   <div className="rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                    <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>ERP 코드</div>
+                    <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>ERP 코드</div>
                     <div className="mt-1 font-mono text-base font-bold" style={{ color: LEGACY_COLORS.blue }}>{selectedItem.erp_code}</div>
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                    <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>현재고</div>
+                    <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>현재고</div>
                     <div className="mt-1 font-mono text-xl font-black">{formatNumber(selectedItem.quantity)}</div>
                   </div>
                   <div className="rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                    <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>안전재고</div>
+                    <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>안전재고</div>
                     <div className="mt-1 font-mono text-xl font-black">{selectedItem.min_stock == null ? "-" : formatNumber(selectedItem.min_stock)}</div>
                   </div>
                 </div>
                 <div className="rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                  <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>모델</div>
+                  <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>모델</div>
                   <div className="mt-1 text-base">{normalizeModel(selectedItem.legacy_model)}</div>
                 </div>
                 {(selectedItem.unit || selectedItem.supplier) && (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                      <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>단위</div>
+                      <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>단위</div>
                       <div className="mt-1 text-base">{selectedItem.unit || "-"}</div>
                     </div>
                     <div className="rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                      <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>공급처</div>
+                      <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>공급처</div>
                       <div className="mt-1 text-sm truncate">{selectedItem.supplier || "-"}</div>
                     </div>
                   </div>
                 )}
                 {selectedItem.spec && (
                   <div className="rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                    <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>스펙</div>
+                    <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>스펙</div>
                     <div className="mt-1 text-base">{selectedItem.spec}</div>
                   </div>
                 )}
@@ -618,7 +618,7 @@ const selectedSlots = useMemo(
             {/* 위치별 재고 */}
             {(Number(selectedItem.warehouse_qty) > 0 || (selectedItem.locations ?? []).some((l) => Number(l.quantity) > 0)) && (
               <section className="rounded-[28px] border p-5" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
-                <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
                   위치별 재고
                 </div>
                 <div className="space-y-2">
@@ -651,7 +651,7 @@ const selectedSlots = useMemo(
 
             {/* 최근 이력 */}
             <section className="rounded-[28px] border p-5" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
-              <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
                 최근 이력
               </div>
               <div className="space-y-2">
@@ -668,7 +668,7 @@ const selectedSlots = useMemo(
                         </span>
                         <span className="font-mono text-sm">{formatNumber(log.quantity_change)}</span>
                       </div>
-                      <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                      <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                         {log.notes || "메모 없음"}
                       </div>
                     </div>

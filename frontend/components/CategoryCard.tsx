@@ -120,12 +120,12 @@ export default function CategoryCard({ data, isAlert = false }: CategoryCardProp
                 {data.category}
               </span>
               {isAlert && (
-                <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-xs text-red-400">
+                <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-sm text-red-400">
                   확인 필요
                 </span>
               )}
             </div>
-            <p className="mt-0.5 text-xs text-slate-400">{meta.shortName}</p>
+            <p className="mt-0.5 text-sm text-slate-400">{meta.shortName}</p>
           </div>
         </div>
 
@@ -135,7 +135,7 @@ export default function CategoryCard({ data, isAlert = false }: CategoryCardProp
               data.item_count > 0 ? meta.dot : "bg-slate-600"
             }`}
           />
-          <span className="text-xs text-slate-500">
+          <span className="text-sm text-slate-500">
             {data.item_count > 0 ? "운영 중" : "품목 없음"}
           </span>
         </div>
@@ -143,14 +143,14 @@ export default function CategoryCard({ data, isAlert = false }: CategoryCardProp
 
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg bg-slate-900/50 p-3">
-          <p className="mb-1 text-xs text-slate-500">품목 수</p>
+          <p className="mb-1 text-sm text-slate-500">품목 수</p>
           <p className="font-mono text-2xl font-bold text-slate-100">
             {data.item_count.toLocaleString()}
           </p>
-          <p className="text-xs text-slate-500">종류</p>
+          <p className="text-sm text-slate-500">종류</p>
         </div>
         <div className="rounded-lg bg-slate-900/50 p-3">
-          <p className="mb-1 text-xs text-slate-500">총 재고</p>
+          <p className="mb-1 text-sm text-slate-500">총 재고</p>
           <p
             className={`font-mono text-2xl font-bold ${
               isAlert ? "text-red-300" : "text-blue-300"
@@ -158,12 +158,12 @@ export default function CategoryCard({ data, isAlert = false }: CategoryCardProp
           >
             {totalQty.toLocaleString(undefined, { maximumFractionDigits: 0 })}
           </p>
-          <p className="text-xs text-slate-500">EA 기준</p>
+          <p className="text-sm text-slate-500">EA 기준</p>
         </div>
       </div>
 
       {data.item_count > 0 && totalQty === 0 && (
-        <div className="mt-3 flex items-center gap-1.5 text-xs text-amber-400">
+        <div className="mt-3 flex items-center gap-1.5 text-sm text-amber-400">
           <span>주의</span>
           <span>현재 재고가 0입니다. 입고 여부를 확인해 주세요.</span>
         </div>

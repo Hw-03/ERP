@@ -132,7 +132,7 @@ export function DesktopSidebar({
                   <div className="truncate text-sm font-bold text-left" style={{ color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.text }}>
                     {tab.label}
                   </div>
-                  <div className="truncate text-xs text-left" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <div className="truncate text-sm text-left" style={{ color: LEGACY_COLORS.muted2 }}>
                     {tab.subtitle}
                   </div>
                 </div>

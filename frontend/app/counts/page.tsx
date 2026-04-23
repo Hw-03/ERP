@@ -87,7 +87,7 @@ export default function CountsPage() {
           className="mb-6 overflow-hidden rounded-[14px] border p-3"
           style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
         >
-          <div className="mb-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+          <div className="mb-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
             실사 입력
           </div>
           <select
@@ -110,7 +110,7 @@ export default function CountsPage() {
 
           {selectedItem && (
             <div
-              className="mb-2 rounded-lg px-3 py-2 text-xs"
+              className="mb-2 rounded-lg px-3 py-2 text-sm"
               style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}
             >
               시스템 재고: {formatNumber(selectedItem.quantity)} {selectedItem.unit}
@@ -172,7 +172,7 @@ export default function CountsPage() {
 
           {error && (
             <div
-              className="mt-3 rounded-lg px-3 py-2 text-xs"
+              className="mt-3 rounded-lg px-3 py-2 text-sm"
               style={{
                 background: "rgba(242,95,92,.1)",
                 color: LEGACY_COLORS.red,
@@ -183,7 +183,7 @@ export default function CountsPage() {
           )}
           {info && (
             <div
-              className="mt-3 rounded-lg px-3 py-2 text-xs"
+              className="mt-3 rounded-lg px-3 py-2 text-sm"
               style={{
                 background: "rgba(31,209,122,.1)",
                 color: LEGACY_COLORS.green,
@@ -194,7 +194,7 @@ export default function CountsPage() {
           )}
         </div>
 
-        <div className="mb-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+        <div className="mb-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
           최근 실사 이력
         </div>
         {counts.length === 0 ? (
@@ -212,11 +212,11 @@ export default function CountsPage() {
                   <div className="truncate text-sm font-semibold">
                     {c.item_name}
                   </div>
-                  <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                     시스템 {formatNumber(c.system_qty)} → 실사 {formatNumber(c.counted_qty)}
                     {c.reason ? ` · ${c.reason}` : ""}
                   </div>
-                  <div className="text-[10px]" style={{ color: LEGACY_COLORS.muted }}>
+                  <div className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
                     {new Date(c.created_at).toLocaleString("ko-KR")}
                     {c.operator ? ` · ${c.operator}` : ""}
                   </div>
