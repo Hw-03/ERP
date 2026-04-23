@@ -9,9 +9,33 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import BOM, Inventory, Item
-from app.schemas import BOMCreate, BOMResponse, BOMTreeNode, BOMUpdate
+from app.schemas import BOMCreate, BOMDetailResponse, BOMResponse, BOMTreeNode, BOMUpdate
 
 router = APIRouter()
+
+
+@router.get("", response_model=List[BOMDetailResponse])
+def get_all_bom(db: Session = Depends(get_db)):
+    """Return all BOM relationships with parent and child item names."""
+    entries = db.query(BOM).all()
+    result = []
+    for entry in entries:
+        parent = db.query(Item).filter(Item.item_id == entry.parent_item_id).first()
+        child = db.query(Item).filter(Item.item_id == entry.child_item_id).first()
+        if not parent or not child:
+            continue
+        result.append(BOMDetailResponse(
+            bom_id=entry.bom_id,
+            parent_item_id=entry.parent_item_id,
+            parent_item_name=parent.item_name,
+            parent_erp_code=parent.erp_code,
+            child_item_id=entry.child_item_id,
+            child_item_name=child.item_name,
+            child_erp_code=child.erp_code,
+            quantity=entry.quantity,
+            unit=entry.unit,
+        ))
+    return result
 
 
 @router.post("", response_model=BOMResponse, status_code=status.HTTP_201_CREATED)

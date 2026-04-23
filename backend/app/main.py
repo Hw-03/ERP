@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
+from sqlalchemy import or_, text
 
 from app.database import Base, SessionLocal, engine
 from app.models import (
@@ -25,6 +25,7 @@ from app.routers import (
     inventory,
     items,
     loss,
+    models as models_router,
     production,
     queue,
     scrap,
@@ -141,6 +142,7 @@ app.include_router(loss.router, prefix="/api/loss", tags=["Loss"])
 app.include_router(variance.router, prefix="/api/variance", tags=["Variance"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 app.include_router(counts.router, prefix="/api/counts", tags=["Counts"])
+app.include_router(models_router.router, prefix="/api/models", tags=["Models"])
 
 
 def ensure_reference_data() -> None:
@@ -229,13 +231,17 @@ def ensure_reference_data() -> None:
             types = [
                 ("TR", "T", "R", 10, "튜브 원자재"),
                 ("TA", "T", "A", 20, "튜브 조립체"),
+                ("TF", "T", "F", 22, "튜브 F타입"),
                 ("HR", "H", "R", 15, "고압 원자재"),
                 ("HA", "H", "A", 30, "고압 조립체"),
+                ("HF", "H", "F", 32, "고압 F타입"),
                 ("VR", "V", "R", 25, "진공 원자재"),
                 ("VA", "V", "A", 40, "진공 조립체"),
+                ("VF", "V", "F", 42, "진공 F타입"),
                 ("NA", "N", "A", 50, "튜닝 조립체 (출력값 최적화)"),
                 ("AR", "A", "R", 45, "조립 원자재"),
                 ("AA", "A", "A", 60, "최종 조립체"),
+                ("BF", "B", "F", 62, "조립 F타입"),
                 ("PR", "P", "R", 55, "포장 원자재"),
                 ("PA", "P", "A", 70, "완제품 (최종 패키징)"),
             ]
@@ -243,6 +249,18 @@ def ensure_reference_data() -> None:
                 db.add(
                     ProcessType(code=code, prefix=prefix, suffix=suffix, stage_order=order, description=desc)
                 )
+            db.commit()
+        else:
+            # F타입 추가 (기존 DB에 없을 경우 삽입)
+            f_types = [
+                ("TF", "T", "F", 22, "튜브 F타입"),
+                ("HF", "H", "F", 32, "고압 F타입"),
+                ("VF", "V", "F", 42, "진공 F타입"),
+                ("BF", "B", "F", 62, "조립 F타입"),
+            ]
+            for code, prefix, suffix, order, desc in f_types:
+                if not db.query(ProcessType).filter(ProcessType.code == code).first():
+                    db.add(ProcessType(code=code, prefix=prefix, suffix=suffix, stage_order=order, description=desc))
             db.commit()
 
         # ------ Process flow rules ------
@@ -314,8 +332,50 @@ def populate_erp_codes() -> None:
         db.close()
 
 
+def migrate_f_type_erp_codes() -> None:
+    """TF/HF/VF/BF 카테고리 품목의 process_type_code를 고유 F타입 코드로 재부여한다."""
+    REMAP = {"TF": "TF", "HF": "HF", "VF": "VF", "BF": "BF"}
+    db = SessionLocal()
+    try:
+        symbol_map: dict[int, str] = {
+            ps.slot: ps.symbol
+            for ps in db.query(ProductSymbol).all()
+            if ps.symbol
+        }
+        serial_counter: dict[tuple, int] = {}
+        for item in db.query(Item).filter(Item.serial_no.isnot(None)).all():
+            key = (item.symbol_slot, item.process_type_code)
+            serial_counter[key] = max(serial_counter.get(key, 0), item.serial_no or 0)
+
+        count = 0
+        for cat_val, new_pt in REMAP.items():
+            f_items = (
+                db.query(Item)
+                .filter(Item.category == cat_val)
+                .filter(or_(Item.process_type_code != new_pt, Item.process_type_code.is_(None)))
+                .all()
+            )
+            for item in f_items:
+                slot = item.symbol_slot
+                symbol = symbol_map.get(slot, "공") if slot else "공"
+                key = (slot, new_pt)
+                serial_counter[key] = serial_counter.get(key, 0) + 1
+                serial = serial_counter[key]
+                item.process_type_code = new_pt
+                item.serial_no = serial
+                item.erp_code = make_erp_code(symbol, new_pt, serial, item.option_code)
+                count += 1
+
+        if count:
+            db.commit()
+            print(f"[ERP] F타입 코드 재부여: {count}개")
+    finally:
+        db.close()
+
+
 ensure_reference_data()
 populate_erp_codes()
+migrate_f_type_erp_codes()
 
 
 @app.get("/health", tags=["System"])

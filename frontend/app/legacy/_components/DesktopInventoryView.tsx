@@ -4,11 +4,10 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 const DESKTOP_PAGE_SIZE = 100;
 import { PackageSearch, Search, Sparkles, TrendingUp } from "lucide-react";
-import { api, type Item, type TransactionLog } from "@/lib/api";
+import { api, type Item, type ProductionCapacity, type ProductModel, type TransactionLog } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import {
   LEGACY_COLORS,
-  LEGACY_MODELS,
   employeeColor,
   formatNumber,
   getStockState,
@@ -71,22 +70,16 @@ function Chip({
   label,
   onClick,
   tone,
-  fluid,
 }: {
   active: boolean;
   label: string;
   onClick: () => void;
   tone: string;
-  fluid?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className={
-        fluid
-          ? "rounded-full border px-4 py-2.5 text-sm font-semibold transition-all hover:brightness-110 text-center"
-          : "rounded-full border px-4 py-2.5 text-sm font-semibold transition-all hover:brightness-110"
-      }
+      className="w-full rounded-full border px-4 py-2 text-sm font-semibold transition-all hover:brightness-110"
       style={{
         background: active ? `${tone}22` : LEGACY_COLORS.s2,
         borderColor: active ? tone : LEGACY_COLORS.border,
@@ -112,13 +105,15 @@ export function DesktopInventoryView({
   const [itemLogs, setItemLogs] = useState<TransactionLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dept, setDept] = useState("ALL");
-  const [model, setModel] = useState("전체");
+  const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
+  const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const [productModels, setProductModels] = useState<ProductModel[]>([]);
   const [kpi, setKpi] = useState<KpiFilter>("ALL");
   const [localSearch, setLocalSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(DESKTOP_PAGE_SIZE);
   const [capacityModal, setCapacityModal] = useState(false);
   const [hoveredKpi, setHoveredKpi] = useState<KpiFilter | null>(null);
+  const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -131,8 +126,6 @@ export function DesktopInventoryView({
       const nextItems = await api.getItems({
         limit: 2000,
         search: globalSearch.trim() || undefined,
-        department: dept === "ALL" ? undefined : dept,
-        legacyModel: model === "전체" ? undefined : model,
       });
       setItems(nextItems);
       onStatusChange(`재고 ${nextItems.length}건을 불러왔습니다.`);
@@ -146,10 +139,24 @@ export function DesktopInventoryView({
     }
   }
 
+  function toggleDept(v: string) {
+    setSelectedDepts((prev) => prev.includes(v) ? prev.filter((d) => d !== v) : [...prev, v]);
+    setDisplayLimit(DESKTOP_PAGE_SIZE);
+  }
+  function toggleModel(v: string) {
+    setSelectedModels((prev) => prev.includes(v) ? prev.filter((m) => m !== v) : [...prev, v]);
+    setDisplayLimit(DESKTOP_PAGE_SIZE);
+  }
+
+  useEffect(() => {
+    void api.getModels().then(setProductModels).catch(() => {});
+    void api.getProductionCapacity().then(setCapacityData).catch(() => {});
+  }, []);
+
   useEffect(() => {
     void loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [globalSearch, dept, model]);
+  }, [globalSearch]);
 
   useEffect(() => {
     if (!selectedItem) {
@@ -159,7 +166,17 @@ export function DesktopInventoryView({
     void api.getTransactions({ itemId: selectedItem.item_id, limit: 10 }).then(setItemLogs).catch(() => setItemLogs([]));
   }, [selectedItem]);
 
-const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, deferredLocalSearch)), [items, deferredLocalSearch]);
+const scopedItems = useMemo(() => items.filter((item) => {
+    if (!matchesSearch(item, deferredLocalSearch)) return false;
+    if (selectedDepts.length > 0) {
+      const inDept = selectedDepts.some((d) =>
+        d === "창고" ? (item.warehouse_qty ?? 0) > 0 : item.locations.some((loc) => loc.department === d),
+      );
+      if (!inDept) return false;
+    }
+    if (selectedModels.length > 0 && !selectedModels.includes(item.legacy_model ?? "")) return false;
+    return true;
+  }), [items, deferredLocalSearch, selectedDepts, selectedModels]);
   const filteredItems = useMemo(() => scopedItems.filter((item) => matchesKpi(item, kpi)), [scopedItems, kpi]);
 
   useEffect(() => {
@@ -174,7 +191,7 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
     return { totalCount: scopedItems.length, totalQuantity, normalCount, lowCount, zeroCount };
   }, [scopedItems]);
 
-  const isFiltered = dept !== "ALL" || model !== "전체";
+  const isFiltered = selectedDepts.length > 0 || selectedModels.length > 0;
 
 
   return (
@@ -186,20 +203,58 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
         onClick={() => setCapacityModal(false)}
       >
         <div
-          className="w-full max-w-[380px] rounded-[28px] border p-7"
+          className="w-full max-w-[520px] rounded-[28px] border p-7"
           style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="mb-1 text-base font-black" style={{ color: LEGACY_COLORS.text }}>준비 중</div>
-          <div className="text-base" style={{ color: LEGACY_COLORS.muted2 }}>
-            BOM 등록이 완료된 후 실수치가 연결됩니다.
-          </div>
+          <div className="mb-4 text-base font-black" style={{ color: LEGACY_COLORS.text }}>생산 가능수량 상세</div>
+          {capacityData && capacityData.top_items.length > 0 ? (
+            <>
+              <div className="mb-4 grid grid-cols-2 gap-3">
+                <div className="rounded-[18px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>즉시 생산 가능</div>
+                  <div className="mt-1 font-mono text-[22px] font-black" style={{ color: LEGACY_COLORS.cyan }}>{formatNumber(capacityData.immediate)}</div>
+                </div>
+                <div className="rounded-[18px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>최대 생산 가능</div>
+                  <div className="mt-1 font-mono text-[22px] font-black" style={{ color: LEGACY_COLORS.blue }}>{formatNumber(capacityData.maximum)}</div>
+                </div>
+              </div>
+              {capacityData.limiting_item && (
+                <div className="mb-4 rounded-[14px] border px-4 py-3 text-sm" style={{ background: "rgba(255,136,0,.08)", borderColor: "rgba(255,136,0,.25)", color: LEGACY_COLORS.yellow }}>
+                  병목 부품: <span className="font-bold">{capacityData.limiting_item}</span>
+                </div>
+              )}
+              <div className="max-h-52 overflow-y-auto rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+                <div className="grid grid-cols-[1fr_80px_80px] border-b px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                  <span>품목</span>
+                  <span className="text-right">즉시</span>
+                  <span className="text-right">최대</span>
+                </div>
+                {capacityData.top_items.map((item, i) => (
+                  <div key={item.item_id} className="grid grid-cols-[1fr_80px_80px] items-center px-4 py-2.5"
+                    style={{ borderBottom: i === capacityData.top_items.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}` }}>
+                    <div>
+                      <div className="truncate text-sm" style={{ color: LEGACY_COLORS.text }}>{item.item_name}</div>
+                      <div className="font-mono text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
+                    </div>
+                    <div className="text-right font-mono text-sm font-bold" style={{ color: LEGACY_COLORS.cyan }}>{formatNumber(item.immediate)}</div>
+                    <div className="text-right font-mono text-sm" style={{ color: LEGACY_COLORS.blue }}>{formatNumber(item.maximum)}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="mb-4 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+              {capacityData == null ? "데이터를 불러오는 중…" : "BOM이 등록된 품목이 없습니다."}
+            </div>
+          )}
           <button
-            className="mt-6 w-full rounded-[18px] border py-3 text-base font-semibold"
+            className="mt-5 w-full rounded-[18px] border py-3 text-base font-semibold"
             style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
             onClick={() => setCapacityModal(false)}
           >
-            확인
+            닫기
           </button>
         </div>
       </div>
@@ -259,9 +314,10 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                     <Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />
                     부서 구분
                   </div>
-                  <div className="flex justify-between">
-                    {DEPT_OPTIONS.map((opt) => (
-                      <Chip key={opt.value} active={dept === opt.value} label={opt.label} onClick={() => setDept(opt.value)} tone={LEGACY_COLORS.green} fluid />
+                  <div className="grid grid-cols-4 gap-2">
+                    <Chip active={selectedDepts.length === 0} label="전체" onClick={() => setSelectedDepts([])} tone={LEGACY_COLORS.green} />
+                    {DEPT_OPTIONS.filter((o) => o.value !== "ALL").map((opt) => (
+                      <Chip key={opt.value} active={selectedDepts.includes(opt.value)} label={opt.label} onClick={() => toggleDept(opt.value)} tone={LEGACY_COLORS.green} />
                     ))}
                   </div>
                 </div>
@@ -271,9 +327,10 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                     <TrendingUp className="h-4 w-4" style={{ color: LEGACY_COLORS.cyan }} />
                     모델 구분
                   </div>
-                  <div className="flex justify-between">
-                    {LEGACY_MODELS.map((entry) => (
-                      <Chip key={entry} active={model === entry} label={entry} onClick={() => setModel(entry)} tone={LEGACY_COLORS.cyan} fluid />
+                  <div className="grid grid-cols-3 gap-2 overflow-x-auto">
+                    <Chip active={selectedModels.length === 0} label="전체" onClick={() => setSelectedModels([])} tone={LEGACY_COLORS.cyan} />
+                    {productModels.map((m) => (
+                      <Chip key={m.model_name} active={selectedModels.includes(m.model_name ?? "")} label={m.model_name ?? ""} onClick={() => toggleModel(m.model_name ?? "")} tone={LEGACY_COLORS.cyan} />
                     ))}
                   </div>
                 </div>
@@ -290,7 +347,7 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                     즉시 생산 가능수량
                   </div>
                   <div className="mt-2 font-mono text-[24px] font-black leading-none" style={{ color: LEGACY_COLORS.cyan }}>
-                    —
+                    {capacityData == null ? "…" : capacityData.immediate === 0 && capacityData.top_items.length === 0 ? "미등록" : formatNumber(capacityData.immediate)}
                   </div>
                   <div className="mt-2 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
                     현 재고로 즉시 생산 가능한 수량
@@ -306,7 +363,7 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                     최대 생산 가능수량
                   </div>
                   <div className="mt-2 font-mono text-[24px] font-black leading-none" style={{ color: LEGACY_COLORS.blue }}>
-                    —
+                    {capacityData == null ? "…" : capacityData.maximum === 0 && capacityData.top_items.length === 0 ? "미등록" : formatNumber(capacityData.maximum)}
                   </div>
                   <div className="mt-2 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
                     전체 BOM 기준 최대 생산 가능 수량
@@ -388,6 +445,11 @@ const scopedItems = useMemo(() => items.filter((item) => matchesSearch(item, def
                               {item.spec || "-"}
                             </div>
                             {(() => {
+                              if (Number(item.quantity) === 0) {
+                                return (
+                                  <div className="mt-2 h-[5px] overflow-hidden rounded-full" style={{ background: "#ef4444" }} title="품절" />
+                                );
+                              }
                               const total = Math.max(Number(item.quantity), 1);
                               const wh = Number(item.warehouse_qty);
                               const depts = (item.locations ?? []).filter((l) => Number(l.quantity) > 0);

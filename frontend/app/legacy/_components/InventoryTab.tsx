@@ -1,7 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { api, type Item } from "@/lib/api";
+import { api, type Item, type ProductModel } from "@/lib/api";
 import { FilterPills } from "./FilterPills";
 import { ItemDetailSheet } from "./ItemDetailSheet";
 import type { ToastState } from "./Toast";
@@ -24,14 +24,9 @@ const DEPT_OPTIONS = [
   { label: "출하", value: "출하" },
 ];
 
-const MODEL_OPTIONS = [
+const STATIC_MODEL_OPTIONS = [
   { label: "전체", value: "ALL" },
   { label: "공용", value: "공용" },
-  { label: "DX3000", value: "DX3000" },
-  { label: "ADX4000W", value: "ADX4000W" },
-  { label: "ADX6000", value: "ADX6000" },
-  { label: "COCOON", value: "COCOON" },
-  { label: "SOLO", value: "SOLO" },
 ];
 
 const KPI_OPTIONS = [
@@ -40,6 +35,17 @@ const KPI_OPTIONS = [
   { label: "부족", value: "LOW" },
   { label: "품절", value: "ZERO" },
 ];
+
+const TYPE_OPTIONS = [
+  { label: "전체", value: "ALL" },
+  { label: "RM(원자재)", value: "RM" },
+  { label: "반제품(?A)", value: "SEMI" },
+  { label: "고정형(?F)", value: "FIXED" },
+  { label: "완제품(FG)", value: "FG" },
+];
+
+const SEMI_CATS = new Set(["TA", "HA", "VA", "BA"]);
+const FIXED_CATS = new Set(["TF", "HF", "VF", "BF"]);
 
 const PAGE_SIZE = 100;
 
@@ -64,15 +70,22 @@ export function InventoryTab({
   onOpenHistory: () => void;
 }) {
   const [items, setItems] = useState<Item[]>([]);
+  const [productModels, setProductModels] = useState<ProductModel[]>([]);
   const [search, setSearch] = useState("");
   const [dept, setDept] = useState("ALL");
   const [model, setModel] = useState("ALL");
   const [kpi, setKpi] = useState("ALL");
+  const [itemType, setItemType] = useState("ALL");
   const [grouped, setGrouped] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+
+  const modelOptions = useMemo(() => [
+    ...STATIC_MODEL_OPTIONS,
+    ...productModels.map((m) => ({ label: m.model_name ?? "", value: m.model_name ?? "" })),
+  ], [productModels]);
 
   const deferredSearch = useDeferredValue(search);
 
@@ -98,6 +111,10 @@ export function InventoryTab({
   }
 
   useEffect(() => {
+    void api.getModels().then(setProductModels).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     setPage(1);
     void fetchItems(0, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -107,18 +124,16 @@ export function InventoryTab({
     return items.filter((item) => {
       const avail = Number(item.available_quantity ?? item.quantity);
       const min = item.min_stock == null ? null : Number(item.min_stock);
-      if (kpi === "OK") {
-        return avail > 0 && !(min != null && avail < min);
-      }
-      if (kpi === "LOW") {
-        return avail > 0 && min != null && avail < min;
-      }
-      if (kpi === "ZERO") {
-        return avail <= 0;
-      }
+      if (kpi === "OK" && !(avail > 0 && !(min != null && avail < min))) return false;
+      if (kpi === "LOW" && !(avail > 0 && min != null && avail < min)) return false;
+      if (kpi === "ZERO" && !(avail <= 0)) return false;
+      if (itemType === "RM" && item.category !== "RM") return false;
+      if (itemType === "SEMI" && !SEMI_CATS.has(item.category ?? "")) return false;
+      if (itemType === "FIXED" && !FIXED_CATS.has(item.category ?? "")) return false;
+      if (itemType === "FG" && item.category !== "FG") return false;
       return true;
     });
-  }, [items, kpi]);
+  }, [items, kpi, itemType]);
 
   const displayRows = useMemo<DisplayRow[]>(() => {
     if (!grouped) {
@@ -223,7 +238,8 @@ export function InventoryTab({
       </div>
 
       <FilterPills options={DEPT_OPTIONS} value={dept} onChange={setDept} activeColor={LEGACY_COLORS.green} />
-      <FilterPills options={MODEL_OPTIONS} value={model} onChange={setModel} activeColor={LEGACY_COLORS.cyan} />
+      <FilterPills options={modelOptions} value={model} onChange={setModel} activeColor={LEGACY_COLORS.cyan} />
+      <FilterPills options={TYPE_OPTIONS} value={itemType} onChange={setItemType} activeColor={LEGACY_COLORS.purple} />
 
       <div className="mb-[10px] grid grid-cols-4 gap-2">
         {[
@@ -353,6 +369,11 @@ export function InventoryTab({
                     {item.location ? ` · 📍${item.location}` : ""}
                   </div>
                   {(() => {
+                    if (row.quantity === 0) {
+                      return (
+                        <div className="mt-2 h-[6px] overflow-hidden rounded-full" style={{ background: "#ef4444" }} title="품절" />
+                      );
+                    }
                     const totalForGauge = Math.max(row.quantity, row.available, 1);
                     const whPct = Math.min(100, (row.warehouse / totalForGauge) * 100);
                     const prodPct = Math.min(100 - whPct, (row.production / totalForGauge) * 100);

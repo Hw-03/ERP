@@ -11,16 +11,19 @@ from sqlalchemy.orm import Session
 _CATEGORY_TO_PROCESS: dict[str, str | None] = {
     "RM": None,   # legacy_part 보고 판단
     "TA": "TA",
-    "TF": "TA",
+    "TF": "TF",
     "HA": "HA",
-    "HF": "HA",
+    "HF": "HF",
     "VA": "VA",
-    "VF": "VA",
+    "VF": "VF",
     "BA": "AA",
-    "BF": "AA",
+    "BF": "BF",
     "FG": "PA",
     "UK": None,   # 미분류 → 스킵
 }
+
+# F타입 카테고리: 창고 배치 불가, 해당 부서에만 위치 가능
+F_TYPE_CATEGORIES = {"TF", "HF", "VF", "BF"}
 
 _PART_TO_PROCESS_FOR_RM: dict[str, str] = {
     "자재창고": "TR",

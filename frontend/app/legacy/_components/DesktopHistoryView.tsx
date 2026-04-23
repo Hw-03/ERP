@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Activity, Calendar, ChevronDown, Search, TrendingDown, TrendingUp } from "lucide-react";
+import { Activity, Calendar, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, List, Search, TrendingDown, TrendingUp } from "lucide-react";
 import { api, type TransactionLog, type TransactionType } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import {
@@ -113,8 +113,16 @@ function Chip({
   );
 }
 
+function toDateKey(iso: string): string {
+  const d = parseUtc(iso);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
 export function DesktopHistoryView() {
   const [logs, setLogs] = useState<TransactionLog[]>([]);
+  const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
   const [selected, setSelected] = useState<TransactionLog | null>(null);
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [dateFilter, setDateFilter] = useState("ALL");
@@ -122,10 +130,17 @@ export function DesktopHistoryView() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [calendarLoading, setCalendarLoading] = useState(false);
   const [editingNotes, setEditingNotes] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
   const [itemRecentLogs, setItemRecentLogs] = useState<TransactionLog[]>([]);
+
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const now = new Date();
+  const [calendarYear, setCalendarYear] = useState(now.getFullYear());
+  const [calendarMonth, setCalendarMonth] = useState(now.getMonth());
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -151,6 +166,56 @@ export function DesktopHistoryView() {
       })
       .catch(() => setItemRecentLogs([]));
   }, [selected]);
+
+  useEffect(() => {
+    if (viewMode !== "calendar") return;
+    setCalendarLoading(true);
+    setSelectedDay(null);
+    void api.getTransactions({ limit: 5000, skip: 0 }).then((data) => {
+      setCalendarLogs(data);
+      if (data.length > 0) {
+        const d = parseUtc(data[0].created_at);
+        setCalendarYear(d.getFullYear());
+        setCalendarMonth(d.getMonth());
+      }
+      setCalendarLoading(false);
+    }).catch(() => setCalendarLoading(false));
+  }, [viewMode]);
+
+  function prevMonth() {
+    if (calendarMonth === 0) { setCalendarYear((y) => y - 1); setCalendarMonth(11); }
+    else setCalendarMonth((m) => m - 1);
+  }
+  function nextMonth() {
+    if (calendarMonth === 11) { setCalendarYear((y) => y + 1); setCalendarMonth(0); }
+    else setCalendarMonth((m) => m + 1);
+  }
+
+  const calendarDayMap = useMemo(() => {
+    const map = new Map<string, TransactionLog[]>();
+    for (const log of calendarLogs) {
+      const key = toDateKey(log.created_at);
+      const d = parseUtc(log.created_at);
+      if (d.getFullYear() !== calendarYear || d.getMonth() !== calendarMonth) continue;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(log);
+    }
+    return map;
+  }, [calendarLogs, calendarYear, calendarMonth]);
+
+  const calendarDays = useMemo(() => {
+    const firstDay = new Date(calendarYear, calendarMonth, 1).getDay();
+    const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+    const cells: (number | null)[] = [];
+    for (let i = 0; i < firstDay; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  }, [calendarYear, calendarMonth]);
+
+  const selectedDayLogs = useMemo(() => (selectedDay ? (calendarDayMap.get(selectedDay) ?? []) : []), [selectedDay, calendarDayMap]);
+
+  const todayKey = toDateKey(new Date().toISOString());
 
   const filteredLogs = useMemo(() => {
     const start = getPeriodStart(dateFilter);
@@ -280,7 +345,7 @@ export function DesktopHistoryView() {
           {/* ── 필터 바 ── */}
           <section className="card">
             <div className="flex flex-col gap-3">
-              {/* 검색 + CSV */}
+              {/* 검색 + 토글 */}
               <div className="flex items-center gap-3">
                 <div
                   className="flex flex-1 items-center gap-2 rounded-[14px] border px-3 py-2.5"
@@ -297,6 +362,23 @@ export function DesktopHistoryView() {
                   {search && (
                     <button onClick={() => setSearch("")} className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>✕</button>
                   )}
+                </div>
+                {/* 목록/달력 토글 */}
+                <div className="flex overflow-hidden rounded-[12px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+                  <button
+                    onClick={() => setViewMode("list")}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm font-bold transition-colors"
+                    style={{ background: viewMode === "list" ? LEGACY_COLORS.blue : "transparent", color: viewMode === "list" ? "#fff" : LEGACY_COLORS.muted2 }}
+                  >
+                    <List className="h-3.5 w-3.5" />목록
+                  </button>
+                  <button
+                    onClick={() => setViewMode("calendar")}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm font-bold transition-colors"
+                    style={{ background: viewMode === "calendar" ? LEGACY_COLORS.blue : "transparent", color: viewMode === "calendar" ? "#fff" : LEGACY_COLORS.muted2 }}
+                  >
+                    <CalendarDays className="h-3.5 w-3.5" />달력
+                  </button>
                 </div>
               </div>
 
@@ -318,7 +400,116 @@ export function DesktopHistoryView() {
             </div>
           </section>
 
+          {/* ── 달력 뷰 ── */}
+          {viewMode === "calendar" && (
+            <section className="card">
+              {/* 월 네비게이션 */}
+              <div className="mb-4 flex items-center justify-between rounded-[20px] border px-5 py-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                <button onClick={prevMonth} className="rounded-full p-1.5 hover:bg-white/10">
+                  <ChevronLeft className="h-4 w-4" style={{ color: LEGACY_COLORS.muted2 }} />
+                </button>
+                <span className="text-base font-bold">{calendarYear}년 {calendarMonth + 1}월</span>
+                <button onClick={nextMonth} className="rounded-full p-1.5 hover:bg-white/10">
+                  <ChevronRight className="h-4 w-4" style={{ color: LEGACY_COLORS.muted2 }} />
+                </button>
+              </div>
+
+              {calendarLoading ? (
+                <div className="py-12 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>달력 데이터 불러오는 중...</div>
+              ) : (
+                <>
+                  {/* 요일 헤더 */}
+                  <div className="mb-1 grid grid-cols-7">
+                    {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
+                      <div key={d} className="py-1 text-center text-[11px] font-bold"
+                        style={{ color: i === 0 ? "#f25f5c" : i === 6 ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}>
+                        {d}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 날짜 그리드 */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {calendarDays.map((day, idx) => {
+                      if (day === null) return <div key={`empty-${idx}`} />;
+                      const mm = String(calendarMonth + 1).padStart(2, "0");
+                      const dd = String(day).padStart(2, "0");
+                      const key = `${calendarYear}-${mm}-${dd}`;
+                      const dayLogs = calendarDayMap.get(key) ?? [];
+                      const isToday = key === todayKey;
+                      const isSelected = key === selectedDay;
+                      const hasReceive = dayLogs.some((l) => l.transaction_type === "RECEIVE" || l.transaction_type === "PRODUCE");
+                      const hasShip = dayLogs.some((l) => l.transaction_type === "SHIP" || l.transaction_type === "BACKFLUSH");
+                      const hasAdjust = dayLogs.some((l) => l.transaction_type === "ADJUST");
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => setSelectedDay((c) => (c === key ? null : key))}
+                          className="flex flex-col items-center rounded-[14px] border p-2 transition-colors hover:brightness-110"
+                          style={{
+                            background: isSelected ? "rgba(101,169,255,.18)" : isToday ? "rgba(101,169,255,.08)" : LEGACY_COLORS.s2,
+                            borderColor: isSelected ? LEGACY_COLORS.blue : isToday ? `${LEGACY_COLORS.blue}44` : LEGACY_COLORS.border,
+                            minHeight: "64px",
+                          }}
+                        >
+                          <span className="text-sm font-bold" style={{ color: isToday ? LEGACY_COLORS.blue : LEGACY_COLORS.text }}>{day}</span>
+                          {dayLogs.length > 0 && (
+                            <span className="mt-1 rounded-full px-1.5 py-0.5 font-mono text-[10px] font-bold" style={{ background: "rgba(101,169,255,.2)", color: LEGACY_COLORS.blue }}>
+                              {dayLogs.length}
+                            </span>
+                          )}
+                          <div className="mt-1 flex gap-0.5">
+                            {hasReceive && <span className="h-1.5 w-1.5 rounded-full" style={{ background: LEGACY_COLORS.green }} />}
+                            {hasShip && <span className="h-1.5 w-1.5 rounded-full" style={{ background: LEGACY_COLORS.red }} />}
+                            {hasAdjust && <span className="h-1.5 w-1.5 rounded-full" style={{ background: LEGACY_COLORS.yellow }} />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* 선택일 거래 목록 */}
+                  {selectedDay && (
+                    <div className="mt-4 rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                      <div className="mb-3 text-sm font-bold">{selectedDay} 거래 {selectedDayLogs.length}건</div>
+                      {selectedDayLogs.length === 0 ? (
+                        <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>거래 없음</div>
+                      ) : (
+                        <div className="space-y-2">
+                          {selectedDayLogs.map((log) => {
+                            const tcolor = transactionColor(log.transaction_type);
+                            return (
+                              <button
+                                key={log.log_id}
+                                onClick={() => setSelected((c) => (c?.log_id === log.log_id ? null : log))}
+                                className="flex w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition-all hover:brightness-110"
+                                style={{
+                                  background: selected?.log_id === log.log_id ? "rgba(101,169,255,.10)" : LEGACY_COLORS.s1,
+                                  borderColor: selected?.log_id === log.log_id ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+                                }}
+                              >
+                                <span className="inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: `${tcolor}22`, color: tcolor }}>
+                                  {transactionLabel(log.transaction_type)}
+                                </span>
+                                <span className="min-w-0 flex-1 truncate text-sm">{log.item_name}</span>
+                                <span className="shrink-0 font-mono text-sm font-bold" style={{ color: tcolor }}>
+                                  {Number(log.quantity_change) >= 0 ? "+" : ""}{formatNumber(log.quantity_change)}
+                                </span>
+                                <span className="shrink-0 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{formatDate(log.created_at).split(" ")[1]}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+          )}
+
           {/* ── 메인 테이블 ── */}
+          {viewMode === "list" && (
           <section className="card" style={{ backgroundImage: "linear-gradient(rgba(101,169,255,.04), rgba(101,169,255,.04))" }}>
             <div
               className="sticky top-0 z-20 -mx-5 -mt-5 mb-4 flex items-center gap-3 rounded-t-[28px] px-5 pb-3 pt-5"
@@ -478,6 +669,7 @@ export function DesktopHistoryView() {
               </button>
             )}
           </section>
+          )}
         </div>
       </div>
 

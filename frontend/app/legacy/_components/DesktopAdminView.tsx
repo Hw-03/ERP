@@ -2,13 +2,13 @@
 
 import type { ElementType } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { DatabaseBackup, FileDown, KeyRound, PackagePlus, Search, Settings2, ShieldCheck, Users, X } from "lucide-react";
-import { api, type BOMEntry, type Employee, type Item, type ShipPackage } from "@/lib/api";
+import { Check, DatabaseBackup, FileDown, KeyRound, Layers, PackagePlus, Search, Settings2, ShieldCheck, Trash2, Users, X } from "lucide-react";
+import { api, type BOMDetailEntry, type BOMEntry, type Employee, type Item, type ProductModel, type ShipPackage } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import { PinLock } from "./PinLock";
 import { DEPARTMENT_LABELS, LEGACY_COLORS, buildItemSearchLabel, formatNumber, normalizeDepartment } from "./legacyUi";
 
-type AdminSection = "items" | "employees" | "bom" | "packages" | "export" | "settings";
+type AdminSection = "items" | "employees" | "models" | "bom" | "packages" | "export" | "settings";
 
 const CATEGORY_OPTIONS = [
   { value: "RM", label: "RM — 원자재" },
@@ -28,6 +28,14 @@ const MODEL_SLOTS = [
 ];
 const UNIT_OPTIONS = ["EA", "SET", "kg", "g", "m", "mm", "L", "box"];
 
+const PKG_CATEGORY_OPTIONS = [
+  { value: "ALL", label: "전체" },
+  { value: "RM",  label: "RM"  },
+  { value: "?A",  label: "?A"  },
+  { value: "?F",  label: "?F"  },
+  { value: "FG",  label: "FG"  },
+];
+
 const EMPTY_ADD_FORM = {
   item_name: "",
   category: "RM" as Item["category"],
@@ -42,12 +50,12 @@ const EMPTY_ADD_FORM = {
 };
 
 const SECTIONS: { id: AdminSection; label: string; description: string; icon: ElementType }[] = [
+  { id: "models", label: "모델", description: "제품 모델 추가/삭제", icon: Layers },
   { id: "items", label: "품목", description: "품목 기본 정보 수정", icon: PackagePlus },
   { id: "employees", label: "직원", description: "직원 활성 상태 관리", icon: Users },
   { id: "bom", label: "BOM", description: "부모-자식 자재 구성", icon: Settings2 },
   { id: "packages", label: "출하묶음", description: "패키지 구성 관리", icon: ShieldCheck },
   { id: "export", label: "내보내기", description: "엑셀 데이터 내보내기", icon: FileDown },
-  { id: "settings", label: "설정", description: "PIN, CSV, 초기화", icon: KeyRound },
 ];
 
 export function DesktopAdminView({
@@ -63,6 +71,9 @@ export function DesktopAdminView({
   const [items, setItems] = useState<Item[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [packages, setPackages] = useState<ShipPackage[]>([]);
+  const [productModels, setProductModels] = useState<ProductModel[]>([]);
+  const [modelAddName, setModelAddName] = useState("");
+  const [modelAddSymbol, setModelAddSymbol] = useState("");
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [addMode, setAddMode] = useState(false);
   const [addForm, setAddForm] = useState(EMPTY_ADD_FORM);
@@ -75,26 +86,33 @@ export function DesktopAdminView({
   const [bomParentSearch, setBomParentSearch] = useState("");
   const [bomParentCat, setBomParentCat] = useState("ALL");
   const [bomChildSearch, setBomChildSearch] = useState("");
-  const [bomChildId, setBomChildId] = useState("");
-  const [bomChildQty, setBomChildQty] = useState("1");
-  const [bomChildUnit, setBomChildUnit] = useState("EA");
   const [editingBomId, setEditingBomId] = useState<string | null>(null);
   const [editingQty, setEditingQty] = useState("");
+  const [allBomRows, setAllBomRows] = useState<BOMDetailEntry[]>([]);
+  const [pendingChildId, setPendingChildId] = useState<string | null>(null);
+  const [pendingChildQty, setPendingChildQty] = useState("1");
+  const [bomChildCat, setBomChildCat] = useState("ALL");
   const [message, setMessage] = useState("");
   const [pinForm, setPinForm] = useState({ current_pin: "", new_pin: "", confirm_pin: "" });
   const [resetPin, setResetPin] = useState("");
   const [itemSearch, setItemSearch] = useState("");
+  const [pkgRenaming, setPkgRenaming] = useState(false);
+  const [pkgNameDraft, setPkgNameDraft] = useState("");
+  const [pkgItemSearch, setPkgItemSearch] = useState("");
+  const [pkgItemQtyMap, setPkgItemQtyMap] = useState<Record<string, number>>({});
+  const [pkgItemCategory, setPkgItemCategory] = useState("ALL");
 
   async function loadData() {
-    const [nextItems, nextEmployees, nextPackages] = await Promise.all([
+    const [nextItems, nextEmployees, nextPackages, nextModels] = await Promise.all([
       api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
       api.getEmployees(),
       api.getShipPackages(),
+      api.getModels(),
     ]);
     setItems(nextItems);
     setEmployees(nextEmployees);
     setPackages(nextPackages);
-    if (!parentId && nextItems[0]) setParentId(nextItems[0].item_id);
+    setProductModels(nextModels);
     onStatusChange(`관리자 데이터를 불러왔습니다. 품목 ${nextItems.length}건 / 직원 ${nextEmployees.length}명`);
   }
 
@@ -109,21 +127,48 @@ export function DesktopAdminView({
     void api.getBOM(parentId).then(setBomRows).catch(() => setBomRows([]));
   }, [parentId]);
 
+  function refreshAllBom() {
+    void api.getAllBOM().then(setAllBomRows).catch(() => setAllBomRows([]));
+  }
+
+  useEffect(() => {
+    if (!unlocked) return;
+    refreshAllBom();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unlocked]);
+
   const visibleItems = useMemo(() => {
     const keyword = `${globalSearch} ${itemSearch}`.trim().toLowerCase();
     if (!keyword) return items.slice(0, 200);
     return items.filter((item) => `${item.item_name} ${item.erp_code}`.toLowerCase().includes(keyword)).slice(0, 200);
   }, [globalSearch, itemSearch, items]);
 
-  const quickItems = useMemo(() => items.slice(0, 40), [items]);
+  const filteredPkgItems = useMemo(() => {
+    const kw = pkgItemSearch.trim().toLowerCase();
+    const A_SET = new Set(["TA", "HA", "VA", "BA"]);
+    const F_SET = new Set(["TF", "HF", "VF", "BF"]);
+    return items
+      .filter((i) => {
+        if (pkgItemCategory === "ALL") return true;
+        if (pkgItemCategory === "?A") return A_SET.has(i.category);
+        if (pkgItemCategory === "?F") return F_SET.has(i.category);
+        return i.category === pkgItemCategory;
+      })
+      .filter((i) => !kw || `${i.item_name} ${i.erp_code ?? ""}`.toLowerCase().includes(kw))
+      .slice(0, 40);
+  }, [items, pkgItemSearch, pkgItemCategory]);
 
-  const BOM_PARENT_CATS = ["ALL", "BA", "BF", "TA", "HA", "VA"];
+  const BOM_PARENT_CATS = ["ALL", "BA", "HA", "VA", "TA", "BF", "TF", "FG"];
+  const BOM_CHILD_CATS = ["ALL", "RM", "?A", "?F"];
+  const A_CATS = new Set(["TA", "HA", "VA", "BA"]);
+  const F_CATS = new Set(["TF", "HF", "VF", "BF"]);
+
   const bomParentItems = useMemo(() => {
-    let pool = items;
+    let pool = items.filter((i) => i.category !== "RM");
     if (bomParentCat !== "ALL") pool = pool.filter((i) => i.category === bomParentCat);
     const kw = bomParentSearch.trim().toLowerCase();
     if (kw) pool = pool.filter((i) => `${i.item_name} ${i.erp_code ?? ""}`.toLowerCase().includes(kw));
-    return pool.slice(0, 60);
+    return pool.slice(0, 100);
   }, [items, bomParentSearch, bomParentCat]);
 
   const bomChildItems = useMemo(() => {
@@ -131,10 +176,16 @@ export function DesktopAdminView({
     const existingIds = new Set(bomRows.map((r) => r.child_item_id));
     return items
       .filter((i) => i.item_id !== parentId)
+      .filter((i) => {
+        if (bomChildCat === "RM") return i.category === "RM";
+        if (bomChildCat === "?A") return A_CATS.has(i.category);
+        if (bomChildCat === "?F") return F_CATS.has(i.category);
+        return true;
+      })
       .filter((i) => !kw || `${i.item_name} ${i.erp_code ?? ""}`.toLowerCase().includes(kw))
-      .slice(0, 40)
+      .slice(0, 60)
       .map((i) => ({ ...i, alreadyIn: existingIds.has(i.item_id) }));
-  }, [items, parentId, bomChildSearch, bomRows]);
+  }, [items, parentId, bomChildSearch, bomChildCat, bomRows]);
 
   async function addItem() {
     if (!addForm.item_name.trim()) {
@@ -204,32 +255,74 @@ export function DesktopAdminView({
   }
 
   async function createSimplePackage() {
-    const created = await api.createShipPackage({
-      package_code: `PKG-${Date.now()}`,
-      name: `출하묶음 ${packages.length + 1}`,
-    });
-    setPackages((current) => [...current, created]);
-    setSelectedPackage(created);
-    onStatusChange(`${created.name} 출하묶음을 생성했습니다.`);
+    try {
+      const created = await api.createShipPackage({
+        package_code: `PKG-${Date.now()}`,
+        name: `출하묶음 ${packages.length + 1}`,
+      });
+      const newPkg = { ...created, items: [] as ShipPackage["items"] };
+      setPackages((current) => [...current, newPkg]);
+      setSelectedPackage(newPkg);
+      onStatusChange(`${created.name} 출하묶음을 생성했습니다.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "출하묶음 생성에 실패했습니다.");
+    }
   }
 
   async function addPackageItem(itemId: string) {
     if (!selectedPackage) return;
-    const updated = await api.addShipPackageItem(selectedPackage.package_id, { item_id: itemId, quantity: 1 });
+    const qty = pkgItemQtyMap[itemId] ?? 1;
+    const updated = await api.addShipPackageItem(selectedPackage.package_id, { item_id: itemId, quantity: qty });
     setPackages((current) => current.map((entry) => (entry.package_id === updated.package_id ? updated : entry)));
     setSelectedPackage(updated);
     onStatusChange(`${updated.name}에 품목을 추가했습니다.`);
   }
 
-  async function addBomRow() {
-    if (!parentId || !bomChildId) return;
-    const qty = parseFloat(bomChildQty) || 1;
+  async function renamePackage() {
+    if (!selectedPackage || !pkgNameDraft.trim()) return;
     try {
-      const created = await api.createBOM({ parent_item_id: parentId, child_item_id: bomChildId, quantity: qty, unit: bomChildUnit });
+      const updated = await api.updateShipPackage(selectedPackage.package_id, { name: pkgNameDraft.trim() });
+      const newPkg = { ...updated, items: selectedPackage.items };
+      setPackages((current) => current.map((entry) => (entry.package_id === newPkg.package_id ? newPkg : entry)));
+      setSelectedPackage(newPkg);
+      setPkgRenaming(false);
+      onStatusChange(`출하묶음 이름을 '${newPkg.name}'으로 변경했습니다.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "이름 변경에 실패했습니다.");
+    }
+  }
+
+  async function removePackageItem(packageItemId: string) {
+    if (!selectedPackage) return;
+    try {
+      const updated = await api.deleteShipPackageItem(selectedPackage.package_id, packageItemId);
+      setPackages((current) => current.map((entry) => (entry.package_id === updated.package_id ? updated : entry)));
+      setSelectedPackage(updated);
+      onStatusChange("품목을 출하묶음에서 제거했습니다.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "품목 제거에 실패했습니다.");
+    }
+  }
+
+  async function deletePackage(packageId: string) {
+    try {
+      await api.deleteShipPackage(packageId);
+      setPackages((current) => current.filter((entry) => entry.package_id !== packageId));
+      if (selectedPackage?.package_id === packageId) setSelectedPackage(null);
+      onStatusChange("출하묶음을 삭제했습니다.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "출하묶음 삭제에 실패했습니다.");
+    }
+  }
+
+  async function addBomRowDirect(childId: string, qty: number) {
+    if (!parentId) return;
+    try {
+      const created = await api.createBOM({ parent_item_id: parentId, child_item_id: childId, quantity: qty, unit: "EA" });
       setBomRows((current) => [...current, created]);
-      setBomChildId("");
-      setBomChildSearch("");
-      setBomChildQty("1");
+      setPendingChildId(null);
+      setPendingChildQty("1");
+      refreshAllBom();
       onStatusChange("BOM 항목을 추가했습니다.");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "추가에 실패했습니다.");
@@ -278,7 +371,8 @@ export function DesktopAdminView({
     );
   }
 
-  const activeSection = SECTIONS.find((entry) => entry.id === section);
+  const SETTINGS_ENTRY = { id: "settings" as AdminSection, label: "설정", description: "PIN, CSV, 초기화", icon: KeyRound };
+  const activeSection = SECTIONS.find((entry) => entry.id === section) ?? (section === "settings" ? SETTINGS_ENTRY : undefined);
 
   return (
     <div className="flex min-h-0 flex-1 gap-4 pl-0 pr-4">
@@ -317,7 +411,23 @@ export function DesktopAdminView({
               );
             })}
           </div>
-          <div className="mt-3 shrink-0">
+          <div className="mt-3 shrink-0 flex flex-col gap-2">
+            <button
+              onClick={() => setSection("settings")}
+              className="flex w-full items-center gap-3 rounded-[20px] border px-3 py-3 text-left transition-colors hover:bg-white/[0.12]"
+              style={{
+                background: section === "settings" ? "rgba(142,125,255,.16)" : LEGACY_COLORS.s2,
+                borderColor: section === "settings" ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
+              }}
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px]" style={{ background: section === "settings" ? LEGACY_COLORS.purple : LEGACY_COLORS.s1, color: section === "settings" ? "#fff" : LEGACY_COLORS.muted2 }}>
+                <KeyRound className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-base font-bold truncate">설정</div>
+                <div className="mt-0.5 text-[11px] leading-4 truncate" style={{ color: LEGACY_COLORS.muted2 }}>PIN, CSV, 초기화</div>
+              </div>
+            </button>
             <button
               onClick={() => setUnlocked(false)}
               className="w-full rounded-[16px] border px-3 py-2.5 text-[11px] font-semibold transition-colors hover:bg-white/10"
@@ -651,17 +761,20 @@ export function DesktopAdminView({
 
             {/* ── BOM 관리 ── */}
             {section === "bom" ? (
-              <div className="grid h-full gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-                {/* 좌측: 상위 품목 선택 + 하위 자재 추가 폼 */}
-                <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">
-                  {/* 상위 품목 선택 */}
-                  <div className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                    <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>상위 품목 선택</div>
+              <div className="grid h-full gap-3" style={{ gridTemplateColumns: "300px minmax(0,1fr)" }}>
+
+                {/* 좌측: 상위 품목 선택 */}
+                <div className="flex min-h-0 flex-col overflow-hidden rounded-[28px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                  <div className="shrink-0 border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+                    <div className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>상위 품목 선택</div>
+                    <div className="mt-1 text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>RM 제외 · {bomParentItems.length}건 표시</div>
+                  </div>
+                  <div className="shrink-0 px-3 pt-3">
                     <input
                       value={bomParentSearch}
                       onChange={(e) => setBomParentSearch(e.target.value)}
                       placeholder="품목명 / ERP 코드 검색"
-                      className="mb-2 w-full rounded-[14px] border px-3 py-2 text-base outline-none"
+                      className="mb-2 w-full rounded-[12px] border px-3 py-1.5 text-sm outline-none"
                       style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
                     />
                     <div className="mb-2 flex flex-wrap gap-1">
@@ -669,7 +782,7 @@ export function DesktopAdminView({
                         <button
                           key={cat}
                           onClick={() => setBomParentCat(cat)}
-                          className="rounded-full px-2.5 py-0.5 text-[11px] font-bold"
+                          className="rounded-full px-2 py-0.5 text-[10px] font-bold"
                           style={{
                             background: bomParentCat === cat ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
                             color: bomParentCat === cat ? "#fff" : LEGACY_COLORS.muted2,
@@ -680,176 +793,269 @@ export function DesktopAdminView({
                         </button>
                       ))}
                     </div>
-                    <div className="max-h-52 overflow-y-auto rounded-[14px] border" style={{ borderColor: LEGACY_COLORS.border }}>
-                      {bomParentItems.map((item, index) => (
-                        <button
-                          key={item.item_id}
-                          onClick={() => { setParentId(item.item_id); setBomChildId(""); setBomChildSearch(""); }}
-                          className="block w-full px-3 py-2.5 text-left text-base"
-                          style={{
-                            background: parentId === item.item_id ? "rgba(142,125,255,.12)" : "transparent",
-                            borderBottom: index === bomParentItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
-                            color: parentId === item.item_id ? LEGACY_COLORS.text : LEGACY_COLORS.text,
-                            fontWeight: parentId === item.item_id ? 700 : 400,
-                          }}
-                        >
-                          <span className="text-[11px] font-mono" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</span>
-                          <span className="ml-2">{item.item_name}</span>
-                        </button>
-                      ))}
-                      {bomParentItems.length === 0 && (
-                        <div className="px-3 py-3 text-base" style={{ color: LEGACY_COLORS.muted2 }}>검색 결과 없음</div>
-                      )}
-                    </div>
                   </div>
-
-                  {/* 하위 자재 추가 폼 */}
-                  <div className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                    <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>하위 자재 추가</div>
-                    <input
-                      value={bomChildSearch}
-                      onChange={(e) => { setBomChildSearch(e.target.value); setBomChildId(""); }}
-                      placeholder="품목명 / ERP 코드 검색"
-                      className="mb-2 w-full rounded-[14px] border px-3 py-2 text-base outline-none"
-                      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                    />
-                    {bomChildSearch && (
-                      <div className="mb-2 max-h-40 overflow-y-auto rounded-[14px] border" style={{ borderColor: LEGACY_COLORS.border }}>
-                        {bomChildItems.map((item, index) => (
-                          <button
-                            key={item.item_id}
-                            disabled={item.alreadyIn}
-                            onClick={() => { setBomChildId(item.item_id); setBomChildSearch(`${item.erp_code ?? ""} ${item.item_name}`); }}
-                            className="block w-full px-3 py-2 text-left text-base"
-                            style={{
-                              background: bomChildId === item.item_id ? "rgba(142,125,255,.12)" : "transparent",
-                              borderBottom: index === bomChildItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
-                              color: item.alreadyIn ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
-                              opacity: item.alreadyIn ? 0.5 : 1,
-                            }}
-                          >
-                            <span className="text-[11px] font-mono" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</span>
-                            <span className="ml-2">{item.item_name}</span>
-                            {item.alreadyIn && <span className="ml-1 text-[10px]">(이미 추가됨)</span>}
-                          </button>
-                        ))}
-                        {bomChildItems.length === 0 && (
-                          <div className="px-3 py-3 text-base" style={{ color: LEGACY_COLORS.muted2 }}>검색 결과 없음</div>
-                        )}
-                      </div>
-                    )}
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        min="0.001"
-                        step="1"
-                        value={bomChildQty}
-                        onChange={(e) => setBomChildQty(e.target.value)}
-                        className="w-20 rounded-[14px] border px-3 py-2 text-right text-base outline-none"
-                        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                      />
-                      <select
-                        value={bomChildUnit}
-                        onChange={(e) => setBomChildUnit(e.target.value)}
-                        className="rounded-[14px] border px-2 py-2 text-base outline-none"
-                        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                      >
-                        {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
-                      </select>
+                  <div className="min-h-0 overflow-y-auto">
+                    {bomParentItems.map((item, index) => (
                       <button
-                        onClick={() => void addBomRow()}
-                        disabled={!bomChildId}
-                        className="flex-1 rounded-[14px] py-2 text-base font-bold text-white"
-                        style={{ background: bomChildId ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2, opacity: bomChildId ? 1 : 0.5 }}
+                        key={item.item_id}
+                        onClick={() => { setParentId(item.item_id); setPendingChildId(null); setBomChildSearch(""); setBomChildCat("ALL"); }}
+                        className="block w-full px-3 py-2.5 text-left transition-colors"
+                        style={{
+                          background: parentId === item.item_id ? "rgba(79,142,247,.14)" : "transparent",
+                          borderBottom: index === bomParentItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
+                        }}
                       >
-                        추가
+                        <div className="flex items-center gap-2">
+                          <span className="shrink-0 rounded px-1 py-0.5 font-mono text-[9px] font-bold" style={{ background: "rgba(79,142,247,.12)", color: LEGACY_COLORS.blue }}>{item.category}</span>
+                          <div className="truncate text-sm font-medium" style={{ color: parentId === item.item_id ? LEGACY_COLORS.blue : LEGACY_COLORS.text }}>{item.item_name}</div>
+                        </div>
+                        <div className="mt-0.5 font-mono text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
                       </button>
-                    </div>
+                    ))}
+                    {bomParentItems.length === 0 && (
+                      <div className="px-4 py-4 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>결과 없음</div>
+                    )}
                   </div>
                 </div>
 
-                {/* 우측: BOM 목록 */}
-                <div className="flex min-h-0 flex-col overflow-hidden rounded-[28px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                  {/* 헤더 */}
-                  <div className="flex shrink-0 items-center justify-between border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-                    <div>
-                      <span className="text-sm font-bold">{items.find((i) => i.item_id === parentId)?.item_name ?? "상위 품목 선택"}</span>
-                      {parentId && <span className="ml-2 text-[11px] font-mono" style={{ color: LEGACY_COLORS.muted2 }}>{items.find((i) => i.item_id === parentId)?.erp_code}</span>}
-                    </div>
-                    <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>총 {bomRows.length}개 자재</span>
-                  </div>
-                  {bomRows.length === 0 ? (
-                    <div className="p-5 text-base" style={{ color: LEGACY_COLORS.muted2 }}>BOM 항목이 없습니다. 왼쪽에서 자재를 추가하세요.</div>
-                  ) : (
-                    <div className="overflow-y-auto">
-                      <div className="grid grid-cols-[1fr_100px_80px_60px_40px] border-b px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-                        <span>자재명</span>
-                        <span className="text-right">소요수량</span>
-                        <span className="text-right">현재고</span>
-                        <span className="text-right">가능</span>
-                        <span />
-                      </div>
-                      {bomRows.map((row, index) => {
-                        const childItem = items.find((item) => item.item_id === row.child_item_id);
-                        const stock = Number(childItem?.quantity ?? 0);
-                        const capacity = row.quantity > 0 ? Math.floor(stock / row.quantity) : 0;
-                        return (
-                          <div
-                            key={row.bom_id}
-                            className="grid grid-cols-[1fr_100px_80px_60px_40px] items-center px-4 py-3"
-                            style={{ borderBottom: index === bomRows.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}` }}
-                          >
-                            <div>
-                              <div className="text-base font-semibold">{childItem?.item_name || row.child_item_id}</div>
-                              <div className="mt-0.5 font-mono text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{childItem?.erp_code}</div>
-                            </div>
-                            <div className="flex items-center justify-end gap-1">
-                              {editingBomId === row.bom_id ? (
-                                <input
-                                  autoFocus
-                                  type="number"
-                                  value={editingQty}
-                                  onChange={(e) => setEditingQty(e.target.value)}
-                                  onBlur={() => void saveBomQty(row)}
-                                  onKeyDown={(e) => e.key === "Enter" && void saveBomQty(row)}
-                                  className="w-14 rounded border bg-transparent px-1 text-right font-mono text-sm outline-none"
-                                  style={{ borderColor: LEGACY_COLORS.blue, color: LEGACY_COLORS.text }}
-                                />
-                              ) : (
-                                <span
-                                  title="클릭하여 수량 편집"
-                                  onClick={() => { setEditingBomId(row.bom_id); setEditingQty(String(row.quantity)); }}
-                                  className="cursor-pointer font-mono text-sm hover:underline"
-                                  style={{ color: LEGACY_COLORS.text }}
+                {/* 우측: BOM 상세 */}
+                <div className="flex min-h-0 flex-col gap-3">
+
+                  {/* 하위 품목 추가 카드 */}
+                  <div className="shrink-0 overflow-hidden rounded-[28px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                    {!parentId ? (
+                      <div className="px-5 py-4 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>← 좌측에서 상위 품목을 선택하세요</div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between border-b px-5 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+                          <div>
+                            <span className="mr-2 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold" style={{ background: "rgba(79,142,247,.12)", color: LEGACY_COLORS.blue }}>
+                              {items.find((i) => i.item_id === parentId)?.category}
+                            </span>
+                            <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>{items.find((i) => i.item_id === parentId)?.item_name ?? "-"}</span>
+                            <span className="ml-2 font-mono text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{items.find((i) => i.item_id === parentId)?.erp_code}</span>
+                          </div>
+                          <span className="text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>하위 {bomRows.length}개</span>
+                        </div>
+                        <div className="px-4 pb-3 pt-3">
+                          <div className="text-[10px] font-bold uppercase tracking-[0.15em] mb-2" style={{ color: LEGACY_COLORS.muted2 }}>하위 품목 추가</div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <input
+                              value={bomChildSearch}
+                              onChange={(e) => { setBomChildSearch(e.target.value); setPendingChildId(null); }}
+                              placeholder="품목명 / ERP 코드"
+                              className="flex-1 rounded-[12px] border px-3 py-1.5 text-sm outline-none"
+                              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                            />
+                            <div className="flex gap-1 shrink-0">
+                              {BOM_CHILD_CATS.map((cat) => (
+                                <button
+                                  key={cat}
+                                  onClick={() => setBomChildCat(cat)}
+                                  className="rounded-full px-2 py-1 text-[10px] font-bold"
+                                  style={{
+                                    background: bomChildCat === cat ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
+                                    color: bomChildCat === cat ? "#fff" : LEGACY_COLORS.muted2,
+                                    border: `1px solid ${LEGACY_COLORS.border}`,
+                                  }}
                                 >
-                                  {formatNumber(row.quantity)}
-                                </span>
-                              )}
-                              <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{row.unit}</span>
-                            </div>
-                            <div className="text-right font-mono text-sm" style={{ color: stock > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red }}>{formatNumber(stock)}</div>
-                            <div className="text-right font-mono text-sm font-bold" style={{ color: capacity > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}>{formatNumber(capacity)}</div>
-                            <div className="flex justify-end">
-                              <button
-                                onClick={() => void api.deleteBOM(row.bom_id).then(() => setBomRows((current) => current.filter((entry) => entry.bom_id !== row.bom_id)))}
-                                className="flex items-center justify-center rounded-full p-1 hover:bg-red-500/10"
-                                style={{ color: LEGACY_COLORS.red }}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
+                                  {cat}
+                                </button>
+                              ))}
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                          <div className="max-h-44 overflow-y-auto rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+                            {bomChildItems.length === 0 ? (
+                              <div className="px-4 py-3 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>결과 없음</div>
+                            ) : (
+                              bomChildItems.map((item, index) => (
+                                <div key={item.item_id} style={{ borderBottom: index === bomChildItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}` }}>
+                                  <button
+                                    disabled={item.alreadyIn}
+                                    onClick={() => { if (!item.alreadyIn) setPendingChildId(pendingChildId === item.item_id ? null : item.item_id); }}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left"
+                                    style={{
+                                      background: pendingChildId === item.item_id ? "rgba(79,142,247,.10)" : "transparent",
+                                      opacity: item.alreadyIn ? 0.45 : 1,
+                                    }}
+                                  >
+                                    <span className="shrink-0 rounded px-1 py-0.5 font-mono text-[9px] font-bold" style={{ background: "rgba(79,142,247,.10)", color: LEGACY_COLORS.blue }}>{item.category}</span>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="truncate text-sm" style={{ color: LEGACY_COLORS.text }}>{item.item_name}</div>
+                                      <div className="font-mono text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
+                                    </div>
+                                    {item.alreadyIn && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ background: "rgba(31,209,122,.15)", color: LEGACY_COLORS.green }}>추가됨</span>}
+                                  </button>
+                                  {pendingChildId === item.item_id && (
+                                    <div className="flex items-center gap-2 bg-blue-500/5 px-3 py-2">
+                                      <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>소요량</span>
+                                      <input
+                                        autoFocus
+                                        type="number"
+                                        min="0.001"
+                                        step="1"
+                                        value={pendingChildQty}
+                                        onChange={(e) => setPendingChildQty(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === "Enter") void addBomRowDirect(item.item_id, parseFloat(pendingChildQty) || 1); }}
+                                        className="w-20 rounded-[10px] border px-2 py-1 text-right text-sm font-mono outline-none"
+                                        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.blue, color: LEGACY_COLORS.text }}
+                                      />
+                                      <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>EA</span>
+                                      <button
+                                        onClick={() => void addBomRowDirect(item.item_id, parseFloat(pendingChildQty) || 1)}
+                                        className="ml-auto rounded-[10px] px-3 py-1 text-xs font-bold text-white"
+                                        style={{ background: LEGACY_COLORS.blue }}
+                                      >
+                                        추가
+                                      </button>
+                                      <button
+                                        onClick={() => setPendingChildId(null)}
+                                        className="rounded-[10px] px-2 py-1 text-xs"
+                                        style={{ color: LEGACY_COLORS.muted2 }}
+                                      >
+                                        취소
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* BOM 목록 테이블 */}
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                    {parentId ? (
+                      <>
+                        <div className="shrink-0 border-b px-5 py-3 text-[11px] font-bold uppercase tracking-[0.18em]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                          구성 자재 목록
+                        </div>
+                        {bomRows.length === 0 ? (
+                          <div className="p-5 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>등록된 BOM 항목이 없습니다.</div>
+                        ) : (
+                          <div className="min-h-0 overflow-y-auto">
+                            <div className="grid items-center border-b px-5 py-2 text-[10px] font-bold uppercase tracking-[0.15em]"
+                              style={{ gridTemplateColumns: "36px 1fr 120px 100px 80px 80px 40px", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                              <span>구분</span>
+                              <span>자재명</span>
+                              <span className="text-right">ERP 코드</span>
+                              <span className="text-right">소요량</span>
+                              <span className="text-right">재고</span>
+                              <span className="text-right">가능수량</span>
+                              <span />
+                            </div>
+                            {bomRows.map((row, index) => {
+                              const childItem = items.find((item) => item.item_id === row.child_item_id);
+                              const stock = Number(childItem?.quantity ?? 0);
+                              const capacity = row.quantity > 0 ? Math.floor(stock / Number(row.quantity)) : 0;
+                              return (
+                                <div
+                                  key={row.bom_id}
+                                  className="grid items-center px-5 py-3"
+                                  style={{ gridTemplateColumns: "36px 1fr 120px 100px 80px 80px 40px", borderBottom: index === bomRows.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}` }}
+                                >
+                                  <span className="rounded px-1 py-0.5 font-mono text-[9px] font-bold w-fit" style={{ background: "rgba(79,142,247,.10)", color: LEGACY_COLORS.blue }}>{childItem?.category}</span>
+                                  <div>
+                                    <div className="truncate text-sm font-medium" style={{ color: LEGACY_COLORS.text }}>{childItem?.item_name || row.child_item_id}</div>
+                                  </div>
+                                  <div className="text-right font-mono text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{childItem?.erp_code ?? "-"}</div>
+                                  <div className="flex items-center justify-end gap-1">
+                                    {editingBomId === row.bom_id ? (
+                                      <input
+                                        autoFocus
+                                        type="number"
+                                        value={editingQty}
+                                        onChange={(e) => setEditingQty(e.target.value)}
+                                        onBlur={() => void saveBomQty(row)}
+                                        onKeyDown={(e) => e.key === "Enter" && void saveBomQty(row)}
+                                        className="w-14 rounded border bg-transparent px-1 text-right font-mono text-sm outline-none"
+                                        style={{ borderColor: LEGACY_COLORS.blue, color: LEGACY_COLORS.text }}
+                                      />
+                                    ) : (
+                                      <span
+                                        title="클릭하여 수량 편집"
+                                        onClick={() => { setEditingBomId(row.bom_id); setEditingQty(String(row.quantity)); }}
+                                        className="cursor-pointer font-mono text-sm hover:underline"
+                                        style={{ color: LEGACY_COLORS.text }}
+                                      >
+                                        ×{formatNumber(row.quantity)}
+                                      </span>
+                                    )}
+                                    <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{row.unit}</span>
+                                  </div>
+                                  <div className="text-right font-mono text-sm" style={{ color: stock > 0 ? LEGACY_COLORS.text : LEGACY_COLORS.red }}>{formatNumber(stock)}</div>
+                                  <div className="text-right font-mono text-sm font-bold" style={{ color: capacity > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}>{formatNumber(capacity)}</div>
+                                  <div className="flex justify-end">
+                                    <button
+                                      onClick={() => void api.deleteBOM(row.bom_id).then(() => { setBomRows((current) => current.filter((e) => e.bom_id !== row.bom_id)); refreshAllBom(); })}
+                                      className="flex items-center justify-center rounded-full p-1 hover:bg-red-500/10"
+                                      style={{ color: LEGACY_COLORS.red }}
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex shrink-0 items-center justify-between border-b px-5 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+                          <span className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>전체 BOM 현황</span>
+                          <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{allBomRows.length}개 관계</span>
+                        </div>
+                        {allBomRows.length === 0 ? (
+                          <div className="p-5 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>등록된 BOM이 없습니다.</div>
+                        ) : (
+                          <div className="min-h-0 overflow-y-auto">
+                            <div className="grid grid-cols-[80px_1fr_1fr_80px] border-b px-5 py-2 text-[10px] font-bold uppercase tracking-[0.15em]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                              <span>구분</span>
+                              <span>상위 품목</span>
+                              <span>하위 품목</span>
+                              <span className="text-right">수량</span>
+                            </div>
+                            {allBomRows.map((row, index) => (
+                              <div
+                                key={row.bom_id}
+                                className="grid grid-cols-[80px_1fr_1fr_80px] items-center px-5 py-2.5"
+                                style={{ borderBottom: index === allBomRows.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}` }}
+                              >
+                                <div className="flex gap-1">
+                                  <span className="rounded px-1 py-0.5 font-mono text-[9px] font-bold" style={{ background: "rgba(79,142,247,.10)", color: LEGACY_COLORS.blue }}>
+                                    {row.parent_erp_code?.split("-")[1] ?? "?"}
+                                  </span>
+                                </div>
+                                <div>
+                                  <div className="truncate text-sm">{row.parent_item_name}</div>
+                                  <div className="font-mono text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{row.parent_erp_code}</div>
+                                </div>
+                                <div>
+                                  <div className="truncate text-sm">{row.child_item_name}</div>
+                                  <div className="font-mono text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{row.child_erp_code}</div>
+                                </div>
+                                <div className="text-right font-mono text-sm" style={{ color: LEGACY_COLORS.text }}>
+                                  ×{formatNumber(row.quantity)}<span className="ml-0.5 text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{row.unit}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : null}
 
             {/* ── 출하묶음 ── */}
             {section === "packages" ? (
-              <div className="grid h-full gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
+              <div className="grid h-full gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
+                {/* 좌측: 묶음 목록 */}
                 <div className="flex min-h-0 flex-col gap-3">
                   <button
                     onClick={() => void createSimplePackage()}
@@ -858,53 +1064,266 @@ export function DesktopAdminView({
                   >
                     새 출하묶음 생성
                   </button>
-                  <div className="overflow-y-auto rounded-[28px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                  <div className="min-h-0 overflow-y-auto rounded-[28px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                    {packages.length === 0 && (
+                      <div className="px-4 py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>출하묶음이 없습니다.</div>
+                    )}
                     {packages.map((pkg, index) => (
-                      <button
+                      <div
                         key={pkg.package_id}
-                        onClick={() => setSelectedPackage(pkg)}
-                        className="block w-full px-4 py-4 text-left"
+                        className="flex items-center gap-2 px-4 py-3"
                         style={{
                           borderBottom: index === packages.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
                           background: selectedPackage?.package_id === pkg.package_id ? "rgba(142,125,255,.10)" : "transparent",
                         }}
                       >
-                        <div className="text-base font-semibold">{pkg.name}</div>
-                        <div className="mt-1 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>{pkg.package_code} / {pkg.items.length}종</div>
-                      </button>
+                        <button
+                          onClick={() => { setSelectedPackage(pkg); setPkgRenaming(false); }}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <div className="truncate text-sm font-semibold">{pkg.name}</div>
+                          <div className="mt-0.5 font-mono text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{pkg.package_code} · {pkg.items.length}종</div>
+                        </button>
+                        <button
+                          onClick={() => { if (window.confirm(`'${pkg.name}' 묶음을 삭제할까요?`)) void deletePackage(pkg.package_id); }}
+                          className="shrink-0 rounded-full p-1.5 transition-colors hover:bg-red-500/20"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.red }} />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="overflow-y-auto rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                {/* 우측: 묶음 상세 */}
+                <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
                   {selectedPackage ? (
                     <>
-                      <div className="text-xl font-black">{selectedPackage.name}</div>
-                      <div className="mt-1 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>{selectedPackage.package_code}</div>
-                      <div className="mt-4 space-y-2">
-                        {selectedPackage.items.map((item) => (
-                          <div key={item.package_item_id} className="rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-                            <div className="text-base font-semibold">{item.item_name}</div>
-                            <div className="mt-1 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>{formatNumber(item.quantity)} {item.item_unit}</div>
+                      {/* 묶음 이름 */}
+                      <div className="rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                        {pkgRenaming ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              autoFocus
+                              value={pkgNameDraft}
+                              onChange={(e) => setPkgNameDraft(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === "Enter") void renamePackage(); if (e.key === "Escape") setPkgRenaming(false); }}
+                              className="flex-1 rounded-[14px] border px-3 py-2 text-base font-bold outline-none"
+                              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.purple, color: LEGACY_COLORS.text }}
+                            />
+                            <button onClick={() => void renamePackage()} className="rounded-[14px] px-3 py-2 text-sm font-bold text-white" style={{ background: LEGACY_COLORS.purple }}>
+                              <Check className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => setPkgRenaming(false)} className="rounded-[14px] px-3 py-2 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+                              <X className="h-4 w-4" />
+                            </button>
                           </div>
-                        ))}
+                        ) : (
+                          <div className="flex items-center justify-between gap-2">
+                            <div>
+                              <div className="text-xl font-black">{selectedPackage.name}</div>
+                              <div className="mt-0.5 font-mono text-sm" style={{ color: LEGACY_COLORS.muted2 }}>{selectedPackage.package_code}</div>
+                            </div>
+                            <button
+                              onClick={() => { setPkgNameDraft(selectedPackage.name); setPkgRenaming(true); }}
+                              className="rounded-[14px] border px-3 py-1.5 text-[11px] font-bold transition-colors hover:bg-white/10"
+                              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+                            >
+                              이름 변경
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      <div className="mt-4 space-y-2">
-                        {quickItems.map((item) => (
-                          <button
-                            key={item.item_id}
-                            onClick={() => void addPackageItem(item.item_id)}
-                            className="block w-full rounded-[18px] border px-4 py-3 text-left text-base"
-                            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-                          >
-                            {buildItemSearchLabel(item)}
-                          </button>
-                        ))}
+
+                      {/* 현재 구성 품목 */}
+                      <div className="rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                        <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>구성 품목 ({selectedPackage.items.length}종)</div>
+                        {selectedPackage.items.length === 0 ? (
+                          <div className="py-3 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>아직 품목이 없습니다.</div>
+                        ) : (
+                          <div className="space-y-2">
+                            {selectedPackage.items.map((item) => (
+                              <div key={item.package_item_id} className="flex items-center gap-3 rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-sm font-semibold">{item.item_name}</div>
+                                  <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{formatNumber(item.quantity)} {item.item_unit}</div>
+                                </div>
+                                <button
+                                  onClick={() => void removePackageItem(item.package_item_id)}
+                                  className="shrink-0 rounded-full p-1.5 transition-colors hover:bg-red-500/20"
+                                >
+                                  <X className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.red }} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 품목 추가 */}
+                      <div className="rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                        <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>품목 추가</div>
+                        <div className="mb-2 flex flex-wrap gap-1.5">
+                          {PKG_CATEGORY_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.value}
+                              onClick={() => setPkgItemCategory(opt.value)}
+                              className="rounded-full border px-2.5 py-1 font-mono text-xs font-semibold transition-all"
+                              style={{
+                                background: pkgItemCategory === opt.value ? `${LEGACY_COLORS.cyan}22` : LEGACY_COLORS.s1,
+                                borderColor: pkgItemCategory === opt.value ? LEGACY_COLORS.cyan : LEGACY_COLORS.border,
+                                color: pkgItemCategory === opt.value ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2,
+                              }}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="mb-3 flex items-center gap-2 rounded-[14px] border px-3 py-2" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+                          <Search className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
+                          <input
+                            value={pkgItemSearch}
+                            onChange={(e) => setPkgItemSearch(e.target.value)}
+                            placeholder="품목명·코드 검색"
+                            className="flex-1 bg-transparent text-sm outline-none"
+                            style={{ color: LEGACY_COLORS.text }}
+                          />
+                          {pkgItemSearch && <button onClick={() => setPkgItemSearch("")} style={{ color: LEGACY_COLORS.muted2 }}>✕</button>}
+                        </div>
+                        <div className="space-y-2">
+                          {filteredPkgItems.map((item) => (
+                            <div key={item.item_id} className="flex items-center gap-2 rounded-[18px] border px-3 py-2.5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+                              <div className="min-w-0 flex-1 text-sm">{buildItemSearchLabel(item)}</div>
+                              <input
+                                type="number"
+                                min="1"
+                                value={pkgItemQtyMap[item.item_id] ?? 1}
+                                onChange={(e) => setPkgItemQtyMap((prev) => ({ ...prev, [item.item_id]: Math.max(1, Number(e.target.value)) }))}
+                                className="w-14 rounded-[10px] border px-2 py-1 text-center text-sm font-mono outline-none"
+                                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                              />
+                              <button
+                                onClick={() => void addPackageItem(item.item_id)}
+                                className="shrink-0 rounded-[10px] px-3 py-1.5 text-[11px] font-bold text-white"
+                                style={{ background: LEGACY_COLORS.blue }}
+                              >
+                                추가
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </>
                   ) : (
-                    <div className="text-base" style={{ color: LEGACY_COLORS.muted2 }}>왼쪽 목록에서 출하묶음을 선택해 주세요.</div>
+                    <div className="flex h-full items-center justify-center rounded-[28px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                      <div className="text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>왼쪽 목록에서 출하묶음을 선택해 주세요.</div>
+                    </div>
                   )}
+                </div>
+              </div>
+            ) : null}
+
+            {/* ── 모델 관리 ── */}
+            {section === "models" ? (
+              <div className="overflow-y-auto">
+                <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
+                  {/* 모델 추가 폼 */}
+                  <div className="rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                    <div className="mb-4 flex items-center gap-2 text-base font-bold">
+                      <Layers className="h-4 w-4" /> 새 모델 추가
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="mb-1 block text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>모델명 *</label>
+                        <input
+                          value={modelAddName}
+                          onChange={(e) => setModelAddName(e.target.value)}
+                          placeholder="예: ADX8000"
+                          className="w-full rounded-[14px] border px-3 py-2 text-base outline-none"
+                          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>기호 (1자, 선택)</label>
+                        <input
+                          value={modelAddSymbol}
+                          onChange={(e) => setModelAddSymbol(e.target.value.slice(0, 5))}
+                          placeholder="자동 생성"
+                          className="w-full rounded-[14px] border px-3 py-2 text-base outline-none"
+                          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                        />
+                      </div>
+                      <button
+                        disabled={!modelAddName.trim()}
+                        onClick={() => {
+                          if (!modelAddName.trim()) return;
+                          void api.createModel({ model_name: modelAddName.trim(), symbol: modelAddSymbol.trim() || undefined })
+                            .then((created) => {
+                              setProductModels((prev) => [...prev, created]);
+                              setModelAddName("");
+                              setModelAddSymbol("");
+                              onStatusChange(`'${created.model_name}' 모델을 추가했습니다.`);
+                            })
+                            .catch((err) => setMessage(err instanceof Error ? err.message : "모델 추가 실패"));
+                        }}
+                        className="w-full rounded-[14px] py-2.5 text-base font-bold text-white"
+                        style={{ background: modelAddName.trim() ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2, opacity: modelAddName.trim() ? 1 : 0.5 }}
+                      >
+                        모델 추가
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 모델 목록 */}
+                  <div className="rounded-[28px] border p-5" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                    <div className="mb-4 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-base font-bold">
+                        <Layers className="h-4 w-4" /> 등록된 모델
+                      </div>
+                      <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{productModels.length}개</span>
+                    </div>
+                    {productModels.length === 0 ? (
+                      <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>등록된 모델이 없습니다.</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {productModels.map((model) => (
+                          <div
+                            key={model.slot}
+                            className="flex items-center justify-between rounded-[18px] border px-4 py-3"
+                            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-black text-white"
+                                style={{ background: LEGACY_COLORS.purple }}
+                              >
+                                {model.symbol ?? "?"}
+                              </div>
+                              <div>
+                                <div className="text-base font-bold">{model.model_name}</div>
+                                <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>슬롯 {model.slot} · 기호 {model.symbol}</div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                if (!confirm(`'${model.model_name}' 모델을 삭제하시겠습니까?\n이 모델을 사용하는 품목이 있으면 삭제되지 않습니다.`)) return;
+                                void api.deleteModel(model.slot)
+                                  .then(() => {
+                                    setProductModels((prev) => prev.filter((m) => m.slot !== model.slot));
+                                    onStatusChange(`'${model.model_name}' 모델을 삭제했습니다.`);
+                                  })
+                                  .catch((err) => setMessage(err instanceof Error ? err.message : "삭제 실패"));
+                              }}
+                              className="flex items-center gap-1 rounded-full p-2 hover:bg-red-500/10"
+                              style={{ color: LEGACY_COLORS.red }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : null}

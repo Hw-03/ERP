@@ -333,6 +333,18 @@ class BOMResponse(BaseModel):
     notes: Optional[str]
 
 
+class BOMDetailResponse(BaseModel):
+    bom_id: uuid.UUID
+    parent_item_id: uuid.UUID
+    parent_item_name: str
+    parent_erp_code: Optional[str]
+    child_item_id: uuid.UUID
+    child_item_name: str
+    child_erp_code: Optional[str]
+    quantity: Decimal
+    unit: str
+
+
 class BOMTreeNode(BaseModel):
     item_id: uuid.UUID
     erp_code: str

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import BOM, Inventory, Item, TransactionLog, TransactionTypeEnum
+from app.models import BOM, CategoryEnum, Inventory, Item, TransactionLog, TransactionTypeEnum
 from app.schemas import BackflushDetail, ProductionReceiptRequest, ProductionReceiptResponse
 from app.services import inventory as inventory_svc
 from app.services.bom import explode_bom as _explode_bom_svc
@@ -228,3 +228,99 @@ def _explode_bom(
 ) -> List[Tuple[uuid.UUID, Decimal]]:
     """Thin wrapper kept for backward compatibility; delegates to services/bom."""
     return _explode_bom_svc(db, parent_item_id, qty_to_produce, depth, visited)
+
+
+@router.get("/capacity", summary="전체 생산 가능수량 조회")
+def get_production_capacity(db: Session = Depends(get_db)):
+    """BOM이 등록된 BA 품목들에 대해 즉시/최대 생산 가능수량을 계산한다.
+
+    - immediate: 현 available(총재고 - 보류) 기준 최소 생산 가능량
+    - maximum: 총재고 기준 최소 생산 가능량
+    """
+    # BOM parent 중 다른 BOM의 child가 아닌 것 = 최상위 품목
+    all_parent_ids = {row[0] for row in db.query(BOM.parent_item_id).distinct().all()}
+    all_child_ids = {row[0] for row in db.query(BOM.child_item_id).distinct().all()}
+    top_level_ids = all_parent_ids - all_child_ids
+
+    if not top_level_ids:
+        return {"immediate": 0, "maximum": 0, "limiting_item": None, "top_items": []}
+
+    top_items_db = (
+        db.query(Item)
+        .filter(Item.item_id.in_(list(top_level_ids)))
+        .filter(Item.category == CategoryEnum.BA)
+        .limit(15)
+        .all()
+    )
+
+    top_results = []
+    for item in top_items_db:
+        components = _explode_bom(db, item.item_id, Decimal("1"))
+        merged: Dict[uuid.UUID, Decimal] = {}
+        for cid, qty in components:
+            merged[cid] = merged.get(cid, Decimal("0")) + qty
+
+        if not merged:
+            continue
+
+        min_immediate = float("inf")
+        min_maximum = float("inf")
+        limiting_item = None
+
+        for comp_id, req_qty in merged.items():
+            inv = db.query(Inventory).filter(Inventory.item_id == comp_id).first()
+            total = float(inv.quantity) if inv else 0.0
+            pending = float((inv.pending_quantity or Decimal("0"))) if inv else 0.0
+            available = total - pending
+            req = float(req_qty)
+            if req <= 0:
+                continue
+            imm_can = available / req
+            max_can = total / req
+            if imm_can < min_immediate:
+                min_immediate = imm_can
+                comp_item = db.query(Item).filter(Item.item_id == comp_id).first()
+                limiting_item = comp_item.item_name if comp_item else None
+            if max_can < min_maximum:
+                min_maximum = max_can
+
+        top_results.append({
+            "item_id": str(item.item_id),
+            "item_name": item.item_name,
+            "erp_code": item.erp_code,
+            "immediate": int(min_immediate) if min_immediate != float("inf") else 0,
+            "maximum": int(min_maximum) if min_maximum != float("inf") else 0,
+        })
+
+    if not top_results:
+        return {"immediate": 0, "maximum": 0, "limiting_item": None, "top_items": []}
+
+    total_immediate = sum(r["immediate"] for r in top_results)
+    total_maximum = sum(r["maximum"] for r in top_results)
+
+    # 가장 즉시 생산 가능량이 작은 품목의 병목 부품
+    min_item = min(top_results, key=lambda r: r["immediate"])
+    # 병목 부품명 재계산
+    bottleneck_name = None
+    components = _explode_bom(db, uuid.UUID(min_item["item_id"]), Decimal("1"))
+    merged_min: Dict[uuid.UUID, Decimal] = {}
+    for cid, qty in components:
+        merged_min[cid] = merged_min.get(cid, Decimal("0")) + qty
+    min_ratio = float("inf")
+    for comp_id, req_qty in merged_min.items():
+        inv = db.query(Inventory).filter(Inventory.item_id == comp_id).first()
+        total = float(inv.quantity) if inv else 0.0
+        pending = float((inv.pending_quantity or Decimal("0"))) if inv else 0.0
+        available = total - pending
+        req = float(req_qty)
+        if req > 0 and available / req < min_ratio:
+            min_ratio = available / req
+            comp_item = db.query(Item).filter(Item.item_id == comp_id).first()
+            bottleneck_name = comp_item.item_name if comp_item else None
+
+    return {
+        "immediate": total_immediate,
+        "maximum": total_maximum,
+        "limiting_item": bottleneck_name,
+        "top_items": sorted(top_results, key=lambda r: r["immediate"]),
+    }

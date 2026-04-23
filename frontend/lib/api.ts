@@ -70,6 +70,13 @@ export interface InventorySummary {
   uk_item_count: number;
 }
 
+export interface ProductModel {
+  slot: number;
+  symbol: string | null;
+  model_name: string | null;
+  is_reserved: boolean;
+}
+
 export interface Item {
   item_id: string;
   item_name: string;
@@ -261,6 +268,18 @@ export interface BOMEntry {
   notes: string | null;
 }
 
+export interface BOMDetailEntry {
+  bom_id: string;
+  parent_item_id: string;
+  parent_item_name: string;
+  parent_erp_code: string | null;
+  child_item_id: string;
+  child_item_name: string;
+  child_erp_code: string | null;
+  quantity: number;
+  unit: string;
+}
+
 export interface BOMTreeNode {
   item_id: string;
   erp_code: string;
@@ -306,6 +325,21 @@ export interface ProductionCheckResponse {
   quantity_to_produce: number;
   can_produce: boolean;
   components: ProductionCheckComponent[];
+}
+
+export interface ProductionCapacityItem {
+  item_id: string;
+  item_name: string;
+  erp_code: string | null;
+  immediate: number;
+  maximum: number;
+}
+
+export interface ProductionCapacity {
+  immediate: number;
+  maximum: number;
+  limiting_item: string | null;
+  top_items: ProductionCapacityItem[];
 }
 
 export interface BackflushDetail {
@@ -532,6 +566,23 @@ export const api = {
     if (!res.ok) throw new Error(await parseError(res));
   },
 
+  getModels: () => fetcher<ProductModel[]>(toApiUrl("/api/models")),
+
+  createModel: async (payload: { model_name: string; symbol?: string }) => {
+    const res = await fetch(toApiUrl("/api/models"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<ProductModel>;
+  },
+
+  deleteModel: async (slot: number) => {
+    const res = await fetch(toApiUrl(`/api/models/${slot}`), { method: "DELETE" });
+    if (!res.ok) throw new Error(await parseError(res));
+  },
+
   getShipPackages: () => fetcher<ShipPackage[]>(toApiUrl("/api/ship-packages")),
 
   createShipPackage: async (payload: { package_code: string; name: string; notes?: string }) => {
@@ -739,6 +790,7 @@ export const api = {
   getItemLocations: (itemId: string) =>
     fetcher<InventoryLocationRow[]>(toApiUrl(`/api/inventory/locations/${itemId}`)),
 
+  getAllBOM: () => fetcher<BOMDetailEntry[]>(toApiUrl("/api/bom")),
   getBOM: (parentItemId: string) => fetcher<BOMEntry[]>(toApiUrl(`/api/bom/${parentItemId}`)),
   getBOMTree: (parentItemId: string) =>
     fetcher<BOMTreeNode>(toApiUrl(`/api/bom/${parentItemId}/tree`)),
@@ -792,6 +844,9 @@ export const api = {
 
   checkProduction: (itemId: string, quantity: number) =>
     fetcher<ProductionCheckResponse>(toApiUrl(`/api/production/bom-check/${itemId}?quantity=${quantity}`)),
+
+  getProductionCapacity: () =>
+    fetcher<ProductionCapacity>(toApiUrl("/api/production/capacity")),
 
   getTransactions: (params?: {
     itemId?: string;

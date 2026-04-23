@@ -2,12 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowLeftRight, Boxes, Check, PackageCheck, RotateCcw, Search, Sparkles, TrendingUp, UserRound, Workflow } from "lucide-react";
-import { api, type Department, type Employee, type Item, type ShipPackage, type TransactionLog } from "@/lib/api";
+import { api, type Department, type Employee, type Item, type ProductModel, type ShipPackage, type TransactionLog } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import { SelectedItemsPanel } from "./SelectedItemsPanel";
 import {
   LEGACY_COLORS,
-  LEGACY_MODELS,
   employeeColor,
   firstEmployeeLetter,
   formatNumber,
@@ -117,12 +116,17 @@ export function DesktopWarehouseView({
   const [localSearch, setLocalSearch] = useState("");
   const [dept, setDept] = useState("ALL");
   const [modelFilter, setModelFilter] = useState("전체");
+  const [productModels, setProductModels] = useState<ProductModel[]>([]);
   const [referenceNo, setReferenceNo] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    void api.getModels().then(setProductModels).catch(() => {});
+  }, []);
 
   useEffect(() => {
     void Promise.all([
@@ -353,8 +357,8 @@ export function DesktopWarehouseView({
                     <TrendingUp className="h-4 w-4" style={{ color: LEGACY_COLORS.cyan }} />
                     모델 구분
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {LEGACY_MODELS.map((entry) => (
+                  <div className="grid grid-cols-3 gap-2 overflow-x-auto">
+                    {["전체", "공용", ...productModels.map((m) => m.model_name ?? "")].map((entry) => (
                       <Chip key={entry} active={modelFilter === entry} label={entry} onClick={() => setModelFilter(entry)} tone={LEGACY_COLORS.cyan} />
                     ))}
                   </div>
