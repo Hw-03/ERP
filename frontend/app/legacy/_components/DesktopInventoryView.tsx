@@ -507,10 +507,10 @@ const selectedSlots = useMemo(
                               ))}
                             </div>
                           </td>
-                          <td className={`border-b px-4 ${py} text-right align-middle whitespace-nowrap font-mono text-sm font-bold`} style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className={`border-b px-4 ${py} text-center align-middle whitespace-nowrap font-mono text-sm font-bold`} style={{ borderColor: LEGACY_COLORS.border }}>
                             {formatNumber(item.quantity)}
                           </td>
-                          <td className={`border-b px-4 ${py} text-right align-middle whitespace-nowrap font-mono text-sm`} style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className={`border-b px-4 ${py} text-center align-middle whitespace-nowrap font-mono text-sm`} style={{ borderColor: LEGACY_COLORS.border }}>
                             {item.min_stock == null ? "-" : formatNumber(item.min_stock)}
                           </td>
                         </tr>
