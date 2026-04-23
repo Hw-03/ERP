@@ -16,6 +16,8 @@ import {
   transactionLabel,
 } from "./legacyUi";
 
+const PAGE_SIZE = 100;
+
 const DEPT_OPTIONS = [
   { label: "전체", value: "ALL" },
   { label: "창고", value: "창고" },
@@ -116,6 +118,8 @@ export function DesktopWarehouseView({
   const [localSearch, setLocalSearch] = useState("");
   const [dept, setDept] = useState("ALL");
   const [modelFilter, setModelFilter] = useState("전체");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
+  const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
   const [productModels, setProductModels] = useState<ProductModel[]>([]);
   const [referenceNo, setReferenceNo] = useState("");
   const [notes, setNotes] = useState("");
@@ -206,10 +210,21 @@ export function DesktopWarehouseView({
           return item.locations?.some((loc) => loc.department === dept && loc.quantity > 0) ?? false;
         })
         .filter((item) => modelFilter === "전체" || item.legacy_model === modelFilter)
-        .filter((item) => matchesSearch(item, searchKeyword))
-        .slice(0, 300),
-    [items, dept, modelFilter, searchKeyword],
+        .filter((item) => {
+          if (categoryFilter === "ALL") return true;
+          if (categoryFilter === "RM") return item.category === "RM";
+          if (categoryFilter === "A") return ["TA", "HA", "VA", "BA"].includes(item.category);
+          if (categoryFilter === "F") return ["TF", "HF", "VF", "BF"].includes(item.category);
+          if (categoryFilter === "FG") return item.category === "FG";
+          return true;
+        })
+        .filter((item) => matchesSearch(item, searchKeyword)),
+    [items, dept, modelFilter, categoryFilter, searchKeyword],
   );
+
+  useEffect(() => {
+    setDisplayLimit(PAGE_SIZE);
+  }, [filteredItems]);
 
   useEffect(() => {
     if (!pendingScrollId || !listRef.current) return;
@@ -364,6 +379,23 @@ export function DesktopWarehouseView({
                   </div>
                 </div>
               </div>
+              <div className="rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                <div className="mb-3 flex items-center gap-2 text-base font-bold">
+                  <Boxes className="h-4 w-4" style={{ color: LEGACY_COLORS.purple }} />
+                  자재 분류
+                </div>
+                <div className="grid grid-cols-5 gap-2">
+                  {([
+                    { id: "ALL", label: "전체" },
+                    { id: "RM", label: "원자재" },
+                    { id: "A", label: "조립품" },
+                    { id: "F", label: "반제품" },
+                    { id: "FG", label: "완제품" },
+                  ] as const).map(({ id, label }) => (
+                    <Chip key={id} active={categoryFilter === id} label={label} onClick={() => setCategoryFilter(id)} tone={LEGACY_COLORS.purple} />
+                  ))}
+                </div>
+              </div>
             </section>
           )}
 
@@ -451,7 +483,7 @@ export function DesktopWarehouseView({
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredItems.map((item) => {
+                    {filteredItems.slice(0, displayLimit).map((item) => {
                       const stock = getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock));
                       const active = selectedItems.has(item.item_id);
                       return (
@@ -546,6 +578,20 @@ export function DesktopWarehouseView({
                 </table>
               )}
             </div>
+            {filteredItems.length > displayLimit && (
+              <button
+                onClick={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
+                className="mt-4 w-full rounded-[24px] border py-4 text-base font-semibold"
+                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+              >
+                100개 더 보기 ({formatNumber(Math.min(displayLimit + PAGE_SIZE, filteredItems.length))} / {formatNumber(filteredItems.length)})
+              </button>
+            )}
+            {filteredItems.length > 0 && (
+              <div className="mt-2 text-center text-xs" style={{ color: LEGACY_COLORS.muted }}>
+                {formatNumber(Math.min(displayLimit, filteredItems.length))} / {formatNumber(filteredItems.length)}개 표시
+              </div>
+            )}
           </section>
         </div>
       </div>

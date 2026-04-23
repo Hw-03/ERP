@@ -338,6 +338,14 @@ def export_items_xlsx(
     return make_xlsx_response(wb, filename)
 
 
+@router.get("/{item_id}/debug-locs")
+def debug_locs(item_id: uuid.UUID, db: Session = Depends(get_db)):
+    from sqlalchemy import text
+    raw = db.execute(text("SELECT item_id, department, quantity FROM inventory_locations WHERE item_id = :id"), {"id": item_id.hex}).fetchall()
+    orm = db.query(InventoryLocation).filter(InventoryLocation.item_id == item_id).all()
+    return {"raw_sql": [dict(r._mapping) for r in raw], "orm_count": len(orm), "item_id_hex": item_id.hex}
+
+
 @router.get("/{item_id}", response_model=ItemWithInventory)
 def get_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
     row = _build_item_query(db).filter(Item.item_id == item_id).first()

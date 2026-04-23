@@ -41,6 +41,7 @@ export function WarehouseIOTab({
   const [loading, setLoading] = useState(true);
   const [employeeId, setEmployeeId] = useState("");
   const [itemSearch, setItemSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [selectedItems, setSelectedItems] = useState<Map<string, number>>(new Map());
   const [note, setNote] = useState("");
   const [referenceNo, setReferenceNo] = useState("");
@@ -62,14 +63,20 @@ export function WarehouseIOTab({
 
   const filteredItems = useMemo(() => {
     const keyword = itemSearch.trim().toLowerCase();
-    if (!keyword) return items.slice(0, 30);
-    return items
-      .filter((item) => {
-        const haystack = `${item.item_name} ${item.erp_code} ${item.barcode ?? ""}`.toLowerCase();
-        return haystack.includes(keyword);
-      })
-      .slice(0, 50);
-  }, [itemSearch, items]);
+    const byCat = items.filter((item) => {
+      if (categoryFilter === "ALL") return true;
+      if (categoryFilter === "RM") return item.category === "RM";
+      if (categoryFilter === "A") return ["TA", "HA", "VA", "BA"].includes(item.category);
+      if (categoryFilter === "F") return ["TF", "HF", "VF", "BF"].includes(item.category);
+      if (categoryFilter === "FG") return item.category === "FG";
+      return true;
+    });
+    if (!keyword) return byCat;
+    return byCat.filter((item) => {
+      const haystack = `${item.item_name} ${item.erp_code} ${item.barcode ?? ""}`.toLowerCase();
+      return haystack.includes(keyword);
+    });
+  }, [itemSearch, categoryFilter, items]);
 
   const selectedEntries = useMemo(
     () =>
@@ -301,6 +308,29 @@ export function WarehouseIOTab({
           </button>
         </div>
       )}
+
+      <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+        {([
+          { id: "ALL", label: "전체" },
+          { id: "RM", label: "원자재" },
+          { id: "A", label: "조립품" },
+          { id: "F", label: "반제품" },
+          { id: "FG", label: "완제품" },
+        ] as const).map(({ id, label }) => (
+          <button
+            key={id}
+            onClick={() => setCategoryFilter(id)}
+            className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold"
+            style={{
+              background: categoryFilter === id ? "rgba(161,100,255,.18)" : LEGACY_COLORS.s2,
+              borderColor: categoryFilter === id ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
+              color: categoryFilter === id ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       <div className="mb-2 flex items-center gap-2 rounded-[11px] border px-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
         <span>🔍</span>

@@ -11,6 +11,18 @@ const STATUS_LABEL: Record<QueueBatchStatus, string> = {
   CANCELLED: "취소",
 };
 
+const BATCH_TYPE_LABEL: Record<string, string> = {
+  PRODUCE: "생산",
+  DISASSEMBLE: "분해",
+  RETURN: "반품",
+};
+
+const DIRECTION_LABEL: Record<string, string> = {
+  IN: "입고",
+  OUT: "출고",
+  SCRAP: "폐기",
+};
+
 const STATUS_COLOR: Record<QueueBatchStatus, string> = {
   OPEN: LEGACY_COLORS.blue,
   CONFIRMED: LEGACY_COLORS.green,
@@ -69,7 +81,7 @@ export default function QueuePage() {
     >
       <div className="mx-auto max-w-[700px]">
         <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-2xl font-black">Queue 배치</h1>
+          <h1 className="text-2xl font-black">작업 배치</h1>
           <Link href="/legacy" className="text-sm" style={{ color: LEGACY_COLORS.blue }}>
             ← 레거시
           </Link>
@@ -123,7 +135,7 @@ export default function QueuePage() {
                         className="rounded-full px-2 py-[2px] text-sm font-bold"
                         style={{ background: "rgba(96,165,250,.15)", color: STATUS_COLOR[b.status] }}
                       >
-                        {b.batch_type}
+                        {BATCH_TYPE_LABEL[b.batch_type] ?? b.batch_type}
                       </span>
                       <span className="text-sm font-semibold" style={{ color: STATUS_COLOR[b.status] }}>
                         {STATUS_LABEL[b.status]}
@@ -186,7 +198,7 @@ export default function QueuePage() {
                                   : LEGACY_COLORS.muted2,
                         }}
                       >
-                        {ln.direction}
+                        {DIRECTION_LABEL[ln.direction] ?? ln.direction}
                       </span>
                       <span className="flex-1 truncate" style={{ opacity: ln.included ? 1 : 0.4 }}>
                         {ln.item_name ?? ln.item_id}

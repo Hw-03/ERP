@@ -144,14 +144,14 @@ export function DesktopInventoryView({
   function toggleDept(v: string) {
     setSelectedDepts((prev) => {
       const next = prev.includes(v) ? prev.filter((d) => d !== v) : [...prev, v];
-      return next.length === ALL_DEPT_VALUES.length ? [] : next;
+      return next;
     });
     setDisplayLimit(DESKTOP_PAGE_SIZE);
   }
   function toggleModel(v: string) {
     setSelectedModels((prev) => {
       const next = prev.includes(v) ? prev.filter((m) => m !== v) : [...prev, v];
-      return next.length === productModels.length ? [] : next;
+      return next;
     });
     setDisplayLimit(DESKTOP_PAGE_SIZE);
   }

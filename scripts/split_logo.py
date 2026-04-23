@@ -6,6 +6,7 @@ import numpy as np
 import os
 import sys
 from scipy.signal import argrelmin
+from scipy.ndimage import label
 
 
 def dark_counts(arr, threshold=100):
@@ -55,6 +56,48 @@ def find_dividers(counts, window=4, min_threshold=6):
             prev = d
 
     return filtered
+
+
+def make_transparent(rgb_arr):
+    """흰 배경을 알파 0으로 변환. min(R,G,B)가 낮을수록 불투명."""
+    min_ch = rgb_arr[:, :, :3].min(axis=2).astype(float)
+    alpha = np.clip(255 * (240 - min_ch) / 90, 0, 255).astype(np.uint8)
+    return np.dstack([rgb_arr[:, :, :3], alpha])
+
+
+def tight_crop(rgba_arr, margin=2):
+    """완전히 투명한 행/열을 잘라내고, margin px 여유만 남긴다."""
+    alpha = rgba_arr[:, :, 3]
+    cols = np.where(alpha.any(axis=0))[0]
+    rows = np.where(alpha.any(axis=1))[0]
+    if not len(cols) or not len(rows):
+        return rgba_arr
+    c1 = max(0, cols[0] - margin)
+    c2 = min(rgba_arr.shape[1], cols[-1] + margin + 1)
+    r1 = max(0, rows[0] - margin)
+    r2 = min(rgba_arr.shape[0], rows[-1] + margin + 1)
+    return rgba_arr[r1:r2, c1:c2]
+
+
+def pad_transparent(rgba_arr, pad=4):
+    """오브젝트 주변에 투명 여백을 추가한다 (옆 글자 픽셀 침범 없이)."""
+    h, w = rgba_arr.shape[:2]
+    out = np.zeros((h + 2 * pad, w + 2 * pad, 4), dtype=np.uint8)
+    out[pad:pad + h, pad:pad + w] = rgba_arr
+    return out
+
+
+def keep_largest_blob(rgba_arr):
+    """알파>0 픽셀 중 가장 큰 연결 덩어리만 남기고 나머지를 투명화."""
+    mask = rgba_arr[:, :, 3] > 0
+    labeled, num = label(mask)
+    if num <= 1:
+        return rgba_arr
+    sizes = [(labeled == i).sum() for i in range(1, num + 1)]
+    largest = sizes.index(max(sizes)) + 1
+    out = rgba_arr.copy()
+    out[labeled != largest, 3] = 0
+    return out
 
 
 def split_logo(input_path, output_dir='split_logos'):
@@ -111,21 +154,24 @@ def split_logo(input_path, output_dir='split_logos'):
             bds = [0] + divs + [trimmed.shape[1]]
             char_idx = 0
             for k in range(len(bds) - 1):
-                cx1 = max(0, bds[k] - PAD)
-                cx2 = min(trimmed.shape[1], bds[k+1] + PAD)
+                # 글자 경계는 PAD 없이 divider 기준으로만 자름 (옆 글자 픽셀 방지)
+                cx1 = bds[k]
+                cx2 = bds[k+1]
                 char_arr = trimmed[:, cx1:cx2, :]
                 # 빈 섹션 건너뛰기
                 if dark_counts(char_arr, 100).max() == 0:
                     continue
                 letter = letters[char_idx] if char_idx < len(letters) else f'char{char_idx+1}'
                 out_path = os.path.join(output_dir, f'letter_{letter}.png')
-                Image.fromarray(char_arr).save(out_path)
-                print(f"  저장: {out_path}  ({char_arr.shape[1]}x{char_arr.shape[0]}px)")
+                rgba = pad_transparent(tight_crop(keep_largest_blob(make_transparent(char_arr)), margin=0))
+                Image.fromarray(rgba).save(out_path)
+                print(f"  저장: {out_path}  ({rgba.shape[1]}x{rgba.shape[0]}px)")
                 char_idx += 1
         else:
             out_path = os.path.join(output_dir, f'{name}.png')
-            Image.fromarray(sec).save(out_path)
-            print(f"저장: {out_path}  ({sec.shape[1]}x{sec.shape[0]}px)")
+            rgba = pad_transparent(tight_crop(keep_largest_blob(make_transparent(sec)), margin=0))
+            Image.fromarray(rgba).save(out_path)
+            print(f"저장: {out_path}  ({rgba.shape[1]}x{rgba.shape[0]}px)")
 
     print(f"\n완료! 저장 위치: {os.path.abspath(output_dir)}")
 
