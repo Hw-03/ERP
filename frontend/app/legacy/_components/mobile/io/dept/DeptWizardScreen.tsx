@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, X } from "lucide-react";
 import { api, type Item } from "@/lib/api";
-import { LEGACY_COLORS } from "../../../legacyUi";
+import { LEGACY_COLORS, employeeColor } from "../../../legacyUi";
 import type { ToastState } from "../../../Toast";
-import { IconButton, WizardProgress } from "../../primitives";
+import { IconButton, WizardHeader, type SummaryChip } from "../../primitives";
 import { useEmployees } from "../../hooks/useEmployees";
 import { usePackages } from "../../hooks/usePackages";
 import { DEPT_STEPS } from "./deptWizardConfig";
@@ -46,6 +46,52 @@ export function DeptWizardScreen({ showToast }: { showToast: (toast: ToastState)
     () => employees.find((e) => e.employee_id === state.employeeId) ?? null,
     [employees, state.employeeId],
   );
+
+  const summaryChips: SummaryChip[] = useMemo(() => {
+    const out: SummaryChip[] = [];
+    if (state.department) {
+      out.push({
+        key: "dept",
+        label: state.department,
+        tone: employeeColor(state.department),
+        onClick: state.step > 0 ? () => dispatch({ type: "GO", step: 0 }) : undefined,
+      });
+    }
+    if (employee) {
+      out.push({
+        key: "employee",
+        label: employee.name,
+        tone: LEGACY_COLORS.green,
+        onClick: state.step > 1 ? () => dispatch({ type: "GO", step: 1 }) : undefined,
+      });
+    }
+    if (state.direction) {
+      out.push({
+        key: "direction",
+        label: state.direction === "in" ? "입고" : "출고",
+        tone: state.direction === "in" ? LEGACY_COLORS.green : LEGACY_COLORS.red,
+        onClick: state.step > 2 ? () => dispatch({ type: "GO", step: 2 }) : undefined,
+      });
+    }
+    if (state.step > 3) {
+      if (state.usePackage && state.packageId) {
+        out.push({
+          key: "items",
+          label: "패키지",
+          tone: LEGACY_COLORS.purple,
+          onClick: () => dispatch({ type: "GO", step: 3 }),
+        });
+      } else if (state.items.size > 0) {
+        out.push({
+          key: "items",
+          label: `${state.items.size}건`,
+          tone: LEGACY_COLORS.cyan,
+          onClick: () => dispatch({ type: "GO", step: 3 }),
+        });
+      }
+    }
+    return out;
+  }, [state, employee, dispatch]);
 
   const submit = async () => {
     if (!employee) {
@@ -128,7 +174,7 @@ export function DeptWizardScreen({ showToast }: { showToast: (toast: ToastState)
   return (
     <div className="flex flex-col">
       <div
-        className="sticky top-0 z-10 flex items-center gap-2 border-b px-3 py-3"
+        className="sticky top-0 z-10 flex items-start gap-2 border-b px-3 py-3"
         style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
       >
         <IconButton
@@ -140,9 +186,10 @@ export function DeptWizardScreen({ showToast }: { showToast: (toast: ToastState)
           color={atFirst ? LEGACY_COLORS.muted : LEGACY_COLORS.text}
         />
         <div className="min-w-0 flex-1">
-          <WizardProgress
+          <WizardHeader
             steps={DEPT_STEPS.map((s) => ({ key: s.key, label: s.label }))}
             current={state.step}
+            chips={summaryChips}
           />
         </div>
         <IconButton
@@ -174,6 +221,7 @@ export function DeptWizardScreen({ showToast }: { showToast: (toast: ToastState)
           itemsLoading={itemsLoading}
           packages={packages}
           packagesLoading={packagesLoading}
+          showToast={showToast}
           onNext={() => {
             if (state.usePackage && !state.packageId) {
               dispatch({ type: "SET_ERROR", error: "패키지를 선택해 주세요." });
@@ -193,6 +241,7 @@ export function DeptWizardScreen({ showToast }: { showToast: (toast: ToastState)
           employee={employee}
           packages={packages}
           onSubmit={() => void submit()}
+          onBack={() => dispatch({ type: "PREV" })}
         />
       )}
     </div>

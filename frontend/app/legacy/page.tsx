@@ -5,7 +5,7 @@ import { MobileShell, type TabId } from "./_components/mobile/MobileShell";
 import { InventoryScreen } from "./_components/mobile/screens/InventoryScreen";
 import { HistoryScreen } from "./_components/mobile/screens/HistoryScreen";
 import { Toast, type ToastState } from "./_components/Toast";
-import { AdminTab } from "./_components/AdminTab";
+import { AdminShell } from "./_components/mobile/screens/admin/AdminShell";
 import { DesktopLegacyShell } from "./_components/DesktopLegacyShell";
 import {
   WarehouseWizardProvider,
@@ -83,11 +83,7 @@ function LegacyBody() {
               )}
               {activeTab === "warehouse" && <WarehouseWizardScreen showToast={showToast} />}
               {activeTab === "dept" && <DeptWizardScreen showToast={showToast} />}
-              {activeTab === "admin" && (
-                <div className="px-[14px] py-[14px]">
-                  <AdminTab showToast={showToast} />
-                </div>
-              )}
+              {activeTab === "admin" && <AdminShell showToast={showToast} />}
             </>
           )}
         </MobileShell>

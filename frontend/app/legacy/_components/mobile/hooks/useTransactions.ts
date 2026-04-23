@@ -8,6 +8,7 @@ const PAGE_SIZE = 100;
 export function useTransactions() {
   const [logs, setLogs] = useState<TransactionLog[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const reqId = useRef(0);
@@ -21,6 +22,11 @@ export function useTransactions() {
         setLogs(data);
         setHasMore(data.length === PAGE_SIZE);
         setPage(1);
+        setError(null);
+      }
+    } catch (err) {
+      if (reqId.current === id) {
+        setError(err instanceof Error ? err.message : "이력을 불러오지 못했습니다.");
       }
     } finally {
       if (reqId.current === id) setLoading(false);
@@ -43,12 +49,16 @@ export function useTransactions() {
         setLogs((prev) => [...prev, ...data]);
         setHasMore(data.length === PAGE_SIZE);
       }
+    } catch (err) {
+      if (reqId.current === id) {
+        setError(err instanceof Error ? err.message : "이력을 불러오지 못했습니다.");
+      }
     } finally {
       if (reqId.current === id) setLoading(false);
     }
   }, [hasMore, loading, page]);
 
-  return { logs, loading, hasMore, refetch, loadMore };
+  return { logs, loading, error, hasMore, refetch, loadMore };
 }
 
 export async function fetchMonthLogs(year: number, month: number): Promise<TransactionLog[]> {

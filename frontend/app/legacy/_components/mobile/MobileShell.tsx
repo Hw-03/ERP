@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Bell, Lock, Package, Warehouse, Wrench, type LucideIcon } from "lucide-react";
 import clsx from "clsx";
 import { LEGACY_COLORS } from "../legacyUi";
-import { TYPO } from "./tokens";
+import { ELEVATION, TYPO } from "./tokens";
 import { AlertsSheet } from "./AlertsSheet";
 import { IconButton } from "./primitives";
 
@@ -46,21 +46,30 @@ export function MobileShell({
       >
         <div
           className="shrink-0"
-          style={{ height: "env(safe-area-inset-top, 18px)", background: LEGACY_COLORS.s1 }}
+          style={{
+            height: "env(safe-area-inset-top, 18px)",
+            background: `linear-gradient(180deg, ${LEGACY_COLORS.s1 as string} 0%, ${LEGACY_COLORS.s1 as string} 100%)`,
+          }}
         />
 
         <header
-          className="flex shrink-0 items-end justify-between border-b px-5 pb-3 pt-2"
-          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+          className="relative flex shrink-0 items-end justify-between px-5 pb-3 pt-2"
+          style={{
+            background: LEGACY_COLORS.s1,
+            boxShadow: ELEVATION.sticky,
+          }}
         >
           <div className="min-w-0 flex-1">
             <div
-              className={clsx(TYPO.caption, "font-bold uppercase tracking-[2px]")}
+              className={clsx(TYPO.overline, "font-bold uppercase tracking-[2.5px]")}
               style={{ color: LEGACY_COLORS.muted2 }}
             >
               {subtitle}
             </div>
-            <div className="text-xl font-black leading-tight" style={{ color: LEGACY_COLORS.text }}>
+            <div
+              className={clsx(TYPO.headline, "font-black leading-tight")}
+              style={{ color: LEGACY_COLORS.text }}
+            >
               {title}
             </div>
           </div>
@@ -73,14 +82,14 @@ export function MobileShell({
         <main className="relative flex-1 overflow-y-auto">{children}</main>
 
         <nav
-          className="shrink-0 border-t"
+          className="shrink-0"
           style={{
             background: LEGACY_COLORS.s1,
-            borderColor: LEGACY_COLORS.border,
+            boxShadow: "0 -8px 20px rgba(0,0,0,.28)",
             paddingBottom: "calc(env(safe-area-inset-bottom, 10px))",
           }}
         >
-          <div className="flex">
+          <div className="flex px-2 pt-2">
             {TABS.map((tab) => {
               const active = tab.id === activeTab;
               const Icon = tab.icon;
@@ -88,25 +97,33 @@ export function MobileShell({
                 <button
                   key={tab.id}
                   onClick={() => onTabChange(tab.id)}
-                  className="flex flex-1 flex-col items-center gap-1 px-1 py-2 transition-colors active:bg-white/[0.08]"
+                  className="flex flex-1 flex-col items-center gap-[3px] py-1 transition-[transform] active:scale-[0.92]"
                   aria-label={tab.label}
                   aria-current={active ? "page" : undefined}
                 >
-                  <Icon
-                    size={20}
-                    strokeWidth={active ? 2 : 1.75}
-                    color={active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted}
-                  />
+                  <span
+                    className={clsx(
+                      "relative inline-flex h-9 w-[48px] items-center justify-center rounded-full transition-colors",
+                    )}
+                    style={{
+                      background: active ? `${LEGACY_COLORS.blue as string}1f` : "transparent",
+                    }}
+                  >
+                    <Icon
+                      size={20}
+                      strokeWidth={active ? 2.25 : 1.75}
+                      color={active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted}
+                    />
+                  </span>
                   <div
-                    className={clsx(TYPO.caption, "font-semibold")}
-                    style={{ color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted }}
+                    className={clsx(TYPO.overline, active ? "font-black" : "font-semibold")}
+                    style={{
+                      color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted,
+                      letterSpacing: "0.5px",
+                    }}
                   >
                     {tab.label}
                   </div>
-                  <div
-                    className="h-[3px] w-6 rounded-full"
-                    style={{ background: active ? LEGACY_COLORS.blue : "transparent" }}
-                  />
                 </button>
               );
             })}

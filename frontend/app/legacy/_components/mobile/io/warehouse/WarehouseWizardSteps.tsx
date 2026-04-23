@@ -5,6 +5,7 @@ import { ChevronRight, Minus, Plus, PackageSearch, ScanLine, Trash2 } from "luci
 import type { Employee, Item } from "@/lib/api";
 import { LEGACY_COLORS, formatNumber, normalizeDepartment } from "../../../legacyUi";
 import { BarcodeScannerModal } from "../../../BarcodeScannerModal";
+import type { ToastState } from "../../../Toast";
 import { TYPO } from "../../tokens";
 import {
   EmptyState,
@@ -13,6 +14,9 @@ import {
   IconButton,
   InlineSearch,
   PersonAvatar,
+  PrimaryActionButton,
+  SectionCard,
+  SectionCardRow,
   StickyFooter,
 } from "../../primitives";
 import { WAREHOUSE_MODE_META, type WarehouseMode } from "./warehouseWizardConfig";
@@ -28,9 +32,7 @@ export function StepType() {
 
   return (
     <div className="flex flex-col gap-3 px-4 pb-6 pt-4">
-      <div className={`${TYPO.caption} font-semibold uppercase tracking-[1.5px]`} style={{ color: LEGACY_COLORS.muted2 }}>
-        이동 유형을 선택해 주세요
-      </div>
+      <StepHeading title="이 작업의 유형을 결정합니다" hint="선택하면 바로 다음 단계로 넘어갑니다" />
       <div className="flex flex-col gap-2">
         {(Object.keys(WAREHOUSE_MODE_META) as WarehouseMode[]).map((mode) => {
           const meta = WAREHOUSE_MODE_META[mode];
@@ -101,9 +103,7 @@ export function StepPerson({ employees, loading }: { employees: Employee[]; load
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-6 pt-4">
-      <div className={`${TYPO.caption} font-semibold uppercase tracking-[1.5px]`} style={{ color: LEGACY_COLORS.muted2 }}>
-        담당 직원을 선택해 주세요
-      </div>
+      <StepHeading title="작업을 진행할 담당자를 선택합니다" hint="담당자를 누르면 바로 다음 단계로 넘어갑니다" />
       {grouped.map(([dept, group]) => (
         <div key={dept} className="flex flex-col gap-2">
           <div className={`${TYPO.caption} font-bold`} style={{ color: LEGACY_COLORS.muted }}>
@@ -146,10 +146,12 @@ export function StepItems({
   items,
   loading,
   onNext,
+  showToast,
 }: {
   items: Item[];
   loading: boolean;
   onNext: () => void;
+  showToast?: (toast: ToastState) => void;
 }) {
   const { state, dispatch } = useWarehouseWizard();
   const [search, setSearch] = useState("");
@@ -188,10 +190,13 @@ export function StepItems({
     }
     const current = state.items.get(hit.item_id) ?? 0;
     dispatch({ type: "SET_QTY", itemId: hit.item_id, qty: current + 1 });
+    showToast?.({ type: "info", message: `${hit.item_name} +1 (${current + 1})` });
   };
 
   return (
     <div className="flex flex-col gap-3 px-4 pb-28 pt-4">
+      <StepHeading title="처리할 품목과 수량을 결정합니다" hint="검색, 바코드 스캔, 카테고리로 빠르게 찾을 수 있습니다" />
+
       <div className="flex items-center gap-2">
         <div className="flex-1">
           <InlineSearch value={search} onChange={setSearch} placeholder="품명 · 코드 · 바코드" />
@@ -388,10 +393,12 @@ export function StepConfirm({
   items,
   employee,
   onSubmit,
+  onBack,
 }: {
   items: Item[];
   employee: Employee | null;
   onSubmit: () => void;
+  onBack?: () => void;
 }) {
   const { state, dispatch } = useWarehouseWizard();
   const meta = state.mode ? WAREHOUSE_MODE_META[state.mode as WarehouseMode] : null;
@@ -402,70 +409,84 @@ export function StepConfirm({
 
   const totalQty = selectedList.reduce((sum, e) => sum + e.qty, 0);
 
+  const headline = meta ? `${meta.label}을 처리합니다` : "처리 내용을 확정합니다";
+
   return (
-    <div className="flex flex-col gap-3 px-4 pb-28 pt-4">
-      <div
-        className="flex flex-col gap-2 rounded-[20px] border px-4 py-3"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-      >
-        <Row label="유형" value={meta?.label ?? "-"} />
-        <Row
+    <div className="flex flex-col gap-3 px-4 pb-36 pt-4">
+      <div>
+        <div
+          className={`${TYPO.headline} font-black leading-tight`}
+          style={{ color: LEGACY_COLORS.green }}
+        >
+          {headline}
+        </div>
+        <div className={`${TYPO.caption} mt-1`} style={{ color: LEGACY_COLORS.muted2 }}>
+          확정을 누르면 지금 즉시 재고가 반영됩니다.
+        </div>
+      </div>
+
+      <SectionCard title="기본 정보" padding="sm">
+        <SectionCardRow label="유형" value={meta?.label ?? "-"} />
+        <SectionCardRow
           label="흐름"
           value={meta ? `${meta.flow.from} → ${meta.flow.to}` : "-"}
           valueColor={LEGACY_COLORS.blue}
         />
-        <Row
+        <SectionCardRow
           label="담당"
           value={employee ? `${employee.name} · ${normalizeDepartment(employee.department)}` : "-"}
         />
-        <Row label="품목" value={`${selectedList.length}건 · 합계 ${formatNumber(totalQty)}`} />
-      </div>
+      </SectionCard>
 
-      <div
-        className="max-h-[36vh] overflow-y-auto rounded-[20px] border"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      <SectionCard
+        title={`품목 · ${selectedList.length}건 · 합계 ${formatNumber(totalQty)}`}
+        padding="none"
       >
-        {selectedList.map((e, idx) => (
-          <div
-            key={e.item.item_id}
-            className="flex items-center justify-between px-3 py-2"
-            style={{
-              borderBottom: idx === selectedList.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
-            }}
-          >
-            <div className="min-w-0 flex-1">
-              <div className={`${TYPO.body} truncate font-black`} style={{ color: LEGACY_COLORS.text }}>
-                {e.item.item_name}
+        <div className="max-h-[30vh] overflow-y-auto">
+          {selectedList.map((e, idx) => (
+            <div
+              key={e.item.item_id}
+              className="flex items-center justify-between px-4 py-2"
+              style={{
+                borderBottom:
+                  idx === selectedList.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
+              }}
+            >
+              <div className="min-w-0 flex-1">
+                <div className={`${TYPO.body} truncate font-black`} style={{ color: LEGACY_COLORS.text }}>
+                  {e.item.item_name}
+                </div>
+                <div className={`${TYPO.caption} truncate font-mono`} style={{ color: LEGACY_COLORS.muted }}>
+                  {e.item.erp_code}
+                </div>
               </div>
-              <div className={`${TYPO.caption} truncate font-mono`} style={{ color: LEGACY_COLORS.muted }}>
-                {e.item.erp_code}
+              <div className={`${TYPO.title} shrink-0 font-black tabular-nums`} style={{ color: LEGACY_COLORS.blue }}>
+                {formatNumber(e.qty)} {e.item.unit}
               </div>
             </div>
-            <div className={`${TYPO.title} shrink-0 font-black tabular-nums`} style={{ color: LEGACY_COLORS.blue }}>
-              {formatNumber(e.qty)} {e.item.unit}
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </SectionCard>
 
-      <FieldLabel>참조번호</FieldLabel>
-      <input
-        value={state.referenceNo}
-        onChange={(e) => dispatch({ type: "SET_REFERENCE", referenceNo: e.target.value })}
-        placeholder="예: LOT-240412"
-        className={`${TYPO.body} rounded-[14px] border px-3 py-3 outline-none`}
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-      />
-
-      <FieldLabel>비고</FieldLabel>
-      <textarea
-        value={state.note}
-        onChange={(e) => dispatch({ type: "SET_NOTE", note: e.target.value })}
-        rows={3}
-        placeholder="메모 (선택)"
-        className={`${TYPO.body} resize-none rounded-[14px] border px-3 py-3 outline-none`}
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-      />
+      <SectionCard title="참조번호 · 비고" padding="sm">
+        <div className="flex flex-col gap-2">
+          <input
+            value={state.referenceNo}
+            onChange={(e) => dispatch({ type: "SET_REFERENCE", referenceNo: e.target.value })}
+            placeholder="참조번호 (예: LOT-240412)"
+            className={`${TYPO.body} rounded-[14px] border px-3 py-3 outline-none`}
+            style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+          />
+          <textarea
+            value={state.note}
+            onChange={(e) => dispatch({ type: "SET_NOTE", note: e.target.value })}
+            rows={2}
+            placeholder="비고 (선택)"
+            className={`${TYPO.body} resize-none rounded-[14px] border px-3 py-3 outline-none`}
+            style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+          />
+        </div>
+      </SectionCard>
 
       {state.error ? (
         <div
@@ -481,40 +502,44 @@ export function StepConfirm({
       ) : null}
 
       <StickyFooter>
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={state.submitting}
-          className={`${TYPO.body} w-full rounded-[14px] py-3 font-black disabled:opacity-40`}
-          style={{ background: LEGACY_COLORS.green, color: "#041008" }}
-        >
-          {state.submitting ? "처리 중…" : `확정 · ${selectedList.length}건`}
-        </button>
+        <div className="flex flex-col gap-2">
+          {onBack ? (
+            <button
+              type="button"
+              onClick={onBack}
+              disabled={state.submitting}
+              className={`${TYPO.caption} w-full rounded-[14px] py-2 font-semibold disabled:opacity-40`}
+              style={{ color: LEGACY_COLORS.muted2 }}
+            >
+              뒤로 가서 수정
+            </button>
+          ) : null}
+          <PrimaryActionButton
+            intent="success"
+            label={meta ? `${meta.label} 확정` : "확정"}
+            count={selectedList.length}
+            total={totalQty}
+            onClick={onSubmit}
+            disabled={state.submitting}
+            loadingText="처리 중…"
+          />
+        </div>
       </StickyFooter>
     </div>
   );
 }
 
-function Row({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
+function StepHeading({ title, hint }: { title: string; hint?: string }) {
   return (
-    <div className="flex items-center justify-between">
-      <span className={`${TYPO.caption} font-semibold`} style={{ color: LEGACY_COLORS.muted2 }}>
-        {label}
-      </span>
-      <span className={`${TYPO.body} font-black`} style={{ color: valueColor ?? LEGACY_COLORS.text }}>
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      className={`${TYPO.caption} mt-1 font-semibold uppercase tracking-[1.2px]`}
-      style={{ color: LEGACY_COLORS.muted }}
-    >
-      {children}
+    <div className="flex flex-col gap-[2px]">
+      <div className={`${TYPO.title} font-black`} style={{ color: LEGACY_COLORS.text }}>
+        {title}
+      </div>
+      {hint ? (
+        <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
+          {hint}
+        </div>
+      ) : null}
     </div>
   );
 }

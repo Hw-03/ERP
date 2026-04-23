@@ -17,6 +17,7 @@ import {
   employeeColor,
   formatNumber,
 } from "../../../legacyUi";
+import type { ToastState } from "../../../Toast";
 import { TYPO } from "../../tokens";
 import {
   EmptyState,
@@ -25,6 +26,9 @@ import {
   IconButton,
   InlineSearch,
   PersonAvatar,
+  PrimaryActionButton,
+  SectionCard,
+  SectionCardRow,
   StickyFooter,
 } from "../../primitives";
 import { DEPT_WIZARD_DEPARTMENTS } from "./deptWizardConfig";
@@ -38,12 +42,10 @@ export function StepDepartment() {
   const { state, dispatch } = useDeptWizard();
   return (
     <div className="flex flex-col gap-3 px-4 pb-6 pt-4">
-      <div
-        className={`${TYPO.caption} font-semibold uppercase tracking-[1.5px]`}
-        style={{ color: LEGACY_COLORS.muted2 }}
-      >
-        부서를 선택해 주세요
-      </div>
+      <StepHeading
+        title="어느 부서의 거래인지 선택합니다"
+        hint="선택 시 바로 해당 부서의 담당자 단계로 넘어갑니다"
+      />
       <div className="grid grid-cols-2 gap-2">
         {DEPT_WIZARD_DEPARTMENTS.map((dept) => {
           const active = state.department === dept;
@@ -110,12 +112,10 @@ export function StepPerson({
 
   return (
     <div className="flex flex-col gap-3 px-4 pb-6 pt-4">
-      <div
-        className={`${TYPO.caption} font-semibold uppercase tracking-[1.5px]`}
-        style={{ color: LEGACY_COLORS.muted2 }}
-      >
-        {state.department}부 담당자를 선택해 주세요
-      </div>
+      <StepHeading
+        title={`${state.department ?? ""}부 담당자를 선택합니다`}
+        hint="담당자 선택 시 다음 단계로 자동 이동합니다"
+      />
       {visibleEmployees.length === 0 ? (
         <EmptyState
           icon={PackageSearch}
@@ -166,12 +166,10 @@ export function StepDirection() {
   ];
   return (
     <div className="flex flex-col gap-3 px-4 pb-6 pt-4">
-      <div
-        className={`${TYPO.caption} font-semibold uppercase tracking-[1.5px]`}
-        style={{ color: LEGACY_COLORS.muted2 }}
-      >
-        입고 또는 출고를 선택해 주세요
-      </div>
+      <StepHeading
+        title="입고인지 출고인지 선택합니다"
+        hint="부서가 받는지(입고) 내보내는지(출고)에 따라 재고가 반대로 움직입니다"
+      />
       <div className="flex flex-col gap-2">
         {options.map((o) => {
           const active = state.direction === o.key;
@@ -231,12 +229,14 @@ export function StepItems({
   packages,
   packagesLoading,
   onNext,
+  showToast,
 }: {
   items: Item[];
   itemsLoading: boolean;
   packages: ShipPackage[];
   packagesLoading: boolean;
   onNext: () => void;
+  showToast?: (toast: ToastState) => void;
 }) {
   const { state, dispatch } = useDeptWizard();
   const [search, setSearch] = useState("");
@@ -271,10 +271,20 @@ export function StepItems({
     }
     const current = state.items.get(hit.item_id) ?? 0;
     dispatch({ type: "SET_QTY", itemId: hit.item_id, qty: current + 1 });
+    showToast?.({ type: "info", message: `${hit.item_name} +1 (${current + 1})` });
   };
 
   return (
     <div className="flex flex-col gap-3 px-4 pb-28 pt-4">
+      <StepHeading
+        title={
+          state.usePackage
+            ? "출하할 패키지를 선택합니다"
+            : "처리할 품목과 수량을 결정합니다"
+        }
+        hint={canUsePackage ? "개별 품목과 출하 패키지 중 하나로 처리할 수 있습니다" : undefined}
+      />
+
       {canUsePackage ? (
         <FilterChipRow>
           <FilterChip
@@ -389,7 +399,6 @@ function PackagePicker({ packages, loading }: { packages: ShipPackage[]; loading
             type="button"
             onClick={() => {
               dispatch({ type: "SET_PACKAGE", packageId: pkg.package_id });
-              // Use the reserved itemId "__PACKAGE__" to carry qty across state.
               dispatch({ type: "SET_QTY", itemId: "__PACKAGE__", qty: 1 });
             }}
             className="flex flex-col gap-1 rounded-[20px] border px-4 py-3 text-left active:scale-[0.99]"
@@ -579,113 +588,125 @@ export function StepConfirm({
   employee,
   packages,
   onSubmit,
+  onBack,
 }: {
   items: Item[];
   employee: Employee | null;
   packages: ShipPackage[];
   onSubmit: () => void;
+  onBack?: () => void;
 }) {
   const { state, dispatch } = useDeptWizard();
   const pkg = packages.find((p) => p.package_id === state.packageId) ?? null;
-  const qty = state.items.get("__PACKAGE__") ?? 1;
+  const pkgQty = state.items.get("__PACKAGE__") ?? 1;
 
   const selectedList = Array.from(state.items.entries())
     .filter(([id]) => id !== "__PACKAGE__")
     .map(([id, q]) => ({ item: items.find((i) => i.item_id === id), qty: q }))
     .filter((e): e is { item: Item; qty: number } => !!e.item);
 
-  const summaryRow = (label: string, value: string, color?: string) => (
-    <div className="flex items-center justify-between">
-      <span className={`${TYPO.caption} font-semibold`} style={{ color: LEGACY_COLORS.muted2 }}>
-        {label}
-      </span>
-      <span className={`${TYPO.body} font-black`} style={{ color: color ?? LEGACY_COLORS.text }}>
-        {value}
-      </span>
-    </div>
-  );
+  const totalQty = selectedList.reduce((s, e) => s + e.qty, 0);
+  const directionLabel = state.direction === "in" ? "입고" : state.direction === "out" ? "출고" : "-";
+  const intent: "success" | "danger" = state.direction === "in" ? "success" : "danger";
+  const headlineColor = state.direction === "in" ? LEGACY_COLORS.green : LEGACY_COLORS.red;
+  const headline = `${state.department ?? ""}부 · ${directionLabel}을 처리합니다`;
 
   return (
-    <div className="flex flex-col gap-3 px-4 pb-28 pt-4">
-      <div
-        className="flex flex-col gap-2 rounded-[20px] border px-4 py-3"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-      >
-        {summaryRow("부서", state.department ?? "-")}
-        {summaryRow("담당", employee ? `${employee.name}` : "-")}
-        {summaryRow(
-          "방향",
-          state.direction === "in" ? "부서 입고" : state.direction === "out" ? "부서 출고" : "-",
-          state.direction === "in" ? LEGACY_COLORS.green : LEGACY_COLORS.red,
-        )}
-        {state.usePackage
-          ? summaryRow("패키지", pkg ? `${pkg.name} × ${qty}` : "-")
-          : summaryRow(
-              "품목",
-              `${selectedList.length}건 · 합계 ${formatNumber(selectedList.reduce((s, e) => s + e.qty, 0))}`,
-            )}
-      </div>
-
-      {!state.usePackage ? (
+    <div className="flex flex-col gap-3 px-4 pb-36 pt-4">
+      <div>
         <div
-          className="max-h-[30vh] overflow-y-auto rounded-[20px] border"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+          className={`${TYPO.headline} font-black leading-tight`}
+          style={{ color: headlineColor }}
         >
-          {selectedList.map((e, idx) => (
-            <div
-              key={e.item.item_id}
-              className="flex items-center justify-between px-3 py-2"
-              style={{
-                borderBottom: idx === selectedList.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
-              }}
-            >
-              <div className="min-w-0 flex-1">
-                <div className={`${TYPO.body} truncate font-black`} style={{ color: LEGACY_COLORS.text }}>
-                  {e.item.item_name}
-                </div>
-                <div className={`${TYPO.caption} truncate font-mono`} style={{ color: LEGACY_COLORS.muted }}>
-                  {e.item.erp_code}
-                </div>
-              </div>
-              <div
-                className={`${TYPO.title} shrink-0 font-black tabular-nums`}
-                style={{ color: LEGACY_COLORS.blue }}
-              >
-                {formatNumber(e.qty)} {e.item.unit}
-              </div>
-            </div>
-          ))}
+          {headline}
         </div>
-      ) : null}
-
-      <div
-        className={`${TYPO.caption} mt-1 font-semibold uppercase tracking-[1.2px]`}
-        style={{ color: LEGACY_COLORS.muted }}
-      >
-        참조번호
+        <div className={`${TYPO.caption} mt-1`} style={{ color: LEGACY_COLORS.muted2 }}>
+          확정을 누르면 지금 즉시 재고가 반영됩니다.
+        </div>
       </div>
-      <input
-        value={state.referenceNo}
-        onChange={(e) => dispatch({ type: "SET_REFERENCE", referenceNo: e.target.value })}
-        placeholder="예: DIO-240412"
-        className={`${TYPO.body} rounded-[14px] border px-3 py-3 outline-none`}
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-      />
 
-      <div
-        className={`${TYPO.caption} mt-1 font-semibold uppercase tracking-[1.2px]`}
-        style={{ color: LEGACY_COLORS.muted }}
-      >
-        비고
-      </div>
-      <textarea
-        value={state.note}
-        onChange={(e) => dispatch({ type: "SET_NOTE", note: e.target.value })}
-        rows={3}
-        placeholder="메모 (선택)"
-        className={`${TYPO.body} resize-none rounded-[14px] border px-3 py-3 outline-none`}
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-      />
+      <SectionCard title="기본 정보" padding="sm">
+        <SectionCardRow label="부서" value={state.department ?? "-"} />
+        <SectionCardRow label="담당" value={employee?.name ?? "-"} />
+        <SectionCardRow
+          label="방향"
+          value={state.direction === "in" ? "부서 입고" : state.direction === "out" ? "부서 출고" : "-"}
+          valueColor={headlineColor}
+        />
+      </SectionCard>
+
+      {state.usePackage ? (
+        <SectionCard title="패키지" padding="sm">
+          <SectionCardRow
+            label="이름"
+            value={pkg ? pkg.name : "-"}
+          />
+          <SectionCardRow
+            label="출하 수량"
+            value={pkg ? `${pkgQty}회` : "-"}
+            valueColor={LEGACY_COLORS.purple}
+          />
+          {pkg ? (
+            <SectionCardRow
+              label="구성"
+              value={`${pkg.items.length}개`}
+              valueColor={LEGACY_COLORS.muted2}
+            />
+          ) : null}
+        </SectionCard>
+      ) : (
+        <SectionCard
+          title={`품목 · ${selectedList.length}건 · 합계 ${formatNumber(totalQty)}`}
+          padding="none"
+        >
+          <div className="max-h-[30vh] overflow-y-auto">
+            {selectedList.map((e, idx) => (
+              <div
+                key={e.item.item_id}
+                className="flex items-center justify-between px-4 py-2"
+                style={{
+                  borderBottom: idx === selectedList.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
+                }}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className={`${TYPO.body} truncate font-black`} style={{ color: LEGACY_COLORS.text }}>
+                    {e.item.item_name}
+                  </div>
+                  <div className={`${TYPO.caption} truncate font-mono`} style={{ color: LEGACY_COLORS.muted }}>
+                    {e.item.erp_code}
+                  </div>
+                </div>
+                <div
+                  className={`${TYPO.title} shrink-0 font-black tabular-nums`}
+                  style={{ color: LEGACY_COLORS.blue }}
+                >
+                  {formatNumber(e.qty)} {e.item.unit}
+                </div>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
+      <SectionCard title="참조번호 · 비고" padding="sm">
+        <div className="flex flex-col gap-2">
+          <input
+            value={state.referenceNo}
+            onChange={(e) => dispatch({ type: "SET_REFERENCE", referenceNo: e.target.value })}
+            placeholder="참조번호 (예: DIO-240412)"
+            className={`${TYPO.body} rounded-[14px] border px-3 py-3 outline-none`}
+            style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+          />
+          <textarea
+            value={state.note}
+            onChange={(e) => dispatch({ type: "SET_NOTE", note: e.target.value })}
+            rows={2}
+            placeholder="비고 (선택)"
+            className={`${TYPO.body} resize-none rounded-[14px] border px-3 py-3 outline-none`}
+            style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+          />
+        </div>
+      </SectionCard>
 
       {state.error ? (
         <div
@@ -701,23 +722,48 @@ export function StepConfirm({
       ) : null}
 
       <StickyFooter>
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={state.submitting}
-          className={`${TYPO.body} w-full rounded-[14px] py-3 font-black disabled:opacity-40`}
-          style={{
-            background: state.direction === "in" ? LEGACY_COLORS.green : LEGACY_COLORS.red,
-            color: state.direction === "in" ? "#041008" : "#fff",
-          }}
-        >
-          {state.submitting
-            ? "처리 중…"
-            : state.usePackage
-              ? `패키지 출하 · ${qty}회`
-              : `확정 · ${selectedList.length}건`}
-        </button>
+        <div className="flex flex-col gap-2">
+          {onBack ? (
+            <button
+              type="button"
+              onClick={onBack}
+              disabled={state.submitting}
+              className={`${TYPO.caption} w-full rounded-[14px] py-2 font-semibold disabled:opacity-40`}
+              style={{ color: LEGACY_COLORS.muted2 }}
+            >
+              뒤로 가서 수정
+            </button>
+          ) : null}
+          <PrimaryActionButton
+            intent={intent}
+            label={
+              state.usePackage
+                ? `패키지 출하 확정 · ${pkgQty}회`
+                : `부서 ${directionLabel} 확정`
+            }
+            count={state.usePackage ? undefined : selectedList.length}
+            total={state.usePackage ? undefined : totalQty}
+            onClick={onSubmit}
+            disabled={state.submitting}
+            loadingText="처리 중…"
+          />
+        </div>
       </StickyFooter>
+    </div>
+  );
+}
+
+function StepHeading({ title, hint }: { title: string; hint?: string }) {
+  return (
+    <div className="flex flex-col gap-[2px]">
+      <div className={`${TYPO.title} font-black`} style={{ color: LEGACY_COLORS.text }}>
+        {title}
+      </div>
+      {hint ? (
+        <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
+          {hint}
+        </div>
+      ) : null}
     </div>
   );
 }

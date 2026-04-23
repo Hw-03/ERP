@@ -4,11 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, X } from "lucide-react";
 import { api, type Item } from "@/lib/api";
 import { LEGACY_COLORS, normalizeDepartment } from "../../../legacyUi";
-import { TYPO } from "../../tokens";
 import type { ToastState } from "../../../Toast";
-import { IconButton, WizardProgress } from "../../primitives";
+import { IconButton, WizardHeader, type SummaryChip } from "../../primitives";
 import { useEmployees } from "../../hooks/useEmployees";
-import { WAREHOUSE_STEPS } from "./warehouseWizardConfig";
+import { WAREHOUSE_MODE_META, WAREHOUSE_STEPS, type WarehouseMode } from "./warehouseWizardConfig";
 import { useWarehouseWizard } from "./context";
 import { StepConfirm, StepItems, StepPerson, StepType } from "./WarehouseWizardSteps";
 
@@ -39,6 +38,36 @@ export function WarehouseWizardScreen({ showToast }: { showToast: (toast: ToastS
     () => employees.find((e) => e.employee_id === state.employeeId) ?? null,
     [employees, state.employeeId],
   );
+
+  const summaryChips: SummaryChip[] = useMemo(() => {
+    const out: SummaryChip[] = [];
+    if (state.mode) {
+      const meta = WAREHOUSE_MODE_META[state.mode as WarehouseMode];
+      out.push({
+        key: "mode",
+        label: meta.label,
+        tone: LEGACY_COLORS.blue,
+        onClick: state.step > 0 ? () => dispatch({ type: "GO", step: 0 }) : undefined,
+      });
+    }
+    if (employee) {
+      out.push({
+        key: "employee",
+        label: `${employee.name}`,
+        tone: LEGACY_COLORS.green,
+        onClick: state.step > 1 ? () => dispatch({ type: "GO", step: 1 }) : undefined,
+      });
+    }
+    if (state.items.size > 0 && state.step > 2) {
+      out.push({
+        key: "items",
+        label: `${state.items.size}건`,
+        tone: LEGACY_COLORS.cyan,
+        onClick: () => dispatch({ type: "GO", step: 2 }),
+      });
+    }
+    return out;
+  }, [state.mode, state.step, state.items.size, employee, dispatch]);
 
   const submit = async () => {
     if (!employee) {
@@ -96,7 +125,7 @@ export function WarehouseWizardScreen({ showToast }: { showToast: (toast: ToastS
   return (
     <div className="flex flex-col">
       <div
-        className="sticky top-0 z-10 flex items-center gap-2 border-b px-3 py-3"
+        className="sticky top-0 z-10 flex items-start gap-2 border-b px-3 py-3"
         style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
       >
         <IconButton
@@ -108,9 +137,10 @@ export function WarehouseWizardScreen({ showToast }: { showToast: (toast: ToastS
           color={atFirstStep ? LEGACY_COLORS.muted : LEGACY_COLORS.text}
         />
         <div className="min-w-0 flex-1">
-          <WizardProgress
+          <WizardHeader
             steps={WAREHOUSE_STEPS.map((s) => ({ key: s.key, label: s.label }))}
             current={state.step}
+            chips={summaryChips}
           />
         </div>
         <IconButton
@@ -137,6 +167,7 @@ export function WarehouseWizardScreen({ showToast }: { showToast: (toast: ToastS
         <StepItems
           items={items}
           loading={itemsLoading}
+          showToast={showToast}
           onNext={() => {
             if (state.items.size === 0) {
               dispatch({ type: "SET_ERROR", error: "품목을 1개 이상 선택해 주세요." });
@@ -147,13 +178,7 @@ export function WarehouseWizardScreen({ showToast }: { showToast: (toast: ToastS
         />
       )}
       {stepMeta?.key === "confirm" && (
-        <StepConfirm items={items} employee={employee} onSubmit={() => void submit()} />
-      )}
-
-      {stepMeta?.key === "type" && (
-        <div className={`${TYPO.caption} px-4 pb-6 text-center`} style={{ color: LEGACY_COLORS.muted }}>
-          원하는 이동 유형을 선택하면 다음 단계로 넘어갑니다.
-        </div>
+        <StepConfirm items={items} employee={employee} onSubmit={() => void submit()} onBack={() => dispatch({ type: "PREV" })} />
       )}
     </div>
   );

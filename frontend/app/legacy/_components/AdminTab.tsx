@@ -91,7 +91,7 @@ const EMPTY_ADD_FORM = {
   initial_quantity: "",
 };
 
-function ItemsSection({ showToast }: { showToast: (toast: ToastState) => void }) {
+export function ItemsSection({ showToast }: { showToast: (toast: ToastState) => void }) {
   const [items, setItems] = useState<Item[]>([]);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Item | null>(null);
@@ -416,7 +416,7 @@ function ItemsSection({ showToast }: { showToast: (toast: ToastState) => void })
   );
 }
 
-function EmployeesSection({ showToast }: { showToast: (toast: ToastState) => void }) {
+export function EmployeesSection({ showToast }: { showToast: (toast: ToastState) => void }) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState({
@@ -542,7 +542,7 @@ function EmployeesSection({ showToast }: { showToast: (toast: ToastState) => voi
   );
 }
 
-function BomSection({ showToast }: { showToast: (toast: ToastState) => void }) {
+export function BomSection({ showToast }: { showToast: (toast: ToastState) => void }) {
   const [items, setItems] = useState<Item[]>([]);
   const [parentId, setParentId] = useState("");
   const [bomRows, setBomRows] = useState<BOMEntry[]>([]);
@@ -666,7 +666,7 @@ function BomSection({ showToast }: { showToast: (toast: ToastState) => void }) {
   );
 }
 
-function PackagesSection({ showToast }: { showToast: (toast: ToastState) => void }) {
+export function PackagesSection({ showToast }: { showToast: (toast: ToastState) => void }) {
   const [packages, setPackages] = useState<ShipPackage[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<ShipPackage | null>(null);
@@ -802,7 +802,7 @@ function PackagesSection({ showToast }: { showToast: (toast: ToastState) => void
   );
 }
 
-function SettingsSection({ showToast }: { showToast: (toast: ToastState) => void }) {
+export function SettingsSection({ showToast }: { showToast: (toast: ToastState) => void }) {
   const [pinForm, setPinForm] = useState({ current_pin: "", new_pin: "", confirm_pin: "" });
   const [resetPin, setResetPin] = useState("");
 

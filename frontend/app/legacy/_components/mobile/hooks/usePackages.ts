@@ -8,7 +8,7 @@ export function usePackages() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const reload = useCallback(() => {
+  const refetch = useCallback(() => {
     setLoading(true);
     return api
       .getShipPackages()
@@ -23,8 +23,8 @@ export function usePackages() {
   }, []);
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    void refetch();
+  }, [refetch]);
 
-  return { packages, loading, error, reload };
+  return { packages, loading, error, refetch };
 }

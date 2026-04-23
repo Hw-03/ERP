@@ -7,11 +7,14 @@ import { LEGACY_COLORS } from "../../legacyUi";
 import { TYPO } from "../tokens";
 import { FilterChip, FilterChipRow, SheetHeader } from "../primitives";
 
+export type KpiKey = "ALL" | "OK" | "LOW" | "ZERO";
+
 export type InventoryFilters = {
   department: string;
   legacyModel: string;
   itemType: string;
   grouped: boolean;
+  kpi: KpiKey;
 };
 
 const DEPT_OPTIONS = [
@@ -32,6 +35,13 @@ const TYPE_OPTIONS = [
   { label: "고정형(?F)", value: "FIXED" },
   { label: "완제품(FG)", value: "FG" },
 ];
+
+export const KPI_LABEL: Record<KpiKey, string> = {
+  ALL: "전체",
+  OK: "정상",
+  LOW: "부족",
+  ZERO: "품절",
+};
 
 export function InventoryFilterSheet({
   open,
@@ -167,7 +177,60 @@ export function countActiveFilters(f: InventoryFilters) {
   if (f.legacyModel !== "ALL") n++;
   if (f.itemType !== "ALL") n++;
   if (f.grouped) n++;
+  if (f.kpi !== "ALL") n++;
   return n;
+}
+
+export function buildActiveFilterChips(
+  f: InventoryFilters,
+  onChange: (next: InventoryFilters) => void,
+): { key: string; label: string; tone: string; onRemove: () => void }[] {
+  const chips: { key: string; label: string; tone: string; onRemove: () => void }[] = [];
+  if (f.kpi !== "ALL") {
+    const tone =
+      f.kpi === "OK" ? LEGACY_COLORS.green : f.kpi === "LOW" ? LEGACY_COLORS.yellow : LEGACY_COLORS.red;
+    chips.push({
+      key: "kpi",
+      label: `상태: ${KPI_LABEL[f.kpi]}`,
+      tone,
+      onRemove: () => onChange({ ...f, kpi: "ALL" }),
+    });
+  }
+  if (f.department !== "ALL") {
+    chips.push({
+      key: "department",
+      label: `부서: ${f.department}`,
+      tone: LEGACY_COLORS.green,
+      onRemove: () => onChange({ ...f, department: "ALL" }),
+    });
+  }
+  if (f.legacyModel !== "ALL") {
+    chips.push({
+      key: "legacyModel",
+      label: `모델: ${f.legacyModel}`,
+      tone: LEGACY_COLORS.cyan,
+      onRemove: () => onChange({ ...f, legacyModel: "ALL" }),
+    });
+  }
+  if (f.itemType !== "ALL") {
+    const label =
+      TYPE_OPTIONS.find((t) => t.value === f.itemType)?.label ?? f.itemType;
+    chips.push({
+      key: "itemType",
+      label: `타입: ${label}`,
+      tone: LEGACY_COLORS.purple,
+      onRemove: () => onChange({ ...f, itemType: "ALL" }),
+    });
+  }
+  if (f.grouped) {
+    chips.push({
+      key: "grouped",
+      label: "묶음 보기",
+      tone: LEGACY_COLORS.yellow,
+      onRemove: () => onChange({ ...f, grouped: false }),
+    });
+  }
+  return chips;
 }
 
 export const DEFAULT_INVENTORY_FILTERS: InventoryFilters = {
@@ -175,4 +238,5 @@ export const DEFAULT_INVENTORY_FILTERS: InventoryFilters = {
   legacyModel: "ALL",
   itemType: "ALL",
   grouped: false,
+  kpi: "ALL",
 };
