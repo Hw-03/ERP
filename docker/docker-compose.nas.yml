@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   backend:
-    build: ./backend
+    build: ../backend
     container_name: erp_backend
     restart: unless-stopped
     environment:
@@ -10,11 +10,11 @@ services:
     ports:
       - "8010:8010"
     volumes:
-      - ./backend/erp.db:/app/erp.db
+      - ../backend/erp.db:/app/erp.db
     command: uvicorn app.main:app --host 0.0.0.0 --port 8010
 
   frontend:
-    build: ./frontend
+    build: ../frontend
     container_name: erp_frontend
     restart: unless-stopped
     environment:
