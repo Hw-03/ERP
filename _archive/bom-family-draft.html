@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BOM 가계도 초안</title>
+  <style>
+    :root {
+      --bg: #e9e9e9;
+      --paper: #ffffff;
+      --blue: #4472c4;
+      --blue-dark: #244a86;
+      --line: #8aa4d6;
+      --text: #152238;
+      --muted: #697386;
+      --assembly: #4472c4;
+      --high: #e3b341;
+      --vacuum: #8b65d8;
+      --tube: #2d9eb3;
+      --raw: #4472c4;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", "Malgun Gothic", Arial, sans-serif;
+    }
+
+    main {
+      padding: 26px 28px;
+    }
+
+    .sheet {
+      min-height: calc(100vh - 52px);
+      border: 1px solid #c8c8c8;
+      background: var(--paper);
+      padding: 26px 28px 44px;
+      overflow-x: auto;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      min-width: 1120px;
+      margin-bottom: 26px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: right;
+    }
+
+    .model-board {
+      display: grid;
+      grid-template-columns: repeat(5, 220px);
+      gap: 46px;
+      align-items: start;
+      min-width: 1280px;
+      padding: 0 4px;
+    }
+
+    .model-column {
+      position: relative;
+      min-height: 610px;
+      text-align: center;
+    }
+
+    .model-column::before {
+      content: "";
+      position: absolute;
+      top: 48px;
+      left: 50%;
+      width: 2px;
+      height: 478px;
+      transform: translateX(-1px);
+      background: linear-gradient(180deg, var(--line), rgba(138, 164, 214, 0.08));
+      z-index: 0;
+    }
+
+    .model-box {
+      position: relative;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 118px;
+      height: 48px;
+      border: 1px solid var(--blue-dark);
+      background: var(--blue);
+      color: #fff;
+      font-weight: 800;
+      font-size: 14px;
+      line-height: 1.15;
+      box-shadow: 0 4px 10px rgba(36, 74, 134, 0.22);
+    }
+
+    .stage {
+      position: relative;
+      z-index: 1;
+      margin-top: 46px;
+    }
+
+    .stage-title {
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .circle-row,
+    .triangle-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .circle-node {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 52px;
+      height: 52px;
+      border: 1px solid var(--blue-dark);
+      border-radius: 999px;
+      background: var(--assembly);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      box-shadow: 0 3px 9px rgba(36, 74, 134, 0.18);
+    }
+
+    .circle-node.high {
+      background: var(--high);
+      color: #2d2100;
+      border-color: #a17400;
+    }
+
+    .circle-node.vacuum {
+      background: var(--vacuum);
+      border-color: #5b35a9;
+    }
+
+    .circle-node.tube {
+      background: var(--tube);
+      border-color: #197184;
+    }
+
+    .triangle-group {
+      width: 42px;
+      text-align: center;
+    }
+
+    .triangle-node {
+      width: 0;
+      height: 0;
+      margin: 0 auto;
+      border-left: 22px solid transparent;
+      border-right: 22px solid transparent;
+      border-bottom: 46px solid var(--raw);
+      filter: drop-shadow(0 3px 5px rgba(36, 74, 134, 0.18));
+    }
+
+    .triangle-group:nth-child(2n) .triangle-node {
+      border-bottom-color: #5b88d6;
+    }
+
+    .caption {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.15;
+      overflow-wrap: anywhere;
+    }
+
+    .bom-card {
+      display: inline-block;
+      min-width: 128px;
+      max-width: 188px;
+      border: 1px solid #d7dfef;
+      border-radius: 6px;
+      background: #f8fbff;
+      padding: 8px 10px;
+      text-align: left;
+      box-shadow: 0 4px 12px rgba(15, 35, 75, 0.08);
+    }
+
+    .bom-card strong {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 12px;
+    }
+
+    .bom-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.3;
+    }
+
+    .legend {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      min-width: 1120px;
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-box {
+      width: 18px;
+      height: 14px;
+      border: 1px solid var(--blue-dark);
+      background: var(--blue);
+    }
+
+    .legend-circle {
+      width: 15px;
+      height: 15px;
+      border-radius: 999px;
+      background: var(--assembly);
+    }
+
+    .legend-triangle {
+      width: 0;
+      height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-bottom: 16px solid var(--raw);
+    }
+
+    @media (max-width: 760px) {
+      main {
+        padding: 12px;
+      }
+
+      .sheet {
+        min-height: calc(100vh - 24px);
+        padding: 18px 16px 30px;
+      }
+
+      header {
+        min-width: 980px;
+      }
+
+      .model-board {
+        grid-template-columns: repeat(5, 190px);
+        gap: 34px;
+        min-width: 1080px;
+      }
+
+      .model-column {
+        min-height: 570px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="sheet">
+      <header>
+        <div>
+          <h1>BOM 가계도 초안</h1>
+        </div>
+        <p class="note">모델명은 프로젝트 파일에서 확인한 제품 모델 기준입니다. 데이터는 방향 확인용 샘플입니다.</p>
+      </header>
+
+      <div class="model-board" aria-label="모델별 BOM 도식">
+        <section class="model-column" aria-label="DX3000 BOM">
+          <div class="model-box">DX3000</div>
+
+          <div class="stage">
+            <div class="stage-title">1차 조립품</div>
+            <div class="circle-row">
+              <span class="circle-node">BF</span>
+              <span class="circle-node high">HF</span>
+              <span class="circle-node vacuum">VF</span>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="stage-title">2차 하위 BOM</div>
+            <div class="circle-row">
+              <span class="circle-node tube">TF</span>
+              <span class="circle-node">BA</span>
+              <span class="circle-node high">HA</span>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="stage-title">원자재</div>
+            <div class="triangle-row">
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-프레임</span></span>
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-케이블</span></span>
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-볼트</span></span>
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-포장</span></span>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="bom-card">
+              <strong>3-PA-0001-BG</strong>
+              <span>완제품 1 EA 기준</span>
+              <span>본체 + 고압 + 진공 + 튜브</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="model-column" aria-label="COCOON BOM">
+          <div class="model-box">COCOON</div>
+
+          <div class="stage">
+            <div class="stage-title">1차 조립품</div>
+            <div class="circle-row">
+              <span class="circle-node">BF</span>
+              <span class="circle-node vacuum">VF</span>
+              <span class="circle-node tube">TF</span>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="stage-title">2차 하위 BOM</div>
+            <div class="circle-row">
+              <span class="circle-node">BA</span>
+              <span class="circle-node high">HA</span>
+              <span class="circle-node vacuum">VA</span>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="stage-title">원자재</div>
+            <div class="triangle-row">
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-커버</span></span>
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-실링</span></span>
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-PCB</span></span>
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-하네스</span></span>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="bom-card">
+              <strong>7-PA-0001-BG</strong>
+              <span>완제품 1 EA 기준</span>
+              <span>소형 모델용 BOM 흐름</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="model-column" aria-label="SOLO BOM">
+          <div class="model-box">SOLO</div>
+
+          <div class="stage">
+            <div class="stage-title">1차 조립품</div>
+            <div class="circle-row">
+              <span class="circle-node">BF</span>
+              <span class="circle-node high">HF</span>
+              <span class="circle-node tube">TF</span>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="stage-title">2차 하위 BOM</div>
+            <div class="circle-row">
+              <span class="circle-node tube">TA</span>
+              <span class="circle-node">BA</span>
+              <span class="circle-node vacuum">VA</span>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="stage-title">원자재</div>
+            <div class="triangle-row">
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-튜브</span></span>
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-브라켓</span></span>
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-필라멘트</span></span>
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-포장</span></span>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="bom-card">
+              <strong>8-PA-0001-BG</strong>
+              <span>완제품 1 EA 기준</span>
+              <span>튜브 중심 하위 BOM</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="model-column" aria-label="ADX4000W BOM">
+          <div class="model-box">ADX4000W</div>
+
+          <div class="stage">
+            <div class="stage-title">1차 조립품</div>
+            <div class="circle-row">
+              <span class="circle-node">BF</span>
+              <span class="circle-node high">HF</span>
+              <span class="circle-node vacuum">VF</span>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="stage-title">2차 하위 BOM</div>
+            <div class="circle-row">
+              <span class="circle-node">BA</span>
+              <span class="circle-node high">HA</span>
+              <span class="circle-node tube">TF</span>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="stage-title">원자재</div>
+            <div class="triangle-row">
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-판금</span></span>
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-고압선</span></span>
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-펌프</span></span>
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-체결</span></span>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="bom-card">
+              <strong>4-PA-0001-BG</strong>
+              <span>완제품 1 EA 기준</span>
+              <span>고압/진공 병렬 구성</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="model-column" aria-label="ADX6000FB BOM">
+          <div class="model-box">ADX6000FB</div>
+
+          <div class="stage">
+            <div class="stage-title">1차 조립품</div>
+            <div class="circle-row">
+              <span class="circle-node">BF</span>
+              <span class="circle-node high">HF</span>
+              <span class="circle-node vacuum">VF</span>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="stage-title">2차 하위 BOM</div>
+            <div class="circle-row">
+              <span class="circle-node tube">TF</span>
+              <span class="circle-node high">HA</span>
+              <span class="circle-node vacuum">VA</span>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="stage-title">원자재</div>
+            <div class="triangle-row">
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-튜브</span></span>
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-보드</span></span>
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-챔버</span></span>
+              <span class="triangle-group"><span class="triangle-node"></span><span class="caption">RM-포장</span></span>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="bom-card">
+              <strong>6-PA-0001-BG</strong>
+              <span>완제품 1 EA 기준</span>
+              <span>대형 모델용 BOM 흐름</span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="legend" aria-label="도형 설명">
+        <span class="legend-item"><span class="legend-box"></span>모델/완제품</span>
+        <span class="legend-item"><span class="legend-circle"></span>조립품/반제품</span>
+        <span class="legend-item"><span class="legend-triangle"></span>원자재</span>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
