@@ -28,6 +28,15 @@ from app.services import inventory as inventory_svc
 
 router = APIRouter()
 
+_PROCESS_TO_DEPT: dict[str, str] = {
+    "TR": "튜브", "TA": "튜브",
+    "HR": "고압", "HA": "고압",
+    "VR": "진공", "VA": "진공",
+    "NA": "튜닝",
+    "AR": "조립", "AA": "조립",
+    "PR": "출하", "PA": "출하",
+}
+
 
 def _build_item_query(db: Session):
     return db.query(Item, Inventory).outerjoin(Inventory, Item.item_id == Inventory.item_id)
@@ -63,6 +72,10 @@ def _to_item_with_inventory(
         row.slot for row in db.query(ItemModel).filter(ItemModel.item_id == item.item_id).all()
     ]
 
+    dept = _PROCESS_TO_DEPT.get(item.process_type_code or "", None)
+    if dept is None and any(loc.department.value == "AS" for loc in loc_rows):
+        dept = "AS"
+
     return ItemWithInventory(
         item_id=item.item_id,
         item_name=item.item_name,
@@ -94,6 +107,7 @@ def _to_item_with_inventory(
         last_reserver_name=inventory.last_reserver_name if inventory else None,
         location=inventory.location if inventory else None,
         locations=locations,
+        department=dept,
     )
 
 

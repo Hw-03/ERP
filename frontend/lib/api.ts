@@ -108,6 +108,7 @@ export interface Item {
   serial_no: number | null;
   created_at: string;
   updated_at: string;
+  department: string | null;
 }
 
 // =============================================================================

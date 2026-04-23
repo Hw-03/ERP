@@ -95,6 +95,7 @@ class ItemWithInventory(ItemResponse):
     last_reserver_name: Optional[str] = None
     location: Optional[str] = None
     locations: List[InventoryLocationResponse] = []
+    department: Optional[str] = None
 
 
 class EmployeeCreate(BaseModel):

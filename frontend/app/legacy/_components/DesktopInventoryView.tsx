@@ -58,8 +58,13 @@ function matchesSearch(item: Item, keyword: string) {
   return haystack.includes(keyword);
 }
 
+function safeQty(item: Item) {
+  const n = Number(item.quantity);
+  return isNaN(n) ? 0 : n;
+}
+
 function matchesKpi(item: Item, kpi: KpiFilter) {
-  const qty = Number(item.quantity);
+  const qty = safeQty(item);
   const min = getMinStock(item);
   if (kpi === "NORMAL") return qty > 0 && qty >= min;
   if (kpi === "LOW") return qty > 0 && qty < min;
@@ -183,7 +188,9 @@ const selectedSlots = useMemo(
     if (!matchesSearch(item, deferredLocalSearch)) return false;
     if (selectedDepts.length > 0) {
       const inDept = selectedDepts.some((d) =>
-        d === "창고" ? (item.warehouse_qty ?? 0) > 0 : item.locations.some((loc) => loc.department === d),
+        d === "창고"
+          ? (item.warehouse_qty ?? 0) > 0
+          : item.department === d,
       );
       if (!inDept) return false;
     }
@@ -197,10 +204,10 @@ const selectedSlots = useMemo(
   }, [filteredItems]);
 
   const summary = useMemo(() => {
-    const totalQuantity = scopedItems.reduce((acc, item) => acc + Number(item.quantity), 0);
-    const normalCount = scopedItems.filter((item) => Number(item.quantity) > 0 && Number(item.quantity) >= getMinStock(item)).length;
-    const lowCount = scopedItems.filter((item) => Number(item.quantity) > 0 && Number(item.quantity) < getMinStock(item)).length;
-    const zeroCount = scopedItems.filter((item) => Number(item.quantity) <= 0).length;
+    const totalQuantity = scopedItems.reduce((acc, item) => acc + safeQty(item), 0);
+    const normalCount = scopedItems.filter((item) => safeQty(item) > 0 && safeQty(item) >= getMinStock(item)).length;
+    const lowCount = scopedItems.filter((item) => safeQty(item) > 0 && safeQty(item) < getMinStock(item)).length;
+    const zeroCount = scopedItems.filter((item) => safeQty(item) <= 0).length;
     return { totalCount: scopedItems.length, totalQuantity, normalCount, lowCount, zeroCount };
   }, [scopedItems]);
 
@@ -282,7 +289,7 @@ const selectedSlots = useMemo(
               {/* KPI 카드 */}
               <div className="mt-4 grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
                 {[
-                  { label: isFiltered ? "조회 품목" : "전체 품목", value: summary.totalCount, hint: isFiltered ? "필터 적용 결과" : `총 재고 ${formatNumber(summary.totalQuantity)}`, tone: LEGACY_COLORS.blue, key: "ALL" as KpiFilter },
+                  { label: isFiltered ? "조회 품목" : "전체 품목", value: filteredItems.length, hint: isFiltered ? "필터 적용 결과" : `총 재고 ${formatNumber(summary.totalQuantity)}`, tone: LEGACY_COLORS.blue, key: "ALL" as KpiFilter },
                   { label: "정상", value: summary.normalCount, hint: "운영 가능 품목", tone: LEGACY_COLORS.green, key: "NORMAL" as KpiFilter },
                   { label: "부족", value: summary.lowCount, hint: "안전재고 이하", tone: LEGACY_COLORS.yellow, key: "LOW" as KpiFilter },
                   { label: "품절", value: summary.zeroCount, hint: "즉시 확인 필요", tone: LEGACY_COLORS.red, key: "ZERO" as KpiFilter },
