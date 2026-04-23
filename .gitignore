@@ -32,3 +32,10 @@ Thumbs.db
 
 # Dev-only generated assets
 .dev/screenshots/
+
+# Local / personal files
+workspace.ahk
+backend/query_test.py
+
+# Archive vault (Obsidian)
+_archive/ERP-Vault/
