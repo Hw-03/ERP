@@ -103,6 +103,7 @@ export function DesktopAdminView({
   const [pkgItemCategory, setPkgItemCategory] = useState("ALL");
 
   async function loadData() {
+    setMessage("");
     const [nextItems, nextEmployees, nextPackages, nextModels] = await Promise.all([
       api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
       api.getEmployees(),
