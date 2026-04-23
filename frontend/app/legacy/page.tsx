@@ -1,14 +1,19 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { LegacyLayout, type TabId } from "./_components/LegacyLayout";
+import { MobileShell, type TabId } from "./_components/mobile/MobileShell";
+import { InventoryScreen } from "./_components/mobile/screens/InventoryScreen";
+import { HistoryScreen } from "./_components/mobile/screens/HistoryScreen";
 import { Toast, type ToastState } from "./_components/Toast";
-import { InventoryTab } from "./_components/InventoryTab";
-import { WarehouseIOTab } from "./_components/WarehouseIOTab";
-import { DeptIOTab } from "./_components/DeptIOTab";
-import { HistoryTab } from "./_components/HistoryTab";
 import { AdminTab } from "./_components/AdminTab";
 import { DesktopLegacyShell } from "./_components/DesktopLegacyShell";
+import {
+  WarehouseWizardProvider,
+  useWarehouseWizard,
+} from "./_components/mobile/io/warehouse/context";
+import { WarehouseWizardScreen } from "./_components/mobile/io/warehouse/WarehouseWizardScreen";
+import { DeptWizardProvider } from "./_components/mobile/io/dept/context";
+import { DeptWizardScreen } from "./_components/mobile/io/dept/DeptWizardScreen";
 
 const TAB_TITLES: Record<TabId, { subtitle: string; title: string }> = {
   inventory: { subtitle: "재고 현황", title: "재고" },
@@ -18,24 +23,33 @@ const TAB_TITLES: Record<TabId, { subtitle: string; title: string }> = {
 };
 
 export default function LegacyPage() {
-  const [activeTab, setActiveTab] = useState<TabId>("warehouse");
+  return (
+    <WarehouseWizardProvider>
+      <DeptWizardProvider>
+        <LegacyBody />
+      </DeptWizardProvider>
+    </WarehouseWizardProvider>
+  );
+}
+
+function LegacyBody() {
+  const [activeTab, setActiveTab] = useState<TabId>("inventory");
   const [showHistory, setShowHistory] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const { dispatch: warehouseDispatch } = useWarehouseWizard();
 
   const showToast = useCallback((next: ToastState) => setToast(next), []);
   const clearToast = useCallback(() => setToast(null), []);
 
   const title = useMemo(() => {
-    if (showHistory) {
-      return { subtitle: "입출고 이력", title: "입출고 이력" };
-    }
+    if (showHistory) return { subtitle: "입출고 이력", title: "입출고 이력" };
     return TAB_TITLES[activeTab];
   }, [activeTab, showHistory]);
 
   return (
     <>
       <div className="lg:hidden">
-        <LegacyLayout
+        <MobileShell
           activeTab={activeTab}
           onTabChange={(tab) => {
             setActiveTab(tab);
@@ -45,22 +59,38 @@ export default function LegacyPage() {
           title={title.title}
         >
           {showHistory ? (
-            <HistoryTab onClose={() => setShowHistory(false)} />
+            <HistoryScreen onClose={() => setShowHistory(false)} />
           ) : (
             <>
               {activeTab === "inventory" && (
-                <InventoryTab showToast={showToast} onOpenHistory={() => setShowHistory(true)} />
+                <InventoryScreen
+                  showToast={showToast}
+                  onOpenHistory={() => setShowHistory(true)}
+                  onBulkIO={(items) => {
+                    warehouseDispatch({
+                      type: "PREFILL_ITEMS",
+                      itemIds: items.map((i) => i.item_id),
+                      qty: 1,
+                    });
+                    warehouseDispatch({ type: "GO", step: 0 });
+                    setActiveTab("warehouse");
+                    showToast({
+                      type: "info",
+                      message: `${items.length}건이 창고입출고에 추가되었습니다.`,
+                    });
+                  }}
+                />
               )}
-              {activeTab === "warehouse" && (
-                <WarehouseIOTab showToast={showToast} onOpenHistory={() => setShowHistory(true)} />
+              {activeTab === "warehouse" && <WarehouseWizardScreen showToast={showToast} />}
+              {activeTab === "dept" && <DeptWizardScreen showToast={showToast} />}
+              {activeTab === "admin" && (
+                <div className="px-[14px] py-[14px]">
+                  <AdminTab showToast={showToast} />
+                </div>
               )}
-              {activeTab === "dept" && (
-                <DeptIOTab showToast={showToast} onOpenHistory={() => setShowHistory(true)} />
-              )}
-              {activeTab === "admin" && <AdminTab showToast={showToast} />}
             </>
           )}
-        </LegacyLayout>
+        </MobileShell>
       </div>
 
       <DesktopLegacyShell />

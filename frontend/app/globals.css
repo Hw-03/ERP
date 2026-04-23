@@ -27,6 +27,16 @@
     --c-radius-xl: 32px;
     --c-radius-lg: 24px;
     --c-radius-md: 18px;
+    --c-radius-sm: 14px;
+    --c-radius-xs: 8px;
+    --c-text-caption: 12px;
+    --c-text-body: 14px;
+    --c-text-title: 16px;
+    --c-text-display: 20px;
+    --c-action: var(--c-blue);
+    --c-ok: var(--c-green);
+    --c-warn: var(--c-yellow);
+    --c-danger: var(--c-red);
     --pill-hover-mix: 55%;
     --pill-glow-strength: 75%;
     --pill-glow-blur: 24px;

@@ -1,0 +1,160 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { ChevronLeft, X } from "lucide-react";
+import { api, type Item } from "@/lib/api";
+import { LEGACY_COLORS, normalizeDepartment } from "../../../legacyUi";
+import { TYPO } from "../../tokens";
+import type { ToastState } from "../../../Toast";
+import { IconButton, WizardProgress } from "../../primitives";
+import { useEmployees } from "../../hooks/useEmployees";
+import { WAREHOUSE_STEPS } from "./warehouseWizardConfig";
+import { useWarehouseWizard } from "./context";
+import { StepConfirm, StepItems, StepPerson, StepType } from "./WarehouseWizardSteps";
+
+export function WarehouseWizardScreen({ showToast }: { showToast: (toast: ToastState) => void }) {
+  const { state, dispatch } = useWarehouseWizard();
+  const { employees, loading: employeesLoading } = useEmployees({ activeOnly: true });
+  const [items, setItems] = useState<Item[]>([]);
+  const [itemsLoading, setItemsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setItemsLoading(true);
+    api
+      .getItems({ limit: 2000 })
+      .then((data) => {
+        if (!cancelled) setItems(data);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setItemsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const employee = useMemo(
+    () => employees.find((e) => e.employee_id === state.employeeId) ?? null,
+    [employees, state.employeeId],
+  );
+
+  const submit = async () => {
+    if (!employee) {
+      dispatch({ type: "SET_ERROR", error: "담당 직원을 선택해 주세요." });
+      return;
+    }
+    if (state.items.size === 0) {
+      dispatch({ type: "SET_ERROR", error: "품목을 선택해 주세요." });
+      return;
+    }
+
+    dispatch({ type: "SET_SUBMITTING", value: true });
+    dispatch({ type: "SET_ERROR", error: null });
+
+    const producedBy = `${employee.name} (${normalizeDepartment(employee.department)})`;
+    const entries = Array.from(state.items.entries());
+    const failures: string[] = [];
+
+    for (const [itemId, qty] of entries) {
+      const item = items.find((i) => i.item_id === itemId);
+      const payload = {
+        item_id: itemId,
+        quantity: qty,
+        reference_no: state.referenceNo || undefined,
+        produced_by: producedBy,
+        notes: state.note || undefined,
+      };
+      try {
+        if (state.mode === "wh2d") await api.shipInventory(payload);
+        else await api.receiveInventory(payload);
+      } catch {
+        failures.push(item?.item_name ?? itemId);
+      }
+    }
+
+    dispatch({ type: "SET_SUBMITTING", value: false });
+
+    if (failures.length > 0) {
+      const msg = `처리 실패: ${failures.join(", ")}`;
+      dispatch({ type: "SET_ERROR", error: msg });
+      showToast({ type: "error", message: msg });
+      return;
+    }
+
+    showToast({
+      type: "success",
+      message: `창고 입출고 ${entries.length}건 처리 완료`,
+    });
+    dispatch({ type: "RESET" });
+  };
+
+  const atFirstStep = state.step === 0;
+  const stepMeta = WAREHOUSE_STEPS[state.step];
+
+  return (
+    <div className="flex flex-col">
+      <div
+        className="sticky top-0 z-10 flex items-center gap-2 border-b px-3 py-3"
+        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+      >
+        <IconButton
+          icon={ChevronLeft}
+          label="이전 단계"
+          size="md"
+          onClick={() => dispatch({ type: "PREV" })}
+          disabled={atFirstStep}
+          color={atFirstStep ? LEGACY_COLORS.muted : LEGACY_COLORS.text}
+        />
+        <div className="min-w-0 flex-1">
+          <WizardProgress
+            steps={WAREHOUSE_STEPS.map((s) => ({ key: s.key, label: s.label }))}
+            current={state.step}
+          />
+        </div>
+        <IconButton
+          icon={X}
+          label="취소"
+          size="md"
+          onClick={() => {
+            if (
+              typeof window !== "undefined" &&
+              (state.mode != null || state.items.size > 0 || state.employeeId != null) &&
+              !window.confirm("작성 중인 내용을 모두 취소할까요?")
+            ) {
+              return;
+            }
+            dispatch({ type: "RESET" });
+          }}
+          color={LEGACY_COLORS.muted2}
+        />
+      </div>
+
+      {stepMeta?.key === "type" && <StepType />}
+      {stepMeta?.key === "person" && <StepPerson employees={employees} loading={employeesLoading} />}
+      {stepMeta?.key === "items" && (
+        <StepItems
+          items={items}
+          loading={itemsLoading}
+          onNext={() => {
+            if (state.items.size === 0) {
+              dispatch({ type: "SET_ERROR", error: "품목을 1개 이상 선택해 주세요." });
+              return;
+            }
+            dispatch({ type: "NEXT" });
+          }}
+        />
+      )}
+      {stepMeta?.key === "confirm" && (
+        <StepConfirm items={items} employee={employee} onSubmit={() => void submit()} />
+      )}
+
+      {stepMeta?.key === "type" && (
+        <div className={`${TYPO.caption} px-4 pb-6 text-center`} style={{ color: LEGACY_COLORS.muted }}>
+          원하는 이동 유형을 선택하면 다음 단계로 넘어갑니다.
+        </div>
+      )}
+    </div>
+  );
+}
