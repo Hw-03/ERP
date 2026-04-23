@@ -25,7 +25,9 @@ const DEPT_OPTIONS = [
   { label: "튜닝", value: "튜닝" },
   { label: "조립", value: "조립" },
   { label: "출하", value: "출하" },
+  { label: "AS", value: "AS" },
 ];
+const ALL_DEPT_VALUES = DEPT_OPTIONS.filter((o) => o.value !== "ALL").map((o) => o.value);
 
 type KpiFilter = "ALL" | "NORMAL" | "LOW" | "ZERO";
 
@@ -140,11 +142,17 @@ export function DesktopInventoryView({
   }
 
   function toggleDept(v: string) {
-    setSelectedDepts((prev) => prev.includes(v) ? prev.filter((d) => d !== v) : [...prev, v]);
+    setSelectedDepts((prev) => {
+      const next = prev.includes(v) ? prev.filter((d) => d !== v) : [...prev, v];
+      return next.length === ALL_DEPT_VALUES.length ? [] : next;
+    });
     setDisplayLimit(DESKTOP_PAGE_SIZE);
   }
   function toggleModel(v: string) {
-    setSelectedModels((prev) => prev.includes(v) ? prev.filter((m) => m !== v) : [...prev, v]);
+    setSelectedModels((prev) => {
+      const next = prev.includes(v) ? prev.filter((m) => m !== v) : [...prev, v];
+      return next.length === productModels.length ? [] : next;
+    });
     setDisplayLimit(DESKTOP_PAGE_SIZE);
   }
 
@@ -166,7 +174,12 @@ export function DesktopInventoryView({
     void api.getTransactions({ itemId: selectedItem.item_id, limit: 10 }).then(setItemLogs).catch(() => setItemLogs([]));
   }, [selectedItem]);
 
-const scopedItems = useMemo(() => items.filter((item) => {
+const selectedSlots = useMemo(
+    () => new Set(productModels.filter((m) => selectedModels.includes(m.model_name ?? "")).map((m) => m.slot)),
+    [productModels, selectedModels],
+  );
+
+  const scopedItems = useMemo(() => items.filter((item) => {
     if (!matchesSearch(item, deferredLocalSearch)) return false;
     if (selectedDepts.length > 0) {
       const inDept = selectedDepts.some((d) =>
@@ -174,9 +187,9 @@ const scopedItems = useMemo(() => items.filter((item) => {
       );
       if (!inDept) return false;
     }
-    if (selectedModels.length > 0 && !selectedModels.includes(item.legacy_model ?? "")) return false;
+    if (selectedSlots.size > 0 && !item.model_slots.some((s) => selectedSlots.has(s))) return false;
     return true;
-  }), [items, deferredLocalSearch, selectedDepts, selectedModels]);
+  }), [items, deferredLocalSearch, selectedDepts, selectedSlots]);
   const filteredItems = useMemo(() => scopedItems.filter((item) => matchesKpi(item, kpi)), [scopedItems, kpi]);
 
   useEffect(() => {
@@ -314,7 +327,7 @@ const scopedItems = useMemo(() => items.filter((item) => {
                     <Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />
                     부서 구분
                   </div>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <Chip active={selectedDepts.length === 0} label="전체" onClick={() => setSelectedDepts([])} tone={LEGACY_COLORS.green} />
                     {DEPT_OPTIONS.filter((o) => o.value !== "ALL").map((opt) => (
                       <Chip key={opt.value} active={selectedDepts.includes(opt.value)} label={opt.label} onClick={() => toggleDept(opt.value)} tone={LEGACY_COLORS.green} />

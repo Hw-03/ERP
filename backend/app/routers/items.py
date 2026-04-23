@@ -45,21 +45,19 @@ def _to_item_with_inventory(
     defect = inventory_svc.defective_total(db, item.item_id) if inventory else _D("0")
     total = wh + prod + defect
 
-    locations: list[InventoryLocationResponse] = []
-    if inventory:
-        loc_rows = (
-            db.query(InventoryLocation)
-            .filter(InventoryLocation.item_id == item.item_id, InventoryLocation.quantity > 0)
-            .all()
+    loc_rows = (
+        db.query(InventoryLocation)
+        .filter(InventoryLocation.item_id == item.item_id)
+        .all()
+    )
+    locations: list[InventoryLocationResponse] = [
+        InventoryLocationResponse(
+            department=row.department,
+            status=row.status,
+            quantity=row.quantity or _D("0"),
         )
-        locations = [
-            InventoryLocationResponse(
-                department=row.department,
-                status=row.status,
-                quantity=row.quantity or _D("0"),
-            )
-            for row in loc_rows
-        ]
+        for row in loc_rows
+    ]
 
     item_model_slots = [
         row.slot for row in db.query(ItemModel).filter(ItemModel.item_id == item.item_id).all()
