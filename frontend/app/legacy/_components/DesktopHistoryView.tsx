@@ -294,7 +294,7 @@ export function DesktopHistoryView() {
                 className="flex flex-col gap-1 rounded-[20px] border p-4"
                 style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
               >
-                <div className="text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>전체 건수</div>
+                <div className="text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>전체 건수</div>
                 <div className="font-mono text-2xl font-black">{formatNumber(stats.total)}</div>
                 <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>필터 기준</div>
               </div>
@@ -303,7 +303,7 @@ export function DesktopHistoryView() {
                 className="flex flex-col gap-1 rounded-[20px] border p-4"
                 style={{ background: "rgba(67,211,157,.06)", borderColor: "rgba(67,211,157,.22)" }}
               >
-                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.green }}>
+                <div className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.green }}>
                   <TrendingUp className="h-3.5 w-3.5" />
                   입고 합계
                 </div>
@@ -315,7 +315,7 @@ export function DesktopHistoryView() {
                 className="flex flex-col gap-1 rounded-[20px] border p-4"
                 style={{ background: "rgba(255,123,123,.06)", borderColor: "rgba(255,123,123,.22)" }}
               >
-                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.red }}>
+                <div className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.red }}>
                   <TrendingDown className="h-3.5 w-3.5" />
                   출고 합계
                 </div>
@@ -327,7 +327,7 @@ export function DesktopHistoryView() {
                 className="flex flex-col gap-1 rounded-[20px] border p-4"
                 style={{ background: "rgba(101,169,255,.06)", borderColor: "rgba(101,169,255,.22)" }}
               >
-                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.blue }}>
+                <div className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.blue }}>
                   <Calendar className="h-3.5 w-3.5" />
                   오늘 건수
                 </div>
@@ -379,7 +379,7 @@ export function DesktopHistoryView() {
 
               {/* 유형 필터 */}
               <div className="flex flex-wrap items-center gap-2">
-                <span className="shrink-0 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>유형</span>
+                <span className="shrink-0 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>유형</span>
                 {TYPE_OPTIONS.map((opt) => (
                   <Chip key={opt.value} active={typeFilter === opt.value} label={opt.label} onClick={() => setTypeFilter(opt.value)} />
                 ))}
@@ -387,7 +387,7 @@ export function DesktopHistoryView() {
 
               {/* 기간 필터 */}
               <div className="flex flex-wrap items-center gap-2">
-                <span className="shrink-0 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>기간</span>
+                <span className="shrink-0 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>기간</span>
                 {DATE_OPTIONS.map((opt) => (
                   <Chip key={opt.value} active={dateFilter === opt.value} label={opt.label} onClick={() => setDateFilter(opt.value)} tone={LEGACY_COLORS.purple} />
                 ))}
@@ -720,7 +720,7 @@ export function DesktopHistoryView() {
 
             {/* 메모 편집 */}
             <div className="rounded-[24px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-              <div className="mb-2 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>메모</div>
+              <div className="mb-2 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>메모</div>
               <textarea
                 value={editingNotes}
                 onChange={(e) => setEditingNotes(e.target.value)}
@@ -741,7 +741,7 @@ export function DesktopHistoryView() {
             {/* 이 품목의 최근 거래 */}
             {itemRecentLogs.length > 0 && (
               <div className="rounded-[24px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                <div className="mb-3 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                <div className="mb-3 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
                   이 품목의 최근 거래
                 </div>
                 <div className="space-y-2">

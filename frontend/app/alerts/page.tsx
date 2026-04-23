@@ -105,7 +105,7 @@ export default function AlertsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span
-                      className="rounded-full px-2 py-[2px] text-xs font-bold"
+                      className="rounded-full px-2 py-[2px] text-sm font-bold"
                       style={{
                         background:
                           a.kind === "SAFETY"
@@ -116,7 +116,7 @@ export default function AlertsPage() {
                     >
                       {a.kind === "SAFETY" ? "안전재고" : "실사편차"}
                     </span>
-                    <div className="truncate text-sm font-semibold">{a.item_name}</div>
+                    <div className="truncate text-base font-semibold">{a.item_name}</div>
                   </div>
                   <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                     {a.message}
@@ -129,7 +129,7 @@ export default function AlertsPage() {
                 {!a.acknowledged_at && (
                   <button
                     onClick={() => ack(a.alert_id)}
-                    className="rounded-lg px-3 py-1 text-xs font-bold"
+                    className="rounded-lg px-3 py-1 text-sm font-bold"
                     style={{ background: LEGACY_COLORS.s3, color: LEGACY_COLORS.text }}
                   >
                     확인

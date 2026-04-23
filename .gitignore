@@ -37,5 +37,5 @@ Thumbs.db
 workspace.ahk
 backend/query_test.py
 
-# Archive vault (Obsidian)
-_archive/ERP-Vault/
+# Obsidian vault lock file (자동 생성)
+vault/.obsidian/workspace.json

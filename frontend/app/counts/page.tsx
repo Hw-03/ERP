@@ -87,7 +87,7 @@ export default function CountsPage() {
           className="mb-6 overflow-hidden rounded-[14px] border p-3"
           style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
         >
-          <div className="mb-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+          <div className="mb-2 text-base font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
             실사 입력
           </div>
           <select
@@ -194,7 +194,7 @@ export default function CountsPage() {
           )}
         </div>
 
-        <div className="mb-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+        <div className="mb-2 text-base font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
           최근 실사 이력
         </div>
         {counts.length === 0 ? (
@@ -209,7 +209,7 @@ export default function CountsPage() {
             {counts.map((c) => (
               <div key={c.count_id} className="flex items-center justify-between gap-3 px-3 py-3">
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold">
+                  <div className="truncate text-base font-semibold">
                     {c.item_name}
                   </div>
                   <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>

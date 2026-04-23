@@ -1,0 +1,93 @@
+{
+  "collapse-filter": false,
+  "search": "",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "path:ERP.md",
+      "color": {
+        "a": 1,
+        "rgb": 9133302
+      }
+    },
+    {
+      "query": "path:_vault",
+      "color": {
+        "a": 1,
+        "rgb": 16098851
+      }
+    },
+    {
+      "query": "path:backend/app/routers",
+      "color": {
+        "a": 1,
+        "rgb": 4367861
+      }
+    },
+    {
+      "query": "path:backend/app/services",
+      "color": {
+        "a": 1,
+        "rgb": 2001125
+      }
+    },
+    {
+      "query": "path:backend",
+      "color": {
+        "a": 1,
+        "rgb": 1402304
+      }
+    },
+    {
+      "query": "path:frontend/app/legacy",
+      "color": {
+        "a": 1,
+        "rgb": 14964526
+      }
+    },
+    {
+      "query": "path:frontend",
+      "color": {
+        "a": 1,
+        "rgb": 9256510
+      }
+    },
+    {
+      "query": "path:docs",
+      "color": {
+        "a": 1,
+        "rgb": 35195
+      }
+    },
+    {
+      "query": "path:scripts",
+      "color": {
+        "a": 1,
+        "rgb": 4431943
+      }
+    },
+    {
+      "query": "path:data",
+      "color": {
+        "a": 1,
+        "rgb": 15965202
+      }
+    }
+  ],
+  "collapse-display": false,
+  "showArrow": false,
+  "textFadeMultiplier": 0,
+  "nodeSizeMultiplier": 1,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": false,
+  "centerStrength": 0.518713248970312,
+  "repelStrength": 10,
+  "linkStrength": 1,
+  "linkDistance": 250,
+  "scale": 0.36288736930120624,
+  "close": false
+}

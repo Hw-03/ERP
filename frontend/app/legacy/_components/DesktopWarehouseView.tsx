@@ -570,7 +570,7 @@ export function DesktopWarehouseView({
         <div className="space-y-4">
           {/* 작업 유형 */}
           <section className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-            <div className="mb-3 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div className="mb-3 text-sm font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
               작업 유형
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -619,7 +619,7 @@ export function DesktopWarehouseView({
               || workType === "defective-register"
               || workType === "supplier-return") && (
               <div className="mt-3">
-                <div className="mb-2 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                <div className="mb-2 text-sm font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
                   {workType === "supplier-return"
                     ? "반품할 부서 (불량 보관 위치)"
                     : workType === "defective-register"
@@ -651,7 +651,7 @@ export function DesktopWarehouseView({
             {/* 불량 source 토글 */}
             {workType === "defective-register" && (
               <div className="mt-3">
-                <div className="mb-2 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                <div className="mb-2 text-sm font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
                   불량 발견 위치
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -680,7 +680,7 @@ export function DesktopWarehouseView({
 
           {/* 담당 직원 */}
           <section className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-            <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
               <UserRound className="h-3.5 w-3.5" />
               담당 직원
             </div>
@@ -708,7 +708,7 @@ export function DesktopWarehouseView({
           {/* 선택 품목 + 수량 스테퍼 */}
           {workType !== "package-out" && (
             <section className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-              <div className="mb-3 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="mb-3 text-sm font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
                 선택 품목 및 수량
               </div>
               {selectedEntries.length === 0 ? (
@@ -755,7 +755,7 @@ export function DesktopWarehouseView({
           {/* 패키지 출고: 참조번호/메모만 */}
           {workType === "package-out" && (
             <section className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-              <div className="mb-3 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="mb-3 text-sm font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
                 메모
               </div>
               <input
@@ -797,7 +797,7 @@ export function DesktopWarehouseView({
           {/* 선택 품목 최근 이력 */}
           {itemLogs.length > 0 && (
             <section className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-              <div className="mb-3 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="mb-3 text-sm font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
                 최근 이력
               </div>
               <div className="space-y-2">

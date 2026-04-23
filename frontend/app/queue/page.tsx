@@ -80,7 +80,7 @@ export default function QueuePage() {
             <button
               key={s}
               onClick={() => setStatus(s)}
-              className="rounded-xl px-3 py-2 text-sm font-bold"
+              className="rounded-xl px-3 py-2 text-base font-bold"
               style={{
                 background: status === s ? LEGACY_COLORS.blue : LEGACY_COLORS.s3,
                 color: status === s ? "#fff" : LEGACY_COLORS.muted2,
@@ -120,12 +120,12 @@ export default function QueuePage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span
-                        className="rounded-full px-2 py-[2px] text-xs font-bold"
+                        className="rounded-full px-2 py-[2px] text-sm font-bold"
                         style={{ background: "rgba(96,165,250,.15)", color: STATUS_COLOR[b.status] }}
                       >
                         {b.batch_type}
                       </span>
-                      <span className="text-xs font-semibold" style={{ color: STATUS_COLOR[b.status] }}>
+                      <span className="text-sm font-semibold" style={{ color: STATUS_COLOR[b.status] }}>
                         {STATUS_LABEL[b.status]}
                       </span>
                       {b.owner_name && (
@@ -134,7 +134,7 @@ export default function QueuePage() {
                         </span>
                       )}
                     </div>
-                    <div className="mt-1 truncate text-sm font-semibold">
+                    <div className="mt-1 truncate text-base font-semibold">
                       {b.parent_item_name ?? "-"}
                       {b.parent_quantity != null ? ` × ${formatNumber(b.parent_quantity)}` : ""}
                     </div>
@@ -147,14 +147,14 @@ export default function QueuePage() {
                     <div className="flex flex-col gap-1">
                       <button
                         onClick={() => doConfirm(b.batch_id)}
-                        className="rounded-lg px-3 py-1 text-xs font-bold"
+                        className="rounded-lg px-3 py-1 text-sm font-bold"
                         style={{ background: LEGACY_COLORS.green, color: "#fff" }}
                       >
                         확정
                       </button>
                       <button
                         onClick={() => doCancel(b.batch_id)}
-                        className="rounded-lg px-3 py-1 text-xs font-bold"
+                        className="rounded-lg px-3 py-1 text-sm font-bold"
                         style={{ background: LEGACY_COLORS.s3, color: LEGACY_COLORS.text }}
                       >
                         취소
@@ -166,7 +166,7 @@ export default function QueuePage() {
                   {b.lines.map((ln) => (
                     <div key={ln.line_id} className="flex items-center gap-3 px-3 py-2 text-xs">
                       <span
-                        className="rounded-full px-2 py-[2px] text-xs font-bold"
+                        className="rounded-full px-2 py-[2px] text-sm font-bold"
                         style={{
                           background:
                             ln.direction === "OUT"

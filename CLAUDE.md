@@ -14,6 +14,7 @@
 - `scripts/` : 파이썬 유틸 스크립트 (예: `erp_integration.py`)
 - `docs/` : 핸드오버/리포트 문서
 - `.dev/` : Playwright 스크린샷 도구 (개발 전용)
+- `vault/` : Obsidian 인수인계 볼트 (커밋 대상)
 - `_archive/`, `_backup/` : 수정 금지
 
 ## 최우선 작업 원칙

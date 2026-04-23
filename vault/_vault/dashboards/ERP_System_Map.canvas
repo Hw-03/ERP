@@ -1,0 +1,23 @@
+{
+	"nodes":[
+		{"id":"note","type":"text","text":"# ERP Vault 안내 지도\n\n그래프 뷰에서 `_vault` 문서가 원본 프로젝트와 연결되지 않도록, 이 Canvas는 파일 노드를 사용하지 않는다.\n\n아래 항목들은 실제 링크가 아니라 읽는 순서 안내다.","x":-520,"y":-320,"width":420,"height":220},
+		{"id":"control-room","type":"text","text":"ERP Control Room\n\n첫 화면 / 관제실","x":-520,"y":-40,"width":260,"height":120},
+		{"id":"first-reader","type":"text","text":"처음 읽는 사람\n\n첫날 인수인계 안내서","x":-180,"y":-40,"width":260,"height":120},
+		{"id":"moc","type":"text","text":"ERP MOC\n\n전체 프로젝트 설명 지도","x":160,"y":-40,"width":260,"height":120},
+		{"id":"glossary","type":"text","text":"용어 사전\n\nERP / BOM / 재고 용어","x":500,"y":-160,"width":260,"height":120},
+		{"id":"faq","type":"text","text":"FAQ 전체\n\n자주 묻는 질문","x":500,"y":100,"width":260,"height":120},
+		{"id":"scenario-item","type":"text","text":"품목 등록 시나리오\n\n새 품목 등록 흐름","x":-520,"y":240,"width":260,"height":120},
+		{"id":"scenario-stock","type":"text","text":"재고 입출고 시나리오\n\n입고 / 출고 / 이동","x":-180,"y":240,"width":260,"height":120},
+		{"id":"scenario-prod","type":"text","text":"생산 배치 시나리오\n\n생산 / BOM 백플러시","x":160,"y":240,"width":260,"height":120},
+		{"id":"scenario-return","type":"text","text":"분해 반품 시나리오\n\n분해 / 반품 흐름","x":500,"y":240,"width":260,"height":120}
+	],
+	"edges":[
+		{"id":"edge-control-first-reader","fromNode":"control-room","fromSide":"right","toNode":"first-reader","toSide":"left","label":"1"},
+		{"id":"edge-first-reader-moc","fromNode":"first-reader","fromSide":"right","toNode":"moc","toSide":"left","label":"2"},
+		{"id":"edge-moc-glossary","fromNode":"moc","fromSide":"right","toNode":"glossary","toSide":"left","label":"terms"},
+		{"id":"edge-moc-faq","fromNode":"moc","fromSide":"right","toNode":"faq","toSide":"left","label":"q&a"},
+		{"id":"edge-item-stock","fromNode":"scenario-item","fromSide":"right","toNode":"scenario-stock","toSide":"left","label":"after"},
+		{"id":"edge-stock-prod","fromNode":"scenario-stock","fromSide":"right","toNode":"scenario-prod","toSide":"left","label":"then"},
+		{"id":"edge-prod-return","fromNode":"scenario-prod","fromSide":"right","toNode":"scenario-return","toSide":"left","label":"exception"}
+	]
+}
