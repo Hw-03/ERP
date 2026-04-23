@@ -157,15 +157,22 @@ export function formatErpCode(code?: string | null, compact = true): string | nu
 const PROCESS_LABEL: Record<string, string> = {
   TR: "Tube Raw",
   TA: "Tube Ass'y",
+  TF: "Tube Final",
   HR: "High-v Raw",
   HA: "High-v Ass'y",
+  HF: "High-v Final",
   VR: "Vacuum Raw",
   VA: "Vacuum Ass'y",
+  VF: "Vacuum Final",
+  NR: "Neck Raw",
   NA: "Neck Ass'y",
+  NF: "Neck Final",
   AR: "Assembly Raw",
   AA: "Assembly",
+  AF: "Assembly Final",
   PR: "Pack Raw",
   PA: "Packaging",
+  PF: "Pack Final",
 };
 
 export function processStageLabel(code?: string | null): string {
@@ -174,12 +181,12 @@ export function processStageLabel(code?: string | null): string {
 }
 
 const PROCESS_TO_DEPT: Record<string, string> = {
-  TR: "튜브", TA: "튜브",
-  HR: "고압", HA: "고압",
-  VR: "진공", VA: "진공",
-  NA: "튜닝",
-  AR: "조립", AA: "조립",
-  PR: "출하", PA: "출하",
+  TR: "튜브", TA: "튜브", TF: "튜브",
+  HR: "고압", HA: "고압", HF: "고압",
+  VR: "진공", VA: "진공", VF: "진공",
+  NR: "튜닝", NA: "튜닝", NF: "튜닝",
+  AR: "조립", AA: "조립", AF: "조립",
+  PR: "출하", PA: "출하", PF: "출하",
 };
 
 export function erpCodeDept(erp_code?: string | null): string | null {

@@ -67,7 +67,7 @@ const CATEGORY_META: Record<Category, CategoryMeta> = {
     icon: "🧩",
     shortName: "조립 반제품",
   },
-  BF: {
+  AF: {
     badge: "bg-indigo-800/60 text-indigo-200",
     border: "border-l-indigo-400",
     dot: "bg-indigo-300",

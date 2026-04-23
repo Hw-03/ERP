@@ -41,7 +41,7 @@ CATEGORY_TO_FILE_TYPE: dict[str, str] = {
     "VA": "발생부자재",
     "VF": "발생부자재",
     "BA": "조립자재",
-    "BF": "조립자재",
+    "AF": "조립자재",
     "FG": "완제품",
 }
 
@@ -54,7 +54,7 @@ CATEGORY_TO_PART: dict[str, str] = {
     "VA": "진공파트",
     "VF": "진공파트",
     "BA": "조립출하",
-    "BF": "조립출하",
+    "AF": "조립출하",
     "FG": "출하",
 }
 

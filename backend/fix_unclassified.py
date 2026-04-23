@@ -36,21 +36,17 @@ CAT_TO_DEPT: dict[str, DepartmentEnum] = {
     "VA": DepartmentEnum.VACUUM,
     "VF": DepartmentEnum.VACUUM,
     "BA": DepartmentEnum.ASSEMBLY,
-    "BF": DepartmentEnum.ASSEMBLY,
+    "AF": DepartmentEnum.ASSEMBLY,
     "FG": DepartmentEnum.SHIPPING,
 }
 
 PROCESS_TO_DEPT: dict[str, DepartmentEnum] = {
-    "TR": DepartmentEnum.TUBE,
-    "HR": DepartmentEnum.HIGH_VOLTAGE,
-    "VR": DepartmentEnum.VACUUM,
-    "AR": DepartmentEnum.ASSEMBLY,
-    "AA": DepartmentEnum.ASSEMBLY,
-    "PR": DepartmentEnum.SHIPPING,
-    "PA": DepartmentEnum.SHIPPING,
-    "TA": DepartmentEnum.TUBE,
-    "HA": DepartmentEnum.HIGH_VOLTAGE,
-    "VA": DepartmentEnum.VACUUM,
+    "TR": DepartmentEnum.TUBE,    "TA": DepartmentEnum.TUBE,    "TF": DepartmentEnum.TUBE,
+    "HR": DepartmentEnum.HIGH_VOLTAGE, "HA": DepartmentEnum.HIGH_VOLTAGE, "HF": DepartmentEnum.HIGH_VOLTAGE,
+    "VR": DepartmentEnum.VACUUM,  "VA": DepartmentEnum.VACUUM,  "VF": DepartmentEnum.VACUUM,
+    "NR": DepartmentEnum.TUNING,  "NA": DepartmentEnum.TUNING,  "NF": DepartmentEnum.TUNING,
+    "AR": DepartmentEnum.ASSEMBLY, "AA": DepartmentEnum.ASSEMBLY, "AF": DepartmentEnum.ASSEMBLY,
+    "PR": DepartmentEnum.SHIPPING, "PA": DepartmentEnum.SHIPPING, "PF": DepartmentEnum.SHIPPING,
 }
 
 
@@ -66,7 +62,7 @@ def pick_symbol(category: str, legacy_model: str | None, erp_code: str | None) -
     # 3. 카테고리별 랜덤
     if category == "FG":
         return random.choice(ALL_SYMBOLS)
-    elif category in {"TA", "TF", "HA", "HF", "VA", "VF", "BA", "BF"}:
+    elif category in {"TA", "TF", "HA", "HF", "VA", "VF", "BA", "AF"}:
         k = random.randint(1, 2)
         return "".join(sorted(random.sample(ALL_SYMBOLS, k)))
     else:  # RM, UK

@@ -1,4 +1,4 @@
-﻿---
+---
 type: code-note
 project: ERP
 layer: backend
@@ -78,26 +78,26 @@ employees / system_settings
 
 품목(자재·반제품·완제품) 기본 정보 저장. 시스템의 **모든 것의 기준**이 되는 표.
 
-| 컬럼 | 타입 | NULL | 설명 |
-|------|------|------|------|
-| `item_id` | UUID | NOT NULL (PK) | 품목 고유 ID |
-| `item_code` | String(50) | NULL, UNIQUE | 레거시 CSV 코드 (ERP코드 전환 후 제거 예정) |
-| `item_name` | String(200) | NOT NULL | 품목명 |
-| `spec` | Text | NULL | 규격·사양 |
-| `category` | Enum | NOT NULL, default=`UK` | RM/TA/TF/HA/HF/VA/VF/BA/BF/FG/UK |
-| `unit` | String(20) | NOT NULL, default=`EA` | 단위 (EA, kg, m 등) |
-| `barcode` | String(100) | NULL | 바코드 |
-| `legacy_file_type` | String(50) | NULL | 원자재/조립자재/발생부자재/완제품/미분류 |
-| `legacy_part` | String(50) | NULL | 자재창고/조립출하/고압파트/진공파트/튜닝파트/출하 |
-| `legacy_model` | String(50) | NULL | DX3000/ADX4000W/ADX6000/COCOON/SOLO/공용 |
-| `supplier` | String(200) | NULL | 공급업체 |
-| `min_stock` | Numeric(15,4) | NULL | 안전재고 임계값 |
-| `erp_code` | String(40) | NULL, UNIQUE | 4파트 ERP 코드 (예: `346-AR-0012-BG`) |
-| `model_symbol` | String(20) | NULL | 기호 조합 (예: "346", "3", "34678") |
-| `process_type_code` | String(2) | NULL, FK→process_types | 공정 코드 (TR/TA/HR/HA/VR/VA/NA/AR/AA/PR/PA) |
-| `option_code` | String(10) | NULL | 옵션 코드 (자유 텍스트) |
-| `serial_no` | Integer | NULL | 일련번호 |
-| `created_at`, `updated_at` | DateTime | NOT NULL | 생성·수정 시각 |
+| 컬럼                         | 타입            | NULL                   | 설명                                       |
+| -------------------------- | ------------- | ---------------------- | ---------------------------------------- |
+| `item_id`                  | UUID          | NOT NULL (PK)          | 품목 고유 ID                                 |
+| `item_code`                | String(50)    | NULL, UNIQUE           | 레거시 CSV 코드 (ERP코드 전환 후 제거 예정)            |
+| `item_name`                | String(200)   | NOT NULL               | 품목명                                      |
+| `spec`                     | Text          | NULL                   | 규격·사양                                    |
+| `category`                 | Enum          | NOT NULL, default=`UK` | RM/TA/TF/HA/HF/VA/VF/BA/BF/FG/UK         |
+| `unit`                     | String(20)    | NOT NULL, default=`EA` | 단위 (EA, kg, m 등)                         |
+| `barcode`                  | String(100)   | NULL                   | 바코드                                      |
+| `legacy_file_type`         | String(50)    | NULL                   | 원자재/조립자재/발생부자재/완제품/미분류                   |
+| `legacy_part`              | String(50)    | NULL                   | 자재창고/조립출하/고압파트/진공파트/튜닝파트/출하              |
+| `legacy_model`             | String(50)    | NULL                   | DX3000/ADX4000W/ADX6000/COCOON/SOLO/공용   |
+| `supplier`                 | String(200)   | NULL                   | 공급업체                                     |
+| `min_stock`                | Numeric(15,4) | NULL                   | 안전재고 임계값                                 |
+| `erp_code`                 | String(40)    | NULL, UNIQUE           | 4파트 ERP 코드 (예: `346-AR-0012-BG`)         |
+| `model_symbol`             | String(20)    | NULL                   | 기호 조합 (예: "346", "3", "34678")           |
+| `process_type_code`        | String(2)     | NULL, FK→process_types | 공정 코드 (TR/TA/HR/HA/VR/VA/NA/AR/AA/PR/PA) |
+| `option_code`              | String(10)    | NULL                   | 옵션 코드 (자유 텍스트)                           |
+| `serial_no`                | Integer       | NULL                   | 일련번호                                     |
+| `created_at`, `updated_at` | DateTime      | NOT NULL               | 생성·수정 시각                                 |
 
 샘플 row:
 ```

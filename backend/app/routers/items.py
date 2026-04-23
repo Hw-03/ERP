@@ -29,12 +29,12 @@ from app.services import inventory as inventory_svc
 router = APIRouter()
 
 _PROCESS_TO_DEPT: dict[str, str] = {
-    "TR": "튜브", "TA": "튜브",
-    "HR": "고압", "HA": "고압",
-    "VR": "진공", "VA": "진공",
-    "NA": "튜닝",
-    "AR": "조립", "AA": "조립",
-    "PR": "출하", "PA": "출하",
+    "TR": "튜브", "TA": "튜브", "TF": "튜브",
+    "HR": "고압", "HA": "고압", "HF": "고압",
+    "VR": "진공", "VA": "진공", "VF": "진공",
+    "NR": "튜닝", "NA": "튜닝", "NF": "튜닝",
+    "AR": "조립", "AA": "조립", "AF": "조립",
+    "PR": "출하", "PA": "출하", "PF": "출하",
 }
 
 
@@ -267,7 +267,7 @@ _CATEGORY_ROW_COLOR = {
     "TA": "D6F5F5", "TF": "D6F5F5",
     "HA": "FFF8D6", "HF": "FFF8D6",
     "VA": "EAD6FF", "VF": "EAD6FF",
-    "BA": "FFE8D6", "BF": "FFE8D6",
+    "BA": "FFE8D6", "AF": "FFE8D6",
     "FG": "D6F5E0",
     "UK": "EBEBEB",
 }

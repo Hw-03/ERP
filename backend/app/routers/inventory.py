@@ -92,7 +92,7 @@ CATEGORY_LABELS = {
     CategoryEnum.VA: "진공 반제품",
     CategoryEnum.VF: "진공 완제품",
     CategoryEnum.BA: "조립 반제품",
-    CategoryEnum.BF: "조립 완제품",
+    CategoryEnum.AF: "조립 완제품",
     CategoryEnum.FG: "완제품",
     CategoryEnum.UK: "미분류 품목",
 }
@@ -106,7 +106,7 @@ CATEGORY_ORDER = [
     CategoryEnum.VA,
     CategoryEnum.VF,
     CategoryEnum.BA,
-    CategoryEnum.BF,
+    CategoryEnum.AF,
     CategoryEnum.FG,
     CategoryEnum.UK,
 ]

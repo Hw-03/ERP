@@ -17,20 +17,20 @@ _CATEGORY_TO_PROCESS: dict[str, str | None] = {
     "VA": "VA",
     "VF": "VF",
     "BA": "AA",
-    "BF": "BF",
+    "AF": "AF",
     "FG": "PA",
     "UK": None,   # 미분류 → 스킵
 }
 
 # F타입 카테고리: 창고 배치 불가, 해당 부서에만 위치 가능
-F_TYPE_CATEGORIES = {"TF", "HF", "VF", "BF"}
+F_TYPE_CATEGORIES = {"TF", "HF", "VF", "AF"}
 
 _PART_TO_PROCESS_FOR_RM: dict[str, str] = {
     "자재창고": "TR",
     "고압파트": "HR",
     "진공파트": "VR",
     "조립출하": "AR",
-    "튜닝파트": "AR",
+    "튜닝파트": "NR",
     "출하":    "PR",
 }
 

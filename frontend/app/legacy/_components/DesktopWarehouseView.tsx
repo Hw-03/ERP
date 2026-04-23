@@ -214,7 +214,7 @@ export function DesktopWarehouseView({
           if (categoryFilter === "ALL") return true;
           if (categoryFilter === "RM") return item.category === "RM";
           if (categoryFilter === "A") return ["TA", "HA", "VA", "BA"].includes(item.category);
-          if (categoryFilter === "F") return ["TF", "HF", "VF", "BF"].includes(item.category);
+          if (categoryFilter === "F") return ["TF", "HF", "VF", "AF"].includes(item.category);
           if (categoryFilter === "FG") return item.category === "FG";
           return true;
         })

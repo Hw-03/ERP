@@ -99,7 +99,7 @@ app = FastAPI(
     | VA | Vacuum Ass'y | 진공 반제품 |
     | VF | Vacuum Final | 진공 완제품 |
     | BA | Body Ass'y | 조립 반제품 |
-    | BF | Body Final | 조립 완제품 |
+    | AF | Assembly Final | 조립 완제품 |
     | FG | Finished Good | 완제품 |
     | UK | Unknown | 미분류 또는 확인 필요 |
 
@@ -238,12 +238,15 @@ def ensure_reference_data() -> None:
                 ("VR", "V", "R", 25, "진공 원자재"),
                 ("VA", "V", "A", 40, "진공 조립체"),
                 ("VF", "V", "F", 42, "진공 F타입"),
+                ("NR", "N", "R", 48, "튜닝 원자재"),
                 ("NA", "N", "A", 50, "튜닝 조립체 (출력값 최적화)"),
+                ("NF", "N", "F", 52, "튜닝 F타입"),
                 ("AR", "A", "R", 45, "조립 원자재"),
                 ("AA", "A", "A", 60, "최종 조립체"),
-                ("BF", "B", "F", 62, "조립 F타입"),
+                ("AF", "A", "F", 62, "조립 F타입"),
                 ("PR", "P", "R", 55, "포장 원자재"),
                 ("PA", "P", "A", 70, "완제품 (최종 패키징)"),
+                ("PF", "P", "F", 72, "출하 F타입"),
             ]
             for code, prefix, suffix, order, desc in types:
                 db.add(
@@ -256,7 +259,10 @@ def ensure_reference_data() -> None:
                 ("TF", "T", "F", 22, "튜브 F타입"),
                 ("HF", "H", "F", 32, "고압 F타입"),
                 ("VF", "V", "F", 42, "진공 F타입"),
-                ("BF", "B", "F", 62, "조립 F타입"),
+                ("NR", "N", "R", 48, "튜닝 원자재"),
+                ("NF", "N", "F", 52, "튜닝 F타입"),
+                ("AF", "A", "F", 62, "조립 F타입"),
+                ("PF", "P", "F", 72, "출하 F타입"),
             ]
             for code, prefix, suffix, order, desc in f_types:
                 if not db.query(ProcessType).filter(ProcessType.code == code).first():
@@ -333,8 +339,8 @@ def populate_erp_codes() -> None:
 
 
 def migrate_f_type_erp_codes() -> None:
-    """TF/HF/VF/BF 카테고리 품목의 process_type_code를 고유 F타입 코드로 재부여한다."""
-    REMAP = {"TF": "TF", "HF": "HF", "VF": "VF", "BF": "BF"}
+    """TF/HF/VF/AF 카테고리 품목의 process_type_code를 고유 F타입 코드로 재부여한다."""
+    REMAP = {"TF": "TF", "HF": "HF", "VF": "VF", "AF": "AF"}
     db = SessionLocal()
     try:
         symbol_map: dict[int, str] = {

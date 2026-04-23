@@ -38,7 +38,7 @@ const CATEGORY_META: Record<string, { label: string; color: string; bg: string }
   VA: { label: "진공조립", color: LEGACY_COLORS.purple, bg: "rgba(142,125,255,.16)" },
   VF: { label: "진공완성", color: LEGACY_COLORS.purple, bg: "rgba(142,125,255,.16)" },
   BA: { label: "본체조립", color: "#f97316", bg: "rgba(249,115,22,.16)" },
-  BF: { label: "본체완성", color: "#f97316", bg: "rgba(249,115,22,.16)" },
+  AF: { label: "조립완성", color: "#f97316", bg: "rgba(249,115,22,.16)" },
   FG: { label: "완제품", color: LEGACY_COLORS.green, bg: "rgba(67,211,157,.16)" },
   UK: { label: "미분류", color: LEGACY_COLORS.muted2, bg: "rgba(157,173,199,.16)" },
 };

@@ -146,7 +146,7 @@ export function DesktopAdminView({
   const filteredPkgItems = useMemo(() => {
     const kw = pkgItemSearch.trim().toLowerCase();
     const A_SET = new Set(["TA", "HA", "VA", "BA"]);
-    const F_SET = new Set(["TF", "HF", "VF", "BF"]);
+    const F_SET = new Set(["TF", "HF", "VF", "AF"]);
     return items
       .filter((i) => {
         if (pkgItemCategory === "ALL") return true;
@@ -158,10 +158,10 @@ export function DesktopAdminView({
       .slice(0, 40);
   }, [items, pkgItemSearch, pkgItemCategory]);
 
-  const BOM_PARENT_CATS = ["ALL", "BA", "HA", "VA", "TA", "BF", "TF", "FG"];
+  const BOM_PARENT_CATS = ["ALL", "BA", "HA", "VA", "TA", "AF", "TF", "FG"];
   const BOM_CHILD_CATS = ["ALL", "RM", "?A", "?F"];
   const A_CATS = new Set(["TA", "HA", "VA", "BA"]);
-  const F_CATS = new Set(["TF", "HF", "VF", "BF"]);
+  const F_CATS = new Set(["TF", "HF", "VF", "AF"]);
 
   const bomParentItems = useMemo(() => {
     let pool = items.filter((i) => i.category !== "RM");

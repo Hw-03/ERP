@@ -13,7 +13,7 @@ export type Category =
   | "VA"
   | "VF"
   | "BA"
-  | "BF"
+  | "AF"
   | "FG"
   | "UK";
 

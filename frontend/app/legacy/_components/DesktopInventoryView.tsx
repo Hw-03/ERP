@@ -40,7 +40,7 @@ const KPI_OPTIONS: { key: KpiFilter; label: string; tone: string }[] = [
 ];
 
 function getMinStock(item: Item) {
-  return item.min_stock == null ? 10 : Number(item.min_stock);
+  return item.min_stock == null ? 0 : Number(item.min_stock);
 }
 
 function matchesSearch(item: Item, keyword: string) {
@@ -212,7 +212,7 @@ const selectedSlots = useMemo(
     return { totalCount: scopedItems.length, totalQuantity, normalCount, lowCount, zeroCount };
   }, [scopedItems]);
 
-  const isFiltered = selectedDepts.length > 0 || selectedModels.length > 0;
+  const isFiltered = selectedDepts.length > 0 || selectedModels.length > 0 || deferredLocalSearch.length > 0;
 
 
   return (
@@ -290,7 +290,7 @@ const selectedSlots = useMemo(
               {/* KPI 카드 */}
               <div className="mt-4 grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
                 {[
-                  { label: isFiltered ? "조회 품목" : "전체 품목", value: filteredItems.length, hint: isFiltered ? "필터 적용 결과" : `총 재고 ${formatNumber(summary.totalQuantity)}`, tone: LEGACY_COLORS.blue, key: "ALL" as KpiFilter },
+                  { label: isFiltered ? "조회 품목" : "전체 품목", value: filteredItems.length, hint: isFiltered ? `전체 ${items.length}건 중 필터 적용` : `총 재고 ${formatNumber(summary.totalQuantity)}`, tone: LEGACY_COLORS.blue, key: "ALL" as KpiFilter },
                   { label: "정상", value: summary.normalCount, hint: "운영 가능 품목", tone: LEGACY_COLORS.green, key: "NORMAL" as KpiFilter },
                   { label: "부족", value: summary.lowCount, hint: "안전재고 이하", tone: LEGACY_COLORS.yellow, key: "LOW" as KpiFilter },
                   { label: "품절", value: summary.zeroCount, hint: "즉시 확인 필요", tone: LEGACY_COLORS.red, key: "ZERO" as KpiFilter },
@@ -414,6 +414,37 @@ const selectedSlots = useMemo(
                   {formatNumber(filteredItems.length)}
                 </span>
               </div>
+              {isFiltered && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {selectedDepts.map((d) => (
+                    <button key={d} onClick={() => toggleDept(d)}
+                      className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold transition-opacity hover:opacity-80"
+                      style={{ background: `${LEGACY_COLORS.green}22`, color: LEGACY_COLORS.green, border: `1px solid ${LEGACY_COLORS.green}55` }}>
+                      {d} ×
+                    </button>
+                  ))}
+                  {selectedModels.map((m) => (
+                    <button key={m} onClick={() => toggleModel(m)}
+                      className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold transition-opacity hover:opacity-80"
+                      style={{ background: `${LEGACY_COLORS.cyan}22`, color: LEGACY_COLORS.cyan, border: `1px solid ${LEGACY_COLORS.cyan}55` }}>
+                      {m} ×
+                    </button>
+                  ))}
+                  {deferredLocalSearch && (
+                    <button onClick={() => setLocalSearch("")}
+                      className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold transition-opacity hover:opacity-80"
+                      style={{ background: `${LEGACY_COLORS.blue}22`, color: LEGACY_COLORS.blue, border: `1px solid ${LEGACY_COLORS.blue}55` }}>
+                      "{deferredLocalSearch}" ×
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setSelectedDepts([]); setSelectedModels([]); setLocalSearch(""); setKpi("ALL"); }}
+                    className="rounded-full px-2.5 py-0.5 text-xs font-bold transition-opacity hover:opacity-80"
+                    style={{ color: LEGACY_COLORS.muted2, border: `1px solid ${LEGACY_COLORS.border}` }}>
+                    전체 초기화
+                  </button>
+                </div>
+              )}
             </div>
 
             {error ? (
@@ -445,7 +476,8 @@ const selectedSlots = useMemo(
                   </thead>
                   <tbody>
                     {filteredItems.slice(0, displayLimit).map((item) => {
-                      const stock = getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock));
+                      const minStock = getMinStock(item);
+                      const stock = getStockState(safeQty(item), minStock === 0 ? null : minStock);
                       const selected = selectedItem?.item_id === item.item_id;
                       const py = "py-3";
                       return (

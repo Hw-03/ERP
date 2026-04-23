@@ -58,7 +58,7 @@ def main() -> None:
         ta_items = db.query(Item).filter(Item.category == CategoryEnum.TA).all()
         ha_items = db.query(Item).filter(Item.category == CategoryEnum.HA).all()
         va_items = db.query(Item).filter(Item.category == CategoryEnum.VA).all()
-        bf_items = db.query(Item).filter(Item.category == CategoryEnum.BF).all()
+        bf_items = db.query(Item).filter(Item.category == CategoryEnum.AF).all()
         tf_items = db.query(Item).filter(Item.category == CategoryEnum.TF).all()
         rm_items = db.query(Item).filter(Item.category == CategoryEnum.RM).all()
 

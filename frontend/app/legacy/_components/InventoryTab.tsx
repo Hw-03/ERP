@@ -45,7 +45,7 @@ const TYPE_OPTIONS = [
 ];
 
 const SEMI_CATS = new Set(["TA", "HA", "VA", "BA"]);
-const FIXED_CATS = new Set(["TF", "HF", "VF", "BF"]);
+const FIXED_CATS = new Set(["TF", "HF", "VF", "AF"]);
 
 const PAGE_SIZE = 100;
 
