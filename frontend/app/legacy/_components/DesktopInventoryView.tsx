@@ -9,6 +9,7 @@ import { DesktopRightPanel } from "./DesktopRightPanel";
 import {
   LEGACY_COLORS,
   employeeColor,
+  erpCodeDept,
   formatNumber,
   getStockState,
   normalizeModel,
@@ -190,7 +191,7 @@ const selectedSlots = useMemo(
       const inDept = selectedDepts.some((d) =>
         d === "창고"
           ? (item.warehouse_qty ?? 0) > 0
-          : item.department === d,
+          : item.department === d || erpCodeDept(item.erp_code) === d || item.locations.some((loc) => loc.department === d),
       );
       if (!inDept) return false;
     }
@@ -512,6 +513,11 @@ const selectedSlots = useMemo(
                                   {l.department}
                                 </span>
                               ))}
+                              {Number(item.warehouse_qty) === 0 && item.locations.every((l) => Number(l.quantity) === 0) && (item.department ?? erpCodeDept(item.erp_code)) && (
+                                <span className="inline-flex rounded-full px-1.5 py-0.5 text-sm font-bold opacity-50" style={{ color: employeeColor(item.department ?? erpCodeDept(item.erp_code)) }}>
+                                  {item.department ?? erpCodeDept(item.erp_code)}
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className={`border-b px-4 ${py} text-center align-middle whitespace-nowrap font-mono text-sm font-bold`} style={{ borderColor: LEGACY_COLORS.border }}>
