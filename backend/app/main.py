@@ -33,6 +33,7 @@ from app.routers import (
     inventory,
     items,
     loss,
+    models as models_router,
     production,
     queue,
     scrap,
@@ -101,6 +102,7 @@ app.include_router(loss.router, prefix="/api/loss", tags=["Loss"])
 app.include_router(variance.router, prefix="/api/variance", tags=["Variance"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 app.include_router(counts.router, prefix="/api/counts", tags=["Counts"])
+app.include_router(models_router.router, prefix="/api/models", tags=["Models"])
 
 
 @app.get("/health", tags=["System"])
