@@ -1,34 +1,23 @@
 "use client";
 
 import type { ElementType, ReactNode } from "react";
-import { Clock3, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { LEGACY_COLORS } from "./legacyUi";
 import { ThemeToggle } from "./ThemeToggle";
-
-export type TopbarStatusSlot = {
-  label: string;
-  value: string | number;
-  tone?: string;
-};
 
 export function DesktopTopbar({
   title,
   icon: Icon,
   onRefresh,
-  statusText,
-  statusSlots,
   actionSlot,
+  stockWarnings,
 }: {
   title: string;
   icon?: ElementType;
-  subtitle?: string;
   onRefresh: () => void;
-  statusText: string;
-  statusSlots?: TopbarStatusSlot[];
   actionSlot?: ReactNode;
+  stockWarnings?: { low: number; zero: number };
 }) {
-  const useSlots = statusSlots && statusSlots.length > 0;
-
   return (
     <header className="pl-0 pr-4 pt-0">
       <div
@@ -45,6 +34,29 @@ export function DesktopTopbar({
             <div className="text-[24px] font-black tracking-[-0.02em]">{title}</div>
           </div>
         </div>
+
+        {stockWarnings && stockWarnings.zero > 0 && (
+          <span
+            className="inline-flex items-center rounded-full px-3 py-1 text-sm font-bold"
+            style={{
+              color: LEGACY_COLORS.red,
+              background: `color-mix(in srgb, ${LEGACY_COLORS.red} 12%, transparent)`,
+            }}
+          >
+            품절 {stockWarnings.zero}
+          </span>
+        )}
+        {stockWarnings && stockWarnings.low > 0 && (
+          <span
+            className="inline-flex items-center rounded-full px-3 py-1 text-sm font-bold"
+            style={{
+              color: LEGACY_COLORS.yellow,
+              background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 12%, transparent)`,
+            }}
+          >
+            부족 {stockWarnings.low}
+          </span>
+        )}
 
         {actionSlot}
         <ThemeToggle />

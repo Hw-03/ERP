@@ -1,8 +1,6 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-
-const DESKTOP_PAGE_SIZE = 100;
 import { ChevronDown, Filter, PackageSearch, Search, Sparkles, TrendingUp } from "lucide-react";
 import { api, type Item, type ProductModel, type TransactionLog } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
@@ -17,6 +15,8 @@ import {
   transactionLabel,
 } from "./legacyUi";
 
+const DESKTOP_PAGE_SIZE = 100;
+
 const DEPT_OPTIONS = [
   { label: "전체", value: "ALL" },
   { label: "창고", value: "창고" },
@@ -30,13 +30,6 @@ const DEPT_OPTIONS = [
 ];
 
 type KpiFilter = "ALL" | "NORMAL" | "LOW" | "ZERO";
-
-export type InventorySummary = {
-  total: number;
-  low: number;
-  zero: number;
-  lastUpdatedAt: number | null;
-};
 
 function getMinStock(item: Item) {
   return item.min_stock == null ? 0 : Number(item.min_stock);
@@ -88,7 +81,7 @@ function Chip({
       onClick={onClick}
       className="w-full rounded-full border px-4 py-2 text-sm font-semibold transition-all hover:brightness-110"
       style={{
-        background: active ? `${tone}22` : LEGACY_COLORS.s2,
+        background: active ? `color-mix(in srgb, ${tone} 14%, transparent)` : LEGACY_COLORS.s2,
         borderColor: active ? tone : LEGACY_COLORS.border,
         color: active ? tone : LEGACY_COLORS.muted2,
       }}
@@ -471,10 +464,12 @@ export function DesktopInventoryView({
   globalSearch,
   onStatusChange,
   onGoToWarehouse,
+  onSummaryChange,
 }: {
   globalSearch: string;
   onStatusChange: (status: string) => void;
   onGoToWarehouse: (item: Item) => void;
+  onSummaryChange?: (s: { low: number; zero: number }) => void;
 }) {
   const [items, setItems] = useState<Item[]>([]);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
@@ -581,6 +576,10 @@ export function DesktopInventoryView({
     return { totalCount: scopedItems.length, totalQuantity, normalCount, lowCount, zeroCount };
   }, [scopedItems]);
 
+  useEffect(() => {
+    onSummaryChange?.({ low: summary.lowCount, zero: summary.zeroCount });
+  }, [summary.lowCount, summary.zeroCount, onSummaryChange]);
+
   const isFiltered = selectedDepts.length > 0 || selectedModels.length > 0 || deferredLocalSearch.length > 0;
   const activeFilterCount =
     selectedDepts.length + selectedModels.length + (deferredLocalSearch.length > 0 ? 1 : 0);
@@ -607,7 +606,7 @@ export function DesktopInventoryView({
         return (
           <span
             className="inline-flex rounded-full px-3 py-1 text-sm font-bold"
-            style={{ color: stock.color, background: `${stock.color}20` }}
+            style={{ color: stock.color, background: `color-mix(in srgb, ${stock.color} 12%, transparent)` }}
           >
             {stock.label}
           </span>
@@ -730,7 +729,7 @@ export function DesktopInventoryView({
                             >
                               <span
                                 className="inline-flex w-fit rounded-full px-2.5 py-1 text-sm font-bold"
-                                style={{ color: stock.color, background: `${stock.color}20` }}
+                                style={{ color: stock.color, background: `color-mix(in srgb, ${stock.color} 12%, transparent)` }}
                               >
                                 {stock.label}
                               </span>
