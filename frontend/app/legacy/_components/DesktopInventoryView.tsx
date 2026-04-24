@@ -4,7 +4,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 const DESKTOP_PAGE_SIZE = 100;
 import { ChevronDown, Filter, PackageSearch, Search, Sparkles, TrendingUp } from "lucide-react";
-import { api, type Item, type ProductionCapacity, type ProductModel, type TransactionLog } from "@/lib/api";
+import { api, type Item, type ProductModel, type TransactionLog } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import {
   LEGACY_COLORS,
@@ -123,7 +123,7 @@ function CompactKpiBar({
             onClick={() => onChange(card.key)}
             onMouseEnter={() => setHovered(card.key)}
             onMouseLeave={() => setHovered(null)}
-            className="rounded-[16px] border px-4 py-3 text-left transition-colors hover:brightness-110"
+            className="rounded-[16px] border px-4 py-4 text-left transition-colors hover:brightness-110"
             style={{
               background: isActive
                 ? `color-mix(in srgb, ${card.tone} 22%, transparent)`
@@ -136,15 +136,12 @@ function CompactKpiBar({
             }}
           >
             <div className="flex items-baseline justify-between gap-2">
-              <div className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
                 {card.label}
               </div>
               <div className="font-mono text-[22px] font-black leading-none" style={{ color: card.tone }}>
                 {formatNumber(card.value)}
               </div>
-            </div>
-            <div className="mt-1.5 truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-              {card.hint}
             </div>
           </button>
         );
@@ -210,9 +207,6 @@ function TableStickyHeader({
   activeFilterCount,
   filtersOpen,
   onToggleFilters,
-  capacityData,
-  onOpenCapacity,
-  activeChipsRow,
 }: {
   searchValue: string;
   onSearchChange: (v: string) => void;
@@ -220,12 +214,7 @@ function TableStickyHeader({
   activeFilterCount: number;
   filtersOpen: boolean;
   onToggleFilters: () => void;
-  capacityData: ProductionCapacity | null;
-  onOpenCapacity: () => void;
-  activeChipsRow?: React.ReactNode;
 }) {
-  const capacityEmpty =
-    capacityData != null && capacityData.immediate === 0 && capacityData.top_items.length === 0;
   return (
     <div
       className="sticky top-0 z-20 -mx-5 -mt-5 mb-4 rounded-t-[28px]"
@@ -270,7 +259,7 @@ function TableStickyHeader({
           필터
           {activeFilterCount > 0 && (
             <span
-              className="inline-flex min-w-[18px] items-center justify-center rounded-full px-1 font-mono text-xs font-bold"
+              className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full text-[11px] font-bold leading-none"
               style={{ background: LEGACY_COLORS.blue, color: "#fff" }}
             >
               {activeFilterCount}
@@ -281,37 +270,7 @@ function TableStickyHeader({
             style={{ transform: filtersOpen ? "rotate(180deg)" : undefined }}
           />
         </button>
-        <button
-          onClick={onOpenCapacity}
-          className="flex shrink-0 items-center gap-2 rounded-[14px] border px-3 py-2 text-sm transition-colors hover:brightness-110"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-          title="생산 가능수량 상세"
-        >
-          <span className="font-bold uppercase tracking-[0.12em]" style={{ color: LEGACY_COLORS.muted2 }}>
-            생산 가능
-          </span>
-          {capacityData == null ? (
-            <span style={{ color: LEGACY_COLORS.muted2 }}>···</span>
-          ) : capacityEmpty ? (
-            <span style={{ color: LEGACY_COLORS.muted2 }}>미등록</span>
-          ) : (
-            <>
-              <span className="font-mono font-bold" style={{ color: LEGACY_COLORS.cyan }}>
-                즉시 {formatNumber(capacityData.immediate)}
-              </span>
-              <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
-              <span className="font-mono font-bold" style={{ color: LEGACY_COLORS.blue }}>
-                최대 {formatNumber(capacityData.maximum)}
-              </span>
-            </>
-          )}
-        </button>
       </div>
-      {activeChipsRow && (
-        <div className="border-t px-5 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
-          {activeChipsRow}
-        </div>
-      )}
     </div>
   );
 }
@@ -514,12 +473,10 @@ function RightPanelBody({
 export function DesktopInventoryView({
   globalSearch,
   onStatusChange,
-  onSummaryChange,
   onGoToWarehouse,
 }: {
   globalSearch: string;
   onStatusChange: (status: string) => void;
-  onSummaryChange?: (summary: InventorySummary) => void;
   onGoToWarehouse: (item: Item) => void;
 }) {
   const [items, setItems] = useState<Item[]>([]);
@@ -533,10 +490,8 @@ export function DesktopInventoryView({
   const [kpi, setKpi] = useState<KpiFilter>("ALL");
   const [localSearch, setLocalSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(DESKTOP_PAGE_SIZE);
-  const [capacityModal, setCapacityModal] = useState(false);
-  const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
+
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -551,7 +506,6 @@ export function DesktopInventoryView({
         search: globalSearch.trim() || undefined,
       });
       setItems(nextItems);
-      setLastUpdatedAt(Date.now());
       onStatusChange(`재고 ${nextItems.length}건을 불러왔습니다.`);
       setSelectedItem((current) => (current ? nextItems.find((item) => item.item_id === current.item_id) ?? null : null));
     } catch (nextError) {
@@ -574,7 +528,6 @@ export function DesktopInventoryView({
 
   useEffect(() => {
     void api.getModels().then(setProductModels).catch(() => {});
-    void api.getProductionCapacity().then(setCapacityData).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -631,22 +584,6 @@ export function DesktopInventoryView({
     return { totalCount: scopedItems.length, totalQuantity, normalCount, lowCount, zeroCount };
   }, [scopedItems]);
 
-  const globalSummary = useMemo(() => {
-    const low = items.filter((i) => safeQty(i) > 0 && safeQty(i) < getMinStock(i)).length;
-    const zero = items.filter((i) => safeQty(i) <= 0).length;
-    return { total: items.length, low, zero };
-  }, [items]);
-
-  useEffect(() => {
-    if (!onSummaryChange) return;
-    onSummaryChange({
-      total: globalSummary.total,
-      low: globalSummary.low,
-      zero: globalSummary.zero,
-      lastUpdatedAt,
-    });
-  }, [globalSummary.total, globalSummary.low, globalSummary.zero, lastUpdatedAt, onSummaryChange]);
-
   const isFiltered = selectedDepts.length > 0 || selectedModels.length > 0 || deferredLocalSearch.length > 0;
   const activeFilterCount =
     selectedDepts.length + selectedModels.length + (deferredLocalSearch.length > 0 ? 1 : 0);
@@ -663,64 +600,6 @@ export function DesktopInventoryView({
     { label: "부족", value: summary.lowCount, hint: "안전재고 이하", tone: LEGACY_COLORS.yellow, key: "LOW" },
     { label: "품절", value: summary.zeroCount, hint: "즉시 확인", tone: LEGACY_COLORS.red, key: "ZERO" },
   ];
-
-  const activeChipsRow = isFiltered ? (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {selectedDepts.map((d) => (
-        <button
-          key={d}
-          onClick={() => toggleDept(d)}
-          className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold transition-opacity hover:opacity-80"
-          style={{
-            background: `${LEGACY_COLORS.green}22`,
-            color: LEGACY_COLORS.green,
-            border: `1px solid ${LEGACY_COLORS.green}55`,
-          }}
-        >
-          {d} ×
-        </button>
-      ))}
-      {selectedModels.map((m) => (
-        <button
-          key={m}
-          onClick={() => toggleModel(m)}
-          className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold transition-opacity hover:opacity-80"
-          style={{
-            background: `${LEGACY_COLORS.cyan}22`,
-            color: LEGACY_COLORS.cyan,
-            border: `1px solid ${LEGACY_COLORS.cyan}55`,
-          }}
-        >
-          {m} ×
-        </button>
-      ))}
-      {deferredLocalSearch && (
-        <button
-          onClick={() => setLocalSearch("")}
-          className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold transition-opacity hover:opacity-80"
-          style={{
-            background: `${LEGACY_COLORS.blue}22`,
-            color: LEGACY_COLORS.blue,
-            border: `1px solid ${LEGACY_COLORS.blue}55`,
-          }}
-        >
-          &quot;{deferredLocalSearch}&quot; ×
-        </button>
-      )}
-      <button
-        onClick={() => {
-          setSelectedDepts([]);
-          setSelectedModels([]);
-          setLocalSearch("");
-          setKpi("ALL");
-        }}
-        className="rounded-full px-2.5 py-0.5 text-xs font-bold transition-opacity hover:opacity-80"
-        style={{ color: LEGACY_COLORS.muted2, border: `1px solid ${LEGACY_COLORS.border}` }}
-      >
-        전체 초기화
-      </button>
-    </div>
-  ) : null;
 
   const headerBadge = selectedItem
     ? (() => {
@@ -740,127 +619,7 @@ export function DesktopInventoryView({
     : null;
 
   return (
-    <>
-      {capacityModal && (
-        <div
-          className="fixed inset-0 z-[300] flex items-center justify-center"
-          style={{ background: "rgba(0,0,0,.55)" }}
-          onClick={() => setCapacityModal(false)}
-        >
-          <div
-            className="w-full max-w-[520px] rounded-[28px] border p-7"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 text-base font-black" style={{ color: LEGACY_COLORS.text }}>
-              생산 가능수량 상세
-            </div>
-            {capacityData && capacityData.top_items.length > 0 ? (
-              <>
-                <div className="mb-4 grid grid-cols-2 gap-3">
-                  <div
-                    className="rounded-[18px] border p-4"
-                    style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-                  >
-                    <div
-                      className="text-sm font-bold uppercase tracking-[0.15em]"
-                      style={{ color: LEGACY_COLORS.muted2 }}
-                    >
-                      즉시 생산 가능
-                    </div>
-                    <div className="mt-1 font-mono text-[22px] font-black" style={{ color: LEGACY_COLORS.cyan }}>
-                      {formatNumber(capacityData.immediate)}
-                    </div>
-                  </div>
-                  <div
-                    className="rounded-[18px] border p-4"
-                    style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-                  >
-                    <div
-                      className="text-sm font-bold uppercase tracking-[0.15em]"
-                      style={{ color: LEGACY_COLORS.muted2 }}
-                    >
-                      최대 생산 가능
-                    </div>
-                    <div className="mt-1 font-mono text-[22px] font-black" style={{ color: LEGACY_COLORS.blue }}>
-                      {formatNumber(capacityData.maximum)}
-                    </div>
-                  </div>
-                </div>
-                {capacityData.limiting_item && (
-                  <div
-                    className="mb-4 rounded-[14px] border px-4 py-3 text-sm"
-                    style={{
-                      background: "rgba(255,136,0,.08)",
-                      borderColor: "rgba(255,136,0,.25)",
-                      color: LEGACY_COLORS.yellow,
-                    }}
-                  >
-                    병목 부품: <span className="font-bold">{capacityData.limiting_item}</span>
-                  </div>
-                )}
-                <div
-                  className="max-h-52 overflow-y-auto rounded-[16px] border"
-                  style={{ borderColor: LEGACY_COLORS.border }}
-                >
-                  <div
-                    className="grid grid-cols-[1fr_80px_80px] border-b px-4 py-2 text-sm font-bold uppercase tracking-[0.15em]"
-                    style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-                  >
-                    <span>품목</span>
-                    <span className="text-right">즉시</span>
-                    <span className="text-right">최대</span>
-                  </div>
-                  {capacityData.top_items.map((item, i) => (
-                    <div
-                      key={item.item_id}
-                      className="grid grid-cols-[1fr_80px_80px] items-center px-4 py-2.5"
-                      style={{
-                        borderBottom:
-                          i === capacityData.top_items.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
-                      }}
-                    >
-                      <div>
-                        <div className="truncate text-sm" style={{ color: LEGACY_COLORS.text }}>
-                          {item.item_name}
-                        </div>
-                        <div className="font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                          {item.erp_code}
-                        </div>
-                      </div>
-                      <div
-                        className="text-right font-mono text-sm font-bold"
-                        style={{ color: LEGACY_COLORS.cyan }}
-                      >
-                        {formatNumber(item.immediate)}
-                      </div>
-                      <div className="text-right font-mono text-sm" style={{ color: LEGACY_COLORS.blue }}>
-                        {formatNumber(item.maximum)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="mb-4 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-                {capacityData == null ? "데이터를 불러오는 중…" : "BOM이 등록된 품목이 없습니다."}
-              </div>
-            )}
-            <button
-              className="mt-5 w-full rounded-[18px] border py-3 text-base font-semibold"
-              style={{
-                background: LEGACY_COLORS.s2,
-                borderColor: LEGACY_COLORS.border,
-                color: LEGACY_COLORS.muted2,
-              }}
-              onClick={() => setCapacityModal(false)}
-            >
-              닫기
-            </button>
-          </div>
-        </div>
-      )}
-      <div className="flex min-h-0 flex-1 gap-4 pl-0 pr-4">
+    <div className="flex min-h-0 flex-1 gap-4 pl-0 pr-4">
         {/* ── 좌측: 스크롤 컨테이너 ── */}
         <div
           ref={scrollRef}
@@ -868,7 +627,7 @@ export function DesktopInventoryView({
           style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.bg }}
         >
           <div className="flex flex-col gap-3 pb-6">
-            {/* ── 컴팩트 상단: KPI + (접힘형) 필터 ── */}
+            {/* ── 컴팩트 상단: KPI + 생산가능 + (접힘형) 필터 ── */}
             <section className="card" style={{ padding: "14px 16px" }}>
               <CompactKpiBar cards={kpiCards} activeKey={kpi} onChange={setKpi} />
               <InventoryFilters
@@ -895,9 +654,6 @@ export function DesktopInventoryView({
                 activeFilterCount={activeFilterCount}
                 filtersOpen={filtersOpen}
                 onToggleFilters={() => setFiltersOpen((prev) => !prev)}
-                capacityData={capacityData}
-                onOpenCapacity={() => setCapacityModal(true)}
-                activeChipsRow={activeChipsRow}
               />
 
               {error ? (
@@ -1044,42 +800,40 @@ export function DesktopInventoryView({
                               {item.erp_code ?? "-"}
                             </td>
                             <td
-                              className="border-b px-4 py-2.5 align-middle"
+                              className="border-b px-4 py-2.5 align-middle whitespace-nowrap"
                               style={{ borderColor: LEGACY_COLORS.border }}
                             >
-                              <div className="flex flex-wrap gap-1">
-                                {Number(item.warehouse_qty) > 0 && (
-                                  <span
-                                    className="inline-flex rounded-full px-1.5 py-0.5 text-sm font-bold"
-                                    style={{ color: "#3ac4b0" }}
-                                  >
-                                    창고
-                                  </span>
-                                )}
-                                {item.locations
-                                  .filter((l) => Number(l.quantity) > 0)
-                                  .map((l) => (
-                                    <span
-                                      key={l.department}
-                                      className="inline-flex rounded-full px-1.5 py-0.5 text-sm font-bold"
-                                      style={{ color: employeeColor(l.department) }}
-                                    >
-                                      {l.department}
-                                    </span>
-                                  ))}
-                                {Number(item.warehouse_qty) === 0 &&
-                                  item.locations.every((l) => Number(l.quantity) === 0) &&
-                                  (item.department ?? erpCodeDept(item.erp_code)) && (
-                                    <span
-                                      className="inline-flex rounded-full px-1.5 py-0.5 text-sm font-bold opacity-50"
-                                      style={{
-                                        color: employeeColor(item.department ?? erpCodeDept(item.erp_code)),
-                                      }}
-                                    >
-                                      {item.department ?? erpCodeDept(item.erp_code)}
-                                    </span>
-                                  )}
-                              </div>
+                              {(() => {
+                                const badges: { key: string; label: string; color: string; dim?: boolean }[] = [];
+                                if (Number(item.warehouse_qty) > 0)
+                                  badges.push({ key: "창고", label: "창고", color: "#3dd4a0" });
+                                for (const l of item.locations.filter((l) => Number(l.quantity) > 0))
+                                  badges.push({ key: l.department, label: l.department, color: employeeColor(l.department) });
+                                if (badges.length === 0) {
+                                  const dept = item.department ?? erpCodeDept(item.erp_code);
+                                  if (dept) badges.push({ key: dept, label: dept, color: employeeColor(dept), dim: true });
+                                }
+                                const visible = badges.slice(0, 2);
+                                const extra = badges.length - 2;
+                                return (
+                                  <div className="flex items-center gap-1.5">
+                                    {visible.map((b) => (
+                                      <span
+                                        key={b.key}
+                                        className={`text-sm font-bold${b.dim ? " opacity-50" : ""}`}
+                                        style={{ color: b.color }}
+                                      >
+                                        {b.label}
+                                      </span>
+                                    ))}
+                                    {extra > 0 && (
+                                      <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                                        +{extra}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </td>
                             <td
                               className="border-b px-4 py-2.5 text-center align-middle whitespace-nowrap font-mono text-base font-black"
@@ -1155,6 +909,5 @@ export function DesktopInventoryView({
           )}
         </DesktopRightPanel>
       </div>
-    </>
   );
 }

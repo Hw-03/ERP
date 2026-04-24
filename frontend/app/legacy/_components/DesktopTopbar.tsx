@@ -1,6 +1,6 @@
 "use client";
 
-import type { ElementType } from "react";
+import type { ElementType, ReactNode } from "react";
 import { Clock3, RefreshCw } from "lucide-react";
 import { LEGACY_COLORS } from "./legacyUi";
 import { ThemeToggle } from "./ThemeToggle";
@@ -17,6 +17,7 @@ export function DesktopTopbar({
   onRefresh,
   statusText,
   statusSlots,
+  actionSlot,
 }: {
   title: string;
   icon?: ElementType;
@@ -24,6 +25,7 @@ export function DesktopTopbar({
   onRefresh: () => void;
   statusText: string;
   statusSlots?: TopbarStatusSlot[];
+  actionSlot?: ReactNode;
 }) {
   const useSlots = statusSlots && statusSlots.length > 0;
 
@@ -44,36 +46,7 @@ export function DesktopTopbar({
           </div>
         </div>
 
-        <div className="hidden min-w-[260px] items-center gap-3 rounded-[20px] border px-4 py-2.5 xl:flex" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: "rgba(101,169,255,.14)", color: LEGACY_COLORS.blue }}>
-            <Clock3 className="h-3.5 w-3.5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            {useSlots ? (
-              <div className="flex items-center gap-2.5 text-base">
-                {statusSlots!.map((slot, i) => (
-                  <span key={`${slot.label}-${i}`} className="flex items-center gap-1.5 whitespace-nowrap">
-                    <span style={{ color: LEGACY_COLORS.muted2 }}>{slot.label}</span>
-                    <span
-                      className="font-mono font-bold"
-                      style={{ color: slot.tone ?? LEGACY_COLORS.text }}
-                    >
-                      {slot.value}
-                    </span>
-                    {i < statusSlots!.length - 1 && (
-                      <span style={{ color: LEGACY_COLORS.muted2 }}>·</span>
-                    )}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <div className="truncate text-base" style={{ color: LEGACY_COLORS.muted2 }}>
-                {statusText}
-              </div>
-            )}
-          </div>
-        </div>
-
+        {actionSlot}
         <ThemeToggle />
 
         <button
