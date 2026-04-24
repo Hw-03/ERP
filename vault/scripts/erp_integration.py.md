@@ -39,7 +39,7 @@ aliases:
 > - `data/ERP_Source_Links.csv` — 원본 행 → 품목 매핑
 > - `data/ERP_Excluded_Items.csv` — 비활성 항목 7개
 > - `data/ERP_Unmatched_A_Items.csv` — 파일 A 미매핑 94개
-> - `docs/ERP_Integration_Report.md` — 통합 결과 리포트
+> - `docs/CODEX_PROGRESS.md` — 최근 작업 기록
 
 ## 실행 방법
 
@@ -92,7 +92,7 @@ python scripts/erp_integration.py
 ## 관련 문서
 
 - [[data/data]] — 입력·출력 파일 목록
-- [[docs/ERP_Integration_Report.md.md]] — 통합 결과 리포트
+- [[docs/CODEX_PROGRESS.md.md]] — 최근 작업 기록
 - [[backend/sync_excel_stock.py.md]] — DB 동기화 스크립트
 - [[scripts/import_real_inventory.py.md]] — CSV → DB 주입 스크립트
 

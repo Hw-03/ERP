@@ -5,18 +5,28 @@ import { Clock3, RefreshCw } from "lucide-react";
 import { LEGACY_COLORS } from "./legacyUi";
 import { ThemeToggle } from "./ThemeToggle";
 
+export type TopbarStatusSlot = {
+  label: string;
+  value: string | number;
+  tone?: string;
+};
+
 export function DesktopTopbar({
   title,
   icon: Icon,
   onRefresh,
   statusText,
+  statusSlots,
 }: {
   title: string;
   icon?: ElementType;
   subtitle?: string;
   onRefresh: () => void;
   statusText: string;
+  statusSlots?: TopbarStatusSlot[];
 }) {
+  const useSlots = statusSlots && statusSlots.length > 0;
+
   return (
     <header className="pl-0 pr-4 pt-0">
       <div
@@ -39,9 +49,28 @@ export function DesktopTopbar({
             <Clock3 className="h-3.5 w-3.5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-base" style={{ color: LEGACY_COLORS.muted2 }}>
-              {statusText}
-            </div>
+            {useSlots ? (
+              <div className="flex items-center gap-2.5 text-base">
+                {statusSlots!.map((slot, i) => (
+                  <span key={`${slot.label}-${i}`} className="flex items-center gap-1.5 whitespace-nowrap">
+                    <span style={{ color: LEGACY_COLORS.muted2 }}>{slot.label}</span>
+                    <span
+                      className="font-mono font-bold"
+                      style={{ color: slot.tone ?? LEGACY_COLORS.text }}
+                    >
+                      {slot.value}
+                    </span>
+                    {i < statusSlots!.length - 1 && (
+                      <span style={{ color: LEGACY_COLORS.muted2 }}>·</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div className="truncate text-base" style={{ color: LEGACY_COLORS.muted2 }}>
+                {statusText}
+              </div>
+            )}
           </div>
         </div>
 

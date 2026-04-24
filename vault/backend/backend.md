@@ -1,4 +1,4 @@
-﻿---
+---
 type: index
 project: ERP
 layer: backend
@@ -13,85 +13,46 @@ aliases:
 # backend
 
 > [!summary] 역할
-> FastAPI 기반의 REST API 서버. 재고·품목·생산·BOM 등 모든 데이터 처리를 담당한다.
-> SQLite 데이터베이스(`erp.db`)를 사용한다.
+> FastAPI 기반의 API 서버와 DB 관리 코드를 담는 폴더.
+> 이번 브랜치 기준으로는 재고 무결성 점검, 모델 관리, 부트스트랩 스크립트가 더 분명하게 분리됐다.
 
-## 하위 문서
+## 핵심 문서
 
-- [[backend/app/app]] — 핵심 앱 모듈
-- [[backend/app/main.py.md]] — 서버 진입점
-- [[backend/app/models.py.md]] — DB 테이블 정의
-- [[backend/app/schemas.py.md]] — 데이터 스키마
-- [[backend/app/database.py.md]] — DB 연결 설정
-- [[backend/requirements.txt.md]] — Python 패키지 목록
-- [[backend/seed.py.md]] — 초기 데이터 시드 (품목 + 기준 데이터)
-- [[backend/seed_bom.py.md]] — BOM 계층 샘플 데이터 생성
-- [[backend/seed_employees.py.md]] — 직원 26명 동기화
-- [[backend/seed_packages.py.md]] — 출하묶음 20개 생성
-- [[backend/sync_excel_stock.py.md]] — 엑셀 → DB 재고 동기화
-- [[backend/Dockerfile.md]] — 컨테이너 빌드 설정
+- [[backend/app/app]] - 앱 내부 구조
+- [[backend/app/main.py.md]] - API 서버 진입점
+- [[backend/app/models.py.md]] - ORM 테이블 정의
+- [[backend/app/schemas.py.md]] - 요청/응답 스키마
+- [[backend/schema.sql.md]] - PostgreSQL 이관용 스키마 파일
+- [[backend/bootstrap_db.py.md]] - DB 초기화/점검용 부트스트랩 스크립트
 
-## 하위 폴더
+## 하위 허브
 
-- [[backend/app/routers/routers]] — API 엔드포인트
-- [[backend/app/services/services]] — 비즈니스 로직
-- [[backend/app/utils/utils]] — 유틸리티
+- [[backend/app/routers/routers]] - API 엔드포인트
+- [[backend/app/services/services]] - 비즈니스 로직
+- [[backend/app/utils/utils]] - 유틸리티 함수
 
-## 실행 방법
+## 이번 브랜치에서 눈여겨볼 변경
+
+- `main.py` 에서 자동 부트스트랩 책임이 줄고, 명시적 초기화 흐름이 더 또렷해졌다.
+- `app/services/integrity.py` 가 생겨서 재고 합계 불일치 점검/복구 로직이 분리됐다.
+- `app/services/stock_math.py` 가 생겨서 화면과 서비스가 공통 재고 계산식을 재사용할 수 있게 됐다.
+- `app/routers/models.py` 가 생겨서 제품 모델 CRUD가 별도 라우터로 분리됐다.
+- 운영 보조 스크립트가 늘어 `bootstrap_db.py`, `assign_models.py`, `fix_unclassified.py`, `seed_bom_complete.py` 같은 정비 도구가 추가됐다.
+
+## 실행 메모
 
 ```bash
 cd backend
 python -m uvicorn app.main:app --reload
 ```
 
-API 문서: http://localhost:8000/docs
-
----
-
-## 쉬운 말로 설명
-
-Backend는 이 ERP의 **"뇌"**다. 사용자가 화면에서 버튼을 누르면, 그 요청을 받아서 규칙대로 데이터를 읽고 쓰는 역할을 한다.
-
-구조는 3층이다:
-1. **입구 (routers/)** — 어떤 URL 요청이 오면 받는 담당. 예: `POST /api/items` 는 `items.py` 가 받는다.
-2. **두뇌 (services/)** — 받은 요청을 실제로 계산·처리. 예: ERP 코드 자동 생성, BOM 전개.
-3. **기억 (models.py + database.py)** — DB 테이블 정의와 연결.
-
-그 밖에 `utils/` 는 자주 쓰는 도우미 함수들, `seed_*.py` 는 초기 데이터 넣는 스크립트.
-
----
-
-## 이 폴더에서 벌어지는 일 (전형적인 흐름)
-
-예: 사용자가 "튜브 10개 입고" 버튼을 누르면:
-
-1. 프론트엔드가 `POST /api/inventory/receive` 호출
-2. **routers/inventory.py** 가 요청 수신
-3. **services/inventory.py** 의 `receive_confirmed()` 실행
-4. **models.py** 의 `Inventory` 테이블 수량 +10
-5. `transaction_logs` 에 `RECEIVE` 기록
-6. 업데이트된 재고 정보를 JSON으로 반환
-7. 프론트가 화면 갱신
-
-자세한 건 재고 입출고 시나리오.
-
----
-
-## 핵심 용어 (자세한 건 용어 사전)
-
-- **FastAPI** — 이 백엔드에서 쓰는 파이썬 웹 프레임워크. URL ↔ 함수 매핑과 자동 문서화 제공.
-- **SQLAlchemy** — DB를 파이썬 클래스로 다루는 라이브러리. `models.py` 가 이걸로 작성됨.
-- **Pydantic** — 요청/응답 데이터 검증. `schemas.py` 에서 사용.
-- **uvicorn** — FastAPI를 실제 실행시키는 서버 프로그램.
-
----
+DB 준비나 정비 작업은 서버 시작과 분리해서 `python bootstrap_db.py --all` 같은 명시적 실행 흐름으로 보는 편이 안전하다.
 
 ## 관련 문서
 
-- [[backend/app/app]] — 앱 내부 구조
-- [[backend/app/routers/routers]] — API 14개 목록
-- [[backend/app/services/services]] — 비즈니스 로직
-- 품목 등록 시나리오, 재고 입출고 시나리오, 생산 배치 시나리오
-- FAQ 전체, 용어 사전
+- [[_vault/guides/ERP_MOC]]
+- [[_vault/guides/처음_읽는_사람]]
+- [[docs/ITEM_CODE_RULES.md.md]]
 
-Up: ERP MOC
+Up: [[ERP]]
+

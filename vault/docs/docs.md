@@ -1,4 +1,4 @@
-﻿---
+---
 type: index
 project: ERP
 layer: docs
@@ -13,49 +13,34 @@ aliases:
 # docs
 
 > [!summary] 역할
-> AI 핸드오버 문서, 개발 진행 현황, 디자인 파일이 있는 폴더.
+> 규칙, 핸드오버, 진행 현황, 디자인 참고 자료를 모아두는 문서 폴더.
+> 이번 브랜치 기준으로는 불필요한 예전 리포트를 걷어내고, 현재 기준 문서만 남기는 방향으로 정리됐다.
 
-## 하위 문서
+## 현재 기준 문서
 
-- [[docs/AI_HANDOVER.md.md]] — AI 작업 인계 문서 (최신 UI 상태, 구조 요약)
-- [[docs/CODEX_PROGRESS.md.md]] — 개발 진행 현황 및 완료된 마일스톤 (M1~M7)
-- [[docs/CODEX_CONNECTED.md.md]] — Codex 연결 확인 파일
-- [[docs/CODEX_MAIN_CHECK.md.md]] — main 브랜치 직접 커밋 확인
-- [[docs/ERP_Integration_Report.md.md]] — 데이터 통합 결과 리포트
-- [[docs/ERP_Mapping_Sample.md.md]] — 품목 매핑 샘플 30건
-- [[docs/design/design]] — UI 디자인 파일 및 스크린샷
+- [[docs/AI_HANDOVER.md.md]] - 최신 인수인계 문서
+- [[docs/CODEX_PROGRESS.md.md]] - 최근 작업 흐름과 변경 내역
+- [[docs/ITEM_CODE_RULES.md.md]] - 품목/공정 코드 규칙의 기준 문서
+- [[docs/README.md.md]] - 문서 폴더 자체 설명
 
----
+## 참고 자료
 
-## 쉬운 말로 설명
+- [[docs/design/design.md]] - 디자인 폴더 안내
+- `docs/design/screenshots/` - 디자인 캡처 이미지
+- `docs/design/uploads/` - 데스크톱/모바일 UI 시안 자산
+- `docs/design/scraps/` - 스케치 파일
 
-프로젝트 **상태와 계약**에 관한 문서 폴더. 코드가 아니라 "어떤 상황인지 / 무엇이 진행됐는지 / 어떤 규칙이 있는지" 기록.
+## 정리 원칙
 
-### 세 종류
-1. **핸드오버** — 다음 사람(또는 AI)에게 넘길 때 필요한 정보 (`AI_HANDOVER.md`)
-2. **진행 기록** — 어디까지 만들었는지 (`CODEX_PROGRESS.md`, `CODEX_MAIN_CHECK.md`)
-3. **리포트** — 데이터 통합 결과 (`ERP_Integration_Report.md`)
-
-### design 폴더
-[[docs/design/design]] 에는 화면 스크린샷, UI 레퍼런스 이미지.
-
----
-
-## FAQ
-
-**Q. 왜 md 문서를 이렇게 많이 두는가?**
-프로토타입 개발 중 AI 협업(Claude, Codex)을 많이 써서, **문맥 전달용** 문서가 누적. 운영 안정화되면 일부 정리 가능.
-
-**Q. AI_HANDOVER 와 CLAUDE.md 차이는?**
-- `AI_HANDOVER.md` — 현재 UI 상태, 화면 레이아웃, 구체적 구현 스냅샷
-- `CLAUDE.md` — 작업 규칙, 스타일, 금지 영역
-
----
+- 현재 기준이 아닌 옛 리포트 노트는 Vault에서도 제거한다.
+- 코드 규칙은 `ITEM_CODE_RULES.md` 를 우선 기준으로 본다.
+- 디자인 자산은 참고 자료로 보되, 실제 구현 기준은 `frontend/` 코드를 우선한다.
 
 ## 관련 문서
 
-- [[CLAUDE.md.md]]
+- [[_vault/guides/ERP_MOC]]
+- [[_vault/guides/처음_읽는_사람]]
 - [[README.md.md]]
-- ERP MOC
 
-Up: ERP MOC
+Up: [[ERP]]
+

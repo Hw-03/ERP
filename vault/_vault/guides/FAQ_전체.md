@@ -33,7 +33,7 @@ aliases:
 - 현재 두 방식 모두 가능하도록 설계. `schema.sql`은 PostgreSQL 이관 용도.
 
 ### Q4. legacy 폴더가 뭐고 왜 있나?
-`frontend/app/legacy/` 가 **현재 실제 쓰는 UI**. 그 외 `app/inventory`, `app/admin` 등 루트 경로들은 새 UI 작업용 리다이렉트 혹은 미완성. 수정할 때 legacy 쪽을 봐야 실제 화면에 반영됨.
+`frontend/app/legacy/` 가 **현재 실제 쓰는 UI**. 이름만 legacy일 뿐 메인 화면은 여기서 나온다. 수정할 때는 `legacy` 와 그 아래 `mobile/` 구조를 같이 봐야 실제 화면에 반영된다.
 
 ---
 
@@ -98,7 +98,7 @@ pending은 "예약만 해둔 상태". 실제 차감은 배치 확정 시. 가용
 ## 🖥 화면 관련
 
 ### Q17. 화면이 모바일 / 데스크톱 둘 다 있다던데?
-`frontend/app/legacy/page.tsx` 에서 `lg:hidden` 기준으로 분기. 작은 화면이면 모바일 탭 UI, 큰 화면이면 데스크톱 `LegacyLayout`. 기능은 대체로 동일.
+`frontend/app/legacy/page.tsx` 에서 분기한다. 큰 화면은 데스크톱 `DesktopLegacyShell`, 작은 화면은 `MobileShell` 과 `mobile/screens`, `mobile/io` 쪽 wizard 흐름을 탄다.
 
 ### Q18. 관리자 암호는 어디서 바꾸나?
 AdminTab 또는 `/api/settings/pin` 엔드포인트. 기본 암호는 코드 확인 필요 (프로토타입이라 보안 단순).
@@ -120,7 +120,7 @@ AdminTab 또는 `/api/settings/pin` 엔드포인트. 기본 암호는 코드 확
 - 중요 DB는 자동화된 일일 백업 권장.
 
 ### Q22. NAS 운영 시 주의사항?
-`docker-compose.nas.yml` 사용. SQLite 기반. 파일 락 이슈 없도록 다중 접속 제한. 자세한 건 `docker-compose.nas.yml` 참고.
+이제 파일 위치는 `docker/docker-compose.nas.yml` 이다. SQLite 기반이어서 파일 락과 동시 접속에 특히 주의해야 한다.
 
 ### Q23. 새 기능 추가하려면 어디부터 봐야 하나?
 1. ERP MOC → 전체 그림
@@ -145,13 +145,16 @@ AdminTab 또는 `/api/settings/pin` 엔드포인트. 기본 암호는 코드 확
 각 `seed_*.py` 스크립트마다 중복 방지 로직 다름. 일반적으로 `INSERT OR IGNORE` 또는 `get_or_create` 패턴 사용. 실행 전 dry-run 가능하면 확인 권장.
 
 ### Q27. schema.sql 수정하면 실제 DB가 바뀌나?
-아니다. `schema.sql` 은 **참고용** 문서. 실제 DB 스키마는 `models.py` 기준으로 SQLAlchemy가 만듦. 이관 시에만 `schema.sql` 로 PostgreSQL 초기화.
+아니다. 지금 기준 파일 위치는 `backend/schema.sql` 이고, 여전히 **참고용/이관용** 문서다. 실제 운영 스키마 기준은 `backend/app/models.py` 와 관련 서비스/부트스트랩 흐름이다.
+
+### Q28. 재고 계산 기준은 어디를 봐야 하나?
+총합/가용 수량 계산식은 `backend/app/services/stock_math.py` 를 먼저 본다. 값이 어긋났는지 확인/복구하는 쪽은 `backend/app/services/integrity.py` 를 본다.
 
 ---
 
 ## 🐛 트러블슈팅
 
-### Q28. "이 품목의 재고가 이상해요" (UI 값 ≠ 실제 재고)
+### Q29. "이 품목의 재고가 이상해요" (UI 값 ≠ 실제 재고)
 순서대로 확인:
 1. 브라우저 새로고침 (캐시 문제)
 2. `GET /api/inventory/summary` 로 API 응답 확인
@@ -159,21 +162,21 @@ AdminTab 또는 `/api/settings/pin` 엔드포인트. 기본 암호는 코드 확
 4. `inventory_locations` 의 부서별 합계와 `total_quantity` 비교 → 차이 있으면 `_sync_total` 호출 필요
 5. `transaction_logs` 최근 몇 건 역추적
 
-### Q29. 배치 확정 버튼 눌렀는데 반영 안 됨
+### Q30. 배치 확정 버튼 눌렀는데 반영 안 됨
 1. 응답 상태코드 확인 (개발자도구 Network)
 2. 이미 CANCELLED/CONFIRMED 된 배치 아닌지 확인
 3. 재고 부족 에러인지 응답 메시지 확인
 4. 백엔드 콘솔 에러 로그 확인
 
-### Q30. API 응답이 느리거나 타임아웃
+### Q31. API 응답이 느리거나 타임아웃
 1. BOM 깊이가 너무 깊어서 전개 오래 걸림 → 순환 의심
 2. DB 연결 문제 → `database.py` 세션 확인
 3. 큰 엑셀 내보내기 → 스트리밍 방식 아니라 메모리 이슈
 
-### Q31. 그래프뷰에서 노드가 안 보임
+### Q32. 그래프뷰에서 노드가 안 보임
 Obsidian 그래프 필터에 `path:"ERP-Vault"` 등 설정. 또는 `.obsidian/graph.json` 의 colorGroups 확인. 링크 없는 orphan 문서면 showOrphans 옵션 체크.
 
-### Q32. 링크가 깨져있음 (Obsidian에서 빨간 링크)
+### Q33. 링크가 깨져있음 (Obsidian에서 빨간 링크)
 1. 파일명 변경했는데 링크 안 바뀜 → Obsidian의 "Rename links" 옵션 활성화 확인
 2. 링크 경로의 대소문자 차이
 3. 확장자 혼동 (`.md.md` 파일이 있음)

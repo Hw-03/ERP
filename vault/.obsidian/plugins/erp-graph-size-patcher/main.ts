@@ -37,6 +37,7 @@ const ERP_COLOR_GROUPS = [
   { query: "path:docs", color: { a: 1, rgb: 0x00897b } },
   { query: "path:scripts", color: { a: 1, rgb: 0x43a047 } },
   { query: "path:data", color: { a: 1, rgb: 0xf39c12 } },
+  { query: "path:docker", color: { a: 1, rgb: 0x546e7a } },
 ];
 
 type UnknownRecord = Record<string, any>;

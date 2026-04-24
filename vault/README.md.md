@@ -32,7 +32,7 @@ aliases:
 > [!info] 주요 산출물
 > - `ERP_Master_DB.csv` — 통합 마스터 DB
 > - `ERP_Source_Links.csv` — 원본 행 매핑
-> - `ERP_Integration_Report.md` — 통합 결과 리포트
+> - `CODEX_PROGRESS.md` — 최근 작업 및 진행 이력
 > - `schema.sql` — PostgreSQL 이관 스키마
 
 ---
@@ -64,7 +64,7 @@ aliases:
 
 - [[data/data]] — 데이터 파일 목록
 - [[scripts/erp_integration.py.md]] — 통합 스크립트
-- [[schema.sql.md]] — SQL 스키마
-- ERP MOC — 전체 맵
+- [[backend/schema.sql.md]] — SQL 스키마
+- [[_vault/guides/ERP_MOC]] — 전체 맵
 
 Up: ERP MOC

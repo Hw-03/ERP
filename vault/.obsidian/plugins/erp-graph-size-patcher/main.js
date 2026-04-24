@@ -41,7 +41,8 @@ var ERP_COLOR_GROUPS = [
   { query: "path:frontend", color: { a: 1, rgb: 9256510 } },
   { query: "path:docs", color: { a: 1, rgb: 35195 } },
   { query: "path:scripts", color: { a: 1, rgb: 4431943 } },
-  { query: "path:data", color: { a: 1, rgb: 15965202 } }
+  { query: "path:data", color: { a: 1, rgb: 15965202 } },
+  { query: "path:docker", color: { a: 1, rgb: 5533306 } }
 ];
 var ErpGraphSizePatcherPlugin = class extends import_obsidian.Plugin {
   constructor() {

@@ -76,6 +76,13 @@
         "a": 1,
         "rgb": 15965202
       }
+    },
+    {
+      "query": "path:docker",
+      "color": {
+        "a": 1,
+        "rgb": 5533306
+      }
     }
   ],
   "collapse-display": false,

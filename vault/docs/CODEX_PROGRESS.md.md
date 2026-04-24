@@ -53,7 +53,7 @@ aliases:
 ## FAQ
 
 **Q. 누가 작성?**
-대부분 Claude Code. Codex 초기 참여 흔적(`CODEX_CONNECTED.md`) 남아있음.
+대부분 Claude Code와 Codex가 이어서 작성했다. 이 문서는 예전 연결 확인 파일보다 현재 진행 기록을 우선 기준으로 본다.
 
 **Q. 상세 진행 확인?**
 git log + PR 설명 참조. 이 파일은 큰 덩어리만.
@@ -63,7 +63,6 @@ git log + PR 설명 참조. 이 파일은 큰 덩어리만.
 ## 관련 문서
 
 - [[docs/AI_HANDOVER.md.md]] — 최신 UI 상태 요약
-- [[docs/CODEX_CONNECTED.md.md]] — 연결된 기능 목록
-- ERP MOC — 전체 맵
+- [[_vault/guides/ERP_MOC]] — 전체 맵
 
 Up: [[docs/docs]]

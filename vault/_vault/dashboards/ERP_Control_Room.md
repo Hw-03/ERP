@@ -1,4 +1,4 @@
-﻿---
+---
 type: dashboard
 project: ERP
 status: active
@@ -16,49 +16,47 @@ aliases:
 # ERP Control Room
 
 > [!summary] 역할
-> 이 문서는 ERP Vault의 **첫 화면**이다. 전체 구조, 업무 시나리오, 코드 노트, 진행 현황을 한 곳에서 빠르게 탐색한다.
+> 이 Vault의 첫 화면.
+> 처음 읽는 사람, 전체 지도, 코드 허브, 최근 변경 포인트를 한 번에 탐색하기 위한 관제실 문서다.
 
 ## Quick Launch
 
 | 목적 | 바로가기 |
 |---|---|
-| 처음 인수인계 | 처음 읽는 사람 ⭐ |
+| 첫 인수인계 | 처음 읽는 사람 |
 | 전체 지도 | ERP MOC |
 | 용어 확인 | 용어 사전 |
-| 자주 묻는 질문 | FAQ 전체 |
-| AI 인계 | `docs/AI_HANDOVER.md.md` |
-| 개발 진행 | `docs/CODEX_PROGRESS.md.md` |
-| 통합 리포트 | `docs/ERP_Integration_Report.md.md` |
+| 문제 해결 | FAQ 전체 |
+| 최신 인계 | `docs/AI_HANDOVER.md.md` |
+| 진행 현황 | `docs/CODEX_PROGRESS.md.md` |
+| 코드 규칙 | `docs/ITEM_CODE_RULES.md.md` |
 
-## Operations Map
+## 핵심 허브
 
-| 흐름 | 설명 |
+| 영역 | 문서 |
 |---|---|
-| 품목 등록 시나리오 | 새 품목 추가 시 화면, API, DB 흐름 |
-| 재고 입출고 시나리오 | 입고, 출고, 이동, 불량 등록 |
-| 생산 배치 시나리오 | 생산 배치와 BOM 백플러시 |
-| 분해 반품 시나리오 | 분해, 반품, 재고 복귀 흐름 |
+| Backend | `backend/backend.md` |
+| Frontend | `frontend/frontend.md` |
+| Mobile UI | `frontend/app/legacy/_components/mobile/mobile.md` |
+| Docker | `docker/docker.md` |
+| Data | `data/data.md` |
+| Scripts | `scripts/scripts.md` |
 
-## Handover Path
+## 추천 읽기 경로
 
 | 시간 | 읽을 문서 | 목표 |
 |---|---|---|
-| 첫 30분 | 처음 읽는 사람 → ERP MOC → 용어 사전 | 프로젝트가 무엇인지 말할 수 있게 되기 |
-| 첫 2시간 | `frontend/lib/api.ts.md` → `backend/app/routers/routers.md` → `backend/app/models.py.md` | 화면, API, DB 연결 이해하기 |
-| 첫 하루 | 시나리오 4종 → `docs/CODEX_PROGRESS.md.md` → ERP System Map.canvas | 실제 업무 흐름과 개발 현황 파악하기 |
+| 첫 30분 | 처음 읽는 사람 -> ERP MOC -> 용어 사전 | 프로젝트 정체 파악 |
+| 첫 2시간 | frontend/frontend -> mobile/mobile -> backend/backend -> api.ts | 화면/서버 연결 이해 |
+| 첫 하루 | 시나리오 4종 -> ITEM_CODE_RULES -> CODEX_PROGRESS | 실제 운영 흐름과 최근 변경 파악 |
 
-## System Entry Points
+## 이번 브랜치 체크포인트
 
-| 영역 | 핵심 노트 |
-|---|---|
-| Backend | `backend/backend.md` |
-| Backend API | `backend/app/routers/routers.md` |
-| Backend Services | `backend/app/services/services.md` |
-| Frontend | `frontend/frontend.md` |
-| Active UI | `frontend/app/legacy/legacy.md` |
-| API Client | `frontend/lib/api.ts.md` |
-| Database | `backend/app/models.py.md` |
-| Migration Plan | `schema.sql.md` |
+- `docker/` 폴더 생김
+- 모바일 UI 하위 구조 대폭 추가
+- 재고 무결성/재고 계산 서비스 분리
+- 모델 관리 라우터 추가
+- 오래된 docs 리포트 정리
 
 ## Active Notes
 
@@ -67,17 +65,7 @@ TABLE layer AS "Layer", type AS "Type", source_path AS "Source"
 FROM ""
 WHERE project = "ERP" AND status = "active"
 SORT layer ASC, file.name ASC
-LIMIT 40
-```
-
-## By Layer
-
-```dataview
-TABLE rows.file.link AS "Notes"
-FROM ""
-WHERE project = "ERP" AND layer
-GROUP BY layer
-SORT layer ASC
+LIMIT 50
 ```
 
 ## Open Work
@@ -89,20 +77,13 @@ WHERE !completed AND contains(tags, "erp")
 SORT file.name ASC
 ```
 
-## Suggested Canvases
+## 운영 원칙
 
-- ERP System Map.canvas
-- `ERP 시스템 전체 흐름.canvas`
-- `Frontend 화면 - API - DB 모델.canvas`
-- `입고 - 이동 - 생산 - 출하.canvas`
-- `BOM 백플러시 흐름.canvas`
+> [!tip]
+> 실제 코드와 설명이 다르면 실제 코드가 우선이다.
 
-## Vault Rules
-
-> [!tip] 운영 원칙
-> 문서는 읽기 쉬운 한국어 설명을 먼저 두고, 실제 코드/경로는 그 뒤에 둔다. 새 코드 노트는 `_vault/templates/Code Note Template.md`에서 시작한다.
-
-> [!warning] 주의
-> `_archive`, `_backup`, `frontend/_archive`는 보존 영역이다. 명시 요청 없이 수정하지 않는다.
+> [!warning]
+> `_vault` 문서는 이해를 돕는 독립 영역이다. 원본 코드 허브와 직접 마구 연결하지 않고, `_vault` 내부 허브를 통해 따라간다.
 
 Up: [[_dashboards]]
+
