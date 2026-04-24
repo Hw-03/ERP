@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Activity, Calendar, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, List, Search, TrendingDown, TrendingUp } from "lucide-react";
+import { Activity, AlertTriangle, Calendar, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, List, Search, TrendingDown, TrendingUp } from "lucide-react";
 import { api, type TransactionLog, type TransactionType } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import {
@@ -13,13 +13,24 @@ import {
 
 const PAGE_SIZE = 100;
 
+const EXCEPTION_TYPES = new Set(["ADJUST", "SCRAP", "LOSS", "DISASSEMBLE", "MARK_DEFECTIVE"]);
+
 const TYPE_OPTIONS = [
   { label: "전체", value: "ALL" },
   { label: "입고", value: "RECEIVE" },
   { label: "출고", value: "SHIP" },
-  { label: "조정", value: "ADJUST" },
-  { label: "생산입고", value: "PRODUCE" },
+  { label: "생산", value: "PRODUCE" },
   { label: "자동차감", value: "BACKFLUSH" },
+  { label: "조정·예외", value: "EXCEPTION" },
+];
+
+const QUICK_FILTERS = [
+  { id: "has_memo", label: "메모 있음" },
+  { id: "no_ref", label: "참조번호 없음" },
+  { id: "exception", label: "조정·예외" },
+  { id: "backflush", label: "자동차감" },
+  { id: "large_ship", label: "대량 출고 ↓" },
+  { id: "today", label: "오늘" },
 ];
 
 const DATE_OPTIONS = [
@@ -103,7 +114,7 @@ function Chip({
       onClick={onClick}
       className="whitespace-nowrap rounded-full border px-3 py-1 text-sm font-semibold transition-all hover:brightness-110"
       style={{
-        background: active ? `${tone}22` : LEGACY_COLORS.s2,
+        background: active ? `color-mix(in srgb, ${tone} 14%, transparent)` : LEGACY_COLORS.s2,
         borderColor: active ? tone : LEGACY_COLORS.border,
         color: active ? tone : LEGACY_COLORS.muted2,
       }}
@@ -137,6 +148,7 @@ export function DesktopHistoryView() {
   const [itemRecentLogs, setItemRecentLogs] = useState<TransactionLog[]>([]);
 
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [quickFilter, setQuickFilter] = useState<string | null>(null);
   const now = new Date();
   const [calendarYear, setCalendarYear] = useState(now.getFullYear());
   const [calendarMonth, setCalendarMonth] = useState(now.getMonth());
@@ -214,24 +226,48 @@ export function DesktopHistoryView() {
 
   const filteredLogs = useMemo(() => {
     const start = getPeriodStart(dateFilter);
-    return logs.filter((log) => {
-      if (typeFilter !== "ALL" && log.transaction_type !== (typeFilter as TransactionType)) return false;
+    let result = logs.filter((log) => {
+      if (typeFilter === "EXCEPTION") {
+        if (!EXCEPTION_TYPES.has(log.transaction_type)) return false;
+      } else if (typeFilter !== "ALL" && log.transaction_type !== (typeFilter as TransactionType)) return false;
       if (start && parseUtc(log.created_at) < start) return false;
       if (search.trim()) {
         const kw = search.trim().toLowerCase();
-        const hay = `${log.item_name} ${log.erp_code} ${log.reference_no ?? ""} ${log.notes ?? ""}`.toLowerCase();
+        const hay = `${log.item_name} ${log.erp_code} ${log.reference_no ?? ""} ${log.notes ?? ""} ${log.produced_by ?? ""}`.toLowerCase();
         if (!hay.includes(kw)) return false;
       }
       return true;
     });
-  }, [logs, typeFilter, dateFilter, search]);
+
+    if (quickFilter) {
+      result = result.filter((log) => {
+        if (quickFilter === "has_memo" && !log.notes?.trim()) return false;
+        if (quickFilter === "no_ref" && log.reference_no) return false;
+        if (quickFilter === "exception" && !EXCEPTION_TYPES.has(log.transaction_type)) return false;
+        if (quickFilter === "backflush" && log.transaction_type !== "BACKFLUSH") return false;
+        if (quickFilter === "today") {
+          const todayStart = new Date();
+          todayStart.setHours(0, 0, 0, 0);
+          if (parseUtc(log.created_at) < todayStart) return false;
+        }
+        return true;
+      });
+
+      if (quickFilter === "large_ship") {
+        result = result.filter((log) => log.transaction_type === "SHIP");
+        result = [...result].sort((a, b) => Math.abs(Number(b.quantity_change)) - Math.abs(Number(a.quantity_change)));
+      }
+    }
+
+    return result;
+  }, [logs, typeFilter, dateFilter, search, quickFilter]);
 
   const stats = useMemo(() => {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     let receiveSum = 0;
     let shipSum = 0;
-    let todayCount = 0;
+    let exceptionCount = 0;
     for (const log of filteredLogs) {
       if (log.transaction_type === "RECEIVE" || log.transaction_type === "PRODUCE") {
         receiveSum += Number(log.quantity_change);
@@ -239,9 +275,11 @@ export function DesktopHistoryView() {
       if (log.transaction_type === "SHIP" || log.transaction_type === "BACKFLUSH") {
         shipSum += Math.abs(Number(log.quantity_change));
       }
-      if (parseUtc(log.created_at) >= todayStart) todayCount++;
+      if (EXCEPTION_TYPES.has(log.transaction_type) || log.transaction_type === "BACKFLUSH") {
+        exceptionCount++;
+      }
     }
-    return { total: filteredLogs.length, receiveSum, shipSum, todayCount };
+    return { total: filteredLogs.length, receiveSum, shipSum, exceptionCount };
   }, [filteredLogs]);
 
   const canLoadMore = logs.length >= page * PAGE_SIZE;
@@ -294,9 +332,10 @@ export function DesktopHistoryView() {
                 className="flex flex-col gap-1 rounded-[20px] border p-4"
                 style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
               >
-                <div className="text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>전체 건수</div>
+                <div className="text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>조회 건수</div>
                 <div className="text-2xl font-black">{formatNumber(stats.total)}</div>
-                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>필터 기준</div>
+                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>현재 로드 기준</div>
+                {canLoadMore && <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>(+더 불러올 수 있음)</div>}
               </div>
 
               <div
@@ -325,14 +364,14 @@ export function DesktopHistoryView() {
 
               <div
                 className="flex flex-col gap-1 rounded-[20px] border p-4"
-                style={{ background: "rgba(101,169,255,.06)", borderColor: "rgba(101,169,255,.22)" }}
+                style={{ background: "rgba(246,198,103,.06)", borderColor: "rgba(246,198,103,.22)" }}
               >
-                <div className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.blue }}>
-                  <Calendar className="h-3.5 w-3.5" />
-                  오늘 건수
+                <div className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.yellow }}>
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  예외 거래
                 </div>
-                <div className="text-2xl font-black" style={{ color: LEGACY_COLORS.blue }}>{formatNumber(stats.todayCount)}</div>
-                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>금일 거래</div>
+                <div className="text-2xl font-black" style={{ color: LEGACY_COLORS.yellow }}>{formatNumber(stats.exceptionCount)}</div>
+                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>조정·폐기·손실·예외</div>
               </div>
             </div>
           </section>
@@ -350,7 +389,7 @@ export function DesktopHistoryView() {
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="품명·코드·참조번호·메모 검색"
+                    placeholder="품명 · ERP코드 · 담당자 · 참조번호 · 메모"
                     className="flex-1 bg-transparent text-base outline-none"
                     style={{ color: LEGACY_COLORS.text }}
                   />
@@ -390,6 +429,25 @@ export function DesktopHistoryView() {
                 <span className="shrink-0 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>기간</span>
                 {DATE_OPTIONS.map((opt) => (
                   <Chip key={opt.value} active={dateFilter === opt.value} label={opt.label} onClick={() => setDateFilter(opt.value)} tone={LEGACY_COLORS.purple} />
+                ))}
+              </div>
+
+              {/* 조회 요약 */}
+              {(typeFilter !== "ALL" || dateFilter !== "ALL" || search.trim() || quickFilter) && (
+                <div className="rounded-[14px] border p-3 text-xs" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                  조회 {stats.total}건
+                  {typeFilter !== "ALL" && ` · 유형: ${TYPE_OPTIONS.find(opt => opt.value === typeFilter)?.label ?? typeFilter}`}
+                  {dateFilter !== "ALL" && ` · 기간: ${DATE_OPTIONS.find(opt => opt.value === dateFilter)?.label ?? dateFilter}`}
+                  {search.trim() && ` · "${search}"`}
+                  {quickFilter && ` · [${QUICK_FILTERS.find(qf => qf.id === quickFilter)?.label ?? quickFilter}]`}
+                </div>
+              )}
+
+              {/* 빠른 필터: 문제 거래 찾기 */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="shrink-0 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>문제 거래</span>
+                {QUICK_FILTERS.map((qf) => (
+                  <Chip key={qf.id} active={quickFilter === qf.id} label={qf.label} onClick={() => setQuickFilter(quickFilter === qf.id ? null : qf.id)} tone={LEGACY_COLORS.yellow} />
                 ))}
               </div>
             </div>
@@ -443,7 +501,7 @@ export function DesktopHistoryView() {
                           className="flex flex-col items-center rounded-[14px] border p-2 transition-colors hover:brightness-110"
                           style={{
                             background: isSelected ? "rgba(101,169,255,.18)" : isToday ? "rgba(101,169,255,.08)" : LEGACY_COLORS.s2,
-                            borderColor: isSelected ? LEGACY_COLORS.blue : isToday ? `${LEGACY_COLORS.blue}44` : LEGACY_COLORS.border,
+                            borderColor: isSelected ? LEGACY_COLORS.blue : isToday ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 27%, transparent)` : LEGACY_COLORS.border,
                             minHeight: "64px",
                           }}
                         >
@@ -483,7 +541,7 @@ export function DesktopHistoryView() {
                                   borderColor: selected?.log_id === log.log_id ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
                                 }}
                               >
-                                <span className="inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: `${tcolor}22`, color: tcolor }}>
+                                <span className="inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: `color-mix(in srgb, ${tcolor} 14%, transparent)`, color: tcolor }}>
                                   {transactionLabel(log.transaction_type)}
                                 </span>
                                 <span className="min-w-0 flex-1 truncate text-sm">{log.item_name}</span>
@@ -574,7 +632,7 @@ export function DesktopHistoryView() {
                           <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
                             <span
                               className="inline-flex rounded-full px-2.5 py-1 text-xs font-bold"
-                              style={{ background: `${tcolor}22`, color: tcolor }}
+                              style={{ background: `color-mix(in srgb, ${tcolor} 14%, transparent)`, color: tcolor }}
                             >
                               {transactionLabel(log.transaction_type)}
                             </span>
@@ -682,7 +740,7 @@ export function DesktopHistoryView() {
             >
               <span
                 className="inline-flex rounded-full px-4 py-1.5 text-sm font-bold"
-                style={{ background: `${transactionColor(selected.transaction_type)}22`, color: transactionColor(selected.transaction_type) }}
+                style={{ background: `color-mix(in srgb, ${transactionColor(selected.transaction_type)} 14%, transparent)`, color: transactionColor(selected.transaction_type) }}
               >
                 {transactionLabel(selected.transaction_type)}
               </span>
@@ -739,11 +797,13 @@ export function DesktopHistoryView() {
             </div>
 
             {/* 이 품목의 최근 거래 */}
-            {itemRecentLogs.length > 0 && (
-              <div className="rounded-[24px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-                <div className="mb-3 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  이 품목의 최근 거래
-                </div>
+            <div className="rounded-[24px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+              <div className="mb-3 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                이 품목의 최근 거래
+              </div>
+              {itemRecentLogs.length === 0 ? (
+                <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>최근 거래 없음</div>
+              ) : (
                 <div className="space-y-2">
                   {itemRecentLogs.map((log) => (
                     <button
@@ -752,25 +812,30 @@ export function DesktopHistoryView() {
                       className="flex w-full items-center justify-between rounded-[14px] border p-3 text-left transition-all hover:brightness-110"
                       style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
                     >
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <span
                           className="inline-flex rounded px-2 py-0.5 text-xs font-bold"
-                          style={{ background: `${transactionColor(log.transaction_type)}22`, color: transactionColor(log.transaction_type) }}
+                          style={{ background: `color-mix(in srgb, ${transactionColor(log.transaction_type)} 14%, transparent)`, color: transactionColor(log.transaction_type) }}
                         >
                           {transactionLabel(log.transaction_type)}
                         </span>
                         <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                           {formatDate(log.created_at)}
                         </div>
+                        {(log.quantity_before != null || log.quantity_after != null) && (
+                          <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                            {log.quantity_before != null ? formatNumber(log.quantity_before) : "-"} → {log.quantity_after != null ? formatNumber(log.quantity_after) : "-"}
+                          </div>
+                        )}
                       </div>
-                      <div className="text-base font-bold" style={{ color: transactionColor(log.transaction_type) }}>
+                      <div className="shrink-0 ml-2 text-base font-bold text-right" style={{ color: transactionColor(log.transaction_type) }}>
                         {Number(log.quantity_change) >= 0 ? "+" : ""}{formatNumber(log.quantity_change)}
                       </div>
                     </button>
                   ))}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         ) : (
           <div className="flex h-full items-center justify-center">
