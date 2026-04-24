@@ -12,11 +12,14 @@ interface BarcodeDetectorType {
 }
 declare global {
   interface Window {
-    BarcodeDetector?: new (options?: { formats: string[] }) => BarcodeDetectorType;
+    BarcodeDetector?: {
+      new(options?: { formats: string[] }): BarcodeDetectorType;
+      getSupportedFormats(): Promise<string[]>;
+    };
   }
 }
 
-type ScannerMode = "native" | "zxing" | "unsupported";
+type ScannerMode = "native" | "zxing" | "insecure" | "unsupported";
 
 export function BarcodeScannerModal({
   onDetected,
@@ -29,17 +32,35 @@ export function BarcodeScannerModal({
   const [error, setError] = useState<string | null>(null);
   const [detected, setDetected] = useState<string | null>(null);
   const zxingControlsRef = useRef<IScannerControls | null>(null);
+  const formatCheckDone = useRef(false);
   const [manualInput, setManualInput] = useState("");
 
-  const [mode] = useState<ScannerMode>(() => {
+  const [mode, setMode] = useState<ScannerMode>(() => {
     if (typeof window === "undefined") return "unsupported";
+    if (!window.isSecureContext) return "insecure";
+    if (!navigator.mediaDevices?.getUserMedia) return "unsupported";
     if (window.BarcodeDetector) return "native";
-    if (typeof navigator !== "undefined" && navigator.mediaDevices) return "zxing";
-    return "unsupported";
+    return "zxing";
   });
 
+  // Verify BarcodeDetector actually supports required formats; downgrade to zxing if not.
   useEffect(() => {
-    if (mode === "unsupported") return;
+    if (mode !== "native" || formatCheckDone.current) return;
+    formatCheckDone.current = true;
+    if (!window.BarcodeDetector?.getSupportedFormats) {
+      setMode("zxing");
+      return;
+    }
+    void window.BarcodeDetector.getSupportedFormats()
+      .then((formats) => {
+        const required = ["qr_code", "code_128", "ean_13"];
+        if (!required.every((f) => formats.includes(f))) setMode("zxing");
+      })
+      .catch(() => setMode("zxing"));
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode === "unsupported" || mode === "insecure") return;
 
     let stopped = false;
 
@@ -180,7 +201,14 @@ export function BarcodeScannerModal({
             className="rounded-xl border px-4 py-6 text-center text-[13px]"
             style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
           >
-            이 기기에서 카메라 스캔을 사용할 수 없습니다.
+            카메라 API를 사용할 수 없습니다.
+          </div>
+        ) : mode === "insecure" ? (
+          <div
+            className="rounded-xl border px-4 py-6 text-center text-[13px]"
+            style={{ background: "rgba(242,95,92,.08)", borderColor: "rgba(242,95,92,.3)", color: LEGACY_COLORS.red }}
+          >
+            카메라 스캔은 HTTPS 또는 localhost 환경에서만 사용할 수 있습니다. 현재 접속 주소에서는 카메라 권한을 사용할 수 없습니다.
           </div>
         ) : error ? (
           <div
@@ -241,7 +269,7 @@ export function BarcodeScannerModal({
           </div>
         )}
 
-        {mode !== "unsupported" && !detected && (
+        {!detected && (
           <div className="mt-2 flex gap-2">
             <input
               type="text"
