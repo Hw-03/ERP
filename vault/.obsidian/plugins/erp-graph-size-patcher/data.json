@@ -1,8 +1,0 @@
-{
-  "enabled": true,
-  "minRadius": 8,
-  "maxRadius": 48,
-  "scaleFactor": 4,
-  "includeExtensions": ".md,.canvas",
-  "patchIntervalMs": 0
-}
