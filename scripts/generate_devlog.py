@@ -6,6 +6,8 @@
 import subprocess
 import re
 from pathlib import Path
+from datetime import datetime
+from collections import defaultdict
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -15,10 +17,13 @@ OUTPUT_PATH = Path("data/개발현황.xlsx")
 # ── 색상 상수 ──────────────────────────────────────────────
 HEADER_BG   = "1F4E79"
 HEADER_FG   = "FFFFFF"
+KPI_LABEL_BG = "2E75B6"
+KPI_VALUE_BG = "DEEAF1"
 DONE_BG     = "E2EFDA"
 TODO_BG     = "F2F2F2"
 STRIPE_BG   = "EBF3FB"
 WHITE_BG    = "FFFFFF"
+GOLD_BG     = "FFF2CC"
 
 def make_fill(hex_color):
     return PatternFill("solid", fgColor=hex_color)
@@ -51,8 +56,80 @@ def auto_col_width(ws, extra=2):
                     max_len = max(max_len, len(line))
         ws.column_dimensions[col_letter].width = min(max_len + extra, 60)
 
-# ── Sheet 1: 개발 현황 요약 ───────────────────────────────
-def build_summary(ws):
+# ── Sheet 1: 대시보드 ──────────────────────────────────────
+def build_dashboard(ws, commits):
+    ws.title = "대시보드"
+
+    # 제목
+    ws.merge_cells("A1:E1")
+    title = ws["A1"]
+    title.value = "📊 ERP 재고관리 시스템 개발 현황"
+    title.fill = make_fill(HEADER_BG)
+    title.font = Font(bold=True, color=HEADER_FG, size=14)
+    title.alignment = Alignment(horizontal="center", vertical="center")
+    title.border = make_border()
+    ws.row_dimensions[1].height = 28
+
+    # KPI 영역 (행 3~6)
+    ws.row_dimensions[3].height = 22
+    kpis = [
+        ("개발 기간", "2026-04-10 ~ 04-24 (15일)"),
+        ("총 커밋 수", f"{len(commits)}건"),
+        ("기능 완료", "17 / 26개 (65%)"),
+        ("개발 영역", "Backend · Frontend · Mobile · Admin · Docs"),
+    ]
+
+    for r, (label, value) in enumerate(kpis, 3):
+        # 레이블
+        c1 = ws.cell(r, 1)
+        c1.value = label
+        c1.fill = make_fill(KPI_LABEL_BG)
+        c1.font = Font(bold=True, color=HEADER_FG, size=11)
+        c1.alignment = Alignment(horizontal="left", vertical="center")
+        c1.border = make_border()
+
+        # 값
+        ws.merge_cells(f"B{r}:E{r}")
+        c2 = ws.cell(r, 2)
+        c2.value = value
+        c2.fill = make_fill(KPI_VALUE_BG)
+        c2.font = Font(bold=True, size=11)
+        c2.alignment = Alignment(horizontal="left", vertical="center")
+        c2.border = make_border()
+        ws.row_dimensions[r].height = 22
+
+    # 날짜별 커밋 막대 (행 8~)
+    ws.row_dimensions[8].height = 20
+    ws.merge_cells("A8:E8")
+    chart_title = ws["A8"]
+    chart_title.value = "📈 날짜별 커밋 수"
+    chart_title.fill = make_fill(HEADER_BG)
+    chart_title.font = Font(bold=True, color=HEADER_FG, size=11)
+    chart_title.alignment = Alignment(horizontal="center", vertical="center")
+    chart_title.border = make_border()
+
+    by_date = group_commits_by_date(commits)
+    dates_sorted = sorted(by_date.keys())
+
+    r = 9
+    for date in dates_sorted:
+        count = len(by_date[date])
+        bar = "■" * (count // 2 if count >= 2 else 1)
+
+        ws.merge_cells(f"A{r}:E{r}")
+        cell = ws.cell(r, 1)
+        cell.value = f"{date}  {bar}  ({count})"
+        cell.fill = make_fill(GOLD_BG)
+        cell.font = Font(size=10, color="000000")
+        cell.alignment = Alignment(horizontal="left", vertical="center")
+        cell.border = make_border()
+        ws.row_dimensions[r].height = 18
+        r += 1
+
+    ws.column_dimensions["A"].width = 50
+
+# ── Sheet 2: 개발 현황 요약 ───────────────────────────────
+def build_summary(ws, commits):
     ws.title = "개발 현황 요약"
     ws.row_dimensions[1].height = 22
 
@@ -60,17 +137,24 @@ def build_summary(ws):
     for col, h in enumerate(headers, 1):
         apply_header(ws.cell(1, col), h)
 
+    # 자동 계산된 커밋 수
+    c1 = count_commits_in_range(commits, "2026-04-10", "2026-04-11")
+    c2 = count_commits_in_range(commits, "2026-04-12", "2026-04-14")
+    c3 = count_commits_in_range(commits, "2026-04-17", "2026-04-19")
+    c4 = count_commits_in_range(commits, "2026-04-21", "2026-04-21")
+    c5 = count_commits_in_range(commits, "2026-04-22", "2026-04-24")
+
     rows = [
         ("2026-04-10 ~ 04-11", "기반 구축",
-         "DB 스키마 설계, FastAPI 백엔드 초기 구축\n자재 통합 스크립트, SQLite 연동", 12, "완료"),
+         "DB 스키마·FastAPI 백엔드·자재 통합 스크립트·SQLite", c1, "완료"),
         ("2026-04-12 ~ 04-14", "UI 개발",
-         "모바일·데스크톱 UI 전면 개발\n직원 관리, 바코드/QR 스캔 기반, 다크모드\n레거시 데스크톱 UI 기본값 설정", 47, "완료"),
-        ("2026-04-17 ~ 04-18", "기능 고도화",
-         "4-파트 ERP 코드 체계 (M1~M7)\nQueue(생산/분해/반품), Pending/Available 분리\n안전재고 알림, 실사 라우터", 8, "완료"),
+         "모바일·데스크톱 UI·BOM·직원·QR스캔·다크모드\n레거시 UI 패리티", c2, "완료"),
+        ("2026-04-17 ~ 04-19", "기능 고도화",
+         "M1~M7(4-파트 코드)·Queue·Pending·안전재고\n실사 라우터", c3, "완료"),
         ("2026-04-21",          "UI 정제",
-         "레거시 데스크톱 레이아웃 Figma 맞춤 정제", 2, "완료"),
-        ("2026-04-22 ~ 04-23", "이번 주 정비",
-         "ERP 코드 전사 기준 통일 (item_code → erp_code)\n재고 현황 막대 시각화, 부서 배지 표시\n모바일 UX 전면 재설계 (위저드 흐름)\n재고 계산 일원화·N+1 제거\nObsidian 인수인계 문서 정리", 31, "완료"),
+         "레거시 레이아웃 Figma 맞춤 정제", c4, "완료"),
+        ("2026-04-22 ~ 04-24", "실 운영 준비",
+         "erp_code 통일·재고 시각화·모바일UX\n품목매칭 도구·ESLint·계산 일원화(N+1 제거)", c5, "완료"),
     ]
 
     for r, (period, cat, work, cnt, status) in enumerate(rows, 2):
@@ -158,7 +242,51 @@ def fetch_commits():
         m = re.match(r"^(feat|fix|refactor|docs|chore|design|style|test|ci|build|perf)(\(.+?\))?!?:", msg)
         ctype = m.group(1) if m else "기타"
         commits.append((date, hash7, msg, ctype))
-    return commits
+    return list(reversed(commits))  # 오래된 순으로
+
+def group_commits_by_date(commits):
+    grouped = defaultdict(list)
+    for date, hash7, msg, ctype in commits:
+        grouped[date].append((hash7, msg, ctype))
+    return grouped
+
+def count_commits_in_range(commits, start_date, end_date):
+    count = 0
+    for date, _, _, _ in commits:
+        if start_date <= date <= end_date:
+            count += 1
+    return count
+
+def build_daily(ws, commits):
+    ws.title = "일일 개발 현황"
+    ws.row_dimensions[1].height = 22
+
+    headers = ["날짜", "커밋 수", "주요 작업", "영역"]
+    for col, h in enumerate(headers, 1):
+        apply_header(ws.cell(1, col), h)
+
+    by_date = group_commits_by_date(commits)
+    dates_sorted = sorted(by_date.keys())
+
+    r = 2
+    for date in dates_sorted:
+        msgs = by_date[date]
+        count = len(msgs)
+        work_summary = "\n".join([msg[:60] for hash7, msg, ctype in msgs[:5]])
+        area = "Backend" if any("feat" in msg.lower() for _, msg, _ in msgs) else "Frontend"
+
+        ws.row_dimensions[r].height = 50
+        bg = STRIPE_BG if r % 2 == 0 else WHITE_BG
+        apply_data(ws.cell(r, 1), date,          bg, align="center")
+        apply_data(ws.cell(r, 2), count,         bg, align="center")
+        apply_data(ws.cell(r, 3), work_summary,  bg)
+        apply_data(ws.cell(r, 4), area,          bg, align="center")
+        r += 1
+
+    ws.column_dimensions["A"].width = 14
+    ws.column_dimensions["B"].width = 10
+    ws.column_dimensions["C"].width = 60
+    ws.column_dimensions["D"].width = 14
 
 def build_commits(ws, commits):
     ws.title = "커밋 이력"
@@ -187,10 +315,12 @@ def main():
     wb = Workbook()
     wb.remove(wb.active)
 
-    build_summary(wb.create_sheet())
-    build_features(wb.create_sheet())
-
     commits = fetch_commits()
+
+    build_dashboard(wb.create_sheet(), commits)
+    build_summary(wb.create_sheet(), commits)
+    build_features(wb.create_sheet())
+    build_daily(wb.create_sheet(), commits)
     build_commits(wb.create_sheet(), commits)
 
     wb.save(OUTPUT_PATH)
