@@ -14,7 +14,7 @@ ERP/MES prototype for material / inventory / production flow.
 - `scripts/` utils
 - `docs/` docs
 - `.dev/` dev tools
-- `vault/` obsidian vault (commit target)
+- `vault/` obsidian vault (only on `vault-sync`; not committed to `main`)
 - `_archive/`, `_backup/` do not edit
 
 ## Core Rules
@@ -99,6 +99,14 @@ Avoid vague messages:
 - explain `merge` separately from `commit`
 - if useful, also list branches safe to delete after merge
 
+## Vault Branch Policy
+- `main` is the runtime/deploy source branch and must stay vault-free.
+- `vault-sync` keeps the same runtime progress as `main`, plus the `vault/` folder.
+- `main` and `vault-sync` should differ only by the presence of `vault/`.
+- When bringing `main` changes into `vault-sync`, do not apply any deletion/removal of `vault/`.
+- Do not merge `vault-sync` directly into `main`.
+- If runtime code from `vault-sync` must go to `main`, create a clean branch or cherry-pick excluding `vault/`.
+
 ## Response Style
 - Korean
 - conclusion first
@@ -131,3 +139,4 @@ Avoid vague messages:
 ```bash
 cd backend
 python -m uvicorn app.main:app --reload
+```
