@@ -95,7 +95,7 @@ export function AdminHomeScreen({
             >
               <div
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px]"
-                style={{ background: `${meta.tone as string}22`, color: meta.tone }}
+                style={{ background: `color-mix(in srgb, ${meta.tone as string} 14%, transparent)`, color: meta.tone }}
               >
                 <Icon size={22} strokeWidth={1.75} />
               </div>

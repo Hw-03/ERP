@@ -101,7 +101,7 @@ export function HistoryFilterSheet({
           <input
             value={filters.search}
             onChange={(e) => onChange({ ...filters, search: e.target.value })}
-            placeholder="품명 · 코드 · 참조번호 · 메모"
+            placeholder="품명 · 코드 · 담당자 · 참조번호 · 메모"
             className={`${TYPO.body} w-full rounded-[14px] border px-3 py-3 outline-none`}
             style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
           />

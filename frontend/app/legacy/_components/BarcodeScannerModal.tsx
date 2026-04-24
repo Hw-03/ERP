@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Camera, X } from "lucide-react";
+import type { IScannerControls } from "@zxing/browser";
 import { LEGACY_COLORS } from "./legacyUi";
 
 // BarcodeDetector is available in Chrome/Edge 83+ and Safari 17+.
@@ -15,6 +16,8 @@ declare global {
   }
 }
 
+type ScannerMode = "native" | "zxing" | "unsupported";
+
 export function BarcodeScannerModal({
   onDetected,
   onClose,
@@ -25,66 +28,126 @@ export function BarcodeScannerModal({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [detected, setDetected] = useState<string | null>(null);
-  const [supported] = useState(() => typeof window !== "undefined" && !!window.BarcodeDetector);
+  const zxingControlsRef = useRef<IScannerControls | null>(null);
+  const [manualInput, setManualInput] = useState("");
+
+  const [mode] = useState<ScannerMode>(() => {
+    if (typeof window === "undefined") return "unsupported";
+    if (window.BarcodeDetector) return "native";
+    if (typeof navigator !== "undefined" && navigator.mediaDevices) return "zxing";
+    return "unsupported";
+  });
 
   useEffect(() => {
-    if (!supported) return;
+    if (mode === "unsupported") return;
 
-    let animFrameId = 0;
-    let stream: MediaStream | null = null;
-    let detector: BarcodeDetectorType | null = null;
     let stopped = false;
 
-    async function start() {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
-        });
-        if (!videoRef.current || stopped) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+    if (mode === "native") {
+      let animFrameId = 0;
+      let stream: MediaStream | null = null;
+      let detector: BarcodeDetectorType | null = null;
 
-        detector = new window.BarcodeDetector!({
-          formats: ["qr_code", "code_128", "code_39", "ean_13", "ean_8", "upc_a", "upc_e", "data_matrix"],
-        });
-
-        const tick = async () => {
-          if (stopped || !videoRef.current || !detector) return;
-          if (videoRef.current.readyState >= 2) {
-            try {
-              const results = await detector.detect(videoRef.current);
-              if (results.length > 0 && !stopped) {
-                stopped = true;
-                setDetected(results[0].rawValue);
-                setTimeout(() => {
-                  onDetected(results[0].rawValue);
-                  onClose();
-                }, 600);
-                return;
-              }
-            } catch {
-              // frame decode error — skip
-            }
+      const startNative = async () => {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+          });
+          if (!videoRef.current || stopped) {
+            stream.getTracks().forEach((t) => t.stop());
+            return;
           }
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+
+          detector = new window.BarcodeDetector!({
+            formats: ["qr_code", "code_128", "code_39", "ean_13", "ean_8", "upc_a", "upc_e", "data_matrix"],
+          });
+
+          const tick = async () => {
+            if (stopped || !videoRef.current || !detector) return;
+            if (videoRef.current.readyState >= 2) {
+              try {
+                const results = await detector.detect(videoRef.current);
+                if (results.length > 0 && !stopped) {
+                  stopped = true;
+                  setDetected(results[0].rawValue);
+                  setTimeout(() => {
+                    onDetected(results[0].rawValue);
+                    onClose();
+                  }, 600);
+                  return;
+                }
+              } catch {
+                // frame decode error — skip
+              }
+            }
+            animFrameId = requestAnimationFrame(() => void tick());
+          };
           animFrameId = requestAnimationFrame(() => void tick());
-        };
-        animFrameId = requestAnimationFrame(() => void tick());
-      } catch (e) {
-        if (!stopped) setError(e instanceof Error ? e.message : "카메라를 열 수 없습니다.");
-      }
+        } catch {
+          if (!stopped) setError("카메라 스캔을 시작하지 못했습니다. 카메라 권한을 허용했는지 확인해 주세요.");
+        }
+      };
+
+      void startNative();
+
+      return () => {
+        stopped = true;
+        cancelAnimationFrame(animFrameId);
+        stream?.getTracks().forEach((t) => t.stop());
+      };
     }
 
-    void start();
+    // ZXing fallback path
+    const startZxing = async () => {
+      try {
+        const { BrowserMultiFormatReader } = await import("@zxing/browser");
+        const reader = new BrowserMultiFormatReader();
+        if (stopped || !videoRef.current) return;
+
+        const controls = await reader.decodeFromVideoDevice(
+          undefined,
+          videoRef.current,
+          (result, err) => {
+            if (stopped) return;
+            if (result) {
+              stopped = true;
+              const text = result.getText();
+              setDetected(text);
+              zxingControlsRef.current?.stop();
+              setTimeout(() => {
+                onDetected(text);
+                onClose();
+              }, 600);
+            }
+            // NotFoundException per frame은 정상 — 무시
+            void err;
+          }
+        );
+        zxingControlsRef.current = controls;
+      } catch {
+        if (!stopped) setError("카메라 스캔을 시작하지 못했습니다. 카메라 권한을 허용했는지 확인해 주세요.");
+      }
+    };
+    void startZxing();
 
     return () => {
       stopped = true;
-      cancelAnimationFrame(animFrameId);
-      stream?.getTracks().forEach((t) => t.stop());
+      zxingControlsRef.current?.stop();
+      zxingControlsRef.current = null;
     };
-  }, [supported, onDetected, onClose]);
+  }, [mode, onDetected, onClose]);
+
+  function handleManualSubmit() {
+    const value = manualInput.trim();
+    if (!value) return;
+    setDetected(value);
+    setTimeout(() => {
+      onDetected(value);
+      onClose();
+    }, 600);
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
@@ -112,14 +175,12 @@ export function BarcodeScannerModal({
           </button>
         </div>
 
-        {!supported ? (
+        {mode === "unsupported" ? (
           <div
             className="rounded-xl border px-4 py-6 text-center text-[13px]"
             style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
           >
-            이 브라우저는 BarcodeDetector API를 지원하지 않습니다.
-            <br />
-            Chrome 또는 Edge 최신 버전을 사용해 주세요.
+            이 기기에서 카메라 스캔을 사용할 수 없습니다.
           </div>
         ) : error ? (
           <div
@@ -135,6 +196,7 @@ export function BarcodeScannerModal({
               ref={videoRef}
               muted
               playsInline
+              autoPlay
               className="aspect-video w-full object-cover"
             />
 
@@ -176,6 +238,30 @@ export function BarcodeScannerModal({
                 <div className="text-[15px] font-black">{detected}</div>
               </div>
             )}
+          </div>
+        )}
+
+        {mode !== "unsupported" && !detected && (
+          <div className="mt-2 flex gap-2">
+            <input
+              type="text"
+              value={manualInput}
+              onChange={(e) => setManualInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleManualSubmit();
+              }}
+              placeholder="바코드 직접 입력"
+              className="flex-1 rounded-lg border px-3 py-1.5 text-[13px] outline-none"
+              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+            />
+            <button
+              onClick={handleManualSubmit}
+              disabled={!manualInput.trim()}
+              className="rounded-lg border px-3 py-1.5 text-[13px] font-semibold disabled:opacity-40"
+              style={{ background: LEGACY_COLORS.blue, borderColor: LEGACY_COLORS.blue, color: "#fff" }}
+            >
+              적용
+            </button>
           </div>
         )}
 

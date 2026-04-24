@@ -237,7 +237,7 @@ export function HistoryScreen({ onClose }: { onClose: () => void }) {
       {viewMode === "list" ? (
         <>
           <div className="grid grid-cols-3 gap-2">
-            <KpiCard label="전체" value={summary.total} color={LEGACY_COLORS.blue} />
+            <KpiCard label="조회 기준" value={summary.total} color={LEGACY_COLORS.blue} />
             <KpiCard label="입고합" value={formatNumber(summary.inSum)} color={LEGACY_COLORS.green} />
             <KpiCard label="출고합" value={formatNumber(summary.outSum)} color={LEGACY_COLORS.red} />
           </div>

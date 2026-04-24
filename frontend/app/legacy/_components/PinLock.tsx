@@ -43,7 +43,7 @@ export function PinLock({ onUnlocked }: { onUnlocked: () => void }) {
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center px-6 pt-6">
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-[22px]" style={{ background: "rgba(142,125,255,.16)", color: LEGACY_COLORS.purple }}>
+      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-[22px]" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.purple} 16%, transparent)`, color: LEGACY_COLORS.purple }}>
         <LockKeyhole className="h-8 w-8" />
       </div>
 
@@ -74,14 +74,14 @@ export function PinLock({ onUnlocked }: { onUnlocked: () => void }) {
       {error ? (
         <div
           className="mb-4 rounded-2xl border px-4 py-3 text-sm"
-          style={{ borderColor: "rgba(255,123,123,.28)", background: "rgba(255,123,123,.12)", color: LEGACY_COLORS.red }}
+          style={{ borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 28%, transparent)`, background: `color-mix(in srgb, ${LEGACY_COLORS.red} 12%, transparent)`, color: LEGACY_COLORS.red }}
         >
           PIN이 올바르지 않습니다.
         </div>
       ) : loading ? (
         <div
           className="mb-4 rounded-2xl border px-4 py-3 text-sm"
-          style={{ borderColor: "rgba(101,169,255,.28)", background: "rgba(101,169,255,.10)", color: LEGACY_COLORS.blue }}
+          style={{ borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 28%, transparent)`, background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`, color: LEGACY_COLORS.blue }}
         >
           확인 중...
         </div>
