@@ -295,7 +295,7 @@ export function DesktopHistoryView() {
                 style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
               >
                 <div className="text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>전체 건수</div>
-                <div className="font-mono text-2xl font-black">{formatNumber(stats.total)}</div>
+                <div className="text-2xl font-black">{formatNumber(stats.total)}</div>
                 <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>필터 기준</div>
               </div>
 
@@ -307,7 +307,7 @@ export function DesktopHistoryView() {
                   <TrendingUp className="h-3.5 w-3.5" />
                   입고 합계
                 </div>
-                <div className="font-mono text-2xl font-black" style={{ color: LEGACY_COLORS.green }}>+{formatNumber(stats.receiveSum)}</div>
+                <div className="text-2xl font-black" style={{ color: LEGACY_COLORS.green }}>+{formatNumber(stats.receiveSum)}</div>
                 <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>RECEIVE · PRODUCE</div>
               </div>
 
@@ -319,7 +319,7 @@ export function DesktopHistoryView() {
                   <TrendingDown className="h-3.5 w-3.5" />
                   출고 합계
                 </div>
-                <div className="font-mono text-2xl font-black" style={{ color: LEGACY_COLORS.red }}>-{formatNumber(stats.shipSum)}</div>
+                <div className="text-2xl font-black" style={{ color: LEGACY_COLORS.red }}>-{formatNumber(stats.shipSum)}</div>
                 <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>SHIP · BACKFLUSH</div>
               </div>
 
@@ -331,7 +331,7 @@ export function DesktopHistoryView() {
                   <Calendar className="h-3.5 w-3.5" />
                   오늘 건수
                 </div>
-                <div className="font-mono text-2xl font-black" style={{ color: LEGACY_COLORS.blue }}>{formatNumber(stats.todayCount)}</div>
+                <div className="text-2xl font-black" style={{ color: LEGACY_COLORS.blue }}>{formatNumber(stats.todayCount)}</div>
                 <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>금일 거래</div>
               </div>
             </div>
@@ -449,7 +449,7 @@ export function DesktopHistoryView() {
                         >
                           <span className="text-sm font-bold" style={{ color: isToday ? LEGACY_COLORS.blue : LEGACY_COLORS.text }}>{day}</span>
                           {dayLogs.length > 0 && (
-                            <span className="mt-1 rounded-full px-1.5 py-0.5 font-mono text-xs font-bold" style={{ background: "rgba(101,169,255,.2)", color: LEGACY_COLORS.blue }}>
+                            <span className="mt-1 rounded-full px-1.5 py-0.5 text-xs font-bold" style={{ background: "rgba(101,169,255,.2)", color: LEGACY_COLORS.blue }}>
                               {dayLogs.length}
                             </span>
                           )}
@@ -487,7 +487,7 @@ export function DesktopHistoryView() {
                                   {transactionLabel(log.transaction_type)}
                                 </span>
                                 <span className="min-w-0 flex-1 truncate text-sm">{log.item_name}</span>
-                                <span className="shrink-0 font-mono text-sm font-bold" style={{ color: tcolor }}>
+                                <span className="shrink-0 text-sm font-bold" style={{ color: tcolor }}>
                                   {Number(log.quantity_change) >= 0 ? "+" : ""}{formatNumber(log.quantity_change)}
                                 </span>
                                 <span className="shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{formatDate(log.created_at).split(" ")[1]}</span>
@@ -511,7 +511,7 @@ export function DesktopHistoryView() {
               style={{ background: LEGACY_COLORS.bg, backgroundImage: "linear-gradient(rgba(101,169,255,.04), rgba(101,169,255,.04))" }}
             >
               <div className="shrink-0 text-base font-bold">입출고 내역</div>
-              <span className="font-mono text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{filteredLogs.length}건</span>
+              <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{filteredLogs.length}건</span>
               {filteredLogs.length > 0 && (
                 <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                   {formatDate(filteredLogs[filteredLogs.length - 1].created_at)} ~ {formatDate(filteredLogs[0].created_at)}
@@ -566,7 +566,7 @@ export function DesktopHistoryView() {
                           }}
                         >
                           {/* 일시 */}
-                          <td className="whitespace-nowrap border-b px-4 py-3 font-mono text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                          <td className="whitespace-nowrap border-b px-4 py-3 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                             {formatDate(log.created_at)}
                           </td>
 
@@ -586,7 +586,7 @@ export function DesktopHistoryView() {
                           </td>
 
                           {/* 코드 */}
-                          <td className="whitespace-nowrap border-b px-4 py-3 font-mono text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                          <td className="whitespace-nowrap border-b px-4 py-3 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                             {log.erp_code}
                           </td>
 
@@ -602,14 +602,14 @@ export function DesktopHistoryView() {
 
                           {/* 수량 */}
                           <td
-                            className="whitespace-nowrap border-b px-4 py-3 text-right font-mono font-bold"
+                            className="whitespace-nowrap border-b px-4 py-3 text-right font-bold"
                             style={{ borderColor: LEGACY_COLORS.border, color: tcolor }}
                           >
                             {Number(log.quantity_change) >= 0 ? "+" : ""}{formatNumber(log.quantity_change)}
                           </td>
 
                           {/* 재고 변화 */}
-                          <td className="whitespace-nowrap border-b px-4 py-3 font-mono text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                          <td className="whitespace-nowrap border-b px-4 py-3 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
                             {log.quantity_before != null ? formatNumber(log.quantity_before) : "-"}
                             <span className="mx-1">→</span>
                             {log.quantity_after != null ? formatNumber(log.quantity_after) : "-"}
@@ -625,7 +625,7 @@ export function DesktopHistoryView() {
                             {log.reference_no ? (
                               <button
                                 onClick={(e) => copyRef(log.reference_no!, e)}
-                                className="rounded border px-2 py-0.5 font-mono text-xs transition-all hover:brightness-110"
+                                className="rounded border px-2 py-0.5 text-xs transition-all hover:brightness-110"
                                 style={{
                                   background: copiedRef === log.reference_no ? "rgba(67,211,157,.2)" : LEGACY_COLORS.s2,
                                   borderColor: LEGACY_COLORS.border,
@@ -686,12 +686,12 @@ export function DesktopHistoryView() {
               >
                 {transactionLabel(selected.transaction_type)}
               </span>
-              <div className="mt-3 font-mono text-4xl font-black" style={{ color: transactionColor(selected.transaction_type) }}>
+              <div className="mt-3 text-4xl font-black" style={{ color: transactionColor(selected.transaction_type) }}>
                 {Number(selected.quantity_change) >= 0 ? "+" : ""}
                 {formatNumber(selected.quantity_change)}
                 <span className="ml-2 text-base font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>{selected.item_unit}</span>
               </div>
-              <div className="mt-2 font-mono text-base" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="mt-2 text-base" style={{ color: LEGACY_COLORS.muted2 }}>
                 {selected.quantity_before != null ? formatNumber(selected.quantity_before) : "-"}
                 <span className="mx-2">→</span>
                 {selected.quantity_after != null ? formatNumber(selected.quantity_after) : "-"}
@@ -759,11 +759,11 @@ export function DesktopHistoryView() {
                         >
                           {transactionLabel(log.transaction_type)}
                         </span>
-                        <div className="mt-1 font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                        <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                           {formatDate(log.created_at)}
                         </div>
                       </div>
-                      <div className="font-mono text-base font-bold" style={{ color: transactionColor(log.transaction_type) }}>
+                      <div className="text-base font-bold" style={{ color: transactionColor(log.transaction_type) }}>
                         {Number(log.quantity_change) >= 0 ? "+" : ""}{formatNumber(log.quantity_change)}
                       </div>
                     </button>

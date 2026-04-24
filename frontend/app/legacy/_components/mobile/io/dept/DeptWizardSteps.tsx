@@ -411,7 +411,7 @@ function PackagePicker({ packages, loading }: { packages: ShipPackage[]; loading
               <div className={`${TYPO.body} font-black`} style={{ color: LEGACY_COLORS.text }}>
                 {pkg.name}
               </div>
-              <div className={`${TYPO.caption} font-mono`} style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
                 {pkg.package_code}
               </div>
             </div>
@@ -511,12 +511,12 @@ function ItemPicker({ items, loading }: { items: Item[]; loading: boolean }) {
                 <div className={`${TYPO.body} truncate font-black`} style={{ color: LEGACY_COLORS.text }}>
                   {item.item_name}
                 </div>
-                <div className={`${TYPO.caption} truncate font-mono`} style={{ color: LEGACY_COLORS.muted }}>
+                <div className={`${TYPO.caption} truncate`} style={{ color: LEGACY_COLORS.muted }}>
                   {item.erp_code ?? "-"}
                 </div>
               </div>
               <div
-                className={`${TYPO.caption} shrink-0 font-mono tabular-nums`}
+                className={`${TYPO.caption} shrink-0 tabular-nums`}
                 style={{ color: LEGACY_COLORS.cyan }}
               >
                 {formatNumber(item.quantity)} {item.unit}
@@ -672,7 +672,7 @@ export function StepConfirm({
                   <div className={`${TYPO.body} truncate font-black`} style={{ color: LEGACY_COLORS.text }}>
                     {e.item.item_name}
                   </div>
-                  <div className={`${TYPO.caption} truncate font-mono`} style={{ color: LEGACY_COLORS.muted }}>
+                  <div className={`${TYPO.caption} truncate`} style={{ color: LEGACY_COLORS.muted }}>
                     {e.item.erp_code}
                   </div>
                 </div>

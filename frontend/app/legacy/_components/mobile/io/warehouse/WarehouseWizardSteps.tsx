@@ -279,11 +279,11 @@ export function StepItems({
                     <div className={`${TYPO.body} truncate font-black`} style={{ color: LEGACY_COLORS.text }}>
                       {item.item_name}
                     </div>
-                    <div className={`${TYPO.caption} truncate font-mono`} style={{ color: LEGACY_COLORS.muted }}>
+                    <div className={`${TYPO.caption} truncate`} style={{ color: LEGACY_COLORS.muted }}>
                       {item.erp_code ?? "-"}
                     </div>
                   </div>
-                  <div className={`${TYPO.caption} shrink-0 font-mono tabular-nums`} style={{ color: LEGACY_COLORS.cyan }}>
+                  <div className={`${TYPO.caption} shrink-0 tabular-nums`} style={{ color: LEGACY_COLORS.cyan }}>
                     {formatNumber(item.quantity)} {item.unit}
                   </div>
                 </button>
@@ -456,7 +456,7 @@ export function StepConfirm({
                 <div className={`${TYPO.body} truncate font-black`} style={{ color: LEGACY_COLORS.text }}>
                   {e.item.item_name}
                 </div>
-                <div className={`${TYPO.caption} truncate font-mono`} style={{ color: LEGACY_COLORS.muted }}>
+                <div className={`${TYPO.caption} truncate`} style={{ color: LEGACY_COLORS.muted }}>
                   {e.item.erp_code}
                 </div>
               </div>

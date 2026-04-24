@@ -203,7 +203,7 @@ export default function QueuePage() {
                       <span className="flex-1 truncate" style={{ opacity: ln.included ? 1 : 0.4 }}>
                         {ln.item_name ?? ln.item_id}
                       </span>
-                      <span className="font-mono">{formatNumber(ln.quantity)}</span>
+                      <span>{formatNumber(ln.quantity)}</span>
                       {ln.bom_expected != null && Number(ln.bom_expected) !== Number(ln.quantity) && (
                         <span className="text-xs" style={{ color: LEGACY_COLORS.yellow }}>
                           (BOM {formatNumber(ln.bom_expected)})

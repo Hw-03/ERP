@@ -417,7 +417,7 @@ export function DesktopWarehouseView({
                   className="flex-1 bg-transparent text-base outline-none"
                   style={{ color: LEGACY_COLORS.text }}
                 />
-                <span className="shrink-0 font-mono text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                <span className="shrink-0 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                   {workType === "package-out" ? formatNumber(filteredPackages.length) : formatNumber(filteredItems.length)}
                 </span>
               </div>
@@ -450,8 +450,8 @@ export function DesktopWarehouseView({
                           style={{ background: active ? "rgba(142,125,255,.08)" : "transparent" }}
                         >
                           <td className="border-b px-4 py-3 font-semibold" style={{ borderColor: LEGACY_COLORS.border }}>{pkg.name}</td>
-                          <td className="border-b px-4 py-3 whitespace-nowrap font-mono text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>{pkg.package_code}</td>
-                          <td className="border-b px-4 py-3 whitespace-nowrap font-mono" style={{ borderColor: LEGACY_COLORS.border }}>{formatNumber(pkg.items.length)}종</td>
+                          <td className="border-b px-4 py-3 whitespace-nowrap text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>{pkg.package_code}</td>
+                          <td className="border-b px-4 py-3 whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>{formatNumber(pkg.items.length)}종</td>
                         </tr>
                       );
                     })}
@@ -547,7 +547,7 @@ export function DesktopWarehouseView({
                               );
                             })()}
                           </td>
-                          <td className="border-b px-4 py-3 align-middle whitespace-nowrap font-mono text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
+                          <td className="border-b px-4 py-3 align-middle whitespace-nowrap text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
                             {item.erp_code ?? "-"}
                           </td>
                           <td className="border-b px-4 py-3 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
@@ -563,12 +563,12 @@ export function DesktopWarehouseView({
                             </div>
                           </td>
                           <td
-                            className="border-b px-4 py-3 text-right align-middle whitespace-nowrap font-mono text-sm font-bold"
+                            className="border-b px-4 py-3 text-right align-middle whitespace-nowrap text-sm font-bold"
                             style={{ borderColor: LEGACY_COLORS.border, color: Number(item.quantity) > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red }}
                           >
                             {formatNumber(item.quantity)}
                           </td>
-                          <td className="border-b px-4 py-3 text-right align-middle whitespace-nowrap font-mono text-sm" style={{ borderColor: LEGACY_COLORS.border }}>
+                          <td className="border-b px-4 py-3 text-right align-middle whitespace-nowrap text-sm" style={{ borderColor: LEGACY_COLORS.border }}>
                             {item.min_stock == null ? "-" : formatNumber(item.min_stock)}
                           </td>
                         </tr>
@@ -853,7 +853,7 @@ export function DesktopWarehouseView({
                       <span className="text-sm font-bold" style={{ color: transactionColor(log.transaction_type) }}>
                         {transactionLabel(log.transaction_type)}
                       </span>
-                      <span className="font-mono text-sm">{formatNumber(log.quantity_change)}</span>
+                      <span className="text-sm">{formatNumber(log.quantity_change)}</span>
                     </div>
                     <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                       {log.notes || "메모 없음"}

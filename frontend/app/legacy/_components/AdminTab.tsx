@@ -653,9 +653,9 @@ export function BomSection({ showToast }: { showToast: (toast: ToastState) => vo
                       <button onClick={() => void removeRow(row.bom_id)} className="font-bold" style={{ color: LEGACY_COLORS.red }}>삭제</button>
                     </div>
                   </div>
-                  <div className="text-right font-mono text-xs">{formatNumber(row.quantity)}</div>
-                  <div className="text-right font-mono text-xs font-bold" style={{ color: stock > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red }}>{formatNumber(stock)}</div>
-                  <div className="text-right font-mono text-xs font-bold" style={{ color: capacity > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}>{formatNumber(capacity)}</div>
+                  <div className="text-right text-xs">{formatNumber(row.quantity)}</div>
+                  <div className="text-right text-xs font-bold" style={{ color: stock > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red }}>{formatNumber(stock)}</div>
+                  <div className="text-right text-xs font-bold" style={{ color: capacity > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}>{formatNumber(capacity)}</div>
                 </div>
               );
             })}

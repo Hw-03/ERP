@@ -173,7 +173,7 @@ export function BarcodeScannerModal({
             {detected && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ background: "rgba(31,209,122,.18)" }}>
                 <div className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.green }}>인식 완료</div>
-                <div className="font-mono text-[15px] font-black">{detected}</div>
+                <div className="text-[15px] font-black">{detected}</div>
               </div>
             )}
           </div>

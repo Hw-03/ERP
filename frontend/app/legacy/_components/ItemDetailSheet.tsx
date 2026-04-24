@@ -160,7 +160,7 @@ export function ItemDetailSheet({
                 <div className="text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
                   {label}
                 </div>
-                <div className={`text-right ${label === "코드" || label === "바코드" ? "font-mono" : ""}`}>
+                <div className="text-right">
                   {value}
                 </div>
               </div>
@@ -205,7 +205,6 @@ export function ItemDetailSheet({
                 background: LEGACY_COLORS.s1,
                 borderColor: LEGACY_COLORS.border,
                 color: LEGACY_COLORS.text,
-                fontFamily: 'Menlo, "Courier New", monospace',
               }}
             />
             <div className="mb-3 grid grid-cols-4 gap-[7px]">
@@ -307,7 +306,7 @@ export function ItemDetailSheet({
                 </div>
                 <div className="shrink-0 text-right">
                   <div
-                    className="font-mono text-sm font-bold"
+                    className="text-sm font-bold"
                     style={{ color: transactionColor(log.transaction_type) }}
                   >
                     {log.quantity_change >= 0 ? "+" : ""}

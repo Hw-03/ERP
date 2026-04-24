@@ -115,7 +115,7 @@ export default function CategoryCard({ data, isAlert = false }: CategoryCardProp
           <div>
             <div className="flex items-center gap-2">
               <span
-                className={`rounded px-2 py-0.5 text-base font-bold font-mono ${meta.badge}`}
+                className={`rounded px-2 py-0.5 text-base font-bold ${meta.badge}`}
               >
                 {data.category}
               </span>
@@ -144,7 +144,7 @@ export default function CategoryCard({ data, isAlert = false }: CategoryCardProp
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg bg-slate-900/50 p-3">
           <p className="mb-1 text-base text-slate-500">품목 수</p>
-          <p className="font-mono text-2xl font-bold text-slate-100">
+          <p className="text-2xl font-bold text-slate-100">
             {data.item_count.toLocaleString()}
           </p>
           <p className="text-base text-slate-500">종류</p>
@@ -152,7 +152,7 @@ export default function CategoryCard({ data, isAlert = false }: CategoryCardProp
         <div className="rounded-lg bg-slate-900/50 p-3">
           <p className="mb-1 text-base text-slate-500">총 재고</p>
           <p
-            className={`font-mono text-2xl font-bold ${
+            className={`text-2xl font-bold ${
               isAlert ? "text-red-300" : "text-blue-300"
             }`}
           >

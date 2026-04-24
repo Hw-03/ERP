@@ -40,7 +40,7 @@ export default function UKAlert({ count, onDismiss }: UKAlertProps) {
 
           <p className="mt-1 text-sm text-red-400/80">
             카테고리가{" "}
-            <span className="rounded bg-red-900/40 px-1.5 py-0.5 font-mono font-bold text-red-300">
+            <span className="rounded bg-red-900/40 px-1.5 py-0.5 font-bold text-red-300">
               UK (Unknown)
             </span>
             로 남아 있는 품목이 <strong className="text-red-200">{count}건</strong> 있습니다.

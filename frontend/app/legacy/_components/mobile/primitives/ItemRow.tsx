@@ -78,7 +78,7 @@ export function ItemRow({
         </div>
         <div className="mt-[3px] flex items-center gap-[6px]">
           <div
-            className={clsx(TYPO.caption, "truncate font-mono")}
+            className={clsx(TYPO.caption, "truncate")}
             style={{ color: LEGACY_COLORS.muted }}
           >
             {erpCompact ?? "-"}

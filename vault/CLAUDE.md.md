@@ -1,4 +1,4 @@
-﻿---
+---
 type: code-note
 project: ERP
 layer: docs

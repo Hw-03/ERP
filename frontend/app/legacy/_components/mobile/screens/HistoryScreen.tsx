@@ -529,7 +529,7 @@ function LogRow({
         <div className={`${TYPO.caption} mt-[1px]`} style={{ color: LEGACY_COLORS.muted2 }}>
           {new Date(log.created_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
           {" · "}
-          <span className="font-mono">{log.erp_code}</span>
+          <span>{log.erp_code}</span>
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-1">
           {log.reference_no ? (
@@ -543,7 +543,7 @@ function LogRow({
               }}
             >
               <Copy size={10} />
-              <span className="font-mono">
+              <span>
                 {copiedRef === log.reference_no ? "복사됨" : log.reference_no}
               </span>
             </button>
@@ -562,7 +562,7 @@ function LogRow({
       </div>
       <div className="shrink-0 text-right">
         <div
-          className={`${TYPO.body} font-mono font-black`}
+          className={`${TYPO.body} font-black`}
           style={{ color: transactionColor(log.transaction_type) }}
         >
           {log.quantity_change >= 0 ? "+" : ""}

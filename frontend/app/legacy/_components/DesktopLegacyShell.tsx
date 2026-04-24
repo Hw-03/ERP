@@ -56,16 +56,16 @@ export function DesktopLegacyShell() {
       >
         <span style={{ color: LEGACY_COLORS.muted2 }}>생산 가능</span>
         {capacityData == null ? (
-          <span className="font-mono" style={{ color: LEGACY_COLORS.muted2 }}>···</span>
-        ) : capacityData.immediate === 0 && capacityData.top_items.length === 0 ? (
+          <span style={{ color: LEGACY_COLORS.muted2 }}>···</span>
+        ) : capacityData.immediate === 0 && capacityData.maximum === 0 ? (
           <span style={{ color: LEGACY_COLORS.muted2 }}>미등록</span>
         ) : (
           <>
-            <span className="font-mono font-bold" style={{ color: LEGACY_COLORS.cyan }}>
+            <span className="font-bold" style={{ color: LEGACY_COLORS.cyan }}>
               즉시 {formatNumber(capacityData.immediate)}
             </span>
             <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
-            <span className="font-mono font-bold" style={{ color: LEGACY_COLORS.blue }}>
+            <span className="font-bold" style={{ color: LEGACY_COLORS.blue }}>
               최대 {formatNumber(capacityData.maximum)}
             </span>
           </>
@@ -143,7 +143,7 @@ export function DesktopLegacyShell() {
                     <div className="text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
                       즉시 생산 가능
                     </div>
-                    <div className="mt-1 font-mono text-[22px] font-black" style={{ color: LEGACY_COLORS.cyan }}>
+                    <div className="mt-1 text-[22px] font-black" style={{ color: LEGACY_COLORS.cyan }}>
                       {formatNumber(capacityData.immediate)}
                     </div>
                   </div>
@@ -151,7 +151,7 @@ export function DesktopLegacyShell() {
                     <div className="text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
                       최대 생산 가능
                     </div>
-                    <div className="mt-1 font-mono text-[22px] font-black" style={{ color: LEGACY_COLORS.blue }}>
+                    <div className="mt-1 text-[22px] font-black" style={{ color: LEGACY_COLORS.blue }}>
                       {formatNumber(capacityData.maximum)}
                     </div>
                   </div>
@@ -181,12 +181,12 @@ export function DesktopLegacyShell() {
                     >
                       <div>
                         <div className="truncate text-sm" style={{ color: LEGACY_COLORS.text }}>{item.item_name}</div>
-                        <div className="font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
+                        <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
                       </div>
-                      <div className="text-right font-mono text-sm font-bold" style={{ color: LEGACY_COLORS.cyan }}>
+                      <div className="text-right text-sm font-bold" style={{ color: LEGACY_COLORS.cyan }}>
                         {formatNumber(item.immediate)}
                       </div>
-                      <div className="text-right font-mono text-sm" style={{ color: LEGACY_COLORS.blue }}>
+                      <div className="text-right text-sm" style={{ color: LEGACY_COLORS.blue }}>
                         {formatNumber(item.maximum)}
                       </div>
                     </div>

@@ -270,7 +270,7 @@ export function InventoryScreen({
       {/* List area */}
       <div className="flex flex-col gap-3 px-4 pt-3">
         <div className="flex items-center justify-between px-1">
-          <div className={`${TYPO.caption} font-mono`} style={{ color: LEGACY_COLORS.muted2 }}>
+          <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
             {formatNumber(totals.count)}개 품목
           </div>
           {!selecting ? (

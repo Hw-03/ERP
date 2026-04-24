@@ -123,7 +123,7 @@ function CompactKpiBar({
             onClick={() => onChange(card.key)}
             onMouseEnter={() => setHovered(card.key)}
             onMouseLeave={() => setHovered(null)}
-            className="rounded-[16px] border px-4 py-4 text-left transition-colors hover:brightness-110"
+            className="rounded-[16px] border px-4 py-8 text-left transition-colors hover:brightness-110"
             style={{
               background: isActive
                 ? `color-mix(in srgb, ${card.tone} 22%, transparent)`
@@ -136,10 +136,10 @@ function CompactKpiBar({
             }}
           >
             <div className="flex items-baseline justify-between gap-2">
-              <div className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
+              <div className="text-[24px] font-black tracking-[-0.02em]" style={{ color: card.tone }}>
                 {card.label}
               </div>
-              <div className="font-mono text-[22px] font-black leading-none" style={{ color: card.tone }}>
+              <div className="text-[22px] font-black leading-none" style={{ color: card.tone }}>
                 {formatNumber(card.value)}
               </div>
             </div>
@@ -239,9 +239,6 @@ function TableStickyHeader({
             className="flex-1 bg-transparent text-base outline-none"
             style={{ color: LEGACY_COLORS.text }}
           />
-          <span className="shrink-0 font-mono text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-            {formatNumber(count)}
-          </span>
         </div>
         <button
           onClick={onToggleFilters}
@@ -303,7 +300,7 @@ function RightPanelBody({
               <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                 ERP 코드
               </div>
-              <div className="mt-1 font-mono text-base font-bold" style={{ color: LEGACY_COLORS.blue }}>
+              <div className="mt-1 text-base font-bold" style={{ color: LEGACY_COLORS.blue }}>
                 {item.erp_code}
               </div>
             </div>
@@ -316,7 +313,7 @@ function RightPanelBody({
               <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                 현재고
               </div>
-              <div className="mt-1 font-mono text-xl font-black">{formatNumber(item.quantity)}</div>
+              <div className="mt-1 text-xl font-black">{formatNumber(item.quantity)}</div>
             </div>
             <div
               className="rounded-[18px] border px-4 py-3"
@@ -325,7 +322,7 @@ function RightPanelBody({
               <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                 안전재고
               </div>
-              <div className="mt-1 font-mono text-xl font-black">
+              <div className="mt-1 text-xl font-black">
                 {item.min_stock == null ? "-" : formatNumber(item.min_stock)}
               </div>
             </div>
@@ -392,7 +389,7 @@ function RightPanelBody({
               >
                 <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.muted2 }} />
                 <span className="flex-1 text-base font-semibold">창고</span>
-                <span className="font-mono text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
+                <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
                   {formatNumber(item.warehouse_qty)}
                 </span>
               </div>
@@ -407,7 +404,7 @@ function RightPanelBody({
                 >
                   <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: employeeColor(l.department) }} />
                   <span className="flex-1 text-base font-semibold">{l.department}</span>
-                  <span className="font-mono text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
+                  <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
                     {formatNumber(l.quantity)}
                   </span>
                 </div>
@@ -454,7 +451,7 @@ function RightPanelBody({
                   <span className="text-sm font-bold" style={{ color: transactionColor(log.transaction_type) }}>
                     {transactionLabel(log.transaction_type)}
                   </span>
-                  <span className="font-mono text-sm">{formatNumber(log.quantity_change)}</span>
+                  <span className="text-sm">{formatNumber(log.quantity_change)}</span>
                 </div>
                 <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                   {log.notes || "메모 없음"}
@@ -794,8 +791,8 @@ export function DesktopInventoryView({
                               })()}
                             </td>
                             <td
-                              className="border-b px-4 py-2.5 align-middle whitespace-nowrap font-mono text-sm font-bold"
-                              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                              className="border-b px-4 py-2.5 align-middle whitespace-nowrap text-sm"
+                              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
                             >
                               {item.erp_code ?? "-"}
                             </td>
@@ -836,7 +833,7 @@ export function DesktopInventoryView({
                               })()}
                             </td>
                             <td
-                              className="border-b px-4 py-2.5 text-center align-middle whitespace-nowrap font-mono text-base font-black"
+                              className="border-b px-4 py-2.5 text-center align-middle whitespace-nowrap text-sm font-bold"
                               style={{
                                 borderColor: LEGACY_COLORS.border,
                                 color: isCritical ? stock.color : LEGACY_COLORS.text,
@@ -845,7 +842,7 @@ export function DesktopInventoryView({
                               {formatNumber(item.quantity)}
                             </td>
                             <td
-                              className="border-b px-4 py-2.5 text-center align-middle whitespace-nowrap font-mono text-sm"
+                              className="border-b px-4 py-2.5 text-center align-middle whitespace-nowrap text-sm font-bold"
                               style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
                             >
                               {item.min_stock == null ? "-" : formatNumber(item.min_stock)}

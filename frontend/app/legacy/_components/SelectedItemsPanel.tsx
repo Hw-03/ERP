@@ -44,7 +44,7 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
                     </span>
                   )}
                 </div>
-                <div className="mt-0.5 font-mono text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
                   {item.erp_code}
                 </div>
               </div>
@@ -60,10 +60,10 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
             {/* 재고 미리보기 */}
             <div className="mt-2 flex items-center gap-2 text-[11px]">
               <span style={{ color: LEGACY_COLORS.muted2 }}>현재고</span>
-              <span className="font-mono font-bold" style={{ color: stock.color }}>{formatNumber(item.quantity)}</span>
+              <span className="font-bold" style={{ color: stock.color }}>{formatNumber(item.quantity)}</span>
               <span style={{ color: LEGACY_COLORS.muted2 }}>→</span>
               <span
-                className="font-mono font-bold"
+                className="font-bold"
                 style={{ color: expected < 0 ? LEGACY_COLORS.red : expected === 0 ? LEGACY_COLORS.yellow : LEGACY_COLORS.green }}
               >
                 {formatNumber(expected)}
@@ -87,7 +87,7 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
                 </button>
               ))}
               <div
-                className="flex-1 rounded-[9px] border px-3 py-1 text-center font-mono text-sm font-black"
+                className="flex-1 rounded-[9px] border px-3 py-1 text-center text-sm font-black"
                 style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
               >
                 {formatNumber(quantity)}
