@@ -80,7 +80,9 @@ export function DesktopLegacyShell() {
           globalSearch=""
           onStatusChange={setStatus}
           onGoToWarehouse={handleGoToWarehouse}
+          onGoToWarehouseTab={() => setActiveTab("warehouse")}
           onSummaryChange={setStockWarnings}
+          capacityData={capacityData}
         />
       );
     }
@@ -98,7 +100,7 @@ export function DesktopLegacyShell() {
       return <DesktopHistoryView key={key} />;
     }
     return <DesktopAdminView key={key} globalSearch="" onStatusChange={setStatus} />;
-  }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse]);
+  }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse, capacityData]);
 
   return (
     <>
@@ -190,7 +192,11 @@ export function DesktopLegacyShell() {
       )}
       <div className="hidden h-screen overflow-hidden lg:flex">
       <div className="flex h-full w-full gap-3 px-3 py-3" style={{ background: LEGACY_COLORS.bg, color: LEGACY_COLORS.text }}>
-        <DesktopSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <DesktopSidebar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          alertCount={{ inventory: stockWarnings ? stockWarnings.zero + stockWarnings.low : 0 }}
+        />
 
         <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
           <DesktopTopbar

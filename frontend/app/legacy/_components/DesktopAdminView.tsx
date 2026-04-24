@@ -525,7 +525,7 @@ export function DesktopAdminView({
           <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
             {/* 기준정보 그룹 */}
             <div>
-              <div className="mb-2 px-1 text-xs font-bold uppercase tracking-[0.16em]" style={{ color: LEGACY_COLORS.muted2 }}>기준정보</div>
+              <div className="mb-2 px-1 text-[10px] font-black uppercase tracking-[0.24em]" style={{ color: LEGACY_COLORS.purple, opacity: 0.8 }}>기준정보</div>
               <div className="flex flex-col gap-2">
                 {SECTIONS.filter((e) => ["models", "items", "employees"].includes(e.id)).map((entry) => {
                   const Icon = entry.icon;
@@ -559,7 +559,7 @@ export function DesktopAdminView({
             </div>
             {/* 구성관리 그룹 */}
             <div>
-              <div className="mb-2 px-1 text-xs font-bold uppercase tracking-[0.16em]" style={{ color: LEGACY_COLORS.muted2 }}>구성관리</div>
+              <div className="mb-2 px-1 text-[10px] font-black uppercase tracking-[0.24em]" style={{ color: LEGACY_COLORS.purple, opacity: 0.8 }}>구성관리</div>
               <div className="flex flex-col gap-2">
                 {SECTIONS.filter((e) => ["bom", "packages"].includes(e.id)).map((entry) => {
                   const Icon = entry.icon;
@@ -593,7 +593,7 @@ export function DesktopAdminView({
             </div>
             {/* 시스템 그룹 */}
             <div>
-              <div className="mb-2 px-1 text-xs font-bold uppercase tracking-[0.16em]" style={{ color: LEGACY_COLORS.muted2 }}>시스템</div>
+              <div className="mb-2 px-1 text-[10px] font-black uppercase tracking-[0.24em]" style={{ color: LEGACY_COLORS.purple, opacity: 0.8 }}>시스템</div>
               <div className="flex flex-col gap-2">
                 {SECTIONS.filter((e) => ["export"].includes(e.id)).map((entry) => {
                   const Icon = entry.icon;
@@ -636,19 +636,19 @@ export function DesktopAdminView({
                   className="flex w-full items-center gap-3 rounded-[20px] border px-3 py-3 text-left transition-colors hover:bg-white/[0.12]"
                   style={{
                     background: active
-                      ? `color-mix(in srgb, ${LEGACY_COLORS.purple} 16%, transparent)`
-                      : LEGACY_COLORS.s2,
-                    borderColor: active ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
+                      ? `color-mix(in srgb, ${LEGACY_COLORS.red} 14%, transparent)`
+                      : `color-mix(in srgb, ${LEGACY_COLORS.red} 5%, transparent)`,
+                    borderColor: active ? LEGACY_COLORS.red : `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`,
                   }}
                 >
                   <div
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px]"
-                    style={{ background: active ? LEGACY_COLORS.purple : LEGACY_COLORS.s1, color: active ? "#fff" : LEGACY_COLORS.muted2 }}
+                    style={{ background: active ? LEGACY_COLORS.red : `color-mix(in srgb, ${LEGACY_COLORS.red} 18%, transparent)`, color: active ? "#fff" : LEGACY_COLORS.red }}
                   >
                     <Icon className="h-4 w-4" />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-base font-bold truncate">{SETTINGS_ENTRY.label}</div>
+                    <div className="text-base font-bold truncate" style={{ color: LEGACY_COLORS.red }}>{SETTINGS_ENTRY.label}</div>
                     <div className="mt-0.5 text-xs leading-4 truncate" style={{ color: LEGACY_COLORS.muted2 }}>{SETTINGS_ENTRY.description}</div>
                   </div>
                 </button>
@@ -1071,23 +1071,25 @@ export function DesktopAdminView({
                 {/* 단계 흐름 인디케이터 */}
                 <div className="shrink-0 flex items-center gap-2 text-xs font-bold">
                   {[
-                    { step: "①", label: "부모품목 선택", active: !parentId },
-                    { step: "②", label: "자식품목 선택", active: !!parentId && !pendingChildId },
-                    { step: "③", label: "소요량 입력", active: !!pendingChildId },
-                    { step: "④", label: "저장", active: false },
-                  ].map(({ step, label, active }) => (
+                    { step: "①", label: "부모품목 선택", active: !parentId, done: !!parentId },
+                    { step: "②", label: "자식품목 선택", active: !!parentId && !pendingChildId, done: !!pendingChildId },
+                    { step: "③", label: "소요량 입력", active: !!pendingChildId, done: false },
+                    { step: "④", label: "저장", active: false, done: false },
+                  ].map(({ step, label, active, done }) => (
                     <span
                       key={step}
                       className="flex items-center gap-1 rounded-full px-2.5 py-1"
                       style={{
-                        background: active
+                        background: done
+                          ? `color-mix(in srgb, ${LEGACY_COLORS.green} 14%, transparent)`
+                          : active
                           ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 16%, transparent)`
                           : LEGACY_COLORS.s2,
-                        color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
-                        border: `1px solid ${active ? LEGACY_COLORS.blue : LEGACY_COLORS.border}`,
+                        color: done ? LEGACY_COLORS.green : active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
+                        border: `1px solid ${done ? LEGACY_COLORS.green : active ? LEGACY_COLORS.blue : LEGACY_COLORS.border}`,
                       }}
                     >
-                      {step} {label}
+                      {done ? "✓" : step} {label}
                     </span>
                   ))}
                 </div>
@@ -1723,6 +1725,9 @@ export function DesktopAdminView({
                   </div>
 
                   <div className="rounded-[28px] border p-5" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 40%, transparent)` }}>
+                    <div className="mb-3 flex items-center gap-2 rounded-[14px] border px-3 py-2 text-xs font-bold" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.red} 16%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 50%, transparent)`, color: LEGACY_COLORS.red }}>
+                      ⚠ 복구 불가 — 이 작업은 되돌릴 수 없습니다
+                    </div>
                     <div className="mb-4 flex items-center gap-2 text-base font-bold" style={{ color: LEGACY_COLORS.red }}>
                       <DatabaseBackup className="h-4 w-4" /> 안전 초기화
                     </div>

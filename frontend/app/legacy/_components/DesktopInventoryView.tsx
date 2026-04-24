@@ -1,8 +1,8 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Filter, PackageSearch, Search, Sparkles, TrendingUp } from "lucide-react";
-import { api, type Item, type ProductModel, type TransactionLog } from "@/lib/api";
+import { ArrowRight, ChevronDown, Filter, PackageSearch, Search, Sparkles, TrendingUp, Zap } from "lucide-react";
+import { api, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import {
   LEGACY_COLORS,
@@ -99,10 +99,12 @@ function CompactKpiBar({
   cards,
   activeKey,
   onChange,
+  onGoToWarehouseTab,
 }: {
   cards: KpiCard[];
   activeKey: KpiFilter;
   onChange: (key: KpiFilter) => void;
+  onGoToWarehouseTab?: () => void;
 }) {
   const [hovered, setHovered] = useState<KpiFilter | null>(null);
   return (
@@ -110,13 +112,14 @@ function CompactKpiBar({
       {cards.map((card) => {
         const isActive = activeKey === card.key;
         const isHover = hovered === card.key;
+        const isCritical = card.key === "ZERO" || card.key === "LOW";
         return (
           <button
             key={card.key}
             onClick={() => onChange(card.key)}
             onMouseEnter={() => setHovered(card.key)}
             onMouseLeave={() => setHovered(null)}
-            className="rounded-[16px] border px-4 py-8 text-left transition-colors hover:brightness-110"
+            className="rounded-[16px] border px-4 py-4 text-left transition-colors hover:brightness-110"
             style={{
               background: isActive
                 ? `color-mix(in srgb, ${card.tone} 22%, transparent)`
@@ -129,13 +132,25 @@ function CompactKpiBar({
             }}
           >
             <div className="flex items-baseline justify-between gap-2">
-              <div className="text-[24px] font-black tracking-[-0.02em]" style={{ color: card.tone }}>
+              <div className="text-[20px] font-black tracking-[-0.02em]" style={{ color: card.tone }}>
                 {card.label}
               </div>
               <div className="text-[22px] font-black leading-none" style={{ color: card.tone }}>
                 {formatNumber(card.value)}
               </div>
             </div>
+            <div className="mt-1.5 text-[11px] font-semibold" style={{ color: card.tone, opacity: 0.7 }}>
+              {card.hint}
+            </div>
+            {isCritical && onGoToWarehouseTab && card.value > 0 && (
+              <div
+                className="mt-2 flex items-center gap-0.5 text-[11px] font-bold"
+                style={{ color: card.tone }}
+                onClick={(e) => { e.stopPropagation(); onGoToWarehouseTab(); }}
+              >
+                입출고로 이동 <ArrowRight className="h-3 w-3" />
+              </div>
+            )}
           </button>
         );
       })}
@@ -464,12 +479,16 @@ export function DesktopInventoryView({
   globalSearch,
   onStatusChange,
   onGoToWarehouse,
+  onGoToWarehouseTab,
   onSummaryChange,
+  capacityData,
 }: {
   globalSearch: string;
   onStatusChange: (status: string) => void;
   onGoToWarehouse: (item: Item) => void;
+  onGoToWarehouseTab?: () => void;
   onSummaryChange?: (s: { low: number; zero: number }) => void;
+  capacityData?: ProductionCapacity | null;
 }) {
   const [items, setItems] = useState<Item[]>([]);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
@@ -585,6 +604,9 @@ export function DesktopInventoryView({
     selectedDepts.length + selectedModels.length + (deferredLocalSearch.length > 0 ? 1 : 0);
 
   const kpiCards: KpiCard[] = [
+    { label: "품절", value: summary.zeroCount, hint: "즉시 입고 필요", tone: LEGACY_COLORS.red, key: "ZERO" },
+    { label: "부족", value: summary.lowCount, hint: "안전재고 이하", tone: LEGACY_COLORS.yellow, key: "LOW" },
+    { label: "정상", value: summary.normalCount, hint: "운영 가능", tone: LEGACY_COLORS.green, key: "NORMAL" },
     {
       label: isFiltered ? "조회 품목" : "전체 품목",
       value: filteredItems.length,
@@ -592,9 +614,6 @@ export function DesktopInventoryView({
       tone: LEGACY_COLORS.blue,
       key: "ALL",
     },
-    { label: "정상", value: summary.normalCount, hint: "운영 가능", tone: LEGACY_COLORS.green, key: "NORMAL" },
-    { label: "부족", value: summary.lowCount, hint: "안전재고 이하", tone: LEGACY_COLORS.yellow, key: "LOW" },
-    { label: "품절", value: summary.zeroCount, hint: "즉시 확인", tone: LEGACY_COLORS.red, key: "ZERO" },
   ];
 
   const headerBadge = selectedItem
@@ -625,7 +644,20 @@ export function DesktopInventoryView({
           <div className="flex flex-col gap-3 pb-6">
             {/* ── 컴팩트 상단: KPI + 생산가능 + (접힘형) 필터 ── */}
             <section className="card" style={{ padding: "14px 16px" }}>
-              <CompactKpiBar cards={kpiCards} activeKey={kpi} onChange={setKpi} />
+              <CompactKpiBar cards={kpiCards} activeKey={kpi} onChange={setKpi} onGoToWarehouseTab={onGoToWarehouseTab} />
+              {capacityData && (
+                <div
+                  className="mt-3 flex items-center gap-3 rounded-[14px] border px-4 py-2.5"
+                  style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 8%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 30%, transparent)` }}
+                >
+                  <Zap className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.cyan }} />
+                  <span className="text-sm font-semibold" style={{ color: LEGACY_COLORS.cyan }}>생산 가능</span>
+                  <span className="text-sm font-black" style={{ color: LEGACY_COLORS.cyan }}>{formatNumber(capacityData.immediate)}대</span>
+                  {capacityData.limiting_item && (
+                    <span className="ml-auto text-xs" style={{ color: LEGACY_COLORS.muted2 }}>병목: {capacityData.limiting_item}</span>
+                  )}
+                </div>
+              )}
               <InventoryFilters
                 open={filtersOpen}
                 selectedDepts={selectedDepts}
@@ -674,6 +706,26 @@ export function DesktopInventoryView({
                 >
                   재고 데이터를 불러오는 중입니다...
                 </div>
+              ) : filteredItems.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+                  <div
+                    className="rounded-3xl p-4"
+                    style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`, color: LEGACY_COLORS.muted2 }}
+                  >
+                    <PackageSearch className="h-8 w-8" />
+                  </div>
+                  <div className="text-base font-bold">검색 결과가 없습니다.</div>
+                  <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>필터 조건을 변경해 보세요.</div>
+                  {(activeFilterCount > 0 || kpi !== "ALL") && (
+                    <button
+                      onClick={() => { setSelectedDepts([]); setSelectedModels([]); setLocalSearch(""); setKpi("ALL"); }}
+                      className="rounded-full border px-4 py-2 text-sm font-semibold transition-colors hover:brightness-110"
+                      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.blue, color: LEGACY_COLORS.blue }}
+                    >
+                      필터 초기화
+                    </button>
+                  )}
+                </div>
               ) : (
                 <div className="overflow-x-auto rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
                   <table className="min-w-full border-separate border-spacing-0 text-sm">
@@ -687,6 +739,7 @@ export function DesktopInventoryView({
                             { label: "부서", nowrap: true, width: "120px" },
                             { label: "현재고", nowrap: true, width: "84px" },
                             { label: "안전재고", nowrap: true, width: "80px" },
+                            { label: "", nowrap: true, width: "80px" },
                           ] as { label: string; nowrap: boolean; width?: string; minWidth?: string }[]
                         ).map(({ label, nowrap, width, minWidth }) => (
                           <th
@@ -717,7 +770,7 @@ export function DesktopInventoryView({
                             onClick={() =>
                               setSelectedItem((current) => (current?.item_id === item.item_id ? null : item))
                             }
-                            className="cursor-pointer transition-colors hover:bg-white/[0.12]"
+                            className="group cursor-pointer transition-colors hover:bg-white/[0.12]"
                             style={{
                               background: selected ? "rgba(101,169,255,.10)" : "transparent",
                               boxShadow: selected ? `inset 3px 0 0 ${LEGACY_COLORS.blue}` : undefined,
@@ -845,6 +898,18 @@ export function DesktopInventoryView({
                               style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
                             >
                               {item.min_stock == null ? "-" : formatNumber(item.min_stock)}
+                            </td>
+                            <td
+                              className="border-b px-2 py-2.5 align-middle whitespace-nowrap"
+                              style={{ borderColor: LEGACY_COLORS.border }}
+                            >
+                              <button
+                                onClick={(e) => { e.stopPropagation(); onGoToWarehouse(item); }}
+                                className="rounded-full px-2.5 py-1 text-xs font-bold opacity-0 transition-opacity group-hover:opacity-100"
+                                style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`, color: LEGACY_COLORS.blue }}
+                              >
+                                입출고
+                              </button>
                             </td>
                           </tr>
                         );

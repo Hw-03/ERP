@@ -200,7 +200,7 @@ export function erpCodeDeptBadge(erp_code?: string | null): { label: string; col
   const dept = erpCodeDept(erp_code);
   if (!dept) return null;
   const color = employeeColor(dept);
-  return { label: dept, color, bg: `${color}20` };
+  return { label: dept, color, bg: `color-mix(in srgb, ${color} 12%, transparent)` };
 }
 
 const OPTION_COLOR: Record<string, string> = {

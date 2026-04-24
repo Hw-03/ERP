@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, Calendar, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, List, Search, TrendingDown, TrendingUp } from "lucide-react";
+import { Activity, AlertTriangle, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, List, Search, TrendingDown, TrendingUp, X } from "lucide-react";
 import { api, type TransactionLog, type TransactionType } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import {
   LEGACY_COLORS,
+  employeeColor,
   formatNumber,
   transactionColor,
   transactionLabel,
@@ -41,17 +42,17 @@ const DATE_OPTIONS = [
 ];
 
 const CATEGORY_META: Record<string, { label: string; color: string; bg: string }> = {
-  RM: { label: "원자재", color: LEGACY_COLORS.blue, bg: "rgba(101,169,255,.16)" },
-  TA: { label: "튜브조립", color: LEGACY_COLORS.cyan, bg: "rgba(78,201,245,.16)" },
-  TF: { label: "튜브완성", color: LEGACY_COLORS.cyan, bg: "rgba(78,201,245,.16)" },
-  HA: { label: "고압조립", color: LEGACY_COLORS.yellow, bg: "rgba(246,198,103,.16)" },
-  HF: { label: "고압완성", color: LEGACY_COLORS.yellow, bg: "rgba(246,198,103,.16)" },
-  VA: { label: "진공조립", color: LEGACY_COLORS.purple, bg: "rgba(142,125,255,.16)" },
-  VF: { label: "진공완성", color: LEGACY_COLORS.purple, bg: "rgba(142,125,255,.16)" },
-  BA: { label: "본체조립", color: "#f97316", bg: "rgba(249,115,22,.16)" },
-  AF: { label: "조립완성", color: "#f97316", bg: "rgba(249,115,22,.16)" },
-  FG: { label: "완제품", color: LEGACY_COLORS.green, bg: "rgba(67,211,157,.16)" },
-  UK: { label: "미분류", color: LEGACY_COLORS.muted2, bg: "rgba(157,173,199,.16)" },
+  RM: { label: "원자재", color: LEGACY_COLORS.blue, bg: `color-mix(in srgb, ${LEGACY_COLORS.blue} 16%, transparent)` },
+  TA: { label: "튜브조립", color: LEGACY_COLORS.cyan, bg: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 16%, transparent)` },
+  TF: { label: "튜브완성", color: LEGACY_COLORS.cyan, bg: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 16%, transparent)` },
+  HA: { label: "고압조립", color: LEGACY_COLORS.yellow, bg: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 16%, transparent)` },
+  HF: { label: "고압완성", color: LEGACY_COLORS.yellow, bg: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 16%, transparent)` },
+  VA: { label: "진공조립", color: LEGACY_COLORS.purple, bg: `color-mix(in srgb, ${LEGACY_COLORS.purple} 16%, transparent)` },
+  VF: { label: "진공완성", color: LEGACY_COLORS.purple, bg: `color-mix(in srgb, ${LEGACY_COLORS.purple} 16%, transparent)` },
+  BA: { label: "본체조립", color: "#f97316", bg: "color-mix(in srgb, #f97316 16%, transparent)" },
+  AF: { label: "조립완성", color: "#f97316", bg: "color-mix(in srgb, #f97316 16%, transparent)" },
+  FG: { label: "완제품", color: LEGACY_COLORS.green, bg: `color-mix(in srgb, ${LEGACY_COLORS.green} 16%, transparent)` },
+  UK: { label: "미분류", color: LEGACY_COLORS.muted2, bg: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 16%, transparent)` },
 };
 
 function getPeriodStart(value: string): Date | null {
@@ -432,14 +433,35 @@ export function DesktopHistoryView() {
                 ))}
               </div>
 
-              {/* 조회 요약 */}
+              {/* 활성 필터 요약 바 */}
               {(typeFilter !== "ALL" || dateFilter !== "ALL" || search.trim() || quickFilter) && (
-                <div className="rounded-[14px] border p-3 text-xs" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-                  조회 {stats.total}건
-                  {typeFilter !== "ALL" && ` · 유형: ${TYPE_OPTIONS.find(opt => opt.value === typeFilter)?.label ?? typeFilter}`}
-                  {dateFilter !== "ALL" && ` · 기간: ${DATE_OPTIONS.find(opt => opt.value === dateFilter)?.label ?? dateFilter}`}
-                  {search.trim() && ` · "${search}"`}
-                  {quickFilter && ` · [${QUICK_FILTERS.find(qf => qf.id === quickFilter)?.label ?? quickFilter}]`}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>적용됨</span>
+                  {typeFilter !== "ALL" && (
+                    <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 12%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 35%, transparent)`, color: LEGACY_COLORS.blue }}>
+                      유형: {TYPE_OPTIONS.find(opt => opt.value === typeFilter)?.label}
+                      <button onClick={() => setTypeFilter("ALL")}><X className="h-3 w-3" /></button>
+                    </span>
+                  )}
+                  {dateFilter !== "ALL" && (
+                    <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.purple} 12%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.purple} 35%, transparent)`, color: LEGACY_COLORS.purple }}>
+                      기간: {DATE_OPTIONS.find(opt => opt.value === dateFilter)?.label}
+                      <button onClick={() => setDateFilter("ALL")}><X className="h-3 w-3" /></button>
+                    </span>
+                  )}
+                  {search.trim() && (
+                    <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 12%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 35%, transparent)`, color: LEGACY_COLORS.cyan }}>
+                      "{search}"
+                      <button onClick={() => setSearch("")}><X className="h-3 w-3" /></button>
+                    </span>
+                  )}
+                  {quickFilter && (
+                    <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 12%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 35%, transparent)`, color: LEGACY_COLORS.yellow }}>
+                      {QUICK_FILTERS.find(qf => qf.id === quickFilter)?.label}
+                      <button onClick={() => setQuickFilter(null)}><X className="h-3 w-3" /></button>
+                    </span>
+                  )}
+                  <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{stats.total}건</span>
                 </div>
               )}
 
@@ -674,8 +696,20 @@ export function DesktopHistoryView() {
                           </td>
 
                           {/* 담당자 */}
-                          <td className="whitespace-nowrap border-b px-4 py-3 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-                            {log.produced_by?.split("(")[0]?.trim() ?? "-"}
+                          <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+                            {log.produced_by ? (() => {
+                              const name = log.produced_by.split("(")[0]?.trim() ?? "-";
+                              const dept = log.produced_by.match(/\(([^)]+)\)/)?.[1] ?? "";
+                              const color = dept ? employeeColor(dept) : LEGACY_COLORS.muted2;
+                              return (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black text-white" style={{ background: color }}>
+                                    {name[0] ?? "?"}
+                                  </span>
+                                  <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{name}</span>
+                                </div>
+                              );
+                            })() : <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>}
                           </td>
 
                           {/* 참조번호 */}
@@ -749,11 +783,26 @@ export function DesktopHistoryView() {
                 {formatNumber(selected.quantity_change)}
                 <span className="ml-2 text-base font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>{selected.item_unit}</span>
               </div>
-              <div className="mt-2 text-base" style={{ color: LEGACY_COLORS.muted2 }}>
-                {selected.quantity_before != null ? formatNumber(selected.quantity_before) : "-"}
-                <span className="mx-2">→</span>
-                {selected.quantity_after != null ? formatNumber(selected.quantity_after) : "-"}
-              </div>
+              {(selected.quantity_before != null || selected.quantity_after != null) && (
+                <div className="mt-3 flex items-center gap-2">
+                  <div className="flex-1 rounded-[14px] border px-3 py-2 text-center" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 8%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 25%, transparent)` }}>
+                    <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: LEGACY_COLORS.muted2 }}>처리 전</div>
+                    <div className="mt-1 text-lg font-black" style={{ color: LEGACY_COLORS.muted2 }}>
+                      {selected.quantity_before != null ? formatNumber(selected.quantity_before) : "-"}
+                    </div>
+                  </div>
+                  <span className="text-lg" style={{ color: LEGACY_COLORS.muted2 }}>→</span>
+                  <div className="flex-1 rounded-[14px] border px-3 py-2 text-center" style={{
+                    background: `color-mix(in srgb, ${transactionColor(selected.transaction_type)} 8%, transparent)`,
+                    borderColor: `color-mix(in srgb, ${transactionColor(selected.transaction_type)} 30%, transparent)`,
+                  }}>
+                    <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: transactionColor(selected.transaction_type) }}>처리 후</div>
+                    <div className="mt-1 text-lg font-black" style={{ color: transactionColor(selected.transaction_type) }}>
+                      {selected.quantity_after != null ? formatNumber(selected.quantity_after) : "-"}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 상세 정보 */}

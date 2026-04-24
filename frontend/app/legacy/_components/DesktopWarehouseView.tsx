@@ -83,7 +83,7 @@ function Chip({
       onClick={onClick}
       className="w-full rounded-full border px-4 py-2 text-sm font-semibold transition-all hover:brightness-110"
       style={{
-        background: active ? `${tone}22` : LEGACY_COLORS.s2,
+        background: active ? `color-mix(in srgb, ${tone} 14%, transparent)` : LEGACY_COLORS.s2,
         borderColor: active ? tone : LEGACY_COLORS.border,
         color: active ? tone : LEGACY_COLORS.muted2,
       }}
@@ -125,6 +125,7 @@ export function DesktopWarehouseView({
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState<{ count: number; label: string } | null>(null);
   const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -325,11 +326,13 @@ export function DesktopWarehouseView({
         }
       }
 
+      const doneCount = workType !== "package-out" ? selectedEntries.length : 1;
       setReferenceNo("");
       setNotes("");
       setSelectedItems(new Map());
       const refreshed = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
       setItems(refreshed);
+      setLastResult({ count: doneCount, label: effectiveLabel });
       onStatusChange(`${effectiveLabel} ${workType !== "package-out" ? selectedEntries.length + "건 " : ""}처리를 완료했습니다.`);
     } catch (nextError) {
       const message = nextError instanceof Error ? nextError.message : "입출고 처리를 완료하지 못했습니다.";
@@ -510,7 +513,7 @@ export function DesktopWarehouseView({
                             </div>
                           </td>
                           <td className="border-b px-4 py-3 align-middle whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>
-                            <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold" style={{ color: stock.color, background: `${stock.color}20` }}>
+                            <span className="inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold" style={{ color: stock.color, background: `color-mix(in srgb, ${stock.color} 12%, transparent)` }}>
                               {stock.label}
                             </span>
                           </td>
@@ -614,6 +617,57 @@ export function DesktopWarehouseView({
         }
       >
         <div className="space-y-4">
+          {/* 단계 인디케이터 */}
+          {(() => {
+            const step1Done = true;
+            const step2Done = !!selectedEmployee;
+            const step3Done = workType === "package-out" ? !!selectedPackage : selectedEntries.length > 0;
+            const step4Done = !!lastResult;
+            const steps = [
+              { label: "유형", done: step1Done },
+              { label: "담당자", done: step2Done },
+              { label: "품목", done: step3Done },
+              { label: "완료", done: step4Done },
+            ];
+            return (
+              <div className="flex items-center gap-1.5">
+                {steps.map((s, i) => (
+                  <div key={i} className="flex items-center gap-1.5">
+                    <div
+                      className="flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black"
+                      style={{
+                        background: s.done ? LEGACY_COLORS.blue : LEGACY_COLORS.s3,
+                        color: s.done ? "#fff" : LEGACY_COLORS.muted2,
+                      }}
+                    >
+                      {s.done ? <Check className="h-3 w-3" /> : i + 1}
+                    </div>
+                    <span className="text-xs font-semibold" style={{ color: s.done ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}>
+                      {s.label}
+                    </span>
+                    {i < steps.length - 1 && (
+                      <div className="h-px w-4 shrink-0" style={{ background: LEGACY_COLORS.border }} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* 완료 피드백 */}
+          {lastResult && (
+            <div
+              className="flex items-center gap-3 rounded-[18px] border px-4 py-3"
+              style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.green} 10%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.green} 40%, transparent)` }}
+            >
+              <Check className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.green }} />
+              <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.green }}>
+                {lastResult.label} {lastResult.count}건 처리 완료
+              </span>
+              <button className="ml-auto text-xs" style={{ color: LEGACY_COLORS.muted2 }} onClick={() => setLastResult(null)}>✕</button>
+            </div>
+          )}
+
           {/* 작업 유형 */}
           <section className="rounded-[28px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
             <div className="mb-3 text-sm font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -824,6 +878,32 @@ export function DesktopWarehouseView({
           {error && (
             <div className="rounded-[18px] border px-4 py-3 text-base" style={{ background: "rgba(255,123,123,.10)", borderColor: "rgba(255,123,123,.24)", color: LEGACY_COLORS.red }}>
               {error}
+            </div>
+          )}
+
+          {/* 비활성 이유 안내 */}
+          {!selectedEmployee && (
+            <div
+              className="rounded-[18px] border px-4 py-3 text-sm font-semibold"
+              style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 8%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 30%, transparent)`, color: LEGACY_COLORS.yellow }}
+            >
+              담당 직원을 선택하면 실행할 수 있습니다
+            </div>
+          )}
+          {selectedEmployee && workType !== "package-out" && selectedEntries.length === 0 && (
+            <div
+              className="rounded-[18px] border px-4 py-3 text-sm font-semibold"
+              style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 8%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 30%, transparent)`, color: LEGACY_COLORS.yellow }}
+            >
+              좌측에서 품목을 선택하면 실행할 수 있습니다
+            </div>
+          )}
+          {selectedEmployee && workType === "package-out" && !selectedPackage && (
+            <div
+              className="rounded-[18px] border px-4 py-3 text-sm font-semibold"
+              style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 8%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 30%, transparent)`, color: LEGACY_COLORS.yellow }}
+            >
+              출고할 패키지를 선택하면 실행할 수 있습니다
             </div>
           )}
 
