@@ -29,7 +29,11 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
           <div
             key={item.item_id}
             className="rounded-[18px] border p-3"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+            style={{
+              background: LEGACY_COLORS.s1,
+              borderColor: LEGACY_COLORS.border,
+              borderLeft: `3px solid ${LEGACY_COLORS.blue}`,
+            }}
           >
             {/* 품목 정보 행 */}
             <div className="flex items-start justify-between gap-2">
