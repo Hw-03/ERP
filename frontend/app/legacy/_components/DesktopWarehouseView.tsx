@@ -11,16 +11,15 @@ import {
   EmployeeStep,
   ExecuteStep,
   ItemPickStep,
-  PAGE_SIZE,
   QuantityStep,
   WizardStepCard,
   WorkTypeStep,
-  matchesSearch,
   type DefectiveSource,
   type Direction,
   type TransferDirection,
   type WorkType,
 } from "./_warehouse_steps";
+import { useWarehouseFilters } from "./_warehouse_hooks/useWarehouseFilters";
 
 export function DesktopWarehouseView({
   globalSearch,
@@ -51,13 +50,6 @@ export function DesktopWarehouseView({
   const [employeeId, setEmployeeId] = useState("");
   const [selectedItems, setSelectedItems] = useState<Map<string, number>>(new Map());
   const [selectedPackage, setSelectedPackage] = useState<ShipPackage | null>(null);
-
-  // ─── 검색/필터 ───
-  const [localSearch, setLocalSearch] = useState("");
-  const [dept, setDept] = useState("ALL");
-  const [modelFilter, setModelFilter] = useState("전체");
-  const [categoryFilter, setCategoryFilter] = useState("ALL");
-  const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
 
   // ─── 메모 ───
   const [referenceNo, setReferenceNo] = useState("");
@@ -157,7 +149,6 @@ export function DesktopWarehouseView({
   );
 
   const selectedEmployee = employees.find((e) => e.employee_id === employeeId) ?? null;
-  const searchKeyword = `${globalSearch} ${localSearch}`.trim().toLowerCase();
 
   const isOutbound =
     workType === "raw-io"
@@ -194,40 +185,31 @@ export function DesktopWarehouseView({
   const accent = isOutbound ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   const isCaution = CAUTION_WORK_TYPES.includes(workType);
 
-  // ───────────────────── filters ─────────────────────
+  // ───────────────────── filters (extracted to hook) ─────────────────────
 
-  const filteredItems = useMemo(
-    () =>
-      items
-        .filter((item) => {
-          if (dept === "ALL") return true;
-          if (dept === "창고") return (item.warehouse_qty ?? 0) > 0;
-          return item.locations?.some((loc) => loc.department === dept && loc.quantity > 0) ?? false;
-        })
-        .filter((item) => modelFilter === "전체" || item.legacy_model === modelFilter)
-        .filter((item) => {
-          if (categoryFilter === "ALL") return true;
-          if (categoryFilter === "RM") return item.category === "RM";
-          if (categoryFilter === "A") return ["TA", "HA", "VA", "BA"].includes(item.category);
-          if (categoryFilter === "F") return ["TF", "HF", "VF", "AF"].includes(item.category);
-          if (categoryFilter === "FG") return item.category === "FG";
-          return true;
-        })
-        .filter((item) => matchesSearch(item, searchKeyword)),
-    [items, dept, modelFilter, categoryFilter, searchKeyword],
-  );
-
-  useEffect(() => {
-    setDisplayLimit(PAGE_SIZE);
-  }, [filteredItems]);
-
-  const filteredPackages = useMemo(
-    () =>
-      packages.filter((pkg) =>
-        searchKeyword ? `${pkg.name} ${pkg.package_code}`.toLowerCase().includes(searchKeyword) : true,
-      ),
-    [packages, searchKeyword],
-  );
+  const {
+    localSearch,
+    setLocalSearch,
+    dept,
+    setDept,
+    modelFilter,
+    setModelFilter,
+    categoryFilter,
+    setCategoryFilter,
+    displayLimit,
+    setDisplayLimit,
+    filteredItems,
+    filteredPackages,
+    hiddenSelectedCount,
+    hasActiveFilter,
+    clearFilters,
+  } = useWarehouseFilters({
+    items,
+    packages,
+    selectedItems,
+    globalSearch,
+    isPackageMode: workType === "package-out",
+  });
 
   // ───────────────────── step gating ─────────────────────
 
@@ -733,6 +715,9 @@ export function DesktopWarehouseView({
                 setLocalSearch={setLocalSearch}
                 displayLimit={displayLimit}
                 setDisplayLimit={setDisplayLimit}
+                hiddenSelectedCount={hiddenSelectedCount}
+                hasActiveFilter={hasActiveFilter}
+                clearFilters={clearFilters}
                 pendingScrollId={pendingScrollId}
                 onScrolled={() => setPendingScrollId(null)}
               />

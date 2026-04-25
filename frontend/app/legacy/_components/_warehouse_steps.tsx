@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   AlertTriangle,
   ArrowLeftRight,
@@ -593,6 +593,9 @@ export function ItemPickStep({
   setLocalSearch,
   displayLimit,
   setDisplayLimit,
+  hiddenSelectedCount,
+  hasActiveFilter,
+  clearFilters,
   pendingScrollId,
   onScrolled,
 }: {
@@ -614,6 +617,9 @@ export function ItemPickStep({
   setLocalSearch: (v: string) => void;
   displayLimit: number;
   setDisplayLimit: Dispatch<SetStateAction<number>>;
+  hiddenSelectedCount: number;
+  hasActiveFilter: boolean;
+  clearFilters: () => void;
   pendingScrollId: string | null;
   onScrolled: () => void;
 }) {
@@ -629,27 +635,6 @@ export function ItemPickStep({
   }, [pendingScrollId, filteredItems, onScrolled]);
 
   const isPackage = workType === "package-out";
-
-  const filteredItemIds = useMemo(
-    () => new Set(filteredItems.map((it) => it.item_id)),
-    [filteredItems],
-  );
-  const hiddenSelectedCount = useMemo(
-    () =>
-      isPackage
-        ? 0
-        : Array.from(selectedItems.keys()).filter((id) => !filteredItemIds.has(id)).length,
-    [selectedItems, filteredItemIds, isPackage],
-  );
-  const hasActiveFilter =
-    !isPackage && (dept !== "ALL" || modelFilter !== "전체" || categoryFilter !== "ALL" || !!localSearch);
-
-  function clearFilters() {
-    setDept("ALL");
-    setModelFilter("전체");
-    setCategoryFilter("ALL");
-    setLocalSearch("");
-  }
 
   return (
     <div className="space-y-3">
