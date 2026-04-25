@@ -23,34 +23,37 @@
 
 ### 구현됨
 
-1. **공용 UI 부품 6종** — `frontend/app/legacy/_components/common/`
-   - `EmptyState.tsx` — no-data / no-search-result / filtered-out 3변형
-   - `LoadFailureCard.tsx` — 빨강 띠 + 새로고침 CTA
-   - `LoadingSkeleton.tsx` — table / card / list 3변형 (animate-pulse)
-   - `StatusPill.tsx` — info/success/warning/danger/neutral 톤 + `inferToneFromStatus()`
-   - `ConfirmModal.tsx` — normal/caution/danger 톤. busy 중 ESC/배경 클릭 잠금
-   - `ResultModal.tsx` — success/partial/fail 3종. 실패 리스트 + primaryAction
-2. **입출고 UX 마감** (`DesktopWarehouseView.tsx` + `_warehouse_steps.tsx` + `SelectedItemsPanel.tsx`)
-   - 필터 적용으로 선택 품목이 가려지면 노란 안내 + "필터 해제" 버튼
-   - 출고 시 실행 후 재고가 음수인 행 빨강 강조 + "재고 부족" 라벨
-   - blockerText에 "출고 후 재고가 음수입니다 — 수량을 다시 확인하세요" 추가
-   - 메모 200자 권장 카운터 (200 초과 시 빨강)
-   - submit 중 confirm 모달 ESC/배경 잠금(공용 부품 내장)
-   - 인라인 loadFailure / resultModal / confirm 모달 모두 공용 부품으로 치환
-3. **Inventory / History / Admin / Topbar 시각 언어 통일**
-   - DesktopInventoryView: error → LoadFailureCard, 빈 상태 → EmptyState (필터 초기화 CTA 포함)
-   - DesktopHistoryView: 거래 없음 / 거래 이력 없음 → EmptyState
-   - DesktopAdminView: BOM 빈 상태 2곳 → EmptyState (위험 영역 코드 미변경)
-   - DesktopTopbar: 인라인 status pill / 재고 경고 pill 모두 StatusPill 부품 사용
-4. **운영 스크립트** — `scripts/backup_db.bat`, `scripts/healthcheck.bat`
-5. **문서 신설/갱신**
-   - 신규: `docs/USER_GUIDE.md`, `docs/OPERATIONS.md`, `docs/ARCHITECTURE.md`
-   - 신규(보류 설계서): `docs/BACKEND_REFACTOR_PLAN.md`, `docs/FRONTEND_HOOKS_PLAN.md`
-   - 갱신: `README.md`, `docs/AI_HANDOVER.md`, `docs/CODEX_PROGRESS.md`
+1. **공용 UI 부품 6종** — `frontend/app/legacy/_components/common/` + `index.ts` 배럴
+   - `EmptyState.tsx` / `LoadFailureCard.tsx` / `LoadingSkeleton.tsx`
+   - `StatusPill.tsx` (+ `inferToneFromStatus()`)
+   - `ConfirmModal.tsx` / `ResultModal.tsx` (busy 잠금 / primaryAction)
+2. **입출고 UX 마감** — 필터 가림 안내 / 음수 재고 강조 / blockerText / 메모 200자 카운터 / busy 잠금
+3. **Inventory / History / Admin / Topbar 시각 언어 통일** — EmptyState · StatusPill 통일
+4. **Phase 3 — 대형 구조 정리 (이번 단계 핵심)**
+   - DesktopWarehouseView.tsx 924 → ~492줄
+     - 신규 hook: `useWarehouseFilters` · `useWarehouseWizardState` · `useWarehouseCompletionFeedback` · `useWarehouseData` · `useWarehouseScroll`
+     - 신규 섹션 컴포넌트: `WarehouseHeader` · `WarehouseStickySummary` · `WarehouseCompletionOverlay` · `WarehouseStepLayout` · `WarehouseConfirmContent`
+   - DesktopInventoryView.tsx 1,015 → ~308줄 (`_inventory_sections/` 6 컴포넌트)
+   - DesktopHistoryView.tsx 919 → ~336줄 (`_history_sections/` 4 컴포넌트 + shared)
+   - DesktopAdminView.tsx 1,794 → ~830줄 (`_admin_sections/` 7 컴포넌트 + shared)
+5. **백엔드 helper 도입 (제한적)**
+   - `backend/app/services/_tx.py` — `commit_and_refresh(db, *objs)` / `commit_only(db)`
+   - `backend/app/services/export_helpers.py` — `csv_streaming_response(buffer, filename)`
+   - `routers/inventory.py`의 10개 commit/refresh 패턴 helper 치환
+   - `routers/items.py` + `routers/inventory.py` CSV export 보일러플레이트 통합
+   - **API spec / DB schema / endpoint 응답 / transaction 의미 동일.**
+6. **운영 스크립트** — `scripts/backup_db.bat`, `scripts/healthcheck.bat`
+7. **문서 신설/갱신**
+   - 갱신: `docs/ARCHITECTURE.md`, `docs/FRONTEND_HOOKS_PLAN.md`, `docs/BACKEND_REFACTOR_PLAN.md`, `docs/AI_HANDOVER.md`, `docs/CODEX_PROGRESS.md`
+   - 운영: `docs/USER_GUIDE.md`, `docs/OPERATIONS.md`, `README.md`
 
 ### 변경 없음 (의도적)
 
-- 백엔드 모든 파일
+- 백엔드 모델 / DB schema / API endpoint 시그니처 / Pydantic schemas
+- `submit()` / `dispatchSingleItem()` 본체 / `selectedItems: Map<string, number>` 구조
+- 부분 성공 successIds 제거 동작 / Topbar pill 형식 / completionFlyout 1100+380ms 타이밍
+- ConfirmModal/ResultModal 동작·시각·props
+- AA/AF, BA/BF 코드 / Alembic / 보안/인증 / 테스트 / CI
 - `frontend/lib/api.ts`
 - `start.bat`, `docker-compose.yml`
 - `backend/erp.db`, 루트 `erp.db`
@@ -63,15 +66,13 @@
 - `cd frontend && npm run build` — 통과 (13/13 정적 페이지 생성)
 - `python -m compileall backend` — 통과
 
-## 다음 작업 후보 (보류 설계 → 다음 단계 구현)
+## 다음 작업 후보 (남은 항목)
 
 `docs/BACKEND_REFACTOR_PLAN.md`, `docs/FRONTEND_HOOKS_PLAN.md` 참고.
 
-- 백엔드: commit/refresh 표준화, 에러 detail 표준화, ship-package N+1, export 헬퍼, 운영 파일 위생
-- 프론트: `useWarehouseWizardState`/`useWarehouseSubmit`/`useWarehouseFilters` hook 추출, View 섹션 분할, `useResource` 데이터 페칭 헬퍼
+- 백엔드: 에러 detail dict 표준화, ship-package N+1, transactional context manager, 운영 파일 위생 (이번 Phase 3에서 commit/refresh helper + CSV export helper만 도입됨)
+- 프론트: `useResource` 데이터 페칭 헬퍼 (외부 라이브러리 도입 정책 검토 필요)
 - 운영: docker-compose 포트 정렬, 루트 `erp.db` 정리, seed 스크립트 위치 정리
-
-이 항목들은 본 brunch 에서 **명시적으로 보류**되었으며 다음 단계에서 별도 사이클로 진행하기로 한 결정.
 
 ## 검증 명령
 

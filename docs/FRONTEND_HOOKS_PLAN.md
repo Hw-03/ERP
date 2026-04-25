@@ -1,6 +1,35 @@
-# 프론트 hook / 뷰 분할 설계서 (보류)
+# 프론트 hook / 뷰 분할 설계서
 
-이번 `feat/erp-overhaul` 브랜치에서 **구현하지 않고** 다음 단계 작업의 근거로 남기는 설계서다. 공용 UI 부품(`common/`) 추출은 이번 단계에서 완료된 상태.
+`feat/erp-overhaul` 브랜치 누적 진행 결과(2026-04-25): **본 설계서의 대부분 항목이 구현 완료**됐다. 공용 UI 부품 + 5개 hook + 21개 섹션 컴포넌트가 도입됐고, 4개 Desktop View의 줄 수가 절반 이하로 줄었다.
+
+## 진행 상태 (Phase 3 완료 기준)
+
+| 항목 | 상태 |
+|---|---|
+| 공용 UI 부품(`common/` + `index.ts` 배럴) | ✅ 완료 |
+| `useWarehouseFilters` | ✅ 완료 |
+| `useWarehouseWizardState` | ✅ 완료 |
+| `useWarehouseCompletionFeedback` | ✅ 완료 |
+| `useWarehouseData` | ✅ 완료 |
+| `useWarehouseScroll` | ✅ 완료 |
+| `useWarehouseSubmit` (별도 분리) | ⏸ 보류 — `submit()` 본체는 부모 유지(변경 금지 정책) |
+| `_inventory_sections/` 분할 | ✅ 6 섹션 분리 완료 |
+| `_history_sections/` 분할 | ✅ 4 섹션 + shared 분리 완료 |
+| `_admin_sections/` 분할 | ✅ 7 섹션 + shared 분리 완료 |
+| `useResource` / `useApi` 헬퍼 | ⏸ 보류 — 외부 라이브러리 도입 정책 검토 후 |
+
+| 파일 | Phase 1 진입 시 | Phase 3 완료 후 |
+|---|---|---|
+| `DesktopAdminView.tsx` | 1,794줄 | ~830줄 |
+| `DesktopWarehouseView.tsx` | 924줄 | ~492줄 |
+| `DesktopInventoryView.tsx` | 1,015줄 | ~308줄 |
+| `DesktopHistoryView.tsx` | 919줄 | ~336줄 |
+
+이하 본문은 *왜 그렇게 분할했는가*에 대한 근거 자료로 남겨둔다.
+
+---
+
+## 구 설계서 (배경 — 완료된 항목)
 
 ## 배경
 

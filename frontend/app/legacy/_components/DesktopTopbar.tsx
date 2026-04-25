@@ -4,7 +4,7 @@ import type { ElementType, ReactNode } from "react";
 import { RefreshCw } from "lucide-react";
 import { LEGACY_COLORS } from "./legacyUi";
 import { ThemeToggle } from "./ThemeToggle";
-import { StatusPill, inferToneFromStatus } from "./common/StatusPill";
+import { StatusPill, inferToneFromStatus } from "./common";
 
 export function DesktopTopbar({
   title,

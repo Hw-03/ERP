@@ -18,14 +18,16 @@ ERP/
 │       ├── models.py                # SQLAlchemy 모델 + 16 enum (621줄)
 │       ├── schemas.py               # Pydantic 요청/응답 (40+ 모델)
 │       ├── routers/
-│       │   ├── inventory.py         # 입출고/이동/불량/CSV·XLSX (819줄)
-│       │   ├── items.py             # 품목 CRUD (437줄)
+│       │   ├── inventory.py         # 입출고/이동/불량/CSV·XLSX (~810줄)
+│       │   ├── items.py             # 품목 CRUD (~430줄)
 │       │   ├── production.py        # 생산 입고 + BOM 자동 차감
 │       │   ├── queue.py             # 큐 배치 생성/확정/취소
 │       │   ├── bom.py / codes.py / employees.py / ship_packages.py / alerts.py
 │       └── services/
 │           ├── inventory.py         # 입출고 비즈니스 로직 (445줄, 12 함수)
 │           ├── stock_math.py        # 재고 계산 일원화 (151줄)
+│           ├── _tx.py               # commit_and_refresh / commit_only helper
+│           ├── export_helpers.py    # CSV StreamingResponse helper
 │           ├── bom.py / codes.py / queue.py / integrity.py
 ├── frontend/
 │   ├── lib/api.ts                   # 백엔드 API 클라이언트
@@ -35,20 +37,28 @@ ERP/
 │       │   │   ├── DesktopLegacyShell.tsx
 │       │   │   ├── DesktopSidebar.tsx
 │       │   │   ├── DesktopTopbar.tsx
-│       │   │   ├── DesktopInventoryView.tsx       # 대시보드(재고)
-│       │   │   ├── DesktopWarehouseView.tsx       # 입출고 wizard
+│       │   │   ├── DesktopInventoryView.tsx       # 대시보드(재고) — ~308줄
+│       │   │   ├── DesktopWarehouseView.tsx       # 입출고 wizard — ~492줄
 │       │   │   ├── _warehouse_steps.tsx           # wizard 5단계 컴포넌트
 │       │   │   ├── SelectedItemsPanel.tsx         # 4단계 수량 입력
-│       │   │   ├── DesktopHistoryView.tsx         # 입출고 내역
-│       │   │   ├── DesktopAdminView.tsx           # 관리자
+│       │   │   ├── DesktopHistoryView.tsx         # 입출고 내역 — ~336줄
+│       │   │   ├── DesktopAdminView.tsx           # 관리자 — ~830줄
 │       │   │   ├── legacyUi.ts                    # LEGACY_COLORS · 헬퍼
-│       │   │   └── common/                        # ★ 이번에 신설된 공용 부품
-│       │   │       ├── EmptyState.tsx
-│       │   │       ├── LoadFailureCard.tsx
-│       │   │       ├── LoadingSkeleton.tsx
-│       │   │       ├── StatusPill.tsx
-│       │   │       ├── ConfirmModal.tsx
-│       │   │       └── ResultModal.tsx
+│       │   │   ├── common/                        # 공용 부품 (배럴 + 6 부품)
+│       │   │   │   ├── index.ts
+│       │   │   │   ├── EmptyState.tsx · LoadFailureCard.tsx · LoadingSkeleton.tsx
+│       │   │   │   └── StatusPill.tsx · ConfirmModal.tsx · ResultModal.tsx
+│       │   │   ├── _warehouse_hooks/              # 입출고 hook 5종
+│       │   │   │   ├── useWarehouseData.ts
+│       │   │   │   ├── useWarehouseFilters.ts
+│       │   │   │   ├── useWarehouseWizardState.ts
+│       │   │   │   ├── useWarehouseScroll.ts
+│       │   │   │   └── useWarehouseCompletionFeedback.ts
+│       │   │   ├── _warehouse_sections/           # 입출고 섹션 컴포넌트 4종
+│       │   │   ├── _warehouse_modals/             # 입출고 모달 children 1종
+│       │   │   ├── _inventory_sections/           # 대시보드 섹션 6종
+│       │   │   ├── _history_sections/             # 내역 섹션 4종 + 공용 상수
+│       │   │   └── _admin_sections/               # 관리자 섹션 7종 + 공용 상수
 │       │   └── page.tsx
 │       └── (admin|alerts|history|inventory|operations|queue|...)/page.tsx  # 단순 진입점
 ├── docs/                            # 모든 문서
@@ -134,10 +144,21 @@ available = total - pending_quantity   # 예약 차감 후 가용 재고
 | `ConfirmModal` | 일반·주의·위험 3톤. busy 중에는 ESC/배경 클릭 잠금 |
 | `ResultModal` | 성공·부분실패·실패 3종. 실패 리스트 + primaryAction 슬롯 |
 
-### 부분 분리 vs 미분리 (의도적)
+### 책임 분리 진행 상황 (2026-04-25 기준)
 
-- `DesktopWarehouseView` (1,074줄), `_warehouse_steps.tsx` (1,056줄), `DesktopAdminView` (1,783줄) 등은 분량이 크다. 이번 단계에서는 안전성 위주로 **공용 부품 추출만** 진행했다.
-- hook 추출(`useWarehouseWizardState`/`useWarehouseSubmit`/`useWarehouseFilters`) 과 거대 컴포넌트의 의미 단위 분할은 별도 작업으로 미뤄둔다 — 설계서: `docs/FRONTEND_HOOKS_PLAN.md`
+Phase 3까지 누적된 분리 결과:
+
+- **공용 부품**: `common/` 6종 + `index.ts` 배럴
+- **입출고**: 5 hook (`_warehouse_hooks/`) + 4 섹션 (`_warehouse_sections/`) + 1 모달 children (`_warehouse_modals/`)로 분리
+- **대시보드**: 6 섹션 (`_inventory_sections/`)으로 분리
+- **내역**: 4 섹션 (`_history_sections/`) + 공용 상수로 분리
+- **관리자**: 7 섹션 (`_admin_sections/`) + 공용 상수로 분리
+- **백엔드**: `services/_tx.py` (commit helper) + `services/export_helpers.py` (CSV StreamingResponse helper) 신설
+
+분리 원칙:
+- 부모는 state · API call · effect 소유, 자식은 prop으로 받은 값을 렌더만 한다.
+- `submit()` / `dispatchSingleItem()` 본체와 `selectedItems: Map<string, number>` 구조는 변경 금지 (절대 손대지 않는다).
+- API spec / DB schema / completionFlyout 1100+380ms 타이밍 / Topbar pill 형식은 동일.
 
 ## 데이터 흐름 (입출고 1건)
 
@@ -175,5 +196,5 @@ DesktopWarehouseView.submit()
 
 본 문서가 다루지 않는 항목과 미구현 개선은 다음 설계서에 정리되어 있다.
 
-- `docs/BACKEND_REFACTOR_PLAN.md` — 백엔드 리팩터링(commit/refresh 표준화, 에러 detail 표준, ship-package N+1, 운영 파일 정리)
-- `docs/FRONTEND_HOOKS_PLAN.md` — 프론트 hook 추출 / 거대 컴포넌트 분할 / `useApi` 헬퍼
+- `docs/BACKEND_REFACTOR_PLAN.md` — 에러 detail dict 표준화, ship-package N+1, 운영 파일 정리 (이번에 commit/refresh helper만 도입)
+- `docs/FRONTEND_HOOKS_PLAN.md` — 추가 hook 후보 / `useApi` 헬퍼 (이번에 wizard / data / scroll / filter / completion feedback hook은 모두 도입)

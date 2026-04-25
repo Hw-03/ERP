@@ -1,6 +1,23 @@
-# 백엔드 리팩터링 설계서 (보류)
+# 백엔드 리팩터링 설계서
 
-이번 `feat/erp-overhaul` 브랜치에서 **구현하지 않고** 다음 단계 작업을 위한 근거로 남기는 설계서다. API 스펙·DB 스키마는 모두 호환을 유지한다는 전제 아래 정리.
+`feat/erp-overhaul` 브랜치 Phase 3에서 일부 항목 구현 완료. 전반은 여전히 다음 단계 후보로 남는다.
+
+## 진행 상태 (2026-04-25 update)
+
+| 항목 | 상태 |
+|---|---|
+| `services/_tx.py` 의 `commit_and_refresh` / `commit_only` | ✅ 도입 완료. `routers/inventory.py` 의 10곳에 적용. |
+| `services/export_helpers.py` 의 `csv_streaming_response` | ✅ 도입 완료. `routers/inventory.py` + `routers/items.py` CSV export 보일러플레이트 단축. |
+| 에러 응답 dict 표준화 (`_errors.py`) | ⏸ 보류 — 프론트 파싱 코드 동시 수정 필요. |
+| `transactional` 컨텍스트 매니저로 교체 | ⏸ 보류 — 책임 경계 재배치(서비스가 commit 소유) 는 다음 사이클. |
+| `ship_package` N+1 / bulk endpoint | ⏸ 보류 — 부분 성공 정책과 함께 다룸. |
+| 운영 파일(`scripts/`) 정리 | ⏸ 보류. |
+
+이번 Phase 에서는 라우터의 `db.commit() + db.refresh(...)` 18회 반복 중 inventory.py의 10건을 `commit_and_refresh(db, *objs)` 단일 호출로 대체했다. **transaction 의미·commit 위치는 동일**(여전히 라우터 책임), 단지 호출 코드가 1줄로 단축됐다.
+
+---
+
+## 구 설계서 (배경)
 
 ## 1. 라우터 commit/refresh 표준화
 

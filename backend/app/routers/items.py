@@ -26,6 +26,7 @@ from app.utils.erp_code import infer_process_type, infer_symbol_slot, make_erp_c
 from app.models import ProductSymbol
 from app.services import inventory as inventory_svc
 from app.services import stock_math
+from app.services.export_helpers import csv_streaming_response
 
 router = APIRouter()
 
@@ -290,12 +291,7 @@ def export_items_csv(db: Session = Depends(get_db)):
             ]
         )
 
-    buffer.seek(0)
-    return StreamingResponse(
-        iter([buffer.getvalue()]),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="items-export.csv"'},
-    )
+    return csv_streaming_response(buffer, "items-export.csv")
 
 
 _CATEGORY_ROW_COLOR = {

@@ -41,6 +41,8 @@ from app.schemas import (
 )
 from app.services import inventory as inventory_svc
 from app.services import stock_math
+from app.services._tx import commit_and_refresh, commit_only
+from app.services.export_helpers import csv_streaming_response
 
 
 def _list_locations(db: Session, item_id: uuid.UUID) -> List[InventoryLocationResponse]:
@@ -206,8 +208,7 @@ def receive_inventory(payload: InventoryReceive, db: Session = Depends(get_db)):
             notes=payload.notes,
         )
     )
-    db.commit()
-    db.refresh(inventory)
+    commit_and_refresh(db, inventory)
     return _to_response(db, inventory)
 
 
@@ -248,8 +249,7 @@ def ship_inventory(payload: InventoryShip, db: Session = Depends(get_db)):
             notes=payload.notes,
         )
     )
-    db.commit()
-    db.refresh(inventory)
+    commit_and_refresh(db, inventory)
     return _to_response(db, inventory)
 
 
@@ -324,7 +324,7 @@ def ship_package(payload: PackageShipRequest, db: Session = Depends(get_db)):
             }
         )
 
-    db.commit()
+    commit_only(db)
     return {
         "message": f"{package.name} 패키지 {payload.quantity}건 출고 완료",
         "package_name": package.name,
@@ -361,8 +361,7 @@ def adjust_inventory(payload: InventoryAdjust, db: Session = Depends(get_db)):
             notes=payload.reason,
         )
     )
-    db.commit()
-    db.refresh(inventory)
+    commit_and_refresh(db, inventory)
     return _to_response(db, inventory)
 
 
@@ -397,8 +396,7 @@ def transfer_to_production(payload: TransferRequest, db: Session = Depends(get_d
             notes=payload.notes or f"창고 → {payload.department.value} 이동 ({payload.quantity})",
         )
     )
-    db.commit()
-    db.refresh(inventory)
+    commit_and_refresh(db, inventory)
     return _to_response(db, inventory)
 
 
@@ -428,8 +426,7 @@ def transfer_to_warehouse(payload: TransferRequest, db: Session = Depends(get_db
             notes=payload.notes or f"{payload.department.value} → 창고 복귀 ({payload.quantity})",
         )
     )
-    db.commit()
-    db.refresh(inventory)
+    commit_and_refresh(db, inventory)
     return _to_response(db, inventory)
 
 
@@ -460,8 +457,7 @@ def transfer_between_depts(payload: DeptTransferRequest, db: Session = Depends(g
             notes=payload.notes or f"{payload.from_department.value} → {payload.to_department.value} 이동 ({payload.quantity})",
         )
     )
-    db.commit()
-    db.refresh(inventory)
+    commit_and_refresh(db, inventory)
     return _to_response(db, inventory)
 
 
@@ -500,8 +496,7 @@ def mark_defective(payload: MarkDefectiveRequest, db: Session = Depends(get_db))
             notes=note,
         )
     )
-    db.commit()
-    db.refresh(inventory)
+    commit_and_refresh(db, inventory)
     return _to_response(db, inventory)
 
 
@@ -531,8 +526,7 @@ def return_to_supplier(payload: SupplierReturnRequest, db: Session = Depends(get
             notes=payload.notes or f"공급업체 반품 ({payload.from_department.value} 불량 {payload.quantity})",
         )
     )
-    db.commit()
-    db.refresh(inventory)
+    commit_and_refresh(db, inventory)
     return _to_response(db, inventory)
 
 
@@ -680,12 +674,7 @@ def export_transactions_csv(
             ]
         )
 
-    buffer.seek(0)
-    return StreamingResponse(
-        iter([buffer.getvalue()]),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="transactions-export.csv"'},
-    )
+    return csv_streaming_response(buffer, "transactions-export.csv")
 
 
 _TX_ROW_COLOR = {
@@ -798,8 +787,7 @@ def update_transaction_notes(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
     log.notes = payload.notes
-    db.commit()
-    db.refresh(log)
+    commit_and_refresh(db, log)
 
     return TransactionLogResponse(
         log_id=log.log_id,

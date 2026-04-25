@@ -81,22 +81,48 @@
 
 - 공용 UI 부품 6종 신설 (`frontend/app/legacy/_components/common/`):
   EmptyState · LoadFailureCard · LoadingSkeleton · StatusPill · ConfirmModal · ResultModal
-- 입출고 UX 마감:
-  - 필터 가림 안내 + 필터 해제 버튼
-  - 음수 재고 행 빨강 강조 + "재고 부족" 라벨
-  - blockerText에 출고 음수 안내 추가
-  - 메모 200자 카운터
-  - submit 중 ESC/배경 클릭 잠금 (공용 부품 내장)
-- 데스크톱 4화면 시각 언어 통일:
-  Warehouse / Inventory / History / Admin / Topbar — 인라인 빈/실패/확인/Pill 패턴을 공용 부품으로 치환
+- 입출고 UX 마감 (필터 가림 안내, 음수 재고 강조, blockerText, 메모 200자 카운터, busy 잠금)
+- 데스크톱 4화면 시각 언어 통일
 - 운영 보조 스크립트: `scripts/backup_db.bat`, `scripts/healthcheck.bat`
 - 문서 신설: USER_GUIDE / OPERATIONS / ARCHITECTURE / BACKEND_REFACTOR_PLAN / FRONTEND_HOOKS_PLAN
-- 문서 갱신: README / AI_HANDOVER / CODEX_PROGRESS
+
+## 2026-04-25 `feat/erp-overhaul` Phase 3 — 대형 구조 정리
+
+### 구현 완료
+
+- **DesktopWarehouseView.tsx**: 924 → ~492줄
+  - 신규 hook 5종: `useWarehouseFilters` · `useWarehouseWizardState` · `useWarehouseCompletionFeedback` · `useWarehouseData` · `useWarehouseScroll`
+  - 신규 섹션 컴포넌트: `WarehouseHeader` · `WarehouseStickySummary` · `WarehouseCompletionOverlay` · `WarehouseStepLayout` · `WarehouseConfirmContent`
+- **DesktopInventoryView.tsx**: 1,015 → ~308줄
+  - `_inventory_sections/`: KpiPanel · ActionRequired · CapacityPanel · FilterBar · ItemsTable · DetailPanel
+- **DesktopHistoryView.tsx**: 919 → ~336줄
+  - `_history_sections/`: FilterBar · CalendarStrip · Table · DetailPanel + shared 상수
+- **DesktopAdminView.tsx**: 1,794 → ~830줄
+  - `_admin_sections/`: MasterItems · Employees · Bom · Packages · Models · Export · DangerZone + shared 상수
+- **공용 부품 배럴**: `common/index.ts` 신설, 사용처 import 정리
+- **백엔드 helper (제한적)**:
+  - `backend/app/services/_tx.py`: `commit_and_refresh` / `commit_only` 도입, `inventory.py` 라우터 10건 치환
+  - `backend/app/services/export_helpers.py`: `csv_streaming_response` 도입, inventory + items CSV export 보일러플레이트 단축
+  - **API spec / DB schema / endpoint 응답 / transaction 의미 동일**
+
+### 보존됨 (변경 금지)
+
+- `submit()` / `dispatchSingleItem()` 본체
+- `selectedItems: Map<string, number>` 구조
+- 부분 성공 successIds 제거 동작
+- API 호출 시그니처 / DB schema
+- completionFlyout 1100+380ms 타이밍
+- Topbar pill 메시지 형식
+- ConfirmModal/ResultModal `busy={busy}` 잠금
+- KPI 계산식 / 카테고리 그룹 / 거래 색상화 / TransactionType 매핑
+- BOM 등록·삭제 / 직원 토글 / 패키지 추가·제거 / PIN lock / DB 초기화 동작
 
 ### 보류 (다음 단계로 이월)
 
-- 백엔드 commit/refresh 표준화, 에러 detail 표준, ship-package N+1, export 헬퍼 (설계서: `docs/BACKEND_REFACTOR_PLAN.md`)
-- `useWarehouseWizardState`/`useWarehouseSubmit`/`useWarehouseFilters` hook 추출, View 섹션 분할 (설계서: `docs/FRONTEND_HOOKS_PLAN.md`)
+- 에러 detail dict 표준화 (프론트 파싱 동시 수정 필요)
+- `transactional` 컨텍스트 매니저로 commit 책임 서비스로 이동
+- ship-package N+1
+- `useResource` 데이터 페칭 헬퍼 (외부 라이브러리 도입 정책 검토 필요)
 - 운영 파일 위생(루트 `erp.db` 정리, seed 스크립트 이동, docker-compose 포트 정렬)
 - 보안/권한·테스트·CI
 
