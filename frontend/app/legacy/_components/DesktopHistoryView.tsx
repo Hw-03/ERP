@@ -377,39 +377,60 @@ export function DesktopHistoryView() {
             </div>
           </section>
 
-          {/* ── 필터 바 ── */}
-          <section className="card">
-            <div className="flex flex-col gap-3">
-              {/* 검색 + 토글 */}
-              <div className="flex items-center gap-3">
+          {/* ── 필터 바 (단순화: 검색 / 기간 / 유형만 기본 노출) ── */}
+          <section className="card" style={{ paddingTop: 14, paddingBottom: 14 }}>
+            <div className="flex flex-col gap-2.5">
+              {/* 1줄: 검색 + 기간 세그먼트 + 목록/달력 토글 */}
+              <div className="flex items-center gap-2">
                 <div
-                  className="flex flex-1 items-center gap-2 rounded-[14px] border px-3 py-2.5"
+                  className="flex flex-1 items-center gap-2 rounded-[12px] border px-3 py-2"
                   style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
                 >
                   <Search className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="품명 · ERP코드 · 담당자 · 참조번호 · 메모"
-                    className="flex-1 bg-transparent text-base outline-none"
+                    placeholder="품명 · ERP코드 · 담당자 · 참조번호 · 메모 검색"
+                    className="flex-1 bg-transparent text-sm outline-none"
                     style={{ color: LEGACY_COLORS.text }}
                   />
                   {search && (
-                    <button onClick={() => setSearch("")} className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>✕</button>
+                    <button onClick={() => setSearch("")} className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>✕</button>
                   )}
                 </div>
+
+                {/* 기간 세그먼트 */}
+                <div className="flex overflow-hidden rounded-[12px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+                  {DATE_OPTIONS.map((opt) => {
+                    const active = dateFilter === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => setDateFilter(opt.value)}
+                        className="px-3 py-2 text-xs font-bold transition-colors"
+                        style={{
+                          background: active ? `color-mix(in srgb, ${LEGACY_COLORS.purple} 20%, transparent)` : "transparent",
+                          color: active ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2,
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
                 {/* 목록/달력 토글 */}
                 <div className="flex overflow-hidden rounded-[12px] border" style={{ borderColor: LEGACY_COLORS.border }}>
                   <button
                     onClick={() => setViewMode("list")}
-                    className="flex items-center gap-1.5 px-3 py-2 text-sm font-bold transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold transition-colors"
                     style={{ background: viewMode === "list" ? LEGACY_COLORS.blue : "transparent", color: viewMode === "list" ? "#fff" : LEGACY_COLORS.muted2 }}
                   >
                     <List className="h-3.5 w-3.5" />목록
                   </button>
                   <button
                     onClick={() => setViewMode("calendar")}
-                    className="flex items-center gap-1.5 px-3 py-2 text-sm font-bold transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold transition-colors"
                     style={{ background: viewMode === "calendar" ? LEGACY_COLORS.blue : "transparent", color: viewMode === "calendar" ? "#fff" : LEGACY_COLORS.muted2 }}
                   >
                     <CalendarDays className="h-3.5 w-3.5" />달력
@@ -417,61 +438,49 @@ export function DesktopHistoryView() {
                 </div>
               </div>
 
-              {/* 유형 필터 */}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="shrink-0 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>유형</span>
+              {/* 2줄: 거래 유형 칩 */}
+              <div className="flex flex-wrap items-center gap-1.5">
                 {TYPE_OPTIONS.map((opt) => (
                   <Chip key={opt.value} active={typeFilter === opt.value} label={opt.label} onClick={() => setTypeFilter(opt.value)} />
                 ))}
               </div>
 
-              {/* 기간 필터 */}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="shrink-0 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>기간</span>
-                {DATE_OPTIONS.map((opt) => (
-                  <Chip key={opt.value} active={dateFilter === opt.value} label={opt.label} onClick={() => setDateFilter(opt.value)} tone={LEGACY_COLORS.purple} />
-                ))}
-              </div>
-
-              {/* 활성 필터 요약 바 */}
-              {(typeFilter !== "ALL" || dateFilter !== "ALL" || search.trim() || quickFilter) && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>적용됨</span>
+              {/* 3줄(조건부): 적용된 필터 요약 — 검색/기간/유형만 */}
+              {(typeFilter !== "ALL" || dateFilter !== "ALL" || search.trim()) && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>적용됨</span>
                   {typeFilter !== "ALL" && (
-                    <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 12%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 35%, transparent)`, color: LEGACY_COLORS.blue }}>
-                      유형: {TYPE_OPTIONS.find(opt => opt.value === typeFilter)?.label}
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold"
+                      style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 12%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 35%, transparent)`, color: LEGACY_COLORS.blue }}
+                    >
+                      유형: {TYPE_OPTIONS.find((opt) => opt.value === typeFilter)?.label}
                       <button onClick={() => setTypeFilter("ALL")}><X className="h-3 w-3" /></button>
                     </span>
                   )}
                   {dateFilter !== "ALL" && (
-                    <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.purple} 12%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.purple} 35%, transparent)`, color: LEGACY_COLORS.purple }}>
-                      기간: {DATE_OPTIONS.find(opt => opt.value === dateFilter)?.label}
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold"
+                      style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.purple} 12%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.purple} 35%, transparent)`, color: LEGACY_COLORS.purple }}
+                    >
+                      기간: {DATE_OPTIONS.find((opt) => opt.value === dateFilter)?.label}
                       <button onClick={() => setDateFilter("ALL")}><X className="h-3 w-3" /></button>
                     </span>
                   )}
                   {search.trim() && (
-                    <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 12%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 35%, transparent)`, color: LEGACY_COLORS.cyan }}>
-                      "{search}"
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold"
+                      style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 12%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 35%, transparent)`, color: LEGACY_COLORS.cyan }}
+                    >
+                      &quot;{search}&quot;
                       <button onClick={() => setSearch("")}><X className="h-3 w-3" /></button>
                     </span>
                   )}
-                  {quickFilter && (
-                    <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 12%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 35%, transparent)`, color: LEGACY_COLORS.yellow }}>
-                      {QUICK_FILTERS.find(qf => qf.id === quickFilter)?.label}
-                      <button onClick={() => setQuickFilter(null)}><X className="h-3 w-3" /></button>
-                    </span>
-                  )}
-                  <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{stats.total}건</span>
+                  <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{stats.total}건</span>
                 </div>
               )}
 
-              {/* 빠른 필터: 문제 거래 찾기 */}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="shrink-0 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>문제 거래</span>
-                {QUICK_FILTERS.map((qf) => (
-                  <Chip key={qf.id} active={quickFilter === qf.id} label={qf.label} onClick={() => setQuickFilter(quickFilter === qf.id ? null : qf.id)} tone={LEGACY_COLORS.yellow} />
-                ))}
-              </div>
+              {/* 문제 거래 빠른 필터는 기본 노출 제거 — QUICK_FILTERS·quickFilter는 고급 필터 재도입용으로 유지 */}
             </div>
           </section>
 
