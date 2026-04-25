@@ -16,7 +16,12 @@
 | `_inventory_sections/` 분할 | ✅ 6 섹션 분리 완료 |
 | `_history_sections/` 분할 | ✅ 4 섹션 + shared 분리 완료 |
 | `_admin_sections/` 분할 | ✅ 7 섹션 + shared 분리 완료 |
-| `useResource` / `useApi` 헬퍼 | ⏸ 보류 — 외부 라이브러리 도입 정책 검토 후 |
+| **`useResource` 헬퍼** | ✅ **Phase 4** — `_components/_hooks/useResource.ts` 신설 (외부 라이브러리 미도입). |
+| **`useWarehouseData.loading` 플래그** | ✅ **Phase 4** — 메인 데이터 첫 로딩 상태 노출. |
+| **`_warehouse_steps.tsx` (1,135줄) 파일 분할** | ✅ **Phase 4** — `_warehouse_steps/` 디렉토리 8개 파일로 분리 (constants/atoms + 5 step). 외부 import 경로 호환. |
+| **`AdminBomContext` + `useAdminBom`** | ✅ **Phase 4** — DesktopAdminView 의 BOM useState 10개 + useMemo 2개 + 액션 3개를 Provider/hook 으로 흡수. AdminBomSection Props 22 → 0. |
+| **전역 ErrorBoundary** | ✅ **Phase 4** — `app/error.tsx` + `app/global-error.tsx`. |
+| **에러 detail 파서** | ✅ **Phase 4** — `lib/api.ts:extractErrorMessage` 가 str / 구 dict / 신 dict (`{code, message, extra}`) 모두 처리. |
 
 | 파일 | Phase 1 진입 시 | Phase 3 완료 후 |
 |---|---|---|

@@ -2,16 +2,21 @@
 
 `feat/erp-overhaul` 브랜치 Phase 3에서 일부 항목 구현 완료. 전반은 여전히 다음 단계 후보로 남는다.
 
-## 진행 상태 (2026-04-25 update)
+## 진행 상태 (2026-04-26 Phase 4 update)
 
-| 항목 | 상태 |
-|---|---|
-| `services/_tx.py` 의 `commit_and_refresh` / `commit_only` | ✅ 도입 완료. `routers/inventory.py` 의 10곳에 적용. |
-| `services/export_helpers.py` 의 `csv_streaming_response` | ✅ 도입 완료. `routers/inventory.py` + `routers/items.py` CSV export 보일러플레이트 단축. |
-| 에러 응답 dict 표준화 (`_errors.py`) | ⏸ 보류 — 프론트 파싱 코드 동시 수정 필요. |
-| `transactional` 컨텍스트 매니저로 교체 | ⏸ 보류 — 책임 경계 재배치(서비스가 commit 소유) 는 다음 사이클. |
-| `ship_package` N+1 / bulk endpoint | ⏸ 보류 — 부분 성공 정책과 함께 다룸. |
-| 운영 파일(`scripts/`) 정리 | ⏸ 보류. |
+| 항목 | 상태 | 보류/완료 사유 |
+|---|---|---|
+| `services/_tx.py` 의 `commit_and_refresh` / `commit_only` | ✅ Phase 3 | inventory 10곳 적용. |
+| `services/export_helpers.py` 의 `csv_streaming_response` | ✅ Phase 3 | inventory + items 보일러플레이트 단축. |
+| **에러 응답 dict 표준화 (`_errors.py`)** | ✅ **Phase 4** | `routers/_errors.py` + `ErrorCode` 신설. ship-package + production produce 가 `{code, message, extra}` 사용. 프론트 `extractErrorMessage` 가 str/dict 양쪽 처리. |
+| **전역 예외 핸들러 + 로그 회전** | ✅ **Phase 4** | `app/_logging.py` (RotatingFileHandler 5MB×5), `main.py` 에 ValueError/IntegrityError/OperationalError/Exception 핸들러. |
+| **inventory 라우터 패키지 분할** | ✅ **Phase 4** | 단일 807줄 → `routers/inventory/` 9개 파일 (query, receive, ship, transfer, defective, supplier, transactions, _shared, __init__). |
+| **export endpoint limit 강제** | ✅ **Phase 4** | `/transactions/export.csv|.xlsx` 가 `start_date/end_date` 필수 + 50,000행 상한. `EXPORT_RANGE_REQUIRED` / `EXPORT_RANGE_TOO_LARGE`. |
+| **stock_math bulk_compute 통일** | ✅ **Phase 4** | `get_item` 단건 + `list_inventory` 다건 모두 `bulk_compute` 경유. `to_response_bulk` 로 N+1 제거. |
+| **BOM Where-Used (read-only) API** | ✅ **Phase 4** | `GET /api/bom/where-used/{item_id}` 추가. DB 스키마 변경 없음. |
+| `transactional` 컨텍스트 매니저로 교체 | ⏸ 보류 | 책임 경계 재배치(서비스가 commit 소유)는 다음 사이클. 현재 라우터-주도 commit 으로도 이번 Phase 의 회귀 0건이 검증됨. |
+| `ship_package` 실제 bulk transaction 구현 | ⏸ 보류 | Phase 4 평가 제외 항목. 응답 dict 모양만 표준화하고 query 패턴은 유지. |
+| 운영 파일 위생(seed 폴더, alembic) | ⏸ 보류 | docker-compose 포트, 루트 erp.db 정리 등은 별도 사이클. Phase 4 는 .env.example 확장 + reconcile 스크립트만 추가. |
 
 이번 Phase 에서는 라우터의 `db.commit() + db.refresh(...)` 18회 반복 중 inventory.py의 10건을 `commit_and_refresh(db, *objs)` 단일 호출로 대체했다. **transaction 의미·commit 위치는 동일**(여전히 라우터 책임), 단지 호출 코드가 1줄로 단축됐다.
 

@@ -2,14 +2,40 @@
 
 이 문서는 Claude/Codex가 같은 ERP 프로젝트를 이어서 작업할 때 보는 최신 인수인계 문서다.
 
-## 현재 상태 (2026-04-25)
+## 현재 상태 (2026-04-26 Phase 4 update)
 
 - 프로젝트: DEXCOWIN 재고 관리/ERP 시스템 (내부 ERP/MES 프로토타입)
-- 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/erp.db`) — **이번 단계 미변경**
-- 프론트엔드: Next.js 14 + Tailwind CSS — 데스크톱 셸 마감 중심으로 다듬음
+- 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/erp.db`)
+- 프론트엔드: Next.js 14 + Tailwind CSS
 - 주 화면: `/legacy` (대시보드 / 입출고 / 입출고 내역 / 관리자)
 - 기준 데이터: 통합 품목 971건
 - 현재 브랜치: `feat/erp-overhaul`
+
+## Phase 4 결과 (2026-04-26)
+
+10개 항목 모두 80점 이상 목표. 17개 체크포인트 작업 완료. 자동 검증 통과(tsc/lint/build, compileall).
+
+### 백엔드
+- `routers/_errors.py` 신설 — `ErrorCode` 상수 + `http_error()` 표준 dict 응답.
+- `app/_logging.py` 신설 — RotatingFileHandler `backend/logs/erp.log` (5MB × 5).
+- 전역 예외 핸들러 — ValueError(422) / IntegrityError(409) / OperationalError(503) / Exception(500). Pydantic ValidationError 는 500 으로 분리.
+- `routers/inventory.py` (807줄) → `routers/inventory/` 패키지 9개 파일 분할.
+- BOM Where-Used: `GET /api/bom/where-used/{item_id}`.
+- export endpoint: `start_date/end_date` 필수 + 50,000행 상한.
+- `stock_math.bulk_compute` 단건/다건 통일, `to_response_bulk` 로 N+1 제거.
+
+### 프론트엔드
+- `_warehouse_steps.tsx` (1,135줄) → `_warehouse_steps/` 디렉토리 8 파일.
+- `AdminBomProvider` + `useAdminBom` — AdminBomSection Props 22 → 0, DesktopAdminView 827 → 733줄.
+- `app/error.tsx` + `app/global-error.tsx` — 전역 ErrorBoundary.
+- `lib/api.ts:extractErrorMessage` — str / 구 dict / 신 dict 응답 통일 파싱.
+- `useResource` 훅 + `useWarehouseData.loading` 플래그.
+
+### 문서/운영
+- `docs/GLOSSARY.md`, `docs/ERD.md` 신설.
+- `docs/BACKEND_REFACTOR_PLAN.md`, `docs/FRONTEND_HOOKS_PLAN.md` 보류 사유 + Phase 4 완료 표기.
+- `.env.example` 확장 (PORT, LOG_LEVEL, LOG_DIR, CORS_EXTRA_ORIGINS).
+- `scripts/reconcile_inventory.bat` — 정합성 1차 진단 + 백업.
 
 ## 반드시 지킬 기준
 

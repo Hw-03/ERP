@@ -87,11 +87,28 @@ curl http://127.0.0.1:8010/health/detailed
 - `inventory_mismatch_count`: Inventory 합계와 InventoryLocation 합계 불일치 건수 — `0` 이 정상
 - `latest_transaction_at`: 최근 거래 시각
 
+### 자동 1차 진단 (Phase 4 추가)
+
+`scripts/reconcile_inventory.bat` 한 번 실행하면:
+
+1. `/health/detailed` 호출
+2. `inventory_mismatch_count > 0` 발견 시 **자동으로 backup_db.bat 호출**
+3. 응답 JSON 전체를 콘솔에 출력 → 운영 담당자에게 그대로 전달
+
+자동 수정은 하지 않는다. 백업 + 보고까지만. 실제 수정은 개발자가 수동 절차로.
+
 ## 로그 확인
 
-- 백엔드 로그: `start.bat` 가 띄운 **Backend** 콘솔 창에 그대로 뜬다. 별도 파일 회전 없음(이번 단계에서는 콘솔 로그 위주).
-- 프론트 로그: **Frontend** 콘솔 창. Next.js dev 서버 로그.
-- 브라우저 콘솔: F12 → Console / Network 탭
+### 콘솔 로그
+- 백엔드: `start.bat` 가 띄운 **Backend** 콘솔 창
+- 프론트: **Frontend** 콘솔 창
+- 브라우저: F12 → Console / Network 탭
+
+### 파일 로그 (Phase 4 추가)
+- 위치: `backend/logs/erp.log`
+- 회전: `RotatingFileHandler` 5MB × 5 backup (`erp.log.1` ~ `erp.log.5`)
+- 환경 변수: `LOG_LEVEL` (기본 INFO), `LOG_DIR` (기본 backend/logs)
+- 내용: 전역 예외 핸들러가 잡은 ValueError/IntegrityError/Exception + INFO 레벨 메시지
 
 ## 보안·권한·CI 관련
 
