@@ -375,16 +375,39 @@ function toApiUrl(path: string) {
   return path;
 }
 
+/** 백엔드 detail 구조에서 사용자 표시용 메시지 추출.
+ *
+ * 지원하는 detail 모양:
+ * - 문자열: "품목을 찾을 수 없습니다."
+ * - 구 dict: {message, shortages?}
+ * - 신 dict (Phase 4): {code, message, extra?: {shortages?}}
+ *
+ * shortages 가 있으면 줄바꿈으로 추가한다.
+ */
+export function extractErrorMessage(detail: unknown, fallback = "처리 실패"): string {
+  if (typeof detail === "string") return detail;
+  if (detail && typeof detail === "object") {
+    const d = detail as Record<string, unknown>;
+    const msg = typeof d.message === "string" ? d.message : null;
+    if (!msg) return fallback;
+
+    let shortages: unknown = d.shortages;
+    if (!Array.isArray(shortages) && d.extra && typeof d.extra === "object") {
+      shortages = (d.extra as Record<string, unknown>).shortages;
+    }
+    const tail = Array.isArray(shortages) && shortages.length
+      ? `\n${shortages.join("\n")}`
+      : "";
+    return `${msg}${tail}`;
+  }
+  return fallback;
+}
+
 async function parseError(res: Response) {
   const text = await res.text();
   try {
     const json = JSON.parse(text);
-    if (typeof json.detail === "string") return json.detail;
-    if (json.detail?.message) {
-      const details = Array.isArray(json.detail.shortages) ? `\n${json.detail.shortages.join("\n")}` : "";
-      return `${json.detail.message}${details}`;
-    }
-    return text || res.statusText;
+    return extractErrorMessage(json?.detail, text || res.statusText);
   } catch {
     return text || res.statusText;
   }

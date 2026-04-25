@@ -14,6 +14,9 @@ export function useWarehouseData({ globalSearch, onStatusChange }: Args) {
   const [packages, setPackages] = useState<ShipPackage[]>([]);
   const [productModels, setProductModels] = useState<ProductModel[]>([]);
   const [loadFailure, setLoadFailure] = useState<string | null>(null);
+  // Phase 4: 로딩 플래그 — 메인 데이터(items/employees/packages) 첫 로딩 동안 true.
+  // productModels 는 부수 데이터이므로 플래그에 포함하지 않는다.
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     void api
@@ -26,6 +29,7 @@ export function useWarehouseData({ globalSearch, onStatusChange }: Args) {
   }, [onStatusChange]);
 
   useEffect(() => {
+    setLoading(true);
     void Promise.all([
       api.getEmployees({ activeOnly: true }),
       api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
@@ -42,7 +46,8 @@ export function useWarehouseData({ globalSearch, onStatusChange }: Args) {
         const msg = nextError instanceof Error ? nextError.message : "입출고 데이터를 불러오지 못했습니다.";
         setLoadFailure(msg);
         onStatusChange(msg);
-      });
+      })
+      .finally(() => setLoading(false));
   }, [globalSearch, onStatusChange]);
 
   return {
@@ -51,6 +56,7 @@ export function useWarehouseData({ globalSearch, onStatusChange }: Args) {
     packages,
     productModels,
     loadFailure,
+    loading,
     setItems,
   };
 }

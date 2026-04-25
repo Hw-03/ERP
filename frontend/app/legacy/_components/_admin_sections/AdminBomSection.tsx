@@ -1,70 +1,43 @@
 "use client";
 
 import { X } from "lucide-react";
-import type { BOMDetailEntry, BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS, formatNumber } from "../legacyUi";
 import { EmptyState } from "../common/EmptyState";
 import { BOM_CHILD_CATS, BOM_PARENT_CATS } from "./adminShared";
+import { useAdminBomContext } from "./AdminBomContext";
 
-type ChildItemPlus = Item & { alreadyIn: boolean };
-
-type Props = {
-  items: Item[];
-  parentId: string;
-  setParentId: (id: string) => void;
-  bomRows: BOMEntry[];
-  allBomRows: BOMDetailEntry[];
-  bomParentItems: Item[];
-  bomChildItems: ChildItemPlus[];
-  bomParentSearch: string;
-  setBomParentSearch: (v: string) => void;
-  bomParentCat: string;
-  setBomParentCat: (v: string) => void;
-  bomChildSearch: string;
-  setBomChildSearch: (v: string) => void;
-  bomChildCat: string;
-  setBomChildCat: (v: string) => void;
-  pendingChildId: string | null;
-  setPendingChildId: (v: string | null) => void;
-  pendingChildQty: string;
-  setPendingChildQty: (v: string) => void;
-  editingBomId: string | null;
-  setEditingBomId: (v: string | null) => void;
-  editingQty: string;
-  setEditingQty: (v: string) => void;
-  onAddBomRow: (childId: string, qty: number) => void;
-  onSaveBomQty: (row: BOMEntry) => void;
-  onDeleteBomRow: (bomId: string) => void;
-};
-
-export function AdminBomSection({
-  items,
-  parentId,
-  setParentId,
-  bomRows,
-  allBomRows,
-  bomParentItems,
-  bomChildItems,
-  bomParentSearch,
-  setBomParentSearch,
-  bomParentCat,
-  setBomParentCat,
-  bomChildSearch,
-  setBomChildSearch,
-  bomChildCat,
-  setBomChildCat,
-  pendingChildId,
-  setPendingChildId,
-  pendingChildQty,
-  setPendingChildQty,
-  editingBomId,
-  setEditingBomId,
-  editingQty,
-  setEditingQty,
-  onAddBomRow,
-  onSaveBomQty,
-  onDeleteBomRow,
-}: Props) {
+// Props 없음. 모든 상태/액션은 AdminBomProvider 가 제공하는 Context 에서 읽는다.
+// 기존 22-prop drilling → 0. DesktopAdminView 의 useState 11개도 hook 으로 흡수.
+export function AdminBomSection() {
+  const ctx = useAdminBomContext();
+  const {
+    items,
+    parentId,
+    setParentId,
+    bomRows,
+    allBomRows,
+    bomParentItems,
+    bomChildItems,
+    bomParentSearch,
+    setBomParentSearch,
+    bomParentCat,
+    setBomParentCat,
+    bomChildSearch,
+    setBomChildSearch,
+    bomChildCat,
+    setBomChildCat,
+    pendingChildId,
+    setPendingChildId,
+    pendingChildQty,
+    setPendingChildQty,
+    editingBomId,
+    setEditingBomId,
+    editingQty,
+    setEditingQty,
+    addBomRow: onAddBomRow,
+    saveBomQty: onSaveBomQty,
+    deleteBomRow: onDeleteBomRow,
+  } = ctx;
   return (
     <div className="flex flex-col h-full gap-3">
       {/* 단계 흐름 인디케이터 */}

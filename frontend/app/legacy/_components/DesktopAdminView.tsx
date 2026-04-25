@@ -27,6 +27,7 @@ import { DEPARTMENT_LABELS, LEGACY_COLORS, formatNumber } from "./legacyUi";
 import { AdminMasterItemsSection } from "./_admin_sections/AdminMasterItemsSection";
 import { AdminEmployeesSection } from "./_admin_sections/AdminEmployeesSection";
 import { AdminBomSection } from "./_admin_sections/AdminBomSection";
+import { AdminBomProvider } from "./_admin_sections/AdminBomContext";
 import { AdminPackagesSection } from "./_admin_sections/AdminPackagesSection";
 import { AdminModelsSection } from "./_admin_sections/AdminModelsSection";
 import { AdminExportSection } from "./_admin_sections/AdminExportSection";
@@ -222,17 +223,7 @@ export function DesktopAdminView({
   const [empAddMode, setEmpAddMode] = useState(false);
   const [empAddForm, setEmpAddForm] = useState(EMPTY_EMPLOYEE_FORM);
   const [selectedPackage, setSelectedPackage] = useState<ShipPackage | null>(null);
-  const [parentId, setParentId] = useState("");
-  const [bomRows, setBomRows] = useState<BOMEntry[]>([]);
-  const [bomParentSearch, setBomParentSearch] = useState("");
-  const [bomParentCat, setBomParentCat] = useState("ALL");
-  const [bomChildSearch, setBomChildSearch] = useState("");
-  const [editingBomId, setEditingBomId] = useState<string | null>(null);
-  const [editingQty, setEditingQty] = useState("");
   const [allBomRows, setAllBomRows] = useState<BOMDetailEntry[]>([]);
-  const [pendingChildId, setPendingChildId] = useState<string | null>(null);
-  const [pendingChildQty, setPendingChildQty] = useState("1");
-  const [bomChildCat, setBomChildCat] = useState("ALL");
   const [message, setMessage] = useState("");
   const [pinForm, setPinForm] = useState({ current_pin: "", new_pin: "", confirm_pin: "" });
   const [resetPin, setResetPin] = useState("");
@@ -267,11 +258,6 @@ export function DesktopAdminView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unlocked, globalSearch]);
 
-  useEffect(() => {
-    if (!parentId) return;
-    void api.getBOM(parentId).then(setBomRows).catch(() => setBomRows([]));
-  }, [parentId]);
-
   function refreshAllBom() {
     void api.getAllBOM().then(setAllBomRows).catch(() => setAllBomRows([]));
   }
@@ -302,32 +288,6 @@ export function DesktopAdminView({
       .filter((i) => !kw || `${i.item_name} ${i.erp_code ?? ""}`.toLowerCase().includes(kw))
       .slice(0, 40);
   }, [items, pkgItemSearch, pkgItemCategory]);
-
-  const bomParentItems = useMemo(() => {
-    let pool = items.filter((i) => i.category !== "RM");
-    if (bomParentCat !== "ALL") pool = pool.filter((i) => i.category === bomParentCat);
-    const kw = bomParentSearch.trim().toLowerCase();
-    if (kw) pool = pool.filter((i) => `${i.item_name} ${i.erp_code ?? ""}`.toLowerCase().includes(kw));
-    return pool.slice(0, 100);
-  }, [items, bomParentSearch, bomParentCat]);
-
-  const bomChildItems = useMemo(() => {
-    const A_CATS = new Set(["TA", "HA", "VA", "BA"]);
-    const F_CATS = new Set(["TF", "HF", "VF", "AF"]);
-    const kw = bomChildSearch.trim().toLowerCase();
-    const existingIds = new Set(bomRows.map((r) => r.child_item_id));
-    return items
-      .filter((i) => i.item_id !== parentId)
-      .filter((i) => {
-        if (bomChildCat === "RM") return i.category === "RM";
-        if (bomChildCat === "?A") return A_CATS.has(i.category);
-        if (bomChildCat === "?F") return F_CATS.has(i.category);
-        return true;
-      })
-      .filter((i) => !kw || `${i.item_name} ${i.erp_code ?? ""}`.toLowerCase().includes(kw))
-      .slice(0, 60)
-      .map((i) => ({ ...i, alreadyIn: existingIds.has(i.item_id) }));
-  }, [items, parentId, bomChildSearch, bomChildCat, bomRows]);
 
   function showSave(text: string) {
     setSaveMessage(text);
@@ -470,42 +430,7 @@ export function DesktopAdminView({
     }
   }
 
-  async function addBomRowDirect(childId: string, qty: number) {
-    if (!parentId) return;
-    try {
-      const created = await api.createBOM({ parent_item_id: parentId, child_item_id: childId, quantity: qty, unit: "EA" });
-      setBomRows((current) => [...current, created]);
-      setPendingChildId(null);
-      setPendingChildQty("1");
-      refreshAllBom();
-      onStatusChange("BOM 항목을 추가했습니다.");
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "추가에 실패했습니다.");
-    }
-  }
-
-  async function saveBomQty(row: BOMEntry) {
-    const qty = parseFloat(editingQty);
-    setEditingBomId(null);
-    if (!qty || qty === row.quantity) return;
-    try {
-      const updated = await api.updateBOM(row.bom_id, { quantity: qty });
-      setBomRows((current) => current.map((r) => (r.bom_id === updated.bom_id ? updated : r)));
-      onStatusChange("수량을 변경했습니다.");
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "수량 변경에 실패했습니다.");
-    }
-  }
-
-  async function deleteBomRow(bomId: string) {
-    try {
-      await api.deleteBOM(bomId);
-      setBomRows((current) => current.filter((e) => e.bom_id !== bomId));
-      refreshAllBom();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "삭제 실패");
-    }
-  }
+  // BOM 추가/수정/삭제 액션은 useAdminBom 훅 (AdminBomProvider 내부) 으로 이동.
 
   async function changePin() {
     if (pinForm.new_pin !== pinForm.confirm_pin) {
@@ -709,34 +634,15 @@ export function DesktopAdminView({
               />
             )}
             {section === "bom" && (
-              <AdminBomSection
+              <AdminBomProvider
                 items={items}
-                parentId={parentId}
-                setParentId={setParentId}
-                bomRows={bomRows}
                 allBomRows={allBomRows}
-                bomParentItems={bomParentItems}
-                bomChildItems={bomChildItems}
-                bomParentSearch={bomParentSearch}
-                setBomParentSearch={setBomParentSearch}
-                bomParentCat={bomParentCat}
-                setBomParentCat={setBomParentCat}
-                bomChildSearch={bomChildSearch}
-                setBomChildSearch={setBomChildSearch}
-                bomChildCat={bomChildCat}
-                setBomChildCat={setBomChildCat}
-                pendingChildId={pendingChildId}
-                setPendingChildId={setPendingChildId}
-                pendingChildQty={pendingChildQty}
-                setPendingChildQty={setPendingChildQty}
-                editingBomId={editingBomId}
-                setEditingBomId={setEditingBomId}
-                editingQty={editingQty}
-                setEditingQty={setEditingQty}
-                onAddBomRow={(childId, qty) => void addBomRowDirect(childId, qty)}
-                onSaveBomQty={(row) => void saveBomQty(row)}
-                onDeleteBomRow={(bomId) => void deleteBomRow(bomId)}
-              />
+                refreshAllBom={refreshAllBom}
+                onStatusChange={onStatusChange}
+                onError={(m) => setMessage(m)}
+              >
+                <AdminBomSection />
+              </AdminBomProvider>
             )}
             {section === "packages" && (
               <AdminPackagesSection
@@ -816,7 +722,7 @@ export function DesktopAdminView({
               <div>품목 {formatNumber(items.length)}건</div>
               <div>직원 {formatNumber(employees.length)}명</div>
               <div>출하묶음 {formatNumber(packages.length)}건</div>
-              <div>BOM {formatNumber(bomRows.length)}건</div>
+              <div>BOM {formatNumber(allBomRows.length)}건</div>
               <div>부서 {formatNumber(Object.keys(DEPARTMENT_LABELS).length)}개</div>
             </div>
           </div>
