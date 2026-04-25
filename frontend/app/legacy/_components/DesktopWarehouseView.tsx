@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type Department, type Employee, type Item, type ProductModel, type ShipPackage } from "@/lib/api";
+import { api, type Employee, type Item, type ProductModel, type ShipPackage } from "@/lib/api";
 import { LEGACY_COLORS, formatNumber, normalizeDepartment } from "./legacyUi";
 import { LoadFailureCard } from "./common/LoadFailureCard";
 import { ResultModal } from "./common/ResultModal";
@@ -14,12 +14,11 @@ import {
   QuantityStep,
   WizardStepCard,
   WorkTypeStep,
-  type DefectiveSource,
-  type Direction,
-  type TransferDirection,
   type WorkType,
 } from "./_warehouse_steps";
 import { useWarehouseFilters } from "./_warehouse_hooks/useWarehouseFilters";
+import { useWarehouseWizardState } from "./_warehouse_hooks/useWarehouseWizardState";
+import { useWarehouseCompletionFeedback } from "./_warehouse_hooks/useWarehouseCompletionFeedback";
 
 export function DesktopWarehouseView({
   globalSearch,
@@ -32,14 +31,6 @@ export function DesktopWarehouseView({
   preselectedItem?: Item | null;
   onSubmitSuccess?: () => void;
 }) {
-  // ─── 작업 설정 state ───
-  const [workType, setWorkType] = useState<WorkType>("raw-io");
-  const [rawDirection, setRawDirection] = useState<Direction>("in");
-  const [warehouseDirection, setWarehouseDirection] = useState<TransferDirection>("wh-to-dept");
-  const [deptDirection, setDeptDirection] = useState<Direction>("in");
-  const [selectedDept, setSelectedDept] = useState<Department>("조립");
-  const [defectiveSource, setDefectiveSource] = useState<DefectiveSource>("warehouse");
-
   // ─── 데이터 ───
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [items, setItems] = useState<Item[]>([]);
@@ -61,17 +52,6 @@ export function DesktopWarehouseView({
   const [lastResult, setLastResult] = useState<{ count: number; label: string } | null>(null);
   const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
   const [employeeExpanded, setEmployeeExpanded] = useState(false);
-
-  // ─── 실행 완료 피드백 애니메이션 ───
-  // nonce: 매 실행마다 새 값을 부여해 overlay div의 key로 사용 → 강제 remount 보장
-  const [completionFlyout, setCompletionFlyout] = useState<{ nonce: number; kind: "in" | "out"; count: number } | null>(null);
-  const [completionPhase, setCompletionPhase] = useState<"show" | "out">("show");
-  const flyoutTimer1Ref = useRef<number | null>(null);
-  const flyoutTimer2Ref = useRef<number | null>(null);
-
-  // ─── Wizard 단계 제어 ───
-  const [forcedStep, setForcedStep] = useState<1 | 2 | null>(null);
-  const [step2Confirmed, setStep2Confirmed] = useState(false);
 
   // ─── 최종 실행 확인 팝업 ───
   const [showConfirm, setShowConfirm] = useState(false);
@@ -138,7 +118,7 @@ export function DesktopWarehouseView({
     }
   }, [preselectedItem]);
 
-  // ───────────────────── derivations ─────────────────────
+  // ───────────────────── selection-derived ─────────────────────
 
   const selectedEntries = useMemo(
     () =>
@@ -149,6 +129,41 @@ export function DesktopWarehouseView({
   );
 
   const selectedEmployee = employees.find((e) => e.employee_id === employeeId) ?? null;
+  const step1Done = !!selectedEmployee;
+  const hasSelectedPackage = !!selectedPackage;
+  const hasSelectedItems = selectedEntries.length > 0;
+
+  // ───────────────────── wizard state (extracted to hook) ─────────────────────
+
+  const {
+    workType,
+    rawDirection,
+    warehouseDirection,
+    deptDirection,
+    selectedDept,
+    defectiveSource,
+    forcedStep,
+    setWorkType,
+    setForcedStep,
+    setStep2Confirmed,
+    changeRawDir,
+    changeWarehouseDir,
+    changeDeptDir,
+    changeSelectedDept,
+    changeDefectiveSource,
+    confirmStep2,
+    step2Ready,
+    step2Done,
+    step1State,
+    step2State,
+    hasItems,
+    showStep3,
+    showStep4,
+    showStep5,
+    resetWizardConfig,
+  } = useWarehouseWizardState({ step1Done, hasSelectedPackage, hasSelectedItems });
+
+  // ───────────────────── workType-derived ─────────────────────
 
   const isOutbound =
     workType === "raw-io"
@@ -211,45 +226,17 @@ export function DesktopWarehouseView({
     isPackageMode: workType === "package-out",
   });
 
-  // ───────────────────── step gating ─────────────────────
+  // ───────────────────── completion feedback (extracted to hook) ─────────────────────
 
-  const step1Done = !!selectedEmployee;
+  const { completionFlyout, completionPhase } = useWarehouseCompletionFeedback({
+    lastResult,
+    workType,
+    rawDirection,
+    warehouseDirection,
+    deptDirection,
+  });
 
-  const step2Ready =
-    workType === "package-out"
-      ? true
-      : workType === "raw-io"
-        ? true
-        : workType === "warehouse-io"
-          ? !!selectedDept && !!warehouseDirection
-          : workType === "dept-io"
-            ? !!selectedDept
-            : workType === "defective-register"
-              ? !!selectedDept && !!defectiveSource
-              : workType === "supplier-return"
-                ? !!selectedDept
-                : false;
-
-  const step2Done = step2Ready && step2Confirmed;
-  const hasItems = workType === "package-out" ? !!selectedPackage : selectedEntries.length > 0;
-
-  const step1State: "active" | "complete" | "locked" =
-    forcedStep === 1 ? "active" : step1Done ? "complete" : "active";
-
-  const step2State: "active" | "complete" | "locked" =
-    forcedStep === 1 || (!step1Done && forcedStep !== 2)
-      ? "locked"
-      : forcedStep === 2
-        ? "active"
-        : step2Done
-          ? "complete"
-          : "active";
-
-  const showStep3 = step1Done && step2Done && forcedStep === null;
-  const showStep4 = showStep3 && hasItems;
-  const showStep5 = showStep4; // 5단계는 4단계와 함께 노출하고 blocker로 사유 안내
-
-  // ───────────────────── wrapped setters (step2Confirmed reset) ─────────────────────
+  // ───────────────────── parent-owned wrapped setters (cross-cutting) ─────────────────────
 
   function changeWorkType(wt: WorkType) {
     if (wt === workType) return;
@@ -259,35 +246,9 @@ export function DesktopWarehouseView({
     setStep2Confirmed(false);
     setError(null);
   }
-  function changeRawDir(d: Direction) {
-    setRawDirection(d);
-    setStep2Confirmed(false);
-  }
-  function changeWarehouseDir(d: TransferDirection) {
-    setWarehouseDirection(d);
-    setStep2Confirmed(false);
-  }
-  function changeDeptDir(d: Direction) {
-    setDeptDirection(d);
-    setStep2Confirmed(false);
-  }
-  function changeSelectedDept(d: Department) {
-    setSelectedDept(d);
-    setStep2Confirmed(false);
-  }
-  function changeDefectiveSource(s: DefectiveSource) {
-    setDefectiveSource(s);
-    setStep2Confirmed(false);
-  }
 
   function selectEmployee(id: string) {
     setEmployeeId(id);
-    setForcedStep(null);
-  }
-
-  function confirmStep2() {
-    if (!step2Ready) return;
-    setStep2Confirmed(true);
     setForcedStep(null);
   }
 
@@ -474,18 +435,11 @@ export function DesktopWarehouseView({
   // ───────────────────── effects: post-success reset / status / scroll ─────────────────────
 
   function resetAfterSuccess() {
-    setWorkType("raw-io");
-    setRawDirection("in");
-    setWarehouseDirection("wh-to-dept");
-    setDeptDirection("in");
-    setSelectedDept("조립");
-    setDefectiveSource("warehouse");
+    resetWizardConfig();
     setSelectedItems(new Map());
     setSelectedPackage(null);
     setNotes("");
     setReferenceNo("");
-    setStep2Confirmed(false);
-    setForcedStep(null);
   }
 
   // submit() 본문은 변경하지 않음 — lastResult 변화를 watch해서 추가 reset/status 처리
@@ -521,39 +475,6 @@ export function DesktopWarehouseView({
     }
   }, [lastResult]);
 
-  // 실행 완료 피드백 — 중앙에 큰 카드 잠깐 표시 후 페이드아웃
-  useEffect(() => {
-    if (!lastResult) return;
-
-    if (flyoutTimer1Ref.current != null) window.clearTimeout(flyoutTimer1Ref.current);
-    if (flyoutTimer2Ref.current != null) window.clearTimeout(flyoutTimer2Ref.current);
-
-    // 입고/출고 분기 — 작업 유형 + 방향
-    const isIn = (() => {
-      if (workType === "raw-io") return rawDirection === "in";
-      if (workType === "warehouse-io") return warehouseDirection === "dept-to-wh";
-      if (workType === "dept-io") return deptDirection === "in";
-      return false; // defective-register, supplier-return, package-out → 출고 계열
-    })();
-
-    const nonce = Date.now();
-    setCompletionPhase("show");
-    setCompletionFlyout({ nonce, kind: isIn ? "in" : "out", count: lastResult.count });
-
-    flyoutTimer1Ref.current = window.setTimeout(() => {
-      setCompletionPhase("out");
-    }, 1100);
-
-    flyoutTimer2Ref.current = window.setTimeout(() => {
-      setCompletionFlyout(null);
-    }, 1100 + 380);
-
-    return () => {
-      if (flyoutTimer1Ref.current != null) window.clearTimeout(flyoutTimer1Ref.current);
-      if (flyoutTimer2Ref.current != null) window.clearTimeout(flyoutTimer2Ref.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastResult]);
   useEffect(() => {
     if (forcedStep === 1 && prevForcedStepRef.current !== 1) scrollToRef(step1Ref);
     if (forcedStep === 2 && prevForcedStepRef.current !== 2) scrollToRef(step2Ref);
