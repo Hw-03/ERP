@@ -395,7 +395,10 @@ def get_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
 
     item, inventory = row
-    return _to_item_with_inventory(db, item, inventory)
+    # 단건이지만 list 경로와 동일하게 bulk_compute 사용 — compute_for 단건 호출 경로 정리.
+    figures_map = stock_math.bulk_compute(db, [item.item_id])
+    figures = figures_map.get(item.item_id)
+    return _to_item_with_inventory(db, item, inventory, figures=figures)
 
 
 @router.put("/{item_id}", response_model=ItemResponse)
