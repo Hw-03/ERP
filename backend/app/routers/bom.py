@@ -140,6 +140,46 @@ def delete_bom(bom_id: uuid.UUID, db: Session = Depends(get_db)):
     db.commit()
 
 
+@router.get("/where-used/{item_id}", response_model=List[BOMDetailResponse])
+def get_where_used(item_id: uuid.UUID, db: Session = Depends(get_db)):
+    """주어진 품목을 child 로 사용하는 parent BOM 행 목록 (역방향 추적).
+
+    - 직접 사용처만 반환 (1단계). 다단계 추적은 호출측에서 재귀.
+    - 응답은 `BOMDetailResponse` 배열 — 기존 BOM 조회와 동일 모양.
+    """
+    item = db.query(Item).filter(Item.item_id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
+
+    entries = db.query(BOM).filter(BOM.child_item_id == item_id).all()
+    if not entries:
+        return []
+
+    parent_ids = list({e.parent_item_id for e in entries})
+    parents = {
+        p.item_id: p
+        for p in db.query(Item).filter(Item.item_id.in_(parent_ids)).all()
+    }
+
+    result: List[BOMDetailResponse] = []
+    for entry in entries:
+        parent = parents.get(entry.parent_item_id)
+        if not parent:
+            continue
+        result.append(BOMDetailResponse(
+            bom_id=entry.bom_id,
+            parent_item_id=entry.parent_item_id,
+            parent_item_name=parent.item_name,
+            parent_erp_code=parent.erp_code,
+            child_item_id=entry.child_item_id,
+            child_item_name=item.item_name,
+            child_erp_code=item.erp_code,
+            quantity=entry.quantity,
+            unit=entry.unit,
+        ))
+    return result
+
+
 def _build_tree(
     db: Session,
     item: Item,
