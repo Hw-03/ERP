@@ -1,14 +1,59 @@
 # DEXCOWIN ERP
 
-정밀 X-ray 장비 제조사의 품목, 재고, BOM, 입출고를 관리하는 ERP 프로젝트다.
+정밀 X-ray 장비 제조사의 품목, 재고, BOM, 입출고를 관리하는 내부 ERP/MES 프로토타입.
 
 ## 현재 기준
 
 - 기준 품목 수: 971건
-- 백엔드: FastAPI + SQLAlchemy + SQLite
+- 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/erp.db`)
 - 프론트엔드: Next.js 14 + Tailwind CSS
-- 주 사용 화면: `/legacy`
+- 주 사용 화면: `/legacy` (데스크톱 셸: 대시보드 / 입출고 / 입출고 내역 / 관리자)
 - 품목코드 기준 문서: `docs/ITEM_CODE_RULES.md`
+
+## 빠른 시작 (Windows · 권장)
+
+루트의 `start.bat` 한 번 실행으로 백엔드·프론트가 함께 뜨고 LAN IP 기준 브라우저가 자동 실행된다.
+
+```bat
+start.bat
+```
+
+- 백엔드: `http://0.0.0.0:8010` (로컬 호출은 `http://127.0.0.1:8010`)
+- 프론트엔드: `http://<LAN IP>:3000` 또는 `http://localhost:3000`
+- 같은 사설망 안의 다른 PC에서도 `http://<LAN IP>:3000` 으로 접속 가능
+
+처음 실행 시 `npm install` 과 `pip install -r backend/requirements.txt` 가 자동 수행된다.
+
+## 수동 실행
+
+백엔드:
+
+```bash
+cd backend
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload
+```
+
+프론트엔드:
+
+```bash
+cd frontend
+npm run dev
+```
+
+대표 접속:
+
+```text
+http://localhost:3000
+```
+
+## 운영 보조 스크립트
+
+| 스크립트 | 역할 |
+|---|---|
+| `scripts/backup_db.bat` | `backend/erp.db` 를 `backend/_backup/erp_YYYYMMDD_HHMMSS.db` 로 복사 |
+| `scripts/healthcheck.bat` | `GET /health/detailed` 호출 후 결과 출력 |
+
+자세한 운영 절차는 `docs/OPERATIONS.md` 참고.
 
 ## 품목코드 핵심 규칙
 
@@ -41,50 +86,48 @@ ERP 코드 포맷:
 34-TR-0023
 ```
 
-## 실행
-
-백엔드:
-
-```bash
-cd backend
-uvicorn app.main:app --host 127.0.0.1 --port 8010
-```
-
-프론트엔드:
-
-```bash
-cd frontend
-npm run dev
-```
-
-대표 접속:
-
-```text
-http://localhost:3000
-```
-
 ## 주요 경로
 
 | 경로 | 역할 |
 |---|---|
 | `backend/` | FastAPI 백엔드 |
 | `frontend/` | Next.js 프론트엔드 |
-| `docs/` | 현재 기준 문서와 작업 인수인계 |
-| `docs/design/` | UI 디자인 참고 자료 |
-| `_archive/` | 실험/보관 자료 |
+| `frontend/app/legacy/_components/common/` | 공용 UI 부품(EmptyState · LoadFailureCard · ConfirmModal · ResultModal · StatusPill · LoadingSkeleton) |
+| `docs/` | 현재 기준·운영·구조·인수인계 문서 |
+| `scripts/` | DB 백업 · 헬스체크 등 운영 스크립트 |
+| `_archive/` · `_backup/` · `frontend/_archive/` | 보관용 — 일반 작업 대상 아님 |
 
 ## 문서
 
-- `docs/README.md`: 문서 목차
-- `docs/ITEM_CODE_RULES.md`: 품목코드 최종 기준
-- `docs/AI_HANDOVER.md`: AI 작업 인수인계
-- `docs/CODEX_PROGRESS.md`: 큰 기능 단위 진행 기록
+| 문서 | 대상 | 내용 |
+|---|---|---|
+| `docs/USER_GUIDE.md` | 현장 사용자 | 화면별 사용법 (대시보드 / 입출고 / 내역 / 관리자) |
+| `docs/OPERATIONS.md` | 운영자 | 365일 운영, 시작·재시작, 포트 충돌, 백업, 1차 장애 대응 |
+| `docs/ARCHITECTURE.md` | 개발자 | 폴더 구조·레이어·재고 3-bucket 모델·wizard 흐름 |
+| `docs/ITEM_CODE_RULES.md` | 모두 | 품목코드 최종 기준 |
+| `docs/AI_HANDOVER.md` | AI 협업자 | 인수인계 |
+| `docs/CODEX_PROGRESS.md` | 모두 | 큰 기능 단위 진행 기록 |
+| `docs/BACKEND_REFACTOR_PLAN.md` | 다음 작업 | 미구현 백엔드 개선 설계서(보류) |
+| `docs/FRONTEND_HOOKS_PLAN.md` | 다음 작업 | 미구현 프론트 hook/뷰 분할 설계서(보류) |
 
 ## 검증
 
 ```bash
+# 백엔드
 python -m compileall backend
+
+# 프론트
 cd frontend
+npm run lint
 npx tsc --noEmit
 npm run build
+```
+
+수동 smoke (백엔드 기동 후):
+
+```text
+GET  /health
+GET  /api/items
+GET  /api/inventory/summary
+GET  /api/production/capacity
 ```

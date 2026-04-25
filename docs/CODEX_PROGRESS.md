@@ -69,6 +69,37 @@
 - `66e93cf`: 아카이브 볼트 원본 제거, 재고뷰/로고 스크립트 추가
 - `98fa3c1`: Obsidian vault 이동 및 프론트 UI 업데이트
 
+## 2026-04-25 입출고 단계형 wizard 도입
+
+- 입출고 탭을 **담당자 → 작업유형 → 품목 → 수량 → 실행 → 완료 피드백** 5단계 wizard로 재구성
+- 부분 실패 안전 처리(결과 모달 + 실패 항목만 재시도 + 자동 refresh) 추가
+- Topbar에 작업 상태 pill 표시(`방금 완료 …`)
+
+## 2026-04-25 `feat/erp-overhaul` brunch — UX 마감 / 공용 부품 / 문서
+
+### 구현 완료
+
+- 공용 UI 부품 6종 신설 (`frontend/app/legacy/_components/common/`):
+  EmptyState · LoadFailureCard · LoadingSkeleton · StatusPill · ConfirmModal · ResultModal
+- 입출고 UX 마감:
+  - 필터 가림 안내 + 필터 해제 버튼
+  - 음수 재고 행 빨강 강조 + "재고 부족" 라벨
+  - blockerText에 출고 음수 안내 추가
+  - 메모 200자 카운터
+  - submit 중 ESC/배경 클릭 잠금 (공용 부품 내장)
+- 데스크톱 4화면 시각 언어 통일:
+  Warehouse / Inventory / History / Admin / Topbar — 인라인 빈/실패/확인/Pill 패턴을 공용 부품으로 치환
+- 운영 보조 스크립트: `scripts/backup_db.bat`, `scripts/healthcheck.bat`
+- 문서 신설: USER_GUIDE / OPERATIONS / ARCHITECTURE / BACKEND_REFACTOR_PLAN / FRONTEND_HOOKS_PLAN
+- 문서 갱신: README / AI_HANDOVER / CODEX_PROGRESS
+
+### 보류 (다음 단계로 이월)
+
+- 백엔드 commit/refresh 표준화, 에러 detail 표준, ship-package N+1, export 헬퍼 (설계서: `docs/BACKEND_REFACTOR_PLAN.md`)
+- `useWarehouseWizardState`/`useWarehouseSubmit`/`useWarehouseFilters` hook 추출, View 섹션 분할 (설계서: `docs/FRONTEND_HOOKS_PLAN.md`)
+- 운영 파일 위생(루트 `erp.db` 정리, seed 스크립트 이동, docker-compose 포트 정렬)
+- 보안/권한·테스트·CI
+
 ## 다음 우선순위
 
 - `BF -> AF` 마이그레이션 결과 검증
@@ -76,3 +107,4 @@
 - `min_stock` 미설정 품목의 정상/부족 분류 기준 검증
 - BOM 가계도/Where-Used 시각화 기획
 - 출하 스펙/거래처 관리 기능 설계
+- (위 보류 항목)
