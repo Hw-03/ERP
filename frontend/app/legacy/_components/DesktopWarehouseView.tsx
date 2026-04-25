@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, RotateCcw } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { api, type Department, type Employee, type Item, type ProductModel, type ShipPackage } from "@/lib/api";
 import { LEGACY_COLORS, formatNumber, normalizeDepartment } from "./legacyUi";
 import {
@@ -81,7 +81,6 @@ export function DesktopWarehouseView({
   const step4Ref = useRef<HTMLDivElement>(null);
   const prevStep1DoneRef = useRef(false);
   const prevStep2DoneRef = useRef(false);
-  const prevHasItemsRef = useRef(false);
   const prevForcedStepRef = useRef<1 | 2 | null>(null);
   const prevLastResultRef = useRef<{ count: number; label: string } | null>(null);
 
@@ -384,17 +383,6 @@ export function DesktopWarehouseView({
     });
   }
 
-  function resetAll() {
-    setSelectedItems(new Map());
-    setReferenceNo("");
-    setNotes("");
-    setEmployeeId("");
-    setSelectedPackage(null);
-    setError(null);
-    setForcedStep(null);
-    setStep2Confirmed(false);
-  }
-
   // ───────────────────── summaries (for collapsed cards) ─────────────────────
 
   const step1Summary = selectedEmployee
@@ -448,11 +436,13 @@ export function DesktopWarehouseView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastResult]);
 
-  // 자동 스크롤
-  function scrollToRef(ref: React.RefObject<HTMLDivElement>) {
-    requestAnimationFrame(() => {
-      ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+  // 자동 스크롤 — 카드 mount 애니메이션이 먼저 보이고 그 뒤로 스크롤이 따라오는 느낌
+  function scrollToRef(ref: React.RefObject<HTMLDivElement>, delay = 150) {
+    window.setTimeout(() => {
+      requestAnimationFrame(() => {
+        ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }, delay);
   }
   useEffect(() => {
     if (step1Done && !prevStep1DoneRef.current) scrollToRef(step2Ref);
@@ -463,13 +453,9 @@ export function DesktopWarehouseView({
     prevStep2DoneRef.current = step2Done;
   }, [step2Done]);
   useEffect(() => {
-    if (hasItems && !prevHasItemsRef.current) scrollToRef(step4Ref);
-    prevHasItemsRef.current = hasItems;
-  }, [hasItems]);
-  useEffect(() => {
     if (lastResult && lastResult !== prevLastResultRef.current) {
-      // submit 완료 후 작업유형(2단계)으로 부드럽게 복귀
-      scrollToRef(step2Ref);
+      // submit 완료 후 작업유형(2단계)으로 부드럽게 복귀 — 약간 더 여유있게
+      scrollToRef(step2Ref, 200);
     }
   }, [lastResult]);
   useEffect(() => {
@@ -494,42 +480,32 @@ export function DesktopWarehouseView({
     <div className="flex h-full min-h-0 flex-1 justify-center overflow-y-auto pr-4" ref={scrollRootRef}>
       <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-3 px-6 pb-10 pt-4">
         {/* 헤더 */}
-        <header className="flex items-center justify-between pb-1">
+        <header className="pb-1">
           <h1 className="text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>
             입출고 작업
           </h1>
-          <button
-            onClick={resetAll}
-            className="flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold transition-colors hover:brightness-125"
-            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-          >
-            <RotateCcw className="h-3 w-3" />
-            초기화
-          </button>
         </header>
 
-        {/* 직전 단계 sticky 요약 */}
+        {/* 직전 단계 sticky 요약 — 압축된 완료 카드 느낌 */}
         {stickySummary && (
           <div
-            className="sticky top-0 z-20 -mx-2 rounded-full border px-3 py-1.5 backdrop-blur-md"
+            className="sticky top-0 z-10 flex items-center gap-3 rounded-[18px] border px-4 py-3 backdrop-blur-md"
             style={{
-              background: `color-mix(in srgb, ${LEGACY_COLORS.s1} 80%, transparent)`,
+              background: `color-mix(in srgb, ${LEGACY_COLORS.s1} 92%, transparent)`,
               borderColor: LEGACY_COLORS.border,
             }}
           >
-            <div className="flex items-center gap-2 text-xs">
-              <span
-                className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
-                style={{
-                  background: `color-mix(in srgb, ${LEGACY_COLORS.green} 18%, transparent)`,
-                  color: LEGACY_COLORS.green,
-                }}
-              >
-                {stickySummary.n}. {stickySummary.title}
-              </span>
-              <span className="truncate font-bold" style={{ color: LEGACY_COLORS.text }}>
-                {stickySummary.text}
-              </span>
+            <div
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black"
+              style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}
+            >
+              {stickySummary.n}
+            </div>
+            <div className="min-w-0 flex-1 truncate text-xs font-bold uppercase tracking-[0.12em]" style={{ color: LEGACY_COLORS.muted2 }}>
+              {stickySummary.title}
+            </div>
+            <div className="min-w-0 max-w-[60%] truncate text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
+              {stickySummary.text}
             </div>
           </div>
         )}
@@ -553,34 +529,36 @@ export function DesktopWarehouseView({
           </WizardStepCard>
         </div>
 
-        {/* 2단계: 작업 유형 */}
-        <div ref={step2Ref} style={{ scrollMarginTop: 56 }}>
-          <WizardStepCard
-            n={2}
-            title={step2State === "active" ? "작업 유형을 선택하세요" : "작업 유형"}
-            state={step2State}
-            summary={step2Summary}
-            onChange={step2State === "complete" ? () => setForcedStep(2) : undefined}
-            accent={step2Accent}
-          >
-            <WorkTypeStep
-              workType={workType}
-              onWorkTypeChange={changeWorkType}
-              rawDirection={rawDirection}
-              setRawDirection={changeRawDir}
-              warehouseDirection={warehouseDirection}
-              setWarehouseDirection={changeWarehouseDir}
-              deptDirection={deptDirection}
-              setDeptDirection={changeDeptDir}
-              selectedDept={selectedDept}
-              setSelectedDept={changeSelectedDept}
-              defectiveSource={defectiveSource}
-              setDefectiveSource={changeDefectiveSource}
-              ready={step2Ready}
-              onConfirm={confirmStep2}
-            />
-          </WizardStepCard>
-        </div>
+        {/* 2단계: 작업 유형 (담당자 선택 후에만 등장) */}
+        {step1Done && (
+          <div ref={step2Ref} style={{ scrollMarginTop: 56 }}>
+            <WizardStepCard
+              n={2}
+              title={step2State === "active" ? "작업 유형을 선택하세요" : "작업 유형"}
+              state={step2State}
+              summary={step2Summary}
+              onChange={step2State === "complete" ? () => setForcedStep(2) : undefined}
+              accent={step2Accent}
+            >
+              <WorkTypeStep
+                workType={workType}
+                onWorkTypeChange={changeWorkType}
+                rawDirection={rawDirection}
+                setRawDirection={changeRawDir}
+                warehouseDirection={warehouseDirection}
+                setWarehouseDirection={changeWarehouseDir}
+                deptDirection={deptDirection}
+                setDeptDirection={changeDeptDir}
+                selectedDept={selectedDept}
+                setSelectedDept={changeSelectedDept}
+                defectiveSource={defectiveSource}
+                setDefectiveSource={changeDefectiveSource}
+                ready={step2Ready}
+                onConfirm={confirmStep2}
+              />
+            </WizardStepCard>
+          </div>
+        )}
 
         {/* 3단계: 품목 선택 */}
         {showStep3 && (

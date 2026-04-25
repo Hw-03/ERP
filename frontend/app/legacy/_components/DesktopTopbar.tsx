@@ -64,7 +64,7 @@ export function DesktopTopbar({
 
         {status && (
           <span
-            className="inline-flex max-w-[320px] items-center gap-1.5 truncate rounded-full border px-3 py-1 text-xs font-bold"
+            className="inline-flex max-w-[260px] items-center gap-1.5 truncate rounded-full border px-3 py-1 text-xs font-bold"
             style={{
               color: pillTone,
               background: `color-mix(in srgb, ${pillTone} 14%, transparent)`,
