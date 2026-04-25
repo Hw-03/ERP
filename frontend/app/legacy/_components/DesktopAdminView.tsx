@@ -7,6 +7,7 @@ import { api, type BOMDetailEntry, type BOMEntry, type Employee, type Item, type
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import { PinLock } from "./PinLock";
 import { DEPARTMENT_LABELS, LEGACY_COLORS, buildItemSearchLabel, formatNumber, normalizeDepartment } from "./legacyUi";
+import { EmptyState } from "./common/EmptyState";
 
 type AdminSection = "items" | "employees" | "models" | "bom" | "packages" | "export" | "settings";
 
@@ -1267,7 +1268,12 @@ export function DesktopAdminView({
                           구성 자재 목록
                         </div>
                         {bomRows.length === 0 ? (
-                          <div className="p-5 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>등록된 BOM 항목이 없습니다.</div>
+                          <EmptyState
+                            variant="no-data"
+                            compact
+                            title="등록된 BOM 항목이 없습니다."
+                            description="자재를 추가하면 이곳에 표시됩니다."
+                          />
                         ) : (
                           <div className="min-h-0 overflow-y-auto">
                             <div className="grid items-center border-b px-5 py-2 text-sm font-bold uppercase tracking-[0.15em]"
@@ -1343,7 +1349,12 @@ export function DesktopAdminView({
                           <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{allBomRows.length}개 관계</span>
                         </div>
                         {allBomRows.length === 0 ? (
-                          <div className="p-5 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>등록된 BOM이 없습니다.</div>
+                          <EmptyState
+                            variant="no-data"
+                            compact
+                            title="등록된 BOM이 없습니다."
+                            description="제품을 선택해 BOM을 등록할 수 있습니다."
+                          />
                         ) : (
                           <div className="min-h-0 overflow-y-auto">
                             <div className="grid grid-cols-[80px_1fr_1fr_80px] border-b px-5 py-2 text-sm font-bold uppercase tracking-[0.15em]" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>

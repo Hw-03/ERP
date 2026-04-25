@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   AlertTriangle,
   ArrowLeftRight,
@@ -15,6 +15,7 @@ import {
   RotateCcw,
   X,
 } from "lucide-react";
+import { EmptyState } from "./common/EmptyState";
 import type { LucideIcon } from "lucide-react";
 import type { Department, Employee, Item, ProductModel, ShipPackage } from "@/lib/api";
 import { SelectedItemsPanel } from "./SelectedItemsPanel";
@@ -629,8 +630,62 @@ export function ItemPickStep({
 
   const isPackage = workType === "package-out";
 
+  const filteredItemIds = useMemo(
+    () => new Set(filteredItems.map((it) => it.item_id)),
+    [filteredItems],
+  );
+  const hiddenSelectedCount = useMemo(
+    () =>
+      isPackage
+        ? 0
+        : Array.from(selectedItems.keys()).filter((id) => !filteredItemIds.has(id)).length,
+    [selectedItems, filteredItemIds, isPackage],
+  );
+  const hasActiveFilter =
+    !isPackage && (dept !== "ALL" || modelFilter !== "전체" || categoryFilter !== "ALL" || !!localSearch);
+
+  function clearFilters() {
+    setDept("ALL");
+    setModelFilter("전체");
+    setCategoryFilter("ALL");
+    setLocalSearch("");
+  }
+
   return (
     <div className="space-y-3">
+      {/* 필터로 가려진 선택 품목 안내 */}
+      {hiddenSelectedCount > 0 && (
+        <div
+          className="flex items-center justify-between gap-3 rounded-[12px] border px-3 py-2 text-xs"
+          style={{
+            background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 10%, transparent)`,
+            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 40%, transparent)`,
+            color: LEGACY_COLORS.yellow,
+          }}
+        >
+          <div className="flex min-w-0 items-center gap-2">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate font-bold">
+              선택한 {hiddenSelectedCount}건이 현재 필터로 가려졌습니다
+            </span>
+          </div>
+          {hasActiveFilter && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="shrink-0 rounded-[10px] border px-2.5 py-1 text-[11px] font-bold transition-colors hover:brightness-125"
+              style={{
+                borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 40%, transparent)`,
+                color: LEGACY_COLORS.yellow,
+                background: "transparent",
+              }}
+            >
+              필터 해제
+            </button>
+          )}
+        </div>
+      )}
+
       {/* 필터 */}
       {!isPackage ? (
         <div className="grid grid-cols-[1fr_1fr_1fr_2fr] gap-2">
@@ -727,8 +782,12 @@ export function ItemPickStep({
               );
             })}
             {filteredPackages.length === 0 && (
-              <li className="py-8 text-center text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                검색 결과가 없습니다
+              <li>
+                <EmptyState
+                  variant={localSearch ? "no-search-result" : "no-data"}
+                  compact
+                  description={localSearch ? "검색어를 다시 확인해 주세요." : "등록된 패키지가 없습니다."}
+                />
               </li>
             )}
           </ul>
@@ -809,8 +868,21 @@ export function ItemPickStep({
               })}
               {filteredItems.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                    검색 결과가 없습니다
+                  <td colSpan={6} className="px-3 py-2">
+                    <EmptyState
+                      variant={hasActiveFilter ? "filtered-out" : "no-data"}
+                      compact
+                      description={
+                        hasActiveFilter
+                          ? "필터를 해제하면 다시 표시됩니다."
+                          : "조회할 품목이 없습니다."
+                      }
+                      action={
+                        hasActiveFilter
+                          ? { label: "필터 해제", onClick: clearFilters }
+                          : undefined
+                      }
+                    />
                   </td>
                 </tr>
               )}
@@ -973,15 +1045,32 @@ export function QuantityStep({
 
       {/* 메모 */}
       <label className="flex flex-col gap-1">
-        <span className="text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
-          메모 (선택)
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
+            메모 (선택)
+          </span>
+          <span
+            className="text-[10px] font-bold tabular-nums"
+            style={{
+              color: notes.length > 200 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2,
+            }}
+          >
+            {notes.length}/200
+          </span>
+        </div>
         <input
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="메모를 입력하세요"
           className="rounded-[12px] border px-3 py-2 text-sm outline-none"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+          style={{
+            background: LEGACY_COLORS.s2,
+            borderColor:
+              notes.length > 200
+                ? `color-mix(in srgb, ${LEGACY_COLORS.red} 50%, transparent)`
+                : LEGACY_COLORS.border,
+            color: LEGACY_COLORS.text,
+          }}
         />
       </label>
     </div>

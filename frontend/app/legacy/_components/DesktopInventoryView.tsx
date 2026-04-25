@@ -14,6 +14,8 @@ import {
   transactionColor,
   transactionLabel,
 } from "./legacyUi";
+import { EmptyState } from "./common/EmptyState";
+import { LoadFailureCard } from "./common/LoadFailureCard";
 
 const DESKTOP_PAGE_SIZE = 100;
 
@@ -746,16 +748,7 @@ export function DesktopInventoryView({
               />
 
               {error ? (
-                <div
-                  className="rounded-[24px] border px-4 py-4 text-base"
-                  style={{
-                    borderColor: "rgba(255,123,123,.26)",
-                    background: "rgba(255,123,123,.08)",
-                    color: LEGACY_COLORS.red,
-                  }}
-                >
-                  {error}
-                </div>
+                <LoadFailureCard message={error} onRetry={() => void loadItems()} />
               ) : loading ? (
                 <div
                   className="rounded-[24px] border px-4 py-4 text-base"
@@ -768,27 +761,25 @@ export function DesktopInventoryView({
                   재고 데이터를 불러오는 중입니다...
                 </div>
               ) : filteredItems.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-                  <div
-                    className="rounded-3xl p-4"
-                    style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`, color: LEGACY_COLORS.muted2 }}
-                  >
-                    <PackageSearch className="h-8 w-8" />
-                  </div>
-                  <div className="text-base font-bold">검색 결과가 없습니다.</div>
-                  <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-                    검색어 또는 필터를 초기화해 전체 품목을 다시 확인하세요.
-                  </div>
-                  {(activeFilterCount > 0 || kpi !== "ALL") && (
-                    <button
-                      onClick={() => { setSelectedDepts([]); setSelectedModels([]); setLocalSearch(""); setKpi("ALL"); }}
-                      className="rounded-full border px-4 py-2 text-sm font-semibold transition-colors hover:brightness-110"
-                      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.blue, color: LEGACY_COLORS.blue }}
-                    >
-                      필터 초기화
-                    </button>
-                  )}
-                </div>
+                <EmptyState
+                  variant={activeFilterCount > 0 || kpi !== "ALL" ? "filtered-out" : "no-search-result"}
+                  icon={<PackageSearch className="h-8 w-8" />}
+                  title="검색 결과가 없습니다."
+                  description="검색어 또는 필터를 초기화해 전체 품목을 다시 확인하세요."
+                  action={
+                    activeFilterCount > 0 || kpi !== "ALL"
+                      ? {
+                          label: "필터 초기화",
+                          onClick: () => {
+                            setSelectedDepts([]);
+                            setSelectedModels([]);
+                            setLocalSearch("");
+                            setKpi("ALL");
+                          },
+                        }
+                      : undefined
+                  }
+                />
               ) : (
                 <div className="overflow-x-auto rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
                   <table className="min-w-full border-separate border-spacing-0 text-sm">

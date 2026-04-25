@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle } from "lucide-react";
 import { api, type Department, type Employee, type Item, type ProductModel, type ShipPackage } from "@/lib/api";
 import { LEGACY_COLORS, formatNumber, normalizeDepartment } from "./legacyUi";
+import { LoadFailureCard } from "./common/LoadFailureCard";
+import { ResultModal } from "./common/ResultModal";
+import { ConfirmModal } from "./common/ConfirmModal";
 import {
   CAUTION_WORK_TYPES,
   EmployeeStep,
@@ -435,6 +437,11 @@ export function DesktopWarehouseView({
 
   // ───────────────────── helpers ─────────────────────
 
+  const stockShortage =
+    workType !== "package-out"
+    && isOutbound
+    && selectedEntries.some((e) => Number(e.item.quantity) - e.quantity < 0);
+
   const blockerText = !selectedEmployee
     ? "담당자를 선택하세요"
     : workType === "package-out" && !selectedPackage
@@ -443,7 +450,9 @@ export function DesktopWarehouseView({
         ? "품목을 선택하세요"
         : quantityInvalid
           ? "수량을 확인하세요"
-          : null;
+          : stockShortage
+            ? "출고 후 재고가 음수입니다 — 수량을 다시 확인하세요"
+            : null;
 
   function toggleSelectItem(itemId: string) {
     setSelectedItems((prev) => {
@@ -569,15 +578,7 @@ export function DesktopWarehouseView({
     prevForcedStepRef.current = forcedStep;
   }, [forcedStep]);
 
-  // ESC키로 확인 팝업 닫기
-  useEffect(() => {
-    if (!showConfirm) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !submitting) setShowConfirm(false);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [showConfirm, submitting]);
+  // ESC 닫기는 ConfirmModal 내부에서 busy 잠금과 함께 처리
 
   // ───────────────────── render ─────────────────────
 
@@ -629,32 +630,7 @@ export function DesktopWarehouseView({
         </header>
 
         {/* 데이터 로드 실패 안내 — 빈 화면 방지 */}
-        {loadFailure && (
-          <div
-            className="flex items-center justify-between gap-3 rounded-[14px] border px-4 py-3 text-sm"
-            style={{
-              background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
-              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 35%, transparent)`,
-              color: LEGACY_COLORS.red,
-            }}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              <span className="truncate font-bold">데이터를 불러오지 못했습니다 — {loadFailure}</span>
-            </div>
-            <button
-              onClick={() => window.location.reload()}
-              className="shrink-0 rounded-[10px] border px-3 py-1.5 text-xs font-bold transition-colors hover:brightness-125"
-              style={{
-                borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 40%, transparent)`,
-                color: LEGACY_COLORS.red,
-                background: "transparent",
-              }}
-            >
-              새로고침
-            </button>
-          </div>
-        )}
+        {loadFailure && <LoadFailureCard message={loadFailure} />}
 
         {/* 직전 단계 sticky 요약 — 압축된 완료 카드 느낌 */}
         {stickySummary && (
@@ -839,242 +815,110 @@ export function DesktopWarehouseView({
       </div>
 
       {/* 실행 결과 모달 — 완전 실패 / 부분 실패 */}
-      {resultModal && (
-        <div
-          className="fixed inset-0 z-[450] flex items-center justify-center px-4"
-          style={{ background: "rgba(0,0,0,.55)" }}
-          onClick={() => setResultModal(null)}
-        >
-          <div
-            className="w-full max-w-[560px] rounded-[24px] border p-6"
-            style={{
-              background: LEGACY_COLORS.s1,
-              borderColor:
-                resultModal.kind === "partial"
-                  ? `color-mix(in srgb, ${LEGACY_COLORS.yellow} 50%, transparent)`
-                  : `color-mix(in srgb, ${LEGACY_COLORS.red} 50%, transparent)`,
-              boxShadow: "var(--c-card-shadow)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center gap-2">
-              <AlertTriangle
-                className="h-5 w-5"
-                style={{
-                  color:
-                    resultModal.kind === "partial" ? LEGACY_COLORS.yellow : LEGACY_COLORS.red,
-                }}
-              />
-              <div className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>
-                {resultModal.kind === "partial"
-                  ? `처리 결과 — 성공 ${resultModal.successCount}건 / 실패 ${resultModal.failures.length}건`
-                  : "실행 실패"}
-              </div>
-            </div>
-
-            {resultModal.kind === "partial" && (
-              <div
-                className="mb-4 rounded-[12px] border px-3 py-2 text-xs font-bold"
-                style={{
-                  background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 10%, transparent)`,
-                  borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 40%, transparent)`,
-                  color: LEGACY_COLORS.yellow,
-                }}
-              >
-                성공한 {resultModal.successCount}건은 이미 처리되었습니다. 실패 항목만 다시 시도할 수 있습니다.
-              </div>
-            )}
-
-            <div
-              className="mb-5 max-h-[260px] overflow-y-auto rounded-[14px] border"
-              style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, overscrollBehavior: "contain" }}
-            >
-              <ul className="divide-y" style={{ borderColor: LEGACY_COLORS.border }}>
-                {resultModal.failures.map((f, idx) => (
-                  <li
-                    key={`${f.name}-${idx}`}
-                    className="flex flex-col gap-1 px-3 py-2.5"
-                    style={{ borderColor: LEGACY_COLORS.border }}
-                  >
-                    <span className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
-                      {f.name}
-                    </span>
-                    <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                      {f.reason}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="flex items-center justify-end gap-2">
-              <button
-                onClick={() => setResultModal(null)}
-                className="rounded-[14px] border px-5 py-2.5 text-sm font-bold transition-colors hover:brightness-125"
-                style={{
-                  borderColor: LEGACY_COLORS.border,
-                  color: LEGACY_COLORS.muted2,
-                  background: LEGACY_COLORS.s2,
-                }}
-              >
-                닫기
-              </button>
-              {resultModal.kind === "partial" ? (
-                <button
-                  onClick={() => {
-                    // 실패 항목만 selectedItems에 남아있는 상태 → 확인 모달 다시 열기
+      <ResultModal
+        open={!!resultModal}
+        kind={resultModal?.kind ?? "fail"}
+        successCount={resultModal?.successCount ?? 0}
+        failures={resultModal?.failures ?? []}
+        onClose={() => setResultModal(null)}
+        primaryAction={
+          resultModal?.kind === "partial"
+            ? {
+                label: "실패 항목만 재시도",
+                tone: "warning",
+                onClick: () => {
+                  setResultModal(null);
+                  setShowConfirm(true);
+                },
+              }
+            : resultModal?.kind === "fail"
+              ? {
+                  label: "재시도",
+                  tone: "danger",
+                  onClick: () => {
                     setResultModal(null);
                     setShowConfirm(true);
-                  }}
-                  className="rounded-[14px] px-5 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99]"
-                  style={{ background: LEGACY_COLORS.yellow }}
-                >
-                  실패 항목만 재시도
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    setResultModal(null);
-                    setShowConfirm(true);
-                  }}
-                  className="rounded-[14px] px-5 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99]"
-                  style={{ background: LEGACY_COLORS.red }}
-                >
-                  재시도
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+                  },
+                }
+              : undefined
+        }
+      />
 
       {/* 최종 실행 확인 팝업 */}
-      {showConfirm && (
-        <div
-          className="fixed inset-0 z-[400] flex items-center justify-center px-4"
-          style={{ background: "rgba(0,0,0,.55)" }}
-          onClick={() => {
-            if (!submitting) setShowConfirm(false);
-          }}
+      <ConfirmModal
+        open={showConfirm}
+        title="실행 전 최종 확인"
+        tone={isCaution ? "danger" : "normal"}
+        cautionMessage={isCaution ? "되돌릴 수 없는 작업입니다. 내용을 다시 한 번 확인하세요." : undefined}
+        onClose={() => setShowConfirm(false)}
+        onConfirm={async () => {
+          await submit();
+          setShowConfirm(false);
+        }}
+        busy={submitting}
+        busyLabel="처리 중..."
+        confirmLabel="최종 실행"
+        confirmAccent={accent}
+      >
+        <dl
+          className="mb-4 grid grid-cols-[100px_1fr] gap-x-3 gap-y-2 rounded-[14px] border p-3 text-sm"
+          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
         >
-          <div
-            className="w-full max-w-[520px] rounded-[24px] border p-6"
-            style={{
-              background: LEGACY_COLORS.s1,
-              borderColor: isCaution
-                ? `color-mix(in srgb, ${LEGACY_COLORS.red} 50%, transparent)`
-                : LEGACY_COLORS.border,
-              boxShadow: "var(--c-card-shadow)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center gap-2">
-              {isCaution && <AlertTriangle className="h-5 w-5" style={{ color: LEGACY_COLORS.red }} />}
-              <div className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>
-                실행 전 최종 확인
-              </div>
-            </div>
-
-            {isCaution && (
-              <div
-                className="mb-4 rounded-[12px] border px-3 py-2 text-xs font-bold"
-                style={{
-                  background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
-                  borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 40%, transparent)`,
-                  color: LEGACY_COLORS.red,
-                }}
-              >
-                되돌릴 수 없는 작업입니다. 내용을 다시 한 번 확인하세요.
-              </div>
-            )}
-
-            <dl
-              className="mb-4 grid grid-cols-[100px_1fr] gap-x-3 gap-y-2 rounded-[14px] border p-3 text-sm"
-              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-            >
-              <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>담당자</dt>
-              <dd className="font-black" style={{ color: LEGACY_COLORS.text }}>
-                {selectedEmployee
-                  ? `${selectedEmployee.name} · ${normalizeDepartment(selectedEmployee.department)}`
-                  : "-"}
+          <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>담당자</dt>
+          <dd className="font-black" style={{ color: LEGACY_COLORS.text }}>
+            {selectedEmployee
+              ? `${selectedEmployee.name} · ${normalizeDepartment(selectedEmployee.department)}`
+              : "-"}
+          </dd>
+          <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>작업</dt>
+          <dd className="font-black" style={{ color: LEGACY_COLORS.text }}>{effectiveLabel}</dd>
+          {workType !== "package-out" ? (
+            <>
+              <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>품목 수</dt>
+              <dd className="font-black" style={{ color: LEGACY_COLORS.text }}>{selectedEntries.length}건</dd>
+              <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>총 수량</dt>
+              <dd className="font-black tabular-nums" style={{ color: LEGACY_COLORS.text }}>
+                {formatNumber(totalQty)} EA
               </dd>
-              <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>작업</dt>
-              <dd className="font-black" style={{ color: LEGACY_COLORS.text }}>{effectiveLabel}</dd>
-              {workType !== "package-out" ? (
-                <>
-                  <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>품목 수</dt>
-                  <dd className="font-black" style={{ color: LEGACY_COLORS.text }}>{selectedEntries.length}건</dd>
-                  <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>총 수량</dt>
-                  <dd className="font-black tabular-nums" style={{ color: LEGACY_COLORS.text }}>
-                    {formatNumber(totalQty)} EA
-                  </dd>
-                </>
-              ) : (
-                <>
-                  <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>패키지</dt>
-                  <dd className="font-black" style={{ color: LEGACY_COLORS.text }}>{selectedPackage?.name ?? "-"}</dd>
-                </>
-              )}
-              {notes && (
-                <>
-                  <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>메모</dt>
-                  <dd className="truncate" style={{ color: LEGACY_COLORS.text }}>{notes}</dd>
-                </>
-              )}
-            </dl>
+            </>
+          ) : (
+            <>
+              <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>패키지</dt>
+              <dd className="font-black" style={{ color: LEGACY_COLORS.text }}>{selectedPackage?.name ?? "-"}</dd>
+            </>
+          )}
+          {notes && (
+            <>
+              <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>메모</dt>
+              <dd className="truncate" style={{ color: LEGACY_COLORS.text }}>{notes}</dd>
+            </>
+          )}
+        </dl>
 
-            {workType !== "package-out" && selectedEntries.length > 0 && (
-              <div
-                className="mb-5 max-h-[180px] overflow-y-auto rounded-[14px] border"
-                style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, overscrollBehavior: "contain" }}
-              >
-                <ul className="divide-y" style={{ borderColor: LEGACY_COLORS.border }}>
-                  {selectedEntries.map((entry) => (
-                    <li
-                      key={entry.item.item_id}
-                      className="flex items-center justify-between px-3 py-2 text-xs"
-                      style={{ borderColor: LEGACY_COLORS.border }}
-                    >
-                      <span className="truncate" style={{ color: LEGACY_COLORS.text }}>
-                        {entry.item.item_name}
-                      </span>
-                      <span className="shrink-0 font-black tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>
-                        ×{formatNumber(entry.quantity)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="flex items-center justify-end gap-2">
-              <button
-                onClick={() => setShowConfirm(false)}
-                disabled={submitting}
-                className="rounded-[14px] border px-5 py-2.5 text-sm font-bold transition-colors hover:brightness-125 disabled:opacity-50"
-                style={{
-                  borderColor: LEGACY_COLORS.border,
-                  color: LEGACY_COLORS.muted2,
-                  background: LEGACY_COLORS.s2,
-                }}
-              >
-                취소
-              </button>
-              <button
-                onClick={async () => {
-                  await submit();
-                  setShowConfirm(false);
-                }}
-                disabled={submitting}
-                className="rounded-[14px] px-5 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
-                style={{ background: accent }}
-              >
-                {submitting ? "처리 중..." : "최종 실행"}
-              </button>
-            </div>
+        {workType !== "package-out" && selectedEntries.length > 0 && (
+          <div
+            className="mb-1 max-h-[180px] overflow-y-auto rounded-[14px] border"
+            style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, overscrollBehavior: "contain" }}
+          >
+            <ul className="divide-y" style={{ borderColor: LEGACY_COLORS.border }}>
+              {selectedEntries.map((entry) => (
+                <li
+                  key={entry.item.item_id}
+                  className="flex items-center justify-between px-3 py-2 text-xs"
+                  style={{ borderColor: LEGACY_COLORS.border }}
+                >
+                  <span className="truncate" style={{ color: LEGACY_COLORS.text }}>
+                    {entry.item.item_name}
+                  </span>
+                  <span className="shrink-0 font-black tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>
+                    ×{formatNumber(entry.quantity)}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
-      )}
+        )}
+      </ConfirmModal>
     </div>
   );
 }

@@ -24,6 +24,7 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
         const expected = outgoing
           ? Number(item.quantity) - quantity
           : Number(item.quantity) + quantity;
+        const isShortage = outgoing && expected < 0;
         const expectedColor =
           expected < 0 ? LEGACY_COLORS.red : expected === 0 ? LEGACY_COLORS.yellow : LEGACY_COLORS.green;
 
@@ -31,7 +32,12 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
           <div
             key={item.item_id}
             className="grid grid-cols-[16px_minmax(0,2fr)_minmax(70px,auto)_auto_minmax(72px,auto)_minmax(72px,auto)_32px] items-center gap-3 px-4 py-3"
-            style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
+            style={{
+              borderBottom: `1px solid ${LEGACY_COLORS.border}`,
+              background: isShortage
+                ? `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`
+                : "transparent",
+            }}
           >
             {/* 그립 */}
             <GripVertical className="h-4 w-4" style={{ color: LEGACY_COLORS.muted2 }} />
@@ -97,6 +103,11 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
               <div className="text-base font-black tabular-nums" style={{ color: expectedColor }}>
                 {formatNumber(expected)}
               </div>
+              {isShortage && (
+                <div className="text-[9px] font-bold uppercase tracking-[1px]" style={{ color: LEGACY_COLORS.red }}>
+                  재고 부족
+                </div>
+              )}
             </div>
 
             {/* 제거 */}

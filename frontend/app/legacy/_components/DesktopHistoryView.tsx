@@ -11,6 +11,7 @@ import {
   transactionColor,
   transactionLabel,
 } from "./legacyUi";
+import { EmptyState } from "./common/EmptyState";
 
 const PAGE_SIZE = 100;
 
@@ -557,7 +558,12 @@ export function DesktopHistoryView() {
                     <div className="mt-4 rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
                       <div className="mb-3 text-sm font-bold">{selectedDay} 거래 {selectedDayLogs.length}건</div>
                       {selectedDayLogs.length === 0 ? (
-                        <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>거래 없음</div>
+                        <EmptyState
+                          variant="no-data"
+                          compact
+                          title="거래 없음"
+                          description="선택한 날짜에 처리된 거래가 없습니다."
+                        />
                       ) : (
                         <div className="space-y-2">
                           {selectedDayLogs.map((log) => {
@@ -611,7 +617,11 @@ export function DesktopHistoryView() {
             {loading ? (
               <div className="py-16 text-center text-base" style={{ color: LEGACY_COLORS.muted2 }}>내역을 불러오는 중...</div>
             ) : filteredLogs.length === 0 ? (
-              <div className="py-16 text-center text-base" style={{ color: LEGACY_COLORS.muted2 }}>거래 이력이 없습니다.</div>
+              <EmptyState
+                variant="no-data"
+                title="거래 이력이 없습니다."
+                description="조건에 맞는 거래가 없거나 아직 기록이 없습니다."
+              />
             ) : (
               <div className="overflow-x-auto rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border }}>
                 <table className="min-w-full border-separate border-spacing-0 text-sm">
