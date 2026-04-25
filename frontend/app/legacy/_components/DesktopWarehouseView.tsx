@@ -24,10 +24,12 @@ export function DesktopWarehouseView({
   globalSearch,
   onStatusChange,
   preselectedItem,
+  onSubmitSuccess,
 }: {
   globalSearch: string;
   onStatusChange: (status: string) => void;
   preselectedItem?: Item | null;
+  onSubmitSuccess?: () => void;
 }) {
   // ─── 작업 설정 state ───
   const [workType, setWorkType] = useState<WorkType>("raw-io");
@@ -66,12 +68,31 @@ export function DesktopWarehouseView({
   const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
   const [employeeExpanded, setEmployeeExpanded] = useState(false);
 
+  // ─── 실행 완료 피드백 애니메이션 ───
+  // nonce: 매 실행마다 새 값을 부여해 overlay div의 key로 사용 → 강제 remount 보장
+  const [completionFlyout, setCompletionFlyout] = useState<{ nonce: number; kind: "in" | "out"; count: number } | null>(null);
+  const [completionPhase, setCompletionPhase] = useState<"show" | "out">("show");
+  const flyoutTimer1Ref = useRef<number | null>(null);
+  const flyoutTimer2Ref = useRef<number | null>(null);
+
   // ─── Wizard 단계 제어 ───
   const [forcedStep, setForcedStep] = useState<1 | 2 | null>(null);
   const [step2Confirmed, setStep2Confirmed] = useState(false);
 
   // ─── 최종 실행 확인 팝업 ───
   const [showConfirm, setShowConfirm] = useState(false);
+
+  // ─── 실행 결과 모달 (실패 / 부분 실패) ───
+  const [resultModal, setResultModal] = useState<
+    | {
+        kind: "fail" | "partial";
+        successCount: number;
+        failures: { name: string; reason: string }[];
+      }
+    | null
+  >(null);
+  // 데이터 로드 실패 — 빈 화면 방지용 인라인 안내
+  const [loadFailure, setLoadFailure] = useState<string | null>(null);
 
   // ─── refs (스크롤/sticky용) ───
   const scrollRootRef = useRef<HTMLDivElement>(null);
@@ -87,8 +108,14 @@ export function DesktopWarehouseView({
   // ───────────────────── data load ─────────────────────
 
   useEffect(() => {
-    void api.getModels().then(setProductModels).catch(() => {});
-  }, []);
+    void api
+      .getModels()
+      .then((models) => setProductModels(models))
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : "모델 목록을 불러오지 못했습니다.";
+        onStatusChange(msg);
+      });
+  }, [onStatusChange]);
 
   useEffect(() => {
     void Promise.all([
@@ -100,10 +127,13 @@ export function DesktopWarehouseView({
         setEmployees(nextEmployees);
         setItems(nextItems);
         setPackages(nextPackages);
+        setLoadFailure(null);
         onStatusChange(`입출고 준비 완료: 직원 ${nextEmployees.length}명, 품목 ${nextItems.length}건`);
       })
       .catch((nextError) => {
-        onStatusChange(nextError instanceof Error ? nextError.message : "입출고 데이터를 불러오지 못했습니다.");
+        const msg = nextError instanceof Error ? nextError.message : "입출고 데이터를 불러오지 못했습니다.";
+        setLoadFailure(msg);
+        onStatusChange(msg);
       });
   }, [globalSearch, onStatusChange]);
 
@@ -321,24 +351,59 @@ export function DesktopWarehouseView({
       const producedBy = `${selectedEmployee.name} (${normalizeDepartment(selectedEmployee.department)})`;
 
       if (workType === "package-out" && selectedPackage) {
-        await api.shipPackage({
-          package_id: selectedPackage.package_id,
-          quantity: 1,
-          reference_no: referenceNo || undefined,
-          produced_by: producedBy,
-          notes: notes || undefined,
-        });
+        try {
+          await api.shipPackage({
+            package_id: selectedPackage.package_id,
+            quantity: 1,
+            reference_no: referenceNo || undefined,
+            produced_by: producedBy,
+            notes: notes || undefined,
+          });
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : "패키지 출고에 실패했습니다.";
+          // 데이터 정합성을 위해 items는 새로고침해 둠
+          try {
+            const refreshed = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
+            setItems(refreshed);
+          } catch { /* 무시 */ }
+          setResultModal({ kind: "fail", successCount: 0, failures: [{ name: selectedPackage.name ?? "패키지", reason }] });
+          return;
+        }
       } else {
-        const failures: string[] = [];
+        const failures: { name: string; reason: string }[] = [];
+        const successIds: string[] = [];
         for (const entry of selectedEntries) {
           try {
             await dispatchSingleItem(entry.item, entry.quantity, producedBy);
-          } catch {
-            failures.push(entry.item.item_name);
+            successIds.push(entry.item.item_id);
+          } catch (err) {
+            const reason = err instanceof Error ? err.message : "처리 실패";
+            failures.push({ name: entry.item.item_name, reason });
           }
         }
+
+        // items는 항상 refresh — 부분 성공분이 화면에 반영돼야 함
+        try {
+          const refreshed = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
+          setItems(refreshed);
+        } catch { /* 무시: 모달이 우선 */ }
+
         if (failures.length > 0) {
-          setError(`처리 실패 품목: ${failures.join(", ")}`);
+          // 성공한 항목은 selectedItems에서 제거 → 재시도 시 이중 commit 방지
+          if (successIds.length > 0) {
+            setSelectedItems((prev) => {
+              const next = new Map(prev);
+              for (const id of successIds) next.delete(id);
+              return next;
+            });
+            // 부분 성공: 외부에 반영
+            onSubmitSuccess?.();
+          }
+          setResultModal({
+            kind: successIds.length > 0 ? "partial" : "fail",
+            successCount: successIds.length,
+            failures,
+          });
           return;
         }
       }
@@ -349,13 +414,19 @@ export function DesktopWarehouseView({
       setSelectedItems(new Map());
       setStep2Confirmed(false);
       setForcedStep(null);
-      const refreshed = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
-      setItems(refreshed);
+      // package-out 흐름은 위 분기에서 이미 refresh 안 했을 수 있으므로 success 직전 한 번 더 보장
+      if (workType === "package-out") {
+        try {
+          const refreshed = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
+          setItems(refreshed);
+        } catch { /* 무시 */ }
+      }
       setLastResult({ count: doneCount, label: effectiveLabel });
       onStatusChange(`${effectiveLabel} ${workType !== "package-out" ? selectedEntries.length + "건 " : ""}처리를 완료했습니다.`);
+      onSubmitSuccess?.();
     } catch (nextError) {
       const message = nextError instanceof Error ? nextError.message : "입출고 처리를 완료하지 못했습니다.";
-      setError(message);
+      setResultModal({ kind: "fail", successCount: 0, failures: [{ name: "실행", reason: message }] });
       onStatusChange(message);
     } finally {
       setSubmitting(false);
@@ -458,6 +529,40 @@ export function DesktopWarehouseView({
       scrollToRef(step2Ref, 200);
     }
   }, [lastResult]);
+
+  // 실행 완료 피드백 — 중앙에 큰 카드 잠깐 표시 후 페이드아웃
+  useEffect(() => {
+    if (!lastResult) return;
+
+    if (flyoutTimer1Ref.current != null) window.clearTimeout(flyoutTimer1Ref.current);
+    if (flyoutTimer2Ref.current != null) window.clearTimeout(flyoutTimer2Ref.current);
+
+    // 입고/출고 분기 — 작업 유형 + 방향
+    const isIn = (() => {
+      if (workType === "raw-io") return rawDirection === "in";
+      if (workType === "warehouse-io") return warehouseDirection === "dept-to-wh";
+      if (workType === "dept-io") return deptDirection === "in";
+      return false; // defective-register, supplier-return, package-out → 출고 계열
+    })();
+
+    const nonce = Date.now();
+    setCompletionPhase("show");
+    setCompletionFlyout({ nonce, kind: isIn ? "in" : "out", count: lastResult.count });
+
+    flyoutTimer1Ref.current = window.setTimeout(() => {
+      setCompletionPhase("out");
+    }, 1100);
+
+    flyoutTimer2Ref.current = window.setTimeout(() => {
+      setCompletionFlyout(null);
+    }, 1100 + 380);
+
+    return () => {
+      if (flyoutTimer1Ref.current != null) window.clearTimeout(flyoutTimer1Ref.current);
+      if (flyoutTimer2Ref.current != null) window.clearTimeout(flyoutTimer2Ref.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastResult]);
   useEffect(() => {
     if (forcedStep === 1 && prevForcedStepRef.current !== 1) scrollToRef(step1Ref);
     if (forcedStep === 2 && prevForcedStepRef.current !== 2) scrollToRef(step2Ref);
@@ -478,6 +583,43 @@ export function DesktopWarehouseView({
 
   return (
     <div className="flex h-full min-h-0 flex-1 justify-center overflow-y-auto pr-4" ref={scrollRootRef}>
+      {completionFlyout && (() => {
+        const isIn = completionFlyout.kind === "in";
+        const tone = isIn ? LEGACY_COLORS.green : LEGACY_COLORS.yellow;
+        const heading = isIn ? "입고 완료" : "출고 완료";
+        return (
+          <div
+            key={completionFlyout.nonce}
+            className="pointer-events-none fixed left-1/2 top-1/2 z-[400]"
+            style={{
+              transition: "opacity 380ms ease-out, transform 380ms ease-out",
+              willChange: "transform, opacity",
+              transform:
+                completionPhase === "out"
+                  ? "translate(-50%, -50%) scale(0.94)"
+                  : "translate(-50%, -50%) scale(1)",
+              opacity: completionPhase === "out" ? 0 : 1,
+            }}
+          >
+            <div
+              className="rounded-[36px] border-2 px-16 py-12 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.5)]"
+              style={{
+                background: `linear-gradient(135deg, ${tone}, color-mix(in srgb, ${tone} 68%, #000 32%))`,
+                borderColor: `color-mix(in srgb, ${tone} 55%, #fff 45%)`,
+                color: "#ffffff",
+                minWidth: 380,
+              }}
+            >
+              <div className="text-center text-[48px] font-black leading-none tracking-[-0.02em]">
+                {heading}
+              </div>
+              <div className="mt-4 text-center text-xl font-bold opacity-90">
+                {completionFlyout.count}건
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-3 px-6 pb-10 pt-4">
         {/* 헤더 */}
         <header className="pb-1">
@@ -485,6 +627,34 @@ export function DesktopWarehouseView({
             입출고 작업
           </h1>
         </header>
+
+        {/* 데이터 로드 실패 안내 — 빈 화면 방지 */}
+        {loadFailure && (
+          <div
+            className="flex items-center justify-between gap-3 rounded-[14px] border px-4 py-3 text-sm"
+            style={{
+              background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
+              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 35%, transparent)`,
+              color: LEGACY_COLORS.red,
+            }}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span className="truncate font-bold">데이터를 불러오지 못했습니다 — {loadFailure}</span>
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="shrink-0 rounded-[10px] border px-3 py-1.5 text-xs font-bold transition-colors hover:brightness-125"
+              style={{
+                borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 40%, transparent)`,
+                color: LEGACY_COLORS.red,
+                background: "transparent",
+              }}
+            >
+              새로고침
+            </button>
+          </div>
+        )}
 
         {/* 직전 단계 sticky 요약 — 압축된 완료 카드 느낌 */}
         {stickySummary && (
@@ -667,6 +837,116 @@ export function DesktopWarehouseView({
           </div>
         )}
       </div>
+
+      {/* 실행 결과 모달 — 완전 실패 / 부분 실패 */}
+      {resultModal && (
+        <div
+          className="fixed inset-0 z-[450] flex items-center justify-center px-4"
+          style={{ background: "rgba(0,0,0,.55)" }}
+          onClick={() => setResultModal(null)}
+        >
+          <div
+            className="w-full max-w-[560px] rounded-[24px] border p-6"
+            style={{
+              background: LEGACY_COLORS.s1,
+              borderColor:
+                resultModal.kind === "partial"
+                  ? `color-mix(in srgb, ${LEGACY_COLORS.yellow} 50%, transparent)`
+                  : `color-mix(in srgb, ${LEGACY_COLORS.red} 50%, transparent)`,
+              boxShadow: "var(--c-card-shadow)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center gap-2">
+              <AlertTriangle
+                className="h-5 w-5"
+                style={{
+                  color:
+                    resultModal.kind === "partial" ? LEGACY_COLORS.yellow : LEGACY_COLORS.red,
+                }}
+              />
+              <div className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>
+                {resultModal.kind === "partial"
+                  ? `처리 결과 — 성공 ${resultModal.successCount}건 / 실패 ${resultModal.failures.length}건`
+                  : "실행 실패"}
+              </div>
+            </div>
+
+            {resultModal.kind === "partial" && (
+              <div
+                className="mb-4 rounded-[12px] border px-3 py-2 text-xs font-bold"
+                style={{
+                  background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 10%, transparent)`,
+                  borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 40%, transparent)`,
+                  color: LEGACY_COLORS.yellow,
+                }}
+              >
+                성공한 {resultModal.successCount}건은 이미 처리되었습니다. 실패 항목만 다시 시도할 수 있습니다.
+              </div>
+            )}
+
+            <div
+              className="mb-5 max-h-[260px] overflow-y-auto rounded-[14px] border"
+              style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, overscrollBehavior: "contain" }}
+            >
+              <ul className="divide-y" style={{ borderColor: LEGACY_COLORS.border }}>
+                {resultModal.failures.map((f, idx) => (
+                  <li
+                    key={`${f.name}-${idx}`}
+                    className="flex flex-col gap-1 px-3 py-2.5"
+                    style={{ borderColor: LEGACY_COLORS.border }}
+                  >
+                    <span className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
+                      {f.name}
+                    </span>
+                    <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                      {f.reason}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => setResultModal(null)}
+                className="rounded-[14px] border px-5 py-2.5 text-sm font-bold transition-colors hover:brightness-125"
+                style={{
+                  borderColor: LEGACY_COLORS.border,
+                  color: LEGACY_COLORS.muted2,
+                  background: LEGACY_COLORS.s2,
+                }}
+              >
+                닫기
+              </button>
+              {resultModal.kind === "partial" ? (
+                <button
+                  onClick={() => {
+                    // 실패 항목만 selectedItems에 남아있는 상태 → 확인 모달 다시 열기
+                    setResultModal(null);
+                    setShowConfirm(true);
+                  }}
+                  className="rounded-[14px] px-5 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99]"
+                  style={{ background: LEGACY_COLORS.yellow }}
+                >
+                  실패 항목만 재시도
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setResultModal(null);
+                    setShowConfirm(true);
+                  }}
+                  className="rounded-[14px] px-5 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99]"
+                  style={{ background: LEGACY_COLORS.red }}
+                >
+                  재시도
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 최종 실행 확인 팝업 */}
       {showConfirm && (

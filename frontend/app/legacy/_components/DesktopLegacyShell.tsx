@@ -93,6 +93,7 @@ export function DesktopLegacyShell() {
           globalSearch=""
           onStatusChange={setStatus}
           preselectedItem={warehousePreselected}
+          onSubmitSuccess={loadCapacity}
         />
       );
     }
@@ -100,7 +101,7 @@ export function DesktopLegacyShell() {
       return <DesktopHistoryView key={key} />;
     }
     return <DesktopAdminView key={key} globalSearch="" onStatusChange={setStatus} />;
-  }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse, capacityData]);
+  }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse, capacityData, loadCapacity]);
 
   return (
     <>
