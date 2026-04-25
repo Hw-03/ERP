@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   AlertTriangle,
   ArrowLeftRight,
@@ -162,7 +162,6 @@ export function WizardStepCard({
   summary,
   onChange,
   accent,
-  hint,
   children,
 }: {
   n: number;
@@ -171,10 +170,21 @@ export function WizardStepCard({
   summary?: React.ReactNode;
   onChange?: () => void;
   accent?: string;
-  hint?: string;
   children?: React.ReactNode;
 }) {
   const tone = accent ?? LEGACY_COLORS.blue;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  const animStyle = {
+    opacity: mounted ? 1 : 0,
+    transform: mounted ? "translateY(0)" : "translateY(-4px)",
+    transition:
+      "opacity 200ms ease, transform 200ms ease, border-color 240ms cubic-bezier(0.16,1,0.3,1), background-color 240ms ease, padding 240ms ease",
+  } as const;
 
   if (state === "active") {
     return (
@@ -185,6 +195,7 @@ export function WizardStepCard({
           borderColor: `color-mix(in srgb, ${tone} 50%, transparent)`,
           boxShadow: "var(--c-card-shadow)",
           backgroundImage: "var(--c-panel-glow)",
+          ...animStyle,
         }}
       >
         <header className="mb-5 flex items-center gap-3">
@@ -198,11 +209,6 @@ export function WizardStepCard({
             <div className="text-xl font-black leading-tight" style={{ color: LEGACY_COLORS.text }}>
               {title}
             </div>
-            {hint && (
-              <div className="mt-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                {hint}
-              </div>
-            )}
           </div>
         </header>
         {children}
@@ -211,12 +217,25 @@ export function WizardStepCard({
   }
 
   if (state === "complete") {
+    const handleKey = (e: React.KeyboardEvent<HTMLElement>) => {
+      if (!onChange) return;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onChange();
+      }
+    };
     return (
       <section
-        className="flex items-center gap-3 rounded-[18px] border px-4 py-3"
+        role={onChange ? "button" : undefined}
+        tabIndex={onChange ? 0 : undefined}
+        onClick={onChange}
+        onKeyDown={onChange ? handleKey : undefined}
+        className="group flex items-center gap-3 rounded-[18px] border px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-offset-0"
         style={{
           background: LEGACY_COLORS.s1,
           borderColor: `color-mix(in srgb, ${LEGACY_COLORS.green} 30%, ${LEGACY_COLORS.border})`,
+          cursor: onChange ? "pointer" : "default",
+          ...animStyle,
         }}
       >
         <span
@@ -238,8 +257,12 @@ export function WizardStepCard({
         </div>
         {onChange && (
           <button
-            onClick={onChange}
-            className="flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors hover:brightness-125"
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange();
+            }}
+            className="flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors group-hover:brightness-125"
             style={{
               borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 30%, ${LEGACY_COLORS.border})`,
               color: LEGACY_COLORS.blue,
@@ -258,7 +281,7 @@ export function WizardStepCard({
   return (
     <section
       className="pointer-events-none flex items-center gap-3 rounded-[18px] border px-4 py-3 opacity-50"
-      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, ...animStyle }}
     >
       <span
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black"
@@ -293,9 +316,6 @@ export function EmployeeStep({
 
   return (
     <div>
-      <div className="mb-3 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-        입출고 작업을 처리할 담당자를 먼저 선택하세요.
-      </div>
       <div className="grid grid-cols-5 gap-2">
         {visible.map((emp) => {
           const active = emp.employee_id === selectedId;
@@ -611,12 +631,6 @@ export function ItemPickStep({
 
   return (
     <div className="space-y-3">
-      <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-        {isPackage
-          ? "출고할 패키지를 선택하세요."
-          : "입출고할 품목을 선택하세요. 여러 개를 선택해도 됩니다."}
-      </div>
-
       {/* 필터 */}
       {!isPackage ? (
         <div className="grid grid-cols-[1fr_1fr_1fr_2fr] gap-2">
@@ -682,8 +696,8 @@ export function ItemPickStep({
       {/* 결과 영역 */}
       <div
         ref={listRef}
-        className="scrollbar-hide max-h-[420px] overflow-y-auto rounded-[16px] border"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+        className="scrollbar-hide max-h-[440px] overflow-y-auto rounded-[16px] border"
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, overscrollBehavior: "contain" }}
       >
         {isPackage ? (
           <ul className="space-y-1.5 p-2">
@@ -854,8 +868,6 @@ export function QuantityStep({
   onQuantityChange,
   onRemove,
   onClearPackage,
-  referenceNo,
-  setReferenceNo,
   notes,
   setNotes,
   totalQty,
@@ -867,8 +879,6 @@ export function QuantityStep({
   onQuantityChange: (itemId: string, qty: number) => void;
   onRemove: (itemId: string) => void;
   onClearPackage: () => void;
-  referenceNo: string;
-  setReferenceNo: (v: string) => void;
   notes: string;
   setNotes: (v: string) => void;
   totalQty: number;
@@ -961,33 +971,19 @@ export function QuantityStep({
         </div>
       )}
 
-      {/* 참조번호 / 메모 */}
-      <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
-            참조 번호 (선택)
-          </span>
-          <input
-            value={referenceNo}
-            onChange={(e) => setReferenceNo(e.target.value)}
-            placeholder="예) PO-202405-001"
-            className="rounded-[12px] border px-3 py-2 text-sm outline-none"
-            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
-            메모 (선택)
-          </span>
-          <input
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="메모를 입력하세요"
-            className="rounded-[12px] border px-3 py-2 text-sm outline-none"
-            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-          />
-        </label>
-      </div>
+      {/* 메모 */}
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
+          메모 (선택)
+        </span>
+        <input
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="메모를 입력하세요"
+          className="rounded-[12px] border px-3 py-2 text-sm outline-none"
+          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+        />
+      </label>
     </div>
   );
 }
@@ -995,14 +991,9 @@ export function QuantityStep({
 // ─────────────────────────── Step 5: 실행 ──────────────────────────
 
 export function ExecuteStep({
-  effectiveLabel,
   shortLabel,
-  selectedEmployee,
   workType,
-  selectedDept,
-  totalQty,
   selectedEntries,
-  selectedPackage,
   canExecute,
   isCaution,
   accent,
@@ -1010,14 +1001,9 @@ export function ExecuteStep({
   submitting,
   onSubmit,
 }: {
-  effectiveLabel: string;
   shortLabel: string;
-  selectedEmployee: Employee | null;
   workType: WorkType;
-  selectedDept: Department;
-  totalQty: number;
   selectedEntries: { item: Item; quantity: number }[];
-  selectedPackage: ShipPackage | null;
   canExecute: boolean;
   isCaution: boolean;
   accent: string;
@@ -1030,30 +1016,21 @@ export function ExecuteStep({
   const buttonLabel = submitting ? "처리 중..." : `${shortLabel}${buttonMulti} 실행`;
 
   return (
-    <div className="space-y-4">
-      {/* 실행 요약 */}
-      <div
-        className="grid grid-cols-2 gap-3 rounded-[16px] border p-4"
-        style={{
-          background: `color-mix(in srgb, ${accent} 6%, transparent)`,
-          borderColor: `color-mix(in srgb, ${accent} 24%, transparent)`,
-        }}
-      >
-        <SummaryRow label="작업" value={effectiveLabel} />
-        <SummaryRow
-          label="담당자"
-          value={selectedEmployee ? `${selectedEmployee.name} · ${normalizeDepartment(selectedEmployee.department)}` : "미선택"}
-        />
-        {workTypeNeedsDept(workType) && <SummaryRow label="대상 부서" value={selectedDept} />}
-        {isPackage ? (
-          <SummaryRow label="패키지" value={selectedPackage?.name ?? "-"} />
-        ) : (
-          <>
-            <SummaryRow label="선택 품목" value={`${selectedEntries.length}건`} />
-            <SummaryRow label="총 수량" value={`${formatNumber(totalQty)} EA`} />
-          </>
-        )}
-      </div>
+    <div className="space-y-3">
+      {/* caution 안내 */}
+      {isCaution && (
+        <div
+          className="flex items-start gap-2 rounded-[12px] border px-3 py-2 text-xs"
+          style={{
+            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
+            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 40%, transparent)`,
+            color: LEGACY_COLORS.red,
+          }}
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span className="font-bold">되돌릴 수 없습니다. 최종 확인 팝업에서 한 번 더 점검하세요.</span>
+        </div>
+      )}
 
       {/* blocker */}
       {blockerText && (
@@ -1079,19 +1056,6 @@ export function ExecuteStep({
         {isCaution && !submitting && <AlertTriangle className="h-5 w-5" />}
         {buttonLabel}
       </button>
-    </div>
-  );
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
-        {label}
-      </dt>
-      <dd className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
-        {value}
-      </dd>
     </div>
   );
 }

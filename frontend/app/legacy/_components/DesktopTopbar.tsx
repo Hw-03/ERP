@@ -11,13 +11,17 @@ export function DesktopTopbar({
   onRefresh,
   actionSlot,
   stockWarnings,
+  status,
 }: {
   title: string;
   icon?: ElementType;
   onRefresh: () => void;
   actionSlot?: ReactNode;
   stockWarnings?: { low: number; zero: number };
+  status?: string;
 }) {
+  const isDone = !!status && status.startsWith("방금 완료");
+  const pillTone = isDone ? LEGACY_COLORS.green : LEGACY_COLORS.blue;
   return (
     <header className="pl-0 pr-4 pt-0">
       <div
@@ -55,6 +59,24 @@ export function DesktopTopbar({
             }}
           >
             부족 {stockWarnings.low}
+          </span>
+        )}
+
+        {status && (
+          <span
+            className="inline-flex max-w-[320px] items-center gap-1.5 truncate rounded-full border px-3 py-1 text-xs font-bold"
+            style={{
+              color: pillTone,
+              background: `color-mix(in srgb, ${pillTone} 14%, transparent)`,
+              borderColor: `color-mix(in srgb, ${pillTone} 30%, transparent)`,
+            }}
+            title={status}
+          >
+            <span
+              className="h-1.5 w-1.5 shrink-0 rounded-full"
+              style={{ background: pillTone }}
+            />
+            <span className="truncate">{status}</span>
           </span>
         )}
 

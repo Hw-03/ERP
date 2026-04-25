@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Check, RotateCcw, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, RotateCcw } from "lucide-react";
 import { api, type Department, type Employee, type Item, type ProductModel, type ShipPackage } from "@/lib/api";
-import { LEGACY_COLORS, normalizeDepartment } from "./legacyUi";
+import { LEGACY_COLORS, formatNumber, normalizeDepartment } from "./legacyUi";
 import {
   CAUTION_WORK_TYPES,
   EmployeeStep,
@@ -69,6 +69,21 @@ export function DesktopWarehouseView({
   // ─── Wizard 단계 제어 ───
   const [forcedStep, setForcedStep] = useState<1 | 2 | null>(null);
   const [step2Confirmed, setStep2Confirmed] = useState(false);
+
+  // ─── 최종 실행 확인 팝업 ───
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  // ─── refs (스크롤/sticky용) ───
+  const scrollRootRef = useRef<HTMLDivElement>(null);
+  const step1Ref = useRef<HTMLDivElement>(null);
+  const step2Ref = useRef<HTMLDivElement>(null);
+  const step3Ref = useRef<HTMLDivElement>(null);
+  const step4Ref = useRef<HTMLDivElement>(null);
+  const prevStep1DoneRef = useRef(false);
+  const prevStep2DoneRef = useRef(false);
+  const prevHasItemsRef = useRef(false);
+  const prevForcedStepRef = useRef<1 | 2 | null>(null);
+  const prevLastResultRef = useRef<{ count: number; label: string } | null>(null);
 
   // ───────────────────── data load ─────────────────────
 
@@ -388,187 +403,254 @@ export function DesktopWarehouseView({
   const step2Summary = effectiveLabel;
   const step2Accent = isCaution ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
 
+  const itemsSummary = workType === "package-out"
+    ? selectedPackage?.name ?? ""
+    : selectedEntries.length > 0
+      ? `${selectedEntries.length}건 · 총 ${formatNumber(totalQty)}`
+      : "";
+
+  // 직전 단계 sticky 요약 (가장 최근 complete 1개)
+  const stickySummary: { n: number; title: string; text: string } | null =
+    showStep4 || showStep5
+      ? itemsSummary
+        ? { n: 3, title: "품목", text: itemsSummary }
+        : null
+      : showStep3
+        ? { n: 2, title: "작업 유형", text: step2Summary }
+        : step1Done && step2State !== "complete"
+          ? { n: 1, title: "담당자", text: step1Summary }
+          : null;
+
+  // ───────────────────── effects: post-success reset / status / scroll ─────────────────────
+
+  function resetAfterSuccess() {
+    setWorkType("raw-io");
+    setRawDirection("in");
+    setWarehouseDirection("wh-to-dept");
+    setDeptDirection("in");
+    setSelectedDept("조립");
+    setDefectiveSource("warehouse");
+    setSelectedItems(new Map());
+    setSelectedPackage(null);
+    setNotes("");
+    setReferenceNo("");
+    setStep2Confirmed(false);
+    setForcedStep(null);
+  }
+
+  // submit() 본문은 변경하지 않음 — lastResult 변화를 watch해서 추가 reset/status 처리
+  useEffect(() => {
+    if (lastResult && lastResult !== prevLastResultRef.current) {
+      resetAfterSuccess();
+      onStatusChange(`방금 완료 · ${lastResult.label} · ${lastResult.count}건`);
+    }
+    prevLastResultRef.current = lastResult;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastResult]);
+
+  // 자동 스크롤
+  function scrollToRef(ref: React.RefObject<HTMLDivElement>) {
+    requestAnimationFrame(() => {
+      ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+  useEffect(() => {
+    if (step1Done && !prevStep1DoneRef.current) scrollToRef(step2Ref);
+    prevStep1DoneRef.current = step1Done;
+  }, [step1Done]);
+  useEffect(() => {
+    if (step2Done && !prevStep2DoneRef.current) scrollToRef(step3Ref);
+    prevStep2DoneRef.current = step2Done;
+  }, [step2Done]);
+  useEffect(() => {
+    if (hasItems && !prevHasItemsRef.current) scrollToRef(step4Ref);
+    prevHasItemsRef.current = hasItems;
+  }, [hasItems]);
+  useEffect(() => {
+    if (lastResult && lastResult !== prevLastResultRef.current) {
+      // submit 완료 후 작업유형(2단계)으로 부드럽게 복귀
+      scrollToRef(step2Ref);
+    }
+  }, [lastResult]);
+  useEffect(() => {
+    if (forcedStep === 1 && prevForcedStepRef.current !== 1) scrollToRef(step1Ref);
+    if (forcedStep === 2 && prevForcedStepRef.current !== 2) scrollToRef(step2Ref);
+    prevForcedStepRef.current = forcedStep;
+  }, [forcedStep]);
+
+  // ESC키로 확인 팝업 닫기
+  useEffect(() => {
+    if (!showConfirm) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !submitting) setShowConfirm(false);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [showConfirm, submitting]);
+
   // ───────────────────── render ─────────────────────
 
   return (
-    <div className="flex h-full min-h-0 flex-1 justify-center overflow-y-auto pr-4">
-      <div className="mx-auto flex w-full max-w-[960px] flex-col gap-3 px-6 pb-10 pt-4">
+    <div className="flex h-full min-h-0 flex-1 justify-center overflow-y-auto pr-4" ref={scrollRootRef}>
+      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-3 px-6 pb-10 pt-4">
         {/* 헤더 */}
         <header className="flex items-center justify-between pb-1">
-          <div>
-            <h1 className="text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>
-              입출고 작업
-            </h1>
-            <p className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-              담당자 → 작업 유형 → 품목 → 수량 → 실행 순서로 진행됩니다.
-            </p>
-          </div>
+          <h1 className="text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>
+            입출고 작업
+          </h1>
           <button
             onClick={resetAll}
             className="flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold transition-colors hover:brightness-125"
             style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
           >
             <RotateCcw className="h-3 w-3" />
-            전체 초기화
+            초기화
           </button>
         </header>
 
-        {/* 방금 완료 토스트 */}
-        {lastResult && (
+        {/* 직전 단계 sticky 요약 */}
+        {stickySummary && (
           <div
-            className="flex items-center gap-3 rounded-[16px] border px-4 py-3"
+            className="sticky top-0 z-20 -mx-2 rounded-full border px-3 py-1.5 backdrop-blur-md"
             style={{
-              background: `color-mix(in srgb, ${LEGACY_COLORS.green} 10%, transparent)`,
-              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.green} 40%, transparent)`,
+              background: `color-mix(in srgb, ${LEGACY_COLORS.s1} 80%, transparent)`,
+              borderColor: LEGACY_COLORS.border,
             }}
           >
-            <div
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-              style={{ background: LEGACY_COLORS.green }}
-            >
-              <Check className="h-4 w-4" color="#041008" strokeWidth={3} />
+            <div className="flex items-center gap-2 text-xs">
+              <span
+                className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                style={{
+                  background: `color-mix(in srgb, ${LEGACY_COLORS.green} 18%, transparent)`,
+                  color: LEGACY_COLORS.green,
+                }}
+              >
+                {stickySummary.n}. {stickySummary.title}
+              </span>
+              <span className="truncate font-bold" style={{ color: LEGACY_COLORS.text }}>
+                {stickySummary.text}
+              </span>
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.green }}>
-                방금 완료
-              </div>
-              <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
-                {lastResult.label} · {lastResult.count}건
-              </div>
-            </div>
-            <button
-              className="shrink-0 rounded-full p-1 transition-colors hover:bg-white/10"
-              style={{ color: LEGACY_COLORS.muted2 }}
-              onClick={() => setLastResult(null)}
-            >
-              <X className="h-4 w-4" />
-            </button>
           </div>
         )}
 
         {/* 1단계: 담당자 */}
-        <WizardStepCard
-          n={1}
-          title={step1State === "active" ? "담당자를 선택하세요" : "담당자"}
-          state={step1State}
-          summary={step1Summary}
-          onChange={step1State === "complete" ? () => setForcedStep(1) : undefined}
-          hint={step1State === "active" ? "입출고 작업을 처리할 담당자를 먼저 선택합니다." : undefined}
-        >
-          <EmployeeStep
-            employees={employees}
-            selectedId={employeeId}
-            onSelect={selectEmployee}
-            expanded={employeeExpanded}
-            setExpanded={setEmployeeExpanded}
-          />
-        </WizardStepCard>
+        <div ref={step1Ref} style={{ scrollMarginTop: 56 }}>
+          <WizardStepCard
+            n={1}
+            title={step1State === "active" ? "담당자를 선택하세요" : "담당자"}
+            state={step1State}
+            summary={step1Summary}
+            onChange={step1State === "complete" ? () => setForcedStep(1) : undefined}
+          >
+            <EmployeeStep
+              employees={employees}
+              selectedId={employeeId}
+              onSelect={selectEmployee}
+              expanded={employeeExpanded}
+              setExpanded={setEmployeeExpanded}
+            />
+          </WizardStepCard>
+        </div>
 
         {/* 2단계: 작업 유형 */}
-        <WizardStepCard
-          n={2}
-          title={step2State === "active" ? "작업 유형을 선택하세요" : "작업 유형"}
-          state={step2State}
-          summary={step2Summary}
-          onChange={step2State === "complete" ? () => setForcedStep(2) : undefined}
-          accent={step2Accent}
-          hint={
-            step2State === "active"
-              ? "어떤 종류의 입출고 작업인지 선택하고 방향·부서를 확인하세요."
-              : undefined
-          }
-        >
-          <WorkTypeStep
-            workType={workType}
-            onWorkTypeChange={changeWorkType}
-            rawDirection={rawDirection}
-            setRawDirection={changeRawDir}
-            warehouseDirection={warehouseDirection}
-            setWarehouseDirection={changeWarehouseDir}
-            deptDirection={deptDirection}
-            setDeptDirection={changeDeptDir}
-            selectedDept={selectedDept}
-            setSelectedDept={changeSelectedDept}
-            defectiveSource={defectiveSource}
-            setDefectiveSource={changeDefectiveSource}
-            ready={step2Ready}
-            onConfirm={confirmStep2}
-          />
-        </WizardStepCard>
+        <div ref={step2Ref} style={{ scrollMarginTop: 56 }}>
+          <WizardStepCard
+            n={2}
+            title={step2State === "active" ? "작업 유형을 선택하세요" : "작업 유형"}
+            state={step2State}
+            summary={step2Summary}
+            onChange={step2State === "complete" ? () => setForcedStep(2) : undefined}
+            accent={step2Accent}
+          >
+            <WorkTypeStep
+              workType={workType}
+              onWorkTypeChange={changeWorkType}
+              rawDirection={rawDirection}
+              setRawDirection={changeRawDir}
+              warehouseDirection={warehouseDirection}
+              setWarehouseDirection={changeWarehouseDir}
+              deptDirection={deptDirection}
+              setDeptDirection={changeDeptDir}
+              selectedDept={selectedDept}
+              setSelectedDept={changeSelectedDept}
+              defectiveSource={defectiveSource}
+              setDefectiveSource={changeDefectiveSource}
+              ready={step2Ready}
+              onConfirm={confirmStep2}
+            />
+          </WizardStepCard>
+        </div>
 
         {/* 3단계: 품목 선택 */}
         {showStep3 && (
-          <WizardStepCard
-            n={3}
-            title={hasItems ? "품목 선택 (계속 추가/해제 가능)" : "품목을 선택하세요"}
-            state="active"
-            hint={
-              hasItems
-                ? "필요하면 계속 품목을 추가하거나 해제할 수 있습니다."
-                : "입출고할 품목을 선택하면 다음 단계에서 수량을 조정할 수 있습니다."
-            }
-          >
-            <ItemPickStep
-              workType={workType}
-              filteredItems={filteredItems}
-              filteredPackages={filteredPackages}
-              selectedItems={selectedItems}
-              selectedPackage={selectedPackage}
-              onToggleItem={toggleSelectItem}
-              onSelectPackage={setSelectedPackage}
-              productModels={productModels}
-              dept={dept}
-              setDept={setDept}
-              modelFilter={modelFilter}
-              setModelFilter={setModelFilter}
-              categoryFilter={categoryFilter}
-              setCategoryFilter={setCategoryFilter}
-              localSearch={localSearch}
-              setLocalSearch={setLocalSearch}
-              displayLimit={displayLimit}
-              setDisplayLimit={setDisplayLimit}
-              pendingScrollId={pendingScrollId}
-              onScrolled={() => setPendingScrollId(null)}
-            />
-          </WizardStepCard>
+          <div ref={step3Ref} style={{ scrollMarginTop: 56 }}>
+            <WizardStepCard
+              n={3}
+              title={hasItems ? `품목 ${itemsSummary}` : "품목을 선택하세요"}
+              state="active"
+            >
+              <ItemPickStep
+                workType={workType}
+                filteredItems={filteredItems}
+                filteredPackages={filteredPackages}
+                selectedItems={selectedItems}
+                selectedPackage={selectedPackage}
+                onToggleItem={toggleSelectItem}
+                onSelectPackage={setSelectedPackage}
+                productModels={productModels}
+                dept={dept}
+                setDept={setDept}
+                modelFilter={modelFilter}
+                setModelFilter={setModelFilter}
+                categoryFilter={categoryFilter}
+                setCategoryFilter={setCategoryFilter}
+                localSearch={localSearch}
+                setLocalSearch={setLocalSearch}
+                displayLimit={displayLimit}
+                setDisplayLimit={setDisplayLimit}
+                pendingScrollId={pendingScrollId}
+                onScrolled={() => setPendingScrollId(null)}
+              />
+            </WizardStepCard>
+          </div>
         )}
 
         {/* 4단계: 수량 · 메모 */}
         {showStep4 && (
-          <WizardStepCard
-            n={4}
-            title="수량 · 메모"
-            state="active"
-            accent={accent}
-            hint="각 품목의 수량을 조정하고 필요 시 참조번호·메모를 입력하세요."
-          >
-            <QuantityStep
-              workType={workType}
-              selectedEntries={selectedEntries}
-              isOutbound={isOutbound}
-              selectedPackage={selectedPackage}
-              onQuantityChange={(itemId, qty) => {
-                setSelectedItems((prev) => {
-                  const next = new Map(prev);
-                  next.set(itemId, qty);
-                  return next;
-                });
-              }}
-              onRemove={(itemId) => {
-                setSelectedItems((prev) => {
-                  const next = new Map(prev);
-                  next.delete(itemId);
-                  return next;
-                });
-              }}
-              onClearPackage={() => setSelectedPackage(null)}
-              referenceNo={referenceNo}
-              setReferenceNo={setReferenceNo}
-              notes={notes}
-              setNotes={setNotes}
-              totalQty={totalQty}
-            />
-          </WizardStepCard>
+          <div ref={step4Ref} style={{ scrollMarginTop: 56 }}>
+            <WizardStepCard
+              n={4}
+              title="수량 · 메모"
+              state="active"
+              accent={accent}
+            >
+              <QuantityStep
+                workType={workType}
+                selectedEntries={selectedEntries}
+                isOutbound={isOutbound}
+                selectedPackage={selectedPackage}
+                onQuantityChange={(itemId, qty) => {
+                  setSelectedItems((prev) => {
+                    const next = new Map(prev);
+                    next.set(itemId, qty);
+                    return next;
+                  });
+                }}
+                onRemove={(itemId) => {
+                  setSelectedItems((prev) => {
+                    const next = new Map(prev);
+                    next.delete(itemId);
+                    return next;
+                  });
+                }}
+                onClearPackage={() => setSelectedPackage(null)}
+                notes={notes}
+                setNotes={setNotes}
+                totalQty={totalQty}
+              />
+            </WizardStepCard>
+          </div>
         )}
 
         {/* 5단계: 실행 */}
@@ -578,23 +660,17 @@ export function DesktopWarehouseView({
             title="실행"
             state="active"
             accent={accent}
-            hint="모든 정보를 확인한 뒤 실행 버튼을 누르세요."
           >
             <ExecuteStep
-              effectiveLabel={effectiveLabel}
               shortLabel={shortLabel}
-              selectedEmployee={selectedEmployee}
               workType={workType}
-              selectedDept={selectedDept}
-              totalQty={totalQty}
               selectedEntries={selectedEntries}
-              selectedPackage={selectedPackage}
               canExecute={canExecute}
               isCaution={isCaution}
               accent={accent}
               blockerText={blockerText}
               submitting={submitting}
-              onSubmit={() => void submit()}
+              onSubmit={() => setShowConfirm(true)}
             />
           </WizardStepCard>
         )}
@@ -613,6 +689,134 @@ export function DesktopWarehouseView({
           </div>
         )}
       </div>
+
+      {/* 최종 실행 확인 팝업 */}
+      {showConfirm && (
+        <div
+          className="fixed inset-0 z-[400] flex items-center justify-center px-4"
+          style={{ background: "rgba(0,0,0,.55)" }}
+          onClick={() => {
+            if (!submitting) setShowConfirm(false);
+          }}
+        >
+          <div
+            className="w-full max-w-[520px] rounded-[24px] border p-6"
+            style={{
+              background: LEGACY_COLORS.s1,
+              borderColor: isCaution
+                ? `color-mix(in srgb, ${LEGACY_COLORS.red} 50%, transparent)`
+                : LEGACY_COLORS.border,
+              boxShadow: "var(--c-card-shadow)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center gap-2">
+              {isCaution && <AlertTriangle className="h-5 w-5" style={{ color: LEGACY_COLORS.red }} />}
+              <div className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>
+                실행 전 최종 확인
+              </div>
+            </div>
+
+            {isCaution && (
+              <div
+                className="mb-4 rounded-[12px] border px-3 py-2 text-xs font-bold"
+                style={{
+                  background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
+                  borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 40%, transparent)`,
+                  color: LEGACY_COLORS.red,
+                }}
+              >
+                되돌릴 수 없는 작업입니다. 내용을 다시 한 번 확인하세요.
+              </div>
+            )}
+
+            <dl
+              className="mb-4 grid grid-cols-[100px_1fr] gap-x-3 gap-y-2 rounded-[14px] border p-3 text-sm"
+              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+            >
+              <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>담당자</dt>
+              <dd className="font-black" style={{ color: LEGACY_COLORS.text }}>
+                {selectedEmployee
+                  ? `${selectedEmployee.name} · ${normalizeDepartment(selectedEmployee.department)}`
+                  : "-"}
+              </dd>
+              <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>작업</dt>
+              <dd className="font-black" style={{ color: LEGACY_COLORS.text }}>{effectiveLabel}</dd>
+              {workType !== "package-out" ? (
+                <>
+                  <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>품목 수</dt>
+                  <dd className="font-black" style={{ color: LEGACY_COLORS.text }}>{selectedEntries.length}건</dd>
+                  <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>총 수량</dt>
+                  <dd className="font-black tabular-nums" style={{ color: LEGACY_COLORS.text }}>
+                    {formatNumber(totalQty)} EA
+                  </dd>
+                </>
+              ) : (
+                <>
+                  <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>패키지</dt>
+                  <dd className="font-black" style={{ color: LEGACY_COLORS.text }}>{selectedPackage?.name ?? "-"}</dd>
+                </>
+              )}
+              {notes && (
+                <>
+                  <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>메모</dt>
+                  <dd className="truncate" style={{ color: LEGACY_COLORS.text }}>{notes}</dd>
+                </>
+              )}
+            </dl>
+
+            {workType !== "package-out" && selectedEntries.length > 0 && (
+              <div
+                className="mb-5 max-h-[180px] overflow-y-auto rounded-[14px] border"
+                style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, overscrollBehavior: "contain" }}
+              >
+                <ul className="divide-y" style={{ borderColor: LEGACY_COLORS.border }}>
+                  {selectedEntries.map((entry) => (
+                    <li
+                      key={entry.item.item_id}
+                      className="flex items-center justify-between px-3 py-2 text-xs"
+                      style={{ borderColor: LEGACY_COLORS.border }}
+                    >
+                      <span className="truncate" style={{ color: LEGACY_COLORS.text }}>
+                        {entry.item.item_name}
+                      </span>
+                      <span className="shrink-0 font-black tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>
+                        ×{formatNumber(entry.quantity)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowConfirm(false)}
+                disabled={submitting}
+                className="rounded-[14px] border px-5 py-2.5 text-sm font-bold transition-colors hover:brightness-125 disabled:opacity-50"
+                style={{
+                  borderColor: LEGACY_COLORS.border,
+                  color: LEGACY_COLORS.muted2,
+                  background: LEGACY_COLORS.s2,
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={async () => {
+                  await submit();
+                  setShowConfirm(false);
+                }}
+                disabled={submitting}
+                className="rounded-[14px] px-5 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
+                style={{ background: accent }}
+              >
+                {submitting ? "처리 중..." : "최종 실행"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

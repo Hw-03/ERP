@@ -22,7 +22,7 @@ const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
 
 export function DesktopLegacyShell() {
   const [activeTab, setActiveTab] = useState<DesktopTabId>("inventory");
-  const [, setStatus] = useState("데스크톱 ERP 화면을 준비했습니다.");
+  const [status, setStatus] = useState("데스크톱 ERP 화면을 준비했습니다.");
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [warehousePreselected, setWarehousePreselected] = useState<Item | null>(null);
   const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
@@ -208,6 +208,7 @@ export function DesktopLegacyShell() {
             }}
             actionSlot={capacityActionSlot}
             stockWarnings={activeTab === "inventory" && stockWarnings ? stockWarnings : undefined}
+            status={status}
           />
 
           <div className="mt-1 min-h-0 flex-1 overflow-hidden flex">{content}</div>
