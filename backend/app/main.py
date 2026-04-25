@@ -8,11 +8,16 @@ Startup 부작용 (create_all / run_migrations / seed / ERP 백필) 은 모두
     python bootstrap_db.py --all
 """
 
-from fastapi import Depends, FastAPI
+import uuid
+
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import func, text
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
+from app._logging import get_logger, setup_logging
 from app.database import get_db
 from app.models import (
     Employee,
@@ -22,6 +27,7 @@ from app.models import (
     QueueBatchStatusEnum,
     TransactionLog,
 )
+from app.routers._errors import ErrorCode
 from app.services import integrity as integrity_svc
 
 from app.routers import (
@@ -87,6 +93,76 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+setup_logging()
+_log = get_logger()
+
+
+def _error_payload(code: str, message: str, extra: dict | None = None) -> dict:
+    body: dict = {"code": code, "message": message}
+    if extra:
+        body["extra"] = extra
+    return {"detail": body}
+
+
+@app.exception_handler(ValueError)
+def _value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
+    # Pydantic ValidationError 도 ValueError 하위 — 응답 모델 검증 실패는 서버 결함이므로
+    # 500 으로 떨어뜨려 INTERNAL 핸들러가 처리하게 한다.
+    from pydantic import ValidationError
+    if isinstance(exc, ValidationError):
+        rid = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:8]
+        _log.error("ResponseValidation rid=%s path=%s msg=%s", rid, request.url.path, exc)
+        return JSONResponse(
+            status_code=500,
+            content=_error_payload(
+                ErrorCode.INTERNAL,
+                "응답 데이터 검증 실패(서버 측 오류).",
+                extra={"request_id": rid},
+            ),
+        )
+    rid = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:8]
+    _log.warning("ValueError rid=%s path=%s msg=%s", rid, request.url.path, exc)
+    return JSONResponse(
+        status_code=422,
+        content=_error_payload(ErrorCode.VALIDATION_ERROR, str(exc) or "유효성 검사 실패"),
+    )
+
+
+@app.exception_handler(IntegrityError)
+def _integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
+    rid = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:8]
+    _log.error("IntegrityError rid=%s path=%s msg=%s", rid, request.url.path, exc)
+    return JSONResponse(
+        status_code=409,
+        content=_error_payload(ErrorCode.DB_INTEGRITY, "DB 제약 조건 위반"),
+    )
+
+
+@app.exception_handler(OperationalError)
+def _operational_error_handler(request: Request, exc: OperationalError) -> JSONResponse:
+    rid = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:8]
+    _log.error("OperationalError rid=%s path=%s msg=%s", rid, request.url.path, exc)
+    return JSONResponse(
+        status_code=503,
+        content=_error_payload(ErrorCode.DB_UNAVAILABLE, "DB 연결 일시 오류"),
+    )
+
+
+@app.exception_handler(Exception)
+def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    # FastAPI 가 HTTPException 은 자체 처리하므로 여기에는 진짜 unhandled 만 옴.
+    rid = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:8]
+    _log.exception("Unhandled rid=%s path=%s", rid, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content=_error_payload(
+            ErrorCode.INTERNAL,
+            "처리 중 오류가 발생했습니다.",
+            extra={"request_id": rid},
+        ),
+    )
+
 
 app.include_router(items.router, prefix="/api/items", tags=["Items"])
 app.include_router(employees.router, prefix="/api/employees", tags=["Employees"])

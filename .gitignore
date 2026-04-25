@@ -11,6 +11,9 @@ venv/
 *.db-shm
 *.db-wal
 
+# Backend runtime logs (Phase 4)
+backend/logs/
+
 # Node
 node_modules/
 .next/

@@ -13,6 +13,7 @@ from app.schemas import BackflushDetail, ProductionReceiptRequest, ProductionRec
 from app.services import inventory as inventory_svc
 from app.services import stock_math
 from app.services.bom import explode_bom as _explode_bom_svc
+from app.routers._errors import ErrorCode, http_error
 
 router = APIRouter()
 
@@ -65,12 +66,11 @@ def production_receipt(
             )
 
     if shortage_errors:
-        raise HTTPException(
+        raise http_error(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "message": "재고 부족으로 생산 입고를 진행할 수 없습니다.",
-                "shortages": shortage_errors,
-            },
+            code=ErrorCode.STOCK_SHORTAGE,
+            message="재고 부족으로 생산 입고를 진행할 수 없습니다.",
+            shortages=shortage_errors,
         )
 
     transaction_ids: List[uuid.UUID] = []
