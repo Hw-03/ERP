@@ -18,8 +18,8 @@ ERP 자재 마스터 DB 통합 스크립트
 
 카테고리 코드:
     RM : 원자재         (파일 A & B/C 모두에 존재)
-    BA : 조립 반제품    (파일 B 단독)
-    BF : 조립 완제품    (파일 B 단독 & 모델명/ASS'Y 키워드)
+    AA : 조립 반제품    (파일 B 단독)
+    AF : 조립 완제품    (파일 B 단독 & 모델명/ASS'Y 키워드)
     HA : 고압 반제품    (파일 C, 부서=고압)
     HF : 고압 완제품    (파일 C, 부서=고압 & ASS'Y 키워드)
     VA : 진공 반제품    (파일 C, 부서=진공/튜닝)
@@ -495,8 +495,8 @@ def classify_bc_only(file: str, dept: str, raw_name: str, model: str, sub_class:
         FG: 이름이 회사 모델명 그 자체 (최종 완제품)
         TF: 분류=튜브/A,SSY 또는 (튜브 + ASS'Y 키워드)
         TA: 분류=튜브* 또는 이름에 튜브 부품 키워드 포함
-        BF/HF/VF: ASS'Y 키워드 포함 (완제품/서브어셈블리)
-        BA/HA/VA: 기본 (반제품/부품)
+        AF/HF/VF: ASS'Y 키워드 포함 (완제품/서브어셈블리)
+        AA/HA/VA: 기본 (반제품/부품)
     """
     if is_final_model(raw_name):
         return "FG"
@@ -504,7 +504,7 @@ def classify_bc_only(file: str, dept: str, raw_name: str, model: str, sub_class:
     has_assy = has_assy_keyword(raw_name)
 
     if file == "B":
-        return "BF" if has_assy else "BA"
+        return "AF" if has_assy else "AA"
 
     # 파일 C - 튜브 우선 판정
     # 1. 분류 컬럼이 '튜브 A,SSY' 또는 (튜브 + 이름에 ASS'Y) → TF
@@ -819,8 +819,8 @@ def write_report(
     lines.append("|---|---|---|")
     cat_desc = {
         "RM": "원자재 (Raw Material)",
-        "BA": "조립 반제품 (Assembly Sub-Assembly)",
-        "BF": "조립 완제품 (Assembly Finished)",
+        "AA": "조립 반제품 (Assembly Sub-Assembly)",
+        "AF": "조립 완제품 (Assembly Finished)",
         "HA": "고압 반제품 (High-voltage Sub-Assembly)",
         "HF": "고압 완제품 (High-voltage Finished)",
         "VA": "진공 반제품 (Vacuum Sub-Assembly)",

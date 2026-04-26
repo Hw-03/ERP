@@ -7,7 +7,7 @@ Usage:
 
 규칙:
 - 각 품목의 현재 총 수량을 창고 + 1~3개 부서로 랜덤 분배
-- 카테고리별 주요 부서 가중치 반영 (TA→튜브, HA→고압, VA→진공, BA→조립, FG→출하)
+- 카테고리별 주요 부서 가중치 반영 (TA→튜브, HA→고압, VA→진공, AA→조립, FG→출하)
 - 10% 확률로 불량 재고 추가 (총량의 2-8%)
 - 안전재고: 70% 품목에 설정, 그 중 30%는 현재 재고 이하로 설정해 경보 테스트
 """
@@ -50,8 +50,8 @@ CATEGORY_DEPT_WEIGHTS: dict[str, list[tuple[DepartmentEnum, int]]] = {
     "HF": [(DepartmentEnum.HIGH_VOLTAGE, 5), (DepartmentEnum.ASSEMBLY, 2)],
     "VA": [(DepartmentEnum.VACUUM, 5), (DepartmentEnum.ASSEMBLY, 2), (DepartmentEnum.TUNING, 1)],
     "VF": [(DepartmentEnum.VACUUM, 5), (DepartmentEnum.ASSEMBLY, 2)],
-    "BA": [(DepartmentEnum.ASSEMBLY, 5), (DepartmentEnum.SHIPPING, 2), (DepartmentEnum.HIGH_VOLTAGE, 1)],
-    "BF": [(DepartmentEnum.ASSEMBLY, 5), (DepartmentEnum.SHIPPING, 2)],
+    "AA": [(DepartmentEnum.ASSEMBLY, 5), (DepartmentEnum.SHIPPING, 2), (DepartmentEnum.HIGH_VOLTAGE, 1)],
+    "AF": [(DepartmentEnum.ASSEMBLY, 5), (DepartmentEnum.SHIPPING, 2)],
     "FG": [(DepartmentEnum.SHIPPING, 5), (DepartmentEnum.ASSEMBLY, 2), (DepartmentEnum.SALES, 1)],
     "UK": [(DepartmentEnum.ETC, 3), (DepartmentEnum.ASSEMBLY, 2), (DepartmentEnum.RESEARCH, 1)],
 }

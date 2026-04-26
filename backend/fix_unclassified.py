@@ -35,7 +35,7 @@ CAT_TO_DEPT: dict[str, DepartmentEnum] = {
     "HF": DepartmentEnum.HIGH_VOLTAGE,
     "VA": DepartmentEnum.VACUUM,
     "VF": DepartmentEnum.VACUUM,
-    "BA": DepartmentEnum.ASSEMBLY,
+    "AA": DepartmentEnum.ASSEMBLY,
     "AF": DepartmentEnum.ASSEMBLY,
     "FG": DepartmentEnum.SHIPPING,
 }
@@ -62,7 +62,7 @@ def pick_symbol(category: str, legacy_model: str | None, erp_code: str | None) -
     # 3. 카테고리별 랜덤
     if category == "FG":
         return random.choice(ALL_SYMBOLS)
-    elif category in {"TA", "TF", "HA", "HF", "VA", "VF", "BA", "AF"}:
+    elif category in {"TA", "TF", "HA", "HF", "VA", "VF", "AA", "AF"}:
         k = random.randint(1, 2)
         return "".join(sorted(random.sample(ALL_SYMBOLS, k)))
     else:  # RM, UK

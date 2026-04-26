@@ -45,7 +45,7 @@ COLUMNS: list[tuple[str, str, str, int, str, str, str]] = [
 
 # 드롭다운 값 목록 (모델 DB와 일치해야 함: models.py CategoryEnum / DepartmentEnum)
 DROPDOWNS: dict[str, list[str]] = {
-    "카테고리": ["RM", "TA", "HA", "VA", "BA", "FG", "UK"],  # TF/HF/VF/BF 는 내부용이라 제외
+    "카테고리": ["RM", "TA", "HA", "VA", "AA", "FG", "UK"],  # TF/HF/VF/AF 는 내부용이라 제외
     "단위":     ["EA", "SET", "kg", "g", "m", "mm", "L", "box"],
     "부서":     ["조립", "고압", "진공", "튜닝", "튜브", "AS", "연구", "영업", "출하", "기타"],
     "모델":     ["공용", "DX3000", "ADX4000W", "ADX6000", "COCOON", "SOLO"],
@@ -204,7 +204,7 @@ def build_guide_sheet(wb: Workbook) -> None:
     kv(r, "TA", "튜브 어셈블리 - 튜브 조립 단계 반제품");                                r += 1
     kv(r, "HA", "고압 어셈블리 - 고압부 조립 단계 반제품");                              r += 1
     kv(r, "VA", "진공 어셈블리 - 진공부 조립 단계 반제품");                              r += 1
-    kv(r, "BA", "조립 완성 - 고압+진공+튜닝 최종 조립 단계");                            r += 1
+    kv(r, "AA", "조립 완성 - 고압+진공+튜닝 최종 조립 단계");                            r += 1
     kv(r, "FG", "완제품 - 출하 준비 끝난 최종 제품");                                    r += 1
     kv(r, "UK", "미분류 - 분류 애매하면 UK 선택, 나중에 관리자가 재분류");               r += 2
 

@@ -163,7 +163,7 @@ export function StepItems({
     const keyword = deferredSearch.trim().toLowerCase();
     return items.filter((item) => {
       if (category === "RM" && item.category !== "RM") return false;
-      if (category === "A" && !["TA", "HA", "VA", "BA"].includes(item.category)) return false;
+      if (category === "A" && !["TA", "HA", "VA", "AA"].includes(item.category)) return false;
       if (category === "F" && !["TF", "HF", "VF", "AF"].includes(item.category)) return false;
       if (category === "FG" && item.category !== "FG") return false;
       if (!keyword) return true;

@@ -267,8 +267,9 @@ def _explode_bom(
     response_model=CapacityResponse,
     summary="전체 생산 가능수량 조회",
 )
+@router.get("/possible", response_model=CapacityResponse, summary="Production capacity alias")
 def get_production_capacity(db: Session = Depends(get_db)):
-    """BOM이 등록된 BA 품목들에 대해 즉시/최대 생산 가능수량을 계산한다.
+    """BOM이 등록된 AA 품목들에 대해 즉시/최대 생산 가능수량을 계산한다.
 
     - **immediate**: warehouse_available (= warehouse_qty - pending) 기준 최소 생산 가능량.
       production_receipt 의 실제 차감 검사식과 일치 (부서 생산재고/불량은 제외).
@@ -288,7 +289,7 @@ def get_production_capacity(db: Session = Depends(get_db)):
     top_items_db = (
         db.query(Item)
         .filter(Item.item_id.in_(list(top_level_ids)))
-        .filter(Item.category == CategoryEnum.BA)
+        .filter(Item.category == CategoryEnum.AA)
         .limit(15)
         .all()
     )

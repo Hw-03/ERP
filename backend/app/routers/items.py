@@ -310,7 +310,7 @@ _CATEGORY_ROW_COLOR = {
     "TA": "D6F5F5", "TF": "D6F5F5",
     "HA": "FFF8D6", "HF": "FFF8D6",
     "VA": "EAD6FF", "VF": "EAD6FF",
-    "BA": "FFE8D6", "BF": "FFE8D6",
+    "AA": "FFE8D6", "AF": "FFE8D6",
     "FG": "D6F5E0",
     "UK": "EBEBEB",
 }

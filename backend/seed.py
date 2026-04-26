@@ -52,8 +52,8 @@ CATEGORY_MAP = {
     "HF": CategoryEnum.HF,
     "VA": CategoryEnum.VA,
     "VF": CategoryEnum.VF,
-    "BA": CategoryEnum.BA,
-    "BF": CategoryEnum.AF,
+    "AA": CategoryEnum.AA,
+    "AF": CategoryEnum.AF,
     "FG": CategoryEnum.FG,
     "UK": CategoryEnum.UK,
 }
@@ -66,7 +66,7 @@ CATEGORY_TO_FILE_TYPE: dict[str, str] = {
     "HF": "발생부자재",
     "VA": "발생부자재",
     "VF": "발생부자재",
-    "BA": "조립자재",
+    "AA": "조립자재",
     "AF": "조립자재",
     "FG": "완제품",
 }
@@ -79,7 +79,7 @@ CATEGORY_TO_PART: dict[str, str] = {
     "HF": "고압파트",
     "VA": "진공파트",
     "VF": "진공파트",
-    "BA": "조립출하",
+    "AA": "조립출하",
     "AF": "조립출하",
     "FG": "출하",
 }
@@ -129,7 +129,7 @@ def infer_legacy_category(file_type: str | None, part: str | None) -> CategoryEn
     if file_type == "완제품" or part == "출하":
         return CategoryEnum.FG
     if file_type == "조립자재":
-        return CategoryEnum.BA
+        return CategoryEnum.AA
     if file_type == "발생부자재":
         if "고압" in part:
             return CategoryEnum.HA
@@ -413,7 +413,7 @@ def seed() -> None:
         print(f"Rows skipped: {skipped}")
         print(f"Default stock=100 applied: {defaulted_stock}")
         print("Category counts:")
-        for code in ["RM", "TA", "TF", "HA", "HF", "VA", "VF", "BA", "AF", "FG", "UK"]:
+        for code in ["RM", "TA", "TF", "HA", "HF", "VA", "VF", "AA", "AF", "FG", "UK"]:
             print(f"  {code}: {category_counts.get(code, 0)}")
 
         if errors:

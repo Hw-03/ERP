@@ -64,7 +64,7 @@ class CategoryEnum(str, enum.Enum):
     HF = "HF"
     VA = "VA"
     VF = "VF"
-    BA = "BA"
+    AA = "AA"
     AF = "AF"
     FG = "FG"
     UK = "UK"

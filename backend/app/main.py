@@ -66,8 +66,8 @@ app = FastAPI(
     | HF | High-voltage Final | 고압 완제품 |
     | VA | Vacuum Ass'y | 진공 반제품 |
     | VF | Vacuum Final | 진공 완제품 |
-    | BA | Body Ass'y | 조립 반제품 |
-    | BF | Body Final | 조립 완제품 |
+    | AA | Body Ass'y | 조립 반제품 |
+    | AF | Body Final | 조립 완제품 |
     | FG | Finished Good | 완제품 |
     | UK | Unknown | 미분류 또는 확인 필요 |
 

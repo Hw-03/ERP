@@ -16,7 +16,7 @@ _CATEGORY_TO_PROCESS: dict[str, str | None] = {
     "HF": "HF",
     "VA": "VA",
     "VF": "VF",
-    "BA": "AA",
+    "AA": "AA",
     "AF": "AF",
     "FG": "PA",
     "UK": None,   # 미분류 → 스킵
