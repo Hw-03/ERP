@@ -5,6 +5,7 @@ import { LEGACY_COLORS, formatNumber } from "../legacyUi";
 import { EmptyState } from "../common/EmptyState";
 import { BOM_CHILD_CATS, BOM_PARENT_CATS } from "./adminShared";
 import { useAdminBomContext } from "./AdminBomContext";
+import { BomStepIndicator } from "./_bom_parts/BomStepIndicator";
 
 // Props 없음. 모든 상태/액션은 AdminBomProvider 가 제공하는 Context 에서 읽는다.
 // 기존 22-prop drilling → 0. DesktopAdminView 의 useState 11개도 hook 으로 흡수.
@@ -41,31 +42,7 @@ export function AdminBomSection() {
   } = ctx;
   return (
     <div className="flex flex-col h-full gap-3">
-      {/* 단계 흐름 인디케이터 */}
-      <div className="shrink-0 flex items-center gap-2 text-xs font-bold">
-        {[
-          { step: "①", label: "부모품목 선택", active: !parentId, done: !!parentId },
-          { step: "②", label: "자식품목 선택", active: !!parentId && !pendingChildId, done: !!pendingChildId },
-          { step: "③", label: "소요량 입력", active: !!pendingChildId, done: false },
-          { step: "④", label: "저장", active: false, done: false },
-        ].map(({ step, label, active, done }) => (
-          <span
-            key={step}
-            className="flex items-center gap-1 rounded-full px-2.5 py-1"
-            style={{
-              background: done
-                ? `color-mix(in srgb, ${LEGACY_COLORS.green} 14%, transparent)`
-                : active
-                ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 16%, transparent)`
-                : LEGACY_COLORS.s2,
-              color: done ? LEGACY_COLORS.green : active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
-              border: `1px solid ${done ? LEGACY_COLORS.green : active ? LEGACY_COLORS.blue : LEGACY_COLORS.border}`,
-            }}
-          >
-            {done ? "✓" : step} {label}
-          </span>
-        ))}
-      </div>
+      <BomStepIndicator parentSelected={!!parentId} childSelected={!!pendingChildId} />
 
       <div className="grid min-h-0 flex-1 gap-3" style={{ gridTemplateColumns: "300px minmax(0,1fr)" }}>
         {/* 좌측: 상위 품목 선택 */}

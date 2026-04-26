@@ -28,6 +28,7 @@ from app.models import ProductSymbol
 from app.services import audit
 from app.services import inventory as inventory_svc
 from app.services import stock_math
+from app.services._tx import commit_and_refresh
 from app.services.export_helpers import csv_streaming_response
 
 router = APIRouter()
@@ -167,8 +168,7 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         payload_summary=f"{item.item_name} ({item.erp_code or 'no-erp'}, init {init_qty})",
     )
 
-    db.commit()
-    db.refresh(item)
+    commit_and_refresh(db, item)
     return item
 
 
@@ -441,6 +441,5 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
             payload_summary=f"{item.item_name}: {', '.join(changed)}",
         )
 
-    db.commit()
-    db.refresh(item)
+    commit_and_refresh(db, item)
     return item

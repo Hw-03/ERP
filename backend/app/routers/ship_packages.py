@@ -17,6 +17,7 @@ from app.schemas import (
     ShipPackageResponse,
     ShipPackageUpdate,
 )
+from app.services._tx import commit_and_refresh, commit_only
 
 router = APIRouter()
 
@@ -39,8 +40,7 @@ def create_package(payload: ShipPackageCreate, db: Session = Depends(get_db)):
         notes=payload.notes,
     )
     db.add(package)
-    db.commit()
-    db.refresh(package)
+    commit_and_refresh(db, package)
     return package
 
 
@@ -55,8 +55,7 @@ def update_package(package_id: uuid.UUID, payload: ShipPackageUpdate, db: Sessio
     if payload.notes is not None:
         package.notes = payload.notes
     package.updated_at = datetime.now(UTC).replace(tzinfo=None)
-    db.commit()
-    db.refresh(package)
+    commit_and_refresh(db, package)
     return package
 
 
@@ -66,7 +65,7 @@ def delete_package(package_id: uuid.UUID, db: Session = Depends(get_db)):
     if not package:
         raise http_error(404, ErrorCode.NOT_FOUND, "출하 패키지를 찾을 수 없습니다.")
     db.delete(package)
-    db.commit()
+    commit_only(db)
 
 
 @router.post("/{package_id}/items", response_model=ShipPackageDetailResponse, status_code=status.HTTP_201_CREATED)
@@ -96,12 +95,19 @@ def add_package_item(package_id: uuid.UUID, payload: ShipPackageItemCreate, db: 
         )
 
     package.updated_at = datetime.now(UTC).replace(tzinfo=None)
-    db.commit()
-    db.refresh(package)
+    commit_and_refresh(db, package)
     return _to_detail_response(package)
 
 
-@router.delete("/{package_id}/items/{package_item_id}", response_model=ShipPackageDetailResponse)
+@router.delete(
+    "/{package_id}/items/{package_item_id}",
+    response_model=ShipPackageDetailResponse,
+    summary="패키지 품목 제거 후 갱신된 패키지 반환",
+    description=(
+        "child 1건을 삭제하고 갱신된 parent 를 반환합니다 (200 + body). "
+        "child-delete 패턴 — pure DELETE (204) 는 `/{package_id}` 가 담당."
+    ),
+)
 def delete_package_item(package_id: uuid.UUID, package_item_id: uuid.UUID, db: Session = Depends(get_db)):
     package = db.query(ShipPackage).filter(ShipPackage.package_id == package_id).first()
     if not package:
@@ -113,8 +119,7 @@ def delete_package_item(package_id: uuid.UUID, package_item_id: uuid.UUID, db: S
 
     db.delete(package_item)
     package.updated_at = datetime.now(UTC).replace(tzinfo=None)
-    db.commit()
-    db.refresh(package)
+    commit_and_refresh(db, package)
     return _to_detail_response(package)
 
 

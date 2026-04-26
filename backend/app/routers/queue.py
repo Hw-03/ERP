@@ -326,7 +326,12 @@ def add_line(
 @router.delete(
     "/{batch_id}/lines/{line_id}",
     response_model=QueueBatchResponse,
-    summary="라인 제거",
+    summary="배치 라인 제거 후 갱신된 배치 반환",
+    description=(
+        "라인 1건을 삭제하고 갱신된 배치 객체를 반환합니다 (200 + body). "
+        "프론트가 재조회 없이 상태를 갱신할 수 있도록 의도된 child-delete 패턴. "
+        "pure DELETE (204) 가 필요한 경우 별도 엔드포인트 추가 예정."
+    ),
 )
 def delete_line(
     batch_id: uuid.UUID,

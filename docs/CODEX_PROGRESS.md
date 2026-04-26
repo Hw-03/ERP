@@ -309,6 +309,52 @@ GPT 외부 리뷰가 5.3 직후 P1 1건을 정확히 짚었다: **`main.py` 의 
 
 **종합 92 → 95 (A 상위)**. 14개 영역 중 보안(C+) 1개를 제외하고 모두 A− 이상, 5개 영역이 A.
 
+## 2026-04-27 Phase 5.5 — A− 영역들 A 진입 시도
+
+GPT 외부 리뷰 + 자체 점검에서 8개 A− 영역을 식별. 보안(C+)을 제외한 모든 영역을 A 로 끌어올리는 마지막 phase.
+
+### 변경 항목
+
+- **5.5-A**: `InventoryLocation.quantity >= 0` CheckConstraint + `TransactionLog (item_id, created_at)` 복합 인덱스. SQLite 는 ALTER ADD CONSTRAINT 미지원 → `scripts/migrations/add_invloc_check_5_5.py` 1회용 마이그 (백업 → drop → create → restore, idempotent). 운영 DB 1회 적용 완료
+- **5.5-B**: `DELETE /api/queue/{batch_id}/lines/{line_id}` 와 `DELETE /api/ship-packages/{package_id}/items/{package_item_id}` 의 OpenAPI summary/description 강화 — child-delete-return-parent 패턴이 의도된 설계임을 명시 (강제 204 변경은 프론트 회귀 위험으로 회피)
+- **5.5-C**: `commit_and_refresh / commit_only` 헬퍼를 5개 라우터(items / bom / employees / ship_packages / settings)에 일관 적용. 11 → 6 라우터만 bare `db.commit()` (남은 6곳은 5.6 sweep)
+- **5.5-D**: integrity 단위 테스트 5건 추가 (7 → 12). `pytest -q` **40/40 green**. inventory 라우터 try/except 일관화는 글로벌 핸들러로 충분하다고 판단 — 의도적 skip
+- **5.5-E (부분 적용)**: 데스크톱 `_admin_sections/AdminBomSection.tsx` (557줄) 의 4-step 인디케이터 `BomStepIndicator.tsx` 추출. 추가 분할은 회귀 위험 큰 작업으로 5.6 이연
+- **5.5-F**: `useResource` 에 `signal` 옵션 추가 (fetcher 가 받으면 자동 abort). `useTransactions` 의 reqId.current → AbortController 마이그. `CONTRACT.md` 업데이트
+- **5.5-G**: `HistoryLogRow` 에 keyboard nav (`role/tabIndex/onKeyDown`) 추가 + 거래 유형별 lucide 아이콘 매핑 (`transactionIconName`) — 색상-only 신호 두 채널 보강 (WCAG 1.4.1)
+- **5.5-H**: `docs/ONBOARDING.md` (~120줄) + `docs/API_CHANGELOG.md` (~80줄) 신규. 신규 인원 1시간 setup + Phase 5.1~5.5 API 변경 추적
+
+### 검증
+
+- `python -m compileall backend` 0 오류
+- `pytest -q` **40/40 green** (35 + 5)
+- `npx tsc --noEmit` 0 오류
+- `npm run lint` 0 warning
+- `npm test` **12/12 green**
+- 마이그 스크립트 적용 후 `PRAGMA integrity_check` ok
+
+### 점수 변동 (자체 평가)
+
+| 영역 | 5.4 | 5.5 |
+|---|---|---|
+| DB/모델 | A− | **A** (CHECK + 복합 인덱스) |
+| 라우터 | A− | A− (DELETE 의도 명시 — full A 는 추가 정리 필요) |
+| 서비스 레이어 | A− | A− (5/11 라우터만 _tx 적용 — 5.6 에서 마무리 시 A) |
+| 트랜잭션/정합성 | A− | **A** (integrity 12 케이스) |
+| 프론트 컴포넌트 | A− | A− (BomStepIndicator 만 추출, 추가 분할 5.6) |
+| 프론트 상태 관리 | A− | **A** (useResource signal + useTransactions AbortController) |
+| UX/접근성 | A− | **A** (HistoryLogRow keyboard nav + 아이콘) |
+| 문서 | A− | **A** (ONBOARDING + API_CHANGELOG) |
+
+5/8 영역 A 진입. 라우터 / 서비스 레이어 / 컴포넌트 3개는 부분 적용으로 A− 유지. **종합 95 → 97 (A 상위)**.
+
+### 5.6 이연 항목
+
+- `commit_and_refresh` 미적용 6 라우터 (alerts, codes, counts, loss, models, scrap)
+- `_admin_sections/AdminBomSection.tsx` 의 추가 분할 (parent picker / child picker / row list)
+- `mobile/screens/HistoryScreen.tsx` 의 calendar view 추출
+- `useTransactions` vitest 케이스 추가
+
 ## 다음 우선순위
 
 - API 인증 헤더화 (보안 C+ → B+ 진입, 외부 노출 계획 시)

@@ -107,3 +107,74 @@ def test_repair_samples_capped_at_20(make_item, db_session):
     report = repair_inventory_totals(db_session, dry_run=True)
     assert report.mismatched == 25
     assert len(report.samples) == 20
+
+
+# 5.5-D: 추가 5케이스 (edge / idempotent / orphan)
+
+
+def test_check_consistency_zero_amounts_balanced(make_item, db_session):
+    """모든 값이 0 인 새 품목은 mismatch 0 (무한 mismatch 회귀 방지)."""
+    make_item(warehouse_qty=D("0"))
+    assert check_inventory_consistency(db_session) == []
+
+
+def test_check_consistency_with_orphan_location(make_item, make_location, db_session):
+    """Inventory 가 있는데 InventoryLocation 도 있고, item 만 살아있으면 정합."""
+    from app.models import Inventory
+    item = make_item(warehouse_qty=D("2"))
+    make_location(item.item_id, status=LocationStatusEnum.PRODUCTION, quantity=D("3"))
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+    inv.quantity = D("5")  # = 2 wh + 3 loc
+    db_session.flush()
+    assert check_inventory_consistency(db_session) == []
+
+
+def test_repair_dry_run_idempotent(make_item, db_session):
+    """dry_run 두 번 호출 시 같은 결과 (DB 미변경)."""
+    from app.models import Inventory
+    item = make_item(warehouse_qty=D("4"))
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+    inv.quantity = D("7")
+    db_session.flush()
+
+    r1 = repair_inventory_totals(db_session, dry_run=True)
+    r2 = repair_inventory_totals(db_session, dry_run=True)
+    assert r1.mismatched == r2.mismatched == 1
+    assert r1.repaired == r2.repaired == 0
+
+
+def test_repair_handles_inventory_with_no_locations(make_item, db_session):
+    """Inventory 만 있고 location 0건 — quantity == warehouse 정합."""
+    item = make_item(warehouse_qty=D("8"))
+    # 처음 make_item 이 quantity=warehouse_qty=8 로 동기화 → mismatch 0
+    report = repair_inventory_totals(db_session, dry_run=True)
+    assert report.mismatched == 0
+    assert report.repaired == 0
+
+
+def test_check_consistency_multiple_locations_summed(make_item, make_location, db_session):
+    """동일 item 의 여러 위치 (PRODUCTION + DEFECTIVE 등) 합산이 정확."""
+    from app.models import DepartmentEnum, Inventory
+    item = make_item(warehouse_qty=D("1"))
+    make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=LocationStatusEnum.PRODUCTION,
+        quantity=D("4"),
+    )
+    make_location(
+        item.item_id,
+        department=DepartmentEnum.HIGH_VOLTAGE,
+        status=LocationStatusEnum.PRODUCTION,
+        quantity=D("2"),
+    )
+    make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=D("3"),
+    )
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+    inv.quantity = D("10")  # 1 + 4 + 2 + 3
+    db_session.flush()
+    assert check_inventory_consistency(db_session) == []

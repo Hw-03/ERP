@@ -12,6 +12,7 @@ from app.models import BOM, Inventory, Item
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import BOMCreate, BOMDetailResponse, BOMResponse, BOMTreeNode, BOMUpdate
 from app.services import audit
+from app.services._tx import commit_and_refresh, commit_only
 from app.services.bom import BomCache, build_bom_cache
 
 router = APIRouter()
@@ -110,8 +111,7 @@ def create_bom(payload: BOMCreate, request: Request, db: Session = Depends(get_d
         payload_summary=f"{parent.item_name} ← {child.item_name} ×{payload.quantity}{payload.unit}",
     )
 
-    db.commit()
-    db.refresh(bom_entry)
+    commit_and_refresh(db, bom_entry)
     return bom_entry
 
 
@@ -141,8 +141,7 @@ def update_bom(bom_id: uuid.UUID, payload: BOMUpdate, request: Request, db: Sess
             payload_summary=", ".join(changed),
         )
 
-    db.commit()
-    db.refresh(bom_entry)
+    commit_and_refresh(db, bom_entry)
     return bom_entry
 
 
@@ -207,7 +206,7 @@ def delete_bom(bom_id: uuid.UUID, request: Request, db: Session = Depends(get_db
         payload_summary=f"parent={bom_entry.parent_item_id} child={bom_entry.child_item_id}",
     )
     db.delete(bom_entry)
-    db.commit()
+    commit_only(db)
 
 
 @router.get("/where-used/{item_id}", response_model=List[BOMDetailResponse])

@@ -12,6 +12,7 @@ from app.models import DepartmentEnum, Employee
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import EmployeeCreate, EmployeeResponse, EmployeeUpdate
 from app.services import audit
+from app.services._tx import commit_and_refresh, commit_only
 
 router = APIRouter()
 
@@ -60,8 +61,7 @@ def create_employee(payload: EmployeeCreate, request: Request, db: Session = Dep
         payload_summary=f"{employee.name} ({employee.employee_code})",
     )
 
-    db.commit()
-    db.refresh(employee)
+    commit_and_refresh(db, employee)
     return _to_response(employee)
 
 
@@ -101,8 +101,7 @@ def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, request: Re
             payload_summary=f"{employee.name}: {', '.join(changed)}",
         )
 
-    db.commit()
-    db.refresh(employee)
+    commit_and_refresh(db, employee)
     return _to_response(employee)
 
 
@@ -121,7 +120,7 @@ def delete_employee(employee_id: uuid.UUID, request: Request, db: Session = Depe
         payload_summary=f"{employee.name} ({employee.employee_code})",
     )
     db.delete(employee)
-    db.commit()
+    commit_only(db)
 
 
 def _to_response(employee: Employee) -> EmployeeResponse:

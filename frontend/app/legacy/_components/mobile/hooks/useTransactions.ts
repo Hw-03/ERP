@@ -5,56 +5,61 @@ import { api, type TransactionLog } from "@/lib/api";
 
 const PAGE_SIZE = 100;
 
+// 5.5-F: AbortController 마이그 — 빠른 refetch 충돌 시 마지막 결과만 반영.
+// (CONTRACT.md 의 list hook 표준 패턴)
 export function useTransactions() {
   const [logs, setLogs] = useState<TransactionLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const reqId = useRef(0);
+
+  const activeCtrlRef = useRef<AbortController | null>(null);
 
   const refetch = useCallback(async () => {
-    const id = ++reqId.current;
+    activeCtrlRef.current?.abort();
+    const ctrl = new AbortController();
+    activeCtrlRef.current = ctrl;
     setLoading(true);
     try {
-      const data = await api.getTransactions({ limit: PAGE_SIZE, skip: 0 });
-      if (reqId.current === id) {
-        setLogs(data);
-        setHasMore(data.length === PAGE_SIZE);
-        setPage(1);
-        setError(null);
-      }
+      const data = await api.getTransactions({ limit: PAGE_SIZE, skip: 0 }, { signal: ctrl.signal });
+      if (ctrl.signal.aborted) return;
+      setLogs(data);
+      setHasMore(data.length === PAGE_SIZE);
+      setPage(1);
+      setError(null);
     } catch (err) {
-      if (reqId.current === id) {
-        setError(err instanceof Error ? err.message : "이력을 불러오지 못했습니다.");
-      }
+      if ((err as Error)?.name === "AbortError" || ctrl.signal.aborted) return;
+      setError(err instanceof Error ? err.message : "이력을 불러오지 못했습니다.");
     } finally {
-      if (reqId.current === id) setLoading(false);
+      if (!ctrl.signal.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     void refetch();
+    return () => activeCtrlRef.current?.abort();
   }, [refetch]);
 
   const loadMore = useCallback(async () => {
     if (!hasMore || loading) return;
     const next = page + 1;
     setPage(next);
-    const id = ++reqId.current;
+    const ctrl = new AbortController();
     setLoading(true);
     try {
-      const data = await api.getTransactions({ limit: PAGE_SIZE, skip: (next - 1) * PAGE_SIZE });
-      if (reqId.current === id) {
-        setLogs((prev) => [...prev, ...data]);
-        setHasMore(data.length === PAGE_SIZE);
-      }
+      const data = await api.getTransactions(
+        { limit: PAGE_SIZE, skip: (next - 1) * PAGE_SIZE },
+        { signal: ctrl.signal },
+      );
+      if (ctrl.signal.aborted) return;
+      setLogs((prev) => [...prev, ...data]);
+      setHasMore(data.length === PAGE_SIZE);
     } catch (err) {
-      if (reqId.current === id) {
-        setError(err instanceof Error ? err.message : "이력을 불러오지 못했습니다.");
-      }
+      if ((err as Error)?.name === "AbortError" || ctrl.signal.aborted) return;
+      setError(err instanceof Error ? err.message : "이력을 불러오지 못했습니다.");
     } finally {
-      if (reqId.current === id) setLoading(false);
+      if (!ctrl.signal.aborted) setLoading(false);
     }
   }, [hasMore, loading, page]);
 

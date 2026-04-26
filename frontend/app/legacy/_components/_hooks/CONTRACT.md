@@ -56,7 +56,8 @@
 
 | 상황 | 패턴 |
 |---|---|
-| 검색창 빠른 타이핑 | AbortController (`useItems`) |
+| 검색창 빠른 타이핑 | AbortController (`useItems`, `useTransactions`) |
+| 단일 fetcher + deps 변경 | `useResource(fetcher, deps)` — fetcher 가 `signal` 받으면 자동 abort 처리 (5.5-F) |
 | 변하지 않는 reference 데이터 | `useResource(fn, [])` |
 | 외부 트리거(저장 후 갱신) | 부모가 `refetch()` 호출 / Context 의 `refresh*` 콜백 |
 | 단일 mutation | `await api.x()` → `setState` (pessimistic) |

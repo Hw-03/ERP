@@ -272,6 +272,8 @@ class InventoryLocation(Base):
     )
 
     __table_args__ = (
+        # 5.5-A: 음수 위치 재고 방지. 서비스 레이어에서 막지만 DB-level 안전망.
+        CheckConstraint("quantity >= 0", name="ck_invloc_quantity_nonneg"),
         UniqueConstraint("item_id", "department", "status", name="uq_invloc_item_dept_status"),
         Index("ix_invloc_item", "item_id"),
         Index("ix_invloc_dept", "department"),
@@ -411,6 +413,12 @@ class TransactionLog(Base):
 
     item = relationship("Item", back_populates="transaction_logs")
     batch = relationship("QueueBatch", back_populates="transaction_logs")
+
+    __table_args__ = (
+        # 5.5-A: "품목 X 의 최근 거래 N건" / "기간 export" 쿼리 가속.
+        # 단일 item_id 인덱스 + created_at 인덱스 조합보다 복합이 효율적.
+        Index("ix_tx_item_created", "item_id", "created_at"),
+    )
 
 
 # =============================================================================

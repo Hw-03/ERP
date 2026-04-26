@@ -23,6 +23,7 @@ from app.schemas import (
 )
 from app.services import audit
 from app.services import integrity as integrity_svc
+from app.services._tx import commit_and_refresh, commit_only
 
 
 class ResetRequest(BaseModel):
@@ -46,8 +47,7 @@ def ensure_admin_pin(db: Session) -> SystemSetting:
 
     setting = SystemSetting(setting_key=ADMIN_PIN_KEY, setting_value=DEFAULT_ADMIN_PIN)
     db.add(setting)
-    db.commit()
-    db.refresh(setting)
+    commit_and_refresh(db, setting)
     return setting
 
 
@@ -80,7 +80,7 @@ def update_admin_pin(payload: AdminPinUpdateRequest, request: Request, db: Sessi
         payload_summary="관리자 PIN 변경",
     )
 
-    db.commit()
+    commit_only(db)
     return MessageResponse(message="관리자 비밀번호를 변경했습니다.")
 
 
@@ -130,7 +130,7 @@ def repair_inventory_integrity(
             target_id="inventory",
             payload_summary=f"repaired {getattr(report, 'fixed_count', '?')} rows",
         )
-        db.commit()
+        commit_only(db)
     return report.to_dict()
 
 
@@ -150,7 +150,7 @@ def reset_database(payload: ResetRequest, request: Request, db: Session = Depend
         target_id="database",
         payload_summary="DB 초기화 + 시드 재적재 시작",
     )
-    db.commit()
+    commit_only(db)
 
     try:
         import sys

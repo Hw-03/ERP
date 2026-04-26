@@ -870,14 +870,17 @@ export const api = {
   getProductionCapacity: () =>
     fetcher<ProductionCapacity>(toApiUrl("/api/production/capacity")),
 
-  getTransactions: (params?: {
-    itemId?: string;
-    transactionType?: TransactionType;
-    referenceNo?: string;
-    search?: string;
-    limit?: number;
-    skip?: number;
-  }) => {
+  getTransactions: (
+    params?: {
+      itemId?: string;
+      transactionType?: TransactionType;
+      referenceNo?: string;
+      search?: string;
+      limit?: number;
+      skip?: number;
+    },
+    opts?: { signal?: AbortSignal },
+  ) => {
     const query = new URLSearchParams();
     if (params?.itemId) query.set("item_id", params.itemId);
     if (params?.transactionType) query.set("transaction_type", params.transactionType);
@@ -885,7 +888,7 @@ export const api = {
     if (params?.search) query.set("search", params.search);
     if (params?.limit !== undefined) query.set("limit", String(params.limit));
     if (params?.skip !== undefined) query.set("skip", String(params.skip));
-    return fetcher<TransactionLog[]>(toApiUrl(`/api/inventory/transactions?${query}`));
+    return fetcher<TransactionLog[]>(toApiUrl(`/api/inventory/transactions?${query}`), opts?.signal);
   },
 
   updateTransactionNotes: async (logId: string, notes: string | null): Promise<TransactionLog> => {

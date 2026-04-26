@@ -1,9 +1,45 @@
 "use client";
 
 import { memo } from "react";
+import {
+  Activity,
+  AlertCircle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  BookmarkMinus,
+  BookmarkPlus,
+  Hammer,
+  Recycle,
+  Sliders,
+  Trash2,
+  Undo2,
+  Wrench,
+} from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS, employeeColor, formatNumber, transactionColor, transactionLabel } from "../legacyUi";
+import {
+  LEGACY_COLORS,
+  employeeColor,
+  formatNumber,
+  transactionColor,
+  transactionIconName,
+  transactionLabel,
+} from "../legacyUi";
 import { CATEGORY_META, formatHistoryDate, rowTint } from "./historyShared";
+
+const TX_ICON = {
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Sliders,
+  Hammer,
+  Recycle,
+  Trash2,
+  AlertCircle,
+  Wrench,
+  Undo2,
+  BookmarkPlus,
+  BookmarkMinus,
+  Activity,
+} as const;
 
 type Props = {
   log: TransactionLog;
@@ -29,10 +65,23 @@ function HistoryLogRowImpl({ log, selected, copiedRef, onSelect, onCopyRef }: Pr
     producer = { name, color: dept ? employeeColor(dept) : LEGACY_COLORS.muted2 };
   }
 
+  // 5.5-G: keyboard nav 추가
+  const handleSelect = () => onSelect(log);
+  const TxIcon = TX_ICON[transactionIconName(log.transaction_type)];
+
   return (
     <tr
-      onClick={() => onSelect(log)}
-      className="cursor-pointer transition-colors hover:brightness-110"
+      onClick={handleSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleSelect();
+        }
+      }}
+      tabIndex={0}
+      role="button"
+      aria-pressed={selected}
+      className="cursor-pointer transition-colors hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
       style={{
         background: selected ? "rgba(101,169,255,.10)" : rowTint(log.transaction_type),
         outline: selected ? `1.5px solid ${LEGACY_COLORS.blue}` : "none",
@@ -46,9 +95,10 @@ function HistoryLogRowImpl({ log, selected, copiedRef, onSelect, onCopyRef }: Pr
       </td>
       <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         <span
-          className="inline-flex rounded-full px-2.5 py-1 text-xs font-bold"
+          className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold"
           style={{ background: `color-mix(in srgb, ${tcolor} 14%, transparent)`, color: tcolor }}
         >
+          <TxIcon className="h-3.5 w-3.5" aria-hidden="true" />
           {transactionLabel(log.transaction_type)}
         </span>
       </td>
