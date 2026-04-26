@@ -1,8 +1,8 @@
 """971개 품목의 ERP 코드를 새 체계(다중 모델 기호)로 일괄 재부여.
 
 사용법:
-  python scripts/reapply_erp_codes.py           # dry-run (기본)
-  python scripts/reapply_erp_codes.py --apply   # 실제 DB 반영
+  python scripts/migrations/reapply_erp_codes.py           # dry-run (기본)
+  python scripts/migrations/reapply_erp_codes.py --apply   # 실제 DB 반영
 
 규칙:
   - legacy_model 컬럼 기반으로 model_symbol 파생
@@ -17,7 +17,7 @@ import argparse
 from pathlib import Path
 from collections import defaultdict
 
-DB_PATH = Path(__file__).parent.parent / "backend" / "erp.db"
+DB_PATH = Path(__file__).parent.parent.parent / "backend" / "erp.db"
 
 LEGACY_MODEL_TO_SLOT = {
     "DX3000":    1,

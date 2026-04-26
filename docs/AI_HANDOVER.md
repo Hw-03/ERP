@@ -63,7 +63,7 @@
 - `docs/GLOSSARY.md`, `docs/ERD.md` 신설.
 - `docs/BACKEND_REFACTOR_PLAN.md`, `docs/FRONTEND_HOOKS_PLAN.md` 보류 사유 + Phase 4 완료 표기.
 - `.env.example` 확장 (PORT, LOG_LEVEL, LOG_DIR, CORS_EXTRA_ORIGINS).
-- `scripts/reconcile_inventory.bat` — 정합성 1차 진단 + 백업.
+- `scripts/ops/reconcile_inventory.bat` — 정합성 1차 진단 + 백업.
 
 ## 반드시 지킬 기준
 
@@ -96,7 +96,7 @@
    - `routers/inventory.py`의 10개 commit/refresh 패턴 helper 치환
    - `routers/items.py` + `routers/inventory.py` CSV export 보일러플레이트 통합
    - **API spec / DB schema / endpoint 응답 / transaction 의미 동일.**
-6. **운영 스크립트** — `scripts/backup_db.bat`, `scripts/healthcheck.bat`
+6. **운영 스크립트** — `scripts/ops/backup_db.bat`, `scripts/ops/healthcheck.bat`
 7. **문서 신설/갱신**
    - 갱신: `docs/ARCHITECTURE.md`, `docs/FRONTEND_HOOKS_PLAN.md`, `docs/BACKEND_REFACTOR_PLAN.md`, `docs/AI_HANDOVER.md`, `docs/CODEX_PROGRESS.md`
    - 운영: `docs/USER_GUIDE.md`, `docs/OPERATIONS.md`, `README.md`

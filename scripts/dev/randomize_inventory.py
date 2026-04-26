@@ -2,8 +2,8 @@
 창고/부서 랜덤 재고 분배 + 안전재고 설정 스크립트.
 
 Usage:
-    python scripts/randomize_inventory.py           # dry-run (미리보기만)
-    python scripts/randomize_inventory.py --apply   # 실제 DB 반영
+    python scripts/dev/randomize_inventory.py           # dry-run (미리보기만)
+    python scripts/dev/randomize_inventory.py --apply   # 실제 DB 반영
 
 규칙:
 - 각 품목의 현재 총 수량을 창고 + 1~3개 부서로 랜덤 분배
@@ -19,7 +19,7 @@ import sys
 from decimal import Decimal
 from pathlib import Path
 
-BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
+BACKEND_DIR = Path(__file__).resolve().parent.parent.parent / "backend"
 sys.path.insert(0, str(BACKEND_DIR))
 os.environ["DATABASE_URL"] = f"sqlite:///{(BACKEND_DIR / 'erp.db').as_posix()}"
 
@@ -227,7 +227,7 @@ def randomize(apply: bool = False) -> None:
             print(f"  품절(0) 예정: {zero_count}개")
             print(f"  안전재고 설정 예정: {safety_set}개")
             print(f"  경보 예상: ~{safety_alert_preview}개")
-            print("\n실제 반영: python scripts/randomize_inventory.py --apply")
+            print("\n실제 반영: python scripts/dev/randomize_inventory.py --apply")
 
     finally:
         db.close()

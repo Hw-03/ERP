@@ -1,6 +1,6 @@
 """
 개발 현황 엑셀 생성 스크립트
-실행: python scripts/generate_devlog.py
+실행: python scripts/dev/generate_devlog.py
 출력: data/개발현황.xlsx
 """
 import subprocess

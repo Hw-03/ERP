@@ -6,14 +6,14 @@
   3. product_symbols 데이터 업데이트 (새 기호 매핑 적용)
   4. process_types 에 NA 추가
 
-실행: python scripts/migrate_erp_schema.py
+실행: python scripts/migrations/migrate_erp_schema.py
 """
 
 import sqlite3
 import sys
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent.parent / "backend" / "erp.db"
+DB_PATH = Path(__file__).parent.parent.parent / "backend" / "erp.db"
 
 
 def run():
@@ -90,7 +90,7 @@ def run():
     conn.commit()
     conn.close()
     print("\n=== 마이그레이션 완료 ===")
-    print("다음 단계: python scripts/reapply_erp_codes.py --dry-run")
+    print("다음 단계: python scripts/migrations/reapply_erp_codes.py --dry-run")
 
 
 if __name__ == "__main__":

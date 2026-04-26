@@ -83,7 +83,7 @@
   EmptyState · LoadFailureCard · LoadingSkeleton · StatusPill · ConfirmModal · ResultModal
 - 입출고 UX 마감 (필터 가림 안내, 음수 재고 강조, blockerText, 메모 200자 카운터, busy 잠금)
 - 데스크톱 4화면 시각 언어 통일
-- 운영 보조 스크립트: `scripts/backup_db.bat`, `scripts/healthcheck.bat`
+- 운영 보조 스크립트: `scripts/ops/backup_db.bat`, `scripts/ops/healthcheck.bat`
 - 문서 신설: USER_GUIDE / OPERATIONS / ARCHITECTURE / BACKEND_REFACTOR_PLAN / FRONTEND_HOOKS_PLAN
 
 ## 2026-04-25 `feat/erp-overhaul` Phase 3 — 대형 구조 정리

@@ -2,7 +2,7 @@
 실제 재고 입력용 엑셀 양식 (data/재고_입력_양식.xlsx) 생성기.
 
 사용법:
-    py scripts/generate_inventory_template.py
+    py scripts/dev/generate_inventory_template.py
 
 산출물:
     data/재고_입력_양식.xlsx
@@ -20,7 +20,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 OUTPUT_PATH = ROOT / "data" / "재고_입력_양식.xlsx"
 
 # 데이터 행을 얼마나 미리 만들어 둘지 (드롭다운 + 테두리 적용 범위)

@@ -2,15 +2,15 @@
 data/재고_입력_양식.xlsx 를 읽어서 items / inventory 테이블에 반영.
 
 기본 동작:
-    py scripts/import_real_inventory.py
+    py scripts/dev/import_real_inventory.py
         → dry-run. 몇 건 추가/업데이트/스킵될지 리포트만 출력.
 
 실제 반영:
-    py scripts/import_real_inventory.py --apply
+    py scripts/dev/import_real_inventory.py --apply
         → 기존 품목은 품번(item_code) 기준 upsert, 없으면 새 품목 등록.
 
 기존 971개 테스트 데이터 삭제 후 완전 교체:
-    py scripts/import_real_inventory.py --apply --wipe-existing
+    py scripts/dev/import_real_inventory.py --apply --wipe-existing
         (주의: 되돌릴 수 없음. 사용자 확인 필수)
 """
 
@@ -27,7 +27,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_XLSX = ROOT / "data" / "재고_입력_양식.xlsx"
 BACKEND_DIR = ROOT / "backend"
 SQLITE_PATH = BACKEND_DIR / "erp.db"

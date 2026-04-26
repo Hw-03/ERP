@@ -4,8 +4,8 @@
 누락 공정 코드(NR, NF, PF)를 process_types 테이블에 추가한다.
 
 사용법:
-  dry-run (기본):  python scripts/migrate_bf_to_af.py
-  실제 적용:       python scripts/migrate_bf_to_af.py --apply
+  dry-run (기본):  python scripts/migrations/migrate_bf_to_af.py
+  실제 적용:       python scripts/migrations/migrate_bf_to_af.py --apply
 """
 
 import argparse
@@ -15,7 +15,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent.parent / "backend" / "erp.db"
+DB_PATH = Path(__file__).parent.parent.parent / "backend" / "erp.db"
 
 NEW_PROCESS_TYPES = [
     ("NR", "N", "R", 48, "튜닝 원자재"),

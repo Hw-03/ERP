@@ -7,7 +7,7 @@ rem  - 외부 백업이 필요하면 _backup 폴더를 통째로 복사할 것
 rem ============================================================
 setlocal
 
-set "ROOT=%~dp0.."
+set "ROOT=%~dp0..\.."
 set "DB=%ROOT%\backend\erp.db"
 set "DEST_DIR=%ROOT%\backend\_backup"
 

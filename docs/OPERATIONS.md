@@ -18,10 +18,10 @@ LAN IP는 자동 감지된다. 같은 사설망의 다른 PC에서도 `http://<L
 ## 매일 정상 동작 확인 (1분)
 
 1. 우측 상단 **새로고침** 버튼 → 데이터가 갱신되고 pill이 정상 메시지로 바뀌면 OK.
-2. 또는 운영자 PC에서 `scripts/healthcheck.bat` 실행:
+2. 또는 운영자 PC에서 `scripts/ops/healthcheck.bat` 실행:
 
 ```bat
-scripts\healthcheck.bat
+scripts\ops\healthcheck.bat
 ```
 
 응답에 `status: "ok"`, `database: "ok"`, 최근 거래 시각이 정상이면 OK. `inventory_mismatch_count > 0` 이면 데이터 정합성 점검 필요.
@@ -89,7 +89,7 @@ curl http://127.0.0.1:8010/health/detailed
 
 ### 자동 1차 진단 (Phase 4 추가)
 
-`scripts/reconcile_inventory.bat` 한 번 실행하면:
+`scripts/ops/reconcile_inventory.bat` 한 번 실행하면:
 
 1. `/health/detailed` 호출
 2. `inventory_mismatch_count > 0` 발견 시 **자동으로 backup_db.bat 호출**
