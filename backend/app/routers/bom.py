@@ -19,10 +19,19 @@ router = APIRouter()
 def get_all_bom(db: Session = Depends(get_db)):
     """Return all BOM relationships with parent and child item names."""
     entries = db.query(BOM).all()
+    if not entries:
+        return []
+
+    needed_ids = {e.parent_item_id for e in entries} | {e.child_item_id for e in entries}
+    items_map = {
+        i.item_id: i
+        for i in db.query(Item).filter(Item.item_id.in_(list(needed_ids))).all()
+    }
+
     result = []
     for entry in entries:
-        parent = db.query(Item).filter(Item.item_id == entry.parent_item_id).first()
-        child = db.query(Item).filter(Item.item_id == entry.child_item_id).first()
+        parent = items_map.get(entry.parent_item_id)
+        child = items_map.get(entry.child_item_id)
         if not parent or not child:
             continue
         result.append(BOMDetailResponse(

@@ -22,6 +22,8 @@
 | **AdminEmployeesContext + useAdminEmployees** | ✅ Phase 5 — Props 8 → 0 |
 | **AdminModelsContext + useAdminModels** | ✅ Phase 5 — Props 6 → 0 |
 | **BOM Where-Used UI** | ✅ Phase 5 — 관리자 BOM 우측 패널에 추가 |
+| **`erp_code` 타입 백엔드 정합** | ✅ Phase 5.1 — `TransactionLog / ShipPackageItemDetail / ProductionCheckComponent / BackflushDetail` 등 4 타입을 `string \| null` 로 정정 (백엔드 응답이 Optional). HistoryDetailPanel 의 `[string,string][]` 단언 자리에 `?? "-"` 가드 추가. |
+| **`useAdminBom.saveBomQty` 후 전체 BOM 갱신** | ✅ Phase 5.1 — 수량 수정 후 `refreshAllBom()` 호출 누락 수정. add/delete 와 동일하게 우측 "전체 BOM 현황" 즉시 갱신. |
 | **`useWarehouseData.loading` 플래그** | ✅ **Phase 4** — 메인 데이터 첫 로딩 상태 노출. |
 | **`_warehouse_steps.tsx` (1,135줄) 파일 분할** | ✅ **Phase 4** — `_warehouse_steps/` 디렉토리 8개 파일로 분리 (constants/atoms + 5 step). 외부 import 경로 호환. |
 | **`AdminBomContext` + `useAdminBom`** | ✅ **Phase 4** — DesktopAdminView 의 BOM useState 10개 + useMemo 2개 + 액션 3개를 Provider/hook 으로 흡수. AdminBomSection Props 22 → 0. |

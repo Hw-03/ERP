@@ -152,6 +152,7 @@ export function useAdminBom({
     try {
       const updated = await api.updateBOM(row.bom_id, { quantity: qty });
       setBomRows((current) => current.map((r) => (r.bom_id === updated.bom_id ? updated : r)));
+      refreshAllBom();
       onStatusChange("수량을 변경했습니다.");
     } catch (err) {
       onError(err instanceof Error ? err.message : "수량 변경에 실패했습니다.");

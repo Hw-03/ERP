@@ -12,7 +12,9 @@ from app.models import BOM, CategoryEnum, Inventory, Item, TransactionLog, Trans
 from app.schemas import BackflushDetail, ProductionReceiptRequest, ProductionReceiptResponse
 from app.services import inventory as inventory_svc
 from app.services import stock_math
+from app.services.bom import BomCache, build_bom_cache
 from app.services.bom import explode_bom as _explode_bom_svc
+from app.services.bom import merge_requirements
 from app.routers._errors import ErrorCode, http_error
 
 router = APIRouter()
@@ -233,17 +235,20 @@ def _explode_bom(
     qty_to_produce: Decimal,
     depth: int = 0,
     visited: frozenset = frozenset(),
+    *,
+    cache: BomCache | None = None,
 ) -> List[Tuple[uuid.UUID, Decimal]]:
     """Thin wrapper kept for backward compatibility; delegates to services/bom."""
-    return _explode_bom_svc(db, parent_item_id, qty_to_produce, depth, visited)
+    return _explode_bom_svc(db, parent_item_id, qty_to_produce, depth, visited, cache=cache)
 
 
 @router.get("/capacity", summary="전체 생산 가능수량 조회")
 def get_production_capacity(db: Session = Depends(get_db)):
     """BOM이 등록된 BA 품목들에 대해 즉시/최대 생산 가능수량을 계산한다.
 
-    - immediate: 현 available(총재고 - 보류) 기준 최소 생산 가능량
-    - maximum: 총재고 기준 최소 생산 가능량
+    - immediate: warehouse_available (= warehouse_qty - pending) 기준 최소 생산 가능량
+      → production_receipt 의 실제 차감 검사식과 일치 (부서 생산재고/불량은 제외)
+    - maximum: total (= warehouse + production + defective) 기준 최소 생산 가능량
     """
     # BOM parent 중 다른 BOM의 child가 아닌 것 = 최상위 품목
     all_parent_ids = {row[0] for row in db.query(BOM.parent_item_id).distinct().all()}
@@ -261,37 +266,55 @@ def get_production_capacity(db: Session = Depends(get_db)):
         .all()
     )
 
-    top_results = []
+    # 1) BOM 전체를 한 번만 읽어 캐시 만들고 모든 top item 을 펼친다 (N+1 제거)
+    bom_cache = build_bom_cache(db)
+    explode_cache: Dict[uuid.UUID, Dict[uuid.UUID, Decimal]] = {}
+    all_comp_ids: set[uuid.UUID] = set()
     for item in top_items_db:
-        components = _explode_bom(db, item.item_id, Decimal("1"))
-        merged: Dict[uuid.UUID, Decimal] = {}
-        for cid, qty in components:
-            merged[cid] = merged.get(cid, Decimal("0")) + qty
+        merged = merge_requirements(_explode_bom(db, item.item_id, Decimal("1"), cache=bom_cache))
+        if not merged:
+            continue
+        explode_cache[item.item_id] = merged
+        all_comp_ids.update(merged.keys())
 
+    if not explode_cache:
+        return {"immediate": 0, "maximum": 0, "limiting_item": None, "top_items": []}
+
+    # 2) bulk 로 한 번에 재고 + 품목 정보 조회 (N+1 제거)
+    figures_map = stock_math.bulk_compute(db, all_comp_ids)
+    items_map = {
+        i.item_id: i
+        for i in db.query(Item).filter(Item.item_id.in_(list(all_comp_ids))).all()
+    }
+
+    top_results = []
+    bottleneck_by_top: Dict[uuid.UUID, str | None] = {}
+    for item in top_items_db:
+        merged = explode_cache.get(item.item_id)
         if not merged:
             continue
 
         min_immediate = float("inf")
         min_maximum = float("inf")
-        limiting_item = None
+        limiting_item: str | None = None
 
         for comp_id, req_qty in merged.items():
-            inv = db.query(Inventory).filter(Inventory.item_id == comp_id).first()
-            total = float(inv.quantity) if inv else 0.0
-            pending = float((inv.pending_quantity or Decimal("0"))) if inv else 0.0
-            available = total - pending
             req = float(req_qty)
             if req <= 0:
                 continue
-            imm_can = available / req
+            fig = figures_map.get(comp_id) or stock_math.StockFigures()
+            wh_avail = float(fig.warehouse_available)
+            total = float(fig.total)
+            imm_can = wh_avail / req
             max_can = total / req
             if imm_can < min_immediate:
                 min_immediate = imm_can
-                comp_item = db.query(Item).filter(Item.item_id == comp_id).first()
+                comp_item = items_map.get(comp_id)
                 limiting_item = comp_item.item_name if comp_item else None
             if max_can < min_maximum:
                 min_maximum = max_can
 
+        bottleneck_by_top[item.item_id] = limiting_item
         top_results.append({
             "item_id": str(item.item_id),
             "item_name": item.item_name,
@@ -306,25 +329,9 @@ def get_production_capacity(db: Session = Depends(get_db)):
     total_immediate = sum(r["immediate"] for r in top_results)
     total_maximum = sum(r["maximum"] for r in top_results)
 
-    # 가장 즉시 생산 가능량이 작은 품목의 병목 부품
+    # 가장 즉시 생산 가능량이 작은 top item 의 병목 부품 (이미 위에서 캐시됨)
     min_item = min(top_results, key=lambda r: r["immediate"])
-    # 병목 부품명 재계산
-    bottleneck_name = None
-    components = _explode_bom(db, uuid.UUID(min_item["item_id"]), Decimal("1"))
-    merged_min: Dict[uuid.UUID, Decimal] = {}
-    for cid, qty in components:
-        merged_min[cid] = merged_min.get(cid, Decimal("0")) + qty
-    min_ratio = float("inf")
-    for comp_id, req_qty in merged_min.items():
-        inv = db.query(Inventory).filter(Inventory.item_id == comp_id).first()
-        total = float(inv.quantity) if inv else 0.0
-        pending = float((inv.pending_quantity or Decimal("0"))) if inv else 0.0
-        available = total - pending
-        req = float(req_qty)
-        if req > 0 and available / req < min_ratio:
-            min_ratio = available / req
-            comp_item = db.query(Item).filter(Item.item_id == comp_id).first()
-            bottleneck_name = comp_item.item_name if comp_item else None
+    bottleneck_name = bottleneck_by_top.get(uuid.UUID(min_item["item_id"]))
 
     return {
         "immediate": total_immediate,

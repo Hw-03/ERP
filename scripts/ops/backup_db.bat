@@ -1,36 +1,73 @@
 @echo off
 rem ============================================================
-rem  ERP DB 백업 스크립트
-rem  - backend\erp.db 를 backend\_backup\erp_YYYYMMDD_HHMMSS.db 로 복사
-rem  - 백엔드가 실행 중이어도 SQLite WAL 모드라 보통 안전하게 복사됨
-rem  - 외부 백업이 필요하면 _backup 폴더를 통째로 복사할 것
+rem  ERP DB backup script (WAL safe)
+rem  - copies backend\erp.db to backend\_backup\erp_YYYYMMDD_HHMMSS.db
+rem  - safe to run while the backend is up (transaction-consistent)
+rem
+rem  fallback order:
+rem    1) sqlite3 CLI ".backup" command (preferred)
+rem    2) python sqlite3 backup() API (uses backend's bundled sqlite3 module)
+rem    3) WAL checkpoint + copy of db / wal / shm 3 files (last resort)
 rem ============================================================
-setlocal
+setlocal enabledelayedexpansion
 
 set "ROOT=%~dp0..\.."
 set "DB=%ROOT%\backend\erp.db"
 set "DEST_DIR=%ROOT%\backend\_backup"
 
 if not exist "%DB%" (
-    echo [BACKUP] erp.db 를 찾을 수 없습니다: %DB%
+    echo [BACKUP] erp.db not found: %DB%
     exit /b 1
 )
 
 if not exist "%DEST_DIR%" mkdir "%DEST_DIR%"
 
-rem YYYYMMDD_HHMMSS 타임스탬프 — locale 의존 없이 PowerShell 사용
+rem timestamp via PowerShell so the format is locale-independent
 for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss"`) do set "TS=%%i"
-
 set "DEST=%DEST_DIR%\erp_%TS%.db"
 
-copy /Y "%DB%" "%DEST%" >nul
-if errorlevel 1 (
-    echo [BACKUP] 복사 실패: %DB% -^> %DEST%
-    exit /b 1
+rem ----- 1: sqlite3 CLI -----------------------------------------------------
+where sqlite3 >nul 2>&1
+if not errorlevel 1 (
+    sqlite3 "%DB%" ".backup '%DEST%'"
+    if not errorlevel 1 (
+        echo [BACKUP] OK ^(sqlite3 .backup^)
+        echo   from : %DB%
+        echo   to   : %DEST%
+        endlocal & exit /b 0
+    )
+    echo [BACKUP] sqlite3 .backup failed - trying python fallback
 )
 
-echo [BACKUP] OK
+rem ----- 2: Python sqlite3 backup API --------------------------------------
+where python >nul 2>&1
+if not errorlevel 1 (
+    python -c "import sqlite3,sys; src=sqlite3.connect(r'%DB%'); dst=sqlite3.connect(r'%DEST%'); src.backup(dst); dst.close(); src.close()"
+    if not errorlevel 1 (
+        echo [BACKUP] OK ^(python sqlite3.backup^)
+        echo   from : %DB%
+        echo   to   : %DEST%
+        endlocal & exit /b 0
+    )
+    echo [BACKUP] python backup failed - trying file copy fallback
+)
+
+rem ----- 3: WAL checkpoint + copy 3 files ----------------------------------
+where python >nul 2>&1
+if not errorlevel 1 (
+    python -c "import sqlite3; c=sqlite3.connect(r'%DB%'); c.execute('PRAGMA wal_checkpoint(TRUNCATE)'); c.close()"
+)
+copy /Y "%DB%" "%DEST%" >nul
+if errorlevel 1 (
+    echo [BACKUP] copy failed: %DB% -^> %DEST%
+    endlocal & exit /b 1
+)
+if exist "%DB%-wal" copy /Y "%DB%-wal" "%DEST%-wal" >nul
+if exist "%DB%-shm" copy /Y "%DB%-shm" "%DEST%-shm" >nul
+
+echo [BACKUP] OK ^(file copy fallback^)
 echo   from : %DB%
 echo   to   : %DEST%
 
 endlocal
+exit /b 0

@@ -235,7 +235,7 @@ export interface Employee {
 export interface ShipPackageItemDetail {
   package_item_id: string;
   item_id: string;
-  erp_code: string;
+  erp_code: string | null;
   item_name: string;
   item_category: Category;
   item_unit: string;
@@ -295,7 +295,7 @@ export interface BOMTreeNode {
 export interface TransactionLog {
   log_id: string;
   item_id: string;
-  erp_code: string;
+  erp_code: string | null;
   item_name: string;
   item_category: Category;
   item_unit: string;
@@ -310,7 +310,7 @@ export interface TransactionLog {
 }
 
 export interface ProductionCheckComponent {
-  erp_code: string;
+  erp_code: string | null;
   item_name: string;
   category: Category;
   unit: string;
@@ -345,7 +345,7 @@ export interface ProductionCapacity {
 
 export interface BackflushDetail {
   item_id: string;
-  erp_code: string;
+  erp_code: string | null;
   item_name: string;
   category: Category;
   required_quantity: number;
@@ -703,7 +703,7 @@ export const api = {
       message: string;
       package_name: string;
       quantity: number;
-      items: { item_id: string; erp_code: string; item_name: string; quantity: number; stock_after: number }[];
+      items: { item_id: string; erp_code: string | null; item_name: string; quantity: number; stock_after: number }[];
     }>;
   },
 

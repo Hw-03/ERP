@@ -126,6 +126,33 @@
 - 운영 파일 위생(루트 `erp.db` 정리, seed 스크립트 이동, docker-compose 포트 정렬)
 - 보안/권한·테스트·CI
 
+## 2026-04-26 Phase 5.1 — 정합 fix · 성능 · 백업 안전성
+
+GPT 교차 리뷰에서 코드로 확인된 정합성 결함을 일괄 정리.
+
+### 백엔드
+
+- **`/api/production/capacity` 계산식 통일**: `inv.quantity - pending` 으로 부서 생산재고/불량재고까지 가용으로 계산하던 식을 `StockFigures.warehouse_available` (= warehouse - pending) 로 교체. `production_receipt` 의 실제 차감 검사식과 일치 → "생산 가능 = 화면 표시" 보장.
+- **/capacity N+1 제거**: 루프 내 단건 쿼리 4종을 `build_bom_cache()` 1회 + `bulk_compute()` 1회 + `Items IN` 1회로 압축.
+- **`bom.py get_all_bom` N+1 제거**: parent/child 단건 쿼리 N×2회 → `Items IN` 1회.
+- **`services/bom.py explode_bom` 메모리 캐시화**: `BomCache` 타입 도입, `cache=` 키워드로 호출 간 공유 가능. 단독 호출에서도 진입 시 1회 BOM 전체 로드 후 메모리에서 재귀 → 깊이마다의 BOM/Item 단건 쿼리 제거.
+
+### 프론트엔드
+
+- **`erp_code` 타입 정합**: `TransactionLog` · `ShipPackageItemDetail` · `ProductionCheckComponent` · `BackflushDetail` + ship 응답 inline 타입을 `string | null` 로 정정 (백엔드는 Optional). `HistoryDetailPanel.tsx` 의 `[string,string][]` 단언 자리에 `?? "-"` 가드 추가.
+- **`useAdminBom.saveBomQty` 후 전체 BOM 갱신**: BOM 수량 수정 후 `refreshAllBom()` 호출 누락을 추가. add/delete 와 동일하게 우측 "전체 BOM 현황" 즉시 반영.
+
+### 운영
+
+- **WAL 안전 백업**: `scripts/ops/backup_db.bat` 가 `sqlite3 .backup` → Python `sqlite3.backup` → WAL checkpoint+3종 파일 복사 폴백 순서로 동작. 백엔드 가동 중 백업의 트랜잭션 일관성 보장.
+- **OPERATIONS.md 백업 절차** 갱신.
+
+### 검증
+
+- `python -m compileall backend` — 0 오류
+- `npx tsc --noEmit` — 0 오류
+- `npm run lint` — 0 warning
+
 ## 다음 우선순위
 
 - `BF -> AF` 마이그레이션 결과 검증
@@ -133,4 +160,6 @@
 - `min_stock` 미설정 품목의 정상/부족 분류 기준 검증
 - BOM 가계도/Where-Used 시각화 기획
 - 출하 스펙/거래처 관리 기능 설계
+- API 인증 헤더화 (외부 노출 계획 시)
+- 루트 `erp.db` 정리 + seed 스크립트 이동
 - (위 보류 항목)

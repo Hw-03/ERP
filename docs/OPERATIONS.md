@@ -32,11 +32,12 @@ scripts\ops\healthcheck.bat
 - **수동 백업**:
 
 ```bat
-scripts\backup_db.bat
+scripts\ops\backup_db.bat
 ```
 
-→ `backend/_backup/erp_YYYYMMDD_HHMMSS.db` 로 복사된다. 백엔드가 떠 있어도 보통 안전.
+→ `backend/_backup/erp_YYYYMMDD_HHMMSS.db` 로 복사된다.
 
+- **백업 안전성**: 스크립트는 SQLite 의 online backup API(`sqlite3 .backup` 또는 Python `sqlite3.backup`)를 사용하므로 백엔드가 가동 중이어도 트랜잭션 일관성이 보장된다. 둘 다 사용 불가한 환경에서는 WAL checkpoint 후 `erp.db / erp.db-wal / erp.db-shm` 3종을 함께 복사하는 폴백 경로로 진입한다.
 - **권장 주기**: 입출고가 많은 날 일과 종료 후 1회. 외부 디스크 보관이 필요하면 `backend/_backup/` 폴더를 통째로 복사한다.
 - **루트 `erp.db` 와 `backend/erp.db` 가 둘 다 존재**할 수 있다. 운영 DB는 `backend/erp.db` 한 개만 사용한다(루트 파일은 손대지 말고, 정리는 다음 작업에서 별도로 진행 예정).
 

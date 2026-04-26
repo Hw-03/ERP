@@ -319,7 +319,7 @@ export function DesktopHistoryView() {
       {/* ── 우측: 상세 패널 ── */}
       <DesktopRightPanel
         title={selected ? selected.item_name : "항목을 선택하세요"}
-        subtitle={selected ? `${selected.erp_code} · ${formatHistoryDate(selected.created_at)}` : undefined}
+        subtitle={selected ? `${selected.erp_code ?? "-"} · ${formatHistoryDate(selected.created_at)}` : undefined}
       >
         <HistoryDetailPanel
           selected={selected}
