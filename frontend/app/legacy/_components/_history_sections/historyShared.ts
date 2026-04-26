@@ -28,7 +28,7 @@ export const CATEGORY_META: Record<string, { label: string; color: string; bg: s
   HF: { label: "고압완성", color: LEGACY_COLORS.yellow, bg: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 16%, transparent)` },
   VA: { label: "진공조립", color: LEGACY_COLORS.purple, bg: `color-mix(in srgb, ${LEGACY_COLORS.purple} 16%, transparent)` },
   VF: { label: "진공완성", color: LEGACY_COLORS.purple, bg: `color-mix(in srgb, ${LEGACY_COLORS.purple} 16%, transparent)` },
-  BA: { label: "본체조립", color: "#f97316", bg: "color-mix(in srgb, #f97316 16%, transparent)" },
+  AA: { label: "본체조립", color: "#f97316", bg: "color-mix(in srgb, #f97316 16%, transparent)" },
   AF: { label: "조립완성", color: "#f97316", bg: "color-mix(in srgb, #f97316 16%, transparent)" },
   FG: { label: "완제품", color: LEGACY_COLORS.green, bg: `color-mix(in srgb, ${LEGACY_COLORS.green} 16%, transparent)` },
   UK: { label: "미분류", color: LEGACY_COLORS.muted2, bg: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 16%, transparent)` },

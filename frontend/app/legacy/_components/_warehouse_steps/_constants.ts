@@ -55,7 +55,7 @@ export const CATEGORY_LABEL: Record<string, string> = {
   TA: "튜브조립",
   HA: "고압조립",
   VA: "진공조립",
-  BA: "브라켓",
+  AA: "브라켓",
   TF: "튜브반제",
   HF: "고압반제",
   VF: "진공반제",
