@@ -50,8 +50,9 @@ http://localhost:3000
 
 | 스크립트 | 역할 |
 |---|---|
-| `scripts/backup_db.bat` | `backend/erp.db` 를 `backend/_backup/erp_YYYYMMDD_HHMMSS.db` 로 복사 |
-| `scripts/healthcheck.bat` | `GET /health/detailed` 호출 후 결과 출력 |
+| `scripts/ops/backup_db.bat` | `backend/erp.db` 를 `backend/_backup/erp_YYYYMMDD_HHMMSS.db` 로 복사 |
+| `scripts/ops/healthcheck.bat` | `GET /health/detailed` 호출 후 결과 출력 |
+| `scripts/ops/reconcile_inventory.bat` | 정합성 1차 진단 + 자동 백업 |
 
 자세한 운영 절차는 `docs/OPERATIONS.md` 참고.
 
@@ -86,16 +87,31 @@ ERP 코드 포맷:
 34-TR-0023
 ```
 
-## 주요 경로
+## 한눈에 보는 폴더 구조
 
-| 경로 | 역할 |
-|---|---|
-| `backend/` | FastAPI 백엔드 |
-| `frontend/` | Next.js 프론트엔드 |
-| `frontend/app/legacy/_components/common/` | 공용 UI 부품(EmptyState · LoadFailureCard · ConfirmModal · ResultModal · StatusPill · LoadingSkeleton) |
-| `docs/` | 현재 기준·운영·구조·인수인계 문서 |
-| `scripts/` | DB 백업 · 헬스체크 등 운영 스크립트 |
-| `_archive/` · `_backup/` · `frontend/_archive/` | 보관용 — 일반 작업 대상 아님 |
+```
+ERP/
+├── backend/              FastAPI · SQLAlchemy · SQLite
+│   ├── app/              routers / services / models
+│   ├── erp.db            기준 스냅샷 (971 품목)
+│   └── requirements.txt
+├── frontend/             Next.js 14 · Tailwind
+│   └── app/legacy/       현재 활성 셸 (대시보드/입출고/내역/관리자)
+├── data/                 입력 자료 (xlsx · csv)
+├── docs/                 기준 · 운영 · 구조 · 인수인계
+│   └── research/         외부 연구 보고서
+├── scripts/              보조 스크립트
+│   ├── ops/              백업 · 헬스체크 · 재고 정합
+│   ├── migrations/       DB 스키마 / 코드 정제
+│   └── dev/              개발 보조 · 일회성 임포트
+├── docker/               컨테이너 정의 (선택)
+├── _archive/, _backup/   보관용 — 작업 대상 아님
+├── start.bat             통합 실행 (Windows)
+├── README.md             이 문서
+└── CLAUDE.md             AI/개발자 작업 규칙
+```
+
+공용 UI 부품(EmptyState · LoadFailureCard · ConfirmModal · ResultModal · StatusPill · LoadingSkeleton) 은 `frontend/app/legacy/_components/common/` — 자세한 컴포넌트 위치·레이어는 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 참조.
 
 ## 문서 허브
 
