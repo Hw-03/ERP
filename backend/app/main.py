@@ -142,13 +142,22 @@ def _error_payload(code: str, message: str, extra: dict | None = None) -> dict:
     return {"detail": body}
 
 
+def _rid(request: Request) -> str:
+    """미들웨어가 request.state에 박은 request_id를 우선 사용. 없으면 헤더, 그래도 없으면 새로 발급."""
+    return (
+        getattr(request.state, "request_id", None)
+        or request.headers.get("X-Request-Id")
+        or uuid.uuid4().hex[:12]
+    )
+
+
 @app.exception_handler(ValueError)
 def _value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
     # Pydantic ValidationError 도 ValueError 하위 — 응답 모델 검증 실패는 서버 결함이므로
     # 500 으로 떨어뜨려 INTERNAL 핸들러가 처리하게 한다.
     from pydantic import ValidationError
     if isinstance(exc, ValidationError):
-        rid = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:8]
+        rid = _rid(request)
         _log.error("ResponseValidation rid=%s path=%s msg=%s", rid, request.url.path, exc)
         return JSONResponse(
             status_code=500,
@@ -158,7 +167,7 @@ def _value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
                 extra={"request_id": rid},
             ),
         )
-    rid = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:8]
+    rid = _rid(request)
     _log.warning("ValueError rid=%s path=%s msg=%s", rid, request.url.path, exc)
     return JSONResponse(
         status_code=422,
@@ -168,7 +177,7 @@ def _value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
 
 @app.exception_handler(IntegrityError)
 def _integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
-    rid = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:8]
+    rid = _rid(request)
     _log.error("IntegrityError rid=%s path=%s msg=%s", rid, request.url.path, exc)
     return JSONResponse(
         status_code=409,
@@ -178,7 +187,7 @@ def _integrity_error_handler(request: Request, exc: IntegrityError) -> JSONRespo
 
 @app.exception_handler(OperationalError)
 def _operational_error_handler(request: Request, exc: OperationalError) -> JSONResponse:
-    rid = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:8]
+    rid = _rid(request)
     _log.error("OperationalError rid=%s path=%s msg=%s", rid, request.url.path, exc)
     return JSONResponse(
         status_code=503,
@@ -189,7 +198,7 @@ def _operational_error_handler(request: Request, exc: OperationalError) -> JSONR
 @app.exception_handler(Exception)
 def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     # FastAPI 가 HTTPException 은 자체 처리하므로 여기에는 진짜 unhandled 만 옴.
-    rid = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:8]
+    rid = _rid(request)
     _log.exception("Unhandled rid=%s path=%s", rid, request.url.path)
     return JSONResponse(
         status_code=500,
