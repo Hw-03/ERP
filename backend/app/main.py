@@ -19,7 +19,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app._logging import get_logger, setup_logging
-from app.database import get_db
+from app.database import Base, engine, get_db
 from app.models import (
     Employee,
     Inventory,
@@ -31,7 +31,13 @@ from app.models import (
 from app.routers._errors import ErrorCode
 from app.services import integrity as integrity_svc
 
+# Phase 5.2: 신규 모델 (예: AdminAuditLog) 의 테이블이 누락된 경우 startup 시 idempotent 하게 생성.
+# create_all 은 기본 checkfirst=True 라 IF NOT EXISTS 효과. 기존 테이블은 손대지 않는다.
+# alembic 미도입 환경에서 신규 테이블만 자동 적용하는 안전한 방법.
+Base.metadata.create_all(bind=engine)
+
 from app.routers import (
+    admin_audit,
     alerts,
     bom,
     codes,
@@ -98,6 +104,7 @@ app = FastAPI(
         {"name": "Variance", "description": "차이 분석."},
         {"name": "Alerts", "description": "안전재고/실사 알림."},
         {"name": "Counts", "description": "실사 등록·강제 조정."},
+        {"name": "Admin Audit", "description": "관리자 액션 감사로그 조회 (마스터/설정 변경)."},
     ],
 )
 
@@ -225,6 +232,7 @@ app.include_router(variance.router, prefix="/api/variance", tags=["Variance"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 app.include_router(counts.router, prefix="/api/counts", tags=["Counts"])
 app.include_router(models_router.router, prefix="/api/models", tags=["Models"])
+app.include_router(admin_audit.router, prefix="/api/admin", tags=["Admin Audit"])
 
 
 @app.get("/health", tags=["System"])

@@ -2,9 +2,10 @@
 
 import { ChevronDown } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS, employeeColor, formatNumber, transactionColor, transactionLabel } from "../legacyUi";
+import { LEGACY_COLORS } from "../legacyUi";
 import { EmptyState } from "../common/EmptyState";
-import { CATEGORY_META, formatHistoryDate, rowTint } from "./historyShared";
+import { formatHistoryDate } from "./historyShared";
+import { HistoryLogRow } from "./HistoryLogRow";
 
 type Props = {
   loading: boolean;
@@ -84,119 +85,16 @@ export function HistoryTable({
               </tr>
             </thead>
             <tbody>
-              {filteredLogs.map((log) => {
-                const isSelected = selectedLogId === log.log_id;
-                const tcolor = transactionColor(log.transaction_type);
-                const cat = CATEGORY_META[log.item_category] ?? {
-                  label: log.item_category,
-                  color: LEGACY_COLORS.muted2,
-                  bg: "rgba(157,173,199,.16)",
-                };
-                return (
-                  <tr
-                    key={log.log_id}
-                    onClick={() => onSelectLog(log)}
-                    className="cursor-pointer transition-colors hover:brightness-110"
-                    style={{
-                      background: isSelected ? "rgba(101,169,255,.10)" : rowTint(log.transaction_type),
-                      outline: isSelected ? `1.5px solid ${LEGACY_COLORS.blue}` : "none",
-                    }}
-                  >
-                    <td
-                      className="whitespace-nowrap border-b px-4 py-3 text-xs"
-                      style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-                    >
-                      {formatHistoryDate(log.created_at)}
-                    </td>
-                    <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-                      <span
-                        className="inline-flex rounded-full px-2.5 py-1 text-xs font-bold"
-                        style={{ background: `color-mix(in srgb, ${tcolor} 14%, transparent)`, color: tcolor }}
-                      >
-                        {transactionLabel(log.transaction_type)}
-                      </span>
-                    </td>
-                    <td className="max-w-[180px] border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-                      <div className="truncate font-semibold">{log.item_name}</div>
-                    </td>
-                    <td
-                      className="whitespace-nowrap border-b px-4 py-3 text-xs"
-                      style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-                    >
-                      {log.erp_code}
-                    </td>
-                    <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-                      <span
-                        className="inline-flex rounded-full px-2 py-0.5 text-xs font-bold"
-                        style={{ background: cat.bg, color: cat.color }}
-                      >
-                        {cat.label}
-                      </span>
-                    </td>
-                    <td
-                      className="whitespace-nowrap border-b px-4 py-3 text-right font-bold"
-                      style={{ borderColor: LEGACY_COLORS.border, color: tcolor }}
-                    >
-                      {Number(log.quantity_change) >= 0 ? "+" : ""}
-                      {formatNumber(log.quantity_change)}
-                    </td>
-                    <td
-                      className="whitespace-nowrap border-b px-4 py-3 text-xs"
-                      style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-                    >
-                      {log.quantity_before != null ? formatNumber(log.quantity_before) : "-"}
-                      <span className="mx-1">→</span>
-                      {log.quantity_after != null ? formatNumber(log.quantity_after) : "-"}
-                    </td>
-                    <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-                      {log.produced_by ? (
-                        (() => {
-                          const name = log.produced_by.split("(")[0]?.trim() ?? "-";
-                          const dept = log.produced_by.match(/\(([^)]+)\)/)?.[1] ?? "";
-                          const color = dept ? employeeColor(dept) : LEGACY_COLORS.muted2;
-                          return (
-                            <div className="flex items-center gap-1.5">
-                              <span
-                                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black text-white"
-                                style={{ background: color }}
-                              >
-                                {name[0] ?? "?"}
-                              </span>
-                              <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{name}</span>
-                            </div>
-                          );
-                        })()
-                      ) : (
-                        <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-                      {log.reference_no ? (
-                        <button
-                          onClick={(e) => onCopyRef(log.reference_no!, e)}
-                          className="rounded border px-2 py-0.5 text-xs transition-all hover:brightness-110"
-                          style={{
-                            background: copiedRef === log.reference_no ? "rgba(67,211,157,.2)" : LEGACY_COLORS.s2,
-                            borderColor: LEGACY_COLORS.border,
-                            color: copiedRef === log.reference_no ? LEGACY_COLORS.green : LEGACY_COLORS.muted2,
-                          }}
-                          title="클릭해서 복사"
-                        >
-                          {copiedRef === log.reference_no ? "복사됨!" : log.reference_no}
-                        </button>
-                      ) : (
-                        <span style={{ color: LEGACY_COLORS.muted2 }}>-</span>
-                      )}
-                    </td>
-                    <td
-                      className="max-w-[160px] border-b px-4 py-3"
-                      style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-                    >
-                      <div className="truncate text-xs">{log.notes || "-"}</div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {filteredLogs.map((log) => (
+                <HistoryLogRow
+                  key={log.log_id}
+                  log={log}
+                  selected={selectedLogId === log.log_id}
+                  copiedRef={copiedRef}
+                  onSelect={onSelectLog}
+                  onCopyRef={onCopyRef}
+                />
+              ))}
             </tbody>
           </table>
         </div>

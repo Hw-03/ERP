@@ -113,17 +113,24 @@ function OverviewBar({
   packages: ShipPackage[];
   allBomRows: BOMDetailEntry[];
 }) {
-  const belowMin = items.filter(
-    (i) => i.min_stock != null && Number(i.quantity) < Number(i.min_stock),
-  ).length;
-  const stats = [
-    { label: "품목", value: items.length, color: LEGACY_COLORS.blue },
-    { label: "직원", value: employees.length, color: LEGACY_COLORS.green },
-    { label: "모델", value: productModels.length, color: LEGACY_COLORS.purple },
-    { label: "출하묶음", value: packages.length, color: LEGACY_COLORS.cyan },
-    { label: "BOM 구성", value: allBomRows.length, color: LEGACY_COLORS.yellow },
-    { label: "안전재고 미달", value: belowMin, color: LEGACY_COLORS.red },
-  ];
+  const belowMin = useMemo(
+    () =>
+      items.filter(
+        (i) => i.min_stock != null && Number(i.quantity) < Number(i.min_stock),
+      ).length,
+    [items],
+  );
+  const stats = useMemo(
+    () => [
+      { label: "품목", value: items.length, color: LEGACY_COLORS.blue },
+      { label: "직원", value: employees.length, color: LEGACY_COLORS.green },
+      { label: "모델", value: productModels.length, color: LEGACY_COLORS.purple },
+      { label: "출하묶음", value: packages.length, color: LEGACY_COLORS.cyan },
+      { label: "BOM 구성", value: allBomRows.length, color: LEGACY_COLORS.yellow },
+      { label: "안전재고 미달", value: belowMin, color: LEGACY_COLORS.red },
+    ],
+    [items.length, employees.length, productModels.length, packages.length, allBomRows.length, belowMin],
+  );
   return (
     <div
       className="mb-4 shrink-0 flex flex-wrap gap-2 rounded-[20px] border px-4 py-3"

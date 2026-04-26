@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Enum as SAEnum,
@@ -225,6 +226,17 @@ class Inventory(Base):
     )
 
     item = relationship("Item", back_populates="inventory")
+
+    __table_args__ = (
+        CheckConstraint("quantity >= 0", name="ck_inventory_quantity_nonneg"),
+        CheckConstraint("warehouse_qty >= 0", name="ck_inventory_warehouse_nonneg"),
+        CheckConstraint("pending_quantity >= 0", name="ck_inventory_pending_nonneg"),
+        # pending 은 창고 예약분이므로 창고 보관량을 넘을 수 없다.
+        CheckConstraint(
+            "warehouse_qty >= pending_quantity",
+            name="ck_inventory_pending_le_warehouse",
+        ),
+    )
 
 
 class InventoryLocation(Base):
@@ -619,3 +631,27 @@ class PhysicalCount(Base):
     reason = Column(String(200), nullable=True)
     operator = Column(String(100), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
+
+
+class AdminAuditLog(Base):
+    """관리자 액션 감사로그.
+
+    재고 변동(입출고/이동/불량/공급사반품/생산/큐)은 TransactionLog 가 본질적 audit 이고,
+    이 표는 그 외의 마스터/설정 변경 (item·employee·bom·settings·codes) 만 기록한다.
+    """
+    __tablename__ = "admin_audit_logs"
+
+    audit_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    actor_pin_role = Column(String(32), nullable=False, default="admin")
+    action = Column(String(64), nullable=False, index=True)
+    target_type = Column(String(64), nullable=False, index=True)
+    target_id = Column(String(64), nullable=True)
+    payload_summary = Column(Text, nullable=True)
+    request_id = Column(String(32), nullable=True, index=True)
+    created_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        server_default=func.now(),
+        index=True,
+    )

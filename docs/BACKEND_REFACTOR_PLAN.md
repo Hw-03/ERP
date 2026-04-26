@@ -23,6 +23,18 @@
 | **`services/bom.py explode_bom` 메모리 캐시** | ✅ — `BomCache` 도입. `cache=` 키워드로 호출 간 공유 가능. 단독 호출 시에도 진입점에서 1쿼리만 발사. |
 | **WAL 안전 백업** | ✅ — `scripts/ops/backup_db.bat` 가 `sqlite3 .backup` → Python `sqlite3.backup` → WAL checkpoint+3종 복사 폴백 순서로 동작. |
 
+## 진행 상태 (2026-04-26 Phase 5.2 — 4개 영역 A−)
+
+| Phase 5.2 항목 | 상태 |
+|---|---|
+| **SQLite 락 정책** | ✅ `database.py` 에 `busy_timeout=5000` + `synchronous=NORMAL` 추가. WAL과 짝, 동시 쓰기 충돌 시 5초 대기 후 재시도. |
+| **Inventory CheckConstraint** | ✅ `models.py Inventory.__table_args__` 에 4개 CHECK (`quantity/warehouse_qty/pending_quantity ≥ 0`, `warehouse_qty ≥ pending_quantity`). 사전 위반 0건 확인 후 적용. |
+| **`_build_tree` N+1 제거** | ✅ `bom.py:_build_tree_cached` — BomCache 1회 + Items/Inventory IN 1회씩 사전 로드. 트리 깊이 무관 쿼리 수 일정. |
+| **관리자 감사로그 (`AdminAuditLog`)** | ✅ 신규 모델 + `services/audit.record()` 헬퍼 + `routers/admin_audit.py` 조회 API. write-path 7곳(items / employees / bom / settings PIN·integrity·reset / codes symbols)에 통합. 재고 거래는 `transaction_logs` 가 본질적 audit 이라 제외. |
+| **startup idempotent create_all** | ✅ `main.py` 가 startup 시 `Base.metadata.create_all(engine)` 호출. 기존 테이블 미변경, 신규 테이블만 자동 생성 (alembic 미도입 환경에서 안전한 마이그레이션). |
+| **운영 스크립트 3종** | ✅ `restore_db.bat` (PRE-RESTORE 스냅샷 + integrity_check + wal/shm 제거), `verify_backup.bat` (최신 백업 무결성·행수), `cleanup_backups.bat` (N일 이상 자동 삭제). |
+| **OpenAPI 태그 추가** | ✅ "Admin Audit" 태그 description 추가. |
+
 ## 진행 상태 (2026-04-26 Phase 4 update)
 
 | 항목 | 상태 | 보류/완료 사유 |

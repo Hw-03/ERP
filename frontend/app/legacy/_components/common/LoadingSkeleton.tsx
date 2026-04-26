@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { LEGACY_COLORS } from "../legacyUi";
 
 type Variant = "table" | "card" | "list";
@@ -10,7 +11,7 @@ interface Props {
   className?: string;
 }
 
-export function LoadingSkeleton({ variant = "list", rows = 4, className = "" }: Props) {
+function LoadingSkeletonImpl({ variant = "list", rows = 4, className = "" }: Props) {
   const items = Array.from({ length: Math.max(1, rows) });
 
   if (variant === "table") {
@@ -75,6 +76,8 @@ export function LoadingSkeleton({ variant = "list", rows = 4, className = "" }: 
     </div>
   );
 }
+
+export const LoadingSkeleton = memo(LoadingSkeletonImpl);
 
 function Bar({ w, h }: { w: string; h: number }) {
   return (

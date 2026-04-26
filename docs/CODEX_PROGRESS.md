@@ -153,13 +153,74 @@ GPT 교차 리뷰에서 코드로 확인된 정합성 결함을 일괄 정리.
 - `npx tsc --noEmit` — 0 오류
 - `npm run lint` — 0 warning
 
+## 2026-04-26 Phase 5.2 — 4개 영역을 A−로
+
+GPT 교차 리뷰 후 잔존 4개 약점(DB/모델, 프론트 컴포넌트, 프론트 성능, 운영 readiness)을 A−까지 끌어올림.
+
+### 5.2-A 백엔드 정합성·성능
+
+- `database.py`: SQLite PRAGMA 보강 — `busy_timeout=5000`(락 5초 대기), `synchronous=NORMAL`(WAL 짝). 단일 writer 한계는 그대로.
+- `models.py`: `Inventory.__table_args__` 신설 — `quantity/warehouse_qty/pending_quantity ≥ 0` + `warehouse_qty ≥ pending_quantity` CheckConstraint. (기존 데이터 위반 0건 사전 확인)
+- `bom.py _build_tree`: BOM 캐시 + Items/Inventory IN 1회씩 사전 로드로 N+1 잔재 제거. 트리 깊이 무관 쿼리 수 일정.
+
+### 5.2-D 운영 readiness
+
+- 신규 모델 `AdminAuditLog` + `services/audit.record()` 헬퍼.
+- write-path 7곳에 audit 기록 추가:
+  - `items.py`: create/update
+  - `employees.py`: create/update/delete
+  - `bom.py`: create/update/delete
+  - `settings.py`: pin_change / integrity_repair / reset_db
+  - `codes.py`: symbol_update
+- (재고 거래는 `transaction_logs` 가 본질적 audit이라 제외)
+- 신규 라우터 `GET /api/admin/audit-logs` (action/target_type/since/limit 필터).
+- `main.py` startup 시 `Base.metadata.create_all(engine)` idempotent 호출 — 신규 테이블 자동 적용.
+- 신규 ops 스크립트 3종:
+  - `restore_db.bat` — 안전 복구 (PRE-RESTORE 스냅샷 + integrity_check + wal/shm 제거)
+  - `verify_backup.bat` — 최신 백업 검증 (integrity + 핵심 테이블 행수)
+  - `cleanup_backups.bat` — 30일 이상 자동 정리
+- `OPERATIONS.md` 보강: 백업 검증·정리, DB 복구, 감사로그 조회, Windows Task Scheduler 등록 가이드.
+
+### 5.2-B 프론트 성능
+
+- `_hooks/useChunkedRender.ts` 신설 — 외부 의존성 없이 IntersectionObserver 기반 chunked 누적 렌더.
+- `InventoryItemRow.tsx`, `HistoryLogRow.tsx` 행 컴포넌트 추출 + `React.memo`. 부모 리렌더 시 변경 없는 행은 비-재렌더.
+- 공용 경량 컴포넌트 4개에 `React.memo`: `EmptyState` · `LoadFailureCard` · `LoadingSkeleton` · `StatusPill`.
+- `DesktopAdminView`: `belowMin`/`stats` 매 렌더 재계산을 `useMemo` 로 차단.
+
+### 5.2-C 컴포넌트 분할
+
+- `AdminTab.tsx` (886줄) → 75줄로 축소. 5섹션을 `mobile/screens/admin/` 폴더로 분리:
+  - `AdminItemsSection` · `AdminEmployeesSection` · `AdminBomSection` · `AdminPackagesSection` · `AdminSettingsSection` + `_shared.ts`
+- `DeptWizardSteps.tsx` (769줄) → re-export 9줄로 축소. 5단계를 `_dept_steps/` 폴더로 분리:
+  - `DeptStep` · `PersonStep` · `DirectionStep` · `ItemsStep` · `ConfirmStep` + `_shared.tsx`
+- 사전 조사로 분할 대상 축소: `AdminBomSection`/`HistoryScreen`/`DesktopAdminView`는 이미 분할 완료 상태로 추가 작업 불필요.
+
+### 검증
+
+- `python -m compileall backend` — 0 오류
+- `npx tsc --noEmit` — 0 오류
+- `npm run lint` — 0 warning
+- 백엔드 라이브 검증:
+  - `GET /api/bom/{id}/tree` — 재귀 트리 정상
+  - `PATCH /api/bom/{id}` 후 `GET /api/admin/audit-logs` — `bom.update` 행 + request_id 매칭 확인
+  - `scripts/ops/backup_db.bat` + `verify_backup.bat` — integrity ok / 핵심 테이블 행수 정상
+- Playwright 모바일(430×900):
+  - 부서 wizard Step 1 → Step 2 자동 이동 (분할된 `DeptStep` / `PersonStep` 동작)
+  - 관리자 5섹션 모두 진입 + BOM 섹션 콘텐츠 렌더 (분할된 5 admin section 동작)
+- 콘솔 에러 0건
+
+### 점수 변동
+
+영역 4개 한 단계 상승: DB/모델 B+→A−, 프론트 컴포넌트 B+→A−, 프론트 성능 B→A−, 운영 readiness B+→A−. 보안(C+)만 의도적으로 제외 (LAN 운영).
+
 ## 다음 우선순위
 
+- API 인증 헤더화 (보안 C+ → B+ 진입, 외부 노출 계획 시)
 - `BF -> AF` 마이그레이션 결과 검증
 - 모든 부서/모델 개별 선택과 전체 필터의 품목 수 일치 검증
 - `min_stock` 미설정 품목의 정상/부족 분류 기준 검증
-- BOM 가계도/Where-Used 시각화 기획
+- BOM 가계도 시각화 기획
 - 출하 스펙/거래처 관리 기능 설계
-- API 인증 헤더화 (외부 노출 계획 시)
 - 루트 `erp.db` 정리 + seed 스크립트 이동
 - (위 보류 항목)

@@ -24,6 +24,12 @@
 | **BOM Where-Used UI** | ✅ Phase 5 — 관리자 BOM 우측 패널에 추가 |
 | **`erp_code` 타입 백엔드 정합** | ✅ Phase 5.1 — `TransactionLog / ShipPackageItemDetail / ProductionCheckComponent / BackflushDetail` 등 4 타입을 `string \| null` 로 정정 (백엔드 응답이 Optional). HistoryDetailPanel 의 `[string,string][]` 단언 자리에 `?? "-"` 가드 추가. |
 | **`useAdminBom.saveBomQty` 후 전체 BOM 갱신** | ✅ Phase 5.1 — 수량 수정 후 `refreshAllBom()` 호출 누락 수정. add/delete 와 동일하게 우측 "전체 BOM 현황" 즉시 갱신. |
+| **`useChunkedRender` 가상 스크롤 hook** | ✅ Phase 5.2 — IntersectionObserver 기반 chunked 누적 렌더. 외부 의존성 0. |
+| **InventoryItemRow / HistoryLogRow 추출 + memo** | ✅ Phase 5.2 — 거대 IIFE 행 로직을 `React.memo` 래핑된 행 컴포넌트로 추출. 부모 리렌더 시 변경 없는 행 재렌더 차단. |
+| **공용 경량 컴포넌트 React.memo** | ✅ Phase 5.2 — `EmptyState / LoadFailureCard / LoadingSkeleton / StatusPill` 4개 래핑. |
+| **DesktopAdminView useMemo 보강** | ✅ Phase 5.2 — `belowMin` / `stats` 매 렌더 재계산 차단. |
+| **AdminTab.tsx 5섹션 분할** | ✅ Phase 5.2 — 886줄 → 75줄. `mobile/screens/admin/` 폴더에 5개 섹션(`AdminItemsSection / AdminEmployeesSection / AdminBomSection / AdminPackagesSection / AdminSettingsSection`) + `_shared.ts`. 모바일 회귀 0건 (Playwright 검증). |
+| **DeptWizardSteps.tsx 5단계 분할** | ✅ Phase 5.2 — 769줄 → re-export 9줄. `_dept_steps/` 폴더에 5개 단계(`DeptStep / PersonStep / DirectionStep / ItemsStep / ConfirmStep`) + `_shared.tsx`. 기존 import 경로 호환 유지. |
 | **`useWarehouseData.loading` 플래그** | ✅ **Phase 4** — 메인 데이터 첫 로딩 상태 노출. |
 | **`_warehouse_steps.tsx` (1,135줄) 파일 분할** | ✅ **Phase 4** — `_warehouse_steps/` 디렉토리 8개 파일로 분리 (constants/atoms + 5 step). 외부 import 경로 호환. |
 | **`AdminBomContext` + `useAdminBom`** | ✅ **Phase 4** — DesktopAdminView 의 BOM useState 10개 + useMemo 2개 + 액션 3개를 Provider/hook 으로 흡수. AdminBomSection Props 22 → 0. |

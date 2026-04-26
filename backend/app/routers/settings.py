@@ -6,7 +6,7 @@
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from pydantic import BaseModel, Field
@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from app.database import get_db
 from app.models import Inventory, SystemSetting
 from app.schemas import AdminPinUpdateRequest, AdminPinVerifyRequest, MessageResponse
+from app.services import audit
 from app.services import integrity as integrity_svc
 
 
@@ -52,7 +53,7 @@ def verify_admin_pin(payload: AdminPinVerifyRequest, db: Session = Depends(get_d
 
 
 @router.put("/admin-pin", response_model=MessageResponse)
-def update_admin_pin(payload: AdminPinUpdateRequest, db: Session = Depends(get_db)):
+def update_admin_pin(payload: AdminPinUpdateRequest, request: Request, db: Session = Depends(get_db)):
     setting = ensure_admin_pin(db)
 
     if payload.current_pin != setting.setting_value:
@@ -62,6 +63,16 @@ def update_admin_pin(payload: AdminPinUpdateRequest, db: Session = Depends(get_d
 
     setting.setting_value = payload.new_pin
     setting.updated_at = datetime.now(UTC).replace(tzinfo=None)
+
+    audit.record(
+        db,
+        request=request,
+        action="settings.pin_change",
+        target_type="settings",
+        target_id="admin_pin",
+        payload_summary="관리자 PIN 변경",
+    )
+
     db.commit()
     return MessageResponse(message="관리자 비밀번호를 변경했습니다.")
 
@@ -94,6 +105,7 @@ def check_inventory_integrity(
 @router.post("/integrity/repair")
 def repair_inventory_integrity(
     payload: IntegrityRepairRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """Inventory.quantity 를 warehouse + Σ locations 로 재계산해 복구.
@@ -102,15 +114,36 @@ def repair_inventory_integrity(
     """
     _require_admin(db, payload.pin)
     report = integrity_svc.repair_inventory_totals(db, dry_run=payload.dry_run)
+    if not payload.dry_run:
+        audit.record(
+            db,
+            request=request,
+            action="settings.integrity_repair",
+            target_type="settings",
+            target_id="inventory",
+            payload_summary=f"repaired {getattr(report, 'fixed_count', '?')} rows",
+        )
+        db.commit()
     return report.to_dict()
 
 
 @router.post("/reset", response_model=MessageResponse)
-def reset_database(payload: ResetRequest, db: Session = Depends(get_db)):
+def reset_database(payload: ResetRequest, request: Request, db: Session = Depends(get_db)):
     """PIN 검증 후 시드 데이터 재적재 (안전 초기화). 관리자 도구."""
     setting = ensure_admin_pin(db)
     if payload.pin != setting.setting_value:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="관리자 비밀번호가 올바르지 않습니다.")
+
+    # reset 직전에 audit 1건 기록 (reset 자체는 시드 재적재로 audit_logs 도 비울 수 있어 사후 기록은 무의미).
+    audit.record(
+        db,
+        request=request,
+        action="settings.reset_db",
+        target_type="settings",
+        target_id="database",
+        payload_summary="DB 초기화 + 시드 재적재 시작",
+    )
+    db.commit()
 
     try:
         import sys

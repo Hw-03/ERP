@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import { LEGACY_COLORS } from "../legacyUi";
 
 export type EmptyStateVariant = "no-data" | "no-search-result" | "filtered-out";
@@ -30,7 +30,7 @@ interface Props {
   className?: string;
 }
 
-export function EmptyState({
+function EmptyStateImpl({
   variant = "no-data",
   title,
   description,
@@ -74,3 +74,5 @@ export function EmptyState({
     </div>
   );
 }
+
+export const EmptyState = memo(EmptyStateImpl);

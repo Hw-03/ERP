@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "../legacyUi";
 
@@ -10,7 +11,7 @@ interface Props {
   prefix?: string;
 }
 
-export function LoadFailureCard({
+function LoadFailureCardImpl({
   message,
   onRetry,
   retryLabel = "새로고침",
@@ -48,3 +49,5 @@ export function LoadFailureCard({
     </div>
   );
 }
+
+export const LoadFailureCard = memo(LoadFailureCardImpl);

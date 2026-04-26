@@ -2,7 +2,7 @@
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -18,6 +18,7 @@ from app.schemas import (
     ProductSymbolResponse,
     ProductSymbolUpdate,
 )
+from app.services import audit
 from app.services import codes as code_svc
 
 router = APIRouter()
@@ -32,7 +33,7 @@ def list_symbols(db: Session = Depends(get_db)):
 
 
 @router.put("/symbols/{slot}", response_model=ProductSymbolResponse)
-def update_symbol(slot: int, payload: ProductSymbolUpdate, db: Session = Depends(get_db)):
+def update_symbol(slot: int, payload: ProductSymbolUpdate, request: Request, db: Session = Depends(get_db)):
     row = db.query(ProductSymbol).filter(ProductSymbol.slot == slot).one_or_none()
     if row is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "해당 슬롯이 없습니다.")
@@ -63,6 +64,15 @@ def update_symbol(slot: int, payload: ProductSymbolUpdate, db: Session = Depends
     # If symbol or model assigned, unlock reservation flag
     if row.symbol and row.model_name:
         row.is_reserved = False
+
+    audit.record(
+        db,
+        request=request,
+        action="codes.symbol_update",
+        target_type="product_symbol",
+        target_id=str(slot),
+        payload_summary=f"slot={slot} symbol={row.symbol} model={row.model_name}",
+    )
 
     db.commit()
     db.refresh(row)

@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { LEGACY_COLORS } from "../legacyUi";
 
 export type StatusPillTone = "info" | "success" | "warning" | "danger" | "neutral";
@@ -21,7 +22,7 @@ interface Props {
   title?: string;
 }
 
-export function StatusPill({
+function StatusPillImpl({
   label,
   tone = "info",
   showDot = true,
@@ -48,6 +49,8 @@ export function StatusPill({
     </span>
   );
 }
+
+export const StatusPill = memo(StatusPillImpl);
 
 export function inferToneFromStatus(status: string | null | undefined): StatusPillTone {
   if (!status) return "info";
