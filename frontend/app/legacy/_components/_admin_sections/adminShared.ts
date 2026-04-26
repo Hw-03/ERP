@@ -5,7 +5,7 @@ export const CATEGORY_OPTIONS = [
   { value: "TA", label: "TA — 튜브 조립" },
   { value: "HA", label: "HA — 고압 조립" },
   { value: "VA", label: "VA — 진공 조립" },
-  { value: "BA", label: "BA — 최종 조립" },
+  { value: "AA", label: "AA — 최종 조립" },
   { value: "FG", label: "FG — 완제품" },
   { value: "UK", label: "UK — 미분류" },
 ];
@@ -53,5 +53,5 @@ export const EMPTY_EMPLOYEE_FORM = {
 
 export type EmployeeAddForm = typeof EMPTY_EMPLOYEE_FORM;
 
-export const BOM_PARENT_CATS = ["ALL", "BA", "HA", "VA", "TA", "AF", "TF", "FG"];
+export const BOM_PARENT_CATS = ["ALL", "AA", "HA", "VA", "TA", "AF", "TF", "FG"];
 export const BOM_CHILD_CATS = ["ALL", "RM", "?A", "?F"];

@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { BOMDetailEntry, BOMEntry, Item } from "@/lib/api";
 import { api } from "@/lib/api";
 
-const A_CATS = new Set(["TA", "HA", "VA", "BA"]);
+const A_CATS = new Set(["TA", "HA", "VA", "AA"]);
 const F_CATS = new Set(["TF", "HF", "VF", "AF"]);
 
 type ChildItemPlus = Item & { alreadyIn: boolean };

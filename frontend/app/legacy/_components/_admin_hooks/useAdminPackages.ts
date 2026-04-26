@@ -8,7 +8,7 @@ import { useMemo, useState } from "react";
 import type { Item, ShipPackage } from "@/lib/api";
 import { api } from "@/lib/api";
 
-const A_SET = new Set(["TA", "HA", "VA", "BA"]);
+const A_SET = new Set(["TA", "HA", "VA", "AA"]);
 const F_SET = new Set(["TF", "HF", "VF", "AF"]);
 
 export type UseAdminPackagesArgs = {
