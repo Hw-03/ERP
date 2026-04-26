@@ -8,6 +8,7 @@ Startup 부작용 (create_all / run_migrations / seed / ERP 백필) 은 모두
     python bootstrap_db.py --all
 """
 
+import os
 import uuid
 
 from fastapi import Depends, FastAPI, Request
@@ -76,23 +77,59 @@ app = FastAPI(
     - BOM 관리와 트리 조회
     - 생산 입고와 BOM 기반 Backflush
     """,
-    version="1.2.0",
+    version="1.3.0",
     docs_url="/docs",
     redoc_url="/redoc",
     redirect_slashes=False,
+    openapi_tags=[
+        {"name": "System", "description": "헬스체크, 메타 — 운영 점검용."},
+        {"name": "Items", "description": "품목 마스터 CRUD + 검색."},
+        {"name": "Employees", "description": "직원 마스터."},
+        {"name": "Inventory", "description": "재고 조회·입출고·이동·불량·반품·거래이력."},
+        {"name": "BOM", "description": "BOM CRUD + 트리 + Where-Used."},
+        {"name": "Production", "description": "생산 입고 + BOM Backflush."},
+        {"name": "Queue", "description": "Queue 배치 워크플로 (생산/분해/반품 2단계)."},
+        {"name": "Settings", "description": "관리자 PIN, 시스템 정합성 점검·복구."},
+        {"name": "Ship Packages", "description": "출하 묶음 CRUD."},
+        {"name": "Models", "description": "제품 모델 슬롯."},
+        {"name": "Codes", "description": "코드 마스터 (제품기호/옵션/공정)."},
+        {"name": "Scrap", "description": "폐기 이력."},
+        {"name": "Loss", "description": "분실/누락 이력."},
+        {"name": "Variance", "description": "차이 분석."},
+        {"name": "Alerts", "description": "안전재고/실사 알림."},
+        {"name": "Counts", "description": "실사 등록·강제 조정."},
+    ],
 )
+
+_DEFAULT_CORS_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+# Phase 5: CORS_EXTRA_ORIGINS 환경 변수가 있으면 콤마로 split 해서 추가.
+# 변수 미설정/빈 값이면 기본 origin 만 사용 (기존 동작 동일).
+_extra_origins_raw = os.environ.get("CORS_EXTRA_ORIGINS", "").strip()
+_extra_origins = [o.strip() for o in _extra_origins_raw.split(",") if o.strip()] if _extra_origins_raw else []
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=_DEFAULT_CORS_ORIGINS + _extra_origins,
     allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def _request_id_middleware(request: Request, call_next):
+    """X-Request-Id 헤더가 있으면 통과, 없으면 발급. 응답 헤더에 부착."""
+    rid = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:12]
+    # request.state 에 저장 (필요 시 라우터에서 접근 가능)
+    request.state.request_id = rid
+    response = await call_next(request)
+    response.headers["X-Request-Id"] = rid
+    return response
+
 
 setup_logging()
 _log = get_logger()
