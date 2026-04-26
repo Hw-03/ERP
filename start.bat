@@ -33,6 +33,20 @@ if exist "requirements.txt" (
 )
 popd
 
+rem ====== Ensure DB schema is up to date (Phase 5.4-B) ======
+rem main.py 의 Base.metadata.create_all 부작용을 제거했으므로,
+rem 신규 모델 추가 시 idempotent 하게 테이블을 생성하기 위해 schema 단계만 실행.
+pushd "%~dp0backend"
+echo [ERP] Ensuring DB schema is up to date...
+py bootstrap_db.py --schema
+if errorlevel 1 (
+    echo [ERP] ERROR: bootstrap_db.py --schema failed. Aborting.
+    popd
+    pause
+    exit /b 1
+)
+popd
+
 rem ====== Auto-detect current LAN IPv4 (active adapter with default gateway) ======
 powershell -NoProfile -Command "$c = Get-NetIPConfiguration; $t = $c | Where-Object { $_.IPv4DefaultGateway -ne $null -and $_.NetAdapter.Status -eq 'Up' } | Select-Object -First 1; if ($t) { $t.IPv4Address.IPAddress }" > "%TEMP%\erp_ip.txt" 2>nul
 set /p IP=<"%TEMP%\erp_ip.txt"

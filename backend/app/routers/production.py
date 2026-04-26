@@ -60,16 +60,22 @@ def production_receipt(
     for item_id, req_qty in component_requirements:
         merged[item_id] = merged.get(item_id, Decimal("0")) + req_qty
 
+    # 5.4-E: bulk 사전 로드 — Items / Inventory 각 1회 IN 쿼리.
+    # 기존엔 component 마다 db.query 가 반복되어 N+1 였음.
+    comp_ids = list(merged.keys())
+    items_map = {i.item_id: i for i in db.query(Item).filter(Item.item_id.in_(comp_ids)).all()}
+    invs_map = {i.item_id: i for i in db.query(Inventory).filter(Inventory.item_id.in_(comp_ids)).all()}
+
     shortage_errors = []
     for comp_item_id, required_qty in merged.items():
-        inv = db.query(Inventory).filter(Inventory.item_id == comp_item_id).first()
+        inv = invs_map.get(comp_item_id)
         # 생산 BACKFLUSH는 창고 가용분 기준으로 사전 검사 (warehouse - pending)
         current_avail = (
             (inv.warehouse_qty or Decimal("0")) - (inv.pending_quantity or Decimal("0"))
             if inv else Decimal("0")
         )
         if current_avail < required_qty:
-            comp_item = db.query(Item).filter(Item.item_id == comp_item_id).first()
+            comp_item = items_map.get(comp_item_id)
             shortage_errors.append(
                 f"[{comp_item.erp_code}] {comp_item.item_name}: 필요 {required_qty} {comp_item.unit}, "
                 f"가용 {current_avail} {comp_item.unit}, 부족 {required_qty - current_avail}"
@@ -88,7 +94,14 @@ def production_receipt(
 
     try:
         for comp_item_id, required_qty in merged.items():
-            comp_item = db.query(Item).filter(Item.item_id == comp_item_id).first()
+            # items_map 재사용 (5.4-E)
+            comp_item = items_map.get(comp_item_id)
+            if comp_item is None:
+                raise http_error(
+                    status.HTTP_404_NOT_FOUND,
+                    ErrorCode.NOT_FOUND,
+                    f"부품 {comp_item_id} 을 찾을 수 없습니다.",
+                )
 
             # 재고 변경은 서비스 레이어로 위임 (창고 차감 + _sync_total 은 내부 책임)
             inv, qty_before = inventory_svc.consume_warehouse(db, comp_item_id, required_qty)
@@ -257,9 +270,12 @@ def _explode_bom(
 def get_production_capacity(db: Session = Depends(get_db)):
     """BOM이 등록된 BA 품목들에 대해 즉시/최대 생산 가능수량을 계산한다.
 
-    - immediate: warehouse_available (= warehouse_qty - pending) 기준 최소 생산 가능량
-      → production_receipt 의 실제 차감 검사식과 일치 (부서 생산재고/불량은 제외)
-    - maximum: total (= warehouse + production + defective) 기준 최소 생산 가능량
+    - **immediate**: warehouse_available (= warehouse_qty - pending) 기준 최소 생산 가능량.
+      production_receipt 의 실제 차감 검사식과 일치 (부서 생산재고/불량은 제외).
+      → "지금 당장 만들 수 있는 수량" 의 정확한 값.
+    - **maximum**: total (= warehouse + production + defective) 기준 이론적 최대.
+      **불량 재고도 포함**되므로 실제 가용량과 다를 수 있음. UI 에서는
+      immediate 와 maximum 의 차이를 운영자에게 분명히 설명해야 한다.
     """
     # BOM parent 중 다른 BOM의 child가 아닌 것 = 최상위 품목
     all_parent_ids = {row[0] for row in db.query(BOM.parent_item_id).distinct().all()}

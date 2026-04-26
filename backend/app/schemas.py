@@ -702,14 +702,35 @@ class CapacityTopItem(BaseModel):
     item_id: str
     item_name: str
     erp_code: Optional[str] = None
-    immediate: int
-    maximum: int
+    immediate: int = Field(
+        ...,
+        description="warehouse_available (= warehouse_qty - pending) 기준 즉시 생산 가능량. production_receipt 의 실제 차감 검사식과 일치.",
+    )
+    maximum: int = Field(
+        ...,
+        description="total (= warehouse + production + defective) 기준 이론적 최대. 불량 재고를 포함하므로 실제 가용량과 다름.",
+    )
 
 
 class CapacityResponse(BaseModel):
-    immediate: int
-    maximum: int
-    limiting_item: Optional[str] = None
+    """전체 생산 가능 수량 응답.
+
+    - **immediate**: 지금 당장 생산 가능한 수량 (창고 가용분 기준).
+    - **maximum**: 모든 위치 (창고 + 부서 생산 + 불량) 합계 기준 이론적 최대.
+      불량 재고도 포함되므로 UI 에 노출할 때는 immediate 와의 차이를 설명해야 한다.
+    """
+    immediate: int = Field(
+        ...,
+        description="warehouse_available 기준 즉시 생산 가능량 (production_receipt 와 일치).",
+    )
+    maximum: int = Field(
+        ...,
+        description="total (warehouse + production + defective) 기준 이론적 최대. 불량 재고 포함.",
+    )
+    limiting_item: Optional[str] = Field(
+        None,
+        description="immediate 를 결정한 가장 부족한 부품의 표시 이름.",
+    )
     top_items: List[CapacityTopItem] = Field(default_factory=list)
 
 

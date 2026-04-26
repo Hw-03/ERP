@@ -6,9 +6,16 @@ in-memory SQLite + 단일 connection 기반. PRAGMA 셋업과 Base.metadata.crea
 
 from __future__ import annotations
 
-from decimal import Decimal
+import os
 import sys
+from decimal import Decimal
 from pathlib import Path
+
+# 5.4-C: pytest 가 실제 backend/erp.db 를 건드리지 않도록 보장.
+# database.py 가 모듈 로드 시 engine = create_engine(DATABASE_URL) 을 평가하므로
+# app.* import 전에 DATABASE_URL 을 in-memory 로 고정한다.
+# 어떤 fixture 가 app.main 을 import 해도 default engine 이 in-memory 라 실 DB 안 건드림.
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 import pytest
 from sqlalchemy import create_engine, event

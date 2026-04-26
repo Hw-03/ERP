@@ -1,5 +1,5 @@
 // 모바일 관리자 5섹션이 공유하는 상수.
-// AdminTab.tsx 에서 분할되어 나온 것이므로 이름·값 모두 그대로.
+// 과거 AdminTab.tsx 에서 분할되어 나왔다가 5.2 의 AdminShell 패턴으로 대체됨.
 
 import type { Item } from "@/lib/api";
 

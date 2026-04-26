@@ -307,3 +307,15 @@ export function useResource<T>(
 - `useResource.test.tsx` (4) / `ConfirmModal.test.tsx` (4) / `useItems.test.tsx` (4) — **12/12 green**
 
 검증: `npx tsc --noEmit` 0 오류, `npm run lint` 0 warning, `npm test` 12/12.
+
+---
+
+## Phase 5.4 (2026-04-26) — dead code 정리 + CI
+
+| 변경 | 비고 |
+|---|---|
+| `AdminTab.tsx` 삭제 | Phase 5.2 분할 후 import 0건 (5.2 의 `role=tablist` 추가가 무용지물) |
+| `_shared.ts` 주석 정리 | 분할 history 갱신 |
+| CI workflow | `npm run lint` + `npx tsc --noEmit` + `npm test` 자동 실행 |
+
+검증: tsc 0, lint 0, vitest 12/12.

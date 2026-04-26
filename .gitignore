@@ -6,6 +6,13 @@ __pycache__/
 .venv
 venv/
 
+# Test artifacts (Phase 5.4-H)
+.pytest_cache/
+.coverage
+coverage/
+htmlcov/
+frontend/.vitest/
+
 # Database
 *.db
 *.db-shm

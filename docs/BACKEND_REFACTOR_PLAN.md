@@ -296,3 +296,20 @@ API 설계 B+ → A− / 테스트 C+ → A−. 자세한 항목은 `docs/CODEX_
 | 라우터 smoke 테스트 | `test_admin_audit` 6 케이스 | limit le=2000 검증 포함 |
 
 검증: `pytest -q` 35/35 green. `python -m compileall backend` 0 오류.
+
+---
+
+## Phase 5.4 (2026-04-26) — P1 부채 제거 + CI 도입
+
+`main.py` 의 `Base.metadata.create_all(bind=engine)` 부작용 제거 + pytest 격리 + N+1 추가 정리. 자세한 항목은 `docs/CODEX_PROGRESS.md` 참고.
+
+| 변경 | 영역 | 비고 |
+|---|---|---|
+| `main.py` create_all 제거 | startup | docstring 과 일치. 신규 테이블은 `bootstrap_db.py --schema` 로 |
+| `start.bat` 에 schema step | 운영 | 백엔드 기동 직전 자동. 실패 시 abort |
+| `conftest.py` DATABASE_URL 강제 | 테스트 | `sqlite:///:memory:` — pytest 가 실 erp.db 안 건드림 |
+| `CapacityResponse` 필드 description | API | `maximum` 이 불량 재고 포함임을 OpenAPI 에 명시 |
+| `production_receipt` N+1 제거 | 성능 | shortage 검사 + backflush 루프 양쪽 IN 쿼리 |
+| CI 워크플로 | 인프라 | `.github/workflows/ci.yml` — pytest + vitest + tsc + lint |
+
+검증: `pytest -q` 35/35 green. `from app.main import app` 전후 erp.db mtime 동일.
