@@ -818,6 +818,9 @@ export const api = {
   getBOM: (parentItemId: string) => fetcher<BOMEntry[]>(toApiUrl(`/api/bom/${parentItemId}`)),
   getBOMTree: (parentItemId: string) =>
     fetcher<BOMTreeNode>(toApiUrl(`/api/bom/${parentItemId}/tree`)),
+  /** 주어진 품목을 자식으로 사용하는 parent BOM 행. 직접 사용처(1단계). */
+  getBOMWhereUsed: (itemId: string) =>
+    fetcher<BOMDetailEntry[]>(toApiUrl(`/api/bom/where-used/${itemId}`)),
 
   createBOM: async (payload: {
     parent_item_id: string;

@@ -54,6 +54,9 @@ export type AdminBomState = {
   bomParentItems: Item[];
   bomChildItems: ChildItemPlus[];
 
+  // Phase 5: Where-Used (선택된 parent 가 어떤 다른 parent 의 child 로 들어가는지)
+  whereUsedRows: BOMDetailEntry[];
+
   // 액션
   addBomRow: (childId: string, qty: number) => void;
   saveBomQty: (row: BOMEntry) => void;
@@ -84,6 +87,19 @@ export function useAdminBom({
       return;
     }
     void api.getBOM(parentId).then(setBomRows).catch(() => setBomRows([]));
+  }, [parentId]);
+
+  // Phase 5: Where-Used (이 parent 품목이 다른 BOM 의 child 로 들어가는 곳)
+  const [whereUsedRows, setWhereUsedRows] = useState<BOMDetailEntry[]>([]);
+  useEffect(() => {
+    if (!parentId) {
+      setWhereUsedRows([]);
+      return;
+    }
+    void api
+      .getBOMWhereUsed(parentId)
+      .then(setWhereUsedRows)
+      .catch(() => setWhereUsedRows([]));
   }, [parentId]);
 
   const bomParentItems = useMemo(() => {
@@ -176,6 +192,7 @@ export function useAdminBom({
     allBomRows,
     bomParentItems,
     bomChildItems,
+    whereUsedRows,
     addBomRow: (childId, qty) => void addBomRow(childId, qty),
     saveBomQty: (row) => void saveBomQty(row),
     deleteBomRow: (bomId) => void deleteBomRow(bomId),
