@@ -174,7 +174,7 @@ class ShipPackageResponse(BaseModel):
 class ShipPackageItemDetail(BaseModel):
     package_item_id: uuid.UUID
     item_id: uuid.UUID
-    erp_code: str
+    erp_code: Optional[str] = None
     item_name: str
     item_category: CategoryEnum
     item_unit: str
@@ -348,7 +348,7 @@ class BOMDetailResponse(BaseModel):
 
 class BOMTreeNode(BaseModel):
     item_id: uuid.UUID
-    erp_code: str
+    erp_code: Optional[str] = None
     item_name: str
     category: CategoryEnum
     unit: str
@@ -370,7 +370,7 @@ class ProductionReceiptRequest(BaseModel):
 
 class BackflushDetail(BaseModel):
     item_id: uuid.UUID
-    erp_code: str
+    erp_code: Optional[str] = None
     item_name: str
     category: CategoryEnum
     required_quantity: Decimal
@@ -398,7 +398,7 @@ class TransactionLogResponse(BaseModel):
 
     log_id: uuid.UUID
     item_id: uuid.UUID
-    erp_code: str
+    erp_code: Optional[str] = None
     item_name: str
     item_category: CategoryEnum
     item_unit: str
