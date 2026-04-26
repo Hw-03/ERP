@@ -111,6 +111,7 @@ ERP 코드 포맷:
 | [docs/CODEX_PROGRESS.md](docs/CODEX_PROGRESS.md) | 모두 | 큰 기능 단위 진행 기록 |
 | [docs/BACKEND_REFACTOR_PLAN.md](docs/BACKEND_REFACTOR_PLAN.md) | 다음 작업 | 백엔드 개선 진행 / 보류 사유 |
 | [docs/FRONTEND_HOOKS_PLAN.md](docs/FRONTEND_HOOKS_PLAN.md) | 다음 작업 | 프론트 hook·뷰 분할 진행 / 보류 사유 |
+| [docs/research/MOBILE_BARCODE_ARCHITECTURE.md](docs/research/MOBILE_BARCODE_ARCHITECTURE.md) | 다음 작업 검토 | 모바일 바코드 스캐너 아키텍처 외부 연구 |
 
 ## 검증
 
