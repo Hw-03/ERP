@@ -178,7 +178,11 @@ def _value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
     _log.warning("ValueError rid=%s path=%s msg=%s", rid, request.url.path, exc)
     return JSONResponse(
         status_code=422,
-        content=_error_payload(ErrorCode.VALIDATION_ERROR, str(exc) or "유효성 검사 실패"),
+        content=_error_payload(
+            ErrorCode.VALIDATION_ERROR,
+            str(exc) or "유효성 검사 실패",
+            extra={"request_id": rid},
+        ),
     )
 
 
@@ -188,7 +192,11 @@ def _integrity_error_handler(request: Request, exc: IntegrityError) -> JSONRespo
     _log.error("IntegrityError rid=%s path=%s msg=%s", rid, request.url.path, exc)
     return JSONResponse(
         status_code=409,
-        content=_error_payload(ErrorCode.DB_INTEGRITY, "DB 제약 조건 위반"),
+        content=_error_payload(
+            ErrorCode.DB_INTEGRITY,
+            "DB 제약 조건 위반",
+            extra={"request_id": rid},
+        ),
     )
 
 
@@ -198,7 +206,11 @@ def _operational_error_handler(request: Request, exc: OperationalError) -> JSONR
     _log.error("OperationalError rid=%s path=%s msg=%s", rid, request.url.path, exc)
     return JSONResponse(
         status_code=503,
-        content=_error_payload(ErrorCode.DB_UNAVAILABLE, "DB 연결 일시 오류"),
+        content=_error_payload(
+            ErrorCode.DB_UNAVAILABLE,
+            "DB 연결 일시 오류",
+            extra={"request_id": rid},
+        ),
     )
 
 

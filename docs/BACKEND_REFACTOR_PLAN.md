@@ -277,3 +277,22 @@ POST /api/inventory/ship-package
 - 입출고 wizard 5단계 모두 정상
 - 부분 실패 모달 동작 동일
 - Topbar pill / completionFlyout / 자동 refresh 동일
+
+---
+
+## Phase 5.3 (2026-04-26) — API 설계 + 테스트 인프라 A−
+
+API 설계 B+ → A− / 테스트 C+ → A−. 자세한 항목은 `docs/CODEX_PROGRESS.md` 참고.
+
+| 변경 | 영역 | 비고 |
+|---|---|---|
+| limit bounds 통일 | `admin_audit / alerts / settings` | `le=1000` → `le=2000` |
+| Pydantic v2 마이그 | `admin_audit.AdminAuditLogResponse` | `class Config` → `model_config = ConfigDict` |
+| response_model 부착 | `production.bom-check / capacity`, `settings.integrity/inventory / repair` | 신규 schemas 5종 (BomCheck*, Capacity*, IntegrityCheck/Repair*) |
+| http_error 마이그 | `settings.py` 6곳 | 모두 `ErrorCode + http_error()` 경유 |
+| request_id 응답 포함 | `main.py` ValueError fallback / IntegrityError / OperationalError | 5 핸들러 모두 rid 포함 |
+| pytest 인프라 | `backend/pytest.ini` + `tests/conftest.py` | in-memory SQLite + TestClient |
+| services 단위 테스트 | `test_stock_math` 11 / `test_bom` 11 / `test_integrity` 7 | 29 케이스 |
+| 라우터 smoke 테스트 | `test_admin_audit` 6 케이스 | limit le=2000 검증 포함 |
+
+검증: `pytest -q` 35/35 green. `python -m compileall backend` 0 오류.

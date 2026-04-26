@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useId, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "../legacyUi";
+import { useFocusTrap } from "../_hooks/useFocusTrap";
 
 export type ConfirmTone = "normal" | "caution" | "danger";
 
@@ -51,6 +52,9 @@ export function ConfirmModal({
     return () => window.removeEventListener("keydown", handler);
   }, [open, busy, onClose]);
 
+  const titleId = useId();
+  const panelRef = useFocusTrap<HTMLDivElement>(open);
+
   if (!open) return null;
 
   const toneAccent = TONE_ACCENT[tone];
@@ -66,8 +70,10 @@ export function ConfirmModal({
       }}
       role="dialog"
       aria-modal="true"
+      aria-labelledby={titleId}
     >
       <div
+        ref={panelRef}
         className="w-full max-w-[520px] rounded-[24px] border p-6"
         style={{
           background: LEGACY_COLORS.s1,
@@ -80,7 +86,7 @@ export function ConfirmModal({
       >
         <div className="mb-4 flex items-center gap-2">
           {isCautionLike && <AlertTriangle className="h-5 w-5" style={{ color: toneAccent }} />}
-          <div className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>
+          <div id={titleId} className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>
             {title}
           </div>
         </div>

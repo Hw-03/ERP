@@ -281,3 +281,29 @@ export function useResource<T>(
 - 단일 PR로 진행하면 디프가 너무 커서 회귀 식별이 어렵다
 - wizard 핵심 로직 이동은 운영 데이터에 직접 영향이 가는 부분 — 신중한 별도 사이클 권장
 - 본 단계에서는 사용자 체감 마감(공용 부품 + UX 마감) 을 먼저 끝내는 것이 ROI 가 높다
+
+---
+
+## Phase 5.3 (2026-04-26) — 상태 관리 / UX·접근성 / 테스트 A−
+
+자세한 항목은 `docs/CODEX_PROGRESS.md` 참고. 핵심 변경 요약:
+
+### 상태 관리 (B+ → A−)
+- `lib/api.ts` 의 `postJson<T> / putJson<T> / patchJson<T>` 헬퍼 — inline `as Promise<T>` 캐스팅 제거
+- `useItems` AbortController 마이그 (reqId.current 폐기) — 빠른 검색·필터 시 마지막 결과만
+- `_hooks/CONTRACT.md` — read / list / mutation hook 표준 모양 + race 처리 정책 문서화
+- pessimistic mutation 패턴을 의도 주석으로 명시 (`useAdminPackages`, `useAdminBom`)
+
+### UX/접근성 (B+ → A−)
+- `useFocusTrap.ts` 신규 + `ConfirmModal` / `ResultModal` / `BottomSheet` 3건 적용
+- `Toast.tsx` `role="status"` (error 시 `alert`) + `aria-live`
+- `InventoryItemRow.tsx` 색상-only → 아이콘+색상 두 채널 + 행 keyboard nav (`role="button"` `tabIndex` `onKeyDown`)
+- `mobile/primitives/ItemRow.tsx` 체크박스 외곽 44×44 hit-area
+- `globals.css` `prefers-reduced-motion` 전역 무력화
+- `AdminTab.tsx` `role="tablist"` + `aria-selected` + `tabIndex` 시맨틱 탭
+
+### 테스트 (C+ → A−)
+- `vitest@^2` + `@testing-library/react@^16` + `jsdom`
+- `useResource.test.tsx` (4) / `ConfirmModal.test.tsx` (4) / `useItems.test.tsx` (4) — **12/12 green**
+
+검증: `npx tsc --noEmit` 0 오류, `npm run lint` 0 warning, `npm test` 12/12.

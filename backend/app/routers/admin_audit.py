@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -31,14 +31,13 @@ class AdminAuditLogResponse(BaseModel):
     request_id: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 @router.get("/audit-logs", response_model=List[AdminAuditLogResponse])
 def list_audit_logs(
     db: Session = Depends(get_db),
-    limit: int = Query(100, ge=1, le=1000),
+    limit: int = Query(100, ge=1, le=2000),
     action: Optional[str] = Query(None, description="필터: 정확히 일치 또는 prefix (예: bom.)"),
     target_type: Optional[str] = Query(None),
     since: Optional[datetime] = Query(None, description="이 시각 이후만 (UTC)"),

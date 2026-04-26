@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import type { Item } from "@/lib/api";
 import {
   LEGACY_COLORS,
@@ -65,10 +66,24 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
   const visibleBadges = badges.slice(0, 2);
   const extraBadges = badges.length - 2;
 
+  // 색상 외에도 아이콘으로 두 채널 신호 (WCAG 1.4.1)
+  const StockIcon = stock.label === "품절" ? XCircle : stock.label === "부족" ? AlertTriangle : CheckCircle2;
+
+  const handleSelect = () => onSelect(selected ? null : item);
+
   return (
     <tr
-      onClick={() => onSelect(selected ? null : item)}
-      className="group cursor-pointer transition-all hover:bg-[rgba(101,169,255,0.09)] hover:[box-shadow:inset_3px_0_0_rgba(101,169,255,0.45)]"
+      onClick={handleSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleSelect();
+        }
+      }}
+      tabIndex={0}
+      role="button"
+      aria-pressed={selected}
+      className="group cursor-pointer transition-all hover:bg-[rgba(101,169,255,0.09)] hover:[box-shadow:inset_3px_0_0_rgba(101,169,255,0.45)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
       style={{
         background: selected ? "rgba(101,169,255,.10)" : "transparent",
         boxShadow: selected ? `inset 3px 0 0 ${LEGACY_COLORS.blue}` : undefined,
@@ -79,9 +94,10 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
         style={{ borderColor: LEGACY_COLORS.border }}
       >
         <span
-          className="inline-flex w-fit rounded-full px-2.5 py-1 text-sm font-bold"
+          className="inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-sm font-bold"
           style={{ color: stock.color, background: `color-mix(in srgb, ${stock.color} 12%, transparent)` }}
         >
+          <StockIcon className="h-3.5 w-3.5" aria-hidden="true" />
           {stock.label}
         </span>
       </td>
@@ -101,6 +117,8 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
             className="mt-2 flex h-[5px] overflow-hidden rounded-full"
             style={{ background: LEGACY_COLORS.s3 }}
             title={segments.map((s) => s.label).join(" / ")}
+            role="img"
+            aria-label={`재고 분포: ${segments.map((s) => `${s.label} ${s.pct.toFixed(0)}%`).join(", ")}`}
           >
             {segments.map((s, i) => (
               <div

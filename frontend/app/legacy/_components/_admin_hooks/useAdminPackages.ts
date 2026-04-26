@@ -77,6 +77,8 @@ export function useAdminPackages({
 
   async function _createSimplePackage() {
     try {
+      // 의도적 pessimistic — API 성공 후에만 setPackages. 실패 시 UI 가 잘못 보이지 않음.
+      // 진정한 optimistic 이 필요하면 snapshot → set → catch → restore 패턴 도입.
       const created = await api.createShipPackage({
         package_code: `PKG-${Date.now()}`,
         name: `출하묶음 ${packages.length + 1}`,

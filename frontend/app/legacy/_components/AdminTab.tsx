@@ -30,22 +30,34 @@ function SectionTabs({
   onLock: () => void;
 }) {
   return (
-    <div className="mb-3 flex gap-[7px] overflow-x-auto">
-      {SECTIONS.map((entry) => (
-        <button
-          key={entry.id}
-          onClick={() => setSection(entry.id)}
-          className="shrink-0 rounded-full border px-4 py-[7px] text-xs font-bold transition-all hover:brightness-110"
-          style={{
-            background: section === entry.id ? LEGACY_COLORS.purple : LEGACY_COLORS.s2,
-            borderColor: section === entry.id ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
-            color: section === entry.id ? "#fff" : LEGACY_COLORS.muted2,
-          }}
-        >
-          {entry.label}
-        </button>
-      ))}
+    <div
+      role="tablist"
+      aria-label="관리자 메뉴"
+      className="mb-3 flex gap-[7px] overflow-x-auto"
+    >
+      {SECTIONS.map((entry) => {
+        const isActive = section === entry.id;
+        return (
+          <button
+            key={entry.id}
+            role="tab"
+            type="button"
+            aria-selected={isActive}
+            tabIndex={isActive ? 0 : -1}
+            onClick={() => setSection(entry.id)}
+            className="shrink-0 rounded-full border px-4 py-[7px] text-xs font-bold transition-all hover:brightness-110"
+            style={{
+              background: isActive ? LEGACY_COLORS.purple : LEGACY_COLORS.s2,
+              borderColor: isActive ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
+              color: isActive ? "#fff" : LEGACY_COLORS.muted2,
+            }}
+          >
+            {entry.label}
+          </button>
+        );
+      })}
       <button
+        type="button"
         onClick={onLock}
         className="ml-auto shrink-0 rounded-full border px-4 py-[7px] text-xs font-bold transition-all hover:brightness-110"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}

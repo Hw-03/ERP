@@ -150,3 +150,21 @@
 .flow-arrow {
   animation: flow 2s ease-in-out infinite;
 }
+
+/* 사용자가 동작 감소를 선호하는 경우 모든 자체 애니메이션 무력화 (WCAG 2.3.3). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .flow-arrow,
+  .animate-fade-in,
+  .animate-pulse-slow,
+  [data-anim="sheetUp"] {
+    animation: none !important;
+  }
+}

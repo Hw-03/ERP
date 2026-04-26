@@ -9,7 +9,13 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import BOM, CategoryEnum, Inventory, Item, TransactionLog, TransactionTypeEnum
-from app.schemas import BackflushDetail, ProductionReceiptRequest, ProductionReceiptResponse
+from app.schemas import (
+    BackflushDetail,
+    BomCheckResponse,
+    CapacityResponse,
+    ProductionReceiptRequest,
+    ProductionReceiptResponse,
+)
 from app.services import inventory as inventory_svc
 from app.services import stock_math
 from app.services.bom import BomCache, build_bom_cache
@@ -165,6 +171,7 @@ def production_receipt(
 
 @router.get(
     "/bom-check/{item_id}",
+    response_model=BomCheckResponse,
     summary="생산 가능 여부 사전 확인",
 )
 def check_production_feasibility(
@@ -242,7 +249,11 @@ def _explode_bom(
     return _explode_bom_svc(db, parent_item_id, qty_to_produce, depth, visited, cache=cache)
 
 
-@router.get("/capacity", summary="전체 생산 가능수량 조회")
+@router.get(
+    "/capacity",
+    response_model=CapacityResponse,
+    summary="전체 생산 가능수량 조회",
+)
 def get_production_capacity(db: Session = Depends(get_db)):
     """BOM이 등록된 BA 품목들에 대해 즉시/최대 생산 가능수량을 계산한다.
 

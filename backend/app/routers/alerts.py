@@ -97,7 +97,7 @@ def list_alerts(
     include_acknowledged: bool = Query(False),
     item_id: Optional[uuid.UUID] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(200, ge=1, le=1000),
+    limit: int = Query(200, ge=1, le=2000),
     db: Session = Depends(get_db),
 ):
     q = db.query(StockAlert)

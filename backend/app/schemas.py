@@ -672,3 +672,61 @@ class PhysicalCountResponse(BaseModel):
     reason: Optional[str] = None
     operator: Optional[str] = None
     created_at: datetime
+
+
+# =============================================================================
+# Phase 5.3-A — 운영 도구 응답 schema (BOM 가능 여부 / 생산 capacity / 정합성)
+# =============================================================================
+class BomCheckComponent(BaseModel):
+    erp_code: Optional[str] = None
+    item_name: str
+    category: str
+    unit: str
+    required: float
+    current_stock: float
+    pending: float
+    available: float
+    shortage: float
+    ok: bool
+
+
+class BomCheckResponse(BaseModel):
+    item_id: str
+    item_name: str
+    quantity_to_produce: float
+    can_produce: bool
+    components: List[BomCheckComponent]
+
+
+class CapacityTopItem(BaseModel):
+    item_id: str
+    item_name: str
+    erp_code: Optional[str] = None
+    immediate: int
+    maximum: int
+
+
+class CapacityResponse(BaseModel):
+    immediate: int
+    maximum: int
+    limiting_item: Optional[str] = None
+    top_items: List[CapacityTopItem] = Field(default_factory=list)
+
+
+class IntegrityCheckResponse(BaseModel):
+    """`/api/settings/integrity/inventory` 응답.
+
+    samples 는 InventoryMismatch.to_dict() 의 자유로운 dict — schema 강제 안 함.
+    """
+    checked: int
+    mismatched_count: int
+    samples: List[dict]
+
+
+class IntegrityRepairResponse(BaseModel):
+    """`/api/settings/integrity/repair` 응답."""
+    checked: int
+    mismatched: int
+    repaired: int
+    dry_run: bool
+    samples: List[dict]

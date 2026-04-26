@@ -129,6 +129,7 @@ export function useAdminBom({
   async function addBomRow(childId: string, qty: number) {
     if (!parentId) return;
     try {
+      // 의도적 pessimistic — API 성공 후에만 setBomRows. 실패 시 UI 가 잘못 보이지 않음.
       const created = await api.createBOM({
         parent_item_id: parentId,
         child_item_id: childId,

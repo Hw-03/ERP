@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useId } from "react";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { LEGACY_COLORS } from "../legacyUi";
+import { useFocusTrap } from "../_hooks/useFocusTrap";
 
 export type ResultKind = "success" | "partial" | "fail";
 
@@ -41,6 +43,19 @@ export function ResultModal({
   closeLabel = "닫기",
   primaryAction,
 }: Props) {
+  // ESC 닫기
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, onClose]);
+
+  const titleId = useId();
+  const panelRef = useFocusTrap<HTMLDivElement>(open);
+
   if (!open) return null;
 
   const headerTone =
@@ -67,8 +82,10 @@ export function ResultModal({
       onClick={onClose}
       role="dialog"
       aria-modal="true"
+      aria-labelledby={titleId}
     >
       <div
+        ref={panelRef}
         className="w-full max-w-[560px] rounded-[24px] border p-6"
         style={{
           background: LEGACY_COLORS.s1,
@@ -79,7 +96,7 @@ export function ResultModal({
       >
         <div className="mb-4 flex items-center gap-2">
           <HeaderIcon className="h-5 w-5" style={{ color: headerTone }} />
-          <div className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>
+          <div id={titleId} className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>
             {computedTitle}
           </div>
         </div>

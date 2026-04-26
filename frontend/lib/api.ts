@@ -413,11 +413,12 @@ async function parseError(res: Response) {
   }
 }
 
-export async function fetcher<T>(url: string): Promise<T> {
+export async function fetcher<T>(url: string, signal?: AbortSignal): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(url);
+    res = await fetch(url, { signal });
   } catch (error) {
+    if ((error as Error)?.name === "AbortError") throw error;
     throw new Error(
       error instanceof Error
         ? `API 연결에 실패했습니다. ${url} 주소에 접근할 수 있는지 확인해 주세요.`
@@ -430,21 +431,39 @@ export async function fetcher<T>(url: string): Promise<T> {
   return res.json();
 }
 
+// 5.3-B: 쓰기 응답 타입 캐스팅을 한 곳으로. createItem/updateItem/createEmployee 등이 사용.
+async function writeJson<T>(url: string, method: "POST" | "PUT" | "PATCH", body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as T;
+}
+
+export const postJson = <T>(url: string, body: unknown): Promise<T> => writeJson<T>(url, "POST", body);
+export const putJson = <T>(url: string, body: unknown): Promise<T> => writeJson<T>(url, "PUT", body);
+export const patchJson = <T>(url: string, body: unknown): Promise<T> => writeJson<T>(url, "PATCH", body);
+
 export const api = {
   getInventorySummary: () => fetcher<InventorySummary>(toApiUrl("/api/inventory/summary")),
 
-  getItems: (params?: {
-    category?: Category;
-    search?: string;
-    skip?: number;
-    limit?: number;
-    legacyFileType?: string;
-    legacyPart?: string;
-    legacyModel?: string;
-    legacyItemType?: string;
-    barcode?: string;
-    department?: string;
-  }) => {
+  getItems: (
+    params?: {
+      category?: Category;
+      search?: string;
+      skip?: number;
+      limit?: number;
+      legacyFileType?: string;
+      legacyPart?: string;
+      legacyModel?: string;
+      legacyItemType?: string;
+      barcode?: string;
+      department?: string;
+    },
+    opts?: { signal?: AbortSignal },
+  ) => {
     const query = new URLSearchParams();
     if (params?.category) query.set("category", params.category);
     if (params?.search) query.set("search", params.search);
@@ -456,7 +475,7 @@ export const api = {
     if (params?.legacyItemType) query.set("legacy_item_type", params.legacyItemType);
     if (params?.barcode) query.set("barcode", params.barcode);
     if (params?.department) query.set("department", params.department);
-    return fetcher<Item[]>(toApiUrl(`/api/items?${query}`));
+    return fetcher<Item[]>(toApiUrl(`/api/items?${query}`), opts?.signal);
   },
 
   getItem: (itemId: string) => fetcher<Item>(toApiUrl(`/api/items/${itemId}`)),
@@ -473,15 +492,7 @@ export const api = {
     initial_quantity?: number;
     model_slots?: number[];
     option_code?: string;
-  }) => {
-    const res = await fetch(toApiUrl("/api/items"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<Item>;
-  },
+  }) => postJson<Item>(toApiUrl("/api/items"), payload),
 
   updateItem: async (
     itemId: string,
@@ -498,15 +509,7 @@ export const api = {
       supplier?: string;
       min_stock?: number;
     },
-  ) => {
-    const res = await fetch(toApiUrl(`/api/items/${itemId}`), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<Item>;
-  },
+  ) => putJson<Item>(toApiUrl(`/api/items/${itemId}`), payload),
 
   verifyAdminPin: async (pin: string) => {
     const res = await fetch(toApiUrl("/api/settings/verify-pin"), {
@@ -545,7 +548,7 @@ export const api = {
     return fetcher<Employee[]>(toApiUrl(`/api/employees?${query}`));
   },
 
-  createEmployee: async (payload: {
+  createEmployee: (payload: {
     employee_code: string;
     name: string;
     role: string;
@@ -554,15 +557,7 @@ export const api = {
     level?: EmployeeLevel;
     display_order?: number;
     is_active?: boolean;
-  }) => {
-    const res = await fetch(toApiUrl("/api/employees"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<Employee>;
-  },
+  }) => postJson<Employee>(toApiUrl("/api/employees"), payload),
 
   updateEmployee: async (
     employeeId: string,

@@ -6,14 +6,21 @@
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from pydantic import BaseModel, Field
 
 from app.database import get_db
 from app.models import Inventory, SystemSetting
-from app.schemas import AdminPinUpdateRequest, AdminPinVerifyRequest, MessageResponse
+from app.routers._errors import ErrorCode, http_error
+from app.schemas import (
+    AdminPinUpdateRequest,
+    AdminPinVerifyRequest,
+    IntegrityCheckResponse,
+    IntegrityRepairResponse,
+    MessageResponse,
+)
 from app.services import audit
 from app.services import integrity as integrity_svc
 
@@ -48,7 +55,7 @@ def ensure_admin_pin(db: Session) -> SystemSetting:
 def verify_admin_pin(payload: AdminPinVerifyRequest, db: Session = Depends(get_db)):
     setting = ensure_admin_pin(db)
     if payload.pin != setting.setting_value:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="관리자 비밀번호가 올바르지 않습니다.")
+        raise http_error(403, ErrorCode.BAD_REQUEST, "관리자 비밀번호가 올바르지 않습니다.")
     return MessageResponse(message="관리자 인증이 완료되었습니다.")
 
 
@@ -57,9 +64,9 @@ def update_admin_pin(payload: AdminPinUpdateRequest, request: Request, db: Sessi
     setting = ensure_admin_pin(db)
 
     if payload.current_pin != setting.setting_value:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="현재 비밀번호가 올바르지 않습니다.")
+        raise http_error(403, ErrorCode.BAD_REQUEST, "현재 비밀번호가 올바르지 않습니다.")
     if payload.current_pin == payload.new_pin:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="새 비밀번호는 현재 비밀번호와 달라야 합니다.")
+        raise http_error(400, ErrorCode.BUSINESS_RULE, "새 비밀번호는 현재 비밀번호와 달라야 합니다.")
 
     setting.setting_value = payload.new_pin
     setting.updated_at = datetime.now(UTC).replace(tzinfo=None)
@@ -80,13 +87,13 @@ def update_admin_pin(payload: AdminPinUpdateRequest, request: Request, db: Sessi
 def _require_admin(db: Session, pin: str) -> None:
     setting = ensure_admin_pin(db)
     if pin != setting.setting_value:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="관리자 비밀번호가 올바르지 않습니다.")
+        raise http_error(403, ErrorCode.BAD_REQUEST, "관리자 비밀번호가 올바르지 않습니다.")
 
 
-@router.get("/integrity/inventory")
+@router.get("/integrity/inventory", response_model=IntegrityCheckResponse)
 def check_inventory_integrity(
     pin: str = Query(..., min_length=4, max_length=32, description="관리자 PIN"),
-    limit: int = Query(100, ge=1, le=1000),
+    limit: int = Query(100, ge=1, le=2000),
     db: Session = Depends(get_db),
 ):
     """재고 불변식(quantity == warehouse + Σ locations) 미스매치 목록.
@@ -102,7 +109,7 @@ def check_inventory_integrity(
     }
 
 
-@router.post("/integrity/repair")
+@router.post("/integrity/repair", response_model=IntegrityRepairResponse)
 def repair_inventory_integrity(
     payload: IntegrityRepairRequest,
     request: Request,
@@ -132,7 +139,7 @@ def reset_database(payload: ResetRequest, request: Request, db: Session = Depend
     """PIN 검증 후 시드 데이터 재적재 (안전 초기화). 관리자 도구."""
     setting = ensure_admin_pin(db)
     if payload.pin != setting.setting_value:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="관리자 비밀번호가 올바르지 않습니다.")
+        raise http_error(403, ErrorCode.BAD_REQUEST, "관리자 비밀번호가 올바르지 않습니다.")
 
     # reset 직전에 audit 1건 기록 (reset 자체는 시드 재적재로 audit_logs 도 비울 수 있어 사후 기록은 무의미).
     audit.record(
@@ -157,7 +164,4 @@ def reset_database(payload: ResetRequest, request: Request, db: Session = Depend
         seed_module.run_seed()
         return MessageResponse(message="데이터베이스를 초기화하고 시드를 재적재했습니다.")
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"초기화 중 오류가 발생했습니다: {exc}",
-        )
+        raise http_error(500, ErrorCode.INTERNAL, f"초기화 중 오류가 발생했습니다: {exc}")
