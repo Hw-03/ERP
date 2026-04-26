@@ -43,6 +43,9 @@ Thumbs.db
 /api_requests.log
 /all_console_errors.log
 /bom-snapshot.yml
+/verify_*.png
+/*-snap.yml
+/verify-*.yml
 
 # Local / personal files
 workspace.ahk
