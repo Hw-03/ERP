@@ -1,33 +1,24 @@
 "use client";
 
 import { X } from "lucide-react";
-import type { Employee } from "@/lib/api";
 import { DEPARTMENT_LABELS, LEGACY_COLORS, normalizeDepartment } from "../legacyUi";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "./adminShared";
+import { useAdminEmployeesContext } from "./AdminEmployeesContext";
 
-type Props = {
-  employees: Employee[];
-  selectedEmployee: Employee | null;
-  setSelectedEmployee: (e: Employee | null) => void;
-  empAddMode: boolean;
-  setEmpAddMode: (v: boolean) => void;
-  empAddForm: EmployeeAddForm;
-  setEmpAddForm: (updater: (f: EmployeeAddForm) => EmployeeAddForm) => void;
-  onAddEmployee: () => void;
-  onToggleEmployee: (e: Employee) => void;
-};
-
-export function AdminEmployeesSection({
-  employees,
-  selectedEmployee,
-  setSelectedEmployee,
-  empAddMode,
-  setEmpAddMode,
-  empAddForm,
-  setEmpAddForm,
-  onAddEmployee,
-  onToggleEmployee,
-}: Props) {
+// Props 없음. AdminEmployeesProvider 의 Context 에서 모두 읽는다.
+export function AdminEmployeesSection() {
+  const ctx = useAdminEmployeesContext();
+  const {
+    employees,
+    selectedEmployee,
+    setSelectedEmployee,
+    empAddMode,
+    setEmpAddMode,
+    empAddForm,
+    setEmpAddForm,
+    addEmployee: onAddEmployee,
+    toggleEmployee: onToggleEmployee,
+  } = ctx;
   return (
     <div className="grid h-full gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
       <div

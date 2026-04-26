@@ -1,53 +1,35 @@
 "use client";
 
 import { Check, Search, Trash2, X } from "lucide-react";
-import type { Item, ShipPackage } from "@/lib/api";
 import { LEGACY_COLORS, buildItemSearchLabel, formatNumber } from "../legacyUi";
 import { PKG_CATEGORY_OPTIONS } from "./adminShared";
+import { useAdminPackagesContext } from "./AdminPackagesContext";
 
-type Props = {
-  packages: ShipPackage[];
-  selectedPackage: ShipPackage | null;
-  setSelectedPackage: (p: ShipPackage | null) => void;
-  pkgRenaming: boolean;
-  setPkgRenaming: (v: boolean) => void;
-  pkgNameDraft: string;
-  setPkgNameDraft: (v: string) => void;
-  pkgItemSearch: string;
-  setPkgItemSearch: (v: string) => void;
-  pkgItemCategory: string;
-  setPkgItemCategory: (v: string) => void;
-  pkgItemQtyMap: Record<string, number>;
-  setPkgItemQtyMap: (updater: (prev: Record<string, number>) => Record<string, number>) => void;
-  filteredPkgItems: Item[];
-  onCreateSimplePackage: () => void;
-  onAddPackageItem: (itemId: string) => void;
-  onRenamePackage: () => void;
-  onRemovePackageItem: (packageItemId: string) => void;
-  onDeletePackage: (packageId: string) => void;
-};
-
-export function AdminPackagesSection({
-  packages,
-  selectedPackage,
-  setSelectedPackage,
-  pkgRenaming,
-  setPkgRenaming,
-  pkgNameDraft,
-  setPkgNameDraft,
-  pkgItemSearch,
-  setPkgItemSearch,
-  pkgItemCategory,
-  setPkgItemCategory,
-  pkgItemQtyMap,
-  setPkgItemQtyMap,
-  filteredPkgItems,
-  onCreateSimplePackage,
-  onAddPackageItem,
-  onRenamePackage,
-  onRemovePackageItem,
-  onDeletePackage,
-}: Props) {
+// Props 없음. 모든 상태/액션은 AdminPackagesProvider 의 Context 에서 읽는다.
+// 기존 18-prop drilling → 0.
+export function AdminPackagesSection() {
+  const ctx = useAdminPackagesContext();
+  const {
+    packages,
+    selectedPackage,
+    setSelectedPackage,
+    pkgRenaming,
+    setPkgRenaming,
+    pkgNameDraft,
+    setPkgNameDraft,
+    pkgItemSearch,
+    setPkgItemSearch,
+    pkgItemCategory,
+    setPkgItemCategory,
+    pkgItemQtyMap,
+    setPkgItemQtyMap,
+    filteredPkgItems,
+    createSimplePackage: onCreateSimplePackage,
+    addPackageItem: onAddPackageItem,
+    renamePackage: onRenamePackage,
+    removePackageItem: onRemovePackageItem,
+    deletePackage: onDeletePackage,
+  } = ctx;
   return (
     <div className="grid h-full gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
       {/* 좌측: 묶음 목록 */}

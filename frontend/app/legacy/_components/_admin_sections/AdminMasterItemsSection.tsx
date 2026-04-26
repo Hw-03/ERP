@@ -3,38 +3,25 @@
 import { PackagePlus, Search, X } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS, formatNumber } from "../legacyUi";
-import { CATEGORY_OPTIONS, EMPTY_ADD_FORM, MODEL_SLOTS, UNIT_OPTIONS, type AddForm } from "./adminShared";
+import { CATEGORY_OPTIONS, EMPTY_ADD_FORM, MODEL_SLOTS, UNIT_OPTIONS } from "./adminShared";
+import { useAdminMasterItemsContext } from "./AdminMasterItemsContext";
 
-type Props = {
-  visibleItems: Item[];
-  selectedItem: Item | null;
-  setSelectedItem: (item: Item | null) => void;
-  itemSearch: string;
-  setItemSearch: (v: string) => void;
-  addMode: boolean;
-  setAddMode: (v: boolean) => void;
-  addForm: AddForm;
-  setAddForm: (updater: (f: AddForm) => AddForm) => void;
-  onAddItem: () => void;
-  onSaveItemField: (
-    field: "item_name" | "spec" | "barcode" | "legacy_model" | "supplier",
-    value: string,
-  ) => void;
-};
-
-export function AdminMasterItemsSection({
-  visibleItems,
-  selectedItem,
-  setSelectedItem,
-  itemSearch,
-  setItemSearch,
-  addMode,
-  setAddMode,
-  addForm,
-  setAddForm,
-  onAddItem,
-  onSaveItemField,
-}: Props) {
+// Props 없음. AdminMasterItemsProvider 의 Context 에서 모두 읽는다.
+export function AdminMasterItemsSection() {
+  const ctx = useAdminMasterItemsContext();
+  const {
+    visibleItems,
+    selectedItem,
+    setSelectedItem,
+    itemSearch,
+    setItemSearch,
+    addMode,
+    setAddMode,
+    addForm,
+    setAddForm,
+    addItem: onAddItem,
+    saveItemField: onSaveItemField,
+  } = ctx;
   return (
     <div className="grid h-full gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
       {/* 품목 목록 */}

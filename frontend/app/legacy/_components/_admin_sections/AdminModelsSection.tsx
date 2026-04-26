@@ -1,28 +1,21 @@
 "use client";
 
 import { Layers, Trash2 } from "lucide-react";
-import type { ProductModel } from "@/lib/api";
 import { LEGACY_COLORS } from "../legacyUi";
+import { useAdminModelsContext } from "./AdminModelsContext";
 
-type Props = {
-  productModels: ProductModel[];
-  modelAddName: string;
-  setModelAddName: (v: string) => void;
-  modelAddSymbol: string;
-  setModelAddSymbol: (v: string) => void;
-  onAddModel: () => void;
-  onDeleteModel: (slot: number) => void;
-};
-
-export function AdminModelsSection({
-  productModels,
-  modelAddName,
-  setModelAddName,
-  modelAddSymbol,
-  setModelAddSymbol,
-  onAddModel,
-  onDeleteModel,
-}: Props) {
+// Props 없음. AdminModelsProvider 의 Context 에서 모두 읽는다.
+export function AdminModelsSection() {
+  const ctx = useAdminModelsContext();
+  const {
+    productModels,
+    modelAddName,
+    setModelAddName,
+    modelAddSymbol,
+    setModelAddSymbol,
+    addModel: onAddModel,
+    deleteModel: onDeleteModel,
+  } = ctx;
   return (
     <div className="overflow-y-auto">
       <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">

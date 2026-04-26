@@ -28,6 +28,10 @@ import { AdminMasterItemsSection } from "./_admin_sections/AdminMasterItemsSecti
 import { AdminEmployeesSection } from "./_admin_sections/AdminEmployeesSection";
 import { AdminBomSection } from "./_admin_sections/AdminBomSection";
 import { AdminBomProvider } from "./_admin_sections/AdminBomContext";
+import { AdminPackagesProvider } from "./_admin_sections/AdminPackagesContext";
+import { AdminMasterItemsProvider } from "./_admin_sections/AdminMasterItemsContext";
+import { AdminEmployeesProvider } from "./_admin_sections/AdminEmployeesContext";
+import { AdminModelsProvider } from "./_admin_sections/AdminModelsContext";
 import { AdminPackagesSection } from "./_admin_sections/AdminPackagesSection";
 import { AdminModelsSection } from "./_admin_sections/AdminModelsSection";
 import { AdminExportSection } from "./_admin_sections/AdminExportSection";
@@ -210,30 +214,22 @@ export function DesktopAdminView({
   const [unlocked, setUnlocked] = useState(false);
   const [section, setSection] = useState<AdminSection>("items");
 
+  // 외부 데이터 (3개 섹션이 공유) — DesktopAdminView 가 한 번만 fetch
   const [items, setItems] = useState<Item[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [packages, setPackages] = useState<ShipPackage[]>([]);
   const [productModels, setProductModels] = useState<ProductModel[]>([]);
-  const [modelAddName, setModelAddName] = useState("");
-  const [modelAddSymbol, setModelAddSymbol] = useState("");
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [addMode, setAddMode] = useState(false);
-  const [addForm, setAddForm] = useState(EMPTY_ADD_FORM);
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-  const [empAddMode, setEmpAddMode] = useState(false);
-  const [empAddForm, setEmpAddForm] = useState(EMPTY_EMPLOYEE_FORM);
-  const [selectedPackage, setSelectedPackage] = useState<ShipPackage | null>(null);
   const [allBomRows, setAllBomRows] = useState<BOMDetailEntry[]>([]);
+
+  // 위젯 외 상태
   const [message, setMessage] = useState("");
   const [pinForm, setPinForm] = useState({ current_pin: "", new_pin: "", confirm_pin: "" });
   const [resetPin, setResetPin] = useState("");
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [itemSearch, setItemSearch] = useState("");
-  const [pkgRenaming, setPkgRenaming] = useState(false);
-  const [pkgNameDraft, setPkgNameDraft] = useState("");
-  const [pkgItemSearch, setPkgItemSearch] = useState("");
-  const [pkgItemQtyMap, setPkgItemQtyMap] = useState<Record<string, number>>({});
-  const [pkgItemCategory, setPkgItemCategory] = useState("ALL");
+
+  // BOM/Packages/MasterItems/Employees/Models 의 모든 state·액션은
+  // 각자의 *Provider 안에서 관리한다 (useAdminBom / useAdminPackages / useAdminMasterItems /
+  //  useAdminEmployees / useAdminModels). DesktopAdminView 는 데이터 + 콜백만 제공.
 
   async function loadData() {
     setMessage("");
@@ -268,169 +264,12 @@ export function DesktopAdminView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unlocked]);
 
-  const visibleItems = useMemo(() => {
-    const keyword = `${globalSearch} ${itemSearch}`.trim().toLowerCase();
-    if (!keyword) return items.slice(0, 200);
-    return items.filter((item) => `${item.item_name} ${item.erp_code}`.toLowerCase().includes(keyword)).slice(0, 200);
-  }, [globalSearch, itemSearch, items]);
-
-  const filteredPkgItems = useMemo(() => {
-    const kw = pkgItemSearch.trim().toLowerCase();
-    const A_SET = new Set(["TA", "HA", "VA", "BA"]);
-    const F_SET = new Set(["TF", "HF", "VF", "AF"]);
-    return items
-      .filter((i) => {
-        if (pkgItemCategory === "ALL") return true;
-        if (pkgItemCategory === "?A") return A_SET.has(i.category);
-        if (pkgItemCategory === "?F") return F_SET.has(i.category);
-        return i.category === pkgItemCategory;
-      })
-      .filter((i) => !kw || `${i.item_name} ${i.erp_code ?? ""}`.toLowerCase().includes(kw))
-      .slice(0, 40);
-  }, [items, pkgItemSearch, pkgItemCategory]);
-
   function showSave(text: string) {
     setSaveMessage(text);
     setTimeout(() => setSaveMessage(null), 2500);
   }
 
-  async function addItem() {
-    if (!addForm.item_name.trim()) {
-      setMessage("품목명을 입력하세요.");
-      return;
-    }
-    try {
-      const created = await api.createItem({
-        item_name: addForm.item_name.trim(),
-        category: addForm.category,
-        spec: addForm.spec || undefined,
-        unit: addForm.unit || "EA",
-        model_slots: addForm.model_slots.length > 0 ? addForm.model_slots : undefined,
-        option_code: addForm.option_code || undefined,
-        legacy_item_type: addForm.legacy_item_type || undefined,
-        supplier: addForm.supplier || undefined,
-        min_stock: addForm.min_stock ? Number(addForm.min_stock) : undefined,
-        initial_quantity: addForm.initial_quantity ? Number(addForm.initial_quantity) : undefined,
-      });
-      setItems((current) => [created, ...current]);
-      setSelectedItem(created);
-      setAddMode(false);
-      setAddForm(EMPTY_ADD_FORM);
-      onStatusChange(`'${created.item_name}' 품목이 추가됐습니다. (${created.erp_code})`);
-      showSave(`'${created.item_name}' 품목이 추가됐습니다.`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "품목 추가에 실패했습니다.");
-    }
-  }
-
-  async function saveItemField(
-    field: "item_name" | "spec" | "barcode" | "legacy_model" | "supplier",
-    value: string,
-  ) {
-    if (!selectedItem) return;
-    const updated = await api.updateItem(selectedItem.item_id, { [field]: value || undefined });
-    setItems((current) => current.map((item) => (item.item_id === updated.item_id ? updated : item)));
-    setSelectedItem(updated);
-    onStatusChange(`${updated.item_name} 정보를 저장했습니다.`);
-    showSave("저장됐습니다.");
-  }
-
-  async function addEmployee() {
-    if (!empAddForm.employee_code.trim() || !empAddForm.name.trim()) {
-      setMessage("직원코드와 이름은 필수입니다.");
-      return;
-    }
-    try {
-      const created = await api.createEmployee({
-        employee_code: empAddForm.employee_code.trim(),
-        name: empAddForm.name.trim(),
-        role: empAddForm.role.trim(),
-        department: empAddForm.department as Employee["department"],
-        phone: empAddForm.phone.trim() || undefined,
-        display_order: employees.length + 1,
-      });
-      setEmployees((current) => [...current, created]);
-      setEmpAddMode(false);
-      setEmpAddForm(EMPTY_EMPLOYEE_FORM);
-      setSelectedEmployee(created);
-      onStatusChange(`'${created.name}' 직원을 추가했습니다.`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "직원 추가에 실패했습니다.");
-    }
-  }
-
-  async function toggleEmployee(employee: Employee) {
-    const action = employee.is_active ? "비활성화" : "활성화";
-    const confirmed = window.confirm(`'${employee.name}' 직원을 ${action}하시겠습니까?`);
-    if (!confirmed) return;
-    const updated = await api.updateEmployee(employee.employee_id, { is_active: !employee.is_active });
-    setEmployees((current) => current.map((entry) => (entry.employee_id === employee.employee_id ? updated : entry)));
-    setSelectedEmployee(updated);
-    onStatusChange(`${updated.name} 직원 상태를 변경했습니다.`);
-  }
-
-  async function createSimplePackage() {
-    try {
-      const created = await api.createShipPackage({
-        package_code: `PKG-${Date.now()}`,
-        name: `출하묶음 ${packages.length + 1}`,
-      });
-      const newPkg = { ...created, items: [] as ShipPackage["items"] };
-      setPackages((current) => [...current, newPkg]);
-      setSelectedPackage(newPkg);
-      onStatusChange(`${created.name} 출하묶음을 생성했습니다.`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "출하묶음 생성에 실패했습니다.");
-    }
-  }
-
-  async function addPackageItem(itemId: string) {
-    if (!selectedPackage) return;
-    const qty = pkgItemQtyMap[itemId] ?? 1;
-    const updated = await api.addShipPackageItem(selectedPackage.package_id, { item_id: itemId, quantity: qty });
-    setPackages((current) => current.map((entry) => (entry.package_id === updated.package_id ? updated : entry)));
-    setSelectedPackage(updated);
-    onStatusChange(`${updated.name}에 품목을 추가했습니다.`);
-  }
-
-  async function renamePackage() {
-    if (!selectedPackage || !pkgNameDraft.trim()) return;
-    try {
-      const updated = await api.updateShipPackage(selectedPackage.package_id, { name: pkgNameDraft.trim() });
-      const newPkg = { ...updated, items: selectedPackage.items };
-      setPackages((current) => current.map((entry) => (entry.package_id === newPkg.package_id ? newPkg : entry)));
-      setSelectedPackage(newPkg);
-      setPkgRenaming(false);
-      onStatusChange(`출하묶음 이름을 '${newPkg.name}'으로 변경했습니다.`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "이름 변경에 실패했습니다.");
-    }
-  }
-
-  async function removePackageItem(packageItemId: string) {
-    if (!selectedPackage) return;
-    try {
-      const updated = await api.deleteShipPackageItem(selectedPackage.package_id, packageItemId);
-      setPackages((current) => current.map((entry) => (entry.package_id === updated.package_id ? updated : entry)));
-      setSelectedPackage(updated);
-      onStatusChange("품목을 출하묶음에서 제거했습니다.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "품목 제거에 실패했습니다.");
-    }
-  }
-
-  async function deletePackage(packageId: string) {
-    try {
-      await api.deleteShipPackage(packageId);
-      setPackages((current) => current.filter((entry) => entry.package_id !== packageId));
-      if (selectedPackage?.package_id === packageId) setSelectedPackage(null);
-      onStatusChange("출하묶음을 삭제했습니다.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "출하묶음 삭제에 실패했습니다.");
-    }
-  }
-
-  // BOM 추가/수정/삭제 액션은 useAdminBom 훅 (AdminBomProvider 내부) 으로 이동.
+  // BOM, Packages, MasterItems, Employees, Models 의 모든 액션은 각 훅 내부에 있다.
 
   async function changePin() {
     if (pinForm.new_pin !== pinForm.confirm_pin) {
@@ -449,32 +288,6 @@ export function DesktopAdminView({
     await loadData();
     setMessage("시드 기준으로 데이터를 다시 적재했습니다.");
     onStatusChange("시드 기준으로 데이터를 다시 적재했습니다.");
-  }
-
-  function addModel() {
-    if (!modelAddName.trim()) return;
-    void api
-      .createModel({ model_name: modelAddName.trim(), symbol: modelAddSymbol.trim() || undefined })
-      .then((created) => {
-        setProductModels((prev) => [...prev, created]);
-        setModelAddName("");
-        setModelAddSymbol("");
-        onStatusChange(`'${created.model_name}' 모델을 추가했습니다.`);
-      })
-      .catch((err) => setMessage(err instanceof Error ? err.message : "모델 추가 실패"));
-  }
-
-  function deleteModel(slot: number) {
-    const model = productModels.find((m) => m.slot === slot);
-    if (!model) return;
-    if (!confirm(`'${model.model_name}' 모델을 삭제하시겠습니까?\n이 모델을 사용하는 품목이 있으면 삭제되지 않습니다.`)) return;
-    void api
-      .deleteModel(slot)
-      .then(() => {
-        setProductModels((prev) => prev.filter((m) => m.slot !== slot));
-        onStatusChange(`'${model.model_name}' 모델을 삭제했습니다.`);
-      })
-      .catch((err) => setMessage(err instanceof Error ? err.message : "삭제 실패"));
   }
 
   if (!unlocked) {
@@ -606,32 +419,26 @@ export function DesktopAdminView({
           {/* 섹션별 콘텐츠 */}
           <div className="min-h-0 flex-1 overflow-hidden">
             {section === "items" && (
-              <AdminMasterItemsSection
-                visibleItems={visibleItems}
-                selectedItem={selectedItem}
-                setSelectedItem={setSelectedItem}
-                itemSearch={itemSearch}
-                setItemSearch={setItemSearch}
-                addMode={addMode}
-                setAddMode={setAddMode}
-                addForm={addForm}
-                setAddForm={setAddForm}
-                onAddItem={() => void addItem()}
-                onSaveItemField={(field, value) => void saveItemField(field, value)}
-              />
+              <AdminMasterItemsProvider
+                items={items}
+                setItems={setItems}
+                globalSearch={globalSearch}
+                onStatusChange={onStatusChange}
+                onError={(m) => setMessage(m)}
+                onShowSave={showSave}
+              >
+                <AdminMasterItemsSection />
+              </AdminMasterItemsProvider>
             )}
             {section === "employees" && (
-              <AdminEmployeesSection
+              <AdminEmployeesProvider
                 employees={employees}
-                selectedEmployee={selectedEmployee}
-                setSelectedEmployee={setSelectedEmployee}
-                empAddMode={empAddMode}
-                setEmpAddMode={setEmpAddMode}
-                empAddForm={empAddForm}
-                setEmpAddForm={setEmpAddForm}
-                onAddEmployee={() => void addEmployee()}
-                onToggleEmployee={(e) => void toggleEmployee(e)}
-              />
+                setEmployees={setEmployees}
+                onStatusChange={onStatusChange}
+                onError={(m) => setMessage(m)}
+              >
+                <AdminEmployeesSection />
+              </AdminEmployeesProvider>
             )}
             {section === "bom" && (
               <AdminBomProvider
@@ -645,38 +452,25 @@ export function DesktopAdminView({
               </AdminBomProvider>
             )}
             {section === "packages" && (
-              <AdminPackagesSection
+              <AdminPackagesProvider
+                items={items}
                 packages={packages}
-                selectedPackage={selectedPackage}
-                setSelectedPackage={setSelectedPackage}
-                pkgRenaming={pkgRenaming}
-                setPkgRenaming={setPkgRenaming}
-                pkgNameDraft={pkgNameDraft}
-                setPkgNameDraft={setPkgNameDraft}
-                pkgItemSearch={pkgItemSearch}
-                setPkgItemSearch={setPkgItemSearch}
-                pkgItemCategory={pkgItemCategory}
-                setPkgItemCategory={setPkgItemCategory}
-                pkgItemQtyMap={pkgItemQtyMap}
-                setPkgItemQtyMap={setPkgItemQtyMap}
-                filteredPkgItems={filteredPkgItems}
-                onCreateSimplePackage={() => void createSimplePackage()}
-                onAddPackageItem={(itemId) => void addPackageItem(itemId)}
-                onRenamePackage={() => void renamePackage()}
-                onRemovePackageItem={(id) => void removePackageItem(id)}
-                onDeletePackage={(id) => void deletePackage(id)}
-              />
+                setPackages={setPackages}
+                onStatusChange={onStatusChange}
+                onError={(m) => setMessage(m)}
+              >
+                <AdminPackagesSection />
+              </AdminPackagesProvider>
             )}
             {section === "models" && (
-              <AdminModelsSection
+              <AdminModelsProvider
                 productModels={productModels}
-                modelAddName={modelAddName}
-                setModelAddName={setModelAddName}
-                modelAddSymbol={modelAddSymbol}
-                setModelAddSymbol={setModelAddSymbol}
-                onAddModel={addModel}
-                onDeleteModel={deleteModel}
-              />
+                setProductModels={setProductModels}
+                onStatusChange={onStatusChange}
+                onError={(m) => setMessage(m)}
+              >
+                <AdminModelsSection />
+              </AdminModelsProvider>
             )}
             {section === "export" && (
               <AdminExportSection
