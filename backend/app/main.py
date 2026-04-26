@@ -278,5 +278,5 @@ def root():
     return {
         "message": "X-Ray ERP System API",
         "docs": "/docs",
-        "version": "1.2.0",
+        "version": app.version,
     }
