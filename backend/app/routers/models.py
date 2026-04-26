@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import ItemModel, ProductSymbol
 from app.routers._errors import ErrorCode, http_error
+from app.services._tx import commit_and_refresh, commit_only
 
 router = APIRouter()
 
@@ -27,7 +28,7 @@ class ProductModelCreate(BaseModel):
     symbol: Optional[str] = Field(None, max_length=5)
 
 
-@router.get("", response_model=List[ProductModelResponse])
+@router.get("", response_model=List[ProductModelResponse], summary="제품 모델 목록 (예약 제외)")
 def list_models(db: Session = Depends(get_db)):
     """등록된 제품 모델 목록 반환 (is_reserved=False인 실제 모델만)."""
     return (
@@ -39,7 +40,12 @@ def list_models(db: Session = Depends(get_db)):
     )
 
 
-@router.post("", response_model=ProductModelResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=ProductModelResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="제품 모델 신규 등록 (slot 자동 배정)",
+)
 def create_model(payload: ProductModelCreate, db: Session = Depends(get_db)):
     """새 제품 모델 추가."""
     # 이름 중복 확인
@@ -68,13 +74,17 @@ def create_model(payload: ProductModelCreate, db: Session = Depends(get_db)):
 
     ps = ProductSymbol(slot=next_slot, symbol=symbol, model_name=payload.model_name, is_reserved=False)
     db.add(ps)
-    db.commit()
-    db.refresh(ps)
+    commit_and_refresh(db, ps)
     return ps
 
 
-@router.delete("/{slot}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_model(slot: int, db: Session = Depends(get_db)):
+@router.delete(
+    "/{slot}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    summary="제품 모델 삭제 (연결 품목 있으면 409)",
+)
+def delete_model(slot: int, db: Session = Depends(get_db)) -> None:
     """제품 모델 삭제 (해당 슬롯을 사용하는 품목이 있으면 거부)."""
     ps = db.query(ProductSymbol).filter(ProductSymbol.slot == slot).first()
     if not ps:
@@ -90,4 +100,4 @@ def delete_model(slot: int, db: Session = Depends(get_db)):
         )
 
     db.delete(ps)
-    db.commit()
+    commit_only(db)

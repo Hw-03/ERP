@@ -20,6 +20,7 @@ from app.models import (
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import ScrapLogCreateRequest, ScrapLogResponse
 from app.services import inventory as inv_svc
+from app.services._tx import commit_and_refresh
 
 router = APIRouter()
 
@@ -85,8 +86,7 @@ def create_scrap(payload: ScrapLogCreateRequest, db: Session = Depends(get_db)):
             notes=payload.reason,
         )
     )
-    db.commit()
-    db.refresh(log)
+    commit_and_refresh(db, log)
     return _to_response(db, log)
 
 

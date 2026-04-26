@@ -19,6 +19,7 @@ from app.models import Item, LossLog, TransactionLog, TransactionTypeEnum
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import LossLogCreateRequest, LossLogResponse
 from app.services import inventory as inv_svc
+from app.services._tx import commit_and_refresh
 
 router = APIRouter()
 
@@ -89,8 +90,7 @@ def create_loss(
             notes=payload.reason,
         )
     )
-    db.commit()
-    db.refresh(log)
+    commit_and_refresh(db, log)
     return _to_response(db, log)
 
 

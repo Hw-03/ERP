@@ -29,6 +29,7 @@ from app.schemas import (
     PhysicalCountResponse,
 )
 from app.services import inventory as inv_svc
+from app.services._tx import commit_and_refresh
 
 router = APIRouter()
 
@@ -116,8 +117,7 @@ def submit_count(
                 ),
             )
         )
-    db.commit()
-    db.refresh(count)
+    commit_and_refresh(db, count)
     return _to_response(db, count)
 
 

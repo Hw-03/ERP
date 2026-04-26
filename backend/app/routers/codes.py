@@ -20,6 +20,7 @@ from app.schemas import (
 )
 from app.services import audit
 from app.services import codes as code_svc
+from app.services._tx import commit_and_refresh
 
 router = APIRouter()
 
@@ -27,12 +28,12 @@ router = APIRouter()
 # ---- Product Symbols (100 slots) -------------------------------------------
 
 
-@router.get("/symbols", response_model=List[ProductSymbolResponse])
+@router.get("/symbols", response_model=List[ProductSymbolResponse], summary="제품기호 100슬롯 조회")
 def list_symbols(db: Session = Depends(get_db)):
     return db.query(ProductSymbol).order_by(ProductSymbol.slot).all()
 
 
-@router.put("/symbols/{slot}", response_model=ProductSymbolResponse)
+@router.put("/symbols/{slot}", response_model=ProductSymbolResponse, summary="제품기호 슬롯 수정")
 def update_symbol(slot: int, payload: ProductSymbolUpdate, request: Request, db: Session = Depends(get_db)):
     row = db.query(ProductSymbol).filter(ProductSymbol.slot == slot).one_or_none()
     if row is None:
@@ -74,15 +75,14 @@ def update_symbol(slot: int, payload: ProductSymbolUpdate, request: Request, db:
         payload_summary=f"slot={slot} symbol={row.symbol} model={row.model_name}",
     )
 
-    db.commit()
-    db.refresh(row)
+    commit_and_refresh(db, row)
     return row
 
 
 # ---- Option Codes -----------------------------------------------------------
 
 
-@router.get("/options", response_model=List[OptionCodeResponse])
+@router.get("/options", response_model=List[OptionCodeResponse], summary="옵션 코드 목록")
 def list_options(db: Session = Depends(get_db)):
     return db.query(OptionCode).order_by(OptionCode.code).all()
 
@@ -90,12 +90,12 @@ def list_options(db: Session = Depends(get_db)):
 # ---- Process Types ----------------------------------------------------------
 
 
-@router.get("/process-types", response_model=List[ProcessTypeResponse])
+@router.get("/process-types", response_model=List[ProcessTypeResponse], summary="공정 코드 목록")
 def list_process_types(db: Session = Depends(get_db)):
     return db.query(ProcessType).order_by(ProcessType.stage_order, ProcessType.code).all()
 
 
-@router.get("/process-flows", response_model=List[ProcessFlowRuleResponse])
+@router.get("/process-flows", response_model=List[ProcessFlowRuleResponse], summary="공정 흐름 규칙 목록")
 def list_process_flows(db: Session = Depends(get_db)):
     return db.query(ProcessFlowRule).order_by(ProcessFlowRule.rule_id).all()
 
@@ -103,7 +103,7 @@ def list_process_flows(db: Session = Depends(get_db)):
 # ---- 4-part code operations ------------------------------------------------
 
 
-@router.post("/parse", response_model=ErpCodeResponse)
+@router.post("/parse", response_model=ErpCodeResponse, summary="4-파트 ERP 코드 파싱")
 def parse_code(payload: ErpCodeParseRequest, db: Session = Depends(get_db)):
     try:
         code = code_svc.parse_erp_code(payload.code)
@@ -121,7 +121,12 @@ def parse_code(payload: ErpCodeParseRequest, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/generate", response_model=ErpCodeResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/generate",
+    response_model=ErpCodeResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="4-파트 ERP 코드 자동 생성",
+)
 def generate_code(payload: ErpCodeGenerateRequest, db: Session = Depends(get_db)):
     try:
         code = code_svc.generate_code(

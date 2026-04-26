@@ -244,7 +244,16 @@ export function ItemPickStep({
                     key={item.item_id}
                     data-item-id={item.item_id}
                     onClick={() => onToggleItem(item.item_id)}
-                    className="cursor-pointer transition-colors hover:brightness-110"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onToggleItem(item.item_id);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="button"
+                    aria-pressed={active}
+                    className="cursor-pointer transition-colors hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
                     style={{
                       background: active ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)` : "transparent",
                     }}

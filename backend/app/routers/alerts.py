@@ -20,6 +20,7 @@ from app.models import AlertKindEnum, Inventory, Item, StockAlert
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import StockAlertAcknowledgeRequest, StockAlertResponse
 from app.services import inventory as inv_svc
+from app.services._tx import commit_and_refresh, commit_only
 from datetime import datetime
 
 router = APIRouter()
@@ -83,7 +84,7 @@ def scan_safety_alerts(db: Session = Depends(get_db)):
         )
         db.add(alert)
         created.append(alert)
-    db.commit()
+    commit_only(db)
     return [_to_response(db, a) for a in created]
 
 
@@ -130,6 +131,5 @@ def acknowledge_alert(
         raise http_error(400, ErrorCode.BAD_REQUEST, "이미 확인된 알림입니다.")
     alert.acknowledged_at = datetime.utcnow()
     alert.acknowledged_by = payload.acknowledged_by
-    db.commit()
-    db.refresh(alert)
+    commit_and_refresh(db, alert)
     return _to_response(db, alert)

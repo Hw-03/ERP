@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+import pytest
+
 from app.models import LocationStatusEnum
 from app.services.integrity import check_inventory_consistency, repair_inventory_totals
 
@@ -178,3 +180,61 @@ def test_check_consistency_multiple_locations_summed(make_item, make_location, d
     inv.quantity = D("10")  # 1 + 4 + 2 + 3
     db_session.flush()
     assert check_inventory_consistency(db_session) == []
+
+
+# 5.6-G: DB-level 안전망 (CheckConstraint / UniqueConstraint) 보호 테스트
+
+
+def test_inventory_location_check_constraint_blocks_negative(make_item, db_session):
+    """InventoryLocation.quantity = -1 INSERT 시 CHECK 제약으로 IntegrityError.
+
+    5.5-A 의 ck_invloc_quantity_nonneg 를 보호. 마이그레이션이 제거되거나
+    create_all 이 CHECK 를 누락하면 이 테스트가 회귀를 잡는다.
+    """
+    from sqlalchemy.exc import IntegrityError
+    from app.models import DepartmentEnum, InventoryLocation, LocationStatusEnum
+
+    item = make_item(warehouse_qty=D("0"))
+    bad = InventoryLocation(
+        item_id=item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=LocationStatusEnum.PRODUCTION,
+        quantity=D("-1"),
+    )
+    db_session.add(bad)
+    try:
+        db_session.flush()
+    except IntegrityError:
+        db_session.rollback()
+        return
+    pytest.fail("CheckConstraint ck_invloc_quantity_nonneg 가 음수 INSERT 를 막지 못함")
+
+
+def test_inventory_location_unique_constraint_blocks_duplicate(make_item, make_location, db_session):
+    """동일 (item_id, department, status) INSERT 시 UNIQUE 제약 위반.
+
+    5.5-A 의 uq_invloc_item_dept_status 를 보호. SchemaSync / create_all 회귀 검증.
+    """
+    from sqlalchemy.exc import IntegrityError
+    from app.models import DepartmentEnum, InventoryLocation, LocationStatusEnum
+
+    item = make_item(warehouse_qty=D("0"))
+    make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=LocationStatusEnum.PRODUCTION,
+        quantity=D("1"),
+    )
+    dup = InventoryLocation(
+        item_id=item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=LocationStatusEnum.PRODUCTION,
+        quantity=D("2"),
+    )
+    db_session.add(dup)
+    try:
+        db_session.flush()
+    except IntegrityError:
+        db_session.rollback()
+        return
+    pytest.fail("UniqueConstraint uq_invloc_item_dept_status 가 중복 INSERT 를 막지 못함")

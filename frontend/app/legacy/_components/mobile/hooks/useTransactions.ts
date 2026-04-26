@@ -43,9 +43,13 @@ export function useTransactions() {
 
   const loadMore = useCallback(async () => {
     if (!hasMore || loading) return;
+    // 5.6-B: 이전 inflight (refetch 또는 loadMore) 가 있으면 취소 + ref 보관 →
+    // unmount cleanup (useEffect) 에서 동일 ref 로 abort 가능.
+    activeCtrlRef.current?.abort();
+    const ctrl = new AbortController();
+    activeCtrlRef.current = ctrl;
     const next = page + 1;
     setPage(next);
-    const ctrl = new AbortController();
     setLoading(true);
     try {
       const data = await api.getTransactions(

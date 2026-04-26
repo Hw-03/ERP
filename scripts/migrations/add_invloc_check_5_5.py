@@ -8,15 +8,28 @@ SQLite 는 ALTER ADD CONSTRAINT 미지원 → 테이블 재생성으로 적용.
 사용:
     cd backend
     python ../scripts/migrations/add_invloc_check_5_5.py
+
+5.6-A 보완:
+- 백업: shutil.copy2 → sqlite3 backup API (WAL transaction-consistent)
+- 재생성 후 status / updated_at 인덱스 보존
+- PRAGMA foreign_key_check 추가 (integrity_check 와 함께)
+- 실행 전 백엔드 종료 안내 + WAL checkpoint(TRUNCATE) 시도
 """
 
 from __future__ import annotations
 
-import shutil
 import sqlite3
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
+
+# Windows cp949 콘솔에서도 한글/em-dash 출력 가능하도록 utf-8 reconfigure.
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 BACKEND_DIR = Path(__file__).resolve().parents[2] / "backend"
 DB_PATH = BACKEND_DIR / "erp.db"
@@ -24,11 +37,22 @@ BACKUP_DIR = BACKEND_DIR / "_backup"
 
 
 def _backup() -> Path:
+    """sqlite3 backup API 로 transaction-consistent 백업.
+
+    shutil.copy2 는 WAL 모드에서 erp.db-wal 의 미flush 변경분이 누락될 수 있다.
+    sqlite3.Connection.backup() 은 트랜잭션 단위 일관성을 보장하고 busy 시 자동 재시도한다.
+    """
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     dst = BACKUP_DIR / f"erp_PRE-MIG-5_5_{ts}.db"
-    shutil.copy2(DB_PATH, dst)
-    print(f"[MIG] backup → {dst}")
+    src = sqlite3.connect(DB_PATH)
+    dst_conn = sqlite3.connect(dst)
+    try:
+        src.backup(dst_conn)
+    finally:
+        dst_conn.close()
+        src.close()
+    print(f"[MIG] backup → {dst} (sqlite3 backup API, WAL-safe)")
     return dst
 
 
@@ -57,8 +81,18 @@ def main() -> int:
         print(f"[MIG] {DB_PATH} 없음 — bootstrap_db.py --schema 먼저 실행하세요.")
         return 1
 
+    print("[MIG] 백엔드(uvicorn) 가 실행 중이면 종료 후 진행하세요. 5초 후 계속...")
+    time.sleep(5)
+
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys=ON")
+
+    # WAL 잔여분 main DB 로 flush (busy 면 skip)
+    try:
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        print("[MIG] PRAGMA wal_checkpoint(TRUNCATE) 적용")
+    except sqlite3.OperationalError as exc:
+        print(f"[MIG] wal_checkpoint skip — {exc}")
 
     # 1) 사전 검증
     bad = _violations(conn)
@@ -98,11 +132,13 @@ def main() -> int:
             ALTER TABLE inventory_locations__new RENAME TO inventory_locations;
             CREATE INDEX IF NOT EXISTS ix_invloc_item ON inventory_locations (item_id);
             CREATE INDEX IF NOT EXISTS ix_invloc_dept ON inventory_locations (department);
+            CREATE INDEX IF NOT EXISTS ix_inventory_locations_status ON inventory_locations (status);
+            CREATE INDEX IF NOT EXISTS ix_inventory_locations_updated_at ON inventory_locations (updated_at);
             COMMIT;
             """
         )
         conn.execute("PRAGMA foreign_keys=ON")
-        print("[MIG] inventory_locations CHECK 적용 완료")
+        print("[MIG] inventory_locations CHECK + 인덱스 4종 적용 완료")
 
     # 3) TransactionLog 복합 인덱스
     if _has_index(conn, "ix_tx_item_created"):
@@ -114,11 +150,21 @@ def main() -> int:
         conn.commit()
         print("[MIG] transaction_logs ix_tx_item_created 생성")
 
-    # 4) integrity_check
-    res = conn.execute("PRAGMA integrity_check").fetchone()[0]
-    print(f"[MIG] PRAGMA integrity_check: {res}")
+    # 4) integrity_check + foreign_key_check
+    res_int = conn.execute("PRAGMA integrity_check").fetchone()[0]
+    fk_violations = conn.execute("PRAGMA foreign_key_check").fetchall()
+    print(f"[MIG] PRAGMA integrity_check: {res_int}")
+    print(f"[MIG] PRAGMA foreign_key_check: {len(fk_violations)} violation(s)")
+    if fk_violations:
+        for v in fk_violations[:10]:
+            print(f"        {v}")
+
     conn.close()
-    return 0 if res == "ok" else 3
+    if res_int != "ok":
+        return 3
+    if fk_violations:
+        return 4
+    return 0
 
 
 if __name__ == "__main__":
