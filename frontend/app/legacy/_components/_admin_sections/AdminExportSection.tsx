@@ -39,7 +39,7 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
             <FileDown className="h-4 w-4" /> 거래 엑셀
           </div>
           <p className="mb-4 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-            전체 입출고 거래 내역을 엑셀 파일로 내보냅니다.
+            최근 30일 입출고 거래 내역을 엑셀 파일로 내보냅니다.
           </p>
           <a
             href={transactionsExportUrl}
@@ -47,7 +47,7 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
             className="block w-full rounded-[18px] px-4 py-3 text-center text-sm font-semibold text-white"
             style={{ background: LEGACY_COLORS.green }}
           >
-            거래 내역 다운로드
+            최근 30일 거래 내역 다운로드
           </a>
         </div>
       </div>

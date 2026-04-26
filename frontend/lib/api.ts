@@ -910,12 +910,25 @@ export const api = {
     const suffix = qs.toString() ? `?${qs}` : "";
     return toApiUrl(`/api/items/export.xlsx${suffix}`);
   },
-  getTransactionsExportUrl: (params?: { transaction_type?: string; search?: string }) => {
+  getTransactionsExportUrl: (params?: {
+    transaction_type?: string;
+    search?: string;
+    start_date?: string; // YYYY-MM-DD
+    end_date?: string;   // YYYY-MM-DD
+  }) => {
     const qs = new URLSearchParams();
     if (params?.transaction_type) qs.set("transaction_type", params.transaction_type);
     if (params?.search) qs.set("search", params.search);
-    const suffix = qs.toString() ? `?${qs}` : "";
-    return toApiUrl(`/api/inventory/transactions/export.xlsx${suffix}`);
+    // backend export endpoint 가 start_date/end_date 둘 다 필수.
+    // 미지정 시 최근 30일(오늘 포함, D-29 ~ 오늘)을 자동 부여한다.
+    const today = new Date();
+    const from = new Date(today);
+    from.setDate(today.getDate() - 29);
+    const ymd = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    qs.set("start_date", params?.start_date ?? ymd(from));
+    qs.set("end_date", params?.end_date ?? ymd(today));
+    return toApiUrl(`/api/inventory/transactions/export.xlsx?${qs}`);
   },
 
   // Queue batches ------------------------------------------------------------
