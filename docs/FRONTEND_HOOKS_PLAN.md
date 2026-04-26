@@ -16,7 +16,12 @@
 | `_inventory_sections/` 분할 | ✅ 6 섹션 분리 완료 |
 | `_history_sections/` 분할 | ✅ 4 섹션 + shared 분리 완료 |
 | `_admin_sections/` 분할 | ✅ 7 섹션 + shared 분리 완료 |
-| **`useResource` 헬퍼** | ✅ **Phase 4** — `_components/_hooks/useResource.ts` 신설 (외부 라이브러리 미도입). |
+| **`useResource` 헬퍼** | ✅ **Phase 4** — `_components/_hooks/useResource.ts` 신설 (외부 라이브러리 미도입). 기존 3 View 데이터 페칭 적용은 Phase 5 에서 검토했으나 미세 동작 차이 가능성으로 **신규 코드 전용 인프라**로만 보존 (회귀 0 원칙). |
+| **AdminPackagesContext + useAdminPackages** | ✅ Phase 5 — Props 18 → 0 |
+| **AdminMasterItemsContext + useAdminMasterItems** | ✅ Phase 5 — Props 9 → 0 |
+| **AdminEmployeesContext + useAdminEmployees** | ✅ Phase 5 — Props 8 → 0 |
+| **AdminModelsContext + useAdminModels** | ✅ Phase 5 — Props 6 → 0 |
+| **BOM Where-Used UI** | ✅ Phase 5 — 관리자 BOM 우측 패널에 추가 |
 | **`useWarehouseData.loading` 플래그** | ✅ **Phase 4** — 메인 데이터 첫 로딩 상태 노출. |
 | **`_warehouse_steps.tsx` (1,135줄) 파일 분할** | ✅ **Phase 4** — `_warehouse_steps/` 디렉토리 8개 파일로 분리 (constants/atoms + 5 step). 외부 import 경로 호환. |
 | **`AdminBomContext` + `useAdminBom`** | ✅ **Phase 4** — DesktopAdminView 의 BOM useState 10개 + useMemo 2개 + 액션 3개를 Provider/hook 으로 흡수. AdminBomSection Props 22 → 0. |

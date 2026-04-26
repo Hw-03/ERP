@@ -11,6 +11,34 @@
 - 기준 데이터: 통합 품목 971건
 - 현재 브랜치: `feat/erp-overhaul`
 
+## Phase 5 결과 (2026-04-26)
+
+회귀 0 보장 하에 76점 → 약 84~86 도달을 목표로 한 안전 한정 개선.
+
+### 백엔드
+- 모든 라우터(19개 중 settings.py 제외 12개)의 ~76 HTTPException 을 `routers/_errors.http_error` 로 마이그. 메시지 동일, code 추가만.
+- 새 ErrorCode: NOT_FOUND, BAD_REQUEST, CONFLICT, UNPROCESSABLE, BUSINESS_RULE.
+- `request_id` middleware: X-Request-Id 헤더 자동 발급 + 응답 헤더 부착. 로그에 포함.
+- OpenAPI 16개 태그 description 보강 (system/items/employees/inventory/...).
+- `.env` `CORS_EXTRA_ORIGINS` 변수 실제 wiring (콤마 구분, 변수 미설정 시 기본 origins 그대로).
+
+### 프론트엔드
+- Admin Context 4섹션 확장 (Phase 4 의 BomContext 패턴 복제):
+  - AdminPackagesProvider: 18-prop drilling → 0
+  - AdminMasterItemsProvider: 9-prop → 0 (visibleItems 메모 + addItem/saveItemField 흡수)
+  - AdminEmployeesProvider: 8-prop → 0
+  - AdminModelsProvider: 6-prop → 0
+- DesktopAdminView 대폭 축소: 733줄 → 약 500줄 예상 (검증 필요).
+- BOM Where-Used UI: 관리자 BOM 우측 패널에 "이 품목이 사용되는 곳" 카드 추가. parent 선택 시 자동 fetch.
+- `lib/api.ts:getBOMWhereUsed` 추가.
+- useResource 훅은 Phase 4 에 도입했으나 기존 3 View 의 데이터 페칭은 미세 동작 차이 위험으로 **무변경**. 신규 코드 전용 인프라로 보존.
+
+### 절대 무변경 (Phase 5 금지 항목)
+- services/inventory.py (445줄), routers/items.py (436줄), routers/production.py (331줄)
+- ItemPickStep.tsx (359줄), Mobile/Desktop wizard 공유 훅
+- start.bat 포트 파라미터화, settings.py PIN 라우터
+- selectedItems Map, submit() 본체, completionFlyout 타이밍, LEGACY_COLORS 토큰
+
 ## Phase 4 결과 (2026-04-26)
 
 10개 항목 모두 80점 이상 목표. 17개 체크포인트 작업 완료. 자동 검증 통과(tsc/lint/build, compileall).

@@ -97,18 +97,20 @@ ERP 코드 포맷:
 | `scripts/` | DB 백업 · 헬스체크 등 운영 스크립트 |
 | `_archive/` · `_backup/` · `frontend/_archive/` | 보관용 — 일반 작업 대상 아님 |
 
-## 문서
+## 문서 허브
 
 | 문서 | 대상 | 내용 |
 |---|---|---|
-| `docs/USER_GUIDE.md` | 현장 사용자 | 화면별 사용법 (대시보드 / 입출고 / 내역 / 관리자) |
-| `docs/OPERATIONS.md` | 운영자 | 365일 운영, 시작·재시작, 포트 충돌, 백업, 1차 장애 대응 |
-| `docs/ARCHITECTURE.md` | 개발자 | 폴더 구조·레이어·재고 3-bucket 모델·wizard 흐름 |
-| `docs/ITEM_CODE_RULES.md` | 모두 | 품목코드 최종 기준 |
-| `docs/AI_HANDOVER.md` | AI 협업자 | 인수인계 |
-| `docs/CODEX_PROGRESS.md` | 모두 | 큰 기능 단위 진행 기록 |
-| `docs/BACKEND_REFACTOR_PLAN.md` | 다음 작업 | 미구현 백엔드 개선 설계서(보류) |
-| `docs/FRONTEND_HOOKS_PLAN.md` | 다음 작업 | 미구현 프론트 hook/뷰 분할 설계서(보류) |
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | 현장 사용자 | 화면별 사용법 (대시보드 / 입출고 / 내역 / 관리자) |
+| [docs/OPERATIONS.md](docs/OPERATIONS.md) | 운영자 | 365일 운영, 시작·재시작, 포트 충돌, 백업, 1차 장애 대응 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 개발자 | 폴더 구조·레이어·재고 3-bucket 모델·wizard 흐름 |
+| [docs/ERD.md](docs/ERD.md) | 개발자 | 엔티티 관계도(Mermaid) + 자재→재고→생산→출하 흐름 |
+| [docs/GLOSSARY.md](docs/GLOSSARY.md) | 모두 | 도메인 용어 단일 소스 (부서·카테고리·재고 모델·에러코드) |
+| [docs/ITEM_CODE_RULES.md](docs/ITEM_CODE_RULES.md) | 모두 | 품목코드 최종 기준 |
+| [docs/AI_HANDOVER.md](docs/AI_HANDOVER.md) | AI 협업자 | 인수인계 (Phase 4·5 결과 포함) |
+| [docs/CODEX_PROGRESS.md](docs/CODEX_PROGRESS.md) | 모두 | 큰 기능 단위 진행 기록 |
+| [docs/BACKEND_REFACTOR_PLAN.md](docs/BACKEND_REFACTOR_PLAN.md) | 다음 작업 | 백엔드 개선 진행 / 보류 사유 |
+| [docs/FRONTEND_HOOKS_PLAN.md](docs/FRONTEND_HOOKS_PLAN.md) | 다음 작업 | 프론트 hook·뷰 분할 진행 / 보류 사유 |
 
 ## 검증
 

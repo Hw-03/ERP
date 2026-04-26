@@ -2,6 +2,17 @@
 
 `feat/erp-overhaul` 브랜치 Phase 3에서 일부 항목 구현 완료. 전반은 여전히 다음 단계 후보로 남는다.
 
+## 진행 상태 (2026-04-26 Phase 5 update)
+
+| Phase 5 항목 | 상태 |
+|---|---|
+| **모든 라우터 에러 응답 표준화** | ✅ Phase 5 — 12개 라우터의 ~76 HTTPException 을 `http_error` 로 일괄 마이그. settings.py(PIN 라우터)는 보안/인증/권한 제외 규칙 따라 보존. |
+| **request_id middleware** | ✅ Phase 5 — X-Request-Id 자동 발급 + 응답 헤더 부착. |
+| **OpenAPI 태그·요약 보강** | ✅ Phase 5 — 16개 태그 description 추가. |
+| **CORS_EXTRA_ORIGINS env wiring** | ✅ Phase 5 — `main.py` 가 환경 변수 콤마 split 해서 origin 추가. |
+| services/inventory.py 분할 (445줄) | ⏸ 보류 — 트랜잭션 로직 위험. Phase 6+ 에서 테스트와 함께. |
+| items.py / production.py 분할 | ⏸ 보류 — 비즈니스 로직 복합. 동상. |
+
 ## 진행 상태 (2026-04-26 Phase 4 update)
 
 | 항목 | 상태 | 보류/완료 사유 |
