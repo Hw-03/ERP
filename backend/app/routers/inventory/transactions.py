@@ -284,10 +284,10 @@ def update_transaction_notes(
     """Update the notes field of a transaction log entry."""
     log = db.query(TransactionLog).filter(TransactionLog.log_id == log_id).first()
     if not log:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+        raise http_error(status.HTTP_404_NOT_FOUND, ErrorCode.NOT_FOUND, "Transaction not found")
     item = db.query(Item).filter(Item.item_id == log.item_id).first()
     if not item:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+        raise http_error(status.HTTP_404_NOT_FOUND, ErrorCode.NOT_FOUND, "Item not found")
 
     log.notes = payload.notes
     commit_and_refresh(db, log)

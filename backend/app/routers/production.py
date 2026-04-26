@@ -30,20 +30,22 @@ def production_receipt(
 ):
     produced_item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if not produced_item:
-        raise HTTPException(status_code=404, detail="생산 대상 품목을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "생산 대상 품목을 찾을 수 없습니다.")
 
     try:
         component_requirements = _explode_bom(db, payload.item_id, payload.quantity)
     except RecursionError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="BOM 구조에 순환 참조가 있습니다. BOM 구성을 확인해 주세요.",
+        raise http_error(
+            status.HTTP_400_BAD_REQUEST,
+            ErrorCode.BAD_REQUEST,
+            "BOM 구조에 순환 참조가 있습니다. BOM 구성을 확인해 주세요.",
         )
 
     if not component_requirements:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"'{produced_item.item_name}'에 등록된 BOM이 없습니다.",
+        raise http_error(
+            status.HTTP_400_BAD_REQUEST,
+            ErrorCode.BAD_REQUEST,
+            f"'{produced_item.item_name}'에 등록된 BOM이 없습니다.",
         )
 
     merged: Dict[uuid.UUID, Decimal] = {}
@@ -138,9 +140,10 @@ def production_receipt(
         db.commit()
     except Exception as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"생산 처리 중 오류가 발생했습니다: {exc}",
+        raise http_error(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            ErrorCode.INTERNAL,
+            f"생산 처리 중 오류가 발생했습니다: {exc}",
         )
 
     return ProductionReceiptResponse(
@@ -169,7 +172,7 @@ def check_production_feasibility(
 ):
     item = db.query(Item).filter(Item.item_id == item_id).first()
     if not item:
-        raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
     component_requirements = _explode_bom(db, item_id, quantity)
     merged: Dict[uuid.UUID, Decimal] = {}

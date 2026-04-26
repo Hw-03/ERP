@@ -15,6 +15,7 @@ from sqlalchemy import func
 
 from app.database import get_db
 from app.models import CategoryEnum, DepartmentEnum, Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
+from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     InventoryLocationResponse,
     ItemCreate,
@@ -392,7 +393,7 @@ def export_items_xlsx(
 def get_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
     row = _build_item_query(db).filter(Item.item_id == item_id).first()
     if not row:
-        raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
     item, inventory = row
     # 단건이지만 list 경로와 동일하게 bulk_compute 사용 — compute_for 단건 호출 경로 정리.
@@ -405,7 +406,7 @@ def get_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
 def update_item(item_id: uuid.UUID, payload: ItemUpdate, db: Session = Depends(get_db)):
     item = db.query(Item).filter(Item.item_id == item_id).first()
     if not item:
-        raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
     if payload.item_name is not None:
         item.item_name = payload.item_name

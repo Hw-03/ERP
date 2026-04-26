@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ItemModel, ProductSymbol
+from app.routers._errors import ErrorCode, http_error
 
 router = APIRouter()
 
@@ -44,13 +45,13 @@ def create_model(payload: ProductModelCreate, db: Session = Depends(get_db)):
     # 이름 중복 확인
     existing_name = db.query(ProductSymbol).filter(ProductSymbol.model_name == payload.model_name).first()
     if existing_name:
-        raise HTTPException(status_code=409, detail="같은 이름의 모델이 이미 존재합니다.")
+        raise http_error(409, ErrorCode.CONFLICT, "같은 이름의 모델이 이미 존재합니다.")
 
     # 다음 빈 slot 찾기 (1~100)
     used_slots = {ps.slot for ps in db.query(ProductSymbol).all()}
     next_slot = next((s for s in range(1, 101) if s not in used_slots), None)
     if next_slot is None:
-        raise HTTPException(status_code=400, detail="슬롯이 모두 사용 중입니다.")
+        raise http_error(400, ErrorCode.BAD_REQUEST, "슬롯이 모두 사용 중입니다.")
 
     # symbol 처리: 제공 안 하면 slot 번호를 문자로 사용
     symbol = payload.symbol
@@ -63,7 +64,7 @@ def create_model(payload: ProductModelCreate, db: Session = Depends(get_db)):
     else:
         dup = db.query(ProductSymbol).filter(ProductSymbol.symbol == symbol).first()
         if dup:
-            raise HTTPException(status_code=409, detail="같은 기호(symbol)의 모델이 이미 존재합니다.")
+            raise http_error(409, ErrorCode.CONFLICT, "같은 기호(symbol)의 모델이 이미 존재합니다.")
 
     ps = ProductSymbol(slot=next_slot, symbol=symbol, model_name=payload.model_name, is_reserved=False)
     db.add(ps)
@@ -77,14 +78,15 @@ def delete_model(slot: int, db: Session = Depends(get_db)):
     """제품 모델 삭제 (해당 슬롯을 사용하는 품목이 있으면 거부)."""
     ps = db.query(ProductSymbol).filter(ProductSymbol.slot == slot).first()
     if not ps:
-        raise HTTPException(status_code=404, detail="모델을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "모델을 찾을 수 없습니다.")
 
     # 해당 slot을 사용하는 품목 확인
     linked_items = db.query(ItemModel).filter(ItemModel.slot == slot).count()
     if linked_items > 0:
-        raise HTTPException(
-            status_code=409,
-            detail=f"이 모델을 사용하는 품목이 {linked_items}개 있습니다. 먼저 품목 연결을 해제하세요.",
+        raise http_error(
+            409,
+            ErrorCode.CONFLICT,
+            f"이 모델을 사용하는 품목이 {linked_items}개 있습니다. 먼저 품목 연결을 해제하세요.",
         )
 
     db.delete(ps)

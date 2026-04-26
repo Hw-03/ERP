@@ -17,6 +17,7 @@ from app.models import (
     TransactionLog,
     TransactionTypeEnum,
 )
+from app.routers._errors import ErrorCode, http_error
 from app.schemas import ScrapLogCreateRequest, ScrapLogResponse
 from app.services import inventory as inv_svc
 
@@ -48,15 +49,16 @@ def _to_response(db: Session, log: ScrapLog) -> ScrapLogResponse:
 def create_scrap(payload: ScrapLogCreateRequest, db: Session = Depends(get_db)):
     item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if item is None:
-        raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
     inv = inv_svc.get_or_create_inventory(db, payload.item_id)
     wh = inv.warehouse_qty or Decimal("0")
     pending = inv.pending_quantity or Decimal("0")
     if wh - pending < payload.quantity:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=(
+        raise http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            ErrorCode.STOCK_SHORTAGE,
+            (
                 f"창고 가용 재고 부족 (창고 {wh}, 예약중 {pending}, "
                 f"요청 {payload.quantity})."
             ),

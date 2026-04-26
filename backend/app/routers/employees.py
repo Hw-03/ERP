@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import DepartmentEnum, Employee
+from app.routers._errors import ErrorCode, http_error
 from app.schemas import EmployeeCreate, EmployeeResponse, EmployeeUpdate
 
 router = APIRouter()
@@ -34,7 +35,7 @@ def list_employees(
 def create_employee(payload: EmployeeCreate, db: Session = Depends(get_db)):
     existing = db.query(Employee).filter(Employee.employee_code == payload.employee_code).first()
     if existing:
-        raise HTTPException(status_code=409, detail="직원 코드가 이미 존재합니다.")
+        raise http_error(409, ErrorCode.CONFLICT, "직원 코드가 이미 존재합니다.")
 
     employee = Employee(
         employee_code=payload.employee_code,
@@ -56,7 +57,7 @@ def create_employee(payload: EmployeeCreate, db: Session = Depends(get_db)):
 def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, db: Session = Depends(get_db)):
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
-        raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
 
     if payload.name is not None:
         employee.name = payload.name
@@ -83,7 +84,7 @@ def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, db: Session
 def delete_employee(employee_id: uuid.UUID, db: Session = Depends(get_db)):
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
-        raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
     db.delete(employee)
     db.commit()
 

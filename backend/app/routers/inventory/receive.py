@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Item, TransactionLog, TransactionTypeEnum
+from app.routers._errors import ErrorCode, http_error
 from app.schemas import InventoryAdjust, InventoryReceive, InventoryResponse
 from app.services import inventory as inventory_svc
 from app.services._tx import commit_and_refresh
@@ -23,7 +24,7 @@ router = APIRouter()
 def receive_inventory(payload: InventoryReceive, db: Session = Depends(get_db)):
     item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if not item:
-        raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
     inventory = inventory_svc.get_or_create_inventory(db, payload.item_id)
     qty_before = inventory.quantity or Decimal("0")
@@ -55,14 +56,14 @@ def adjust_inventory(payload: InventoryAdjust, db: Session = Depends(get_db)):
     """
     item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if not item:
-        raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
     try:
         inventory, qty_before, delta = inventory_svc.adjust_warehouse(
             db, payload.item_id, payload.quantity, location=payload.location
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
     db.add(
         TransactionLog(

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import OptionCode, ProcessFlowRule, ProcessType, ProductSymbol
+from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     ErpCodeGenerateRequest,
     ErpCodeParseRequest,
@@ -34,7 +35,7 @@ def list_symbols(db: Session = Depends(get_db)):
 def update_symbol(slot: int, payload: ProductSymbolUpdate, db: Session = Depends(get_db)):
     row = db.query(ProductSymbol).filter(ProductSymbol.slot == slot).one_or_none()
     if row is None:
-        raise HTTPException(status_code=404, detail="해당 슬롯이 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "해당 슬롯이 없습니다.")
 
     if payload.symbol is not None:
         # Enforce uniqueness when assigning a symbol
@@ -44,9 +45,10 @@ def update_symbol(slot: int, payload: ProductSymbolUpdate, db: Session = Depends
             .one_or_none()
         )
         if dup is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"기호 '{payload.symbol}' 는 이미 슬롯 {dup.slot}에 사용 중입니다.",
+            raise http_error(
+                status.HTTP_409_CONFLICT,
+                ErrorCode.CONFLICT,
+                f"기호 '{payload.symbol}' 는 이미 슬롯 {dup.slot}에 사용 중입니다.",
             )
         row.symbol = payload.symbol
     if payload.model_name is not None:
@@ -97,7 +99,7 @@ def parse_code(payload: ErpCodeParseRequest, db: Session = Depends(get_db)):
         code = code_svc.parse_erp_code(payload.code)
         code_svc.validate_code(db, code)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, str(exc))
     return ErpCodeResponse(
         symbol=code.symbol,
         process_type=code.process_type,
@@ -119,7 +121,7 @@ def generate_code(payload: ErpCodeGenerateRequest, db: Session = Depends(get_db)
             option=payload.option,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, str(exc))
     return ErpCodeResponse(
         symbol=code.symbol,
         process_type=code.process_type,

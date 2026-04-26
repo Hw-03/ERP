@@ -34,11 +34,11 @@ def ship_inventory(payload: InventoryShip, db: Session = Depends(get_db)):
     """출고: 출하부 PRODUCTION 에서만 차감."""
     item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if not item:
-        raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
     inventory = db.query(Inventory).filter(Inventory.item_id == payload.item_id).first()
     if not inventory:
-        raise HTTPException(status_code=404, detail="출고할 재고가 존재하지 않습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "출고할 재고가 존재하지 않습니다.")
 
     qty_before = inventory.quantity or Decimal("0")
     try:
@@ -46,9 +46,10 @@ def ship_inventory(payload: InventoryShip, db: Session = Depends(get_db)):
             db, payload.item_id, payload.quantity, DepartmentEnum.SHIPPING
         )
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"{exc} 다른 부서에서 출하부로 먼저 이동해 주세요.",
+        raise http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            ErrorCode.UNPROCESSABLE,
+            f"{exc} 다른 부서에서 출하부로 먼저 이동해 주세요.",
         )
 
     if payload.location is not None:
@@ -75,10 +76,10 @@ def ship_package(payload: PackageShipRequest, db: Session = Depends(get_db)):
     """패키지 출고: 모든 구성품을 출하부 PRODUCTION 에서 차감."""
     package = db.query(ShipPackage).filter(ShipPackage.package_id == payload.package_id).first()
     if not package:
-        raise HTTPException(status_code=404, detail="출하 패키지를 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "출하 패키지를 찾을 수 없습니다.")
 
     if not package.items:
-        raise HTTPException(status_code=400, detail="패키지에 등록된 품목이 없습니다.")
+        raise http_error(400, ErrorCode.BAD_REQUEST, "패키지에 등록된 품목이 없습니다.")
 
     shortages: list[str] = []
     for package_item in package.items:

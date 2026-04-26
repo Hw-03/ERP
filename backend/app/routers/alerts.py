@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import AlertKindEnum, Inventory, Item, StockAlert
+from app.routers._errors import ErrorCode, http_error
 from app.schemas import StockAlertAcknowledgeRequest, StockAlertResponse
 from app.services import inventory as inv_svc
 from datetime import datetime
@@ -124,9 +125,9 @@ def acknowledge_alert(
 ):
     alert = db.query(StockAlert).filter(StockAlert.alert_id == alert_id).first()
     if alert is None:
-        raise HTTPException(status_code=404, detail="알림을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "알림을 찾을 수 없습니다.")
     if alert.acknowledged_at is not None:
-        raise HTTPException(status_code=400, detail="이미 확인된 알림입니다.")
+        raise http_error(400, ErrorCode.BAD_REQUEST, "이미 확인된 알림입니다.")
     alert.acknowledged_at = datetime.utcnow()
     alert.acknowledged_by = payload.acknowledged_by
     db.commit()

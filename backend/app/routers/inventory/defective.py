@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Item, TransactionLog, TransactionTypeEnum
+from app.routers._errors import ErrorCode, http_error
 from app.schemas import InventoryResponse, MarkDefectiveRequest
 from app.services import inventory as inventory_svc
 from app.services._tx import commit_and_refresh
@@ -23,7 +24,7 @@ router = APIRouter()
 def mark_defective(payload: MarkDefectiveRequest, db: Session = Depends(get_db)):
     item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if not item:
-        raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
     inventory = inventory_svc.get_or_create_inventory(db, payload.item_id)
     qty_before = inventory.quantity or Decimal("0")
     try:
@@ -34,7 +35,7 @@ def mark_defective(payload: MarkDefectiveRequest, db: Session = Depends(get_db))
             source_dept=payload.source_department,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
     note = (
         f"불량 등록 [{payload.source}"

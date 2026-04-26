@@ -16,6 +16,7 @@ from fastapi import HTTPException
 
 # 코드 상수 — 라우터에서 직접 import 해서 사용
 class ErrorCode:
+    # Phase 4
     STOCK_SHORTAGE = "STOCK_SHORTAGE"            # 422 — 재고 부족 (extra.shortages: list[str])
     EXPORT_RANGE_TOO_LARGE = "EXPORT_RANGE_TOO_LARGE"  # 422 — export 범위 초과
     EXPORT_RANGE_REQUIRED = "EXPORT_RANGE_REQUIRED"    # 400 — start_date/end_date 필수
@@ -23,6 +24,13 @@ class ErrorCode:
     DB_INTEGRITY = "DB_INTEGRITY"                # 409 — IntegrityError
     DB_UNAVAILABLE = "DB_UNAVAILABLE"            # 503 — OperationalError
     INTERNAL = "INTERNAL"                        # 500 — Exception fallback
+
+    # Phase 5 — 라우터 일반 마이그레이션용
+    NOT_FOUND = "NOT_FOUND"                      # 404 — 리소스 없음
+    BAD_REQUEST = "BAD_REQUEST"                  # 400 — 잘못된 요청
+    CONFLICT = "CONFLICT"                        # 409 — 중복/충돌
+    UNPROCESSABLE = "UNPROCESSABLE"              # 422 — 비즈니스 검증 실패 (구체 코드가 없는 경우)
+    BUSINESS_RULE = "BUSINESS_RULE"              # 422 — 도메인 규칙 위반
 
 
 def http_error(
