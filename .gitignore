@@ -36,6 +36,14 @@ Thumbs.db
 # Dev-only generated assets
 .dev/screenshots/
 
+# Playwright MCP regression artifacts (root-level temp output)
+.playwright-mcp/
+/0[0-9]_*.png
+/0[0-9][a-z]_*.png
+/api_requests.log
+/all_console_errors.log
+/bom-snapshot.yml
+
 # Local / personal files
 workspace.ahk
 backend/query_test.py
