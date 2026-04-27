@@ -13,12 +13,12 @@ export function AdminEmployeesSection({ showToast }: { showToast: (toast: ToastS
     employee_code: "",
     name: "",
     role: "",
-    department: "議곕┰",
+    department: "조립",
     phone: "",
   });
 
   useEffect(() => {
-    void api.getEmployees().then(setEmployees);
+    void api.getEmployees({ activeOnly: false }).then(setEmployees);
   }, []);
 
   async function addEmployee() {
@@ -33,7 +33,7 @@ export function AdminEmployeesSection({ showToast }: { showToast: (toast: ToastS
       });
       setEmployees((current) => [...current, next]);
       setAddOpen(false);
-      setForm({ employee_code: "", name: "", role: "", department: "議곕┰", phone: "" });
+      setForm({ employee_code: "", name: "", role: "", department: "조립", phone: "" });
       showToast({ message: "직원을 추가했습니다.", type: "success" });
     } catch (error) {
       showToast({ message: error instanceof Error ? error.message : "직원을 추가하지 못했습니다.", type: "error" });
