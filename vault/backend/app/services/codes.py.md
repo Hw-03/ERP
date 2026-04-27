@@ -1,111 +1,256 @@
-﻿---
+---
 type: code-note
 project: ERP
 layer: backend
 source_path: backend/app/services/codes.py
 status: active
+updated: 2026-04-27
+source_sha: cef52126db36
 tags:
   - erp
   - backend
   - service
-  - codes
-aliases:
-  - 코드 서비스
+  - py
 ---
 
-# services/codes.py
+# codes.py
 
 > [!summary] 역할
-> ERP 코드 체계(ProductSymbol, OptionCode, ProcessType) 조회 서비스.
+> 라우터에서 직접 처리하기 무거운 `codes` 비즈니스 로직과 계산 책임을 분리해 담는다.
 
-> [!info] 주요 책임
-> - 심볼·옵션·공정 타입 데이터 조회
-> - `codes.py` 라우터에서 호출
+## 원본 위치
 
----
+- Source: `backend/app/services/codes.py`
+- Layer: `backend`
+- Kind: `service`
+- Size: `7712` bytes
 
-## 쉬운 말로 설명
+## 연결
 
-이 파일이 **ERP 코드 체계의 엔진**. 코드의 생성·파싱·검증·일련번호 부여를 모두 담당.
+- Parent hub: [[backend/app/services/services|backend/app/services]]
+- Related: [[backend/backend]]
 
-코드 형식: `{제품기호}-{구분코드}-{일련번호}-{옵션코드}` (옵션 생략 가능)
+## 읽는 포인트
 
-- `3-PA-0012-WM` = 제품기호 3(DX3000 슬롯), 공정 PA(최종 완제품), 일련번호 12, 옵션 WM(흰색 무광)
-- `376-TR-0012-BG` = 제품기호 376(여러 제품에 공유되는 자재), 공정 TR, 일련번호 12, 옵션 BG
+- 서비스는 라우터보다 안쪽의 업무 규칙을 담는다.
+- 재고 수량이나 BOM 계산은 화면 표시와 실제 거래가 일치해야 한다.
 
-**핵심 규칙**:
-- 제품기호는 숫자만 (슬롯 ID들을 이어붙임)
-- 단일 슬롯 기호(`3`)는 특정 제품 전용, 다자리 기호(`376`)는 여러 제품 공유 자재/조립체
-- `PA`(완제품), `AA`(최종 조립체)는 **반드시 단일 슬롯 기호**만 허용 → 공유 기호로 완제품 만들 수 없음
-- 일련번호는 `{symbol}-{process_type}` 조합별로 개별 관리 (겹치지 않음)
+## 원본 발췌
 
----
+````python
+"""4-part ERP code utilities: parse, format, validate, generate.
 
-## 핵심 함수
+Code format: [제품기호]-[구분코드]-[일련번호]-[옵션코드]
 
-### `parse_erp_code(raw: str) -> ErpCode`
-- `"3-PA-12-BG"` 또는 `"3-PA-0012-BG"` 모두 허용 (compact/zero-pad 둘 다).
-- 토큰 개수 3 또는 4만 허용 (옵션 없어도 됨).
-- 제품기호는 숫자 전용, 공정/옵션은 2자 고정.
-- 잘못된 형식 → `ValueError`.
+Examples
+    376-TR-0012-BG   (raw material shared across DX3000, COCOON, ADX6000FB)
+    3-PA-0012-WM     (DX3000 finished good, white matte)
 
-### `format_erp_code(code: ErpCode, *, compact=False) -> str`
-- `ErpCode` 객체 → 문자열. `compact=True`면 `0012` → `12`.
+Rules
+    - Symbol is a non-empty string composed of single-slot digits (e.g. "3",
+      "7", "376"). Multi-digit symbol is a concatenation of slot symbols and
+      is allowed only for raw/assembly items shared across products.
+    - For PA (최종 완제품) and AA (최종 조립체), symbol MUST be a single slot
+      symbol (len == 1 and the symbol maps to a finished-good slot).
+    - Process type is always exactly 2 characters from process_types.code.
+    - Serial is a zero-padded integer (default width 4). Leading zeros are
+      stripped on display via format_erp_code(compact=True).
+    - Option is exactly 2 characters from option_codes.code, or empty/None
+      for items without options.
+"""
 
-### `validate_code(db, code)`
-- 마스터 테이블과 대조 검증:
-  - 제품기호 각 자리가 `product_symbols` 테이블에 존재 & 예약석 아님
-  - `process_type` 이 `process_types` 테이블에 존재
-  - `PA`/`AA`면 단일 슬롯 + `is_finished_good=True`
-  - 옵션 있으면 `option_codes` 에 존재
+from __future__ import annotations
 
-### `next_serial(db, symbol, process_type) -> int`
-- 해당 `(symbol, process_type)` 조합의 Item 테이블 최대 `serial_no` + 1.
-- 조합별 독립 → `3-PA` 시리얼과 `3-AA` 시리얼 따로 증가.
+import re
+from dataclasses import dataclass, field
+from typing import List, Optional
 
-### `generate_code(db, *, symbol, process_type, option=None) -> ErpCode`
-- 자동 일련번호 부여 + 검증 → 바로 쓸 수 있는 `ErpCode` 반환.
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
----
+from app.models import Item, OptionCode, ProcessType, ProductSymbol
 
-## ErpCode 데이터 클래스
 
-```python
+SERIAL_PAD_WIDTH = 4
+CODE_TOKEN_RE = re.compile(r"^[0-9A-Za-z]+$")
+
+
+# ---------------------------------------------------------------------------
+# Data transfer object
+# ---------------------------------------------------------------------------
+
+
 @dataclass
 class ErpCode:
-    symbol: str              # "3" or "376"
-    process_type: str        # "TR", "PA" ...
-    serial: int              # 12 (정수)
-    option: Optional[str]    # "BG" or None
-    symbol_slots: List[int]  # [3, 7, 6] 파싱된 슬롯 목록
-```
+    symbol: str                  # e.g. "3" or "376"
+    process_type: str            # e.g. "TR", "PA"
+    serial: int                  # integer (no padding)
+    option: Optional[str] = None # e.g. "BG" or None
+    symbol_slots: List[int] = field(default_factory=list)  # resolved slot ids
+
+    def format(self, *, compact: bool = False) -> str:
+        return format_erp_code(self, compact=compact)
+
+
+# ---------------------------------------------------------------------------
+# Parse / Format
+# ---------------------------------------------------------------------------
+
+
+def parse_erp_code(raw: str) -> ErpCode:
+    """Parse a 4-part code. Accepts both compact ("3-PA-12-BG") and zero-padded
+    ("3-PA-0012-BG") forms. Option segment is optional."""
+    if not raw or not isinstance(raw, str):
+        raise ValueError("코드 문자열이 비었습니다.")
+
+    tokens = raw.strip().upper().split("-")
+    if len(tokens) not in (3, 4):
+        raise ValueError(f"코드 토큰 개수가 잘못되었습니다: {raw!r} (3 또는 4개 기대)")
+
+    for tok in tokens:
+        if not tok or not CODE_TOKEN_RE.match(tok):
+            raise ValueError(f"토큰에 허용되지 않는 문자가 있습니다: {tok!r}")
+
+    symbol, process_type, serial_str = tokens[0], tokens[1], tokens[2]
+    option = tokens[3] if len(tokens) == 4 else None
+
+    if not symbol.isdigit():
+        raise ValueError(f"제품기호는 숫자만 허용됩니다: {symbol!r}")
+    if len(process_type) != 2:
+        raise ValueError(f"구분코드는 2자여야 합니다: {process_type!r}")
+    try:
+        serial = int(serial_str)
+    except ValueError as exc:
+        raise ValueError(f"일련번호는 정수여야 합니다: {serial_str!r}") from exc
+    if serial < 0:
+        raise ValueError("일련번호는 0 이상이어야 합니다.")
+    if option is not None and len(option) != 2:
+        raise ValueError(f"옵션코드는 2자여야 합니다: {option!r}")
+
+    return ErpCode(
+        symbol=symbol,
+        process_type=process_type,
+        serial=serial,
+        option=option,
+        symbol_slots=_split_symbol(symbol),
+    )
+
+
+def format_erp_code(code: ErpCode, *, compact: bool = False) -> str:
+    """Render to canonical string. compact=True drops leading zeros on serial."""
+    if compact:
+        serial_part = str(code.serial)
+    else:
+        serial_part = f"{code.serial:0{SERIAL_PAD_WIDTH}d}"
+    parts = [code.symbol, code.process_type, serial_part]
+    if code.option:
+        parts.append(code.option)
+    return "-".join(parts)
+
+
+def _split_symbol(symbol: str) -> List[int]:
+    """Treat each digit in symbol as a slot id (symbol matches the slot digit).
+
+    NOTE: Current scheme uses digits 0-9 only. Symbol "376" => slots [3, 7, 6].
+    """
+    return [int(ch) for ch in symbol]
+
+
+# ---------------------------------------------------------------------------
+# Validation against master tables
+# ---------------------------------------------------------------------------
+
+
+def validate_code(db: Session, code: ErpCode) -> None:
+    """Raise ValueError if any part does not match master tables or rules."""
+    # Symbol: every digit must map to an assigned (non-reserved) product_symbol
+    for digit in code.symbol:
+        slot_row = (
+            db.query(ProductSymbol)
+            .filter(ProductSymbol.symbol == digit)
+            .one_or_none()
+        )
+        if slot_row is None or slot_row.is_reserved:
+            raise ValueError(
+                f"제품기호 '{digit}' 이(가) 배정되지 않았거나 예약석입니다."
+            )
+
+    # Process type must exist
+    ptype = db.query(ProcessType).filter(ProcessType.code == code.process_type).one_or_none()
+    if ptype is None:
+        raise ValueError(f"구분코드 '{code.process_type}' 은(는) 정의되지 않았습니다.")
+
+    # PA/AA must use a single-slot symbol with is_finished_good=True
+    if code.process_type in ("PA", "AA"):
+        if len(code.symbol) != 1:
+            raise ValueError(
+                f"완제품/최종조립체({code.process_type})는 반드시 단일 슬롯 기호만 사용 가능합니다. "
+                f"현재: {code.symbol}"
+            )
+        slot_row = (
+            db.query(ProductSymbol).filter(ProductSymbol.symbol == code.symbol).one()
+        )
+        if not slot_row.is_finished_good:
+            raise ValueError(
+                f"기호 '{code.symbol}' 은(는) 완제품 배정 슬롯이 아닙니다."
+            )
+
+    # Option (if present) must exist
+    if code.option:
+        opt_row = db.query(OptionCode).filter(OptionCode.code == code.option).one_or_none()
+        if opt_row is None:
+            raise ValueError(f"옵션코드 '{code.option}' 은(는) 정의되지 않았습니다.")
+
+
+# ---------------------------------------------------------------------------
+# Serial generation
+# ---------------------------------------------------------------------------
+
+
+def next_serial(db: Session, symbol: str, process_type: str) -> int:
+    """Return the next available serial for (symbol, process_type), based on
+    existing Item.serial_no values under that prefix. Serial is scoped to the
+    combination to avoid colliding across product/process dimensions."""
+    max_serial = (
+        db.query(func.max(Item.serial_no))
+        .filter(
+            Item.process_type_code == process_type,
+            # Items sharing the same symbol prefix
+            Item.erp_code.like(f"{symbol}-{process_type}-%"),
+        )
+        .scalar()
+    )
+    return int(max_serial or 0) + 1
+
+
+def generate_code(
+    db: Session,
+    *,
+    symbol: str,
+    process_type: str,
+    option: Optional[str] = None,
+) -> ErpCode:
+    """Build a new ErpCode with an auto-assigned serial. Validates against
+    master tables before returning."""
+    symbol = symbol.strip()
+    process_type = process_type.strip().upper()
+    option = option.strip().upper() if option else None
+
+    code = ErpCode(
+        symbol=symbol,
+        process_type=process_type,
+        serial=next_serial(db, symbol, process_type),
+        option=option,
+        symbol_slots=_split_symbol(symbol),
+    )
+    validate_code(db, code)
+    return code
+````
 
 ---
 
-## FAQ
+## 정책
 
-**Q. 왜 symbol만 숫자? 글자 쓰면 안 되나?**
-제품기호 슬롯이 0~9 범위로 고정됐다. 다자리 기호(`376`)는 자릿수 기호를 이어붙인 형태라 숫자만 허용.
-
-**Q. 같은 제품기호인데 일련번호 중복 허용되나?**
-아니. `(symbol, process_type)` 쌍 기준으로 유니크. `3-PA-0012` 두 개면 중복 에러.
-
-**Q. `PA`/`AA`에 `376` 같은 공유 기호 쓰면?**
-검증에서 `ValueError`. 완제품은 반드시 특정 슬롯(단일 기호)에 귀속돼야 함.
-
-**Q. 옵션 없는 품목은?**
-`option=None` 허용. 코드 문자열에선 3토큰 형태 `3-TR-0012`.
-
-**Q. Reserved 슬롯이란?**
-아직 제품 배정이 안 된 예약 슬롯(ProductSymbol.is_reserved=True). 이 슬롯으로 코드 생성 시도 → 거부.
-
----
-
-## 관련 문서
-
-- [[backend/app/routers/codes.py.md]] — HTTP 엔드포인트
-- [[backend/app/utils/erp_code.py.md]] — 고수준 코드 빌더
-- [[backend/app/models.py.md]] — `ProductSymbol`, `OptionCode`, `ProcessType`
-- 용어 사전 — ERP 코드 4파트
-
-Up: [[backend/app/services/services]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

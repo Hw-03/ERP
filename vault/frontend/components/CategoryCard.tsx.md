@@ -1,79 +1,222 @@
-﻿---
+---
 type: code-note
 project: ERP
 layer: frontend
 source_path: frontend/components/CategoryCard.tsx
 status: active
+updated: 2026-04-27
+source_sha: 5d14d7d67f57
 tags:
   - erp
   - frontend
-  - component
-  - ui
-aliases:
-  - 카테고리 카드
+  - source-file
+  - tsx
 ---
 
 # CategoryCard.tsx
 
 > [!summary] 역할
-> 11개 ERP 카테고리(RM, TA, TF, HA, HF, VA, VF, BA, BF, FG, UK)를 카드 형태로 표시하는 컴포넌트.
-> 각 카테고리의 색상, 아이콘, 재고 합계를 시각적으로 표현한다.
+> 원본 프로젝트의 `CategoryCard.tsx` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
 
-> [!info] 카테고리별 스타일
-> | 카테고리 | 아이콘 | 배경 색상 |
-> |---------|--------|-----------|
-> | RM | 🧱 | slate 계열 |
-> | TA | 🧪 | blue (진한) |
-> | TF | 🔵 | blue (중간) |
-> | HA, HF | 고압 색상 | 주황 계열 |
-> | VA, VF | 진공 색상 | 보라 계열 |
-> | BA, BF | 조립 색상 | 초록 계열 |
-> | FG | 완제품 색상 | 노랑 계열 |
+## 원본 위치
 
-> [!warning] 주의
-> 이 컴포넌트는 현재 `frontend/app/legacy/` 의 실제 UI에서 직접 사용되지 않고,
-> 레거시 구조 이전 라우트(`/inventory` 등)에서 사용 예정이었던 컴포넌트다.
+- Source: `frontend/components/CategoryCard.tsx`
+- Layer: `frontend`
+- Kind: `source-file`
+- Size: `5195` bytes
+
+## 연결
+
+- Parent hub: [[frontend/components/components|frontend/components]]
+- Related: [[frontend/frontend]]
+
+## 읽는 포인트
+
+- 실제 수정은 원본 파일에서 한다.
+- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+
+## 원본 발췌
+
+````tsx
+"use client";
+
+import { type Category, type CategorySummary } from "@/lib/api";
+
+interface CategoryMeta {
+  badge: string;
+  border: string;
+  dot: string;
+  icon: string;
+  shortName: string;
+}
+
+const CATEGORY_META: Record<Category, CategoryMeta> = {
+  RM: {
+    badge: "bg-slate-700 text-slate-200",
+    border: "border-l-slate-500",
+    dot: "bg-slate-400",
+    icon: "🧱",
+    shortName: "원자재",
+  },
+  TA: {
+    badge: "bg-blue-900/60 text-blue-300",
+    border: "border-l-blue-600",
+    dot: "bg-blue-400",
+    icon: "🧪",
+    shortName: "튜브 반제품",
+  },
+  TF: {
+    badge: "bg-blue-800/60 text-blue-200",
+    border: "border-l-blue-400",
+    dot: "bg-blue-300",
+    icon: "🔵",
+    shortName: "튜브 완제품",
+  },
+  HA: {
+    badge: "bg-purple-900/60 text-purple-300",
+    border: "border-l-purple-600",
+    dot: "bg-purple-400",
+    icon: "⚡",
+    shortName: "고압 반제품",
+  },
+  HF: {
+    badge: "bg-purple-800/60 text-purple-200",
+    border: "border-l-purple-400",
+    dot: "bg-purple-300",
+    icon: "🔌",
+    shortName: "고압 완제품",
+  },
+  VA: {
+    badge: "bg-cyan-900/60 text-cyan-300",
+    border: "border-l-cyan-600",
+    dot: "bg-cyan-400",
+    icon: "🫧",
+    shortName: "진공 반제품",
+  },
+  VF: {
+    badge: "bg-cyan-800/60 text-cyan-200",
+    border: "border-l-cyan-400",
+    dot: "bg-cyan-300",
+    icon: "💠",
+    shortName: "진공 완제품",
+  },
+  AA: {
+    badge: "bg-indigo-900/60 text-indigo-300",
+    border: "border-l-indigo-600",
+    dot: "bg-indigo-400",
+    icon: "🧩",
+    shortName: "조립 반제품",
+  },
+  AF: {
+    badge: "bg-indigo-800/60 text-indigo-200",
+    border: "border-l-indigo-400",
+    dot: "bg-indigo-300",
+    icon: "📦",
+    shortName: "조립 완제품",
+  },
+  FG: {
+    badge: "bg-green-900/60 text-green-300",
+    border: "border-l-green-500",
+    dot: "bg-green-400",
+    icon: "✅",
+    shortName: "완제품",
+  },
+  UK: {
+    badge: "bg-red-900/60 text-red-300",
+    border: "border-l-red-600",
+    dot: "bg-red-400",
+    icon: "⚠️",
+    shortName: "미분류",
+  },
+};
+
+interface CategoryCardProps {
+  data: CategorySummary;
+  isAlert?: boolean;
+}
+
+export default function CategoryCard({ data, isAlert = false }: CategoryCardProps) {
+  const meta = CATEGORY_META[data.category];
+  const totalQty = Number(data.total_quantity);
+
+  const cardClassName = isAlert
+    ? "rounded-xl border border-red-800/60 border-l-4 border-l-red-500 bg-red-950/40 p-5 shadow-lg"
+    : `rounded-xl border border-slate-700/60 border-l-4 ${meta.border} bg-slate-800 p-5 shadow-lg`;
+
+  return (
+    <div
+      className={`${cardClassName} transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl`}
+    >
+      <div className="mb-4 flex items-start justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl" role="img" aria-label={data.category}>
+            {meta.icon}
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <span
+                className={`rounded px-2 py-0.5 text-base font-bold ${meta.badge}`}
+              >
+                {data.category}
+              </span>
+              {isAlert && (
+                <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-base text-red-400">
+                  확인 필요
+                </span>
+              )}
+            </div>
+            <p className="mt-0.5 text-base text-slate-400">{meta.shortName}</p>
+          </div>
+        </div>
+
+        <div className="mt-1 flex items-center gap-1.5">
+          <div
+            className={`h-2 w-2 rounded-full ${
+              data.item_count > 0 ? meta.dot : "bg-slate-600"
+            }`}
+          />
+          <span className="text-base text-slate-500">
+            {data.item_count > 0 ? "운영 중" : "품목 없음"}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-lg bg-slate-900/50 p-3">
+          <p className="mb-1 text-base text-slate-500">품목 수</p>
+          <p className="text-2xl font-bold text-slate-100">
+            {data.item_count.toLocaleString()}
+          </p>
+          <p className="text-base text-slate-500">종류</p>
+        </div>
+        <div className="rounded-lg bg-slate-900/50 p-3">
+          <p className="mb-1 text-base text-slate-500">총 재고</p>
+          <p
+            className={`text-2xl font-bold ${
+              isAlert ? "text-red-300" : "text-blue-300"
+            }`}
+          >
+            {totalQty.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </p>
+          <p className="text-base text-slate-500">EA 기준</p>
+        </div>
+      </div>
+
+      {data.item_count > 0 && totalQty === 0 && (
+        <div className="mt-3 flex items-center gap-1.5 text-base text-amber-400">
+          <span>주의</span>
+          <span>현재 재고가 0입니다. 입고 여부를 확인해 주세요.</span>
+        </div>
+      )}
+    </div>
+  );
+}
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**카테고리별 요약 카드 UI**. 11개 ERP 카테고리(원자재 RM, 튜브 TA/TF, 고압 HA/HF, 진공 VA/VF, 조립 BA/BF, 완제품 FG, 미분류 UK) 각각을 화려한 카드로 표시.
-
-각 카드 요소:
-- 이모지/아이콘
-- 카테고리명(한글)
-- 재고 합계 수량
-- 품목 수 (예: "전체 34종")
-
-## 카테고리 기호 의미
-
-| 기호 | 뜻 | 예 |
-|------|-----|-----|
-| RM | Raw Material (원자재) | 나사, 판금 |
-| TA/TF | Tube 조립/부품 | 튜브 하네스 |
-| HA/HF | 고압부 조립/부품 | 고압 레귤레이터 |
-| VA/VF | 진공부 조립/부품 | 진공 밸브 |
-| BA/BF | 조립(Body) 조립/부품 | 섀시 |
-| FG | Finished Goods (완성품) | DX3000 본체 |
-| UK | Unknown (미분류) | 신규 등록 직후 품목 |
-
-(A = Assembly, F = Fabricated part/단품)
-
-## FAQ
-
-**Q. 현재 실제로 쓰이는가?**
-레거시 UI 전환 단계에서 사용 예정. 현재 주력은 `legacy/_components/*`.
-
-**Q. 색상 커스터마이즈?**
-`legacyUi.ts` 의 `LEGACY_COLORS` 참조하되, 각 카테고리별 매핑은 이 컴포넌트 내부 상수.
-
----
-
-## 관련 문서
-
-- [[frontend/components/components]] — 공용 컴포넌트 목록
-- [[frontend/lib/api.ts.md]] — `Category`, `CategorySummary` 타입 정의
-- 용어 사전 — RM/TA/TF 등 카테고리 용어
-
-Up: [[frontend/components/components]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

@@ -4,98 +4,213 @@ project: ERP
 layer: backend
 source_path: backend/app/routers/settings.py
 status: active
+updated: 2026-04-27
+source_sha: 9dc712d384c4
 tags:
   - erp
   - backend
   - router
-  - settings
-  - admin
-aliases:
-  - 설정 라우터
-  - 관리자 API
+  - py
 ---
 
 # settings.py
 
 > [!summary] 역할
-> 관리자 핀(PIN) 검증, 변경, DB 초기화 등 시스템 설정을 담당하는 API.
+> FastAPI 라우터 계층의 `settings` 영역 API 엔드포인트를 담당한다.
 
-> [!info] 주요 책임
-> - `POST /api/settings/verify-pin` — 관리자 핀 검증
-> - `PUT /api/settings/admin-pin` — 관리자 핀 변경
-> - `POST /api/settings/reset` — DB 초기화 (핀 인증 필요)
+## 원본 위치
 
-> [!warning] 주의
-> - DB 초기화는 **되돌릴 수 없음**. 핀 검증 후에만 실행 가능.
-> - 관리자 탭 진입 시 핀락(PinLock) 화면이 먼저 표시됨
+- Source: `backend/app/routers/settings.py`
+- Layer: `backend`
+- Kind: `router`
+- Size: `6311` bytes
+
+## 연결
+
+- Parent hub: [[backend/app/routers/routers|backend/app/routers]]
+- Related: [[backend/backend]]
+
+## 읽는 포인트
+
+- 라우터는 API 표면이다. 요청/응답 계약은 `schemas.py`와 함께 확인한다.
+- DB 변경은 서비스/모델/테스트까지 같이 본다.
+
+## 원본 발췌
+
+````python
+"""System settings router.
+
+관리자 PIN 인증 엔드포인트와 DB 재시드(안전 초기화), 재고 불변식 점검/복구 엔드포인트.
+무결성 점검 · 복구는 운영자가 명시적으로 호출하는 관리자 도구이며 프론트엔드는 사용하지 않는다.
+"""
+
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy.orm import Session
+
+from pydantic import BaseModel, Field
+
+from app.database import get_db
+from app.models import Inventory, SystemSetting
+from app.routers._errors import ErrorCode, http_error
+from app.schemas import (
+    AdminPinUpdateRequest,
+    AdminPinVerifyRequest,
+    IntegrityCheckResponse,
+    IntegrityRepairResponse,
+    MessageResponse,
+)
+from app.services import audit
+from app.services import integrity as integrity_svc
+from app.services._tx import commit_and_refresh, commit_only
+
+
+class ResetRequest(BaseModel):
+    pin: str = Field(..., min_length=4, max_length=32, description="현재 관리자 PIN")
+
+
+class IntegrityRepairRequest(BaseModel):
+    pin: str = Field(..., min_length=4, max_length=32)
+    dry_run: bool = True
+
+router = APIRouter()
+
+ADMIN_PIN_KEY = "admin_pin"
+DEFAULT_ADMIN_PIN = "0000"
+
+
+def ensure_admin_pin(db: Session) -> SystemSetting:
+    setting = db.query(SystemSetting).filter(SystemSetting.setting_key == ADMIN_PIN_KEY).first()
+    if setting:
+        return setting
+
+    setting = SystemSetting(setting_key=ADMIN_PIN_KEY, setting_value=DEFAULT_ADMIN_PIN)
+    db.add(setting)
+    commit_and_refresh(db, setting)
+    return setting
+
+
+@router.post("/verify-pin", response_model=MessageResponse)
+def verify_admin_pin(payload: AdminPinVerifyRequest, db: Session = Depends(get_db)):
+    setting = ensure_admin_pin(db)
+    if payload.pin != setting.setting_value:
+        raise http_error(403, ErrorCode.BAD_REQUEST, "관리자 비밀번호가 올바르지 않습니다.")
+    return MessageResponse(message="관리자 인증이 완료되었습니다.")
+
+
+@router.put("/admin-pin", response_model=MessageResponse)
+def update_admin_pin(payload: AdminPinUpdateRequest, request: Request, db: Session = Depends(get_db)):
+    setting = ensure_admin_pin(db)
+
+    if payload.current_pin != setting.setting_value:
+        raise http_error(403, ErrorCode.BAD_REQUEST, "현재 비밀번호가 올바르지 않습니다.")
+    if payload.current_pin == payload.new_pin:
+        raise http_error(400, ErrorCode.BUSINESS_RULE, "새 비밀번호는 현재 비밀번호와 달라야 합니다.")
+
+    setting.setting_value = payload.new_pin
+    setting.updated_at = datetime.now(UTC).replace(tzinfo=None)
+
+    audit.record(
+        db,
+        request=request,
+        action="settings.pin_change",
+        target_type="settings",
+        target_id="admin_pin",
+        payload_summary="관리자 PIN 변경",
+    )
+
+    commit_only(db)
+    return MessageResponse(message="관리자 비밀번호를 변경했습니다.")
+
+
+def _require_admin(db: Session, pin: str) -> None:
+    setting = ensure_admin_pin(db)
+    if pin != setting.setting_value:
+        raise http_error(403, ErrorCode.BAD_REQUEST, "관리자 비밀번호가 올바르지 않습니다.")
+
+
+@router.get("/integrity/inventory", response_model=IntegrityCheckResponse)
+def check_inventory_integrity(
+    pin: str = Query(..., min_length=4, max_length=32, description="관리자 PIN"),
+    limit: int = Query(100, ge=1, le=2000),
+    db: Session = Depends(get_db),
+):
+    """재고 불변식(quantity == warehouse + Σ locations) 미스매치 목록.
+
+    관리자 PIN 필요. 프론트에서 사용하지 않는 운영 도구.
+    """
+    _require_admin(db, pin)
+    mismatches = integrity_svc.check_inventory_consistency(db)
+    return {
+        "checked": db.query(Inventory).count(),
+        "mismatched_count": len(mismatches),
+        "samples": [m.to_dict() for m in mismatches[:limit]],
+    }
+
+
+@router.post("/integrity/repair", response_model=IntegrityRepairResponse)
+def repair_inventory_integrity(
+    payload: IntegrityRepairRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Inventory.quantity 를 warehouse + Σ locations 로 재계산해 복구.
+
+    `dry_run=True` (기본) 로 먼저 확인 후 실제 적용 시 false 로 호출.
+    """
+    _require_admin(db, payload.pin)
+    report = integrity_svc.repair_inventory_totals(db, dry_run=payload.dry_run)
+    if not payload.dry_run:
+        audit.record(
+            db,
+            request=request,
+            action="settings.integrity_repair",
+            target_type="settings",
+            target_id="inventory",
+            payload_summary=f"repaired {getattr(report, 'fixed_count', '?')} rows",
+        )
+        commit_only(db)
+    return report.to_dict()
+
+
+@router.post("/reset", response_model=MessageResponse)
+def reset_database(payload: ResetRequest, request: Request, db: Session = Depends(get_db)):
+    """PIN 검증 후 시드 데이터 재적재 (안전 초기화). 관리자 도구."""
+    setting = ensure_admin_pin(db)
+    if payload.pin != setting.setting_value:
+        raise http_error(403, ErrorCode.BAD_REQUEST, "관리자 비밀번호가 올바르지 않습니다.")
+
+    # reset 직전에 audit 1건 기록 (reset 자체는 시드 재적재로 audit_logs 도 비울 수 있어 사후 기록은 무의미).
+    audit.record(
+        db,
+        request=request,
+        action="settings.reset_db",
+        target_type="settings",
+        target_id="database",
+        payload_summary="DB 초기화 + 시드 재적재 시작",
+    )
+    commit_only(db)
+
+    try:
+        import sys
+        from pathlib import Path
+        backend_dir = Path(__file__).resolve().parents[2]
+        if str(backend_dir) not in sys.path:
+            sys.path.insert(0, str(backend_dir))
+        import importlib
+        import seed as seed_module
+        importlib.reload(seed_module)
+        seed_module.run_seed()
+        return MessageResponse(message="데이터베이스를 초기화하고 시드를 재적재했습니다.")
+    except Exception as exc:
+        raise http_error(500, ErrorCode.INTERNAL, f"초기화 중 오류가 발생했습니다: {exc}")
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-이 라우터는 **"관리자 전용 설정"** 엔드포인트 묶음. 주로 **PIN 관리**와 **DB 리셋**.
-
-PIN은 `system_settings` 테이블에 평문 저장 (`admin_pin` 키). 초기값 `"0000"`. 4~32자 문자열.
-
----
-
-## 엔드포인트
-
-| 경로 | 메서드 | 용도 |
-|------|--------|------|
-| `/api/settings/verify-pin` | POST | PIN 검증 |
-| `/api/settings/admin-pin` | PUT | PIN 변경 (현재 PIN 확인 필요) |
-| `/api/settings/reset` | POST | DB 시드 재적재 (PIN 필요, 파괴적) |
-
-### 요청 예시
-
-**PIN 검증**:
-```json
-POST /api/settings/verify-pin
-{ "pin": "0000" }
-```
-틀리면 403.
-
-**PIN 변경**:
-```json
-PUT /api/settings/admin-pin
-{ "current_pin": "0000", "new_pin": "1234" }
-```
-현재 PIN 틀리면 403. 같은 값이면 400.
-
-**DB 리셋**:
-```json
-POST /api/settings/reset
-{ "pin": "0000" }
-```
-→ `seed.py` 재로드 + `run_seed()` 호출. 실제 데이터가 모두 초기 시드로 교체됨.
-
----
-
-## FAQ
-
-**Q. PIN이 평문 저장이어도 되나?**
-프로토타입 수준. 실운영 전환 시 해시화 필요 (`bcrypt` 등). `system_settings.setting_value`는 Text 컬럼.
-
-**Q. PIN 잊어버리면?**
-DB에서 직접 수정: `UPDATE system_settings SET setting_value='0000' WHERE setting_key='admin_pin';`
-
-**Q. `/reset` 정확히 뭐가 일어나나?**
-`backend/seed.py`의 `run_seed()` 실행. 기존 `items`/`inventory`/`transactions` 등 싹 지우고 샘플 데이터로 대체.
-
-**Q. 운영 서버에서 `/reset` 호출하면?**
-**실제 데이터 증발**. 반드시 백업 후. PIN도 보호막이라 공유 주의.
-
-**Q. PIN은 세션 유지되나?**
-NO. 매번 `verify-pin`. 프론트가 sessionStorage에 캐싱해 UX 개선.
-
----
-
-## 관련 문서
-
-- [[backend/app/models.py.md]] — `SystemSetting`
-- [[backend/seed.py.md]] — `run_seed()` 내용
-- [[frontend/app/legacy/_components/PinLock.tsx.md]]
-- [[frontend/app/admin/admin]]
-
-Up: [[backend/app/routers/routers]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

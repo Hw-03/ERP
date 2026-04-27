@@ -2,28 +2,40 @@
 type: index
 project: ERP
 layer: frontend
+source_path: frontend/app/legacy/_components/mobile/hooks/
 status: active
+updated: 2026-04-27
 tags:
   - erp
   - frontend
-  - mobile
-  - hooks
-aliases:
-  - 모바일 훅 허브
+  - index
 ---
 
 # hooks
 
 > [!summary] 역할
-> 모바일 화면이 공통으로 재사용하는 데이터 훅 모음.
+> `frontend/app/legacy/_components/mobile/hooks/` 아래 원본 파일들을 Obsidian에서 탐색하기 위한 폴더 허브다.
 
-## 하위 문서
+## 원본 위치
 
-- [[frontend/app/legacy/_components/mobile/hooks/useEmployees.ts.md]]
-- [[frontend/app/legacy/_components/mobile/hooks/useItems.ts.md]]
-- [[frontend/app/legacy/_components/mobile/hooks/useModels.ts.md]]
-- [[frontend/app/legacy/_components/mobile/hooks/usePackages.ts.md]]
-- [[frontend/app/legacy/_components/mobile/hooks/useTransactions.ts.md]]
+- Source: `frontend/app/legacy/_components/mobile/hooks/`
+- File count: `6`
 
-Up: [[frontend/app/legacy/_components/mobile/mobile]]
+## 하위 허브
 
+- [[frontend/app/legacy/_components/mobile/hooks/__tests__/__tests__|__tests__]]
+
+## 파일 노트
+
+- [[frontend/app/legacy/_components/mobile/hooks/useEmployees.ts|useEmployees.ts]]
+- [[frontend/app/legacy/_components/mobile/hooks/useItems.ts|useItems.ts]]
+- [[frontend/app/legacy/_components/mobile/hooks/useModels.ts|useModels.ts]]
+- [[frontend/app/legacy/_components/mobile/hooks/usePackages.ts|usePackages.ts]]
+- [[frontend/app/legacy/_components/mobile/hooks/useTransactions.ts|useTransactions.ts]]
+
+## 읽는 팁
+
+- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
+- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
+
+Up: [[frontend/app/legacy/_components/mobile/mobile|frontend/app/legacy/_components/mobile]]

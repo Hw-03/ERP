@@ -4,53 +4,68 @@ project: ERP
 layer: frontend
 source_path: frontend/tsconfig.json
 status: active
+updated: 2026-04-27
+source_sha: b18b390217d2
 tags:
   - erp
   - frontend
-  - typescript
-  - config
-aliases:
-  - TypeScript 설정
+  - source-file
+  - json
 ---
 
 # tsconfig.json
 
 > [!summary] 역할
-> TypeScript 컴파일러 옵션을 정의하는 설정 파일.
+> 원본 프로젝트의 `tsconfig.json` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
 
-> [!info] 핵심 설정
-> | 옵션 | 값 | 설명 |
-> |------|-----|------|
-> | `strict` | true | 엄격 타입 검사 활성화 |
-> | `moduleResolution` | bundler | Next.js 15 번들러 모드 |
-> | `paths` | `@/*` → `"./*"` | `@/` 절대경로 별칭 설정 |
-> | `jsx` | preserve | JSX 보존 (Next.js가 처리) |
-> | `exclude` | node_modules, _archive | 컴파일 제외 폴더 |
+## 원본 위치
 
-> [!info] 경로 별칭
-> `@/*` 별칭 덕분에 `@/lib/api`, `@/components/AppHeader` 같은 절대경로 import가 가능하다.
+- Source: `frontend/tsconfig.json`
+- Layer: `frontend`
+- Kind: `source-file`
+- Size: `600` bytes
+
+## 연결
+
+- Parent hub: [[frontend/frontend|frontend]]
+- Related: [[frontend/frontend]]
+
+## 읽는 포인트
+
+- 실제 수정은 원본 파일에서 한다.
+- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+
+## 원본 발췌
+
+````json
+{
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", "_archive", "**/_archive/**"]
+}
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**TypeScript 가 코드를 어떻게 검사·변환할지 정의하는 설정**. 특히 `paths` 의 `@/*` → `./*` 덕분에 `import from "@/lib/api"` 같은 짧은 경로가 가능.
-
-Next.js 는 `tsconfig.json` 을 자동으로 인식하므로 별도 설정 전파 불필요.
-
-## FAQ
-
-**Q. `strict: true` 때문에 빌드 에러?**
-타입 안전성 보장. 임시로 풀려면 `"strict": false` 또는 개별 옵션(`noImplicitAny: false`). 가능하면 유지.
-
-**Q. `@/*` 를 `@/src/*` 로 바꾸려면?**
-`paths` + `baseUrl` 수정. Next.js 는 즉시 반영.
-
----
-
-## 관련 문서
-
-- [[frontend/package.json.md]] — 의존성 목록
-- [[frontend/next.config.js.md]] — Next 설정
-
-Up: [[frontend/frontend]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

@@ -4,58 +4,60 @@ project: ERP
 layer: backend
 source_path: backend/requirements.txt
 status: active
+updated: 2026-04-27
+source_sha: 2ae926058177
 tags:
   - erp
   - backend
-  - infra
-aliases:
-  - Python 패키지 목록
+  - source-file
+  - txt
 ---
 
 # requirements.txt
 
 > [!summary] 역할
-> 백엔드 서버 실행에 필요한 Python 패키지 목록. `pip install -r requirements.txt`로 설치한다.
+> 원본 프로젝트의 `requirements.txt` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
 
-> [!info] 주요 패키지
-> - `fastapi` — 웹 프레임워크
-> - `uvicorn` — ASGI 서버
-> - `sqlalchemy` — ORM (DB 연동)
-> - `pydantic` — 데이터 검증
-> - `openpyxl` — 엑셀 파일 처리
-> - `python-dotenv` — 환경변수 로드
+## 원본 위치
 
----
+- Source: `backend/requirements.txt`
+- Layer: `backend`
+- Kind: `source-file`
+- Size: `265` bytes
 
-## 쉬운 말로 설명
+## 연결
 
-**백엔드 실행에 필요한 파이썬 라이브러리 목록**. 새 환경에서 서버 돌리려면:
-```bash
-pip install -r backend/requirements.txt
-```
+- Parent hub: [[backend/backend|backend]]
+- Related: [[backend/backend]]
 
-## 의존성 역할
+## 읽는 포인트
 
-| 패키지 | 용도 |
-|--------|------|
-| `fastapi` | 라우터, DI, OpenAPI 자동 문서화 |
-| `uvicorn[standard]` | 개발/운영 ASGI 서버 |
-| `sqlalchemy` | ORM — `models.py` 클래스 ↔ DB 테이블 매핑 |
-| `pydantic` v2 | 요청/응답 데이터 검증 (`schemas.py`) |
-| `openpyxl` | 엑셀 파일 읽기/쓰기 (내보내기/가져오기) |
-| `python-dotenv` | `.env` 파일 로드 |
+- 실제 수정은 원본 파일에서 한다.
+- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
 
-## FAQ
+## 원본 발췌
 
-**Q. 버전 pin?**
-운영 안정성 위해 `==` 로 고정 권장. 현재는 일부만 pin.
+````text
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+sqlalchemy>=2.0.31
+psycopg2-binary>=2.9.10
+alembic==1.13.1
+python-dotenv==1.0.1
+pydantic[email]>=2.9.0
+python-multipart==0.0.9
+openpyxl==3.1.5
 
-**Q. 새 패키지 추가?**
-`pip install <pkg>` → `pip freeze | grep <pkg> >> requirements.txt` 로 버전 포함 추가.
-
-**Q. gunicorn 필요?**
-단일 서버 소규모 운영에는 uvicorn 으로 충분. 멀티프로세스 필요 시 `gunicorn + uvicorn.workers.UvicornWorker` 조합.
+# Testing (Phase 5.3-D)
+pytest>=8.0
+pytest-cov>=5.0
+httpx>=0.27
+````
 
 ---
 
-Up: [[backend/backend]]
+## 정책
+
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

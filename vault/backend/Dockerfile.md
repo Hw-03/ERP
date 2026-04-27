@@ -1,54 +1,61 @@
 ---
 type: code-note
 project: ERP
-layer: infra
+layer: backend
 source_path: backend/Dockerfile
 status: active
+updated: 2026-04-27
+source_sha: 44e6b605710a
 tags:
   - erp
-  - infra
-  - docker
-aliases:
-  - 백엔드 도커파일
+  - backend
+  - source-file
+  - file
 ---
 
-# Dockerfile (backend)
+# Dockerfile
 
 > [!summary] 역할
-> 백엔드 FastAPI 서버를 Docker 컨테이너로 빌드하는 설정 파일.
+> 원본 프로젝트의 `Dockerfile` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
 
-> [!info] 주요 내용
-> - Python 베이스 이미지 사용
-> - `requirements.txt` 설치
-> - uvicorn으로 앱 실행
+## 원본 위치
+
+- Source: `backend/Dockerfile`
+- Layer: `backend`
+- Kind: `source-file`
+- Size: `219` bytes
+
+## 연결
+
+- Parent hub: [[backend/backend|backend]]
+- Related: [[backend/backend]]
+
+## 읽는 포인트
+
+- 실제 수정은 원본 파일에서 한다.
+- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+
+## 원본 발췌
+
+````text
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**백엔드 컨테이너 빌드 레시피**. `python:3.11-slim` 등 경량 이미지 기반 → `requirements.txt` 설치 → 앱 복사 → `uvicorn` 실행.
-
-## 빌드 예시
-
-```bash
-docker build -t erp-backend ./backend
-docker run -p 8000:8000 erp-backend
-```
-
-## FAQ
-
-**Q. pip install 느림?**
-베이스 이미지 캐시 적극 활용. `COPY requirements.txt` 를 `COPY . .` 보다 먼저 하면 requirements 변경 없는 한 빌드 재사용.
-
-**Q. SQLite 파일은 컨테이너 안에?**
-`docker-compose*.yml` 에서 호스트 파일을 volume 으로 마운트. 이미지에는 포함 X.
-
----
-
-## 관련 문서
-
-- [[docker-compose.yml.md]] — 프론트+백 합쳐서 실행하는 설정
-- [[docker-compose.nas.yml.md]] — NAS 운영 설정
-- [[backend/requirements.txt.md]]
-
-Up: [[backend/backend]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

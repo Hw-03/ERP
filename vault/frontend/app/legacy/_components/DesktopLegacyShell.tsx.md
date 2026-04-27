@@ -4,86 +4,239 @@ project: ERP
 layer: frontend
 source_path: frontend/app/legacy/_components/DesktopLegacyShell.tsx
 status: active
+updated: 2026-04-27
+source_sha: 05c8710180ca
 tags:
   - erp
   - frontend
-  - component
-  - legacy
-  - shell
-aliases:
-  - 데스크톱 쉘
-  - 메인 레이아웃 컴포넌트
+  - frontend-component
+  - tsx
 ---
 
 # DesktopLegacyShell.tsx
 
 > [!summary] 역할
-> 데스크톱 화면의 전체 레이아웃을 담당하는 최상위 쉘 컴포넌트.
-> 사이드바, 탭 전환, 각 탭별 뷰 렌더링을 조율한다.
+> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
 
-> [!info] 주요 책임
-> - 현재 활성 탭 상태 관리 (`inventory` / `warehouse` / `admin`)
-> - 사이드바 렌더링 (`DesktopSidebar`)
-> - 탭별 뷰 컴포넌트 조건부 렌더링
-> - 전역 알림 배너 표시
+## 원본 위치
 
-> [!warning] 주의
-> - 활성 탭은 정확히 3개: `inventory`, `warehouse`, `admin`
-> - 이 파일이 데스크톱 UI의 실질적인 진입점이다
-> - 탭 추가/제거 시 이 파일을 수정해야 함
+- Source: `frontend/app/legacy/_components/DesktopLegacyShell.tsx`
+- Layer: `frontend`
+- Kind: `frontend-component`
+- Size: `8806` bytes
+
+## 연결
+
+- Parent hub: [[frontend/app/legacy/_components/_components|frontend/app/legacy/_components]]
+- Related: [[frontend/frontend]]
+
+## 읽는 포인트
+
+- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
+- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+
+## 원본 발췌
+
+````tsx
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ElementType } from "react";
+import { Boxes, History, Settings2, Warehouse } from "lucide-react";
+import { DesktopSidebar, type DesktopTabId } from "./DesktopSidebar";
+import { DesktopTopbar } from "./DesktopTopbar";
+import { DesktopInventoryView } from "./DesktopInventoryView";
+import { DesktopWarehouseView } from "./DesktopWarehouseView";
+import { DesktopAdminView } from "./DesktopAdminView";
+import { DesktopHistoryView } from "./DesktopHistoryView";
+import { LEGACY_COLORS, formatNumber } from "./legacyUi";
+import { api, type ProductionCapacity } from "@/lib/api";
+import type { Item } from "@/lib/api";
+
+const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
+  inventory: { title: "대시보드", icon: Boxes },
+  warehouse: { title: "입출고", icon: Warehouse },
+  history: { title: "입출고 내역", icon: History },
+  admin: { title: "관리자", icon: Settings2 },
+};
+
+export function DesktopLegacyShell() {
+  const [activeTab, setActiveTab] = useState<DesktopTabId>("inventory");
+  const [status, setStatus] = useState("데스크톱 ERP 화면을 준비했습니다.");
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const [warehousePreselected, setWarehousePreselected] = useState<Item | null>(null);
+  const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
+  const [capacityModal, setCapacityModal] = useState(false);
+  const [stockWarnings, setStockWarnings] = useState<{ low: number; zero: number } | null>(null);
+
+  const loadCapacity = useCallback(() => {
+    void api.getProductionCapacity().then(setCapacityData).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    loadCapacity();
+  }, [loadCapacity]);
+
+  const activeMeta = TAB_META[activeTab];
+
+  const handleGoToWarehouse = useCallback((item: Item) => {
+    setWarehousePreselected(item);
+    setActiveTab("warehouse");
+  }, []);
+
+  const content = useMemo(() => {
+    const key = `${activeTab}-${refreshNonce}`;
+    if (activeTab === "inventory") {
+      return (
+        <DesktopInventoryView
+          key={key}
+          globalSearch=""
+          onStatusChange={setStatus}
+          onGoToWarehouse={handleGoToWarehouse}
+          onGoToWarehouseTab={() => setActiveTab("warehouse")}
+          onSummaryChange={setStockWarnings}
+          capacityData={capacityData}
+          onCapacityClick={() => setCapacityModal(true)}
+        />
+      );
+    }
+    if (activeTab === "warehouse") {
+      return (
+        <DesktopWarehouseView
+          key={key}
+          globalSearch=""
+          onStatusChange={setStatus}
+          preselectedItem={warehousePreselected}
+          onSubmitSuccess={loadCapacity}
+        />
+      );
+    }
+    if (activeTab === "history") {
+      return <DesktopHistoryView key={key} />;
+    }
+    return <DesktopAdminView key={key} globalSearch="" onStatusChange={setStatus} />;
+  }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse, capacityData, loadCapacity]);
+
+  return (
+    <>
+      {capacityModal && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,.55)" }}
+          onClick={() => setCapacityModal(false)}
+        >
+          <div
+            className="w-full max-w-[520px] rounded-[28px] border p-7"
+            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 text-base font-black" style={{ color: LEGACY_COLORS.text }}>
+              생산 가능수량 상세
+            </div>
+            {capacityData && capacityData.top_items.length > 0 ? (
+              <>
+                <div className="mb-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-[18px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                    <div className="text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                      즉시 생산 가능
+                    </div>
+                    <div className="mt-1 text-[22px] font-black" style={{ color: LEGACY_COLORS.cyan }}>
+                      {formatNumber(capacityData.immediate)}
+                    </div>
+                  </div>
+                  <div className="rounded-[18px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                    <div className="text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                      최대 생산 가능
+                    </div>
+                    <div className="mt-1 text-[22px] font-black" style={{ color: LEGACY_COLORS.blue }}>
+                      {formatNumber(capacityData.maximum)}
+                    </div>
+                  </div>
+                </div>
+                {capacityData.limiting_item && (
+                  <div
+                    className="mb-4 rounded-[14px] border px-4 py-3 text-sm"
+                    style={{ background: "rgba(255,136,0,.08)", borderColor: "rgba(255,136,0,.25)", color: LEGACY_COLORS.yellow }}
+                  >
+                    병목 부품: <span className="font-bold">{capacityData.limiting_item}</span>
+                  </div>
+                )}
+                <div className="max-h-52 overflow-y-auto rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+                  <div
+                    className="grid grid-cols-[1fr_80px_80px] border-b px-4 py-2 text-sm font-bold uppercase tracking-[0.15em]"
+                    style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+                  >
+                    <span>품목</span>
+                    <span className="text-right">즉시</span>
+                    <span className="text-right">최대</span>
+                  </div>
+                  {capacityData.top_items.map((item, i) => (
+                    <div
+                      key={item.item_id}
+                      className="grid grid-cols-[1fr_80px_80px] items-center px-4 py-2.5"
+                      style={{ borderBottom: i === capacityData.top_items.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}` }}
+                    >
+                      <div>
+                        <div className="truncate text-sm" style={{ color: LEGACY_COLORS.text }}>{item.item_name}</div>
+                        <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
+                      </div>
+                      <div className="text-right text-sm font-bold" style={{ color: LEGACY_COLORS.cyan }}>
+                        {formatNumber(item.immediate)}
+                      </div>
+                      <div className="text-right text-sm" style={{ color: LEGACY_COLORS.blue }}>
+                        {formatNumber(item.maximum)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="mb-4 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+                {capacityData == null ? "데이터를 불러오는 중…" : "BOM이 등록된 품목이 없습니다."}
+              </div>
+            )}
+            <button
+              className="mt-5 w-full rounded-[18px] border py-3 text-base font-semibold"
+              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+              onClick={() => setCapacityModal(false)}
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="hidden h-screen overflow-hidden lg:flex">
+      <div className="flex h-full w-full gap-3 px-3 py-3" style={{ background: LEGACY_COLORS.bg, color: LEGACY_COLORS.text }}>
+        <DesktopSidebar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          alertCount={{ inventory: stockWarnings ? stockWarnings.zero + stockWarnings.low : 0 }}
+        />
+
+        <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
+          <DesktopTopbar
+            title={activeMeta.title}
+            icon={activeMeta.icon}
+            onRefresh={() => {
+              setRefreshNonce((current) => current + 1);
+              loadCapacity();
+            }}
+            status={status}
+          />
+
+          <div className="mt-1 min-h-0 flex-1 overflow-hidden flex">{content}</div>
+        </div>
+      </div>
+    </div>
+    </>
+  );
+}
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**레거시 데스크톱 UI의 최상위 프레임**. 화면을 좌측 사이드바 + 상단 탑바 + 우측 본문으로 나누고, 사이드바에서 탭을 누르면 본문을 갈아 끼우는 구조.
-
-탭 4개: **대시보드(inventory) / 입출고(warehouse) / 내역(history) / 관리자(admin)**. 상태(`activeTab`)에 따라 `DesktopInventoryView` / `DesktopWarehouseView` / `DesktopHistoryView` / `DesktopAdminView` 중 하나를 렌더.
-
-`refreshNonce` 를 `key` 로 붙여 새로고침 버튼 누르면 자식 컴포넌트 전체 re-mount.
-
----
-
-## 상태
-
-| 상태 | 타입 | 역할 |
-|------|------|------|
-| `activeTab` | `DesktopTabId` | 현재 활성 탭 |
-| `status` | `string` | 탑바에 표시되는 메시지 |
-| `refreshNonce` | `number` | 새로고침 시 증가 (자식 리마운트 트리거) |
-| `warehousePreselected` | `Item \| null` | 대시보드에서 품목 클릭 시 입출고 탭으로 이동할 때 사전 선택 |
-
----
-
-## 주요 흐름
-
-```
-사용자가 대시보드에서 품목 클릭 → onGoToWarehouse(item)
-  → setWarehousePreselected(item) + setActiveTab("warehouse")
-  → DesktopWarehouseView 가 preselectedItem 받아서 해당 품목 미리 선택된 상태로 열림
-```
-
----
-
-## FAQ
-
-**Q. 탭 추가하려면?**
-`DesktopSidebar` 의 `DesktopTabId` 타입에 새 값 추가 + `TAB_META` 에 엔트리 + `content` useMemo 의 분기에 새 뷰 추가.
-
-**Q. `lg:flex` 숨김 처리는?**
-`className="hidden ... lg:flex"` — 모바일(`<1024px`)에선 숨기고 PC에서만 표시. 모바일은 별도 레이아웃(LegacyLayout) 이 담당.
-
----
-
-## 관련 문서
-
-- [[frontend/app/legacy/_components/DesktopSidebar.tsx.md]]
-- [[frontend/app/legacy/_components/DesktopTopbar.tsx.md]]
-- [[frontend/app/legacy/_components/DesktopInventoryView.tsx.md]]
-- [[frontend/app/legacy/_components/DesktopWarehouseView.tsx.md]]
-- [[frontend/app/legacy/_components/DesktopHistoryView.tsx.md]]
-- [[frontend/app/legacy/_components/DesktopAdminView.tsx.md]]
-- [[frontend/app/legacy/_components/AlertsBanner.tsx.md]]
-- [[frontend/app/legacy/_components/legacyUi.ts.md]] — `LEGACY_COLORS`
-
-Up: [[frontend/app/legacy/_components/_components]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

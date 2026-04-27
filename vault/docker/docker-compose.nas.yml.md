@@ -1,79 +1,74 @@
-﻿---
+---
 type: code-note
 project: ERP
-layer: infra
-source_path: docker-compose.nas.yml
+layer: docker
+source_path: docker/docker-compose.nas.yml
 status: active
+updated: 2026-04-27
+source_sha: 9e18de828161
 tags:
   - erp
-  - infra
   - docker
-  - compose
-  - production
-aliases:
-  - 도커 컴포즈 (NAS 운영)
+  - docker-config
+  - yml
 ---
 
 # docker-compose.nas.yml
 
 > [!summary] 역할
-> NAS(Synology 등) 서버에서 **실제 운영 환경**으로 ERP를 실행하는 Docker Compose 설정.
-> PostgreSQL 없이 **SQLite 파일**을 직접 마운트하여 사용한다.
+> Docker 기반 실행과 배포 구성을 정의하는 인프라 설정 파일이다.
 
-> [!info] 서비스 구성
-> | 서비스 | 포트 | 설명 |
-> |--------|------|------|
-> | `backend` | 8010 | FastAPI (SQLite 마운트) |
-> | `frontend` | 3000 | Next.js (production 빌드) |
+## 원본 위치
 
-> [!info] 개발용(`docker-compose.yml`)과의 차이
-> | 항목 | 개발용 | NAS 운영용 |
-> |------|--------|-----------|
-> | DB | PostgreSQL 컨테이너 | SQLite 파일 마운트 |
-> | 포트 | 8000 | 8010 |
-> | Frontend CMD | `npm run dev` | `npm run build && npm run start` |
-> | pgAdmin | 포함 | 없음 |
+- Source: `docker/docker-compose.nas.yml`
+- Layer: `docker`
+- Kind: `docker-config`
+- Size: `624` bytes
 
-> [!warning] 주의
-> `backend/erp.db` 파일이 컨테이너 내부에 마운트(`/app/erp.db`)된다.
-> DB 파일 손실 방지를 위해 NAS 백업 설정을 별도로 유지할 것.
+## 연결
 
----
+- Parent hub: [[docker/docker|docker]]
 
-## 쉬운 말로 설명
+## 읽는 포인트
 
-**실제 서비스 중인 NAS 용 컴포즈 파일**. SQLite 파일 하나를 컨테이너에 마운트해서 그대로 쓰는 단순 구조. DB 관리 도구(pgAdmin) 없이 최소 구성.
+- 실제 수정은 원본 파일에서 한다.
+- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
 
-운영 배포 명령:
-```bash
-docker compose -f docker-compose.nas.yml up -d --build
-```
+## 원본 발췌
 
-## 백업 전략
+````yaml
+version: "3.9"
 
-SQLite 파일 (`backend/erp.db`) 하나만 복사하면 전체 데이터 백업 완료.
+services:
+  backend:
+    build: ../backend
+    container_name: erp_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: sqlite:////app/erp.db
+    ports:
+      - "8010:8010"
+    volumes:
+      - ../backend/erp.db:/app/erp.db
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8010
 
-```bash
-# 매일 스냅샷
-cp backend/erp.db backup/erp-$(date +%Y%m%d).db
-```
-
-NAS 자체 스냅샷 기능도 추가로 설정 권장.
-
-## FAQ
-
-**Q. PostgreSQL 로 이관?**
-`docker-compose.yml` 로 전환 + `schema.sql` 기반 스키마 재생성 + 데이터 덤프/임포트 필요. 마이그레이션 스크립트는 따로 없어 수동.
-
-**Q. 포트 8000 대신 8010 인 이유?**
-NAS 내부 다른 서비스와 충돌 피하려고. 방화벽/역프록시 설정과 매칭.
+  frontend:
+    build: ../frontend
+    container_name: erp_frontend
+    restart: unless-stopped
+    environment:
+      BACKEND_INTERNAL_URL: http://backend:8010
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    command: sh -c "npm run build && npm run start"
+````
 
 ---
 
-## 관련 문서
+## 정책
 
-- [[docker-compose.yml.md]] — 개발 환경 설정
-- [[start.bat.md]] — 로컬 직접 실행
-- [[backend/app/database.py.md]] — SQLite WAL 모드
-
-Up: ERP MOC
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

@@ -1,75 +1,115 @@
-﻿---
+---
 type: code-note
 project: ERP
-layer: infra
-source_path: docker-compose.yml
+layer: docker
+source_path: docker/docker-compose.yml
 status: active
+updated: 2026-04-27
+source_sha: 738f91f3fcaf
 tags:
   - erp
-  - infra
   - docker
-  - compose
-aliases:
-  - 도커 컴포즈 (개발용)
+  - docker-config
+  - yml
 ---
 
 # docker-compose.yml
 
 > [!summary] 역할
-> 개발 환경에서 **PostgreSQL + pgAdmin + 백엔드 + 프론트엔드**를 한 번에 실행하는 Docker Compose 설정.
+> Docker 기반 실행과 배포 구성을 정의하는 인프라 설정 파일이다.
 
-> [!info] 서비스 구성
-> | 서비스 | 이미지 | 포트 | 설명 |
-> |--------|--------|------|------|
-> | `postgres` | postgres:15-alpine | 5432 | PostgreSQL DB |
-> | `pgadmin` | dpage/pgadmin4 | 5050 | DB 관리 웹 UI |
-> | `backend` | ./backend (빌드) | 8000 | FastAPI 서버 |
-> | `frontend` | ./frontend (빌드) | 3000 | Next.js 서버 |
+## 원본 위치
 
-> [!warning] 주의
-> 이 파일은 **PostgreSQL을 사용하는 개발 환경** 설정이다.
-> 현재 실제 운영은 `docker-compose.nas.yml` (SQLite 기반)로 실행 중이다.
-> 로컬 개발 시에는 `start.bat` 으로 직접 실행하는 것이 일반적이다.
+- Source: `docker/docker-compose.yml`
+- Layer: `docker`
+- Kind: `docker-config`
+- Size: `1586` bytes
+
+## 연결
+
+- Parent hub: [[docker/docker|docker]]
+
+## 읽는 포인트
+
+- 실제 수정은 원본 파일에서 한다.
+- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+
+## 원본 발췌
+
+````yaml
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: erp_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: erp_user
+      POSTGRES_PASSWORD: erp_pass
+      POSTGRES_DB: erp_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp_user -d erp_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: erp_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@erp.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+
+  backend:
+    build: ../backend
+    container_name: erp_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://erp_user:erp_pass@postgres:5432/erp_db
+      SECRET_KEY: change-me-in-production
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build: ../frontend
+    container_name: erp_frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    command: npm run dev
+
+volumes:
+  postgres_data:
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**개발자가 "한 번의 명령"으로 모든 서비스 띄우는 설정 파일**. `docker compose up` 하면 4개 컨테이너가 네트워크로 연결되어 기동.
-
-```
-docker compose up -d      # 백그라운드 실행
-docker compose logs -f    # 로그 확인
-docker compose down       # 모두 종료
-```
-
-## 접속 경로
-
-- 프론트엔드: `http://localhost:3000`
-- 백엔드 API: `http://localhost:8000/docs` (Swagger)
-- pgAdmin: `http://localhost:5050`
-- PostgreSQL: `localhost:5432` (외부 툴로 접속)
-
-## 실제 사용 빈도
-
-- 개발 시 PostgreSQL 테스트 필요 → 이거 사용
-- 일반 로컬 개발 → `start.bat` 이 더 빠름 (SQLite)
-- 운영 → `docker-compose.nas.yml` 사용
-
-## FAQ
-
-**Q. pgAdmin 비밀번호?**
-`docker-compose.yml` 의 `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` 환경변수 참조.
-
-**Q. 데이터 볼륨 유지?**
-`postgres-data` named volume. `docker compose down -v` 해야 삭제됨.
-
----
-
-## 관련 문서
-
-- [[docker-compose.nas.yml.md]] — NAS 운영 환경 (SQLite)
-- [[start.bat.md]] — 로컬 직접 실행 스크립트
-- [[backend/Dockerfile.md]], [[frontend/Dockerfile.md]]
-
-Up: ERP MOC
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

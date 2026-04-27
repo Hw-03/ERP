@@ -4,34 +4,268 @@ project: ERP
 layer: frontend
 source_path: frontend/app/legacy/_components/DesktopInventoryView.tsx
 status: active
+updated: 2026-04-27
+source_sha: 494daabcc823
 tags:
   - erp
   - frontend
-  - component
-aliases:
-  - 데스크톱 재고 화면
+  - frontend-component
+  - tsx
 ---
 
 # DesktopInventoryView.tsx
 
 > [!summary] 역할
-> 품목 검색과 재고 요약, 선택 품목 상세 조회를 담당하는 데스크톱 재고 화면.
+> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
 
-## 쉬운 말로 설명
+## 원본 위치
 
-사용자가 "지금 뭐가 얼마나 있지?"를 가장 자주 확인하는 메인 화면 중 하나다.  
-모바일 `InventoryScreen` 과 같은 데이터를 다른 방식으로 보여준다고 생각하면 이해가 쉽다.
+- Source: `frontend/app/legacy/_components/DesktopInventoryView.tsx`
+- Layer: `frontend`
+- Kind: `frontend-component`
+- Size: `12137` bytes
 
-## 핵심 책임
+## 연결
 
-- 품목 검색과 리스트 표시
-- 재고 요약 정보와 품목 상세 패널 연결
-- 선택 품목을 창고/부서 입출고 흐름으로 넘길 준비
+- Parent hub: [[frontend/app/legacy/_components/_components|frontend/app/legacy/_components]]
+- Related: [[frontend/frontend]]
 
-## 관련 문서
+## 읽는 포인트
 
-- [[frontend/app/legacy/_components/mobile/screens/InventoryScreen.tsx.md]]
-- [[frontend/lib/api.ts.md]]
+- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
+- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
 
-Up: [[frontend/app/legacy/_components/_components]]
+## 원본 발췌
 
+> 전체 310줄 중 앞부분만 발췌했다. 실제 수정은 원본 파일을 기준으로 한다.
+
+````tsx
+"use client";
+
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { PackageSearch } from "lucide-react";
+import { api, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
+import { DesktopRightPanel } from "./DesktopRightPanel";
+import { LEGACY_COLORS, erpCodeDept, getStockState } from "./legacyUi";
+import { InventoryKpiPanel, type KpiCard, type KpiFilter } from "./_inventory_sections/InventoryKpiPanel";
+import { InventoryActionRequired } from "./_inventory_sections/InventoryActionRequired";
+import { InventoryCapacityPanel } from "./_inventory_sections/InventoryCapacityPanel";
+import {
+  InventoryFilters,
+  InventoryTableStickyHeader,
+} from "./_inventory_sections/InventoryFilterBar";
+import { InventoryItemsTable } from "./_inventory_sections/InventoryItemsTable";
+import { InventoryDetailPanel } from "./_inventory_sections/InventoryDetailPanel";
+
+const DESKTOP_PAGE_SIZE = 100;
+
+function getMinStock(item: Item) {
+  return item.min_stock == null ? 0 : Number(item.min_stock);
+}
+
+function matchesSearch(item: Item, keyword: string) {
+  if (!keyword) return true;
+  const haystack = [
+    item.erp_code,
+    item.item_name,
+    item.spec ?? "",
+    item.location ?? "",
+    item.supplier ?? "",
+    item.legacy_model ?? "",
+    item.barcode ?? "",
+  ]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(keyword);
+}
+
+function safeQty(item: Item) {
+  const n = Number(item.quantity);
+  return isNaN(n) ? 0 : n;
+}
+
+function matchesKpi(item: Item, kpi: KpiFilter) {
+  const qty = safeQty(item);
+  const min = getMinStock(item);
+  if (kpi === "NORMAL") return qty > 0 && qty >= min;
+  if (kpi === "LOW") return qty > 0 && qty < min;
+  if (kpi === "ZERO") return qty <= 0;
+  return true;
+}
+
+export function DesktopInventoryView({
+  globalSearch,
+  onStatusChange,
+  onGoToWarehouse,
+  onGoToWarehouseTab,
+  onSummaryChange,
+  capacityData,
+  onCapacityClick,
+}: {
+  globalSearch: string;
+  onStatusChange: (status: string) => void;
+  onGoToWarehouse: (item: Item) => void;
+  onGoToWarehouseTab?: () => void;
+  onSummaryChange?: (s: { low: number; zero: number }) => void;
+  capacityData?: ProductionCapacity | null;
+  onCapacityClick?: () => void;
+}) {
+  const [items, setItems] = useState<Item[]>([]);
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [itemLogs, setItemLogs] = useState<TransactionLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
+  const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const [productModels, setProductModels] = useState<ProductModel[]>([]);
+  const [kpi, setKpi] = useState<KpiFilter>("ALL");
+  const [localSearch, setLocalSearch] = useState("");
+  const [displayLimit, setDisplayLimit] = useState(DESKTOP_PAGE_SIZE);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const deferredLocalSearch = useDeferredValue(localSearch.trim().toLowerCase());
+
+  async function loadItems() {
+    try {
+      setLoading(true);
+      setError(null);
+      const nextItems = await api.getItems({
+        limit: 2000,
+        search: globalSearch.trim() || undefined,
+      });
+      setItems(nextItems);
+      onStatusChange(`재고 ${nextItems.length}건을 불러왔습니다.`);
+      setSelectedItem((current) => (current ? nextItems.find((item) => item.item_id === current.item_id) ?? null : null));
+    } catch (nextError) {
+      const message = nextError instanceof Error ? nextError.message : "재고 데이터를 불러오지 못했습니다.";
+      setError(message);
+      onStatusChange(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function toggleDept(v: string) {
+    setSelectedDepts((prev) => (prev.includes(v) ? prev.filter((d) => d !== v) : [...prev, v]));
+    setDisplayLimit(DESKTOP_PAGE_SIZE);
+  }
+  function toggleModel(v: string) {
+    setSelectedModels((prev) => (prev.includes(v) ? prev.filter((m) => m !== v) : [...prev, v]));
+    setDisplayLimit(DESKTOP_PAGE_SIZE);
+  }
+
+  useEffect(() => {
+    void api.getModels().then(setProductModels).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    void loadItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalSearch]);
+
+  useEffect(() => {
+    if (!selectedItem) {
+      setItemLogs([]);
+      return;
+    }
+    void api
+      .getTransactions({ itemId: selectedItem.item_id, limit: 10 })
+      .then(setItemLogs)
+      .catch(() => setItemLogs([]));
+  }, [selectedItem]);
+
+  const selectedSlots = useMemo(
+    () => new Set(productModels.filter((m) => selectedModels.includes(m.model_name ?? "")).map((m) => m.slot)),
+    [productModels, selectedModels],
+  );
+
+  const scopedItems = useMemo(
+    () =>
+      items.filter((item) => {
+        if (!matchesSearch(item, deferredLocalSearch)) return false;
+        if (selectedDepts.length > 0) {
+          const inDept = selectedDepts.some((d) =>
+            d === "창고"
+              ? (item.warehouse_qty ?? 0) > 0
+              : item.department === d ||
+                erpCodeDept(item.erp_code) === d ||
+                item.locations.some((loc) => loc.department === d),
+          );
+          if (!inDept) return false;
+        }
+        if (selectedSlots.size > 0 && !item.model_slots.some((s) => selectedSlots.has(s))) return false;
+        return true;
+      }),
+    [items, deferredLocalSearch, selectedDepts, selectedSlots],
+  );
+  const filteredItems = useMemo(() => scopedItems.filter((item) => matchesKpi(item, kpi)), [scopedItems, kpi]);
+
+  useEffect(() => {
+    setDisplayLimit(DESKTOP_PAGE_SIZE);
+  }, [filteredItems]);
+
+  const summary = useMemo(() => {
+    const totalQuantity = scopedItems.reduce((acc, item) => acc + safeQty(item), 0);
+    const normalCount = scopedItems.filter((item) => safeQty(item) > 0 && safeQty(item) >= getMinStock(item)).length;
+    const lowCount = scopedItems.filter((item) => safeQty(item) > 0 && safeQty(item) < getMinStock(item)).length;
+    const zeroCount = scopedItems.filter((item) => safeQty(item) <= 0).length;
+    return { totalCount: scopedItems.length, totalQuantity, normalCount, lowCount, zeroCount };
+  }, [scopedItems]);
+
+  useEffect(() => {
+    onSummaryChange?.({ low: summary.lowCount, zero: summary.zeroCount });
+  }, [summary.lowCount, summary.zeroCount, onSummaryChange]);
+
+  const isFiltered = selectedDepts.length > 0 || selectedModels.length > 0 || deferredLocalSearch.length > 0;
+  const activeFilterCount =
+    selectedDepts.length + selectedModels.length + (deferredLocalSearch.length > 0 ? 1 : 0);
+
+  const kpiCards: KpiCard[] = [
+    {
+      label: "전체",
+      value: filteredItems.length,
+      hint: isFiltered
+        ? `필터 적용 중 · 전체 ${items.length}건 중 ${filteredItems.length}건 조회`
+        : "조회 기준 전체 품목",
+      tone: LEGACY_COLORS.blue,
+      key: "ALL",
+    },
+    { label: "정상", value: summary.normalCount, hint: "운영 가능", tone: LEGACY_COLORS.green, key: "NORMAL" },
+    { label: "부족", value: summary.lowCount, hint: "안전재고 이하", tone: LEGACY_COLORS.yellow, key: "LOW" },
+    { label: "품절", value: summary.zeroCount, hint: "즉시 조치 필요", tone: LEGACY_COLORS.red, key: "ZERO" },
+  ];
+
+  const headerBadge = selectedItem
+    ? (() => {
+        const stock = getStockState(
+          Number(selectedItem.quantity),
+          selectedItem.min_stock == null ? null : Number(selectedItem.min_stock),
+        );
+        return (
+          <span
+            className="inline-flex rounded-full px-3 py-1 text-sm font-bold"
+            style={{ color: stock.color, background: `color-mix(in srgb, ${stock.color} 12%, transparent)` }}
+          >
+            {stock.label}
+          </span>
+        );
+      })()
+    : null;
+
+  function resetAllFilters() {
+    setSelectedDepts([]);
+    setSelectedModels([]);
+    setLocalSearch("");
+    setKpi("ALL");
+  }
+
+````
+
+---
+
+## 정책
+
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

@@ -4,94 +4,192 @@ project: ERP
 layer: backend
 source_path: backend/app/routers/ship_packages.py
 status: active
+updated: 2026-04-27
+source_sha: 78d3579401f4
 tags:
   - erp
   - backend
   - router
-  - ship-packages
-aliases:
-  - 출하 패키지 라우터
+  - py
 ---
 
 # ship_packages.py
 
 > [!summary] 역할
-> 출하 패키지(묶음 출하)를 관리하는 API. 여러 품목을 하나의 패키지로 묶어 한 번에 출하할 수 있다.
+> FastAPI 라우터 계층의 `ship_packages` 영역 API 엔드포인트를 담당한다.
 
-> [!info] 주요 책임
-> - `GET /api/ship-packages` — 패키지 목록 조회
-> - `POST /api/ship-packages` — 패키지 생성
-> - `PUT /api/ship-packages/{package_id}` — 패키지 정보 수정
-> - `DELETE /api/ship-packages/{package_id}` — 패키지 삭제
-> - `POST /api/ship-packages/{package_id}/items` — 패키지에 품목 추가
-> - `DELETE /api/ship-packages/{package_id}/items/{package_item_id}` — 품목 제거
+## 원본 위치
 
-> [!warning] 주의
-> - 실제 출하(재고 차감)는 `inventory.py`의 `/api/inventory/ship-package`에서 처리
+- Source: `backend/app/routers/ship_packages.py`
+- Layer: `backend`
+- Kind: `router`
+- Size: `5693` bytes
+
+## 연결
+
+- Parent hub: [[backend/app/routers/routers|backend/app/routers]]
+- Related: [[backend/backend]]
+
+## 읽는 포인트
+
+- 라우터는 API 표면이다. 요청/응답 계약은 `schemas.py`와 함께 확인한다.
+- DB 변경은 서비스/모델/테스트까지 같이 본다.
+
+## 원본 발췌
+
+````python
+"""Shipment package router."""
+
+from datetime import UTC, datetime
+import uuid
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models import Item, ShipPackage, ShipPackageItem
+from app.routers._errors import ErrorCode, http_error
+from app.schemas import (
+    ShipPackageCreate,
+    ShipPackageDetailResponse,
+    ShipPackageItemCreate,
+    ShipPackageResponse,
+    ShipPackageUpdate,
+)
+from app.services._tx import commit_and_refresh, commit_only
+
+router = APIRouter()
+
+
+@router.get("", response_model=List[ShipPackageDetailResponse])
+def list_packages(db: Session = Depends(get_db)):
+    packages = db.query(ShipPackage).order_by(ShipPackage.updated_at.desc()).all()
+    return [_to_detail_response(package) for package in packages]
+
+
+@router.post("", response_model=ShipPackageResponse, status_code=status.HTTP_201_CREATED)
+def create_package(payload: ShipPackageCreate, db: Session = Depends(get_db)):
+    existing = db.query(ShipPackage).filter(ShipPackage.package_code == payload.package_code).first()
+    if existing:
+        raise http_error(409, ErrorCode.CONFLICT, "패키지 코드가 이미 존재합니다.")
+
+    package = ShipPackage(
+        package_code=payload.package_code,
+        name=payload.name,
+        notes=payload.notes,
+    )
+    db.add(package)
+    commit_and_refresh(db, package)
+    return package
+
+
+@router.put("/{package_id}", response_model=ShipPackageResponse)
+def update_package(package_id: uuid.UUID, payload: ShipPackageUpdate, db: Session = Depends(get_db)):
+    package = db.query(ShipPackage).filter(ShipPackage.package_id == package_id).first()
+    if not package:
+        raise http_error(404, ErrorCode.NOT_FOUND, "출하 패키지를 찾을 수 없습니다.")
+
+    if payload.name is not None:
+        package.name = payload.name
+    if payload.notes is not None:
+        package.notes = payload.notes
+    package.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    commit_and_refresh(db, package)
+    return package
+
+
+@router.delete("/{package_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_package(package_id: uuid.UUID, db: Session = Depends(get_db)):
+    package = db.query(ShipPackage).filter(ShipPackage.package_id == package_id).first()
+    if not package:
+        raise http_error(404, ErrorCode.NOT_FOUND, "출하 패키지를 찾을 수 없습니다.")
+    db.delete(package)
+    commit_only(db)
+
+
+@router.post("/{package_id}/items", response_model=ShipPackageDetailResponse, status_code=status.HTTP_201_CREATED)
+def add_package_item(package_id: uuid.UUID, payload: ShipPackageItemCreate, db: Session = Depends(get_db)):
+    package = db.query(ShipPackage).filter(ShipPackage.package_id == package_id).first()
+    if not package:
+        raise http_error(404, ErrorCode.NOT_FOUND, "출하 패키지를 찾을 수 없습니다.")
+
+    item = db.query(Item).filter(Item.item_id == payload.item_id).first()
+    if not item:
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+
+    existing = (
+        db.query(ShipPackageItem)
+        .filter(ShipPackageItem.package_id == package_id, ShipPackageItem.item_id == payload.item_id)
+        .first()
+    )
+    if existing:
+        existing.quantity = payload.quantity
+    else:
+        db.add(
+            ShipPackageItem(
+                package_id=package_id,
+                item_id=payload.item_id,
+                quantity=payload.quantity,
+            )
+        )
+
+    package.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    commit_and_refresh(db, package)
+    return _to_detail_response(package)
+
+
+@router.delete(
+    "/{package_id}/items/{package_item_id}",
+    response_model=ShipPackageDetailResponse,
+    summary="패키지 품목 제거 후 갱신된 패키지 반환",
+    description=(
+        "child 1건을 삭제하고 갱신된 parent 를 반환합니다 (200 + body). "
+        "child-delete 패턴 — pure DELETE (204) 는 `/{package_id}` 가 담당."
+    ),
+)
+def delete_package_item(package_id: uuid.UUID, package_item_id: uuid.UUID, db: Session = Depends(get_db)):
+    package = db.query(ShipPackage).filter(ShipPackage.package_id == package_id).first()
+    if not package:
+        raise http_error(404, ErrorCode.NOT_FOUND, "출하 패키지를 찾을 수 없습니다.")
+
+    package_item = db.query(ShipPackageItem).filter(ShipPackageItem.package_item_id == package_item_id).first()
+    if not package_item:
+        raise http_error(404, ErrorCode.NOT_FOUND, "패키지 품목을 찾을 수 없습니다.")
+
+    db.delete(package_item)
+    package.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    commit_and_refresh(db, package)
+    return _to_detail_response(package)
+
+
+def _to_detail_response(package: ShipPackage) -> ShipPackageDetailResponse:
+    return ShipPackageDetailResponse(
+        package_id=package.package_id,
+        package_code=package.package_code,
+        name=package.name,
+        notes=package.notes,
+        created_at=package.created_at,
+        updated_at=package.updated_at,
+        items=[
+            {
+                "package_item_id": item.package_item_id,
+                "item_id": item.item_id,
+                "erp_code": item.item.erp_code,
+                "item_name": item.item.item_name,
+                "item_category": item.item.category,
+                "item_unit": item.item.unit,
+                "quantity": item.quantity,
+            }
+            for item in package.items
+        ],
+    )
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**출하 패키지** = "이 묶음으로 한 번에 내보낼 품목 + 수량" 템플릿. 자주 쓰는 출하 조합을 미리 등록해두고, 실제 출하 시 패키지 선택 + 수량만 지정하면 구성품이 한꺼번에 출고.
-
-이 라우터는 패키지 **등록·구성 관리** (재고는 안 건드림). 실제 출고는 `inventory.py`의 `ship-package`.
-
----
-
-## 엔드포인트
-
-| 경로 | 메서드 | 용도 |
-|------|--------|------|
-| `/api/ship-packages` | GET | 패키지 목록 + 구성품 |
-| `/api/ship-packages` | POST | 패키지 생성 (package_code 유니크) |
-| `/api/ship-packages/{id}` | PUT | 이름·메모 수정 |
-| `/api/ship-packages/{id}` | DELETE | 패키지 삭제 (구성품 CASCADE) |
-| `/api/ship-packages/{id}/items` | POST | 구성품 추가/수량 업데이트 |
-| `/api/ship-packages/{id}/items/{package_item_id}` | DELETE | 구성품 제거 |
-
-### 요청 예시
-
-**생성**:
-```json
-POST /api/ship-packages
-{
-  "package_code": "SOLO-STD-01",
-  "name": "SOLO 표준 패키지",
-  "notes": "본체 + 케이블 + 매뉴얼"
-}
-```
-
-**구성품 추가**:
-```json
-POST /api/ship-packages/{id}/items
-{ "item_id": "uuid-SOLO-본체", "quantity": 1 }
-```
-
-같은 `item_id`로 재요청 시 → 수량 덮어씀(중복 생성 안 함).
-
----
-
-## FAQ
-
-**Q. `package_code`는 어디서 쓰이나?**
-사람이 알아보기 쉬운 별명. API는 UUID 기반이지만 화면에서 `SOLO-STD-01` 같은 코드 표시.
-
-**Q. 빈 패키지를 출하 시도하면?**
-`inventory/ship-package`에서 400 `패키지에 등록된 품목이 없습니다.`
-
-**Q. 구성품 수량 소수?**
-`Numeric(15,4)`. 무게·길이 단위 가능.
-
-**Q. 패키지 출하 실패 시?**
-`inventory/ship-package`가 모든 구성품 사전 검사 → 하나라도 부족하면 422 + 부족 목록. 출하 전 반드시 부서 이동.
-
----
-
-## 관련 문서
-
-- [[backend/app/routers/inventory.py.md]] — 실제 출고 처리 `ship-package`
-- [[backend/app/models.py.md]] — `ShipPackage`, `ShipPackageItem`
-- [[frontend/app/admin/admin]] — 패키지 관리 UI
-
-Up: [[backend/app/routers/routers]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

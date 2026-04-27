@@ -1,67 +1,61 @@
 ---
 type: code-note
 project: ERP
-layer: infra
+layer: frontend
 source_path: frontend/Dockerfile
 status: active
+updated: 2026-04-27
+source_sha: a1006a15eb8b
 tags:
   - erp
-  - infra
-  - docker
   - frontend
-aliases:
-  - 프론트엔드 도커파일
+  - source-file
+  - file
 ---
 
-# Dockerfile (frontend)
+# Dockerfile
 
 > [!summary] 역할
-> Next.js 프론트엔드 서버를 Docker 컨테이너로 빌드하는 설정 파일.
+> 원본 프로젝트의 `Dockerfile` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
 
-> [!info] 주요 내용
-> - 베이스 이미지: `node:20-alpine`
-> - 작업 디렉토리: `/app`
-> - `npm install` 후 소스 복사
-> - 포트: `3000`
-> - 실행 명령: `npm run dev`
+## 원본 위치
 
-> [!warning] 주의
-> 현재 `CMD`가 `npm run dev` (개발 서버)로 설정되어 있다.
-> 운영 환경에서는 `npm run build && npm run start` 로 변경 필요.
-> `docker-compose.nas.yml` 에서는 이미 production 모드로 변경되어 있다.
+- Source: `frontend/Dockerfile`
+- Layer: `frontend`
+- Kind: `source-file`
+- Size: `141` bytes
 
----
+## 연결
 
-## 쉬운 말로 설명
+- Parent hub: [[frontend/frontend|frontend]]
+- Related: [[frontend/frontend]]
 
-**프론트엔드 컨테이너 빌드 레시피**. Node 20 alpine → 의존성 설치 → 소스 복사 → dev 서버 실행.
+## 읽는 포인트
 
-## 두 가지 실행 모드
+- 실제 수정은 원본 파일에서 한다.
+- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
 
-| 모드 | CMD | 용도 |
-|------|-----|------|
-| dev | `npm run dev` | 핫리로드, 개발 전용 |
-| production | `npm run build && npm run start` | 정적 빌드, 운영 |
+## 원본 발췌
 
-Dockerfile 자체는 dev. 운영에서는 `docker-compose.nas.yml` 이 command 를 오버라이드.
+````text
+FROM node:20-alpine
 
-## FAQ
+WORKDIR /app
 
-**Q. 빌드 캐시 활용?**
-`package.json` 을 먼저 COPY 하고 `npm install` 이후에 소스 COPY. 의존성 안 바뀌면 재빌드 빠름.
+COPY package.json package-lock.json* ./
+RUN npm install
 
-**Q. 이미지 크기 줄이려면?**
-multi-stage build (`builder` + `runner` 분리) 로 개선 가능. 현재는 단순 single-stage.
+COPY . .
 
-**Q. 환경변수 `NEXT_PUBLIC_API_BASE_URL` 어디서?**
-`docker-compose.yml` 의 `environment:` 섹션에서 주입. 빌드 시점에 inline 필요하면 `ARG`로 전달.
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]
+````
 
 ---
 
-## 관련 문서
+## 정책
 
-- [[docker-compose.yml.md]] — 전체 서비스 실행 설정
-- [[docker-compose.nas.yml.md]] — NAS 운영 환경 설정
-- [[backend/Dockerfile.md]] — 백엔드 도커파일
-
-Up: [[frontend/frontend]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

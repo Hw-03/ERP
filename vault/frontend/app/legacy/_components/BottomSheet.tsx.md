@@ -4,74 +4,131 @@ project: ERP
 layer: frontend
 source_path: frontend/app/legacy/_components/BottomSheet.tsx
 status: active
+updated: 2026-04-27
+source_sha: c2be57e59c59
 tags:
   - erp
   - frontend
-  - component
-  - mobile
-  - ui
-aliases:
-  - 바텀시트 모달
+  - frontend-component
+  - tsx
 ---
 
 # BottomSheet.tsx
 
 > [!summary] 역할
-> 화면 하단에서 슬라이드 업으로 나타나는 **모바일용 모달 컴포넌트**.
-> 품목 상세, 편집 폼 등 다양한 컨텐츠를 담는 범용 컨테이너 역할을 한다.
+> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
 
-> [!info] 주요 동작
-> - `open` prop이 `true`일 때만 렌더링
-> - 배경(오버레이) 클릭 시 `onClose` 콜백 호출
-> - 열려 있을 때 `body` 스크롤 잠금 (`overflow: hidden`)
-> - 제목(`title`) prop은 선택 사항
+## 원본 위치
 
-## Props
+- Source: `frontend/app/legacy/_components/BottomSheet.tsx`
+- Layer: `frontend`
+- Kind: `frontend-component`
+- Size: `2375` bytes
 
-| Prop | 타입 | 설명 |
-|------|------|------|
-| `open` | boolean | 열림/닫힘 상태 |
-| `onClose` | function | 닫기 콜백 |
-| `title` | string? | 상단 제목 (선택) |
-| `children` | ReactNode | 내부 컨텐츠 |
+## 연결
+
+- Parent hub: [[frontend/app/legacy/_components/_components|frontend/app/legacy/_components]]
+- Related: [[frontend/frontend]]
+
+## 읽는 포인트
+
+- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
+- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+
+## 원본 발췌
+
+````tsx
+"use client";
+
+import { useEffect, useId } from "react";
+import { LEGACY_COLORS } from "./legacyUi";
+import { useFocusTrap } from "./_hooks/useFocusTrap";
+
+export function BottomSheet({
+  open,
+  onClose,
+  title,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title?: string;
+  children: React.ReactNode;
+}) {
+  useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  // ESC 닫기
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, onClose]);
+
+  const titleId = useId();
+  const sheetRef = useFocusTrap<HTMLDivElement>(open);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-end justify-center"
+      style={{ background: "rgba(0,0,0,.6)" }}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={title ? titleId : undefined}
+      aria-label={title ? undefined : "선택 시트"}
+    >
+      <div
+        ref={sheetRef}
+        className="w-full max-w-[430px] overflow-y-auto rounded-t-[22px] border-t"
+        style={{
+          background: LEGACY_COLORS.s1,
+          borderColor: LEGACY_COLORS.border,
+          maxHeight: "92vh",
+          paddingBottom: "calc(env(safe-area-inset-bottom, 16px) + 20px)",
+          animation: "sheetUp .25s cubic-bezier(.32,1.2,.6,1)",
+        }}
+        data-anim="sheetUp"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <style jsx>{`
+          @keyframes sheetUp {
+            from {
+              transform: translateY(60px);
+              opacity: 0;
+            }
+            to {
+              transform: none;
+              opacity: 1;
+            }
+          }
+        `}</style>
+        <div className="mx-auto my-3 h-1 w-[34px] rounded-full" style={{ background: LEGACY_COLORS.s3 }} />
+        {title ? (
+          <div className="mb-[14px] px-5">
+            <div id={titleId} className="text-lg font-black">{title}</div>
+          </div>
+        ) : null}
+        {children}
+      </div>
+    </div>
+  );
+}
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**화면 하단에서 미끄러져 올라오는 범용 모달**. 모바일 UX 패턴(iOS/Android 앱의 액션 시트). 폭 430px 고정으로 디자인.
-
-오버레이(검정 60% 불투명) 클릭 → `onClose`. 내부 클릭 → 전파 중단(모달 유지).
-
-열릴 때:
-- body 스크롤 잠금 (`overflow: hidden`)
-- `sheetUp` 애니메이션(0.25초, cubic-bezier)
-
-닫힐 때:
-- `null` 반환 (DOM 에서 완전히 제거)
-- body 스크롤 복원
-
-`env(safe-area-inset-bottom)` 사용 → 아이폰 노치/홈버튼 영역 대응.
-
----
-
-## FAQ
-
-**Q. 닫기 애니메이션이 없음?**
-현재는 열기만 애니메이션. 닫힐 땐 바로 언마운트. 부드러운 slide-down 원하면 exit 상태 + `setTimeout` 필요.
-
-**Q. 오버레이 클릭 방지?**
-`onClose` 를 빈 함수로 넘기고 내부에 명시적 닫기 버튼 배치.
-
-**Q. 여러 모달 중첩?**
-`z-[200]` 고정이라 같은 깊이면 겹침. 복수 바텀시트 필요하면 props 로 z-index 조정하도록 개선.
-
----
-
-## 관련 문서
-
-- [[frontend/app/legacy/_components/ItemDetailSheet.tsx.md]] — 품목 상세 바텀시트
-- [[frontend/app/legacy/_components/AdminTab.tsx.md]] — 관리자 탭 (바텀시트 사용)
-- [[frontend/app/legacy/_components/LegacyLayout.tsx.md]] — 모바일 레이아웃
-
-Up: [[frontend/app/legacy/_components/_components]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

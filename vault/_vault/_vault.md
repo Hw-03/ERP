@@ -2,30 +2,33 @@
 type: vault-hub
 project: ERP
 status: active
+updated: 2026-04-27
 tags:
   - erp
   - vault
   - hub
 aliases:
-  - Vault Hub
-  - 볼트 허브
+  - Vault 전용 영역
 ---
 
-# Vault Hub
+# _vault
+
 
 > [!summary] 역할
-> 원본 프로젝트에는 없는 Obsidian 전용 문서를 묶는 최상위 허브.
+> Obsidian 전용 가이드, 대시보드, 템플릿을 모아두는 영역이다. 원본 코드 폴더가 아니라 인수인계 레이어다.
 
-## 묶음
+## 하위 허브
 
-| 묶음 | 내용 |
-|---|---|
-| [[_dashboards]] | 대시보드와 Canvas 지도 |
-| [[_guides]] | 인수인계 가이드, 용어, FAQ, 시나리오 |
-| [[_templates]] | 새 문서를 만들 때 쓰는 Obsidian 템플릿 |
+- [[_vault/dashboards/_dashboards]]
+- [[_vault/guides/_guides]]
+- [[_vault/templates/_templates]]
 
-## 원칙
+## 핵심 문서
 
-- 이 허브는 `_vault` 내부 문서만 연결한다.
-- 원본 프로젝트 미러(`backend`, `frontend`, `docs`, `scripts`, `data`)와 직접 연결하지 않는다.
-- 그래프 뷰에서 `_vault` 문서는 이 허브 아래의 독립 클러스터로만 보이게 관리한다.
+- [[_vault/dashboards/ERP_Control_Room]]
+- [[_vault/guides/ERP_MOC]]
+- [[_vault/guides/처음_읽는_사람]]
+- [[_vault/guides/FAQ_전체]]
+- [[_vault/guides/용어사전]]
+
+Up: [[ERP]]

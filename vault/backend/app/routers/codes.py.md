@@ -1,112 +1,197 @@
-﻿---
+---
 type: code-note
 project: ERP
 layer: backend
 source_path: backend/app/routers/codes.py
 status: active
+updated: 2026-04-27
+source_sha: 1af1396c5f05
 tags:
   - erp
   - backend
   - router
-  - codes
-aliases:
-  - ERP 코드 라우터
+  - py
 ---
 
 # codes.py
 
 > [!summary] 역할
-> ERP 4-part 코드 체계(제품 심볼, 옵션 코드, 공정 타입, 흐름 규칙)를 조회하는 API.
+> FastAPI 라우터 계층의 `codes` 영역 API 엔드포인트를 담당한다.
 
-> [!info] 주요 책임
-> - 제품 심볼(ProductSymbol) 목록 조회 — 모델별 슬롯 번호
-> - 옵션 코드(OptionCode) 목록 조회 — 색상/마감 코드
-> - 공정 타입(ProcessType) 목록 조회 — TR/TA/HR/HA 등
-> - 공정 흐름 규칙(ProcessFlowRule) 조회
+## 원본 위치
 
-> [!warning] 주의
-> - 이 데이터는 `main.py`에서 초기 시드로 생성됨
-> - ERP 코드 구조: `{심볼}-{공정타입}-{일련번호}-{옵션코드}`
+- Source: `backend/app/routers/codes.py`
+- Layer: `backend`
+- Kind: `router`
+- Size: `5462` bytes
+
+## 연결
+
+- Parent hub: [[backend/app/routers/routers|backend/app/routers]]
+- Related: [[backend/backend]]
+
+## 읽는 포인트
+
+- 라우터는 API 표면이다. 요청/응답 계약은 `schemas.py`와 함께 확인한다.
+- DB 변경은 서비스/모델/테스트까지 같이 본다.
+
+## 원본 발췌
+
+````python
+"""Code master router: 제품기호 / 옵션 / 공정 / 흐름 + 4-파트 코드 파싱·생성."""
+
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models import OptionCode, ProcessFlowRule, ProcessType, ProductSymbol
+from app.routers._errors import ErrorCode, http_error
+from app.schemas import (
+    ErpCodeGenerateRequest,
+    ErpCodeParseRequest,
+    ErpCodeResponse,
+    OptionCodeResponse,
+    ProcessFlowRuleResponse,
+    ProcessTypeResponse,
+    ProductSymbolResponse,
+    ProductSymbolUpdate,
+)
+from app.services import audit
+from app.services import codes as code_svc
+from app.services._tx import commit_and_refresh
+
+router = APIRouter()
+
+
+# ---- Product Symbols (100 slots) -------------------------------------------
+
+
+@router.get("/symbols", response_model=List[ProductSymbolResponse], summary="제품기호 100슬롯 조회")
+def list_symbols(db: Session = Depends(get_db)):
+    return db.query(ProductSymbol).order_by(ProductSymbol.slot).all()
+
+
+@router.put("/symbols/{slot}", response_model=ProductSymbolResponse, summary="제품기호 슬롯 수정")
+def update_symbol(slot: int, payload: ProductSymbolUpdate, request: Request, db: Session = Depends(get_db)):
+    row = db.query(ProductSymbol).filter(ProductSymbol.slot == slot).one_or_none()
+    if row is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "해당 슬롯이 없습니다.")
+
+    if payload.symbol is not None:
+        # Enforce uniqueness when assigning a symbol
+        dup = (
+            db.query(ProductSymbol)
+            .filter(ProductSymbol.symbol == payload.symbol, ProductSymbol.slot != slot)
+            .one_or_none()
+        )
+        if dup is not None:
+            raise http_error(
+                status.HTTP_409_CONFLICT,
+                ErrorCode.CONFLICT,
+                f"기호 '{payload.symbol}' 는 이미 슬롯 {dup.slot}에 사용 중입니다.",
+            )
+        row.symbol = payload.symbol
+    if payload.model_name is not None:
+        row.model_name = payload.model_name
+    if payload.is_finished_good is not None:
+        row.is_finished_good = payload.is_finished_good
+    if payload.is_reserved is not None:
+        row.is_reserved = payload.is_reserved
+    if payload.notes is not None:
+        row.notes = payload.notes
+
+    # If symbol or model assigned, unlock reservation flag
+    if row.symbol and row.model_name:
+        row.is_reserved = False
+
+    audit.record(
+        db,
+        request=request,
+        action="codes.symbol_update",
+        target_type="product_symbol",
+        target_id=str(slot),
+        payload_summary=f"slot={slot} symbol={row.symbol} model={row.model_name}",
+    )
+
+    commit_and_refresh(db, row)
+    return row
+
+
+# ---- Option Codes -----------------------------------------------------------
+
+
+@router.get("/options", response_model=List[OptionCodeResponse], summary="옵션 코드 목록")
+def list_options(db: Session = Depends(get_db)):
+    return db.query(OptionCode).order_by(OptionCode.code).all()
+
+
+# ---- Process Types ----------------------------------------------------------
+
+
+@router.get("/process-types", response_model=List[ProcessTypeResponse], summary="공정 코드 목록")
+def list_process_types(db: Session = Depends(get_db)):
+    return db.query(ProcessType).order_by(ProcessType.stage_order, ProcessType.code).all()
+
+
+@router.get("/process-flows", response_model=List[ProcessFlowRuleResponse], summary="공정 흐름 규칙 목록")
+def list_process_flows(db: Session = Depends(get_db)):
+    return db.query(ProcessFlowRule).order_by(ProcessFlowRule.rule_id).all()
+
+
+# ---- 4-part code operations ------------------------------------------------
+
+
+@router.post("/parse", response_model=ErpCodeResponse, summary="4-파트 ERP 코드 파싱")
+def parse_code(payload: ErpCodeParseRequest, db: Session = Depends(get_db)):
+    try:
+        code = code_svc.parse_erp_code(payload.code)
+        code_svc.validate_code(db, code)
+    except ValueError as exc:
+        raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, str(exc))
+    return ErpCodeResponse(
+        symbol=code.symbol,
+        process_type=code.process_type,
+        serial=code.serial,
+        option=code.option,
+        symbol_slots=code.symbol_slots,
+        formatted_full=code.format(compact=False),
+        formatted_compact=code.format(compact=True),
+    )
+
+
+@router.post(
+    "/generate",
+    response_model=ErpCodeResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="4-파트 ERP 코드 자동 생성",
+)
+def generate_code(payload: ErpCodeGenerateRequest, db: Session = Depends(get_db)):
+    try:
+        code = code_svc.generate_code(
+            db,
+            symbol=payload.symbol,
+            process_type=payload.process_type,
+            option=payload.option,
+        )
+    except ValueError as exc:
+        raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, str(exc))
+    return ErpCodeResponse(
+        symbol=code.symbol,
+        process_type=code.process_type,
+        serial=code.serial,
+        option=code.option,
+        symbol_slots=code.symbol_slots,
+        formatted_full=code.format(compact=False),
+        formatted_compact=code.format(compact=True),
+    )
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-이 라우터는 **"ERP 코드의 4가지 구성요소 참조"** 및 **"코드 파싱·생성 유틸"**. 화면 드롭다운·선택기에 코드 후보를 뿌려주고, 임의 문자열을 파싱·검증하거나 새 코드를 생성한다.
-
-### 4파트 구조
-`346-AR-0012-BG`
-- `346` — 제품 심볼 (슬롯 3,4,6 조합)
-- `AR` — 공정 타입 (튜브/고압/진공/조립·R=원자재, A=조립)
-- `0012` — 4자리 일련번호 (슬롯+공정별)
-- `BG` — 옵션 코드 (색상·마감 등, 생략 가능)
-
----
-
-## 엔드포인트
-
-| 경로 | 메서드 | 용도 |
-|------|--------|------|
-| `/api/codes/symbols` | GET | 100개 슬롯 전체 (`is_finished_good` / `is_reserved` 포함) |
-| `/api/codes/symbols/{slot}` | PUT | 슬롯에 기호·모델명 배정 |
-| `/api/codes/options` | GET | 옵션 코드 전체 |
-| `/api/codes/process-types` | GET | 공정 타입 전체 (stage_order 정렬) |
-| `/api/codes/process-flows` | GET | 공정 전이 규칙 |
-| `/api/codes/parse` | POST | 임의 문자열 → 구조체 파싱 + 유효성 |
-| `/api/codes/generate` | POST | 새 코드 생성 (일련번호 자동) |
-
-### 예: 파싱
-```json
-POST /api/codes/parse
-{ "code": "346-AR-0012-BG" }
-```
-응답:
-```json
-{
-  "symbol": "346",
-  "process_type": "AR",
-  "serial": 12,
-  "option": "BG",
-  "symbol_slots": [3, 4, 6],
-  "formatted_full": "346-AR-0012-BG",
-  "formatted_compact": "346AR0012BG"
-}
-```
-
-### 예: 생성
-```json
-POST /api/codes/generate
-{ "symbol": "346", "process_type": "AR", "option": "BG" }
-```
-→ 같은 `(346, AR)`의 다음 일련번호 할당.
-
----
-
-## FAQ
-
-**Q. 슬롯이 100개인 이유?**
-제품 기호 조합의 경우의 수 제한. 단일 슬롯(1~100)은 제품 기호 하나. 복수 슬롯 조합으로 "공용 부품"을 표현 (예: 슬롯 3+4+6 공용 → `346`).
-
-**Q. 슬롯 PUT 시 `is_reserved`는?**
-`symbol`과 `model_name` 둘 다 세팅되면 자동으로 `is_reserved=false`. 운영 시작 전 예약 해제.
-
-**Q. 기호 중복 등록?**
-409. 한 기호는 한 슬롯에만.
-
-**Q. ProcessFlowRule은 어디서 쓰나?**
-주로 문서·참고용. 실제 재고 이동 로직엔 직접 관여 안 함. 공정 체인 이해용 테이블.
-
-**Q. `parse` 실패 예?**
-공정 타입이 등록 안된 코드(`XY`), 슬롯에 없는 심볼, 포맷 오류 등 → 400.
-
----
-
-## 관련 문서
-
-- [[backend/app/main.py.md]] — 슬롯·공정·옵션 초기 시드
-- [[backend/app/utils/erp_code.py.md]] — 코드 생성 알고리즘
-- [[backend/app/services/codes.py.md]] — `parse_erp_code`, `generate_code` 로직
-- [[backend/app/models.py.md]] — `ProductSymbol` / `OptionCode` / `ProcessType` / `ProcessFlowRule`
-- 용어 사전 — 4파트 구조 상세
-
-Up: [[backend/app/routers/routers]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

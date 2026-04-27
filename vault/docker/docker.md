@@ -2,30 +2,33 @@
 type: index
 project: ERP
 layer: docker
+source_path: docker/
 status: active
+updated: 2026-04-27
 tags:
   - erp
   - docker
-  - infra
-aliases:
-  - 도커 폴더
+  - index
 ---
 
 # docker
 
 > [!summary] 역할
-> 컨테이너 실행 방식과 환경별 compose 설정을 모아두는 폴더.
+> Docker 실행/배포 설정을 담는 폴더다.
 
-## 하위 문서
+## 원본 위치
 
-- [[docker/docker-compose.yml.md]] - 기본 Docker 실행 설정
-- [[docker/docker-compose.nas.yml.md]] - NAS/SQLite 운영용 설정
+- Source: `docker/`
+- File count: `2`
 
-## 관련 문서
+## 파일 노트
 
-- [[backend/backend]]
-- [[frontend/frontend]]
-- [[_vault/guides/처음_읽는_사람]]
+- [[docker/docker-compose.nas.yml|docker-compose.nas.yml]]
+- [[docker/docker-compose.yml|docker-compose.yml]]
+
+## 읽는 팁
+
+- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
+- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
 
 Up: [[ERP]]
-

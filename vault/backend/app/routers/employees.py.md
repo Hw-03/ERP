@@ -4,96 +4,185 @@ project: ERP
 layer: backend
 source_path: backend/app/routers/employees.py
 status: active
+updated: 2026-04-27
+source_sha: 4b1dfe9bd401
 tags:
   - erp
   - backend
   - router
-  - employees
-aliases:
-  - 직원 라우터
-  - 직원 API
+  - py
 ---
 
 # employees.py
 
 > [!summary] 역할
-> 직원 마스터 데이터를 관리하는 API. 재고 입출고 시 담당자 선택에 사용된다.
+> FastAPI 라우터 계층의 `employees` 영역 API 엔드포인트를 담당한다.
 
-> [!info] 주요 책임
-> - `GET /api/employees` — 직원 목록 조회 (부서·활성여부 필터)
-> - `POST /api/employees` — 직원 추가
-> - `PUT /api/employees/{employee_id}` — 직원 정보 수정
-> - `DELETE /api/employees/{employee_id}` — 직원 삭제(비활성화)
+## 원본 위치
 
-> [!warning] 주의
-> - 초기 직원 데이터는 `main.py`의 `ensure_reference_data()`에서 시드됨
-> - 부서 목록: 조립, 고압, 진공, 튜닝, 튜브, AS, 연구, 영업, 출하, 기타
+- Source: `backend/app/routers/employees.py`
+- Layer: `backend`
+- Kind: `router`
+- Size: `5404` bytes
+
+## 연결
+
+- Parent hub: [[backend/app/routers/routers|backend/app/routers]]
+- Related: [[backend/backend]]
+
+## 읽는 포인트
+
+- 라우터는 API 표면이다. 요청/응답 계약은 `schemas.py`와 함께 확인한다.
+- DB 변경은 서비스/모델/테스트까지 같이 본다.
+
+## 원본 발췌
+
+````python
+"""Employee master router."""
+
+from datetime import UTC, datetime
+import uuid
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models import DepartmentEnum, Employee
+from app.routers._errors import ErrorCode, http_error
+from app.schemas import EmployeeCreate, EmployeeResponse, EmployeeUpdate
+from app.services import audit
+from app.services._tx import commit_and_refresh, commit_only
+
+router = APIRouter()
+
+
+@router.get("", response_model=List[EmployeeResponse])
+def list_employees(
+    department: Optional[DepartmentEnum] = Query(None),
+    active_only: bool = Query(True),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Employee)
+    if department:
+        query = query.filter(Employee.department == department)
+    if active_only:
+        query = query.filter(Employee.is_active == "true")
+
+    employees = query.order_by(Employee.display_order.asc(), Employee.name.asc()).all()
+    return [_to_response(employee) for employee in employees]
+
+
+@router.post("", response_model=EmployeeResponse, status_code=status.HTTP_201_CREATED)
+def create_employee(payload: EmployeeCreate, request: Request, db: Session = Depends(get_db)):
+    existing = db.query(Employee).filter(Employee.employee_code == payload.employee_code).first()
+    if existing:
+        raise http_error(409, ErrorCode.CONFLICT, "직원 코드가 이미 존재합니다.")
+
+    employee = Employee(
+        employee_code=payload.employee_code,
+        name=payload.name,
+        role=payload.role,
+        phone=payload.phone,
+        department=payload.department,
+        level=payload.level,
+        display_order=payload.display_order,
+        is_active="true" if payload.is_active else "false",
+    )
+    db.add(employee)
+    db.flush()
+
+    audit.record(
+        db,
+        request=request,
+        action="employee.create",
+        target_type="employee",
+        target_id=str(employee.employee_id),
+        payload_summary=f"{employee.name} ({employee.employee_code})",
+    )
+
+    commit_and_refresh(db, employee)
+    return _to_response(employee)
+
+
+@router.put("/{employee_id}", response_model=EmployeeResponse)
+def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, request: Request, db: Session = Depends(get_db)):
+    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    if not employee:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+
+    changed: list[str] = []
+    if payload.name is not None and employee.name != payload.name:
+        employee.name = payload.name; changed.append("name")
+    if payload.role is not None and employee.role != payload.role:
+        employee.role = payload.role; changed.append("role")
+    if payload.phone is not None and employee.phone != payload.phone:
+        employee.phone = payload.phone; changed.append("phone")
+    if payload.department is not None and employee.department != payload.department:
+        employee.department = payload.department; changed.append("department")
+    if payload.level is not None and employee.level != payload.level:
+        employee.level = payload.level; changed.append("level")
+    if payload.display_order is not None and employee.display_order != payload.display_order:
+        employee.display_order = payload.display_order; changed.append("display_order")
+    if payload.is_active is not None:
+        new_flag = "true" if payload.is_active else "false"
+        if employee.is_active != new_flag:
+            employee.is_active = new_flag; changed.append("is_active")
+
+    employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
+
+    if changed:
+        audit.record(
+            db,
+            request=request,
+            action="employee.update",
+            target_type="employee",
+            target_id=str(employee.employee_id),
+            payload_summary=f"{employee.name}: {', '.join(changed)}",
+        )
+
+    commit_and_refresh(db, employee)
+    return _to_response(employee)
+
+
+@router.delete("/{employee_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_employee(employee_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    if not employee:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+
+    audit.record(
+        db,
+        request=request,
+        action="employee.delete",
+        target_type="employee",
+        target_id=str(employee.employee_id),
+        payload_summary=f"{employee.name} ({employee.employee_code})",
+    )
+    db.delete(employee)
+    commit_only(db)
+
+
+def _to_response(employee: Employee) -> EmployeeResponse:
+    return EmployeeResponse(
+        employee_id=employee.employee_id,
+        employee_code=employee.employee_code,
+        name=employee.name,
+        role=employee.role,
+        phone=employee.phone,
+        department=employee.department,
+        level=employee.level,
+        display_order=int(employee.display_order),
+        is_active=employee.is_active == "true",
+        created_at=employee.created_at,
+        updated_at=employee.updated_at,
+    )
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-이 라우터는 **"직원 마스터 CRUD"**. 화면 곳곳의 "담당자 선택" 드롭다운에서 참조하는 원본 데이터.
-
-직원 등급(`level`)은 `admin`/`manager`/`staff` 3단계. `admin`만 관리 탭에서 설정 건드릴 수 있는 UI 분기에 사용.
-
----
-
-## 엔드포인트
-
-| 경로 | 메서드 | 용도 |
-|------|--------|------|
-| `/api/employees` | GET | 목록 (department, active_only 필터) |
-| `/api/employees` | POST | 생성 (employee_code 유니크) |
-| `/api/employees/{employee_id}` | PUT | 수정 (부분 업데이트) |
-| `/api/employees/{employee_id}` | DELETE | **하드 삭제** (행 자체 제거) |
-
-### 요청 예시
-```json
-POST /api/employees
-{
-  "employee_code": "EMP-042",
-  "name": "김현우",
-  "role": "생산팀장",
-  "phone": "010-1234-5678",
-  "department": "조립",
-  "level": "manager",
-  "display_order": 10,
-  "is_active": true
-}
-```
-
-### 정렬
-`GET` 기본 정렬: `display_order ASC, name ASC`. 화면 표시 순서 제어.
-
-### 비활성 처리
-`is_active=false`로 PUT하면 활성 필터에서 제외. 완전 삭제 대신 권장.
-
----
-
-## FAQ
-
-**Q. DELETE는 왜 비활성 대신 하드 삭제?**
-간단 구현. 운영에서는 `PUT is_active=false`로 대체 권장. 삭제된 직원이 남긴 pending·배치는 `ON DELETE SET NULL`로 `owner_employee_id=NULL`.
-
-**Q. 같은 이름 직원 여러 명?**
-OK. 유니크는 `employee_code`만. 이름 중복은 허용.
-
-**Q. `display_order` 용도?**
-화면 드롭다운에서 자주 쓰는 사람을 위로 올리는 용도. 숫자 작을수록 위.
-
-**Q. `level=admin`은 몇 명?**
-초기 시드에는 1명. 필요 시 PUT으로 변경. admin PIN과는 별개(단순 UI 가시성용).
-
-**Q. 부서 변경 시 영향?**
-과거 이력은 유지(비정규화 `owner_name` 사용). 앞으로 배치 생성 시엔 새 부서가 반영.
-
----
-
-## 관련 문서
-
-- [[backend/app/main.py.md]] — 초기 시드
-- [[backend/app/models.py.md]] — `Employee`, `DepartmentEnum`, `EmployeeLevelEnum`
-- [[frontend/app/admin/admin]]
-
-Up: [[backend/app/routers/routers]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

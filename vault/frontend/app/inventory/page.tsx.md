@@ -1,52 +1,54 @@
-﻿---
+---
 type: code-note
 project: ERP
 layer: frontend
 source_path: frontend/app/inventory/page.tsx
 status: active
+updated: 2026-04-27
+source_sha: a8d4d6f996ab
 tags:
   - erp
   - frontend
-  - route
-  - inventory
-aliases:
-  - 재고 페이지 라우트
+  - frontend-component
+  - tsx
 ---
 
-# app/inventory/page.tsx
+# page.tsx
 
 > [!summary] 역할
-> `/inventory` 경로 접속 시 루트(`/`)로 리다이렉트하는 래퍼 파일.
-> 실제 재고 조회 UI는 레거시 UI의 `DesktopInventoryView` 탭에 있다.
+> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
+
+## 원본 위치
+
+- Source: `frontend/app/inventory/page.tsx`
+- Layer: `frontend`
+- Kind: `frontend-component`
+- Size: `106` bytes
+
+## 연결
+
+- Parent hub: [[frontend/app/inventory/inventory|frontend/app/inventory]]
+- Related: [[frontend/frontend]]
+
+## 읽는 포인트
+
+- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
+- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+
+## 원본 발췌
+
+````tsx
+import { redirect } from "next/navigation";
+
+export default function InventoryPage() {
+  redirect("/");
+}
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**`/inventory` → `/` 리디렉션**. 재고 조회는 레거시 UI "재고" 탭에서. 가장 자주 쓰이는 화면이라 기본 진입점이기도 함.
-
-재고 3-bucket 모델:
-- **창고(warehouse_qty)** — 메인 자재창고 보유분
-- **부서 버킷(production 버킷들)** — 튜브/고압/진공/튜닝/조립/출하 부서가 끌어간 작업 중 재고
-- **불량 버킷(defective)** — 불량 판정된 재고 (공급사 반품 대기)
-
-총재고 = warehouse_qty + 모든 부서 production 합 + defective 합
-
-## FAQ
-
-**Q. 화면상 재고 ≠ 실제 창고?**
-부서 버킷이 쌓여있을 가능성. "창고" 수치 외에 부서별 상세도 확인.
-
-**Q. 재고 0인데 출고 시도?**
-백엔드 `reserve_pending()` 에서 예외. 프론트 토스트로 "재고 부족" 표시.
-
----
-
-## 관련 문서
-
-- [[frontend/app/legacy/_components/DesktopInventoryView.tsx.md]] — 실제 재고 뷰 (데스크톱)
-- [[frontend/app/legacy/_components/InventoryTab.tsx.md]] — 모바일 버전
-- [[frontend/app/inventory/inventory]] — 라우트 폴더 인덱스
-- 재고 입출고 시나리오 — 입출고 전체 흐름
-
-Up: [[frontend/app/app]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

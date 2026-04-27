@@ -4,98 +4,268 @@ project: ERP
 layer: frontend
 source_path: frontend/app/legacy/_components/ItemDetailSheet.tsx
 status: active
+updated: 2026-04-27
+source_sha: 571af59de9dc
 tags:
   - erp
   - frontend
-  - component
-  - mobile
-  - inventory
-aliases:
-  - 품목 상세 시트
+  - frontend-component
+  - tsx
 ---
 
 # ItemDetailSheet.tsx
 
 > [!summary] 역할
-> 특정 품목을 선택했을 때 하단에서 올라오는 **상세 정보 + 재고 조작 패널**.
-> 조정(ADJUST), 입고(RECEIVE), 출고(SHIP) 3가지 액션을 직접 수행할 수 있다.
+> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
 
-> [!info] 표시 정보
-> - 품번(ERP 코드), 품명, 카테고리 배지
-> - 현재 창고 재고 + 부서별 재고
-> - 최근 거래 이력 (최신 5건)
+## 원본 위치
 
-> [!info] 재고 조작 액션
-> | 액션 | 설명 |
-> |------|------|
-> | ADJUST | 재고 수량 직접 조정 (플러스/마이너스) |
-> | RECEIVE | 입고 처리 |
-> | SHIP | 출고 처리 |
+- Source: `frontend/app/legacy/_components/ItemDetailSheet.tsx`
+- Layer: `frontend`
+- Kind: `frontend-component`
+- Size: `12540` bytes
 
-> [!warning] 주의
-> - `BottomSheet` 위에 렌더링됨
-> - 저장 후 `onSaved` 콜백으로 부모 컴포넌트에 업데이트된 품목 데이터 전달
+## 연결
+
+- Parent hub: [[frontend/app/legacy/_components/_components|frontend/app/legacy/_components]]
+- Related: [[frontend/frontend]]
+
+## 읽는 포인트
+
+- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
+- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+
+## 원본 발췌
+
+> 전체 326줄 중 앞부분만 발췌했다. 실제 수정은 원본 파일을 기준으로 한다.
+
+````tsx
+"use client";
+
+import { useEffect, useState } from "react";
+import { api, type Item, type TransactionLog } from "@/lib/api";
+import { BottomSheet } from "./BottomSheet";
+import {
+  LEGACY_COLORS,
+  erpCodeDeptBadge,
+  formatNumber,
+  getStockState,
+  transactionColor,
+  transactionLabel,
+} from "./legacyUi";
+
+type ActionMode = "ADJUST" | "RECEIVE" | "SHIP";
+
+export function ItemDetailSheet({
+  item,
+  onClose,
+  onSaved,
+}: {
+  item: Item | null;
+  onClose: () => void;
+  onSaved: (updated: Item) => void;
+}) {
+  const [mode, setMode] = useState<ActionMode>("ADJUST");
+  const [qty, setQty] = useState("0");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [logs, setLogs] = useState<TransactionLog[]>([]);
+
+  useEffect(() => {
+    if (!item) return;
+    setMode("ADJUST");
+    setQty(String(Number(item.quantity)));
+    setNotes("");
+    setError(null);
+    void api.getTransactions({ itemId: item.item_id, limit: 10 }).then(setLogs).catch(() => setLogs([]));
+  }, [item]);
+
+  if (!item) return null;
+
+  const availableQty = Number(
+    item.available_quantity ?? Number(item.quantity) - Number(item.pending_quantity ?? 0),
+  );
+  const stockState = getStockState(availableQty, item.min_stock == null ? null : Number(item.min_stock));
+  const deptBadge = erpCodeDeptBadge(item.erp_code);
+
+  const bump = (delta: number) => {
+    const minimum = mode === "ADJUST" ? 0 : 1;
+    setQty((current) => String(Math.max(minimum, Number(current || 0) + delta)));
+  };
+
+  async function submit() {
+    const currentItem = item;
+    if (!currentItem) return;
+
+    const numericQty = Number(qty);
+    if (Number.isNaN(numericQty) || numericQty < 0) {
+      setError("수량을 확인해 주세요.");
+      return;
+    }
+    if (mode !== "ADJUST" && numericQty <= 0) {
+      setError("수량은 1 이상이어야 합니다.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError(null);
+      const payload = {
+        item_id: currentItem.item_id,
+        quantity: numericQty,
+        notes: notes || undefined,
+      };
+
+      let response;
+      if (mode === "ADJUST") {
+        response = await api.adjustInventory({
+          item_id: currentItem.item_id,
+          quantity: numericQty,
+          reason: notes || "레거시 UI 조정",
+        });
+      } else if (mode === "RECEIVE") {
+        response = await api.receiveInventory(payload);
+      } else {
+        response = await api.shipInventory(payload);
+      }
+
+      onSaved({
+        ...currentItem,
+        quantity: Number(response.quantity),
+        location: response.location,
+        updated_at: response.updated_at,
+      });
+      onClose();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "처리하지 못했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <BottomSheet open={!!item} onClose={onClose} title={item.item_name}>
+      <div className="px-5 pb-6">
+        <div className="mb-[14px]">
+          <div className="mb-[6px] flex flex-wrap gap-[6px]">
+            <span
+              className="rounded-full px-[7px] py-[2px] text-[9px] font-bold"
+              style={{
+                background:
+                  stockState.label === "정상"
+                    ? "rgba(31,209,122,.15)"
+                    : stockState.label === "부족"
+                      ? "rgba(244,185,66,.15)"
+                      : "rgba(242,95,92,.15)",
+                color: stockState.color,
+              }}
+            >
+              {stockState.label}
+            </span>
+            {deptBadge && (
+              <span
+                className="rounded-full px-[7px] py-[2px] text-[9px] font-bold"
+                style={{ background: deptBadge.bg, color: deptBadge.color }}
+              >
+                {deptBadge.label}
+              </span>
+            )}
+          </div>
+
+          <div className="overflow-hidden rounded-[14px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+            {[
+              ["ERP 코드", item.erp_code ?? "-"],
+              ["사양", item.spec || "-"],
+              ["총재고", `${formatNumber(item.quantity)} ${item.unit}`],
+              [
+                "가용 / 예약",
+                `${formatNumber(item.available_quantity ?? item.quantity)} / ${formatNumber(item.pending_quantity ?? 0)} ${item.unit}`,
+              ],
+              ...(item.last_reserver_name && Number(item.pending_quantity ?? 0) > 0
+                ? [["점유자", `🔒 ${item.last_reserver_name}`] as [string, string]]
+                : []),
+              ["위치", item.location || "-"],
+              ["파트", item.legacy_part || "-"],
+              ["모델", item.legacy_model || "공용"],
+              ["공급처", item.supplier || "-"],
+              ["바코드", item.barcode || "-"],
+              ["안전재고", item.min_stock != null ? formatNumber(item.min_stock) : "-"],
+            ].map(([label, value], index, array) => (
+              <div
+                key={label}
+                className="flex items-center justify-between gap-3 px-[14px] py-[10px]"
+                style={{
+                  borderBottom: index === array.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
+                }}
+              >
+                <div className="text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  {label}
+                </div>
+                <div className="text-right">
+                  {value}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-[14px] overflow-hidden rounded-[14px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+          <div className="flex gap-2 px-[14px] py-3">
+            {[
+              { id: "ADJUST", label: "조정" },
+              { id: "RECEIVE", label: "입고" },
+              { id: "SHIP", label: "출고" },
+            ].map((action) => (
+              <button
+                key={action.id}
+                onClick={() => {
+                  setMode(action.id as ActionMode);
+                  setQty(action.id === "ADJUST" ? String(Number(item.quantity)) : "1");
+                }}
+                className="flex-1 rounded-xl py-2 text-xs font-bold"
+                style={{
+                  background: mode === action.id ? LEGACY_COLORS.blue : LEGACY_COLORS.s3,
+                  color: mode === action.id ? "#fff" : LEGACY_COLORS.muted2,
+                }}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="px-[14px] pb-[14px]">
+            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={{ color: LEGACY_COLORS.muted2 }}>
+              {mode === "ADJUST" ? "최종 수량" : "처리 수량"}
+            </div>
+            <input
+              value={qty}
+              onChange={(event) => setQty(event.target.value)}
+              inputMode="numeric"
+              className="mb-[7px] w-full rounded-[11px] border px-[13px] py-[11px] text-center text-[22px] font-bold outline-none"
+              style={{
+                background: LEGACY_COLORS.s1,
+                borderColor: LEGACY_COLORS.border,
+                color: LEGACY_COLORS.text,
+              }}
+            />
+            <div className="mb-3 grid grid-cols-4 gap-[7px]">
+              {[-10, -1, 1, 10].map((delta) => (
+                <button
+                  key={delta}
+                  onClick={() => bump(delta)}
+                  className="rounded-[10px] py-[11px] text-sm font-bold"
+                  style={{
+                    background: delta < 0 ? "rgba(242,95,92,.15)" : "rgba(31,209,122,.12)",
+                    color: delta < 0 ? LEGACY_COLORS.red : LEGACY_COLORS.green,
+                  }}
+                >
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**모바일에서 품목 하나 터치하면 올라오는 상세 카드**. PC용 `DesktopRightPanel` 의 모바일 버전. 품목 정보 확인 + 간단 재고 조작(±버튼, 입고, 출고)을 한 화면에서 처리.
-
-예: 재고 목록에서 "ADX4000W 메인보드" 터치 → 바텀시트 올라옴 → 현재 수량 120개 확인 → "-5" 버튼 → "조정 저장" → 시트 닫힘 + 목록 갱신.
-
-## 표시 구조
-
-```
-─────────────────────────
- [배지] ERP코드: 3-AR-0001
- 품명: 메인보드 Type-A
-─────────────────────────
- 창고재고: 120
- 조립부서:  34
- 출하부서:  12
-─────────────────────────
- [수량 조정 입력박스]
- [ ADJUST ] [ RECEIVE ] [ SHIP ]
-─────────────────────────
- 최근 거래 (5건)
- 04/22 +10 RECEIVE 홍길동
- 04/21 -5  SHIP     김철수
- ...
-```
-
-## 내부 처리 흐름
-
-1. `item` prop 변경 → `GET /items/{id}/history?limit=5` 재조회
-2. 액션 버튼 클릭 → 해당 API 호출:
-   - ADJUST → `POST /inventory/adjust`
-   - RECEIVE → `POST /inventory/receive`
-   - SHIP → `POST /inventory/ship`
-3. 성공 시 `onSaved(updatedItem)` 콜백 → 부모(`InventoryTab`)가 목록 갱신
-4. 실패 시 토스트 에러 표시 후 시트 유지
-
-## FAQ
-
-**Q. ADJUST vs RECEIVE 차이?**
-- RECEIVE: 협력사로부터 **입고**, 이력에 공급사 정보 포함
-- ADJUST: **수량만 보정** (실사 차이, 단순 오입력 정정 등)
-
-**Q. 마이너스 조정 가능?**
-가능. `-5` 같은 음수 입력 → ADJUST 로 처리.
-
-**Q. 부서별 재고 조정은?**
-이 시트에선 창고 재고만. 부서 이동은 `DeptIOTab` / `DesktopWarehouseView` 의 "부서-창고 I/O" 탭에서.
-
-**Q. 이력 5건 이상?**
-더보기 버튼 없음. 전체 이력은 `HistoryTab` 이나 데스크톱 이력 뷰에서 확인.
-
----
-
-## 관련 문서
-
-- [[frontend/app/legacy/_components/BottomSheet.tsx.md]] — 바텀시트 컨테이너
-- [[frontend/app/legacy/_components/InventoryTab.tsx.md]] — 재고 탭 (호출 주체)
-- [[frontend/app/legacy/_components/DesktopRightPanel.tsx.md]] — 데스크톱 버전
-- [[backend/app/routers/inventory.py.md]] — 조정/입고/출고 API
-
-Up: [[frontend/app/legacy/_components/_components]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

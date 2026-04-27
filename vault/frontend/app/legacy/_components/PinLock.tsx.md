@@ -4,97 +4,161 @@ project: ERP
 layer: frontend
 source_path: frontend/app/legacy/_components/PinLock.tsx
 status: active
+updated: 2026-04-27
+source_sha: 505b3f976a54
 tags:
   - erp
   - frontend
-  - component
-  - legacy
-  - admin
-  - security
-aliases:
-  - 핀락
-  - 관리자 인증
+  - frontend-component
+  - tsx
 ---
 
 # PinLock.tsx
 
 > [!summary] 역할
-> 관리자 탭 진입 시 표시되는 PIN 입력 화면. 올바른 핀을 입력해야 관리자 기능에 접근 가능하다.
+> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
 
-> [!info] 주요 책임
-> - 숫자 키패드 UI 제공
-> - 핀 입력 상태 관리
-> - `/api/settings/verify-pin` API 호출로 서버에서 검증
-> - 검증 성공 시 관리자 화면으로 진입
+## 원본 위치
 
-> [!warning] 주의
-> - 핀은 클라이언트에서 검증하지 않고, 반드시 서버에서 검증함
-> - 기본 핀은 `backend/seed.py` 또는 설정에서 확인
+- Source: `frontend/app/legacy/_components/PinLock.tsx`
+- Layer: `frontend`
+- Kind: `frontend-component`
+- Size: `4141` bytes
+
+## 연결
+
+- Parent hub: [[frontend/app/legacy/_components/_components|frontend/app/legacy/_components]]
+- Related: [[frontend/frontend]]
+
+## 읽는 포인트
+
+- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
+- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+
+## 원본 발췌
+
+````tsx
+"use client";
+
+import { useMemo, useState } from "react";
+import { LockKeyhole } from "lucide-react";
+import { api } from "@/lib/api";
+import { LEGACY_COLORS } from "./legacyUi";
+
+const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "삭제"];
+
+export function PinLock({ onUnlocked }: { onUnlocked: () => void }) {
+  const [pin, setPin] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  const dots = useMemo(() => Array.from({ length: 4 }), []);
+
+  const verify = async (pinToVerify: string) => {
+    try {
+      setLoading(true);
+      await api.verifyAdminPin(pinToVerify);
+      onUnlocked();
+    } catch {
+      setError(true);
+      setPin("");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addDigit = (value: string) => {
+    if (!value || loading || pin.length >= 4) return;
+    const next = pin + value;
+    setPin(next);
+    setError(false);
+    if (next.length === 4) void verify(next);
+  };
+
+  const removeDigit = () => {
+    if (loading) return;
+    setPin((current) => current.slice(0, -1));
+    setError(false);
+  };
+
+  return (
+    <div className="flex min-h-[60vh] flex-col items-center px-6 pt-6">
+      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-[22px]" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.purple} 16%, transparent)`, color: LEGACY_COLORS.purple }}>
+        <LockKeyhole className="h-8 w-8" />
+      </div>
+
+      <div className="text-center">
+        <div className="text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: LEGACY_COLORS.muted2 }}>
+          Admin Access
+        </div>
+        <div className="mt-2 text-2xl font-black">관리자 잠금 해제</div>
+        <div className="mt-2 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+          관리자 PIN을 입력하면 설정과 마스터 데이터를 수정할 수 있습니다.
+        </div>
+      </div>
+
+      <div className="my-6 flex gap-3">
+        {dots.map((_, index) => (
+          <div
+            key={index}
+            className="h-4 w-4 rounded-full border-2 transition"
+            style={{
+              borderColor: error ? LEGACY_COLORS.red : LEGACY_COLORS.borderStrong,
+              background: index < pin.length ? (loading ? LEGACY_COLORS.blue : LEGACY_COLORS.purple) : "transparent",
+              transform: index < pin.length ? "scale(1.05)" : undefined,
+            }}
+          />
+        ))}
+      </div>
+
+      {error ? (
+        <div
+          className="mb-4 rounded-2xl border px-4 py-3 text-sm"
+          style={{ borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 28%, transparent)`, background: `color-mix(in srgb, ${LEGACY_COLORS.red} 12%, transparent)`, color: LEGACY_COLORS.red }}
+        >
+          PIN이 올바르지 않습니다.
+        </div>
+      ) : loading ? (
+        <div
+          className="mb-4 rounded-2xl border px-4 py-3 text-sm"
+          style={{ borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 28%, transparent)`, background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`, color: LEGACY_COLORS.blue }}
+        >
+          확인 중...
+        </div>
+      ) : (
+        <div className="mb-4 h-[46px]" />
+      )}
+
+      <div className="grid w-full max-w-[320px] grid-cols-3 gap-3">
+        {KEYS.map((key, index) =>
+          key ? (
+            <button
+              key={`${key}-${index}`}
+              onClick={() => (key === "삭제" ? removeDigit() : addDigit(key))}
+              disabled={loading || (key !== "삭제" && pin.length >= 4)}
+              className="rounded-[18px] border py-4 text-lg font-bold transition disabled:opacity-40"
+              style={{
+                background: LEGACY_COLORS.s2,
+                borderColor: LEGACY_COLORS.border,
+                color: LEGACY_COLORS.text,
+              }}
+            >
+              {key}
+            </button>
+          ) : (
+            <div key={`blank-${index}`} />
+          ),
+        )}
+      </div>
+    </div>
+  );
+}
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**4자리 숫자키패드 PIN 입력 화면**. 4자리 채우면 자동으로 `/api/settings/verify-pin` 호출 → 성공 시 `onUnlocked()` 콜백.
-
-점 4개(`dots`)로 입력 상태 시각화: 아무것도 없음 → 보라색 점 → 파란색(확인 중) → 빨간색 점(틀림).
-
----
-
-## Props
-
-```typescript
-{ onUnlocked: () => void }
-```
-
-## 주요 상호작용
-
-```
-사용자가 숫자 키 누름 → pin = pin + digit
-pin.length === 4 → verify(pin) 자동 호출
-  ↓
-api.verifyAdminPin(pin)
-  성공 → onUnlocked() 호출 (부모가 unlocked 상태 true)
-  실패 → error=true, pin="" (다시 입력 대기)
-```
-
-`삭제` 버튼 = 마지막 자리 제거.
-
----
-
-## 키패드 레이아웃 (`KEYS` 상수)
-
-```
-1  2  3
-4  5  6
-7  8  9
-   0  삭제
-```
-
-(빈 문자열 slot 으로 2열에만 0 배치)
-
----
-
-## FAQ
-
-**Q. PIN 기본값은?**
-`0000`. `main.py` 의 `ensure_reference_data()` 에서 `SystemSetting.admin_pin` 초기값.
-
-**Q. 4자리 고정인가? 늘리려면?**
-현재 `KEYS.length === 12` 이고 `pin.length >= 4` 체크 + `dots length=4`. 6자리 원하면 세 곳 모두 수정.
-
-**Q. 서버가 내려가면?**
-`api.verifyAdminPin` throws → `setError(true)`. 실제 네트워크 오류 메시지 구분 없이 "PIN이 올바르지 않습니다" 로 표시(개선 여지).
-
-**Q. 입력 중 F5?**
-PIN 초기화. 브라우저 메모리만이라 세션스토리지 캐시는 별도 구현 필요.
-
----
-
-## 관련 문서
-
-- [[frontend/app/legacy/_components/DesktopAdminView.tsx.md]] — 부모
-- [[backend/app/routers/settings.py.md]] — `/verify-pin` API
-- [[backend/app/models.py.md]] — `SystemSetting`
-
-Up: [[frontend/app/legacy/_components/_components]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

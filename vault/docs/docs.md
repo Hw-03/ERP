@@ -2,45 +2,51 @@
 type: index
 project: ERP
 layer: docs
+source_path: docs/
 status: active
+updated: 2026-04-27
 tags:
   - erp
   - docs
-aliases:
-  - 문서 폴더
+  - index
 ---
 
 # docs
 
 > [!summary] 역할
-> 규칙, 핸드오버, 진행 현황, 디자인 참고 자료를 모아두는 문서 폴더.
-> 이번 브랜치 기준으로는 불필요한 예전 리포트를 걷어내고, 현재 기준 문서만 남기는 방향으로 정리됐다.
+> 현재 개발과 운영 판단에 필요한 기준 문서가 모인 폴더다.
 
-## 현재 기준 문서
+## 원본 위치
 
-- [[docs/AI_HANDOVER.md.md]] - 최신 인수인계 문서
-- [[docs/CODEX_PROGRESS.md.md]] - 최근 작업 흐름과 변경 내역
-- [[docs/ITEM_CODE_RULES.md.md]] - 품목/공정 코드 규칙의 기준 문서
-- [[docs/README.md.md]] - 문서 폴더 자체 설명
+- Source: `docs/`
+- File count: `92`
 
-## 참고 자료
+## 하위 허브
 
-- [[docs/design/design.md]] - 디자인 폴더 안내
-- `docs/design/screenshots/` - 디자인 캡처 이미지
-- `docs/design/uploads/` - 데스크톱/모바일 UI 시안 자산
-- `docs/design/scraps/` - 스케치 파일
+- [[docs/design/design|design]]
+- [[docs/regression-2026-04-26/regression-2026-04-26|regression-2026-04-26]]
+- [[docs/research/research|research]]
 
-## 정리 원칙
+## 파일 노트
 
-- 현재 기준이 아닌 옛 리포트 노트는 Vault에서도 제거한다.
-- 코드 규칙은 `ITEM_CODE_RULES.md` 를 우선 기준으로 본다.
-- 디자인 자산은 참고 자료로 보되, 실제 구현 기준은 `frontend/` 코드를 우선한다.
+- [[docs/AI_HANDOVER.md|AI_HANDOVER.md]]
+- [[docs/API_CHANGELOG.md|API_CHANGELOG.md]]
+- [[docs/ARCHITECTURE.md|ARCHITECTURE.md]]
+- [[docs/BACKEND_REFACTOR_PLAN.md|BACKEND_REFACTOR_PLAN.md]]
+- [[docs/CODEX_PROGRESS.md|CODEX_PROGRESS.md]]
+- [[docs/ERD.md|ERD.md]]
+- [[docs/FRONTEND_HOOKS_PLAN.md|FRONTEND_HOOKS_PLAN.md]]
+- [[docs/GLOSSARY.md|GLOSSARY.md]]
+- [[docs/ITEM_CODE_RULES.md|ITEM_CODE_RULES.md]]
+- [[docs/MOBILE_SCAN_TESTING.md|MOBILE_SCAN_TESTING.md]]
+- [[docs/ONBOARDING.md|ONBOARDING.md]]
+- [[docs/OPERATIONS.md|OPERATIONS.md]]
+- [[docs/README.md|README.md]]
+- [[docs/USER_GUIDE.md|USER_GUIDE.md]]
 
-## 관련 문서
+## 읽는 팁
 
-- [[_vault/guides/ERP_MOC]]
-- [[_vault/guides/처음_읽는_사람]]
-- [[README.md.md]]
+- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
+- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
 
 Up: [[ERP]]
-

@@ -2,57 +2,51 @@
 type: index
 project: ERP
 layer: backend
+source_path: backend/
 status: active
+updated: 2026-04-27
 tags:
   - erp
   - backend
-aliases:
-  - 백엔드 폴더
+  - index
 ---
 
 # backend
 
 > [!summary] 역할
-> FastAPI 기반의 API 서버와 DB 관리 코드를 담는 폴더.
-> 이번 브랜치 기준으로는 재고 무결성 점검, 모델 관리, 부트스트랩 스크립트가 더 분명하게 분리됐다.
+> FastAPI 서버, DB 모델, 라우터, 서비스, 테스트를 담는 백엔드 루트다.
 
-## 핵심 문서
+## 원본 위치
 
-- [[backend/app/app]] - 앱 내부 구조
-- [[backend/app/main.py.md]] - API 서버 진입점
-- [[backend/app/models.py.md]] - ORM 테이블 정의
-- [[backend/app/schemas.py.md]] - 요청/응답 스키마
-- [[backend/schema.sql.md]] - PostgreSQL 이관용 스키마 파일
-- [[backend/bootstrap_db.py.md]] - DB 초기화/점검용 부트스트랩 스크립트
+- Source: `backend/`
+- File count: `68`
 
 ## 하위 허브
 
-- [[backend/app/routers/routers]] - API 엔드포인트
-- [[backend/app/services/services]] - 비즈니스 로직
-- [[backend/app/utils/utils]] - 유틸리티 함수
+- [[backend/app/app|app]]
+- [[backend/tests/tests|tests]]
 
-## 이번 브랜치에서 눈여겨볼 변경
+## 파일 노트
 
-- `main.py` 에서 자동 부트스트랩 책임이 줄고, 명시적 초기화 흐름이 더 또렷해졌다.
-- `app/services/integrity.py` 가 생겨서 재고 합계 불일치 점검/복구 로직이 분리됐다.
-- `app/services/stock_math.py` 가 생겨서 화면과 서비스가 공통 재고 계산식을 재사용할 수 있게 됐다.
-- `app/routers/models.py` 가 생겨서 제품 모델 CRUD가 별도 라우터로 분리됐다.
-- 운영 보조 스크립트가 늘어 `bootstrap_db.py`, `assign_models.py`, `fix_unclassified.py`, `seed_bom_complete.py` 같은 정비 도구가 추가됐다.
+- [[backend/.env.example|.env.example]]
+- [[backend/.gitignore|.gitignore]]
+- [[backend/Dockerfile|Dockerfile]]
+- [[backend/assign_models.py|assign_models.py]]
+- [[backend/bootstrap_db.py|bootstrap_db.py]]
+- [[backend/fix_unclassified.py|fix_unclassified.py]]
+- [[backend/pytest.ini|pytest.ini]]
+- [[backend/requirements.txt|requirements.txt]]
+- [[backend/schema.sql|schema.sql]]
+- [[backend/seed.py|seed.py]]
+- [[backend/seed_bom.py|seed_bom.py]]
+- [[backend/seed_bom_complete.py|seed_bom_complete.py]]
+- [[backend/seed_employees.py|seed_employees.py]]
+- [[backend/seed_packages.py|seed_packages.py]]
+- [[backend/sync_excel_stock.py|sync_excel_stock.py]]
 
-## 실행 메모
+## 읽는 팁
 
-```bash
-cd backend
-python -m uvicorn app.main:app --reload
-```
-
-DB 준비나 정비 작업은 서버 시작과 분리해서 `python bootstrap_db.py --all` 같은 명시적 실행 흐름으로 보는 편이 안전하다.
-
-## 관련 문서
-
-- [[_vault/guides/ERP_MOC]]
-- [[_vault/guides/처음_읽는_사람]]
-- [[docs/ITEM_CODE_RULES.md.md]]
+- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
+- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
 
 Up: [[ERP]]
-

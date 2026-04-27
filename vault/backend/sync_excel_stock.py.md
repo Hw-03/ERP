@@ -4,81 +4,268 @@ project: ERP
 layer: backend
 source_path: backend/sync_excel_stock.py
 status: active
+updated: 2026-04-27
+source_sha: 265948b32528
 tags:
   - erp
   - backend
-  - sync
-  - excel
-  - data
-aliases:
-  - 엑셀 재고 동기화 스크립트
+  - source-file
+  - py
 ---
 
 # sync_excel_stock.py
 
 > [!summary] 역할
-> `data/` 폴더의 원본 엑셀 파일들과 `ERP_Master_DB.csv` 를 읽어서
-> `backend/erp.db`의 `items` / `inventory` 테이블에 동기화하는 스크립트.
+> 원본 프로젝트의 `sync_excel_stock.py` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
 
-> [!info] 처리 흐름
-> 1. `ERP_Master_DB.csv` 에서 품목 마스터 로드
-> 2. 카테고리별로 대응 엑셀 파일·시트 결정
-> 3. 엑셀에서 현재 재고 수량 추출
-> 4. DB 품목과 매칭 → `inventory.warehouse_qty` 업데이트
-> 5. 매칭 실패 품목은 로그로 기록
+## 원본 위치
 
-> [!info] 카테고리-파일 대응표
-> | 카테고리 | 파일 유형 | 파트 |
-> |----------|-----------|------|
-> | RM | 원자재 | 자재창고 |
-> | TA/TF | 조립자재 | 튜닝파트 |
-> | HA/HF | 발생부자재 | 고압파트 |
-> | VA/VF | 발생부자재 | 진공파트 |
-> | BA/BF | 조립자재 | 조립출하 |
-> | FG | 완제품 | 출하 |
+- Source: `backend/sync_excel_stock.py`
+- Layer: `backend`
+- Kind: `source-file`
+- Size: `8666` bytes
 
-> [!warning] 주의
-> - 실행 전 `data/` 폴더의 엑셀 파일이 최신 상태인지 확인할 것
-> - DB를 직접 수정하므로 적용 전 백업 권장
+## 연결
 
-## 실행 방법
+- Parent hub: [[backend/backend|backend]]
+- Related: [[backend/backend]]
 
-```bash
-# 프로젝트 루트 또는 backend/ 에서 실행
-python backend/sync_excel_stock.py
-```
+## 읽는 포인트
+
+- 실제 수정은 원본 파일에서 한다.
+- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+
+## 원본 발췌
+
+> 전체 260줄 중 앞부분만 발췌했다. 실제 수정은 원본 파일을 기준으로 한다.
+
+````python
+"""
+Sync legacy metadata and current stock from ERP Excel workbooks into backend/erp.db.
+
+Usage:
+    python backend/sync_excel_stock.py
+    cd backend && python sync_excel_stock.py
+"""
+
+from __future__ import annotations
+
+import csv
+import os
+import re
+import sys
+from collections import Counter, defaultdict
+from decimal import Decimal
+from pathlib import Path
+
+from openpyxl import load_workbook
+
+
+BACKEND_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BACKEND_DIR.parent
+DATA_DIR = PROJECT_ROOT / "data"
+CSV_PATH = DATA_DIR / "ERP_Master_DB.csv"
+SQLITE_PATH = BACKEND_DIR / "erp.db"
+
+sys.path.insert(0, str(BACKEND_DIR))
+os.environ["DATABASE_URL"] = f"sqlite:///{SQLITE_PATH.as_posix()}"
+
+from app.database import SessionLocal
+from app.models import Inventory, Item
+
+
+CATEGORY_TO_FILE_TYPE: dict[str, str] = {
+    "RM": "원자재",
+    "TA": "조립자재",
+    "TF": "조립자재",
+    "HA": "발생부자재",
+    "HF": "발생부자재",
+    "VA": "발생부자재",
+    "VF": "발생부자재",
+    "AA": "조립자재",
+    "AF": "조립자재",
+    "FG": "완제품",
+}
+
+CATEGORY_TO_PART: dict[str, str] = {
+    "RM": "자재창고",
+    "TA": "튜닝파트",
+    "TF": "튜닝파트",
+    "HA": "고압파트",
+    "HF": "고압파트",
+    "VA": "진공파트",
+    "VF": "진공파트",
+    "AA": "조립출하",
+    "AF": "조립출하",
+    "FG": "출하",
+}
+
+
+def normalize_text(value: object | None) -> str:
+    if value is None:
+        return ""
+    text = str(value).replace("\n", " ").strip()
+    return re.sub(r"\s+", " ", text)
+
+
+def to_decimal(value: object | None) -> Decimal | None:
+    if value in (None, ""):
+        return None
+    try:
+        return Decimal(str(value).replace(",", "").strip())
+    except Exception:
+        return None
+
+
+def to_number(value: object | None) -> float:
+    if value in (None, ""):
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(str(value).replace(",", "").strip())
+    except Exception:
+        return 0.0
+
+
+def load_master_rows() -> list[dict[str, str]]:
+    with CSV_PATH.open("r", encoding="utf-8-sig", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
+def apply_metadata(db, rows: list[dict[str, str]]) -> int:
+    updated = 0
+    for row in rows:
+        item_code = (row.get("item_id") or "").strip()
+        if not item_code:
+            continue
+
+        raw_category_code = (row.get("category_code") or "").strip().upper()
+        changed = (
+            db.query(Item)
+            .filter(Item.item_code == item_code)
+            .update(
+                {
+                    Item.barcode: item_code,
+                    Item.legacy_file_type: CATEGORY_TO_FILE_TYPE.get(raw_category_code, "미분류"),
+                    Item.legacy_part: CATEGORY_TO_PART.get(raw_category_code, "자재창고"),
+                    Item.legacy_item_type: normalize_text(row.get("part_type")) or None,
+                    Item.legacy_model: normalize_text(row.get("model_ref")) or "공용",
+                    Item.supplier: normalize_text(row.get("supplier")) or None,
+                    Item.min_stock: to_decimal(row.get("safety_stock")),
+                },
+                synchronize_session=False,
+            )
+        )
+        updated += changed
+
+    return updated
+
+
+def queue_rows(rows: list[dict[str, str]]):
+    by_name_spec: dict[tuple[str, str], list[str]] = defaultdict(list)
+    by_name: dict[str, list[str]] = defaultdict(list)
+
+    for row in rows:
+        item_code = (row.get("item_id") or "").strip()
+        if not item_code:
+            continue
+        name = normalize_text(row.get("original_name_a") or row.get("std_name"))
+        spec = normalize_text(row.get("std_spec"))
+        by_name_spec[(name, spec)].append(item_code)
+        by_name[name].append(item_code)
+
+    return by_name_spec, by_name
+
+
+def consume_match(
+    name: str,
+    spec: str,
+    by_name_spec: dict[tuple[str, str], list[str]],
+    by_name: dict[str, list[str]],
+    used: set[str],
+) -> str | None:
+    for queue in (by_name_spec.get((name, spec), []), by_name.get(name, [])):
+        while queue and queue[0] in used:
+            queue.pop(0)
+        if queue:
+            item_code = queue.pop(0)
+            used.add(item_code)
+            return item_code
+    return None
+
+
+def sum_row_cells(ws, row_index: int, start_col: int, end_col: int) -> float:
+    total = 0.0
+    for values in ws.iter_rows(min_row=row_index, max_row=row_index, min_col=start_col, max_col=end_col, values_only=True):
+        for cell in values:
+            total += to_number(cell)
+    return total
+
+
+def load_stock_updates(rows: list[dict[str, str]]) -> list[tuple[str, float, str]]:
+    updates: list[tuple[str, float, str]] = []
+    by_name_spec, by_name = queue_rows(rows)
+    used: set[str] = set()
+
+    f704 = next((path for path in DATA_DIR.iterdir() if path.suffix.lower() == ".xlsx" and path.name.startswith("F704")), None)
+    if f704 is not None:
+        workbook = load_workbook(f704, read_only=True, data_only=True)
+        sheet = workbook["26.03월"] if "26.03월" in workbook.sheetnames else workbook[workbook.sheetnames[-1]]
+        for values in sheet.iter_rows(min_row=4, values_only=True):
+            row = list(values)
+            name = normalize_text(row[3] if len(row) > 3 else None)
+            spec = normalize_text(row[4] if len(row) > 4 else None)
+            if not name:
+                continue
+            quantity = (
+                to_number(row[10] if len(row) > 10 else None)
+                + to_number(row[21] if len(row) > 21 else None)
+                - to_number(row[30] if len(row) > 30 else None)
+                - to_number(row[51] if len(row) > 51 else None)
+            )
+            item_code = consume_match(name, spec, by_name_spec, by_name, used)
+            if item_code:
+                updates.append((item_code, quantity, f704.name))
+
+    for path in DATA_DIR.iterdir():
+        if path.suffix.lower() != ".xlsx" or path.name.startswith("F704"):
+            continue
+
+        workbook = load_workbook(path, read_only=True, data_only=True)
+        main_sheet = workbook[workbook.sheetnames[0]]
+        incoming_sheet = workbook[workbook.sheetnames[1]]
+        outgoing_sheet = workbook[workbook.sheetnames[2]]
+
+        if main_sheet.title == "조립 자재":
+            start_row = 3
+            name_col = 4
+            prev_col = 6
+        else:
+            start_row = 3
+            name_col = 5
+            prev_col = 7
+
+        for row_index, values in enumerate(main_sheet.iter_rows(min_row=start_row, values_only=True), start=start_row):
+            row = list(values)
+            name = normalize_text(row[name_col - 1] if len(row) >= name_col else None)
+            if not name or name in {"품명", "항목"}:
+                continue
+
+            prev_stock = to_number(row[prev_col - 1] if len(row) >= prev_col else None)
+            incoming = sum_row_cells(incoming_sheet, row_index, 6, 36)
+            outgoing = sum_row_cells(outgoing_sheet, row_index, 6, 36)
+            quantity = prev_stock + incoming - outgoing
+
+            item_code = consume_match(name, "", by_name_spec, by_name, used)
+            if item_code:
+                updates.append((item_code, quantity, path.name))
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**엑셀 파일 → DB 직결 동기화 스크립트**. `import_real_inventory.py` 는 "양식 엑셀 1개" 기준, 이건 "부서별 현황 엑셀 3개 + 통합 CSV" 기준.
-
-용도 차이:
-- `scripts/import_real_inventory.py` — 담당자가 수동 작성한 "양식" 기반
-- `backend/sync_excel_stock.py` — 부서별 "자재 현황" 엑셀 직접 스캔 (자동 매칭)
-
-## 매칭 실패 로그
-
-- 품명 변경 / 오타로 DB 품목과 못 찾는 경우
-- 카테고리 불일치 (엑셀엔 BA, DB엔 RM 등)
-- `unmatched.log` 파일로 출력 → 운영자가 수동 보정
-
-## FAQ
-
-**Q. 엑셀 시트 이름 바뀌면?**
-스크립트 내 시트명 하드코딩 부분 수정 필요. 부서별 파일/시트 대응표 참조.
-
-**Q. 부서 production 버킷까지 동기화?**
-현재는 `warehouse_qty` 만. 부서별 수치는 이력(inventory_histories)으로만 추적, 엑셀 원천 자료가 보통 통합 수치라 창고로 수렴.
-
----
-
-## 관련 문서
-
-- [[data/data]] — 원본 엑셀/CSV 파일 목록
-- [[backend/app/utils/excel.py.md]] — 엑셀 파싱 유틸
-- [[backend/app/routers/inventory.py.md]] — 재고 API
-- [[scripts/erp_integration.py.md]] — 엑셀 통합 → `ERP_Master_DB.csv`
-
-Up: [[backend/backend]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

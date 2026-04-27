@@ -4,83 +4,98 @@ project: ERP
 layer: backend
 source_path: backend/app/routers/variance.py
 status: active
+updated: 2026-04-27
+source_sha: 06c6a5180542
 tags:
   - erp
   - backend
   - router
-  - variance
-aliases:
-  - 차이 라우터
-  - BOM 차이 API
+  - py
 ---
 
 # variance.py
 
 > [!summary] 역할
-> BOM 예정 수량과 실제 사용 수량의 차이(Variance)를 기록·조회하는 API.
+> FastAPI 라우터 계층의 `variance` 영역 API 엔드포인트를 담당한다.
 
-> [!info] 주요 책임
-> - `GET /api/variance/` — Variance 목록 조회 (품목·배치 필터)
-> - Variance 레코드는 Queue 배치 확정 시 자동 생성됨
+## 원본 위치
+
+- Source: `backend/app/routers/variance.py`
+- Layer: `backend`
+- Kind: `router`
+- Size: `1711` bytes
+
+## 연결
+
+- Parent hub: [[backend/app/routers/routers|backend/app/routers]]
+- Related: [[backend/backend]]
+
+## 읽는 포인트
+
+- 라우터는 API 표면이다. 요청/응답 계약은 `schemas.py`와 함께 확인한다.
+- DB 변경은 서비스/모델/테스트까지 같이 본다.
+
+## 원본 발췌
+
+````python
+"""Variance log router: BOM expected vs actual 차이 조회 (읽기 전용).
+
+Queue confirm 시 자동 생성됨. UI는 배치 사후 분석과 품목별 누적 편차
+대시보드에서 사용.
+"""
+
+from __future__ import annotations
+
+import uuid
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models import Item, VarianceLog
+from app.schemas import VarianceLogResponse
+
+router = APIRouter()
+
+
+def _to_response(db: Session, log: VarianceLog) -> VarianceLogResponse:
+    item = db.query(Item).filter(Item.item_id == log.item_id).first()
+    return VarianceLogResponse(
+        var_id=log.var_id,
+        batch_id=log.batch_id,
+        item_id=log.item_id,
+        erp_code=item.erp_code if item else None,
+        item_name=item.item_name if item else None,
+        bom_expected=log.bom_expected,
+        actual_used=log.actual_used,
+        diff=log.diff,
+        note=log.note,
+        created_at=log.created_at,
+    )
+
+
+@router.get("", response_model=List[VarianceLogResponse], summary="Variance 로그 조회")
+def list_variance(
+    item_id: Optional[uuid.UUID] = Query(None),
+    batch_id: Optional[uuid.UUID] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    q = db.query(VarianceLog)
+    if item_id:
+        q = q.filter(VarianceLog.item_id == item_id)
+    if batch_id:
+        q = q.filter(VarianceLog.batch_id == batch_id)
+    rows = q.order_by(VarianceLog.created_at.desc()).offset(skip).limit(limit).all()
+    return [_to_response(db, r) for r in rows]
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**Variance(차이)** = BOM 예상치 − 현장 실사용. 읽기 전용 조회 API. 직접 생성 경로는 없고 `queue.py`의 배치 확정 시 자동 기록.
-
-용도: "BOM에선 2개 쓰라고 했는데 실제로 3개 썼다" 같은 편차 누적 분석 → BOM 개정 근거.
-
----
-
-## 엔드포인트
-
-| 경로 | 메서드 | 용도 |
-|------|--------|------|
-| `/api/variance` | GET | 목록 (item_id / batch_id 필터, 최신순) |
-
-응답 (`VarianceLogResponse`):
-```json
-{
-  "var_id": "...",
-  "batch_id": "...",
-  "item_id": "...",
-  "erp_code": "3-AR-0012",
-  "item_name": "튜브",
-  "bom_expected": 2,
-  "actual_used": 3,
-  "diff": 1,
-  "note": null,
-  "created_at": "2026-04-22T10:00:00"
-}
-```
-
-`diff = actual_used - bom_expected`. 양수 = 더 많이 사용, 음수 = 적게 사용.
-
----
-
-## FAQ
-
-**Q. 언제 자동 생성?**
-`queue confirm_batch()` 내부에서 OUT 라인 중 `bom_expected`가 있고 실제 `quantity`와 다른 경우.
-
-**Q. `bom_expected`가 NULL이면?**
-수동 추가한 라인(BOM 기반 아님). Variance 기록 안 됨.
-
-**Q. Variance가 쌓이는 품목은?**
-BOM 수량을 실제에 맞게 조정 고려. `bom.py`의 PATCH로 수정 가능.
-
-**Q. 대시보드 이걸로 만들 수 있나?**
-가능. 품목별 누적 diff 집계 → BOM 정확도 지표. 현재 API는 row만 반환, 집계는 클라이언트에서.
-
----
-
-## 관련 문서
-
-- [[backend/app/routers/queue.py.md]] — Variance 생성 경로
-- [[backend/app/routers/bom.py.md]] — BOM 수량 수정
-- [[backend/app/routers/scrap.py.md]] — 별도 폐기 기록
-- [[backend/app/routers/loss.py.md]]
-- [[backend/app/models.py.md]] — `VarianceLog`
-
-Up: [[backend/app/routers/routers]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

@@ -1,91 +1,156 @@
-﻿---
+---
 type: code-note
 project: ERP
 layer: backend
 source_path: backend/app/routers/scrap.py
 status: active
+updated: 2026-04-27
+source_sha: e2a4e0037b45
 tags:
   - erp
   - backend
   - router
-  - scrap
-aliases:
-  - 스크랩 라우터
-  - 불량 처리 API
+  - py
 ---
 
 # scrap.py
 
 > [!summary] 역할
-> 불량·폐기 처리(Scrap) 기록을 남기는 API. 생산 과정에서 발생한 불량품을 기록한다.
+> FastAPI 라우터 계층의 `scrap` 영역 API 엔드포인트를 담당한다.
 
-> [!info] 주요 책임
-> - `POST /api/scrap/` — 스크랩 기록 등록 (품목, 수량, 공정 단계, 사유)
-> - `GET /api/scrap/` — 스크랩 목록 조회 (품목·배치 필터)
+## 원본 위치
+
+- Source: `backend/app/routers/scrap.py`
+- Layer: `backend`
+- Kind: `router`
+- Size: `3528` bytes
+
+## 연결
+
+- Parent hub: [[backend/app/routers/routers|backend/app/routers]]
+- Related: [[backend/backend]]
+
+## 읽는 포인트
+
+- 라우터는 API 표면이다. 요청/응답 계약은 `schemas.py`와 함께 확인한다.
+- DB 변경은 서비스/모델/테스트까지 같이 본다.
+
+## 원본 발췌
+
+````python
+"""Scrap log router: 폐기(불량) 이력 기록 및 조회."""
+
+from __future__ import annotations
+
+import uuid
+from decimal import Decimal
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models import (
+    Inventory,
+    Item,
+    ScrapLog,
+    TransactionLog,
+    TransactionTypeEnum,
+)
+from app.routers._errors import ErrorCode, http_error
+from app.schemas import ScrapLogCreateRequest, ScrapLogResponse
+from app.services import inventory as inv_svc
+from app.services._tx import commit_and_refresh
+
+router = APIRouter()
+
+
+def _to_response(db: Session, log: ScrapLog) -> ScrapLogResponse:
+    item = db.query(Item).filter(Item.item_id == log.item_id).first()
+    return ScrapLogResponse(
+        scrap_id=log.scrap_id,
+        item_id=log.item_id,
+        erp_code=item.erp_code if item else None,
+        item_name=item.item_name if item else None,
+        quantity=log.quantity,
+        process_stage=log.process_stage,
+        reason=log.reason,
+        batch_id=log.batch_id,
+        operator=log.operator,
+        created_at=log.created_at,
+    )
+
+
+@router.post(
+    "",
+    response_model=ScrapLogResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Scrap(폐기) 기록 + 재고 차감",
+)
+def create_scrap(payload: ScrapLogCreateRequest, db: Session = Depends(get_db)):
+    item = db.query(Item).filter(Item.item_id == payload.item_id).first()
+    if item is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+
+    inv = inv_svc.get_or_create_inventory(db, payload.item_id)
+    wh = inv.warehouse_qty or Decimal("0")
+    pending = inv.pending_quantity or Decimal("0")
+    if wh - pending < payload.quantity:
+        raise http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            ErrorCode.STOCK_SHORTAGE,
+            (
+                f"창고 가용 재고 부족 (창고 {wh}, 예약중 {pending}, "
+                f"요청 {payload.quantity})."
+            ),
+        )
+
+    inv, qty_before = inv_svc.consume_warehouse(db, payload.item_id, payload.quantity)
+
+    log = ScrapLog(
+        item_id=payload.item_id,
+        quantity=payload.quantity,
+        process_stage=payload.process_stage,
+        reason=payload.reason,
+        operator=payload.operator,
+    )
+    db.add(log)
+    db.add(
+        TransactionLog(
+            item_id=payload.item_id,
+            transaction_type=TransactionTypeEnum.SCRAP,
+            quantity_change=-payload.quantity,
+            quantity_before=qty_before,
+            quantity_after=inv.quantity,
+            produced_by=payload.operator,
+            notes=payload.reason,
+        )
+    )
+    commit_and_refresh(db, log)
+    return _to_response(db, log)
+
+
+@router.get("", response_model=List[ScrapLogResponse], summary="Scrap 로그 조회")
+def list_scrap(
+    item_id: Optional[uuid.UUID] = Query(None),
+    batch_id: Optional[uuid.UUID] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    q = db.query(ScrapLog)
+    if item_id:
+        q = q.filter(ScrapLog.item_id == item_id)
+    if batch_id:
+        q = q.filter(ScrapLog.batch_id == batch_id)
+    rows = q.order_by(ScrapLog.created_at.desc()).offset(skip).limit(limit).all()
+    return [_to_response(db, r) for r in rows]
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**Scrap(스크랩/폐기)** = 내가 불량 판단해서 버리는 행위. **항상 창고 가용분에서 차감** (Loss와 달리 선택 아님).
-
-공정 단계(`process_stage`)를 지정해 "어느 공정에서 폐기했는지" 추적 가능.
-
----
-
-## 엔드포인트
-
-| 경로 | 메서드 | 용도 |
-|------|--------|------|
-| `/api/scrap` | POST | 폐기 기록 + 재고 차감 |
-| `/api/scrap` | GET | 목록 (item_id / batch_id 필터) |
-
-### 요청
-```json
-POST /api/scrap
-{
-  "item_id": "...",
-  "quantity": 1,
-  "process_stage": "AR",
-  "reason": "용접 크랙 발견",
-  "operator": "김현우"
-}
-```
-
-### 처리
-```
-1. 창고 가용 검사 (wh - pending) >= qty?
-   부족 → 422
-2. ScrapLog 생성 (process_stage 포함)
-3. warehouse_qty -= qty
-4. TransactionLog(SCRAP, -qty)
-5. commit
-```
-
----
-
-## FAQ
-
-**Q. 부서 PRODUCTION에 있는 걸 Scrap하려면?**
-직접 이 API로는 불가(창고만 대상). 먼저 `transfer-to-warehouse`로 창고 복귀 후 Scrap. 또는 `mark-defective`로 DEFECTIVE 격리 → `supplier-return` 경로.
-
-**Q. `process_stage` 용도?**
-누적 집계해 어느 공정에서 불량이 자주 나는지 분석. 실제 재고 로직엔 영향 없음.
-
-**Q. 배치와 연결된 Scrap?**
-Queue 배치 확정 시 SCRAP direction 라인은 자동으로 `ScrapLog` 생성 + `batch_id` 링크.
-
-**Q. Scrap 취소?**
-API 없음. 잘못 찍었으면 `receive` 로 되돌려 입고 + 메모에 참조.
-
----
-
-## 관련 문서
-
-- [[backend/app/routers/loss.py.md]] — Loss(원인 불명) 비교
-- [[backend/app/routers/queue.py.md]] — 배치 내 SCRAP 라인
-- [[backend/app/routers/variance.py.md]]
-- [[backend/app/models.py.md]] — `ScrapLog`
-- 용어 사전 — Scrap / Loss / Variance
-
-Up: [[backend/app/routers/routers]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

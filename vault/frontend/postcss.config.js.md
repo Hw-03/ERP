@@ -4,45 +4,52 @@ project: ERP
 layer: frontend
 source_path: frontend/postcss.config.js
 status: active
+updated: 2026-04-27
+source_sha: 81781ed39dc8
 tags:
   - erp
   - frontend
-  - styles
-  - config
-aliases:
-  - PostCSS 설정
+  - source-file
+  - js
 ---
 
 # postcss.config.js
 
 > [!summary] 역할
-> CSS 변환 파이프라인을 정의하는 PostCSS 설정 파일.
-> Tailwind CSS와 autoprefixer를 플러그인으로 등록한다.
+> 원본 프로젝트의 `postcss.config.js` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
 
-> [!info] 포함 플러그인
-> - `tailwindcss` — Tailwind CSS 처리
-> - `autoprefixer` — 브라우저 호환 CSS 접두사 자동 추가
+## 원본 위치
+
+- Source: `frontend/postcss.config.js`
+- Layer: `frontend`
+- Kind: `source-file`
+- Size: `83` bytes
+
+## 연결
+
+- Parent hub: [[frontend/frontend|frontend]]
+- Related: [[frontend/frontend]]
+
+## 읽는 포인트
+
+- 실제 수정은 원본 파일에서 한다.
+- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+
+## 원본 발췌
+
+````js
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**CSS 전처리 파이프라인 정의**. Next.js 빌드 시 모든 CSS 파일이 이 파이프라인을 통과 → Tailwind 클래스를 실제 CSS 로 변환 + 브라우저별 접두사(`-webkit-`) 자동 추가.
-
-건드릴 일 거의 없음. Tailwind 기본 구성에 포함되어 있음.
-
-## FAQ
-
-**Q. 추가 플러그인 넣고 싶다면?**
-예: `cssnano` (최적화), `postcss-nested` (중첩 문법). `plugins` 객체에 추가하면 됨.
-
-**Q. 빌드 속도 느림?**
-`tailwindcss` 가 content scan 하는 시간. `content` 경로 최소화로 개선.
-
----
-
-## 관련 문서
-
-- [[frontend/tailwind.config.ts.md]] — Tailwind 상세 설정
-
-Up: [[frontend/frontend]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

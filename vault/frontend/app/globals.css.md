@@ -4,81 +4,216 @@ project: ERP
 layer: frontend
 source_path: frontend/app/globals.css
 status: active
+updated: 2026-04-27
+source_sha: ab7160069fb6
 tags:
   - erp
   - frontend
-  - styles
-  - theme
+  - source-file
   - css
-aliases:
-  - 글로벌 CSS
 ---
 
 # globals.css
 
 > [!summary] 역할
-> 전체 앱에 적용되는 **CSS 변수(테마 팔레트)와 Tailwind 기본 설정**을 정의하는 파일.
-> 다크/라이트 모드 전환의 핵심으로, 모든 컴포넌트가 이 변수를 참조한다.
+> 원본 프로젝트의 `globals.css` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
 
-> [!info] CSS 변수 체계 (다크 모드 기본)
-> | 변수 | 설명 | 기본값 |
-> |------|------|--------|
-> | `--c-bg` | 최외곽 배경 | `#07101d` (매우 진한 네이비) |
-> | `--c-s1` ~ `--c-s4` | 레이어별 배경 (밝아지는 순) | 반투명 네이비 |
-> | `--c-border` | 테두리 기본 | 연한 하늘색 12% |
-> | `--c-blue` | 주 강조색 | `#65a9ff` |
-> | `--c-green` | 성공/정상 | `#43d39d` |
-> | `--c-red` | 위험/오류 | `#ff7b7b` |
-> | `--c-yellow` | 경고 | `#f6c667` |
-> | `--c-purple` | 보조 강조 | `#8e7dff` |
-> | `--c-cyan` | 보조 강조 2 | `#4ec9f5` |
+## 원본 위치
 
-> [!info] 라이트 모드
-> `[data-theme="light"]` 선택자로 CSS 변수를 흰 배경 계열로 오버라이드.
-> `ThemeToggle` 컴포넌트가 `data-theme` 속성을 토글한다.
+- Source: `frontend/app/globals.css`
+- Layer: `frontend`
+- Kind: `source-file`
+- Size: `4541` bytes
+
+## 연결
+
+- Parent hub: [[frontend/app/app|frontend/app]]
+- Related: [[frontend/frontend]]
+
+## 읽는 포인트
+
+- 실제 수정은 원본 파일에서 한다.
+- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+
+## 원본 발췌
+
+````css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #08111f;
+    --foreground: #edf2fb;
+    --c-bg: #07101d;
+    --c-s1: rgba(11, 21, 36, 0.92);
+    --c-s2: rgba(18, 31, 51, 0.92);
+    --c-s3: rgba(28, 44, 68, 0.9);
+    --c-s4: rgba(39, 58, 87, 0.88);
+    --c-border: rgba(165, 190, 220, 0.12);
+    --c-border-strong: rgba(149, 197, 255, 0.28);
+    --c-blue: #65a9ff;
+    --c-green: #43d39d;
+    --c-red: #ff7b7b;
+    --c-yellow: #f6c667;
+    --c-purple: #8e7dff;
+    --c-cyan: #4ec9f5;
+    --c-text: #edf2fb;
+    --c-muted: #72829a;
+    --c-muted2: #9badc7;
+    --c-panel-glow: radial-gradient(circle at top right, rgba(101, 169, 255, 0.16), transparent 32%);
+    --c-card-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+    --c-radius-xl: 32px;
+    --c-radius-lg: 24px;
+    --c-radius-md: 18px;
+    --c-radius-sm: 14px;
+    --c-radius-xs: 8px;
+    --c-text-caption: 12px;
+    --c-text-body: 14px;
+    --c-text-title: 16px;
+    --c-text-display: 20px;
+    --c-action: var(--c-blue);
+    --c-ok: var(--c-green);
+    --c-warn: var(--c-yellow);
+    --c-danger: var(--c-red);
+    --pill-hover-mix: 55%;
+    --pill-glow-strength: 75%;
+    --pill-glow-blur: 24px;
+    --pill-inset-ring: 1;
+    --kpi-hover-mix: 28%;
+    --kpi-glow-strength: 65%;
+    --kpi-glow-blur: 32px;
+    --sidebar-hover-mix: 50%;
+    --sidebar-glow-strength: 55%;
+  }
+
+  :root[data-theme="light"] {
+    --c-bg: #eff4fb;
+    --c-s1: rgba(255, 255, 255, 0.92);
+    --c-s2: rgba(244, 247, 252, 0.96);
+    --c-s3: rgba(230, 236, 245, 0.96);
+    --c-s4: rgba(214, 224, 237, 0.98);
+    --c-border: rgba(76, 97, 130, 0.1);
+    --c-border-strong: rgba(70, 122, 222, 0.22);
+    --c-blue: #2f74e7;
+    --c-green: #179f72;
+    --c-red: #d95a5a;
+    --c-yellow: #b98619;
+    --c-purple: #6f59e8;
+    --c-cyan: #078db0;
+    --c-text: #101a2b;
+    --c-muted: #72829a;
+    --c-muted2: #56657e;
+    --c-panel-glow: radial-gradient(circle at top right, rgba(47, 116, 231, 0.08), transparent 36%);
+    --c-card-shadow: 0 24px 64px rgba(45, 70, 106, 0.12);
+    --pill-hover-mix: 14%;
+    --pill-glow-strength: 0%;
+    --pill-glow-blur: 0px;
+    --pill-inset-ring: 0;
+    --kpi-hover-mix: 18%;
+    --kpi-glow-strength: 0%;
+    --kpi-glow-blur: 0px;
+    --sidebar-hover-mix: 18%;
+    --sidebar-glow-strength: 0%;
+  }
+
+  html {
+    font-family: "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: var(--c-bg);
+    color: var(--c-text);
+    min-height: 100vh;
+  }
+
+  /* 스크롤바 스타일 */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--c-s3);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--c-muted);
+  }
+}
+
+@layer components {
+  .card {
+    @apply border p-5;
+    background: var(--c-s1);
+    border-color: var(--c-border);
+    border-radius: var(--c-radius-lg);
+    box-shadow: var(--c-card-shadow);
+    background-image: var(--c-panel-glow);
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+
+  .btn-primary {
+    background: var(--c-blue);
+    @apply rounded-xl px-4 py-2 font-medium text-white transition-colors duration-150 focus:outline-none;
+  }
+
+  .btn-secondary {
+    background: var(--c-s2);
+    color: var(--c-text);
+    @apply rounded-xl px-4 py-2 font-medium transition-colors duration-150 focus:outline-none;
+  }
+}
+
+/* 스크롤바 숨김 (스크롤은 유지) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* 카테고리 흐름 화살표 애니메이션 */
+@keyframes flow {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 1; }
+}
+
+.flow-arrow {
+  animation: flow 2s ease-in-out infinite;
+}
+
+/* 사용자가 동작 감소를 선호하는 경우 모든 자체 애니메이션 무력화 (WCAG 2.3.3). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .flow-arrow,
+  .animate-fade-in,
+  .animate-pulse-slow,
+  [data-anim="sheetUp"] {
+    animation: none !important;
+  }
+}
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**테마 팔레트 본체**. CSS 변수(`--c-bg`, `--c-blue` 등)를 한 번 정의하면 앱 전체 컴포넌트가 이 값을 참조. 테마 바뀔 때 변수값만 바뀌므로 UI 수정 없이 전체 색상 교체.
-
-동작:
-1. `:root` 에 다크 모드 값 정의 (기본)
-2. `[data-theme="light"]` 로 라이트 모드 오버라이드
-3. `ThemeToggle` 이 `document.documentElement.dataset.theme` 를 `"light"` / 제거
-4. 브라우저가 자동으로 관련 변수 재해석 → 전체 리페인트
-
-## 예시: 값 참조
-
-```tsx
-// TypeScript 상수 (legacyUi.ts)
-const LEGACY_COLORS = {
-  bg: "var(--c-bg)",      // 다크: #07101d, 라이트: #ffffff
-  blue: "var(--c-blue)",  // 다크: #65a9ff, 라이트: #2962ff (예시)
-};
-
-// 사용
-<div style={{ background: LEGACY_COLORS.bg }}>
-```
-
-## FAQ
-
-**Q. Tailwind 와의 관계?**
-Tailwind 클래스(`bg-slate-950` 등)와 CSS 변수(`var(--c-bg)`)를 혼용. 레거시 UI 는 변수 중심, 새 UI 는 Tailwind 중심.
-
-**Q. 라이트 모드에서 색상 어색함?**
-라이트 모드 팔레트 매핑이 완벽하지 않은 곳이 남아있음. 수정 시 이 파일 `[data-theme="light"]` 블록에서 해당 변수값 조정.
-
-**Q. 시스템 다크모드 자동 감지?**
-현재는 안 함. `@media (prefers-color-scheme: dark)` 블록 추가하면 가능. 단 `ThemeToggle` 과 충돌 방지 로직 필요.
-
----
-
-## 관련 문서
-
-- [[frontend/app/legacy/_components/legacyUi.ts.md]] — CSS 변수를 TypeScript 상수로 매핑
-- [[frontend/app/legacy/_components/ThemeToggle.tsx.md]] — 테마 전환 컴포넌트
-- [[frontend/tailwind.config.ts.md]] — Tailwind 설정
-
-Up: [[frontend/app/app]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

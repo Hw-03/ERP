@@ -4,64 +4,98 @@ project: ERP
 layer: frontend
 source_path: frontend/app/legacy/_components/AlertsBanner.tsx
 status: active
+updated: 2026-04-27
+source_sha: bbbcfd1bb63f
 tags:
   - erp
   - frontend
-  - component
-  - legacy
-  - alerts
-aliases:
-  - 알림 배너
+  - frontend-component
+  - tsx
 ---
 
 # AlertsBanner.tsx
 
 > [!summary] 역할
-> 화면 상단에 안전재고 미달 알림을 표시하는 배너 컴포넌트.
+> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
 
-> [!info] 주요 책임
-> - 미확인 알림 수 표시
-> - 알림 클릭 시 상세 내용 확인 및 acknowledge 처리
+## 원본 위치
+
+- Source: `frontend/app/legacy/_components/AlertsBanner.tsx`
+- Layer: `frontend`
+- Kind: `frontend-component`
+- Size: `1529` bytes
+
+## 연결
+
+- Parent hub: [[frontend/app/legacy/_components/_components|frontend/app/legacy/_components]]
+- Related: [[frontend/frontend]]
+
+## 읽는 포인트
+
+- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
+- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+
+## 원본 발췌
+
+````tsx
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { api, type StockAlert } from "@/lib/api";
+import { LEGACY_COLORS } from "./legacyUi";
+
+/** Lightweight banner that surfaces unacknowledged alerts.
+ *  Fetched on mount and re-polled every 60s. Click → /alerts. */
+export function AlertsBanner() {
+  const [alerts, setAlerts] = useState<StockAlert[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const rows = await api.listAlerts({ includeAcknowledged: false });
+        if (mounted) setAlerts(rows);
+      } catch {
+        /* ignore */
+      }
+    };
+    void load();
+    const t = setInterval(load, 60_000);
+    return () => {
+      mounted = false;
+      clearInterval(t);
+    };
+  }, []);
+
+  if (alerts.length === 0) return null;
+
+  const safety = alerts.filter((a) => a.kind === "SAFETY").length;
+  const variance = alerts.filter((a) => a.kind === "COUNT_VARIANCE").length;
+
+  return (
+    <Link
+      href="/alerts"
+      className="block rounded-[12px] border px-3 py-2 text-xs font-semibold transition-all hover:brightness-110"
+      style={{
+        background: "rgba(244,185,66,.12)",
+        borderColor: "rgba(244,185,66,.5)",
+        color: LEGACY_COLORS.yellow,
+      }}
+    >
+      ⚠️ 미확인 알림 {alerts.length}건
+      {safety > 0 ? ` · 안전재고 ${safety}` : ""}
+      {variance > 0 ? ` · 실사편차 ${variance}` : ""}
+      <span className="ml-2 opacity-70">→</span>
+    </Link>
+  );
+}
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**상단에 항상 떠 있는 작은 노란 배너**. 미확인 알림(`acknowledged=false`) 이 1개라도 있으면 표시, 없으면 `null` 렌더(사라짐).
-
-마운트 시 `api.listAlerts({ includeAcknowledged: false })` 1회 호출 + **60초마다 자동 재조회**.
-
-클릭 시 `/alerts` 페이지로 이동.
-
----
-
-## 표시 예시
-
-```
-⚠️ 미확인 알림 5건 · 안전재고 3 · 실사편차 2  →
-```
-
-`SAFETY` 와 `COUNT_VARIANCE` 두 종류만 세부 카운트 표시.
-
----
-
-## FAQ
-
-**Q. 알림 놓쳤을 때?**
-최대 60초 지연. 더 빠르게 보려면 폴링 주기 단축(`60_000` → `10_000`).
-
-**Q. 새로운 알림 종류 추가하면 배너에 표시됨?**
-표시는 됨(`alerts.length` 에 포함). 다만 세부 카운트 라벨은 SAFETY/COUNT_VARIANCE 만 하드코딩. 추가 시 코드 수정 필요.
-
-**Q. 왜 Link 로 구현? router.push 로 안 하나?**
-Next.js `<Link>` 가 SSR 이점(pre-fetch). 그냥 `<a>` 보다 빠름.
-
----
-
-## 관련 문서
-
-- [[backend/app/routers/alerts.py.md]] — `/api/alerts`
-- [[frontend/app/alerts/alerts]] — `/alerts` 페이지
-- [[frontend/app/legacy/_components/DesktopLegacyShell.tsx.md]]
-
-Up: [[frontend/app/legacy/_components/_components]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

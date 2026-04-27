@@ -1,160 +1,271 @@
-﻿---
+---
 type: code-note
 project: ERP
 layer: backend
 source_path: backend/app/services/queue.py
 status: active
+updated: 2026-04-27
+source_sha: c814466a25e5
 tags:
   - erp
   - backend
   - service
-  - queue
-aliases:
-  - 큐 서비스
+  - py
 ---
 
-# services/queue.py
+# queue.py
 
 > [!summary] 역할
-> 생산 대기열 배치의 확정·취소 시 실재고 반영과 관련 로그 생성을 처리하는 서비스.
+> 라우터에서 직접 처리하기 무거운 `queue` 비즈니스 로직과 계산 책임을 분리해 담는다.
 
-> [!info] 주요 책임
-> - 배치 확정 시 IN/OUT/SCRAP/LOSS 라인별 재고 반영
-> - Variance(차이) 자동 계산 및 기록
-> - Scrap/Loss 로그 자동 생성
+## 원본 위치
+
+- Source: `backend/app/services/queue.py`
+- Layer: `backend`
+- Kind: `service`
+- Size: `16903` bytes
+
+## 연결
+
+- Parent hub: [[backend/app/services/services|backend/app/services]]
+- Related: [[backend/backend]]
+
+## 읽는 포인트
+
+- 서비스는 라우터보다 안쪽의 업무 규칙을 담는다.
+- 재고 수량이나 BOM 계산은 화면 표시와 실제 거래가 일치해야 한다.
+
+## 원본 발췌
+
+> 전체 439줄 중 앞부분만 발췌했다. 실제 수정은 원본 파일을 기준으로 한다.
+
+````python
+"""Queue batch service: 예약(Pending)/확정(Commit) 2단계 워크플로.
+
+Batch types
+    PRODUCE      — 상위 품목 생산. BOM 자동 확장 → 자식 품목이 OUT 라인(예약),
+                   상위 품목은 confirm 시 IN으로 증가.
+    DISASSEMBLE  — 상위 품목 분해. 상위가 OUT(차감), 자식이 IN(선별 입고)이
+                   되며 included=False인 라인은 폐기/분실로 분기 가능.
+    RETURN       — 상위 품목 반품 입고. 상위가 IN이며, BOM 라인을 호출해
+                   구성품 중 누락된 것을 LOSS로 전환.
+
+Lifecycle
+    1. create_batch(...)  → status=OPEN, BOM 라인 자동 생성, OUT 라인은
+       inventory.pending_quantity에 즉시 예약(Available→Pending 이동).
+    2. override_line_quantity / toggle_line / add_line / remove_line — OPEN
+       상태에서 자유 수정. Pending 증감이 즉시 반영됨.
+    3. confirm_batch(...)  → Pending 정리 + Total 실제 차감(OUT), IN 라인
+       증가, SCRAP/LOSS 로그 생성, variance_logs 기록. TransactionLog에
+       batch_id 심음.
+    4. cancel_batch(...)   → Pending 해제 (Available 복구), status=CANCELLED.
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from decimal import Decimal
+from typing import Iterable, List, Optional, Tuple
+
+from sqlalchemy.orm import Session
+
+from app.models import (
+    Employee,
+    Inventory,
+    Item,
+    LossLog,
+    QueueBatch,
+    QueueBatchStatusEnum,
+    QueueBatchTypeEnum,
+    QueueLine,
+    QueueLineDirectionEnum,
+    ScrapLog,
+    TransactionLog,
+    TransactionTypeEnum,
+    VarianceLog,
+)
+from app.services import inventory as inv_svc
+from app.services.bom import direct_children, explode_bom, merge_requirements
+
+
+# ---------------------------------------------------------------------------
+# Create
+# ---------------------------------------------------------------------------
+
+
+def create_batch(
+    db: Session,
+    *,
+    batch_type: QueueBatchTypeEnum,
+    parent_item_id: Optional[uuid.UUID] = None,
+    parent_quantity: Optional[Decimal] = None,
+    owner: Optional[Employee] = None,
+    owner_name: Optional[str] = None,
+    reference_no: Optional[str] = None,
+    notes: Optional[str] = None,
+    load_bom: bool = True,
+) -> QueueBatch:
+    """Create an OPEN batch. If load_bom=True, auto-populate lines from BOM
+    and apply Pending reservations for OUT lines."""
+    batch = QueueBatch(
+        batch_type=batch_type,
+        status=QueueBatchStatusEnum.OPEN,
+        parent_item_id=parent_item_id,
+        parent_quantity=parent_quantity,
+        owner_employee_id=owner.employee_id if owner else None,
+        owner_name=owner.name if owner else owner_name,
+        reference_no=reference_no,
+        notes=notes,
+    )
+    db.add(batch)
+    db.flush()
+
+    if load_bom and parent_item_id is not None and parent_quantity is not None:
+        _seed_lines_from_bom(db, batch, parent_item_id, parent_quantity)
+
+    return batch
+
+
+def _seed_lines_from_bom(
+    db: Session,
+    batch: QueueBatch,
+    parent_item_id: uuid.UUID,
+    parent_quantity: Decimal,
+) -> None:
+    """Populate initial QueueLines based on batch_type.
+
+    PRODUCE:     depth-expanded leaves as OUT, with Pending reservation.
+    DISASSEMBLE: parent as OUT (Pending), immediate children as IN (no reserve).
+    RETURN:      parent as IN (no reserve), immediate children listed as IN
+                 (user will mark missing ones as LOSS via toggle_line).
+    """
+    if batch.batch_type == QueueBatchTypeEnum.PRODUCE:
+        pairs = merge_requirements(explode_bom(db, parent_item_id, parent_quantity))
+        for item_id, qty in pairs.items():
+            _add_and_reserve(db, batch, item_id, qty, QueueLineDirectionEnum.OUT, bom_expected=qty)
+        # Parent goes IN upon confirm
+        _add_line_no_reserve(
+            db, batch, parent_item_id, parent_quantity, QueueLineDirectionEnum.IN
+        )
+
+    elif batch.batch_type == QueueBatchTypeEnum.DISASSEMBLE:
+        # Parent comes out of inventory
+        _add_and_reserve(db, batch, parent_item_id, parent_quantity, QueueLineDirectionEnum.OUT, bom_expected=parent_quantity)
+        for child_id, each_qty in direct_children(db, parent_item_id):
+            qty = each_qty * parent_quantity
+            _add_line_no_reserve(db, batch, child_id, qty, QueueLineDirectionEnum.IN, bom_expected=qty)
+
+    elif batch.batch_type == QueueBatchTypeEnum.RETURN:
+        _add_line_no_reserve(db, batch, parent_item_id, parent_quantity, QueueLineDirectionEnum.IN, bom_expected=parent_quantity)
+        for child_id, each_qty in direct_children(db, parent_item_id):
+            qty = each_qty * parent_quantity
+            _add_line_no_reserve(db, batch, child_id, qty, QueueLineDirectionEnum.IN, bom_expected=qty)
+
+
+def _add_and_reserve(
+    db: Session,
+    batch: QueueBatch,
+    item_id: uuid.UUID,
+    qty: Decimal,
+    direction: QueueLineDirectionEnum,
+    *,
+    bom_expected: Optional[Decimal] = None,
+) -> QueueLine:
+    inv_svc.reserve(
+        db, item_id, qty,
+        employee_name=batch.owner_name,
+    )
+    line = QueueLine(
+        batch_id=batch.batch_id,
+        item_id=item_id,
+        direction=direction,
+        quantity=qty,
+        bom_expected=bom_expected,
+        included=True,
+    )
+    db.add(line)
+    db.flush()
+    return line
+
+
+def _add_line_no_reserve(
+    db: Session,
+    batch: QueueBatch,
+    item_id: uuid.UUID,
+    qty: Decimal,
+    direction: QueueLineDirectionEnum,
+    *,
+    bom_expected: Optional[Decimal] = None,
+) -> QueueLine:
+    line = QueueLine(
+        batch_id=batch.batch_id,
+        item_id=item_id,
+        direction=direction,
+        quantity=qty,
+        bom_expected=bom_expected,
+        included=True,
+    )
+    db.add(line)
+    db.flush()
+    return line
+
+
+# ---------------------------------------------------------------------------
+# Mutate (OPEN only)
+# ---------------------------------------------------------------------------
+
+
+def _ensure_open(batch: QueueBatch) -> None:
+    if batch.status != QueueBatchStatusEnum.OPEN:
+        raise ValueError(f"배치가 OPEN 상태가 아닙니다 (현재: {batch.status.value}).")
+
+
+def override_line_quantity(
+    db: Session, line: QueueLine, new_qty: Decimal
+) -> QueueLine:
+    """Change quantity of an OPEN line. For OUT lines this adjusts Pending
+    accordingly (delta can be positive or negative)."""
+    if new_qty < 0:
+        raise ValueError("수량은 0 이상이어야 합니다.")
+    batch = line.batch
+    _ensure_open(batch)
+
+    if line.direction == QueueLineDirectionEnum.OUT and line.included:
+        delta = new_qty - line.quantity
+        if delta > 0:
+            inv_svc.reserve(db, line.item_id, delta, employee_name=batch.owner_name)
+        elif delta < 0:
+            inv_svc.release(db, line.item_id, -delta)
+    line.quantity = new_qty
+    return line
+
+
+def toggle_line(
+    db: Session, line: QueueLine, *, included: bool, new_direction: Optional[QueueLineDirectionEnum] = None
+) -> QueueLine:
+    """Enable/disable a line, optionally re-classifying its direction (e.g.
+    mark as LOSS/SCRAP instead of IN). Pending is adjusted for OUT lines."""
+    _ensure_open(line.batch)
+    prev_included = line.included
+    prev_direction = line.direction
+    batch = line.batch
+
+    # Compute effective pending delta: Pending exists only for OUT+included.
+    prev_reserves = prev_included and prev_direction == QueueLineDirectionEnum.OUT
+    new_direction_final = new_direction if new_direction is not None else line.direction
+    new_reserves = included and new_direction_final == QueueLineDirectionEnum.OUT
+
+    if prev_reserves and not new_reserves:
+        inv_svc.release(db, line.item_id, line.quantity)
+    elif not prev_reserves and new_reserves:
+        inv_svc.reserve(db, line.item_id, line.quantity, employee_name=batch.owner_name)
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**생산 대기열(Queue) 배치의 모든 라이프사이클** 관리. 배치 생성 → 수정 → 확정 → 취소까지.
-
-가장 중요한 함수는 `confirm_batch()`. 배치를 확정하면 이 한 함수가 **모든 재고 이동·TransactionLog·ScrapLog/LossLog/VarianceLog 기록**을 한 원자(atomic) 트랜잭션으로 실행.
-
----
-
-## 핵심 함수
-
-### `create_batch(db, payload)`
-- 신규 배치(PRODUCE/DISASSEMBLE/RETURN) 생성 + BOM 기반 OUT 라인 자동 채움.
-- 내부에서 `_seed_lines_from_bom()` 호출.
-- OUT 라인마다 해당 부서의 `InventoryLocation.pending_quantity += qty` (예약 잠금).
-
-### `_seed_lines_from_bom(db, batch, product_item, qty)`
-- 배치 타입별 다른 동작:
-  - **PRODUCE**: `explode_bom()` 결과로 OUT 라인 채우고, 결과 완제품 IN 라인 1개 추가.
-  - **DISASSEMBLE**: `direct_children()` 결과로 IN 라인 채우고(자식 부품 생김), 부모 OUT 라인 1개(부모 소멸).
-  - **RETURN**: DISASSEMBLE 과 유사하나 `is_return=True` 표시.
-
-### `override_line_quantity(db, line_id, new_qty, operator)`
-- OPEN 배치의 특정 라인 수량 수동 덮어쓰기.
-- `bom_expected` 는 그대로 유지, `quantity` 만 변경 → 확정 시 Variance 기록 트리거.
-- pending 재계산(old_pending 해제 후 new_pending 재예약).
-
-### `toggle_line(db, line_id)`
-- OUT/SCRAP/LOSS 라인을 번갈아 전환 (사용자가 "이건 버릴 거"로 바꾸는 동작).
-- `direction` 만 변경.
-
-### `add_line(db, batch_id, item_id, direction, qty, ...)` / `remove_line(db, line_id)`
-- 수동 라인 추가/삭제. BOM 없이 현장 판단으로 자재 추가.
-
-### `confirm_batch(db, batch_id, operator)` ⭐⭐⭐
-- **가장 중요한 함수**. 배치 전체를 실재고에 반영.
-- 라인 처리 순서 고정: **OUT → SCRAP → LOSS → IN** (자재 먼저 빼고 결과물 입고).
-- 각 라인에서:
-  - OUT: 부서 재고(`InventoryLocation`) 차감. `bom_expected != quantity` 면 `VarianceLog` 자동 생성.
-  - SCRAP: 창고 `warehouse_qty` 차감 + `ScrapLog` 생성.
-  - LOSS: 창고 차감(`deduct=True`인 경우) + `LossLog` 생성.
-  - IN: 창고 `warehouse_qty` += qty (DISASSEMBLE의 자식 부품 입고 or PRODUCE의 완제품 입고).
-- 모든 OUT 라인의 pending 예약을 `consume_pending` 으로 실수량 전환.
-- `TransactionLog` 각 라인별 기록.
-- 배치 상태 `OPEN → CONFIRMED`.
-
-### `cancel_batch(db, batch_id, operator)`
-- OPEN 배치를 취소. OUT 라인 pending 전부 `release`.
-- 상태 `OPEN → CANCELLED`.
-- 이미 CONFIRMED 는 취소 불가(되돌리려면 반대 배치 필요).
-
----
-
-## 의사코드 (confirm_batch)
-
-```
-confirm_batch(batch_id):
-  batch = query(Batch, id=batch_id)
-  if batch.status != OPEN: 409
-
-  lines_ordered = sort_by_direction(batch.lines, [OUT, SCRAP, LOSS, IN])
-
-  for line in lines_ordered:
-    match line.direction:
-      OUT:
-        loc = InventoryLocation(item, dept, PRODUCTION)
-        if loc.quantity < line.quantity: 422
-        consume_pending(inv, line.quantity)  # wh 창고에서 실제 차감은 여기
-        loc.quantity -= line.quantity
-        TransactionLog(BACKFLUSH, -qty, batch_id)
-        if line.bom_expected and line.bom_expected != line.quantity:
-          VarianceLog(item, batch, bom_expected, actual=quantity, diff)
-
-      SCRAP:
-        wh_available = warehouse_qty - pending
-        if wh_available < qty: 422
-        warehouse_qty -= qty
-        ScrapLog + TransactionLog(SCRAP, -qty)
-
-      LOSS:
-        if line.deduct:
-          warehouse_qty -= qty
-        LossLog + TransactionLog(LOSS, change)
-
-      IN:
-        warehouse_qty += line.quantity
-        TransactionLog(PRODUCE or DISASSEMBLE, +qty)
-
-  batch.status = CONFIRMED
-  batch.confirmed_at = now()
-  commit
-```
-
----
-
-## 핵심 불변식
-
-- 라인 처리 순서 고정(OUT→SCRAP→LOSS→IN). 바꾸면 재고 일관성 깨짐.
-- OUT 라인의 pending 예약은 CONFIRM 또는 CANCEL 에서만 해소.
-- 한 배치의 라인은 전부 성공하거나 전부 롤백. 부분 확정 없음.
-- Variance는 OUT 라인만 대상 (IN 라인은 Variance 없음).
-
----
-
-## FAQ
-
-**Q. 확정했는데 재고가 부족하면?**
-첫 라인부터 차례로 검사하다 부족하면 422 반환 + 롤백. 배치는 OPEN 유지.
-
-**Q. 확정 후 실수 발견?**
-취소 불가. 반대 방향 배치(예: PRODUCE → DISASSEMBLE)를 새로 만들어 수동 보정.
-
-**Q. 라인 처리 순서가 왜 OUT → IN?**
-자재(OUT)를 먼저 빼고 완제품(IN)을 받는다. 반대로 하면 "완제품은 생겼는데 자재가 없어서 차감 실패" 같은 중간 이상 상태.
-
-**Q. BOM 없이 현장에서 라인 추가하면?**
-`add_line()` 으로 `bom_expected=None` 인 라인 생성. 확정 시 Variance는 기록 안 함(bom_expected 없으므로).
-
-**Q. Variance는 언제 기록?**
-OUT 라인에 `bom_expected` 값이 있고 실제 `quantity` 와 다를 때만. `bom_expected` NULL이면 건너뜀.
-
----
-
-## 관련 문서
-
-- [[backend/app/routers/queue.py.md]]
-- [[backend/app/routers/variance.py.md]]
-- [[backend/app/services/inventory.py.md]] — 버킷 이동 헬퍼
-- [[backend/app/services/bom.py.md]] — `explode_bom`, `direct_children`
-- [[backend/app/models.py.md]] — `Batch`, `BatchLine`, `VarianceLog`
-- 생산 배치 시나리오
-- 분해 반품 시나리오
-
-Up: [[backend/app/services/services]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

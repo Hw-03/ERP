@@ -4,75 +4,124 @@ project: ERP
 layer: backend
 source_path: backend/seed_bom.py
 status: active
+updated: 2026-04-27
+source_sha: 5e07b2436d54
 tags:
   - erp
   - backend
-  - seed
-  - bom
-aliases:
-  - BOM 시드 스크립트
+  - source-file
+  - py
 ---
 
 # seed_bom.py
 
 > [!summary] 역할
-> DB에 계층적 BOM(자재 명세서) 샘플 데이터를 자동으로 생성하는 스크립트.
-> 개발/테스트 환경에서 BOM 트리 구조를 미리 만들어 두기 위해 사용한다.
+> 원본 프로젝트의 `seed_bom.py` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
 
-> [!info] 생성 구조
-> - **Level 1**: BA 품목 상위 10개를 부모로, TA/HA/VA/RM 혼합 자식 10개씩 연결
-> - **Level 2**: Level 1 자식 중 TA/HA/VA 6개를 부모로, RM 자식 5개씩 연결
-> - 수량은 1~8 사이 랜덤, 단위는 `EA`
-> - 중복 BOM 항목은 자동 스킵
+## 원본 위치
 
-> [!warning] 주의
-> 이 스크립트는 **테스트용 가상 BOM**을 생성한다.
-> 실제 제품 BOM 데이터와는 다르며, `random.seed(42)` 로 고정되어 있어 실행마다 동일한 결과가 나온다.
+- Source: `backend/seed_bom.py`
+- Layer: `backend`
+- Kind: `source-file`
+- Size: `2646` bytes
 
-## 실행 방법
+## 연결
 
-```bash
-cd backend
-python seed_bom.py
-```
+- Parent hub: [[backend/backend|backend]]
+- Related: [[backend/backend]]
+
+## 읽는 포인트
+
+- 실제 수정은 원본 파일에서 한다.
+- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+
+## 원본 발췌
+
+````python
+"""BOM 계층적 생성 스크립트.
+구조:
+  Level 1: AA 품목 상위 10개 → TA/HA/VA/RM 자식 10개씩
+  Level 2: TA/HA/VA 중 6개 → RM 자식 5개씩
+"""
+import sys
+import os
+import random
+import uuid
+from decimal import Decimal
+
+sys.path.insert(0, os.path.dirname(__file__))
+
+from app.database import SessionLocal
+from app.models import Item, BOM, CategoryEnum
+
+random.seed(42)
+
+
+def add_bom(db, existing: set, parent: Item, child: Item, qty: int) -> bool:
+    key = (str(parent.item_id), str(child.item_id))
+    if key in existing or parent.item_id == child.item_id:
+        return False
+    db.add(BOM(
+        bom_id=uuid.uuid4(),
+        parent_item_id=parent.item_id,
+        child_item_id=child.item_id,
+        quantity=Decimal(str(qty)),
+        unit="EA",
+    ))
+    existing.add(key)
+    return True
+
+
+def main() -> None:
+    db = SessionLocal()
+    try:
+        ba_items = db.query(Item).filter(Item.category == CategoryEnum.AA).all()
+        ta_items = db.query(Item).filter(Item.category == CategoryEnum.TA).all()
+        ha_items = db.query(Item).filter(Item.category == CategoryEnum.HA).all()
+        va_items = db.query(Item).filter(Item.category == CategoryEnum.VA).all()
+        rm_items = db.query(Item).filter(Item.category == CategoryEnum.RM).all()
+
+        if not ba_items:
+            print("AA 카테고리 품목이 없습니다.")
+            return
+
+        existing: set = set()
+        created = 0
+
+        # Level 1: AA 상위 10개를 부모로, TA/HA/VA/RM 섞어서 각 10개씩
+        l1_parents = ba_items[:10]
+        child_pool = ta_items + ha_items + va_items + rm_items
+
+        for parent in l1_parents:
+            candidates = [c for c in child_pool if c.item_id != parent.item_id]
+            targets = random.sample(candidates, min(10, len(candidates)))
+            for child in targets:
+                if add_bom(db, existing, parent, child, random.randint(1, 8)):
+                    created += 1
+
+        # Level 2: TA/HA/VA 각 2개씩(총 6개)를 부모로, RM 자식 5개씩
+        l2_pool = ta_items[:2] + ha_items[:2] + va_items[:2]
+        for parent in l2_pool:
+            targets = random.sample(rm_items, min(5, len(rm_items)))
+            for child in targets:
+                if add_bom(db, existing, parent, child, random.randint(1, 5)):
+                    created += 1
+
+        db.commit()
+        print(f"BOM {created}개 생성 완료.")
+        print(f"  Level1 부모 (AA): {[p.item_name for p in l1_parents]}")
+    finally:
+        db.close()
+
+
+if __name__ == "__main__":
+    main()
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**테스트용 BOM(제품 하나를 만들 때 필요한 자재 목록) 트리를 자동으로 깔아주는 스크립트**. 실제 BOM 과 무관. UI 에서 "BOM 이 어떻게 보이는지" 테스트할 때 사용.
-
-`random.seed(42)` 고정 → 실행해도 항상 같은 구조 생성.
-
-## 생성 예시
-
-```
-BA 품목 0 (완성품 A)
- ├── TA 자재 1 (수량 3)
- ├── HA 자재 4 (수량 5)
- ├── RM 자재 7 (수량 2)
- └── ...(총 10개 자식)
-
-TA 자재 1 (조립 하위)
- ├── RM 자재 12 (수량 1)
- ├── RM 자재 15 (수량 8)
- └── ...(총 5개 자식)
-```
-
-## FAQ
-
-**Q. 실제 운영 BOM 에 덮어쓰지?**
-신규 BOM 만 추가. 기존 `(parent, child)` 쌍 있으면 스킵.
-
-**Q. MAX_DEPTH 10 에 걸리지?**
-이 스크립트는 Level 2 까지만 생성하므로 여유 충분.
-
----
-
-## 관련 문서
-
-- [[backend/seed.py.md]] — 기본 품목(Item) 시드
-- [[backend/app/routers/bom.py.md]] — BOM API 라우터
-- [[backend/app/services/bom.py.md]] — BOM 비즈니스 로직
-
-Up: [[backend/backend]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

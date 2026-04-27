@@ -1,108 +1,140 @@
-﻿---
+---
 type: code-note
 project: ERP
 layer: backend
 source_path: backend/app/services/bom.py
 status: active
+updated: 2026-04-27
+source_sha: 7bde2908048b
 tags:
   - erp
   - backend
   - service
-  - bom
-aliases:
-  - BOM 서비스
+  - py
 ---
 
-# services/bom.py
+# bom.py
 
 > [!summary] 역할
-> BOM 트리를 재귀적으로 조회하는 비즈니스 로직. 다단계 부품 구조를 트리 형태로 반환한다.
+> 라우터에서 직접 처리하기 무거운 `bom` 비즈니스 로직과 계산 책임을 분리해 담는다.
 
-> [!info] 주요 책임
-> - 재귀 BOM 트리 조회 (부모→자식→손자 구조)
-> - 각 노드에 현재 재고 수량 포함
-> - 생산 가능 여부 계산에 사용
+## 원본 위치
+
+- Source: `backend/app/services/bom.py`
+- Layer: `backend`
+- Kind: `service`
+- Size: `3121` bytes
+
+## 연결
+
+- Parent hub: [[backend/app/services/services|backend/app/services]]
+- Related: [[backend/backend]]
+
+## 읽는 포인트
+
+- 서비스는 라우터보다 안쪽의 업무 규칙을 담는다.
+- 재고 수량이나 BOM 계산은 화면 표시와 실제 거래가 일치해야 한다.
+
+## 원본 발췌
+
+````python
+"""BOM expansion utilities shared by production and queue services."""
+
+from __future__ import annotations
+
+import uuid
+from decimal import Decimal
+from typing import Dict, List, Optional, Tuple
+
+from sqlalchemy.orm import Session
+
+from app.models import BOM
+
+
+MAX_DEPTH = 10
+
+# parent_item_id -> List[(child_item_id, per-unit quantity)]
+BomCache = Dict[uuid.UUID, List[Tuple[uuid.UUID, Decimal]]]
+
+
+def build_bom_cache(db: Session) -> BomCache:
+    """모든 BOM 행을 한 번에 읽어 parent → children 매핑을 반환.
+
+    여러 품목을 연속으로 explode 해야 하는 호출자(/capacity 등)는
+    이 캐시를 한 번만 만들고 explode_bom 의 cache 인자로 재사용한다.
+    """
+    cache: BomCache = {}
+    for row in db.query(BOM).all():
+        cache.setdefault(row.parent_item_id, []).append((row.child_item_id, row.quantity))
+    return cache
+
+
+def explode_bom(
+    db: Session,
+    parent_item_id: uuid.UUID,
+    qty_to_produce: Decimal,
+    depth: int = 0,
+    visited: frozenset = frozenset(),
+    *,
+    cache: Optional[BomCache] = None,
+) -> List[Tuple[uuid.UUID, Decimal]]:
+    """Expand a BOM recursively into flat leaf component requirements.
+
+    - cache 가 주어지면 추가 쿼리 없이 메모리에서 전개 (배치 호출 최적).
+    - 없으면 진입 시 1회만 BOM 전체를 읽어 캐시로 사용 (재귀 내 N+1 제거).
+    """
+    if cache is None:
+        cache = build_bom_cache(db)
+    return _explode_with_cache(parent_item_id, qty_to_produce, depth, visited, cache)
+
+
+def _explode_with_cache(
+    parent_item_id: uuid.UUID,
+    qty_to_produce: Decimal,
+    depth: int,
+    visited: frozenset,
+    cache: BomCache,
+) -> List[Tuple[uuid.UUID, Decimal]]:
+    if depth > MAX_DEPTH or parent_item_id in visited:
+        return []
+
+    visited = visited | {parent_item_id}
+    result: List[Tuple[uuid.UUID, Decimal]] = []
+
+    for child_id, per_unit_qty in cache.get(parent_item_id, []):
+        required_qty = per_unit_qty * qty_to_produce
+        if child_id in cache:
+            # child 가 자체 BOM 을 가지면 leaf 까지 더 내려간다
+            result.extend(_explode_with_cache(child_id, required_qty, depth + 1, visited, cache))
+        else:
+            result.append((child_id, required_qty))
+
+    return result
+
+
+def merge_requirements(
+    pairs: List[Tuple[uuid.UUID, Decimal]],
+) -> Dict[uuid.UUID, Decimal]:
+    """Aggregate requirements from explode_bom into {item_id: total_qty}."""
+    merged: Dict[uuid.UUID, Decimal] = {}
+    for item_id, qty in pairs:
+        merged[item_id] = merged.get(item_id, Decimal("0")) + qty
+    return merged
+
+
+def direct_children(db: Session, parent_item_id: uuid.UUID) -> List[Tuple[uuid.UUID, Decimal]]:
+    """Return only the first level of BOM children (for disassembly/return
+    where we want to present the immediate components rather than leaves)."""
+    return [
+        (entry.child_item_id, entry.quantity)
+        for entry in db.query(BOM).filter(BOM.parent_item_id == parent_item_id).all()
+    ]
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**BOM 폭파(Explode)** = "제품 1개 만들려면 최하위 부품이 몇 개 필요한가"를 계산해내는 로직.
-
-예: ADX6000FB 1대 만드는데 → BOM에 "본체 1 + 케이블 2"가 있고, "본체" 또한 BOM이 있어 "보드 1 + 케이스 1"로 이루어져 있다면 → 최종 리프 부품으로 `보드 1, 케이스 1, 케이블 2`를 반환.
-
-즉 중간 조립체는 투명하게 내려가고 **실제 창고에서 꺼내야 할 가장 말단 부품만** 남긴다. 이걸 쓰면 생산 배치 생성 시 "자재 얼마나 필요한가"를 자동으로 계산할 수 있다.
-
----
-
-## 핵심 함수
-
-### `explode_bom(db, parent_item_id, qty_to_produce, depth=0, visited=frozenset())`
-- 재귀적으로 BOM을 리프까지 전개.
-- `(child_item_id, required_qty)` 튜플 리스트 반환.
-- **depth 제한**: `MAX_DEPTH = 10`. 10단 넘으면 빈 리스트 반환(무한 재귀 차단).
-- **순환 방지**: `visited` 프로즌셋에 부모 id 누적. 이미 방문한 id가 부모로 돌아오면 중단.
-- 자식이 또 BOM을 가지면 재귀, 없으면 리프로 결과에 추가.
-
-### `merge_requirements(pairs)`
-- `[(id, qty), (id, qty), ...]` 리스트를 `{id: total_qty}` dict로 합산.
-- 같은 부품이 여러 번 나오면 수량을 더함.
-
-### `direct_children(db, parent_item_id)`
-- 한 단계만 내려가서 **직접 자식만** 반환.
-- 용도: 분해(DISASSEMBLE) / 반품(RETURN) 시 "바로 아래 부품"을 보여줘야 할 때 (리프까지 내려가면 안 됨).
-
----
-
-## 의사코드 (explode_bom)
-
-```
-explode_bom(parent_id, qty, depth, visited):
-  if depth > 10 or parent_id in visited:
-    return []
-  visited = visited + {parent_id}
-  result = []
-  for each BOM row where parent = parent_id:
-    required = row.quantity * qty
-    if 자식에게도 BOM 있음:
-      result += explode_bom(자식, required, depth+1, visited)
-    else:
-      result += [(자식, required)]
-  return result
-```
-
----
-
-## 누가 호출하나
-
-- `services/queue.py::_seed_lines_from_bom()` — 배치 생성 시 OUT 라인 자동 채움.
-- `routers/production.py::receipt_confirmed()` — 백플러시(BACKFLUSH)로 자재 차감.
-- `routers/bom.py::GET /tree` — 간접 사용(별도 재귀).
-
----
-
-## FAQ
-
-**Q. 왜 리프만 반환?**
-중간 조립체는 실물이 창고에 없고 논리 단위일 뿐. 실제 차감 대상은 가장 말단 부품.
-
-**Q. 중간 조립체가 진짜 재고로 존재하는 경우?**
-그 중간 조립체의 BOM을 비워두면 리프로 취급돼 그 자체가 차감 대상이 된다.
-
-**Q. 순환 참조가 있으면?**
-`A→B→A` 같은 순환은 `visited`가 막는다. 빈 결과 반환 → 경고는 별도 없음, 사용자가 BOM 편집 시 주의.
-
-**Q. depth 10 초과 시 동작?**
-조용히 빈 리스트 반환. 10단 구조 설계는 비현실적이므로 실사용에선 안 걸림.
-
----
-
-## 관련 문서
-
-- [[backend/app/routers/bom.py.md]]
-- [[backend/app/routers/production.py.md]]
-- [[backend/app/services/queue.py.md]] — `_seed_lines_from_bom`
-- [[backend/app/models.py.md]] — `BOM` 테이블
-- 생산 배치 시나리오
-
-Up: [[backend/app/services/services]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

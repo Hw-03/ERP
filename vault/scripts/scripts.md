@@ -2,52 +2,34 @@
 type: index
 project: ERP
 layer: scripts
+source_path: scripts/
 status: active
+updated: 2026-04-27
 tags:
   - erp
   - scripts
-  - utility
-aliases:
-  - 스크립트 폴더
+  - index
 ---
 
 # scripts
 
 > [!summary] 역할
-> 데이터 정리, DB 점검, 이관, 보조 생성 작업을 수동으로 돌리는 스크립트 폴더.
-> 서비스 코드와 분리된 운영 보조 도구들이 계속 모이는 곳이다.
+> `scripts/` 아래 원본 파일들을 Obsidian에서 탐색하기 위한 폴더 허브다.
 
-## 핵심 스크립트
+## 원본 위치
 
-| 파일 | 역할 |
-|---|---|
-| [[scripts/erp_integration.py.md]] | 엑셀 원본을 ERP CSV로 통합 |
-| [[scripts/import_real_inventory.py.md]] | 실제 재고 양식을 DB 반영 |
-| [[scripts/migrate_erp_schema.py.md]] | 스키마 마이그레이션 |
-| [[scripts/reapply_erp_codes.py.md]] | ERP 코드 재계산 |
-| [[scripts/check_db.py.md]] | DB 상태 점검 |
-| [[scripts/fix_legacy_items.py.md]] | 기존 품목 데이터 정리 |
-| [[scripts/migrate_bf_to_af.py.md]] | 코드 규칙 변경 보정 |
-| [[scripts/generate_devlog.py.md]] | 개발 로그 생성 |
-| [[scripts/split_logo.py.md]] | 로고 자산 분할 |
+- Source: `scripts/`
+- File count: `32`
 
-## 이번 브랜치 포인트
+## 하위 허브
 
-- 운영 점검용 `check_db.py` 가 추가됐다.
-- 코드 규칙 정리와 관련된 보정 스크립트가 늘었다.
-- 이미지 자산 처리용 `split_logo.py` 와 `split_logos/` 폴더가 생겼다.
+- [[scripts/dev/dev|dev]]
+- [[scripts/migrations/migrations|migrations]]
+- [[scripts/ops/ops|ops]]
 
-## 실행 전 주의
+## 읽는 팁
 
-- 대상 DB 파일과 경로를 먼저 확인한다.
-- dry-run 옵션이 있으면 먼저 미리보기로 확인한다.
-- 결과가 실제 운영 데이터에 들어가는지 항상 체크한다.
-
-## 관련 문서
-
-- [[data/data]]
-- [[docs/ITEM_CODE_RULES.md.md]]
-- [[backend/backend]]
+- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
+- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
 
 Up: [[ERP]]
-

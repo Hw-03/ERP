@@ -4,94 +4,181 @@ project: ERP
 layer: backend
 source_path: backend/app/routers/alerts.py
 status: active
+updated: 2026-04-27
+source_sha: e28e7e2e0b3a
 tags:
   - erp
   - backend
   - router
-  - alerts
-aliases:
-  - 알림 라우터
-  - 안전재고 알림 API
+  - py
 ---
 
 # alerts.py
 
 > [!summary] 역할
-> 안전재고 이하로 떨어진 품목에 대한 알림을 생성하고 관리하는 API.
+> FastAPI 라우터 계층의 `alerts` 영역 API 엔드포인트를 담당한다.
 
-> [!info] 주요 책임
-> - `POST /api/alerts/scan` — 전체 품목 스캔 후 안전재고 미달 항목 알림 생성
-> - `GET /api/alerts/` — 알림 목록 조회 (종류·확인여부·품목 필터)
-> - `POST /api/alerts/{alert_id}/acknowledge` — 알림 확인 처리
+## 원본 위치
 
-> [!warning] 주의
-> - 알림 종류: `SAFETY`(안전재고 미달), `COUNT_VARIANCE`(실물 조사 차이)
-> - 확인(acknowledge)하지 않은 알림은 계속 표시됨
+- Source: `backend/app/routers/alerts.py`
+- Layer: `backend`
+- Kind: `router`
+- Size: `4894` bytes
+
+## 연결
+
+- Parent hub: [[backend/app/routers/routers|backend/app/routers]]
+- Related: [[backend/backend]]
+
+## 읽는 포인트
+
+- 라우터는 API 표면이다. 요청/응답 계약은 `schemas.py`와 함께 확인한다.
+- DB 변경은 서비스/모델/테스트까지 같이 본다.
+
+## 원본 발췌
+
+````python
+"""Stock alert router: 안전재고 미달 및 실사 편차 알림.
+
+현재 전략: 호출 시점에 on-demand 스캔(`POST /api/alerts/scan`)으로 SAFETY
+알림을 생성한다. 스캔은 `items.min_stock`이 설정된 품목 중 available가
+임계값 미만인 경우 미acknowledged 알림이 없으면 새로 추가한다. COUNT_VARIANCE
+알림은 `/api/counts` 제출 시 자동 생성된다(감지 임계값: |diff| > 0).
+"""
+
+from __future__ import annotations
+
+import uuid
+from decimal import Decimal
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models import AlertKindEnum, Inventory, Item, StockAlert
+from app.routers._errors import ErrorCode, http_error
+from app.schemas import StockAlertAcknowledgeRequest, StockAlertResponse
+from app.services import inventory as inv_svc
+from app.services._tx import commit_and_refresh, commit_only
+from datetime import datetime
+
+router = APIRouter()
+
+
+def _to_response(db: Session, alert: StockAlert) -> StockAlertResponse:
+    item = db.query(Item).filter(Item.item_id == alert.item_id).first()
+    return StockAlertResponse(
+        alert_id=alert.alert_id,
+        item_id=alert.item_id,
+        erp_code=item.erp_code if item else None,
+        item_name=item.item_name if item else None,
+        kind=alert.kind,
+        threshold=alert.threshold,
+        observed_value=alert.observed_value,
+        message=alert.message,
+        triggered_at=alert.triggered_at,
+        acknowledged_at=alert.acknowledged_at,
+        acknowledged_by=alert.acknowledged_by,
+    )
+
+
+@router.post(
+    "/scan",
+    response_model=List[StockAlertResponse],
+    summary="안전재고 미달 스캔 → 신규 SAFETY 알림 생성",
+)
+def scan_safety_alerts(db: Session = Depends(get_db)):
+    """전 품목 순회: min_stock 보유 품목 중 available < min_stock 이고,
+    같은 품목의 미확인 SAFETY 알림이 없으면 신규 생성."""
+    created: List[StockAlert] = []
+    items = (
+        db.query(Item)
+        .filter(Item.min_stock.isnot(None))
+        .all()
+    )
+    for item in items:
+        inv = db.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+        avail = inv_svc.available(inv, db=db) if inv else Decimal("0")
+        min_stock = item.min_stock or Decimal("0")
+        if avail >= min_stock:
+            continue
+        # Skip if an unacked SAFETY alert already exists
+        exists = (
+            db.query(StockAlert)
+            .filter(
+                StockAlert.item_id == item.item_id,
+                StockAlert.kind == AlertKindEnum.SAFETY,
+                StockAlert.acknowledged_at.is_(None),
+            )
+            .first()
+        )
+        if exists:
+            continue
+        alert = StockAlert(
+            item_id=item.item_id,
+            kind=AlertKindEnum.SAFETY,
+            threshold=min_stock,
+            observed_value=avail,
+            message=f"{item.item_name}: 가용 {avail} < 안전재고 {min_stock}",
+        )
+        db.add(alert)
+        created.append(alert)
+    commit_only(db)
+    return [_to_response(db, a) for a in created]
+
+
+@router.get(
+    "",
+    response_model=List[StockAlertResponse],
+    summary="알림 조회 (미확인 기본)",
+)
+def list_alerts(
+    kind: Optional[AlertKindEnum] = Query(None),
+    include_acknowledged: bool = Query(False),
+    item_id: Optional[uuid.UUID] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(200, ge=1, le=2000),
+    db: Session = Depends(get_db),
+):
+    q = db.query(StockAlert)
+    if kind is not None:
+        q = q.filter(StockAlert.kind == kind)
+    if not include_acknowledged:
+        q = q.filter(StockAlert.acknowledged_at.is_(None))
+    if item_id is not None:
+        q = q.filter(StockAlert.item_id == item_id)
+    rows = (
+        q.order_by(StockAlert.triggered_at.desc()).offset(skip).limit(limit).all()
+    )
+    return [_to_response(db, r) for r in rows]
+
+
+@router.post(
+    "/{alert_id}/acknowledge",
+    response_model=StockAlertResponse,
+    summary="알림 확인 처리",
+)
+def acknowledge_alert(
+    alert_id: uuid.UUID,
+    payload: StockAlertAcknowledgeRequest,
+    db: Session = Depends(get_db),
+):
+    alert = db.query(StockAlert).filter(StockAlert.alert_id == alert_id).first()
+    if alert is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "알림을 찾을 수 없습니다.")
+    if alert.acknowledged_at is not None:
+        raise http_error(400, ErrorCode.BAD_REQUEST, "이미 확인된 알림입니다.")
+    alert.acknowledged_at = datetime.utcnow()
+    alert.acknowledged_by = payload.acknowledged_by
+    commit_and_refresh(db, alert)
+    return _to_response(db, alert)
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-이 라우터는 **"재고 관련 경고 게시판"**이다. 배경으로 도는 게 아니라 **필요할 때 수동 스캔**(`POST /scan`)으로 `SAFETY` 알림을 만들고, 실사 차이는 `counts` 라우터가 호출될 때 자동 생성.
-
-### 알림 2종
-- **SAFETY** — 가용재고 < `items.min_stock`. 스캔 시 감지.
-- **COUNT_VARIANCE** — 실사량이 시스템 수량과 다를 때. `/counts` 제출 시 자동.
-
----
-
-## 엔드포인트
-
-| 경로 | 메서드 | 용도 |
-|------|--------|------|
-| `/api/alerts/scan` | POST | 안전재고 전수 스캔 → 신규 SAFETY 알림 |
-| `/api/alerts` | GET | 알림 목록 (kind, include_acknowledged, item_id 필터) |
-| `/api/alerts/{alert_id}/acknowledge` | POST | 확인 처리 (담당자 이름 기록) |
-
-### 스캔 로직
-```
-for item where min_stock IS NOT NULL:
-  avail = available(inv)
-  if avail < min_stock:
-    if 미확인 SAFETY 알림 이미 있음: skip
-    else: StockAlert(SAFETY, threshold=min_stock, observed=avail, message=...)
-```
-→ 중복 방지: 같은 품목이 이미 미확인이면 새 행 안 만듦.
-
-### 확인
-```json
-POST /api/alerts/{id}/acknowledge
-{ "acknowledged_by": "김현우" }
-```
-→ `acknowledged_at`, `acknowledged_by` 기록. 이미 확인됨이면 400.
-
----
-
-## FAQ
-
-**Q. 스캔은 누가 언제 호출?**
-프론트가 `/alerts` 페이지 진입 시 또는 주기적으로 호출. 자동 cron 없음.
-
-**Q. 확인 후 다시 떨어지면?**
-확인된 알림은 그대로 남고, 다시 재고가 미달이면 **새 SAFETY 알림**이 생성된다 (미확인 기준으로 중복 체크).
-
-**Q. `include_acknowledged=false` 기본값?**
-YES. 기본은 **미확인**만 표시. 확인된 이력까지 보려면 쿼리 추가.
-
-**Q. threshold 바꾸면 기존 알림은?**
-영향 없음. 기존 알림의 `threshold`는 발생 당시 값. 다음 스캔에서 새 값 기준.
-
-**Q. `observed_value`가 음수?**
-이론상 가능. `available = wh + production - pending`이라 `pending`이 커서 가용이 음수일 수 있음.
-
----
-
-## 관련 문서
-
-- [[backend/app/routers/counts.py.md]] — COUNT_VARIANCE 자동 생성 경로
-- [[backend/app/routers/items.py.md]] — `min_stock` 설정
-- [[backend/app/services/inventory.py.md]] — `available()` 함수
-- [[backend/app/models.py.md]] — `StockAlert`
-- [[frontend/app/alerts/alerts]]
-
-Up: [[backend/app/routers/routers]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

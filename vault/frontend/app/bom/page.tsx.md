@@ -1,51 +1,54 @@
-﻿---
+---
 type: code-note
 project: ERP
 layer: frontend
 source_path: frontend/app/bom/page.tsx
 status: active
+updated: 2026-04-27
+source_sha: c4a6e55fbe8b
 tags:
   - erp
   - frontend
-  - route
-  - bom
-aliases:
-  - BOM 페이지 라우트
+  - frontend-component
+  - tsx
 ---
 
-# app/bom/page.tsx
+# page.tsx
 
 > [!summary] 역할
-> `/bom` 경로 접속 시 루트(`/`)로 리다이렉트하는 래퍼 파일.
-> BOM 관리는 레거시 UI의 Admin 탭 내 BOM 섹션에서 처리한다.
+> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
+
+## 원본 위치
+
+- Source: `frontend/app/bom/page.tsx`
+- Layer: `frontend`
+- Kind: `frontend-component`
+- Size: `100` bytes
+
+## 연결
+
+- Parent hub: [[frontend/app/bom/bom|frontend/app/bom]]
+- Related: [[frontend/frontend]]
+
+## 읽는 포인트
+
+- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
+- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+
+## 원본 발췌
+
+````tsx
+import { redirect } from "next/navigation";
+
+export default function BomPage() {
+  redirect("/");
+}
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**`/bom` → `/` 리디렉션**. BOM(제품 하나를 만들 때 필요한 자재 목록) 관리는 관리자 탭 안의 BOM 섹션에서 처리. 독립 페이지 없음.
-
-BOM 실제 사용 흐름:
-1. 관리자 탭 진입 → BOM 섹션
-2. 상위 품목 선택 (예: `5-FG-0001` DX3000 완성품)
-3. 하위 자재 목록 확인/추가 (예: 메인보드 1, 섀시 1, 나사 12)
-4. 생산 배치 확정 시 자동 차감에 사용됨
-
-## FAQ
-
-**Q. BOM 트리를 시각적으로?**
-현재는 flat 테이블만. 재귀 표시(들여쓰기 트리) 는 `DesktopAdminView` BOM 섹션에서 일부 지원.
-
-**Q. BOM 의 순환 참조?**
-백엔드 `explode_bom()` 이 visited set + MAX_DEPTH=10 으로 방지. A→B→A 같은 순환은 저장 시 사전 검증은 없으나 조회 시 중단됨.
-
----
-
-## 관련 문서
-
-- [[frontend/app/bom/bom]] — 라우트 폴더 인덱스
-- [[frontend/app/legacy/_components/DesktopAdminView.tsx.md]] — BOM 섹션 포함
-- [[backend/app/services/bom.py.md]] — `explode_bom()` 로직
-- 용어 사전 — BOM / 백플러시 용어
-
-Up: [[frontend/app/app]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

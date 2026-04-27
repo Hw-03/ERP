@@ -4,73 +4,189 @@ project: ERP
 layer: frontend
 source_path: frontend/app/legacy/_components/SelectedItemsPanel.tsx
 status: active
+updated: 2026-04-27
+source_sha: 0cff61d508ec
 tags:
   - erp
   - frontend
-  - component
-  - warehouse
-  - ui
-aliases:
-  - 선택 품목 패널
+  - frontend-component
+  - tsx
 ---
 
 # SelectedItemsPanel.tsx
 
 > [!summary] 역할
-> 창고 입출고 작업 시 **선택된 품목 목록과 수량**을 표시하는 패널.
-> 수량 변경과 품목 제거 기능을 제공하며, 선택 항목이 없으면 렌더링하지 않는다.
+> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
 
-> [!info] 표시 내용
-> - 선택된 각 품목의 ERP 코드 배지, 품명
-> - 수량 입력 필드 (직접 수정 가능)
-> - 품목 제거 버튼 (X)
-> - `outgoing` prop으로 출고 모드 표시 조절
+## 원본 위치
 
-## Props
+- Source: `frontend/app/legacy/_components/SelectedItemsPanel.tsx`
+- Layer: `frontend`
+- Kind: `frontend-component`
+- Size: `6125` bytes
 
-| Prop | 설명 |
-|------|------|
-| `entries` | 선택된 품목 배열 `{ item, quantity }[]` |
-| `onQuantityChange` | 수량 변경 콜백 |
-| `onRemove` | 품목 제거 콜백 |
-| `outgoing` | 출고 모드 여부 (기본 false) |
+## 연결
+
+- Parent hub: [[frontend/app/legacy/_components/_components|frontend/app/legacy/_components]]
+- Related: [[frontend/frontend]]
+
+## 읽는 포인트
+
+- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
+- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+
+## 원본 발췌
+
+````tsx
+"use client";
+
+import { GripVertical, X } from "lucide-react";
+import { type Item } from "@/lib/api";
+import { LEGACY_COLORS, erpCodeDeptBadge, formatNumber, getStockState } from "./legacyUi";
+
+export type SelectedEntry = { item: Item; quantity: number };
+
+interface Props {
+  entries: SelectedEntry[];
+  onQuantityChange: (itemId: string, qty: number) => void;
+  onRemove: (itemId: string) => void;
+  outgoing?: boolean;
+}
+
+export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoing = false }: Props) {
+  if (entries.length === 0) return null;
+
+  return (
+    <div>
+      {entries.map(({ item, quantity }) => {
+        const stock = getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock));
+        const deptBadge = erpCodeDeptBadge(item.erp_code);
+        const expected = outgoing
+          ? Number(item.quantity) - quantity
+          : Number(item.quantity) + quantity;
+        const isShortage = outgoing && expected < 0;
+        const expectedColor =
+          expected < 0 ? LEGACY_COLORS.red : expected === 0 ? LEGACY_COLORS.yellow : LEGACY_COLORS.green;
+
+        return (
+          <div
+            key={item.item_id}
+            className="grid grid-cols-[16px_minmax(0,2fr)_minmax(70px,auto)_auto_minmax(72px,auto)_minmax(72px,auto)_32px] items-center gap-3 px-4 py-3"
+            style={{
+              borderBottom: `1px solid ${LEGACY_COLORS.border}`,
+              background: isShortage
+                ? `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`
+                : "transparent",
+            }}
+          >
+            {/* 그립 */}
+            <GripVertical className="h-4 w-4" style={{ color: LEGACY_COLORS.muted2 }} />
+
+            {/* 품목명 + ERP */}
+            <div className="min-w-0">
+              <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
+                {item.item_name}
+              </div>
+              <div className="truncate text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+                {item.erp_code ?? "-"}
+              </div>
+            </div>
+
+            {/* 분류 배지 */}
+            {deptBadge ? (
+              <span
+                className="justify-self-start rounded-full px-2 py-0.5 text-[10px] font-bold"
+                style={{ color: deptBadge.color, background: deptBadge.bg }}
+              >
+                {deptBadge.label}
+              </span>
+            ) : (
+              <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
+            )}
+
+            {/* 스테퍼 */}
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="text-[9px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                수량
+              </span>
+              <div className="flex items-center gap-1">
+                <StepBtn tone={LEGACY_COLORS.red} onClick={() => onQuantityChange(item.item_id, Math.max(1, quantity - 10))}>-10</StepBtn>
+                <StepBtn tone={LEGACY_COLORS.red} onClick={() => onQuantityChange(item.item_id, Math.max(1, quantity - 1))}>-1</StepBtn>
+                <input
+                  type="number"
+                  min={1}
+                  value={quantity}
+                  onChange={(e) => onQuantityChange(item.item_id, Math.max(1, Number(e.target.value) || 1))}
+                  className="w-[72px] rounded-[10px] border px-2 py-1.5 text-center text-sm font-black tabular-nums outline-none"
+                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                />
+                <StepBtn tone={LEGACY_COLORS.green} onClick={() => onQuantityChange(item.item_id, quantity + 1)}>+1</StepBtn>
+                <StepBtn tone={LEGACY_COLORS.green} onClick={() => onQuantityChange(item.item_id, quantity + 10)}>+10</StepBtn>
+              </div>
+            </div>
+
+            {/* 현재 재고 */}
+            <div className="text-right">
+              <div className="text-[9px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                현재 재고
+              </div>
+              <div className="text-base font-black tabular-nums" style={{ color: stock.color }}>
+                {formatNumber(item.quantity)}
+              </div>
+            </div>
+
+            {/* 실행 후 재고 */}
+            <div className="text-right">
+              <div className="text-[9px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                실행 후
+              </div>
+              <div className="text-base font-black tabular-nums" style={{ color: expectedColor }}>
+                {formatNumber(expected)}
+              </div>
+              {isShortage && (
+                <div className="text-[9px] font-bold uppercase tracking-[1px]" style={{ color: LEGACY_COLORS.red }}>
+                  재고 부족
+                </div>
+              )}
+            </div>
+
+            {/* 제거 */}
+            <button
+              onClick={() => onRemove(item.item_id)}
+              className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-white/10"
+              style={{ color: LEGACY_COLORS.muted2 }}
+              title="선택 해제"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function StepBtn({ tone, onClick, children }: { tone: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className="rounded-[10px] border px-2.5 py-1.5 text-xs font-black transition-colors hover:brightness-110"
+      style={{
+        background: `color-mix(in srgb, ${tone} 10%, transparent)`,
+        borderColor: `color-mix(in srgb, ${tone} 30%, transparent)`,
+        color: tone,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**장바구니 같은 위젯**. 창고 입출고 화면에서 여러 품목을 한 번에 처리할 때, 지금 뭘 몇 개 선택했는지 보여주는 임시 리스트. 항목이 0개면 화면에서 사라짐.
-
-예: 입고 작업 중
-- 품목 검색 → "메인보드" 추가 → 수량 10
-- "고정판" 추가 → 수량 5
-- "나사" 추가 → 수량 100
-- 최종적으로 "입고 확정" → 3개 품목 한꺼번에 RECEIVE 처리
-
-## 내부 동작
-
-- `entries` 배열을 `.map()` 으로 렌더링
-- 각 row에 수량 input + X 버튼
-- `onQuantityChange(itemId, newQty)` — input 변경 시
-- `onRemove(itemId)` — X 버튼 클릭 시
-- `outgoing=true` 면 "출고"로 표시 (배지 색상/문구 변화)
-
-## FAQ
-
-**Q. 수량 0이면?**
-입력은 가능하지만 상위 컴포넌트에서 0 제외하고 API 전송하는 게 일반적. UI 상으론 에러 표시 없음.
-
-**Q. 같은 품목 두 번 추가하면?**
-상위 로직에서 처리. 보통 기존 수량에 합산하거나 중복 거부. `SelectedItemsPanel` 자체는 `entries` 그대로 표시.
-
-**Q. 전체 비우기?**
-각 항목 X 반복. 일괄 삭제 버튼은 없음 — 필요하면 상위에 추가.
-
----
-
-## 관련 문서
-
-- [[frontend/app/legacy/_components/DesktopWarehouseView.tsx.md]] — 창고 뷰 (패널 사용)
-- [[frontend/app/legacy/_components/WarehouseIOTab.tsx.md]] — 창고 입출고 탭
-
-Up: [[frontend/app/legacy/_components/_components]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

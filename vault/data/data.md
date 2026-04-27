@@ -2,45 +2,42 @@
 type: index
 project: ERP
 layer: data
+source_path: data/
 status: active
+updated: 2026-04-27
 tags:
   - erp
   - data
-aliases:
-  - 데이터 파일 폴더
+  - index
 ---
 
 # data
 
 > [!summary] 역할
-> ERP 구축과 운영 보조에 쓰는 원본 엑셀/CSV 자료 폴더.
-> 코드보다 업무 원천 자료에 가깝기 때문에 직접 수정 여부를 항상 조심해서 봐야 한다.
+> 현장 엑셀, CSV, 매칭 자료 등 ERP의 기준 데이터 자산이 모인 폴더다.
 
-## 현재 주요 파일
+## 원본 위치
 
-| 파일 | 의미 |
-|---|---|
-| `2026.03_생산부 자재_고압,진공,튜닝파트.xlsx` | 생산부 자재 원본 |
-| `2026.03_생산부 자재_조립,출하파트.xlsx` | 조립/출하 파트 원본 |
-| `F704-03 (R00) 자재 재고 현황.xlsx` | 재고 현황 기준표 |
-| `개발현황.xlsx` | 개발 진행 참고 자료 |
-| `재고_입력_양식.xlsx` | 재고 입력용 양식 |
-| `ERP_Master_DB.csv` | 통합 결과 마스터 |
-| `ERP_Source_Links.csv` | 원본 연결 정보 |
-| `ERP_Excluded_Items.csv` | 제외 품목 목록 |
-| `ERP_Unmatched_A_Items.csv` | 매칭 실패 품목 목록 |
+- Source: `data/`
+- File count: `11`
 
-## 읽는 포인트
+## 파일 노트
 
-- 운영 중인 진실의 원천은 DB이지만, 초기 이관과 검증은 여전히 이 자료들을 통해 추적한다.
-- 데이터 파일 하나를 수정하는 것보다, 어떤 스크립트가 이 파일을 읽는지 함께 보는 게 중요하다.
-- `개발현황.xlsx` 같은 파일은 코드가 아니라 맥락 전달용 자료다.
+- [[data/2026.03_생산부 자재_고압,진공,튜닝파트.xlsx|2026.03_생산부 자재_고압,진공,튜닝파트.xlsx]]
+- [[data/2026.03_생산부 자재_조립,출하파트.xlsx|2026.03_생산부 자재_조립,출하파트.xlsx]]
+- [[data/ERP_Excluded_Items.csv|ERP_Excluded_Items.csv]]
+- [[data/ERP_Master_DB.csv|ERP_Master_DB.csv]]
+- [[data/ERP_Source_Links.csv|ERP_Source_Links.csv]]
+- [[data/ERP_Unmatched_A_Items.csv|ERP_Unmatched_A_Items.csv]]
+- [[data/F704-03 (R00) 자재 재고 현황.xlsx|F704-03 (R00) 자재 재고 현황.xlsx]]
+- [[data/개발현황.xlsx|개발현황.xlsx]]
+- [[data/생산부_재고_매칭작업.xlsx|생산부_재고_매칭작업.xlsx]]
+- [[data/재고_입력_양식.xlsx|재고_입력_양식.xlsx]]
+- [[data/창고_재고.xlsx|창고_재고.xlsx]]
 
-## 관련 문서
+## 읽는 팁
 
-- [[scripts/scripts]]
-- [[docs/README.md.md]]
-- [[_vault/guides/처음_읽는_사람]]
+- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
+- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
 
 Up: [[ERP]]
-

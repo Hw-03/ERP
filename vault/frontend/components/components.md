@@ -4,52 +4,32 @@ project: ERP
 layer: frontend
 source_path: frontend/components/
 status: active
+updated: 2026-04-27
 tags:
   - erp
   - frontend
-  - component
-aliases:
-  - 공용 컴포넌트
+  - index
 ---
 
-# frontend/components
+# components
 
 > [!summary] 역할
-> 레거시 UI 외부에서 공통으로 사용하는 컴포넌트 폴더.
+> `frontend/components/` 아래 원본 파일들을 Obsidian에서 탐색하기 위한 폴더 허브다.
 
-## 하위 문서
+## 원본 위치
 
-- [[frontend/components/AppHeader.tsx.md]] — 앱 공용 헤더
-- [[frontend/components/CategoryCard.tsx.md]] — 카테고리 카드
-- [[frontend/components/UKAlert.tsx.md]] — UK(미분류) 품목 알림
+- Source: `frontend/components/`
+- File count: `3`
 
----
+## 파일 노트
 
-## 쉬운 말로 설명
+- [[frontend/components/AppHeader.tsx|AppHeader.tsx]]
+- [[frontend/components/CategoryCard.tsx|CategoryCard.tsx]]
+- [[frontend/components/UKAlert.tsx|UKAlert.tsx]]
 
-`legacy/_components/` 외부에서 **공통으로 쓰는 컴포넌트** 폴더. 현재는 3개. 범위가 좁고 주로 새 UI 작업용.
+## 읽는 팁
 
-### 각 컴포넌트
-- **AppHeader** — 앱 상단 공용 헤더 (로고, 타이틀)
-- **CategoryCard** — 카테고리(RM/TA/FG 등) 요약 카드
-- **UKAlert** — 미분류(UK) 품목 경고 (카테고리가 UK인 품목이 있을 때 노출)
+- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
+- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
 
----
-
-## FAQ
-
-**Q. legacy 쪽 컴포넌트와 뭐가 다른가?**
-- `legacy/_components/` — 현재 운영 중인 레거시 UI 전용
-- `components/` — 여러 곳에서 쓰거나, 새 UI 전환용
-
-**Q. 새 공용 컴포넌트는 여기에?**
-특정 화면에 묶이지 않으면 여기로. 레거시 UI 내부에서만 쓰면 `legacy/_components/`.
-
----
-
-## 관련 문서
-
-- [[frontend/frontend]] (상위)
-- [[frontend/app/legacy/_components/_components]] — 레거시 전용 컴포넌트
-
-Up: [[frontend/frontend]]
+Up: [[frontend/frontend|frontend]]

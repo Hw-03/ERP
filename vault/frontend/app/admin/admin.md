@@ -4,63 +4,30 @@ project: ERP
 layer: frontend
 source_path: frontend/app/admin/
 status: active
+updated: 2026-04-27
 tags:
   - erp
   - frontend
-  - route
-  - admin
-aliases:
-  - 관리자 페이지 라우트
+  - index
 ---
 
-# frontend/app/admin
+# admin
 
 > [!summary] 역할
-> `/admin` 경로 라우트. 관리자 기능(품목·직원·BOM·설정) 화면 진입점.
+> `frontend/app/admin/` 아래 원본 파일들을 Obsidian에서 탐색하기 위한 폴더 허브다.
 
-> [!warning] 주의
-> - 실제 관리자 UI는 `legacy/_components/DesktopAdminView.tsx`에 구현됨
-> - 진입 시 `PinLock` 화면이 먼저 표시됨
+## 원본 위치
 
-## 관련 문서
+- Source: `frontend/app/admin/`
+- File count: `1`
 
-- [[frontend/app/legacy/_components/DesktopAdminView.tsx.md]]
-- [[frontend/app/legacy/_components/PinLock.tsx.md]]
+## 파일 노트
 
----
+- [[frontend/app/admin/page.tsx|page.tsx]]
 
-## 쉬운 말로 설명
+## 읽는 팁
 
-`/admin` URL로 접속 시 관리자 모드 진입. 민감 기능(품목 삭제, 직원 관리, BOM 편집, DB 리셋 등)이 모여있어 **PIN 입력이 먼저 요구**된다.
+- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
+- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
 
-### 흐름
-```
-/admin 접속 → PinLock 화면
-    ↓ (올바른 PIN 입력)
-DesktopAdminView
-    ├─ 품목 관리 탭
-    ├─ 직원 관리 탭
-    ├─ BOM 관리 탭
-    ├─ 코드 마스터 탭
-    └─ 설정 탭 (PIN 변경, DB 리셋)
-```
-
----
-
-## FAQ
-
-**Q. 기본 PIN은?**
-`backend/app/routers/settings.py` 또는 초기 시드에서 확인. 운영 시 반드시 변경.
-
-**Q. PIN 분실 시?**
-DB 직접 접속해서 `settings` 테이블의 해시값을 재설정하거나, 서버 재시작하며 seed 재실행.
-
----
-
-## 관련 문서
-
-- [[backend/app/routers/settings.py.md]] — PIN 관리 API
-- [[backend/app/routers/employees.py.md]]
-- [[backend/app/routers/codes.py.md]]
-
-Up: [[frontend/app/app]]
+Up: [[frontend/app/app|frontend/app]]

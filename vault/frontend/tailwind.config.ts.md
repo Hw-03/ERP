@@ -4,49 +4,97 @@ project: ERP
 layer: frontend
 source_path: frontend/tailwind.config.ts
 status: active
+updated: 2026-04-27
+source_sha: 8cee352f5416
 tags:
   - erp
   - frontend
-  - styles
-  - tailwind
-  - config
-aliases:
-  - Tailwind 설정
+  - source-file
+  - ts
 ---
 
 # tailwind.config.ts
 
 > [!summary] 역할
-> Tailwind CSS의 커스텀 색상, 폰트 등을 정의하는 설정 파일.
+> 원본 프로젝트의 `tailwind.config.ts` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
 
-> [!info] 주요 설정
-> - **content**: `pages/`, `components/`, `app/` 하위 모든 ts/tsx/mdx 파일 포함
-> - **커스텀 색상** (`brand`): 50~950 단계 파란색 계열 (X-ray ERP 산업용 테마)
-> - **폰트**:
->   - sans: `Inter`, `system-ui`
->   - mono: `JetBrains Mono`, `Fira Code`
+## 원본 위치
+
+- Source: `frontend/tailwind.config.ts`
+- Layer: `frontend`
+- Kind: `source-file`
+- Size: `1383` bytes
+
+## 연결
+
+- Parent hub: [[frontend/frontend|frontend]]
+- Related: [[frontend/frontend]]
+
+## 읽는 포인트
+
+- 실제 수정은 원본 파일에서 한다.
+- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+
+## 원본 발췌
+
+````ts
+import type { Config } from "tailwindcss";
+
+const config: Config = {
+  content: [
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        // X-ray ERP 산업용 테마 — Slate / Blue
+        brand: {
+          50:  "#eff6ff",
+          100: "#dbeafe",
+          200: "#bfdbfe",
+          300: "#93c5fd",
+          400: "#60a5fa",
+          500: "#3b82f6",
+          600: "#2563eb",
+          700: "#1d4ed8",
+          800: "#1e40af",
+          900: "#1e3a8a",
+          950: "#172554",
+        },
+      },
+      fontFamily: {
+        sans: ["Pretendard", "Noto Sans KR", "system-ui", "sans-serif"],
+        mono: ["Pretendard", "Noto Sans KR", "system-ui", "sans-serif"],
+      },
+      animation: {
+        "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "fade-in": "fadeIn 0.3s ease-in-out",
+      },
+      keyframes: {
+        fadeIn: {
+          "0%": { opacity: "0", transform: "translateY(-8px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        scan: {
+          "0%":   { top: "8px" },
+          "50%":  { top: "calc(100% - 8px)" },
+          "100%": { top: "8px" },
+        },
+      },
+    },
+  },
+  plugins: [],
+};
+
+export default config;
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**Tailwind CSS 에 "우리 프로젝트 전용 색상/폰트" 를 추가하는 설정**. 기본 Tailwind 는 `blue-500` 같은 색만 있는데, 여기서 `brand-600` 같은 커스텀 색 추가 가능.
-
-현재 설정은 비교적 기본. 색상은 대부분 `globals.css` 의 CSS 변수로 관리 → Tailwind 는 구조·레이아웃 담당.
-
-## FAQ
-
-**Q. 새 색상 추가?**
-`theme.extend.colors` 에 `{ myColor: "#ff00ff" }` 추가 → `className="bg-myColor"` 사용 가능.
-
-**Q. content 경로 중요도?**
-Tailwind 는 여기 지정된 파일만 스캔해서 사용된 클래스만 빌드. 경로 누락 시 스타일 미적용.
-
----
-
-## 관련 문서
-
-- [[frontend/app/globals.css.md]] — CSS 변수 정의 (Tailwind 레이어와 함께 사용)
-- [[frontend/postcss.config.js.md]] — PostCSS 설정
-
-Up: [[frontend/frontend]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

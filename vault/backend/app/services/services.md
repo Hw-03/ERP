@@ -4,47 +4,39 @@ project: ERP
 layer: backend
 source_path: backend/app/services/
 status: active
+updated: 2026-04-27
 tags:
   - erp
   - backend
-  - service
-aliases:
-  - 서비스 레이어
+  - index
 ---
 
-# backend/app/services
+# services
 
 > [!summary] 역할
-> 라우터에서 분리한 실제 비즈니스 로직과 계산식을 담는 폴더.
-> 이번 브랜치에서는 재고 무결성 점검과 공통 재고 계산식이 별도 서비스로 분리되면서 역할이 더 선명해졌다.
+> `backend/app/services/` 아래 원본 파일들을 Obsidian에서 탐색하기 위한 폴더 허브다.
 
-## 하위 문서
+## 원본 위치
 
-- [[backend/app/services/bom.py.md]]
-- [[backend/app/services/codes.py.md]]
-- [[backend/app/services/inventory.py.md]]
-- [[backend/app/services/queue.py.md]]
-- [[backend/app/services/integrity.py.md]]
-- [[backend/app/services/stock_math.py.md]]
+- Source: `backend/app/services/`
+- File count: `10`
 
-## 이번 브랜치 포인트
+## 파일 노트
 
-- `integrity.py` 는 `inventory.quantity == warehouse + locations` 규칙을 검사/복구한다.
-- `stock_math.py` 는 화면과 서비스가 함께 쓰는 재고 수치 계산식을 모아둔다.
-- 기존 `inventory.py`, `queue.py` 는 공통 계산을 재사용하는 방향으로 읽어야 이해가 빠르다.
+- [[backend/app/services/__init__.py|__init__.py]]
+- [[backend/app/services/_tx.py|_tx.py]]
+- [[backend/app/services/audit.py|audit.py]]
+- [[backend/app/services/bom.py|bom.py]]
+- [[backend/app/services/codes.py|codes.py]]
+- [[backend/app/services/export_helpers.py|export_helpers.py]]
+- [[backend/app/services/integrity.py|integrity.py]]
+- [[backend/app/services/inventory.py|inventory.py]]
+- [[backend/app/services/queue.py|queue.py]]
+- [[backend/app/services/stock_math.py|stock_math.py]]
 
-## 읽는 순서
+## 읽는 팁
 
-1. [[backend/app/services/stock_math.py.md]]
-2. [[backend/app/services/integrity.py.md]]
-3. [[backend/app/services/inventory.py.md]]
-4. [[backend/app/services/queue.py.md]]
+- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
+- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
 
-## 관련 문서
-
-- [[backend/app/routers/routers]]
-- [[backend/app/models.py.md]]
-- [[docs/ITEM_CODE_RULES.md.md]]
-
-Up: [[backend/app/app]]
-
+Up: [[backend/app/app|backend/app]]

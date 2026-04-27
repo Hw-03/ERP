@@ -1,79 +1,200 @@
-﻿---
+---
 type: code-note
 project: ERP
-layer: infra
-source_path: schema.sql
+layer: backend
+source_path: backend/schema.sql
 status: active
+updated: 2026-04-27
+source_sha: c43e9d19d7c7
 tags:
   - erp
-  - infra
-  - database
-  - schema
+  - backend
+  - source-file
   - sql
-aliases:
-  - SQL 스키마
 ---
 
 # schema.sql
 
 > [!summary] 역할
-> 향후 **PostgreSQL 기반 ERP 이관**을 위한 완전한 관계형 DB 스키마.
-> 현재 운영 중인 SQLite(`erp.db`)와는 별개로, 장기적인 SQL DB 전환을 준비하는 설계 문서다.
+> 원본 프로젝트의 `schema.sql` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
 
-> [!info] 설계 원칙
-> 1. 자재 마스터(`items`)가 **단일 진실의 원천 (Single Source of Truth)**
-> 2. BOM은 `bom_headers` / `bom_lines` 로 분리
-> 3. 재고 스냅샷은 `stock_snapshots` 로 월별 이력 관리
-> 4. 소스 추적(`item_source_links`)으로 엑셀 원본 행 기록
-> 5. 모든 PK는 surrogate key (자동 증가) + 비즈니스 키는 UNIQUE 제약
+## 원본 위치
 
-> [!info] 주요 테이블
-> | 테이블 | 설명 |
-> |--------|------|
-> | `items` | 자재 마스터 (단일 진실 원천) |
-> | `bom_headers` | BOM 헤더 (상위 품목) |
-> | `bom_lines` | BOM 라인 (하위 품목 + 수량) |
-> | `stock_snapshots` | 월별 재고 스냅샷 |
-> | `item_source_links` | 엑셀 원본 행 → 품목 매핑 |
+- Source: `backend/schema.sql`
+- Layer: `backend`
+- Kind: `source-file`
+- Size: `5342` bytes
 
-> [!info] 포함 Enum 타입
-> - `category_code_enum`: RM, BA, BF, HA, HF, VA, VF, TA, TF, FG
-> - `mapping_status_enum`: mapped, assy_only, raw_only
-> - `department_enum`: 조립, 고압, 진공, 튜닝, 출하, 구매, 품질 등
+## 연결
 
-> [!warning] 주의
-> 현재 실제 운영은 **SQLite + SQLAlchemy ORM**(`backend/app/models.py`)으로 이루어진다.
-> 이 파일은 PostgreSQL 이관용 참조 스키마이며, 현재 앱과 완전히 동일하지 않을 수 있다.
+- Parent hub: [[backend/backend|backend]]
+- Related: [[backend/backend]]
+
+## 읽는 포인트
+
+- 실제 수정은 원본 파일에서 한다.
+- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+
+## 원본 발췌
+
+````sql
+-- =============================================================================
+-- DEXCOWIN ERP reference schema
+-- =============================================================================
+--
+-- This file is a PostgreSQL reference schema for documentation/import planning.
+-- The running application uses the SQLAlchemy models under backend/app/models.py.
+--
+-- Current item/process code rules are documented in docs/ITEM_CODE_RULES.md.
+-- Assembly F type is AF. AF is a legacy code and must not be used.
+-- =============================================================================
+
+DROP TYPE IF EXISTS category_code_enum CASCADE;
+CREATE TYPE category_code_enum AS ENUM (
+    'RM', 'AA', 'AF', 'HA', 'HF', 'VA', 'VF', 'TA', 'TF', 'FG', 'UK'
+);
+
+DROP TYPE IF EXISTS mapping_status_enum CASCADE;
+CREATE TYPE mapping_status_enum AS ENUM (
+    'mapped',
+    'assy_only',
+    'raw_only'
+);
+
+DROP TABLE IF EXISTS bom_lines CASCADE;
+DROP TABLE IF EXISTS bom_headers CASCADE;
+DROP TABLE IF EXISTS stock_snapshots CASCADE;
+DROP TABLE IF EXISTS item_source_links CASCADE;
+DROP TABLE IF EXISTS product_models CASCADE;
+DROP TABLE IF EXISTS items CASCADE;
+
+CREATE TABLE items (
+    item_pk BIGSERIAL PRIMARY KEY,
+    item_id VARCHAR(36) NOT NULL UNIQUE,
+    erp_code VARCHAR(50) UNIQUE,
+    category_code category_code_enum NOT NULL,
+    process_type_code VARCHAR(2),
+    symbol_slot INTEGER,
+    option_code VARCHAR(2),
+    serial_no INTEGER,
+    std_name VARCHAR(200) NOT NULL,
+    std_spec VARCHAR(200),
+    std_unit VARCHAR(20) DEFAULT 'EA',
+    part_type VARCHAR(50),
+    maker VARCHAR(100),
+    maker_pn VARCHAR(100),
+    supplier VARCHAR(100),
+    department VARCHAR(20),
+    model_ref VARCHAR(200),
+    min_stock INTEGER,
+    mapping_status mapping_status_enum NOT NULL DEFAULT 'raw_only',
+    original_name_a VARCHAR(200),
+    original_name_bc VARCHAR(200),
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE INDEX idx_items_category ON items(category_code);
+CREATE INDEX idx_items_erp_code ON items(erp_code);
+CREATE INDEX idx_items_process_type ON items(process_type_code);
+CREATE INDEX idx_items_department ON items(department);
+CREATE INDEX idx_items_std_name ON items(std_name);
+
+CREATE TABLE item_source_links (
+    link_pk BIGSERIAL PRIMARY KEY,
+    item_pk BIGINT NOT NULL REFERENCES items(item_pk) ON DELETE CASCADE,
+    source_file VARCHAR(10) NOT NULL,
+    source_sheet VARCHAR(50) NOT NULL,
+    source_row INTEGER NOT NULL,
+    original_name VARCHAR(200) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_source_link UNIQUE (item_pk, source_file, source_sheet, source_row)
+);
+
+CREATE TABLE product_models (
+    model_pk BIGSERIAL PRIMARY KEY,
+    model_code VARCHAR(50) NOT NULL UNIQUE,
+    model_name VARCHAR(100),
+    model_family VARCHAR(50),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE stock_snapshots (
+    snap_pk BIGSERIAL PRIMARY KEY,
+    item_pk BIGINT NOT NULL REFERENCES items(item_pk) ON DELETE CASCADE,
+    snap_date DATE NOT NULL,
+    stock_qty INTEGER NOT NULL DEFAULT 0,
+    inbound_qty INTEGER NOT NULL DEFAULT 0,
+    outbound_qty INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_stock_snap UNIQUE (item_pk, snap_date)
+);
+
+CREATE TABLE bom_headers (
+    bom_pk BIGSERIAL PRIMARY KEY,
+    parent_item_pk BIGINT NOT NULL REFERENCES items(item_pk),
+    version VARCHAR(20) NOT NULL DEFAULT '1.0',
+    valid_from DATE NOT NULL DEFAULT CURRENT_DATE,
+    valid_to DATE,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(50),
+    CONSTRAINT uq_bom_version UNIQUE (parent_item_pk, version)
+);
+
+CREATE TABLE bom_lines (
+    line_pk BIGSERIAL PRIMARY KEY,
+    bom_pk BIGINT NOT NULL REFERENCES bom_headers(bom_pk) ON DELETE CASCADE,
+    seq INTEGER NOT NULL,
+    child_item_pk BIGINT NOT NULL REFERENCES items(item_pk),
+    quantity NUMERIC(12, 4) NOT NULL DEFAULT 1,
+    unit VARCHAR(20) DEFAULT 'EA',
+    scrap_rate NUMERIC(5, 4) DEFAULT 0,
+    notes TEXT,
+    CONSTRAINT uq_bom_line UNIQUE (bom_pk, seq)
+);
+
+CREATE OR REPLACE VIEW v_current_bom AS
+SELECT
+    h.bom_pk,
+    h.parent_item_pk,
+    pi.item_id AS parent_item_id,
+    pi.std_name AS parent_name,
+    pi.category_code AS parent_category,
+    l.seq,
+    l.child_item_pk,
+    ci.item_id AS child_item_id,
+    ci.std_name AS child_name,
+    ci.category_code AS child_category,
+    l.quantity,
+    l.unit,
+    l.scrap_rate,
+    h.version,
+    h.valid_from
+FROM bom_headers h
+JOIN bom_lines l ON l.bom_pk = h.bom_pk
+JOIN items pi ON pi.item_pk = h.parent_item_pk
+JOIN items ci ON ci.item_pk = l.child_item_pk
+WHERE h.valid_to IS NULL OR h.valid_to >= CURRENT_DATE;
+
+CREATE OR REPLACE VIEW v_stock_summary_by_category AS
+SELECT
+    category_code,
+    COUNT(*) AS item_count,
+    COUNT(*) FILTER (WHERE min_stock IS NOT NULL) AS min_stock_item_count
+FROM items
+WHERE is_active = TRUE
+GROUP BY category_code
+ORDER BY category_code;
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**"PostgreSQL 로 이관할 때 쓰려고 만들어둔 설계 청사진"**. 현재 실제 운영은 SQLite + SQLAlchemy ORM 이지만, 규모 커지면 Postgres 로 가기 위한 참고 파일.
-
-현재 코드와 100% 일치하지 않음. 이관 시 `models.py` 를 기준으로 다시 맞춰야 할 가능성.
-
-## `items.py` (models.py) 와의 차이 예
-
-- `schema.sql` 은 `CHECK` 제약 + ENUM 타입 풍부
-- `models.py` 는 SQLAlchemy 제약 중 일부만 생성 (SQLite 호환성)
-- `stock_snapshots` 는 `schema.sql` 에만 정의 (월별 스냅샷 테이블, 미구현)
-- 소스 추적 테이블 `item_source_links` 도 `schema.sql` 에만
-
-## FAQ
-
-**Q. 이 파일을 현재 DB 에 실행 가능?**
-실패. SQLite 문법 아님 + 테이블 구조 다름. `models.py` 의 `Base.metadata.create_all()` 이 실제 스키마.
-
-**Q. 이관 계획 있음?**
-당장은 없음. 프로토타입 단계. SQLite WAL 모드로 충분.
-
----
-
-## 관련 문서
-
-- [[backend/app/models.py.md]] — 현재 운영 중인 SQLAlchemy 모델
-- [[backend/app/database.py.md]] — SQLite 연결 설정
-- [[scripts/migrate_erp_schema.py.md]] — DB 스키마 마이그레이션 스크립트
-
-Up: ERP MOC
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

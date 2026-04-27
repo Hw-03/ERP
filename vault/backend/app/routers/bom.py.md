@@ -1,132 +1,271 @@
-﻿---
+---
 type: code-note
 project: ERP
 layer: backend
 source_path: backend/app/routers/bom.py
 status: active
+updated: 2026-04-27
+source_sha: 58f916990af4
 tags:
   - erp
   - backend
   - router
-  - bom
-aliases:
-  - BOM 라우터
-  - 자재명세서 API
+  - py
 ---
 
 # bom.py
 
 > [!summary] 역할
-> BOM(Bill of Materials, 자재명세서)을 관리하는 API. 어떤 제품을 만들 때 어떤 부품이 몇 개 필요한지를 정의한다.
+> FastAPI 라우터 계층의 `bom` 영역 API 엔드포인트를 담당한다.
 
-> [!info] 주요 책임
-> - `GET /api/bom/{parent_item_id}` — 특정 품목의 BOM 목록 조회
-> - `GET /api/bom/{parent_item_id}/tree` — BOM 트리 구조 조회 (다단계 재귀)
-> - `POST /api/bom` — BOM 항목 추가
-> - `PATCH /api/bom/{bom_id}` — BOM 수량/단위 수정
-> - `DELETE /api/bom/{bom_id}` — BOM 항목 삭제
+## 원본 위치
 
-> [!warning] 주의
-> - BOM 트리는 재귀적으로 조회됨 — 순환 참조 주의
-> - BOM 정보는 생산 입고 시 Backflush(자재 자동 차감)에 사용됨
+- Source: `backend/app/routers/bom.py`
+- Layer: `backend`
+- Kind: `router`
+- Size: `11588` bytes
 
----
+## 연결
 
-## 쉬운 말로 설명
+- Parent hub: [[backend/app/routers/routers|backend/app/routers]]
+- Related: [[backend/backend]]
 
-BOM = **"제품 하나 만들 때 필요한 부품 목록표"**. 예: ADX6000 1대 = 튜브 1 + 고압보드 1 + 케이블 2.
+## 읽는 포인트
 
-이 라우터는 그 목록표를 **만들고/읽고/고치고/지우는** CRUD 엔드포인트. 실제 자재 차감(BOM 폭발 → 재고 감소)은 `queue.py` + `services/queue.py`에서 처리한다.
+- 라우터는 API 표면이다. 요청/응답 계약은 `schemas.py`와 함께 확인한다.
+- DB 변경은 서비스/모델/테스트까지 같이 본다.
 
----
+## 원본 발췌
 
-## 엔드포인트 상세
+> 전체 339줄 중 앞부분만 발췌했다. 실제 수정은 원본 파일을 기준으로 한다.
 
-| 경로 | 메서드 | 용도 |
-|------|--------|------|
-| `/api/bom` | POST | 부모-자식 관계 추가 |
-| `/api/bom/{parent_item_id}` | GET | 직자식 목록 (평면 1단계) |
-| `/api/bom/{parent_item_id}/tree` | GET | 재귀 트리 (깊이 10 제한) |
-| `/api/bom/{bom_id}` | PATCH | 수량·단위 수정 |
-| `/api/bom/{bom_id}` | DELETE | 관계 삭제 |
+````python
+"""BOM router for Bill of Materials CRUD and tree queries."""
 
-### 요청 예시
+import uuid
+from decimal import Decimal
+from typing import List
 
-**생성**:
-```json
-POST /api/bom
-{
-  "parent_item_id": "uuid-of-ADX6000",
-  "child_item_id": "uuid-of-튜브",
-  "quantity": 1,
-  "unit": "EA",
-  "notes": "표준 사양"
-}
-```
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.orm import Session
 
-**트리 조회 응답** (`BOMTreeNode` 재귀):
-```json
-{
-  "item_id": "uuid-ADX6000",
-  "erp_code": "346-PA-0001",
-  "item_name": "ADX6000",
-  "category": "FG",
-  "required_quantity": 1,
-  "current_stock": 3,
-  "children": [
-    {
-      "item_id": "uuid-튜브",
-      "erp_code": "3-AR-0012",
-      "required_quantity": 1,
-      "current_stock": 5,
-      "children": [ ... 재귀 ... ]
+from app.database import get_db
+from app.models import BOM, Inventory, Item
+from app.routers._errors import ErrorCode, http_error
+from app.schemas import BOMCreate, BOMDetailResponse, BOMResponse, BOMTreeNode, BOMUpdate
+from app.services import audit
+from app.services._tx import commit_and_refresh, commit_only
+from app.services.bom import BomCache, build_bom_cache
+
+router = APIRouter()
+
+
+@router.get("", response_model=List[BOMDetailResponse])
+def get_all_bom(db: Session = Depends(get_db)):
+    """Return all BOM relationships with parent and child item names."""
+    entries = db.query(BOM).all()
+    if not entries:
+        return []
+
+    needed_ids = {e.parent_item_id for e in entries} | {e.child_item_id for e in entries}
+    items_map = {
+        i.item_id: i
+        for i in db.query(Item).filter(Item.item_id.in_(list(needed_ids))).all()
     }
-  ]
-}
-```
-`required_quantity`는 상위 노드에서 누적 곱. 예: 부모 2개 생산이면 자식 `required = BOM.quantity × 2`.
+
+    result = []
+    for entry in entries:
+        parent = items_map.get(entry.parent_item_id)
+        child = items_map.get(entry.child_item_id)
+        if not parent or not child:
+            continue
+        result.append(BOMDetailResponse(
+            bom_id=entry.bom_id,
+            parent_item_id=entry.parent_item_id,
+            parent_item_name=parent.item_name,
+            parent_erp_code=parent.erp_code,
+            child_item_id=entry.child_item_id,
+            child_item_name=child.item_name,
+            child_erp_code=child.erp_code,
+            quantity=entry.quantity,
+            unit=entry.unit,
+        ))
+    return result
+
+
+@router.post("", response_model=BOMResponse, status_code=status.HTTP_201_CREATED)
+def create_bom(payload: BOMCreate, request: Request, db: Session = Depends(get_db)):
+    """Create a BOM row for a parent and child item."""
+
+    if payload.parent_item_id == payload.child_item_id:
+        raise http_error(
+            status.HTTP_400_BAD_REQUEST,
+            ErrorCode.BAD_REQUEST,
+            "상위 품목과 하위 품목은 같을 수 없습니다.",
+        )
+
+    parent = db.query(Item).filter(Item.item_id == payload.parent_item_id).first()
+    if not parent:
+        raise http_error(404, ErrorCode.NOT_FOUND, "상위 품목을 찾을 수 없습니다.")
+
+    child = db.query(Item).filter(Item.item_id == payload.child_item_id).first()
+    if not child:
+        raise http_error(404, ErrorCode.NOT_FOUND, "하위 품목을 찾을 수 없습니다.")
+
+    existing = (
+        db.query(BOM)
+        .filter(
+            BOM.parent_item_id == payload.parent_item_id,
+            BOM.child_item_id == payload.child_item_id,
+        )
+        .first()
+    )
+    if existing:
+        raise http_error(
+            status.HTTP_409_CONFLICT,
+            ErrorCode.CONFLICT,
+            "동일한 BOM 항목이 이미 존재합니다.",
+        )
+
+    if _is_circular(db, payload.parent_item_id, payload.child_item_id):
+        raise http_error(
+            status.HTTP_400_BAD_REQUEST,
+            ErrorCode.BAD_REQUEST,
+            "순환 참조가 발생합니다. BOM 구성을 확인해 주세요.",
+        )
+
+    bom_entry = BOM(
+        parent_item_id=payload.parent_item_id,
+        child_item_id=payload.child_item_id,
+        quantity=payload.quantity,
+        unit=payload.unit,
+        notes=payload.notes,
+    )
+    db.add(bom_entry)
+    db.flush()
+
+    audit.record(
+        db,
+        request=request,
+        action="bom.create",
+        target_type="bom",
+        target_id=str(bom_entry.bom_id),
+        payload_summary=f"{parent.item_name} ← {child.item_name} ×{payload.quantity}{payload.unit}",
+    )
+
+    commit_and_refresh(db, bom_entry)
+    return bom_entry
+
+
+@router.patch("/{bom_id}", response_model=BOMResponse)
+def update_bom(bom_id: uuid.UUID, payload: BOMUpdate, request: Request, db: Session = Depends(get_db)):
+    """Update quantity or unit of an existing BOM row."""
+    bom_entry = db.query(BOM).filter(BOM.bom_id == bom_id).first()
+    if not bom_entry:
+        raise http_error(404, ErrorCode.NOT_FOUND, "BOM 항목을 찾을 수 없습니다.")
+
+    changed: list[str] = []
+    if payload.quantity is not None and bom_entry.quantity != payload.quantity:
+        old_qty = bom_entry.quantity
+        bom_entry.quantity = payload.quantity
+        changed.append(f"qty {old_qty}→{payload.quantity}")
+    if payload.unit is not None and bom_entry.unit != payload.unit:
+        bom_entry.unit = payload.unit
+        changed.append(f"unit→{payload.unit}")
+
+    if changed:
+        audit.record(
+            db,
+            request=request,
+            action="bom.update",
+            target_type="bom",
+            target_id=str(bom_entry.bom_id),
+            payload_summary=", ".join(changed),
+        )
+
+    commit_and_refresh(db, bom_entry)
+    return bom_entry
+
+
+@router.get("/{parent_item_id}", response_model=List[BOMResponse])
+def get_bom_flat(parent_item_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Return direct child BOM rows for a given parent item."""
+
+    item = db.query(Item).filter(Item.item_id == parent_item_id).first()
+    if not item:
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+
+    return db.query(BOM).filter(BOM.parent_item_id == parent_item_id).all()
+
+
+@router.get("/{parent_item_id}/tree", response_model=BOMTreeNode)
+def get_bom_tree(parent_item_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Return a recursive BOM tree for a given parent item.
+
+    진입 시 BOM 캐시 1회 + 후손 후보 Items/Inventory IN 1회씩으로 N+1 제거.
+    """
+    bom_cache = build_bom_cache(db)
+    needed_ids = _collect_descendants(parent_item_id, bom_cache, set())
+    needed_ids.add(parent_item_id)
+
+    items_map = {
+        i.item_id: i
+        for i in db.query(Item).filter(Item.item_id.in_(list(needed_ids))).all()
+    }
+    if parent_item_id not in items_map:
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+
+    invs_map = {
+        i.item_id: i
+        for i in db.query(Inventory).filter(Inventory.item_id.in_(list(needed_ids))).all()
+    }
+
+    return _build_tree_cached(
+        items_map[parent_item_id],
+        Decimal("1"),
+        items_map,
+        invs_map,
+        bom_cache,
+        depth=0,
+        visited=set(),
+    )
+
+
+@router.delete("/{bom_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_bom(bom_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+    """Delete a BOM row."""
+
+    bom_entry = db.query(BOM).filter(BOM.bom_id == bom_id).first()
+    if not bom_entry:
+        raise http_error(404, ErrorCode.NOT_FOUND, "BOM 항목을 찾을 수 없습니다.")
+
+    audit.record(
+        db,
+        request=request,
+        action="bom.delete",
+        target_type="bom",
+        target_id=str(bom_entry.bom_id),
+        payload_summary=f"parent={bom_entry.parent_item_id} child={bom_entry.child_item_id}",
+    )
+    db.delete(bom_entry)
+    commit_only(db)
+
+
+@router.get("/where-used/{item_id}", response_model=List[BOMDetailResponse])
+def get_where_used(item_id: uuid.UUID, db: Session = Depends(get_db)):
+    """주어진 품목을 child 로 사용하는 parent BOM 행 목록 (역방향 추적).
+
+    - 직접 사용처만 반환 (1단계). 다단계 추적은 호출측에서 재귀.
+    - 응답은 `BOMDetailResponse` 배열 — 기존 BOM 조회와 동일 모양.
+    """
+    item = db.query(Item).filter(Item.item_id == item_id).first()
+    if not item:
+````
 
 ---
 
-## 안전장치
+## 정책
 
-- **자기참조 금지**: `parent_item_id == child_item_id` → 400
-- **중복 금지**: `(parent, child)` 유니크 → 409
-- **순환 참조 검사** (`_is_circular`): A→B→C→A 같은 경우 409. DFS 스택 사용.
-- **깊이 제한** (`depth > 10`): 트리 조회 시 더 이상 펼치지 않음. 잘못된 BOM 구성 보호.
-
----
-
-## FAQ
-
-**Q. 부모가 자식을 여러 개 가질 수 있나?**
-당연. `(parent=ADX6000, child=튜브, qty=1)`, `(parent=ADX6000, child=보드, qty=1)` 각각 다른 행.
-
-**Q. 자식을 중간에 바꾸려면?**
-DELETE 후 POST. 또는 DELETE → 새 POST. PATCH로 자식 교체는 불가(수량·단위만).
-
-**Q. `quantity=0.5` 가능?**
-`Numeric(15,4)`라 소수점 4자리까지 OK. 도료 0.25kg 등 가능.
-
-**Q. BOM 트리 10 깊이 제한 넘으면?**
-해당 자식 노드의 `children=[]`으로 반환. 화면에서 "더 보기" 없음. 실무에서 10단계는 매우 깊다 — 대부분 3~5단계.
-
-**Q. BOM 수정하면 이미 만든 제품 재고는?**
-변동 없음. BOM은 "앞으로 만들 때"만 참조. 과거 배치는 당시 BOM 기준으로 이미 처리됨.
-
-**Q. 자식만 삭제하면 부모도 영향?**
-items CASCADE로 자식 `items` 행을 지우면 `bom` 행도 삭제. 부모 행 자체는 남음. 하지만 대부분 `items` 직접 삭제는 지양.
-
----
-
-## 관련 문서
-
-- [[backend/app/services/bom.py.md]] — `explode_bom()` (재귀 폭발)
-- [[backend/app/services/queue.py.md]] — 배치 생성 시 BOM 자동 로드
-- [[backend/app/models.py.md]] — `BOM` 테이블
-- [[backend/app/routers/production.py.md]] — Backflush 경로
-- [[backend/app/routers/queue.py.md]] — `load_bom=true` 배치 생성
-- [[frontend/app/bom/bom]]
-- 용어 사전 — BOM / 백플러시 설명
-
-Up: [[backend/app/routers/routers]]
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

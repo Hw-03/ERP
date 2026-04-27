@@ -1,54 +1,33 @@
-﻿---
+---
 type: index
 project: ERP
 layer: frontend
 source_path: frontend/app/operations/
 status: active
+updated: 2026-04-27
 tags:
   - erp
   - frontend
-  - route
-  - operations
-aliases:
-  - 작업 페이지
+  - index
 ---
 
-# frontend/app/operations
+# operations
 
 > [!summary] 역할
-> `/operations` 경로 라우트. 창고 입출고 작업 화면.
+> `frontend/app/operations/` 아래 원본 파일들을 Obsidian에서 탐색하기 위한 폴더 허브다.
 
-## 관련 문서
+## 원본 위치
 
-- [[frontend/app/legacy/_components/DesktopWarehouseView.tsx.md]]
+- Source: `frontend/app/operations/`
+- File count: `1`
 
----
+## 파일 노트
 
-## 쉬운 말로 설명
+- [[frontend/app/operations/page.tsx|page.tsx]]
 
-`/operations` URL. **입출고 작업** 페이지. 실무자가 가장 자주 쓰는 화면이며, 창고-부서 이관, 입고/출고 같은 일상 작업을 처리.
+## 읽는 팁
 
-### 주요 작업
-- 품목 선택 → 수량 입력 → 작업 버튼
-- 입고 / 출고 / 창고→부서 / 부서→창고 / 부서간 이동 / 불량 등록
+- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
+- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
 
-실제 UI: [[frontend/app/legacy/_components/DesktopWarehouseView.tsx.md]]
-
----
-
-## FAQ
-
-**Q. 대량 작업 가능한가?**
-여러 품목 한 번에 선택 → 하나의 작업으로 묶어 처리 가능 (`DesktopRightPanel` + `SelectedItemsPanel`).
-
-**Q. 실수로 입력했으면?**
-이력(`/history`) 에서 해당 거래 확인 후 반대 거래(조정 또는 역방향 이관)로 수정. 감사 추적.
-
----
-
-## 관련 문서
-
-- [[backend/app/routers/inventory.py.md]] — 호출 API
-- 재고 입출고 시나리오 ⭐
-
-Up: [[frontend/app/app]]
+Up: [[frontend/app/app|frontend/app]]

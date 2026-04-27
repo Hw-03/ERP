@@ -2,6 +2,7 @@
 type: moc
 project: ERP
 status: active
+updated: 2026-04-27
 tags:
   - erp
   - moc
@@ -11,62 +12,13 @@ aliases:
   - 프로젝트 시작점
 ---
 
-# X-Ray ERP 시스템 - 메인 허브
+# ERP MOC
+
 
 > [!summary] 프로젝트 개요
-> 정밀 X-Ray 장비 제조 회사의 자재/재고/생산 흐름을 관리하는 ERP/MES 성격의 내부 운영 시스템.
-> FastAPI 백엔드와 Next.js 프론트엔드로 구성되어 있고, 현재 인수인계용 Vault는 `C:\ERP\vault` 아래에 있다.
+> DEXCOWIN 내부 ERP/MES 성격의 재고, 입출고, 생산, BOM, 운영 보조 시스템이다. 이 Vault는 실제 코드 구조를 Obsidian에서 따라가기 쉽게 만든 인수인계 레이어다.
 
-## 어디부터 읽으면 되나요?
-
-| 목적 | 시작 문서 |
-|---|---|
-| 처음 인수인계 받기 | 처음 읽는 사람 |
-| 전체 구조 파악 | 이 문서 |
-| 관제실처럼 보기 | ERP Control Room |
-| 용어 확인 | 용어 사전 |
-| 자주 막히는 질문 | FAQ 전체 |
-
-## 폴더별 진입 링크
-
-### Backend
-
-- [[backend/backend]]
-- [[backend/app/routers/routers]]
-- [[backend/app/services/services]]
-- [[backend/app/models.py.md]]
-
-### Frontend
-
-- [[frontend/frontend]]
-- [[frontend/app/legacy/legacy]]
-- [[frontend/app/legacy/_components/mobile/mobile]]
-- [[frontend/lib/api.ts.md]]
-
-### Infra / Data / Ops
-
-- [[docker/docker]]
-- [[data/data]]
-- [[scripts/scripts]]
-- [[docs/docs]]
-
-### Vault 전용 문서
-
-- [[_vault/_vault]]
-- [[_vault/dashboards/ERP_Control_Room]]
-- [[_vault/guides/처음_읽는_사람]]
-
-## 이번 브랜치 핵심 변화
-
-- Docker 설정이 루트에서 `docker/` 폴더로 이동
-- `backend/schema.sql` 기준 정리
-- `backend/app/routers/models.py` 추가
-- `backend/app/services/integrity.py`, `stock_math.py` 추가
-- `frontend/app/legacy/_components/mobile/` 대폭 확장
-- 예전 모바일 탭 일부 `_archive` 이동
-- `docs/ITEM_CODE_RULES.md` 가 코드 규칙 기준 문서로 정리
-
-## 지금 구조를 이해하는 가장 짧은 흐름
+## 시스템 흐름
 
 ```text
 사용자 화면
@@ -75,29 +27,53 @@ aliases:
   -> backend/app/routers
   -> backend/app/services
   -> backend/app/models.py
-  -> DB
+  -> SQLite DB
 ```
 
-## 특별히 먼저 볼 폴더
+## 주요 허브
 
-| 폴더 | 이유 |
-|---|---|
-| `frontend/app/legacy/_components/mobile/` | 이번 브랜치에서 가장 크게 늘어난 UI 영역 |
-| `backend/app/services/` | 재고 계산/무결성 책임이 더 잘 나뉜 핵심 영역 |
-| `docker/` | 실행 설정 위치가 바뀐 부분 |
-| `docs/` | 기준 문서가 정리된 부분 |
+### Backend
 
-## 실제 코드는 어디 있나요?
+- [[backend/backend]]
+- [[backend/app/routers/routers]]
+- [[backend/app/routers/inventory/inventory]]
+- [[backend/app/services/services]]
+- [[backend/app/models.py.md]]
 
-실제 작업 기준 프로젝트 루트는 `C:\ERP` 이다.  
-이 Vault는 그 구조를 설명하기 위한 문서 레이어이고, 실제 수정은 원본 코드에서 일어난다.
+### Frontend
 
-## 관련 문서
+- [[frontend/frontend]]
+- [[frontend/app/legacy/legacy]]
+- [[frontend/app/legacy/_components/_components]]
+- [[frontend/app/legacy/_components/_inventory_sections/_inventory_sections]]
+- [[frontend/app/legacy/_components/_warehouse_steps/_warehouse_steps]]
+- [[frontend/app/legacy/_components/_admin_sections/_admin_sections]]
+- [[frontend/lib/api.ts.md]]
 
-- 처음 읽는 사람
-- ERP Control Room
-- 용어 사전
-- FAQ 전체
+### Ops / Docs / Data
 
-Up: [[_guides]]
+- [[scripts/ops/ops]]
+- [[scripts/migrations/migrations]]
+- [[docs/docs]]
+- [[data/data]]
+- [[docker/docker]]
+- [[.github/workflows/workflows]]
 
+## 최신 구조 변화
+
+- `backend/app/routers/inventory.py` 단일 파일은 사라지고 `backend/app/routers/inventory/` 패키지로 분리됐다.
+- 백엔드에는 `_errors`, `_logging`, audit, export helper, transaction helper, 테스트/CI가 추가됐다.
+- 프론트엔드는 데스크톱 inventory/history/admin/warehouse 영역이 섹션과 hook 단위로 쪼개졌다.
+- 모바일 admin/dept wizard도 하위 step/section 파일로 분리됐다.
+- `scripts/`는 `dev`, `migrations`, `ops`로 역할이 분리됐다.
+- `main`은 코드만, `vault-sync`는 같은 코드에 Vault 문서를 더하는 정책이다.
+
+## 읽는 원칙
+
+1. 실제 수정은 원본 코드에서 한다.
+2. Vault 노트는 인수인계와 탐색용 설명이다.
+3. 품목코드 기준은 [[docs/ITEM_CODE_RULES.md.md]]를 우선한다.
+4. 재고 수량 규칙은 백엔드 서비스와 프론트 표시가 같은 계산을 써야 한다.
+5. 운영 작업은 `scripts/ops`와 백업 절차를 먼저 확인한다.
+
+Up: [[_vault/guides/_guides]]

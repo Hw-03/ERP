@@ -1,70 +1,196 @@
-﻿---
+---
 type: code-note
 project: ERP
-layer: docs
+layer: root
 source_path: README.md
 status: active
+updated: 2026-04-27
+source_sha: 35fc4a4a5dd5
 tags:
   - erp
-  - docs
-  - overview
-aliases:
-  - 프로젝트 README
+  - root
+  - project-doc
+  - md
 ---
 
 # README.md
 
 > [!summary] 역할
-> ERP 프로젝트의 **공개용 개요 문서**.
-> 프로젝트 목적, 입력 파일 구성, 산출물, 실행 방법을 설명한다.
+> 프로젝트 루트에서 전체 규칙과 시작점을 설명하는 기준 문서다.
 
-> [!info] 프로젝트 목적
-> 정밀 X-ray 발생 장치 제조사의 부서별로 파편화된 엑셀 자재 파일을
-> **단일 표준 마스터 DB**로 통합하고 SQL 기반 ERP 시스템으로의 이관을 준비한다.
+## 원본 위치
 
-> [!info] 입력 파일 3종
-> | 파일 | 역할 |
-> |------|------|
-> | `F704-03 (R00) 자재 재고 현황.xlsx` | 원자재 마스터 (Baseline) |
-> | `2026.03_생산부 자재_조립,출하파트.xlsx` | 조립/출하팀 자재 |
-> | `2026.03_생산부 자재_고압,진공,튜닝파트.xlsx` | 고압/진공/튜닝팀 자재 |
+- Source: `README.md`
+- Layer: `root`
+- Kind: `project-doc`
+- Size: `5626` bytes
 
-> [!info] 주요 산출물
-> - `ERP_Master_DB.csv` — 통합 마스터 DB
-> - `ERP_Source_Links.csv` — 원본 행 매핑
-> - `CODEX_PROGRESS.md` — 최근 작업 및 진행 이력
-> - `schema.sql` — PostgreSQL 이관 스키마
+## 읽는 포인트
+
+- 실제 수정은 원본 파일에서 한다.
+- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+
+## 원본 발췌
+
+````markdown
+# DEXCOWIN ERP
+
+정밀 X-ray 장비 제조사의 품목, 재고, BOM, 입출고를 관리하는 내부 ERP/MES 프로토타입.
+
+## 현재 기준
+
+- 기준 품목 수: 971건
+- 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/erp.db`)
+- 프론트엔드: Next.js 14 + Tailwind CSS
+- 주 사용 화면: `/legacy` (데스크톱 셸: 대시보드 / 입출고 / 입출고 내역 / 관리자)
+- 품목코드 기준 문서: `docs/ITEM_CODE_RULES.md`
+
+## 빠른 시작 (Windows · 권장)
+
+루트의 `start.bat` 한 번 실행으로 백엔드·프론트가 함께 뜨고 LAN IP 기준 브라우저가 자동 실행된다.
+
+```bat
+start.bat
+```
+
+- 백엔드: `http://0.0.0.0:8010` (로컬 호출은 `http://127.0.0.1:8010`)
+- 프론트엔드: `http://<LAN IP>:3000` 또는 `http://localhost:3000`
+- 같은 사설망 안의 다른 PC에서도 `http://<LAN IP>:3000` 으로 접속 가능
+
+처음 실행 시 `npm install` 과 `pip install -r backend/requirements.txt` 가 자동 수행된다.
+
+## 수동 실행
+
+백엔드:
+
+```bash
+cd backend
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload
+```
+
+프론트엔드:
+
+```bash
+cd frontend
+npm run dev
+```
+
+대표 접속:
+
+```text
+http://localhost:3000
+```
+
+## 운영 보조 스크립트
+
+| 스크립트 | 역할 |
+|---|---|
+| `scripts/ops/backup_db.bat` | `backend/erp.db` 를 `backend/_backup/erp_YYYYMMDD_HHMMSS.db` 로 복사 |
+| `scripts/ops/healthcheck.bat` | `GET /health/detailed` 호출 후 결과 출력 |
+| `scripts/ops/reconcile_inventory.bat` | 정합성 1차 진단 + 자동 백업 |
+
+자세한 운영 절차는 `docs/OPERATIONS.md` 참고.
+
+## 품목코드 핵심 규칙
+
+공정코드는 18개를 사용한다.
+
+| 부서 | R 타입 | A 타입 | F 타입 |
+|---|---|---|---|
+| 튜브 | `TR` | `TA` | `TF` |
+| 고압 | `HR` | `HA` | `HF` |
+| 진공 | `VR` | `VA` | `VF` |
+| 튜닝 | `NR` | `NA` | `NF` |
+| 조립 | `AR` | `AA` | `AF` |
+| 출하 | `PR` | `PA` | `PF` |
+
+- 조립 F 타입은 `AF`다.
+- `BF`는 구형 오염 코드이며 현재 기준에서 사용하지 않는다.
+- 부서 필터는 `category`가 아니라 `process_type_code` 또는 백엔드 `department` 응답 기준으로 동작해야 한다.
+
+ERP 코드 포맷:
+
+```text
+{모델기호}-{process_type_code}-{일련번호:04d}[-{옵션코드}]
+```
+
+예시:
+
+```text
+346-AF-0001
+3-PA-0001-BG
+34-TR-0023
+```
+
+## 한눈에 보는 폴더 구조
+
+```
+ERP/
+├── backend/              FastAPI · SQLAlchemy · SQLite
+│   ├── app/              routers / services / models
+│   ├── erp.db            기준 스냅샷 (971 품목)
+│   └── requirements.txt
+├── frontend/             Next.js 14 · Tailwind
+│   └── app/legacy/       현재 활성 셸 (대시보드/입출고/내역/관리자)
+├── data/                 입력 자료 (xlsx · csv)
+├── docs/                 기준 · 운영 · 구조 · 인수인계
+│   └── research/         외부 연구 보고서
+├── scripts/              보조 스크립트
+│   ├── ops/              백업 · 헬스체크 · 재고 정합
+│   ├── migrations/       DB 스키마 / 코드 정제
+│   └── dev/              개발 보조 · 일회성 임포트
+├── docker/               컨테이너 정의 (선택)
+├── _archive/, _backup/   보관용 — 작업 대상 아님
+├── start.bat             통합 실행 (Windows)
+├── README.md             이 문서
+└── CLAUDE.md             AI/개발자 작업 규칙
+```
+
+공용 UI 부품(EmptyState · LoadFailureCard · ConfirmModal · ResultModal · StatusPill · LoadingSkeleton) 은 `frontend/app/legacy/_components/common/` — 자세한 컴포넌트 위치·레이어는 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 참조.
+
+## 문서 허브
+
+| 문서 | 대상 | 내용 |
+|---|---|---|
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | 현장 사용자 | 화면별 사용법 (대시보드 / 입출고 / 내역 / 관리자) |
+| [docs/OPERATIONS.md](docs/OPERATIONS.md) | 운영자 | 365일 운영, 시작·재시작, 포트 충돌, 백업, 1차 장애 대응 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 개발자 | 폴더 구조·레이어·재고 3-bucket 모델·wizard 흐름 |
+| [docs/ERD.md](docs/ERD.md) | 개발자 | 엔티티 관계도(Mermaid) + 자재→재고→생산→출하 흐름 |
+| [docs/GLOSSARY.md](docs/GLOSSARY.md) | 모두 | 도메인 용어 단일 소스 (부서·카테고리·재고 모델·에러코드) |
+| [docs/ITEM_CODE_RULES.md](docs/ITEM_CODE_RULES.md) | 모두 | 품목코드 최종 기준 |
+| [docs/AI_HANDOVER.md](docs/AI_HANDOVER.md) | AI 협업자 | 인수인계 (Phase 4·5 결과 포함) |
+| [docs/CODEX_PROGRESS.md](docs/CODEX_PROGRESS.md) | 모두 | 큰 기능 단위 진행 기록 |
+| [docs/BACKEND_REFACTOR_PLAN.md](docs/BACKEND_REFACTOR_PLAN.md) | 다음 작업 | 백엔드 개선 진행 / 보류 사유 |
+| [docs/FRONTEND_HOOKS_PLAN.md](docs/FRONTEND_HOOKS_PLAN.md) | 다음 작업 | 프론트 hook·뷰 분할 진행 / 보류 사유 |
+| [docs/research/MOBILE_BARCODE_ARCHITECTURE.md](docs/research/MOBILE_BARCODE_ARCHITECTURE.md) | 다음 작업 검토 | 모바일 바코드 스캐너 아키텍처 외부 연구 |
+
+## 검증
+
+```bash
+# 백엔드
+python -m compileall backend
+
+# 프론트
+cd frontend
+npm run lint
+npx tsc --noEmit
+npm run build
+```
+
+수동 smoke (백엔드 기동 후):
+
+```text
+GET  /health
+GET  /api/items
+GET  /api/inventory/summary
+GET  /api/production/capacity
+```
+````
 
 ---
 
-## 쉬운 말로 설명
+## 정책
 
-**프로젝트 겉표지**. Github 에 접속한 누군가가 맨 처음 읽는 문서. 프로젝트가 뭔지, 왜 있는지, 어떻게 돌려보는지 요점만 정리.
-
-내부 개발자용 상세 규칙은 `CLAUDE.md`, AI 핸드오버는 `docs/AI_HANDOVER.md` 로 분리.
-
-## 2026-04-22 기준 현황
-
-- 971개 품목 통합 완료
-- FastAPI + Next.js 15 기반 프로토타입 운영 중
-- NAS 서버에서 Docker 기반 서비스 중 (`docker-compose.nas.yml`)
-- 실제 자재 엑셀 주기적 반영 중
-
-## FAQ
-
-**Q. 공개 저장소인가?**
-아님. 사내 참고용 + 개인 학습용.
-
-**Q. 새 멤버 온보딩?**
-이 README → `CLAUDE.md` → `docs/AI_HANDOVER.md` → `ERP MOC.md` 순서로 읽으면 전체 파악.
-
----
-
-## 관련 문서
-
-- [[data/data]] — 데이터 파일 목록
-- [[scripts/erp_integration.py.md]] — 통합 스크립트
-- [[backend/schema.sql.md]] — SQL 스키마
-- [[_vault/guides/ERP_MOC]] — 전체 맵
-
-Up: ERP MOC
+- `main` 브랜치는 코드만 유지한다.
+- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
+- 코드와 노트가 다르면 실제 코드가 우선이다.

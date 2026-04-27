@@ -2,27 +2,39 @@
 type: index
 project: ERP
 layer: frontend
+source_path: frontend/app/legacy/_components/mobile/io/dept/
 status: active
+updated: 2026-04-27
 tags:
   - erp
   - frontend
-  - mobile
-  - dept
-aliases:
-  - 부서 입출고 허브
+  - index
 ---
 
 # dept
 
 > [!summary] 역할
-> 부서 입출고용 모바일 wizard 화면과 상태를 묶는 허브.
+> `frontend/app/legacy/_components/mobile/io/dept/` 아래 원본 파일들을 Obsidian에서 탐색하기 위한 폴더 허브다.
 
-## 하위 문서
+## 원본 위치
 
-- [[frontend/app/legacy/_components/mobile/io/dept/context.tsx.md]]
-- [[frontend/app/legacy/_components/mobile/io/dept/deptWizardConfig.ts.md]]
-- [[frontend/app/legacy/_components/mobile/io/dept/DeptWizardSteps.tsx.md]]
-- [[frontend/app/legacy/_components/mobile/io/dept/DeptWizardScreen.tsx.md]]
+- Source: `frontend/app/legacy/_components/mobile/io/dept/`
+- File count: `10`
 
-Up: [[frontend/app/legacy/_components/mobile/io/io]]
+## 하위 허브
 
+- [[frontend/app/legacy/_components/mobile/io/dept/_dept_steps/_dept_steps|_dept_steps]]
+
+## 파일 노트
+
+- [[frontend/app/legacy/_components/mobile/io/dept/DeptWizardScreen.tsx|DeptWizardScreen.tsx]]
+- [[frontend/app/legacy/_components/mobile/io/dept/DeptWizardSteps.tsx|DeptWizardSteps.tsx]]
+- [[frontend/app/legacy/_components/mobile/io/dept/context.tsx|context.tsx]]
+- [[frontend/app/legacy/_components/mobile/io/dept/deptWizardConfig.ts|deptWizardConfig.ts]]
+
+## 읽는 팁
+
+- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
+- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
+
+Up: [[frontend/app/legacy/_components/mobile/io/io|frontend/app/legacy/_components/mobile/io]]
