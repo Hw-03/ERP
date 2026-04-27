@@ -21,9 +21,7 @@ const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
 };
 
 export function DesktopLegacyShell() {
-  const [activeTab, setActiveTab] = useState<DesktopTabId>(
-    () => (localStorage.getItem("desktop-active-tab") as DesktopTabId) ?? "inventory",
-  );
+  const [activeTab, setActiveTab] = useState<DesktopTabId>("inventory");
   const [status, setStatus] = useState("데스크톱 ERP 화면을 준비했습니다.");
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [warehousePreselected, setWarehousePreselected] = useState<Item | null>(null);

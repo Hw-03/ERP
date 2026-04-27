@@ -36,9 +36,7 @@ export default function LegacyPage() {
 }
 
 function LegacyBody() {
-  const [activeTab, setActiveTab] = useState<TabId>(
-    () => (localStorage.getItem("mobile-active-tab") as TabId) ?? "inventory",
-  );
+  const [activeTab, setActiveTab] = useState<TabId>("inventory");
   const [showHistory, setShowHistory] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const { dispatch: warehouseDispatch } = useWarehouseWizard();
