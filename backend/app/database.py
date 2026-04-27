@@ -34,6 +34,10 @@ if _is_sqlite:
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA foreign_keys=ON")
+        # 동시 쓰기 락 충돌 시 5초 대기 후 재시도 (단일 writer SQLite의 현실적 보강)
+        cursor.execute("PRAGMA busy_timeout=5000")
+        # WAL 모드와 짝. fsync 빈도 줄여 처리량 ↑, 안전성은 거의 유지.
+        cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.close()
 
 

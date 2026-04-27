@@ -18,9 +18,11 @@ const TABS: { id: DesktopTabId; label: string; subtitle: string; icon: ElementTy
 export function DesktopSidebar({
   activeTab,
   onTabChange,
+  alertCount,
 }: {
   activeTab: DesktopTabId;
   onTabChange: (tab: DesktopTabId) => void;
+  alertCount?: Partial<Record<DesktopTabId, number>>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [hoveredTab, setHoveredTab] = useState<DesktopTabId | null>(null);
@@ -109,14 +111,24 @@ export function DesktopSidebar({
                       : undefined,
                 }}
               >
-                <div
-                  className="my-1 flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[16px] transition-all duration-150 group-hover:brightness-110 group-hover:scale-[1.05]"
-                  style={{
-                    background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
-                    color: active ? "#fff" : LEGACY_COLORS.muted2,
-                  }}
-                >
-                  <Icon className="h-5 w-5" />
+                <div className="relative my-1 shrink-0">
+                  <div
+                    className="flex h-[46px] w-[46px] items-center justify-center rounded-[16px] transition-all duration-150 group-hover:brightness-110 group-hover:scale-[1.05]"
+                    style={{
+                      background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
+                      color: active ? "#fff" : LEGACY_COLORS.muted2,
+                    }}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  {(alertCount?.[tab.id] ?? 0) > 0 && (
+                    <span
+                      className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-black text-white"
+                      style={{ background: LEGACY_COLORS.red }}
+                    >
+                      {alertCount![tab.id]}
+                    </span>
+                  )}
                 </div>
                 <div
                   className="min-w-0 overflow-hidden pl-2 text-left transition-[opacity,transform,width,max-width] duration-200"

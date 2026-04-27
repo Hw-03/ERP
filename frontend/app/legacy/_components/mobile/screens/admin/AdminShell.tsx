@@ -7,13 +7,11 @@ import { ELEVATION, TYPO } from "../../tokens";
 import { IconButton } from "../../primitives";
 import { PinLock } from "../../../PinLock";
 import type { ToastState } from "../../../Toast";
-import {
-  BomSection,
-  EmployeesSection,
-  ItemsSection,
-  PackagesSection,
-  SettingsSection,
-} from "../../../AdminTab";
+import { AdminBomSection } from "./AdminBomSection";
+import { AdminEmployeesSection } from "./AdminEmployeesSection";
+import { AdminItemsSection } from "./AdminItemsSection";
+import { AdminPackagesSection } from "./AdminPackagesSection";
+import { AdminSettingsSection } from "./AdminSettingsSection";
 import { AdminHomeScreen, type AdminSection, ADMIN_SECTION_META } from "./AdminHomeScreen";
 
 export function AdminShell({ showToast }: { showToast: (toast: ToastState) => void }) {
@@ -80,11 +78,11 @@ export function AdminShell({ showToast }: { showToast: (toast: ToastState) => vo
       </div>
 
       <div className="px-4 pt-4 pb-6">
-        {section === "items" && <ItemsSection showToast={showToast} />}
-        {section === "employees" && <EmployeesSection showToast={showToast} />}
-        {section === "bom" && <BomSection showToast={showToast} />}
-        {section === "packages" && <PackagesSection showToast={showToast} />}
-        {section === "settings" && <SettingsSection showToast={showToast} />}
+        {section === "items" && <AdminItemsSection showToast={showToast} />}
+        {section === "employees" && <AdminEmployeesSection showToast={showToast} />}
+        {section === "bom" && <AdminBomSection showToast={showToast} />}
+        {section === "packages" && <AdminPackagesSection showToast={showToast} />}
+        {section === "settings" && <AdminSettingsSection showToast={showToast} />}
       </div>
     </div>
   );

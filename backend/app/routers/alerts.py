@@ -17,8 +17,10 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import AlertKindEnum, Inventory, Item, StockAlert
+from app.routers._errors import ErrorCode, http_error
 from app.schemas import StockAlertAcknowledgeRequest, StockAlertResponse
 from app.services import inventory as inv_svc
+from app.services._tx import commit_and_refresh, commit_only
 from datetime import datetime
 
 router = APIRouter()
@@ -82,7 +84,7 @@ def scan_safety_alerts(db: Session = Depends(get_db)):
         )
         db.add(alert)
         created.append(alert)
-    db.commit()
+    commit_only(db)
     return [_to_response(db, a) for a in created]
 
 
@@ -96,7 +98,7 @@ def list_alerts(
     include_acknowledged: bool = Query(False),
     item_id: Optional[uuid.UUID] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(200, ge=1, le=1000),
+    limit: int = Query(200, ge=1, le=2000),
     db: Session = Depends(get_db),
 ):
     q = db.query(StockAlert)
@@ -124,11 +126,10 @@ def acknowledge_alert(
 ):
     alert = db.query(StockAlert).filter(StockAlert.alert_id == alert_id).first()
     if alert is None:
-        raise HTTPException(status_code=404, detail="알림을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "알림을 찾을 수 없습니다.")
     if alert.acknowledged_at is not None:
-        raise HTTPException(status_code=400, detail="이미 확인된 알림입니다.")
+        raise http_error(400, ErrorCode.BAD_REQUEST, "이미 확인된 알림입니다.")
     alert.acknowledged_at = datetime.utcnow()
     alert.acknowledged_by = payload.acknowledged_by
-    db.commit()
-    db.refresh(alert)
+    commit_and_refresh(db, alert)
     return _to_response(db, alert)

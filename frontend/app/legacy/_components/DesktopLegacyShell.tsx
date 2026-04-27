@@ -22,7 +22,7 @@ const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
 
 export function DesktopLegacyShell() {
   const [activeTab, setActiveTab] = useState<DesktopTabId>("inventory");
-  const [, setStatus] = useState("데스크톱 ERP 화면을 준비했습니다.");
+  const [status, setStatus] = useState("데스크톱 ERP 화면을 준비했습니다.");
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [warehousePreselected, setWarehousePreselected] = useState<Item | null>(null);
   const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
@@ -80,7 +80,9 @@ export function DesktopLegacyShell() {
           globalSearch=""
           onStatusChange={setStatus}
           onGoToWarehouse={handleGoToWarehouse}
+          onGoToWarehouseTab={() => setActiveTab("warehouse")}
           onSummaryChange={setStockWarnings}
+          capacityData={capacityData}
         />
       );
     }
@@ -91,6 +93,7 @@ export function DesktopLegacyShell() {
           globalSearch=""
           onStatusChange={setStatus}
           preselectedItem={warehousePreselected}
+          onSubmitSuccess={loadCapacity}
         />
       );
     }
@@ -98,7 +101,7 @@ export function DesktopLegacyShell() {
       return <DesktopHistoryView key={key} />;
     }
     return <DesktopAdminView key={key} globalSearch="" onStatusChange={setStatus} />;
-  }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse]);
+  }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse, capacityData, loadCapacity]);
 
   return (
     <>
@@ -190,7 +193,11 @@ export function DesktopLegacyShell() {
       )}
       <div className="hidden h-screen overflow-hidden lg:flex">
       <div className="flex h-full w-full gap-3 px-3 py-3" style={{ background: LEGACY_COLORS.bg, color: LEGACY_COLORS.text }}>
-        <DesktopSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <DesktopSidebar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          alertCount={{ inventory: stockWarnings ? stockWarnings.zero + stockWarnings.low : 0 }}
+        />
 
         <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
           <DesktopTopbar
@@ -202,6 +209,7 @@ export function DesktopLegacyShell() {
             }}
             actionSlot={capacityActionSlot}
             stockWarnings={activeTab === "inventory" && stockWarnings ? stockWarnings : undefined}
+            status={status}
           />
 
           <div className="mt-1 min-h-0 flex-1 overflow-hidden flex">{content}</div>

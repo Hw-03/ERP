@@ -1,15 +1,15 @@
 """BOM 완성 스크립트.
 
-기존 BOM(130개)은 유지하고, ?F 타입(BF, TF) 품목을 대응하는
+기존 BOM(130개)은 유지하고, ?F 타입(AF, TF) 품목을 대응하는
 상위 어셈블리에 연결하여 제품별 BOM 트리를 완성한다.
 
 연결 규칙:
-  BA → BF  (조립 반제품 → 조립 고정형)
+  AA → AF  (조립 반제품 → 조립 고정형)
   TA → TF  (튜브 반제품 → 튜브 고정형)
-  BA → HA, VA, TA  (이미 seed_bom.py에서 일부 생성됨, 보완)
+  AA → HA, VA, TA  (이미 seed_bom.py에서 일부 생성됨, 보완)
 
 model_symbol 중복 여부로 같은 제품군인지 판별한다.
-예) BA model_symbol="346", BF model_symbol="34" → 공통 기호 "3","4" 있으므로 연결.
+예) AA model_symbol="346", AF model_symbol="34" → 공통 기호 "3","4" 있으므로 연결.
 """
 
 import os
@@ -54,7 +54,7 @@ def add_bom(db, existing: set, parent: Item, child: Item, qty: int) -> bool:
 def main() -> None:
     db = SessionLocal()
     try:
-        ba_items = db.query(Item).filter(Item.category == CategoryEnum.BA).all()
+        ba_items = db.query(Item).filter(Item.category == CategoryEnum.AA).all()
         ta_items = db.query(Item).filter(Item.category == CategoryEnum.TA).all()
         ha_items = db.query(Item).filter(Item.category == CategoryEnum.HA).all()
         va_items = db.query(Item).filter(Item.category == CategoryEnum.VA).all()
@@ -69,7 +69,7 @@ def main() -> None:
         created_tf = 0
         created_sub = 0
 
-        # BA → BF 연결 (model_symbol 겹치는 것끼리)
+        # AA → AF 연결 (model_symbol 겹치는 것끼리)
         bf_linked: set[str] = set()
         for ba in ba_items:
             for bf in bf_items:
@@ -78,7 +78,7 @@ def main() -> None:
                         created_bf += 1
                         bf_linked.add(str(bf.item_id))
 
-        # model_symbol이 없는 BF는 model_symbol 없는 BA에 연결
+        # model_symbol이 없는 AF는 model_symbol 없는 AA에 연결
         bf_unlinked = [b for b in bf_items if str(b.item_id) not in bf_linked]
         ba_no_sym = [b for b in ba_items if not b.model_symbol]
         if bf_unlinked and ba_no_sym:
@@ -103,8 +103,8 @@ def main() -> None:
                 if add_bom(db, existing, ta_items[0], tf, 1):
                     created_tf += 1
 
-        # BA에 아직 HA/VA/TA 서브어셈블리 없는 경우 보완
-        # (기존 seed는 10개 BA에만 적용됨 — 나머지 BA도 서브어셈블리 연결)
+        # AA에 아직 HA/VA/TA 서브어셈블리 없는 경우 보완
+        # (기존 seed는 10개 AA에만 적용됨 — 나머지 AA도 서브어셈블리 연결)
         for ba in ba_items:
             sym = ba.model_symbol or ""
             # 같은 모델의 HA 연결
@@ -112,7 +112,7 @@ def main() -> None:
                 if symbols_overlap(sym, ha.model_symbol or ""):
                     if add_bom(db, existing, ba, ha, 1):
                         created_sub += 1
-                    break  # BA당 HA 1개만
+                    break  # AA당 HA 1개만
             # 같은 모델의 VA 연결
             for va in va_items:
                 if symbols_overlap(sym, va.model_symbol or ""):
@@ -147,7 +147,7 @@ def main() -> None:
 
         db.commit()
         print(f"추가된 BOM:")
-        print(f"  BA → BF: {created_bf}개")
+        print(f"  AA → AF: {created_bf}개")
         print(f"  TA → TF: {created_tf}개")
         print(f"  서브어셈블리 보완: {created_sub}개")
         print(f"  합계: {created_bf + created_tf + created_sub}개")

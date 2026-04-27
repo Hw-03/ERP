@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 import { LEGACY_COLORS } from "./legacyUi";
+import { useFocusTrap } from "./_hooks/useFocusTrap";
 
 export function BottomSheet({
   open,
@@ -21,6 +22,19 @@ export function BottomSheet({
     };
   }, [open]);
 
+  // ESC 닫기
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, onClose]);
+
+  const titleId = useId();
+  const sheetRef = useFocusTrap<HTMLDivElement>(open);
+
   if (!open) return null;
 
   return (
@@ -28,8 +42,13 @@ export function BottomSheet({
       className="fixed inset-0 z-[200] flex items-end justify-center"
       style={{ background: "rgba(0,0,0,.6)" }}
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={title ? titleId : undefined}
+      aria-label={title ? undefined : "선택 시트"}
     >
       <div
+        ref={sheetRef}
         className="w-full max-w-[430px] overflow-y-auto rounded-t-[22px] border-t"
         style={{
           background: LEGACY_COLORS.s1,
@@ -38,6 +57,7 @@ export function BottomSheet({
           paddingBottom: "calc(env(safe-area-inset-bottom, 16px) + 20px)",
           animation: "sheetUp .25s cubic-bezier(.32,1.2,.6,1)",
         }}
+        data-anim="sheetUp"
         onClick={(event) => event.stopPropagation()}
       >
         <style jsx>{`
@@ -55,7 +75,7 @@ export function BottomSheet({
         <div className="mx-auto my-3 h-1 w-[34px] rounded-full" style={{ background: LEGACY_COLORS.s3 }} />
         {title ? (
           <div className="mb-[14px] px-5">
-            <div className="text-lg font-black">{title}</div>
+            <div id={titleId} className="text-lg font-black">{title}</div>
           </div>
         ) : null}
         {children}

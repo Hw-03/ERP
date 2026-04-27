@@ -28,6 +28,7 @@ from app.models import (
     QueueBatchStatusEnum,
     QueueLine,
 )
+from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     QueueBatchCreateRequest,
     QueueBatchResponse,
@@ -130,7 +131,7 @@ def _prefetch_items_for_batches(db: Session, batches: list[QueueBatch]) -> dict:
 def _get_batch_or_404(db: Session, batch_id: uuid.UUID) -> QueueBatch:
     batch = db.query(QueueBatch).filter(QueueBatch.batch_id == batch_id).first()
     if batch is None:
-        raise HTTPException(status_code=404, detail="배치를 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "배치를 찾을 수 없습니다.")
     return batch
 
 
@@ -141,7 +142,7 @@ def _get_line_or_404(db: Session, batch_id: uuid.UUID, line_id: uuid.UUID) -> Qu
         .first()
     )
     if line is None:
-        raise HTTPException(status_code=404, detail="라인을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "라인을 찾을 수 없습니다.")
     return line
 
 
@@ -165,14 +166,14 @@ def create_batch(payload: QueueBatchCreateRequest, db: Session = Depends(get_db)
             .first()
         )
         if owner_emp is None:
-            raise HTTPException(status_code=404, detail="작업자를 찾을 수 없습니다.")
+            raise http_error(404, ErrorCode.NOT_FOUND, "작업자를 찾을 수 없습니다.")
 
     if payload.parent_item_id is not None:
         parent = (
             db.query(Item).filter(Item.item_id == payload.parent_item_id).first()
         )
         if parent is None:
-            raise HTTPException(status_code=404, detail="상위 품목을 찾을 수 없습니다.")
+            raise http_error(404, ErrorCode.NOT_FOUND, "상위 품목을 찾을 수 없습니다.")
 
     try:
         batch = queue_svc.create_batch(
@@ -189,8 +190,8 @@ def create_batch(payload: QueueBatchCreateRequest, db: Session = Depends(get_db)
         db.commit()
     except ValueError as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        raise http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.UNPROCESSABLE, str(exc)
         )
 
     db.refresh(batch)
@@ -254,8 +255,8 @@ def override_line(
         db.commit()
     except ValueError as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        raise http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.UNPROCESSABLE, str(exc)
         )
     db.refresh(batch)
     return _batch_to_response(db, batch)
@@ -281,8 +282,8 @@ def toggle_line(
         db.commit()
     except ValueError as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        raise http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.UNPROCESSABLE, str(exc)
         )
     db.refresh(batch)
     return _batch_to_response(db, batch)
@@ -301,7 +302,7 @@ def add_line(
     batch = _get_batch_or_404(db, batch_id)
     item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if item is None:
-        raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
     try:
         queue_svc.add_line(
             db,
@@ -315,8 +316,8 @@ def add_line(
         db.commit()
     except ValueError as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        raise http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.UNPROCESSABLE, str(exc)
         )
     db.refresh(batch)
     return _batch_to_response(db, batch)
@@ -325,7 +326,12 @@ def add_line(
 @router.delete(
     "/{batch_id}/lines/{line_id}",
     response_model=QueueBatchResponse,
-    summary="라인 제거",
+    summary="배치 라인 제거 후 갱신된 배치 반환",
+    description=(
+        "라인 1건을 삭제하고 갱신된 배치 객체를 반환합니다 (200 + body). "
+        "프론트가 재조회 없이 상태를 갱신할 수 있도록 의도된 child-delete 패턴. "
+        "pure DELETE (204) 가 필요한 경우 별도 엔드포인트 추가 예정."
+    ),
 )
 def delete_line(
     batch_id: uuid.UUID,
@@ -339,8 +345,8 @@ def delete_line(
         db.commit()
     except ValueError as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        raise http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.UNPROCESSABLE, str(exc)
         )
     db.refresh(batch)
     return _batch_to_response(db, batch)
@@ -363,8 +369,8 @@ def confirm_batch(batch_id: uuid.UUID, db: Session = Depends(get_db)):
         db.commit()
     except ValueError as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        raise http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.UNPROCESSABLE, str(exc)
         )
     db.refresh(batch)
     return _batch_to_response(db, batch)
@@ -382,8 +388,8 @@ def cancel_batch(batch_id: uuid.UUID, db: Session = Depends(get_db)):
         db.commit()
     except ValueError as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        raise http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.UNPROCESSABLE, str(exc)
         )
     db.refresh(batch)
     return _batch_to_response(db, batch)

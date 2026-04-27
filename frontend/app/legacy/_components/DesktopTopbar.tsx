@@ -4,6 +4,7 @@ import type { ElementType, ReactNode } from "react";
 import { RefreshCw } from "lucide-react";
 import { LEGACY_COLORS } from "./legacyUi";
 import { ThemeToggle } from "./ThemeToggle";
+import { StatusPill, inferToneFromStatus } from "./common";
 
 export function DesktopTopbar({
   title,
@@ -11,12 +12,14 @@ export function DesktopTopbar({
   onRefresh,
   actionSlot,
   stockWarnings,
+  status,
 }: {
   title: string;
   icon?: ElementType;
   onRefresh: () => void;
   actionSlot?: ReactNode;
   stockWarnings?: { low: number; zero: number };
+  status?: string;
 }) {
   return (
     <header className="pl-0 pr-4 pt-0">
@@ -36,27 +39,13 @@ export function DesktopTopbar({
         </div>
 
         {stockWarnings && stockWarnings.zero > 0 && (
-          <span
-            className="inline-flex items-center rounded-full px-3 py-1 text-sm font-bold"
-            style={{
-              color: LEGACY_COLORS.red,
-              background: `color-mix(in srgb, ${LEGACY_COLORS.red} 12%, transparent)`,
-            }}
-          >
-            품절 {stockWarnings.zero}
-          </span>
+          <StatusPill tone="danger" label={`품절 ${stockWarnings.zero}`} showDot={false} maxWidth="none" />
         )}
         {stockWarnings && stockWarnings.low > 0 && (
-          <span
-            className="inline-flex items-center rounded-full px-3 py-1 text-sm font-bold"
-            style={{
-              color: LEGACY_COLORS.yellow,
-              background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 12%, transparent)`,
-            }}
-          >
-            부족 {stockWarnings.low}
-          </span>
+          <StatusPill tone="warning" label={`부족 ${stockWarnings.low}`} showDot={false} maxWidth="none" />
         )}
+
+        {status && <StatusPill tone={inferToneFromStatus(status)} label={status} title={status} />}
 
         {actionSlot}
         <ThemeToggle />

@@ -6,7 +6,7 @@ from io import StringIO
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -15,6 +15,7 @@ from sqlalchemy import func
 
 from app.database import get_db
 from app.models import CategoryEnum, DepartmentEnum, Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
+from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     InventoryLocationResponse,
     ItemCreate,
@@ -24,8 +25,11 @@ from app.schemas import (
 )
 from app.utils.erp_code import infer_process_type, infer_symbol_slot, make_erp_code, next_serial_no, slots_to_model_symbol
 from app.models import ProductSymbol
+from app.services import audit
 from app.services import inventory as inventory_svc
 from app.services import stock_math
+from app.services._tx import commit_and_refresh
+from app.services.export_helpers import csv_streaming_response
 
 router = APIRouter()
 
@@ -109,7 +113,7 @@ def _to_item_with_inventory(
 
 
 @router.post("", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
-def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
+def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get_db)):
     category_val = payload.category.value if payload.category else "UK"
 
     pt = infer_process_type(category_val, payload.legacy_part)
@@ -155,8 +159,16 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
     inventory = Inventory(item_id=item.item_id, quantity=init_qty, warehouse_qty=init_qty)
     db.add(inventory)
 
-    db.commit()
-    db.refresh(item)
+    audit.record(
+        db,
+        request=request,
+        action="item.create",
+        target_type="item",
+        target_id=str(item.item_id),
+        payload_summary=f"{item.item_name} ({item.erp_code or 'no-erp'}, init {init_qty})",
+    )
+
+    commit_and_refresh(db, item)
     return item
 
 
@@ -290,12 +302,7 @@ def export_items_csv(db: Session = Depends(get_db)):
             ]
         )
 
-    buffer.seek(0)
-    return StreamingResponse(
-        iter([buffer.getvalue()]),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="items-export.csv"'},
-    )
+    return csv_streaming_response(buffer, "items-export.csv")
 
 
 _CATEGORY_ROW_COLOR = {
@@ -303,7 +310,7 @@ _CATEGORY_ROW_COLOR = {
     "TA": "D6F5F5", "TF": "D6F5F5",
     "HA": "FFF8D6", "HF": "FFF8D6",
     "VA": "EAD6FF", "VF": "EAD6FF",
-    "BA": "FFE8D6", "BF": "FFE8D6",
+    "AA": "FFE8D6", "AF": "FFE8D6",
     "FG": "D6F5E0",
     "UK": "EBEBEB",
 }
@@ -396,42 +403,43 @@ def export_items_xlsx(
 def get_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
     row = _build_item_query(db).filter(Item.item_id == item_id).first()
     if not row:
-        raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
     item, inventory = row
-    return _to_item_with_inventory(db, item, inventory)
+    # 단건이지만 list 경로와 동일하게 bulk_compute 사용 — compute_for 단건 호출 경로 정리.
+    figures_map = stock_math.bulk_compute(db, [item.item_id])
+    figures = figures_map.get(item.item_id)
+    return _to_item_with_inventory(db, item, inventory, figures=figures)
 
 
 @router.put("/{item_id}", response_model=ItemResponse)
-def update_item(item_id: uuid.UUID, payload: ItemUpdate, db: Session = Depends(get_db)):
+def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: Session = Depends(get_db)):
     item = db.query(Item).filter(Item.item_id == item_id).first()
     if not item:
-        raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
-    if payload.item_name is not None:
-        item.item_name = payload.item_name
-    if payload.spec is not None:
-        item.spec = payload.spec
-    if payload.category is not None:
-        item.category = payload.category
-    if payload.unit is not None:
-        item.unit = payload.unit
-    if payload.barcode is not None:
-        item.barcode = payload.barcode
-    if payload.legacy_file_type is not None:
-        item.legacy_file_type = payload.legacy_file_type
-    if payload.legacy_part is not None:
-        item.legacy_part = payload.legacy_part
-    if payload.legacy_item_type is not None:
-        item.legacy_item_type = payload.legacy_item_type
-    if payload.legacy_model is not None:
-        item.legacy_model = payload.legacy_model
-    if payload.supplier is not None:
-        item.supplier = payload.supplier
-    if payload.min_stock is not None:
-        item.min_stock = payload.min_stock
+    changed: list[str] = []
+    for field in (
+        "item_name", "spec", "category", "unit", "barcode",
+        "legacy_file_type", "legacy_part", "legacy_item_type", "legacy_model",
+        "supplier", "min_stock",
+    ):
+        new_val = getattr(payload, field)
+        if new_val is not None and getattr(item, field) != new_val:
+            setattr(item, field, new_val)
+            changed.append(field)
 
     item.updated_at = datetime.now(UTC).replace(tzinfo=None)
-    db.commit()
-    db.refresh(item)
+
+    if changed:
+        audit.record(
+            db,
+            request=request,
+            action="item.update",
+            target_type="item",
+            target_id=str(item.item_id),
+            payload_summary=f"{item.item_name}: {', '.join(changed)}",
+        )
+
+    commit_and_refresh(db, item)
     return item
