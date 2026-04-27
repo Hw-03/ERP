@@ -237,15 +237,15 @@ function AdminEmployees({ employees }) {
 
 /* ---------- BOM ---------- */
 function AdminBOM({ items }) {
-  const [parent, setParent] = React.useState("BA-000001");
+  const [parent, setParent] = React.useState("AA-000001");
   const bom = [
-    { code: "BA-000002", name: "FRONT COVER (듀얼 슬라이드)", qty: 1, stock: 130, status: "ok" },
-    { code: "BA-000003", name: "REAR COVER", qty: 1, stock: 100, status: "ok" },
-    { code: "BA-000004", name: "LCD LED", qty: 1, stock: 100, status: "ok" },
-    { code: "BA-000005", name: "EX LED (왼쪽)", qty: 1, stock: 100, status: "ok" },
-    { code: "BA-000006", name: "EX LED (오른쪽)", qty: 1, stock: 100, status: "ok" },
-    { code: "BA-000007", name: "HAND STRAP", qty: 2, stock: 45, status: "low" },
-    { code: "BA-000010", name: "LCD 윈도우", qty: 1, stock: 0, status: "out" },
+    { code: "AA-000002", name: "FRONT COVER (듀얼 슬라이드)", qty: 1, stock: 130, status: "ok" },
+    { code: "AA-000003", name: "REAR COVER", qty: 1, stock: 100, status: "ok" },
+    { code: "AA-000004", name: "LCD LED", qty: 1, stock: 100, status: "ok" },
+    { code: "AA-000005", name: "EX LED (왼쪽)", qty: 1, stock: 100, status: "ok" },
+    { code: "AA-000006", name: "EX LED (오른쪽)", qty: 1, stock: 100, status: "ok" },
+    { code: "AA-000007", name: "HAND STRAP", qty: 2, stock: 45, status: "low" },
+    { code: "AA-000010", name: "LCD 윈도우", qty: 1, stock: 0, status: "out" },
   ];
   const canBuild = Math.min(...bom.map(b => Math.floor(b.stock / b.qty)));
   return (

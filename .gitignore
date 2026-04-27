@@ -6,10 +6,20 @@ __pycache__/
 .venv
 venv/
 
+# Test artifacts (Phase 5.4-H)
+.pytest_cache/
+.coverage
+coverage/
+htmlcov/
+frontend/.vitest/
+
 # Database
 *.db
 *.db-shm
 *.db-wal
+
+# Backend runtime logs (Phase 4)
+backend/logs/
 
 # Node
 node_modules/
@@ -32,6 +42,17 @@ Thumbs.db
 
 # Dev-only generated assets
 .dev/screenshots/
+
+# Playwright MCP regression artifacts (root-level temp output)
+.playwright-mcp/
+/0[0-9]_*.png
+/0[0-9][a-z]_*.png
+/api_requests.log
+/all_console_errors.log
+/bom-snapshot.yml
+/verify_*.png
+/*-snap.yml
+/verify-*.yml
 
 # Local / personal files
 workspace.ahk

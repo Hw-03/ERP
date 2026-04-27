@@ -29,7 +29,7 @@ import {
   type InventoryFilters,
 } from "./InventoryFilterSheet";
 
-const SEMI_CATS = new Set(["TA", "HA", "VA", "BA"]);
+const SEMI_CATS = new Set(["TA", "HA", "VA", "AA"]);
 const FIXED_CATS = new Set(["TF", "HF", "VF", "AF"]);
 
 type DisplayRow = { key: string; item: Item; quantity: number; available: number; count: number };

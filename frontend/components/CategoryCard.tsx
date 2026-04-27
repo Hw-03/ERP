@@ -60,7 +60,7 @@ const CATEGORY_META: Record<Category, CategoryMeta> = {
     icon: "💠",
     shortName: "진공 완제품",
   },
-  BA: {
+  AA: {
     badge: "bg-indigo-900/60 text-indigo-300",
     border: "border-l-indigo-600",
     dot: "bg-indigo-400",

@@ -39,7 +39,7 @@ CATEGORY_TO_DEPT: dict[CategoryEnum, DepartmentEnum] = {
     CategoryEnum.HF: DepartmentEnum.HIGH_VOLTAGE,
     CategoryEnum.VA: DepartmentEnum.VACUUM,
     CategoryEnum.VF: DepartmentEnum.VACUUM,
-    CategoryEnum.BA: DepartmentEnum.ASSEMBLY,
+    CategoryEnum.AA: DepartmentEnum.ASSEMBLY,
     CategoryEnum.AF: DepartmentEnum.ASSEMBLY,
     CategoryEnum.FG: DepartmentEnum.SHIPPING,
 }

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Item, ShipPackage, ShipPackageItem
+from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     ShipPackageCreate,
     ShipPackageDetailResponse,
@@ -16,6 +17,7 @@ from app.schemas import (
     ShipPackageResponse,
     ShipPackageUpdate,
 )
+from app.services._tx import commit_and_refresh, commit_only
 
 router = APIRouter()
 
@@ -30,7 +32,7 @@ def list_packages(db: Session = Depends(get_db)):
 def create_package(payload: ShipPackageCreate, db: Session = Depends(get_db)):
     existing = db.query(ShipPackage).filter(ShipPackage.package_code == payload.package_code).first()
     if existing:
-        raise HTTPException(status_code=409, detail="패키지 코드가 이미 존재합니다.")
+        raise http_error(409, ErrorCode.CONFLICT, "패키지 코드가 이미 존재합니다.")
 
     package = ShipPackage(
         package_code=payload.package_code,
@@ -38,8 +40,7 @@ def create_package(payload: ShipPackageCreate, db: Session = Depends(get_db)):
         notes=payload.notes,
     )
     db.add(package)
-    db.commit()
-    db.refresh(package)
+    commit_and_refresh(db, package)
     return package
 
 
@@ -47,15 +48,14 @@ def create_package(payload: ShipPackageCreate, db: Session = Depends(get_db)):
 def update_package(package_id: uuid.UUID, payload: ShipPackageUpdate, db: Session = Depends(get_db)):
     package = db.query(ShipPackage).filter(ShipPackage.package_id == package_id).first()
     if not package:
-        raise HTTPException(status_code=404, detail="출하 패키지를 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "출하 패키지를 찾을 수 없습니다.")
 
     if payload.name is not None:
         package.name = payload.name
     if payload.notes is not None:
         package.notes = payload.notes
     package.updated_at = datetime.now(UTC).replace(tzinfo=None)
-    db.commit()
-    db.refresh(package)
+    commit_and_refresh(db, package)
     return package
 
 
@@ -63,20 +63,20 @@ def update_package(package_id: uuid.UUID, payload: ShipPackageUpdate, db: Sessio
 def delete_package(package_id: uuid.UUID, db: Session = Depends(get_db)):
     package = db.query(ShipPackage).filter(ShipPackage.package_id == package_id).first()
     if not package:
-        raise HTTPException(status_code=404, detail="출하 패키지를 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "출하 패키지를 찾을 수 없습니다.")
     db.delete(package)
-    db.commit()
+    commit_only(db)
 
 
 @router.post("/{package_id}/items", response_model=ShipPackageDetailResponse, status_code=status.HTTP_201_CREATED)
 def add_package_item(package_id: uuid.UUID, payload: ShipPackageItemCreate, db: Session = Depends(get_db)):
     package = db.query(ShipPackage).filter(ShipPackage.package_id == package_id).first()
     if not package:
-        raise HTTPException(status_code=404, detail="출하 패키지를 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "출하 패키지를 찾을 수 없습니다.")
 
     item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if not item:
-        raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
     existing = (
         db.query(ShipPackageItem)
@@ -95,25 +95,31 @@ def add_package_item(package_id: uuid.UUID, payload: ShipPackageItemCreate, db: 
         )
 
     package.updated_at = datetime.now(UTC).replace(tzinfo=None)
-    db.commit()
-    db.refresh(package)
+    commit_and_refresh(db, package)
     return _to_detail_response(package)
 
 
-@router.delete("/{package_id}/items/{package_item_id}", response_model=ShipPackageDetailResponse)
+@router.delete(
+    "/{package_id}/items/{package_item_id}",
+    response_model=ShipPackageDetailResponse,
+    summary="패키지 품목 제거 후 갱신된 패키지 반환",
+    description=(
+        "child 1건을 삭제하고 갱신된 parent 를 반환합니다 (200 + body). "
+        "child-delete 패턴 — pure DELETE (204) 는 `/{package_id}` 가 담당."
+    ),
+)
 def delete_package_item(package_id: uuid.UUID, package_item_id: uuid.UUID, db: Session = Depends(get_db)):
     package = db.query(ShipPackage).filter(ShipPackage.package_id == package_id).first()
     if not package:
-        raise HTTPException(status_code=404, detail="출하 패키지를 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "출하 패키지를 찾을 수 없습니다.")
 
     package_item = db.query(ShipPackageItem).filter(ShipPackageItem.package_item_id == package_item_id).first()
     if not package_item:
-        raise HTTPException(status_code=404, detail="패키지 품목을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "패키지 품목을 찾을 수 없습니다.")
 
     db.delete(package_item)
     package.updated_at = datetime.now(UTC).replace(tzinfo=None)
-    db.commit()
-    db.refresh(package)
+    commit_and_refresh(db, package)
     return _to_detail_response(package)
 
 

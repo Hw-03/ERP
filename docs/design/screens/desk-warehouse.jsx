@@ -8,8 +8,8 @@ function DeskWarehouse() {
   const [catFilter, setCatFilter] = React.useState("all");
   const [opType, setOpType] = React.useState("receive"); // receive | transfer | dept | package | in | out
   const [picked, setPicked] = React.useState([
-    { code: "BA-000001", qty: 20 },
-    { code: "BA-000004", qty: 5 },
+    { code: "AA-000001", qty: 20 },
+    { code: "AA-000004", qty: 5 },
   ]);
   const [selectedEmp, setSelectedEmp] = React.useState("E001");
   const [qty, setQty] = React.useState(1);

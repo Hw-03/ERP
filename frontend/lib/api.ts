@@ -12,7 +12,7 @@ export type Category =
   | "HF"
   | "VA"
   | "VF"
-  | "BA"
+  | "AA"
   | "AF"
   | "FG"
   | "UK";
@@ -235,7 +235,7 @@ export interface Employee {
 export interface ShipPackageItemDetail {
   package_item_id: string;
   item_id: string;
-  erp_code: string;
+  erp_code: string | null;
   item_name: string;
   item_category: Category;
   item_unit: string;
@@ -295,7 +295,7 @@ export interface BOMTreeNode {
 export interface TransactionLog {
   log_id: string;
   item_id: string;
-  erp_code: string;
+  erp_code: string | null;
   item_name: string;
   item_category: Category;
   item_unit: string;
@@ -310,7 +310,7 @@ export interface TransactionLog {
 }
 
 export interface ProductionCheckComponent {
-  erp_code: string;
+  erp_code: string | null;
   item_name: string;
   category: Category;
   unit: string;
@@ -345,7 +345,7 @@ export interface ProductionCapacity {
 
 export interface BackflushDetail {
   item_id: string;
-  erp_code: string;
+  erp_code: string | null;
   item_name: string;
   category: Category;
   required_quantity: number;
@@ -375,26 +375,50 @@ function toApiUrl(path: string) {
   return path;
 }
 
+/** 백엔드 detail 구조에서 사용자 표시용 메시지 추출.
+ *
+ * 지원하는 detail 모양:
+ * - 문자열: "품목을 찾을 수 없습니다."
+ * - 구 dict: {message, shortages?}
+ * - 신 dict (Phase 4): {code, message, extra?: {shortages?}}
+ *
+ * shortages 가 있으면 줄바꿈으로 추가한다.
+ */
+export function extractErrorMessage(detail: unknown, fallback = "처리 실패"): string {
+  if (typeof detail === "string") return detail;
+  if (detail && typeof detail === "object") {
+    const d = detail as Record<string, unknown>;
+    const msg = typeof d.message === "string" ? d.message : null;
+    if (!msg) return fallback;
+
+    let shortages: unknown = d.shortages;
+    if (!Array.isArray(shortages) && d.extra && typeof d.extra === "object") {
+      shortages = (d.extra as Record<string, unknown>).shortages;
+    }
+    const tail = Array.isArray(shortages) && shortages.length
+      ? `\n${shortages.join("\n")}`
+      : "";
+    return `${msg}${tail}`;
+  }
+  return fallback;
+}
+
 async function parseError(res: Response) {
   const text = await res.text();
   try {
     const json = JSON.parse(text);
-    if (typeof json.detail === "string") return json.detail;
-    if (json.detail?.message) {
-      const details = Array.isArray(json.detail.shortages) ? `\n${json.detail.shortages.join("\n")}` : "";
-      return `${json.detail.message}${details}`;
-    }
-    return text || res.statusText;
+    return extractErrorMessage(json?.detail, text || res.statusText);
   } catch {
     return text || res.statusText;
   }
 }
 
-export async function fetcher<T>(url: string): Promise<T> {
+export async function fetcher<T>(url: string, signal?: AbortSignal): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(url);
+    res = await fetch(url, { signal });
   } catch (error) {
+    if ((error as Error)?.name === "AbortError") throw error;
     throw new Error(
       error instanceof Error
         ? `API 연결에 실패했습니다. ${url} 주소에 접근할 수 있는지 확인해 주세요.`
@@ -407,21 +431,39 @@ export async function fetcher<T>(url: string): Promise<T> {
   return res.json();
 }
 
+// 5.3-B: 쓰기 응답 타입 캐스팅을 한 곳으로. createItem/updateItem/createEmployee 등이 사용.
+async function writeJson<T>(url: string, method: "POST" | "PUT" | "PATCH", body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as T;
+}
+
+export const postJson = <T>(url: string, body: unknown): Promise<T> => writeJson<T>(url, "POST", body);
+export const putJson = <T>(url: string, body: unknown): Promise<T> => writeJson<T>(url, "PUT", body);
+export const patchJson = <T>(url: string, body: unknown): Promise<T> => writeJson<T>(url, "PATCH", body);
+
 export const api = {
   getInventorySummary: () => fetcher<InventorySummary>(toApiUrl("/api/inventory/summary")),
 
-  getItems: (params?: {
-    category?: Category;
-    search?: string;
-    skip?: number;
-    limit?: number;
-    legacyFileType?: string;
-    legacyPart?: string;
-    legacyModel?: string;
-    legacyItemType?: string;
-    barcode?: string;
-    department?: string;
-  }) => {
+  getItems: (
+    params?: {
+      category?: Category;
+      search?: string;
+      skip?: number;
+      limit?: number;
+      legacyFileType?: string;
+      legacyPart?: string;
+      legacyModel?: string;
+      legacyItemType?: string;
+      barcode?: string;
+      department?: string;
+    },
+    opts?: { signal?: AbortSignal },
+  ) => {
     const query = new URLSearchParams();
     if (params?.category) query.set("category", params.category);
     if (params?.search) query.set("search", params.search);
@@ -433,7 +475,7 @@ export const api = {
     if (params?.legacyItemType) query.set("legacy_item_type", params.legacyItemType);
     if (params?.barcode) query.set("barcode", params.barcode);
     if (params?.department) query.set("department", params.department);
-    return fetcher<Item[]>(toApiUrl(`/api/items?${query}`));
+    return fetcher<Item[]>(toApiUrl(`/api/items?${query}`), opts?.signal);
   },
 
   getItem: (itemId: string) => fetcher<Item>(toApiUrl(`/api/items/${itemId}`)),
@@ -450,15 +492,7 @@ export const api = {
     initial_quantity?: number;
     model_slots?: number[];
     option_code?: string;
-  }) => {
-    const res = await fetch(toApiUrl("/api/items"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<Item>;
-  },
+  }) => postJson<Item>(toApiUrl("/api/items"), payload),
 
   updateItem: async (
     itemId: string,
@@ -475,15 +509,7 @@ export const api = {
       supplier?: string;
       min_stock?: number;
     },
-  ) => {
-    const res = await fetch(toApiUrl(`/api/items/${itemId}`), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<Item>;
-  },
+  ) => putJson<Item>(toApiUrl(`/api/items/${itemId}`), payload),
 
   verifyAdminPin: async (pin: string) => {
     const res = await fetch(toApiUrl("/api/settings/verify-pin"), {
@@ -522,7 +548,7 @@ export const api = {
     return fetcher<Employee[]>(toApiUrl(`/api/employees?${query}`));
   },
 
-  createEmployee: async (payload: {
+  createEmployee: (payload: {
     employee_code: string;
     name: string;
     role: string;
@@ -531,15 +557,7 @@ export const api = {
     level?: EmployeeLevel;
     display_order?: number;
     is_active?: boolean;
-  }) => {
-    const res = await fetch(toApiUrl("/api/employees"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<Employee>;
-  },
+  }) => postJson<Employee>(toApiUrl("/api/employees"), payload),
 
   updateEmployee: async (
     employeeId: string,
@@ -680,7 +698,7 @@ export const api = {
       message: string;
       package_name: string;
       quantity: number;
-      items: { item_id: string; erp_code: string; item_name: string; quantity: number; stock_after: number }[];
+      items: { item_id: string; erp_code: string | null; item_name: string; quantity: number; stock_after: number }[];
     }>;
   },
 
@@ -795,6 +813,9 @@ export const api = {
   getBOM: (parentItemId: string) => fetcher<BOMEntry[]>(toApiUrl(`/api/bom/${parentItemId}`)),
   getBOMTree: (parentItemId: string) =>
     fetcher<BOMTreeNode>(toApiUrl(`/api/bom/${parentItemId}/tree`)),
+  /** 주어진 품목을 자식으로 사용하는 parent BOM 행. 직접 사용처(1단계). */
+  getBOMWhereUsed: (itemId: string) =>
+    fetcher<BOMDetailEntry[]>(toApiUrl(`/api/bom/where-used/${itemId}`)),
 
   createBOM: async (payload: {
     parent_item_id: string;
@@ -849,14 +870,17 @@ export const api = {
   getProductionCapacity: () =>
     fetcher<ProductionCapacity>(toApiUrl("/api/production/capacity")),
 
-  getTransactions: (params?: {
-    itemId?: string;
-    transactionType?: TransactionType;
-    referenceNo?: string;
-    search?: string;
-    limit?: number;
-    skip?: number;
-  }) => {
+  getTransactions: (
+    params?: {
+      itemId?: string;
+      transactionType?: TransactionType;
+      referenceNo?: string;
+      search?: string;
+      limit?: number;
+      skip?: number;
+    },
+    opts?: { signal?: AbortSignal },
+  ) => {
     const query = new URLSearchParams();
     if (params?.itemId) query.set("item_id", params.itemId);
     if (params?.transactionType) query.set("transaction_type", params.transactionType);
@@ -864,7 +888,7 @@ export const api = {
     if (params?.search) query.set("search", params.search);
     if (params?.limit !== undefined) query.set("limit", String(params.limit));
     if (params?.skip !== undefined) query.set("skip", String(params.skip));
-    return fetcher<TransactionLog[]>(toApiUrl(`/api/inventory/transactions?${query}`));
+    return fetcher<TransactionLog[]>(toApiUrl(`/api/inventory/transactions?${query}`), opts?.signal);
   },
 
   updateTransactionNotes: async (logId: string, notes: string | null): Promise<TransactionLog> => {
@@ -884,12 +908,25 @@ export const api = {
     const suffix = qs.toString() ? `?${qs}` : "";
     return toApiUrl(`/api/items/export.xlsx${suffix}`);
   },
-  getTransactionsExportUrl: (params?: { transaction_type?: string; search?: string }) => {
+  getTransactionsExportUrl: (params?: {
+    transaction_type?: string;
+    search?: string;
+    start_date?: string; // YYYY-MM-DD
+    end_date?: string;   // YYYY-MM-DD
+  }) => {
     const qs = new URLSearchParams();
     if (params?.transaction_type) qs.set("transaction_type", params.transaction_type);
     if (params?.search) qs.set("search", params.search);
-    const suffix = qs.toString() ? `?${qs}` : "";
-    return toApiUrl(`/api/inventory/transactions/export.xlsx${suffix}`);
+    // backend export endpoint 가 start_date/end_date 둘 다 필수.
+    // 미지정 시 최근 30일(오늘 포함, D-29 ~ 오늘)을 자동 부여한다.
+    const today = new Date();
+    const from = new Date(today);
+    from.setDate(today.getDate() - 29);
+    const ymd = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    qs.set("start_date", params?.start_date ?? ymd(from));
+    qs.set("end_date", params?.end_date ?? ymd(today));
+    return toApiUrl(`/api/inventory/transactions/export.xlsx?${qs}`);
   },
 
   // Queue batches ------------------------------------------------------------

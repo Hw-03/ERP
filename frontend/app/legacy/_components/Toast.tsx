@@ -33,6 +33,9 @@ export function Toast({
   return (
     <div className="pointer-events-none fixed left-1/2 top-[calc(env(safe-area-inset-top,16px)+54px)] z-[500] w-[calc(100%-28px)] max-w-[402px] -translate-x-1/2">
       <div
+        role={toast.type === "error" ? "alert" : "status"}
+        aria-live={toast.type === "error" ? "assertive" : "polite"}
+        aria-atomic="true"
         className="rounded-xl border px-[14px] py-[10px] text-xs font-semibold"
         style={{
           background: LEGACY_COLORS.s3,

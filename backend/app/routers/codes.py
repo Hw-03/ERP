@@ -2,11 +2,12 @@
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import OptionCode, ProcessFlowRule, ProcessType, ProductSymbol
+from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     ErpCodeGenerateRequest,
     ErpCodeParseRequest,
@@ -17,7 +18,9 @@ from app.schemas import (
     ProductSymbolResponse,
     ProductSymbolUpdate,
 )
+from app.services import audit
 from app.services import codes as code_svc
+from app.services._tx import commit_and_refresh
 
 router = APIRouter()
 
@@ -25,16 +28,16 @@ router = APIRouter()
 # ---- Product Symbols (100 slots) -------------------------------------------
 
 
-@router.get("/symbols", response_model=List[ProductSymbolResponse])
+@router.get("/symbols", response_model=List[ProductSymbolResponse], summary="제품기호 100슬롯 조회")
 def list_symbols(db: Session = Depends(get_db)):
     return db.query(ProductSymbol).order_by(ProductSymbol.slot).all()
 
 
-@router.put("/symbols/{slot}", response_model=ProductSymbolResponse)
-def update_symbol(slot: int, payload: ProductSymbolUpdate, db: Session = Depends(get_db)):
+@router.put("/symbols/{slot}", response_model=ProductSymbolResponse, summary="제품기호 슬롯 수정")
+def update_symbol(slot: int, payload: ProductSymbolUpdate, request: Request, db: Session = Depends(get_db)):
     row = db.query(ProductSymbol).filter(ProductSymbol.slot == slot).one_or_none()
     if row is None:
-        raise HTTPException(status_code=404, detail="해당 슬롯이 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "해당 슬롯이 없습니다.")
 
     if payload.symbol is not None:
         # Enforce uniqueness when assigning a symbol
@@ -44,9 +47,10 @@ def update_symbol(slot: int, payload: ProductSymbolUpdate, db: Session = Depends
             .one_or_none()
         )
         if dup is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"기호 '{payload.symbol}' 는 이미 슬롯 {dup.slot}에 사용 중입니다.",
+            raise http_error(
+                status.HTTP_409_CONFLICT,
+                ErrorCode.CONFLICT,
+                f"기호 '{payload.symbol}' 는 이미 슬롯 {dup.slot}에 사용 중입니다.",
             )
         row.symbol = payload.symbol
     if payload.model_name is not None:
@@ -62,15 +66,23 @@ def update_symbol(slot: int, payload: ProductSymbolUpdate, db: Session = Depends
     if row.symbol and row.model_name:
         row.is_reserved = False
 
-    db.commit()
-    db.refresh(row)
+    audit.record(
+        db,
+        request=request,
+        action="codes.symbol_update",
+        target_type="product_symbol",
+        target_id=str(slot),
+        payload_summary=f"slot={slot} symbol={row.symbol} model={row.model_name}",
+    )
+
+    commit_and_refresh(db, row)
     return row
 
 
 # ---- Option Codes -----------------------------------------------------------
 
 
-@router.get("/options", response_model=List[OptionCodeResponse])
+@router.get("/options", response_model=List[OptionCodeResponse], summary="옵션 코드 목록")
 def list_options(db: Session = Depends(get_db)):
     return db.query(OptionCode).order_by(OptionCode.code).all()
 
@@ -78,12 +90,12 @@ def list_options(db: Session = Depends(get_db)):
 # ---- Process Types ----------------------------------------------------------
 
 
-@router.get("/process-types", response_model=List[ProcessTypeResponse])
+@router.get("/process-types", response_model=List[ProcessTypeResponse], summary="공정 코드 목록")
 def list_process_types(db: Session = Depends(get_db)):
     return db.query(ProcessType).order_by(ProcessType.stage_order, ProcessType.code).all()
 
 
-@router.get("/process-flows", response_model=List[ProcessFlowRuleResponse])
+@router.get("/process-flows", response_model=List[ProcessFlowRuleResponse], summary="공정 흐름 규칙 목록")
 def list_process_flows(db: Session = Depends(get_db)):
     return db.query(ProcessFlowRule).order_by(ProcessFlowRule.rule_id).all()
 
@@ -91,13 +103,13 @@ def list_process_flows(db: Session = Depends(get_db)):
 # ---- 4-part code operations ------------------------------------------------
 
 
-@router.post("/parse", response_model=ErpCodeResponse)
+@router.post("/parse", response_model=ErpCodeResponse, summary="4-파트 ERP 코드 파싱")
 def parse_code(payload: ErpCodeParseRequest, db: Session = Depends(get_db)):
     try:
         code = code_svc.parse_erp_code(payload.code)
         code_svc.validate_code(db, code)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, str(exc))
     return ErpCodeResponse(
         symbol=code.symbol,
         process_type=code.process_type,
@@ -109,7 +121,12 @@ def parse_code(payload: ErpCodeParseRequest, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/generate", response_model=ErpCodeResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/generate",
+    response_model=ErpCodeResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="4-파트 ERP 코드 자동 생성",
+)
 def generate_code(payload: ErpCodeGenerateRequest, db: Session = Depends(get_db)):
     try:
         code = code_svc.generate_code(
@@ -119,7 +136,7 @@ def generate_code(payload: ErpCodeGenerateRequest, db: Session = Depends(get_db)
             option=payload.option,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, str(exc))
     return ErpCodeResponse(
         symbol=code.symbol,
         process_type=code.process_type,

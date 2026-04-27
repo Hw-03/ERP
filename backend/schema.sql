@@ -6,12 +6,12 @@
 -- The running application uses the SQLAlchemy models under backend/app/models.py.
 --
 -- Current item/process code rules are documented in docs/ITEM_CODE_RULES.md.
--- Assembly F type is AF. BF is a legacy code and must not be used.
+-- Assembly F type is AF. AF is a legacy code and must not be used.
 -- =============================================================================
 
 DROP TYPE IF EXISTS category_code_enum CASCADE;
 CREATE TYPE category_code_enum AS ENUM (
-    'RM', 'BA', 'AF', 'HA', 'HF', 'VA', 'VF', 'TA', 'TF', 'FG', 'UK'
+    'RM', 'AA', 'AF', 'HA', 'HF', 'VA', 'VF', 'TA', 'TF', 'FG', 'UK'
 );
 
 DROP TYPE IF EXISTS mapping_status_enum CASCADE;

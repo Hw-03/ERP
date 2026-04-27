@@ -23,11 +23,13 @@ from app.models import (
     TransactionLog,
     TransactionTypeEnum,
 )
+from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     PhysicalCountCreateRequest,
     PhysicalCountResponse,
 )
 from app.services import inventory as inv_svc
+from app.services._tx import commit_and_refresh
 
 router = APIRouter()
 
@@ -60,7 +62,7 @@ def submit_count(
 ):
     item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if item is None:
-        raise HTTPException(status_code=404, detail="품목을 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
     inv = inv_svc.get_or_create_inventory(db, payload.item_id)
     # 실사는 창고(warehouse) 단위로 수행 (생산/불량 위치는 별도 실사 흐름 추후)
@@ -70,9 +72,10 @@ def submit_count(
 
     # Enforce physical can't go below pending (someone has reserved it)
     if payload.counted_qty < pending:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=(
+        raise http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            ErrorCode.UNPROCESSABLE,
+            (
                 f"실사량이 예약 수량보다 적습니다 (counted {payload.counted_qty}, "
                 f"pending {pending}). 예약 해제 후 다시 실사하세요."
             ),
@@ -114,8 +117,7 @@ def submit_count(
                 ),
             )
         )
-    db.commit()
-    db.refresh(count)
+    commit_and_refresh(db, count)
     return _to_response(db, count)
 
 

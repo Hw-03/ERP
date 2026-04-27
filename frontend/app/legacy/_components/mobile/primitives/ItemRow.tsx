@@ -49,15 +49,20 @@ export function ItemRow({
       }}
     >
       {showCheckbox ? (
+        // 시각 22×22 유지 + 외곽 44×44 hit-area (WCAG 2.5.5)
         <span
-          className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border transition-colors"
-          style={{
-            background: selected ? LEGACY_COLORS.blue : "transparent",
-            borderColor: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-          }}
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center"
           aria-hidden
         >
-          {selected ? <Check size={13} strokeWidth={3} color="#fff" /> : null}
+          <span
+            className="inline-flex h-[22px] w-[22px] items-center justify-center rounded-full border transition-colors"
+            style={{
+              background: selected ? LEGACY_COLORS.blue : "transparent",
+              borderColor: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+            }}
+          >
+            {selected ? <Check size={13} strokeWidth={3} color="#fff" /> : null}
+          </span>
         </span>
       ) : null}
 

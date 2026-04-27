@@ -6,7 +6,7 @@
 
 | 문서 | 용도 |
 |---|---|
-| `ITEM_CODE_RULES.md` | 품목코드와 공정코드의 최종 기준. `AF` 기준과 `BF` 사용 금지를 명시한다. |
+| `ITEM_CODE_RULES.md` | 품목코드와 공정코드의 최종 기준. `AF` 기준과 `AF` 사용 금지를 명시한다. |
 | `AI_HANDOVER.md` | Claude/Codex가 이어받을 때 보는 최신 인수인계 문서. |
 | `CODEX_PROGRESS.md` | 큰 기능 단위의 진행 이력과 최근 변경 요약. |
 

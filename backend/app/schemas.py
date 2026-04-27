@@ -174,7 +174,7 @@ class ShipPackageResponse(BaseModel):
 class ShipPackageItemDetail(BaseModel):
     package_item_id: uuid.UUID
     item_id: uuid.UUID
-    erp_code: str
+    erp_code: Optional[str] = None
     item_name: str
     item_category: CategoryEnum
     item_unit: str
@@ -348,7 +348,7 @@ class BOMDetailResponse(BaseModel):
 
 class BOMTreeNode(BaseModel):
     item_id: uuid.UUID
-    erp_code: str
+    erp_code: Optional[str] = None
     item_name: str
     category: CategoryEnum
     unit: str
@@ -370,7 +370,7 @@ class ProductionReceiptRequest(BaseModel):
 
 class BackflushDetail(BaseModel):
     item_id: uuid.UUID
-    erp_code: str
+    erp_code: Optional[str] = None
     item_name: str
     category: CategoryEnum
     required_quantity: Decimal
@@ -398,7 +398,7 @@ class TransactionLogResponse(BaseModel):
 
     log_id: uuid.UUID
     item_id: uuid.UUID
-    erp_code: str
+    erp_code: Optional[str] = None
     item_name: str
     item_category: CategoryEnum
     item_unit: str
@@ -672,3 +672,82 @@ class PhysicalCountResponse(BaseModel):
     reason: Optional[str] = None
     operator: Optional[str] = None
     created_at: datetime
+
+
+# =============================================================================
+# Phase 5.3-A — 운영 도구 응답 schema (BOM 가능 여부 / 생산 capacity / 정합성)
+# =============================================================================
+class BomCheckComponent(BaseModel):
+    erp_code: Optional[str] = None
+    item_name: str
+    category: str
+    unit: str
+    required: float
+    current_stock: float
+    pending: float
+    available: float
+    shortage: float
+    ok: bool
+
+
+class BomCheckResponse(BaseModel):
+    item_id: str
+    item_name: str
+    quantity_to_produce: float
+    can_produce: bool
+    components: List[BomCheckComponent]
+
+
+class CapacityTopItem(BaseModel):
+    item_id: str
+    item_name: str
+    erp_code: Optional[str] = None
+    immediate: int = Field(
+        ...,
+        description="warehouse_available (= warehouse_qty - pending) 기준 즉시 생산 가능량. production_receipt 의 실제 차감 검사식과 일치.",
+    )
+    maximum: int = Field(
+        ...,
+        description="total (= warehouse + production + defective) 기준 이론적 최대. 불량 재고를 포함하므로 실제 가용량과 다름.",
+    )
+
+
+class CapacityResponse(BaseModel):
+    """전체 생산 가능 수량 응답.
+
+    - **immediate**: 지금 당장 생산 가능한 수량 (창고 가용분 기준).
+    - **maximum**: 모든 위치 (창고 + 부서 생산 + 불량) 합계 기준 이론적 최대.
+      불량 재고도 포함되므로 UI 에 노출할 때는 immediate 와의 차이를 설명해야 한다.
+    """
+    immediate: int = Field(
+        ...,
+        description="warehouse_available 기준 즉시 생산 가능량 (production_receipt 와 일치).",
+    )
+    maximum: int = Field(
+        ...,
+        description="total (warehouse + production + defective) 기준 이론적 최대. 불량 재고 포함.",
+    )
+    limiting_item: Optional[str] = Field(
+        None,
+        description="immediate 를 결정한 가장 부족한 부품의 표시 이름.",
+    )
+    top_items: List[CapacityTopItem] = Field(default_factory=list)
+
+
+class IntegrityCheckResponse(BaseModel):
+    """`/api/settings/integrity/inventory` 응답.
+
+    samples 는 InventoryMismatch.to_dict() 의 자유로운 dict — schema 강제 안 함.
+    """
+    checked: int
+    mismatched_count: int
+    samples: List[dict]
+
+
+class IntegrityRepairResponse(BaseModel):
+    """`/api/settings/integrity/repair` 응답."""
+    checked: int
+    mismatched: int
+    repaired: int
+    dry_run: bool
+    samples: List[dict]

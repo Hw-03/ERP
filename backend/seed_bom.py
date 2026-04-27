@@ -1,6 +1,6 @@
 """BOM 계층적 생성 스크립트.
 구조:
-  Level 1: BA 품목 상위 10개 → TA/HA/VA/RM 자식 10개씩
+  Level 1: AA 품목 상위 10개 → TA/HA/VA/RM 자식 10개씩
   Level 2: TA/HA/VA 중 6개 → RM 자식 5개씩
 """
 import sys
@@ -35,20 +35,20 @@ def add_bom(db, existing: set, parent: Item, child: Item, qty: int) -> bool:
 def main() -> None:
     db = SessionLocal()
     try:
-        ba_items = db.query(Item).filter(Item.category == CategoryEnum.BA).all()
+        ba_items = db.query(Item).filter(Item.category == CategoryEnum.AA).all()
         ta_items = db.query(Item).filter(Item.category == CategoryEnum.TA).all()
         ha_items = db.query(Item).filter(Item.category == CategoryEnum.HA).all()
         va_items = db.query(Item).filter(Item.category == CategoryEnum.VA).all()
         rm_items = db.query(Item).filter(Item.category == CategoryEnum.RM).all()
 
         if not ba_items:
-            print("BA 카테고리 품목이 없습니다.")
+            print("AA 카테고리 품목이 없습니다.")
             return
 
         existing: set = set()
         created = 0
 
-        # Level 1: BA 상위 10개를 부모로, TA/HA/VA/RM 섞어서 각 10개씩
+        # Level 1: AA 상위 10개를 부모로, TA/HA/VA/RM 섞어서 각 10개씩
         l1_parents = ba_items[:10]
         child_pool = ta_items + ha_items + va_items + rm_items
 
@@ -69,7 +69,7 @@ def main() -> None:
 
         db.commit()
         print(f"BOM {created}개 생성 완료.")
-        print(f"  Level1 부모 (BA): {[p.item_name for p in l1_parents]}")
+        print(f"  Level1 부모 (AA): {[p.item_name for p in l1_parents]}")
     finally:
         db.close()
 

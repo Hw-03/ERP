@@ -200,7 +200,7 @@ export function erpCodeDeptBadge(erp_code?: string | null): { label: string; col
   const dept = erpCodeDept(erp_code);
   if (!dept) return null;
   const color = employeeColor(dept);
-  return { label: dept, color, bg: `${color}20` };
+  return { label: dept, color, bg: `color-mix(in srgb, ${color} 12%, transparent)` };
 }
 
 const OPTION_COLOR: Record<string, string> = {
@@ -228,6 +228,52 @@ export function transactionColor(type: TransactionType) {
       return "#fb923c";
     default:
       return LEGACY_COLORS.muted2;
+  }
+}
+
+// 5.5-G: 거래 유형 아이콘 — 색상-only 신호 보강 (WCAG 1.4.1 두 채널).
+// lucide-react 의 아이콘 이름만 반환하고 import 는 호출측에서 처리 (이 파일은 "use client" 라
+// 트리쉐이킹 영향 최소화). 필요 시 호출측에서 매핑.
+export type TransactionIconName =
+  | "ArrowDownToLine"   // RECEIVE
+  | "ArrowUpFromLine"   // SHIP
+  | "Sliders"           // ADJUST
+  | "Hammer"            // PRODUCE
+  | "Recycle"           // BACKFLUSH
+  | "Trash2"            // SCRAP
+  | "AlertCircle"       // LOSS
+  | "Wrench"            // DISASSEMBLE
+  | "Undo2"             // RETURN
+  | "BookmarkPlus"      // RESERVE
+  | "BookmarkMinus"     // RESERVE_RELEASE
+  | "Activity";         // 기타 / 기본
+
+export function transactionIconName(type: TransactionType | string): TransactionIconName {
+  switch (type) {
+    case "RECEIVE":
+      return "ArrowDownToLine";
+    case "SHIP":
+      return "ArrowUpFromLine";
+    case "ADJUST":
+      return "Sliders";
+    case "PRODUCE":
+      return "Hammer";
+    case "BACKFLUSH":
+      return "Recycle";
+    case "SCRAP":
+      return "Trash2";
+    case "LOSS":
+      return "AlertCircle";
+    case "DISASSEMBLE":
+      return "Wrench";
+    case "RETURN":
+      return "Undo2";
+    case "RESERVE":
+      return "BookmarkPlus";
+    case "RESERVE_RELEASE":
+      return "BookmarkMinus";
+    default:
+      return "Activity";
   }
 }
 
