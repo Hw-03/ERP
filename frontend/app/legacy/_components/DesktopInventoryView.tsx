@@ -58,6 +58,7 @@ export function DesktopInventoryView({
   onGoToWarehouseTab,
   onSummaryChange,
   capacityData,
+  onCapacityClick,
 }: {
   globalSearch: string;
   onStatusChange: (status: string) => void;
@@ -65,6 +66,7 @@ export function DesktopInventoryView({
   onGoToWarehouseTab?: () => void;
   onSummaryChange?: (s: { low: number; zero: number }) => void;
   capacityData?: ProductionCapacity | null;
+  onCapacityClick?: () => void;
 }) {
   const [items, setItems] = useState<Item[]>([]);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
@@ -233,7 +235,7 @@ export function DesktopInventoryView({
               zeroCount={summary.zeroCount}
               onGoToWarehouseTab={onGoToWarehouseTab}
             />
-            <InventoryCapacityPanel capacityData={capacityData} />
+            <InventoryCapacityPanel capacityData={capacityData} onClick={onCapacityClick} />
             <InventoryFilters
               open={filtersOpen}
               selectedDepts={selectedDepts}

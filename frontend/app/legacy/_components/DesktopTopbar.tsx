@@ -11,14 +11,12 @@ export function DesktopTopbar({
   icon: Icon,
   onRefresh,
   actionSlot,
-  stockWarnings,
   status,
 }: {
   title: string;
   icon?: ElementType;
   onRefresh: () => void;
   actionSlot?: ReactNode;
-  stockWarnings?: { low: number; zero: number };
   status?: string;
 }) {
   return (
@@ -37,13 +35,6 @@ export function DesktopTopbar({
             <div className="text-[24px] font-black tracking-[-0.02em]">{title}</div>
           </div>
         </div>
-
-        {stockWarnings && stockWarnings.zero > 0 && (
-          <StatusPill tone="danger" label={`품절 ${stockWarnings.zero}`} showDot={false} maxWidth="none" />
-        )}
-        {stockWarnings && stockWarnings.low > 0 && (
-          <StatusPill tone="warning" label={`부족 ${stockWarnings.low}`} showDot={false} maxWidth="none" />
-        )}
 
         {status && <StatusPill tone={inferToneFromStatus(status)} label={status} title={status} />}
 
