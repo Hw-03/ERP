@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LoginIntro } from "./LoginIntro";
-import { LoginCard } from "./LoginCard";
+import { OperatorLoginCard } from "./OperatorLoginCard";
 
 type GatePhase = "loading" | "intro" | "form" | "authed";
 
@@ -40,7 +40,7 @@ export function ErpLoginGate({ children }: ErpLoginGateProps) {
           className="erp-card-anim w-full"
           style={{ animation: "erp-card-rise 0.5s ease forwards" }}
         >
-          <LoginCard onLogin={handleLogin} />
+          <OperatorLoginCard onLogin={handleLogin} />
         </div>
       )}
     </div>

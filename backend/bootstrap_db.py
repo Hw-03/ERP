@@ -41,6 +41,7 @@ from app.models import (
     ProcessType,
     ProductSymbol,
 )
+from app.services.pin_auth import DEFAULT_PIN_HASH
 from app.utils.erp_code import infer_process_type, infer_symbol_slot, make_erp_code
 
 
@@ -82,6 +83,21 @@ _MIGRATION_DDL: list[str] = [
     # Queue 조회 성능 개선 인덱스 (created_at desc 정렬, 담당자별 필터)
     "CREATE INDEX IF NOT EXISTS ix_queue_batches_created_at ON queue_batches(created_at)",
     "CREATE INDEX IF NOT EXISTS ix_queue_batches_owner_employee_id ON queue_batches(owner_employee_id)",
+    # PIN 로그인 — 작업자 식별용 (실제 보안 인증 아님)
+    "ALTER TABLE employees ADD COLUMN pin_hash TEXT",
+    # 거래 수정 감사 이력 (3차 메타 수정 + 4차 수량 보정 공유)
+    """CREATE TABLE IF NOT EXISTS transaction_edit_logs (
+        edit_id CHAR(36) PRIMARY KEY,
+        original_log_id CHAR(36) NOT NULL REFERENCES transaction_logs(log_id) ON DELETE CASCADE,
+        edited_by_employee_id CHAR(36) NOT NULL REFERENCES employees(employee_id),
+        edited_by_name VARCHAR(100) NOT NULL,
+        reason TEXT NOT NULL,
+        before_payload TEXT NOT NULL,
+        after_payload TEXT NOT NULL,
+        correction_log_id CHAR(36) REFERENCES transaction_logs(log_id) ON DELETE SET NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_tel_original ON transaction_edit_logs(original_log_id)",
 ]
 
 
@@ -118,6 +134,16 @@ def run_migrations() -> dict[str, int]:
         try:
             conn.execute(
                 text("UPDATE inventory SET pending_quantity = 0 WHERE pending_quantity IS NULL")
+            )
+            conn.commit()
+        except Exception:
+            pass
+
+        # 기존 직원에 PIN 기본값 0000 적용 (pin_hash NULL인 경우만)
+        try:
+            conn.execute(
+                text("UPDATE employees SET pin_hash = :h WHERE pin_hash IS NULL"),
+                {"h": DEFAULT_PIN_HASH},
             )
             conn.commit()
         except Exception:
@@ -212,6 +238,7 @@ def seed_reference_data() -> dict[str, int]:
                         level=level,
                         display_order=idx,
                         is_active="true",
+                        pin_hash=DEFAULT_PIN_HASH,  # 기본 PIN: 0000
                     )
                 )
                 counts["employees"] += 1

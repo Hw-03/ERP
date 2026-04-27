@@ -170,7 +170,6 @@ export function DesktopLegacyShell() {
         <DesktopSidebar
           activeTab={activeTab}
           onTabChange={(tab) => {
-            localStorage.setItem("desktop-active-tab", tab);
             setActiveTab(tab);
           }}
           alertCount={{ inventory: stockWarnings ? stockWarnings.zero + stockWarnings.low : 0 }}

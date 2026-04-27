@@ -55,7 +55,6 @@ function LegacyBody() {
         <MobileShell
           activeTab={activeTab}
           onTabChange={(tab) => {
-            localStorage.setItem("mobile-active-tab", tab);
             setActiveTab(tab);
             setShowHistory(false);
           }}

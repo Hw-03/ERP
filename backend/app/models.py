@@ -321,6 +321,8 @@ class Employee(Base):
     )
     display_order = Column(Integer, nullable=False, default=0)
     is_active = Column(BoolAsString, nullable=False, default=True)
+    # 작업자 식별용 PIN 해시 — 실제 보안 인증이 아님. None이면 기본 PIN 0000 적용
+    pin_hash = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
     updated_at = Column(
         DateTime,
@@ -419,6 +421,35 @@ class TransactionLog(Base):
         # 단일 item_id 인덱스 + created_at 인덱스 조합보다 복합이 효율적.
         Index("ix_tx_item_created", "item_id", "created_at"),
     )
+
+
+class TransactionEditLog(Base):
+    """거래 수정 감사 이력. 메타데이터 수정(3차) + 수량 보정(4차) 모두 기록."""
+
+    __tablename__ = "transaction_edit_logs"
+
+    edit_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    original_log_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("transaction_logs.log_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    edited_by_employee_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("employees.employee_id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    edited_by_name = Column(String(100), nullable=False)  # 스냅샷 — 직원 비활성/이름 변경 후에도 보존
+    reason = Column(Text, nullable=False)  # 필수
+    before_payload = Column(Text, nullable=False)  # JSON 스냅샷
+    after_payload = Column(Text, nullable=False)  # JSON 스냅샷
+    correction_log_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("transaction_logs.log_id", ondelete="SET NULL"),
+        nullable=True,
+    )  # 4차 수량 보정 시 생성된 ADJUST 거래 참조
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
 
 
 # =============================================================================

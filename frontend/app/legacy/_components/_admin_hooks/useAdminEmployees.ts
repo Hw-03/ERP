@@ -3,9 +3,38 @@
 // AdminEmployeesSection 전용 hook.
 
 import { useEffect, useState } from "react";
-import type { Employee } from "@/lib/api";
+import type { Employee, EmployeeLevel } from "@/lib/api";
 import { api } from "@/lib/api";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../_admin_sections/adminShared";
+
+export type EmployeeEditForm = {
+  name: string;
+  role: string;
+  phone: string;
+  department: string;
+  level: EmployeeLevel;
+  display_order: number;
+};
+
+const EMPTY_EDIT_FORM: EmployeeEditForm = {
+  name: "",
+  role: "",
+  phone: "",
+  department: "조립",
+  level: "staff",
+  display_order: 0,
+};
+
+function toEditForm(emp: Employee): EmployeeEditForm {
+  return {
+    name: emp.name,
+    role: emp.role,
+    phone: emp.phone ?? "",
+    department: emp.department,
+    level: emp.level,
+    display_order: emp.display_order,
+  };
+}
 
 export type UseAdminEmployeesArgs = {
   employees: Employee[];
@@ -27,6 +56,14 @@ export type AdminEmployeesState = {
   confirmTarget: Employee | null;
   confirmToggle: () => void;
   cancelConfirm: () => void;
+  /* 2차: 정보 수정 / PIN 초기화 */
+  editForm: EmployeeEditForm;
+  setEditForm: (updater: (f: EmployeeEditForm) => EmployeeEditForm) => void;
+  saveEmployee: () => void;
+  pinResetTarget: Employee | null;
+  requestPinReset: (employee: Employee) => void;
+  confirmPinReset: () => void;
+  cancelPinReset: () => void;
 };
 
 export function useAdminEmployees({
@@ -39,14 +76,26 @@ export function useAdminEmployees({
   const [empAddMode, setEmpAddMode] = useState(false);
   const [empAddForm, setEmpAddForm] = useState<EmployeeAddForm>(EMPTY_EMPLOYEE_FORM);
   const [confirmTarget, setConfirmTarget] = useState<Employee | null>(null);
+  const [editForm, setEditForm] = useState<EmployeeEditForm>(EMPTY_EDIT_FORM);
+  const [pinResetTarget, setPinResetTarget] = useState<Employee | null>(null);
 
+  // 선택된 직원이 외부 employees 변경 시 동기화 + editForm 초기화
   useEffect(() => {
     if (!selectedEmployee) return;
     const synced = employees.find((e) => e.employee_id === selectedEmployee.employee_id);
-    if (synced && synced.is_active !== selectedEmployee.is_active) {
+    if (synced && synced !== selectedEmployee) {
       setSelectedEmployee(synced);
     }
-  }, [employees]);
+  }, [employees, selectedEmployee]);
+
+  // 직원 선택 시 editForm 채우기
+  useEffect(() => {
+    if (selectedEmployee) {
+      setEditForm(toEditForm(selectedEmployee));
+    } else {
+      setEditForm(EMPTY_EDIT_FORM);
+    }
+  }, [selectedEmployee]);
 
   async function _addEmployee() {
     if (!empAddForm.employee_code.trim() || !empAddForm.name.trim()) {
@@ -87,6 +136,42 @@ export function useAdminEmployees({
     }
   }
 
+  async function _saveEmployee() {
+    if (!selectedEmployee) return;
+    if (!editForm.name.trim()) {
+      onError("이름은 필수입니다.");
+      return;
+    }
+    try {
+      const updated = await api.updateEmployee(selectedEmployee.employee_id, {
+        name: editForm.name.trim(),
+        role: editForm.role.trim(),
+        phone: editForm.phone.trim() || undefined,
+        department: editForm.department as Employee["department"],
+        level: editForm.level,
+        display_order: editForm.display_order,
+      });
+      setEmployees((current) =>
+        current.map((e) => (e.employee_id === updated.employee_id ? updated : e)),
+      );
+      setSelectedEmployee(updated);
+      onStatusChange(`'${updated.name}' 정보를 저장했습니다.`);
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "직원 정보 저장 실패");
+    }
+  }
+
+  async function _doResetPin(employee: Employee) {
+    try {
+      await api.resetEmployeePin(employee.employee_id);
+      setPinResetTarget(null);
+      onStatusChange(`'${employee.name}' PIN을 0000으로 초기화했습니다.`);
+    } catch (error) {
+      setPinResetTarget(null);
+      onError(error instanceof Error ? error.message : "PIN 초기화 실패");
+    }
+  }
+
   return {
     employees,
     selectedEmployee,
@@ -100,5 +185,12 @@ export function useAdminEmployees({
     confirmTarget,
     confirmToggle: () => { if (confirmTarget) void _doToggleEmployee(confirmTarget); },
     cancelConfirm: () => setConfirmTarget(null),
+    editForm,
+    setEditForm,
+    saveEmployee: () => void _saveEmployee(),
+    pinResetTarget,
+    requestPinReset: (e) => setPinResetTarget(e),
+    confirmPinReset: () => { if (pinResetTarget) void _doResetPin(pinResetTarget); },
+    cancelPinReset: () => setPinResetTarget(null),
   };
 }

@@ -1,0 +1,54 @@
+/**
+ * 현재 로그인된 작업자 정보를 localStorage에서 관리하는 훅.
+ *
+ * 작업자 식별용 — 실제 보안 인증이 아님.
+ * 로그인된 작업자 정보는 입출고/수정 작업의 produced_by 기본값으로 사용된다.
+ */
+
+import { useEffect, useState } from "react";
+import type { Department, EmployeeLevel } from "@/lib/api";
+
+export interface Operator {
+  employee_id: string;
+  name: string;
+  department: Department;
+  level: EmployeeLevel;
+  employee_code: string;
+}
+
+const OPERATOR_KEY = "dexcowin_erp_operator";
+
+function readOperator(): Operator | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(OPERATOR_KEY);
+    return raw ? (JSON.parse(raw) as Operator) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setCurrentOperator(op: Operator): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(OPERATOR_KEY, JSON.stringify(op));
+}
+
+export function clearCurrentOperator(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(OPERATOR_KEY);
+}
+
+export function useCurrentOperator(): Operator | null {
+  const [operator, setOperator] = useState<Operator | null>(null);
+
+  useEffect(() => {
+    setOperator(readOperator());
+  }, []);
+
+  return operator;
+}
+
+/** produced_by 필드에 사용되는 포맷: "이름(부서)" */
+export function operatorProducedBy(op: Operator): string {
+  return `${op.name}(${op.department})`;
+}
