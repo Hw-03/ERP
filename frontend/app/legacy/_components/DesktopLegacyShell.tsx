@@ -44,33 +44,6 @@ export function DesktopLegacyShell() {
     setActiveTab("warehouse");
   }, []);
 
-  const capacityActionSlot =
-    activeTab === "inventory" ? (
-      <button
-        onClick={() => setCapacityModal(true)}
-        className="flex shrink-0 items-center gap-1.5 rounded-[20px] border px-4 py-2.5 text-sm font-bold whitespace-nowrap transition-opacity hover:opacity-90"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-        title="생산 가능수량 상세"
-      >
-        <span style={{ color: LEGACY_COLORS.muted2 }}>생산 가능</span>
-        {capacityData == null ? (
-          <span style={{ color: LEGACY_COLORS.muted2 }}>···</span>
-        ) : capacityData.immediate === 0 && capacityData.maximum === 0 ? (
-          <span style={{ color: LEGACY_COLORS.muted2 }}>미등록</span>
-        ) : (
-          <>
-            <span className="font-bold" style={{ color: LEGACY_COLORS.cyan }}>
-              즉시 {formatNumber(capacityData.immediate)}
-            </span>
-            <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
-            <span className="font-bold" style={{ color: LEGACY_COLORS.blue }}>
-              최대 {formatNumber(capacityData.maximum)}
-            </span>
-          </>
-        )}
-      </button>
-    ) : null;
-
   const content = useMemo(() => {
     const key = `${activeTab}-${refreshNonce}`;
     if (activeTab === "inventory") {
@@ -83,6 +56,7 @@ export function DesktopLegacyShell() {
           onGoToWarehouseTab={() => setActiveTab("warehouse")}
           onSummaryChange={setStockWarnings}
           capacityData={capacityData}
+          onCapacityClick={() => setCapacityModal(true)}
         />
       );
     }
@@ -207,8 +181,6 @@ export function DesktopLegacyShell() {
               setRefreshNonce((current) => current + 1);
               loadCapacity();
             }}
-            actionSlot={capacityActionSlot}
-            stockWarnings={activeTab === "inventory" && stockWarnings ? stockWarnings : undefined}
             status={status}
           />
 
