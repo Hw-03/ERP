@@ -5,24 +5,25 @@ import { Moon, Sun } from "lucide-react";
 import { LEGACY_COLORS } from "./legacyUi";
 
 export function ThemeToggle() {
-  const [isLight, setIsLight] = useState(false);
+  const [isLight, setIsLight] = useState(true);
 
   useEffect(() => {
     const stored = localStorage.getItem("theme");
-    if (stored === "light") {
-      document.documentElement.setAttribute("data-theme", "light");
-      setIsLight(true);
+    if (stored === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+      setIsLight(false);
     }
+    // stored === null 또는 "light" → 라이트 모드 (CSS 기본값, 속성 불필요)
   }, []);
 
   function toggle() {
     const next = !isLight;
     setIsLight(next);
     if (next) {
-      document.documentElement.setAttribute("data-theme", "light");
+      document.documentElement.removeAttribute("data-theme");
       localStorage.setItem("theme", "light");
     } else {
-      document.documentElement.removeAttribute("data-theme");
+      document.documentElement.setAttribute("data-theme", "dark");
       localStorage.setItem("theme", "dark");
     }
   }

@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { LoginIntro } from "./LoginIntro";
 import { LoginCard } from "./LoginCard";
 
-const AUTH_KEY = "erp_auth";
-
 type GatePhase = "loading" | "intro" | "form" | "authed";
 
 interface ErpLoginGateProps {
@@ -16,16 +14,11 @@ export function ErpLoginGate({ children }: ErpLoginGateProps) {
   const [phase, setPhase] = useState<GatePhase>("loading");
 
   useEffect(() => {
-    if (localStorage.getItem(AUTH_KEY) === "1") {
-      setPhase("authed");
-      return;
-    }
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     setPhase(reduced ? "form" : "intro");
   }, []);
 
   const handleLogin = () => {
-    localStorage.setItem(AUTH_KEY, "1");
     setPhase("authed");
   };
 

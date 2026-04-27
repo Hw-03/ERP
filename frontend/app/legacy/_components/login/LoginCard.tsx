@@ -128,19 +128,6 @@ export function LoginCard({ onLogin }: LoginCardProps) {
           © 2026 DEXCOWIN · ERP System
         </p>
 
-        {/* 개발 편의 버튼 */}
-        {process.env.NODE_ENV === "development" && (
-          <button
-            className="absolute bottom-3 right-4 rounded px-2 py-0.5 text-[10px] opacity-30 transition-opacity hover:opacity-80"
-            style={{ background: "var(--c-s3)", color: "var(--c-muted)" }}
-            onClick={() => {
-              localStorage.removeItem("erp_auth");
-              location.reload();
-            }}
-          >
-            dev: reset
-          </button>
-        )}
       </div>
     </div>
   );
