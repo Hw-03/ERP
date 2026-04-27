@@ -2,7 +2,7 @@
 
 // AdminEmployeesSection 전용 hook.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Employee } from "@/lib/api";
 import { api } from "@/lib/api";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../_admin_sections/adminShared";
@@ -24,6 +24,9 @@ export type AdminEmployeesState = {
   setEmpAddForm: (updater: (f: EmployeeAddForm) => EmployeeAddForm) => void;
   addEmployee: () => void;
   toggleEmployee: (employee: Employee) => void;
+  confirmTarget: Employee | null;
+  confirmToggle: () => void;
+  cancelConfirm: () => void;
 };
 
 export function useAdminEmployees({
@@ -35,6 +38,15 @@ export function useAdminEmployees({
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [empAddMode, setEmpAddMode] = useState(false);
   const [empAddForm, setEmpAddForm] = useState<EmployeeAddForm>(EMPTY_EMPLOYEE_FORM);
+  const [confirmTarget, setConfirmTarget] = useState<Employee | null>(null);
+
+  useEffect(() => {
+    if (!selectedEmployee) return;
+    const synced = employees.find((e) => e.employee_id === selectedEmployee.employee_id);
+    if (synced && synced.is_active !== selectedEmployee.is_active) {
+      setSelectedEmployee(synced);
+    }
+  }, [employees]);
 
   async function _addEmployee() {
     if (!empAddForm.employee_code.trim() || !empAddForm.name.trim()) {
@@ -60,18 +72,17 @@ export function useAdminEmployees({
     }
   }
 
-  async function _toggleEmployee(employee: Employee) {
-    const action = employee.is_active ? "비활성화" : "활성화";
-    const confirmed = window.confirm(`'${employee.name}' 직원을 ${action}하시겠습니까?`);
-    if (!confirmed) return;
+  async function _doToggleEmployee(employee: Employee) {
     try {
       const updated = await api.updateEmployee(employee.employee_id, { is_active: !employee.is_active });
       setEmployees((current) =>
         current.map((entry) => (entry.employee_id === employee.employee_id ? updated : entry)),
       );
       setSelectedEmployee(updated);
+      setConfirmTarget(null);
       onStatusChange(`${updated.name} 직원 상태를 변경했습니다.`);
     } catch (error) {
+      setConfirmTarget(null);
       onError(error instanceof Error ? error.message : "직원 상태 변경 실패");
     }
   }
@@ -85,6 +96,9 @@ export function useAdminEmployees({
     empAddForm,
     setEmpAddForm,
     addEmployee: () => void _addEmployee(),
-    toggleEmployee: (e) => void _toggleEmployee(e),
+    toggleEmployee: (e) => setConfirmTarget(e),
+    confirmTarget,
+    confirmToggle: () => { if (confirmTarget) void _doToggleEmployee(confirmTarget); },
+    cancelConfirm: () => setConfirmTarget(null),
   };
 }

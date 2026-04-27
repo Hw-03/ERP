@@ -33,7 +33,9 @@ export default function LegacyPage() {
 }
 
 function LegacyBody() {
-  const [activeTab, setActiveTab] = useState<TabId>("inventory");
+  const [activeTab, setActiveTab] = useState<TabId>(
+    () => (localStorage.getItem("mobile-active-tab") as TabId) ?? "inventory",
+  );
   const [showHistory, setShowHistory] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const { dispatch: warehouseDispatch } = useWarehouseWizard();
@@ -52,6 +54,7 @@ function LegacyBody() {
         <MobileShell
           activeTab={activeTab}
           onTabChange={(tab) => {
+            localStorage.setItem("mobile-active-tab", tab);
             setActiveTab(tab);
             setShowHistory(false);
           }}

@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { DEPARTMENT_LABELS, LEGACY_COLORS, normalizeDepartment } from "../legacyUi";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "./adminShared";
 import { useAdminEmployeesContext } from "./AdminEmployeesContext";
+import { ConfirmModal } from "../common/ConfirmModal";
 
 // Props 없음. AdminEmployeesProvider 의 Context 에서 모두 읽는다.
 export function AdminEmployeesSection() {
@@ -18,8 +19,12 @@ export function AdminEmployeesSection() {
     setEmpAddForm,
     addEmployee: onAddEmployee,
     toggleEmployee: onToggleEmployee,
+    confirmTarget,
+    confirmToggle,
+    cancelConfirm,
   } = ctx;
   return (
+    <>
     <div className="grid h-full gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
       <div
         className="flex flex-col overflow-hidden rounded-[28px] border"
@@ -193,5 +198,15 @@ export function AdminEmployeesSection() {
         )}
       </div>
     </div>
+
+    <ConfirmModal
+      open={confirmTarget !== null}
+      title={`'${confirmTarget?.name}' 직원을 ${confirmTarget?.is_active ? "비활성화" : "활성화"}하시겠습니까?`}
+      tone={confirmTarget?.is_active ? "danger" : "normal"}
+      confirmLabel={confirmTarget?.is_active ? "비활성화" : "활성화"}
+      onClose={cancelConfirm}
+      onConfirm={confirmToggle}
+    />
+    </>
   );
 }

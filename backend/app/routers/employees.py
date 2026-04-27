@@ -85,9 +85,8 @@ def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, request: Re
     if payload.display_order is not None and employee.display_order != payload.display_order:
         employee.display_order = payload.display_order; changed.append("display_order")
     if payload.is_active is not None:
-        new_flag = "true" if payload.is_active else "false"
-        if employee.is_active != new_flag:
-            employee.is_active = new_flag; changed.append("is_active")
+        if employee.is_active != payload.is_active:
+            employee.is_active = payload.is_active; changed.append("is_active")
 
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
@@ -133,7 +132,7 @@ def _to_response(employee: Employee) -> EmployeeResponse:
         department=employee.department,
         level=employee.level,
         display_order=int(employee.display_order),
-        is_active=employee.is_active == "true",
+        is_active=bool(employee.is_active),
         created_at=employee.created_at,
         updated_at=employee.updated_at,
     )

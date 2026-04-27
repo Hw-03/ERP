@@ -21,7 +21,9 @@ const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
 };
 
 export function DesktopLegacyShell() {
-  const [activeTab, setActiveTab] = useState<DesktopTabId>("inventory");
+  const [activeTab, setActiveTab] = useState<DesktopTabId>(
+    () => (localStorage.getItem("desktop-active-tab") as DesktopTabId) ?? "inventory",
+  );
   const [status, setStatus] = useState("데스크톱 ERP 화면을 준비했습니다.");
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [warehousePreselected, setWarehousePreselected] = useState<Item | null>(null);
@@ -169,7 +171,10 @@ export function DesktopLegacyShell() {
       <div className="flex h-full w-full gap-3 px-3 py-3" style={{ background: LEGACY_COLORS.bg, color: LEGACY_COLORS.text }}>
         <DesktopSidebar
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={(tab) => {
+            localStorage.setItem("desktop-active-tab", tab);
+            setActiveTab(tab);
+          }}
           alertCount={{ inventory: stockWarnings ? stockWarnings.zero + stockWarnings.low : 0 }}
         />
 

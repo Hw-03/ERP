@@ -242,7 +242,7 @@ export function DesktopAdminView({
     setMessage("");
     const [nextItems, nextEmployees, nextPackages, nextModels] = await Promise.all([
       api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
-      api.getEmployees(),
+      api.getEmployees({ activeOnly: false }),
       api.getShipPackages(),
       api.getModels(),
     ]);

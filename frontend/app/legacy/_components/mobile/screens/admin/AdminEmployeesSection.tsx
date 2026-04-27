@@ -41,8 +41,12 @@ export function AdminEmployeesSection({ showToast }: { showToast: (toast: ToastS
   }
 
   async function toggleActive(employee: Employee) {
-    const updated = await api.updateEmployee(employee.employee_id, { is_active: !employee.is_active });
-    setEmployees((current) => current.map((entry) => (entry.employee_id === employee.employee_id ? updated : entry)));
+    try {
+      const updated = await api.updateEmployee(employee.employee_id, { is_active: !employee.is_active });
+      setEmployees((current) => current.map((entry) => (entry.employee_id === employee.employee_id ? updated : entry)));
+    } catch (error) {
+      showToast({ message: error instanceof Error ? error.message : "상태 변경에 실패했습니다.", type: "error" });
+    }
   }
 
   async function move(employee: Employee, delta: number) {
