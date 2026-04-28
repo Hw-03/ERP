@@ -11,6 +11,7 @@ import type {
   Item,
   RequestBucket,
   ShipPackage,
+  StockRequest,
   StockRequestCreatePayload,
   StockRequestType,
 } from "@/lib/api";
@@ -176,6 +177,96 @@ export function buildStockRequestPayload(input: BuildPayloadInput): StockRequest
     reference_no: input.referenceNo || null,
     notes: input.notes || null,
     lines,
+  };
+}
+
+// ───────────────────────── Draft (장바구니) 복원 ─────────────────────────
+// resolveRequestType + buildLines 의 역방향. DRAFT 의 request_type + lines 를
+// wizard state 로 환원해 "이어서 작성" 시 UI 를 복구한다.
+
+export interface RestoredFormState {
+  workType: WorkType;
+  rawDirection: Direction;
+  warehouseDirection: TransferDirection;
+  deptDirection: Direction;
+  selectedDept: Department;
+  defectiveSource: DefectiveSource;
+  selectedItems: Map<string, number>;
+  notes: string;
+  referenceNo: string;
+}
+
+/** DRAFT → wizard state. UI 가 생성하지 못하는 request_type 은 null. */
+export function draftToFormState(draft: StockRequest): RestoredFormState | null {
+  const selectedItems = new Map<string, number>();
+  for (const line of draft.lines ?? []) {
+    selectedItems.set(line.item_id, Number(line.quantity) || 0);
+  }
+
+  // Defaults — request_type 이 정하지 않는 차원은 안전한 초기값 유지.
+  let workType: WorkType = "raw-io";
+  let rawDirection: Direction = "in";
+  let warehouseDirection: TransferDirection = "wh-to-dept";
+  const deptDirection: Direction = "in";
+  let selectedDept: Department = "조립";
+  let defectiveSource: DefectiveSource = "warehouse";
+
+  const firstLine = draft.lines?.[0];
+
+  switch (draft.request_type) {
+    case "raw_receive":
+      workType = "raw-io";
+      rawDirection = "in";
+      break;
+    case "raw_ship":
+      workType = "raw-io";
+      rawDirection = "out";
+      break;
+    case "warehouse_to_dept":
+      workType = "warehouse-io";
+      warehouseDirection = "wh-to-dept";
+      if (firstLine?.to_department) selectedDept = firstLine.to_department;
+      break;
+    case "dept_to_warehouse":
+      workType = "warehouse-io";
+      warehouseDirection = "dept-to-wh";
+      if (firstLine?.from_department) selectedDept = firstLine.from_department;
+      break;
+    case "mark_defective_wh":
+      workType = "defective-register";
+      defectiveSource = "warehouse";
+      if (firstLine?.to_department) selectedDept = firstLine.to_department;
+      break;
+    case "mark_defective_prod":
+      workType = "defective-register";
+      defectiveSource = "production";
+      if (firstLine?.from_department) selectedDept = firstLine.from_department;
+      break;
+    case "supplier_return":
+      workType = "supplier-return";
+      if (firstLine?.from_department) selectedDept = firstLine.from_department;
+      break;
+    case "package_out":
+      // 패키지 정보(selectedPackage)는 lines 만으로 복원 불가 — 사용자가 다시 선택해야 함.
+      workType = "package-out";
+      break;
+    case "dept_internal":
+      // 현 UI 가 생성하지 않는 타입 — 호출자가 무시.
+      return null;
+    default:
+      return null;
+  }
+
+  return {
+    workType,
+    rawDirection,
+    warehouseDirection,
+    deptDirection,
+    selectedDept,
+    defectiveSource,
+    selectedItems,
+    notes: draft.notes ?? "",
+    referenceNo: draft.reference_no ?? "",
   };
 }
 

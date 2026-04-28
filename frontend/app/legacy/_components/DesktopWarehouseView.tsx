@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type Item, type ShipPackage } from "@/lib/api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { api, type Item, type ShipPackage, type StockRequest } from "@/lib/api";
 import { LEGACY_COLORS, formatNumber, normalizeDepartment } from "./legacyUi";
 import { ConfirmModal, ResultModal } from "./common";
 import { CAUTION_WORK_TYPES, type WorkType } from "./_warehouse_steps";
@@ -17,13 +17,24 @@ import { WarehouseStepLayout } from "./_warehouse_sections/WarehouseStepLayout";
 import { WarehouseConfirmContent } from "./_warehouse_modals/WarehouseConfirmContent";
 import { MyRequestsPanel } from "./_warehouse_sections/MyRequestsPanel";
 import { WarehouseQueuePanel } from "./_warehouse_sections/WarehouseQueuePanel";
+import { DraftCartPanel } from "./_warehouse_sections/DraftCartPanel";
 import {
   buildStockRequestPayload,
+  draftToFormState,
   inputRequiresApproval,
+  resolveRequestType,
 } from "./_warehouse_helpers/requestMapping";
 import { readCurrentOperator } from "./login/useCurrentOperator";
 
-type SectionTab = "compose" | "mine" | "queue";
+type SectionTab = "compose" | "cart" | "mine" | "queue";
+
+const AUTO_SAVE_DEBOUNCE_MS = 600;
+const AUTO_SAVE_LABEL: Record<"idle" | "saving" | "saved" | "error", string> = {
+  idle: "",
+  saving: "장바구니 저장 중...",
+  saved: "장바구니 저장됨",
+  error: "장바구니 저장 실패",
+};
 
 export function DesktopWarehouseView({
   globalSearch,
@@ -50,12 +61,22 @@ export function DesktopWarehouseView({
   const [selectedItems, setSelectedItems] = useState<Map<string, number>>(new Map());
   const [selectedPackage, setSelectedPackage] = useState<ShipPackage | null>(null);
 
-  // ─── 섹션 탭 (요청 작성 / 내 요청 / 창고 승인함) ───
+  // ─── 섹션 탭 (요청 작성 / 장바구니 / 내 요청 / 창고 승인함) ───
   const [sectionTab, setSectionTab] = useState<SectionTab>("compose");
   const [panelRefreshNonce, setPanelRefreshNonce] = useState(0);
   const canSeeQueue =
     (operator?.warehouse_role ?? "none") === "primary" ||
     (operator?.warehouse_role ?? "none") === "deputy";
+
+  // ─── 장바구니(DRAFT) 자동저장 ───
+  // 서버 DB 에 직원별 + request_type 별 미제출 요청 초안을 저장한다.
+  // 본 컴포넌트는 currentDraftId 만 추적하고, 본문은 모두 서버에 위임한다.
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+  const restoringRef = useRef(false);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 로그인된 직원 정보가 employees 로드 후에도 같은 ID이도록 보장
   useEffect(() => {
@@ -191,6 +212,175 @@ export function DesktopWarehouseView({
     defectiveSource,
   });
 
+  // ─── 현재 wizard state 가 가리키는 request_type ───
+  const currentRequestType = useMemo(
+    () =>
+      resolveRequestType({
+        workType,
+        rawDirection,
+        warehouseDirection,
+        deptDirection,
+        defectiveSource,
+      }),
+    [workType, rawDirection, warehouseDirection, deptDirection, defectiveSource],
+  );
+
+  // ─── 장바구니 자동저장 (debounce) ───
+  // 패키지 출고는 selectedPackage 정보가 lines 만으로 복원 불가하므로 제외.
+  useEffect(() => {
+    if (restoringRef.current) return;
+    if (!operator || !selectedEmployee) return;
+    if (workType === "package-out") return;
+
+    const draftLines = buildStockRequestPayload({
+      workType,
+      rawDirection,
+      warehouseDirection,
+      deptDirection,
+      selectedDept,
+      defectiveSource,
+      entries: selectedEntries,
+      selectedPackage,
+      requesterEmployeeId: selectedEmployee.employee_id,
+      referenceNo,
+      notes,
+    }).lines;
+
+    const hasContent =
+      draftLines.length > 0 || notes.trim() !== "" || referenceNo.trim() !== "";
+    // 빈 상태이고 기존 draft 도 없으면 저장 스킵 (불필요한 빈 draft 방지).
+    if (!hasContent && !currentDraftId) return;
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(async () => {
+      if (restoringRef.current) return;
+      try {
+        setAutoSaveStatus("saving");
+        const draft = await api.upsertStockRequestDraft({
+          requester_employee_id: selectedEmployee.employee_id,
+          request_type: currentRequestType,
+          reference_no: referenceNo || null,
+          notes: notes || null,
+          lines: draftLines,
+        });
+        setCurrentDraftId(draft.request_id);
+        setAutoSaveStatus("saved");
+      } catch {
+        setAutoSaveStatus("error");
+      }
+    }, AUTO_SAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    operator?.employee_id,
+    selectedEmployee?.employee_id,
+    workType,
+    rawDirection,
+    warehouseDirection,
+    deptDirection,
+    selectedDept,
+    defectiveSource,
+    selectedItems,
+    selectedPackage,
+    notes,
+    referenceNo,
+    currentRequestType,
+  ]);
+
+  // ─── 작업유형 변경 시 해당 request_type 의 draft 복원 ───
+  // 없으면 currentDraftId 를 반드시 null 로 초기화 (stale id 로 다른 유형 draft 가 submit 되는 사고 방지).
+  useEffect(() => {
+    if (sectionTab !== "compose") return;
+    if (!operator || !selectedEmployee) return;
+    if (workType === "package-out") {
+      setCurrentDraftId(null);
+      setAutoSaveStatus("idle");
+      return;
+    }
+
+    let cancelled = false;
+    api
+      .getStockRequestDraft(selectedEmployee.employee_id, currentRequestType)
+      .then((draft) => {
+        if (cancelled) return;
+        if (!draft) {
+          setCurrentDraftId(null);
+          setAutoSaveStatus("idle");
+          return;
+        }
+        // 복원 동안 autosave 재발동 차단.
+        restoringRef.current = true;
+        if (autoSaveTimerRef.current) {
+          clearTimeout(autoSaveTimerRef.current);
+          autoSaveTimerRef.current = null;
+        }
+        const restored = draftToFormState(draft);
+        if (restored) {
+          setSelectedItems(new Map(restored.selectedItems));
+          setNotes(restored.notes);
+          setReferenceNo(restored.referenceNo);
+        }
+        setCurrentDraftId(draft.request_id);
+        setAutoSaveStatus("saved");
+        setTimeout(() => {
+          restoringRef.current = false;
+        }, 0);
+      })
+      .catch(() => {
+        if (!cancelled) restoringRef.current = false;
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    sectionTab,
+    operator?.employee_id,
+    selectedEmployee?.employee_id,
+    currentRequestType,
+    workType,
+  ]);
+
+  // ─── 장바구니 → "이어서 작성" 핸들러 ───
+  const handleContinueDraft = useCallback(
+    (draft: StockRequest) => {
+      const restored = draftToFormState(draft);
+      if (!restored) return;
+
+      restoringRef.current = true;
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+
+      // wizard state 복원 — 작업유형/방향/부서.
+      wizard.setWorkType(restored.workType);
+      wizard.changeRawDir(restored.rawDirection);
+      wizard.changeWarehouseDir(restored.warehouseDirection);
+      wizard.changeDeptDir(restored.deptDirection);
+      wizard.changeSelectedDept(restored.selectedDept);
+      wizard.changeDefectiveSource(restored.defectiveSource);
+      wizard.setStep2Confirmed(true);
+
+      // 폼 데이터 복원 — Map 은 항상 new Map 으로 갱신해 변경 감지.
+      setSelectedItems(new Map(restored.selectedItems));
+      setNotes(restored.notes);
+      setReferenceNo(restored.referenceNo);
+      setCurrentDraftId(draft.request_id);
+      setAutoSaveStatus("saved");
+
+      setSectionTab("compose");
+      setTimeout(() => {
+        restoringRef.current = false;
+      }, 0);
+    },
+    [wizard],
+  );
+
   // ─── 단일 통합 제출: /api/stock-requests 한 번 호출 ───
   async function submit() {
     if (!selectedEmployee) return setError("담당 직원을 먼저 선택해 주세요.");
@@ -217,8 +407,23 @@ export function DesktopWarehouseView({
         notes,
       });
 
+      // 진행 중인 autosave 가 submit 직후의 빈 form 으로 덮어쓰는 일 방지.
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+
       try {
-        await api.createStockRequest(payload);
+        if (currentDraftId) {
+          // 기존 draft 가 있으면 submit 으로 전환.
+          await api.submitStockRequestDraft(
+            currentDraftId,
+            selectedEmployee.employee_id,
+          );
+        } else {
+          // draft 가 없는 경우(예: package-out 또는 막 진입) 안전망으로 직접 생성.
+          await api.createStockRequest(payload);
+        }
       } catch (err) {
         const reason = err instanceof Error ? err.message : "요청 처리를 완료하지 못했습니다.";
         setResultModal({ kind: "fail", successCount: 0, failures: [{ name: "요청 제출", reason }] });
@@ -235,6 +440,9 @@ export function DesktopWarehouseView({
       }
 
       const doneCount = workType !== "package-out" ? selectedEntries.length : 1;
+      // 제출 완료 — draft 추적 해제 (제출된 요청은 더 이상 DRAFT 가 아님).
+      setCurrentDraftId(null);
+      setAutoSaveStatus("idle");
       setReferenceNo("");
       setNotes("");
       setSelectedItems(new Map());
@@ -345,6 +553,7 @@ export function DesktopWarehouseView({
   function renderSectionTabs() {
     const tabs: { id: SectionTab; label: string }[] = [
       { id: "compose", label: "요청 작성" },
+      { id: "cart", label: "장바구니" },
       { id: "mine", label: "내 요청" },
     ];
     if (canSeeQueue) tabs.push({ id: "queue", label: "창고 승인함" });
@@ -381,6 +590,24 @@ export function DesktopWarehouseView({
         <WarehouseHeader loadFailure={loadFailure} />
         {renderSectionTabs()}
 
+        {sectionTab === "cart" && (
+          <DraftCartPanel
+            employeeId={operator?.employee_id ?? employeeId ?? null}
+            refreshNonce={panelRefreshNonce}
+            onContinue={(draft) => {
+              handleContinueDraft(draft);
+              setPanelRefreshNonce((n) => n + 1);
+            }}
+            onChanged={() => {
+              // submit/delete 시 draft 가 사라졌을 수 있으므로 stale 추적 해제.
+              setCurrentDraftId(null);
+              setAutoSaveStatus("idle");
+              setPanelRefreshNonce((n) => n + 1);
+              onSubmitSuccess?.();
+            }}
+          />
+        )}
+
         {sectionTab === "mine" && (
           <MyRequestsPanel
             employeeId={employeeId || operator?.employee_id || null}
@@ -411,6 +638,21 @@ export function DesktopWarehouseView({
 
         {sectionTab !== "compose" ? null : (
           <>
+        {autoSaveStatus !== "idle" && (
+          <div
+            className="self-end text-xs"
+            style={{
+              color:
+                autoSaveStatus === "error"
+                  ? LEGACY_COLORS.red
+                  : autoSaveStatus === "saving"
+                    ? LEGACY_COLORS.muted
+                    : LEGACY_COLORS.green,
+            }}
+          >
+            {AUTO_SAVE_LABEL[autoSaveStatus]}
+          </div>
+        )}
         <WarehouseStickySummary summary={stickySummary} />
 
         <WarehouseStepLayout
