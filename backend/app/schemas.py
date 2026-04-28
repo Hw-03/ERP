@@ -834,6 +834,20 @@ class StockRequestCreate(BaseModel):
     lines: List[StockRequestLineCreate] = Field(..., min_length=1)
 
 
+class StockRequestDraftUpsert(BaseModel):
+    """장바구니(DRAFT) upsert 페이로드. lines 는 빈 리스트 허용 — 저장 도중 단계."""
+    requester_employee_id: uuid.UUID
+    request_type: StockRequestTypeEnum
+    reference_no: Optional[str] = Field(None, max_length=100)
+    notes: Optional[str] = None
+    lines: List[StockRequestLineCreate] = Field(default_factory=list)
+
+
+class StockRequestSubmitPayload(BaseModel):
+    """장바구니(DRAFT) → 제출 전환 페이로드."""
+    requester_employee_id: uuid.UUID
+
+
 class StockRequestActionRequest(BaseModel):
     """승인/반려/취소 공통 페이로드 — pin 필수."""
     actor_employee_id: uuid.UUID

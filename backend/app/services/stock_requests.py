@@ -240,7 +240,137 @@ def validate_line_shape_for_request_type(
 
 
 # ---------------------------------------------------------------------------
-# 요청 생성
+# 내부 헬퍼 — create_request / submit_draft_request 공통 단계
+# ---------------------------------------------------------------------------
+
+
+def _validate_lines(
+    request_type: StockRequestTypeEnum,
+    lines_input: Sequence[LineInput],
+    *,
+    allow_empty: bool = False,
+) -> None:
+    """quantity > 0 + shape 검증. 실패 시 ValueError.
+
+    allow_empty=True 면 lines_input 가 비어 있어도 통과 (DRAFT 저장 도중 단계용).
+    """
+    if not lines_input:
+        if allow_empty:
+            return
+        raise ValueError("요청 라인이 비어 있습니다.")
+    for li in lines_input:
+        if li.quantity <= 0:
+            raise ValueError("수량은 0보다 커야 합니다.")
+        validate_line_shape_for_request_type(request_type, li)
+
+
+def _build_request_and_lines(
+    db: Session,
+    *,
+    requester: Employee,
+    request_type: StockRequestTypeEnum,
+    lines_input: Sequence[LineInput],
+    reference_no: Optional[str],
+    notes: Optional[str],
+    status: StockRequestStatusEnum,
+    request_code: Optional[str],
+    submitted_at: Optional[datetime],
+) -> StockRequest:
+    """StockRequest + StockRequestLine row 생성. 호출자가 사전 검증 책임.
+
+    inventory_svc 호출 / TransactionLog 생성은 절대 하지 않는다 (DRAFT 안전성 보장).
+    """
+    requires_approval = any(
+        line_requires_approval(li.from_bucket, li.to_bucket) for li in lines_input
+    )
+
+    request = StockRequest(
+        request_code=request_code,
+        requester_employee_id=requester.employee_id,
+        requester_name=requester.name,
+        requester_department=requester.department,
+        request_type=request_type,
+        status=status,
+        requires_warehouse_approval=requires_approval,
+        submitted_at=submitted_at,
+        reference_no=reference_no,
+        notes=notes,
+    )
+    db.add(request)
+    db.flush()
+
+    for li in lines_input:
+        item = db.query(Item).filter(Item.item_id == li.item_id).first()
+        if item is None:
+            raise ValueError(f"품목을 찾을 수 없습니다: {li.item_id}")
+        line = StockRequestLine(
+            request_id=request.request_id,
+            item_id=li.item_id,
+            item_name_snapshot=item.item_name,
+            erp_code_snapshot=item.erp_code,
+            quantity=li.quantity,
+            from_bucket=li.from_bucket,
+            from_department=li.from_department,
+            to_bucket=li.to_bucket,
+            to_department=li.to_department,
+            status=status,
+        )
+        db.add(line)
+    db.flush()
+    return request
+
+
+def _finalize_submission(
+    db: Session,
+    *,
+    request: StockRequest,
+    requester: Employee,
+    now: datetime,
+) -> StockRequest:
+    """제출 시점 분기 — request 와 lines 가 SUBMITTED 상태로 flush 된 직후 호출.
+
+    - 승인 불필요 → 즉시 실행 + COMPLETED
+    - 승인 필요 + pending 필요 → reserve + RESERVED
+    - 승인 필요 + pending 불필요 → SUBMITTED 유지
+    """
+    lines = list(request.lines)
+    if not request.requires_warehouse_approval:
+        _execute_all_lines(
+            db, request, lines, operator_name=requester.name, approver=requester
+        )
+        request.status = StockRequestStatusEnum.COMPLETED
+        request.approved_by_employee_id = requester.employee_id
+        request.approved_by_name = requester.name
+        request.approved_at = now
+        request.completed_at = now
+        for line in lines:
+            line.status = StockRequestStatusEnum.COMPLETED
+        return request
+
+    pending_lines = [
+        li for li in lines if line_requires_pending(li.from_bucket, li.to_bucket)
+    ]
+    if pending_lines:
+        agg: dict[uuid.UUID, Decimal] = {}
+        for li in pending_lines:
+            agg[li.item_id] = agg.get(li.item_id, Decimal("0")) + (
+                li.quantity or Decimal("0")
+            )
+        for item_id, qty in agg.items():
+            inventory_svc.reserve(db, item_id, qty, employee=requester)
+        request.status = StockRequestStatusEnum.RESERVED
+        request.reserved_at = now
+        for line in lines:
+            line.status = StockRequestStatusEnum.RESERVED
+    else:
+        request.status = StockRequestStatusEnum.SUBMITTED
+        for line in lines:
+            line.status = StockRequestStatusEnum.SUBMITTED
+    return request
+
+
+# ---------------------------------------------------------------------------
+# 요청 생성 (즉시 제출 흐름)
 # ---------------------------------------------------------------------------
 
 
@@ -260,98 +390,233 @@ def create_request(
     - 승인 필요 + 점유 불필요 → SUBMITTED 상태로 저장.
     - 승인 불필요 → 즉시 실행 후 COMPLETED.
     """
-    if not lines_input:
-        raise ValueError("요청 라인이 비어 있습니다.")
-
-    # request_type ↔ bucket/department 조합 정합성 + quantity 양수 — DB row 생성 전 일괄 검증.
-    # 검증 실패 시 StockRequest row 도, Inventory.pending_quantity 변경도 발생하지 않는다.
-    for li in lines_input:
-        if li.quantity <= 0:
-            raise ValueError("수량은 0보다 커야 합니다.")
-        validate_line_shape_for_request_type(request_type, li)
-
+    _validate_lines(request_type, lines_input)
     now = datetime.utcnow()
     code = _generate_request_code(db, now)
-
-    requires_approval = any(
-        line_requires_approval(li.from_bucket, li.to_bucket) for li in lines_input
-    )
-
-    request = StockRequest(
-        request_code=code,
-        requester_employee_id=requester.employee_id,
-        requester_name=requester.name,
-        requester_department=requester.department,
+    request = _build_request_and_lines(
+        db,
+        requester=requester,
         request_type=request_type,
-        status=StockRequestStatusEnum.SUBMITTED,
-        requires_warehouse_approval=requires_approval,
-        submitted_at=now,
+        lines_input=lines_input,
         reference_no=reference_no,
         notes=notes,
+        status=StockRequestStatusEnum.SUBMITTED,
+        request_code=code,
+        submitted_at=now,
     )
-    db.add(request)
-    db.flush()
+    return _finalize_submission(db, request=request, requester=requester, now=now)
 
-    # 라인 객체 생성 (item 스냅샷 포함)
-    lines: List[StockRequestLine] = []
-    for li in lines_input:
-        if li.quantity <= 0:
-            raise ValueError("수량은 0보다 커야 합니다.")
-        item = db.query(Item).filter(Item.item_id == li.item_id).first()
-        if item is None:
-            raise ValueError(f"품목을 찾을 수 없습니다: {li.item_id}")
-        line = StockRequestLine(
-            request_id=request.request_id,
-            item_id=li.item_id,
-            item_name_snapshot=item.item_name,
-            erp_code_snapshot=item.erp_code,
-            quantity=li.quantity,
-            from_bucket=li.from_bucket,
-            from_department=li.from_department,
-            to_bucket=li.to_bucket,
-            to_department=li.to_department,
-            status=StockRequestStatusEnum.SUBMITTED,
+
+# ---------------------------------------------------------------------------
+# 직원별 저장형 입출고 장바구니 (DRAFT)
+# ---------------------------------------------------------------------------
+# 핵심 제약:
+# - DRAFT 저장은 inventory_svc.* 호출 / TransactionLog 생성을 절대 하지 않는다.
+# - request_code 는 NULL 로 유지 — submit 시점에만 생성한다.
+# - 직원 + request_type 기준 active draft 는 1개만 유지한다.
+
+
+def upsert_draft_request(
+    db: Session,
+    *,
+    requester: Employee,
+    request_type: StockRequestTypeEnum,
+    lines_input: Sequence[LineInput],
+    reference_no: Optional[str],
+    notes: Optional[str],
+) -> StockRequest:
+    """직원 + request_type 기준 active draft 를 upsert.
+
+    - lines_input 은 비어 있어도 허용 (저장 도중 단계).
+    - lines_input 이 비어 있지 않으면 1차 shape 검증 통과 필수.
+    - 기존 DRAFT 가 있으면 lines 전체 교체 + notes/reference_no 갱신, 신규 row 생성 금지.
+    """
+    _validate_lines(request_type, lines_input, allow_empty=True)
+
+    existing = (
+        db.query(StockRequest)
+        .filter(
+            StockRequest.requester_employee_id == requester.employee_id,
+            StockRequest.request_type == request_type,
+            StockRequest.status == StockRequestStatusEnum.DRAFT,
         )
-        db.add(line)
-        lines.append(line)
+        .first()
+    )
+    if existing is not None:
+        # 기존 lines 명시 삭제 (cascade 의존하지 않음).
+        # bulk delete 로 ORM 추적 우회 → cascade 재진입에 의한 중복 DELETE 회피.
+        db.query(StockRequestLine).filter(
+            StockRequestLine.request_id == existing.request_id
+        ).delete(synchronize_session=False)
+        db.flush()
+        db.expire(existing, ["lines"])
+
+        existing.reference_no = reference_no
+        existing.notes = notes
+        existing.requires_warehouse_approval = any(
+            line_requires_approval(li.from_bucket, li.to_bucket) for li in lines_input
+        )
+        # request_code 는 DRAFT 동안 NULL 유지 — submit 시점에만 발급.
+
+        for li in lines_input:
+            item = db.query(Item).filter(Item.item_id == li.item_id).first()
+            if item is None:
+                raise ValueError(f"품목을 찾을 수 없습니다: {li.item_id}")
+            db.add(
+                StockRequestLine(
+                    request_id=existing.request_id,
+                    item_id=li.item_id,
+                    item_name_snapshot=item.item_name,
+                    erp_code_snapshot=item.erp_code,
+                    quantity=li.quantity,
+                    from_bucket=li.from_bucket,
+                    from_department=li.from_department,
+                    to_bucket=li.to_bucket,
+                    to_department=li.to_department,
+                    status=StockRequestStatusEnum.DRAFT,
+                )
+            )
+        db.flush()
+        return existing
+
+    # 신규 DRAFT 생성 — request_code=None, submitted_at=None.
+    return _build_request_and_lines(
+        db,
+        requester=requester,
+        request_type=request_type,
+        lines_input=lines_input,
+        reference_no=reference_no,
+        notes=notes,
+        status=StockRequestStatusEnum.DRAFT,
+        request_code=None,
+        submitted_at=None,
+    )
+
+
+def get_draft_request(
+    db: Session,
+    *,
+    requester_employee_id: uuid.UUID,
+    request_type: StockRequestTypeEnum,
+) -> Optional[StockRequest]:
+    """직원 + request_type 기준 단일 DRAFT 조회. 없으면 None."""
+    return (
+        db.query(StockRequest)
+        .filter(
+            StockRequest.requester_employee_id == requester_employee_id,
+            StockRequest.request_type == request_type,
+            StockRequest.status == StockRequestStatusEnum.DRAFT,
+        )
+        .first()
+    )
+
+
+def list_draft_requests(
+    db: Session,
+    *,
+    requester_employee_id: uuid.UUID,
+) -> List[StockRequest]:
+    """해당 직원의 DRAFT 목록만 (updated_at 내림차순)."""
+    return (
+        db.query(StockRequest)
+        .filter(
+            StockRequest.requester_employee_id == requester_employee_id,
+            StockRequest.status == StockRequestStatusEnum.DRAFT,
+        )
+        .order_by(StockRequest.updated_at.desc())
+        .all()
+    )
+
+
+def delete_draft_request(
+    db: Session,
+    *,
+    request_id: uuid.UUID,
+    requester_employee_id: uuid.UUID,
+) -> None:
+    """DRAFT 삭제. cascade 의존하지 않고 lines 명시 삭제 후 request 삭제."""
+    request = (
+        db.query(StockRequest).filter(StockRequest.request_id == request_id).first()
+    )
+    if request is None:
+        raise ValueError("장바구니를 찾을 수 없습니다.")
+    if request.requester_employee_id != requester_employee_id:
+        raise PermissionError("본인 장바구니만 삭제할 수 있습니다.")
+    if request.status != StockRequestStatusEnum.DRAFT:
+        raise ValueError("장바구니(DRAFT) 상태가 아닙니다.")
+
+    # Lines 명시 삭제 — bulk delete 로 ORM 추적 우회 (cascade 재진입 방지).
+    db.query(StockRequestLine).filter(
+        StockRequestLine.request_id == request.request_id
+    ).delete(synchronize_session=False)
+    db.flush()
+    # request.lines 는 stale — expire 후 request 삭제.
+    db.expire(request, ["lines"])
+    db.delete(request)
     db.flush()
 
-    if not requires_approval:
-        # 즉시 실행 — 한 트랜잭션 내에서 모든 라인 처리.
-        try:
-            _execute_all_lines(db, request, lines, operator_name=requester.name, approver=requester)
-        except ValueError:
-            # 즉시 실행 실패 시 호출측 rollback 으로 전체 무효화.
-            raise
-        request.status = StockRequestStatusEnum.COMPLETED
-        request.approved_by_employee_id = requester.employee_id
-        request.approved_by_name = requester.name
-        request.approved_at = now
-        request.completed_at = now
-        for line in lines:
-            line.status = StockRequestStatusEnum.COMPLETED
-        return request
 
-    # 승인 필요 — 점유 처리.
-    pending_lines = [li for li in lines if line_requires_pending(li.from_bucket, li.to_bucket)]
-    if pending_lines:
-        # 동일 품목이 여러 라인에 등장하면 합산하여 한 번에 reserve.
-        agg: dict[uuid.UUID, Decimal] = {}
-        for li in pending_lines:
-            agg[li.item_id] = agg.get(li.item_id, Decimal("0")) + (li.quantity or Decimal("0"))
-        for item_id, qty in agg.items():
-            inventory_svc.reserve(db, item_id, qty, employee=requester)
-        request.status = StockRequestStatusEnum.RESERVED
-        request.reserved_at = now
-        for line in lines:
-            line.status = StockRequestStatusEnum.RESERVED
-    else:
-        # 점유는 안 하지만 창고 담당자 승인은 필요 (예: dept_to_warehouse, raw_receive)
-        request.status = StockRequestStatusEnum.SUBMITTED
-        for line in lines:
-            line.status = StockRequestStatusEnum.SUBMITTED
+def submit_draft_request(
+    db: Session,
+    *,
+    request_id: uuid.UUID,
+    requester_employee_id: uuid.UUID,
+) -> StockRequest:
+    """DRAFT 제출. 본인 검증 → shape 재검증 → request_code 발급 → _finalize_submission."""
+    request = (
+        db.query(StockRequest).filter(StockRequest.request_id == request_id).first()
+    )
+    if request is None:
+        raise ValueError("장바구니를 찾을 수 없습니다.")
+    if request.requester_employee_id != requester_employee_id:
+        raise PermissionError("본인 장바구니만 제출할 수 있습니다.")
+    if request.status != StockRequestStatusEnum.DRAFT:
+        raise ValueError("장바구니(DRAFT) 상태가 아닙니다.")
 
-    return request
+    requester = (
+        db.query(Employee)
+        .filter(Employee.employee_id == request.requester_employee_id)
+        .first()
+    )
+    if requester is None:
+        raise ValueError("요청자(직원) 정보가 없습니다.")
+    if not bool(requester.is_active):
+        raise ValueError("비활성 직원의 장바구니는 제출할 수 없습니다.")
+
+    db_lines = list(request.lines)
+    if not db_lines:
+        raise ValueError("요청 라인이 비어 있습니다.")
+
+    # DB 라인 → LineInput 으로 환원하여 1차 shape 검증 재사용.
+    line_inputs = [
+        LineInput(
+            item_id=line.item_id,
+            quantity=line.quantity,
+            from_bucket=line.from_bucket,
+            from_department=line.from_department,
+            to_bucket=line.to_bucket,
+            to_department=line.to_department,
+        )
+        for line in db_lines
+    ]
+    _validate_lines(request.request_type, line_inputs)
+
+    now = datetime.utcnow()
+    if not request.request_code:
+        request.request_code = _generate_request_code(db, now)
+    request.submitted_at = now
+    # lines 가 DRAFT 동안 변경됐을 가능성에 대비해 requires_warehouse_approval 재계산.
+    request.requires_warehouse_approval = any(
+        line_requires_approval(li.from_bucket, li.to_bucket) for li in line_inputs
+    )
+
+    # status 를 SUBMITTED 로 옮긴 뒤 분기 실행.
+    request.status = StockRequestStatusEnum.SUBMITTED
+    for line in db_lines:
+        line.status = StockRequestStatusEnum.SUBMITTED
+    db.flush()
+
+    return _finalize_submission(db, request=request, requester=requester, now=now)
 
 
 # ---------------------------------------------------------------------------

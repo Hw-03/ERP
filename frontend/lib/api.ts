@@ -318,6 +318,14 @@ export interface StockRequestCreatePayload {
   }>;
 }
 
+export interface StockRequestDraftUpsertPayload {
+  requester_employee_id: string;
+  request_type: StockRequestType;
+  reference_no?: string | null;
+  notes?: string | null;
+  lines: StockRequestCreatePayload["lines"];
+}
+
 export interface StockRequestActionPayload {
   actor_employee_id: string;
   pin: string;
@@ -1367,4 +1375,69 @@ export const api = {
     fetcher<StockRequestReservationLine[]>(
       toApiUrl(`/api/stock-requests/reservations?item_id=${encodeURIComponent(itemId)}`)
     ),
+
+  // Stock request drafts (직원별 저장형 입출고 장바구니) -------------------
+  upsertStockRequestDraft: async (
+    payload: StockRequestDraftUpsertPayload
+  ): Promise<StockRequest> => {
+    const res = await fetch(toApiUrl("/api/stock-requests/draft"), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<StockRequest>;
+  },
+
+  getStockRequestDraft: async (
+    requesterEmployeeId: string,
+    requestType: StockRequestType
+  ): Promise<StockRequest | null> => {
+    const res = await fetch(
+      toApiUrl(
+        `/api/stock-requests/draft?requester_employee_id=${encodeURIComponent(
+          requesterEmployeeId
+        )}&request_type=${encodeURIComponent(requestType)}`
+      )
+    );
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<StockRequest | null>;
+  },
+
+  listStockRequestDrafts: (requesterEmployeeId: string) =>
+    fetcher<StockRequest[]>(
+      toApiUrl(
+        `/api/stock-requests/drafts?requester_employee_id=${encodeURIComponent(
+          requesterEmployeeId
+        )}`
+      )
+    ),
+
+  deleteStockRequestDraft: async (
+    requestId: string,
+    requesterEmployeeId: string
+  ): Promise<void> => {
+    const res = await fetch(
+      toApiUrl(
+        `/api/stock-requests/draft/${requestId}?requester_employee_id=${encodeURIComponent(
+          requesterEmployeeId
+        )}`
+      ),
+      { method: "DELETE" }
+    );
+    if (!res.ok) throw new Error(await parseError(res));
+  },
+
+  submitStockRequestDraft: async (
+    requestId: string,
+    requesterEmployeeId: string
+  ): Promise<StockRequest> => {
+    const res = await fetch(toApiUrl(`/api/stock-requests/${requestId}/submit`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requester_employee_id: requesterEmployeeId }),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<StockRequest>;
+  },
 };
