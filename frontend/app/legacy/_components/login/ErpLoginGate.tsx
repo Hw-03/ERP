@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { LoginIntro } from "./LoginIntro";
 import { OperatorLoginCard } from "./OperatorLoginCard";
+import { readCurrentOperator } from "./useCurrentOperator";
 
 type GatePhase = "loading" | "intro" | "form" | "authed";
 
@@ -14,6 +15,11 @@ export function ErpLoginGate({ children }: ErpLoginGateProps) {
   const [phase, setPhase] = useState<GatePhase>("loading");
 
   useEffect(() => {
+    // 이미 로그인된 작업자 정보가 localStorage에 있으면 인트로/폼 건너뛰고 바로 진입
+    if (readCurrentOperator()) {
+      setPhase("authed");
+      return;
+    }
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     setPhase(reduced ? "form" : "intro");
   }, []);

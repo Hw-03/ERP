@@ -305,9 +305,70 @@ def test_quantity_correct_links_correction_log(client, db_session, receive_log, 
     assert edits[0]["correction_log_id"] == correction_id
 
 
+def test_quantity_correct_blocks_double_correction(client, db_session, receive_log, editor):
+    """동일 거래에 이미 수량 보정이 있으면 추가 보정 차단."""
+    log, _ = receive_log
+
+    # 1차 보정: 100 → 80
+    r1 = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "1차 보정",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+    assert r1.status_code == 200
+
+    # 2차 보정: 80 → 90 (차단되어야 함)
+    r2 = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 90,
+            "reason": "2차 보정 시도",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+    assert r2.status_code == 422
+    detail = r2.json()["detail"]
+    assert "이미 수량 보정된 거래" in detail["message"]
+
+
+def test_quantity_correct_blocks_below_pending(client, db_session, make_item, editor):
+    """예약 수량(pending)보다 창고 재고가 낮아지는 보정은 차단."""
+    from decimal import Decimal as D
+    item = make_item(name="예약품", warehouse_qty=D("100"), pending=D("60"))
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=D("100"),
+        quantity_before=D("0"),
+        quantity_after=D("100"),
+    )
+    db_session.add(log)
+    db_session.commit()
+
+    # 100 → 50으로 보정 시도하면 창고가 50이 되어 pending(60)보다 작아짐
+    resp = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 50,
+            "reason": "예약보다 낮은 보정",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+    assert resp.status_code == 422
+    detail = resp.json()["detail"]
+    assert "예약 수량" in detail["message"]
+
+
 # ─── 직원 PIN 초기화 (2차) ─────────────────────────────────────────────────
 
-def test_reset_pin_endpoint(client, db_session):
+def test_reset_pin_requires_admin_pin(client, db_session):
+    """reset-pin은 관리자 PIN 검증 없이 호출하면 거부."""
     emp = Employee(
         employee_code="PR01",
         name="피인변경자",
@@ -316,20 +377,48 @@ def test_reset_pin_endpoint(client, db_session):
         level=EmployeeLevelEnum.STAFF,
         display_order=1,
         is_active="true",
-        pin_hash=hash_pin("9999"),  # 변경된 PIN
+        pin_hash=hash_pin("9999"),
     )
     db_session.add(emp)
     db_session.commit()
 
-    # 9999로 검증 성공
-    r = client.post(f"/api/employees/{emp.employee_id}/verify-pin", json={"pin": "9999"})
-    assert r.status_code == 200
+    # 1) admin_pin 누락 → 422 (필수 필드)
+    r_no_body = client.post(f"/api/employees/{emp.employee_id}/reset-pin")
+    assert r_no_body.status_code == 422
 
-    # 초기화 후
-    reset = client.post(f"/api/employees/{emp.employee_id}/reset-pin")
+    # 2) 잘못된 admin_pin → 403
+    r_wrong = client.post(
+        f"/api/employees/{emp.employee_id}/reset-pin",
+        json={"admin_pin": "9999"},  # 기본 admin pin은 0000
+    )
+    assert r_wrong.status_code == 403
+
+    # 직원 PIN은 그대로 9999
+    r_check = client.post(f"/api/employees/{emp.employee_id}/verify-pin", json={"pin": "9999"})
+    assert r_check.status_code == 200
+
+
+def test_reset_pin_with_correct_admin_pin(client, db_session):
+    """올바른 관리자 PIN으로 호출 시 직원 PIN이 0000으로 초기화."""
+    emp = Employee(
+        employee_code="PR02",
+        name="초기화대상",
+        role="테스트",
+        department=DepartmentEnum.ASSEMBLY,
+        level=EmployeeLevelEnum.STAFF,
+        display_order=2,
+        is_active="true",
+        pin_hash=hash_pin("9999"),
+    )
+    db_session.add(emp)
+    db_session.commit()
+
+    reset = client.post(
+        f"/api/employees/{emp.employee_id}/reset-pin",
+        json={"admin_pin": "0000"},
+    )
     assert reset.status_code == 204
 
-    # 9999는 실패, 0000은 성공
     r1 = client.post(f"/api/employees/{emp.employee_id}/verify-pin", json={"pin": "9999"})
     assert r1.status_code == 403
     r2 = client.post(f"/api/employees/{emp.employee_id}/verify-pin", json={"pin": "0000"})

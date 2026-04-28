@@ -28,6 +28,11 @@ function readOperator(): Operator | null {
   }
 }
 
+/** localStorage에서 현재 작업자를 동기 읽기. SSR-safe (서버에서는 null). */
+export function readCurrentOperator(): Operator | null {
+  return readOperator();
+}
+
 export function setCurrentOperator(op: Operator): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(OPERATOR_KEY, JSON.stringify(op));

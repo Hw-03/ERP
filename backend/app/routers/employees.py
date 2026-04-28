@@ -10,7 +10,14 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import DepartmentEnum, Employee
 from app.routers._errors import ErrorCode, http_error
-from app.schemas import EmployeeCreate, EmployeeResponse, EmployeeUpdate, PinVerifyRequest
+from app.schemas import (
+    EmployeeCreate,
+    EmployeePinResetRequest,
+    EmployeeResponse,
+    EmployeeUpdate,
+    PinVerifyRequest,
+)
+from app.routers.settings import require_admin
 from app.services.pin_auth import DEFAULT_PIN_HASH, verify_pin
 from app.services import audit
 from app.services._tx import commit_and_refresh, commit_only
@@ -137,8 +144,15 @@ def verify_employee_pin(employee_id: uuid.UUID, payload: PinVerifyRequest, db: S
 
 
 @router.post("/{employee_id}/reset-pin", status_code=status.HTTP_204_NO_CONTENT)
-def reset_employee_pin(employee_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
-    """직원 PIN을 기본값(0000)으로 초기화 — 관리자 작업."""
+def reset_employee_pin(
+    employee_id: uuid.UUID,
+    payload: EmployeePinResetRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """직원 PIN을 기본값(0000)으로 초기화 — 관리자 PIN 검증 필요."""
+    require_admin(db, payload.admin_pin)
+
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")

@@ -84,10 +84,15 @@ def update_admin_pin(payload: AdminPinUpdateRequest, request: Request, db: Sessi
     return MessageResponse(message="관리자 비밀번호를 변경했습니다.")
 
 
-def _require_admin(db: Session, pin: str) -> None:
+def require_admin(db: Session, pin: str) -> None:
+    """관리자 PIN 검증. 일치하지 않으면 403."""
     setting = ensure_admin_pin(db)
     if pin != setting.setting_value:
         raise http_error(403, ErrorCode.BAD_REQUEST, "관리자 비밀번호가 올바르지 않습니다.")
+
+
+# 내부 호환 alias
+_require_admin = require_admin
 
 
 @router.get("/integrity/inventory", response_model=IntegrityCheckResponse)

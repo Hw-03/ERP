@@ -492,11 +492,27 @@ def quantity_correct_transaction(
             "RECEIVE의 수량 변화량은 양수여야 합니다.",
         )
 
+    # 동일 거래에 이미 수량 보정 이력이 있으면 추가 보정 차단 (정책 미확정)
+    existing_correction = (
+        db.query(TransactionEditLog.edit_id)
+        .filter(
+            TransactionEditLog.original_log_id == log.log_id,
+            TransactionEditLog.correction_log_id.isnot(None),
+        )
+        .first()
+    )
+    if existing_correction is not None:
+        raise http_error(
+            422,
+            ErrorCode.BUSINESS_RULE,
+            "이미 수량 보정된 거래입니다. 추가 보정은 별도 정책 확정 후 가능합니다.",
+        )
+
     editor = _verify_editor(db, payload.edited_by_employee_id, payload.edited_by_pin)
 
     delta = new_qty - log.quantity_change
 
-    # 재고 음수 방지: 보정 후 warehouse_qty가 0 이상이어야 함
+    # 재고 검증: 보정 후 warehouse_qty >= max(0, pending_quantity)
     inv = db.query(Inventory).filter(Inventory.item_id == log.item_id).first()
     if not inv:
         raise http_error(404, ErrorCode.NOT_FOUND, "재고 레코드를 찾을 수 없습니다.")
@@ -507,6 +523,12 @@ def quantity_correct_transaction(
             422,
             ErrorCode.STOCK_SHORTAGE,
             f"재고 부족: 보정 후 창고 재고가 {float(new_warehouse)}로 음수가 됩니다.",
+        )
+    if new_warehouse < inv.pending_quantity:
+        raise http_error(
+            422,
+            ErrorCode.STOCK_SHORTAGE,
+            "예약 수량보다 창고 재고가 낮아질 수 없습니다.",
         )
 
     before = _log_snapshot(log)

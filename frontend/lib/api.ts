@@ -610,10 +610,12 @@ export const api = {
     return res.json() as Promise<Employee>;
   },
 
-  // PIN 0000으로 초기화 — 관리자 작업
-  resetEmployeePin: async (employeeId: string) => {
+  // 직원 PIN을 0000으로 초기화 — 관리자 PIN 검증 필요
+  resetEmployeePin: async (employeeId: string, adminPin: string) => {
     const res = await fetch(toApiUrl(`/api/employees/${employeeId}/reset-pin`), {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ admin_pin: adminPin }),
     });
     if (!res.ok) throw new Error(await parseError(res));
   },

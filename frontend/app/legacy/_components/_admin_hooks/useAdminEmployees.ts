@@ -61,6 +61,9 @@ export type AdminEmployeesState = {
   setEditForm: (updater: (f: EmployeeEditForm) => EmployeeEditForm) => void;
   saveEmployee: () => void;
   pinResetTarget: Employee | null;
+  pinResetAdminPin: string;
+  setPinResetAdminPin: (v: string) => void;
+  pinResetError: string;
   requestPinReset: (employee: Employee) => void;
   confirmPinReset: () => void;
   cancelPinReset: () => void;
@@ -78,6 +81,8 @@ export function useAdminEmployees({
   const [confirmTarget, setConfirmTarget] = useState<Employee | null>(null);
   const [editForm, setEditForm] = useState<EmployeeEditForm>(EMPTY_EDIT_FORM);
   const [pinResetTarget, setPinResetTarget] = useState<Employee | null>(null);
+  const [pinResetAdminPin, setPinResetAdminPin] = useState("");
+  const [pinResetError, setPinResetError] = useState("");
 
   // 선택된 직원이 외부 employees 변경 시 동기화 + editForm 초기화
   useEffect(() => {
@@ -162,13 +167,19 @@ export function useAdminEmployees({
   }
 
   async function _doResetPin(employee: Employee) {
+    if (!pinResetAdminPin.trim()) {
+      setPinResetError("관리자 PIN을 입력하세요.");
+      return;
+    }
     try {
-      await api.resetEmployeePin(employee.employee_id);
+      await api.resetEmployeePin(employee.employee_id, pinResetAdminPin.trim());
       setPinResetTarget(null);
+      setPinResetAdminPin("");
+      setPinResetError("");
       onStatusChange(`'${employee.name}' PIN을 0000으로 초기화했습니다.`);
     } catch (error) {
-      setPinResetTarget(null);
-      onError(error instanceof Error ? error.message : "PIN 초기화 실패");
+      const msg = error instanceof Error ? error.message : "PIN 초기화 실패";
+      setPinResetError(msg);
     }
   }
 
@@ -189,8 +200,19 @@ export function useAdminEmployees({
     setEditForm,
     saveEmployee: () => void _saveEmployee(),
     pinResetTarget,
-    requestPinReset: (e) => setPinResetTarget(e),
+    pinResetAdminPin,
+    setPinResetAdminPin,
+    pinResetError,
+    requestPinReset: (e) => {
+      setPinResetTarget(e);
+      setPinResetAdminPin("");
+      setPinResetError("");
+    },
     confirmPinReset: () => { if (pinResetTarget) void _doResetPin(pinResetTarget); },
-    cancelPinReset: () => setPinResetTarget(null),
+    cancelPinReset: () => {
+      setPinResetTarget(null);
+      setPinResetAdminPin("");
+      setPinResetError("");
+    },
   };
 }

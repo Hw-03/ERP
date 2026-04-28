@@ -103,6 +103,11 @@ class PinVerifyRequest(BaseModel):
     pin: str = Field(..., min_length=1, max_length=20)
 
 
+class EmployeePinResetRequest(BaseModel):
+    # 직원 PIN 초기화 — 관리자 PIN 검증 필요
+    admin_pin: str = Field(..., min_length=1, max_length=32)
+
+
 class EmployeeCreate(BaseModel):
     employee_code: str = Field(..., max_length=30)
     name: str = Field(..., max_length=100)

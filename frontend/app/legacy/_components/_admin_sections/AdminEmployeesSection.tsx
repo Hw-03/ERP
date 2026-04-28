@@ -32,6 +32,9 @@ export function AdminEmployeesSection() {
     setEditForm,
     saveEmployee,
     pinResetTarget,
+    pinResetAdminPin,
+    setPinResetAdminPin,
+    pinResetError,
     requestPinReset,
     confirmPinReset,
     cancelPinReset,
@@ -313,11 +316,32 @@ export function AdminEmployeesSection() {
       open={pinResetTarget !== null}
       title={`'${pinResetTarget?.name}' 직원의 PIN을 0000으로 초기화하시겠습니까?`}
       tone="caution"
-      cautionMessage="기존 PIN은 더 이상 사용할 수 없게 됩니다."
+      cautionMessage="기존 PIN은 더 이상 사용할 수 없게 됩니다. 관리자 PIN을 입력하세요."
       confirmLabel="초기화"
       onClose={cancelPinReset}
       onConfirm={confirmPinReset}
-    />
+    >
+      <div className="mt-2">
+        <div className="mb-1 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
+          관리자 PIN
+        </div>
+        <input
+          type="password"
+          inputMode="numeric"
+          maxLength={32}
+          value={pinResetAdminPin}
+          onChange={(e) => setPinResetAdminPin(e.target.value)}
+          placeholder="0000"
+          className="w-full rounded-[12px] border px-3 py-2 text-sm tracking-widest outline-none"
+          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+        />
+        {pinResetError && (
+          <p className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.red }}>
+            {pinResetError}
+          </p>
+        )}
+      </div>
+    </ConfirmModal>
     </>
   );
 }
