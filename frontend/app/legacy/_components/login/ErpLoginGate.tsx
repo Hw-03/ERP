@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 import { LoginIntro } from "./LoginIntro";
 import { OperatorLoginCard } from "./OperatorLoginCard";
-import { readCurrentOperator } from "./useCurrentOperator";
+import { clearCurrentOperator, readCurrentOperator } from "./useCurrentOperator";
 
 type GatePhase = "loading" | "intro" | "form" | "authed";
 
@@ -15,13 +16,39 @@ export function ErpLoginGate({ children }: ErpLoginGateProps) {
   const [phase, setPhase] = useState<GatePhase>("loading");
 
   useEffect(() => {
-    // 이미 로그인된 작업자 정보가 localStorage에 있으면 인트로/폼 건너뛰고 바로 진입
-    if (readCurrentOperator()) {
-      setPhase("authed");
-      return;
+    let cancelled = false;
+    const goToLogin = () => {
+      if (cancelled) return;
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      setPhase(reduced ? "form" : "intro");
+    };
+
+    const stored = readCurrentOperator();
+    if (!stored) {
+      goToLogin();
+      return () => { cancelled = true; };
     }
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    setPhase(reduced ? "form" : "intro");
+
+    // 작업자 식별용 — 비활성 직원이면 자동 진입을 차단한다 (보안 인증 아님).
+    void api
+      .getEmployees({ activeOnly: true })
+      .then((list) => {
+        if (cancelled) return;
+        const stillActive = list.some((e) => e.employee_id === stored.employee_id);
+        if (stillActive) {
+          setPhase("authed");
+        } else {
+          clearCurrentOperator();
+          goToLogin();
+        }
+      })
+      .catch(() => {
+        // 네트워크 실패 시 보수적으로 로그인 화면으로
+        clearCurrentOperator();
+        goToLogin();
+      });
+
+    return () => { cancelled = true; };
   }, []);
 
   const handleLogin = () => {

@@ -365,6 +365,47 @@ def test_quantity_correct_blocks_below_pending(client, db_session, make_item, ed
     assert "예약 수량" in detail["message"]
 
 
+def test_quantity_correct_handles_null_pending_quantity(client, db_session, make_item, editor):
+    """pending_quantity가 None인 레거시 레코드여도 보정이 정상 동작해야 한다."""
+    from decimal import Decimal as D
+    from sqlalchemy.orm.attributes import set_committed_value
+
+    item = make_item(name="레거시품", warehouse_qty=D("100"))
+
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=D("100"),
+        quantity_before=D("0"),
+        quantity_after=D("100"),
+    )
+    db_session.add(log)
+    db_session.commit()
+
+    # 인메모리에서 pending_quantity를 None으로 강제 — DB NOT NULL 제약을 우회하여
+    # 레거시 데이터 / 부분 SELECT 상황을 재현. set_committed_value는 dirty mark 없이
+    # ORM 속성을 변경하므로 후속 flush가 NULL을 INSERT/UPDATE 하지 않는다.
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+    set_committed_value(inv, "pending_quantity", None)
+    assert inv.pending_quantity is None
+
+    # 100 → 80 보정. None pending 환경에서 서버 오류 없이 정상 처리되어야 함.
+    resp = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "레거시 레코드 보정",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+    assert resp.status_code == 200, resp.json()
+
+    # 재고 정합성: 창고 80
+    db_session.refresh(inv)
+    assert inv.warehouse_qty == D("80")
+
+
 # ─── 직원 PIN 초기화 (2차) ─────────────────────────────────────────────────
 
 def test_reset_pin_requires_admin_pin(client, db_session):

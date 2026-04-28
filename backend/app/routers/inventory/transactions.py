@@ -524,7 +524,9 @@ def quantity_correct_transaction(
             ErrorCode.STOCK_SHORTAGE,
             f"재고 부족: 보정 후 창고 재고가 {float(new_warehouse)}로 음수가 됩니다.",
         )
-    if new_warehouse < inv.pending_quantity:
+    # pending_quantity가 None인 레거시 레코드 방어
+    pending = inv.pending_quantity or Decimal("0")
+    if new_warehouse < pending:
         raise http_error(
             422,
             ErrorCode.STOCK_SHORTAGE,
