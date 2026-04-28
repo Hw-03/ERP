@@ -319,6 +319,9 @@ class Employee(Base):
         nullable=False,
         default=EmployeeLevelEnum.STAFF,
     )
+    # 창고 결재 역할: "none" | "primary" | "deputy". 시스템 권한(level)과 별개의 업무 역할.
+    # 소문자 문자열로 통일 (DB / API / 프론트 모두 동일).
+    warehouse_role = Column(String(20), nullable=False, default="none", server_default="none")
     display_order = Column(Integer, nullable=False, default=0)
     is_active = Column(BoolAsString, nullable=False, default=True)
     # 작업자 식별용 PIN 해시 — 실제 보안 인증이 아님. None이면 기본 PIN 0000 적용
@@ -330,6 +333,13 @@ class Employee(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
         server_default=func.now(),
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "warehouse_role IN ('none', 'primary', 'deputy')",
+            name="ck_employee_warehouse_role",
+        ),
     )
 
 
@@ -670,6 +680,159 @@ class PhysicalCount(Base):
     reason = Column(String(200), nullable=True)
     operator = Column(String(100), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
+
+
+# =============================================================================
+# Stock request workflow (작업자 요청 → 창고 담당자 승인 → 재고 반영)
+# =============================================================================
+
+
+class StockRequestStatusEnum(str, enum.Enum):
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+    RESERVED = "reserved"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
+    COMPLETED = "completed"
+    FAILED_APPROVAL = "failed_approval"
+
+
+class StockRequestTypeEnum(str, enum.Enum):
+    RAW_RECEIVE = "raw_receive"
+    RAW_SHIP = "raw_ship"
+    WAREHOUSE_TO_DEPT = "warehouse_to_dept"
+    DEPT_TO_WAREHOUSE = "dept_to_warehouse"
+    DEPT_INTERNAL = "dept_internal"
+    MARK_DEFECTIVE_WH = "mark_defective_wh"
+    MARK_DEFECTIVE_PROD = "mark_defective_prod"
+    SUPPLIER_RETURN = "supplier_return"
+    PACKAGE_OUT = "package_out"
+
+
+class RequestBucketEnum(str, enum.Enum):
+    WAREHOUSE = "warehouse"
+    PRODUCTION = "production"
+    DEFECTIVE = "defective"
+    NONE = "none"
+
+
+class StockRequest(Base):
+    """입출고 결재 요청. 창고 재고가 움직이는 작업은 승인 후에만 실재고 반영."""
+
+    __tablename__ = "stock_requests"
+
+    request_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_code = Column(String(40), unique=True, nullable=True, index=True)
+    requester_employee_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("employees.employee_id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    requester_name = Column(String(100), nullable=False)
+    requester_department = Column(
+        SAEnum(DepartmentEnum, name="department_enum", create_type=False),
+        nullable=False,
+    )
+    request_type = Column(
+        SAEnum(StockRequestTypeEnum, name="stock_request_type_enum", create_type=True),
+        nullable=False,
+        index=True,
+    )
+    status = Column(
+        SAEnum(StockRequestStatusEnum, name="stock_request_status_enum", create_type=True),
+        nullable=False,
+        default=StockRequestStatusEnum.SUBMITTED,
+        index=True,
+    )
+    requires_warehouse_approval = Column(Boolean, nullable=False, default=True)
+    reserved_at = Column(DateTime, nullable=True)
+    submitted_at = Column(DateTime, nullable=True)
+    approved_by_employee_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    approved_by_name = Column(String(100), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    rejected_by_employee_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    rejected_by_name = Column(String(100), nullable=True)
+    rejected_at = Column(DateTime, nullable=True)
+    rejected_reason = Column(Text, nullable=True)  # FAILED_APPROVAL 사유도 여기 저장
+    cancelled_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    reference_no = Column(String(100), nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        server_default=func.now(),
+    )
+
+    lines = relationship(
+        "StockRequestLine",
+        back_populates="request",
+        cascade="all, delete-orphan",
+        order_by="StockRequestLine.created_at",
+    )
+
+
+class StockRequestLine(Base):
+    __tablename__ = "stock_request_lines"
+
+    line_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("stock_requests.request_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    item_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("items.item_id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    item_name_snapshot = Column(String(200), nullable=False)
+    erp_code_snapshot = Column(String(50), nullable=True)
+    quantity = Column(Numeric(15, 4), nullable=False)
+    from_bucket = Column(
+        SAEnum(RequestBucketEnum, name="request_bucket_enum", create_type=True),
+        nullable=False,
+    )
+    from_department = Column(
+        SAEnum(DepartmentEnum, name="department_enum", create_type=False),
+        nullable=True,
+    )
+    to_bucket = Column(
+        SAEnum(RequestBucketEnum, name="request_bucket_enum", create_type=False),
+        nullable=False,
+    )
+    to_department = Column(
+        SAEnum(DepartmentEnum, name="department_enum", create_type=False),
+        nullable=True,
+    )
+    status = Column(
+        SAEnum(StockRequestStatusEnum, name="stock_request_status_enum", create_type=False),
+        nullable=False,
+        default=StockRequestStatusEnum.SUBMITTED,
+    )
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
+
+    request = relationship("StockRequest", back_populates="lines")
+    item = relationship("Item")
+
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="ck_stock_request_line_qty_positive"),
+        Index("ix_stock_request_line_item_status", "item_id", "status"),
+    )
 
 
 class AdminAuditLog(Base):

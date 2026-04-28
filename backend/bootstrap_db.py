@@ -98,6 +98,8 @@ _MIGRATION_DDL: list[str] = [
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     )""",
     "CREATE INDEX IF NOT EXISTS ix_tel_original ON transaction_edit_logs(original_log_id)",
+    # 창고 결재 역할 — 직원 업무 역할(시스템 권한 level과 별개)
+    "ALTER TABLE employees ADD COLUMN warehouse_role VARCHAR(20) NOT NULL DEFAULT 'none'",
 ]
 
 
@@ -144,6 +146,18 @@ def run_migrations() -> dict[str, int]:
             conn.execute(
                 text("UPDATE employees SET pin_hash = :h WHERE pin_hash IS NULL"),
                 {"h": DEFAULT_PIN_HASH},
+            )
+            conn.commit()
+        except Exception:
+            pass
+
+        # warehouse_role NULL/empty → 'none' 보정 (ALTER 가 idempotent 하지 않은 환경 대비)
+        try:
+            conn.execute(
+                text(
+                    "UPDATE employees SET warehouse_role = 'none' "
+                    "WHERE warehouse_role IS NULL OR warehouse_role = ''"
+                )
             )
             conn.commit()
         except Exception:

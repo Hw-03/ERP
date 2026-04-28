@@ -15,6 +15,15 @@ import { WarehouseStickySummary } from "./_warehouse_sections/WarehouseStickySum
 import { WarehouseCompletionOverlay } from "./_warehouse_sections/WarehouseCompletionOverlay";
 import { WarehouseStepLayout } from "./_warehouse_sections/WarehouseStepLayout";
 import { WarehouseConfirmContent } from "./_warehouse_modals/WarehouseConfirmContent";
+import { MyRequestsPanel } from "./_warehouse_sections/MyRequestsPanel";
+import { WarehouseQueuePanel } from "./_warehouse_sections/WarehouseQueuePanel";
+import {
+  buildStockRequestPayload,
+  inputRequiresApproval,
+} from "./_warehouse_helpers/requestMapping";
+import { readCurrentOperator } from "./login/useCurrentOperator";
+
+type SectionTab = "compose" | "mine" | "queue";
 
 export function DesktopWarehouseView({
   globalSearch,
@@ -33,10 +42,25 @@ export function DesktopWarehouseView({
     onStatusChange,
   });
 
+  // ─── 로그인 작업자 자동 진입 ───
+  const operator = typeof window !== "undefined" ? readCurrentOperator() : null;
+
   // ─── 선택 ───
-  const [employeeId, setEmployeeId] = useState("");
+  const [employeeId, setEmployeeId] = useState<string>(operator?.employee_id ?? "");
   const [selectedItems, setSelectedItems] = useState<Map<string, number>>(new Map());
   const [selectedPackage, setSelectedPackage] = useState<ShipPackage | null>(null);
+
+  // ─── 섹션 탭 (요청 작성 / 내 요청 / 창고 승인함) ───
+  const [sectionTab, setSectionTab] = useState<SectionTab>("compose");
+  const [panelRefreshNonce, setPanelRefreshNonce] = useState(0);
+  const canSeeQueue =
+    (operator?.warehouse_role ?? "none") === "primary" ||
+    (operator?.warehouse_role ?? "none") === "deputy";
+
+  // 로그인된 직원 정보가 employees 로드 후에도 같은 ID이도록 보장
+  useEffect(() => {
+    if (operator && employeeId === "") setEmployeeId(operator.employee_id);
+  }, [operator, employeeId]);
 
   // ─── 메모 ───
   const [referenceNo, setReferenceNo] = useState("");
@@ -158,104 +182,56 @@ export function DesktopWarehouseView({
     setForcedStep(null);
   }
 
-  // ─── api calls (preserved) ───
-  async function dispatchSingleItem(item: Item, qty: number, producedBy: string) {
-    const baseRef = referenceNo || undefined;
-    const baseNotes = notes || undefined;
-    if (workType === "raw-io") {
-      const payload = { item_id: item.item_id, quantity: qty, reference_no: baseRef, produced_by: producedBy, notes: baseNotes };
-      if (rawDirection === "out") await api.shipInventory(payload);
-      else await api.receiveInventory(payload);
-    } else if (workType === "warehouse-io") {
-      const payload = { item_id: item.item_id, quantity: qty, department: selectedDept, reference_no: baseRef, produced_by: producedBy, notes: baseNotes };
-      if (warehouseDirection === "wh-to-dept") await api.transferToProduction(payload);
-      else await api.transferToWarehouse(payload);
-    } else if (workType === "dept-io") {
-      const payload = { item_id: item.item_id, quantity: qty, department: selectedDept, reference_no: baseRef, produced_by: producedBy, notes: baseNotes };
-      if (deptDirection === "in") await api.transferToProduction(payload);
-      else await api.transferToWarehouse(payload);
-    } else if (workType === "defective-register") {
-      await api.markDefective({
-        item_id: item.item_id,
-        quantity: qty,
-        source: defectiveSource,
-        source_department: defectiveSource === "production" ? selectedDept : undefined,
-        target_department: selectedDept,
-        reason: baseNotes,
-        operator: producedBy,
-      });
-    } else if (workType === "supplier-return") {
-      await api.returnToSupplier({ item_id: item.item_id, quantity: qty, from_department: selectedDept, reference_no: baseRef, notes: baseNotes, operator: producedBy });
-    }
-  }
+  // ─── 승인 필요 여부 (UI 라벨/메시지 분기용) ───
+  const requiresApproval = inputRequiresApproval({
+    workType,
+    rawDirection,
+    warehouseDirection,
+    deptDirection,
+    defectiveSource,
+  });
 
+  // ─── 단일 통합 제출: /api/stock-requests 한 번 호출 ───
   async function submit() {
     if (!selectedEmployee) return setError("담당 직원을 먼저 선택해 주세요.");
     if (workType === "package-out" && !selectedPackage) return setError("출고할 패키지를 선택해 주세요.");
     if (workType !== "package-out" && selectedEntries.length === 0) return setError("품목을 먼저 선택해 주세요.");
-    if (workType !== "package-out" && selectedEntries.some((e) => e.quantity <= 0)) return setError("모든 선택 품목의 수량은 1 이상이어야 합니다.");
+    if (workType !== "package-out" && selectedEntries.some((e) => e.quantity <= 0))
+      return setError("모든 선택 품목의 수량은 1 이상이어야 합니다.");
 
     try {
       setSubmitting(true);
       setError(null);
-      const producedBy = `${selectedEmployee.name} (${normalizeDepartment(selectedEmployee.department)})`;
 
-      if (workType === "package-out" && selectedPackage) {
-        try {
-          await api.shipPackage({
-            package_id: selectedPackage.package_id,
-            quantity: 1,
-            reference_no: referenceNo || undefined,
-            produced_by: producedBy,
-            notes: notes || undefined,
-          });
-        } catch (err) {
-          const reason = err instanceof Error ? err.message : "패키지 출고에 실패했습니다.";
-          // 데이터 정합성을 위해 items는 새로고침해 둠
-          try {
-            const refreshed = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
-            setItems(refreshed);
-          } catch { /* 무시 */ }
-          setResultModal({ kind: "fail", successCount: 0, failures: [{ name: selectedPackage.name ?? "패키지", reason }] });
-          return;
-        }
-      } else {
-        const failures: { name: string; reason: string }[] = [];
-        const successIds: string[] = [];
-        for (const entry of selectedEntries) {
-          try {
-            await dispatchSingleItem(entry.item, entry.quantity, producedBy);
-            successIds.push(entry.item.item_id);
-          } catch (err) {
-            const reason = err instanceof Error ? err.message : "처리 실패";
-            failures.push({ name: entry.item.item_name, reason });
-          }
-        }
+      const payload = buildStockRequestPayload({
+        workType,
+        rawDirection,
+        warehouseDirection,
+        deptDirection,
+        selectedDept,
+        defectiveSource,
+        entries: selectedEntries,
+        selectedPackage,
+        requesterEmployeeId: selectedEmployee.employee_id,
+        referenceNo,
+        notes,
+      });
 
-        // items는 항상 refresh — 부분 성공분이 화면에 반영돼야 함
-        try {
-          const refreshed = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
-          setItems(refreshed);
-        } catch { /* 무시: 모달이 우선 */ }
+      try {
+        await api.createStockRequest(payload);
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : "요청 처리를 완료하지 못했습니다.";
+        setResultModal({ kind: "fail", successCount: 0, failures: [{ name: "요청 제출", reason }] });
+        return;
+      }
 
-        if (failures.length > 0) {
-          // 성공한 항목은 selectedItems에서 제거 → 재시도 시 이중 commit 방지
-          if (successIds.length > 0) {
-            setSelectedItems((prev) => {
-              const next = new Map(prev);
-              for (const id of successIds) next.delete(id);
-              return next;
-            });
-            // 부분 성공: 외부에 반영
-            onSubmitSuccess?.();
-          }
-          setResultModal({
-            kind: successIds.length > 0 ? "partial" : "fail",
-            successCount: successIds.length,
-            failures,
-          });
-          return;
-        }
+      // 승인 불필요(즉시 처리) 흐름은 재고가 즉시 반영됨 → items 갱신.
+      // 승인 필요(점유) 흐름은 pending_quantity 만 변하므로 마찬가지로 갱신.
+      try {
+        const refreshed = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
+        setItems(refreshed);
+      } catch {
+        /* 무시: 후속 작업 우선 */
       }
 
       const doneCount = workType !== "package-out" ? selectedEntries.length : 1;
@@ -264,18 +240,15 @@ export function DesktopWarehouseView({
       setSelectedItems(new Map());
       setStep2Confirmed(false);
       setForcedStep(null);
-      // package-out 흐름은 위 분기에서 이미 refresh 안 했을 수 있으므로 success 직전 한 번 더 보장
-      if (workType === "package-out") {
-        try {
-          const refreshed = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
-          setItems(refreshed);
-        } catch { /* 무시 */ }
-      }
       setLastResult({ count: doneCount, label: effectiveLabel });
-      onStatusChange(`${effectiveLabel} ${workType !== "package-out" ? selectedEntries.length + "건 " : ""}처리를 완료했습니다.`);
+      const finishedMessage = requiresApproval
+        ? `${effectiveLabel} — 창고 승인 요청을 제출했습니다.`
+        : `${effectiveLabel} ${workType !== "package-out" ? selectedEntries.length + "건 " : ""}처리를 완료했습니다.`;
+      onStatusChange(finishedMessage);
+      setPanelRefreshNonce((n) => n + 1);
       onSubmitSuccess?.();
     } catch (nextError) {
-      const message = nextError instanceof Error ? nextError.message : "입출고 처리를 완료하지 못했습니다.";
+      const message = nextError instanceof Error ? nextError.message : "처리를 완료하지 못했습니다.";
       setResultModal({ kind: "fail", successCount: 0, failures: [{ name: "실행", reason: message }] });
       onStatusChange(message);
     } finally {
@@ -368,6 +341,37 @@ export function DesktopWarehouseView({
 
   // ESC 닫기는 ConfirmModal 내부에서 busy 잠금과 함께 처리
 
+  // ─── 섹션 탭 헤더 ───
+  function renderSectionTabs() {
+    const tabs: { id: SectionTab; label: string }[] = [
+      { id: "compose", label: "요청 작성" },
+      { id: "mine", label: "내 요청" },
+    ];
+    if (canSeeQueue) tabs.push({ id: "queue", label: "창고 승인함" });
+    return (
+      <div className="flex items-center gap-2">
+        {tabs.map((t) => {
+          const active = sectionTab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setSectionTab(t.id)}
+              className="rounded-full border px-4 py-1.5 text-sm font-bold transition"
+              style={{
+                background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
+                color: active ? "white" : LEGACY_COLORS.text,
+                borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+              }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
   // ─── render ───
   return (
     <div className="flex h-full min-h-0 flex-1 justify-center overflow-y-auto pr-4" ref={refs.scrollRootRef}>
@@ -375,6 +379,38 @@ export function DesktopWarehouseView({
 
       <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-3 px-6 pb-10 pt-4">
         <WarehouseHeader loadFailure={loadFailure} />
+        {renderSectionTabs()}
+
+        {sectionTab === "mine" && (
+          <MyRequestsPanel
+            employeeId={employeeId || operator?.employee_id || null}
+            refreshNonce={panelRefreshNonce}
+            onChanged={() => {
+              setPanelRefreshNonce((n) => n + 1);
+              onSubmitSuccess?.();
+            }}
+          />
+        )}
+
+        {sectionTab === "queue" && canSeeQueue && operator && (
+          <WarehouseQueuePanel
+            approverEmployeeId={operator.employee_id}
+            refreshNonce={panelRefreshNonce}
+            onChanged={async () => {
+              setPanelRefreshNonce((n) => n + 1);
+              try {
+                const refreshed = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
+                setItems(refreshed);
+              } catch {
+                /* 무시 */
+              }
+              onSubmitSuccess?.();
+            }}
+          />
+        )}
+
+        {sectionTab !== "compose" ? null : (
+          <>
         <WarehouseStickySummary summary={stickySummary} />
 
         <WarehouseStepLayout
@@ -430,6 +466,8 @@ export function DesktopWarehouseView({
             {error}
           </div>
         )}
+          </>
+        )}
       </div>
 
       <ResultModal
@@ -463,9 +501,15 @@ export function DesktopWarehouseView({
 
       <ConfirmModal
         open={showConfirm}
-        title="실행 전 최종 확인"
+        title={requiresApproval ? "창고 승인 요청 — 최종 확인" : "즉시 처리 — 최종 확인"}
         tone={isCaution ? "danger" : "normal"}
-        cautionMessage={isCaution ? "되돌릴 수 없는 작업입니다. 내용을 다시 한 번 확인하세요." : undefined}
+        cautionMessage={
+          isCaution
+            ? "되돌릴 수 없는 작업입니다. 내용을 다시 한 번 확인하세요."
+            : requiresApproval
+              ? "제출 후 창고 담당자(정/부)의 승인 전까지 실제 재고는 변경되지 않습니다."
+              : undefined
+        }
         onClose={() => setShowConfirm(false)}
         onConfirm={async () => {
           await submit();
@@ -473,7 +517,7 @@ export function DesktopWarehouseView({
         }}
         busy={submitting}
         busyLabel="처리 중..."
-        confirmLabel="최종 실행"
+        confirmLabel={requiresApproval ? "요청 제출" : "즉시 처리"}
         confirmAccent={accent}
       >
         <WarehouseConfirmContent

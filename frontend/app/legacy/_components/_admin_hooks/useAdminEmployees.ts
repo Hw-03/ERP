@@ -3,7 +3,7 @@
 // AdminEmployeesSection 전용 hook.
 
 import { useEffect, useState } from "react";
-import type { Employee, EmployeeLevel } from "@/lib/api";
+import type { Employee, EmployeeLevel, WarehouseRole } from "@/lib/api";
 import { api } from "@/lib/api";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../_admin_sections/adminShared";
 
@@ -13,6 +13,7 @@ export type EmployeeEditForm = {
   phone: string;
   department: string;
   level: EmployeeLevel;
+  warehouse_role: WarehouseRole;
   display_order: number;
 };
 
@@ -22,6 +23,7 @@ const EMPTY_EDIT_FORM: EmployeeEditForm = {
   phone: "",
   department: "조립",
   level: "staff",
+  warehouse_role: "none",
   display_order: 0,
 };
 
@@ -32,6 +34,7 @@ function toEditForm(emp: Employee): EmployeeEditForm {
     phone: emp.phone ?? "",
     department: emp.department,
     level: emp.level,
+    warehouse_role: (emp.warehouse_role ?? "none") as WarehouseRole,
     display_order: emp.display_order,
   };
 }
@@ -114,6 +117,7 @@ export function useAdminEmployees({
         role: empAddForm.role.trim(),
         department: empAddForm.department as Employee["department"],
         phone: empAddForm.phone.trim() || undefined,
+        warehouse_role: empAddForm.warehouse_role,
         display_order: employees.length + 1,
       });
       setEmployees((current) => [...current, created]);
@@ -154,6 +158,7 @@ export function useAdminEmployees({
         phone: editForm.phone.trim() || undefined,
         department: editForm.department as Employee["department"],
         level: editForm.level,
+        warehouse_role: editForm.warehouse_role,
         display_order: editForm.display_order,
       });
       setEmployees((current) =>
