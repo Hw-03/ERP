@@ -126,6 +126,120 @@ class LineInput:
 
 
 # ---------------------------------------------------------------------------
+# request_type ↔ bucket/department 조합 사양표
+# ---------------------------------------------------------------------------
+# 각 request_type 별로 허용되는 from/to bucket 과 department 필수/금지 규칙.
+# create_request() 진입부에서 라인별로 검증해 잘못된 조합으로 승인 정책을 우회하는
+# 페이로드(예: raw_ship + bucket=none)를 차단한다.
+
+_ALLOWED_SHAPES: dict[StockRequestTypeEnum, dict] = {
+    StockRequestTypeEnum.RAW_RECEIVE: {
+        "from_bucket": RequestBucketEnum.NONE,
+        "to_bucket": RequestBucketEnum.WAREHOUSE,
+        "from_dept_required": False,
+        "to_dept_required": False,
+    },
+    StockRequestTypeEnum.RAW_SHIP: {
+        "from_bucket": RequestBucketEnum.WAREHOUSE,
+        "to_bucket": RequestBucketEnum.NONE,
+        "from_dept_required": False,
+        "to_dept_required": False,
+    },
+    StockRequestTypeEnum.WAREHOUSE_TO_DEPT: {
+        "from_bucket": RequestBucketEnum.WAREHOUSE,
+        "to_bucket": RequestBucketEnum.PRODUCTION,
+        "from_dept_required": False,
+        "to_dept_required": True,
+    },
+    StockRequestTypeEnum.DEPT_TO_WAREHOUSE: {
+        "from_bucket": RequestBucketEnum.PRODUCTION,
+        "to_bucket": RequestBucketEnum.WAREHOUSE,
+        "from_dept_required": True,
+        "to_dept_required": False,
+    },
+    StockRequestTypeEnum.DEPT_INTERNAL: {
+        "from_bucket": RequestBucketEnum.PRODUCTION,
+        "to_bucket": RequestBucketEnum.PRODUCTION,
+        "from_dept_required": True,
+        "to_dept_required": True,
+    },
+    StockRequestTypeEnum.MARK_DEFECTIVE_WH: {
+        "from_bucket": RequestBucketEnum.WAREHOUSE,
+        "to_bucket": RequestBucketEnum.DEFECTIVE,
+        "from_dept_required": False,
+        "to_dept_required": True,
+    },
+    StockRequestTypeEnum.MARK_DEFECTIVE_PROD: {
+        "from_bucket": RequestBucketEnum.PRODUCTION,
+        "to_bucket": RequestBucketEnum.DEFECTIVE,
+        "from_dept_required": True,
+        "to_dept_required": True,
+    },
+    StockRequestTypeEnum.SUPPLIER_RETURN: {
+        "from_bucket": RequestBucketEnum.DEFECTIVE,
+        "to_bucket": RequestBucketEnum.NONE,
+        "from_dept_required": True,
+        "to_dept_required": False,
+    },
+    StockRequestTypeEnum.PACKAGE_OUT: {
+        "from_bucket": RequestBucketEnum.WAREHOUSE,
+        "to_bucket": RequestBucketEnum.NONE,
+        "from_dept_required": False,
+        "to_dept_required": False,
+    },
+}
+
+
+def validate_line_shape_for_request_type(
+    request_type: StockRequestTypeEnum,
+    line: LineInput,
+) -> None:
+    """request_type 과 라인 bucket/department 조합 정합성 검증.
+
+    실패 시 ValueError. 호출자(create_request)가 DB row 생성 전에 호출해야 한다.
+    이 검증을 통과하지 못하면 StockRequest row 도, pending_quantity 변경도 발생하지 않는다.
+    """
+    spec = _ALLOWED_SHAPES.get(request_type)
+    if spec is None:
+        # 새 request_type 이 추가됐는데 사양표에 없으면 명시적으로 거부 (안전 우선).
+        raise ValueError(f"지원하지 않는 요청 유형: {request_type}")
+
+    expected_from = spec["from_bucket"]
+    expected_to = spec["to_bucket"]
+    if line.from_bucket != expected_from or line.to_bucket != expected_to:
+        raise ValueError(
+            f"요청 유형 '{request_type.value}' 은 from_bucket='{expected_from.value}', "
+            f"to_bucket='{expected_to.value}' 만 허용합니다 "
+            f"(받음: from='{line.from_bucket.value}', to='{line.to_bucket.value}')."
+        )
+
+    from_dept_required: bool = spec["from_dept_required"]
+    if from_dept_required and line.from_department is None:
+        raise ValueError(
+            f"요청 유형 '{request_type.value}' 은 from_department 가 필수입니다."
+        )
+    if not from_dept_required and line.from_department is not None:
+        raise ValueError(
+            f"요청 유형 '{request_type.value}' 은 from_department 를 받지 않습니다."
+        )
+
+    to_dept_required: bool = spec["to_dept_required"]
+    if to_dept_required and line.to_department is None:
+        raise ValueError(
+            f"요청 유형 '{request_type.value}' 은 to_department 가 필수입니다."
+        )
+    if not to_dept_required and line.to_department is not None:
+        raise ValueError(
+            f"요청 유형 '{request_type.value}' 은 to_department 를 받지 않습니다."
+        )
+
+    # dept_internal 만 추가 규칙: 출발/도착 부서가 같으면 의미 없는 이동.
+    if request_type == StockRequestTypeEnum.DEPT_INTERNAL:
+        if line.from_department == line.to_department:
+            raise ValueError("부서 내부 이동의 출발/도착 부서가 동일합니다.")
+
+
+# ---------------------------------------------------------------------------
 # 요청 생성
 # ---------------------------------------------------------------------------
 
@@ -148,6 +262,13 @@ def create_request(
     """
     if not lines_input:
         raise ValueError("요청 라인이 비어 있습니다.")
+
+    # request_type ↔ bucket/department 조합 정합성 + quantity 양수 — DB row 생성 전 일괄 검증.
+    # 검증 실패 시 StockRequest row 도, Inventory.pending_quantity 변경도 발생하지 않는다.
+    for li in lines_input:
+        if li.quantity <= 0:
+            raise ValueError("수량은 0보다 커야 합니다.")
+        validate_line_shape_for_request_type(request_type, li)
 
     now = datetime.utcnow()
     code = _generate_request_code(db, now)

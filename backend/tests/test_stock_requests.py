@@ -569,3 +569,87 @@ def test_reservations_endpoint_lists_active_pending_lines(db_session, client, ma
     assert rows[0]["requester_name"] == "요청자K"
     assert rows[0]["to_department"] == DepartmentEnum.ASSEMBLY.value
     assert Decimal(rows[0]["quantity"]) == Decimal("4")
+
+
+# ---------------------------------------------------------------------------
+# request_type ↔ bucket 조합 강제 검증 (1차 보완)
+# ---------------------------------------------------------------------------
+# 잘못된 페이로드로 승인 정책을 우회하려는 시도를 차단하는 검증.
+# 모든 케이스에서 (1) 422 응답, (2) StockRequest row 미생성, (3) pending_quantity 불변.
+
+
+@pytest.mark.parametrize(
+    "case_label,request_type,line_overrides",
+    [
+        # 가장 위험한 케이스: raw_ship 인데 bucket 모두 none → 승인 우회 시도.
+        # line_requires_approval(none, none)=False 라서 즉시 실행 분기로 빠질 수 있다.
+        (
+            "raw_ship_bypass",
+            "raw_ship",
+            {"from_bucket": "none", "to_bucket": "none"},
+        ),
+        # raw_receive 인데 to_bucket 도 none → 입고 대상 누락.
+        (
+            "raw_receive_no_target",
+            "raw_receive",
+            {"from_bucket": "none", "to_bucket": "none"},
+        ),
+        # warehouse_to_dept 인데 to_department 누락 → 어느 부서로 갈지 모호.
+        (
+            "warehouse_to_dept_no_dept",
+            "warehouse_to_dept",
+            {
+                "from_bucket": "warehouse",
+                "to_bucket": "production",
+                "to_department": None,
+            },
+        ),
+        # dept_internal 인데 출발/도착 부서가 같음 → 의미 없는 이동.
+        (
+            "dept_internal_same_dept",
+            "dept_internal",
+            {
+                "from_bucket": "production",
+                "from_department": "조립",
+                "to_bucket": "production",
+                "to_department": "조립",
+            },
+        ),
+    ],
+)
+def test_create_request_rejects_invalid_shape(
+    db_session, client, make_item, case_label, request_type, line_overrides
+):
+    """422 응답 + StockRequest row 미생성 + pending_quantity 불변 동시 검증."""
+    item = make_item(name=f"PSHAPE_{case_label}", warehouse_qty=Decimal("10"))
+    requester = _make_employee(db_session, code=f"WS_{case_label[:6]}", name=f"요청자_{case_label}")
+    db_session.commit()
+
+    line_payload = {
+        "item_id": str(item.item_id),
+        "quantity": "1",
+        # 기본값: 정상적인 warehouse_to_dept 형식. case 별 overrides 가 덮어씀.
+        "from_bucket": "warehouse",
+        "to_bucket": "production",
+        "to_department": DepartmentEnum.ASSEMBLY.value,
+    }
+    # to_department 가 None 으로 명시된 케이스도 그대로 반영되도록 update 사용.
+    line_payload.update(line_overrides)
+
+    out = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type=request_type,
+        lines=[line_payload],
+    )
+    # (1) 422 응답
+    assert out["status_code"] == 422, f"{case_label}: {out['body']}"
+
+    # (2) StockRequest row 미생성
+    assert db_session.query(StockRequest).count() == 0, case_label
+
+    # (3) pending_quantity 불변 (warehouse_qty 도 그대로)
+    db_session.expire_all()
+    inv = db_session.query(Inventory).filter_by(item_id=item.item_id).first()
+    assert inv.pending_quantity == Decimal("0"), case_label
+    assert inv.warehouse_qty == Decimal("10"), case_label
