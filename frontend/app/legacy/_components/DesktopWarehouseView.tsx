@@ -191,11 +191,21 @@ export function DesktopWarehouseView({
   // ─── parent-owned wrapped setters (cross-cutting) ───
   function changeWorkType(wt: WorkType) {
     if (wt === workType) return;
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    restoringRef.current = true;
     setWorkType(wt);
     setSelectedItems(new Map());
     setSelectedPackage(null);
+    setNotes("");
+    setReferenceNo("");
+    setCurrentDraftId(null);
+    setAutoSaveStatus("idle");
     setStep2Confirmed(false);
     setError(null);
+    setTimeout(() => { restoringRef.current = false; }, 0);
   }
 
   function selectEmployee(id: string) {
@@ -246,10 +256,8 @@ export function DesktopWarehouseView({
       notes,
     }).lines;
 
-    const hasContent =
-      draftLines.length > 0 || notes.trim() !== "" || referenceNo.trim() !== "";
-    // 빈 상태이고 기존 draft 도 없으면 저장 스킵 (불필요한 빈 draft 방지).
-    if (!hasContent && !currentDraftId) return;
+    // lines 가 없고 기존 draft 도 없으면 저장 스킵 (workType 전환 직후 ghost draft 방지).
+    if (draftLines.length === 0 && !currentDraftId) return;
 
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(async () => {
@@ -307,8 +315,13 @@ export function DesktopWarehouseView({
       .then((draft) => {
         if (cancelled) return;
         if (!draft) {
+          setSelectedItems(new Map());
+          setSelectedPackage(null);
+          setNotes("");
+          setReferenceNo("");
           setCurrentDraftId(null);
           setAutoSaveStatus("idle");
+          restoringRef.current = false;
           return;
         }
         // 복원 동안 autosave 재발동 차단.
