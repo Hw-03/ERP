@@ -16,6 +16,9 @@ from app.models import (
     QueueBatchStatusEnum,
     QueueBatchTypeEnum,
     QueueLineDirectionEnum,
+    RequestBucketEnum,
+    StockRequestStatusEnum,
+    StockRequestTypeEnum,
     TransactionTypeEnum,
 )
 
@@ -115,6 +118,7 @@ class EmployeeCreate(BaseModel):
     phone: Optional[str] = Field(None, max_length=30)
     department: DepartmentEnum
     level: EmployeeLevelEnum = EmployeeLevelEnum.STAFF
+    warehouse_role: str = Field("none", description="창고 결재 역할 (none/primary/deputy)")
     display_order: int = 0
     is_active: bool = True
 
@@ -125,6 +129,7 @@ class EmployeeUpdate(BaseModel):
     phone: Optional[str] = Field(None, max_length=30)
     department: Optional[DepartmentEnum] = None
     level: Optional[EmployeeLevelEnum] = None
+    warehouse_role: Optional[str] = Field(None, description="창고 결재 역할 (none/primary/deputy)")
     display_order: Optional[int] = None
     is_active: Optional[bool] = None
 
@@ -139,6 +144,7 @@ class EmployeeResponse(BaseModel):
     phone: Optional[str]
     department: DepartmentEnum
     level: EmployeeLevelEnum
+    warehouse_role: str = "none"
     display_order: int
     is_active: bool
     created_at: datetime
@@ -804,3 +810,94 @@ class IntegrityRepairResponse(BaseModel):
     repaired: int
     dry_run: bool
     samples: List[dict]
+
+
+# =============================================================================
+# Stock requests (작업자 결재 요청 흐름)
+# =============================================================================
+
+
+class StockRequestLineCreate(BaseModel):
+    item_id: uuid.UUID
+    quantity: Decimal = Field(..., gt=0)
+    from_bucket: RequestBucketEnum
+    from_department: Optional[DepartmentEnum] = None
+    to_bucket: RequestBucketEnum
+    to_department: Optional[DepartmentEnum] = None
+
+
+class StockRequestCreate(BaseModel):
+    requester_employee_id: uuid.UUID
+    request_type: StockRequestTypeEnum
+    reference_no: Optional[str] = Field(None, max_length=100)
+    notes: Optional[str] = None
+    lines: List[StockRequestLineCreate] = Field(..., min_length=1)
+
+
+class StockRequestActionRequest(BaseModel):
+    """승인/반려/취소 공통 페이로드 — pin 필수."""
+    actor_employee_id: uuid.UUID
+    pin: str = Field(..., min_length=1, max_length=32)
+    reason: Optional[str] = None  # reject 시에만 사용
+
+
+class StockRequestLineResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    line_id: uuid.UUID
+    request_id: uuid.UUID
+    item_id: uuid.UUID
+    item_name_snapshot: str
+    erp_code_snapshot: Optional[str] = None
+    quantity: Decimal
+    from_bucket: RequestBucketEnum
+    from_department: Optional[DepartmentEnum] = None
+    to_bucket: RequestBucketEnum
+    to_department: Optional[DepartmentEnum] = None
+    status: StockRequestStatusEnum
+    created_at: datetime
+
+
+class StockRequestResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    request_id: uuid.UUID
+    request_code: Optional[str] = None
+    requester_employee_id: uuid.UUID
+    requester_name: str
+    requester_department: DepartmentEnum
+    request_type: StockRequestTypeEnum
+    status: StockRequestStatusEnum
+    requires_warehouse_approval: bool
+    reserved_at: Optional[datetime] = None
+    submitted_at: Optional[datetime] = None
+    approved_by_employee_id: Optional[uuid.UUID] = None
+    approved_by_name: Optional[str] = None
+    approved_at: Optional[datetime] = None
+    rejected_by_employee_id: Optional[uuid.UUID] = None
+    rejected_by_name: Optional[str] = None
+    rejected_at: Optional[datetime] = None
+    rejected_reason: Optional[str] = None
+    cancelled_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    reference_no: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    lines: List[StockRequestLineResponse] = []
+
+
+class ReservationLineResponse(BaseModel):
+    """품목별 점유중 라인 — InventoryDetailPanel 표시용."""
+    model_config = ConfigDict(from_attributes=True)
+
+    line_id: uuid.UUID
+    request_id: uuid.UUID
+    request_code: Optional[str] = None
+    requester_name: str
+    requester_department: DepartmentEnum
+    quantity: Decimal
+    from_bucket: RequestBucketEnum
+    to_bucket: RequestBucketEnum
+    to_department: Optional[DepartmentEnum] = None
+    created_at: datetime

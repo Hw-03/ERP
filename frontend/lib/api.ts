@@ -52,6 +52,7 @@ export type Department =
   | "출하"
   | "기타";
 export type EmployeeLevel = "admin" | "manager" | "staff";
+export type WarehouseRole = "none" | "primary" | "deputy";
 
 export interface CategorySummary {
   category: Category;
@@ -226,10 +227,114 @@ export interface Employee {
   phone: string | null;
   department: Department;
   level: EmployeeLevel;
+  /** 창고 결재 역할 — 기본 "none". primary/deputy 만 승인/반려 가능. */
+  warehouse_role: WarehouseRole;
   display_order: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+// =============================================================================
+// Stock requests (작업자 결재 요청 흐름)
+// =============================================================================
+
+export type StockRequestStatus =
+  | "draft"
+  | "submitted"
+  | "reserved"
+  | "rejected"
+  | "cancelled"
+  | "completed"
+  | "failed_approval";
+
+export type StockRequestType =
+  | "raw_receive"
+  | "raw_ship"
+  | "warehouse_to_dept"
+  | "dept_to_warehouse"
+  | "dept_internal"
+  | "mark_defective_wh"
+  | "mark_defective_prod"
+  | "supplier_return"
+  | "package_out";
+
+export type RequestBucket = "warehouse" | "production" | "defective" | "none";
+
+export interface StockRequestLine {
+  line_id: string;
+  request_id: string;
+  item_id: string;
+  item_name_snapshot: string;
+  erp_code_snapshot: string | null;
+  quantity: number;
+  from_bucket: RequestBucket;
+  from_department: Department | null;
+  to_bucket: RequestBucket;
+  to_department: Department | null;
+  status: StockRequestStatus;
+  created_at: string;
+}
+
+export interface StockRequest {
+  request_id: string;
+  request_code: string | null;
+  requester_employee_id: string;
+  requester_name: string;
+  requester_department: Department;
+  request_type: StockRequestType;
+  status: StockRequestStatus;
+  requires_warehouse_approval: boolean;
+  reserved_at: string | null;
+  submitted_at: string | null;
+  approved_by_employee_id: string | null;
+  approved_by_name: string | null;
+  approved_at: string | null;
+  rejected_by_employee_id: string | null;
+  rejected_by_name: string | null;
+  rejected_at: string | null;
+  rejected_reason: string | null;
+  cancelled_at: string | null;
+  completed_at: string | null;
+  reference_no: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  lines: StockRequestLine[];
+}
+
+export interface StockRequestCreatePayload {
+  requester_employee_id: string;
+  request_type: StockRequestType;
+  reference_no?: string | null;
+  notes?: string | null;
+  lines: Array<{
+    item_id: string;
+    quantity: number;
+    from_bucket: RequestBucket;
+    from_department?: Department | null;
+    to_bucket: RequestBucket;
+    to_department?: Department | null;
+  }>;
+}
+
+export interface StockRequestActionPayload {
+  actor_employee_id: string;
+  pin: string;
+  reason?: string;
+}
+
+export interface StockRequestReservationLine {
+  line_id: string;
+  request_id: string;
+  request_code: string | null;
+  requester_name: string;
+  requester_department: Department;
+  quantity: number;
+  from_bucket: RequestBucket;
+  to_bucket: RequestBucket;
+  to_department: Department | null;
+  created_at: string;
 }
 
 export interface ShipPackageItemDetail {
@@ -569,6 +674,7 @@ export const api = {
     phone?: string;
     department: Department;
     level?: EmployeeLevel;
+    warehouse_role?: WarehouseRole;
     display_order?: number;
     is_active?: boolean;
   }) => postJson<Employee>(toApiUrl("/api/employees"), payload),
@@ -581,6 +687,7 @@ export const api = {
       phone?: string;
       department?: Department;
       level?: EmployeeLevel;
+      warehouse_role?: WarehouseRole;
       display_order?: number;
       is_active?: boolean;
     },
@@ -1195,4 +1302,69 @@ export const api = {
     if (itemId) query.set("item_id", itemId);
     return fetcher<PhysicalCount[]>(toApiUrl(`/api/counts/?${query}`));
   },
+
+  // Stock requests (창고 결재 흐름) -----------------------------------------
+  createStockRequest: async (payload: StockRequestCreatePayload): Promise<StockRequest> => {
+    const res = await fetch(toApiUrl("/api/stock-requests"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<StockRequest>;
+  },
+
+  listMyStockRequests: (employeeId: string) =>
+    fetcher<StockRequest[]>(
+      toApiUrl(
+        `/api/stock-requests?requester_employee_id=${encodeURIComponent(employeeId)}`
+      )
+    ),
+
+  listWarehouseQueue: () =>
+    fetcher<StockRequest[]>(toApiUrl("/api/stock-requests/warehouse-queue")),
+
+  approveStockRequest: async (
+    requestId: string,
+    payload: StockRequestActionPayload
+  ): Promise<StockRequest> => {
+    const res = await fetch(toApiUrl(`/api/stock-requests/${requestId}/approve`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<StockRequest>;
+  },
+
+  rejectStockRequest: async (
+    requestId: string,
+    payload: StockRequestActionPayload
+  ): Promise<StockRequest> => {
+    const res = await fetch(toApiUrl(`/api/stock-requests/${requestId}/reject`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<StockRequest>;
+  },
+
+  cancelStockRequest: async (
+    requestId: string,
+    payload: StockRequestActionPayload
+  ): Promise<StockRequest> => {
+    const res = await fetch(toApiUrl(`/api/stock-requests/${requestId}/cancel`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<StockRequest>;
+  },
+
+  getItemReservations: (itemId: string) =>
+    fetcher<StockRequestReservationLine[]>(
+      toApiUrl(`/api/stock-requests/reservations?item_id=${encodeURIComponent(itemId)}`)
+    ),
 };

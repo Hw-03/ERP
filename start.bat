@@ -35,12 +35,12 @@ popd
 
 rem ====== Ensure DB schema is up to date (Phase 5.4-B) ======
 rem main.py 의 Base.metadata.create_all 부작용을 제거했으므로,
-rem 신규 모델 추가 시 idempotent 하게 테이블을 생성하기 위해 schema 단계만 실행.
+rem 신규 모델/컬럼 추가 시 idempotent 하게 반영하기 위해 schema + migrate 둘 다 실행.
 pushd "%~dp0backend"
 echo [ERP] Ensuring DB schema is up to date...
-py bootstrap_db.py --schema
+py bootstrap_db.py --schema --migrate
 if errorlevel 1 (
-    echo [ERP] ERROR: bootstrap_db.py --schema failed. Aborting.
+    echo [ERP] ERROR: bootstrap_db.py --schema --migrate failed. Aborting.
     popd
     pause
     exit /b 1

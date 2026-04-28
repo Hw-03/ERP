@@ -1,10 +1,12 @@
 "use client";
 
-import type { Item, TransactionLog } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { api, type Item, type StockRequestReservationLine, type TransactionLog } from "@/lib/api";
 import {
   LEGACY_COLORS,
   employeeColor,
   formatNumber,
+  normalizeDepartment,
   normalizeModel,
   transactionColor,
   transactionLabel,
@@ -17,6 +19,29 @@ type Props = {
 };
 
 export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
+  const [reservations, setReservations] = useState<StockRequestReservationLine[]>([]);
+  const pendingQty = Number(item.pending_quantity) || 0;
+  const availableQty = Number(item.available_quantity) || 0;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (pendingQty <= 0) {
+      setReservations([]);
+      return;
+    }
+    api
+      .getItemReservations(item.item_id)
+      .then((rows) => {
+        if (!cancelled) setReservations(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setReservations([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [item.item_id, pendingQty]);
+
   return (
     <div className="space-y-4">
       {/* 품목 정보 */}
@@ -60,6 +85,38 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
               </div>
               <div className="mt-1 text-xl font-black">
                 {item.min_stock == null ? "-" : formatNumber(item.min_stock)}
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div
+              className="rounded-[18px] border px-4 py-3"
+              style={{
+                background: LEGACY_COLORS.s1,
+                borderColor: pendingQty > 0
+                  ? `color-mix(in srgb, ${LEGACY_COLORS.yellow} 40%, transparent)`
+                  : LEGACY_COLORS.border,
+              }}
+            >
+              <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                점유중
+              </div>
+              <div
+                className="mt-1 text-xl font-black"
+                style={{ color: pendingQty > 0 ? LEGACY_COLORS.yellow : LEGACY_COLORS.text }}
+              >
+                {formatNumber(pendingQty)}
+              </div>
+            </div>
+            <div
+              className="rounded-[18px] border px-4 py-3"
+              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+            >
+              <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                가용재고
+              </div>
+              <div className="mt-1 text-xl font-black" style={{ color: LEGACY_COLORS.green }}>
+                {formatNumber(availableQty)}
               </div>
             </div>
           </div>
@@ -107,6 +164,36 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
           )}
         </div>
       </section>
+
+      {/* 점유 요청 목록 */}
+      {reservations.length > 0 && (
+        <section
+          className="rounded-[28px] border p-5"
+          style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
+        >
+          <div className="mb-3 text-sm font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+            점유중 요청 ({reservations.length}건)
+          </div>
+          <div className="space-y-2">
+            {reservations.map((r) => (
+              <div
+                key={r.line_id}
+                className="flex flex-wrap items-center gap-2 rounded-[14px] border px-3 py-2 text-sm"
+                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+              >
+                <span className="font-bold">{r.requester_name}</span>
+                <span style={{ color: LEGACY_COLORS.muted }}>
+                  · {normalizeDepartment(r.requester_department)}
+                </span>
+                <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                  창고 → {r.to_department ? normalizeDepartment(r.to_department) : "외부"}
+                </span>
+                <span className="ml-auto font-bold">{formatNumber(r.quantity)} 개</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 위치별 재고 */}
       {(Number(item.warehouse_qty) > 0 || (item.locations ?? []).some((l) => Number(l.quantity) > 0)) && (

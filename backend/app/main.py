@@ -47,6 +47,7 @@ from app.routers import (
     scrap,
     settings,
     ship_packages,
+    stock_requests,
     variance,
 )
 
@@ -240,6 +241,7 @@ app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 app.include_router(counts.router, prefix="/api/counts", tags=["Counts"])
 app.include_router(models_router.router, prefix="/api/models", tags=["Models"])
 app.include_router(admin_audit.router, prefix="/api/admin", tags=["Admin Audit"])
+app.include_router(stock_requests.router, prefix="/api/stock-requests", tags=["Stock Requests"])
 
 
 @app.get("/health", tags=["System"])

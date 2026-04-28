@@ -47,6 +47,14 @@ def create_employee(payload: EmployeeCreate, request: Request, db: Session = Dep
     if existing:
         raise http_error(409, ErrorCode.CONFLICT, "직원 코드가 이미 존재합니다.")
 
+    role_value = (payload.warehouse_role or "none").lower()
+    if role_value not in ("none", "primary", "deputy"):
+        raise http_error(
+            422,
+            ErrorCode.UNPROCESSABLE,
+            "warehouse_role 은 none/primary/deputy 중 하나여야 합니다.",
+        )
+
     employee = Employee(
         employee_code=payload.employee_code,
         name=payload.name,
@@ -54,6 +62,7 @@ def create_employee(payload: EmployeeCreate, request: Request, db: Session = Dep
         phone=payload.phone,
         department=payload.department,
         level=payload.level,
+        warehouse_role=role_value,
         display_order=payload.display_order,
         is_active="true" if payload.is_active else "false",
     )
@@ -90,6 +99,17 @@ def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, request: Re
         employee.department = payload.department; changed.append("department")
     if payload.level is not None and employee.level != payload.level:
         employee.level = payload.level; changed.append("level")
+    if payload.warehouse_role is not None:
+        new_role = payload.warehouse_role.lower()
+        if new_role not in ("none", "primary", "deputy"):
+            raise http_error(
+                422,
+                ErrorCode.UNPROCESSABLE,
+                "warehouse_role 은 none/primary/deputy 중 하나여야 합니다.",
+            )
+        if (employee.warehouse_role or "none") != new_role:
+            employee.warehouse_role = new_role
+            changed.append("warehouse_role")
     if payload.display_order is not None and employee.display_order != payload.display_order:
         employee.display_order = payload.display_order; changed.append("display_order")
     if payload.is_active is not None:
@@ -180,6 +200,7 @@ def _to_response(employee: Employee) -> EmployeeResponse:
         phone=employee.phone,
         department=employee.department,
         level=employee.level,
+        warehouse_role=(employee.warehouse_role or "none"),
         display_order=int(employee.display_order),
         is_active=bool(employee.is_active),
         created_at=employee.created_at,

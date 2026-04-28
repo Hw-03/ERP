@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import type { EmployeeLevel } from "@/lib/api";
+import type { EmployeeLevel, WarehouseRole } from "@/lib/api";
 import { DEPARTMENT_LABELS, LEGACY_COLORS, normalizeDepartment } from "../legacyUi";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "./adminShared";
 import { useAdminEmployeesContext } from "./AdminEmployeesContext";
@@ -12,6 +12,12 @@ const LEVEL_LABEL: Record<EmployeeLevel, string> = {
   manager: "매니저",
   staff: "사원",
 };
+
+const WAREHOUSE_ROLE_OPTIONS: { value: WarehouseRole; label: string }[] = [
+  { value: "none", label: "없음" },
+  { value: "primary", label: "창고 정담당자" },
+  { value: "deputy", label: "창고 부담당자" },
+];
 
 export function AdminEmployeesSection() {
   const ctx = useAdminEmployeesContext();
@@ -185,6 +191,21 @@ export function AdminEmployeesSection() {
                 ))}
               </select>
             </div>
+            <div>
+              <div className="mb-2 text-sm font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                창고 결재 역할
+              </div>
+              <select
+                value={empAddForm.warehouse_role}
+                onChange={(e) => setEmpAddForm((f) => ({ ...f, warehouse_role: e.target.value as WarehouseRole }))}
+                className="w-full rounded-[18px] border px-4 py-3 text-base outline-none"
+                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+              >
+                {WAREHOUSE_ROLE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
             <button
               onClick={onAddEmployee}
               className="w-full rounded-[18px] px-4 py-3 text-base font-bold text-white"
@@ -252,6 +273,20 @@ export function AdminEmployeesSection() {
                 >
                   {(["admin", "manager", "staff"] as EmployeeLevel[]).map((value) => (
                     <option key={value} value={value}>{LEVEL_LABEL[value]}</option>
+                  ))}
+                </select>
+              </FieldRow>
+              <FieldRow label="창고 결재 역할">
+                <select
+                  value={editForm.warehouse_role}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, warehouse_role: e.target.value as WarehouseRole }))
+                  }
+                  className="w-full rounded-[14px] border px-3 py-2 text-sm outline-none"
+                  style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                >
+                  {WAREHOUSE_ROLE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
               </FieldRow>
