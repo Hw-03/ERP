@@ -169,7 +169,9 @@ export function DesktopLegacyShell() {
       <div className="flex h-full w-full gap-3 px-3 py-3" style={{ background: LEGACY_COLORS.bg, color: LEGACY_COLORS.text }}>
         <DesktopSidebar
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={(tab) => {
+            setActiveTab(tab);
+          }}
           alertCount={{ inventory: stockWarnings ? stockWarnings.zero + stockWarnings.low : 0 }}
         />
 

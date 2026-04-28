@@ -307,6 +307,20 @@ export interface TransactionLog {
   produced_by: string | null;
   notes: string | null;
   created_at: string;
+  edit_count?: number;  // 3차: 수정 이력 개수 (서버 응답에 포함)
+}
+
+/** 거래 수정 이력 (3차 메타 수정 + 4차 수량 보정 공통). */
+export interface TransactionEditLog {
+  edit_id: string;
+  original_log_id: string;
+  edited_by_employee_id: string;
+  edited_by_name: string;
+  reason: string;
+  before_payload: string;  // JSON string
+  after_payload: string;   // JSON string
+  correction_log_id: string | null;
+  created_at: string;
 }
 
 export interface ProductionCheckComponent {
@@ -582,6 +596,27 @@ export const api = {
 
   deleteEmployee: async (employeeId: string) => {
     const res = await fetch(toApiUrl(`/api/employees/${employeeId}`), { method: "DELETE" });
+    if (!res.ok) throw new Error(await parseError(res));
+  },
+
+  // 작업자 식별용 PIN 검증 — 실제 보안 인증이 아님
+  verifyEmployeePin: async (employeeId: string, pin: string) => {
+    const res = await fetch(toApiUrl(`/api/employees/${employeeId}/verify-pin`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin }),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<Employee>;
+  },
+
+  // 직원 PIN을 0000으로 초기화 — 관리자 PIN 검증 필요
+  resetEmployeePin: async (employeeId: string, adminPin: string) => {
+    const res = await fetch(toApiUrl(`/api/employees/${employeeId}/reset-pin`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ admin_pin: adminPin }),
+    });
     if (!res.ok) throw new Error(await parseError(res));
   },
 
@@ -891,14 +926,51 @@ export const api = {
     return fetcher<TransactionLog[]>(toApiUrl(`/api/inventory/transactions?${query}`), opts?.signal);
   },
 
-  updateTransactionNotes: async (logId: string, notes: string | null): Promise<TransactionLog> => {
-    const res = await fetch(toApiUrl(`/api/inventory/transactions/${logId}`), {
-      method: "PUT",
+  /** 거래 메타데이터(notes/reference_no/produced_by) 수정. reason + PIN 필수. */
+  metaEditTransaction: async (
+    logId: string,
+    payload: {
+      notes?: string | null;
+      reference_no?: string | null;
+      produced_by?: string | null;
+      reason: string;
+      edited_by_employee_id: string;
+      edited_by_pin: string;
+    },
+  ): Promise<TransactionLog> => {
+    const res = await fetch(toApiUrl(`/api/inventory/transactions/${logId}/meta-edit`), {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ notes }),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error(await parseError(res));
     return res.json() as Promise<TransactionLog>;
+  },
+
+  /** 특정 거래의 수정 이력 (최신순). */
+  getTransactionEdits: (logId: string): Promise<TransactionEditLog[]> =>
+    fetcher<TransactionEditLog[]>(toApiUrl(`/api/inventory/transactions/${logId}/edits`)),
+
+  /** RECEIVE/SHIP 수량 보정. SHIP은 quantity_change가 음수여야 함. */
+  quantityCorrectTransaction: async (
+    logId: string,
+    payload: {
+      quantity_change: number;
+      reason: string;
+      edited_by_employee_id: string;
+      edited_by_pin: string;
+    },
+  ): Promise<{ original: TransactionLog; correction: TransactionLog }> => {
+    const res = await fetch(
+      toApiUrl(`/api/inventory/transactions/${logId}/quantity-correction`),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<{ original: TransactionLog; correction: TransactionLog }>;
   },
 
   getItemsExportUrl: (params?: { category?: string; search?: string }) => {

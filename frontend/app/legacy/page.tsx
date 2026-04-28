@@ -14,6 +14,7 @@ import {
 import { WarehouseWizardScreen } from "./_components/mobile/io/warehouse/WarehouseWizardScreen";
 import { DeptWizardProvider } from "./_components/mobile/io/dept/context";
 import { DeptWizardScreen } from "./_components/mobile/io/dept/DeptWizardScreen";
+import { ErpLoginGate } from "./_components/login/ErpLoginGate";
 
 const TAB_TITLES: Record<TabId, { subtitle: string; title: string }> = {
   inventory: { subtitle: "재고 현황", title: "재고" },
@@ -24,11 +25,13 @@ const TAB_TITLES: Record<TabId, { subtitle: string; title: string }> = {
 
 export default function LegacyPage() {
   return (
-    <WarehouseWizardProvider>
-      <DeptWizardProvider>
-        <LegacyBody />
-      </DeptWizardProvider>
-    </WarehouseWizardProvider>
+    <ErpLoginGate>
+      <WarehouseWizardProvider>
+        <DeptWizardProvider>
+          <LegacyBody />
+        </DeptWizardProvider>
+      </WarehouseWizardProvider>
+    </ErpLoginGate>
   );
 }
 

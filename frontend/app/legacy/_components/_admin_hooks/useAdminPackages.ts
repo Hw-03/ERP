@@ -84,7 +84,7 @@ export function useAdminPackages({
         name: `출하묶음 ${packages.length + 1}`,
       });
       const newPkg = { ...created, items: [] as ShipPackage["items"] };
-      setPackages((current) => [...current, newPkg]);
+      setPackages((current) => [newPkg, ...current]);
       setSelectedPackage(newPkg);
       onStatusChange(`${created.name} 출하묶음을 생성했습니다.`);
     } catch (error) {

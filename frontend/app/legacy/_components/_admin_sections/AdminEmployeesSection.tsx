@@ -1,11 +1,18 @@
 "use client";
 
 import { X } from "lucide-react";
+import type { EmployeeLevel } from "@/lib/api";
 import { DEPARTMENT_LABELS, LEGACY_COLORS, normalizeDepartment } from "../legacyUi";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "./adminShared";
 import { useAdminEmployeesContext } from "./AdminEmployeesContext";
+import { ConfirmModal } from "../common/ConfirmModal";
 
-// Props 없음. AdminEmployeesProvider 의 Context 에서 모두 읽는다.
+const LEVEL_LABEL: Record<EmployeeLevel, string> = {
+  admin: "관리자",
+  manager: "매니저",
+  staff: "사원",
+};
+
 export function AdminEmployeesSection() {
   const ctx = useAdminEmployeesContext();
   const {
@@ -18,9 +25,23 @@ export function AdminEmployeesSection() {
     setEmpAddForm,
     addEmployee: onAddEmployee,
     toggleEmployee: onToggleEmployee,
+    confirmTarget,
+    confirmToggle,
+    cancelConfirm,
+    editForm,
+    setEditForm,
+    saveEmployee,
+    pinResetTarget,
+    pinResetAdminPin,
+    setPinResetAdminPin,
+    pinResetError,
+    requestPinReset,
+    confirmPinReset,
+    cancelPinReset,
   } = ctx;
   return (
-    <div className="grid h-full gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+    <>
+    <div className="grid h-full gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div
         className="flex flex-col overflow-hidden rounded-[28px] border"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
@@ -173,25 +194,165 @@ export function AdminEmployeesSection() {
             </button>
           </div>
         ) : selectedEmployee ? (
-          <>
-            <div className="text-xl font-black">{selectedEmployee.name}</div>
-            <div className="mt-1 text-base" style={{ color: LEGACY_COLORS.muted2 }}>
-              {selectedEmployee.role} / {normalizeDepartment(selectedEmployee.department)}
+          <div className="space-y-4">
+            <div>
+              <div className="text-xl font-black">{selectedEmployee.name}</div>
+              <div className="mt-1 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+                {selectedEmployee.employee_code}
+              </div>
             </div>
+
+            {/* 정보 수정 폼 */}
+            <div className="space-y-3 border-t pt-4" style={{ borderColor: LEGACY_COLORS.border }}>
+              <FieldRow label="이름">
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                  className="w-full rounded-[14px] border px-3 py-2 text-sm outline-none"
+                  style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                />
+              </FieldRow>
+              <FieldRow label="역할">
+                <input
+                  type="text"
+                  value={editForm.role}
+                  onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value }))}
+                  className="w-full rounded-[14px] border px-3 py-2 text-sm outline-none"
+                  style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                />
+              </FieldRow>
+              <FieldRow label="연락처">
+                <input
+                  type="text"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+                  className="w-full rounded-[14px] border px-3 py-2 text-sm outline-none"
+                  style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                />
+              </FieldRow>
+              <FieldRow label="부서">
+                <select
+                  value={editForm.department}
+                  onChange={(e) => setEditForm((f) => ({ ...f, department: e.target.value }))}
+                  className="w-full rounded-[14px] border px-3 py-2 text-sm outline-none"
+                  style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                >
+                  {Object.keys(DEPARTMENT_LABELS).map((value) => (
+                    <option key={value} value={value}>{DEPARTMENT_LABELS[value]}</option>
+                  ))}
+                </select>
+              </FieldRow>
+              <FieldRow label="권한">
+                <select
+                  value={editForm.level}
+                  onChange={(e) => setEditForm((f) => ({ ...f, level: e.target.value as EmployeeLevel }))}
+                  className="w-full rounded-[14px] border px-3 py-2 text-sm outline-none"
+                  style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                >
+                  {(["admin", "manager", "staff"] as EmployeeLevel[]).map((value) => (
+                    <option key={value} value={value}>{LEVEL_LABEL[value]}</option>
+                  ))}
+                </select>
+              </FieldRow>
+              <FieldRow label="표시 순서">
+                <input
+                  type="number"
+                  value={editForm.display_order}
+                  onChange={(e) => setEditForm((f) => ({ ...f, display_order: Number(e.target.value) || 0 }))}
+                  className="w-full rounded-[14px] border px-3 py-2 text-sm outline-none"
+                  style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                />
+              </FieldRow>
+            </div>
+
             <button
-              onClick={() => onToggleEmployee(selectedEmployee)}
-              className="mt-5 w-full rounded-[18px] px-4 py-3 text-base font-bold text-white"
-              style={{ background: selectedEmployee.is_active ? LEGACY_COLORS.red : LEGACY_COLORS.green }}
+              onClick={saveEmployee}
+              className="w-full rounded-[14px] px-4 py-2.5 text-sm font-bold text-white"
+              style={{ background: LEGACY_COLORS.blue }}
             >
-              {selectedEmployee.is_active ? "비활성으로 전환" : "활성으로 전환"}
+              저장
             </button>
-          </>
+
+            {/* PIN 초기화 / 비활성화 */}
+            <div className="grid grid-cols-2 gap-2 border-t pt-4" style={{ borderColor: LEGACY_COLORS.border }}>
+              <button
+                onClick={() => requestPinReset(selectedEmployee)}
+                className="rounded-[14px] border px-3 py-2.5 text-sm font-bold"
+                style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.yellow }}
+              >
+                PIN 초기화
+              </button>
+              <button
+                onClick={() => onToggleEmployee(selectedEmployee)}
+                className="rounded-[14px] px-3 py-2.5 text-sm font-bold text-white"
+                style={{ background: selectedEmployee.is_active ? LEGACY_COLORS.red : LEGACY_COLORS.green }}
+              >
+                {selectedEmployee.is_active ? "비활성화" : "활성화"}
+              </button>
+            </div>
+            <p className="text-center text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+              직원 영구 삭제는 지원하지 않습니다 — 비활성화로 대체하세요.
+            </p>
+          </div>
         ) : (
           <div className="text-base" style={{ color: LEGACY_COLORS.muted2 }}>
-            직원을 선택하면 활성 상태를 바꿀 수 있습니다.
+            직원을 선택하면 정보를 수정하거나 PIN을 초기화할 수 있습니다.
           </div>
         )}
       </div>
+    </div>
+
+    <ConfirmModal
+      open={confirmTarget !== null}
+      title={`'${confirmTarget?.name}' 직원을 ${confirmTarget?.is_active ? "비활성화" : "활성화"}하시겠습니까?`}
+      tone={confirmTarget?.is_active ? "danger" : "normal"}
+      confirmLabel={confirmTarget?.is_active ? "비활성화" : "활성화"}
+      onClose={cancelConfirm}
+      onConfirm={confirmToggle}
+    />
+
+    <ConfirmModal
+      open={pinResetTarget !== null}
+      title={`'${pinResetTarget?.name}' 직원의 PIN을 0000으로 초기화하시겠습니까?`}
+      tone="caution"
+      cautionMessage="기존 PIN은 더 이상 사용할 수 없게 됩니다. 관리자 PIN을 입력하세요."
+      confirmLabel="초기화"
+      onClose={cancelPinReset}
+      onConfirm={confirmPinReset}
+    >
+      <div className="mt-2">
+        <div className="mb-1 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
+          관리자 PIN
+        </div>
+        <input
+          type="password"
+          inputMode="numeric"
+          maxLength={32}
+          value={pinResetAdminPin}
+          onChange={(e) => setPinResetAdminPin(e.target.value)}
+          placeholder="0000"
+          className="w-full rounded-[12px] border px-3 py-2 text-sm tracking-widest outline-none"
+          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+        />
+        {pinResetError && (
+          <p className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.red }}>
+            {pinResetError}
+          </p>
+        )}
+      </div>
+    </ConfirmModal>
+    </>
+  );
+}
+
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="mb-1 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
+        {label}
+      </div>
+      {children}
     </div>
   );
 }

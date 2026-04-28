@@ -10,7 +10,15 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import DepartmentEnum, Employee
 from app.routers._errors import ErrorCode, http_error
-from app.schemas import EmployeeCreate, EmployeeResponse, EmployeeUpdate
+from app.schemas import (
+    EmployeeCreate,
+    EmployeePinResetRequest,
+    EmployeeResponse,
+    EmployeeUpdate,
+    PinVerifyRequest,
+)
+from app.routers.settings import require_admin
+from app.services.pin_auth import DEFAULT_PIN_HASH, verify_pin
 from app.services import audit
 from app.services._tx import commit_and_refresh, commit_only
 
@@ -85,9 +93,8 @@ def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, request: Re
     if payload.display_order is not None and employee.display_order != payload.display_order:
         employee.display_order = payload.display_order; changed.append("display_order")
     if payload.is_active is not None:
-        new_flag = "true" if payload.is_active else "false"
-        if employee.is_active != new_flag:
-            employee.is_active = new_flag; changed.append("is_active")
+        if employee.is_active != payload.is_active:
+            employee.is_active = payload.is_active; changed.append("is_active")
 
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
@@ -123,6 +130,47 @@ def delete_employee(employee_id: uuid.UUID, request: Request, db: Session = Depe
     commit_only(db)
 
 
+@router.post("/{employee_id}/verify-pin", response_model=EmployeeResponse)
+def verify_employee_pin(employee_id: uuid.UUID, payload: PinVerifyRequest, db: Session = Depends(get_db)):
+    """작업자 식별용 PIN 검증 — 실제 보안 인증이 아님."""
+    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    if not employee:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    if not bool(employee.is_active):
+        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원입니다.")
+    if not verify_pin(employee.pin_hash, payload.pin):
+        raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
+    return _to_response(employee)
+
+
+@router.post("/{employee_id}/reset-pin", status_code=status.HTTP_204_NO_CONTENT)
+def reset_employee_pin(
+    employee_id: uuid.UUID,
+    payload: EmployeePinResetRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """직원 PIN을 기본값(0000)으로 초기화 — 관리자 PIN 검증 필요."""
+    require_admin(db, payload.admin_pin)
+
+    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    if not employee:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+
+    employee.pin_hash = DEFAULT_PIN_HASH
+    employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
+
+    audit.record(
+        db,
+        request=request,
+        action="employee.reset_pin",
+        target_type="employee",
+        target_id=str(employee.employee_id),
+        payload_summary=f"{employee.name} PIN 초기화",
+    )
+    commit_only(db)
+
+
 def _to_response(employee: Employee) -> EmployeeResponse:
     return EmployeeResponse(
         employee_id=employee.employee_id,
@@ -133,7 +181,7 @@ def _to_response(employee: Employee) -> EmployeeResponse:
         department=employee.department,
         level=employee.level,
         display_order=int(employee.display_order),
-        is_active=employee.is_active == "true",
+        is_active=bool(employee.is_active),
         created_at=employee.created_at,
         updated_at=employee.updated_at,
     )

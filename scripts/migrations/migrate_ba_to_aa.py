@@ -9,13 +9,12 @@ erp_code에 '-BA-' 패턴이 있으면 '-AA-'로 교체한다.
 """
 
 import argparse
-import shutil
 import sqlite3
 import sys
 from datetime import datetime
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent.parent / "backend" / "erp.db"
+DB_PATH = Path(__file__).resolve().parents[2] / "backend" / "erp.db"
 
 
 def main(apply: bool) -> None:
@@ -25,7 +24,8 @@ def main(apply: bool) -> None:
 
     if apply:
         backup = DB_PATH.with_name(f"erp_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db")
-        shutil.copy2(DB_PATH, backup)
+        with sqlite3.connect(DB_PATH) as _src, sqlite3.connect(backup) as _dst:
+            _src.backup(_dst)
         print(f"[BACKUP] {backup}")
 
     conn = sqlite3.connect(DB_PATH)

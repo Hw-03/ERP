@@ -103,7 +103,21 @@ function HistoryLogRowImpl({ log, selected, copiedRef, onSelect, onCopyRef }: Pr
         </span>
       </td>
       <td className="max-w-[180px] border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <div className="truncate font-semibold">{log.item_name}</div>
+        <div className="flex items-center gap-1.5">
+          <div className="truncate font-semibold">{log.item_name}</div>
+          {(log.edit_count ?? 0) > 0 && (
+            <span
+              className="inline-flex shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+              style={{
+                background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 16%, transparent)`,
+                color: LEGACY_COLORS.yellow,
+              }}
+              title={`${log.edit_count}회 수정됨`}
+            >
+              수정됨
+            </span>
+          )}
+        </div>
       </td>
       <td
         className="whitespace-nowrap border-b px-4 py-3 text-xs"

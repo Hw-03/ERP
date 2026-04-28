@@ -98,6 +98,16 @@ class ItemWithInventory(ItemResponse):
     department: Optional[str] = None
 
 
+class PinVerifyRequest(BaseModel):
+    # 작업자 식별용 PIN 검증 요청 — 실제 보안 인증이 아님
+    pin: str = Field(..., min_length=1, max_length=20)
+
+
+class EmployeePinResetRequest(BaseModel):
+    # 직원 PIN 초기화 — 관리자 PIN 검증 필요
+    admin_pin: str = Field(..., min_length=1, max_length=32)
+
+
 class EmployeeCreate(BaseModel):
     employee_code: str = Field(..., max_length=30)
     name: str = Field(..., max_length=100)
@@ -390,7 +400,42 @@ class ProductionReceiptResponse(BaseModel):
 
 
 class TransactionLogUpdate(BaseModel):
+    """[Deprecated] notes만 수정. 3차에서 TransactionMetaEditRequest로 교체됨."""
     notes: Optional[str] = Field(None, description="비고 수정")
+
+
+class TransactionMetaEditRequest(BaseModel):
+    """거래 메타데이터(notes/reference_no/produced_by) 수정 요청. reason + PIN 필수."""
+
+    notes: Optional[str] = None
+    reference_no: Optional[str] = None
+    produced_by: Optional[str] = None
+    reason: str = Field(..., min_length=1, description="수정 사유 (필수)")
+    edited_by_employee_id: uuid.UUID
+    edited_by_pin: str = Field(..., min_length=1, max_length=20)
+
+
+class TransactionQuantityCorrectionRequest(BaseModel):
+    """RECEIVE/SHIP 수량 보정 요청. SHIP은 quantity_change가 음수여야 함."""
+
+    quantity_change: Decimal = Field(..., description="RECEIVE: 양수, SHIP: 음수")
+    reason: str = Field(..., min_length=1)
+    edited_by_employee_id: uuid.UUID
+    edited_by_pin: str = Field(..., min_length=1, max_length=20)
+
+
+class TransactionEditLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    edit_id: uuid.UUID
+    original_log_id: uuid.UUID
+    edited_by_employee_id: uuid.UUID
+    edited_by_name: str
+    reason: str
+    before_payload: str
+    after_payload: str
+    correction_log_id: Optional[uuid.UUID] = None
+    created_at: datetime
 
 
 class TransactionLogResponse(BaseModel):
@@ -410,6 +455,14 @@ class TransactionLogResponse(BaseModel):
     produced_by: Optional[str]
     notes: Optional[str]
     created_at: datetime
+    edit_count: int = 0  # 3차: 수정 이력 개수
+
+
+class TransactionQuantityCorrectionResponse(BaseModel):
+    """4차 수량 보정 응답. 원본 + 보정 거래 한 쌍."""
+
+    original: TransactionLogResponse
+    correction: TransactionLogResponse
 
 
 class MessageResponse(BaseModel):

@@ -29,8 +29,6 @@ export function DesktopHistoryView() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [calendarLoading, setCalendarLoading] = useState(false);
-  const [editingNotes, setEditingNotes] = useState("");
-  const [savingNotes, setSavingNotes] = useState(false);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
   const [itemRecentLogs, setItemRecentLogs] = useState<TransactionLog[]>([]);
 
@@ -56,7 +54,6 @@ export function DesktopHistoryView() {
       setItemRecentLogs([]);
       return;
     }
-    setEditingNotes(selected.notes ?? "");
     void api
       .getTransactions({ itemId: selected.item_id, limit: 6 })
       .then((data) => {
@@ -171,16 +168,18 @@ export function DesktopHistoryView() {
     }
   }
 
-  async function saveNotes() {
-    if (!selected) return;
-    setSavingNotes(true);
-    try {
-      const updated = await api.updateTransactionNotes(selected.log_id, editingNotes || null);
-      setLogs((prev) => prev.map((l) => (l.log_id === updated.log_id ? updated : l)));
-      setSelected(updated);
-    } finally {
-      setSavingNotes(false);
-    }
+  function handleLogUpdated(updated: TransactionLog) {
+    setLogs((prev) => prev.map((l) => (l.log_id === updated.log_id ? updated : l)));
+    setSelected(updated);
+  }
+
+  function handleLogCorrected(result: { original: TransactionLog; correction: TransactionLog }) {
+    // 원본 로그 갱신 + 보정 거래 prepend
+    setLogs((prev) => {
+      const without = prev.filter((l) => l.log_id !== result.original.log_id);
+      return [result.correction, result.original, ...without];
+    });
+    setSelected(result.original);
   }
 
   function copyRef(ref: string, e: React.MouseEvent) {
@@ -323,12 +322,10 @@ export function DesktopHistoryView() {
       >
         <HistoryDetailPanel
           selected={selected}
-          editingNotes={editingNotes}
-          setEditingNotes={setEditingNotes}
-          savingNotes={savingNotes}
-          onSaveNotes={() => void saveNotes()}
           itemRecentLogs={itemRecentLogs}
           onSelectLog={(log) => setSelected(log)}
+          onLogUpdated={handleLogUpdated}
+          onLogCorrected={handleLogCorrected}
         />
       </DesktopRightPanel>
     </div>
