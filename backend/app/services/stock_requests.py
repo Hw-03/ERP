@@ -23,7 +23,9 @@ from sqlalchemy.orm import Session
 from app.models import (
     DepartmentEnum,
     Employee,
+    InventoryLocation,
     Item,
+    LocationStatusEnum,
     RequestBucketEnum,
     StockRequest,
     StockRequestLine,
@@ -264,6 +266,50 @@ def _validate_lines(
         validate_line_shape_for_request_type(request_type, li)
 
 
+def _preflight_inventory_check(
+    db: Session,
+    request_type: StockRequestTypeEnum,
+    lines_input: Sequence[LineInput],
+) -> None:
+    """제출 시점 재고 사전 검증.
+
+    from_bucket==PRODUCTION 이고 승인 필요 라인(dept_to_warehouse 등)에 대해
+    부서 생산 재고가 충분한지 확인한다. 부족 시 ValueError.
+    창고→부서(from_bucket==WAREHOUSE) 라인은 reserve() 로 이미 보호되므로 제외.
+    """
+    # (item_id, department) → 요청 합산 수량
+    needed: dict[tuple, Decimal] = {}
+    for li in lines_input:
+        if (
+            li.from_bucket == RequestBucketEnum.PRODUCTION
+            and line_requires_approval(li.from_bucket, li.to_bucket)
+            and li.from_department is not None
+        ):
+            key = (li.item_id, li.from_department)
+            needed[key] = needed.get(key, Decimal("0")) + li.quantity
+
+    if not needed:
+        return
+
+    for (item_id, dept), qty in needed.items():
+        loc = (
+            db.query(InventoryLocation)
+            .filter(
+                InventoryLocation.item_id == item_id,
+                InventoryLocation.department == dept,
+                InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+            )
+            .first()
+        )
+        avail = loc.quantity if loc else Decimal("0")
+        if avail < qty:
+            item = db.query(Item).filter(Item.item_id == item_id).first()
+            item_name = item.item_name if item else str(item_id)
+            raise ValueError(
+                f"부서 생산 재고 부족: {item_name} / {dept} 생산 {avail}개, 요청 {qty}개."
+            )
+
+
 def _build_request_and_lines(
     db: Session,
     *,
@@ -391,6 +437,7 @@ def create_request(
     - 승인 불필요 → 즉시 실행 후 COMPLETED.
     """
     _validate_lines(request_type, lines_input)
+    _preflight_inventory_check(db, request_type, lines_input)
     now = datetime.utcnow()
     code = _generate_request_code(db, now)
     request = _build_request_and_lines(
@@ -567,7 +614,7 @@ def submit_draft_request(
         db.query(StockRequest).filter(StockRequest.request_id == request_id).first()
     )
     if request is None:
-        raise ValueError("장바구니를 찾을 수 없습니다.")
+        raise RequestNotFoundError("요청을 찾을 수 없습니다.")
     if request.requester_employee_id != requester_employee_id:
         raise PermissionError("본인 장바구니만 제출할 수 있습니다.")
     if request.status != StockRequestStatusEnum.DRAFT:
@@ -600,6 +647,7 @@ def submit_draft_request(
         for line in db_lines
     ]
     _validate_lines(request.request_type, line_inputs)
+    _preflight_inventory_check(db, request.request_type, line_inputs)
 
     now = datetime.utcnow()
     if not request.request_code:
@@ -959,3 +1007,7 @@ def list_active_reservations(db: Session, item_id: uuid.UUID) -> List[StockReque
 
 class FailedApprovalError(Exception):
     """승인 시점 시스템 검증 실패. 라우터가 catch 해서 별도 트랜잭션으로 status 기록."""
+
+
+class RequestNotFoundError(LookupError):
+    """request_id 가 존재하지 않을 때."""

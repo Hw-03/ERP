@@ -19,6 +19,7 @@ export interface Operator {
 }
 
 const OPERATOR_KEY = "dexcowin_erp_operator";
+const BOOT_KEY = "dexcowin_erp_boot_id";
 
 function readOperator(): Operator | null {
   if (typeof window === "undefined") return null;
@@ -48,14 +49,21 @@ export function readCurrentOperator(): Operator | null {
   return readOperator();
 }
 
-export function setCurrentOperator(op: Operator): void {
+export function getStoredBootId(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(BOOT_KEY);
+}
+
+export function setCurrentOperator(op: Operator, bootId?: string): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(OPERATOR_KEY, JSON.stringify(op));
+  if (bootId) window.localStorage.setItem(BOOT_KEY, bootId);
 }
 
 export function clearCurrentOperator(): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(OPERATOR_KEY);
+  window.localStorage.removeItem(BOOT_KEY);
 }
 
 export function useCurrentOperator(): Operator | null {

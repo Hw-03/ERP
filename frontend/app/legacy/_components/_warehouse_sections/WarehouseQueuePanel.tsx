@@ -30,8 +30,10 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
   const [showRejectFor, setShowRejectFor] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectPin, setRejectPin] = useState("");
+  const [rejectError, setRejectError] = useState<string | null>(null);
   const [approvePinFor, setApprovePinFor] = useState<string | null>(null);
   const [approvePin, setApprovePin] = useState("");
+  const [approveError, setApproveError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -53,11 +55,13 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
   const closeApprove = () => {
     setApprovePinFor(null);
     setApprovePin("");
+    setApproveError(null);
   };
   const closeReject = () => {
     setShowRejectFor(null);
     setRejectReason("");
     setRejectPin("");
+    setRejectError(null);
   };
 
   const submitApprove = async (requestId: string) => {
@@ -72,7 +76,7 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
       await reload();
       onChanged();
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "승인에 실패했습니다.");
+      setApproveError(err instanceof Error ? err.message : "승인에 실패했습니다.");
     } finally {
       setBusyId(null);
     }
@@ -80,9 +84,10 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
 
   const submitReject = async (requestId: string) => {
     if (!rejectPin || !rejectReason.trim()) {
-      window.alert("PIN과 반려 사유를 모두 입력해 주세요.");
+      setRejectError("PIN과 반려 사유를 모두 입력해 주세요.");
       return;
     }
+    setRejectError(null);
     setBusyId(requestId);
     try {
       await api.rejectStockRequest(requestId, {
@@ -94,7 +99,7 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
       await reload();
       onChanged();
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "반려에 실패했습니다.");
+      setRejectError(err instanceof Error ? err.message : "반려에 실패했습니다.");
     } finally {
       setBusyId(null);
     }
@@ -188,6 +193,11 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
               className="mt-3 flex flex-wrap items-center gap-2 rounded-[12px] border px-3 py-2"
               style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
             >
+              {approveError && (
+                <div className="w-full text-xs" style={{ color: LEGACY_COLORS.red }}>
+                  {approveError}
+                </div>
+              )}
               <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>승인 PIN</span>
               <input
                 type="password"
@@ -222,6 +232,11 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
               className="mt-3 flex flex-col gap-2 rounded-[12px] border px-3 py-2"
               style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
             >
+              {rejectError && (
+                <div className="text-xs" style={{ color: LEGACY_COLORS.red }}>
+                  {rejectError}
+                </div>
+              )}
               <textarea
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}

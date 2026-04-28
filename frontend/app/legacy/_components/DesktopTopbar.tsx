@@ -1,10 +1,10 @@
 "use client";
 
-import type { ElementType, ReactNode } from "react";
+import { useState, type ElementType, type ReactNode } from "react";
 import { LogOut, RefreshCw } from "lucide-react";
 import { LEGACY_COLORS, normalizeDepartment } from "./legacyUi";
 import { ThemeToggle } from "./ThemeToggle";
-import { StatusPill, inferToneFromStatus } from "./common";
+import { ConfirmModal, StatusPill, inferToneFromStatus } from "./common";
 import { clearCurrentOperator, useCurrentOperator } from "./login/useCurrentOperator";
 
 const WAREHOUSE_ROLE_LABEL: Record<string, string | null> = {
@@ -28,11 +28,10 @@ export function DesktopTopbar({
 }) {
   const operator = useCurrentOperator();
   const roleLabel = operator ? WAREHOUSE_ROLE_LABEL[operator.warehouse_role] ?? null : null;
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const handleLogout = () => {
-    if (!window.confirm("로그아웃하시겠습니까?")) return;
-    clearCurrentOperator();
-    window.location.reload();
+    setShowLogoutModal(true);
   };
 
   return (
@@ -112,6 +111,20 @@ export function DesktopTopbar({
           </button>
         )}
       </div>
+
+      <ConfirmModal
+        open={showLogoutModal}
+        title="로그아웃"
+        tone="caution"
+        confirmLabel="로그아웃"
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={() => {
+          clearCurrentOperator();
+          window.location.reload();
+        }}
+      >
+        로그아웃하시겠습니까?
+      </ConfirmModal>
     </header>
   );
 }

@@ -1133,3 +1133,58 @@ def test_draft_does_not_appear_in_my_requests_or_warehouse_queue(
     assert res_q.status_code == 200
     assert all(r["status"] != "draft" for r in res_q.json())
     assert len(res_q.json()) == 0
+
+
+# ---------------------------------------------------------------------------
+# Fix 4: 존재하지 않는 request_id submit → 404
+# ---------------------------------------------------------------------------
+
+
+def test_submit_nonexistent_request_id_returns_404(db_session, client):
+    requester = _make_employee(db_session, code="FIX4", name="테스터Fix4")
+    db_session.commit()
+
+    fake_id = str(uuid.uuid4())
+    res = client.post(
+        f"/api/stock-requests/{fake_id}/submit",
+        json={"requester_employee_id": str(requester.employee_id)},
+    )
+    assert res.status_code == 404, res.json()
+
+
+# ---------------------------------------------------------------------------
+# Fix 3: dept_to_warehouse — 부서 생산 재고 부족 시 submit → 422
+# ---------------------------------------------------------------------------
+
+
+def test_submit_dept_to_warehouse_fails_when_production_stock_insufficient(
+    db_session, client, make_item, make_location
+):
+    item = make_item(name="FIX3001", warehouse_qty=Decimal("0"))
+    # 부서 생산 재고 0 (make_location 없음 — InventoryLocation row 없음)
+    requester = _make_employee(db_session, code="FIX3A", name="테스터Fix3")
+    db_session.commit()
+
+    out = _upsert_draft(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="dept_to_warehouse",
+        lines=[
+            {
+                "item_id": str(item.item_id),
+                "quantity": "5",
+                "from_bucket": "production",
+                "from_department": DepartmentEnum.ASSEMBLY.value,
+                "to_bucket": "warehouse",
+            }
+        ],
+    )
+    assert out["status_code"] == 200, out["body"]
+    request_id = out["body"]["request_id"]
+
+    res = client.post(
+        f"/api/stock-requests/{request_id}/submit",
+        json={"requester_employee_id": str(requester.employee_id)},
+    )
+    assert res.status_code == 422, res.json()
+    assert "재고 부족" in res.json().get("detail", {}).get("message", "")

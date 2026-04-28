@@ -368,6 +368,9 @@ def submit_stock_request_draft(
             request_id=request_id,
             requester_employee_id=payload.requester_employee_id,
         )
+    except svc.RequestNotFoundError as exc:
+        db.rollback()
+        raise http_error(404, ErrorCode.NOT_FOUND, str(exc))
     except PermissionError as exc:
         db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))

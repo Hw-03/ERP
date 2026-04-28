@@ -1440,4 +1440,7 @@ export const api = {
     if (!res.ok) throw new Error(await parseError(res));
     return res.json() as Promise<StockRequest>;
   },
+
+  getAppSession: (): Promise<{ boot_id: string; started_at: string }> =>
+    fetcher(toApiUrl("/api/app-session")),
 };

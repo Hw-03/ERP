@@ -46,6 +46,10 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
   const [items, setItems] = useState<StockRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<StockRequest | null>(null);
+  const [cancelPin, setCancelPin] = useState("");
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
 
   const reload = useCallback(async () => {
     if (!employeeId) {
@@ -68,18 +72,34 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
     void reload();
   }, [reload, refreshNonce]);
 
-  const handleCancel = async (request: StockRequest) => {
-    const pin = window.prompt("취소를 위해 PIN을 입력하세요.", "");
-    if (!pin) return;
+  const openCancel = (request: StockRequest) => {
+    setCancelTarget(request);
+    setCancelPin("");
+    setCancelError(null);
+  };
+
+  const closeCancel = () => {
+    setCancelTarget(null);
+    setCancelPin("");
+    setCancelError(null);
+  };
+
+  const submitCancel = async () => {
+    if (!cancelTarget || !cancelPin.trim() || cancelBusy) return;
+    setCancelBusy(true);
+    setCancelError(null);
     try {
-      await api.cancelStockRequest(request.request_id, {
-        actor_employee_id: request.requester_employee_id,
-        pin,
+      await api.cancelStockRequest(cancelTarget.request_id, {
+        actor_employee_id: cancelTarget.requester_employee_id,
+        pin: cancelPin,
       });
+      closeCancel();
       await reload();
       onChanged();
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "요청 취소에 실패했습니다.");
+      setCancelError(err instanceof Error ? err.message : "요청 취소에 실패했습니다.");
+    } finally {
+      setCancelBusy(false);
     }
   };
 
@@ -124,6 +144,7 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
       {items.map((req) => {
         const cancelable =
           req.status === "submitted" || req.status === "reserved";
+        const isThisCancel = cancelTarget?.request_id === req.request_id;
         return (
           <div
             key={req.request_id}
@@ -188,7 +209,7 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
               </div>
             )}
 
-            {cancelable && (
+            {cancelable && !isThisCancel && (
               <div className="mt-3 flex justify-end">
                 <button
                   type="button"
@@ -198,10 +219,69 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
                     color: LEGACY_COLORS.text,
                     background: LEGACY_COLORS.s1,
                   }}
-                  onClick={() => handleCancel(req)}
+                  onClick={() => openCancel(req)}
                 >
                   취소
                 </button>
+              </div>
+            )}
+
+            {isThisCancel && (
+              <div
+                className="mt-3 rounded-[12px] border px-4 py-3"
+                style={{ borderColor: LEGACY_COLORS.borderStrong, background: LEGACY_COLORS.s1 }}
+              >
+                <p className="mb-2 text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
+                  취소 PIN 입력
+                </p>
+                {cancelError && (
+                  <p className="mb-2 text-xs" style={{ color: LEGACY_COLORS.red }}>
+                    {cancelError}
+                  </p>
+                )}
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  placeholder="PIN"
+                  value={cancelPin}
+                  onChange={(e) => setCancelPin(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") void submitCancel(); }}
+                  className="mb-2 w-full rounded-[8px] border px-3 py-1.5 text-sm outline-none"
+                  style={{
+                    background: LEGACY_COLORS.s2,
+                    borderColor: LEGACY_COLORS.border,
+                    color: LEGACY_COLORS.text,
+                  }}
+                  autoFocus
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={closeCancel}
+                    disabled={cancelBusy}
+                    className="rounded-[8px] border px-3 py-1.5 text-xs"
+                    style={{
+                      borderColor: LEGACY_COLORS.border,
+                      color: LEGACY_COLORS.muted,
+                      background: LEGACY_COLORS.s2,
+                    }}
+                  >
+                    닫기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void submitCancel()}
+                    disabled={!cancelPin.trim() || cancelBusy}
+                    className="rounded-[8px] px-3 py-1.5 text-xs font-bold text-white"
+                    style={{
+                      background: LEGACY_COLORS.red,
+                      opacity: !cancelPin.trim() || cancelBusy ? 0.4 : 1,
+                      cursor: !cancelPin.trim() || cancelBusy ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {cancelBusy ? "처리 중..." : "확인"}
+                  </button>
+                </div>
               </div>
             )}
           </div>

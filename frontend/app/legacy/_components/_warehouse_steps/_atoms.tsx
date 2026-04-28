@@ -89,7 +89,7 @@ export function WizardStepCard({
       <section
         className="rounded-[24px] border-2 p-6"
         style={{
-          background: LEGACY_COLORS.s1,
+          backgroundColor: LEGACY_COLORS.s1,
           borderColor: `color-mix(in srgb, ${tone} 50%, transparent)`,
           boxShadow: "var(--c-card-shadow)",
           backgroundImage: "var(--c-panel-glow)",

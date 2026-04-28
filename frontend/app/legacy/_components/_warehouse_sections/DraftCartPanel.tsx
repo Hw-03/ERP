@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type StockRequest } from "@/lib/api";
 import { LEGACY_COLORS, formatNumber, normalizeDepartment } from "../legacyUi";
+import { ConfirmModal } from "../common";
 
 const REQUEST_TYPE_LABEL: Record<string, string> = {
   raw_receive: "원자재 입고",
@@ -33,6 +34,8 @@ export function DraftCartPanel({
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<StockRequest | null>(null);
+  const [opError, setOpError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     if (!employeeId) {
@@ -57,19 +60,17 @@ export function DraftCartPanel({
     void reload();
   }, [reload, refreshNonce]);
 
-  const handleDelete = async (draft: StockRequest) => {
-    if (!employeeId) return;
-    const ok = window.confirm("이 장바구니 항목을 삭제하시겠습니까?");
-    if (!ok) return;
+  const handleDeleteConfirm = async () => {
+    if (!employeeId || !deleteTarget) return;
     try {
-      setBusyId(draft.request_id);
-      await api.deleteStockRequestDraft(draft.request_id, employeeId);
+      setBusyId(deleteTarget.request_id);
+      await api.deleteStockRequestDraft(deleteTarget.request_id, employeeId);
+      setDeleteTarget(null);
       await reload();
       onChanged();
     } catch (err) {
-      window.alert(
-        err instanceof Error ? err.message : "장바구니 삭제에 실패했습니다.",
-      );
+      setOpError(err instanceof Error ? err.message : "장바구니 삭제에 실패했습니다.");
+      setDeleteTarget(null);
     } finally {
       setBusyId(null);
     }
@@ -83,9 +84,7 @@ export function DraftCartPanel({
       await reload();
       onChanged();
     } catch (err) {
-      window.alert(
-        err instanceof Error ? err.message : "요청 제출에 실패했습니다.",
-      );
+      setOpError(err instanceof Error ? err.message : "요청 제출에 실패했습니다.");
     } finally {
       setBusyId(null);
     }
@@ -123,6 +122,24 @@ export function DraftCartPanel({
           }}
         >
           {loadError}
+        </div>
+      )}
+      {opError && (
+        <div
+          className="rounded-[12px] border px-4 py-3 text-sm"
+          style={{
+            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`,
+            color: LEGACY_COLORS.red,
+            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
+          }}
+        >
+          {opError}
+          <button
+            className="ml-2 underline text-xs"
+            onClick={() => setOpError(null)}
+          >
+            닫기
+          </button>
         </div>
       )}
       {!loading && drafts.length === 0 && !loadError && (
@@ -237,7 +254,7 @@ export function DraftCartPanel({
               </button>
               <button
                 type="button"
-                onClick={() => void handleDelete(draft)}
+                onClick={() => setDeleteTarget(draft)}
                 disabled={isBusy}
                 className="rounded-[10px] border px-3 py-1.5 text-xs"
                 style={{
@@ -266,6 +283,17 @@ export function DraftCartPanel({
           </div>
         );
       })}
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title="장바구니 삭제"
+        tone="danger"
+        confirmLabel="삭제"
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => void handleDeleteConfirm()}
+      >
+        이 장바구니 항목을 삭제하시겠습니까?
+      </ConfirmModal>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { LoginIntro } from "./LoginIntro";
 import { OperatorLoginCard } from "./OperatorLoginCard";
-import { clearCurrentOperator, readCurrentOperator } from "./useCurrentOperator";
+import { clearCurrentOperator, getStoredBootId, readCurrentOperator } from "./useCurrentOperator";
 
 type GatePhase = "loading" | "intro" | "form" | "authed";
 
@@ -29,10 +29,28 @@ export function ErpLoginGate({ children }: ErpLoginGateProps) {
       return () => { cancelled = true; };
     }
 
-    // 작업자 식별용 — 비활성 직원이면 자동 진입을 차단한다 (보안 인증 아님).
-    void api
-      .getEmployees({ activeOnly: true })
-      .then((list) => {
+    void (async () => {
+      // boot_id 불일치 시 서버 재시작 감지 → 재로그인 강제
+      try {
+        const session = await api.getAppSession();
+        if (cancelled) return;
+        const storedBootId = getStoredBootId();
+        if (storedBootId !== session.boot_id) {
+          clearCurrentOperator();
+          goToLogin();
+          return;
+        }
+      } catch {
+        // 서버 응답 불가 시 보수적으로 재로그인
+        if (cancelled) return;
+        clearCurrentOperator();
+        goToLogin();
+        return;
+      }
+
+      // 작업자 식별용 — 비활성 직원이면 자동 진입을 차단한다 (보안 인증 아님).
+      try {
+        const list = await api.getEmployees({ activeOnly: true });
         if (cancelled) return;
         const stillActive = list.some((e) => e.employee_id === stored.employee_id);
         if (stillActive) {
@@ -41,12 +59,12 @@ export function ErpLoginGate({ children }: ErpLoginGateProps) {
           clearCurrentOperator();
           goToLogin();
         }
-      })
-      .catch(() => {
-        // 네트워크 실패 시 보수적으로 로그인 화면으로
+      } catch {
+        if (cancelled) return;
         clearCurrentOperator();
         goToLogin();
-      });
+      }
+    })();
 
     return () => { cancelled = true; };
   }, []);

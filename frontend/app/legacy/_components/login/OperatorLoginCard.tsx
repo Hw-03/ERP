@@ -60,14 +60,20 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
     setError("");
     try {
       const emp = await api.verifyEmployeePin(selected.employee_id, pin);
-      setCurrentOperator({
+      const op = {
         employee_id: emp.employee_id,
         name: emp.name,
         department: emp.department,
         level: emp.level,
         employee_code: emp.employee_code,
         warehouse_role: emp.warehouse_role ?? "none",
-      });
+      };
+      try {
+        const session = await api.getAppSession();
+        setCurrentOperator(op, session.boot_id);
+      } catch {
+        setCurrentOperator(op);
+      }
       onLogin();
     } catch {
       setError("PIN이 올바르지 않습니다.");

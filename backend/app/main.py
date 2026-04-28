@@ -8,6 +8,7 @@ Startup 부작용 (create_all / run_migrations / seed / ERP 백필) 은 모두
     python bootstrap_db.py --all
 """
 
+import datetime as _dt
 import os
 import uuid
 
@@ -50,6 +51,10 @@ from app.routers import (
     stock_requests,
     variance,
 )
+
+
+_BOOT_ID: str = uuid.uuid4().hex
+_BOOT_STARTED_AT: str = _dt.datetime.utcnow().isoformat()
 
 
 app = FastAPI(
@@ -247,6 +252,11 @@ app.include_router(stock_requests.router, prefix="/api/stock-requests", tags=["S
 @app.get("/health", tags=["System"])
 def health_check():
     return {"status": "ok", "service": "X-Ray ERP API"}
+
+
+@app.get("/api/app-session", tags=["System"])
+def app_session():
+    return {"boot_id": _BOOT_ID, "started_at": _BOOT_STARTED_AT}
 
 
 @app.get("/health/detailed", tags=["System"])
