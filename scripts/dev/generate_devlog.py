@@ -73,9 +73,9 @@ def build_dashboard(ws, commits):
     # KPI 영역 (행 3~6)
     ws.row_dimensions[3].height = 22
     kpis = [
-        ("개발 기간", "2026-04-10 ~ 04-24 (15일)"),
+        ("개발 기간", "2026-04-10 ~ 04-27 (18일)"),
         ("총 커밋 수", f"{len(commits)}건"),
-        ("기능 완료", "17 / 26개 (65%)"),
+        ("기능 완료", "20 / 29개 (69%)"),
         ("개발 영역", "Backend · Frontend · Mobile · Admin · Docs"),
     ]
 
@@ -143,6 +143,7 @@ def build_summary(ws, commits):
     c3 = count_commits_in_range(commits, "2026-04-17", "2026-04-19")
     c4 = count_commits_in_range(commits, "2026-04-21", "2026-04-21")
     c5 = count_commits_in_range(commits, "2026-04-22", "2026-04-24")
+    c6 = count_commits_in_range(commits, "2026-04-25", "2026-04-27")
 
     rows = [
         ("2026-04-10 ~ 04-11", "기반 구축",
@@ -155,6 +156,8 @@ def build_summary(ws, commits):
          "레거시 레이아웃 Figma 맞춤 정제", c4, "완료"),
         ("2026-04-22 ~ 04-24", "실 운영 준비",
          "erp_code 통일·재고 시각화·모바일UX\n품목매칭 도구·ESLint·계산 일원화(N+1 제거)", c5, "완료"),
+        ("2026-04-25 ~ 04-27", "운영 품질 개선",
+         "입출고 단계형 Wizard UX·BOM Where-Used\n코드 품질 대정비(Phase 5)·CI 도입\n로그인 화면 구현·ERP 카테고리 코드 정비", c6, "완료"),
     ]
 
     for r, (period, cat, work, cnt, status) in enumerate(rows, 2):
@@ -191,6 +194,7 @@ def build_features(ws):
         ("재고 현황 막대 시각화",       "재고",   True,  ""),
         ("BOM 등록 / 조회",            "BOM",   True,  ""),
         ("BOM 웹 수정 기능",           "BOM",   True,  ""),
+        ("BOM Where-Used 조회",       "BOM",   True,  ""),
         ("직원 명단 관리",             "직원",   True,  ""),
         ("부서별 담당 색상 배지 표시",   "직원",   True,  ""),
         ("관리자 화면",                "관리",   True,  ""),
@@ -198,13 +202,15 @@ def build_features(ws):
         ("PC 화면 (데스크톱)",          "UI",    True,  ""),
         ("모바일 화면",                "UI",    True,  ""),
         ("다크 / 라이트 모드",          "UI",    True,  ""),
+        ("입출고 단계형 Wizard UX",     "UI",    True,  ""),
         ("원클릭 실행 (start.bat)",     "인프라", True,  ""),
+        ("테스트 자동화 (CI)",          "인프라", True,  ""),
         # ── 예정 ─────────────────────────────────────────
         ("총재고 / 가용재고 / 예약재고 분리", "재고",  False, ""),
         ("생산 / 분해 / 반품 처리 Queue",   "생산",  False, ""),
         ("QR · 바코드 스캔 완성",           "입출고", False, "모바일 카메라 연동"),
         ("실제 운영 데이터 입력",            "데이터", False, "권동환 사원 협의 후"),
-        ("로그인 및 권한 관리",              "보안",  False, ""),
+        ("로그인 및 권한 관리",              "보안",  False, "화면 구현 완료 — 인증 연동 예정"),
         ("외부 접근 환경 구성",              "인프라", False, "PC 또는 NAS 서버"),
         ("발주 관리",                       "구매",  False, ""),
         ("생산 실적 / 원가 관리",            "생산",  False, ""),
