@@ -24,6 +24,9 @@ export type UseAdminBomArgs = {
   onError: (msg: string) => void;
 };
 
+export type AddRequest = { childId: string; childName: string; qty: number };
+export type DeleteRequest = { bomId: string; childName: string };
+
 export type AdminBomState = {
   // 기본 상태
   parentId: string;
@@ -46,6 +49,14 @@ export type AdminBomState = {
   editingQty: string;
   setEditingQty: (v: string) => void;
 
+  // 자재 추가 슬라이드 패널
+  childPickerOpen: boolean;
+  setChildPickerOpen: (v: boolean) => void;
+
+  // 부모 목록 표시 제한
+  bomParentDisplayLimit: number;
+  setBomParentDisplayLimit: (n: number) => void;
+
   // 외부 데이터 (props 로 받은 그대로 노출)
   items: Item[];
   allBomRows: BOMDetailEntry[];
@@ -53,14 +64,21 @@ export type AdminBomState = {
   // 파생
   bomParentItems: Item[];
   bomChildItems: ChildItemPlus[];
+  bomStats: { totalRelations: number; parentCount: number; childCount: number };
 
   // Phase 5: Where-Used (선택된 parent 가 어떤 다른 parent 의 child 로 들어가는지)
   whereUsedRows: BOMDetailEntry[];
 
+  // ConfirmModal 요청 상태
+  addRequest: AddRequest | null;
+  setAddRequest: (v: AddRequest | null) => void;
+  deleteRequest: DeleteRequest | null;
+  setDeleteRequest: (v: DeleteRequest | null) => void;
+
   // 액션
-  addBomRow: (childId: string, qty: number) => void;
-  saveBomQty: (row: BOMEntry) => void;
-  deleteBomRow: (bomId: string) => void;
+  addBomRow: (childId: string, qty: number) => Promise<void>;
+  saveBomQty: (row: BOMEntry) => Promise<void>;
+  deleteBomRow: (bomId: string) => Promise<void>;
 };
 
 export function useAdminBom({
@@ -80,6 +98,10 @@ export function useAdminBom({
   const [pendingChildQty, setPendingChildQty] = useState("1");
   const [editingBomId, setEditingBomId] = useState<string | null>(null);
   const [editingQty, setEditingQty] = useState("");
+  const [childPickerOpen, setChildPickerOpen] = useState(false);
+  const [bomParentDisplayLimit, setBomParentDisplayLimit] = useState(30);
+  const [addRequest, setAddRequest] = useState<AddRequest | null>(null);
+  const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
 
   useEffect(() => {
     if (!parentId) {
@@ -107,8 +129,18 @@ export function useAdminBom({
     if (bomParentCat !== "ALL") pool = pool.filter((i) => i.category === bomParentCat);
     const kw = bomParentSearch.trim().toLowerCase();
     if (kw) pool = pool.filter((i) => `${i.item_name} ${i.erp_code ?? ""}`.toLowerCase().includes(kw));
-    return pool.slice(0, 100);
+    return pool;
   }, [items, bomParentSearch, bomParentCat]);
+
+  const bomStats = useMemo(() => {
+    const parentIds = new Set(allBomRows.map((r) => r.parent_item_id));
+    const childIds = new Set(allBomRows.map((r) => r.child_item_id));
+    return {
+      totalRelations: allBomRows.length,
+      parentCount: parentIds.size,
+      childCount: childIds.size,
+    };
+  }, [allBomRows]);
 
   const bomChildItems = useMemo<ChildItemPlus[]>(() => {
     const kw = bomChildSearch.trim().toLowerCase();
@@ -139,6 +171,7 @@ export function useAdminBom({
       setBomRows((current) => [...current, created]);
       setPendingChildId(null);
       setPendingChildQty("1");
+      setChildPickerOpen(false);
       refreshAllBom();
       onStatusChange("BOM 항목을 추가했습니다.");
     } catch (err) {
@@ -190,13 +223,22 @@ export function useAdminBom({
     setEditingBomId,
     editingQty,
     setEditingQty,
+    childPickerOpen,
+    setChildPickerOpen,
+    bomParentDisplayLimit,
+    setBomParentDisplayLimit,
     items,
     allBomRows,
     bomParentItems,
     bomChildItems,
+    bomStats,
     whereUsedRows,
-    addBomRow: (childId, qty) => void addBomRow(childId, qty),
-    saveBomQty: (row) => void saveBomQty(row),
-    deleteBomRow: (bomId) => void deleteBomRow(bomId),
+    addRequest,
+    setAddRequest,
+    deleteRequest,
+    setDeleteRequest,
+    addBomRow,
+    saveBomQty,
+    deleteBomRow,
   };
 }

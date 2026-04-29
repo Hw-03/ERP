@@ -19,10 +19,10 @@ export function BomStepIndicator({
   childSelected: boolean;
 }) {
   const steps: Step[] = [
-    { step: "①", label: "부모품목 선택", active: !parentSelected, done: parentSelected },
+    { step: "①", label: "상위 품목 선택", active: !parentSelected, done: parentSelected },
     {
       step: "②",
-      label: "자식품목 선택",
+      label: "하위 품목 선택",
       active: parentSelected && !childSelected,
       done: childSelected,
     },
