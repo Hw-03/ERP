@@ -344,7 +344,7 @@ export function AdminEmployeesSection() {
                   : "변경 이력 없음"}
               </p>
               <p className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                보안상 PIN 자체는 표시되지 않습니다. 직원이 PIN을 잊은 경우 아래 '초기화'로 0000로 되돌리세요.
+                보안상 PIN 자체는 표시되지 않습니다. 직원이 PIN을 잊은 경우 아래 &apos;초기화&apos;로 0000로 되돌리세요.
               </p>
             </div>
 
