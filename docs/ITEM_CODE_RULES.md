@@ -33,15 +33,6 @@
 34-TR-0023
 ```
 
-## category와 process_type_code 구분
-
-| 필드 | 용도 | 예시 |
-|---|---|---|
-| `category` | 원본 엑셀/레거시 통합 단계에서 온 품목 원천 분류 | `RM`, `TA`, `TF`, `HA`, `HF`, `VA`, `VF`, `AA`, `AF`, `FG`, `UK` |
-| `process_type_code` | 품목 코드 생성, 부서 필터, 공정 라벨의 기준 | `TR`, `TA`, `TF`, `HR`, `HA`, `HF`, `VR`, `VA`, `VF`, `NR`, `NA`, `NF`, `AR`, `AA`, `AF`, `PR`, `PA`, `PF` |
-
-부서 필터와 품목 코드 판정은 반드시 `process_type_code` 기준으로 한다. `category`만 보고 부서를 판단하면 전체 필터와 개별 전체 선택 결과가 달라질 수 있다.
-
 ## AI 금지 규칙
 
 1. `BF`/`BA`를 조립 코드로 추가하지 않는다. 조립 A/F 타입은 `AA`/`AF`다.
@@ -54,16 +45,18 @@
 
 | 역할 | 파일 | 기준 위치 |
 |---|---|---|
-| process types 시드 | `backend/app/main.py` | `ensure_reference_data()` |
+| process types 시드 | `backend/bootstrap_db.py` | `_PROCESS_TYPES` / `seed_reference_data()` |
+| process types DB 테이블 | `backend/app/models.py` | `ProcessType` |
 | 부서 매핑 백엔드 | `backend/app/routers/items.py` | `_PROCESS_TO_DEPT` |
-| 카테고리 -> 공정코드 | `backend/app/utils/erp_code.py` | `_CATEGORY_TO_PROCESS` |
-| 부서 매핑 프론트 | `frontend/app/legacy/_components/legacyUi.ts` | `PROCESS_TO_DEPT` |
-| 공정 라벨 프론트 | `frontend/app/legacy/_components/legacyUi.ts` | `PROCESS_LABEL` |
-| 카테고리 UI 메타 | `frontend/components/CategoryCard.tsx` | `CATEGORY_META` |
-| API Item 타입 | `frontend/lib/api.ts` | `Item.department`, `process_type_code` |
+| 공정 라벨 프론트 | `frontend/app/legacy/_components/_history_sections/historyShared.ts` | `PROCESS_TYPE_META` |
+| 공정 선택 UI 상수 | `frontend/app/legacy/_components/_admin_sections/adminShared.ts` | `PROCESS_TYPE_OPTIONS` |
+| API Item 타입 | `frontend/lib/api.ts` | `ProcessTypeCode`, `Item.process_type_code` |
 
 ## 최신 변경 메모
 
-- 2026-04-23: 재고 필터 불일치 원인 추적 중 `BF`, `BA`가 구형/오염 코드로 남아 있음을 확인했다.
-- `BF → AF`, `BA → AA` 전환 완료. 기준을 `AR/AA/AF → 조립`으로 확정했다.
+- 2026-04-23: `BF → AF`, `BA → AA` 전환. 조립 A/F 타입을 `AA`/`AF`로 확정.
+- 2026-04-29: `Item.category` (`CategoryEnum` 11개) 완전 제거. `process_type_code` 18개 단일 기준으로 통일.
+  - 백엔드: `CategoryEnum` 클래스, `Item.category` 컬럼, `_CATEGORY_TO_PROCESS` 매핑 제거.
+  - 프론트: `Category` 타입, `CATEGORY_META`, `item.category` 참조 전체 제거. `PROCESS_TYPE_META` / `ProcessTypeCode`로 대체.
+  - DB: 정리본 722건 기준으로 재생성. `sum(inventory.quantity) = 108,924`.
 - `TR/TA/TF`, `HR/HA/HF`, `VR/VA/VF`, `NR/NA/NF`, `AR/AA/AF`, `PR/PA/PF` 18개 코드가 현재 기준이다.

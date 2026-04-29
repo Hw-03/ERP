@@ -100,7 +100,7 @@ available = total - pending_quantity   # 예약 차감 후 가용 재고
 |---|---|---|
 | GET | `/health`, `/health/detailed` | 헬스체크 (`detailed`는 DB 점검 + mismatch 카운트) |
 | GET | `/api/items` | 품목 목록 (bulk_compute로 N+1 제거) |
-| GET | `/api/inventory/summary` | 카테고리별 재고 요약 |
+| GET | `/api/inventory/summary` | 공정코드별 재고 요약 (`process_types` 18개 기준) |
 | POST | `/api/inventory/receive` | 창고 입고 |
 | POST | `/api/inventory/ship` | 창고 출고 (출하부) |
 | POST | `/api/inventory/transfer-to-production` | 창고 → 부서 이동 |
