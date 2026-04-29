@@ -7,7 +7,6 @@ from decimal import Decimal
 
 import pytest
 from app.models import (
-    CategoryEnum,
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,

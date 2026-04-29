@@ -56,20 +56,6 @@ class BoolAsString(TypeDecorator):
         return str(value).lower() in ("true", "1", "yes", "t")
 
 
-class CategoryEnum(str, enum.Enum):
-    RM = "RM"
-    TA = "TA"
-    TF = "TF"
-    HA = "HA"
-    HF = "HF"
-    VA = "VA"
-    VF = "VF"
-    AA = "AA"
-    AF = "AF"
-    FG = "FG"
-    UK = "UK"
-
-
 class TransactionTypeEnum(str, enum.Enum):
     RECEIVE = "RECEIVE"
     PRODUCE = "PRODUCE"
@@ -144,12 +130,6 @@ class Item(Base):
     item_code = Column(String(50), unique=True, nullable=True, index=True)  # 레거시 CSV 코드 — erp_code로 교체 후 DROP 예정
     item_name = Column(String(200), nullable=False)
     spec = Column(Text, nullable=True)
-    category = Column(
-        SAEnum(CategoryEnum, name="category_enum", create_type=True),
-        nullable=False,
-        default=CategoryEnum.UK,
-        index=True,
-    )
     unit = Column(String(20), nullable=False, default="EA")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
     updated_at = Column(
@@ -161,6 +141,7 @@ class Item(Base):
     )
 
     # Legacy UI display fields (populated from ERP_Master_DB.csv or rule-based defaults)
+
     barcode = Column(String(100), nullable=True, index=True)
     legacy_file_type = Column(String(50), nullable=True, index=True)  # 원자재/조립자재/발생부자재/완제품/미분류
     legacy_part = Column(String(50), nullable=True, index=True)       # 자재창고/조립출하/고압파트/진공파트/튜닝파트/출하
