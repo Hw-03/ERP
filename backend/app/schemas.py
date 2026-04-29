@@ -9,7 +9,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import (
     AlertKindEnum,
-    CategoryEnum,
     DepartmentEnum,
     EmployeeLevelEnum,
     LocationStatusEnum,
@@ -26,7 +25,7 @@ from app.models import (
 class ItemCreate(BaseModel):
     item_name: str = Field(..., max_length=200, description="품목명")
     spec: Optional[str] = Field(None, description="사양")
-    category: CategoryEnum = Field(CategoryEnum.UK, description="11단계 공정 카테고리")
+    process_type_code: Optional[str] = Field(None, max_length=2, description="공정 코드 (TR/HR/.../PF 18개)")
     unit: str = Field("EA", max_length=20, description="단위")
     barcode: Optional[str] = Field(None, max_length=100)
     legacy_file_type: Optional[str] = Field(None, max_length=50)
@@ -43,7 +42,6 @@ class ItemCreate(BaseModel):
 class ItemUpdate(BaseModel):
     item_name: Optional[str] = Field(None, max_length=200)
     spec: Optional[str] = None
-    category: Optional[CategoryEnum] = None
     unit: Optional[str] = Field(None, max_length=20)
     barcode: Optional[str] = Field(None, max_length=100)
     legacy_file_type: Optional[str] = Field(None, max_length=50)
@@ -60,7 +58,6 @@ class ItemResponse(BaseModel):
     item_id: uuid.UUID
     item_name: str
     spec: Optional[str]
-    category: CategoryEnum
     unit: str
     barcode: Optional[str] = None
     legacy_file_type: Optional[str] = None
@@ -194,7 +191,7 @@ class ShipPackageItemDetail(BaseModel):
     item_id: uuid.UUID
     erp_code: Optional[str] = None
     item_name: str
-    item_category: CategoryEnum
+    item_process_type_code: Optional[str] = None
     item_unit: str
     quantity: Decimal
 
@@ -311,9 +308,9 @@ class SupplierReturnRequest(BaseModel):
     operator: Optional[str] = Field(None, max_length=100)
 
 
-class CategorySummary(BaseModel):
-    category: CategoryEnum
-    category_label: str
+class ProcessTypeSummary(BaseModel):
+    process_type_code: str
+    label: str
     item_count: int
     total_quantity: Decimal
     warehouse_qty_sum: Decimal = Decimal("0")
@@ -322,10 +319,9 @@ class CategorySummary(BaseModel):
 
 
 class InventorySummaryResponse(BaseModel):
-    categories: List[CategorySummary]
+    process_types: List[ProcessTypeSummary]
     total_items: int
     total_quantity: Decimal
-    uk_item_count: int
 
 
 class BOMCreate(BaseModel):
@@ -368,7 +364,7 @@ class BOMTreeNode(BaseModel):
     item_id: uuid.UUID
     erp_code: Optional[str] = None
     item_name: str
-    category: CategoryEnum
+    process_type_code: Optional[str] = None
     unit: str
     required_quantity: Decimal
     current_stock: Decimal = Decimal("0")
@@ -390,7 +386,7 @@ class BackflushDetail(BaseModel):
     item_id: uuid.UUID
     erp_code: Optional[str] = None
     item_name: str
-    category: CategoryEnum
+    process_type_code: Optional[str] = None
     required_quantity: Decimal
     stock_before: Decimal
     stock_after: Decimal
@@ -453,7 +449,7 @@ class TransactionLogResponse(BaseModel):
     item_id: uuid.UUID
     erp_code: Optional[str] = None
     item_name: str
-    item_category: CategoryEnum
+    item_process_type_code: Optional[str] = None
     item_unit: str
     transaction_type: TransactionTypeEnum
     quantity_change: Decimal
@@ -741,7 +737,7 @@ class PhysicalCountResponse(BaseModel):
 class BomCheckComponent(BaseModel):
     erp_code: Optional[str] = None
     item_name: str
-    category: str
+    process_type_code: Optional[str] = None
     unit: str
     required: float
     current_stock: float

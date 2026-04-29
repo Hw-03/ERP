@@ -343,9 +343,9 @@ def confirm_batch(db: Session, batch: QueueBatch) -> QueueBatch:
                 )
             )
         elif line.direction == QueueLineDirectionEnum.IN:
-            # PRODUCE 결과는 카테고리 매핑 부서의 PRODUCTION으로, 그 외(분해/반품)는 창고로
+            # PRODUCE 결과는 process_type_code 기반 부서의 PRODUCTION으로, 그 외(분해/반품)는 창고로
             if batch.batch_type == QueueBatchTypeEnum.PRODUCE:
-                target_dept = inv_svc.dept_for_category(item.category)
+                target_dept = inv_svc.dept_for_process_type(item.process_type_code)
                 if target_dept is not None:
                     inv = inv_svc.receive_confirmed(
                         db, line.item_id, line.quantity,

@@ -2,7 +2,7 @@
 
 - to_response: Inventory ORM → InventoryResponse (stock_math 통일 계산 + locations 포함)
 - list_locations: item_id 의 InventoryLocation 행 (수량 > 0) 을 응답 모델로
-- CATEGORY_LABELS / CATEGORY_ORDER: /summary 에서 사용
+- PROCESS_TYPE_LABELS / PROCESS_TYPE_ORDER: /summary 에서 사용 (18개 공정코드 단일 기준)
 """
 
 from __future__ import annotations
@@ -13,37 +13,42 @@ from typing import List
 
 from sqlalchemy.orm import Session
 
-from app.models import CategoryEnum, Inventory, InventoryLocation
+from app.models import Inventory, InventoryLocation
 from app.schemas import InventoryLocationResponse, InventoryResponse
 from app.services import stock_math
 
 
-CATEGORY_LABELS = {
-    CategoryEnum.RM: "원자재",
-    CategoryEnum.TA: "튜브 반제품",
-    CategoryEnum.TF: "튜브 완제품",
-    CategoryEnum.HA: "고압 반제품",
-    CategoryEnum.HF: "고압 완제품",
-    CategoryEnum.VA: "진공 반제품",
-    CategoryEnum.VF: "진공 완제품",
-    CategoryEnum.AA: "조립 반제품",
-    CategoryEnum.AF: "조립 완제품",
-    CategoryEnum.FG: "완제품",
-    CategoryEnum.UK: "미분류 품목",
+# 18개 공정코드 단일 기준 라벨 (README/docs/ITEM_CODE_RULES.md 기준).
+# 부서 prefix 6개 × 단계 suffix 3개 = 18.
+PROCESS_TYPE_LABELS: dict[str, str] = {
+    "TR": "튜브 원자재",
+    "TA": "튜브 조립체",
+    "TF": "튜브 F타입",
+    "HR": "고압 원자재",
+    "HA": "고압 조립체",
+    "HF": "고압 F타입",
+    "VR": "진공 원자재",
+    "VA": "진공 조립체",
+    "VF": "진공 F타입",
+    "NR": "튜닝 원자재",
+    "NA": "튜닝 조립체",
+    "NF": "튜닝 F타입",
+    "AR": "조립 원자재",
+    "AA": "조립 조립체",
+    "AF": "조립 F타입",
+    "PR": "출하 원자재",
+    "PA": "출하 조립체",
+    "PF": "출하 F타입",
 }
 
-CATEGORY_ORDER = [
-    CategoryEnum.RM,
-    CategoryEnum.TA,
-    CategoryEnum.TF,
-    CategoryEnum.HA,
-    CategoryEnum.HF,
-    CategoryEnum.VA,
-    CategoryEnum.VF,
-    CategoryEnum.AA,
-    CategoryEnum.AF,
-    CategoryEnum.FG,
-    CategoryEnum.UK,
+# README 기준 표시 순서 (튜브/고압/진공/튜닝/조립/출하 × R/A/F).
+PROCESS_TYPE_ORDER: list[str] = [
+    "TR", "TA", "TF",
+    "HR", "HA", "HF",
+    "VR", "VA", "VF",
+    "NR", "NA", "NF",
+    "AR", "AA", "AF",
+    "PR", "PA", "PF",
 ]
 
 

@@ -12,9 +12,11 @@ from decimal import Decimal
 sys.path.insert(0, os.path.dirname(__file__))
 
 from app.database import SessionLocal
-from app.models import Item, BOM, CategoryEnum
+from app.models import Item, BOM
 
 random.seed(42)
+
+R_TYPE_CODES = ["TR", "HR", "VR", "NR", "AR", "PR"]  # 원자재 R 시리즈 6종
 
 
 def add_bom(db, existing: set, parent: Item, child: Item, qty: int) -> bool:
@@ -35,14 +37,14 @@ def add_bom(db, existing: set, parent: Item, child: Item, qty: int) -> bool:
 def main() -> None:
     db = SessionLocal()
     try:
-        ba_items = db.query(Item).filter(Item.category == CategoryEnum.AA).all()
-        ta_items = db.query(Item).filter(Item.category == CategoryEnum.TA).all()
-        ha_items = db.query(Item).filter(Item.category == CategoryEnum.HA).all()
-        va_items = db.query(Item).filter(Item.category == CategoryEnum.VA).all()
-        rm_items = db.query(Item).filter(Item.category == CategoryEnum.RM).all()
+        ba_items = db.query(Item).filter(Item.process_type_code == "AA").all()
+        ta_items = db.query(Item).filter(Item.process_type_code == "TA").all()
+        ha_items = db.query(Item).filter(Item.process_type_code == "HA").all()
+        va_items = db.query(Item).filter(Item.process_type_code == "VA").all()
+        rm_items = db.query(Item).filter(Item.process_type_code.in_(R_TYPE_CODES)).all()
 
         if not ba_items:
-            print("AA 카테고리 품목이 없습니다.")
+            print("AA 공정코드 품목이 없습니다.")
             return
 
         existing: set = set()

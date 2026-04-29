@@ -19,7 +19,6 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import (
-    CategoryEnum,
     DepartmentEnum,
     Employee,
     Inventory,
@@ -30,24 +29,38 @@ from app.models import (
 
 
 # ---------------------------------------------------------------------------
-# 카테고리 → 부서 자동 매핑 (PRODUCE 결과물 적재용)
+# process_type_code → 부서 자동 매핑 (PRODUCE 결과물 적재용)
+# 18개 공정코드(README 기준): prefix 1글자(T/H/V/N/A/P)가 부서 계열을 결정.
+# R 시리즈(원자재)는 창고 폴백 — None 반환.
 # ---------------------------------------------------------------------------
-CATEGORY_TO_DEPT: dict[CategoryEnum, DepartmentEnum] = {
-    CategoryEnum.TA: DepartmentEnum.TUBE,
-    CategoryEnum.TF: DepartmentEnum.TUBE,
-    CategoryEnum.HA: DepartmentEnum.HIGH_VOLTAGE,
-    CategoryEnum.HF: DepartmentEnum.HIGH_VOLTAGE,
-    CategoryEnum.VA: DepartmentEnum.VACUUM,
-    CategoryEnum.VF: DepartmentEnum.VACUUM,
-    CategoryEnum.AA: DepartmentEnum.ASSEMBLY,
-    CategoryEnum.AF: DepartmentEnum.ASSEMBLY,
-    CategoryEnum.FG: DepartmentEnum.SHIPPING,
+PROCESS_TYPE_TO_DEPT: dict[str, DepartmentEnum] = {
+    # 튜브
+    "TA": DepartmentEnum.TUBE,
+    "TF": DepartmentEnum.TUBE,
+    # 고압
+    "HA": DepartmentEnum.HIGH_VOLTAGE,
+    "HF": DepartmentEnum.HIGH_VOLTAGE,
+    # 진공
+    "VA": DepartmentEnum.VACUUM,
+    "VF": DepartmentEnum.VACUUM,
+    # 튜닝
+    "NA": DepartmentEnum.TUNING,
+    "NF": DepartmentEnum.TUNING,
+    # 조립
+    "AA": DepartmentEnum.ASSEMBLY,
+    "AF": DepartmentEnum.ASSEMBLY,
+    # 출하
+    "PA": DepartmentEnum.SHIPPING,
+    "PF": DepartmentEnum.SHIPPING,
+    # R 시리즈(TR/HR/VR/NR/AR/PR)는 원자재 — 창고 폴백 (매핑 없음).
 }
 
 
-def dept_for_category(category: CategoryEnum) -> Optional[DepartmentEnum]:
-    """PRODUCE 결과 자동 적재 부서. 매핑 없으면 None (warehouse fallback)."""
-    return CATEGORY_TO_DEPT.get(category)
+def dept_for_process_type(process_type_code: Optional[str]) -> Optional[DepartmentEnum]:
+    """PRODUCE 결과 자동 적재 부서. R 시리즈/매핑 없으면 None (warehouse fallback)."""
+    if not process_type_code:
+        return None
+    return PROCESS_TYPE_TO_DEPT.get(process_type_code)
 
 
 # ---------------------------------------------------------------------------

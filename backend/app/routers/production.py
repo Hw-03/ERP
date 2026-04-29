@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import BOM, CategoryEnum, Inventory, Item, TransactionLog, TransactionTypeEnum
+from app.models import BOM, Inventory, Item, TransactionLog, TransactionTypeEnum
 from app.schemas import (
     BackflushDetail,
     BomCheckResponse,
@@ -125,15 +125,15 @@ def production_receipt(
                     item_id=comp_item_id,
                     erp_code=comp_item.erp_code,
                     item_name=comp_item.item_name,
-                    category=comp_item.category,
+                    process_type_code=comp_item.process_type_code,
                     required_quantity=required_qty,
                     stock_before=qty_before,
                     stock_after=inv.quantity,
                 )
             )
 
-        # 생산 결과: 카테고리 매핑 부서의 PRODUCTION으로 적재 (없으면 창고)
-        target_dept = inventory_svc.dept_for_category(produced_item.category)
+        # 생산 결과: process_type_code 기반 부서의 PRODUCTION으로 적재 (R 시리즈/없음 → 창고 폴백)
+        target_dept = inventory_svc.dept_for_process_type(produced_item.process_type_code)
         produced_inv = inventory_svc.get_or_create_inventory(db, payload.item_id)
         prod_qty_before = produced_inv.quantity or Decimal("0")
         if target_dept is not None:
@@ -229,7 +229,7 @@ def check_production_feasibility(
             {
                 "erp_code": comp_item.erp_code,
                 "item_name": comp_item.item_name,
-                "category": comp_item.category,
+                "process_type_code": comp_item.process_type_code,
                 "unit": comp_item.unit,
                 "required": float(required_qty),
                 "current_stock": float(current_total),
@@ -289,7 +289,7 @@ def get_production_capacity(db: Session = Depends(get_db)):
     top_items_db = (
         db.query(Item)
         .filter(Item.item_id.in_(list(top_level_ids)))
-        .filter(Item.category == CategoryEnum.AA)
+        .filter(Item.process_type_code == "AA")
         .limit(15)
         .all()
     )

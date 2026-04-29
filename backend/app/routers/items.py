@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import CategoryEnum, DepartmentEnum, Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
+from app.models import DepartmentEnum, Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     InventoryLocationResponse,
@@ -23,7 +23,7 @@ from app.schemas import (
     ItemUpdate,
     ItemWithInventory,
 )
-from app.utils.erp_code import infer_process_type, infer_symbol_slot, make_erp_code, next_serial_no, slots_to_model_symbol
+from app.utils.erp_code import infer_symbol_slot, make_erp_code, next_serial_no, slots_to_model_symbol
 from app.models import ProductSymbol
 from app.services import audit
 from app.services import inventory as inventory_svc
@@ -82,7 +82,6 @@ def _to_item_with_inventory(
         item_id=item.item_id,
         item_name=item.item_name,
         spec=item.spec,
-        category=item.category,
         unit=item.unit,
         barcode=item.barcode,
         legacy_file_type=item.legacy_file_type,
@@ -114,9 +113,7 @@ def _to_item_with_inventory(
 
 @router.post("", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
 def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get_db)):
-    category_val = payload.category.value if payload.category else "UK"
-
-    pt = infer_process_type(category_val, payload.legacy_part)
+    pt = payload.process_type_code or None
     model_slots = payload.model_slots or []
     model_sym = slots_to_model_symbol(model_slots) if model_slots else ""
     opt = payload.option_code or None
@@ -133,7 +130,6 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
     item = Item(
         item_name=payload.item_name,
         spec=payload.spec,
-        category=payload.category,
         unit=payload.unit,
         barcode=payload.barcode or None,
         legacy_file_type=payload.legacy_file_type,
@@ -174,7 +170,7 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
 
 @router.get("", response_model=List[ItemWithInventory])
 def list_items(
-    category: Optional[CategoryEnum] = Query(None, description="카테고리 필터"),
+    process_type_code: Optional[str] = Query(None, description="process_type_code 필터 (TR/HR/.../PF 18개)"),
     search: Optional[str] = Query(None, description="품목명, 품목코드, 사양, 위치, 바코드 검색"),
     legacy_file_type: Optional[str] = Query(None, description="레거시 파일 구분 필터"),
     legacy_part: Optional[str] = Query(None, description="레거시 파트 필터"),
@@ -188,8 +184,8 @@ def list_items(
 ):
     query = _build_item_query(db)
 
-    if category:
-        query = query.filter(Item.category == category)
+    if process_type_code:
+        query = query.filter(Item.process_type_code == process_type_code)
 
     if legacy_file_type:
         query = query.filter(Item.legacy_file_type == legacy_file_type)
@@ -237,7 +233,7 @@ def list_items(
             )
         )
 
-    rows = query.order_by(Item.category, Item.erp_code).offset(skip).limit(limit).all()
+    rows = query.order_by(Item.process_type_code, Item.erp_code).offset(skip).limit(limit).all()
     if not rows:
         return []
 
@@ -286,14 +282,14 @@ def export_items_csv(db: Session = Depends(get_db)):
 
     buffer = StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["erp_code", "item_name", "category", "spec", "unit", "quantity", "location", "updated_at"])
+    writer.writerow(["erp_code", "item_name", "process_type_code", "spec", "unit", "quantity", "location", "updated_at"])
 
     for item, inventory in rows:
         writer.writerow(
             [
                 item.erp_code or "",
                 item.item_name,
-                item.category.value,
+                item.process_type_code or "",
                 item.spec or "",
                 item.unit,
                 float(inventory.quantity) if inventory else 0,
@@ -305,20 +301,27 @@ def export_items_csv(db: Session = Depends(get_db)):
     return csv_streaming_response(buffer, "items-export.csv")
 
 
-_CATEGORY_ROW_COLOR = {
-    "RM": "D6E8FF",
-    "TA": "D6F5F5", "TF": "D6F5F5",
-    "HA": "FFF8D6", "HF": "FFF8D6",
-    "VA": "EAD6FF", "VF": "EAD6FF",
-    "AA": "FFE8D6", "AF": "FFE8D6",
-    "FG": "D6F5E0",
-    "UK": "EBEBEB",
+# process_type_code 의 prefix(부서 계열) 1글자 → 행 색상 (xlsx export 용).
+# README 기준 6개 부서: T(튜브)/H(고압)/V(진공)/N(튜닝)/A(조립)/P(출하).
+_PROCESS_PREFIX_ROW_COLOR = {
+    "T": "D6F5F5",  # 튜브
+    "H": "FFF8D6",  # 고압
+    "V": "EAD6FF",  # 진공
+    "N": "FFE8D6",  # 튜닝
+    "A": "D6E8FF",  # 조립
+    "P": "D6F5E0",  # 출하
 }
+
+
+def _row_color_for(process_type_code: Optional[str]) -> str:
+    if not process_type_code:
+        return "EBEBEB"
+    return _PROCESS_PREFIX_ROW_COLOR.get(process_type_code[0], "FFFFFF")
 
 
 @router.get("/export.xlsx")
 def export_items_xlsx(
-    category: Optional[CategoryEnum] = Query(None),
+    process_type_code: Optional[str] = Query(None, description="process_type_code 필터"),
     search: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
@@ -329,8 +332,8 @@ def export_items_xlsx(
     from app.utils.excel import apply_header, auto_width, make_xlsx_response
 
     query = _build_item_query(db)
-    if category:
-        query = query.filter(Item.category == category)
+    if process_type_code:
+        query = query.filter(Item.process_type_code == process_type_code)
     if search:
         pattern = f"%{search}%"
         query = query.filter(
@@ -342,7 +345,7 @@ def export_items_xlsx(
                 Inventory.location.ilike(pattern),
             )
         )
-    rows = query.order_by(Item.category, Item.erp_code).all()
+    rows = query.order_by(Item.process_type_code, Item.erp_code).all()
 
     # 가용수량 계산: stock_math 를 한 번 bulk 로 불러 경로별 재구현을 피한다.
     figures_map = stock_math.bulk_compute(db, [it.item_id for it, _ in rows])
@@ -352,7 +355,7 @@ def export_items_xlsx(
     ws.title = "품목 마스터"
 
     columns = [
-        "품목 코드", "품목명", "카테고리", "사양", "단위",
+        "품목 코드", "품목명", "공정코드", "사양", "단위",
         "재고수량", "가용수량", "예약수량", "위치", "공급업체", "안전재고", "바코드", "수정일",
     ]
     apply_header(ws, columns)
@@ -369,7 +372,7 @@ def export_items_xlsx(
         row_data = [
             item.erp_code or "",
             item.item_name,
-            item.category.value,
+            item.process_type_code or "",
             item.spec or "",
             item.unit,
             qty,
@@ -384,7 +387,7 @@ def export_items_xlsx(
         ws.append(row_data)
 
         row_idx = ws.max_row
-        hex_color = _CATEGORY_ROW_COLOR.get(item.category.value, "FFFFFF")
+        hex_color = _row_color_for(item.process_type_code)
         row_fill = PatternFill("solid", fgColor=hex_color)
         for cell in ws[row_idx]:
             cell.fill = row_fill
@@ -420,7 +423,7 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
 
     changed: list[str] = []
     for field in (
-        "item_name", "spec", "category", "unit", "barcode",
+        "item_name", "spec", "unit", "barcode",
         "legacy_file_type", "legacy_part", "legacy_item_type", "legacy_model",
         "supplier", "min_stock",
     ):

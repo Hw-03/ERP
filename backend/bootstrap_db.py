@@ -42,7 +42,7 @@ from app.models import (
     ProductSymbol,
 )
 from app.services.pin_auth import DEFAULT_PIN_HASH
-from app.utils.erp_code import infer_process_type, infer_symbol_slot, make_erp_code
+from app.utils.erp_code import infer_symbol_slot, make_erp_code
 
 
 # ---------------------------------------------------------------------------
@@ -329,7 +329,7 @@ def backfill_erp_codes() -> int:
 
         count = 0
         for item in targets:
-            pt = infer_process_type(item.category.value, item.legacy_part)
+            pt = item.process_type_code  # 공정코드는 18개 단일 기준 — 추론 없이 그대로 사용
             if pt is None:
                 continue
 
@@ -341,7 +341,6 @@ def backfill_erp_codes() -> int:
             serial_counter[key] = serial_counter.get(key, 0) + 1
             serial = serial_counter[key]
 
-            item.process_type_code = pt
             item.symbol_slot = slot
             item.serial_no = serial
             item.option_code = opt
