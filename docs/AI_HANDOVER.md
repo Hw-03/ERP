@@ -1,10 +1,10 @@
 # AI Handover
 
-이 문서는 Claude/Codex가 같은 ERP 프로젝트를 이어서 작업할 때 보는 최신 인수인계 문서다.
+이 문서는 Claude/Codex가 같은 MES 프로젝트를 이어서 작업할 때 보는 최신 인수인계 문서다.
 
 ## 현재 상태 (2026-04-26 Phase 4 update)
 
-- 프로젝트: DEXCOWIN 재고 관리/ERP 시스템 (내부 ERP/MES 프로토타입)
+- 프로젝트: DEXCOWIN 재고 관리 MES (경량 MES 프로토타입)
 - 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/erp.db`)
 - 프론트엔드: Next.js 14 + Tailwind CSS
 - 주 화면: `/legacy` (대시보드 / 입출고 / 입출고 내역 / 관리자)

@@ -195,7 +195,7 @@ export function AdminMasterItemsSection() {
                 className="mb-2 text-sm font-bold uppercase tracking-[0.18em]"
                 style={{ color: LEGACY_COLORS.muted2 }}
               >
-                사용 제품 <span style={{ color: LEGACY_COLORS.muted2, fontWeight: 400 }}>(ERP 기호)</span>
+                사용 제품 <span style={{ color: LEGACY_COLORS.muted2, fontWeight: 400 }}>(제품 기호)</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {MODEL_SLOTS.map(({ slot, label, symbol }) => {
@@ -226,7 +226,7 @@ export function AdminMasterItemsSection() {
               </div>
               {addForm.model_slots.length > 0 && (
                 <div className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.purple }}>
-                  ERP 기호:{" "}
+                  제품 기호:{" "}
                   {MODEL_SLOTS.filter((m) => addForm.model_slots.includes(m.slot))
                     .map((m) => m.symbol)
                     .sort()
@@ -271,7 +271,7 @@ export function AdminMasterItemsSection() {
                 }}
               >
                 <div className="text-sm font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.purple }}>
-                  ERP 코드
+                  품목 코드
                 </div>
                 <div className="mt-1 text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
                   {selectedItem.erp_code}

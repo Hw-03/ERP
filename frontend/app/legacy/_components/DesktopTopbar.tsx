@@ -3,7 +3,6 @@
 import { useState, type ElementType, type ReactNode } from "react";
 import { LogOut, RefreshCw } from "lucide-react";
 import { LEGACY_COLORS, normalizeDepartment } from "./legacyUi";
-import { ThemeToggle } from "./ThemeToggle";
 import { ConfirmModal, StatusPill, inferToneFromStatus } from "./common";
 import { clearCurrentOperator, useCurrentOperator } from "./login/useCurrentOperator";
 
@@ -83,12 +82,10 @@ export function DesktopTopbar({
           </div>
         )}
 
-        <ThemeToggle />
-
         <button
           onClick={onRefresh}
-          title="새로고침"
-          aria-label="새로고침"
+          title="최신 데이터 확인"
+          aria-label="최신 데이터 확인"
           className="flex h-9 w-9 items-center justify-center rounded-[14px] border transition-opacity hover:opacity-90"
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
         >

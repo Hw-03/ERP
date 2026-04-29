@@ -7,7 +7,7 @@ import { LEGACY_COLORS, formatNumber, normalizeDepartment } from "../legacyUi";
 const STATUS_LABEL: Record<string, string> = {
   draft: "임시",
   submitted: "제출됨",
-  reserved: "점유중",
+  reserved: "승인 대기",
   rejected: "반려",
   cancelled: "취소",
   completed: "완료",

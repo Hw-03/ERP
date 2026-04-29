@@ -1,4 +1,4 @@
-"""Pydantic schemas for the X-Ray ERP API."""
+"""Pydantic schemas for the X-Ray MES API."""
 
 from datetime import datetime
 from decimal import Decimal

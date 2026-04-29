@@ -1,4 +1,4 @@
-"""ERP data models for the X-Ray manufacturing workflow."""
+"""MES data models for the X-Ray manufacturing workflow."""
 
 import enum
 import uuid

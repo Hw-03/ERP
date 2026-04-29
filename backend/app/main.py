@@ -1,4 +1,4 @@
-"""FastAPI application entry point for the X-Ray ERP backend.
+"""FastAPI application entry point for the X-Ray MES backend.
 
 Startup 부작용 (create_all / run_migrations / seed / ERP 백필) 은 모두
 `backend/bootstrap_db.py` 로 옮겼다. 서버 기동만으로는 DB 가 변하지 않는다.
@@ -58,9 +58,9 @@ _BOOT_STARTED_AT: str = _dt.datetime.utcnow().isoformat()
 
 
 app = FastAPI(
-    title="X-Ray ERP System",
+    title="X-Ray MES",
     description="""
-    ## 정밀 X-Ray 장비 제조 ERP
+    ## 정밀 X-Ray 장비 제조 경량 MES
 
     ### 11단계 공정 카테고리
     | Code | 명칭 | 설명 |

@@ -162,7 +162,7 @@ export function AdminItemsSection({ showToast }: { showToast: (toast: ToastState
             </select>
           </div>
           <div>
-            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>사용 제품 (ERP 기호)</div>
+            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>사용 제품 (제품 기호)</div>
             <div className="flex flex-wrap gap-2">
               {MODEL_SLOTS.map(({ slot, label, symbol }) => {
                 const checked = addForm.model_slots.includes(slot);
@@ -175,7 +175,7 @@ export function AdminItemsSection({ showToast }: { showToast: (toast: ToastState
             </div>
             {addForm.model_slots.length > 0 && (
               <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.purple }}>
-                ERP 기호: {MODEL_SLOTS.filter((m) => addForm.model_slots.includes(m.slot)).map((m) => m.symbol).sort().join("")}
+                제품 기호: {MODEL_SLOTS.filter((m) => addForm.model_slots.includes(m.slot)).map((m) => m.symbol).sort().join("")}
               </div>
             )}
           </div>

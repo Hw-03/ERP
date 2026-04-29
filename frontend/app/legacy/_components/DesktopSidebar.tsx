@@ -5,6 +5,7 @@ import Image from "next/image";
 import type { ElementType } from "react";
 import { Boxes, History, Settings2, Warehouse } from "lucide-react";
 import { LEGACY_COLORS } from "./legacyUi";
+import { ThemeToggle } from "./ThemeToggle";
 
 export type DesktopTabId = "inventory" | "warehouse" | "history" | "admin";
 
@@ -152,6 +153,11 @@ export function DesktopSidebar({
             );
           })}
         </nav>
+
+        {/* 테마 전환 버튼 */}
+        <div className="mt-auto flex items-center justify-center pb-1 pt-3">
+          <ThemeToggle />
+        </div>
       </aside>
     </div>
   );

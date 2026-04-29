@@ -78,7 +78,7 @@ export function InventoryItemsTable({
                 [
                   { label: "상태", nowrap: true, width: "80px" },
                   { label: "품목명", nowrap: false, minWidth: "180px" },
-                  { label: "ERP코드", nowrap: true, width: "100px" },
+                  { label: "품목 코드", nowrap: true, width: "100px" },
                   { label: "부서", nowrap: true, width: "120px" },
                   { label: "현재고", nowrap: true, width: "84px" },
                   { label: "안전재고", nowrap: true, width: "80px" },

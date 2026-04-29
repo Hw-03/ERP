@@ -38,7 +38,7 @@ export function BomParentPicker() {
         <input
           value={bomParentSearch}
           onChange={(e) => setBomParentSearch(e.target.value)}
-          placeholder="품목명 / ERP 코드 검색"
+          placeholder="품목명 / 품목 코드 검색"
           className="mb-2 w-full rounded-[12px] border px-3 py-1.5 text-sm outline-none"
           style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
         />

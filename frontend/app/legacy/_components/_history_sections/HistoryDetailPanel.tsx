@@ -146,7 +146,7 @@ export function HistoryDetailPanel({
         {(
           [
             ["품목명", selected.item_name],
-            ["ERP코드", selected.erp_code ?? "-"],
+            ["품목 코드", selected.erp_code ?? "-"],
             ["분류", (CATEGORY_META[selected.item_category] ?? { label: selected.item_category }).label],
             ["단위", selected.item_unit],
             ["담당자", selected.produced_by ?? "-"],

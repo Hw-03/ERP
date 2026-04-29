@@ -81,7 +81,7 @@ export function BomChildPicker() {
               setBomChildSearch(e.target.value);
               setPendingChildId(null);
             }}
-            placeholder="품목명 / ERP 코드"
+            placeholder="품목명 / 품목 코드"
             className="flex-1 rounded-[12px] border px-3 py-1.5 text-sm outline-none"
             style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
           />

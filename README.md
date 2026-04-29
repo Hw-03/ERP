@@ -1,6 +1,6 @@
-# DEXCOWIN ERP
+# DEXCOWIN MES
 
-정밀 X-ray 장비 제조사의 품목, 재고, BOM, 입출고를 관리하는 내부 ERP/MES 프로토타입.
+정밀 X-ray 장비 제조사의 품목, 재고, BOM, 입출고를 관리하는 경량 MES 프로토타입.
 
 ## 현재 기준
 
