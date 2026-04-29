@@ -32,7 +32,7 @@
 ↔ DB의 일부 `Item.erp_code` 가 `null`
 → `routers/inventory/transactions.py:99-115` 응답 매핑에서 Pydantic 검증 실패
 
-화면 자재 목록의 ERP코드 칸이 대부분 "-" 로 표시되는 것과 정합.
+화면 자재 목록의 품목 코드 칸이 대부분 "-" 로 표시되는 것과 정합.
 
 ### 1줄 fix 제안 (미적용)
 ```python

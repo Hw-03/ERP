@@ -44,6 +44,10 @@ export function AdminEmployeesSection() {
     requestPinReset,
     confirmPinReset,
     cancelPinReset,
+    deleteTarget,
+    requestDelete,
+    confirmDelete,
+    cancelDelete,
   } = ctx;
   return (
     <>
@@ -309,7 +313,7 @@ export function AdminEmployeesSection() {
               저장
             </button>
 
-            {/* PIN 초기화 / 비활성화 */}
+            {/* PIN 초기화 / 비활성화 / 삭제 */}
             <div className="grid grid-cols-2 gap-2 border-t pt-4" style={{ borderColor: LEGACY_COLORS.border }}>
               <button
                 onClick={() => requestPinReset(selectedEmployee)}
@@ -326,9 +330,22 @@ export function AdminEmployeesSection() {
                 {selectedEmployee.is_active ? "비활성화" : "활성화"}
               </button>
             </div>
-            <p className="text-center text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-              직원 영구 삭제는 지원하지 않습니다 — 비활성화로 대체하세요.
+            <p className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+              PIN 마지막 변경:{" "}
+              {selectedEmployee.pin_last_changed
+                ? new Date(selectedEmployee.pin_last_changed).toLocaleDateString("ko-KR")
+                : "변경 이력 없음 (기본 PIN)"}
             </p>
+            <button
+              onClick={() => requestDelete(selectedEmployee)}
+              className="w-full rounded-[14px] border px-3 py-2.5 text-sm font-bold"
+              style={{
+                borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 40%, transparent)`,
+                color: LEGACY_COLORS.red,
+              }}
+            >
+              직원 삭제
+            </button>
           </div>
         ) : (
           <div className="text-base" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -345,6 +362,16 @@ export function AdminEmployeesSection() {
       confirmLabel={confirmTarget?.is_active ? "비활성화" : "활성화"}
       onClose={cancelConfirm}
       onConfirm={confirmToggle}
+    />
+
+    <ConfirmModal
+      open={deleteTarget !== null}
+      title={`'${deleteTarget?.name}' 직원을 삭제하시겠습니까?`}
+      tone="danger"
+      cautionMessage="거래 이력이 있으면 비활성화, 없으면 영구 삭제됩니다."
+      confirmLabel="삭제"
+      onClose={cancelDelete}
+      onConfirm={confirmDelete}
     />
 
     <ConfirmModal

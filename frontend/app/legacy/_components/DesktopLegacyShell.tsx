@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ElementType } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Boxes, History, Settings2, Warehouse } from "lucide-react";
 import { DesktopSidebar, type DesktopTabId } from "./DesktopSidebar";
 import { DesktopTopbar } from "./DesktopTopbar";
@@ -13,6 +14,8 @@ import { LEGACY_COLORS, formatNumber } from "./legacyUi";
 import { api, type ProductionCapacity } from "@/lib/api";
 import type { Item } from "@/lib/api";
 
+const VALID_TABS = new Set<DesktopTabId>(["inventory", "warehouse", "history", "admin"]);
+
 const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
   inventory: { title: "대시보드", icon: Boxes },
   warehouse: { title: "입출고", icon: Warehouse },
@@ -21,9 +24,28 @@ const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
 };
 
 export function DesktopLegacyShell() {
-  const [activeTab, setActiveTab] = useState<DesktopTabId>("inventory");
-  const [status, setStatus] = useState("데스크톱 ERP 화면을 준비했습니다.");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const initialTab = (() => {
+    const t = searchParams.get("tab") as DesktopTabId | null;
+    return t && VALID_TABS.has(t) ? t : "inventory";
+  })();
+
+  const [activeTab, setActiveTab] = useState<DesktopTabId>(initialTab);
+  const [status, setStatus] = useState("데스크톱 MES 화면을 준비했습니다.");
+  const [statusNonce, setStatusNonce] = useState(0);
   const [refreshNonce, setRefreshNonce] = useState(0);
+
+  function handleStatusChange(msg: string) {
+    setStatus(msg);
+    setStatusNonce((n) => n + 1);
+  }
+
+  function handleTabChange(tab: DesktopTabId) {
+    setActiveTab(tab);
+    router.replace(`?tab=${tab}`, { scroll: false });
+  }
   const [warehousePreselected, setWarehousePreselected] = useState<Item | null>(null);
   const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
   const [capacityModal, setCapacityModal] = useState(false);
@@ -35,6 +57,16 @@ export function DesktopLegacyShell() {
 
   useEffect(() => {
     loadCapacity();
+  }, [loadCapacity]);
+
+  // window focus 시 조용한 재조회
+  useEffect(() => {
+    function handleFocus() {
+      setRefreshNonce((n) => n + 1);
+      loadCapacity();
+    }
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
   }, [loadCapacity]);
 
   const activeMeta = TAB_META[activeTab];
@@ -51,9 +83,9 @@ export function DesktopLegacyShell() {
         <DesktopInventoryView
           key={key}
           globalSearch=""
-          onStatusChange={setStatus}
+          onStatusChange={handleStatusChange}
           onGoToWarehouse={handleGoToWarehouse}
-          onGoToWarehouseTab={() => setActiveTab("warehouse")}
+          onGoToWarehouseTab={() => handleTabChange("warehouse")}
           onSummaryChange={setStockWarnings}
           capacityData={capacityData}
           onCapacityClick={() => setCapacityModal(true)}
@@ -65,7 +97,7 @@ export function DesktopLegacyShell() {
         <DesktopWarehouseView
           key={key}
           globalSearch=""
-          onStatusChange={setStatus}
+          onStatusChange={handleStatusChange}
           preselectedItem={warehousePreselected}
           onSubmitSuccess={loadCapacity}
         />
@@ -74,7 +106,8 @@ export function DesktopLegacyShell() {
     if (activeTab === "history") {
       return <DesktopHistoryView key={key} />;
     }
-    return <DesktopAdminView key={key} globalSearch="" onStatusChange={setStatus} />;
+    return <DesktopAdminView key={key} globalSearch="" onStatusChange={handleStatusChange} />;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse, capacityData, loadCapacity]);
 
   return (
@@ -169,9 +202,7 @@ export function DesktopLegacyShell() {
       <div className="flex h-full w-full gap-3 px-3 py-3" style={{ background: LEGACY_COLORS.bg, color: LEGACY_COLORS.text }}>
         <DesktopSidebar
           activeTab={activeTab}
-          onTabChange={(tab) => {
-            setActiveTab(tab);
-          }}
+          onTabChange={handleTabChange}
           alertCount={{ inventory: stockWarnings ? stockWarnings.zero + stockWarnings.low : 0 }}
         />
 
@@ -184,6 +215,7 @@ export function DesktopLegacyShell() {
               loadCapacity();
             }}
             status={status}
+            statusNonce={statusNonce}
           />
 
           <div className="mt-1 min-h-0 flex-1 overflow-hidden flex">{content}</div>

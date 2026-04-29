@@ -9,7 +9,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // X-ray ERP 산업용 테마 — Slate / Blue
+        // DEXCOWIN 산업용 테마 — Slate / Blue
         brand: {
           50:  "#eff6ff",
           100: "#dbeafe",

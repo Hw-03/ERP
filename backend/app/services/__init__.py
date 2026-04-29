@@ -1,1 +1,1 @@
-"""Service layer for the X-Ray ERP backend."""
+"""Service layer for the DEXCOWIN MES backend."""

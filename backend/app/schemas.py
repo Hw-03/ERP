@@ -1,4 +1,4 @@
-"""Pydantic schemas for the X-Ray MES API."""
+"""Pydantic schemas for the DEXCOWIN MES API."""
 
 from datetime import datetime
 from decimal import Decimal
@@ -149,6 +149,7 @@ class EmployeeResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    pin_last_changed: Optional[datetime] = None
 
 
 class ShipPackageItemCreate(BaseModel):
@@ -534,7 +535,7 @@ class ProcessFlowRuleResponse(BaseModel):
 
 
 class ErpCodeParseRequest(BaseModel):
-    code: str = Field(..., description="4-part ERP code string")
+    code: str = Field(..., description="4-part 품목 코드 문자열")
 
 
 class ErpCodeGenerateRequest(BaseModel):

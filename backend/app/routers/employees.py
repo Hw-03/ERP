@@ -5,10 +5,11 @@ import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import DepartmentEnum, Employee
+from app.models import DepartmentEnum, Employee, StockRequest
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     EmployeeCreate,
@@ -132,22 +133,41 @@ def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, request: Re
     return _to_response(employee)
 
 
-@router.delete("/{employee_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{employee_id}")
 def delete_employee(employee_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
 
-    audit.record(
-        db,
-        request=request,
-        action="employee.delete",
-        target_type="employee",
-        target_id=str(employee.employee_id),
-        payload_summary=f"{employee.name} ({employee.employee_code})",
-    )
-    db.delete(employee)
-    commit_only(db)
+    has_requests = db.query(StockRequest).filter(
+        StockRequest.requester_employee_id == employee_id
+    ).first() is not None
+
+    if has_requests:
+        employee.is_active = False
+        employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        audit.record(
+            db,
+            request=request,
+            action="employee.deactivate",
+            target_type="employee",
+            target_id=str(employee.employee_id),
+            payload_summary=f"{employee.name} ({employee.employee_code}) — 이력 있어 비활성화",
+        )
+        commit_only(db)
+        return JSONResponse(status_code=200, content={"result": "deactivated"})
+    else:
+        audit.record(
+            db,
+            request=request,
+            action="employee.delete",
+            target_type="employee",
+            target_id=str(employee.employee_id),
+            payload_summary=f"{employee.name} ({employee.employee_code}) — 영구 삭제",
+        )
+        db.delete(employee)
+        commit_only(db)
+        return JSONResponse(status_code=200, content={"result": "deleted"})
 
 
 @router.post("/{employee_id}/verify-pin", response_model=EmployeeResponse)
@@ -179,6 +199,7 @@ def reset_employee_pin(
 
     employee.pin_hash = DEFAULT_PIN_HASH
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    employee.pin_last_changed = datetime.now(UTC).replace(tzinfo=None)
 
     audit.record(
         db,
@@ -205,4 +226,5 @@ def _to_response(employee: Employee) -> EmployeeResponse:
         is_active=bool(employee.is_active),
         created_at=employee.created_at,
         updated_at=employee.updated_at,
+        pin_last_changed=getattr(employee, "pin_last_changed", None),
     )

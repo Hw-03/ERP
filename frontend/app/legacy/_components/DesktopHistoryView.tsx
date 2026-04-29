@@ -32,7 +32,7 @@ export function DesktopHistoryView() {
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
   const [itemRecentLogs, setItemRecentLogs] = useState<TransactionLog[]>([]);
 
-  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("calendar");
   const now = new Date();
   const [calendarYear, setCalendarYear] = useState(now.getFullYear());
   const [calendarMonth, setCalendarMonth] = useState(now.getMonth());

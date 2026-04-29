@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 ## Goal
-ERP/MES prototype for material / inventory / production flow.
+MES 프로토타입 — 자재·재고·입출고·창고 승인·부서 재고·BOM·생산 실행 흐름 관리 시스템.
 
 ## Paths
 - backend: `backend/`

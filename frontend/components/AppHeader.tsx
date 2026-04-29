@@ -27,7 +27,7 @@ export default function AppHeader() {
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
               Precision Manufacturing MES
             </p>
-            <h1 className="text-xl font-semibold text-slate-100">X-Ray 제조 MES</h1>
+            <h1 className="text-xl font-semibold text-slate-100">DEXCOWIN MES</h1>
           </div>
         </div>
 

@@ -70,6 +70,11 @@ export type AdminEmployeesState = {
   requestPinReset: (employee: Employee) => void;
   confirmPinReset: () => void;
   cancelPinReset: () => void;
+  /* 삭제 */
+  deleteTarget: Employee | null;
+  requestDelete: (employee: Employee) => void;
+  confirmDelete: () => void;
+  cancelDelete: () => void;
 };
 
 export function useAdminEmployees({
@@ -86,6 +91,7 @@ export function useAdminEmployees({
   const [pinResetTarget, setPinResetTarget] = useState<Employee | null>(null);
   const [pinResetAdminPin, setPinResetAdminPin] = useState("");
   const [pinResetError, setPinResetError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
 
   // 선택된 직원이 외부 employees 변경 시 동기화 + editForm 초기화
   useEffect(() => {
@@ -171,6 +177,28 @@ export function useAdminEmployees({
     }
   }
 
+  async function _doDeleteEmployee(employee: Employee) {
+    try {
+      const result = await api.deleteEmployee(employee.employee_id);
+      if (result.result === "deleted") {
+        setEmployees((current) => current.filter((e) => e.employee_id !== employee.employee_id));
+        setSelectedEmployee(null);
+        onStatusChange(`'${employee.name}' 직원을 영구 삭제했습니다.`);
+      } else {
+        const updated = { ...employee, is_active: false };
+        setEmployees((current) =>
+          current.map((e) => (e.employee_id === employee.employee_id ? updated : e)),
+        );
+        setSelectedEmployee(updated);
+        onStatusChange(`'${employee.name}' 직원을 비활성화했습니다. (거래 이력 보존)`);
+      }
+      setDeleteTarget(null);
+    } catch (error) {
+      setDeleteTarget(null);
+      onError(error instanceof Error ? error.message : "직원 삭제 실패");
+    }
+  }
+
   async function _doResetPin(employee: Employee) {
     if (!pinResetAdminPin.trim()) {
       setPinResetError("관리자 PIN을 입력하세요.");
@@ -219,5 +247,9 @@ export function useAdminEmployees({
       setPinResetAdminPin("");
       setPinResetError("");
     },
+    deleteTarget,
+    requestDelete: (e) => setDeleteTarget(e),
+    confirmDelete: () => { if (deleteTarget) void _doDeleteEmployee(deleteTarget); },
+    cancelDelete: () => setDeleteTarget(null),
   };
 }

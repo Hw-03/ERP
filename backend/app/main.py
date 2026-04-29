@@ -1,6 +1,6 @@
-"""FastAPI application entry point for the X-Ray MES backend.
+"""FastAPI application entry point for the DEXCOWIN MES backend.
 
-Startup 부작용 (create_all / run_migrations / seed / ERP 백필) 은 모두
+Startup 부작용 (create_all / run_migrations / seed / MES 백필) 은 모두
 `backend/bootstrap_db.py` 로 옮겼다. 서버 기동만으로는 DB 가 변하지 않는다.
 
 초기 설치 / 스키마 변경 / 시드 재적용은 명시적으로:
@@ -58,9 +58,9 @@ _BOOT_STARTED_AT: str = _dt.datetime.utcnow().isoformat()
 
 
 app = FastAPI(
-    title="X-Ray MES",
+    title="DEXCOWIN MES",
     description="""
-    ## 정밀 X-Ray 장비 제조 경량 MES
+    ## DEXCOWIN 경량 MES
 
     ### 11단계 공정 카테고리
     | Code | 명칭 | 설명 |
@@ -251,7 +251,7 @@ app.include_router(stock_requests.router, prefix="/api/stock-requests", tags=["S
 
 @app.get("/health", tags=["System"])
 def health_check():
-    return {"status": "ok", "service": "X-Ray ERP API"}
+    return {"status": "ok", "service": "DEXCOWIN MES API"}
 
 
 @app.get("/api/app-session", tags=["System"])
@@ -312,7 +312,7 @@ def health_detailed(db: Session = Depends(get_db)):
 @app.get("/", tags=["System"])
 def root():
     return {
-        "message": "X-Ray ERP System API",
+        "message": "DEXCOWIN MES System API",
         "docs": "/docs",
         "version": app.version,
     }

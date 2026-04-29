@@ -233,6 +233,7 @@ export interface Employee {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  pin_last_changed?: string | null;
 }
 
 // =============================================================================
@@ -709,9 +710,10 @@ export const api = {
     return res.json() as Promise<Employee>;
   },
 
-  deleteEmployee: async (employeeId: string) => {
+  deleteEmployee: async (employeeId: string): Promise<{ result: "deleted" | "deactivated" }> => {
     const res = await fetch(toApiUrl(`/api/employees/${employeeId}`), { method: "DELETE" });
     if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<{ result: "deleted" | "deactivated" }>;
   },
 
   // 작업자 식별용 PIN 검증 — 실제 보안 인증이 아님

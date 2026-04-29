@@ -79,7 +79,7 @@ function LoginBoot(){
 
       {/* Top controls */}
       <div className="v3-topbar">
-        <span className="v3-tb-k">DX · ERP</span>
+        <span className="v3-tb-k">DX · MES</span>
         <span className="v3-tb-v">{done?'READY':'INITIALIZING'}</span>
         <span className="v3-tb-sp"/>
         {!done && (
