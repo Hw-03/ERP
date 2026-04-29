@@ -3,7 +3,7 @@
 import { PackagePlus, Search, X } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS, formatNumber } from "../legacyUi";
-import { CATEGORY_OPTIONS, EMPTY_ADD_FORM, MODEL_SLOTS, UNIT_OPTIONS } from "./adminShared";
+import { PROCESS_TYPE_OPTIONS, EMPTY_ADD_FORM, MODEL_SLOTS, UNIT_OPTIONS } from "./adminShared";
 import { useAdminMasterItemsContext } from "./AdminMasterItemsContext";
 
 // Props 없음. AdminMasterItemsProvider 의 Context 에서 모두 읽는다.
@@ -155,12 +155,12 @@ export function AdminMasterItemsSection() {
                 </span>
               </div>
               <select
-                value={addForm.category}
-                onChange={(e) => setAddForm((f) => ({ ...f, category: e.target.value as Item["category"] }))}
+                value={addForm.process_type_code}
+                onChange={(e) => setAddForm((f) => ({ ...f, process_type_code: e.target.value }))}
                 className="w-full rounded-[18px] border px-4 py-3 text-base outline-none"
                 style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
               >
-                {CATEGORY_OPTIONS.map((opt) => (
+                {PROCESS_TYPE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>

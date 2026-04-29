@@ -11,7 +11,7 @@ import {
 } from "../legacyUi";
 import { LabeledSelect } from "./_atoms";
 import {
-  CATEGORY_LABEL,
+  PROCESS_TYPE_LABEL,
   DEPT_OPTIONS,
   PAGE_SIZE,
 } from "./_constants";
@@ -238,7 +238,7 @@ export function ItemPickStep({
               {filteredItems.slice(0, displayLimit).map((item) => {
                 const active = selectedItems.has(item.item_id);
                 const stock = getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock));
-                const categoryLabel = item.category ? (CATEGORY_LABEL[item.category] ?? item.category) : "-";
+                const categoryLabel = item.process_type_code ? (PROCESS_TYPE_LABEL[item.process_type_code] ?? item.process_type_code) : "-";
                 return (
                   <tr
                     key={item.item_id}

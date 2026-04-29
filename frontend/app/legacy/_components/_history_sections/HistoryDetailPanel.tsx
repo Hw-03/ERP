@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Activity, History, Pencil, Wrench } from "lucide-react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS, formatNumber, transactionColor, transactionLabel } from "../legacyUi";
-import { CATEGORY_META, formatHistoryDate, parseUtc } from "./historyShared";
+import { PROCESS_TYPE_META, formatHistoryDate, parseUtc } from "./historyShared";
 import { TransactionEditModal } from "./TransactionEditModal";
 import {
   QUANTITY_CORRECTABLE_TYPES,
@@ -147,7 +147,7 @@ export function HistoryDetailPanel({
           [
             ["품목명", selected.item_name],
             ["품목 코드", selected.erp_code ?? "-"],
-            ["분류", (CATEGORY_META[selected.item_category] ?? { label: selected.item_category }).label],
+            ["분류", (PROCESS_TYPE_META[selected.item_process_type_code ?? ""] ?? { label: selected.item_process_type_code ?? "-" }).label],
             ["단위", selected.item_unit],
             ["담당자", selected.produced_by ?? "-"],
             ["참조번호", selected.reference_no ?? "-"],

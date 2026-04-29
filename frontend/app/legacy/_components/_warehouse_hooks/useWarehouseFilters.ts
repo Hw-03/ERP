@@ -38,10 +38,9 @@ export function useWarehouseFilters({
         .filter((item) => modelFilter === "전체" || item.legacy_model === modelFilter)
         .filter((item) => {
           if (categoryFilter === "ALL") return true;
-          if (categoryFilter === "RM") return item.category === "RM";
-          if (categoryFilter === "A") return ["TA", "HA", "VA", "AA"].includes(item.category);
-          if (categoryFilter === "F") return ["TF", "HF", "VF", "AF"].includes(item.category);
-          if (categoryFilter === "FG") return item.category === "FG";
+          if (categoryFilter === "RM") return item.process_type_code?.endsWith("R") ?? false;
+          if (categoryFilter === "A") return item.process_type_code?.endsWith("A") ?? false;
+          if (categoryFilter === "F") return item.process_type_code?.endsWith("F") ?? false;
           return true;
         })
         .filter((item) => matchesSearch(item, searchKeyword)),

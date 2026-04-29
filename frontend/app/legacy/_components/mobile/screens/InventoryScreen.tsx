@@ -29,8 +29,9 @@ import {
   type InventoryFilters,
 } from "./InventoryFilterSheet";
 
-const SEMI_CATS = new Set(["TA", "HA", "VA", "AA"]);
-const FIXED_CATS = new Set(["TF", "HF", "VF", "AF"]);
+const R_SUFFIX = (code: string | null) => code?.endsWith("R") ?? false;
+const A_SUFFIX = (code: string | null) => code?.endsWith("A") ?? false;
+const F_SUFFIX = (code: string | null) => code?.endsWith("F") ?? false;
 
 type DisplayRow = { key: string; item: Item; quantity: number; available: number; count: number };
 
@@ -66,10 +67,9 @@ export function InventoryScreen({
       if (filters.kpi === "OK" && !(avail > 0 && !(min != null && avail < min))) return false;
       if (filters.kpi === "LOW" && !(avail > 0 && min != null && avail < min)) return false;
       if (filters.kpi === "ZERO" && !(avail <= 0)) return false;
-      if (filters.itemType === "RM" && item.category !== "RM") return false;
-      if (filters.itemType === "SEMI" && !SEMI_CATS.has(item.category ?? "")) return false;
-      if (filters.itemType === "FIXED" && !FIXED_CATS.has(item.category ?? "")) return false;
-      if (filters.itemType === "FG" && item.category !== "FG") return false;
+      if (filters.itemType === "RM" && !R_SUFFIX(item.process_type_code)) return false;
+      if (filters.itemType === "SEMI" && !A_SUFFIX(item.process_type_code)) return false;
+      if (filters.itemType === "FIXED" && !F_SUFFIX(item.process_type_code)) return false;
       return true;
     });
   }, [items, filters.kpi, filters.itemType]);

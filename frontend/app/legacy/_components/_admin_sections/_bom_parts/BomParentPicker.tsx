@@ -92,7 +92,7 @@ export function BomParentPicker() {
                   color: LEGACY_COLORS.blue,
                 }}
               >
-                {item.category}
+                {item.process_type_code ?? "-"}
               </span>
               <div
                 className="truncate text-sm font-medium"

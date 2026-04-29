@@ -8,8 +8,8 @@ import { useMemo, useState } from "react";
 import type { Item, ShipPackage } from "@/lib/api";
 import { api } from "@/lib/api";
 
-const A_SET = new Set(["TA", "HA", "VA", "AA"]);
-const F_SET = new Set(["TF", "HF", "VF", "AF"]);
+const A_SUFFIX = (code: string | null | undefined) => code?.endsWith("A") ?? false;
+const F_SUFFIX = (code: string | null | undefined) => code?.endsWith("F") ?? false;
 
 export type UseAdminPackagesArgs = {
   items: Item[];
@@ -67,9 +67,9 @@ export function useAdminPackages({
     return items
       .filter((i) => {
         if (pkgItemCategory === "ALL") return true;
-        if (pkgItemCategory === "?A") return A_SET.has(i.category);
-        if (pkgItemCategory === "?F") return F_SET.has(i.category);
-        return i.category === pkgItemCategory;
+        if (pkgItemCategory === "?A") return A_SUFFIX(i.process_type_code);
+        if (pkgItemCategory === "?F") return F_SUFFIX(i.process_type_code);
+        return i.process_type_code === pkgItemCategory;
       })
       .filter((i) => !kw || `${i.item_name} ${i.erp_code ?? ""}`.toLowerCase().includes(kw))
       .slice(0, 40);

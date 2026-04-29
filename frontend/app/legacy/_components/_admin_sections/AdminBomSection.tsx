@@ -261,7 +261,7 @@ export function AdminBomSection() {
                         const childItem = items.find((item) => item.item_id === row.child_item_id);
                         const stock = Number(childItem?.quantity ?? 0);
                         const capacity = row.quantity > 0 ? Math.floor(stock / Number(row.quantity)) : 0;
-                        const catColor = bomCategoryColor(childItem?.category);
+                        const catColor = bomCategoryColor(childItem?.process_type_code);
                         const isEditing = editingBomId === row.bom_id;
                         return (
                           <div
@@ -279,7 +279,7 @@ export function AdminBomSection() {
                                 color: catColor,
                               }}
                             >
-                              {childItem?.category}
+                              {childItem?.process_type_code ?? "-"}
                             </span>
                             <div>
                               <div className="truncate text-sm font-medium" style={{ color: LEGACY_COLORS.text }}>

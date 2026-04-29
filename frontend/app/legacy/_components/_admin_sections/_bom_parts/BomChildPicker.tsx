@@ -49,7 +49,7 @@ export function BomChildPicker({ onClose }: { onClose: () => void }) {
                 color: LEGACY_COLORS.blue,
               }}
             >
-              {parent?.category ?? "–"}
+              {parent?.process_type_code ?? "–"}
             </span>
             <span className="truncate text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
               {parent?.item_name ?? "–"}
@@ -139,7 +139,7 @@ export function BomChildPicker({ onClose }: { onClose: () => void }) {
                     color: LEGACY_COLORS.blue,
                   }}
                 >
-                  {item.category}
+                  {item.process_type_code ?? "-"}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm" style={{ color: LEGACY_COLORS.text }}>

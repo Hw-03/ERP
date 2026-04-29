@@ -30,10 +30,9 @@ const DEPT_OPTIONS = [
 
 const TYPE_OPTIONS = [
   { label: "전체", value: "ALL" },
-  { label: "RM(원자재)", value: "RM" },
-  { label: "반제품(?A)", value: "SEMI" },
-  { label: "고정형(?F)", value: "FIXED" },
-  { label: "완제품(FG)", value: "FG" },
+  { label: "원자재(?R)", value: "RM" },
+  { label: "조립체(?A)", value: "SEMI" },
+  { label: "F타입(?F)", value: "FIXED" },
 ];
 
 export const KPI_LABEL: Record<KpiKey, string> = {

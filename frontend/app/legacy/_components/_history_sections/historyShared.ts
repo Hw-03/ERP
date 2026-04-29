@@ -20,18 +20,25 @@ export const DATE_OPTIONS = [
   { label: "이번달", value: "MONTH" },
 ];
 
-export const CATEGORY_META: Record<string, { label: string; color: string; bg: string }> = {
-  RM: { label: "원자재", color: LEGACY_COLORS.blue, bg: `color-mix(in srgb, ${LEGACY_COLORS.blue} 16%, transparent)` },
-  TA: { label: "튜브조립", color: LEGACY_COLORS.cyan, bg: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 16%, transparent)` },
-  TF: { label: "튜브완성", color: LEGACY_COLORS.cyan, bg: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 16%, transparent)` },
-  HA: { label: "고압조립", color: LEGACY_COLORS.yellow, bg: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 16%, transparent)` },
-  HF: { label: "고압완성", color: LEGACY_COLORS.yellow, bg: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 16%, transparent)` },
-  VA: { label: "진공조립", color: LEGACY_COLORS.purple, bg: `color-mix(in srgb, ${LEGACY_COLORS.purple} 16%, transparent)` },
-  VF: { label: "진공완성", color: LEGACY_COLORS.purple, bg: `color-mix(in srgb, ${LEGACY_COLORS.purple} 16%, transparent)` },
-  AA: { label: "본체조립", color: "#f97316", bg: "color-mix(in srgb, #f97316 16%, transparent)" },
-  AF: { label: "조립완성", color: "#f97316", bg: "color-mix(in srgb, #f97316 16%, transparent)" },
-  FG: { label: "완제품", color: LEGACY_COLORS.green, bg: `color-mix(in srgb, ${LEGACY_COLORS.green} 16%, transparent)` },
-  UK: { label: "미분류", color: LEGACY_COLORS.muted2, bg: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 16%, transparent)` },
+export const PROCESS_TYPE_META: Record<string, { label: string; color: string; bg: string }> = {
+  TR: { label: "튜브 원자재", color: LEGACY_COLORS.cyan, bg: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 16%, transparent)` },
+  TA: { label: "튜브 조립체", color: LEGACY_COLORS.cyan, bg: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 16%, transparent)` },
+  TF: { label: "튜브 F타입", color: LEGACY_COLORS.cyan, bg: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 16%, transparent)` },
+  HR: { label: "고압 원자재", color: LEGACY_COLORS.yellow, bg: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 16%, transparent)` },
+  HA: { label: "고압 조립체", color: LEGACY_COLORS.yellow, bg: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 16%, transparent)` },
+  HF: { label: "고압 F타입", color: LEGACY_COLORS.yellow, bg: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 16%, transparent)` },
+  VR: { label: "진공 원자재", color: LEGACY_COLORS.purple, bg: `color-mix(in srgb, ${LEGACY_COLORS.purple} 16%, transparent)` },
+  VA: { label: "진공 조립체", color: LEGACY_COLORS.purple, bg: `color-mix(in srgb, ${LEGACY_COLORS.purple} 16%, transparent)` },
+  VF: { label: "진공 F타입", color: LEGACY_COLORS.purple, bg: `color-mix(in srgb, ${LEGACY_COLORS.purple} 16%, transparent)` },
+  NR: { label: "튜닝 원자재", color: "#f97316", bg: "color-mix(in srgb, #f97316 16%, transparent)" },
+  NA: { label: "튜닝 조립체", color: "#f97316", bg: "color-mix(in srgb, #f97316 16%, transparent)" },
+  NF: { label: "튜닝 F타입", color: "#f97316", bg: "color-mix(in srgb, #f97316 16%, transparent)" },
+  AR: { label: "조립 원자재", color: "#818cf8", bg: "color-mix(in srgb, #818cf8 16%, transparent)" },
+  AA: { label: "조립 조립체", color: "#818cf8", bg: "color-mix(in srgb, #818cf8 16%, transparent)" },
+  AF: { label: "조립 F타입", color: "#818cf8", bg: "color-mix(in srgb, #818cf8 16%, transparent)" },
+  PR: { label: "출하 원자재", color: LEGACY_COLORS.green, bg: `color-mix(in srgb, ${LEGACY_COLORS.green} 16%, transparent)` },
+  PA: { label: "출하 조립체", color: LEGACY_COLORS.green, bg: `color-mix(in srgb, ${LEGACY_COLORS.green} 16%, transparent)` },
+  PF: { label: "출하 F타입", color: LEGACY_COLORS.green, bg: `color-mix(in srgb, ${LEGACY_COLORS.green} 16%, transparent)` },
 };
 
 export function getPeriodStart(value: string): Date | null {

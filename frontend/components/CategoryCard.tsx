@@ -1,102 +1,33 @@
 "use client";
 
-import { type Category, type CategorySummary } from "@/lib/api";
+import { type ProcessTypeSummary } from "@/lib/api";
 
-interface CategoryMeta {
+interface ProcessTypeMeta {
   badge: string;
   border: string;
   dot: string;
-  icon: string;
-  shortName: string;
 }
 
-const CATEGORY_META: Record<Category, CategoryMeta> = {
-  RM: {
-    badge: "bg-slate-700 text-slate-200",
-    border: "border-l-slate-500",
-    dot: "bg-slate-400",
-    icon: "🧱",
-    shortName: "원자재",
-  },
-  TA: {
-    badge: "bg-blue-900/60 text-blue-300",
-    border: "border-l-blue-600",
-    dot: "bg-blue-400",
-    icon: "🧪",
-    shortName: "튜브 반제품",
-  },
-  TF: {
-    badge: "bg-blue-800/60 text-blue-200",
-    border: "border-l-blue-400",
-    dot: "bg-blue-300",
-    icon: "🔵",
-    shortName: "튜브 완제품",
-  },
-  HA: {
-    badge: "bg-purple-900/60 text-purple-300",
-    border: "border-l-purple-600",
-    dot: "bg-purple-400",
-    icon: "⚡",
-    shortName: "고압 반제품",
-  },
-  HF: {
-    badge: "bg-purple-800/60 text-purple-200",
-    border: "border-l-purple-400",
-    dot: "bg-purple-300",
-    icon: "🔌",
-    shortName: "고압 완제품",
-  },
-  VA: {
-    badge: "bg-cyan-900/60 text-cyan-300",
-    border: "border-l-cyan-600",
-    dot: "bg-cyan-400",
-    icon: "🫧",
-    shortName: "진공 반제품",
-  },
-  VF: {
-    badge: "bg-cyan-800/60 text-cyan-200",
-    border: "border-l-cyan-400",
-    dot: "bg-cyan-300",
-    icon: "💠",
-    shortName: "진공 완제품",
-  },
-  AA: {
-    badge: "bg-indigo-900/60 text-indigo-300",
-    border: "border-l-indigo-600",
-    dot: "bg-indigo-400",
-    icon: "🧩",
-    shortName: "조립 반제품",
-  },
-  AF: {
-    badge: "bg-indigo-800/60 text-indigo-200",
-    border: "border-l-indigo-400",
-    dot: "bg-indigo-300",
-    icon: "📦",
-    shortName: "조립 완제품",
-  },
-  FG: {
-    badge: "bg-green-900/60 text-green-300",
-    border: "border-l-green-500",
-    dot: "bg-green-400",
-    icon: "✅",
-    shortName: "완제품",
-  },
-  UK: {
-    badge: "bg-red-900/60 text-red-300",
-    border: "border-l-red-600",
-    dot: "bg-red-400",
-    icon: "⚠️",
-    shortName: "미분류",
-  },
-};
+function metaForCode(code: string): ProcessTypeMeta {
+  const prefix = code[0] ?? "";
+  switch (prefix) {
+    case "T": return { badge: "bg-cyan-900/60 text-cyan-300",    border: "border-l-cyan-500",   dot: "bg-cyan-400" };
+    case "H": return { badge: "bg-yellow-900/60 text-yellow-300", border: "border-l-yellow-500", dot: "bg-yellow-400" };
+    case "V": return { badge: "bg-purple-900/60 text-purple-300", border: "border-l-purple-500", dot: "bg-purple-400" };
+    case "N": return { badge: "bg-orange-900/60 text-orange-300", border: "border-l-orange-500", dot: "bg-orange-400" };
+    case "A": return { badge: "bg-indigo-900/60 text-indigo-300", border: "border-l-indigo-500", dot: "bg-indigo-400" };
+    case "P": return { badge: "bg-green-900/60 text-green-300",   border: "border-l-green-500",  dot: "bg-green-400" };
+    default:  return { badge: "bg-slate-700 text-slate-200",      border: "border-l-slate-500",  dot: "bg-slate-400" };
+  }
+}
 
-interface CategoryCardProps {
-  data: CategorySummary;
+interface ProcessTypeCardProps {
+  data: ProcessTypeSummary;
   isAlert?: boolean;
 }
 
-export default function CategoryCard({ data, isAlert = false }: CategoryCardProps) {
-  const meta = CATEGORY_META[data.category];
+export default function CategoryCard({ data, isAlert = false }: ProcessTypeCardProps) {
+  const meta = metaForCode(data.process_type_code);
   const totalQty = Number(data.total_quantity);
 
   const cardClassName = isAlert
@@ -109,15 +40,12 @@ export default function CategoryCard({ data, isAlert = false }: CategoryCardProp
     >
       <div className="mb-4 flex items-start justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-2xl" role="img" aria-label={data.category}>
-            {meta.icon}
-          </span>
           <div>
             <div className="flex items-center gap-2">
               <span
                 className={`rounded px-2 py-0.5 text-base font-bold ${meta.badge}`}
               >
-                {data.category}
+                {data.process_type_code}
               </span>
               {isAlert && (
                 <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-base text-red-400">
@@ -125,7 +53,7 @@ export default function CategoryCard({ data, isAlert = false }: CategoryCardProp
                 </span>
               )}
             </div>
-            <p className="mt-0.5 text-base text-slate-400">{meta.shortName}</p>
+            <p className="mt-0.5 text-base text-slate-400">{data.label}</p>
           </div>
         </div>
 

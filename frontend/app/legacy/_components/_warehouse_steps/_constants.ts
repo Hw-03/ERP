@@ -50,17 +50,13 @@ export const DEPT_OPTIONS = [
   { label: "출하", value: "출하" },
 ];
 
-export const CATEGORY_LABEL: Record<string, string> = {
-  RM: "원자재",
-  TA: "튜브조립",
-  HA: "고압조립",
-  VA: "진공조립",
-  AA: "브라켓",
-  TF: "튜브반제",
-  HF: "고압반제",
-  VF: "진공반제",
-  AF: "조립반제",
-  FG: "완제품",
+export const PROCESS_TYPE_LABEL: Record<string, string> = {
+  TR: "튜브 원자재", TA: "튜브 조립체", TF: "튜브 F타입",
+  HR: "고압 원자재", HA: "고압 조립체", HF: "고압 F타입",
+  VR: "진공 원자재", VA: "진공 조립체", VF: "진공 F타입",
+  NR: "튜닝 원자재", NA: "튜닝 조립체", NF: "튜닝 F타입",
+  AR: "조립 원자재", AA: "조립 조립체", AF: "조립 F타입",
+  PR: "출하 원자재", PA: "출하 조립체", PF: "출하 F타입",
 };
 
 // ─────────────────────────── Helpers ─────────────────────────────

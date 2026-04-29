@@ -8,8 +8,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { BOMDetailEntry, BOMEntry, Item } from "@/lib/api";
 import { api } from "@/lib/api";
 
-const A_CATS = new Set(["TA", "HA", "VA", "AA"]);
-const F_CATS = new Set(["TF", "HF", "VF", "AF"]);
+const A_SUFFIX = (code: string | null | undefined) => code?.endsWith("A") ?? false;
+const F_SUFFIX = (code: string | null | undefined) => code?.endsWith("F") ?? false;
 
 type ChildItemPlus = Item & { alreadyIn: boolean };
 
@@ -125,8 +125,8 @@ export function useAdminBom({
   }, [parentId]);
 
   const bomParentItems = useMemo(() => {
-    let pool = items.filter((i) => i.category !== "RM");
-    if (bomParentCat !== "ALL") pool = pool.filter((i) => i.category === bomParentCat);
+    let pool = items.filter((i) => !i.process_type_code?.endsWith("R"));
+    if (bomParentCat !== "ALL") pool = pool.filter((i) => i.process_type_code === bomParentCat);
     const kw = bomParentSearch.trim().toLowerCase();
     if (kw) pool = pool.filter((i) => `${i.item_name} ${i.erp_code ?? ""}`.toLowerCase().includes(kw));
     return pool;
@@ -148,9 +148,9 @@ export function useAdminBom({
     return items
       .filter((i) => i.item_id !== parentId)
       .filter((i) => {
-        if (bomChildCat === "RM") return i.category === "RM";
-        if (bomChildCat === "?A") return A_CATS.has(i.category);
-        if (bomChildCat === "?F") return F_CATS.has(i.category);
+        if (bomChildCat === "?R") return i.process_type_code?.endsWith("R") ?? false;
+        if (bomChildCat === "?A") return A_SUFFIX(i.process_type_code);
+        if (bomChildCat === "?F") return F_SUFFIX(i.process_type_code);
         return true;
       })
       .filter((i) => !kw || `${i.item_name} ${i.erp_code ?? ""}`.toLowerCase().includes(kw))

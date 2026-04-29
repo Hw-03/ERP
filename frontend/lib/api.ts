@@ -4,18 +4,13 @@ const SERVER_API_BASE = process.env.NEXT_PUBLIC_API_URL
 
 const FALLBACK_SERVER_API_BASE = "http://127.0.0.1:8000";
 
-export type Category =
-  | "RM"
-  | "TA"
-  | "TF"
-  | "HA"
-  | "HF"
-  | "VA"
-  | "VF"
-  | "AA"
-  | "AF"
-  | "FG"
-  | "UK";
+export type ProcessTypeCode =
+  | "TR" | "TA" | "TF"
+  | "HR" | "HA" | "HF"
+  | "VR" | "VA" | "VF"
+  | "NR" | "NA" | "NF"
+  | "AR" | "AA" | "AF"
+  | "PR" | "PA" | "PF";
 
 export type TransactionType =
   | "RECEIVE"
@@ -54,9 +49,9 @@ export type Department =
 export type EmployeeLevel = "admin" | "manager" | "staff";
 export type WarehouseRole = "none" | "primary" | "deputy";
 
-export interface CategorySummary {
-  category: Category;
-  category_label: string;
+export interface ProcessTypeSummary {
+  process_type_code: string;
+  label: string;
   item_count: number;
   total_quantity: number;
   warehouse_qty_sum?: number;
@@ -65,10 +60,9 @@ export interface CategorySummary {
 }
 
 export interface InventorySummary {
-  categories: CategorySummary[];
+  process_types: ProcessTypeSummary[];
   total_items: number;
   total_quantity: number;
-  uk_item_count: number;
 }
 
 export interface ProductModel {
@@ -82,7 +76,6 @@ export interface Item {
   item_id: string;
   item_name: string;
   spec: string | null;
-  category: Category;
   unit: string;
   quantity: number;
   warehouse_qty: number;
@@ -353,7 +346,7 @@ export interface ShipPackageItemDetail {
   item_id: string;
   erp_code: string | null;
   item_name: string;
-  item_category: Category;
+  item_process_type_code: string | null;
   item_unit: string;
   quantity: number;
 }
@@ -401,7 +394,7 @@ export interface BOMTreeNode {
   item_id: string;
   erp_code: string;
   item_name: string;
-  category: Category;
+  process_type_code: string | null;
   unit: string;
   required_quantity: number;
   current_stock: number;
@@ -413,7 +406,7 @@ export interface TransactionLog {
   item_id: string;
   erp_code: string | null;
   item_name: string;
-  item_category: Category;
+  item_process_type_code: string | null;
   item_unit: string;
   transaction_type: TransactionType;
   quantity_change: number;
@@ -442,7 +435,7 @@ export interface TransactionEditLog {
 export interface ProductionCheckComponent {
   erp_code: string | null;
   item_name: string;
-  category: Category;
+  process_type_code: string | null;
   unit: string;
   required: number;
   current_stock: number;
@@ -477,7 +470,7 @@ export interface BackflushDetail {
   item_id: string;
   erp_code: string | null;
   item_name: string;
-  category: Category;
+  process_type_code: string | null;
   required_quantity: number;
   stock_before: number;
   stock_after: number;
@@ -581,7 +574,7 @@ export const api = {
 
   getItems: (
     params?: {
-      category?: Category;
+      process_type_code?: string;
       search?: string;
       skip?: number;
       limit?: number;
@@ -595,7 +588,7 @@ export const api = {
     opts?: { signal?: AbortSignal },
   ) => {
     const query = new URLSearchParams();
-    if (params?.category) query.set("category", params.category);
+    if (params?.process_type_code) query.set("process_type_code", params.process_type_code);
     if (params?.search) query.set("search", params.search);
     if (params?.skip !== undefined) query.set("skip", String(params.skip));
     if (params?.limit !== undefined) query.set("limit", String(params.limit));
@@ -612,7 +605,7 @@ export const api = {
 
   createItem: async (payload: {
     item_name: string;
-    category: Category;
+    process_type_code?: string;
     spec?: string;
     unit?: string;
     legacy_model?: string;
@@ -629,7 +622,7 @@ export const api = {
     payload: {
       item_name?: string;
       spec?: string;
-      category?: Category;
+      process_type_code?: string;
       unit?: string;
       barcode?: string;
       legacy_file_type?: string;
