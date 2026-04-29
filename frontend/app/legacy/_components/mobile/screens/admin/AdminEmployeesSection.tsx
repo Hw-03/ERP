@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type Employee } from "@/lib/api";
+import { api, type DepartmentMaster, type Employee } from "@/lib/api";
 import { BottomSheet } from "../../../BottomSheet";
 import type { ToastState } from "../../../Toast";
-import { DEPARTMENT_LABELS, LEGACY_COLORS, normalizeDepartment } from "../../../legacyUi";
+import { LEGACY_COLORS, normalizeDepartment } from "../../../legacyUi";
 
 export function AdminEmployeesSection({ showToast }: { showToast: (toast: ToastState) => void }) {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [departments, setDepartments] = useState<DepartmentMaster[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState({
     employee_code: "",
@@ -19,6 +20,7 @@ export function AdminEmployeesSection({ showToast }: { showToast: (toast: ToastS
 
   useEffect(() => {
     void api.getEmployees({ activeOnly: false }).then(setEmployees);
+    void api.getDepartments({ isActive: true }).then(setDepartments);
   }, []);
 
   async function addEmployee() {
@@ -120,9 +122,9 @@ export function AdminEmployeesSection({ showToast }: { showToast: (toast: ToastS
               부서
             </div>
             <select value={form.department} onChange={(event) => setForm((current) => ({ ...current, department: event.target.value }))} className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-              {Object.keys(DEPARTMENT_LABELS).map((value) => (
-                <option key={value} value={value}>
-                  {DEPARTMENT_LABELS[value]}
+              {departments.map((d) => (
+                <option key={d.id} value={d.name}>
+                  {d.name}
                 </option>
               ))}
             </select>

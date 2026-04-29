@@ -72,6 +72,13 @@ export interface ProductModel {
   is_reserved: boolean;
 }
 
+export interface DepartmentMaster {
+  id: number;
+  name: string;
+  display_order: number;
+  is_active: boolean;
+}
+
 export interface Item {
   item_id: string;
   item_name: string;
@@ -1440,4 +1447,35 @@ export const api = {
 
   getAppSession: (): Promise<{ boot_id: string; started_at: string }> =>
     fetcher(toApiUrl("/api/app-session")),
+
+  getDepartments: (params?: { isActive?: boolean }) => {
+    const query = new URLSearchParams();
+    if (params?.isActive !== undefined) query.set("is_active", String(params.isActive));
+    return fetcher<DepartmentMaster[]>(toApiUrl(`/api/departments?${query}`));
+  },
+
+  createDepartment: async (payload: { name: string; display_order?: number }) => {
+    const res = await fetch(toApiUrl("/api/departments"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<DepartmentMaster>;
+  },
+
+  updateDepartment: async (id: number, payload: { name?: string; display_order?: number; is_active?: boolean }) => {
+    const res = await fetch(toApiUrl(`/api/departments/${id}`), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<DepartmentMaster>;
+  },
+
+  deleteDepartment: async (id: number) => {
+    const res = await fetch(toApiUrl(`/api/departments/${id}`), { method: "DELETE" });
+    if (!res.ok) throw new Error(await parseError(res));
+  },
 };

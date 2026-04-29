@@ -32,6 +32,7 @@ from sqlalchemy import text
 
 from app.database import Base, SessionLocal, engine
 from app.models import (
+    Department,
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
@@ -247,9 +248,16 @@ _PROCESS_FLOW_RULES: list[tuple] = [
 
 def seed_reference_data() -> dict[str, int]:
     """참조 테이블이 비어 있을 때만 시드. idempotent."""
-    counts = {"employees": 0, "symbols": 0, "options": 0, "process_types": 0, "flow_rules": 0}
+    counts = {"departments": 0, "employees": 0, "symbols": 0, "options": 0, "process_types": 0, "flow_rules": 0}
     db = SessionLocal()
     try:
+        if db.query(Department).count() == 0:
+            _DEPT_SEED = ["조립", "고압", "진공", "튜닝", "튜브", "AS", "연구", "영업", "출하", "기타"]
+            for i, name in enumerate(_DEPT_SEED):
+                db.add(Department(name=name, display_order=i, is_active=True))
+                counts["departments"] += 1
+            db.commit()
+
         if db.query(Employee).count() == 0:
             for idx, (code, name, role, dept, level) in enumerate(_EMPLOYEE_SEED, start=1):
                 db.add(

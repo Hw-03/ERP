@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import DepartmentEnum, Employee, StockRequest
+from app.models import Employee, StockRequest
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     EmployeeCreate,
@@ -28,7 +28,7 @@ router = APIRouter()
 
 @router.get("", response_model=List[EmployeeResponse])
 def list_employees(
-    department: Optional[DepartmentEnum] = Query(None),
+    department: Optional[str] = Query(None),
     active_only: bool = Query(True),
     db: Session = Depends(get_db),
 ):

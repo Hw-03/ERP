@@ -3,7 +3,7 @@
 // AdminEmployeesSection 전용 hook.
 
 import { useEffect, useState } from "react";
-import type { Employee, EmployeeLevel, WarehouseRole } from "@/lib/api";
+import type { DepartmentMaster, Employee, EmployeeLevel, WarehouseRole } from "@/lib/api";
 import { api } from "@/lib/api";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../_admin_sections/adminShared";
 
@@ -42,12 +42,14 @@ function toEditForm(emp: Employee): EmployeeEditForm {
 export type UseAdminEmployeesArgs = {
   employees: Employee[];
   setEmployees: (updater: (prev: Employee[]) => Employee[]) => void;
+  departments: DepartmentMaster[];
   onStatusChange: (msg: string) => void;
   onError: (msg: string) => void;
 };
 
 export type AdminEmployeesState = {
   employees: Employee[];
+  departments: DepartmentMaster[];
   selectedEmployee: Employee | null;
   setSelectedEmployee: (e: Employee | null) => void;
   empAddMode: boolean;
@@ -80,6 +82,7 @@ export type AdminEmployeesState = {
 export function useAdminEmployees({
   employees,
   setEmployees,
+  departments,
   onStatusChange,
   onError,
 }: UseAdminEmployeesArgs): AdminEmployeesState {
@@ -218,6 +221,7 @@ export function useAdminEmployees({
 
   return {
     employees,
+    departments,
     selectedEmployee,
     setSelectedEmployee,
     empAddMode,

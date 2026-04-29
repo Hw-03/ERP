@@ -9,7 +9,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import (
     AlertKindEnum,
-    DepartmentEnum,
     EmployeeLevelEnum,
     LocationStatusEnum,
     QueueBatchStatusEnum,
@@ -80,7 +79,7 @@ class ItemResponse(BaseModel):
 
 class InventoryLocationResponse(BaseModel):
     """부서×상태(생산/불량) 단위 재고 분포."""
-    department: DepartmentEnum
+    department: str
     status: LocationStatusEnum
     quantity: Decimal
 
@@ -113,7 +112,7 @@ class EmployeeCreate(BaseModel):
     name: str = Field(..., max_length=100)
     role: str = Field(..., max_length=100)
     phone: Optional[str] = Field(None, max_length=30)
-    department: DepartmentEnum
+    department: str
     level: EmployeeLevelEnum = EmployeeLevelEnum.STAFF
     warehouse_role: str = Field("none", description="창고 결재 역할 (none/primary/deputy)")
     display_order: int = 0
@@ -124,7 +123,7 @@ class EmployeeUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=100)
     role: Optional[str] = Field(None, max_length=100)
     phone: Optional[str] = Field(None, max_length=30)
-    department: Optional[DepartmentEnum] = None
+    department: Optional[str] = None
     level: Optional[EmployeeLevelEnum] = None
     warehouse_role: Optional[str] = Field(None, description="창고 결재 역할 (none/primary/deputy)")
     display_order: Optional[int] = None
@@ -139,7 +138,7 @@ class EmployeeResponse(BaseModel):
     name: str
     role: str
     phone: Optional[str]
-    department: DepartmentEnum
+    department: str
     level: EmployeeLevelEnum
     warehouse_role: str = "none"
     display_order: int
@@ -265,7 +264,7 @@ class TransferRequest(BaseModel):
     """창고↔부서 이동 (transfer-to-production / transfer-to-warehouse 공용)."""
     item_id: uuid.UUID
     quantity: Decimal = Field(..., gt=0)
-    department: DepartmentEnum
+    department: str
     notes: Optional[str] = Field(None, description="비고")
     reference_no: Optional[str] = Field(None, max_length=100)
     produced_by: Optional[str] = Field(None, max_length=100)
@@ -275,8 +274,8 @@ class DeptTransferRequest(BaseModel):
     """부서간 이동."""
     item_id: uuid.UUID
     quantity: Decimal = Field(..., gt=0)
-    from_department: DepartmentEnum
-    to_department: DepartmentEnum
+    from_department: str
+    to_department: str
     notes: Optional[str] = None
     reference_no: Optional[str] = Field(None, max_length=100)
     produced_by: Optional[str] = Field(None, max_length=100)
@@ -292,8 +291,8 @@ class MarkDefectiveRequest(BaseModel):
     item_id: uuid.UUID
     quantity: Decimal = Field(..., gt=0)
     source: str = Field(..., description="warehouse | production")
-    source_department: Optional[DepartmentEnum] = None
-    target_department: DepartmentEnum
+    source_department: Optional[str] = None
+    target_department: str
     reason: Optional[str] = Field(None, description="불량 사유")
     operator: Optional[str] = Field(None, max_length=100)
 
@@ -302,7 +301,7 @@ class SupplierReturnRequest(BaseModel):
     """공급업체 반품: 부서별 DEFECTIVE 차감."""
     item_id: uuid.UUID
     quantity: Decimal = Field(..., gt=0)
-    from_department: DepartmentEnum
+    from_department: str
     reference_no: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
     operator: Optional[str] = Field(None, max_length=100)
@@ -819,9 +818,9 @@ class StockRequestLineCreate(BaseModel):
     item_id: uuid.UUID
     quantity: Decimal = Field(..., gt=0)
     from_bucket: RequestBucketEnum
-    from_department: Optional[DepartmentEnum] = None
+    from_department: Optional[str] = None
     to_bucket: RequestBucketEnum
-    to_department: Optional[DepartmentEnum] = None
+    to_department: Optional[str] = None
 
 
 class StockRequestCreate(BaseModel):
@@ -863,9 +862,9 @@ class StockRequestLineResponse(BaseModel):
     erp_code_snapshot: Optional[str] = None
     quantity: Decimal
     from_bucket: RequestBucketEnum
-    from_department: Optional[DepartmentEnum] = None
+    from_department: Optional[str] = None
     to_bucket: RequestBucketEnum
-    to_department: Optional[DepartmentEnum] = None
+    to_department: Optional[str] = None
     status: StockRequestStatusEnum
     created_at: datetime
 
@@ -877,7 +876,7 @@ class StockRequestResponse(BaseModel):
     request_code: Optional[str] = None
     requester_employee_id: uuid.UUID
     requester_name: str
-    requester_department: DepartmentEnum
+    requester_department: str
     request_type: StockRequestTypeEnum
     status: StockRequestStatusEnum
     requires_warehouse_approval: bool
@@ -907,9 +906,31 @@ class ReservationLineResponse(BaseModel):
     request_id: uuid.UUID
     request_code: Optional[str] = None
     requester_name: str
-    requester_department: DepartmentEnum
+    requester_department: str
     quantity: Decimal
     from_bucket: RequestBucketEnum
     to_bucket: RequestBucketEnum
-    to_department: Optional[DepartmentEnum] = None
+    to_department: Optional[str] = None
     created_at: datetime
+
+
+class DepartmentCreate(BaseModel):
+    name: str = Field(..., max_length=50)
+    display_order: int = Field(0)
+    pin: str = Field(..., description="관리자 PIN")
+
+
+class DepartmentUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=50)
+    display_order: Optional[int] = None
+    is_active: Optional[bool] = None
+    pin: str = Field(..., description="관리자 PIN")
+
+
+class DepartmentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    display_order: int
+    is_active: bool

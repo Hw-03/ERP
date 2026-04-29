@@ -302,7 +302,7 @@ export function DesktopInventoryView({
           {displayItem && (
             <DesktopRightPanel
               title={displayItem.item_name}
-              subtitle={`${displayItem.erp_code} · ${displayItem.legacy_part ?? "-"}`}
+              subtitle={displayItem.legacy_part ? `${displayItem.erp_code} · ${displayItem.legacy_part}` : (displayItem.erp_code ?? undefined)}
               headerBadge={headerBadge}
             >
               <InventoryDetailPanel item={displayItem} logs={itemLogs} onGoToWarehouse={onGoToWarehouse} />

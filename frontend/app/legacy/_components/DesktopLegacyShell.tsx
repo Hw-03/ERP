@@ -88,7 +88,7 @@ export function DesktopLegacyShell() {
   }, []);
 
   const content = useMemo(() => {
-    const key = `${activeTab}-${refreshNonce}`;
+    const key = activeTab === "admin" ? "admin" : `${activeTab}-${refreshNonce}`;
     if (activeTab === "inventory") {
       return (
         <DesktopInventoryView

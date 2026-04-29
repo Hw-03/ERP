@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import DepartmentEnum, Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
+from app.models import Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     InventoryLocationResponse,
@@ -201,19 +201,15 @@ def list_items(
             # 창고 재고가 1 이상인 품목
             query = query.filter(Inventory.warehouse_qty > 0)
         else:
-            try:
-                dept_enum = DepartmentEnum(department)
-                dept_item_ids = (
-                    db.query(InventoryLocation.item_id)
-                    .filter(
-                        InventoryLocation.department == dept_enum,
-                        InventoryLocation.quantity > 0,
-                    )
-                    .subquery()
+            dept_item_ids = (
+                db.query(InventoryLocation.item_id)
+                .filter(
+                    InventoryLocation.department == department,
+                    InventoryLocation.quantity > 0,
                 )
-                query = query.filter(Item.item_id.in_(dept_item_ids))
-            except ValueError:
-                pass
+                .subquery()
+            )
+            query = query.filter(Item.item_id.in_(dept_item_ids))
 
     if legacy_item_type:
         query = query.filter(Item.legacy_item_type == legacy_item_type)
@@ -233,7 +229,7 @@ def list_items(
             )
         )
 
-    rows = query.order_by(Item.process_type_code, Item.erp_code).offset(skip).limit(limit).all()
+    rows = query.order_by(Item.sort_order, Item.erp_code).offset(skip).limit(limit).all()
     if not rows:
         return []
 
