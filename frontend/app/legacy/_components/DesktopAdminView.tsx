@@ -146,9 +146,6 @@ function OverviewBar({
           <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{label}</span>
         </div>
       ))}
-      <span className="ml-auto self-center text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-        현재 로드 기준
-      </span>
     </div>
   );
 }

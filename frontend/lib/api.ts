@@ -234,6 +234,8 @@ export interface Employee {
   created_at: string;
   updated_at: string;
   pin_last_changed?: string | null;
+  /** true면 기본 PIN(0000) 또는 미설정. false면 직원이 직접 설정한 PIN. */
+  pin_is_default?: boolean;
 }
 
 // =============================================================================

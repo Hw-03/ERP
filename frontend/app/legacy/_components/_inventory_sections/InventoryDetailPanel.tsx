@@ -165,14 +165,14 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
         </div>
       </section>
 
-      {/* 점유 요청 목록 */}
+      {/* 승인 대기 요청 목록 */}
       {reservations.length > 0 && (
         <section
           className="rounded-[28px] border p-5"
           style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
         >
           <div className="mb-3 text-sm font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
-            점유중 요청 ({reservations.length}건)
+            승인 대기 요청 ({reservations.length}건)
           </div>
           <div className="space-y-2">
             {reservations.map((r) => (

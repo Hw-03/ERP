@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type StockRequest } from "@/lib/api";
 import { LEGACY_COLORS, formatNumber, normalizeDepartment } from "../legacyUi";
+import { ConfirmModal } from "../common/ConfirmModal";
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "임시",
@@ -144,7 +145,6 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
       {items.map((req) => {
         const cancelable =
           req.status === "submitted" || req.status === "reserved";
-        const isThisCancel = cancelTarget?.request_id === req.request_id;
         return (
           <div
             key={req.request_id}
@@ -209,7 +209,7 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
               </div>
             )}
 
-            {cancelable && !isThisCancel && (
+            {cancelable && (
               <div className="mt-3 flex justify-end">
                 <button
                   type="button"
@@ -225,68 +225,44 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
                 </button>
               </div>
             )}
-
-            {isThisCancel && (
-              <div
-                className="mt-3 rounded-[12px] border px-4 py-3"
-                style={{ borderColor: LEGACY_COLORS.borderStrong, background: LEGACY_COLORS.s1 }}
-              >
-                <p className="mb-2 text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
-                  취소 PIN 입력
-                </p>
-                {cancelError && (
-                  <p className="mb-2 text-xs" style={{ color: LEGACY_COLORS.red }}>
-                    {cancelError}
-                  </p>
-                )}
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  placeholder="PIN"
-                  value={cancelPin}
-                  onChange={(e) => setCancelPin(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") void submitCancel(); }}
-                  className="mb-2 w-full rounded-[8px] border px-3 py-1.5 text-sm outline-none"
-                  style={{
-                    background: LEGACY_COLORS.s2,
-                    borderColor: LEGACY_COLORS.border,
-                    color: LEGACY_COLORS.text,
-                  }}
-                  autoFocus
-                />
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={closeCancel}
-                    disabled={cancelBusy}
-                    className="rounded-[8px] border px-3 py-1.5 text-xs"
-                    style={{
-                      borderColor: LEGACY_COLORS.border,
-                      color: LEGACY_COLORS.muted,
-                      background: LEGACY_COLORS.s2,
-                    }}
-                  >
-                    닫기
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void submitCancel()}
-                    disabled={!cancelPin.trim() || cancelBusy}
-                    className="rounded-[8px] px-3 py-1.5 text-xs font-bold text-white"
-                    style={{
-                      background: LEGACY_COLORS.red,
-                      opacity: !cancelPin.trim() || cancelBusy ? 0.4 : 1,
-                      cursor: !cancelPin.trim() || cancelBusy ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    {cancelBusy ? "처리 중..." : "확인"}
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         );
       })}
+
+      <ConfirmModal
+        open={cancelTarget !== null}
+        title="요청 취소 — PIN 확인"
+        tone="danger"
+        confirmLabel="요청 취소"
+        cancelLabel="닫기"
+        busy={cancelBusy}
+        onClose={closeCancel}
+        onConfirm={submitCancel}
+      >
+        <p className="mb-3 text-sm" style={{ color: LEGACY_COLORS.text }}>
+          본인 PIN을 입력하면 이 요청이 취소됩니다.
+        </p>
+        {cancelError && (
+          <p className="mb-2 text-xs" style={{ color: LEGACY_COLORS.red }}>
+            {cancelError}
+          </p>
+        )}
+        <input
+          type="password"
+          inputMode="numeric"
+          placeholder="PIN"
+          value={cancelPin}
+          onChange={(e) => setCancelPin(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") void submitCancel(); }}
+          className="w-full rounded-[10px] border px-3 py-2 text-sm outline-none"
+          style={{
+            background: LEGACY_COLORS.s2,
+            borderColor: LEGACY_COLORS.border,
+            color: LEGACY_COLORS.text,
+          }}
+          autoFocus
+        />
+      </ConfirmModal>
     </div>
   );
 }

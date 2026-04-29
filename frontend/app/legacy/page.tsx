@@ -1,6 +1,7 @@
 "use client";
 
-import { Suspense, useCallback, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { MobileShell, type TabId } from "./_components/mobile/MobileShell";
 import { InventoryScreen } from "./_components/mobile/screens/InventoryScreen";
 import { HistoryScreen } from "./_components/mobile/screens/HistoryScreen";
@@ -28,18 +29,47 @@ export default function LegacyPage() {
     <ErpLoginGate>
       <WarehouseWizardProvider>
         <DeptWizardProvider>
-          <LegacyBody />
+          <Suspense>
+            <LegacyBody />
+          </Suspense>
         </DeptWizardProvider>
       </WarehouseWizardProvider>
     </ErpLoginGate>
   );
 }
 
+const VALID_MOBILE_TABS = new Set<TabId>(["inventory", "warehouse", "dept", "admin"]);
+
 function LegacyBody() {
-  const [activeTab, setActiveTab] = useState<TabId>("inventory");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTab = (() => {
+    const t = searchParams.get("tab") as TabId | null;
+    return t && VALID_MOBILE_TABS.has(t) ? t : "inventory";
+  })();
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [showHistory, setShowHistory] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const { dispatch: warehouseDispatch } = useWarehouseWizard();
+
+  // 브라우저 뒤로/앞으로 → URL 변경 시 활성 탭 동기화
+  useEffect(() => {
+    const t = searchParams.get("tab") as TabId | null;
+    if (t && VALID_MOBILE_TABS.has(t) && t !== activeTab) {
+      setActiveTab(t);
+      setShowHistory(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const changeTab = useCallback(
+    (tab: TabId) => {
+      setActiveTab(tab);
+      setShowHistory(false);
+      router.push(`/legacy?tab=${tab}`, { scroll: false });
+    },
+    [router],
+  );
 
   const showToast = useCallback((next: ToastState) => setToast(next), []);
   const clearToast = useCallback(() => setToast(null), []);
@@ -54,10 +84,7 @@ function LegacyBody() {
       <div className="lg:hidden">
         <MobileShell
           activeTab={activeTab}
-          onTabChange={(tab) => {
-            setActiveTab(tab);
-            setShowHistory(false);
-          }}
+          onTabChange={changeTab}
           subtitle={title.subtitle}
           title={title.title}
         >
@@ -76,7 +103,7 @@ function LegacyBody() {
                       qty: 1,
                     });
                     warehouseDispatch({ type: "GO", step: 0 });
-                    setActiveTab("warehouse");
+                    changeTab("warehouse");
                     showToast({
                       type: "info",
                       message: `${items.length}건이 창고입출고에 추가되었습니다.`,

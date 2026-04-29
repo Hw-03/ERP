@@ -150,6 +150,7 @@ class EmployeeResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     pin_last_changed: Optional[datetime] = None
+    pin_is_default: bool = True
 
 
 class ShipPackageItemCreate(BaseModel):

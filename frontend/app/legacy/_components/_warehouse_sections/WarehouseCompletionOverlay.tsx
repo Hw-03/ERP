@@ -13,7 +13,7 @@ export function WarehouseCompletionOverlay({ flyout, phase }: Props) {
   if (!flyout) return null;
   const isIn = flyout.kind === "in";
   const tone = isIn ? LEGACY_COLORS.green : LEGACY_COLORS.yellow;
-  const heading = isIn ? "입고 완료" : "출고 완료";
+  const heading = "요청 제출 완료";
   return (
     <div
       key={flyout.nonce}

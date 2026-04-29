@@ -217,7 +217,6 @@ export function DesktopHistoryView() {
                   조회 건수
                 </div>
                 <div className="text-2xl font-black">{formatNumber(stats.total)}</div>
-                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>현재 로드 기준</div>
                 {canLoadMore && (
                   <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>(+더 불러올 수 있음)</div>
                 )}
@@ -236,7 +235,7 @@ export function DesktopHistoryView() {
                 <div className="text-2xl font-black" style={{ color: LEGACY_COLORS.green }}>
                   +{formatNumber(stats.receiveSum)}
                 </div>
-                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>RECEIVE · PRODUCE</div>
+                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>입고 · 생산입고</div>
               </div>
               <div
                 className="flex flex-col gap-1 rounded-[20px] border p-4"
@@ -252,7 +251,7 @@ export function DesktopHistoryView() {
                 <div className="text-2xl font-black" style={{ color: LEGACY_COLORS.red }}>
                   -{formatNumber(stats.shipSum)}
                 </div>
-                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>SHIP · BACKFLUSH</div>
+                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>출고 · 자동차감</div>
               </div>
               <div
                 className="flex flex-col gap-1 rounded-[20px] border p-4"

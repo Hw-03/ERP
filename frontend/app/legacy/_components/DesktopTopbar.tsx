@@ -151,8 +151,8 @@ export function DesktopTopbar({
 
         <button
           onClick={onRefresh}
-          title="최신 데이터 확인"
-          aria-label="최신 데이터 확인"
+          title="동기화"
+          aria-label="동기화"
           className="flex h-9 w-9 items-center justify-center rounded-[14px] border transition-opacity hover:opacity-90"
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
         >

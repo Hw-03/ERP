@@ -43,9 +43,20 @@ export function DesktopLegacyShell() {
   }, []);
 
   function handleTabChange(tab: DesktopTabId) {
+    if (tab === activeTab) return;
     setActiveTab(tab);
-    router.replace(`?tab=${tab}`, { scroll: false });
+    router.push(`?tab=${tab}`, { scroll: false });
   }
+
+  // 브라우저 뒤로/앞으로 → URL ?tab= 변경 시 activeTab 동기화
+  useEffect(() => {
+    const t = searchParams.get("tab") as DesktopTabId | null;
+    if (t && VALID_TABS.has(t) && t !== activeTab) {
+      setActiveTab(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   const [warehousePreselected, setWarehousePreselected] = useState<Item | null>(null);
   const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
   const [capacityModal, setCapacityModal] = useState(false);

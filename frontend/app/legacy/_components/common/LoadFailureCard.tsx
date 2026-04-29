@@ -14,7 +14,7 @@ interface Props {
 function LoadFailureCardImpl({
   message,
   onRetry,
-  retryLabel = "새로고침",
+  retryLabel = "동기화",
   prefix = "데이터를 불러오지 못했습니다",
 }: Props) {
   const handleRetry = onRetry ?? (() => window.location.reload());

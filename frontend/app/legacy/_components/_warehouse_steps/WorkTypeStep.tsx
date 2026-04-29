@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { AlertTriangle, Check } from "lucide-react";
 import type { Department } from "@/lib/api";
 import { LEGACY_COLORS } from "../legacyUi";
+import { ConfirmModal } from "../common/ConfirmModal";
 import { SettingLabel } from "./_atoms";
 import {
   CAUTION_WORK_TYPES,
@@ -50,6 +52,7 @@ export function WorkTypeStep({
 }) {
   const isCaution = CAUTION_WORK_TYPES.includes(workType);
   const accent = isCaution ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
+  const [pendingDept, setPendingDept] = useState<Department | null>(null);
 
   const directionButtons =
     workType === "raw-io"
@@ -146,10 +149,18 @@ export function WorkTypeStep({
           <div className="grid grid-cols-6 gap-2">
             {PROD_DEPTS.map((d) => {
               const active = d === selectedDept;
+              const handleDeptClick = () => {
+                if (d === selectedDept) return;
+                if (workType === "warehouse-io") {
+                  setPendingDept(d);
+                  return;
+                }
+                setSelectedDept(d);
+              };
               return (
                 <button
                   key={d}
-                  onClick={() => setSelectedDept(d)}
+                  onClick={handleDeptClick}
                   className="rounded-[12px] border px-1 py-2 text-sm font-bold transition-all hover:brightness-110"
                   style={{
                     background: active ? `color-mix(in srgb, ${LEGACY_COLORS.purple} 14%, transparent)` : LEGACY_COLORS.s2,
@@ -221,6 +232,25 @@ export function WorkTypeStep({
           이 작업으로 진행 →
         </button>
       </div>
+
+      <ConfirmModal
+        open={pendingDept !== null}
+        title="대상 부서 변경"
+        tone="caution"
+        confirmLabel="변경"
+        cancelLabel="유지"
+        onClose={() => setPendingDept(null)}
+        onConfirm={() => {
+          if (pendingDept) setSelectedDept(pendingDept);
+          setPendingDept(null);
+        }}
+      >
+        <p className="text-sm" style={{ color: LEGACY_COLORS.text }}>
+          담당자 부서가 <b>{selectedDept}</b>(으)로 지정되어 있습니다.
+          <br />
+          대상 부서를 <b>{pendingDept}</b>(으)로 변경하시겠습니까?
+        </p>
+      </ConfirmModal>
     </div>
   );
 }

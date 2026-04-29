@@ -313,7 +313,42 @@ export function AdminEmployeesSection() {
               저장
             </button>
 
-            {/* PIN 초기화 / 비활성화 / 삭제 */}
+            {/* PIN 정보 카드 */}
+            <div
+              className="rounded-[14px] border p-3 mt-1"
+              style={{
+                background: LEGACY_COLORS.s1,
+                borderColor: LEGACY_COLORS.border,
+              }}
+            >
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  PIN
+                </span>
+                <span
+                  className="rounded-full px-2 py-0.5 text-[11px] font-bold"
+                  style={{
+                    background: `color-mix(in srgb, ${
+                      selectedEmployee.pin_is_default ? LEGACY_COLORS.yellow : LEGACY_COLORS.green
+                    } 18%, transparent)`,
+                    color: selectedEmployee.pin_is_default ? LEGACY_COLORS.yellow : LEGACY_COLORS.green,
+                  }}
+                >
+                  {selectedEmployee.pin_is_default ? "기본 PIN (0000)" : "직원 설정 PIN"}
+                </span>
+              </div>
+              <p className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                마지막 변경:{" "}
+                {selectedEmployee.pin_last_changed
+                  ? new Date(selectedEmployee.pin_last_changed).toLocaleDateString("ko-KR")
+                  : "변경 이력 없음"}
+              </p>
+              <p className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                보안상 PIN 자체는 표시되지 않습니다. 직원이 PIN을 잊은 경우 아래 '초기화'로 0000로 되돌리세요.
+              </p>
+            </div>
+
+            {/* PIN 초기화 / 비활성화 */}
             <div className="grid grid-cols-2 gap-2 border-t pt-4" style={{ borderColor: LEGACY_COLORS.border }}>
               <button
                 onClick={() => requestPinReset(selectedEmployee)}
@@ -330,12 +365,6 @@ export function AdminEmployeesSection() {
                 {selectedEmployee.is_active ? "비활성화" : "활성화"}
               </button>
             </div>
-            <p className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-              PIN 마지막 변경:{" "}
-              {selectedEmployee.pin_last_changed
-                ? new Date(selectedEmployee.pin_last_changed).toLocaleDateString("ko-KR")
-                : "변경 이력 없음 (기본 PIN)"}
-            </p>
             <button
               onClick={() => requestDelete(selectedEmployee)}
               className="w-full rounded-[14px] border px-3 py-2.5 text-sm font-bold"

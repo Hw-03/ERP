@@ -3,7 +3,7 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState, useMemo } from "react";
 import type { TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber } from "../legacyUi";
+import { LEGACY_COLORS, formatNumber, transactionLabel } from "../legacyUi";
 import { EmptyState } from "../common/EmptyState";
 import { formatHistoryDate } from "./historyShared";
 import { HistoryLogRow } from "./HistoryLogRow";
@@ -76,7 +76,7 @@ function BatchHeader({
   const first = group.logs[0];
   const totalQty = group.logs.reduce((s, l) => s + Number(l.quantity_change), 0);
   const allSameType = group.logs.every((l) => l.transaction_type === first.transaction_type);
-  const typeSummary = allSameType ? first.transaction_type : "혼합";
+  const typeSummary = allSameType ? transactionLabel(first.transaction_type) : "혼합";
 
   return (
     <tr

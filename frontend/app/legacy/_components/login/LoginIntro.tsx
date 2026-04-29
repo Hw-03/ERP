@@ -50,6 +50,20 @@ export function LoginIntro({ onSkip, onDone }: LoginIntroProps) {
     onSkip();
   };
 
+  useEffect(() => {
+    const onAnyKey = () => {
+      clearTimers();
+      onSkip();
+    };
+    window.addEventListener("keydown", onAnyKey);
+    window.addEventListener("pointerdown", onAnyKey);
+    return () => {
+      window.removeEventListener("keydown", onAnyKey);
+      window.removeEventListener("pointerdown", onAnyKey);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const isShrink = phase === "shrink";
   const introScale = isMobile ? 1.0 : 1.6;
   const shrinkScale = isMobile ? 0.45 : 0.5;

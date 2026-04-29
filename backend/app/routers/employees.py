@@ -213,6 +213,8 @@ def reset_employee_pin(
 
 
 def _to_response(employee: Employee) -> EmployeeResponse:
+    pin_hash = getattr(employee, "pin_hash", None)
+    pin_is_default = pin_hash is None or pin_hash == DEFAULT_PIN_HASH
     return EmployeeResponse(
         employee_id=employee.employee_id,
         employee_code=employee.employee_code,
@@ -227,4 +229,5 @@ def _to_response(employee: Employee) -> EmployeeResponse:
         created_at=employee.created_at,
         updated_at=employee.updated_at,
         pin_last_changed=getattr(employee, "pin_last_changed", None),
+        pin_is_default=pin_is_default,
     )
