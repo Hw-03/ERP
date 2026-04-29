@@ -56,3 +56,15 @@ export type EmployeeAddForm = typeof EMPTY_EMPLOYEE_FORM;
 
 export const BOM_PARENT_CATS = ["ALL", "AA", "HA", "VA", "TA", "AF", "TF", "FG"];
 export const BOM_CHILD_CATS = ["ALL", "RM", "?A", "?F"];
+
+const ASSEMBLY_CATS = new Set(["AA", "HA", "VA", "TA"]);
+const FINAL_CATS = new Set(["AF", "TF", "HF", "VF"]);
+
+export function bomCategoryColor(cat?: string | null): string {
+  if (!cat) return "var(--c-muted2)";
+  if (cat === "RM") return "var(--c-green)";
+  if (cat === "FG") return "var(--c-cyan)";
+  if (ASSEMBLY_CATS.has(cat)) return "var(--c-blue)";
+  if (FINAL_CATS.has(cat)) return "var(--c-purple)";
+  return "var(--c-blue)";
+}

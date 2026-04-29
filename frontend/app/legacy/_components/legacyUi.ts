@@ -61,27 +61,27 @@ export function normalizeDepartment(value?: string | null) {
 export function employeeColor(value?: string | null) {
   switch (normalizeDepartment(value)) {
     case "조립":
-      return "#3b82f6";
+      return "#1d4ed8"; // blue-700
     case "고압":
-      return "#f97316";
+      return "#c2410c"; // orange-700
     case "진공":
-      return "#8b5cf6";
+      return "#6d28d9"; // violet-700
     case "튜닝":
-      return "#06b6d4";
+      return "#0e7490"; // cyan-700
     case "서비스":
-      return "#10b981";
+      return "#047857"; // emerald-700
     case "AS":
-      return "#ec4899";
+      return "#be185d"; // pink-700
     case "연구":
-      return "#f59e0b";
+      return "#b45309"; // amber-700
     case "영업":
-      return "#ef4444";
+      return "#b91c1c"; // red-700
     case "출하":
-      return "#14b8a6";
+      return "#0f766e"; // teal-700
     case "튜브":
-      return "#84cc16";
+      return "#4d7c0f"; // lime-700
     default:
-      return "#94a3b8";
+      return "#475569"; // slate-600
   }
 }
 

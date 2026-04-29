@@ -9,6 +9,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Loader2, Search, UserCheck } from "lucide-react";
 import { api, type Employee } from "@/lib/api";
 import { setCurrentOperator } from "./useCurrentOperator";
+import { employeeColor } from "../legacyUi";
+
+const DEPT_ORDER = ["튜브", "고압", "진공", "튜닝", "조립", "AS", "영업", "연구", "기타"];
 
 interface OperatorLoginCardProps {
   onLogin: () => void;
@@ -39,7 +42,14 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
         result.push(e.department);
       }
     }
-    return result.sort();
+    return result.sort((a, b) => {
+      const ai = DEPT_ORDER.indexOf(a);
+      const bi = DEPT_ORDER.indexOf(b);
+      if (ai === -1 && bi === -1) return a.localeCompare(b);
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
   }, [employees]);
 
   const filtered = useMemo(() => {
@@ -109,10 +119,8 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
     }
   }, [selected, pin, loading, onLogin]);
 
-  const maxWidth = step === "dept" ? "480px" : step === "select" ? "560px" : "420px";
-
   return (
-    <div className="relative mx-auto w-full" style={{ maxWidth, padding: "0 16px" }}>
+    <div className="relative mx-auto w-full" style={{ maxWidth: "700px", padding: "0 16px" }}>
       <div
         className="relative w-full rounded-[24px] border p-8"
         style={{
@@ -126,7 +134,6 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
         )}
         {step === "select" && (
           <SelectStep
-            dept={selectedDept}
             employees={filtered}
             search={search}
             onSearch={setSearch}
@@ -150,6 +157,25 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
   );
 }
 
+/* ── 부서 버튼 ────────────────────────────────────────────────────────────── */
+
+function DeptButton({ dept, onSelect }: { dept: string; onSelect: (d: string) => void }) {
+  const color = employeeColor(dept);
+  return (
+    <button
+      onClick={() => onSelect(dept)}
+      className="flex w-full items-center justify-center rounded-[16px] border py-7 text-base font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+      style={{
+        background: `color-mix(in srgb, ${color} 12%, transparent)`,
+        borderColor: `color-mix(in srgb, ${color} 30%, transparent)`,
+        color,
+      }}
+    >
+      {dept}
+    </button>
+  );
+}
+
 /* ── 0단계: 부서 선택 ─────────────────────────────────────────────────────── */
 
 function DeptStep({
@@ -159,14 +185,14 @@ function DeptStep({
   departments: string[];
   onSelect: (dept: string) => void;
 }) {
+  const top = departments.slice(0, 5);
+  const bottom = departments.slice(5);
+
   return (
     <>
       <div className="mb-6">
-        <p className="mb-1.5 font-mono text-xs uppercase tracking-[0.18em]" style={{ color: "var(--c-blue)" }}>
-          {"// OPERATOR LOGIN"}
-        </p>
-        <h1 className="text-xl font-bold" style={{ color: "var(--c-text)" }}>
-          부서를 선택하세요
+        <h1 className="text-2xl font-bold" style={{ color: "var(--c-text)" }}>
+          로그인
         </h1>
       </div>
 
@@ -175,27 +201,23 @@ function DeptStep({
           등록된 부서가 없습니다.
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2.5">
-          {departments.map((dept) => (
-            <button
-              key={dept}
-              onClick={() => onSelect(dept)}
-              className="flex items-center justify-center rounded-[16px] border px-4 py-4 text-sm font-semibold transition-all hover:scale-[1.02] hover:opacity-90"
-              style={{
-                background: "var(--c-s2)",
-                borderColor: "var(--c-border)",
-                color: "var(--c-text)",
-              }}
-            >
-              {dept}
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-5 gap-3 mb-3">
+            {top.map((dept) => (
+              <DeptButton key={dept} dept={dept} onSelect={onSelect} />
+            ))}
+          </div>
+          {bottom.length > 0 && (
+            <div className="flex gap-3 justify-center">
+              {bottom.map((dept) => (
+                <div key={dept} style={{ flex: "0 0 calc((100% - 48px) / 5)" }}>
+                  <DeptButton dept={dept} onSelect={onSelect} />
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
-
-      <p className="mt-6 text-center text-xs" style={{ color: "var(--c-muted)" }}>
-        PIN은 작업자 식별 용도입니다 · © 2026 DEXCOWIN
-      </p>
     </>
   );
 }
@@ -203,14 +225,12 @@ function DeptStep({
 /* ── 1단계: 담당자 선택 ─────────────────────────────────────────────────────── */
 
 function SelectStep({
-  dept,
   employees,
   search,
   onSearch,
   onSelect,
   onBack,
 }: {
-  dept: string | null;
   employees: Employee[];
   search: string;
   onSearch: (v: string) => void;
@@ -228,11 +248,8 @@ function SelectStep({
           <ArrowLeft size={13} />
           부서 다시 선택
         </button>
-        <p className="mb-1 font-mono text-xs uppercase tracking-[0.18em]" style={{ color: "var(--c-blue)" }}>
-          {"// OPERATOR SELECT"}
-        </p>
-        <h1 className="text-xl font-bold" style={{ color: "var(--c-text)" }}>
-          {dept ? `${dept} 담당자 선택` : "담당자를 선택하세요"}
+        <h1 className="text-2xl font-bold" style={{ color: "var(--c-text)" }}>
+          로그인
         </h1>
       </div>
 
@@ -254,44 +271,43 @@ function SelectStep({
       </div>
 
       {/* 직원 목록 */}
-      <div className="max-h-[340px] overflow-y-auto rounded-[14px] border" style={{ borderColor: "var(--c-border)" }}>
+      <div className="max-h-[480px] overflow-y-auto rounded-[14px] border" style={{ borderColor: "var(--c-border)" }}>
         {employees.length === 0 ? (
           <div className="py-8 text-center text-sm" style={{ color: "var(--c-muted)" }}>
             {search ? "검색 결과가 없습니다." : "활성 직원이 없습니다."}
           </div>
         ) : (
-          employees.map((emp, i) => (
-            <button
-              key={emp.employee_id}
-              onClick={() => onSelect(emp)}
-              className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--c-s2)]"
-              style={{
-                borderBottom: i < employees.length - 1 ? "1px solid var(--c-border)" : "none",
-              }}
-            >
-              <div
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
-                style={{ background: "var(--c-blue)", color: "#fff", opacity: 0.85 }}
+          employees.map((emp, i) => {
+            const color = employeeColor(emp.department);
+            return (
+              <button
+                key={emp.employee_id}
+                onClick={() => onSelect(emp)}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--c-s2)]"
+                style={{
+                  borderBottom: i < employees.length - 1 ? "1px solid var(--c-border)" : "none",
+                }}
               >
-                {emp.name.charAt(0)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold" style={{ color: "var(--c-text)" }}>
-                  {emp.name}
+                <div
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+                  style={{ background: `color-mix(in srgb, ${color} 20%, transparent)`, color }}
+                >
+                  {emp.name.charAt(0)}
                 </div>
-                <div className="text-xs" style={{ color: "var(--c-muted)" }}>
-                  {emp.department} · {emp.employee_code}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold" style={{ color: "var(--c-text)" }}>
+                    {emp.name}
+                  </div>
+                  <div className="text-xs" style={{ color: "var(--c-muted)" }}>
+                    {emp.department} · {emp.employee_code}
+                  </div>
                 </div>
-              </div>
-              <ArrowLeft size={14} style={{ color: "var(--c-muted)", transform: "rotate(180deg)" }} />
-            </button>
-          ))
+                <ArrowLeft size={14} style={{ color: "var(--c-muted)", transform: "rotate(180deg)" }} />
+              </button>
+            );
+          })
         )}
       </div>
-
-      <p className="mt-5 text-center text-xs" style={{ color: "var(--c-muted)" }}>
-        PIN은 작업자 식별 용도입니다 · © 2026 DEXCOWIN
-      </p>
     </>
   );
 }
@@ -316,6 +332,7 @@ function PinStep({
   loading: boolean;
 }) {
   const canSubmit = pin.length > 0 && !loading;
+  const color = employeeColor(employee.department);
 
   return (
     <>
@@ -333,7 +350,7 @@ function PinStep({
         <div className="flex items-center gap-3">
           <div
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-bold"
-            style={{ background: "var(--c-blue)", color: "#fff" }}
+            style={{ background: `color-mix(in srgb, ${color} 20%, transparent)`, color }}
           >
             {employee.name.charAt(0)}
           </div>
@@ -397,10 +414,6 @@ function PinStep({
           </>
         )}
       </button>
-
-      <p className="mt-5 text-center text-xs" style={{ color: "var(--c-muted)" }}>
-        PIN은 작업자 식별 용도입니다 · © 2026 DEXCOWIN
-      </p>
     </>
   );
 }

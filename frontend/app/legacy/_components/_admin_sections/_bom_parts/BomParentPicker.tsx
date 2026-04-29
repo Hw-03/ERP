@@ -1,6 +1,6 @@
 "use client";
 
-// 5.6-E: AdminBomSection 좌측 — 상위 품목 선택 패널.
+// AdminBomSection 좌측 — 상위 품목 선택 패널.
 // AdminBomContext 의존 (prop drilling 0).
 
 import { LEGACY_COLORS } from "../../legacyUi";
@@ -19,7 +19,12 @@ export function BomParentPicker() {
     setBomParentCat,
     setBomChildSearch,
     setBomChildCat,
+    bomParentDisplayLimit,
+    setBomParentDisplayLimit,
+    setChildPickerOpen,
   } = useAdminBomContext();
+
+  const displayed = bomParentItems.slice(0, bomParentDisplayLimit);
 
   return (
     <div
@@ -31,7 +36,7 @@ export function BomParentPicker() {
           상위 품목 선택
         </div>
         <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-          RM 제외 · {bomParentItems.length}건 표시
+          RM 제외 · {displayed.length} / {bomParentItems.length}건
         </div>
       </div>
       <div className="shrink-0 px-3 pt-3">
@@ -60,7 +65,7 @@ export function BomParentPicker() {
         </div>
       </div>
       <div className="min-h-0 overflow-y-auto">
-        {bomParentItems.map((item, index) => (
+        {displayed.map((item, index) => (
           <button
             key={item.item_id}
             onClick={() => {
@@ -68,6 +73,7 @@ export function BomParentPicker() {
               setPendingChildId(null);
               setBomChildSearch("");
               setBomChildCat("ALL");
+              setChildPickerOpen(false);
             }}
             className="block w-full px-3 py-2.5 text-left transition-colors"
             style={{
@@ -75,7 +81,7 @@ export function BomParentPicker() {
                 parentId === item.item_id
                   ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
                   : "transparent",
-              borderBottom: index === bomParentItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
+              borderBottom: index === displayed.length - 1 && bomParentItems.length <= bomParentDisplayLimit ? "none" : `1px solid ${LEGACY_COLORS.border}`,
             }}
           >
             <div className="flex items-center gap-2">
@@ -98,7 +104,19 @@ export function BomParentPicker() {
             <div className="mt-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
           </button>
         ))}
-        {bomParentItems.length === 0 && (
+        {bomParentItems.length > bomParentDisplayLimit && (
+          <button
+            onClick={() => setBomParentDisplayLimit(bomParentDisplayLimit + 30)}
+            className="w-full py-2.5 text-xs font-medium"
+            style={{
+              color: LEGACY_COLORS.blue,
+              borderTop: `1px solid ${LEGACY_COLORS.border}`,
+            }}
+          >
+            더보기 ({bomParentItems.length - bomParentDisplayLimit}개)
+          </button>
+        )}
+        {displayed.length === 0 && (
           <div className="px-4 py-4 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>결과 없음</div>
         )}
       </div>
