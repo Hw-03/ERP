@@ -137,8 +137,8 @@ export function StepPerson({ employees, loading }: { employees: Employee[]; load
 const ITEM_CATEGORIES = [
   { id: "ALL", label: "전체" },
   { id: "R", label: "원자재" },
-  { id: "A", label: "조립체" },
-  { id: "F", label: "F타입" },
+  { id: "A", label: "중간공정" },
+  { id: "F", label: "공정완료" },
 ] as const;
 
 export function StepItems({

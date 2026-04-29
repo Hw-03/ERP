@@ -9,6 +9,9 @@ Usage:
 필수 헤더: ERP 코드, 품명, 분류, 현재고
 
 ERP 코드 형식: {model_symbol}-{process_type_code}-{serial_no:04d}[-{option_code}]
+
+재고 위치: 현재고는 모두 해당 부서(생산) 위치. warehouse_qty = 0.
+안전재고: 전 품목 min_stock = 200.
 """
 
 from __future__ import annotations
@@ -29,7 +32,7 @@ except ImportError:
     sys.exit("openpyxl 필요: pip install openpyxl")
 
 from app.database import SessionLocal
-from app.models import Inventory, Item, ProcessType
+from app.models import Inventory, InventoryLocation, Item, LocationStatusEnum, ProcessType
 
 EXCEL_PATH = REPO_ROOT / "outputs" / "inventory_cleanup" / "생산부_재고_매칭작업_정리본.xlsx"
 
@@ -42,8 +45,19 @@ VALID_PROCESS_TYPE_CODES = {
     "PR", "PA", "PF",
 }
 
+# process_type_code 첫 글자 → 부서명 (DepartmentEnum 값 기준)
+DEPT_MAP: dict[str, str] = {
+    "T": "튜브",
+    "H": "고압",
+    "V": "진공",
+    "N": "튜닝",
+    "A": "조립",
+    "P": "출하",
+}
+
 EXPECTED_ROWS = 722
 EXPECTED_TOTAL_QTY = Decimal("108924")
+DEFAULT_MIN_STOCK = Decimal("200")
 
 
 def parse_erp_code(raw: str) -> tuple[str, str, int, str | None]:
@@ -111,11 +125,11 @@ def run(dry_run: bool = False) -> None:
         if not valid_codes:
             sys.exit("[오류] process_types 테이블이 비어있음. bootstrap_db.py --seed 먼저 실행하세요.")
 
-        items_to_add: list[Item] = []
-        inventories_to_add: list[Inventory] = []
+        # 파싱 결과를 먼저 수집 (item_id가 필요한 location은 flush 후 생성)
+        parsed: list[dict] = []
         erp_codes_seen: set[str] = set()
 
-        for row in rows:
+        for i, row in enumerate(rows):
             erp = row["erp_code"]
             if erp in erp_codes_seen:
                 sys.exit(f"[오류] ERP 코드 중복: {erp}")
@@ -129,51 +143,89 @@ def run(dry_run: bool = False) -> None:
             if pt_code not in valid_codes:
                 sys.exit(f"[오류] 유효하지 않은 process_type_code: {pt_code!r} (ERP={erp})")
 
-            item = Item(
-                item_code=erp,
-                erp_code=erp,
-                barcode=erp,
-                item_name=row["item_name"],
-                unit="EA",
-                model_symbol=model_symbol,
-                process_type_code=pt_code,
-                serial_no=serial_no,
-                option_code=option_code,
-                legacy_item_type=row["legacy_item_type"],
-            )
-            items_to_add.append(item)
+            dept = DEPT_MAP.get(pt_code[0])
+            if dept is None:
+                sys.exit(f"[오류] 부서 매핑 실패: process_type_code={pt_code!r} (ERP={erp})")
 
-            inv = Inventory(
-                item=item,
-                quantity=row["quantity"],
-                warehouse_qty=row["quantity"],
-                pending_quantity=Decimal("0"),
-            )
-            inventories_to_add.append(inv)
+            parsed.append({
+                "erp": erp,
+                "item_name": row["item_name"],
+                "legacy_item_type": row["legacy_item_type"],
+                "model_symbol": model_symbol,
+                "pt_code": pt_code,
+                "serial_no": serial_no,
+                "option_code": option_code,
+                "dept": dept,
+                "quantity": row["quantity"],
+                "sort_order": i + 1,
+            })
 
-        print(f"\n적재 예정: items={len(items_to_add)}, inventory={len(inventories_to_add)}")
+        print(f"\n적재 예정: items={len(parsed)}, inventory={len(parsed)}, locations={sum(1 for p in parsed if p['quantity'] > 0)}")
 
         if dry_run:
             print("[dry-run] DB 변경 없이 종료.")
             return
 
+        # 1단계: Item 일괄 삽입 후 flush → item_id 확보
+        items_to_add = [
+            Item(
+                item_code=p["erp"],
+                erp_code=p["erp"],
+                barcode=p["erp"],
+                item_name=p["item_name"],
+                unit="EA",
+                model_symbol=p["model_symbol"],
+                process_type_code=p["pt_code"],
+                serial_no=p["serial_no"],
+                option_code=p["option_code"],
+                legacy_item_type=p["legacy_item_type"],
+                sort_order=p["sort_order"],
+                min_stock=DEFAULT_MIN_STOCK,
+            )
+            for p in parsed
+        ]
         db.add_all(items_to_add)
-        db.flush()
+        db.flush()  # item_id 생성
+
+        # 2단계: Inventory + InventoryLocation (item_id 직접 참조)
+        inventories_to_add = []
+        locations_to_add = []
+        for item_obj, p in zip(items_to_add, parsed):
+            qty = p["quantity"]
+            inventories_to_add.append(Inventory(
+                item_id=item_obj.item_id,
+                quantity=qty,
+                warehouse_qty=Decimal("0"),  # 현재고는 창고가 아닌 해당 부서에 있음
+                pending_quantity=Decimal("0"),
+            ))
+            if qty > 0:
+                locations_to_add.append(InventoryLocation(
+                    item_id=item_obj.item_id,
+                    department=p["dept"],
+                    status=LocationStatusEnum.PRODUCTION,
+                    quantity=qty,
+                ))
+
         db.add_all(inventories_to_add)
+        db.add_all(locations_to_add)
         db.commit()
         print("커밋 완료.")
 
         # ── 검증 ──
         item_count = db.query(Item).count()
         inv_count = db.query(Inventory).count()
+        loc_count = db.query(InventoryLocation).count()
         from sqlalchemy import func as sqlfunc
         from app.models import Inventory as Inv
         qty_sum = db.query(sqlfunc.sum(Inv.quantity)).scalar() or Decimal("0")
+        wh_sum = db.query(sqlfunc.sum(Inv.warehouse_qty)).scalar() or Decimal("0")
 
         print(f"\n[검증]")
         print(f"  items 수: {item_count} (예상 {EXPECTED_ROWS}): {'OK' if item_count == EXPECTED_ROWS else 'FAIL'}")
         print(f"  inventory 수: {inv_count} (예상 {EXPECTED_ROWS}): {'OK' if inv_count == EXPECTED_ROWS else 'FAIL'}")
-        print(f"  재고 합계: {qty_sum} (예상 {EXPECTED_TOTAL_QTY}): {'OK' if qty_sum == EXPECTED_TOTAL_QTY else 'FAIL'}")
+        print(f"  locations 수: {loc_count}")
+        print(f"  재고 합계(quantity): {qty_sum} (예상 {EXPECTED_TOTAL_QTY}): {'OK' if qty_sum == EXPECTED_TOTAL_QTY else 'FAIL'}")
+        print(f"  warehouse_qty 합계: {wh_sum} (예상 0): {'OK' if wh_sum == 0 else 'FAIL'}")
 
         from sqlalchemy import text
         fk_check = db.execute(text("PRAGMA foreign_key_check")).fetchall()
@@ -189,6 +241,7 @@ def run(dry_run: bool = False) -> None:
             item_count == EXPECTED_ROWS
             and inv_count == EXPECTED_ROWS
             and qty_sum == EXPECTED_TOTAL_QTY
+            and wh_sum == 0
             and not fk_check
             and integrity[0] == "ok"
             and not invalid_pt
