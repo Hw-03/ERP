@@ -1,4 +1,4 @@
-"""ERP data models for the X-Ray manufacturing workflow."""
+"""MES data models for the DEXCOWIN manufacturing workflow."""
 
 import enum
 import uuid
@@ -326,6 +326,7 @@ class Employee(Base):
     is_active = Column(BoolAsString, nullable=False, default=True)
     # 작업자 식별용 PIN 해시 — 실제 보안 인증이 아님. None이면 기본 PIN 0000 적용
     pin_hash = Column(Text, nullable=True)
+    pin_last_changed = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
     updated_at = Column(
         DateTime,

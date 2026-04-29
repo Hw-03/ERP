@@ -310,7 +310,7 @@ def export_transactions_xlsx(
     }
 
     columns = [
-        "일시", "유형", "ERP코드", "품목명", "카테고리",
+        "일시", "유형", "품목 코드", "품목명", "카테고리",
         "수량변화", "이전재고", "이후재고", "참조번호", "담당자", "메모",
     ]
     apply_header(ws, columns)

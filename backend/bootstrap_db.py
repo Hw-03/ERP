@@ -100,6 +100,8 @@ _MIGRATION_DDL: list[str] = [
     "CREATE INDEX IF NOT EXISTS ix_tel_original ON transaction_edit_logs(original_log_id)",
     # 창고 결재 역할 — 직원 업무 역할(시스템 권한 level과 별개)
     "ALTER TABLE employees ADD COLUMN warehouse_role VARCHAR(20) NOT NULL DEFAULT 'none'",
+    # PIN 마지막 변경 일시 (NULL = 변경 이력 없음)
+    "ALTER TABLE employees ADD COLUMN pin_last_changed DATETIME",
 ]
 
 

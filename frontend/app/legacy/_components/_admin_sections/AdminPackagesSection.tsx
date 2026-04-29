@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { Check, Search, Trash2, X } from "lucide-react";
 import { LEGACY_COLORS, buildItemSearchLabel, formatNumber } from "../legacyUi";
 import { PKG_CATEGORY_OPTIONS } from "./adminShared";
 import { useAdminPackagesContext } from "./AdminPackagesContext";
+import { ConfirmModal } from "../common";
 
 // Props 없음. 모든 상태/액션은 AdminPackagesProvider 의 Context 에서 읽는다.
 // 기존 18-prop drilling → 0.
@@ -30,7 +32,11 @@ export function AdminPackagesSection() {
     removePackageItem: onRemovePackageItem,
     deletePackage: onDeletePackage,
   } = ctx;
+
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+
   return (
+    <>
     <div className="grid h-full gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
       {/* 좌측: 묶음 목록 */}
       <div className="flex min-h-0 flex-col gap-3">
@@ -75,9 +81,7 @@ export function AdminPackagesSection() {
                 </div>
               </button>
               <button
-                onClick={() => {
-                  if (window.confirm(`'${pkg.name}' 묶음을 삭제할까요?`)) onDeletePackage(pkg.package_id);
-                }}
+                onClick={() => setDeleteTarget({ id: pkg.package_id, name: pkg.name })}
                 className="shrink-0 rounded-full p-1.5 transition-colors hover:bg-red-500/20"
               >
                 <Trash2 className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.red }} />
@@ -298,5 +302,20 @@ export function AdminPackagesSection() {
         )}
       </div>
     </div>
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title="묶음 삭제"
+        tone="danger"
+        confirmLabel="삭제"
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (deleteTarget) onDeletePackage(deleteTarget.id);
+          setDeleteTarget(null);
+        }}
+      >
+        &apos;{deleteTarget?.name}&apos; 묶음을 삭제할까요?
+      </ConfirmModal>
+    </>
   );
 }

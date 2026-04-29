@@ -1,7 +1,6 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { PackageSearch } from "lucide-react";
 import { api, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import { LEGACY_COLORS, erpCodeDept, getStockState } from "./legacyUi";
@@ -279,32 +278,16 @@ export function DesktopInventoryView({
         </div>
       </div>
 
-      {/* ── 우측: 품목 상세 패널 ── */}
-      <DesktopRightPanel
-        title={selectedItem ? selectedItem.item_name : "품목을 선택해 주세요"}
-        subtitle={selectedItem ? `${selectedItem.erp_code} · ${selectedItem.legacy_part ?? "-"}` : undefined}
-        headerBadge={headerBadge}
-      >
-        {!selectedItem ? (
-          <div
-            className="flex h-full flex-col items-center justify-center gap-3 rounded-[28px] border p-8 text-center"
-            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-          >
-            <div
-              className="rounded-3xl p-5"
-              style={{ background: "rgba(101,169,255,.12)", color: LEGACY_COLORS.blue }}
-            >
-              <PackageSearch className="h-7 w-7" />
-            </div>
-            <div className="text-base font-bold">선택된 품목이 없습니다.</div>
-            <div className="text-base" style={{ color: LEGACY_COLORS.muted2 }}>
-              목록에서 품목을 선택하세요.
-            </div>
-          </div>
-        ) : (
+      {/* ── 우측: 품목 상세 패널 (품목 선택 후에만 표시) ── */}
+      {selectedItem && (
+        <DesktopRightPanel
+          title={selectedItem.item_name}
+          subtitle={`${selectedItem.erp_code} · ${selectedItem.legacy_part ?? "-"}`}
+          headerBadge={headerBadge}
+        >
           <InventoryDetailPanel item={selectedItem} logs={itemLogs} onGoToWarehouse={onGoToWarehouse} />
-        )}
-      </DesktopRightPanel>
+        </DesktopRightPanel>
+      )}
     </div>
   );
 }

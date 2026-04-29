@@ -1,6 +1,6 @@
-# DEXCOWIN ERP
+# DEXCOWIN MES
 
-정밀 X-ray 장비 제조사의 품목, 재고, BOM, 입출고를 관리하는 내부 ERP/MES 프로토타입.
+DEXCOWIN의 품목, 재고, BOM, 입출고를 관리하는 경량 MES 프로토타입.
 
 ## 현재 기준
 
@@ -73,7 +73,7 @@ http://localhost:3000
 - `BF`는 구형 오염 코드이며 현재 기준에서 사용하지 않는다.
 - 부서 필터는 `category`가 아니라 `process_type_code` 또는 백엔드 `department` 응답 기준으로 동작해야 한다.
 
-ERP 코드 포맷:
+품목 코드 포맷:
 
 ```text
 {모델기호}-{process_type_code}-{일련번호:04d}[-{옵션코드}]

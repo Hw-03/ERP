@@ -31,9 +31,9 @@ type SectionTab = "compose" | "cart" | "mine" | "queue";
 const AUTO_SAVE_DEBOUNCE_MS = 600;
 const AUTO_SAVE_LABEL: Record<"idle" | "saving" | "saved" | "error", string> = {
   idle: "",
-  saving: "장바구니 저장 중...",
-  saved: "장바구니 저장됨",
-  error: "장바구니 저장 실패",
+  saving: "작업 저장 중...",
+  saved: "작업 내용 저장됨",
+  error: "작업 저장 실패",
 };
 
 export function DesktopWarehouseView({
@@ -96,6 +96,7 @@ export function DesktopWarehouseView({
 
   // ─── 모달 ───
   const [showConfirm, setShowConfirm] = useState(false);
+  const [pendingDeptChange, setPendingDeptChange] = useState<import("@/lib/api").Department | null>(null);
   const [resultModal, setResultModal] = useState<
     | {
         kind: "fail" | "partial";
@@ -128,7 +129,12 @@ export function DesktopWarehouseView({
   const hasSelectedItems = selectedEntries.length > 0;
 
   // ─── wizard state (hook) ───
-  const wizard = useWarehouseWizardState({ step1Done, hasSelectedPackage, hasSelectedItems });
+  const wizard = useWarehouseWizardState({
+    step1Done,
+    hasSelectedPackage,
+    hasSelectedItems,
+    initialDept: (operator?.department as import("@/lib/api").Department | undefined) ?? "조립",
+  });
   const {
     workType, rawDirection, warehouseDirection, deptDirection, selectedDept, defectiveSource,
     forcedStep, setWorkType, setForcedStep, setStep2Confirmed, step2Done, step2State,
@@ -669,7 +675,16 @@ export function DesktopWarehouseView({
         <WarehouseStickySummary summary={stickySummary} />
 
         <WarehouseStepLayout
-          wizard={wizard}
+          wizard={{
+            ...wizard,
+            changeSelectedDept: (d) => {
+              if (wizard.step2Confirmed && d !== wizard.selectedDept) {
+                setPendingDeptChange(d);
+              } else {
+                wizard.changeSelectedDept(d);
+              }
+            },
+          }}
           filter={filter}
           refs={refs}
           step1Done={step1Done}
@@ -784,6 +799,20 @@ export function DesktopWarehouseView({
           totalQty={totalQty}
           notes={notes}
         />
+      </ConfirmModal>
+
+      <ConfirmModal
+        open={pendingDeptChange !== null}
+        title="대상 부서 변경"
+        tone="caution"
+        confirmLabel="변경"
+        onClose={() => setPendingDeptChange(null)}
+        onConfirm={() => {
+          if (pendingDeptChange) wizard.changeSelectedDept(pendingDeptChange);
+          setPendingDeptChange(null);
+        }}
+      >
+        대상 부서를 변경하시겠습니까?
       </ConfirmModal>
     </div>
   );

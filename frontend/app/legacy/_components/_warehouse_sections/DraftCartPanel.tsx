@@ -100,7 +100,7 @@ export function DraftCartPanel({
           color: LEGACY_COLORS.muted,
         }}
       >
-        담당자를 먼저 선택하면 내 장바구니가 표시됩니다.
+        담당자를 먼저 선택하면 내 작업중 내역이 표시됩니다.
       </div>
     );
   }

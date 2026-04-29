@@ -103,7 +103,7 @@ def list_process_flows(db: Session = Depends(get_db)):
 # ---- 4-part code operations ------------------------------------------------
 
 
-@router.post("/parse", response_model=ErpCodeResponse, summary="4-파트 ERP 코드 파싱")
+@router.post("/parse", response_model=ErpCodeResponse, summary="4-파트 품목 코드 파싱")
 def parse_code(payload: ErpCodeParseRequest, db: Session = Depends(get_db)):
     try:
         code = code_svc.parse_erp_code(payload.code)
@@ -125,7 +125,7 @@ def parse_code(payload: ErpCodeParseRequest, db: Session = Depends(get_db)):
     "/generate",
     response_model=ErpCodeResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="4-파트 ERP 코드 자동 생성",
+    summary="4-파트 품목 코드 자동 생성",
 )
 def generate_code(payload: ErpCodeGenerateRequest, db: Session = Depends(get_db)):
     try:

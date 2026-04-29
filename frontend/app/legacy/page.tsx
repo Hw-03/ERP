@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { Suspense, useCallback, useMemo, useState } from "react";
 import { MobileShell, type TabId } from "./_components/mobile/MobileShell";
 import { InventoryScreen } from "./_components/mobile/screens/InventoryScreen";
 import { HistoryScreen } from "./_components/mobile/screens/HistoryScreen";
@@ -92,7 +92,9 @@ function LegacyBody() {
         </MobileShell>
       </div>
 
-      <DesktopLegacyShell />
+      <Suspense>
+        <DesktopLegacyShell />
+      </Suspense>
 
       <Toast toast={toast} onClose={clearToast} />
     </>

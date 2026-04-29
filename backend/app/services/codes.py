@@ -1,4 +1,4 @@
-"""4-part ERP code utilities: parse, format, validate, generate.
+"""4-part 품목 코드 utilities: parse, format, validate, generate.
 
 Code format: [제품기호]-[구분코드]-[일련번호]-[옵션코드]
 

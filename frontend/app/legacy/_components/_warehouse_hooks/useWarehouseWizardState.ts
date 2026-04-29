@@ -13,19 +13,21 @@ type Args = {
   step1Done: boolean;
   hasSelectedPackage: boolean;
   hasSelectedItems: boolean;
+  initialDept?: Department;
 };
 
 export function useWarehouseWizardState({
   step1Done,
   hasSelectedPackage,
   hasSelectedItems,
+  initialDept,
 }: Args) {
   // 작업 설정
   const [workType, setWorkType] = useState<WorkType>("raw-io");
   const [rawDirection, setRawDirection] = useState<Direction>("in");
   const [warehouseDirection, setWarehouseDirection] = useState<TransferDirection>("wh-to-dept");
   const [deptDirection, setDeptDirection] = useState<Direction>("in");
-  const [selectedDept, setSelectedDept] = useState<Department>("조립");
+  const [selectedDept, setSelectedDept] = useState<Department>(initialDept ?? "조립");
   const [defectiveSource, setDefectiveSource] = useState<DefectiveSource>("warehouse");
 
   // wizard 단계 제어

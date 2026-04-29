@@ -1,6 +1,6 @@
 # API CHANGELOG
 
-X-Ray ERP 의 외부 노출 가능한 API 변경 이력. 내부 LAN 운영 기준이지만 향후 외부 통합을 위한 형식 안정성을 추적한다.
+DEXCOWIN MES 의 외부 노출 가능한 API 변경 이력. 내부 LAN 운영 기준이지만 향후 외부 통합을 위한 형식 안정성을 추적한다.
 
 각 항목 = 영향받은 엔드포인트 + 변경 종류 (Added / Changed / Fixed / Deprecated / Removed) + 호환성 영향 (Breaking ✗ / Non-breaking ✓).
 

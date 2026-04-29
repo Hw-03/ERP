@@ -1,6 +1,6 @@
-# 신규 인원 온보딩 (X-Ray ERP)
+# 신규 인원 온보딩 (DEXCOWIN MES)
 
-이 문서는 처음 ERP 프로젝트를 받는 운영자/개발자가 **1시간 안에 첫 작업까지** 도달하기 위한 절차를 정리한다.
+이 문서는 처음 MES 프로젝트를 받는 운영자/개발자가 **1시간 안에 첫 작업까지** 도달하기 위한 절차를 정리한다.
 
 > 한국어 LAN 환경 운영 기준. 외부 노출 시나리오는 별도.
 
@@ -98,7 +98,7 @@ scripts\ops\verify_backup.bat
 
 1. `docs/OPERATIONS.md` — 일상 운영 매뉴얼 (백업/복구/audit/Task Scheduler)
 2. `docs/CODEX_PROGRESS.md` — 최근 변경 이력 (Phase 5.x 누적)
-3. `docs/ITEM_CODE_RULES.md` — ERP 코드 포맷 규칙
+3. `docs/ITEM_CODE_RULES.md` — 품목 코드 포맷 규칙
 4. `docs/API_CHANGELOG.md` — API 변경 이력
 5. `docs/AI_HANDOVER.md` — Claude 세션 인계 노트
 

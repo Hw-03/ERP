@@ -153,7 +153,7 @@ export function ItemPickStep({
               <input
                 value={localSearch}
                 onChange={(e) => setLocalSearch(e.target.value)}
-                placeholder="품목명 · ERP코드 · 바코드"
+                placeholder="품목명 · 품목 코드 · 바코드"
                 className="flex-1 bg-transparent text-xs outline-none"
                 style={{ color: LEGACY_COLORS.text }}
               />
@@ -227,7 +227,7 @@ export function ItemPickStep({
                 style={{ color: LEGACY_COLORS.muted2 }}
               >
                 <th className="w-10 px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}></th>
-                <th className="px-2 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>품목명 (ERP 코드)</th>
+                <th className="px-2 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>품목명 (품목 코드)</th>
                 <th className="px-2 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>모델</th>
                 <th className="px-2 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>분류</th>
                 <th className="px-2 py-2 text-center" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>상태</th>

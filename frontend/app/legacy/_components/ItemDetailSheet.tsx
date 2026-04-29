@@ -133,7 +133,7 @@ export function ItemDetailSheet({
 
           <div className="overflow-hidden rounded-[14px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
             {[
-              ["ERP 코드", item.erp_code ?? "-"],
+              ["품목 코드", item.erp_code ?? "-"],
               ["사양", item.spec || "-"],
               ["총재고", `${formatNumber(item.quantity)} ${item.unit}`],
               [

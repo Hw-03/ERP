@@ -9,13 +9,17 @@ import { IconButton, WizardHeader, type SummaryChip } from "../../primitives";
 import { useEmployees } from "../../hooks/useEmployees";
 import { WAREHOUSE_MODE_META, WAREHOUSE_STEPS, type WarehouseMode } from "./warehouseWizardConfig";
 import { useWarehouseWizard } from "./context";
-import { StepConfirm, StepItems, StepPerson, StepType } from "./WarehouseWizardSteps";
+import { StepConfirm, StepItems, StepType } from "./WarehouseWizardSteps";
+import { ConfirmModal } from "../../../common";
+import { useCurrentOperator } from "../../../login/useCurrentOperator";
 
 export function WarehouseWizardScreen({ showToast }: { showToast: (toast: ToastState) => void }) {
   const { state, dispatch } = useWarehouseWizard();
-  const { employees, loading: employeesLoading } = useEmployees({ activeOnly: true });
+  const { employees } = useEmployees({ activeOnly: true });
   const [items, setItems] = useState<Item[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  const operator = useCurrentOperator();
 
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +37,13 @@ export function WarehouseWizardScreen({ showToast }: { showToast: (toast: ToastS
       cancelled = true;
     };
   }, []);
+
+  // 로그인 담당자를 작업 담당자로 자동 주입 (DRAFT 복원값은 덮어쓰지 않음)
+  useEffect(() => {
+    if (operator && !state.employeeId) {
+      dispatch({ type: "SET_EMPLOYEE", employeeId: operator.employee_id });
+    }
+  }, [operator, state.employeeId, dispatch]);
 
   const employee = useMemo(
     () => employees.find((e) => e.employee_id === state.employeeId) ?? null,
@@ -53,17 +64,16 @@ export function WarehouseWizardScreen({ showToast }: { showToast: (toast: ToastS
     if (employee) {
       out.push({
         key: "employee",
-        label: `${employee.name}`,
+        label: employee.name,
         tone: LEGACY_COLORS.green,
-        onClick: state.step > 1 ? () => dispatch({ type: "GO", step: 1 }) : undefined,
       });
     }
-    if (state.items.size > 0 && state.step > 2) {
+    if (state.items.size > 0 && state.step > 1) {
       out.push({
         key: "items",
         label: `${state.items.size}건`,
         tone: LEGACY_COLORS.cyan,
-        onClick: () => dispatch({ type: "GO", step: 2 }),
+        onClick: () => dispatch({ type: "GO", step: 1 }),
       });
     }
     return out;
@@ -71,7 +81,7 @@ export function WarehouseWizardScreen({ showToast }: { showToast: (toast: ToastS
 
   const submit = async () => {
     if (!employee) {
-      dispatch({ type: "SET_ERROR", error: "담당 직원을 선택해 주세요." });
+      dispatch({ type: "SET_ERROR", error: "로그인 정보를 확인해 주세요." });
       return;
     }
     if (state.items.size === 0) {
@@ -123,63 +133,76 @@ export function WarehouseWizardScreen({ showToast }: { showToast: (toast: ToastS
   const stepMeta = WAREHOUSE_STEPS[state.step];
 
   return (
-    <div className="flex flex-col">
-      <div
-        className="sticky top-0 z-10 flex items-start gap-2 border-b px-3 py-3"
-        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-      >
-        <IconButton
-          icon={ChevronLeft}
-          label="이전 단계"
-          size="md"
-          onClick={() => dispatch({ type: "PREV" })}
-          disabled={atFirstStep}
-          color={atFirstStep ? LEGACY_COLORS.muted : LEGACY_COLORS.text}
-        />
-        <div className="min-w-0 flex-1">
-          <WizardHeader
-            steps={WAREHOUSE_STEPS.map((s) => ({ key: s.key, label: s.label }))}
-            current={state.step}
-            chips={summaryChips}
+    <>
+      <div className="flex flex-col">
+        <div
+          className="sticky top-0 z-10 flex items-start gap-2 border-b px-3 py-3"
+          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+        >
+          <IconButton
+            icon={ChevronLeft}
+            label="이전 단계"
+            size="md"
+            onClick={() => dispatch({ type: "PREV" })}
+            disabled={atFirstStep}
+            color={atFirstStep ? LEGACY_COLORS.muted : LEGACY_COLORS.text}
+          />
+          <div className="min-w-0 flex-1">
+            <WizardHeader
+              steps={WAREHOUSE_STEPS.map((s) => ({ key: s.key, label: s.label }))}
+              current={state.step}
+              chips={summaryChips}
+            />
+          </div>
+          <IconButton
+            icon={X}
+            label="취소"
+            size="md"
+            onClick={() => {
+              if (state.mode != null || state.items.size > 0) {
+                setCancelConfirmOpen(true);
+                return;
+              }
+              dispatch({ type: "RESET" });
+            }}
+            color={LEGACY_COLORS.muted2}
           />
         </div>
-        <IconButton
-          icon={X}
-          label="취소"
-          size="md"
-          onClick={() => {
-            if (
-              typeof window !== "undefined" &&
-              (state.mode != null || state.items.size > 0 || state.employeeId != null) &&
-              !window.confirm("작성 중인 내용을 모두 취소할까요?")
-            ) {
-              return;
-            }
-            dispatch({ type: "RESET" });
-          }}
-          color={LEGACY_COLORS.muted2}
-        />
+
+        {stepMeta?.key === "type" && <StepType />}
+        {stepMeta?.key === "items" && (
+          <StepItems
+            items={items}
+            loading={itemsLoading}
+            showToast={showToast}
+            onNext={() => {
+              if (state.items.size === 0) {
+                dispatch({ type: "SET_ERROR", error: "품목을 1개 이상 선택해 주세요." });
+                return;
+              }
+              dispatch({ type: "NEXT" });
+            }}
+          />
+        )}
+        {stepMeta?.key === "confirm" && (
+          <StepConfirm items={items} employee={employee} onSubmit={() => void submit()} onBack={() => dispatch({ type: "PREV" })} />
+        )}
       </div>
 
-      {stepMeta?.key === "type" && <StepType />}
-      {stepMeta?.key === "person" && <StepPerson employees={employees} loading={employeesLoading} />}
-      {stepMeta?.key === "items" && (
-        <StepItems
-          items={items}
-          loading={itemsLoading}
-          showToast={showToast}
-          onNext={() => {
-            if (state.items.size === 0) {
-              dispatch({ type: "SET_ERROR", error: "품목을 1개 이상 선택해 주세요." });
-              return;
-            }
-            dispatch({ type: "NEXT" });
-          }}
-        />
-      )}
-      {stepMeta?.key === "confirm" && (
-        <StepConfirm items={items} employee={employee} onSubmit={() => void submit()} onBack={() => dispatch({ type: "PREV" })} />
-      )}
-    </div>
+      <ConfirmModal
+        open={cancelConfirmOpen}
+        title="작성 취소"
+        tone="caution"
+        confirmLabel="취소"
+        cancelLabel="계속 작성"
+        onClose={() => setCancelConfirmOpen(false)}
+        onConfirm={() => {
+          setCancelConfirmOpen(false);
+          dispatch({ type: "RESET" });
+        }}
+      >
+        작성 중인 내용을 모두 취소할까요?
+      </ConfirmModal>
+    </>
   );
 }

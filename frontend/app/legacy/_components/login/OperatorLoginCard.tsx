@@ -14,11 +14,12 @@ interface OperatorLoginCardProps {
   onLogin: () => void;
 }
 
-type Step = "select" | "pin";
+type Step = "dept" | "select" | "pin";
 
 export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
-  const [step, setStep] = useState<Step>("select");
+  const [step, setStep] = useState<Step>("dept");
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Employee | null>(null);
   const [pin, setPin] = useState("");
@@ -29,16 +30,35 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
     api.getEmployees({ activeOnly: true }).then(setEmployees).catch(() => {});
   }, []);
 
+  const departments = useMemo(() => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const e of employees) {
+      if (e.department && !seen.has(e.department)) {
+        seen.add(e.department);
+        result.push(e.department);
+      }
+    }
+    return result.sort();
+  }, [employees]);
+
   const filtered = useMemo(() => {
+    let list = selectedDept ? employees.filter((e) => e.department === selectedDept) : employees;
     const q = search.trim().toLowerCase();
-    if (!q) return employees;
-    return employees.filter(
+    if (!q) return list;
+    return list.filter(
       (e) =>
         e.name.toLowerCase().includes(q) ||
         e.employee_code.toLowerCase().includes(q) ||
-        (e.department).toLowerCase().includes(q),
+        e.department.toLowerCase().includes(q),
     );
-  }, [employees, search]);
+  }, [employees, selectedDept, search]);
+
+  const handleSelectDept = useCallback((dept: string) => {
+    setSelectedDept(dept);
+    setSearch("");
+    setStep("select");
+  }, []);
 
   const handleSelect = useCallback((emp: Employee) => {
     setSelected(emp);
@@ -48,11 +68,17 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
   }, []);
 
   const handleBack = useCallback(() => {
-    setStep("select");
-    setSelected(null);
-    setPin("");
-    setError("");
-  }, []);
+    if (step === "pin") {
+      setStep("select");
+      setPin("");
+      setError("");
+    } else {
+      setStep("dept");
+      setSelectedDept(null);
+      setSearch("");
+      setSelected(null);
+    }
+  }, [step]);
 
   const handlePinSubmit = useCallback(async () => {
     if (!selected || pin.length === 0 || loading) return;
@@ -83,8 +109,10 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
     }
   }, [selected, pin, loading, onLogin]);
 
+  const maxWidth = step === "dept" ? "480px" : step === "select" ? "560px" : "420px";
+
   return (
-    <div className="relative mx-auto w-full" style={{ maxWidth: step === "select" ? "560px" : "420px", padding: "0 16px" }}>
+    <div className="relative mx-auto w-full" style={{ maxWidth, padding: "0 16px" }}>
       <div
         className="relative w-full rounded-[24px] border p-8"
         style={{
@@ -93,14 +121,20 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
           boxShadow: "var(--c-card-shadow)",
         }}
       >
-        {step === "select" ? (
+        {step === "dept" && (
+          <DeptStep departments={departments} onSelect={handleSelectDept} />
+        )}
+        {step === "select" && (
           <SelectStep
+            dept={selectedDept}
             employees={filtered}
             search={search}
             onSearch={setSearch}
             onSelect={handleSelect}
+            onBack={handleBack}
           />
-        ) : (
+        )}
+        {step === "pin" && (
           <PinStep
             employee={selected!}
             pin={pin}
@@ -116,27 +150,89 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
   );
 }
 
-/* ── 1단계: 담당자 선택 ─────────────────────────────────────────────────── */
+/* ── 0단계: 부서 선택 ─────────────────────────────────────────────────────── */
+
+function DeptStep({
+  departments,
+  onSelect,
+}: {
+  departments: string[];
+  onSelect: (dept: string) => void;
+}) {
+  return (
+    <>
+      <div className="mb-6">
+        <p className="mb-1.5 font-mono text-xs uppercase tracking-[0.18em]" style={{ color: "var(--c-blue)" }}>
+          {"// OPERATOR LOGIN"}
+        </p>
+        <h1 className="text-xl font-bold" style={{ color: "var(--c-text)" }}>
+          부서를 선택하세요
+        </h1>
+      </div>
+
+      {departments.length === 0 ? (
+        <div className="py-8 text-center text-sm" style={{ color: "var(--c-muted)" }}>
+          등록된 부서가 없습니다.
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2.5">
+          {departments.map((dept) => (
+            <button
+              key={dept}
+              onClick={() => onSelect(dept)}
+              className="flex items-center justify-center rounded-[16px] border px-4 py-4 text-sm font-semibold transition-all hover:scale-[1.02] hover:opacity-90"
+              style={{
+                background: "var(--c-s2)",
+                borderColor: "var(--c-border)",
+                color: "var(--c-text)",
+              }}
+            >
+              {dept}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <p className="mt-6 text-center text-xs" style={{ color: "var(--c-muted)" }}>
+        PIN은 작업자 식별 용도입니다 · © 2026 DEXCOWIN
+      </p>
+    </>
+  );
+}
+
+/* ── 1단계: 담당자 선택 ─────────────────────────────────────────────────────── */
 
 function SelectStep({
+  dept,
   employees,
   search,
   onSearch,
   onSelect,
+  onBack,
 }: {
+  dept: string | null;
   employees: Employee[];
   search: string;
   onSearch: (v: string) => void;
   onSelect: (e: Employee) => void;
+  onBack: () => void;
 }) {
   return (
     <>
       <div className="mb-5">
-        <p className="mb-1.5 font-mono text-xs uppercase tracking-[0.18em]" style={{ color: "var(--c-blue)" }}>
+        <button
+          onClick={onBack}
+          className="mb-3 flex items-center gap-1.5 text-xs transition-opacity hover:opacity-70"
+          style={{ color: "var(--c-muted)" }}
+        >
+          <ArrowLeft size={13} />
+          부서 다시 선택
+        </button>
+        <p className="mb-1 font-mono text-xs uppercase tracking-[0.18em]" style={{ color: "var(--c-blue)" }}>
           {"// OPERATOR SELECT"}
         </p>
         <h1 className="text-xl font-bold" style={{ color: "var(--c-text)" }}>
-          담당자를 선택하세요
+          {dept ? `${dept} 담당자 선택` : "담당자를 선택하세요"}
         </h1>
       </div>
 
@@ -148,7 +244,7 @@ function SelectStep({
         <Search size={14} style={{ color: "var(--c-muted)", flexShrink: 0 }} />
         <input
           type="text"
-          placeholder="이름, 코드, 부서 검색"
+          placeholder="이름, 코드 검색"
           value={search}
           onChange={(e) => onSearch(e.target.value)}
           className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--c-muted)]"

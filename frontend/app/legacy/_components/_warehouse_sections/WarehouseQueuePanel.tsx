@@ -146,7 +146,7 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
                 color: LEGACY_COLORS.yellow,
               }}
             >
-              {req.status === "reserved" ? "점유중" : "제출됨"}
+              {req.status === "reserved" ? "승인 대기" : "제출됨"}
             </span>
             <span className="font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
               {req.request_code ?? req.request_id.slice(0, 8)}
@@ -216,7 +216,7 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
                 className="rounded-[10px] px-3 py-1.5 text-xs font-bold"
                 style={{ background: LEGACY_COLORS.green, color: "white" }}
               >
-                {busyId === req.request_id ? "처리 중..." : "확정 승인"}
+                {busyId === req.request_id ? "처리 중..." : "승인 확정"}
               </button>
               <button
                 type="button"

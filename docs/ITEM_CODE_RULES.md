@@ -19,7 +19,7 @@
 - 조립 A 타입은 반드시 `AA`다. (`BA`는 구형 오염 코드)
 - 조립 F 타입은 반드시 `AF`다. (`BF`는 구형 오염 코드)
 
-## ERP 코드 포맷
+## 품목 코드 포맷
 
 ```text
 {모델기호}-{process_type_code}-{일련번호:04d}[-{옵션코드}]
@@ -38,9 +38,9 @@
 | 필드 | 용도 | 예시 |
 |---|---|---|
 | `category` | 원본 엑셀/레거시 통합 단계에서 온 품목 원천 분류 | `RM`, `TA`, `TF`, `HA`, `HF`, `VA`, `VF`, `AA`, `AF`, `FG`, `UK` |
-| `process_type_code` | ERP 코드 생성, 부서 필터, 공정 라벨의 기준 | `TR`, `TA`, `TF`, `HR`, `HA`, `HF`, `VR`, `VA`, `VF`, `NR`, `NA`, `NF`, `AR`, `AA`, `AF`, `PR`, `PA`, `PF` |
+| `process_type_code` | 품목 코드 생성, 부서 필터, 공정 라벨의 기준 | `TR`, `TA`, `TF`, `HR`, `HA`, `HF`, `VR`, `VA`, `VF`, `NR`, `NA`, `NF`, `AR`, `AA`, `AF`, `PR`, `PA`, `PF` |
 
-부서 필터와 ERP 코드 판정은 반드시 `process_type_code` 기준으로 한다. `category`만 보고 부서를 판단하면 전체 필터와 개별 전체 선택 결과가 달라질 수 있다.
+부서 필터와 품목 코드 판정은 반드시 `process_type_code` 기준으로 한다. `category`만 보고 부서를 판단하면 전체 필터와 개별 전체 선택 결과가 달라질 수 있다.
 
 ## AI 금지 규칙
 

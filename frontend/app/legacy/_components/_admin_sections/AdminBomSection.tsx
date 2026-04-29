@@ -72,7 +72,7 @@ export function AdminBomSection() {
                     >
                       <span>구분</span>
                       <span>자재명</span>
-                      <span className="text-right">ERP 코드</span>
+                      <span className="text-right">품목 코드</span>
                       <span className="text-right">소요량</span>
                       <span className="text-right">재고</span>
                       <span className="text-right">가능수량</span>

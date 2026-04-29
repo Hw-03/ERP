@@ -32,7 +32,7 @@ export function DesktopHistoryView() {
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
   const [itemRecentLogs, setItemRecentLogs] = useState<TransactionLog[]>([]);
 
-  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("calendar");
   const now = new Date();
   const [calendarYear, setCalendarYear] = useState(now.getFullYear());
   const [calendarMonth, setCalendarMonth] = useState(now.getMonth());
@@ -315,19 +315,21 @@ export function DesktopHistoryView() {
         </div>
       </div>
 
-      {/* ── 우측: 상세 패널 ── */}
-      <DesktopRightPanel
-        title={selected ? selected.item_name : "항목을 선택하세요"}
-        subtitle={selected ? `${selected.erp_code ?? "-"} · ${formatHistoryDate(selected.created_at)}` : undefined}
-      >
-        <HistoryDetailPanel
-          selected={selected}
-          itemRecentLogs={itemRecentLogs}
-          onSelectLog={(log) => setSelected(log)}
-          onLogUpdated={handleLogUpdated}
-          onLogCorrected={handleLogCorrected}
-        />
-      </DesktopRightPanel>
+      {/* ── 우측: 상세 패널 (항목 선택 후에만 표시) ── */}
+      {selected && (
+        <DesktopRightPanel
+          title={selected.item_name}
+          subtitle={`${selected.erp_code ?? "-"} · ${formatHistoryDate(selected.created_at)}`}
+        >
+          <HistoryDetailPanel
+            selected={selected}
+            itemRecentLogs={itemRecentLogs}
+            onSelectLog={(log) => setSelected(log)}
+            onLogUpdated={handleLogUpdated}
+            onLogCorrected={handleLogCorrected}
+          />
+        </DesktopRightPanel>
+      )}
     </div>
   );
 }

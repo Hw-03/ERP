@@ -42,7 +42,7 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
             {/* 그립 */}
             <GripVertical className="h-4 w-4" style={{ color: LEGACY_COLORS.muted2 }} />
 
-            {/* 품목명 + ERP */}
+            {/* 품목명 + 품목 코드 */}
             <div className="min-w-0">
               <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
                 {item.item_name}

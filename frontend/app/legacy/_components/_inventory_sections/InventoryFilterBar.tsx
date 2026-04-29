@@ -158,7 +158,7 @@ export function InventoryTableStickyHeader({
           <input
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="품명 · ERP코드 · 위치 · 공급처 검색"
+            placeholder="품명 · 품목 코드 · 위치 · 공급처 검색"
             className="flex-1 bg-transparent text-base outline-none"
             style={{ color: LEGACY_COLORS.text }}
           />

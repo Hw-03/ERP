@@ -30,7 +30,6 @@ export const WAREHOUSE_MODE_META: Record<
 
 export const WAREHOUSE_STEPS = [
   { key: "type", label: "유형" },
-  { key: "person", label: "담당자" },
   { key: "items", label: "품목/수량" },
   { key: "confirm", label: "확인" },
 ] as const;

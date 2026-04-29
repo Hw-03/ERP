@@ -1,6 +1,6 @@
 # 운영 매뉴얼
 
-내부 ERP를 365일 켜두는 PC에서 운영하는 사람을 위한 매뉴얼. 보안/권한·CI/CD·실 서비스 등록은 이 문서의 범위가 아니다.
+내부 MES를 365일 켜두는 PC에서 운영하는 사람을 위한 매뉴얼. 보안/권한·CI/CD·실 서비스 등록은 이 문서의 범위가 아니다.
 
 ## 표준 실행 경로
 
@@ -178,13 +178,13 @@ GET /api/admin/audit-logs?since=2026-04-26T00:00:00    # 시각 이후
 
 ```bat
 rem 매일 18:00 백업
-schtasks /Create /TN "ERP Backup Daily" /TR "C:\Users\HW\Documents\GitHub\ERP\scripts\ops\backup_db.bat" /SC DAILY /ST 18:00 /F
+schtasks /Create /TN "MES Backup Daily" /TR "C:\Users\HW\Documents\GitHub\ERP\scripts\ops\backup_db.bat" /SC DAILY /ST 18:00 /F
 
 rem 매주 월요일 09:00 백업 검증
-schtasks /Create /TN "ERP Verify Weekly" /TR "C:\Users\HW\Documents\GitHub\ERP\scripts\ops\verify_backup.bat" /SC WEEKLY /D MON /ST 09:00 /F
+schtasks /Create /TN "MES Verify Weekly" /TR "C:\Users\HW\Documents\GitHub\ERP\scripts\ops\verify_backup.bat" /SC WEEKLY /D MON /ST 09:00 /F
 
 rem 매월 1일 03:00 30일 이상 백업 정리
-schtasks /Create /TN "ERP Cleanup Monthly" /TR "C:\Users\HW\Documents\GitHub\ERP\scripts\ops\cleanup_backups.bat" /SC MONTHLY /D 1 /ST 03:00 /F
+schtasks /Create /TN "MES Cleanup Monthly" /TR "C:\Users\HW\Documents\GitHub\ERP\scripts\ops\cleanup_backups.bat" /SC MONTHLY /D 1 /ST 03:00 /F
 ```
 
 등록 후 작업 스케줄러 GUI 에서 "가장 높은 권한으로 실행" 옵션 체크 권장. 1회 등록하고 그대로 두면 365일 자동 운영.

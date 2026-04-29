@@ -59,7 +59,7 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
               style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
             >
               <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                ERP 코드
+                품목 코드
               </div>
               <div className="mt-1 text-base font-bold" style={{ color: LEGACY_COLORS.blue }}>
                 {item.erp_code}
@@ -99,7 +99,7 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
               }}
             >
               <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                점유중
+                승인 대기 수량
               </div>
               <div
                 className="mt-1 text-xl font-black"
@@ -113,7 +113,7 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
               style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
             >
               <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                가용재고
+                사용 가능 재고
               </div>
               <div className="mt-1 text-xl font-black" style={{ color: LEGACY_COLORS.green }}>
                 {formatNumber(availableQty)}
