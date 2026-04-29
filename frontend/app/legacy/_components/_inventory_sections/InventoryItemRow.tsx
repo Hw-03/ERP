@@ -103,9 +103,11 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
       </td>
       <td className="border-b px-4 py-2.5 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="font-semibold">{item.item_name}</div>
-        <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-          {item.spec || "-"}
-        </div>
+        {item.spec && (
+          <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+            {item.spec}
+          </div>
+        )}
         {Number(item.quantity) === 0 ? (
           <div
             className="mt-2 h-[5px] overflow-hidden rounded-full"
