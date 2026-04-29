@@ -79,9 +79,9 @@ export function WizardStepCard({
 
   const animStyle = {
     opacity: mounted ? 1 : 0,
-    transform: mounted ? "translateY(0)" : "translateY(-4px)",
+    transform: mounted ? "translateY(0)" : "translateY(-10px)",
     transition:
-      "opacity 200ms ease, transform 200ms ease, border-color 240ms cubic-bezier(0.16,1,0.3,1), background-color 240ms ease, padding 240ms ease",
+      "opacity 280ms ease, transform 280ms ease, border-color 240ms cubic-bezier(0.16,1,0.3,1), background-color 240ms ease, padding 240ms ease",
   } as const;
 
   if (state === "active") {

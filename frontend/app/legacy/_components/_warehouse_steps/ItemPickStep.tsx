@@ -330,6 +330,7 @@ export function ItemPickStep({
         {!isPackage && filteredItems.length > displayLimit && (
           <div className="p-2">
             <button
+              type="button"
               onClick={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
               className="w-full rounded-[12px] border py-2.5 text-xs font-semibold"
               style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}

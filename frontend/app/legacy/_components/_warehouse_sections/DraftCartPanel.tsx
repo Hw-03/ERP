@@ -49,7 +49,7 @@ export function DraftCartPanel({
       setDrafts(rows);
     } catch (err) {
       setLoadError(
-        err instanceof Error ? err.message : "장바구니를 불러오지 못했습니다.",
+        err instanceof Error ? err.message : "작업 중 목록을 불러오지 못했습니다.",
       );
     } finally {
       setLoading(false);
@@ -69,7 +69,7 @@ export function DraftCartPanel({
       await reload();
       onChanged();
     } catch (err) {
-      setOpError(err instanceof Error ? err.message : "장바구니 삭제에 실패했습니다.");
+      setOpError(err instanceof Error ? err.message : "삭제에 실패했습니다.");
       setDeleteTarget(null);
     } finally {
       setBusyId(null);
@@ -151,7 +151,7 @@ export function DraftCartPanel({
             color: LEGACY_COLORS.muted,
           }}
         >
-          저장된 장바구니가 없습니다. 요청 작성 화면에서 입력하면 자동으로 저장됩니다.
+          작업 중인 요청이 없습니다. 요청 작성 화면에서 입력하면 자동으로 저장됩니다.
         </div>
       )}
       {drafts.map((draft) => {
@@ -286,13 +286,13 @@ export function DraftCartPanel({
 
       <ConfirmModal
         open={deleteTarget !== null}
-        title="장바구니 삭제"
+        title="작업 삭제"
         tone="danger"
         confirmLabel="삭제"
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => void handleDeleteConfirm()}
       >
-        이 장바구니 항목을 삭제하시겠습니까?
+        이 작업 항목을 삭제하시겠습니까?
       </ConfirmModal>
     </div>
   );

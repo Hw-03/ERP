@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, TrendingDown, TrendingUp } from "lucide-react";
 import { api, type TransactionLog, type TransactionType } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
@@ -37,6 +37,7 @@ export function DesktopHistoryView() {
   const [calendarYear, setCalendarYear] = useState(now.getFullYear());
   const [calendarMonth, setCalendarMonth] = useState(now.getMonth());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const lastSelectedRef = useRef<TransactionLog | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -194,8 +195,11 @@ export function DesktopHistoryView() {
     setSelected((c) => (c?.log_id === log.log_id ? null : log));
   }
 
+  if (selected) lastSelectedRef.current = selected;
+  const displaySelected = selected ?? lastSelectedRef.current;
+
   return (
-    <div className="flex min-h-0 flex-1 gap-4 pl-0 pr-4">
+    <div className="flex min-h-0 flex-1 pl-0 pr-4">
       {/* ── 좌측: 스크롤 영역 ── */}
       <div
         className="scrollbar-hide min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px] border"
@@ -315,21 +319,39 @@ export function DesktopHistoryView() {
         </div>
       </div>
 
-      {/* ── 우측: 상세 패널 (항목 선택 후에만 표시) ── */}
-      {selected && (
-        <DesktopRightPanel
-          title={selected.item_name}
-          subtitle={`${selected.erp_code ?? "-"} · ${formatHistoryDate(selected.created_at)}`}
+      {/* ── 우측: 상세 패널 ── */}
+      <div
+        className="shrink-0 overflow-hidden"
+        style={{
+          width: selected ? 436 : 0,
+          transition: "width 160ms cubic-bezier(0.4, 0, 0.2, 1)",
+        }}
+      >
+        <div
+          className="h-full pl-4"
+          style={{
+            opacity: selected ? 1 : 0,
+            transform: selected ? "translateX(0)" : "translateX(18px)",
+            transition: "opacity 260ms ease, transform 260ms ease",
+            willChange: "transform, opacity",
+          }}
         >
-          <HistoryDetailPanel
-            selected={selected}
-            itemRecentLogs={itemRecentLogs}
-            onSelectLog={(log) => setSelected(log)}
-            onLogUpdated={handleLogUpdated}
-            onLogCorrected={handleLogCorrected}
-          />
-        </DesktopRightPanel>
-      )}
+          {displaySelected && (
+            <DesktopRightPanel
+              title={displaySelected.item_name}
+              subtitle={`${displaySelected.erp_code ?? "-"} · ${formatHistoryDate(displaySelected.created_at)}`}
+            >
+              <HistoryDetailPanel
+                selected={displaySelected}
+                itemRecentLogs={itemRecentLogs}
+                onSelectLog={(log) => setSelected(log)}
+                onLogUpdated={handleLogUpdated}
+                onLogCorrected={handleLogCorrected}
+              />
+            </DesktopRightPanel>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

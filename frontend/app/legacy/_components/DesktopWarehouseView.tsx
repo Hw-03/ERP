@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Item, type ShipPackage, type StockRequest } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber, normalizeDepartment } from "./legacyUi";
+import { LEGACY_COLORS, formatNumber } from "./legacyUi";
 import { ConfirmModal, ResultModal } from "./common";
 import { CAUTION_WORK_TYPES, type WorkType } from "./_warehouse_steps";
 import { useWarehouseFilters } from "./_warehouse_hooks/useWarehouseFilters";
@@ -92,7 +92,6 @@ export function DesktopWarehouseView({
   const [error, setError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<{ count: number; label: string } | null>(null);
   const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
-  const [employeeExpanded, setEmployeeExpanded] = useState(false);
 
   // ─── 모달 ───
   const [showConfirm, setShowConfirm] = useState(false);
@@ -212,11 +211,6 @@ export function DesktopWarehouseView({
     setStep2Confirmed(false);
     setError(null);
     setTimeout(() => { restoringRef.current = false; }, 0);
-  }
-
-  function selectEmployee(id: string) {
-    setEmployeeId(id);
-    setForcedStep(null);
   }
 
   // ─── 승인 필요 여부 (UI 라벨/메시지 분기용) ───
@@ -525,9 +519,6 @@ export function DesktopWarehouseView({
   }
 
   // ─── summaries (for collapsed cards) ───
-  const step1Summary = selectedEmployee
-    ? `${selectedEmployee.name} · ${normalizeDepartment(selectedEmployee.department)}`
-    : "";
   const step2Summary = effectiveLabel;
   const step2Accent = isCaution ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   const itemsSummary = workType === "package-out"
@@ -538,13 +529,11 @@ export function DesktopWarehouseView({
   const stickySummary: { n: number; title: string; text: string } | null =
     showStep4 || showStep5
       ? itemsSummary
-        ? { n: 3, title: "품목", text: itemsSummary }
+        ? { n: 2, title: "품목", text: itemsSummary }
         : null
       : showStep3
-        ? { n: 2, title: "작업 유형", text: step2Summary }
-        : step1Done && step2State !== "complete"
-          ? { n: 1, title: "담당자", text: step1Summary }
-          : null;
+        ? { n: 1, title: "작업 유형", text: step2Summary }
+        : null;
 
   // ─── post-success reset effect ───
   const prevLastResultRef = useRef<{ count: number; label: string } | null>(null);
@@ -572,7 +561,7 @@ export function DesktopWarehouseView({
   function renderSectionTabs() {
     const tabs: { id: SectionTab; label: string }[] = [
       { id: "compose", label: "요청 작성" },
-      { id: "cart", label: "장바구니" },
+      { id: "cart", label: "작업 중" },
       { id: "mine", label: "내 요청" },
     ];
     if (canSeeQueue) tabs.push({ id: "queue", label: "창고 승인함" });
@@ -687,14 +676,6 @@ export function DesktopWarehouseView({
           }}
           filter={filter}
           refs={refs}
-          step1Done={step1Done}
-          step1Summary={step1Summary}
-          employees={employees}
-          employeeId={employeeId}
-          onSelectEmployee={selectEmployee}
-          employeeExpanded={employeeExpanded}
-          setEmployeeExpanded={setEmployeeExpanded}
-          onEditStep1={() => setForcedStep(1)}
           step2Summary={step2Summary}
           step2Accent={step2Accent}
           onChangeWorkType={changeWorkType}

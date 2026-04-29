@@ -81,6 +81,7 @@ export function DesktopInventoryView({
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastSelectedItemRef = useRef<Item | null>(null);
   const deferredLocalSearch = useDeferredValue(localSearch.trim().toLowerCase());
 
   async function loadItems() {
@@ -193,11 +194,14 @@ export function DesktopInventoryView({
     { label: "품절", value: summary.zeroCount, hint: "즉시 조치 필요", tone: LEGACY_COLORS.red, key: "ZERO" },
   ];
 
-  const headerBadge = selectedItem
+  if (selectedItem) lastSelectedItemRef.current = selectedItem;
+  const displayItem = selectedItem ?? lastSelectedItemRef.current;
+
+  const headerBadge = displayItem
     ? (() => {
         const stock = getStockState(
-          Number(selectedItem.quantity),
-          selectedItem.min_stock == null ? null : Number(selectedItem.min_stock),
+          Number(displayItem.quantity),
+          displayItem.min_stock == null ? null : Number(displayItem.min_stock),
         );
         return (
           <span
@@ -218,7 +222,7 @@ export function DesktopInventoryView({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 gap-4 pl-0 pr-4">
+    <div className="flex min-h-0 flex-1 pl-0 pr-4">
       {/* ── 좌측: 스크롤 컨테이너 ── */}
       <div
         ref={scrollRef}
@@ -278,16 +282,34 @@ export function DesktopInventoryView({
         </div>
       </div>
 
-      {/* ── 우측: 품목 상세 패널 (품목 선택 후에만 표시) ── */}
-      {selectedItem && (
-        <DesktopRightPanel
-          title={selectedItem.item_name}
-          subtitle={`${selectedItem.erp_code} · ${selectedItem.legacy_part ?? "-"}`}
-          headerBadge={headerBadge}
+      {/* ── 우측: 품목 상세 패널 ── */}
+      <div
+        className="shrink-0 overflow-hidden"
+        style={{
+          width: selectedItem ? 436 : 0,
+          transition: "width 160ms cubic-bezier(0.4, 0, 0.2, 1)",
+        }}
+      >
+        <div
+          className="h-full pl-4"
+          style={{
+            opacity: selectedItem ? 1 : 0,
+            transform: selectedItem ? "translateX(0)" : "translateX(18px)",
+            transition: "opacity 260ms ease, transform 260ms ease",
+            willChange: "transform, opacity",
+          }}
         >
-          <InventoryDetailPanel item={selectedItem} logs={itemLogs} onGoToWarehouse={onGoToWarehouse} />
-        </DesktopRightPanel>
-      )}
+          {displayItem && (
+            <DesktopRightPanel
+              title={displayItem.item_name}
+              subtitle={`${displayItem.erp_code} · ${displayItem.legacy_part ?? "-"}`}
+              headerBadge={headerBadge}
+            >
+              <InventoryDetailPanel item={displayItem} logs={itemLogs} onGoToWarehouse={onGoToWarehouse} />
+            </DesktopRightPanel>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -50,7 +50,7 @@ export function useWarehouseFilters({
 
   useEffect(() => {
     setDisplayLimit(PAGE_SIZE);
-  }, [filteredItems]);
+  }, [dept, modelFilter, categoryFilter, localSearch, globalSearch]);
 
   const filteredPackages = useMemo(
     () =>

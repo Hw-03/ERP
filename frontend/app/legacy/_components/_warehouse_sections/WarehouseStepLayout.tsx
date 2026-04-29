@@ -1,9 +1,8 @@
 "use client";
 
 import type { Dispatch, RefObject, SetStateAction } from "react";
-import type { Department, Employee, Item, ProductModel, ShipPackage } from "@/lib/api";
+import type { Department, Item, ProductModel, ShipPackage } from "@/lib/api";
 import {
-  EmployeeStep,
   ExecuteStep,
   ItemPickStep,
   QuantityStep,
@@ -62,30 +61,18 @@ type Props = {
   filter: FilterLike;
 
   refs: {
-    step1Ref: RefObject<HTMLDivElement>;
     step2Ref: RefObject<HTMLDivElement>;
     step3Ref: RefObject<HTMLDivElement>;
     step4Ref: RefObject<HTMLDivElement>;
   };
 
-  step1Done: boolean;
-
-  // step1
-  step1Summary: string;
-  employees: Employee[];
-  employeeId: string;
-  onSelectEmployee: (id: string) => void;
-  employeeExpanded: boolean;
-  setEmployeeExpanded: Dispatch<SetStateAction<boolean>>;
-  onEditStep1: () => void;
-
-  // step2
+  // step1 (작업 유형)
   step2Summary: string;
   step2Accent: string;
   onChangeWorkType: (wt: WorkType) => void;
   onEditStep2: () => void;
 
-  // step3 (selection / data)
+  // step2 (품목 선택)
   itemsSummary: string;
   selectedItems: Map<string, number>;
   selectedPackage: ShipPackage | null;
@@ -95,7 +82,7 @@ type Props = {
   pendingScrollId: string | null;
   onScrolled: () => void;
 
-  // step4
+  // step3 (수량 · 메모)
   accent: string;
   selectedEntries: { item: Item; quantity: number }[];
   isOutbound: boolean;
@@ -106,7 +93,7 @@ type Props = {
   setNotes: Dispatch<SetStateAction<string>>;
   totalQty: number;
 
-  // step5
+  // step4 (실행)
   shortLabel: string;
   canExecute: boolean;
   isCaution: boolean;
@@ -115,18 +102,26 @@ type Props = {
   onSubmit: () => void;
 };
 
+function AnimatedReveal({ show, children }: { show: boolean; children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateRows: show ? "1fr" : "0fr",
+        transition: "grid-template-rows 320ms ease",
+      }}
+    >
+      <div style={{ overflow: "hidden" }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function WarehouseStepLayout({
   wizard: w,
   filter: f,
   refs,
-  step1Done,
-  step1Summary,
-  employees,
-  employeeId,
-  onSelectEmployee,
-  employeeExpanded,
-  setEmployeeExpanded,
-  onEditStep1,
   step2Summary,
   step2Accent,
   onChangeWorkType,
@@ -157,61 +152,40 @@ export function WarehouseStepLayout({
 }: Props) {
   return (
     <>
-      {/* 1단계: 담당자 */}
-      <div ref={refs.step1Ref} style={{ scrollMarginTop: 56 }}>
+      {/* 1단계: 작업 유형 */}
+      <div ref={refs.step2Ref} style={{ scrollMarginTop: 56 }}>
         <WizardStepCard
           n={1}
-          title={w.step1State === "active" ? "담당자를 선택하세요" : "담당자"}
-          state={w.step1State}
-          summary={step1Summary}
-          onChange={w.step1State === "complete" ? onEditStep1 : undefined}
+          title={w.step2State === "active" ? "작업 유형을 선택하세요" : "작업 유형"}
+          state={w.step2State}
+          summary={step2Summary}
+          onChange={w.step2State === "complete" ? onEditStep2 : undefined}
+          accent={step2Accent}
         >
-          <EmployeeStep
-            employees={employees}
-            selectedId={employeeId}
-            onSelect={onSelectEmployee}
-            expanded={employeeExpanded}
-            setExpanded={setEmployeeExpanded}
+          <WorkTypeStep
+            workType={w.workType}
+            onWorkTypeChange={onChangeWorkType}
+            rawDirection={w.rawDirection}
+            setRawDirection={w.changeRawDir}
+            warehouseDirection={w.warehouseDirection}
+            setWarehouseDirection={w.changeWarehouseDir}
+            deptDirection={w.deptDirection}
+            setDeptDirection={w.changeDeptDir}
+            selectedDept={w.selectedDept}
+            setSelectedDept={w.changeSelectedDept}
+            defectiveSource={w.defectiveSource}
+            setDefectiveSource={w.changeDefectiveSource}
+            ready={w.step2Ready}
+            onConfirm={w.confirmStep2}
           />
         </WizardStepCard>
       </div>
 
-      {/* 2단계: 작업 유형 */}
-      {step1Done && (
-        <div ref={refs.step2Ref} style={{ scrollMarginTop: 56 }}>
+      {/* 2단계: 품목 선택 */}
+      <AnimatedReveal show={w.showStep3}>
+        <div ref={refs.step3Ref} style={{ scrollMarginTop: 56, paddingBottom: 4 }}>
           <WizardStepCard
             n={2}
-            title={w.step2State === "active" ? "작업 유형을 선택하세요" : "작업 유형"}
-            state={w.step2State}
-            summary={step2Summary}
-            onChange={w.step2State === "complete" ? onEditStep2 : undefined}
-            accent={step2Accent}
-          >
-            <WorkTypeStep
-              workType={w.workType}
-              onWorkTypeChange={onChangeWorkType}
-              rawDirection={w.rawDirection}
-              setRawDirection={w.changeRawDir}
-              warehouseDirection={w.warehouseDirection}
-              setWarehouseDirection={w.changeWarehouseDir}
-              deptDirection={w.deptDirection}
-              setDeptDirection={w.changeDeptDir}
-              selectedDept={w.selectedDept}
-              setSelectedDept={w.changeSelectedDept}
-              defectiveSource={w.defectiveSource}
-              setDefectiveSource={w.changeDefectiveSource}
-              ready={w.step2Ready}
-              onConfirm={w.confirmStep2}
-            />
-          </WizardStepCard>
-        </div>
-      )}
-
-      {/* 3단계: 품목 선택 */}
-      {w.showStep3 && (
-        <div ref={refs.step3Ref} style={{ scrollMarginTop: 56 }}>
-          <WizardStepCard
-            n={3}
             title={w.hasItems ? `품목 ${itemsSummary}` : "품목을 선택하세요"}
             state="active"
           >
@@ -242,12 +216,12 @@ export function WarehouseStepLayout({
             />
           </WizardStepCard>
         </div>
-      )}
+      </AnimatedReveal>
 
-      {/* 4단계: 수량 · 메모 */}
-      {w.showStep4 && (
-        <div ref={refs.step4Ref} style={{ scrollMarginTop: 56 }}>
-          <WizardStepCard n={4} title="수량 · 메모" state="active" accent={accent}>
+      {/* 3단계: 수량 · 메모 */}
+      <AnimatedReveal show={w.showStep4}>
+        <div ref={refs.step4Ref} style={{ scrollMarginTop: 56, paddingBottom: 4 }}>
+          <WizardStepCard n={3} title="수량 · 메모" state="active" accent={accent}>
             <QuantityStep
               workType={w.workType}
               selectedEntries={selectedEntries}
@@ -262,24 +236,26 @@ export function WarehouseStepLayout({
             />
           </WizardStepCard>
         </div>
-      )}
+      </AnimatedReveal>
 
-      {/* 5단계: 실행 */}
-      {w.showStep5 && (
-        <WizardStepCard n={5} title="실행" state="active" accent={accent}>
-          <ExecuteStep
-            shortLabel={shortLabel}
-            workType={w.workType}
-            selectedEntries={selectedEntries}
-            canExecute={canExecute}
-            isCaution={isCaution}
-            accent={accent}
-            blockerText={blockerText}
-            submitting={submitting}
-            onSubmit={onSubmit}
-          />
-        </WizardStepCard>
-      )}
+      {/* 4단계: 실행 */}
+      <AnimatedReveal show={w.showStep5}>
+        <div style={{ paddingBottom: 4 }}>
+          <WizardStepCard n={4} title="실행" state="active" accent={accent}>
+            <ExecuteStep
+              shortLabel={shortLabel}
+              workType={w.workType}
+              selectedEntries={selectedEntries}
+              canExecute={canExecute}
+              isCaution={isCaution}
+              accent={accent}
+              blockerText={blockerText}
+              submitting={submitting}
+              onSubmit={onSubmit}
+            />
+          </WizardStepCard>
+        </div>
+      </AnimatedReveal>
     </>
   );
 }

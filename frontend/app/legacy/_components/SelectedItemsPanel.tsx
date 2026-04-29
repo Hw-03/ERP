@@ -1,6 +1,6 @@
 "use client";
 
-import { GripVertical, X } from "lucide-react";
+import { X } from "lucide-react";
 import { type Item } from "@/lib/api";
 import { LEGACY_COLORS, erpCodeDeptBadge, formatNumber, getStockState } from "./legacyUi";
 
@@ -31,7 +31,7 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
         return (
           <div
             key={item.item_id}
-            className="grid grid-cols-[16px_minmax(0,2fr)_minmax(70px,auto)_auto_minmax(72px,auto)_minmax(72px,auto)_32px] items-center gap-3 px-4 py-3"
+            className="grid grid-cols-[minmax(0,2fr)_minmax(70px,auto)_auto_minmax(72px,auto)_minmax(72px,auto)_32px] items-center gap-3 px-4 py-3"
             style={{
               borderBottom: `1px solid ${LEGACY_COLORS.border}`,
               background: isShortage
@@ -39,9 +39,6 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
                 : "transparent",
             }}
           >
-            {/* 그립 */}
-            <GripVertical className="h-4 w-4" style={{ color: LEGACY_COLORS.muted2 }} />
-
             {/* 품목명 + 품목 코드 */}
             <div className="min-w-0">
               <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>

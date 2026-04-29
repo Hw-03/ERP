@@ -37,10 +37,10 @@ export function DesktopLegacyShell() {
   const [statusNonce, setStatusNonce] = useState(0);
   const [refreshNonce, setRefreshNonce] = useState(0);
 
-  function handleStatusChange(msg: string) {
+  const handleStatusChange = useCallback((msg: string) => {
     setStatus(msg);
     setStatusNonce((n) => n + 1);
-  }
+  }, []);
 
   function handleTabChange(tab: DesktopTabId) {
     setActiveTab(tab);
