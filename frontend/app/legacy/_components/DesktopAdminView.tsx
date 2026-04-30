@@ -1,7 +1,7 @@
 "use client";
 
 import type { ElementType } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Building2,
@@ -41,7 +41,6 @@ import { AdminExportSection } from "./_admin_sections/AdminExportSection";
 import { AdminDangerZone } from "./_admin_sections/AdminDangerZone";
 import { AdminDepartmentsProvider } from "./_admin_sections/AdminDepartmentsContext";
 import { AdminDepartmentsSection } from "./_admin_sections/AdminDepartmentsSection";
-import { COLOR_PALETTE } from "./_admin_hooks/useAdminDepartments";
 import { EMPTY_ADD_FORM, EMPTY_EMPLOYEE_FORM } from "./_admin_sections/adminShared";
 
 type AdminSection = "items" | "employees" | "models" | "bom" | "packages" | "export" | "settings" | "departments";
@@ -124,11 +123,19 @@ function DeptManagementPanel({
   onStatusChange: (msg: string) => void;
   onError: (msg: string) => void;
 }) {
-  const color = dept.color_hex ?? employeeColor(dept.name);
+  const savedColor = dept.color_hex ?? employeeColor(dept.name);
+  const colorInputRef = useRef<HTMLInputElement>(null);
+  const [localColor, setLocalColor] = useState(savedColor);
 
-  function updateColor(hex: string) {
+  useEffect(() => {
+    setLocalColor(dept.color_hex ?? employeeColor(dept.name));
+  }, [dept.id, dept.color_hex]);
+
+  const colorChanged = localColor.toLowerCase() !== savedColor.toLowerCase();
+
+  function applyColor() {
     void api
-      .updateDepartment(dept.id, { color_hex: hex, pin: adminPin })
+      .updateDepartment(dept.id, { color_hex: localColor, pin: adminPin })
       .then((updated) => {
         setDepartments((prev) => prev.map((d) => (d.id === dept.id ? updated : d)));
         setSelectedDept(updated);
@@ -170,7 +177,7 @@ function DeptManagementPanel({
       >
         <div
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base font-black text-white"
-          style={{ background: color }}
+          style={{ background: localColor }}
         >
           {dept.name.slice(0, 1)}
         </div>
@@ -190,32 +197,57 @@ function DeptManagementPanel({
         </div>
       </div>
 
-      {/* 색상 팔레트 */}
+      {/* 색상 */}
       <div
         className="rounded-[20px] border p-4"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
-        <div className="mb-2 text-xs font-bold uppercase tracking-[0.16em]" style={{ color: LEGACY_COLORS.muted2 }}>
+        <div className="mb-3 text-xs font-bold uppercase tracking-[0.16em]" style={{ color: LEGACY_COLORS.muted2 }}>
           색상
         </div>
-        <div className="grid grid-cols-6 gap-2">
-          {COLOR_PALETTE.map((hex) => {
-            const active = (dept.color_hex ?? "").toLowerCase() === hex.toLowerCase();
-            return (
-              <button
-                key={hex}
-                onClick={() => updateColor(hex)}
-                className="relative flex h-8 w-8 items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
-                style={{ background: hex, boxShadow: active ? `0 0 0 2px white, 0 0 0 4px ${hex}` : undefined }}
-                title={hex}
-              >
-                {active && (
-                  <span className="text-white text-xs font-black">✓</span>
-                )}
-              </button>
-            );
-          })}
+        <div className="mb-3 flex items-center gap-3">
+          <div
+            className="h-9 w-9 shrink-0 rounded-full border-2"
+            style={{ background: savedColor, borderColor: LEGACY_COLORS.border }}
+            title="현재 적용된 색상"
+          />
+          {colorChanged && (
+            <>
+              <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>→</span>
+              <div
+                className="h-9 w-9 shrink-0 rounded-full border-2"
+                style={{ background: localColor, borderColor: LEGACY_COLORS.border }}
+                title="선택한 색상"
+              />
+            </>
+          )}
+          <span className="ml-auto font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+            {colorChanged ? localColor : savedColor}
+          </span>
         </div>
+        <button
+          onClick={() => colorInputRef.current?.click()}
+          className="w-full flex items-center justify-center gap-2 rounded-[12px] py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 active:opacity-75"
+          style={{ background: localColor }}
+        >
+          색상 선택
+        </button>
+        <input
+          ref={colorInputRef}
+          type="color"
+          value={localColor}
+          onChange={(e) => setLocalColor(e.target.value)}
+          className="sr-only"
+        />
+        {colorChanged && (
+          <button
+            onClick={applyColor}
+            className="mt-2 w-full rounded-[12px] py-2.5 text-sm font-semibold text-white"
+            style={{ background: LEGACY_COLORS.blue }}
+          >
+            적용
+          </button>
+        )}
       </div>
 
       {/* 액션 버튼 */}
