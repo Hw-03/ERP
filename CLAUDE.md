@@ -3,6 +3,14 @@
 ## Goal
 MES 프로토타입 — 자재·재고·입출고·창고 승인·부서 재고·BOM·생산 실행 흐름 관리 시스템.
 
+## System Name
+- 시스템 공식 명칭: **DEXCOWIN MES** (ERP 아님, X-Ray 아님)
+- 화면 표기·문서 작성 시 ERP → MES 통일
+
+## Reporting
+- 주간보고: `docs/주간보고.md` — 제목 날짜 범위, 진행 사항, 추후 예정 교체
+- 개발현황 엑셀 재생성: `python scripts/dev/generate_devlog.py` → `data/개발현황.xlsx`
+
 ## Paths
 - backend: `backend/`
 - frontend: `frontend/`
