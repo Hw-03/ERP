@@ -1,6 +1,7 @@
 "use client";
 
-import { X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Search, X } from "lucide-react";
 import type { EmployeeLevel, WarehouseRole } from "@/lib/api";
 import { LEGACY_COLORS, normalizeDepartment } from "../legacyUi";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "./adminShared";
@@ -50,6 +51,18 @@ export function AdminEmployeesSection() {
     confirmDelete,
     cancelDelete,
   } = ctx;
+  const [search, setSearch] = useState("");
+  const filteredEmployees = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return employees;
+    return employees.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        e.employee_code.toLowerCase().includes(q) ||
+        normalizeDepartment(e.department).toLowerCase().includes(q) ||
+        (e.role ?? "").toLowerCase().includes(q),
+    );
+  }, [employees, search]);
   return (
     <>
     <div className="grid h-full gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -76,6 +89,30 @@ export function AdminEmployeesSection() {
               </span>명
             </span>
           </div>
+          <div
+            className="mb-3 flex items-center gap-2 rounded-[12px] border px-3 py-2"
+            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+          >
+            <Search className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="이름·코드·부서·역할 검색"
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+              style={{ color: LEGACY_COLORS.text }}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="flex h-5 w-5 items-center justify-center rounded-full hover:bg-white/10"
+                style={{ color: LEGACY_COLORS.muted2 }}
+                aria-label="검색 초기화"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
           <button
             onClick={() => {
               setEmpAddMode(true);
@@ -88,7 +125,12 @@ export function AdminEmployeesSection() {
           </button>
         </div>
         <div className="overflow-y-auto">
-          {employees.map((employee, index) => (
+          {filteredEmployees.length === 0 && (
+            <div className="px-4 py-8 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+              {search ? "검색 결과가 없습니다." : "직원이 없습니다."}
+            </div>
+          )}
+          {filteredEmployees.map((employee, index) => (
             <button
               key={employee.employee_id}
               onClick={() => {
@@ -97,7 +139,7 @@ export function AdminEmployeesSection() {
               }}
               className="flex w-full items-center justify-between px-4 py-4 text-left transition-colors hover:bg-white/[0.12]"
               style={{
-                borderBottom: index === employees.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
+                borderBottom: index === filteredEmployees.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
                 background:
                   selectedEmployee?.employee_id === employee.employee_id
                     ? `color-mix(in srgb, ${LEGACY_COLORS.purple} 10%, transparent)`

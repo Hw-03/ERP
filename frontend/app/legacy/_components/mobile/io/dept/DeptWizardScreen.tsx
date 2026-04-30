@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, X } from "lucide-react";
 import { api, type Item } from "@/lib/api";
-import { LEGACY_COLORS, employeeColor } from "../../../legacyUi";
+import { LEGACY_COLORS } from "../../../legacyUi";
+import { useDeptColor } from "../../../DepartmentsContext";
 import type { ToastState } from "../../../Toast";
 import { IconButton, WizardHeader, type SummaryChip } from "../../primitives";
 import { useEmployees } from "../../hooks/useEmployees";
@@ -27,6 +28,7 @@ export function DeptWizardScreen({ showToast }: { showToast: (toast: ToastState)
   const [itemsLoading, setItemsLoading] = useState(true);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const operator = useCurrentOperator();
+  const deptColor = useDeptColor(state.department);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,7 +65,7 @@ export function DeptWizardScreen({ showToast }: { showToast: (toast: ToastState)
       out.push({
         key: "dept",
         label: state.department,
-        tone: employeeColor(state.department),
+        tone: deptColor,
         onClick: state.step > 0 ? () => dispatch({ type: "GO", step: 0 }) : undefined,
       });
     }

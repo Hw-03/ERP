@@ -11,6 +11,7 @@ import {
   transactionColor,
   transactionLabel,
 } from "./legacyUi";
+import { useDeptColorLookup } from "./DepartmentsContext";
 
 type ActionMode = "ADJUST" | "RECEIVE" | "SHIP";
 
@@ -29,6 +30,7 @@ export function ItemDetailSheet({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<TransactionLog[]>([]);
+  const getDeptColor = useDeptColorLookup();
 
   useEffect(() => {
     if (!item) return;
@@ -45,7 +47,7 @@ export function ItemDetailSheet({
     item.available_quantity ?? Number(item.quantity) - Number(item.pending_quantity ?? 0),
   );
   const stockState = getStockState(availableQty, item.min_stock == null ? null : Number(item.min_stock));
-  const deptBadge = erpCodeDeptBadge(item.erp_code);
+  const deptBadge = erpCodeDeptBadge(item.erp_code, getDeptColor);
 
   const bump = (delta: number) => {
     const minimum = mode === "ADJUST" ? 0 : 1;

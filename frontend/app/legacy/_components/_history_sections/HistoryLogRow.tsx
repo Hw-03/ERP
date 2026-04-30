@@ -18,12 +18,12 @@ import {
 import type { TransactionLog } from "@/lib/api";
 import {
   LEGACY_COLORS,
-  employeeColor,
   formatNumber,
   transactionColor,
   transactionIconName,
   transactionLabel,
 } from "../legacyUi";
+import { useDeptColor } from "../DepartmentsContext";
 import { PROCESS_TYPE_META, formatHistoryDate, rowTint } from "./historyShared";
 
 const TX_ICON = {
@@ -58,11 +58,12 @@ function HistoryLogRowImpl({ log, selected, copiedRef, onSelect, onCopyRef }: Pr
   };
 
   // 담당자 파싱
+  const producedDept = log.produced_by ? log.produced_by.match(/\(([^)]+)\)/)?.[1] ?? "" : "";
+  const deptColor = useDeptColor(producedDept || undefined);
   let producer: { name: string; color: string } | null = null;
   if (log.produced_by) {
     const name = log.produced_by.split("(")[0]?.trim() ?? "-";
-    const dept = log.produced_by.match(/\(([^)]+)\)/)?.[1] ?? "";
-    producer = { name, color: dept ? employeeColor(dept) : LEGACY_COLORS.muted2 };
+    producer = { name, color: producedDept ? deptColor : LEGACY_COLORS.muted2 };
   }
 
   // 5.5-G: keyboard nav 추가

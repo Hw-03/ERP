@@ -36,7 +36,10 @@ sys.path.insert(0, str(BACKEND_DIR))
 os.environ.setdefault("DATABASE_URL", f"sqlite:///{SQLITE_PATH.as_posix()}")
 
 from app.database import Base, SessionLocal, engine  # noqa: E402
-from app.models import Inventory, Item  # noqa: E402
+from app.models import Inventory, InventoryLocation, Item, LocationStatusEnum  # noqa: E402
+from app.services.inventory import PROCESS_TYPE_TO_DEPT  # noqa: E402
+
+_R_SERIES = {"TR", "HR", "VR", "NR", "AR", "PR"}
 
 
 # 양식과 1:1 매칭되는 헤더 (순서 무관, 헤더명으로 찾음)
@@ -172,16 +175,21 @@ def apply_rows(db, rows: list[dict], wipe: bool) -> dict:
     now = datetime.utcnow()
 
     if wipe:
+        deleted_loc = db.query(InventoryLocation).delete()
         deleted_inv = db.query(Inventory).delete()
         deleted_item = db.query(Item).delete()
         db.commit()
-        print(f"  [WIPE] 기존 Inventory {deleted_inv}건, Item {deleted_item}건 삭제")
+        print(f"  [WIPE] 기존 InventoryLocation {deleted_loc}건, Inventory {deleted_inv}건, Item {deleted_item}건 삭제")
 
     stats = Counter()
 
     for row in rows:
         existing = db.query(Item).filter(Item.item_code == row["품번"]).first()
         pt = row["공정코드"]
+
+        qty = row["현재수량"]
+        is_warehouse = (pt is None) or (pt in _R_SERIES)
+        dept = None if is_warehouse else PROCESS_TYPE_TO_DEPT.get(pt)
 
         if existing:
             existing.item_name = row["품목명"]
@@ -199,17 +207,26 @@ def apply_rows(db, rows: list[dict], wipe: bool) -> dict:
 
             inv = db.query(Inventory).filter(Inventory.item_id == existing.item_id).first()
             if inv:
-                inv.quantity = row["현재수량"]
-                inv.warehouse_qty = row["현재수량"]
+                inv.quantity = qty
+                inv.warehouse_qty = qty if is_warehouse else Decimal("0")
                 inv.location = row["부서"]
                 inv.updated_at = now
             else:
                 db.add(Inventory(
                     item_id=existing.item_id,
-                    quantity=row["현재수량"],
-                    warehouse_qty=row["현재수량"],
+                    quantity=qty,
+                    warehouse_qty=qty if is_warehouse else Decimal("0"),
                     location=row["부서"],
                     updated_at=now,
+                ))
+            # InventoryLocation 재동기화
+            db.query(InventoryLocation).filter(InventoryLocation.item_id == existing.item_id).delete()
+            if not is_warehouse and dept is not None and qty > 0:
+                db.add(InventoryLocation(
+                    item_id=existing.item_id,
+                    department=dept,
+                    status=LocationStatusEnum.PRODUCTION,
+                    quantity=qty,
                 ))
             stats["updated"] += 1
         else:
@@ -233,11 +250,18 @@ def apply_rows(db, rows: list[dict], wipe: bool) -> dict:
             db.flush()
             db.add(Inventory(
                 item_id=item.item_id,
-                quantity=row["현재수량"],
-                warehouse_qty=row["현재수량"],
+                quantity=qty,
+                warehouse_qty=qty if is_warehouse else Decimal("0"),
                 location=row["부서"],
                 updated_at=now,
             ))
+            if not is_warehouse and dept is not None and qty > 0:
+                db.add(InventoryLocation(
+                    item_id=item.item_id,
+                    department=dept,
+                    status=LocationStatusEnum.PRODUCTION,
+                    quantity=qty,
+                ))
             stats["inserted"] += 1
 
     db.commit()

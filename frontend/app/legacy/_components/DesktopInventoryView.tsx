@@ -1,9 +1,10 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { api, type DepartmentMaster, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
+import { api, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import { LEGACY_COLORS, erpCodeDept, getStockState } from "./legacyUi";
+import { useDepartments } from "./DepartmentsContext";
 import { InventoryKpiPanel, type KpiCard, type KpiFilter } from "./_inventory_sections/InventoryKpiPanel";
 import { InventoryCapacityPanel } from "./_inventory_sections/InventoryCapacityPanel";
 import {
@@ -74,7 +75,7 @@ export function DesktopInventoryView({
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [productModels, setProductModels] = useState<ProductModel[]>([]);
-  const [departments, setDepartments] = useState<DepartmentMaster[]>([]);
+  const departments = useDepartments();
   const [kpi, setKpi] = useState<KpiFilter>("ALL");
   const [localSearch, setLocalSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(DESKTOP_PAGE_SIZE);
@@ -114,7 +115,6 @@ export function DesktopInventoryView({
 
   useEffect(() => {
     void api.getModels().then(setProductModels).catch(() => {});
-    void api.getDepartments({ isActive: true }).then(setDepartments).catch(() => {});
   }, []);
 
   useEffect(() => {

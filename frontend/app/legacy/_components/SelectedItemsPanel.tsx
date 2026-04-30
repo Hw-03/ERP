@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import { type Item } from "@/lib/api";
 import { LEGACY_COLORS, erpCodeDeptBadge, formatNumber, getStockState } from "./legacyUi";
+import { useDeptColorLookup } from "./DepartmentsContext";
 
 export type SelectedEntry = { item: Item; quantity: number };
 
@@ -14,13 +15,14 @@ interface Props {
 }
 
 export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoing = false }: Props) {
+  const getDeptColor = useDeptColorLookup();
   if (entries.length === 0) return null;
 
   return (
     <div>
       {entries.map(({ item, quantity }) => {
         const stock = getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock));
-        const deptBadge = erpCodeDeptBadge(item.erp_code);
+        const deptBadge = erpCodeDeptBadge(item.erp_code, getDeptColor);
         const expected = outgoing
           ? Number(item.quantity) - quantity
           : Number(item.quantity) + quantity;

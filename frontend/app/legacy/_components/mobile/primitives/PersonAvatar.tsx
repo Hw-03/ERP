@@ -1,7 +1,8 @@
 "use client";
 
 import clsx from "clsx";
-import { employeeColor, firstEmployeeLetter, LEGACY_COLORS } from "../../legacyUi";
+import { firstEmployeeLetter, LEGACY_COLORS } from "../../legacyUi";
+import { useDeptColor } from "../../DepartmentsContext";
 import { TYPO } from "../tokens";
 
 type Size = "sm" | "md" | "lg";
@@ -28,7 +29,7 @@ export function PersonAvatar({
   showLabel?: boolean;
   className?: string;
 }) {
-  const color = employeeColor(department);
+  const color = useDeptColor(department);
   const { box, text } = SIZE[size];
 
   return (

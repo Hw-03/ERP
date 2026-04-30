@@ -5,11 +5,11 @@ import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import type { Item } from "@/lib/api";
 import {
   LEGACY_COLORS,
-  employeeColor,
   erpCodeDept,
   formatNumber,
   getStockState,
 } from "../legacyUi";
+import { useDeptColorLookup } from "../DepartmentsContext";
 
 function safeQty(item: Item) {
   const n = Number(item.quantity);
@@ -27,6 +27,7 @@ type Props = {
 };
 
 function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
+  const getDeptColor = useDeptColorLookup();
   const minStock = getMinStock(item);
   const stock = getStockState(safeQty(item), minStock === 0 ? null : minStock);
   const qty = safeQty(item);
@@ -48,7 +49,7 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
     if (pct <= 0) break;
     segments.push({
       pct,
-      color: employeeColor(loc.department),
+      color: getDeptColor(loc.department),
       label: `${loc.department} ${formatNumber(loc.quantity)}`,
     });
     used += pct;
@@ -58,10 +59,10 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
   const badges: { key: string; label: string; color: string; dim?: boolean }[] = [];
   if (Number(item.warehouse_qty) > 0) badges.push({ key: "창고", label: "창고", color: "#3dd4a0" });
   for (const l of item.locations.filter((l) => Number(l.quantity) > 0))
-    badges.push({ key: l.department, label: l.department, color: employeeColor(l.department) });
+    badges.push({ key: l.department, label: l.department, color: getDeptColor(l.department) });
   if (badges.length === 0) {
     const dept = item.department ?? erpCodeDept(item.erp_code);
-    if (dept) badges.push({ key: dept, label: dept, color: employeeColor(dept), dim: true });
+    if (dept) badges.push({ key: dept, label: dept, color: getDeptColor(dept), dim: true });
   }
   const visibleBadges = badges.slice(0, 2);
   const extraBadges = badges.length - 2;

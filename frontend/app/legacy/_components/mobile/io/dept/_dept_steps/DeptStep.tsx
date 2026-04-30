@@ -1,19 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api, type DepartmentMaster } from "@/lib/api";
-import { LEGACY_COLORS, employeeColor } from "../../../../legacyUi";
+import { LEGACY_COLORS } from "../../../../legacyUi";
+import { useDepartments, useDeptColorLookup } from "../../../../DepartmentsContext";
 import { TYPO } from "../../../tokens";
 import { useDeptWizard } from "../context";
 import { StepHeading } from "./_shared";
 
 export function StepDepartment() {
   const { state, dispatch } = useDeptWizard();
-  const [departments, setDepartments] = useState<DepartmentMaster[]>([]);
-
-  useEffect(() => {
-    void api.getDepartments({ isActive: true }).then(setDepartments).catch(() => {});
-  }, []);
+  const departments = useDepartments();
+  const getDeptColor = useDeptColorLookup();
 
   return (
     <div className="flex flex-col gap-3 px-4 pb-6 pt-4">
@@ -24,7 +20,7 @@ export function StepDepartment() {
       <div className="grid grid-cols-2 gap-2">
         {departments.map((dept) => {
           const active = state.department === dept.name;
-          const color = dept.color_hex ?? employeeColor(dept.name);
+          const color = getDeptColor(dept.name);
           return (
             <button
               key={dept.id}

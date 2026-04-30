@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api, type DepartmentMaster, type Employee } from "@/lib/api";
+import { useEffect, useMemo, useState } from "react";
+import { api, type Employee } from "@/lib/api";
 import { BottomSheet } from "../../../BottomSheet";
 import type { ToastState } from "../../../Toast";
 import { LEGACY_COLORS, normalizeDepartment } from "../../../legacyUi";
+import { useDepartments } from "../../../DepartmentsContext";
 
 export function AdminEmployeesSection({ showToast }: { showToast: (toast: ToastState) => void }) {
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [departments, setDepartments] = useState<DepartmentMaster[]>([]);
+  const departments = useDepartments();
   const [addOpen, setAddOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const [form, setForm] = useState({
     employee_code: "",
     name: "",
@@ -20,8 +22,24 @@ export function AdminEmployeesSection({ showToast }: { showToast: (toast: ToastS
 
   useEffect(() => {
     void api.getEmployees({ activeOnly: false }).then(setEmployees);
-    void api.getDepartments({ isActive: true }).then(setDepartments);
   }, []);
+
+  const sortedEmployees = useMemo(
+    () => employees.slice().sort((a, b) => a.display_order - b.display_order),
+    [employees],
+  );
+
+  const filteredEmployees = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return sortedEmployees;
+    return sortedEmployees.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        e.employee_code.toLowerCase().includes(q) ||
+        normalizeDepartment(e.department).toLowerCase().includes(q) ||
+        (e.role ?? "").toLowerCase().includes(q),
+    );
+  }, [sortedEmployees, search]);
 
   async function addEmployee() {
     try {
@@ -62,6 +80,14 @@ export function AdminEmployeesSection({ showToast }: { showToast: (toast: ToastS
 
   return (
     <>
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="이름·코드·부서·역할 검색"
+        className="mb-3 w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+      />
       <button
         onClick={() => setAddOpen(true)}
         className="mb-3 w-full rounded-xl border border-dashed py-[13px] text-sm font-bold"
@@ -70,9 +96,12 @@ export function AdminEmployeesSection({ showToast }: { showToast: (toast: ToastS
         + 직원 추가
       </button>
       <div className="overflow-hidden rounded-[14px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-        {employees
-          .slice()
-          .sort((a, b) => a.display_order - b.display_order)
+        {filteredEmployees.length === 0 ? (
+          <div className="px-[14px] py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+            {search ? "검색 결과가 없습니다." : "직원이 없습니다."}
+          </div>
+        ) : null}
+        {filteredEmployees
           .map((employee, index, list) => (
             <div key={employee.employee_id} className="flex items-center gap-3 px-[14px] py-3" style={{ borderBottom: index === list.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}` }}>
               <div className="flex flex-col gap-0.5">

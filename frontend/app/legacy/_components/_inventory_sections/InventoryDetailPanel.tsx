@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import { api, type Item, type StockRequestReservationLine, type TransactionLog } from "@/lib/api";
 import {
   LEGACY_COLORS,
-  employeeColor,
   formatNumber,
   normalizeDepartment,
   normalizeModel,
   transactionColor,
   transactionLabel,
 } from "../legacyUi";
+import { useDeptColorLookup } from "../DepartmentsContext";
 
 type Props = {
   item: Item;
@@ -19,6 +19,7 @@ type Props = {
 };
 
 export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
+  const getDeptColor = useDeptColorLookup();
   const [reservations, setReservations] = useState<StockRequestReservationLine[]>([]);
   const pendingQty = Number(item.pending_quantity) || 0;
   const availableQty = Number(item.available_quantity) || 0;
@@ -225,7 +226,7 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
                   className="flex items-center gap-3 rounded-[14px] border px-3 py-2.5"
                   style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
                 >
-                  <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: employeeColor(l.department) }} />
+                  <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: getDeptColor(l.department) }} />
                   <span className="flex-1 text-base font-semibold">{l.department}</span>
                   <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
                     {formatNumber(l.quantity)}

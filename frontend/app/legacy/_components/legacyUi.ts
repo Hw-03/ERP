@@ -196,10 +196,13 @@ export function erpCodeDept(erp_code?: string | null): string | null {
   return PROCESS_TO_DEPT[parts[1]] ?? null;
 }
 
-export function erpCodeDeptBadge(erp_code?: string | null): { label: string; color: string; bg: string } | null {
+export function erpCodeDeptBadge(
+  erp_code?: string | null,
+  getColor: (name?: string | null) => string = employeeColor,
+): { label: string; color: string; bg: string } | null {
   const dept = erpCodeDept(erp_code);
   if (!dept) return null;
-  const color = employeeColor(dept);
+  const color = getColor(dept);
   return { label: dept, color, bg: `color-mix(in srgb, ${color} 12%, transparent)` };
 }
 

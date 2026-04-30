@@ -3,10 +3,10 @@
 import type { Employee } from "@/lib/api";
 import {
   LEGACY_COLORS,
-  employeeColor,
   firstEmployeeLetter,
   normalizeDepartment,
 } from "../legacyUi";
+import { useDeptColorLookup } from "../DepartmentsContext";
 
 export function EmployeeStep({
   employees,
@@ -21,6 +21,7 @@ export function EmployeeStep({
   expanded: boolean;
   setExpanded: (e: boolean) => void;
 }) {
+  const getDeptColor = useDeptColorLookup();
   const visible = expanded ? employees : employees.slice(0, 10);
   const overflow = !expanded && employees.length > 10;
 
@@ -29,7 +30,7 @@ export function EmployeeStep({
       <div className="grid grid-cols-5 gap-2">
         {visible.map((emp) => {
           const active = emp.employee_id === selectedId;
-          const tone = employeeColor(emp.department);
+          const tone = getDeptColor(emp.department);
           return (
             <button
               key={emp.employee_id}

@@ -10,6 +10,7 @@ import {
   getStockState,
   LEGACY_COLORS,
 } from "../../legacyUi";
+import { useDeptColorLookup } from "../../DepartmentsContext";
 import { TYPO } from "../tokens";
 import { StatusBadge } from "./StatusBadge";
 
@@ -30,8 +31,9 @@ export function ItemRow({
   dense?: boolean;
   className?: string;
 }) {
+  const getDeptColor = useDeptColorLookup();
   const state = getStockState(Number(item.quantity), item.min_stock);
-  const deptBadge = erpCodeDeptBadge(item.erp_code);
+  const deptBadge = erpCodeDeptBadge(item.erp_code, getDeptColor);
   const erpCompact = formatErpCode(item.erp_code);
 
   return (

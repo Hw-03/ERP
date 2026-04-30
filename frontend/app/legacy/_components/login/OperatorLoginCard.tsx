@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Loader2, Search, UserCheck } from "lucide-react";
 import { api, type DepartmentMaster, type Employee } from "@/lib/api";
 import { setCurrentOperator } from "./useCurrentOperator";
-import { employeeColor } from "../legacyUi";
+import { useDepartments, useDeptColor, useDeptColorLookup } from "../DepartmentsContext";
 
 
 interface OperatorLoginCardProps {
@@ -21,7 +21,7 @@ type Step = "dept" | "select" | "pin";
 export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
   const [step, setStep] = useState<Step>("dept");
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [deptMasters, setDeptMasters] = useState<DepartmentMaster[]>([]);
+  const deptMasters = useDepartments();
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Employee | null>(null);
@@ -30,13 +30,10 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    void Promise.all([
-      api.getEmployees({ activeOnly: true }),
-      api.getDepartments({ isActive: true }),
-    ]).then(([emps, depts]) => {
-      setEmployees(emps);
-      setDeptMasters(depts);
-    }).catch(() => {});
+    void api
+      .getEmployees({ activeOnly: true })
+      .then((emps) => setEmployees(emps))
+      .catch(() => {});
   }, []);
 
   // 브라우저 뒤로가기/앞으로가기로 단계 이동 지원
@@ -163,7 +160,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
 /* ── 부서 버튼 ────────────────────────────────────────────────────────────── */
 
 function DeptButton({ dept, onSelect }: { dept: DepartmentMaster; onSelect: (name: string) => void }) {
-  const color = dept.color_hex ?? employeeColor(dept.name);
+  const color = useDeptColor(dept.name);
   return (
     <button
       onClick={() => onSelect(dept.name)}
@@ -237,6 +234,7 @@ function SelectStep({
   onSelect: (e: Employee) => void;
   onBack: () => void;
 }) {
+  const getDeptColor = useDeptColorLookup();
   return (
     <>
       <div className="mb-6">
@@ -282,7 +280,7 @@ function SelectStep({
         <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2">
           <div className="grid grid-cols-5 gap-4">
             {employees.map((emp) => {
-              const color = employeeColor(emp.department);
+              const color = getDeptColor(emp.department);
               return (
                 <button
                   key={emp.employee_id}
@@ -344,7 +342,7 @@ function PinStep({
   loading: boolean;
 }) {
   const canSubmit = pin.length > 0 && !loading;
-  const color = employeeColor(employee.department);
+  const color = useDeptColor(employee.department);
 
   return (
     <>

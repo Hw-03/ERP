@@ -36,11 +36,17 @@ from app.models import (
     Employee,
     EmployeeLevelEnum,
     Inventory,
+    InventoryLocation,
     Item,
+    LocationStatusEnum,
     ShipPackage,
     ShipPackageItem,
     TransactionLog,
 )
+from app.services.inventory import PROCESS_TYPE_TO_DEPT
+
+# R 시리즈(원자재)는 창고 보관. A/F 시리즈는 부서 InventoryLocation에 적재.
+_R_SERIES = {"TR", "HR", "VR", "NR", "AR", "PR"}
 
 
 # CSV `category_code` 컬럼 (RM/TA/.../FG/UK 11개)을 process_type_code 18개로 매핑.
@@ -295,15 +301,27 @@ def seed_from_legacy_html() -> None:
             db.add(item)
             db.flush()
 
+            legacy_pt = infer_legacy_process_type(file_type, part)
+            legacy_qty = quantity or Decimal("0")
+            legacy_is_warehouse = (legacy_pt is None) or (legacy_pt in _R_SERIES)
+            legacy_dept = None if legacy_is_warehouse else PROCESS_TYPE_TO_DEPT.get(legacy_pt)
+
             db.add(
                 Inventory(
                     item_id=item.item_id,
-                    quantity=quantity or Decimal("0"),
-                    warehouse_qty=quantity or Decimal("0"),
+                    quantity=legacy_qty,
+                    warehouse_qty=legacy_qty if legacy_is_warehouse else Decimal("0"),
                     location=part,
                     updated_at=now,
                 )
             )
+            if not legacy_is_warehouse and legacy_dept is not None and legacy_qty > 0:
+                db.add(InventoryLocation(
+                    item_id=item.item_id,
+                    department=legacy_dept,
+                    status=LocationStatusEnum.PRODUCTION,
+                    quantity=legacy_qty,
+                ))
 
         db.commit()
         print(f"Legacy HTML seed complete: {LEGACY_HTML_PATH}")
@@ -410,14 +428,25 @@ def seed() -> None:
             db.add(item)
             db.flush()
 
+            is_warehouse = (inferred_pt is None) or (inferred_pt in _R_SERIES)
+            dept = None if is_warehouse else PROCESS_TYPE_TO_DEPT.get(inferred_pt)
+
             inventory = Inventory(
                 item_id=item.item_id,
                 quantity=quantity,
-                warehouse_qty=quantity,
+                warehouse_qty=quantity if is_warehouse else Decimal("0"),
                 location=location,
                 updated_at=now,
             )
             db.add(inventory)
+            db.flush()
+            if not is_warehouse and dept is not None and quantity > 0:
+                db.add(InventoryLocation(
+                    item_id=item.item_id,
+                    department=dept,
+                    status=LocationStatusEnum.PRODUCTION,
+                    quantity=quantity,
+                ))
 
             inserted += 1
             if inferred_pt:

@@ -27,6 +27,7 @@ import {
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import { PinLock } from "./PinLock";
 import { LEGACY_COLORS, employeeColor, formatNumber } from "./legacyUi";
+import { useRefreshDepartments } from "./DepartmentsContext";
 import { AdminMasterItemsSection } from "./_admin_sections/AdminMasterItemsSection";
 import { AdminEmployeesSection } from "./_admin_sections/AdminEmployeesSection";
 import { AdminBomSection } from "./_admin_sections/AdminBomSection";
@@ -126,6 +127,7 @@ function DeptManagementPanel({
   const savedColor = dept.color_hex ?? employeeColor(dept.name);
   const colorInputRef = useRef<HTMLInputElement>(null);
   const [localColor, setLocalColor] = useState(savedColor);
+  const refreshDepartments = useRefreshDepartments();
 
   useEffect(() => {
     setLocalColor(dept.color_hex ?? employeeColor(dept.name));
@@ -139,6 +141,7 @@ function DeptManagementPanel({
       .then((updated) => {
         setDepartments((prev) => prev.map((d) => (d.id === dept.id ? updated : d)));
         setSelectedDept(updated);
+        void refreshDepartments();
       })
       .catch((err: unknown) => onError(err instanceof Error ? err.message : "색상 변경 실패"));
   }
@@ -152,6 +155,7 @@ function DeptManagementPanel({
         setDepartments((prev) => prev.map((d) => (d.id === dept.id ? updated : d)));
         setSelectedDept(updated);
         onStatusChange(`'${dept.name}' 부서를 ${next ? "활성화" : "비활성화"}했습니다.`);
+        void refreshDepartments();
       })
       .catch((err: unknown) => onError(err instanceof Error ? err.message : "상태 변경 실패"));
   }
@@ -164,6 +168,7 @@ function DeptManagementPanel({
         setDepartments((prev) => prev.filter((d) => d.id !== dept.id));
         setSelectedDept(null);
         onStatusChange(`'${dept.name}' 부서를 삭제했습니다.`);
+        void refreshDepartments();
       })
       .catch((err: unknown) => onError(err instanceof Error ? err.message : "삭제 실패"));
   }

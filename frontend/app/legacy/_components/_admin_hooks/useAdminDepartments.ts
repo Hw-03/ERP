@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { DepartmentMaster } from "@/lib/api";
 import { api } from "@/lib/api";
 import { employeeColor } from "../legacyUi";
+import { useRefreshDepartments } from "../DepartmentsContext";
 
 export const COLOR_PALETTE = [
   "#1d4ed8", "#c2410c", "#6d28d9", "#0e7490",
@@ -83,6 +84,7 @@ export function useAdminDepartments({
   adminPin,
 }: UseAdminDepartmentsArgs): AdminDepartmentsState {
   const [addName, setAddName] = useState("");
+  const refreshDepartments = useRefreshDepartments();
 
   function _addDepartment() {
     const name = addName.trim();
@@ -94,6 +96,7 @@ export function useAdminDepartments({
         setDepartments((prev) => [...prev, created]);
         setAddName("");
         onStatusChange(`'${created.name}' 부서를 추가했습니다.`);
+        void refreshDepartments();
       })
       .catch((err: unknown) => onError(err instanceof Error ? err.message : "부서 추가 실패"));
   }
@@ -108,6 +111,7 @@ export function useAdminDepartments({
         setDepartments((prev) => prev.map((d) => (d.id === id ? updated : d)));
         if (selectedDept?.id === id) setSelectedDept(updated);
         onStatusChange(`'${dept.name}' 부서를 비활성화했습니다.`);
+        void refreshDepartments();
       })
       .catch((err: unknown) => onError(err instanceof Error ? err.message : "비활성화 실패"));
   }
@@ -121,6 +125,7 @@ export function useAdminDepartments({
         setDepartments((prev) => prev.map((d) => (d.id === id ? updated : d)));
         if (selectedDept?.id === id) setSelectedDept(updated);
         onStatusChange(`'${dept.name}' 부서를 활성화했습니다.`);
+        void refreshDepartments();
       })
       .catch((err: unknown) => onError(err instanceof Error ? err.message : "활성화 실패"));
   }
@@ -135,6 +140,7 @@ export function useAdminDepartments({
         setDepartments((prev) => prev.filter((d) => d.id !== id));
         if (selectedDept?.id === id) setSelectedDept(null);
         onStatusChange(`'${dept.name}' 부서를 삭제했습니다.`);
+        void refreshDepartments();
       })
       .catch((err: unknown) => onError(err instanceof Error ? err.message : "삭제 실패"));
   }
@@ -153,6 +159,9 @@ export function useAdminDepartments({
     setDepartments(() => reindexed);
     void api
       .reorderDepartments({ items, pin: adminPin })
+      .then(() => {
+        void refreshDepartments();
+      })
       .catch((err: unknown) => onError(err instanceof Error ? err.message : "순서 저장 실패"));
   }
 
@@ -162,6 +171,7 @@ export function useAdminDepartments({
       .then((updated) => {
         setDepartments((prev) => prev.map((d) => (d.id === id ? updated : d)));
         if (selectedDept?.id === id) setSelectedDept(updated);
+        void refreshDepartments();
       })
       .catch((err: unknown) => onError(err instanceof Error ? err.message : "색상 변경 실패"));
   }
