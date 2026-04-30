@@ -32,6 +32,7 @@ from sqlalchemy import text
 
 from app.database import Base, SessionLocal, engine
 from app.models import (
+    Department,
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
@@ -42,7 +43,7 @@ from app.models import (
     ProductSymbol,
 )
 from app.services.pin_auth import DEFAULT_PIN_HASH
-from app.utils.erp_code import infer_process_type, infer_symbol_slot, make_erp_code
+from app.utils.erp_code import infer_symbol_slot, make_erp_code
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +103,8 @@ _MIGRATION_DDL: list[str] = [
     "ALTER TABLE employees ADD COLUMN warehouse_role VARCHAR(20) NOT NULL DEFAULT 'none'",
     # PIN 마지막 변경 일시 (NULL = 변경 이력 없음)
     "ALTER TABLE employees ADD COLUMN pin_last_changed DATETIME",
+    # 부서 대표 색깔 (HEX, NULL = 기본 purple)
+    "ALTER TABLE departments ADD COLUMN color_hex VARCHAR(7)",
 ]
 
 
@@ -121,18 +124,6 @@ def run_migrations() -> dict[str, int]:
                 applied += 1
             except Exception:
                 skipped += 1
-
-        # 기존 quantity → warehouse_qty 1회 이관 (warehouse_qty 가 0 인 행만)
-        try:
-            conn.execute(
-                text(
-                    "UPDATE inventory SET warehouse_qty = quantity "
-                    "WHERE warehouse_qty = 0 AND quantity > 0"
-                )
-            )
-            conn.commit()
-        except Exception:
-            pass
 
         # pending_quantity NULL 기본값 채우기
         try:
@@ -216,16 +207,23 @@ _OPTION_CODES: list[tuple] = [
 
 _PROCESS_TYPES: list[tuple] = [
     ("TR", "T", "R", 10, "튜브 원자재"),
-    ("TA", "T", "A", 20, "튜브 조립체"),
+    ("TA", "T", "A", 20, "튜브 중간공정"),
+    ("TF", "T", "F", 25, "튜브 공정완료"),
     ("HR", "H", "R", 15, "고압 원자재"),
-    ("HA", "H", "A", 30, "고압 조립체"),
+    ("HA", "H", "A", 30, "고압 중간공정"),
+    ("HF", "H", "F", 35, "고압 공정완료"),
     ("VR", "V", "R", 25, "진공 원자재"),
-    ("VA", "V", "A", 40, "진공 조립체"),
-    ("NA", "N", "A", 50, "튜닝 조립체 (출력값 최적화)"),
+    ("VA", "V", "A", 40, "진공 중간공정"),
+    ("VF", "V", "F", 45, "진공 공정완료"),
+    ("NR", "N", "R", 50, "튜닝 원자재"),
+    ("NA", "N", "A", 55, "튜닝 중간공정"),
+    ("NF", "N", "F", 60, "튜닝 공정완료"),
     ("AR", "A", "R", 45, "조립 원자재"),
-    ("AA", "A", "A", 60, "최종 조립체"),
-    ("PR", "P", "R", 55, "포장 원자재"),
-    ("PA", "P", "A", 70, "완제품 (최종 패키징)"),
+    ("AA", "A", "A", 65, "조립 중간공정"),
+    ("AF", "A", "F", 70, "조립 공정완료"),
+    ("PR", "P", "R", 55, "출하 원자재"),
+    ("PA", "P", "A", 75, "출하 중간공정"),
+    ("PF", "P", "F", 80, "출하 공정완료"),
 ]
 
 _PROCESS_FLOW_RULES: list[tuple] = [
@@ -240,9 +238,16 @@ _PROCESS_FLOW_RULES: list[tuple] = [
 
 def seed_reference_data() -> dict[str, int]:
     """참조 테이블이 비어 있을 때만 시드. idempotent."""
-    counts = {"employees": 0, "symbols": 0, "options": 0, "process_types": 0, "flow_rules": 0}
+    counts = {"departments": 0, "employees": 0, "symbols": 0, "options": 0, "process_types": 0, "flow_rules": 0}
     db = SessionLocal()
     try:
+        if db.query(Department).count() == 0:
+            _DEPT_SEED = ["조립", "고압", "진공", "튜닝", "튜브", "AS", "연구", "영업", "출하", "기타"]
+            for i, name in enumerate(_DEPT_SEED):
+                db.add(Department(name=name, display_order=i, is_active=True))
+                counts["departments"] += 1
+            db.commit()
+
         if db.query(Employee).count() == 0:
             for idx, (code, name, role, dept, level) in enumerate(_EMPLOYEE_SEED, start=1):
                 db.add(
@@ -329,7 +334,7 @@ def backfill_erp_codes() -> int:
 
         count = 0
         for item in targets:
-            pt = infer_process_type(item.category.value, item.legacy_part)
+            pt = item.process_type_code  # 공정코드는 18개 단일 기준 — 추론 없이 그대로 사용
             if pt is None:
                 continue
 
@@ -341,7 +346,6 @@ def backfill_erp_codes() -> int:
             serial_counter[key] = serial_counter.get(key, 0) + 1
             serial = serial_counter[key]
 
-            item.process_type_code = pt
             item.symbol_slot = slot
             item.serial_no = serial
             item.option_code = opt

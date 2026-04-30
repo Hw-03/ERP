@@ -692,13 +692,13 @@ def release_reservation(db: Session, request: StockRequest) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _bucket_label(bucket: RequestBucketEnum, dept: Optional[DepartmentEnum]) -> str:
+def _bucket_label(bucket: RequestBucketEnum, dept: Optional[str]) -> str:
     if bucket == RequestBucketEnum.WAREHOUSE:
         return "창고"
     if bucket == RequestBucketEnum.PRODUCTION:
-        return f"{dept.value} 생산" if dept else "생산"
+        return f"{dept} 생산" if dept else "생산"
     if bucket == RequestBucketEnum.DEFECTIVE:
-        return f"{dept.value} 불량" if dept else "불량"
+        return f"{dept} 불량" if dept else "불량"
     return "외부"
 
 

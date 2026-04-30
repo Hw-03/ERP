@@ -1,11 +1,10 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { api, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
+import { api, type DepartmentMaster, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import { LEGACY_COLORS, erpCodeDept, getStockState } from "./legacyUi";
 import { InventoryKpiPanel, type KpiCard, type KpiFilter } from "./_inventory_sections/InventoryKpiPanel";
-import { InventoryActionRequired } from "./_inventory_sections/InventoryActionRequired";
 import { InventoryCapacityPanel } from "./_inventory_sections/InventoryCapacityPanel";
 import {
   InventoryFilters,
@@ -75,6 +74,7 @@ export function DesktopInventoryView({
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [productModels, setProductModels] = useState<ProductModel[]>([]);
+  const [departments, setDepartments] = useState<DepartmentMaster[]>([]);
   const [kpi, setKpi] = useState<KpiFilter>("ALL");
   const [localSearch, setLocalSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(DESKTOP_PAGE_SIZE);
@@ -93,7 +93,6 @@ export function DesktopInventoryView({
         search: globalSearch.trim() || undefined,
       });
       setItems(nextItems);
-      onStatusChange(`재고 ${nextItems.length}건을 불러왔습니다.`);
       setSelectedItem((current) => (current ? nextItems.find((item) => item.item_id === current.item_id) ?? null : null));
     } catch (nextError) {
       const message = nextError instanceof Error ? nextError.message : "재고 데이터를 불러오지 못했습니다.";
@@ -115,6 +114,7 @@ export function DesktopInventoryView({
 
   useEffect(() => {
     void api.getModels().then(setProductModels).catch(() => {});
+    void api.getDepartments({ isActive: true }).then(setDepartments).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -132,6 +132,8 @@ export function DesktopInventoryView({
       .then(setItemLogs)
       .catch(() => setItemLogs([]));
   }, [selectedItem]);
+
+  const showUnclassified = selectedModels.includes("미분류");
 
   const selectedSlots = useMemo(
     () => new Set(productModels.filter((m) => selectedModels.includes(m.model_name ?? "")).map((m) => m.slot)),
@@ -152,10 +154,14 @@ export function DesktopInventoryView({
           );
           if (!inDept) return false;
         }
-        if (selectedSlots.size > 0 && !item.model_slots.some((s) => selectedSlots.has(s))) return false;
+        if (selectedSlots.size > 0 || showUnclassified) {
+          const matchesSlot = selectedSlots.size > 0 && item.model_slots.some((s) => selectedSlots.has(s));
+          const matchesUnclassified = showUnclassified && item.model_slots.length === 0;
+          if (!matchesSlot && !matchesUnclassified) return false;
+        }
         return true;
       }),
-    [items, deferredLocalSearch, selectedDepts, selectedSlots],
+    [items, deferredLocalSearch, selectedDepts, selectedSlots, showUnclassified],
   );
   const filteredItems = useMemo(() => scopedItems.filter((item) => matchesKpi(item, kpi)), [scopedItems, kpi]);
 
@@ -182,10 +188,10 @@ export function DesktopInventoryView({
   const kpiCards: KpiCard[] = [
     {
       label: "전체",
-      value: filteredItems.length,
+      value: items.length,
       hint: isFiltered
-        ? `필터 적용 중 · 전체 ${items.length}건 중 ${filteredItems.length}건 조회`
-        : "조회 기준 전체 품목",
+        ? `${filteredItems.length}건 조회 중 · 클릭하면 전체 초기화`
+        : "전체 품목",
       tone: LEGACY_COLORS.blue,
       key: "ALL",
     },
@@ -232,11 +238,13 @@ export function DesktopInventoryView({
         <div className="flex flex-col gap-3 pb-6">
           {/* ── 컴팩트 상단: KPI + 생산가능 + (접힘형) 필터 ── */}
           <section className="card" style={{ padding: "14px 16px" }}>
-            <InventoryKpiPanel cards={kpiCards} activeKey={kpi} onChange={setKpi} />
-            <InventoryActionRequired
-              lowCount={summary.lowCount}
-              zeroCount={summary.zeroCount}
-              onGoToWarehouseTab={onGoToWarehouseTab}
+            <InventoryKpiPanel
+              cards={kpiCards}
+              activeKey={kpi}
+              onChange={(key) => {
+                if (key === "ALL") resetAllFilters();
+                else setKpi(key);
+              }}
             />
             <InventoryCapacityPanel capacityData={capacityData} onClick={onCapacityClick} />
             <InventoryFilters
@@ -244,6 +252,7 @@ export function DesktopInventoryView({
               selectedDepts={selectedDepts}
               selectedModels={selectedModels}
               productModels={productModels}
+              departments={departments}
               toggleDept={toggleDept}
               toggleModel={toggleModel}
               onClearDepts={() => setSelectedDepts([])}
@@ -302,7 +311,7 @@ export function DesktopInventoryView({
           {displayItem && (
             <DesktopRightPanel
               title={displayItem.item_name}
-              subtitle={`${displayItem.erp_code} · ${displayItem.legacy_part ?? "-"}`}
+              subtitle={displayItem.legacy_part ? `${displayItem.erp_code} · ${displayItem.legacy_part}` : (displayItem.erp_code ?? undefined)}
               headerBadge={headerBadge}
             >
               <InventoryDetailPanel item={displayItem} logs={itemLogs} onGoToWarehouse={onGoToWarehouse} />

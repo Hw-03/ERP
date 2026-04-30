@@ -1,0 +1,4 @@
+﻿parent_erp_code,parent_item_name,parent_process_type,child_erp_code,child_item_name,child_process_type,quantity,unit,confirmed,notes
+3-NF-0001,"D3GR + D3CD (해외용) 60KV, 2mA",NF,6-NR-0001,A6CB,NR,1,EA,TRUE,샘플 관계
+3-NF-0001,"D3GR + D3CD (해외용) 60KV, 2mA",NF,3-VF-0001,발생부 고압B/D+튜브 최종 작업完 [DX3000],VF,1,EA,FALSE,
+3-NF-0001,"D3GR + D3CD (해외용) 60KV, 2mA",NF,34-HR-0001,캐논튜브 [ D-081B ] _ 60KV,HR,1,EA,FALSE,

@@ -4,7 +4,7 @@
 
 ## 현재 기준
 
-- 품목 총수: 971건
+- 품목 총수: 722건
 - 공정코드: 18개
   - `TR/TA/TF` -> 튜브
   - `HR/HA/HF` -> 고압
@@ -409,6 +409,58 @@ GPT 외부 리뷰가 운영 readiness 를 A → B+ 로 다운그레이드했다 
 - `useTransactions` vitest race 케이스
 - `_warehouse_steps/_atoms.tsx` 의 React style shorthand warning 정리
 - API 인증 (보안 C+ → B+, 별도 phase)
+
+## 2026-04-29 category 제거 + process_type_code 단일화 + DB 재구성
+
+### 배경
+
+`Item.category` (`CategoryEnum` 11개: RM/TA/TF/HA/HF/VA/VF/AA/AF/FG/UK)와 `Item.process_type_code` (18개) 두 컬럼이 공존하면서 NA/NF 코드가 UK로 손실되는 의미 왜곡이 있었다. 이를 `process_type_code` 18개 단일 기준으로 통일하고 DB를 정리본 기준으로 재구성했다.
+
+### Phase 1 — 백엔드 category 제거
+
+- `backend/app/models.py`: `CategoryEnum` 클래스 제거, `Item.category` 컬럼 제거
+- `backend/app/schemas.py`: `category` 필드 제거, `CategorySummary` → `ProcessTypeSummary`, `InventorySummary.categories` → `process_types`
+- `backend/app/routers/inventory/__init__.py`: `category` 필터 파라미터 → `process_type_code`
+- `backend/app/routers/bom.py`: `BOMTreeNode(category=...)` → `process_type_code`
+- `backend/app/utils/erp_code.py`: `_CATEGORY_TO_PROCESS` / `infer_process_type()` 제거
+- `backend/sync_excel_stock.py`: 카테고리 매핑 dict → process_type_code 18개 매핑
+- `backend/scripts/dev/import_real_inventory.py`: `CategoryEnum` → `VALID_PROCESS_TYPE_CODES`
+- `backend/tests/conftest.py`: `process_types` 18개 시드 추가 (FK 제약 해소)
+- 검증: `pytest` 92/92 green
+
+### Phase 2 — 프론트 category 제거
+
+- `frontend/lib/api.ts`: `Category` → `ProcessTypeCode` (18개), `CategorySummary` → `ProcessTypeSummary`, 모든 인터페이스의 `category` 필드 제거
+- `CATEGORY_META` (11개) → `PROCESS_TYPE_META` (18개, prefix 6개 기준 색상)
+- `CATEGORY_LABEL` → `PROCESS_TYPE_LABEL`
+- `CATEGORY_OPTIONS` → `PROCESS_TYPE_OPTIONS`
+- `EMPTY_ADD_FORM.category` → `process_type_code`
+- suffix 기반 필터 리팩터 (`?endsWith("R"|"A"|"F")`) — `SEMI_CATS`/`FIXED_CATS` 하드코딩 집합 제거
+- "FG" 완제품 필터 옵션 제거 (PA/PF로 대체)
+- 변경 파일 23개
+- 검증: `tsc --noEmit` 0 오류, `npm run lint` 0 warning
+
+### Phase 3 — DB 백업 + 재생성 + 정리본 적재
+
+- 백업: `backups/erp_before_inventory_reset_20260429T230721Z.db`
+- `bootstrap_db.py`: `_PROCESS_TYPES` 11→18개로 확장
+- DB 삭제 → `python bootstrap_db.py --schema --seed` (process_types 18개 포함)
+- 신규 스크립트: `scripts/dev/import_inventory_cleanup.py`
+- 적재 소스: `outputs/inventory_cleanup/생산부_재고_매칭작업_정리본.xlsx` (722행)
+- 검증 결과:
+  - `count(items) = 722` ✓
+  - `count(inventory) = 722` ✓
+  - `sum(quantity) = 108,924` ✓
+  - erp_code 중복 0 ✓
+  - FK check 0행 ✓
+  - `PRAGMA integrity_check` ok ✓
+  - process_type_code 18개 범위 내 ✓
+
+### 현재 기준 (갱신)
+
+- **품목 총수: 722건** (정리본 기준)
+- **분류 기준: `process_type_code` 18개 단일** — `category` 컬럼 코드·DB·UI 어디에도 없음
+- 재고 합계: 108,924
 
 ## 다음 우선순위
 

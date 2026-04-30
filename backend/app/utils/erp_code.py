@@ -3,36 +3,13 @@
 Format: {model_symbol}-{process_type}-{serial:04d}[-{option}]
 Example: 346-AR-0001, 3-PA-0001-BG, 34-TR-0023
 model_symbol = 각 제품 기호를 오름차순 정렬해 연결 (DX3000→"3", ADX4000W→"4", ADX6000→"6")
+
+품목 분류 단일 기준은 process_type_code 18개 (README/docs/ITEM_CODE_RULES.md).
+suffix 'F' = F타입(완성/출하성 — 창고 배치 불가).
 """
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-
-_CATEGORY_TO_PROCESS: dict[str, str | None] = {
-    "RM": None,   # legacy_part 보고 판단
-    "TA": "TA",
-    "TF": "TF",
-    "HA": "HA",
-    "HF": "HF",
-    "VA": "VA",
-    "VF": "VF",
-    "AA": "AA",
-    "AF": "AF",
-    "FG": "PA",
-    "UK": None,   # 미분류 → 스킵
-}
-
-# F타입 카테고리: 창고 배치 불가, 해당 부서에만 위치 가능
-F_TYPE_CATEGORIES = {"TF", "HF", "VF", "AF"}
-
-_PART_TO_PROCESS_FOR_RM: dict[str, str] = {
-    "자재창고": "TR",
-    "고압파트": "HR",
-    "진공파트": "VR",
-    "조립출하": "AR",
-    "튜닝파트": "NR",
-    "출하":    "PR",
-}
 
 # legacy_model → product_symbols.slot 매핑 (seed 시 호환용)
 LEGACY_MODEL_TO_SLOT: dict[str, int] = {
@@ -52,13 +29,6 @@ SLOT_TO_SYMBOL: dict[int, str] = {
     4: "4",   # ADX4000W
     5: "6",   # ADX6000FB
 }
-
-
-def infer_process_type(category_value: str, legacy_part: str | None) -> str | None:
-    """category + legacy_part 로 process_type_code 추론."""
-    if category_value == "RM":
-        return _PART_TO_PROCESS_FOR_RM.get(legacy_part or "", "TR")
-    return _CATEGORY_TO_PROCESS.get(category_value)
 
 
 def infer_symbol_slot(legacy_model: str | None) -> int | None:

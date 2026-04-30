@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 import type { EmployeeLevel, WarehouseRole } from "@/lib/api";
-import { DEPARTMENT_LABELS, LEGACY_COLORS, normalizeDepartment } from "../legacyUi";
+import { LEGACY_COLORS, normalizeDepartment } from "../legacyUi";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "./adminShared";
 import { useAdminEmployeesContext } from "./AdminEmployeesContext";
 import { ConfirmModal } from "../common/ConfirmModal";
@@ -23,6 +23,7 @@ export function AdminEmployeesSection() {
   const ctx = useAdminEmployeesContext();
   const {
     employees,
+    departments,
     selectedEmployee,
     setSelectedEmployee,
     empAddMode,
@@ -190,8 +191,8 @@ export function AdminEmployeesSection() {
                 className="w-full rounded-[18px] border px-4 py-3 text-base outline-none"
                 style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
               >
-                {Object.keys(DEPARTMENT_LABELS).map((value) => (
-                  <option key={value} value={value}>{DEPARTMENT_LABELS[value]}</option>
+                {departments.filter((d) => d.is_active).map((d) => (
+                  <option key={d.id} value={d.name}>{d.name}</option>
                 ))}
               </select>
             </div>
@@ -263,8 +264,8 @@ export function AdminEmployeesSection() {
                   className="w-full rounded-[14px] border px-3 py-2 text-sm outline-none"
                   style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
                 >
-                  {Object.keys(DEPARTMENT_LABELS).map((value) => (
-                    <option key={value} value={value}>{DEPARTMENT_LABELS[value]}</option>
+                  {departments.filter((d) => d.is_active).map((d) => (
+                    <option key={d.id} value={d.name}>{d.name}</option>
                   ))}
                 </select>
               </FieldRow>

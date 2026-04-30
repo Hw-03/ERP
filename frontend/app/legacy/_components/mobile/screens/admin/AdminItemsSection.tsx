@@ -80,7 +80,7 @@ export function AdminItemsSection({ showToast }: { showToast: (toast: ToastState
     try {
       const created = await api.createItem({
         item_name: addForm.item_name.trim(),
-        category: addForm.category,
+        process_type_code: addForm.process_type_code || undefined,
         spec: addForm.spec || undefined,
         unit: addForm.unit || "EA",
         model_slots: addForm.model_slots.length > 0 ? addForm.model_slots : undefined,
@@ -142,8 +142,8 @@ export function AdminItemsSection({ showToast }: { showToast: (toast: ToastState
             <input value={addForm.item_name} onChange={(e) => setAddForm((f) => ({ ...f, item_name: e.target.value }))} placeholder="예: 텅스텐 필라멘트" className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none" style={inputStyle} />
           </div>
           <div>
-            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>카테고리 *</div>
-            <select value={addForm.category} onChange={(e) => setAddForm((f) => ({ ...f, category: e.target.value as Item["category"] }))} className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none" style={inputStyle}>
+            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>공정코드 *</div>
+            <select value={addForm.process_type_code} onChange={(e) => setAddForm((f) => ({ ...f, process_type_code: e.target.value }))} className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none" style={inputStyle}>
               {CATEGORY_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
             </select>
           </div>

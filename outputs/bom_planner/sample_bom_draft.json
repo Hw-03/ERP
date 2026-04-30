@@ -1,0 +1,46 @@
+{
+  "tool": "BOM Planner",
+  "version": "1.0",
+  "catalog": {
+    "sourceFile": "생산부_재고_매칭작업_정리본_공정순번.xlsx",
+    "itemCount": 722,
+    "generatedAt": "2026-04-30 11:02:11",
+    "checksum": "ef8c49f3ef74d998"
+  },
+  "createdAt": "2026-04-30T11:02:11",
+  "workerName": "sample",
+  "selectedParent": "3-NF-0001",
+  "relations": [
+    {
+      "id": "sample-1",
+      "parentErpCode": "3-NF-0001",
+      "childErpCode": "6-NR-0001",
+      "quantity": 1,
+      "unit": "EA",
+      "confirmed": true,
+      "notes": "샘플 관계"
+    },
+    {
+      "id": "sample-2",
+      "parentErpCode": "3-NF-0001",
+      "childErpCode": "3-VF-0001",
+      "quantity": 1,
+      "unit": "EA",
+      "confirmed": false,
+      "notes": ""
+    },
+    {
+      "id": "sample-3",
+      "parentErpCode": "3-NF-0001",
+      "childErpCode": "34-HR-0001",
+      "quantity": 1,
+      "unit": "EA",
+      "confirmed": false,
+      "notes": ""
+    }
+  ],
+  "validationSummary": {
+    "errors": 0,
+    "warnings": 1
+  }
+}

@@ -20,10 +20,9 @@ export function StepHeading({ title, hint }: { title: string; hint?: string }) {
 
 export const ITEM_CATEGORIES = [
   { id: "ALL", label: "전체" },
-  { id: "RM", label: "원자재" },
-  { id: "A", label: "조립품" },
-  { id: "F", label: "반제품" },
-  { id: "FG", label: "완제품" },
+  { id: "R", label: "원자재" },
+  { id: "A", label: "중간공정" },
+  { id: "F", label: "공정완료" },
 ] as const;
 
 export type ItemCategoryId = (typeof ITEM_CATEGORIES)[number]["id"];

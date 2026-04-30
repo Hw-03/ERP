@@ -36,32 +36,41 @@ sys.path.insert(0, str(BACKEND_DIR))
 os.environ.setdefault("DATABASE_URL", f"sqlite:///{SQLITE_PATH.as_posix()}")
 
 from app.database import Base, SessionLocal, engine  # noqa: E402
-from app.models import CategoryEnum, Inventory, Item  # noqa: E402
+from app.models import Inventory, Item  # noqa: E402
 
 
 # 양식과 1:1 매칭되는 헤더 (순서 무관, 헤더명으로 찾음)
-REQUIRED_HEADERS = ["품목명", "카테고리", "현재수량"]
+REQUIRED_HEADERS = ["품목명", "공정코드", "현재수량"]
 OPTIONAL_HEADERS = ["규격", "단위", "부서", "모델", "품번", "자재분류", "공급사", "안전재고", "바코드"]
 ALL_HEADERS = REQUIRED_HEADERS + OPTIONAL_HEADERS
 
 DATA_START_ROW = 6  # 1=헤더, 2~4=예시, 5=힌트, 6~=실입력
 
-VALID_CATEGORIES = {c.value for c in CategoryEnum}
+VALID_PROCESS_TYPE_CODES = {
+    "TR", "HR", "VR", "NR", "AR", "PR",
+    "TA", "HA", "VA", "NA", "AA", "PA",
+    "TF", "HF", "VF", "NF", "AF", "PF",
+}
 
-# seed.py 와 일치시킬 legacy 매핑
-CATEGORY_TO_FILE_TYPE = {
-    "RM": "원자재", "TA": "조립자재", "TF": "조립자재",
+PROCESS_TYPE_TO_FILE_TYPE: dict[str, str] = {
+    "TR": "원자재", "HR": "원자재", "VR": "원자재",
+    "NR": "원자재", "AR": "원자재", "PR": "원자재",
+    "TA": "조립자재", "TF": "조립자재",
     "HA": "발생부자재", "HF": "발생부자재",
     "VA": "발생부자재", "VF": "발생부자재",
+    "NA": "조립자재", "NF": "조립자재",
     "AA": "조립자재", "AF": "조립자재",
-    "FG": "완제품",
+    "PA": "조립자재", "PF": "완제품",
 }
-CATEGORY_TO_PART = {
-    "RM": "자재창고", "TA": "튜닝파트", "TF": "튜닝파트",
+PROCESS_TYPE_TO_PART: dict[str, str] = {
+    "TR": "자재창고", "HR": "자재창고", "VR": "자재창고",
+    "NR": "자재창고", "AR": "자재창고", "PR": "자재창고",
+    "TA": "튜브파트", "TF": "튜브파트",
     "HA": "고압파트", "HF": "고압파트",
     "VA": "진공파트", "VF": "진공파트",
+    "NA": "튜닝파트", "NF": "튜닝파트",
     "AA": "조립출하", "AF": "조립출하",
-    "FG": "출하",
+    "PA": "출하", "PF": "출하",
 }
 
 
@@ -108,10 +117,10 @@ def read_rows(xlsx_path: Path) -> tuple[list[dict], list[str]]:
             errors.append(f"행 {excel_row}: 품목명 비어 있음 → 스킵")
             continue
 
-        category = (str(raw.get("카테고리") or "")).strip().upper()
-        if category not in VALID_CATEGORIES:
-            errors.append(f"행 {excel_row}: 카테고리 '{category}' 유효하지 않음 → 스킵 "
-                          f"(가능값: {sorted(VALID_CATEGORIES)})")
+        category = (str(raw.get("공정코드") or "")).strip().upper()
+        if category not in VALID_PROCESS_TYPE_CODES:
+            errors.append(f"행 {excel_row}: 공정코드 '{category}' 유효하지 않음 → 스킵 "
+                          f"(가능값: {sorted(VALID_PROCESS_TYPE_CODES)})")
             continue
 
         qty = parse_decimal(raw.get("현재수량"))
@@ -121,7 +130,7 @@ def read_rows(xlsx_path: Path) -> tuple[list[dict], list[str]]:
         rows.append({
             "excel_row": excel_row,
             "품목명": item_name,
-            "카테고리": category,
+            "공정코드": category,
             "현재수량": qty,
             "규격": (str(raw.get("규격") or "")).strip() or None,
             "단위": (str(raw.get("단위") or "")).strip() or "EA",
@@ -138,7 +147,7 @@ def read_rows(xlsx_path: Path) -> tuple[list[dict], list[str]]:
 
 
 def assign_item_codes(db, rows: list[dict]) -> None:
-    """품번 비어있는 행에 카테고리별 자동 품번 부여 (RM-00001 형식). in-place."""
+    """품번 비어있는 행에 공정코드별 자동 품번 부여 (TR-00001 형식). in-place."""
     existing = {}
     for item in db.query(Item).all():
         code = item.item_code or ""
@@ -149,15 +158,14 @@ def assign_item_codes(db, rows: list[dict]) -> None:
             except ValueError:
                 pass
 
-    # 이번 배치에서 새로 부여할 일련번호 카운터 (기존 최대 + 1부터)
-    next_serial = {cat: existing.get(cat, 0) for cat in VALID_CATEGORIES}
+    next_serial: dict[str, int] = {pt: existing.get(pt, 0) for pt in VALID_PROCESS_TYPE_CODES}
 
     for row in rows:
         if row["품번"]:
             continue
-        cat = row["카테고리"]
-        next_serial[cat] = next_serial.get(cat, 0) + 1
-        row["품번"] = f"{cat}-{next_serial[cat]:05d}"
+        pt = row["공정코드"]
+        next_serial[pt] = next_serial.get(pt, 0) + 1
+        row["품번"] = f"{pt}-{next_serial[pt]:05d}"
 
 
 def apply_rows(db, rows: list[dict], wipe: bool) -> dict:
@@ -173,16 +181,16 @@ def apply_rows(db, rows: list[dict], wipe: bool) -> dict:
 
     for row in rows:
         existing = db.query(Item).filter(Item.item_code == row["품번"]).first()
-        category_enum = CategoryEnum(row["카테고리"])
+        pt = row["공정코드"]
 
         if existing:
             existing.item_name = row["품목명"]
             existing.spec = row["규격"]
-            existing.category = category_enum
+            existing.process_type_code = pt
             existing.unit = row["단위"]
             existing.barcode = row["바코드"] or row["품번"]
-            existing.legacy_file_type = CATEGORY_TO_FILE_TYPE.get(row["카테고리"], "미분류")
-            existing.legacy_part = CATEGORY_TO_PART.get(row["카테고리"], "자재창고")
+            existing.legacy_file_type = PROCESS_TYPE_TO_FILE_TYPE.get(pt, "미분류")
+            existing.legacy_part = PROCESS_TYPE_TO_PART.get(pt, "자재창고")
             existing.legacy_item_type = row["자재분류"]
             existing.legacy_model = row["모델"]
             existing.supplier = row["공급사"]
@@ -209,11 +217,11 @@ def apply_rows(db, rows: list[dict], wipe: bool) -> dict:
                 item_code=row["품번"],
                 item_name=row["품목명"],
                 spec=row["규격"],
-                category=category_enum,
+                process_type_code=pt,
                 unit=row["단위"],
                 barcode=row["바코드"] or row["품번"],
-                legacy_file_type=CATEGORY_TO_FILE_TYPE.get(row["카테고리"], "미분류"),
-                legacy_part=CATEGORY_TO_PART.get(row["카테고리"], "자재창고"),
+                legacy_file_type=PROCESS_TYPE_TO_FILE_TYPE.get(pt, "미분류"),
+                legacy_part=PROCESS_TYPE_TO_PART.get(pt, "자재창고"),
                 legacy_item_type=row["자재분류"],
                 legacy_model=row["모델"],
                 supplier=row["공급사"],
@@ -264,9 +272,9 @@ def main() -> int:
         print("유효한 행이 없습니다. 작업 종료.")
         return 0
 
-    # 카테고리 분포
-    cat_dist = Counter(r["카테고리"] for r in rows)
-    print(f"[CATEGORY] {dict(cat_dist)}")
+    # 공정코드 분포
+    cat_dist = Counter(r["공정코드"] for r in rows)
+    print(f"[PROCESS_TYPE] {dict(cat_dist)}")
 
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()

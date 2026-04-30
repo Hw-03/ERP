@@ -137,7 +137,7 @@ def _to_detail_response(package: ShipPackage) -> ShipPackageDetailResponse:
                 "item_id": item.item_id,
                 "erp_code": item.item.erp_code,
                 "item_name": item.item.item_name,
-                "item_category": item.item.category,
+                "item_process_type_code": item.item.process_type_code,
                 "item_unit": item.item.unit,
                 "quantity": item.quantity,
             }

@@ -1,13 +1,10 @@
-import type { Item } from "@/lib/api";
-
-export const CATEGORY_OPTIONS = [
-  { value: "RM", label: "RM — 원자재" },
-  { value: "TA", label: "TA — 튜브 조립" },
-  { value: "HA", label: "HA — 고압 조립" },
-  { value: "VA", label: "VA — 진공 조립" },
-  { value: "AA", label: "AA — 최종 조립" },
-  { value: "FG", label: "FG — 완제품" },
-  { value: "UK", label: "UK — 미분류" },
+export const PROCESS_TYPE_OPTIONS = [
+  { value: "TR", label: "TR — 튜브 원자재" }, { value: "TA", label: "TA — 튜브 중간공정" }, { value: "TF", label: "TF — 튜브 공정완료" },
+  { value: "HR", label: "HR — 고압 원자재" }, { value: "HA", label: "HA — 고압 중간공정" }, { value: "HF", label: "HF — 고압 공정완료" },
+  { value: "VR", label: "VR — 진공 원자재" }, { value: "VA", label: "VA — 진공 중간공정" }, { value: "VF", label: "VF — 진공 공정완료" },
+  { value: "NR", label: "NR — 튜닝 원자재" }, { value: "NA", label: "NA — 튜닝 중간공정" }, { value: "NF", label: "NF — 튜닝 공정완료" },
+  { value: "AR", label: "AR — 조립 원자재" }, { value: "AA", label: "AA — 조립 중간공정" }, { value: "AF", label: "AF — 조립 공정완료" },
+  { value: "PR", label: "PR — 출하 원자재" }, { value: "PA", label: "PA — 출하 중간공정" }, { value: "PF", label: "PF — 출하 공정완료" },
 ];
 
 export const MODEL_SLOTS = [
@@ -22,15 +19,14 @@ export const UNIT_OPTIONS = ["EA", "SET", "kg", "g", "m", "mm", "L", "box"];
 
 export const PKG_CATEGORY_OPTIONS = [
   { value: "ALL", label: "전체" },
-  { value: "RM",  label: "RM"  },
-  { value: "?A",  label: "?A"  },
-  { value: "?F",  label: "?F"  },
-  { value: "FG",  label: "FG"  },
+  { value: "?R",  label: "원자재(?R)" },
+  { value: "?A",  label: "중간공정(?A)" },
+  { value: "?F",  label: "공정완료(?F)" },
 ];
 
 export const EMPTY_ADD_FORM = {
   item_name: "",
-  category: "RM" as Item["category"],
+  process_type_code: "TR",
   spec: "",
   unit: "EA",
   model_slots: [] as number[],
@@ -54,17 +50,17 @@ export const EMPTY_EMPLOYEE_FORM = {
 
 export type EmployeeAddForm = typeof EMPTY_EMPLOYEE_FORM;
 
-export const BOM_PARENT_CATS = ["ALL", "AA", "HA", "VA", "TA", "AF", "TF", "FG"];
-export const BOM_CHILD_CATS = ["ALL", "RM", "?A", "?F"];
+export const BOM_PARENT_CATS = ["ALL", "AA", "HA", "VA", "TA", "NA", "PA", "AF", "TF", "HF", "VF", "NF", "PF"];
+export const BOM_CHILD_CATS = ["ALL", "?R", "?A", "?F"];
 
-const ASSEMBLY_CATS = new Set(["AA", "HA", "VA", "TA"]);
-const FINAL_CATS = new Set(["AF", "TF", "HF", "VF"]);
-
-export function bomCategoryColor(cat?: string | null): string {
-  if (!cat) return "var(--c-muted2)";
-  if (cat === "RM") return "var(--c-green)";
-  if (cat === "FG") return "var(--c-cyan)";
-  if (ASSEMBLY_CATS.has(cat)) return "var(--c-blue)";
-  if (FINAL_CATS.has(cat)) return "var(--c-purple)";
-  return "var(--c-blue)";
+export function bomCategoryColor(code?: string | null): string {
+  if (!code) return "var(--c-muted2)";
+  const prefix = code[0] ?? "";
+  if (prefix === "T") return "var(--c-cyan)";
+  if (prefix === "H") return "var(--c-yellow)";
+  if (prefix === "V") return "var(--c-purple)";
+  if (prefix === "N") return "#f97316";
+  if (prefix === "A") return "var(--c-blue)";
+  if (prefix === "P") return "var(--c-green)";
+  return "var(--c-muted2)";
 }

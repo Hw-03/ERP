@@ -136,10 +136,9 @@ export function StepPerson({ employees, loading }: { employees: Employee[]; load
 
 const ITEM_CATEGORIES = [
   { id: "ALL", label: "전체" },
-  { id: "RM", label: "원자재" },
-  { id: "A", label: "조립품" },
-  { id: "F", label: "반제품" },
-  { id: "FG", label: "완제품" },
+  { id: "R", label: "원자재" },
+  { id: "A", label: "중간공정" },
+  { id: "F", label: "공정완료" },
 ] as const;
 
 export function StepItems({
@@ -162,10 +161,9 @@ export function StepItems({
   const filteredItems = useMemo(() => {
     const keyword = deferredSearch.trim().toLowerCase();
     return items.filter((item) => {
-      if (category === "RM" && item.category !== "RM") return false;
-      if (category === "A" && !["TA", "HA", "VA", "AA"].includes(item.category)) return false;
-      if (category === "F" && !["TF", "HF", "VF", "AF"].includes(item.category)) return false;
-      if (category === "FG" && item.category !== "FG") return false;
+      if (category === "R" && !item.process_type_code?.endsWith("R")) return false;
+      if (category === "A" && !item.process_type_code?.endsWith("A")) return false;
+      if (category === "F" && !item.process_type_code?.endsWith("F")) return false;
       if (!keyword) return true;
       const haystack = `${item.item_name} ${item.erp_code ?? ""} ${item.barcode ?? ""}`.toLowerCase();
       return haystack.includes(keyword);

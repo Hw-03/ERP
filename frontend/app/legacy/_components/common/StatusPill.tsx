@@ -33,7 +33,7 @@ function StatusPillImpl({
   const color = TONE_COLOR[tone];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 truncate rounded-full border px-3 py-1 text-xs font-bold ${className}`}
+      className={`inline-flex items-center gap-1.5 truncate rounded-full border px-3 py-2 text-xs font-bold ${className}`}
       style={{
         color,
         background: `color-mix(in srgb, ${color} 14%, transparent)`,
@@ -54,6 +54,7 @@ export const StatusPill = memo(StatusPillImpl);
 
 export function inferToneFromStatus(status: string | null | undefined): StatusPillTone {
   if (!status) return "info";
+  if (status === "DEXCOWIN MES System") return "neutral";
   if (status.startsWith("방금 완료")) return "success";
   if (/실패|오류|불러오지 못|에러/.test(status)) return "danger";
   if (/주의|경고|부족|품절/.test(status)) return "warning";

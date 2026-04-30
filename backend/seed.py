@@ -32,7 +32,6 @@ os.environ["DATABASE_URL"] = f"sqlite:///{SQLITE_PATH.as_posix()}"
 from app.database import Base, SessionLocal, engine
 from app.models import (
     BOM,
-    CategoryEnum,
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
@@ -44,44 +43,43 @@ from app.models import (
 )
 
 
-CATEGORY_MAP = {
-    "RM": CategoryEnum.RM,
-    "TA": CategoryEnum.TA,
-    "TF": CategoryEnum.TF,
-    "HA": CategoryEnum.HA,
-    "HF": CategoryEnum.HF,
-    "VA": CategoryEnum.VA,
-    "VF": CategoryEnum.VF,
-    "AA": CategoryEnum.AA,
-    "AF": CategoryEnum.AF,
-    "FG": CategoryEnum.FG,
-    "UK": CategoryEnum.UK,
+# CSV `category_code` 컬럼 (RM/TA/.../FG/UK 11개)을 process_type_code 18개로 매핑.
+# category 컬럼은 제거됐으므로 process_type_code에 직접 채운다.
+# RM은 legacy_part 기반으로 더 정확히 분기 (자재창고→TR / 고압파트→HR / 진공파트→VR / 튜닝파트→NR / 조립출하→AR / 출하→PR).
+CSV_CATEGORY_TO_PROCESS_TYPE: dict[str, str] = {
+    "TA": "TA", "TF": "TF",
+    "HA": "HA", "HF": "HF",
+    "VA": "VA", "VF": "VF",
+    "AA": "AA", "AF": "AF",
+    "FG": "PA",
+    # RM, UK는 직접 매핑 없음 — 호출측에서 legacy_part 기반 추론.
 }
 
-CATEGORY_TO_FILE_TYPE: dict[str, str] = {
-    "RM": "원자재",
-    "TA": "조립자재",
-    "TF": "조립자재",
-    "HA": "발생부자재",
-    "HF": "발생부자재",
-    "VA": "발생부자재",
-    "VF": "발생부자재",
-    "AA": "조립자재",
-    "AF": "조립자재",
-    "FG": "완제품",
+CSV_PART_TO_PROCESS_TYPE_FOR_RM: dict[str, str] = {
+    "자재창고": "TR",
+    "고압파트": "HR",
+    "진공파트": "VR",
+    "조립출하": "AR",
+    "튜닝파트": "NR",
+    "출하":    "PR",
 }
 
-CATEGORY_TO_PART: dict[str, str] = {
-    "RM": "자재창고",
-    "TA": "튜닝파트",
-    "TF": "튜닝파트",
-    "HA": "고압파트",
-    "HF": "고압파트",
-    "VA": "진공파트",
-    "VF": "진공파트",
-    "AA": "조립출하",
-    "AF": "조립출하",
-    "FG": "출하",
+PROCESS_TYPE_TO_FILE_TYPE: dict[str, str] = {
+    "TR": "원자재", "HR": "원자재", "VR": "원자재", "NR": "원자재", "AR": "원자재", "PR": "원자재",
+    "TA": "조립자재", "TF": "조립자재", "AA": "조립자재", "AF": "조립자재",
+    "HA": "발생부자재", "HF": "발생부자재", "VA": "발생부자재", "VF": "발생부자재",
+    "NA": "조립자재", "NF": "조립자재",
+    "PA": "완제품", "PF": "완제품",
+}
+
+PROCESS_TYPE_TO_PART: dict[str, str] = {
+    "TR": "자재창고", "HR": "고압파트", "VR": "진공파트", "NR": "튜닝파트", "AR": "조립출하", "PR": "출하",
+    "TA": "자재창고", "TF": "자재창고",
+    "HA": "고압파트", "HF": "고압파트",
+    "VA": "진공파트", "VF": "진공파트",
+    "NA": "튜닝파트", "NF": "튜닝파트",
+    "AA": "조립출하", "AF": "조립출하",
+    "PA": "출하",     "PF": "출하",
 }
 
 DEFAULT_STOCK_QTY = Decimal("100")
@@ -114,30 +112,43 @@ def parse_decimal(value: str | None) -> Decimal | None:
         return None
 
 
-def get_category(code: str | None) -> CategoryEnum:
+def csv_category_to_process_type(code: str | None, legacy_part: str | None) -> str | None:
+    """CSV의 category_code(11개) + legacy_part → process_type_code(18개) 매핑.
+
+    RM은 legacy_part로 부서 식별이 가능하면 R 시리즈 6종 중 하나로,
+    그렇지 않으면 None (미할당).
+    """
     if not code:
-        return CategoryEnum.UK
-    return CATEGORY_MAP.get(str(code).strip().upper(), CategoryEnum.UK)
+        return None
+    code = str(code).strip().upper()
+    if code == "RM":
+        part = (legacy_part or "").strip()
+        return CSV_PART_TO_PROCESS_TYPE_FOR_RM.get(part)
+    if code == "UK":
+        return None
+    return CSV_CATEGORY_TO_PROCESS_TYPE.get(code)
 
 
-def infer_legacy_category(file_type: str | None, part: str | None) -> CategoryEnum:
+def infer_legacy_process_type(file_type: str | None, part: str | None) -> str | None:
+    """legacy HTML import 호환: file_type + part → process_type_code 추론."""
     file_type = (file_type or "").strip()
     part = (part or "").strip()
 
     if file_type == "원자재":
-        return CategoryEnum.RM
+        # 자재창고가 아니면 부서 prefix로 추론
+        return CSV_PART_TO_PROCESS_TYPE_FOR_RM.get(part, "TR")
     if file_type == "완제품" or part == "출하":
-        return CategoryEnum.FG
+        return "PA"
     if file_type == "조립자재":
-        return CategoryEnum.AA
+        return "AA"
     if file_type == "발생부자재":
         if "고압" in part:
-            return CategoryEnum.HA
+            return "HA"
         if "진공" in part:
-            return CategoryEnum.VA
+            return "VA"
         if "튜닝" in part or "튜브" in part:
-            return CategoryEnum.TA
-    return CategoryEnum.UK
+            return "TA"
+    return None
 
 
 def infer_employee_level(role: str) -> EmployeeLevelEnum:
@@ -269,7 +280,7 @@ def seed_from_legacy_html() -> None:
                 item_code=item_code,
                 item_name=item_name,
                 spec=str(product.get("spec") or "").strip() or None,
-                category=infer_legacy_category(file_type, part),
+                process_type_code=infer_legacy_process_type(file_type, part),
                 unit="EA",
                 barcode=str(product.get("barcode") or "").strip() or item_code,
                 legacy_file_type=file_type,
@@ -329,7 +340,7 @@ def seed() -> None:
     inserted = 0
     skipped = 0
     defaulted_stock = 0
-    category_counts: Counter[str] = Counter()
+    process_type_counts: Counter[str] = Counter()
     errors: list[str] = []
 
     try:
@@ -350,14 +361,23 @@ def seed() -> None:
                 item_code = f"AUTO-{csv_row_number:05d}"
 
             raw_category_code = (row.get("category_code") or "").strip().upper()
-            category = get_category(raw_category_code)
             spec = (row.get("std_spec") or "").strip() or None
             unit = (row.get("std_unit") or "").strip() or "EA"
             location = (row.get("department") or "").strip() or None
 
             barcode = item_code
-            legacy_file_type = CATEGORY_TO_FILE_TYPE.get(raw_category_code, "미분류")
-            legacy_part = CATEGORY_TO_PART.get(raw_category_code, "자재창고")
+            # 1차: legacy_part는 CSV 우선, 없으면 raw_category_code 기반 fallback ("자재창고")
+            csv_legacy_part = (row.get("legacy_part") or "").strip() or None
+            # 임시 추론용 part (process_type_code → file_type/part 결정에 사용)
+            inferred_pt = csv_category_to_process_type(raw_category_code, csv_legacy_part or "자재창고")
+            legacy_file_type = (
+                PROCESS_TYPE_TO_FILE_TYPE.get(inferred_pt, "미분류") if inferred_pt else "미분류"
+            )
+            legacy_part = (
+                csv_legacy_part
+                or (PROCESS_TYPE_TO_PART.get(inferred_pt) if inferred_pt else None)
+                or "자재창고"
+            )
             legacy_item_type = (row.get("part_type") or "").strip() or None
             legacy_model_raw = (row.get("model_ref") or "").strip()
             legacy_model = legacy_model_raw if legacy_model_raw else "공용"
@@ -375,7 +395,7 @@ def seed() -> None:
                 item_code=item_code,
                 item_name=item_name,
                 spec=spec,
-                category=category,
+                process_type_code=inferred_pt,
                 unit=unit,
                 barcode=barcode,
                 legacy_file_type=legacy_file_type,
@@ -400,7 +420,10 @@ def seed() -> None:
             db.add(inventory)
 
             inserted += 1
-            category_counts[category.value] += 1
+            if inferred_pt:
+                process_type_counts[inferred_pt] += 1
+            else:
+                process_type_counts["(unmapped)"] += 1
 
             if inserted % 200 == 0:
                 db.commit()
@@ -412,9 +435,13 @@ def seed() -> None:
         print(f"Items inserted: {inserted}")
         print(f"Rows skipped: {skipped}")
         print(f"Default stock=100 applied: {defaulted_stock}")
-        print("Category counts:")
-        for code in ["RM", "TA", "TF", "HA", "HF", "VA", "VF", "AA", "AF", "FG", "UK"]:
-            print(f"  {code}: {category_counts.get(code, 0)}")
+        print("Process type counts:")
+        for code in [
+            "TR", "TA", "TF", "HR", "HA", "HF", "VR", "VA", "VF",
+            "NR", "NA", "NF", "AR", "AA", "AF", "PR", "PA", "PF",
+            "(unmapped)",
+        ]:
+            print(f"  {code}: {process_type_counts.get(code, 0)}")
 
         if errors:
             print("Sample skipped rows:")

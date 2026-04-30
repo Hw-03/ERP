@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BOM 작업 사용안내</title>
+<style>body{font:15px "Malgun Gothic","Segoe UI",Arial,sans-serif;line-height:1.65;margin:0;background:#f6f7f8;color:#1f252c}main{max-width:920px;margin:0 auto;padding:28px}section{background:#fff;border:1px solid #d9dee5;border-radius:8px;padding:18px;margin:14px 0}h1{margin-top:0}code{background:#eef3f5;padding:2px 5px;border-radius:4px}li{margin:6px 0}</style></head>
+<body><main>
+<h1>BOM 구성 작업 사용안내</h1>
+<p>이 도구는 기존 ERP/DB에 직접 저장하지 않고, 담당자가 BOM 초안을 만든 뒤 검수자가 확인해 CSV로 제출하기 위한 독립 HTML입니다.</p>
+<section><h2>1. 시작</h2><ol><li><code>bom_planner.html</code>을 더블클릭합니다.</li><li>상단의 작업자명에 이름을 입력합니다.</li><li>왼쪽에서 상위 품목을 고릅니다.</li><li>오른쪽 하위 후보에서 <code>＋</code>, 더블클릭, 드래그 앤 드롭, ERP 코드 직접 입력 중 하나로 하위 품목을 추가합니다.</li></ol></section>
+<section><h2>2. 저장</h2><ul><li>작업은 브라우저에 자동 저장됩니다.</li><li>다른 PC로 옮기려면 반드시 <code>작업파일 저장</code>으로 JSON 파일을 내보내세요.</li><li>작업을 이어갈 때는 <code>작업파일 불러오기</code>를 사용합니다.</li></ul></section>
+<section><h2>3. 검수</h2><ul><li><code>검수자</code> 모드로 바꾸면 미완료 상위 품목까지 경고로 표시됩니다.</li><li>오류는 확정 CSV 생성을 막습니다.</li><li>경고만 남은 경우에는 검수자가 사유를 비고에 적고 확정 CSV를 만들 수 있습니다.</li></ul></section>
+<section><h2>4. 제출</h2><ul><li><code>확정 CSV</code>: 최종 BOM 원장 반영용입니다.</li><li><code>검수 CSV</code>: 오류/경고 목록 전달용입니다.</li><li>CSV는 Excel에서 한글이 깨지지 않도록 UTF-8 BOM 형식으로 저장됩니다.</li></ul></section>
+<section><h2>원장 정보</h2><p>생성시각: 2026-04-30 11:02:11<br>원장 checksum: ef8c49f3ef74d998</p></section>
+</main></body></html>

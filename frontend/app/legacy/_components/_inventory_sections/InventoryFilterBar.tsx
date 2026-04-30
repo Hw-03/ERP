@@ -1,20 +1,8 @@
 "use client";
 
 import { ChevronDown, Filter, Search, Sparkles, TrendingUp } from "lucide-react";
-import type { ProductModel } from "@/lib/api";
+import type { DepartmentMaster, ProductModel } from "@/lib/api";
 import { LEGACY_COLORS } from "../legacyUi";
-
-const DEPT_OPTIONS = [
-  { label: "전체", value: "ALL" },
-  { label: "창고", value: "창고" },
-  { label: "튜브", value: "튜브" },
-  { label: "고압", value: "고압" },
-  { label: "진공", value: "진공" },
-  { label: "튜닝", value: "튜닝" },
-  { label: "조립", value: "조립" },
-  { label: "출하", value: "출하" },
-  { label: "AS", value: "AS" },
-];
 
 function Chip({
   active,
@@ -47,6 +35,7 @@ type FiltersProps = {
   selectedDepts: string[];
   selectedModels: string[];
   productModels: ProductModel[];
+  departments: DepartmentMaster[];
   toggleDept: (v: string) => void;
   toggleModel: (v: string) => void;
   onClearDepts: () => void;
@@ -58,6 +47,7 @@ export function InventoryFilters({
   selectedDepts,
   selectedModels,
   productModels,
+  departments,
   toggleDept,
   toggleModel,
   onClearDepts,
@@ -73,12 +63,18 @@ export function InventoryFilters({
         </div>
         <div className="grid grid-cols-3 gap-2">
           <Chip active={selectedDepts.length === 0} label="전체" onClick={onClearDepts} tone={LEGACY_COLORS.green} />
-          {DEPT_OPTIONS.filter((o) => o.value !== "ALL").map((opt) => (
+          <Chip
+            active={selectedDepts.includes("창고")}
+            label="창고"
+            onClick={() => toggleDept("창고")}
+            tone={LEGACY_COLORS.green}
+          />
+          {departments.map((dept) => (
             <Chip
-              key={opt.value}
-              active={selectedDepts.includes(opt.value)}
-              label={opt.label}
-              onClick={() => toggleDept(opt.value)}
+              key={dept.id}
+              active={selectedDepts.includes(dept.name)}
+              label={dept.name}
+              onClick={() => toggleDept(dept.name)}
               tone={LEGACY_COLORS.green}
             />
           ))}
@@ -100,6 +96,12 @@ export function InventoryFilters({
               tone={LEGACY_COLORS.cyan}
             />
           ))}
+          <Chip
+            active={selectedModels.includes("미분류")}
+            label="미분류"
+            onClick={() => toggleModel("미분류")}
+            tone={LEGACY_COLORS.muted2}
+          />
         </div>
       </div>
     </div>

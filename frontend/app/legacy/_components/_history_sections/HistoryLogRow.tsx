@@ -24,7 +24,7 @@ import {
   transactionIconName,
   transactionLabel,
 } from "../legacyUi";
-import { CATEGORY_META, formatHistoryDate, rowTint } from "./historyShared";
+import { PROCESS_TYPE_META, formatHistoryDate, rowTint } from "./historyShared";
 
 const TX_ICON = {
   ArrowDownToLine,
@@ -51,8 +51,8 @@ type Props = {
 
 function HistoryLogRowImpl({ log, selected, copiedRef, onSelect, onCopyRef }: Props) {
   const tcolor = transactionColor(log.transaction_type);
-  const cat = CATEGORY_META[log.item_category] ?? {
-    label: log.item_category,
+  const cat = PROCESS_TYPE_META[log.item_process_type_code ?? ""] ?? {
+    label: log.item_process_type_code ?? "-",
     color: LEGACY_COLORS.muted2,
     bg: "rgba(157,173,199,.16)",
   };

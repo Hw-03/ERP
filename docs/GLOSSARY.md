@@ -14,21 +14,21 @@
 
 부서 필터는 `process_type_code` 또는 `department` 둘 다로 동작 — "전체"와 "모든 부서/모델 개별 선택"은 동일한 결과여야 한다.
 
-## 카테고리 (`CategoryEnum`)
+## 공정코드 (`process_type_code`)
 
-| 코드 | 명칭 | 설명 |
-|---|---|---|
-| `RM` | Raw Material | 원자재 |
-| `TA` | Tube Ass'y | 튜브 반제품 |
-| `TF` | Tube Final | 튜브 완제품 |
-| `HA` | High-voltage Ass'y | 고압 반제품 |
-| `HF` | High-voltage Final | 고압 완제품 |
-| `VA` | Vacuum Ass'y | 진공 반제품 |
-| `VF` | Vacuum Final | 진공 완제품 |
-| `BA` | Body Ass'y | 조립 반제품 (브라켓) |
-| `AF` | Assembly Final | 조립 완제품. **`BF` 는 폐기** — 절대 사용 금지. |
-| `FG` | Finished Good | 완제품 |
-| `UK` | Unknown | 미분류 (확인 필요) |
+품목 분류의 단일 기준. 18개. `{부서 계열 1글자}{단계 1글자}` 형식.
+
+| 부서 | R (원자재) | A (조립체) | F (F타입) |
+|---|---|---|---|
+| 튜브 | `TR` | `TA` | `TF` |
+| 고압 | `HR` | `HA` | `HF` |
+| 진공 | `VR` | `VA` | `VF` |
+| 튜닝 | `NR` | `NA` | `NF` |
+| 조립 | `AR` | `AA` | `AF` |
+| 출하 | `PR` | `PA` | `PF` |
+
+- `CategoryEnum` (`RM`/`TA`/`TF`/`HA`/`HF`/`VA`/`VF`/`AA`/`AF`/`FG`/`UK`) 은 2026-04-29 완전 제거. 코드·DB·UI 어디에도 존재하지 않는다.
+- suffix 의미: `R` = 원자재, `A` = 조립/가공, `F` = 완성/출하형.
 
 ## 재고 3-bucket 모델
 

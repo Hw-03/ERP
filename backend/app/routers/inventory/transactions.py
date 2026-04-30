@@ -108,7 +108,7 @@ def _to_log_response(log: TransactionLog, item: Item, edit_count: int = 0) -> Tr
         item_id=log.item_id,
         erp_code=item.erp_code,
         item_name=item.item_name,
-        item_category=item.category,
+        item_process_type_code=item.process_type_code,
         item_unit=item.unit,
         transaction_type=log.transaction_type,
         quantity_change=log.quantity_change,
@@ -232,7 +232,7 @@ def export_transactions_csv(
             "transaction_type",
             "erp_code",
             "item_name",
-            "category",
+            "process_type_code",
             "quantity_change",
             "quantity_before",
             "quantity_after",
@@ -248,7 +248,7 @@ def export_transactions_csv(
                 log.transaction_type.value,
                 item.erp_code or "",
                 item.item_name,
-                item.category.value,
+                item.process_type_code or "",
                 float(log.quantity_change),
                 "" if log.quantity_before is None else float(log.quantity_before),
                 "" if log.quantity_after is None else float(log.quantity_after),
@@ -310,7 +310,7 @@ def export_transactions_xlsx(
     }
 
     columns = [
-        "일시", "유형", "품목 코드", "품목명", "카테고리",
+        "일시", "유형", "품목 코드", "품목명", "공정코드",
         "수량변화", "이전재고", "이후재고", "참조번호", "담당자", "메모",
     ]
     apply_header(ws, columns)
@@ -325,7 +325,7 @@ def export_transactions_xlsx(
             tx_label.get(tx_val, tx_val),
             item.erp_code or "",
             item.item_name,
-            item.category.value,
+            item.process_type_code or "",
             float(log.quantity_change),
             float(log.quantity_before) if log.quantity_before is not None else "",
             float(log.quantity_after) if log.quantity_after is not None else "",

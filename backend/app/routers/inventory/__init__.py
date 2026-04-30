@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import CategoryEnum, Inventory, Item
+from app.models import Inventory, Item
 from app.schemas import InventoryResponse
 
 from . import (
@@ -51,14 +51,14 @@ router.include_router(supplier.router)
 
 @router.get("", response_model=List[InventoryResponse])
 def list_inventory(
-    category: Optional[CategoryEnum] = Query(None),
+    process_type_code: Optional[str] = Query(None, max_length=2),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=2000),
     db: Session = Depends(get_db),
 ):
     q = db.query(Inventory).join(Item, Inventory.item_id == Item.item_id)
-    if category:
-        q = q.filter(Item.category == category)
+    if process_type_code:
+        q = q.filter(Item.process_type_code == process_type_code)
 
     rows = q.order_by(Item.erp_code).offset(skip).limit(limit).all()
     return to_response_bulk(db, rows)

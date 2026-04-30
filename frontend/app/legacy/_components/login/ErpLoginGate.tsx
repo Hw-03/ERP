@@ -70,12 +70,12 @@ export function ErpLoginGate({ children }: ErpLoginGateProps) {
   }, []);
 
   const handleLogin = () => {
-    // 작업자 로그인 시 직전 메뉴와 무관하게 항상 대시보드(inventory)로 진입.
+    // 작업자 로그인 시 직전 메뉴와 무관하게 항상 대시보드로 진입.
     // 다른 탭이면 전체 리로드로 갈아끼워야 직전 메뉴가 깜빡이는 현상이 없다.
     if (typeof window !== "undefined") {
       const currentTab = new URLSearchParams(window.location.search).get("tab");
-      if (currentTab !== "inventory") {
-        window.location.replace("/legacy?tab=inventory");
+      if (currentTab !== "dashboard") {
+        window.location.replace("/legacy?tab=dashboard");
         return;
       }
     }

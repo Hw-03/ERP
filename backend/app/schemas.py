@@ -9,8 +9,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import (
     AlertKindEnum,
-    CategoryEnum,
-    DepartmentEnum,
     EmployeeLevelEnum,
     LocationStatusEnum,
     QueueBatchStatusEnum,
@@ -26,7 +24,7 @@ from app.models import (
 class ItemCreate(BaseModel):
     item_name: str = Field(..., max_length=200, description="품목명")
     spec: Optional[str] = Field(None, description="사양")
-    category: CategoryEnum = Field(CategoryEnum.UK, description="11단계 공정 카테고리")
+    process_type_code: Optional[str] = Field(None, max_length=2, description="공정 코드 (TR/HR/.../PF 18개)")
     unit: str = Field("EA", max_length=20, description="단위")
     barcode: Optional[str] = Field(None, max_length=100)
     legacy_file_type: Optional[str] = Field(None, max_length=50)
@@ -43,7 +41,6 @@ class ItemCreate(BaseModel):
 class ItemUpdate(BaseModel):
     item_name: Optional[str] = Field(None, max_length=200)
     spec: Optional[str] = None
-    category: Optional[CategoryEnum] = None
     unit: Optional[str] = Field(None, max_length=20)
     barcode: Optional[str] = Field(None, max_length=100)
     legacy_file_type: Optional[str] = Field(None, max_length=50)
@@ -60,7 +57,6 @@ class ItemResponse(BaseModel):
     item_id: uuid.UUID
     item_name: str
     spec: Optional[str]
-    category: CategoryEnum
     unit: str
     barcode: Optional[str] = None
     legacy_file_type: Optional[str] = None
@@ -83,7 +79,7 @@ class ItemResponse(BaseModel):
 
 class InventoryLocationResponse(BaseModel):
     """부서×상태(생산/불량) 단위 재고 분포."""
-    department: DepartmentEnum
+    department: str
     status: LocationStatusEnum
     quantity: Decimal
 
@@ -116,7 +112,7 @@ class EmployeeCreate(BaseModel):
     name: str = Field(..., max_length=100)
     role: str = Field(..., max_length=100)
     phone: Optional[str] = Field(None, max_length=30)
-    department: DepartmentEnum
+    department: str
     level: EmployeeLevelEnum = EmployeeLevelEnum.STAFF
     warehouse_role: str = Field("none", description="창고 결재 역할 (none/primary/deputy)")
     display_order: int = 0
@@ -127,7 +123,7 @@ class EmployeeUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=100)
     role: Optional[str] = Field(None, max_length=100)
     phone: Optional[str] = Field(None, max_length=30)
-    department: Optional[DepartmentEnum] = None
+    department: Optional[str] = None
     level: Optional[EmployeeLevelEnum] = None
     warehouse_role: Optional[str] = Field(None, description="창고 결재 역할 (none/primary/deputy)")
     display_order: Optional[int] = None
@@ -142,7 +138,7 @@ class EmployeeResponse(BaseModel):
     name: str
     role: str
     phone: Optional[str]
-    department: DepartmentEnum
+    department: str
     level: EmployeeLevelEnum
     warehouse_role: str = "none"
     display_order: int
@@ -194,7 +190,7 @@ class ShipPackageItemDetail(BaseModel):
     item_id: uuid.UUID
     erp_code: Optional[str] = None
     item_name: str
-    item_category: CategoryEnum
+    item_process_type_code: Optional[str] = None
     item_unit: str
     quantity: Decimal
 
@@ -268,7 +264,7 @@ class TransferRequest(BaseModel):
     """창고↔부서 이동 (transfer-to-production / transfer-to-warehouse 공용)."""
     item_id: uuid.UUID
     quantity: Decimal = Field(..., gt=0)
-    department: DepartmentEnum
+    department: str
     notes: Optional[str] = Field(None, description="비고")
     reference_no: Optional[str] = Field(None, max_length=100)
     produced_by: Optional[str] = Field(None, max_length=100)
@@ -278,8 +274,8 @@ class DeptTransferRequest(BaseModel):
     """부서간 이동."""
     item_id: uuid.UUID
     quantity: Decimal = Field(..., gt=0)
-    from_department: DepartmentEnum
-    to_department: DepartmentEnum
+    from_department: str
+    to_department: str
     notes: Optional[str] = None
     reference_no: Optional[str] = Field(None, max_length=100)
     produced_by: Optional[str] = Field(None, max_length=100)
@@ -295,8 +291,8 @@ class MarkDefectiveRequest(BaseModel):
     item_id: uuid.UUID
     quantity: Decimal = Field(..., gt=0)
     source: str = Field(..., description="warehouse | production")
-    source_department: Optional[DepartmentEnum] = None
-    target_department: DepartmentEnum
+    source_department: Optional[str] = None
+    target_department: str
     reason: Optional[str] = Field(None, description="불량 사유")
     operator: Optional[str] = Field(None, max_length=100)
 
@@ -305,15 +301,15 @@ class SupplierReturnRequest(BaseModel):
     """공급업체 반품: 부서별 DEFECTIVE 차감."""
     item_id: uuid.UUID
     quantity: Decimal = Field(..., gt=0)
-    from_department: DepartmentEnum
+    from_department: str
     reference_no: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
     operator: Optional[str] = Field(None, max_length=100)
 
 
-class CategorySummary(BaseModel):
-    category: CategoryEnum
-    category_label: str
+class ProcessTypeSummary(BaseModel):
+    process_type_code: str
+    label: str
     item_count: int
     total_quantity: Decimal
     warehouse_qty_sum: Decimal = Decimal("0")
@@ -322,10 +318,9 @@ class CategorySummary(BaseModel):
 
 
 class InventorySummaryResponse(BaseModel):
-    categories: List[CategorySummary]
+    process_types: List[ProcessTypeSummary]
     total_items: int
     total_quantity: Decimal
-    uk_item_count: int
 
 
 class BOMCreate(BaseModel):
@@ -368,7 +363,7 @@ class BOMTreeNode(BaseModel):
     item_id: uuid.UUID
     erp_code: Optional[str] = None
     item_name: str
-    category: CategoryEnum
+    process_type_code: Optional[str] = None
     unit: str
     required_quantity: Decimal
     current_stock: Decimal = Decimal("0")
@@ -390,7 +385,7 @@ class BackflushDetail(BaseModel):
     item_id: uuid.UUID
     erp_code: Optional[str] = None
     item_name: str
-    category: CategoryEnum
+    process_type_code: Optional[str] = None
     required_quantity: Decimal
     stock_before: Decimal
     stock_after: Decimal
@@ -453,7 +448,7 @@ class TransactionLogResponse(BaseModel):
     item_id: uuid.UUID
     erp_code: Optional[str] = None
     item_name: str
-    item_category: CategoryEnum
+    item_process_type_code: Optional[str] = None
     item_unit: str
     transaction_type: TransactionTypeEnum
     quantity_change: Decimal
@@ -741,7 +736,7 @@ class PhysicalCountResponse(BaseModel):
 class BomCheckComponent(BaseModel):
     erp_code: Optional[str] = None
     item_name: str
-    category: str
+    process_type_code: Optional[str] = None
     unit: str
     required: float
     current_stock: float
@@ -823,9 +818,9 @@ class StockRequestLineCreate(BaseModel):
     item_id: uuid.UUID
     quantity: Decimal = Field(..., gt=0)
     from_bucket: RequestBucketEnum
-    from_department: Optional[DepartmentEnum] = None
+    from_department: Optional[str] = None
     to_bucket: RequestBucketEnum
-    to_department: Optional[DepartmentEnum] = None
+    to_department: Optional[str] = None
 
 
 class StockRequestCreate(BaseModel):
@@ -867,9 +862,9 @@ class StockRequestLineResponse(BaseModel):
     erp_code_snapshot: Optional[str] = None
     quantity: Decimal
     from_bucket: RequestBucketEnum
-    from_department: Optional[DepartmentEnum] = None
+    from_department: Optional[str] = None
     to_bucket: RequestBucketEnum
-    to_department: Optional[DepartmentEnum] = None
+    to_department: Optional[str] = None
     status: StockRequestStatusEnum
     created_at: datetime
 
@@ -881,7 +876,7 @@ class StockRequestResponse(BaseModel):
     request_code: Optional[str] = None
     requester_employee_id: uuid.UUID
     requester_name: str
-    requester_department: DepartmentEnum
+    requester_department: str
     request_type: StockRequestTypeEnum
     status: StockRequestStatusEnum
     requires_warehouse_approval: bool
@@ -911,9 +906,44 @@ class ReservationLineResponse(BaseModel):
     request_id: uuid.UUID
     request_code: Optional[str] = None
     requester_name: str
-    requester_department: DepartmentEnum
+    requester_department: str
     quantity: Decimal
     from_bucket: RequestBucketEnum
     to_bucket: RequestBucketEnum
-    to_department: Optional[DepartmentEnum] = None
+    to_department: Optional[str] = None
     created_at: datetime
+
+
+class DepartmentCreate(BaseModel):
+    name: str = Field(..., max_length=50)
+    display_order: int = Field(0)
+    pin: str = Field(..., description="관리자 PIN")
+    color_hex: Optional[str] = Field(None, max_length=7)
+
+
+class DepartmentUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=50)
+    display_order: Optional[int] = None
+    is_active: Optional[bool] = None
+    color_hex: Optional[str] = Field(None, max_length=7)
+    pin: str = Field(..., description="관리자 PIN")
+
+
+class DepartmentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    display_order: int
+    is_active: bool
+    color_hex: Optional[str] = None
+
+
+class DepartmentReorderItem(BaseModel):
+    id: int
+    display_order: int
+
+
+class DepartmentReorderPayload(BaseModel):
+    items: List[DepartmentReorderItem]
+    pin: str

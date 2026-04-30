@@ -63,7 +63,7 @@ def build_dashboard(ws, commits):
     # 제목
     ws.merge_cells("A1:E1")
     title = ws["A1"]
-    title.value = "📊 ERP 재고관리 시스템 개발 현황"
+    title.value = "📊 DEXCOWIN MES 개발 현황"
     title.fill = make_fill(HEADER_BG)
     title.font = Font(bold=True, color=HEADER_FG, size=14)
     title.alignment = Alignment(horizontal="center", vertical="center")
@@ -73,9 +73,9 @@ def build_dashboard(ws, commits):
     # KPI 영역 (행 3~6)
     ws.row_dimensions[3].height = 22
     kpis = [
-        ("개발 기간", "2026-04-10 ~ 04-27 (18일)"),
+        ("개발 기간", "2026-04-10 ~ 04-30 (21일)"),
         ("총 커밋 수", f"{len(commits)}건"),
-        ("기능 완료", "20 / 29개 (69%)"),
+        ("기능 완료", "23 / 33개 (70%)"),
         ("개발 영역", "Backend · Frontend · Mobile · Admin · Docs"),
     ]
 
@@ -144,6 +144,7 @@ def build_summary(ws, commits):
     c4 = count_commits_in_range(commits, "2026-04-21", "2026-04-21")
     c5 = count_commits_in_range(commits, "2026-04-22", "2026-04-24")
     c6 = count_commits_in_range(commits, "2026-04-25", "2026-04-27")
+    c7 = count_commits_in_range(commits, "2026-04-28", "2026-04-30")
 
     rows = [
         ("2026-04-10 ~ 04-11", "기반 구축",
@@ -156,8 +157,10 @@ def build_summary(ws, commits):
          "레거시 레이아웃 Figma 맞춤 정제", c4, "완료"),
         ("2026-04-22 ~ 04-24", "실 운영 준비",
          "erp_code 통일·재고 시각화·모바일UX\n품목매칭 도구·ESLint·계산 일원화(N+1 제거)", c5, "완료"),
-        ("2026-04-25 ~ 04-27", "운영 품질 개선",
-         "입출고 단계형 Wizard UX·BOM Where-Used\n코드 품질 대정비(Phase 5)·CI 도입\n로그인 화면 구현·ERP 카테고리 코드 정비", c6, "완료"),
+        ("2026-04-25 ~ 04-27", "코드 품질 정비",
+         "입출고 단계형 Wizard UX·BOM Where-Used 조회\n코드 품질 대정비(Phase 5)·CI 도입\n로그인 화면 구현·카테고리 코드 정비", c6, "완료"),
+        ("2026-04-28 ~ 04-30", "현장 운영 투입",
+         "창고 승인 기반 입출고 흐름·직원별 장바구니\n작업자 PIN 로그인·감사 이력\n시스템명 MES 통일·품목 분류 개편(진행 중)", c7, "완료"),
     ]
 
     for r, (period, cat, work, cnt, status) in enumerate(rows, 2):
@@ -205,6 +208,9 @@ def build_features(ws):
         ("입출고 단계형 Wizard UX",     "UI",    True,  ""),
         ("원클릭 실행 (start.bat)",     "인프라", True,  ""),
         ("테스트 자동화 (CI)",          "인프라", True,  ""),
+        ("창고 승인 기반 입출고 흐름",   "재고",   True,  "요청→승인→처리 단계 분리"),
+        ("직원별 저장형 입출고 장바구니", "재고",   True,  "화면 이탈 후에도 작업 유지"),
+        ("작업자 PIN 로그인 + 감사 이력", "보안",  True,  "수정 이력 자동 기록"),
         # ── 예정 ─────────────────────────────────────────
         ("총재고 / 가용재고 / 예약재고 분리", "재고",  False, ""),
         ("생산 / 분해 / 반품 처리 Queue",   "생산",  False, ""),
@@ -215,6 +221,7 @@ def build_features(ws):
         ("발주 관리",                       "구매",  False, ""),
         ("생산 실적 / 원가 관리",            "생산",  False, ""),
         ("부서별 진행현황 화면",             "관리",  False, "사장님 요청 — 검토 중"),
+        ("품목 분류 개편 (process_type_code)", "재고", False, "진행 중"),
     ]
 
     for r, (name, cat, done, note) in enumerate(features, 2):

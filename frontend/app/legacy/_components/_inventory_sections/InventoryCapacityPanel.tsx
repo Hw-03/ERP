@@ -18,34 +18,34 @@ export function InventoryCapacityPanel({
     borderColor: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 30%, transparent)`,
   };
   const className =
-    "mt-3 flex w-full flex-wrap items-center gap-3 rounded-[14px] border px-4 py-2.5 text-left" +
+    "mt-3 flex w-full flex-wrap items-center gap-4 rounded-[14px] border px-5 py-4 text-left" +
     (interactive ? " cursor-pointer transition-opacity hover:opacity-90" : "");
   const inner = (
     <>
-      <Zap className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.cyan }} />
-      <span className="text-sm font-semibold" style={{ color: LEGACY_COLORS.cyan }}>생산 가능</span>
+      <Zap className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.cyan }} />
+      <span className="text-base font-semibold" style={{ color: LEGACY_COLORS.cyan }}>생산 가능</span>
       {capacityData.immediate === 0 && capacityData.maximum === 0 ? (
-        <span className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>미등록</span>
+        <span className="text-base" style={{ color: LEGACY_COLORS.muted2 }}>미등록</span>
       ) : (
         <>
-          <span className="text-sm font-black" style={{ color: LEGACY_COLORS.cyan }}>
+          <span className="text-lg font-black" style={{ color: LEGACY_COLORS.cyan }}>
             즉시 {formatNumber(capacityData.immediate)}
           </span>
-          <span className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>/</span>
-          <span className="text-sm font-black" style={{ color: LEGACY_COLORS.blue }}>
+          <span className="text-base" style={{ color: LEGACY_COLORS.muted2 }}>/</span>
+          <span className="text-lg font-black" style={{ color: LEGACY_COLORS.blue }}>
             최대 {formatNumber(capacityData.maximum)}
           </span>
         </>
       )}
       {capacityData.limiting_item && (
         <span
-          className="ml-auto inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold"
+          className="ml-auto inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-bold"
           style={{
             background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 16%, transparent)`,
             color: LEGACY_COLORS.yellow,
           }}
         >
-          <AlertTriangle className="h-3 w-3" />
+          <AlertTriangle className="h-3.5 w-3.5" />
           병목 부품: {capacityData.limiting_item}
         </span>
       )}

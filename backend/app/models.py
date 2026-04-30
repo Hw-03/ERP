@@ -56,20 +56,6 @@ class BoolAsString(TypeDecorator):
         return str(value).lower() in ("true", "1", "yes", "t")
 
 
-class CategoryEnum(str, enum.Enum):
-    RM = "RM"
-    TA = "TA"
-    TF = "TF"
-    HA = "HA"
-    HF = "HF"
-    VA = "VA"
-    VF = "VF"
-    AA = "AA"
-    AF = "AF"
-    FG = "FG"
-    UK = "UK"
-
-
 class TransactionTypeEnum(str, enum.Enum):
     RECEIVE = "RECEIVE"
     PRODUCE = "PRODUCE"
@@ -137,19 +123,24 @@ class EmployeeLevelEnum(str, enum.Enum):
     STAFF = "staff"
 
 
+class Department(Base):
+    __tablename__ = "departments"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(50), unique=True, nullable=False)
+    display_order = Column(Integer, nullable=False, default=0)
+    is_active = Column(Boolean, nullable=False, default=True)
+    color_hex = Column(String(7), nullable=True)
+
+
 class Item(Base):
     __tablename__ = "items"
 
     item_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     item_code = Column(String(50), unique=True, nullable=True, index=True)  # 레거시 CSV 코드 — erp_code로 교체 후 DROP 예정
     item_name = Column(String(200), nullable=False)
+    sort_order = Column(Integer, nullable=True, index=True)  # 엑셀 정리본 행 순서
     spec = Column(Text, nullable=True)
-    category = Column(
-        SAEnum(CategoryEnum, name="category_enum", create_type=True),
-        nullable=False,
-        default=CategoryEnum.UK,
-        index=True,
-    )
     unit = Column(String(20), nullable=False, default="EA")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
     updated_at = Column(
@@ -161,6 +152,7 @@ class Item(Base):
     )
 
     # Legacy UI display fields (populated from ERP_Master_DB.csv or rule-based defaults)
+
     barcode = Column(String(100), nullable=True, index=True)
     legacy_file_type = Column(String(50), nullable=True, index=True)  # 원자재/조립자재/발생부자재/완제품/미분류
     legacy_part = Column(String(50), nullable=True, index=True)       # 자재창고/조립출하/고압파트/진공파트/튜닝파트/출하
@@ -252,11 +244,7 @@ class InventoryLocation(Base):
         nullable=False,
         index=True,
     )
-    department = Column(
-        SAEnum(DepartmentEnum, name="department_enum", create_type=False),
-        nullable=False,
-        index=True,
-    )
+    department = Column(String(50), nullable=False, index=True)
     status = Column(
         SAEnum(LocationStatusEnum, name="location_status_enum", create_type=True),
         nullable=False,
@@ -308,12 +296,7 @@ class Employee(Base):
     name = Column(String(100), nullable=False, index=True)
     role = Column(String(100), nullable=False)
     phone = Column(String(30), nullable=True)
-    department = Column(
-        SAEnum(DepartmentEnum, name="department_enum", create_type=True),
-        nullable=False,
-        default=DepartmentEnum.ETC,
-        index=True,
-    )
+    department = Column(String(50), nullable=False, default="기타", index=True)
     level = Column(
         SAEnum(EmployeeLevelEnum, name="employee_level_enum", create_type=True),
         nullable=False,
@@ -731,10 +714,7 @@ class StockRequest(Base):
         index=True,
     )
     requester_name = Column(String(100), nullable=False)
-    requester_department = Column(
-        SAEnum(DepartmentEnum, name="department_enum", create_type=False),
-        nullable=False,
-    )
+    requester_department = Column(String(50), nullable=False)
     request_type = Column(
         SAEnum(StockRequestTypeEnum, name="stock_request_type_enum", create_type=True),
         nullable=False,
@@ -808,18 +788,12 @@ class StockRequestLine(Base):
         SAEnum(RequestBucketEnum, name="request_bucket_enum", create_type=True),
         nullable=False,
     )
-    from_department = Column(
-        SAEnum(DepartmentEnum, name="department_enum", create_type=False),
-        nullable=True,
-    )
+    from_department = Column(String(50), nullable=True)
     to_bucket = Column(
         SAEnum(RequestBucketEnum, name="request_bucket_enum", create_type=False),
         nullable=False,
     )
-    to_department = Column(
-        SAEnum(DepartmentEnum, name="department_enum", create_type=False),
-        nullable=True,
-    )
+    to_department = Column(String(50), nullable=True)
     status = Column(
         SAEnum(StockRequestStatusEnum, name="stock_request_status_enum", create_type=False),
         nullable=False,

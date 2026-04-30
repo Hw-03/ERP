@@ -40,7 +40,6 @@ export function useWarehouseData({ globalSearch, onStatusChange }: Args) {
         setItems(nextItems);
         setPackages(nextPackages);
         setLoadFailure(null);
-        onStatusChange(`입출고 준비 완료: 직원 ${nextEmployees.length}명, 품목 ${nextItems.length}건`);
       })
       .catch((nextError) => {
         const msg = nextError instanceof Error ? nextError.message : "입출고 데이터를 불러오지 못했습니다.";

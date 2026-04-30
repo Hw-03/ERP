@@ -44,10 +44,9 @@ export function StepItems({
   const filtered = useMemo(() => {
     const k = deferredSearch.trim().toLowerCase();
     return items.filter((item) => {
-      if (category === "RM" && item.category !== "RM") return false;
-      if (category === "A" && !["TA", "HA", "VA", "AA"].includes(item.category)) return false;
-      if (category === "F" && !["TF", "HF", "VF", "AF"].includes(item.category)) return false;
-      if (category === "FG" && item.category !== "FG") return false;
+      if (category === "R" && !item.process_type_code?.endsWith("R")) return false;
+      if (category === "A" && !item.process_type_code?.endsWith("A")) return false;
+      if (category === "F" && !item.process_type_code?.endsWith("F")) return false;
       if (!k) return true;
       const hay = `${item.item_name} ${item.erp_code ?? ""} ${item.barcode ?? ""}`.toLowerCase();
       return hay.includes(k);
