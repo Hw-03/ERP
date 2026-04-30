@@ -1,13 +1,108 @@
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BOM 작업 사용안내</title>
-<style>body{font:15px "Malgun Gothic","Segoe UI",Arial,sans-serif;line-height:1.65;margin:0;background:#f6f7f8;color:#1f252c}main{max-width:920px;margin:0 auto;padding:28px}section{background:#fff;border:1px solid #d9dee5;border-radius:8px;padding:18px;margin:14px 0}h1{margin-top:0}code{background:#eef3f5;padding:2px 5px;border-radius:4px}li{margin:6px 0}</style></head>
+<style>
+body{font:16px/1.65 "Malgun Gothic","Apple SD Gothic Neo","Segoe UI",Arial,sans-serif;margin:0;background:#f5f7fa;color:#1f252c}
+main{max-width:760px;margin:0 auto;padding:32px 24px 64px}
+h1{font-size:30px;margin:0 0 8px;letter-spacing:-.5px}
+.lead{color:#687380;font-size:16px;margin-bottom:24px}
+.step{background:#fff;border:1px solid #e4e8ec;border-radius:18px;padding:22px 26px;margin:14px 0;box-shadow:0 1px 2px rgba(20,31,43,.05)}
+.step h2{margin:0 0 10px;font-size:19px;display:flex;align-items:center;gap:10px}
+.step .num{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#e1f3f2;color:#0d5e62;font-weight:700;font-size:15px}
+.step ul,.step ol{margin:6px 0;padding-left:22px}
+.step li{margin:6px 0}
+.step strong{color:#0d5e62}
+code{background:#eef3f5;padding:2px 7px;border-radius:6px;font-size:14px;font-family:ui-monospace,Menlo,Consolas,monospace}
+.tip{background:#ecfdf5;border:1px solid #86efac;color:#166534;padding:14px 18px;border-radius:14px;margin:14px 0;font-size:15px}
+.note{background:#fef3c7;border:1px solid #fcd34d;color:#854d0e;padding:14px 18px;border-radius:14px;margin:14px 0;font-size:15px}
+.foot{color:#94a3b8;font-size:13px;text-align:center;padding:24px}
+</style></head>
 <body><main>
-<h1>BOM 구성 작업 사용안내</h1>
-<p>이 도구는 기존 ERP/DB에 직접 저장하지 않고, 담당자가 BOM 초안을 만든 뒤 검수자가 확인해 CSV로 제출하기 위한 독립 HTML입니다.</p>
-<section><h2>1. 시작</h2><ol><li><code>bom_planner.html</code>을 더블클릭합니다.</li><li>상단의 작업자명에 이름을 입력합니다.</li><li>왼쪽에서 상위 품목을 고릅니다.</li><li>오른쪽 하위 후보에서 <code>＋</code>, 더블클릭, 드래그 앤 드롭, ERP 코드 직접 입력 중 하나로 하위 품목을 추가합니다.</li></ol></section>
-<section><h2>2. 저장</h2><ul><li>작업은 브라우저에 자동 저장됩니다.</li><li>다른 PC로 옮기려면 반드시 <code>작업파일 저장</code>으로 JSON 파일을 내보내세요.</li><li>작업을 이어갈 때는 <code>작업파일 불러오기</code>를 사용합니다.</li></ul></section>
-<section><h2>3. 검수</h2><ul><li><code>검수자</code> 모드로 바꾸면 미완료 상위 품목까지 경고로 표시됩니다.</li><li>오류는 확정 CSV 생성을 막습니다.</li><li>경고만 남은 경우에는 검수자가 사유를 비고에 적고 확정 CSV를 만들 수 있습니다.</li></ul></section>
-<section><h2>4. 제출</h2><ul><li><code>확정 CSV</code>: 최종 BOM 원장 반영용입니다.</li><li><code>검수 CSV</code>: 오류/경고 목록 전달용입니다.</li><li>CSV는 Excel에서 한글이 깨지지 않도록 UTF-8 BOM 형식으로 저장됩니다.</li></ul></section>
-<section><h2>원장 정보</h2><p>생성시각: 2026-04-30 11:02:11<br>원장 checksum: ef8c49f3ef74d998</p></section>
+<h1>BOM 작업 사용안내</h1>
+<div class="lead">컴퓨터에 익숙하지 않아도, 화면 안내대로 따라가면 끝납니다.</div>
+
+<div class="step">
+  <h2><span class="num">1</span>처음 화면 (탭 3개)</h2>
+  <ul>
+    <li><code>bom_planner.html</code>을 더블클릭해 엽니다.</li>
+    <li>위쪽에 탭이 3개 있어요:
+      <ul>
+        <li><strong>📂 작업하기</strong> — 부서를 골라 새로 BOM 만들기</li>
+        <li><strong>✓ 완료한 BOM</strong> — 끝낸 것 모아보기 + 한꺼번에 다운로드</li>
+        <li><strong>⏳ 아직 안 한 것</strong> — 미처리 상위 품목 한눈에 보기</li>
+      </ul>
+    </li>
+  </ul>
+</div>
+
+<div class="step">
+  <h2><span class="num">2</span>부서 고르기</h2>
+  <ul>
+    <li>「작업하기」 탭에서 자기 <strong>부서</strong>를 한 번 누릅니다 (튜브 / 고압 / 진공 / 튜닝 / 조립 / 출하).</li>
+    <li>그 부서가 만드는 상위 품목 목록으로 넘어갑니다.</li>
+  </ul>
+</div>
+
+<div class="step">
+  <h2><span class="num">3</span>상위 품목 고르기</h2>
+  <ul>
+    <li>위 검색창에 <strong>품명이나 코드</strong>를 적으면 바로 걸러집니다.</li>
+    <li>BOM을 만들 품목을 한 번 누릅니다.</li>
+    <li>오른쪽에 <strong>「아직 안 함 / 작업 중 / 끝남」</strong> 표시가 있어 진행 상태를 알 수 있어요.</li>
+  </ul>
+</div>
+
+<div class="step">
+  <h2><span class="num">4</span>하위 부품 추가</h2>
+  <ul>
+    <li>오른쪽 부품 목록에서 <strong>한 번 누르면 즉시 추가</strong>됩니다 (수량 1, 단위 EA 기본).</li>
+    <li>왼쪽에 들어간 부품의 수량은 <strong>＋ / − 버튼</strong>으로 조정합니다.</li>
+    <li><strong>「검수 끝남」</strong> 스위치를 켜면 그 줄이 검토 완료로 표시됩니다.</li>
+    <li>비고를 적으려면 줄 오른쪽의 <strong>✎ 아이콘</strong>을 누르세요.</li>
+    <li>잘못 넣었다면 <strong>× 아이콘</strong>으로 뺄 수 있어요.</li>
+  </ul>
+  <div class="tip">💡 <strong>팁</strong> — 작업은 자동 저장됩니다. 브라우저를 닫았다 켜도 그대로 이어집니다.</div>
+</div>
+
+<div class="step">
+  <h2><span class="num">5</span>검토 + 완료 처리</h2>
+  <ul>
+    <li>아래쪽 <strong>「다음: 검토하기 →」</strong> 버튼을 누릅니다.</li>
+    <li>요약 카드에서 <strong>「잘된 점」</strong>과 <strong>「고쳐야 할 곳 / 확인할 곳」</strong>을 한눈에 봅니다.</li>
+    <li>빨간 항목이 있으면 「← 더 작업하기」로 돌아가 고칩니다.</li>
+    <li>이상 없으면 <strong>「✓ 이 BOM 완료 처리」</strong>를 누릅니다 — 이 BOM이 「완료한 BOM」 탭으로 모입니다. <strong>이 시점에는 파일이 만들어지지 않습니다.</strong></li>
+  </ul>
+</div>
+
+<div class="step">
+  <h2><span class="num">6</span>전체 다운로드 (작업이 다 끝난 뒤)</h2>
+  <ul>
+    <li>「✓ 완료한 BOM」 탭으로 이동합니다.</li>
+    <li>위쪽 <strong>「📥 전체 다운로드 (CSV)」</strong> 버튼을 한 번 누르면 그동안 완료한 모든 BOM이 한 번에 CSV 2개로 다운로드됩니다.
+      <ul><li><code>bom_final_...csv</code>: 모든 완료 BOM 자료</li>
+      <li><code>bom_review_...csv</code>: 확인이 필요했던 항목 기록</li></ul>
+    </li>
+    <li>잘못 완료 처리한 게 있으면 그 줄의 <strong>「완료 취소」</strong>를 누르거나, 「다시 열기」로 편집을 이어갈 수 있습니다.</li>
+  </ul>
+  <div class="note">⚠ 완료 처리는 빨간 항목이 모두 사라진 뒤에만 됩니다. 노란 항목은 통과해도 완료 가능합니다.</div>
+</div>
+
+<div class="step">
+  <h2><span class="num">7</span>도움이 되는 단축키</h2>
+  <ul>
+    <li><code>Esc</code> — 한 단계 뒤로 갑니다 (편집 → 상위 → 처음 화면).</li>
+    <li><code>Enter</code> — 검색창에서 첫 결과로 이동.</li>
+  </ul>
+</div>
+
+<div class="step">
+  <h2><span class="num">?</span>자주 보이는 메시지</h2>
+  <ul>
+    <li><strong>"공정 순서가 어색해요"</strong> — 부품의 공정 단계가 상위와 비슷하거나 더 늦어 보일 때 뜹니다. 정말 맞다면 비고에 이유를 적어주세요.</li>
+    <li><strong>"같은 부품이 두 번 들어가 있어요"</strong> — 같은 부품이 중복 추가됐어요. 한 줄만 남기고 나머지는 × 로 빼주세요.</li>
+    <li><strong>"부품끼리 서로의 하위가 되어 있어요"</strong> — A→B→A 처럼 빙글 도는 관계입니다. 한쪽을 빼야 합니다.</li>
+  </ul>
+</div>
+
+<div class="foot">생성: 2026-04-30 12:25:42 · 원장 ef8c49f3ef74d998</div>
 </main></body></html>

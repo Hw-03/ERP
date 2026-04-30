@@ -4,10 +4,10 @@
   "catalog": {
     "sourceFile": "생산부_재고_매칭작업_정리본_공정순번.xlsx",
     "itemCount": 722,
-    "generatedAt": "2026-04-30 11:02:11",
+    "generatedAt": "2026-04-30 12:25:42",
     "checksum": "ef8c49f3ef74d998"
   },
-  "createdAt": "2026-04-30T11:02:11",
+  "createdAt": "2026-04-30T12:25:42",
   "workerName": "sample",
   "selectedParent": "3-NF-0001",
   "relations": [
