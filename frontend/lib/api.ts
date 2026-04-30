@@ -77,6 +77,7 @@ export interface DepartmentMaster {
   name: string;
   display_order: number;
   is_active: boolean;
+  color_hex: string | null;
 }
 
 export interface Item {
@@ -1454,7 +1455,7 @@ export const api = {
     return fetcher<DepartmentMaster[]>(toApiUrl(`/api/departments?${query}`));
   },
 
-  createDepartment: async (payload: { name: string; display_order?: number }) => {
+  createDepartment: async (payload: { name: string; display_order?: number; pin: string; color_hex?: string }) => {
     const res = await fetch(toApiUrl("/api/departments"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1464,7 +1465,7 @@ export const api = {
     return res.json() as Promise<DepartmentMaster>;
   },
 
-  updateDepartment: async (id: number, payload: { name?: string; display_order?: number; is_active?: boolean }) => {
+  updateDepartment: async (id: number, payload: { name?: string; display_order?: number; is_active?: boolean; color_hex?: string | null; pin: string }) => {
     const res = await fetch(toApiUrl(`/api/departments/${id}`), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -1474,8 +1475,18 @@ export const api = {
     return res.json() as Promise<DepartmentMaster>;
   },
 
-  deleteDepartment: async (id: number) => {
-    const res = await fetch(toApiUrl(`/api/departments/${id}`), { method: "DELETE" });
+  deleteDepartment: async (id: number, pin: string) => {
+    const res = await fetch(toApiUrl(`/api/departments/${id}?pin=${encodeURIComponent(pin)}`), { method: "DELETE" });
     if (!res.ok) throw new Error(await parseError(res));
+  },
+
+  reorderDepartments: async (payload: { items: { id: number; display_order: number }[]; pin: string }) => {
+    const res = await fetch(toApiUrl("/api/departments/reorder"), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json() as Promise<{ ok: boolean }>;
   },
 };

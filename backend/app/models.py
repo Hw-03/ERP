@@ -130,6 +130,7 @@ class Department(Base):
     name = Column(String(50), unique=True, nullable=False)
     display_order = Column(Integer, nullable=False, default=0)
     is_active = Column(Boolean, nullable=False, default=True)
+    color_hex = Column(String(7), nullable=True)
 
 
 class Item(Base):

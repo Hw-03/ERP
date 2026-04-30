@@ -66,7 +66,7 @@ export function DesktopTopbar({
 
         {status && (
           <span key={statusNonce} style={{ animation: "statusFlash 0.35s ease-out" }}>
-            <StatusPill tone={inferToneFromStatus(status)} label={status} title={status} />
+            <StatusPill tone={inferToneFromStatus(status)} label={status} title={status} className="py-1.5 text-sm" />
           </span>
         )}
 

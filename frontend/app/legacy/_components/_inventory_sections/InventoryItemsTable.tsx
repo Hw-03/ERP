@@ -76,17 +76,17 @@ export function InventoryItemsTable({
             <tr style={{ background: LEGACY_COLORS.s2 }}>
               {(
                 [
-                  { label: "상태", nowrap: true, width: "80px" },
+                  { label: "상태", nowrap: true, width: "90px" },
                   { label: "품목명", nowrap: false, minWidth: "180px" },
-                  { label: "품목 코드", nowrap: true, width: "100px" },
-                  { label: "부서", nowrap: true, width: "120px" },
-                  { label: "현재고", nowrap: true, width: "84px" },
-                  { label: "안전재고", nowrap: true, width: "80px" },
-                ] as { label: string; nowrap: boolean; width?: string; minWidth?: string }[]
-              ).map(({ label, nowrap, width, minWidth }) => (
+                  { label: "품목 코드", nowrap: true, width: "160px" },
+                  { label: "부서", nowrap: true, width: "160px", center: true },
+                  { label: "현재고", nowrap: true, width: "160px", center: true },
+                  { label: "안전재고", nowrap: true, width: "160px", center: true },
+                ] as { label: string; nowrap: boolean; width?: string; minWidth?: string; center?: boolean }[]
+              ).map(({ label, nowrap, width, minWidth, center }) => (
                 <th
                   key={label}
-                  className={`border-b px-4 py-2.5 text-left text-sm font-bold${nowrap ? " whitespace-nowrap" : ""}`}
+                  className={`border-b px-4 py-2.5 text-sm font-bold${nowrap ? " whitespace-nowrap" : ""}${center ? " text-center" : " text-left"}`}
                   style={{
                     borderColor: LEGACY_COLORS.border,
                     color: LEGACY_COLORS.muted2,

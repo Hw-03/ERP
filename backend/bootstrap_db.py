@@ -103,6 +103,8 @@ _MIGRATION_DDL: list[str] = [
     "ALTER TABLE employees ADD COLUMN warehouse_role VARCHAR(20) NOT NULL DEFAULT 'none'",
     # PIN 마지막 변경 일시 (NULL = 변경 이력 없음)
     "ALTER TABLE employees ADD COLUMN pin_last_changed DATETIME",
+    # 부서 대표 색깔 (HEX, NULL = 기본 purple)
+    "ALTER TABLE departments ADD COLUMN color_hex VARCHAR(7)",
 ]
 
 
@@ -122,18 +124,6 @@ def run_migrations() -> dict[str, int]:
                 applied += 1
             except Exception:
                 skipped += 1
-
-        # 기존 quantity → warehouse_qty 1회 이관 (warehouse_qty 가 0 인 행만)
-        try:
-            conn.execute(
-                text(
-                    "UPDATE inventory SET warehouse_qty = quantity "
-                    "WHERE warehouse_qty = 0 AND quantity > 0"
-                )
-            )
-            conn.commit()
-        except Exception:
-            pass
 
         # pending_quantity NULL 기본값 채우기
         try:

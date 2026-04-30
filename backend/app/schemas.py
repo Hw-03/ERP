@@ -918,12 +918,14 @@ class DepartmentCreate(BaseModel):
     name: str = Field(..., max_length=50)
     display_order: int = Field(0)
     pin: str = Field(..., description="관리자 PIN")
+    color_hex: Optional[str] = Field(None, max_length=7)
 
 
 class DepartmentUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=50)
     display_order: Optional[int] = None
     is_active: Optional[bool] = None
+    color_hex: Optional[str] = Field(None, max_length=7)
     pin: str = Field(..., description="관리자 PIN")
 
 
@@ -934,3 +936,14 @@ class DepartmentResponse(BaseModel):
     name: str
     display_order: int
     is_active: bool
+    color_hex: Optional[str] = None
+
+
+class DepartmentReorderItem(BaseModel):
+    id: int
+    display_order: int
+
+
+class DepartmentReorderPayload(BaseModel):
+    items: List[DepartmentReorderItem]
+    pin: str

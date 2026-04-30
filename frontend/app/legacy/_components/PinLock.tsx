@@ -7,7 +7,7 @@ import { LEGACY_COLORS } from "./legacyUi";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "삭제"];
 
-export function PinLock({ onUnlocked }: { onUnlocked: () => void }) {
+export function PinLock({ onUnlocked }: { onUnlocked: (pin: string) => void }) {
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -18,7 +18,7 @@ export function PinLock({ onUnlocked }: { onUnlocked: () => void }) {
     try {
       setLoading(true);
       await api.verifyAdminPin(pinToVerify);
-      onUnlocked();
+      onUnlocked(pinToVerify);
     } catch {
       setError(true);
       setPin("");

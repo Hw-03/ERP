@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Department
 from app.routers.settings import require_admin
-from app.schemas import DepartmentCreate, DepartmentResponse, DepartmentUpdate
+from app.schemas import DepartmentCreate, DepartmentReorderPayload, DepartmentResponse, DepartmentUpdate
 
 router = APIRouter()
 
@@ -32,11 +32,22 @@ def create_department(
     require_admin(db, payload.pin)
     if db.query(Department).filter(Department.name == payload.name).first():
         raise HTTPException(status_code=409, detail="이미 존재하는 부서명입니다.")
-    dept = Department(name=payload.name, display_order=payload.display_order, is_active=True)
+    dept = Department(name=payload.name, display_order=payload.display_order, is_active=True, color_hex=payload.color_hex)
     db.add(dept)
     db.commit()
     db.refresh(dept)
     return dept
+
+
+@router.patch("/reorder")
+def reorder_departments(payload: DepartmentReorderPayload, db: Session = Depends(get_db)):
+    require_admin(db, payload.pin)
+    for item in payload.items:
+        dept = db.query(Department).filter(Department.id == item.id).first()
+        if dept:
+            dept.display_order = item.display_order
+    db.commit()
+    return {"ok": True}
 
 
 @router.put("/{dept_id}", response_model=DepartmentResponse)
@@ -57,6 +68,8 @@ def update_department(
         dept.display_order = payload.display_order
     if payload.is_active is not None:
         dept.is_active = payload.is_active
+    if payload.color_hex is not None:
+        dept.color_hex = payload.color_hex
     db.commit()
     db.refresh(dept)
     return dept
@@ -72,5 +85,5 @@ def delete_department(
     dept = db.query(Department).filter(Department.id == dept_id).first()
     if not dept:
         raise HTTPException(status_code=404, detail="부서를 찾을 수 없습니다.")
-    dept.is_active = False
+    db.delete(dept)
     db.commit()

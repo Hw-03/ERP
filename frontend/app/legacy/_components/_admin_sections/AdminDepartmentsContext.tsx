@@ -19,8 +19,6 @@ export function AdminDepartmentsProvider({
 
 export function useAdminDepartmentsContext(): AdminDepartmentsState {
   const ctx = useContext(AdminDepartmentsContext);
-  if (!ctx) {
-    throw new Error("useAdminDepartmentsContext must be used inside <AdminDepartmentsProvider>");
-  }
+  if (!ctx) throw new Error("useAdminDepartmentsContext must be used inside <AdminDepartmentsProvider>");
   return ctx;
 }

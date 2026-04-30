@@ -90,7 +90,7 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
       }}
     >
       <td
-        className="border-b px-4 py-2.5 align-middle whitespace-nowrap"
+        className="border-b px-4 py-[21px] align-middle whitespace-nowrap"
         style={{ borderColor: LEGACY_COLORS.border }}
       >
         <span
@@ -101,7 +101,7 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
           {stock.label}
         </span>
       </td>
-      <td className="border-b px-4 py-2.5 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className="border-b px-4 py-[21px] align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="font-semibold">{item.item_name}</div>
         {item.spec && (
           <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -110,13 +110,13 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
         )}
         {Number(item.quantity) === 0 ? (
           <div
-            className="mt-2 h-[5px] overflow-hidden rounded-full"
+            className="mt-[20px] h-[4px] overflow-hidden rounded-full"
             style={{ background: "#ef4444" }}
             title="품절"
           />
         ) : (
           <div
-            className="mt-2 flex h-[5px] overflow-hidden rounded-full"
+            className="mt-[20px] flex h-[4px] overflow-hidden rounded-full"
             style={{ background: LEGACY_COLORS.s3 }}
             title={segments.map((s) => s.label).join(" / ")}
             role="img"
@@ -133,16 +133,16 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
         )}
       </td>
       <td
-        className="border-b px-4 py-2.5 align-middle whitespace-nowrap text-sm"
+        className="border-b px-4 py-[21px] align-middle whitespace-nowrap text-sm"
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
       >
         {item.erp_code ?? "-"}
       </td>
       <td
-        className="border-b px-4 py-2.5 align-middle whitespace-nowrap"
+        className="border-b px-4 py-[21px] align-middle whitespace-nowrap"
         style={{ borderColor: LEGACY_COLORS.border }}
       >
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-center gap-1.5">
           {visibleBadges.map((b) => (
             <span
               key={b.key}
@@ -160,7 +160,7 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
         </div>
       </td>
       <td
-        className="border-b px-4 py-2.5 text-center align-middle whitespace-nowrap text-sm font-bold"
+        className="border-b px-4 py-[21px] text-center align-middle whitespace-nowrap text-sm font-bold"
         style={{
           borderColor: LEGACY_COLORS.border,
           color: isCritical ? stock.color : LEGACY_COLORS.text,
@@ -169,7 +169,7 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
         {formatNumber(item.quantity)}
       </td>
       <td
-        className="border-b px-4 py-2.5 text-center align-middle whitespace-nowrap text-sm font-bold"
+        className="border-b px-4 py-[21px] text-center align-middle whitespace-nowrap text-sm font-bold"
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
       >
         {item.min_stock == null ? "-" : formatNumber(item.min_stock)}

@@ -25,7 +25,7 @@ export function InventoryKpiPanel({ cards, activeKey, onChange }: Props) {
             onClick={() => onChange(card.key)}
             onMouseEnter={() => setHovered(card.key)}
             onMouseLeave={() => setHovered(null)}
-            className="rounded-[16px] border px-4 py-4 text-left transition-colors hover:brightness-110"
+            className="rounded-[16px] border px-5 py-5 text-left transition-colors hover:brightness-110"
             style={{
               background: isActive
                 ? `color-mix(in srgb, ${card.tone} 22%, transparent)`
@@ -38,14 +38,14 @@ export function InventoryKpiPanel({ cards, activeKey, onChange }: Props) {
             }}
           >
             <div className="flex items-baseline justify-between gap-2">
-              <div className="text-[20px] font-black tracking-[-0.02em]" style={{ color: card.tone }}>
+              <div className="text-[22px] font-black tracking-[-0.02em]" style={{ color: card.tone }}>
                 {card.label}
               </div>
-              <div className="text-[22px] font-black leading-none" style={{ color: card.tone }}>
+              <div className="text-[32px] font-black leading-none" style={{ color: card.tone }}>
                 {formatNumber(card.value)}
               </div>
             </div>
-            <div className="mt-1.5 text-[11px] font-semibold" style={{ color: card.tone, opacity: 0.7 }}>
+            <div className="mt-2 text-[12px] font-semibold" style={{ color: card.tone, opacity: 0.7 }}>
               {card.hint}
             </div>
           </button>

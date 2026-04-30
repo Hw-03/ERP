@@ -7,11 +7,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Loader2, Search, UserCheck } from "lucide-react";
-import { api, type Employee } from "@/lib/api";
+import { api, type DepartmentMaster, type Employee } from "@/lib/api";
 import { setCurrentOperator } from "./useCurrentOperator";
 import { employeeColor } from "../legacyUi";
 
-const DEPT_ORDER = ["튜브", "고압", "진공", "튜닝", "조립", "AS", "영업", "연구", "기타"];
 
 interface OperatorLoginCardProps {
   onLogin: () => void;
@@ -22,6 +21,7 @@ type Step = "dept" | "select" | "pin";
 export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
   const [step, setStep] = useState<Step>("dept");
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [deptMasters, setDeptMasters] = useState<DepartmentMaster[]>([]);
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Employee | null>(null);
@@ -30,7 +30,13 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    api.getEmployees({ activeOnly: true }).then(setEmployees).catch(() => {});
+    void Promise.all([
+      api.getEmployees({ activeOnly: true }),
+      api.getDepartments({ isActive: true }),
+    ]).then(([emps, depts]) => {
+      setEmployees(emps);
+      setDeptMasters(depts);
+    }).catch(() => {});
   }, []);
 
   // 브라우저 뒤로가기/앞으로가기로 단계 이동 지원
@@ -48,25 +54,6 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
-
-  const departments = useMemo(() => {
-    const seen = new Set<string>();
-    const result: string[] = [];
-    for (const e of employees) {
-      if (e.department && !seen.has(e.department)) {
-        seen.add(e.department);
-        result.push(e.department);
-      }
-    }
-    return result.sort((a, b) => {
-      const ai = DEPT_ORDER.indexOf(a);
-      const bi = DEPT_ORDER.indexOf(b);
-      if (ai === -1 && bi === -1) return a.localeCompare(b);
-      if (ai === -1) return 1;
-      if (bi === -1) return -1;
-      return ai - bi;
-    });
-  }, [employees]);
 
   const filtered = useMemo(() => {
     let list = selectedDept ? employees.filter((e) => e.department === selectedDept) : employees;
@@ -146,7 +133,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
         }}
       >
         {step === "dept" && (
-          <DeptStep departments={departments} onSelect={handleSelectDept} />
+          <DeptStep departments={deptMasters} onSelect={handleSelectDept} />
         )}
         {step === "select" && (
           <SelectStep
@@ -175,11 +162,11 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
 
 /* ── 부서 버튼 ────────────────────────────────────────────────────────────── */
 
-function DeptButton({ dept, onSelect }: { dept: string; onSelect: (d: string) => void }) {
-  const color = employeeColor(dept);
+function DeptButton({ dept, onSelect }: { dept: DepartmentMaster; onSelect: (name: string) => void }) {
+  const color = dept.color_hex ?? employeeColor(dept.name);
   return (
     <button
-      onClick={() => onSelect(dept)}
+      onClick={() => onSelect(dept.name)}
       className="flex w-full items-center justify-center rounded-[20px] border py-8 text-2xl font-bold transition-all active:scale-[0.98]"
       style={{
         background: `color-mix(in srgb, ${color} 12%, transparent)`,
@@ -193,7 +180,7 @@ function DeptButton({ dept, onSelect }: { dept: string; onSelect: (d: string) =>
         e.currentTarget.style.background = `color-mix(in srgb, ${color} 12%, transparent)`;
       }}
     >
-      {dept}
+      {dept.name}
     </button>
   );
 }
@@ -204,12 +191,9 @@ function DeptStep({
   departments,
   onSelect,
 }: {
-  departments: string[];
+  departments: DepartmentMaster[];
   onSelect: (dept: string) => void;
 }) {
-  const top = departments.slice(0, 5);
-  const bottom = departments.slice(5);
-
   return (
     <div className="flex flex-1 flex-col">
       {/* 상단 여백 + 로그인 (상단 공간 약간 위쪽) */}
@@ -219,27 +203,16 @@ function DeptStep({
         </h1>
       </div>
 
-      {/* 부서 버튼 (카드 정중앙) */}
+      {/* 부서 버튼 — 5열 그리드, 자동 줄바꿈 */}
       {departments.length === 0 ? (
         <div className="text-sm" style={{ color: "var(--c-muted)" }}>
           등록된 부서가 없습니다.
         </div>
       ) : (
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-5 gap-4">
-            {top.map((dept) => (
-              <DeptButton key={dept} dept={dept} onSelect={onSelect} />
-            ))}
-          </div>
-          {bottom.length > 0 && (
-            <div className="flex justify-center gap-4">
-              {bottom.map((dept) => (
-                <div key={dept} style={{ flex: "0 0 calc((100% - 64px) / 5)" }}>
-                  <DeptButton dept={dept} onSelect={onSelect} />
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="grid grid-cols-5 gap-4">
+          {departments.map((dept) => (
+            <DeptButton key={dept.id} dept={dept} onSelect={onSelect} />
+          ))}
         </div>
       )}
 
