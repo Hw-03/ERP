@@ -26,7 +26,7 @@ import {
 } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import { PinLock } from "./PinLock";
-import { LEGACY_COLORS, formatNumber } from "./legacyUi";
+import { LEGACY_COLORS, employeeColor, formatNumber } from "./legacyUi";
 import { AdminMasterItemsSection } from "./_admin_sections/AdminMasterItemsSection";
 import { AdminEmployeesSection } from "./_admin_sections/AdminEmployeesSection";
 import { AdminBomSection } from "./_admin_sections/AdminBomSection";
@@ -41,6 +41,7 @@ import { AdminExportSection } from "./_admin_sections/AdminExportSection";
 import { AdminDangerZone } from "./_admin_sections/AdminDangerZone";
 import { AdminDepartmentsProvider } from "./_admin_sections/AdminDepartmentsContext";
 import { AdminDepartmentsSection } from "./_admin_sections/AdminDepartmentsSection";
+import { COLOR_PALETTE } from "./_admin_hooks/useAdminDepartments";
 import { EMPTY_ADD_FORM, EMPTY_EMPLOYEE_FORM } from "./_admin_sections/adminShared";
 
 type AdminSection = "items" | "employees" | "models" | "bom" | "packages" | "export" | "settings" | "departments";
@@ -101,6 +102,147 @@ function SectionHeader({
       </div>
       <div className="mt-1 text-base" style={{ color: LEGACY_COLORS.muted2 }}>
         {description}
+      </div>
+    </div>
+  );
+}
+
+function DeptManagementPanel({
+  dept,
+  adminPin,
+  departments,
+  setDepartments,
+  setSelectedDept,
+  onStatusChange,
+  onError,
+}: {
+  dept: DepartmentMaster;
+  adminPin: string;
+  departments: DepartmentMaster[];
+  setDepartments: (updater: (prev: DepartmentMaster[]) => DepartmentMaster[]) => void;
+  setSelectedDept: (d: DepartmentMaster | null) => void;
+  onStatusChange: (msg: string) => void;
+  onError: (msg: string) => void;
+}) {
+  const color = dept.color_hex ?? employeeColor(dept.name);
+
+  function updateColor(hex: string) {
+    void api
+      .updateDepartment(dept.id, { color_hex: hex, pin: adminPin })
+      .then((updated) => {
+        setDepartments((prev) => prev.map((d) => (d.id === dept.id ? updated : d)));
+        setSelectedDept(updated);
+      })
+      .catch((err: unknown) => onError(err instanceof Error ? err.message : "색상 변경 실패"));
+  }
+
+  function toggleActive() {
+    const next = !dept.is_active;
+    if (next === false && !confirm(`'${dept.name}' 부서를 비활성화하시겠습니까?`)) return;
+    void api
+      .updateDepartment(dept.id, { is_active: next, pin: adminPin })
+      .then((updated) => {
+        setDepartments((prev) => prev.map((d) => (d.id === dept.id ? updated : d)));
+        setSelectedDept(updated);
+        onStatusChange(`'${dept.name}' 부서를 ${next ? "활성화" : "비활성화"}했습니다.`);
+      })
+      .catch((err: unknown) => onError(err instanceof Error ? err.message : "상태 변경 실패"));
+  }
+
+  function deleteDept() {
+    if (!confirm(`'${dept.name}' 부서를 영구 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+    void api
+      .deleteDepartment(dept.id, adminPin)
+      .then(() => {
+        setDepartments((prev) => prev.filter((d) => d.id !== dept.id));
+        setSelectedDept(null);
+        onStatusChange(`'${dept.name}' 부서를 삭제했습니다.`);
+      })
+      .catch((err: unknown) => onError(err instanceof Error ? err.message : "삭제 실패"));
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* 선택된 부서 헤더 */}
+      <div
+        className="rounded-[20px] border p-4 flex items-center gap-3"
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      >
+        <div
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base font-black text-white"
+          style={{ background: color }}
+        >
+          {dept.name.slice(0, 1)}
+        </div>
+        <div className="min-w-0">
+          <div className="text-base font-black truncate">{dept.name}</div>
+          <span
+            className="inline-block rounded-full px-2 py-0.5 text-[11px] font-bold"
+            style={{
+              background: dept.is_active
+                ? `color-mix(in srgb, ${LEGACY_COLORS.green} 14%, transparent)`
+                : `color-mix(in srgb, ${LEGACY_COLORS.muted2} 14%, transparent)`,
+              color: dept.is_active ? LEGACY_COLORS.green : LEGACY_COLORS.muted2,
+            }}
+          >
+            {dept.is_active ? "활성" : "비활성"}
+          </span>
+        </div>
+      </div>
+
+      {/* 색상 팔레트 */}
+      <div
+        className="rounded-[20px] border p-4"
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      >
+        <div className="mb-2 text-xs font-bold uppercase tracking-[0.16em]" style={{ color: LEGACY_COLORS.muted2 }}>
+          색상
+        </div>
+        <div className="grid grid-cols-6 gap-2">
+          {COLOR_PALETTE.map((hex) => {
+            const active = (dept.color_hex ?? "").toLowerCase() === hex.toLowerCase();
+            return (
+              <button
+                key={hex}
+                onClick={() => updateColor(hex)}
+                className="relative flex h-8 w-8 items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
+                style={{ background: hex, boxShadow: active ? `0 0 0 2px white, 0 0 0 4px ${hex}` : undefined }}
+                title={hex}
+              >
+                {active && (
+                  <span className="text-white text-xs font-black">✓</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 액션 버튼 */}
+      <div className="flex flex-col gap-2">
+        <button
+          onClick={toggleActive}
+          className="w-full rounded-[14px] border py-2.5 text-sm font-semibold transition-colors hover:bg-white/10"
+          style={{
+            borderColor: dept.is_active
+              ? `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`
+              : LEGACY_COLORS.border,
+            color: dept.is_active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2,
+          }}
+        >
+          {dept.is_active ? "비활성화" : "활성화"}
+        </button>
+        <button
+          onClick={deleteDept}
+          className="w-full rounded-[14px] border py-2.5 text-sm font-semibold transition-colors hover:bg-white/10"
+          style={{
+            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 20%, transparent)`,
+            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
+            color: LEGACY_COLORS.red,
+          }}
+        >
+          영구 삭제
+        </button>
       </div>
     </div>
   );
@@ -222,8 +364,10 @@ export function DesktopAdminView({
   onStatusChange: (status: string) => void;
 }) {
   const [unlocked, setUnlocked] = useState(false);
+  const [adminPin, setAdminPin] = useState("");
   const [section, setSection] = useState<AdminSection>("items");
   const [showRightPanel, setShowRightPanel] = useState(false);
+  const [selectedDept, setSelectedDept] = useState<DepartmentMaster | null>(null);
 
   // 외부 데이터 (3개 섹션이 공유) — DesktopAdminView 가 한 번만 fetch
   const [items, setItems] = useState<Item[]>([]);
@@ -257,7 +401,6 @@ export function DesktopAdminView({
     setPackages(nextPackages);
     setProductModels(nextModels);
     setDepartments(nextDepts);
-    onStatusChange(`관리자 데이터를 불러왔습니다. 품목 ${nextItems.length}건 / 직원 ${nextEmployees.length}명`);
   }
 
   useEffect(() => {
@@ -267,6 +410,10 @@ export function DesktopAdminView({
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unlocked, globalSearch]);
+
+  useEffect(() => {
+    if (section === "departments") setShowRightPanel(true);
+  }, [section]);
 
   function refreshAllBom() {
     void api.getAllBOM().then(setAllBomRows).catch(() => setAllBomRows([]));
@@ -300,8 +447,8 @@ export function DesktopAdminView({
     await api.resetDatabase(resetPin);
     setResetPin("");
     await loadData();
-    setMessage("시드 기준으로 데이터를 다시 적재했습니다.");
-    onStatusChange("시드 기준으로 데이터를 다시 적재했습니다.");
+    setMessage("기본 데이터 기준으로 다시 적재했습니다.");
+    onStatusChange("기본 데이터 기준으로 다시 적재했습니다.");
   }
 
   if (!unlocked) {
@@ -315,7 +462,7 @@ export function DesktopAdminView({
             boxShadow: "var(--c-card-shadow)",
           }}
         >
-          <PinLock onUnlocked={() => setUnlocked(true)} />
+          <PinLock onUnlocked={(pin) => { setAdminPin(pin); setUnlocked(true); }} />
         </div>
       </div>
     );
@@ -509,8 +656,11 @@ export function DesktopAdminView({
               <AdminDepartmentsProvider
                 departments={departments}
                 setDepartments={setDepartments}
+                selectedDept={selectedDept}
+                setSelectedDept={setSelectedDept}
                 onStatusChange={onStatusChange}
                 onError={(m: string) => setMessage(m)}
+                adminPin={adminPin}
               >
                 <AdminDepartmentsSection />
               </AdminDepartmentsProvider>
@@ -552,34 +702,68 @@ export function DesktopAdminView({
           }}
         >
           <DesktopRightPanel title="관리 요약" subtitle="현재 작업 중인 관리자 영역의 핵심 수치를 요약합니다.">
-            <div className="space-y-4">
-              <div
-                className="rounded-[28px] border p-5 text-base leading-6"
-                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-              >
-                {section === "items" && "품목 섹션에서는 이름, 바코드, 공급처, 모델 정보를 바로 수정할 수 있습니다."}
-                {section === "employees" && "직원 섹션에서는 직원의 운영 상태를 빠르게 전환할 수 있습니다."}
-                {section === "bom" && "BOM 섹션에서는 상위 품목을 기준으로 하위 자재를 추가하거나 제거할 수 있습니다."}
-                {section === "packages" && "출하묶음 섹션에서는 패키지를 만들고 구성 품목을 빠르게 추가할 수 있습니다."}
-                {section === "export" && "엑셀 내보내기 섹션에서 품목·거래 데이터를 엑셀 파일로 다운로드할 수 있습니다."}
-                {section === "settings" && "설정 섹션에서는 관리자 PIN 변경, 초기화를 관리합니다."}
-                {section === "departments" && "부서 섹션에서는 부서를 추가하거나 비활성화할 수 있습니다."}
-              </div>
-              <div
-                className="rounded-[28px] border p-5"
-                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-              >
-                <div className="mb-3 text-sm font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  현재 상태
+            {section === "departments" ? (
+              selectedDept ? (
+                <DeptManagementPanel
+                  dept={selectedDept}
+                  adminPin={adminPin}
+                  departments={departments}
+                  setDepartments={setDepartments}
+                  setSelectedDept={setSelectedDept}
+                  onStatusChange={onStatusChange}
+                  onError={setMessage}
+                />
+              ) : (
+                <div className="space-y-4">
+                  <div
+                    className="rounded-[20px] border p-4 text-sm leading-6"
+                    style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+                  >
+                    부서를 클릭하면 색상 변경, 비활성화, 삭제 옵션이 표시됩니다.
+                  </div>
+                  <div
+                    className="rounded-[20px] border p-4"
+                    style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+                  >
+                    <div className="mb-2 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                      현재 상태
+                    </div>
+                    <div className="space-y-1.5 text-sm">
+                      <div>활성 {formatNumber(departments.filter((d) => d.is_active).length)}개</div>
+                      <div>비활성 {formatNumber(departments.filter((d) => !d.is_active).length)}개</div>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2 text-base">
-                  <div>품목 {formatNumber(items.length)}건</div>
-                  <div>직원 {formatNumber(employees.length)}명</div>
-                  <div>출하묶음 {formatNumber(packages.length)}건</div>
-                  <div>BOM {formatNumber(allBomRows.length)}건</div>
+              )
+            ) : (
+              <div className="space-y-4">
+                <div
+                  className="rounded-[28px] border p-5 text-base leading-6"
+                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+                >
+                  {section === "items" && "품목 섹션에서는 이름, 바코드, 공급처, 모델 정보를 바로 수정할 수 있습니다."}
+                  {section === "employees" && "직원 섹션에서는 직원의 운영 상태를 빠르게 전환할 수 있습니다."}
+                  {section === "bom" && "BOM 섹션에서는 상위 품목을 기준으로 하위 자재를 추가하거나 제거할 수 있습니다."}
+                  {section === "packages" && "출하묶음 섹션에서는 패키지를 만들고 구성 품목을 빠르게 추가할 수 있습니다."}
+                  {section === "export" && "엑셀 내보내기 섹션에서 품목·거래 데이터를 엑셀 파일로 다운로드할 수 있습니다."}
+                  {section === "settings" && "설정 섹션에서는 관리자 PIN 변경, 초기화를 관리합니다."}
+                </div>
+                <div
+                  className="rounded-[28px] border p-5"
+                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+                >
+                  <div className="mb-3 text-sm font-bold uppercase tracking-[0.2em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                    현재 상태
+                  </div>
+                  <div className="space-y-2 text-base">
+                    <div>품목 {formatNumber(items.length)}건</div>
+                    <div>직원 {formatNumber(employees.length)}명</div>
+                    <div>출하묶음 {formatNumber(packages.length)}건</div>
+                    <div>BOM {formatNumber(allBomRows.length)}건</div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </DesktopRightPanel>
         </div>
       </div>

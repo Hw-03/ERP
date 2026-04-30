@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ElementType } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Boxes, History, Settings2, Warehouse } from "lucide-react";
@@ -14,10 +14,11 @@ import { LEGACY_COLORS, formatNumber } from "./legacyUi";
 import { api, type ProductionCapacity } from "@/lib/api";
 import type { Item } from "@/lib/api";
 
-const VALID_TABS = new Set<DesktopTabId>(["inventory", "warehouse", "history", "admin"]);
+const VALID_TABS = new Set<DesktopTabId>(["dashboard", "warehouse", "history", "admin"]);
+const DEFAULT_STATUS = "DEXCOWIN MES System";
 
 const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
-  inventory: { title: "대시보드", icon: Boxes },
+  dashboard: { title: "대시보드", icon: Boxes },
   warehouse: { title: "입출고", icon: Warehouse },
   history: { title: "입출고 내역", icon: History },
   admin: { title: "관리자", icon: Settings2 },
@@ -29,17 +30,27 @@ export function DesktopLegacyShell() {
 
   const initialTab = (() => {
     const t = searchParams.get("tab") as DesktopTabId | null;
-    return t && VALID_TABS.has(t) ? t : "inventory";
+    return t && VALID_TABS.has(t) ? t : "dashboard";
   })();
 
   const [activeTab, setActiveTab] = useState<DesktopTabId>(initialTab);
-  const [status, setStatus] = useState("데스크톱 MES 화면을 준비했습니다.");
+  const [status, setStatus] = useState(DEFAULT_STATUS);
   const [statusNonce, setStatusNonce] = useState(0);
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const autoRevertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleStatusChange = useCallback((msg: string) => {
+    if (autoRevertTimerRef.current) clearTimeout(autoRevertTimerRef.current);
     setStatus(msg);
     setStatusNonce((n) => n + 1);
+    if (msg === DEFAULT_STATUS) return;
+    const isSticky = /실패|못했습니다|오류|에러|부족|품절/.test(msg);
+    if (!isSticky) {
+      autoRevertTimerRef.current = setTimeout(() => {
+        setStatus(DEFAULT_STATUS);
+        setStatusNonce((n) => n + 1);
+      }, 3000);
+    }
   }, []);
 
   function handleTabChange(tab: DesktopTabId) {
@@ -89,7 +100,7 @@ export function DesktopLegacyShell() {
 
   const content = useMemo(() => {
     const key = activeTab === "admin" ? "admin" : `${activeTab}-${refreshNonce}`;
-    if (activeTab === "inventory") {
+    if (activeTab === "dashboard") {
       return (
         <DesktopInventoryView
           key={key}
@@ -214,7 +225,7 @@ export function DesktopLegacyShell() {
         <DesktopSidebar
           activeTab={activeTab}
           onTabChange={handleTabChange}
-          alertCount={{ inventory: stockWarnings ? stockWarnings.zero + stockWarnings.low : 0 }}
+          alertCount={{ dashboard: stockWarnings ? stockWarnings.zero + stockWarnings.low : 0 }}
         />
 
         <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
