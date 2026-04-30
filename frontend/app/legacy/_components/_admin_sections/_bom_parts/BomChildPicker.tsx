@@ -86,16 +86,16 @@ export function BomChildPicker({ onClose }: { onClose: () => void }) {
           <div className="flex gap-1 shrink-0">
             {BOM_CHILD_CATS.map((cat) => (
               <button
-                key={cat}
-                onClick={() => setBomChildCat(cat)}
+                key={cat.value}
+                onClick={() => setBomChildCat(cat.value)}
                 className="rounded-full px-2 py-1 text-xs font-bold"
                 style={{
-                  background: bomChildCat === cat ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
-                  color: bomChildCat === cat ? "#fff" : LEGACY_COLORS.muted2,
+                  background: bomChildCat === cat.value ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
+                  color: bomChildCat === cat.value ? "#fff" : LEGACY_COLORS.muted2,
                   border: `1px solid ${LEGACY_COLORS.border}`,
                 }}
               >
-                {cat}
+                {cat.label}
               </button>
             ))}
           </div>

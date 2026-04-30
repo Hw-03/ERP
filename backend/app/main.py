@@ -63,20 +63,10 @@ app = FastAPI(
     description="""
     ## DEXCOWIN 경량 MES
 
-    ### 11단계 공정 카테고리
-    | Code | 명칭 | 설명 |
-    |------|------|------|
-    | RM | Raw Material | 원자재 |
-    | TA | Tube Ass'y | 튜브 반제품 |
-    | TF | Tube Final | 튜브 완제품 |
-    | HA | High-voltage Ass'y | 고압 반제품 |
-    | HF | High-voltage Final | 고압 완제품 |
-    | VA | Vacuum Ass'y | 진공 반제품 |
-    | VF | Vacuum Final | 진공 완제품 |
-    | AA | Body Ass'y | 조립 반제품 |
-    | AF | Body Final | 조립 완제품 |
-    | FG | Finished Good | 완제품 |
-    | UK | Unknown | 미분류 또는 확인 필요 |
+    ### 공정 분류 코드 (18종)
+    `process_type_code` = 부서(T/H/V/N/A/P) × 단계(R=원자재 / A=중간공정 / F=공정완료)
+
+    TR/TA/TF (튜브) · HR/HA/HF (고압) · VR/VA/VF (진공) · NR/NA/NF (튜닝) · AR/AA/AF (조립) · PR/PA/PF (출하)
 
     ### 주요 기능
     - 품목 마스터 조회 및 수정

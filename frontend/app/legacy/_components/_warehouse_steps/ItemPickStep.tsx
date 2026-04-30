@@ -30,8 +30,8 @@ export function ItemPickStep({
   setDept,
   modelFilter,
   setModelFilter,
-  categoryFilter,
-  setCategoryFilter,
+  stageFilter,
+  setStageFilter,
   localSearch,
   setLocalSearch,
   displayLimit,
@@ -54,8 +54,8 @@ export function ItemPickStep({
   setDept: (v: string) => void;
   modelFilter: string;
   setModelFilter: (v: string) => void;
-  categoryFilter: string;
-  setCategoryFilter: (v: string) => void;
+  stageFilter: string;
+  setStageFilter: (v: string) => void;
   localSearch: string;
   setLocalSearch: (v: string) => void;
   displayLimit: number;
@@ -130,15 +130,14 @@ export function ItemPickStep({
             options={["전체", "공용", ...productModels.map((m) => m.model_name ?? "")].map((v) => ({ value: v, label: v }))}
           />
           <LabeledSelect
-            label="분류"
-            value={categoryFilter}
-            onChange={setCategoryFilter}
+            label="단계"
+            value={stageFilter}
+            onChange={setStageFilter}
             options={[
-              { value: "ALL", label: "전체" },
-              { value: "RM", label: "원자재" },
-              { value: "A", label: "조립품" },
-              { value: "F", label: "반제품" },
-              { value: "FG", label: "완제품" },
+              { value: "ALL",  label: "전체" },
+              { value: "RAW",  label: "원자재" },
+              { value: "MID",  label: "중간공정" },
+              { value: "DONE", label: "공정완료" },
             ]}
           />
           <label className="flex flex-col gap-0.5">

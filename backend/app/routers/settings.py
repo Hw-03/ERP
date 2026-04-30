@@ -24,6 +24,7 @@ from app.schemas import (
 from app.services import audit
 from app.services import integrity as integrity_svc
 from app.services._tx import commit_and_refresh, commit_only
+from app.services.pin_auth import hash_pin
 
 
 class ResetRequest(BaseModel):
@@ -45,16 +46,34 @@ def ensure_admin_pin(db: Session) -> SystemSetting:
     if setting:
         return setting
 
-    setting = SystemSetting(setting_key=ADMIN_PIN_KEY, setting_value=DEFAULT_ADMIN_PIN)
+    setting = SystemSetting(setting_key=ADMIN_PIN_KEY, setting_value=hash_pin(DEFAULT_ADMIN_PIN))
     db.add(setting)
     commit_and_refresh(db, setting)
     return setting
 
 
+def _is_hashed(value: str) -> bool:
+    return len(value) == 64 and all(c in "0123456789abcdef" for c in value)
+
+
+def _matches_admin_pin(db: Session, setting: SystemSetting, input_pin: str) -> bool:
+    """PIN 비교. 평문 발견 시 자동 해시화(lazy migration)."""
+    stored = setting.setting_value
+    if _is_hashed(stored):
+        return stored == hash_pin(input_pin)
+    # 평문 → 비교 후 일치하면 즉시 해시화
+    if stored == input_pin:
+        setting.setting_value = hash_pin(input_pin)
+        setting.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        commit_only(db)
+        return True
+    return False
+
+
 @router.post("/verify-pin", response_model=MessageResponse)
 def verify_admin_pin(payload: AdminPinVerifyRequest, db: Session = Depends(get_db)):
     setting = ensure_admin_pin(db)
-    if payload.pin != setting.setting_value:
+    if not _matches_admin_pin(db, setting, payload.pin):
         raise http_error(403, ErrorCode.BAD_REQUEST, "관리자 비밀번호가 올바르지 않습니다.")
     return MessageResponse(message="관리자 인증이 완료되었습니다.")
 
@@ -63,12 +82,12 @@ def verify_admin_pin(payload: AdminPinVerifyRequest, db: Session = Depends(get_d
 def update_admin_pin(payload: AdminPinUpdateRequest, request: Request, db: Session = Depends(get_db)):
     setting = ensure_admin_pin(db)
 
-    if payload.current_pin != setting.setting_value:
+    if not _matches_admin_pin(db, setting, payload.current_pin):
         raise http_error(403, ErrorCode.BAD_REQUEST, "현재 비밀번호가 올바르지 않습니다.")
     if payload.current_pin == payload.new_pin:
         raise http_error(400, ErrorCode.BUSINESS_RULE, "새 비밀번호는 현재 비밀번호와 달라야 합니다.")
 
-    setting.setting_value = payload.new_pin
+    setting.setting_value = hash_pin(payload.new_pin)
     setting.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
     audit.record(
@@ -87,7 +106,7 @@ def update_admin_pin(payload: AdminPinUpdateRequest, request: Request, db: Sessi
 def require_admin(db: Session, pin: str) -> None:
     """관리자 PIN 검증. 일치하지 않으면 403."""
     setting = ensure_admin_pin(db)
-    if pin != setting.setting_value:
+    if not _matches_admin_pin(db, setting, pin):
         raise http_error(403, ErrorCode.BAD_REQUEST, "관리자 비밀번호가 올바르지 않습니다.")
 
 
@@ -143,7 +162,7 @@ def repair_inventory_integrity(
 def reset_database(payload: ResetRequest, request: Request, db: Session = Depends(get_db)):
     """PIN 검증 후 시드 데이터 재적재 (안전 초기화). 관리자 도구."""
     setting = ensure_admin_pin(db)
-    if payload.pin != setting.setting_value:
+    if not _matches_admin_pin(db, setting, payload.pin):
         raise http_error(403, ErrorCode.BAD_REQUEST, "관리자 비밀번호가 올바르지 않습니다.")
 
     # reset 직전에 audit 1건 기록 (reset 자체는 시드 재적재로 audit_logs 도 비울 수 있어 사후 기록은 무의미).
@@ -158,15 +177,17 @@ def reset_database(payload: ResetRequest, request: Request, db: Session = Depend
     commit_only(db)
 
     try:
-        import sys
-        from pathlib import Path
-        backend_dir = Path(__file__).resolve().parents[2]
-        if str(backend_dir) not in sys.path:
-            sys.path.insert(0, str(backend_dir))
-        import importlib
-        import seed as seed_module
-        importlib.reload(seed_module)
-        seed_module.run_seed()
-        return MessageResponse(message="데이터베이스를 초기화하고 시드를 재적재했습니다.")
+        from app.models import Inventory as _Inv, InventoryLocation as _Loc, Item as _Item
+        from app.services.seed_cleanup import run_cleanup_import
+
+        # 품목·재고 데이터 초기화 (참조 데이터 — Employee/ProcessType 등은 유지)
+        db.query(_Loc).delete(synchronize_session=False)
+        db.query(_Inv).delete(synchronize_session=False)
+        db.query(_Item).delete(synchronize_session=False)
+        db.commit()
+
+        result = run_cleanup_import(db)
+        msg = f"데이터베이스를 초기화하고 722 정리본을 재적재했습니다. (rows={result['rows']}, total_qty={result['total_qty']})"
+        return MessageResponse(message=msg)
     except Exception as exc:
         raise http_error(500, ErrorCode.INTERNAL, f"초기화 중 오류가 발생했습니다: {exc}")
