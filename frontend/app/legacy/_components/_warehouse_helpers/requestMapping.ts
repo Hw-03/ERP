@@ -64,7 +64,9 @@ export function resolveRequestType(input: {
   const { workType, rawDirection, warehouseDirection, deptDirection, defectiveSource } = input;
   switch (workType) {
     case "raw-io":
-      return rawDirection === "in" ? "raw_receive" : "raw_ship";
+      if (rawDirection === "in") return "raw_receive";
+      if (rawDirection === "out") return "raw_ship";
+      return "supplier_return";
     case "warehouse-io":
       return warehouseDirection === "wh-to-dept" ? "warehouse_to_dept" : "dept_to_warehouse";
     case "dept-io":
@@ -73,8 +75,6 @@ export function resolveRequestType(input: {
       return deptDirection === "in" ? "warehouse_to_dept" : "dept_to_warehouse";
     case "defective-register":
       return defectiveSource === "warehouse" ? "mark_defective_wh" : "mark_defective_prod";
-    case "supplier-return":
-      return "supplier_return";
     case "package-out":
       return "package_out";
   }
@@ -99,9 +99,20 @@ function buildLines(input: BuildPayloadInput): LineSpec[] {
 
   return entries.map(({ item, quantity }): LineSpec => {
     if (workType === "raw-io") {
-      return rawDirection === "in"
-        ? { item_id: item.item_id, quantity, from_bucket: "none", to_bucket: "warehouse" }
-        : { item_id: item.item_id, quantity, from_bucket: "warehouse", to_bucket: "none" };
+      if (rawDirection === "in") {
+        return { item_id: item.item_id, quantity, from_bucket: "none", to_bucket: "warehouse" };
+      }
+      if (rawDirection === "out") {
+        return { item_id: item.item_id, quantity, from_bucket: "warehouse", to_bucket: "none" };
+      }
+      // return → 공급업체 반품 (defective[selectedDept] → none)
+      return {
+        item_id: item.item_id,
+        quantity,
+        from_bucket: "defective",
+        from_department: selectedDept,
+        to_bucket: "none",
+      };
     }
     if (workType === "warehouse-io") {
       return warehouseDirection === "wh-to-dept"
@@ -137,32 +148,23 @@ function buildLines(input: BuildPayloadInput): LineSpec[] {
             to_bucket: "warehouse",
           };
     }
-    if (workType === "defective-register") {
-      if (defectiveSource === "warehouse") {
-        return {
-          item_id: item.item_id,
-          quantity,
-          from_bucket: "warehouse",
-          to_bucket: "defective",
-          to_department: selectedDept,
-        };
-      }
+    // defective-register
+    if (defectiveSource === "warehouse") {
       return {
         item_id: item.item_id,
         quantity,
-        from_bucket: "production",
-        from_department: selectedDept,
+        from_bucket: "warehouse",
         to_bucket: "defective",
         to_department: selectedDept,
       };
     }
-    // supplier-return
     return {
       item_id: item.item_id,
       quantity,
-      from_bucket: "defective",
+      from_bucket: "production",
       from_department: selectedDept,
-      to_bucket: "none",
+      to_bucket: "defective",
+      to_department: selectedDept,
     };
   });
 }
@@ -243,7 +245,8 @@ export function draftToFormState(draft: StockRequest): RestoredFormState | null 
       if (firstLine?.from_department) selectedDept = firstLine.from_department;
       break;
     case "supplier_return":
-      workType = "supplier-return";
+      workType = "raw-io";
+      rawDirection = "return";
       if (firstLine?.from_department) selectedDept = firstLine.from_department;
       break;
     case "package_out":
@@ -281,14 +284,13 @@ export function inputRequiresApproval(input: {
   // 라인을 시뮬레이션할 필요 없이 정책 분기를 그대로 본다.
   switch (input.workType) {
     case "raw-io":
+      // return(공급업체 반품)은 from=defective, to=none → warehouse 미포함 → 승인 불필요.
+      return input.rawDirection !== "return";
     case "warehouse-io":
     case "dept-io":
     case "package-out":
       return true;
     case "defective-register":
       return input.defectiveSource === "warehouse";
-    case "supplier-return":
-      // from=defective, to=none → warehouse 미포함 → 승인 불필요
-      return false;
   }
 }

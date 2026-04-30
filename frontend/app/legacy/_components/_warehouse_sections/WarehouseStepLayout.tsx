@@ -60,6 +60,8 @@ type Props = {
   wizard: WizardLike;
   filter: FilterLike;
 
+  availableWorkTypes: WorkType[];
+
   refs: {
     step2Ref: RefObject<HTMLDivElement>;
     step3Ref: RefObject<HTMLDivElement>;
@@ -121,6 +123,7 @@ function AnimatedReveal({ show, children }: { show: boolean; children: React.Rea
 export function WarehouseStepLayout({
   wizard: w,
   filter: f,
+  availableWorkTypes,
   refs,
   step2Summary,
   step2Accent,
@@ -175,6 +178,7 @@ export function WarehouseStepLayout({
             setSelectedDept={w.changeSelectedDept}
             defectiveSource={w.defectiveSource}
             setDefectiveSource={w.changeDefectiveSource}
+            availableWorkTypes={availableWorkTypes}
             ready={w.step2Ready}
             onConfirm={w.confirmStep2}
           />

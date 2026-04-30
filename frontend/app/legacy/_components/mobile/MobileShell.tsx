@@ -1,16 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Bell, Lock, Package, Warehouse, Wrench, type LucideIcon } from "lucide-react";
 import clsx from "clsx";
 import { LEGACY_COLORS } from "../legacyUi";
 import { ELEVATION, TYPO } from "./tokens";
 import { AlertsSheet } from "./AlertsSheet";
 import { IconButton } from "./primitives";
+import { canEnterIO } from "../_warehouse_steps";
+import { useCurrentOperator } from "../login/useCurrentOperator";
 
 export type TabId = "inventory" | "warehouse" | "dept" | "admin";
 
-const TABS: { id: TabId; label: string; icon: LucideIcon }[] = [
+const ALL_TABS: { id: TabId; label: string; icon: LucideIcon }[] = [
   { id: "inventory", label: "재고", icon: Package },
   { id: "warehouse", label: "창고입출고", icon: Warehouse },
   { id: "dept", label: "부서입출고", icon: Wrench },
@@ -33,6 +35,15 @@ export function MobileShell({
   children: React.ReactNode;
 }) {
   const [alertsOpen, setAlertsOpen] = useState(false);
+  const operator = useCurrentOperator();
+  const tabs = useMemo(() => {
+    // operator 가 아직 로드되지 않은 경우 기존대로 모든 탭 표시 (게이트가 막아주므로 안전).
+    if (!operator) return ALL_TABS;
+    return ALL_TABS.filter((tab) => {
+      if (tab.id === "warehouse" || tab.id === "dept") return canEnterIO(operator);
+      return true;
+    });
+  }, [operator]);
 
   return (
     <div className="h-screen overflow-hidden bg-black">
@@ -90,7 +101,7 @@ export function MobileShell({
           }}
         >
           <div className="flex px-2 pt-2">
-            {TABS.map((tab) => {
+            {tabs.map((tab) => {
               const active = tab.id === activeTab;
               const Icon = tab.icon;
               return (

@@ -38,16 +38,16 @@ export function useWarehouseWizardState({
     workType === "package-out"
       ? true
       : workType === "raw-io"
-        ? true
+        ? rawDirection === "return"
+          ? !!selectedDept
+          : true
         : workType === "warehouse-io"
           ? !!selectedDept && !!warehouseDirection
           : workType === "dept-io"
             ? !!selectedDept
             : workType === "defective-register"
               ? !!selectedDept && !!defectiveSource
-              : workType === "supplier-return"
-                ? !!selectedDept
-                : false;
+              : false;
 
   const step2Done = step2Ready && step2Confirmed;
 

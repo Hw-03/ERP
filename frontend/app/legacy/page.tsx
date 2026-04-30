@@ -16,6 +16,9 @@ import { WarehouseWizardScreen } from "./_components/mobile/io/warehouse/Warehou
 import { DeptWizardProvider } from "./_components/mobile/io/dept/context";
 import { DeptWizardScreen } from "./_components/mobile/io/dept/DeptWizardScreen";
 import { ErpLoginGate } from "./_components/login/ErpLoginGate";
+import { DepartmentsProvider } from "./_components/DepartmentsContext";
+import { useCurrentOperator } from "./_components/login/useCurrentOperator";
+import { canEnterIO } from "./_components/_warehouse_steps";
 
 const TAB_TITLES: Record<TabId, { subtitle: string; title: string }> = {
   inventory: { subtitle: "재고 현황", title: "재고" },
@@ -26,15 +29,17 @@ const TAB_TITLES: Record<TabId, { subtitle: string; title: string }> = {
 
 export default function LegacyPage() {
   return (
-    <ErpLoginGate>
-      <WarehouseWizardProvider>
-        <DeptWizardProvider>
-          <Suspense>
-            <LegacyBody />
-          </Suspense>
-        </DeptWizardProvider>
-      </WarehouseWizardProvider>
-    </ErpLoginGate>
+    <DepartmentsProvider>
+      <ErpLoginGate>
+        <WarehouseWizardProvider>
+          <DeptWizardProvider>
+            <Suspense>
+              <LegacyBody />
+            </Suspense>
+          </DeptWizardProvider>
+        </WarehouseWizardProvider>
+      </ErpLoginGate>
+    </DepartmentsProvider>
   );
 }
 
@@ -51,6 +56,7 @@ function LegacyBody() {
   const [showHistory, setShowHistory] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const { dispatch: warehouseDispatch } = useWarehouseWizard();
+  const operator = useCurrentOperator();
 
   // 브라우저 뒤로/앞으로 → URL 변경 시 활성 탭 동기화
   useEffect(() => {
@@ -70,6 +76,14 @@ function LegacyBody() {
     },
     [router],
   );
+
+  // 입출고 권한이 없는 부서 사용자가 직접 ?tab=warehouse|dept 로 진입하면 재고 탭으로 강제 이동
+  useEffect(() => {
+    if (!operator) return;
+    if ((activeTab === "warehouse" || activeTab === "dept") && !canEnterIO(operator)) {
+      changeTab("inventory");
+    }
+  }, [activeTab, operator, changeTab]);
 
   const showToast = useCallback((next: ToastState) => setToast(next), []);
   const clearToast = useCallback(() => setToast(null), []);

@@ -261,6 +261,118 @@ def test_approve_consumes_pending_and_moves_stock(db_session, client, make_item)
 
 
 # ---------------------------------------------------------------------------
+# 시나리오 4-자가: 창고 정/부 본인 요청 → 자가승인 (즉시 COMPLETED, pending 미생성)
+# ---------------------------------------------------------------------------
+
+
+def test_warehouse_primary_self_approves_on_submit(db_session, client, make_item):
+    """warehouse_role=primary 직원이 본인 명의로 wh-to-dept 제출 시 즉시 처리."""
+    item = make_item(name="P004S1", warehouse_qty=Decimal("10"))
+    requester = _make_employee(
+        db_session, code="WHSELF1", name="창고정자가", warehouse_role="primary"
+    )
+    db_session.commit()
+
+    out = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[
+            {
+                "item_id": str(item.item_id),
+                "quantity": "4",
+                "from_bucket": "warehouse",
+                "to_bucket": "production",
+                "to_department": DepartmentEnum.ASSEMBLY.value,
+            }
+        ],
+    )
+    assert out["status_code"] == 201, out["body"]
+    body = out["body"]
+    # 자가승인: 즉시 COMPLETED, 컬럼은 그대로 True 유지하여 감사 추적 보존
+    assert body["status"] == "completed"
+    assert body["requires_warehouse_approval"] is True
+    assert body["approved_by_employee_id"] == str(requester.employee_id)
+    assert body["approved_by_name"] == "창고정자가"
+
+    db_session.expire_all()
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+    # 즉시 차감, pending 자체가 생기지 않음
+    assert inv.warehouse_qty == Decimal("6")
+    assert inv.pending_quantity == Decimal("0")
+
+    # TransactionLog 즉시 생성
+    logs = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.item_id == item.item_id)
+        .all()
+    )
+    assert len(logs) == 1
+
+
+def test_warehouse_deputy_self_approves_on_submit(db_session, client, make_item):
+    """warehouse_role=deputy 도 동일하게 자가승인."""
+    item = make_item(name="P004S2", warehouse_qty=Decimal("5"))
+    requester = _make_employee(
+        db_session, code="WHSELF2", name="창고부자가", warehouse_role="deputy"
+    )
+    db_session.commit()
+
+    out = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[
+            {
+                "item_id": str(item.item_id),
+                "quantity": "2",
+                "from_bucket": "warehouse",
+                "to_bucket": "production",
+                "to_department": DepartmentEnum.ASSEMBLY.value,
+            }
+        ],
+    )
+    assert out["status_code"] == 201, out["body"]
+    assert out["body"]["status"] == "completed"
+
+    db_session.expire_all()
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+    assert inv.warehouse_qty == Decimal("3")
+    assert inv.pending_quantity == Decimal("0")
+
+
+def test_non_warehouse_requester_still_reserves(db_session, client, make_item):
+    """warehouse_role=none 일반 직원의 요청은 종전대로 RESERVED."""
+    item = make_item(name="P004S3", warehouse_qty=Decimal("5"))
+    requester = _make_employee(
+        db_session, code="WHSELF3", name="일반직원", warehouse_role="none"
+    )
+    db_session.commit()
+
+    out = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[
+            {
+                "item_id": str(item.item_id),
+                "quantity": "1",
+                "from_bucket": "warehouse",
+                "to_bucket": "production",
+                "to_department": DepartmentEnum.ASSEMBLY.value,
+            }
+        ],
+    )
+    assert out["status_code"] == 201, out["body"]
+    assert out["body"]["status"] == "reserved"
+
+    db_session.expire_all()
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+    assert inv.warehouse_qty == Decimal("5")  # 미차감
+    assert inv.pending_quantity == Decimal("1")  # 점유만
+
+
+# ---------------------------------------------------------------------------
 # 시나리오 5: 반려 → pending 원복
 # ---------------------------------------------------------------------------
 

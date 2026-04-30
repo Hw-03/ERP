@@ -376,11 +376,18 @@ def _finalize_submission(
     """제출 시점 분기 — request 와 lines 가 SUBMITTED 상태로 flush 된 직후 호출.
 
     - 승인 불필요 → 즉시 실행 + COMPLETED
+    - 요청자가 창고 정/부(warehouse_role=primary/deputy) → 자가승인으로 즉시 실행 + COMPLETED
+      (requires_warehouse_approval 컬럼은 그대로 True 로 유지하여 감사 추적 보존)
     - 승인 필요 + pending 필요 → reserve + RESERVED
     - 승인 필요 + pending 불필요 → SUBMITTED 유지
     """
     lines = list(request.lines)
-    if not request.requires_warehouse_approval:
+    requester_role = (requester.warehouse_role or "none").lower()
+    is_self_warehouse_approval = (
+        request.requires_warehouse_approval
+        and requester_role in ("primary", "deputy")
+    )
+    if (not request.requires_warehouse_approval) or is_self_warehouse_approval:
         _execute_all_lines(
             db, request, lines, operator_name=requester.name, approver=requester
         )

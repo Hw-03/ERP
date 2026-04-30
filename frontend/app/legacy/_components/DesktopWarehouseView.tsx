@@ -4,7 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Item, type ShipPackage, type StockRequest } from "@/lib/api";
 import { LEGACY_COLORS, formatNumber } from "./legacyUi";
 import { ConfirmModal, ResultModal } from "./common";
-import { CAUTION_WORK_TYPES, type WorkType } from "./_warehouse_steps";
+import {
+  CAUTION_WORK_TYPES,
+  canEnterIO,
+  isWarehouseStaff,
+  workTypesForOperator,
+  type WorkType,
+} from "./_warehouse_steps";
 import { useWarehouseFilters } from "./_warehouse_hooks/useWarehouseFilters";
 import { useWarehouseWizardState } from "./_warehouse_hooks/useWarehouseWizardState";
 import { useWarehouseCompletionFeedback } from "./_warehouse_hooks/useWarehouseCompletionFeedback";
@@ -146,7 +152,7 @@ export function DesktopWarehouseView({
   // ─── workType-derived ───
   const isOutbound =
     workType === "raw-io"
-      ? rawDirection === "out"
+      ? rawDirection !== "in" // out + return 모두 재고 차감 방향
       : workType === "warehouse-io"
         ? warehouseDirection === "wh-to-dept"
         : workType === "dept-io"
@@ -155,7 +161,11 @@ export function DesktopWarehouseView({
 
   const effectiveLabel =
     workType === "raw-io"
-      ? `원자재 ${rawDirection === "in" ? "입고" : "출고"}`
+      ? rawDirection === "in"
+        ? "원자재 입고"
+        : rawDirection === "out"
+          ? "원자재 출고"
+          : `공급업체 반품 (${selectedDept} 불량)`
       : workType === "warehouse-io"
         ? warehouseDirection === "wh-to-dept"
           ? `창고→${selectedDept} 이동`
@@ -164,9 +174,7 @@ export function DesktopWarehouseView({
           ? `${selectedDept} ${deptDirection === "in" ? "입고" : "출고"}`
           : workType === "defective-register"
             ? `불량 등록 (${defectiveSource === "warehouse" ? "창고" : selectedDept} → ${selectedDept} 격리)`
-            : workType === "supplier-return"
-              ? `공급업체 반품 (${selectedDept} 불량)`
-              : "패키지 출고";
+            : "패키지 출고";
 
   const shortLabel = effectiveLabel.replace(/\s*\(.*\)\s*$/, "");
   const totalQty = Array.from(selectedItems.values()).reduce((sum, q) => sum + q, 0);
@@ -177,7 +185,9 @@ export function DesktopWarehouseView({
     && (workType === "package-out" ? !!selectedPackage : selectedEntries.length > 0)
     && !quantityInvalid;
   const accent = isOutbound ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
-  const isCaution = CAUTION_WORK_TYPES.includes(workType);
+  const isRawReturn = workType === "raw-io" && rawDirection === "return";
+  const isCaution = CAUTION_WORK_TYPES.includes(workType) || isRawReturn;
+  const availableWorkTypes = useMemo(() => workTypesForOperator(operator), [operator]);
 
   // ─── filters (hook) ───
   const filter = useWarehouseFilters({
@@ -214,13 +224,16 @@ export function DesktopWarehouseView({
   }
 
   // ─── 승인 필요 여부 (UI 라벨/메시지 분기용) ───
-  const requiresApproval = inputRequiresApproval({
-    workType,
-    rawDirection,
-    warehouseDirection,
-    deptDirection,
-    defectiveSource,
-  });
+  // 창고 정/부(warehouse_role=primary/deputy)가 본인 명의로 제출하는 경우 백엔드에서
+  // 자가승인 처리되므로 UI 라벨도 "즉시 처리"로 통일한다.
+  const requiresApproval =
+    inputRequiresApproval({
+      workType,
+      rawDirection,
+      warehouseDirection,
+      deptDirection,
+      defectiveSource,
+    }) && !isWarehouseStaff(operator);
 
   // ─── 현재 wizard state 가 가리키는 request_type ───
   const currentRequestType = useMemo(
@@ -589,6 +602,29 @@ export function DesktopWarehouseView({
     );
   }
 
+  // ─── 진입 차단 (AS/연구/영업/기타 — 입출고 권한 없음) ───
+  if (operator && !canEnterIO(operator)) {
+    return (
+      <div className="flex h-full min-h-0 flex-1 items-center justify-center px-6">
+        <div
+          className="max-w-md rounded-[16px] border p-8 text-center"
+          style={{
+            background: LEGACY_COLORS.s2,
+            borderColor: LEGACY_COLORS.border,
+            color: LEGACY_COLORS.text,
+          }}
+        >
+          <div className="mb-2 text-lg font-black">입출고 권한이 없습니다</div>
+          <div className="text-sm" style={{ color: LEGACY_COLORS.muted }}>
+            {operator.department} 부서는 입출고 작업을 사용할 수 없습니다.
+            <br />
+            재고 조회 또는 관리자 탭을 이용해 주세요.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ─── render ───
   return (
     <div className="flex h-full min-h-0 flex-1 justify-center overflow-y-auto pr-4" ref={refs.scrollRootRef}>
@@ -675,6 +711,7 @@ export function DesktopWarehouseView({
             },
           }}
           filter={filter}
+          availableWorkTypes={availableWorkTypes}
           refs={refs}
           step2Summary={step2Summary}
           step2Accent={step2Accent}

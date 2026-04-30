@@ -32,6 +32,7 @@ export function WorkTypeStep({
   setSelectedDept,
   defectiveSource,
   setDefectiveSource,
+  availableWorkTypes,
   ready,
   onConfirm,
 }: {
@@ -47,18 +48,22 @@ export function WorkTypeStep({
   setSelectedDept: (d: Department) => void;
   defectiveSource: DefectiveSource;
   setDefectiveSource: (s: DefectiveSource) => void;
+  availableWorkTypes: WorkType[];
   ready: boolean;
   onConfirm: () => void;
 }) {
-  const isCaution = CAUTION_WORK_TYPES.includes(workType);
+  const isRawReturn = workType === "raw-io" && rawDirection === "return";
+  const isCaution = CAUTION_WORK_TYPES.includes(workType) || isRawReturn;
   const accent = isCaution ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   const [pendingDept, setPendingDept] = useState<Department | null>(null);
+  const visibleWorkTypes = WORK_TYPES.filter((e) => availableWorkTypes.includes(e.id));
 
   const directionButtons =
     workType === "raw-io"
       ? [
           { id: "in", label: "창고에 입고", active: rawDirection === "in", onClick: () => setRawDirection("in") },
           { id: "out", label: "창고에서 출고", active: rawDirection === "out", onClick: () => setRawDirection("out") },
+          { id: "return", label: "공급업체 반품", active: rawDirection === "return", onClick: () => setRawDirection("return") },
         ]
       : workType === "warehouse-io"
         ? [
@@ -78,7 +83,7 @@ export function WorkTypeStep({
       <div>
         <SettingLabel label="작업 유형 선택" />
         <div className="grid grid-cols-3 gap-2">
-          {WORK_TYPES.map((entry) => {
+          {visibleWorkTypes.map((entry) => {
             const Icon = entry.icon;
             const active = entry.id === workType;
             const cardTone = CAUTION_WORK_TYPES.includes(entry.id) ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
@@ -114,7 +119,7 @@ export function WorkTypeStep({
       {directionButtons.length > 0 && (
         <div>
           <SettingLabel label="이동 방향" />
-          <div className="grid grid-cols-2 gap-2">
+          <div className={`grid gap-2 ${directionButtons.length >= 3 ? "grid-cols-3" : "grid-cols-2"}`}>
             {directionButtons.map((btn) => (
               <button
                 key={btn.id}
@@ -135,12 +140,12 @@ export function WorkTypeStep({
       )}
 
       {/* 부서 */}
-      {workTypeNeedsDept(workType) && (
+      {(workTypeNeedsDept(workType) || isRawReturn) && (
         <div>
           <SettingLabel
             label={
-              workType === "supplier-return"
-                ? "반품할 부서"
+              isRawReturn
+                ? "반품할 부서 (불량 출처)"
                 : workType === "defective-register"
                   ? "불량 격리 부서"
                   : "대상 부서"
@@ -214,9 +219,9 @@ export function WorkTypeStep({
         >
           <AlertTriangle className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.yellow }} />
           <div className="text-[12px]" style={{ color: LEGACY_COLORS.text }}>
-            {workType === "defective-register"
-              ? "불량 등록은 재고가 격리 상태로 이동합니다. 대상 부서·발견 위치를 다시 한 번 확인하세요."
-              : "공급업체 반품은 되돌릴 수 없습니다. 반품 부서와 수량을 확인하세요."}
+            {isRawReturn
+              ? "공급업체 반품은 되돌릴 수 없습니다. 반품 부서(불량 출처)와 수량을 확인하세요."
+              : "불량 등록은 재고가 격리 상태로 이동합니다. 대상 부서·발견 위치를 다시 한 번 확인하세요."}
           </div>
         </div>
       )}
