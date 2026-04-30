@@ -1,6 +1,9 @@
 """
 Seed SQLite ERP data from ERP_Master_DB.csv.
 
+[레거시 부트스트랩 전용] — settings./reset 에서는 사용하지 않음.
+운영 초기화는 app/services/seed_cleanup.py (722 정리본 기준) 를 사용.
+
 Usage:
     python backend/seed.py
     cd backend && python seed.py

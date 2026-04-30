@@ -24,8 +24,7 @@ erDiagram
         uuid item_id PK
         string item_name
         string erp_code
-        enum  category
-        string process_type_code
+        string process_type_code "2자리 코드 (TR/TA/TF 등 18종) — category 필드는 2026-04-29 제거됨"
         string legacy_model
         decimal min_stock
     }

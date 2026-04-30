@@ -19,9 +19,9 @@ export const UNIT_OPTIONS = ["EA", "SET", "kg", "g", "m", "mm", "L", "box"];
 
 export const PKG_CATEGORY_OPTIONS = [
   { value: "ALL", label: "전체" },
-  { value: "?R",  label: "원자재(?R)" },
-  { value: "?A",  label: "중간공정(?A)" },
-  { value: "?F",  label: "공정완료(?F)" },
+  { value: "?R",  label: "원자재" },
+  { value: "?A",  label: "중간공정" },
+  { value: "?F",  label: "공정완료" },
 ];
 
 export const EMPTY_ADD_FORM = {
@@ -51,7 +51,12 @@ export const EMPTY_EMPLOYEE_FORM = {
 export type EmployeeAddForm = typeof EMPTY_EMPLOYEE_FORM;
 
 export const BOM_PARENT_CATS = ["ALL", "AA", "HA", "VA", "TA", "NA", "PA", "AF", "TF", "HF", "VF", "NF", "PF"];
-export const BOM_CHILD_CATS = ["ALL", "?R", "?A", "?F"];
+export const BOM_CHILD_CATS = [
+  { value: "ALL", label: "전체" },
+  { value: "?R",  label: "원자재" },
+  { value: "?A",  label: "중간공정" },
+  { value: "?F",  label: "공정완료" },
+];
 
 export function bomCategoryColor(code?: string | null): string {
   if (!code) return "var(--c-muted2)";

@@ -22,7 +22,7 @@ export function useWarehouseFilters({
   const [localSearch, setLocalSearch] = useState("");
   const [dept, setDept] = useState("ALL");
   const [modelFilter, setModelFilter] = useState("전체");
-  const [categoryFilter, setCategoryFilter] = useState("ALL");
+  const [stageFilter, setStageFilter] = useState("ALL");
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
 
   const searchKeyword = `${globalSearch} ${localSearch}`.trim().toLowerCase();
@@ -37,19 +37,19 @@ export function useWarehouseFilters({
         })
         .filter((item) => modelFilter === "전체" || item.legacy_model === modelFilter)
         .filter((item) => {
-          if (categoryFilter === "ALL") return true;
-          if (categoryFilter === "RM") return item.process_type_code?.endsWith("R") ?? false;
-          if (categoryFilter === "A") return item.process_type_code?.endsWith("A") ?? false;
-          if (categoryFilter === "F") return item.process_type_code?.endsWith("F") ?? false;
+          if (stageFilter === "ALL") return true;
+          if (stageFilter === "RAW") return item.process_type_code?.endsWith("R") ?? false;
+          if (stageFilter === "MID") return item.process_type_code?.endsWith("A") ?? false;
+          if (stageFilter === "DONE") return item.process_type_code?.endsWith("F") ?? false;
           return true;
         })
         .filter((item) => matchesSearch(item, searchKeyword)),
-    [items, dept, modelFilter, categoryFilter, searchKeyword],
+    [items, dept, modelFilter, stageFilter, searchKeyword],
   );
 
   useEffect(() => {
     setDisplayLimit(PAGE_SIZE);
-  }, [dept, modelFilter, categoryFilter, localSearch, globalSearch]);
+  }, [dept, modelFilter, stageFilter, localSearch, globalSearch]);
 
   const filteredPackages = useMemo(
     () =>
@@ -74,12 +74,12 @@ export function useWarehouseFilters({
 
   const hasActiveFilter =
     !isPackageMode
-    && (dept !== "ALL" || modelFilter !== "전체" || categoryFilter !== "ALL" || !!localSearch);
+    && (dept !== "ALL" || modelFilter !== "전체" || stageFilter !== "ALL" || !!localSearch);
 
   function clearFilters() {
     setDept("ALL");
     setModelFilter("전체");
-    setCategoryFilter("ALL");
+    setStageFilter("ALL");
     setLocalSearch("");
   }
 
@@ -90,8 +90,8 @@ export function useWarehouseFilters({
     setDept,
     modelFilter,
     setModelFilter,
-    categoryFilter,
-    setCategoryFilter,
+    stageFilter,
+    setStageFilter,
     displayLimit,
     setDisplayLimit,
     searchKeyword,

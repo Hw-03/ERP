@@ -45,8 +45,8 @@ type FilterLike = {
   setDept: Dispatch<SetStateAction<string>>;
   modelFilter: string;
   setModelFilter: Dispatch<SetStateAction<string>>;
-  categoryFilter: string;
-  setCategoryFilter: Dispatch<SetStateAction<string>>;
+  stageFilter: string;
+  setStageFilter: Dispatch<SetStateAction<string>>;
   displayLimit: number;
   setDisplayLimit: Dispatch<SetStateAction<number>>;
   filteredItems: Item[];
@@ -206,8 +206,8 @@ export function WarehouseStepLayout({
               setDept={f.setDept}
               modelFilter={f.modelFilter}
               setModelFilter={f.setModelFilter}
-              categoryFilter={f.categoryFilter}
-              setCategoryFilter={f.setCategoryFilter}
+              stageFilter={f.stageFilter}
+              setStageFilter={f.setStageFilter}
               localSearch={f.localSearch}
               setLocalSearch={f.setLocalSearch}
               displayLimit={f.displayLimit}
