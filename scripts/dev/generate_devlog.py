@@ -73,9 +73,9 @@ def build_dashboard(ws, commits):
     # KPI 영역 (행 3~6)
     ws.row_dimensions[3].height = 22
     kpis = [
-        ("개발 기간", "2026-04-10 ~ 04-30 (21일)"),
+        ("개발 기간", "2026-04-10 ~ 04-30 (21일 · 근무일 15일)"),
         ("총 커밋 수", f"{len(commits)}건"),
-        ("기능 완료", "27 / 36개 (75%)"),
+        ("기능 완료", "35 / 42개 (83%)"),
         ("개발 영역", "Backend · Frontend · Mobile · Admin · Docs"),
     ]
 
@@ -188,43 +188,56 @@ def build_features(ws):
 
     features = [
         # (기능명, 분류, 완료여부, 비고)
-        ("품목 마스터 관리",           "재고",   True,  ""),
-        ("ERP 자재 코드 체계 통일",     "재고",   True,  "담당자 협의 필요"),
-        ("재고 입고 / 출고 / 조정",     "재고",   True,  ""),
-        ("재고 이력 관리",             "재고",   True,  ""),
-        ("창고 / 생산 / 불량 버킷 분리", "재고",   True,  ""),
-        ("안전재고 기준 이하 알림",      "재고",   True,  ""),
-        ("재고 현황 막대 시각화",       "재고",   True,  ""),
-        ("BOM 등록 / 조회",            "BOM",   True,  ""),
-        ("BOM 웹 수정 기능",           "BOM",   True,  ""),
-        ("BOM Where-Used 조회",       "BOM",   True,  ""),
-        ("직원 명단 관리",             "직원",   True,  ""),
-        ("부서별 담당 색상 배지 표시",   "직원",   True,  ""),
-        ("관리자 화면",                "관리",   True,  ""),
-        ("데이터 CSV 내보내기",         "관리",   True,  ""),
-        ("PC 화면 (데스크톱)",          "UI",    True,  ""),
-        ("모바일 화면",                "UI",    True,  ""),
-        ("다크 / 라이트 모드",          "UI",    True,  ""),
-        ("입출고 단계형 Wizard UX",     "UI",    True,  ""),
-        ("원클릭 실행 (start.bat)",     "인프라", True,  ""),
-        ("테스트 자동화 (CI)",          "인프라", True,  ""),
-        ("창고 승인 기반 입출고 흐름",   "재고",   True,  "요청→승인→처리 단계 분리"),
-        ("직원별 저장형 입출고 장바구니", "재고",   True,  "화면 이탈 후에도 작업 유지"),
-        ("작업자 PIN 로그인 + 감사 이력", "보안",  True,  "수정 이력 자동 기록"),
-        ("품목 분류 개편 (process_type_code)", "재고", True,  "DB 722건 재구성 완료"),
-        ("BOM 플래너 (위저드·일괄 다운로드)", "BOM",  True,  ""),
-        ("입출고 부서별 필터·반품·자가승인", "재고",   True,  ""),
-        ("부서 관리 (DnD·컬러 피커·직원 검색)", "관리", True, ""),
+        # ── 재고 ─────────────────────────────────────────
+        ("품목 마스터 관리",                   "재고",   True,  ""),
+        ("자재 코드 체계 통일",                 "재고",   True,  "담당자 협의 필요"),
+        ("재고 입고 / 출고 / 조정",             "재고",   True,  ""),
+        ("재고 이력 관리",                     "재고",   True,  ""),
+        ("창고 / 생산 / 불량 버킷 분리",        "재고",   True,  ""),
+        ("안전재고 기준 이하 알림",              "재고",   True,  ""),
+        ("재고 현황 막대 시각화",               "재고",   True,  ""),
+        ("품목 분류 개편 (process_type_code)", "재고",   True,  "DB 722건 재구성"),
+        ("재고 실사 (Physical Count)",         "재고",   True,  "강제 조정 포함"),
+        ("차이 분석 (Variance)",               "재고",   True,  "실제-예상 수량 차이 기록"),
+        ("폐기 · 분실 이력 관리",               "재고",   True,  "Scrap / Loss 라우터"),
+        # ── 입출고 워크플로 ──────────────────────────────
+        ("입출고 단계형 Wizard UX",             "입출고", True,  ""),
+        ("입출고 부서별 필터 · 반품 · 자가승인", "입출고", True,  ""),
+        ("창고 승인 기반 입출고 흐름",           "입출고", True,  "요청→승인→처리"),
+        ("직원별 저장형 입출고 장바구니",        "입출고", True,  "화면 이탈 후 유지"),
+        ("생산 / 분해 / 반품 처리 Queue",      "생산",   True,  "2단계 워크플로"),
+        ("QR · 바코드 스캔",                  "입출고", True,  "BarcodeDetector + zxing"),
+        # ── 출하 ─────────────────────────────────────────
+        ("출하 패키지 관리",                   "출하",   True,  "묶음 CRUD + 품목 관리"),
+        # ── BOM ──────────────────────────────────────────
+        ("BOM 등록 / 조회",                   "BOM",   True,  ""),
+        ("BOM 웹 수정 기능",                  "BOM",   True,  ""),
+        ("BOM Where-Used 조회",              "BOM",   True,  ""),
+        ("BOM 플래너 (위저드 · 일괄 다운로드)", "BOM",   True,  ""),
+        # ── 직원 · 보안 ──────────────────────────────────
+        ("직원 명단 관리",                     "직원",   True,  ""),
+        ("부서별 담당 색상 배지 표시",           "직원",   True,  ""),
+        ("작업자 PIN 로그인 + 감사 이력",       "보안",   True,  "수정 이력 자동 기록"),
+        ("로그인 및 권한 관리",                 "보안",   True,  "PIN 기반 — 역할별 접근 제어 예정"),
+        # ── UI · 관리 ────────────────────────────────────
+        ("PC 화면 (데스크톱)",                 "UI",    True,  ""),
+        ("모바일 화면",                        "UI",    True,  ""),
+        ("다크 / 라이트 모드",                 "UI",    True,  ""),
+        ("관리자 화면",                        "관리",   True,  ""),
+        ("부서 관리 (DnD · 컬러 피커 · 검색)", "관리",   True,  ""),
+        ("데이터 CSV 내보내기",                "관리",   True,  ""),
+        # ── 인프라 ───────────────────────────────────────
+        ("원클릭 실행 (start.bat)",            "인프라", True,  ""),
+        ("테스트 자동화 (CI)",                 "인프라", True,  "pytest 42건 + vitest 12건"),
+        ("WAL-safe 백업 / 복구",              "인프라", True,  "ops 스크립트 자동화"),
         # ── 예정 ─────────────────────────────────────────
-        ("총재고 / 가용재고 / 예약재고 분리", "재고",  False, ""),
-        ("생산 / 분해 / 반품 처리 Queue",   "생산",  False, ""),
-        ("QR · 바코드 스캔 완성",           "입출고", False, "모바일 카메라 연동"),
-        ("실제 운영 데이터 입력",            "데이터", False, "권동환 사원 협의 후"),
-        ("로그인 및 권한 관리",              "보안",  False, "화면 구현 완료 — 인증 연동 예정"),
-        ("외부 접근 환경 구성",              "인프라", False, "PC 또는 NAS 서버"),
-        ("발주 관리",                       "구매",  False, ""),
-        ("생산 실적 / 원가 관리",            "생산",  False, ""),
-        ("부서별 진행현황 화면",             "관리",  False, "사장님 요청 — 검토 중"),
+        ("총재고 / 가용재고 / 예약재고 분리",   "재고",  False, "재고 가용성 계산 고도화"),
+        ("실제 운영 데이터 입력",              "데이터", False, "권동환 사원 협의 후"),
+        ("외부 접근 환경 구성",                "인프라", False, "PC 또는 NAS 서버 + API 인증"),
+        ("발주 관리",                         "구매",  False, ""),
+        ("생산 실적 / 원가 관리",              "생산",  False, ""),
+        ("부서별 생산진행도 대시보드",          "관리",  False, "사장님 요청 — 검토 중"),
+        ("출하 거래처 관리",                   "출하",  False, "거래처 마스터 + 출하 이력"),
     ]
 
     for r, (name, cat, done, note) in enumerate(features, 2):
@@ -244,6 +257,15 @@ def build_features(ws):
     ws.column_dimensions["E"].width = 28
 
 # ── Sheet 3: 커밋 이력 ───────────────────────────────────
+_TYPE_MAP = {
+    "feat": "feat", "fix": "fix", "refactor": "refactor",
+    "docs": "docs", "chore": "chore", "ci": "ci", "test": "test",
+    "perf": "perf", "style": "style", "build": "build",
+    "desktop": "desktop", "mobile": "mobile", "backend": "backend",
+    "frontend": "frontend", "admin": "admin", "scripts": "scripts",
+    "devx": "devx", "merge": "merge", "design": "design",
+}
+
 def fetch_commits():
     result = subprocess.run(
         ["git", "log", "--format=%ad|%h|%s", "--date=short"],
@@ -255,8 +277,11 @@ def fetch_commits():
         if len(parts) != 3:
             continue
         date, hash7, msg = parts
-        m = re.match(r"^(feat|fix|refactor|docs|chore|design|style|test|ci|build|perf)(\(.+?\))?!?:", msg)
-        ctype = m.group(1) if m else "기타"
+        # 날짜 prefix 제거: "2026-04-25 desktop: ..." → "desktop: ..."
+        msg_clean = re.sub(r"^\d{4}-\d{2}-\d{2}\s+", "", msg)
+        m = re.match(r"^([a-z][a-z+\-]*)(\(.+?\))?[!:]", msg_clean)
+        raw = m.group(1) if m else None
+        ctype = _TYPE_MAP.get(raw, "기타") if raw else "기타"
         commits.append((date, hash7, msg, ctype))
     return list(reversed(commits))  # 오래된 순으로
 
