@@ -34,42 +34,9 @@ import {
 } from "@/lib/mes/department";
 export { DEPARTMENT_LABELS, DEPARTMENT_ICONS, normalizeDepartment };
 
-/**
- * 부서별 색상.
- *
- * **호환 보존:** wrapper 화 시도 (mes-department.getDepartmentFallbackColor 위임) 결과
- * "연구" 부서에서 동작 차이 발생 — DEPARTMENT_LABELS["연구"]="연구소" 정규화 후
- * 본 switch 의 case "연구" 가 hit 되지 않아 기존 코드는 default slate 를 반환한다.
- * mes-department 의 별칭 매핑("연구소"→"연구") 과 충돌하므로 본 함수는 본문 유지.
- *
- * 통합은 별도 작업으로 분리: Round-10F 에서 부서명 정규화 정책을 통일한 뒤 wrapper 화.
- */
-export function employeeColor(value?: string | null) {
-  switch (normalizeDepartment(value)) {
-    case "조립":
-      return "#1d4ed8"; // blue-700
-    case "고압":
-      return "#c2410c"; // orange-700
-    case "진공":
-      return "#6d28d9"; // violet-700
-    case "튜닝":
-      return "#0e7490"; // cyan-700
-    case "서비스":
-      return "#047857"; // emerald-700
-    case "AS":
-      return "#be185d"; // pink-700
-    case "연구":
-      return "#b45309"; // amber-700
-    case "영업":
-      return "#b91c1c"; // red-700
-    case "출하":
-      return "#0f766e"; // teal-700
-    case "튜브":
-      return "#4d7c0f"; // lime-700
-    default:
-      return "#475569"; // slate-600
-  }
-}
+// Round-10F (#2): employeeColor 본문은 @/lib/mes/color 정본으로 이전.
+// 정책 (A) 통일 (Round-10F #1) 결과 mes-department.MES_DEPARTMENT_COLORS 와 hex 일치 확인.
+export { employeeColor } from "@/lib/mes/color";
 
 export function transactionColor(type: TransactionType) {
   switch (type) {

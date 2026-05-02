@@ -7,6 +7,7 @@ import {
   LEGACY_COLORS,
   OPTION_COLOR,
   optionColor,
+  employeeColor,
 } from "../mes/color";
 
 describe("mes/color barrel — department exports", () => {
@@ -45,6 +46,31 @@ describe("mes/color barrel — LEGACY_COLORS", () => {
     expect(LEGACY_COLORS.red).toBe("var(--c-red)");
     expect(LEGACY_COLORS.muted).toBe("var(--c-muted)");
     expect(LEGACY_COLORS.muted2).toBe("var(--c-muted2)");
+  });
+});
+
+describe("employeeColor (Round-10F 정책 (A))", () => {
+  it("returns MES_DEPARTMENT_COLORS hex for known 부서", () => {
+    expect(employeeColor("조립")).toBe("#1d4ed8");
+    expect(employeeColor("고압")).toBe("#c2410c");
+    expect(employeeColor("진공")).toBe("#6d28d9");
+    expect(employeeColor("튜닝")).toBe("#0e7490");
+    expect(employeeColor("튜브")).toBe("#4d7c0f");
+    expect(employeeColor("AS")).toBe("#be185d");
+    expect(employeeColor("연구")).toBe("#b45309");
+    expect(employeeColor("영업")).toBe("#b91c1c");
+    expect(employeeColor("출하")).toBe("#0f766e");
+  });
+
+  it("absorbs '연구소' alias → 연구 색", () => {
+    expect(employeeColor("연구소")).toBe("#b45309");
+  });
+
+  it("falls back to slate (#475569) for null / empty / unknown", () => {
+    expect(employeeColor(null)).toBe("#475569");
+    expect(employeeColor(undefined)).toBe("#475569");
+    expect(employeeColor("")).toBe("#475569");
+    expect(employeeColor("미지부서")).toBe("#475569");
   });
 });
 

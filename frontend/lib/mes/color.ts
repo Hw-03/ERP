@@ -4,9 +4,11 @@
  * Round-5 (R5-7) 신설. 색상 상수 / 부서 색상 진입점 통합.
  * Round-10A (#3) 정본 flip — LEGACY_COLORS 본문이 본 파일로 이전됐다.
  * Round-10D (#3) — OPTION_COLOR/optionColor 정본 이전.
+ * Round-10F (#2) — employeeColor 정본 이전 (정책 (A) 적용 후 mes-department 와 통합).
  *
  * 새 코드는 `@/lib/mes/color` 또는 `@/lib/mes` barrel 사용.
  */
+import { getDepartmentFallbackColor } from "../mes-department";
 export {
   MES_DEPARTMENT_COLORS,
   getDepartmentFallbackColor,
@@ -53,4 +55,17 @@ export const OPTION_COLOR: Record<string, string> = {
 export function optionColor(code?: string | null): string {
   if (!code) return LEGACY_COLORS.muted2;
   return OPTION_COLOR[code] ?? LEGACY_COLORS.muted2;
+}
+
+/**
+ * 부서명 → 직원 / 부서 색상.
+ *
+ * Round-10F (#2) 정본 이전 — `getDepartmentFallbackColor` 위임.
+ *   - 정책 (A) 적용 후 동작 동일성 검증 완료: legacyUi.employeeColor 의 hex 값과
+ *     `MES_DEPARTMENT_COLORS` 값 완전 일치 (조립/고압/진공/튜닝/튜브/서비스/AS/연구/영업/출하/기타).
+ *   - 빈 / null / undefined → "기타" 의 fallback (#475569 slate-600).
+ *   - "연구소" 같은 alias 도 `normalizeDepartmentName` 이 흡수 (Round-10F 통일 정책).
+ */
+export function employeeColor(value?: string | null): string {
+  return getDepartmentFallbackColor(value ?? "");
 }
