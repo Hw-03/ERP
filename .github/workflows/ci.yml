@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   backend:
-    name: Backend (pytest + compile)
+    name: Backend (pytest + compile + openapi-drift)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,8 +35,28 @@ jobs:
         working-directory: backend
         run: pytest -q
 
+      # docs/openapi.json baseline 과 현재 FastAPI app.openapi() 결과 비교.
+      # 라우터/스키마 변경 시 baseline 미갱신이면 실패 — 갱신 절차는 README 참조.
+      - name: OpenAPI drift check
+        working-directory: backend
+        run: |
+          python -c "
+          import sys, json
+          sys.path.insert(0, '.')
+          from app.main import app
+          with open('/tmp/openapi-current.json', 'w', encoding='utf-8') as f:
+              json.dump(app.openapi(), f, indent=2, sort_keys=True, ensure_ascii=False)
+              f.write('\n')
+          "
+          diff -u ../docs/openapi.json /tmp/openapi-current.json \
+            && echo "✓ OpenAPI spec matches baseline." \
+            || (echo "" && echo "✗ OpenAPI drift detected." \
+                && echo "라우터 또는 스키마가 변경됐습니다. 다음 명령으로 baseline 갱신 후 commit:" \
+                && echo "  cd backend && python -c \"from app.main import app; import json; open('../docs/openapi.json','w',encoding='utf-8').write(json.dumps(app.openapi(),indent=2,sort_keys=True,ensure_ascii=False)+chr(10))\"" \
+                && exit 1)
+
   frontend:
-    name: Frontend (lint + tsc + vitest + build)
+    name: Frontend (lint + tsc + vitest+coverage + build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +66,15 @@ jobs:
           node-version: "20"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
+
+      # Next.js 빌드 캐시 재사용 — 변경 없는 파일은 재컴파일 스킵.
+      - name: Cache .next/cache
+        uses: actions/cache@v4
+        with:
+          path: frontend/.next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}-${{ hashFiles('frontend/**/*.[jt]s', 'frontend/**/*.[jt]sx') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}-
 
       - name: Install dependencies
         working-directory: frontend
@@ -59,9 +88,17 @@ jobs:
         working-directory: frontend
         run: npx tsc --noEmit
 
-      - name: Vitest
+      - name: Vitest (with coverage gate)
         working-directory: frontend
-        run: npm test
+        run: npm run test:coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
+          retention-days: 7
 
       - name: Build (Next.js production)
         working-directory: frontend

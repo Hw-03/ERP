@@ -38,8 +38,39 @@ function Invoke-Check {
 Invoke-Check "Backend pytest" $BackendRoot { python -m pytest -q }
 Invoke-Check "Frontend strict lint" $FrontendRoot { npm run lint:strict }
 Invoke-Check "Frontend type check" $FrontendRoot { npx tsc --noEmit }
-Invoke-Check "Frontend tests" $FrontendRoot { npm test }
+# coverage gate (Round-10A #5) — CI 와 동일한 threshold 50/50/50/50.
+Invoke-Check "Frontend tests + coverage" $FrontendRoot { npm run test:coverage }
 Invoke-Check "Frontend production build" $FrontendRoot { npm run build }
+# OpenAPI drift check (Round-10A #5) — backend 라우터/스키마 변경 시 docs/openapi.json 갱신 강제.
+Invoke-Check "OpenAPI drift" $BackendRoot {
+    $TmpFile = Join-Path $env:TEMP "openapi-current.json"
+    $BaselineFile = Join-Path $RepoRoot "docs/openapi.json"
+
+    $PyScript = @'
+import json
+import sys
+sys.path.insert(0, ".")
+from app.main import app
+out = sys.argv[1]
+with open(out, "w", encoding="utf-8") as f:
+    json.dump(app.openapi(), f, indent=2, sort_keys=True, ensure_ascii=False)
+    f.write("\n")
+'@
+    $PyScript | python - $TmpFile
+    if ($LASTEXITCODE -ne 0) {
+        throw "OpenAPI 캡처 실패"
+    }
+
+    $current = Get-Content $TmpFile -Raw
+    $baseline = Get-Content $BaselineFile -Raw
+    if ($current -ne $baseline) {
+        Write-Host ""
+        Write-Host "✗ OpenAPI drift detected. baseline 갱신 필요:"
+        Write-Host "  cd backend; python -c `"from app.main import app; import json; open('../docs/openapi.json','w',encoding='utf-8').write(json.dumps(app.openapi(),indent=2,sort_keys=True,ensure_ascii=False)+chr(10))`""
+        throw "OpenAPI drift"
+    }
+    Write-Host "✓ OpenAPI spec matches baseline."
+}
 
 if ($DbReadOnlyCheck) {
     Invoke-Check "DB read-only consistency" $RepoRoot {
