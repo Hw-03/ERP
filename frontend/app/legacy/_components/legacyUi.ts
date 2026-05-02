@@ -34,9 +34,8 @@ export const DEPARTMENT_ICONS: Record<string, string> = {
   "기타": "기",
 };
 
-export const LEGACY_FILE_TYPES = ["전체"] as const;
-export const LEGACY_PARTS = ["전체", "자재창고", "조립출하", "고압파트", "진공파트", "튜닝파트"] as const;
-export const LEGACY_MODELS = ["전체", "DX3000", "ADX4000W", "ADX6000", "COCOON", "SOLO"] as const;
+// Round-10E (#3): legacy 재고 필터 옵션 상수는 @/lib/mes/inventory 정본으로 이전.
+export { LEGACY_FILE_TYPES, LEGACY_PARTS, LEGACY_MODELS } from "@/lib/mes/inventory";
 
 export function normalizeDepartment(value?: string | null) {
   if (!value) return "기타";
