@@ -1,6 +1,6 @@
 "use client";
 
-import type { Item, TransactionType } from "@/lib/api";
+import type { TransactionType } from "@/lib/api";
 
 // LEGACY_COLORS 본문은 @/lib/mes/color 정본으로 이전됨 (Round-10A #3).
 // 본 파일 내부 함수들이 직접 참조하므로 import 후 re-export.
@@ -133,49 +133,11 @@ export function transactionColor(type: TransactionType) {
   }
 }
 
-export function buildItemSearchLabel(item: Item) {
-  return `${item.erp_code} / ${item.item_name}`;
-}
-
-export function normalizeModel(value?: string | null) {
-  return value && value.trim() ? value : "공용";
-}
-
-export function itemMatchesKpi(item: Item, kpi: string) {
-  const qty = Number(item.quantity);
-  const min = item.min_stock == null ? null : Number(item.min_stock);
-  if (kpi === "정상") return qty > 0 && !(min != null && qty < min);
-  if (kpi === "부족") return qty > 0 && min != null && qty < min;
-  if (kpi === "품절") return qty <= 0;
-  return true;
-}
-
-export function groupedItems(items: Item[]) {
-  const map = new Map<
-    string,
-    {
-      key: string;
-      representative: Item;
-      quantity: number;
-      count: number;
-    }
-  >();
-
-  for (const item of items) {
-    const key = item.item_name.trim().toLowerCase();
-    const current = map.get(key);
-    if (current) {
-      current.quantity += Number(item.quantity);
-      current.count += 1;
-    } else {
-      map.set(key, {
-        key,
-        representative: item,
-        quantity: Number(item.quantity),
-        count: 1,
-      });
-    }
-  }
-
-  return Array.from(map.values());
-}
+// Round-10E (#6/7/8): Item 도메인 4 함수 (buildItemSearchLabel / normalizeModel /
+// itemMatchesKpi / groupedItems) 본문은 @/lib/mes/item 정본으로 이전.
+export {
+  buildItemSearchLabel,
+  normalizeModel,
+  itemMatchesKpi,
+  groupedItems,
+} from "@/lib/mes/item";
