@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, X } from "lucide-react";
 import { api, type Item } from "@/lib/api";
-import { LEGACY_COLORS, normalizeDepartment } from "../../../legacyUi";
+import { LEGACY_COLORS } from "../../../legacyUi";
+import { normalizeDepartment } from "@/lib/mes/department";
 import type { ToastState } from "@/features/mes/shared/Toast";
 import { IconButton, WizardHeader, type SummaryChip } from "../../primitives";
 import { useEmployees } from "../../hooks/useEmployees";

@@ -1,8 +1,8 @@
 "use client";
 
 import type { TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS, transactionColor } from "./legacyUi";
-import { getTransactionLabel } from "@/lib/mes-status";
+import { LEGACY_COLORS } from "./legacyUi";
+import { getTransactionLabel, transactionColor } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 export interface ItemDetailHistoryListProps {
   logs: TransactionLog[];

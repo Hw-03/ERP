@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { api, type Employee } from "@/lib/api";
 import { BottomSheet } from "@/features/mes/shared/BottomSheet";
 import type { ToastState } from "@/features/mes/shared/Toast";
-import { LEGACY_COLORS, normalizeDepartment } from "../../../legacyUi";
+import { LEGACY_COLORS } from "../../../legacyUi";
+import { normalizeDepartment } from "@/lib/mes/department";
 import { useDepartments } from "../../../DepartmentsContext";
 
 export function AdminEmployeesSection({ showToast }: { showToast: (toast: ToastState) => void }) {

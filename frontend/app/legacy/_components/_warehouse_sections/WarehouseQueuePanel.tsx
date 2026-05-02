@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, type StockRequest } from "@/lib/api";
-import { LEGACY_COLORS, normalizeDepartment } from "../legacyUi";
+import { LEGACY_COLORS } from "../legacyUi";
+import { normalizeDepartment } from "@/lib/mes/department";
 import { formatQty } from "@/lib/mes/format";
 const REQUEST_TYPE_LABEL: Record<string, string> = {
   raw_receive: "원자재 입고",

@@ -3,7 +3,8 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { ChevronRight, Minus, Plus, PackageSearch, ScanLine, Trash2 } from "lucide-react";
 import type { Employee, Item } from "@/lib/api";
-import { LEGACY_COLORS, normalizeDepartment } from "../../../legacyUi";
+import { LEGACY_COLORS } from "../../../legacyUi";
+import { normalizeDepartment } from "@/lib/mes/department";
 import { formatQty } from "@/lib/mes/format";
 import { BarcodeScannerModal } from "../../../BarcodeScannerModal";
 import type { ToastState } from "@/features/mes/shared/Toast";

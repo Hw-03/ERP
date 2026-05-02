@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { DepartmentMaster } from "@/lib/api";
 import { api } from "@/lib/api";
-import { employeeColor } from "../legacyUi";
+import { employeeColor } from "@/lib/mes/color";
 import { useRefreshDepartments } from "../DepartmentsContext";
 
 export const COLOR_PALETTE = [

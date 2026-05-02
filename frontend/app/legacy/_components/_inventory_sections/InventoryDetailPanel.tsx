@@ -2,13 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { api, type Item, type StockRequestReservationLine, type TransactionLog } from "@/lib/api";
-import {
-  LEGACY_COLORS,
-  normalizeDepartment,
-  transactionColor,
-} from "../legacyUi";
+import { LEGACY_COLORS } from "../legacyUi";
+import { normalizeDepartment } from "@/lib/mes/department";
 import { normalizeModel } from "@/lib/mes/item";
-import { getTransactionLabel } from "@/lib/mes-status";
+import { getTransactionLabel, transactionColor } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "../DepartmentsContext";
 

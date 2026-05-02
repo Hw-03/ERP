@@ -11,7 +11,8 @@ import {
   type ReactNode,
 } from "react";
 import { api, type DepartmentMaster } from "@/lib/api";
-import { employeeColor, normalizeDepartment } from "./legacyUi";
+import { employeeColor } from "@/lib/mes/color";
+import { normalizeDepartment } from "@/lib/mes/department";
 
 type Ctx = {
   departments: DepartmentMaster[];

@@ -1,7 +1,8 @@
 "use client";
 
 import type { Employee, Item, ShipPackage } from "@/lib/api";
-import { LEGACY_COLORS, normalizeDepartment } from "../legacyUi";
+import { LEGACY_COLORS } from "../legacyUi";
+import { normalizeDepartment } from "@/lib/mes/department";
 import { formatQty } from "@/lib/mes/format";
 import type { WorkType } from "../_warehouse_steps";
 

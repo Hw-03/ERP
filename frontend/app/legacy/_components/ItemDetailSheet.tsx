@@ -4,13 +4,10 @@ import { useEffect, useState } from "react";
 import { api, type Item, type TransactionLog } from "@/lib/api";
 import { BottomSheet } from "@/features/mes/shared/BottomSheet";
 import { ItemDetailHistoryList } from "./ItemDetailHistoryList";
-import {
-  LEGACY_COLORS,
-  transactionColor,
-} from "./legacyUi";
+import { LEGACY_COLORS } from "./legacyUi";
 import { erpCodeDeptBadge } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
-import { getTransactionLabel } from "@/lib/mes-status";
+import { getTransactionLabel, transactionColor } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "./DepartmentsContext";
 
