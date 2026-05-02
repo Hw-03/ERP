@@ -2,7 +2,8 @@
 
 import { Copy } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS, transactionColor, transactionLabel } from "../../../legacyUi";
+import { LEGACY_COLORS, transactionColor } from "../../../legacyUi";
+import { getTransactionLabel } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import { TYPO } from "../../tokens";
 
@@ -34,7 +35,7 @@ export function HistoryLogRow({ log, copiedRef, onCopy }: Props) {
           color: transactionColor(log.transaction_type),
         }}
       >
-        {transactionLabel(log.transaction_type)}
+        {getTransactionLabel(log.transaction_type)}
       </span>
       <div className="min-w-0 flex-1">
         <div className={`${TYPO.body} truncate font-black`} style={{ color: LEGACY_COLORS.text }}>

@@ -13,7 +13,8 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { api, type Employee, type TransactionLog, type TransactionType } from "@/lib/api";
-import { LEGACY_COLORS, transactionLabel } from "../legacyUi";
+import { LEGACY_COLORS } from "../legacyUi";
+import { getTransactionLabel } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 
@@ -103,7 +104,7 @@ export function TransactionQuantityCorrectModal({ open, log, onClose, onSuccess 
               수량 보정
             </div>
             <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-              {transactionLabel(log.transaction_type)} · {log.item_name}
+              {getTransactionLabel(log.transaction_type)} · {log.item_name}
             </div>
           </div>
           <button onClick={onClose} className="rounded-full p-1 hover:bg-white/10">

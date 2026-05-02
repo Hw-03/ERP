@@ -9,8 +9,8 @@ import {
   erpCodeDeptBadge,
   getStockState,
   transactionColor,
-  transactionLabel,
 } from "./legacyUi";
+import { getTransactionLabel } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "./DepartmentsContext";
 

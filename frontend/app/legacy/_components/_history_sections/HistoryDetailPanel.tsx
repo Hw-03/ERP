@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { Activity, History, Pencil, Wrench } from "lucide-react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS, transactionColor, transactionLabel } from "../legacyUi";
+import { LEGACY_COLORS, transactionColor } from "../legacyUi";
+import { getTransactionLabel } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import { PROCESS_TYPE_META, formatHistoryDate, parseUtc } from "./historyShared";
 import { TransactionEditModal } from "./TransactionEditModal";
@@ -82,7 +83,7 @@ export function HistoryDetailPanel({
             className="inline-flex rounded-full px-4 py-1.5 text-sm font-bold"
             style={{ background: `color-mix(in srgb, ${tcolor} 14%, transparent)`, color: tcolor }}
           >
-            {transactionLabel(selected.transaction_type)}
+            {getTransactionLabel(selected.transaction_type)}
           </span>
           {editCount > 0 && (
             <span
@@ -270,7 +271,7 @@ export function HistoryDetailPanel({
                       color: transactionColor(log.transaction_type),
                     }}
                   >
-                    {transactionLabel(log.transaction_type)}
+                    {getTransactionLabel(log.transaction_type)}
                   </span>
                   <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                     {formatHistoryDate(log.created_at)}

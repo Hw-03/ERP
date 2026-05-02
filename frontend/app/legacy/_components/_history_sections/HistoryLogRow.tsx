@@ -23,8 +23,8 @@ import {
   LEGACY_COLORS,
   transactionColor,
   transactionIconName,
-  transactionLabel,
 } from "../legacyUi";
+import { getTransactionLabel } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColor } from "../DepartmentsContext";
 import { PROCESS_TYPE_META, formatHistoryDate, rowTint } from "./historyShared";
@@ -106,7 +106,7 @@ function HistoryLogRowImpl({ log, selected, copiedRef, onSelect, onCopyRef }: Pr
           style={{ background: `color-mix(in srgb, ${tcolor} 14%, transparent)`, color: tcolor }}
         >
           <TxIcon className="h-3.5 w-3.5" aria-hidden="true" />
-          {transactionLabel(log.transaction_type)}
+          {getTransactionLabel(log.transaction_type)}
         </span>
       </td>
       <td className="max-w-[180px] border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>

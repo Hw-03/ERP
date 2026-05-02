@@ -7,8 +7,8 @@ import {
   normalizeDepartment,
   normalizeModel,
   transactionColor,
-  transactionLabel,
 } from "../legacyUi";
+import { getTransactionLabel } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "../DepartmentsContext";
 
@@ -273,7 +273,7 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold" style={{ color: transactionColor(log.transaction_type) }}>
-                    {transactionLabel(log.transaction_type)}
+                    {getTransactionLabel(log.transaction_type)}
                   </span>
                   <span className="text-sm">{formatQty(log.quantity_change)}</span>
                 </div>

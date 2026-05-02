@@ -1,7 +1,8 @@
 "use client";
 
 import type { TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS, transactionColor, transactionLabel } from "./legacyUi";
+import { LEGACY_COLORS, transactionColor } from "./legacyUi";
+import { getTransactionLabel } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 export interface ItemDetailHistoryListProps {
   logs: TransactionLog[];
@@ -39,7 +40,7 @@ export function ItemDetailHistoryList({ logs }: ItemDetailHistoryListProps) {
                   color: transactionColor(log.transaction_type),
                 }}
               >
-                {transactionLabel(log.transaction_type)}
+                {getTransactionLabel(log.transaction_type)}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>

@@ -1,7 +1,6 @@
 "use client";
 
 import type { Item, TransactionType } from "@/lib/api";
-import { getTransactionLabel as mesGetTransactionLabel } from "@/lib/mes-status";
 
 // LEGACY_COLORS 본문은 @/lib/mes/color 정본으로 이전됨 (Round-10A #3).
 // 본 파일 내부 함수들이 직접 참조하므로 import 후 re-export.
@@ -103,15 +102,6 @@ export function getStockState(quantity: number, minStock?: number | null) {
     return { label: "부족", color: LEGACY_COLORS.yellow };
   }
   return { label: "정상", color: LEGACY_COLORS.green };
-}
-
-/**
- * 호환 wrapper — 본문은 mes-status::getTransactionLabel 로 위임.
- * R4-5 (TX-DRIFT-001 후) — 16종 매핑은 mes-status TRANSACTION_META 가 정본.
- * 새 코드는 mes-status.getTransactionLabel 직접 import 권장.
- */
-export function transactionLabel(type: TransactionType | string) {
-  return mesGetTransactionLabel(type);
 }
 
 export function formatErpCode(code?: string | null, compact = true): string | null {

@@ -58,9 +58,6 @@ export function inferTone(status: string | null | undefined): MesTone {
 
 /**
  * 거래 타입 메타 — 라벨 + 톤.
- *
- * 라벨은 frontend/app/legacy/_components/legacyUi.ts::transactionLabel 과
- * 동일하게 유지한다 (점진 마이그레이션 — 이번 PR 에선 그쪽도 그대로 둔다).
  */
 export interface TransactionMeta {
   label: string;
