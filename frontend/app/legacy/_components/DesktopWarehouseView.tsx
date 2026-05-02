@@ -6,23 +6,20 @@ import { LEGACY_COLORS } from "./legacyUi";
 import { formatQty } from "@/lib/mes/format";
 import { ResultModal } from "./common";
 import { ConfirmModal } from "@/features/mes/shared/ConfirmModal";
-import {
-  CAUTION_WORK_TYPES,
-  canEnterIO,
-  isWarehouseStaff,
-  workTypesForOperator,
-  type WorkType,
-} from "./_warehouse_steps";
+import { type WorkType } from "./_warehouse_steps";
+import { canEnterIO } from "./_warehouse_steps";
 import { useWarehouseFilters } from "./_warehouse_hooks/useWarehouseFilters";
 import { useWarehouseWizardState } from "./_warehouse_hooks/useWarehouseWizardState";
 import { useWarehouseCompletionFeedback } from "./_warehouse_hooks/useWarehouseCompletionFeedback";
 import { useWarehouseData } from "./_warehouse_hooks/useWarehouseData";
 import { useWarehouseScroll } from "./_warehouse_hooks/useWarehouseScroll";
 import { useWarehouseDraft } from "./_warehouse_hooks/useWarehouseDraft";
+import { useWarehouseDerivations } from "./_warehouse_hooks/useWarehouseDerivations";
 import { WarehouseHeader } from "./_warehouse_sections/WarehouseHeader";
 import { WarehouseStickySummary } from "./_warehouse_sections/WarehouseStickySummary";
 import { WarehouseCompletionOverlay } from "./_warehouse_sections/WarehouseCompletionOverlay";
 import { WarehouseStepLayout } from "./_warehouse_sections/WarehouseStepLayout";
+import { WarehouseSectionTabs, type WarehouseSectionTab } from "./_warehouse_sections/WarehouseSectionTabs";
 import { WarehouseConfirmContent } from "./_warehouse_modals/WarehouseConfirmContent";
 import { MyRequestsPanel } from "./_warehouse_sections/MyRequestsPanel";
 import { WarehouseQueuePanel } from "./_warehouse_sections/WarehouseQueuePanel";
@@ -30,12 +27,8 @@ import { DraftCartPanel } from "./_warehouse_sections/DraftCartPanel";
 import {
   buildStockRequestPayload,
   draftToFormState,
-  inputRequiresApproval,
-  resolveRequestType,
 } from "./_warehouse_helpers/requestMapping";
 import { readCurrentOperator } from "./login/useCurrentOperator";
-
-type SectionTab = "compose" | "cart" | "mine" | "queue";
 
 const AUTO_SAVE_LABEL: Record<"idle" | "saving" | "saved" | "error", string> = {
   idle: "",
@@ -70,16 +63,11 @@ export function DesktopWarehouseView({
   const [selectedPackage, setSelectedPackage] = useState<ShipPackage | null>(null);
 
   // ─── 섹션 탭 (요청 작성 / 장바구니 / 내 요청 / 창고 승인함) ───
-  const [sectionTab, setSectionTab] = useState<SectionTab>("compose");
+  const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>("compose");
   const [panelRefreshNonce, setPanelRefreshNonce] = useState(0);
   const canSeeQueue =
     (operator?.warehouse_role ?? "none") === "primary" ||
     (operator?.warehouse_role ?? "none") === "deputy";
-
-  // ─── 장바구니(DRAFT) 자동저장 — Round-10A (#4) 에서 useWarehouseDraft 로 추출 ───
-  // currentDraftId / autoSaveStatus / restoringRef / autoSaveTimerRef 와
-  // autosave + restore 두 effect 는 본 hook 안에서 관리. 호출 위치는
-  // currentRequestType useMemo 다음 (필요한 deps 가 모두 정의된 시점).
 
   // 로그인된 직원 정보가 employees 로드 후에도 같은 ID이도록 보장
   useEffect(() => {
@@ -139,52 +127,45 @@ export function DesktopWarehouseView({
   });
   const {
     workType, rawDirection, warehouseDirection, deptDirection, selectedDept, defectiveSource,
-    forcedStep, setWorkType, setForcedStep, setStep2Confirmed, step2Done, step2State,
+    setWorkType, setForcedStep, setStep2Confirmed,
     showStep3, showStep4, showStep5, resetWizardConfig,
   } = wizard;
 
   // ─── scroll (hook) ───
-  const refs = useWarehouseScroll({ step1Done, step2Done, forcedStep, lastResult });
+  const refs = useWarehouseScroll({
+    step1Done,
+    step2Done: wizard.step2Done,
+    forcedStep: wizard.forcedStep,
+    lastResult,
+  });
 
-  // ─── workType-derived ───
-  const isOutbound =
-    workType === "raw-io"
-      ? rawDirection !== "in" // out + return 모두 재고 차감 방향
-      : workType === "warehouse-io"
-        ? warehouseDirection === "wh-to-dept"
-        : workType === "dept-io"
-          ? deptDirection === "out"
-          : true;
-
-  const effectiveLabel =
-    workType === "raw-io"
-      ? rawDirection === "in"
-        ? "원자재 입고"
-        : rawDirection === "out"
-          ? "원자재 출고"
-          : `공급업체 반품 (${selectedDept} 불량)`
-      : workType === "warehouse-io"
-        ? warehouseDirection === "wh-to-dept"
-          ? `창고→${selectedDept} 이동`
-          : `${selectedDept}→창고 복귀`
-        : workType === "dept-io"
-          ? `${selectedDept} ${deptDirection === "in" ? "입고" : "출고"}`
-          : workType === "defective-register"
-            ? `불량 등록 (${defectiveSource === "warehouse" ? "창고" : selectedDept} → ${selectedDept} 격리)`
-            : "패키지 출고";
-
-  const shortLabel = effectiveLabel.replace(/\s*\(.*\)\s*$/, "");
-  const totalQty = Array.from(selectedItems.values()).reduce((sum, q) => sum + q, 0);
-  const quantityInvalid =
-    workType !== "package-out" && selectedEntries.some((e) => e.quantity <= 0);
-  const canExecute =
-    !!selectedEmployee
-    && (workType === "package-out" ? !!selectedPackage : selectedEntries.length > 0)
-    && !quantityInvalid;
-  const accent = isOutbound ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
-  const isRawReturn = workType === "raw-io" && rawDirection === "return";
-  const isCaution = CAUTION_WORK_TYPES.includes(workType) || isRawReturn;
-  const availableWorkTypes = useMemo(() => workTypesForOperator(operator), [operator]);
+  // ─── derivation (hook) ─── effectiveLabel / canExecute / accent / blockerText / requiresApproval / currentRequestType / availableWorkTypes
+  const {
+    isOutbound,
+    isCaution,
+    effectiveLabel,
+    shortLabel,
+    totalQty,
+    quantityInvalid,
+    canExecute,
+    blockerText,
+    accent,
+    requiresApproval,
+    currentRequestType,
+    availableWorkTypes,
+  } = useWarehouseDerivations({
+    operator,
+    selectedEmployee,
+    selectedItems,
+    selectedEntries,
+    selectedPackage,
+    workType,
+    rawDirection,
+    warehouseDirection,
+    deptDirection,
+    selectedDept,
+    defectiveSource,
+  });
 
   // ─── filters (hook) ───
   const filter = useWarehouseFilters({
@@ -199,51 +180,6 @@ export function DesktopWarehouseView({
     warehouseDirection,
     deptDirection,
   });
-
-  // ─── parent-owned wrapped setters (cross-cutting) ───
-  function changeWorkType(wt: WorkType) {
-    if (wt === workType) return;
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-      autoSaveTimerRef.current = null;
-    }
-    restoringRef.current = true;
-    setWorkType(wt);
-    setSelectedItems(new Map());
-    setSelectedPackage(null);
-    setNotes("");
-    setReferenceNo("");
-    setCurrentDraftId(null);
-    setAutoSaveStatus("idle");
-    setStep2Confirmed(false);
-    setError(null);
-    setTimeout(() => { restoringRef.current = false; }, 0);
-  }
-
-  // ─── 승인 필요 여부 (UI 라벨/메시지 분기용) ───
-  // 창고 정/부(warehouse_role=primary/deputy)가 본인 명의로 제출하는 경우 백엔드에서
-  // 자가승인 처리되므로 UI 라벨도 "즉시 처리"로 통일한다.
-  const requiresApproval =
-    inputRequiresApproval({
-      workType,
-      rawDirection,
-      warehouseDirection,
-      deptDirection,
-      defectiveSource,
-    }) && !isWarehouseStaff(operator);
-
-  // ─── 현재 wizard state 가 가리키는 request_type ───
-  const currentRequestType = useMemo(
-    () =>
-      resolveRequestType({
-        workType,
-        rawDirection,
-        warehouseDirection,
-        deptDirection,
-        defectiveSource,
-      }),
-    [workType, rawDirection, warehouseDirection, deptDirection, defectiveSource],
-  );
 
   // ─── 장바구니 autosave / 복원 (Round-10A #4 에서 hook 으로 추출) ───
   const {
@@ -274,6 +210,26 @@ export function DesktopWarehouseView({
     setNotes,
     setReferenceNo,
   });
+
+  // ─── parent-owned wrapped setters (cross-cutting) ───
+  function changeWorkType(wt: WorkType) {
+    if (wt === workType) return;
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    restoringRef.current = true;
+    setWorkType(wt);
+    setSelectedItems(new Map());
+    setSelectedPackage(null);
+    setNotes("");
+    setReferenceNo("");
+    setCurrentDraftId(null);
+    setAutoSaveStatus("idle");
+    setStep2Confirmed(false);
+    setError(null);
+    setTimeout(() => { restoringRef.current = false; }, 0);
+  }
 
   // ─── 장바구니 → "이어서 작성" 핸들러 ───
   const handleContinueDraft = useCallback(
@@ -308,7 +264,6 @@ export function DesktopWarehouseView({
         restoringRef.current = false;
       }, 0);
     },
-    // wizard 외 나머지(setter/ref) 는 React 가 stable 보장 — useCallback 재생성 없음.
     [wizard, autoSaveTimerRef, restoringRef, setAutoSaveStatus, setCurrentDraftId],
   );
 
@@ -395,24 +350,6 @@ export function DesktopWarehouseView({
     }
   }
 
-  // ─── helpers ───
-  const stockShortage =
-    workType !== "package-out"
-    && isOutbound
-    && selectedEntries.some((e) => Number(e.item.quantity) - e.quantity < 0);
-
-  const blockerText = !selectedEmployee
-    ? "담당자를 선택하세요"
-    : workType === "package-out" && !selectedPackage
-      ? "출고할 패키지를 선택하세요"
-      : workType !== "package-out" && selectedEntries.length === 0
-        ? "품목을 선택하세요"
-        : quantityInvalid
-          ? "수량을 확인하세요"
-          : stockShortage
-            ? "출고 후 재고가 음수입니다 — 수량을 다시 확인하세요"
-            : null;
-
   function toggleSelectItem(itemId: string) {
     setSelectedItems((prev) => {
       const next = new Map(prev);
@@ -473,40 +410,6 @@ export function DesktopWarehouseView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastResult]);
 
-  // ESC 닫기는 ConfirmModal 내부에서 busy 잠금과 함께 처리
-
-  // ─── 섹션 탭 헤더 ───
-  function renderSectionTabs() {
-    const tabs: { id: SectionTab; label: string }[] = [
-      { id: "compose", label: "요청 작성" },
-      { id: "cart", label: "작업 중" },
-      { id: "mine", label: "내 요청" },
-    ];
-    if (canSeeQueue) tabs.push({ id: "queue", label: "창고 승인함" });
-    return (
-      <div className="flex items-center gap-2">
-        {tabs.map((t) => {
-          const active = sectionTab === t.id;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setSectionTab(t.id)}
-              className="rounded-full border px-4 py-1.5 text-sm font-bold transition"
-              style={{
-                background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
-                color: active ? "white" : LEGACY_COLORS.text,
-                borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-              }}
-            >
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
-    );
-  }
-
   // ─── 진입 차단 (AS/연구/영업/기타 — 입출고 권한 없음) ───
   if (operator && !canEnterIO(operator)) {
     return (
@@ -537,7 +440,7 @@ export function DesktopWarehouseView({
 
       <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-3 px-6 pb-10 pt-4">
         <WarehouseHeader loadFailure={loadFailure} />
-        {renderSectionTabs()}
+        <WarehouseSectionTabs active={sectionTab} onChange={setSectionTab} showQueue={canSeeQueue} />
 
         {sectionTab === "cart" && (
           <DraftCartPanel
@@ -587,78 +490,78 @@ export function DesktopWarehouseView({
 
         {sectionTab !== "compose" ? null : (
           <>
-        {autoSaveStatus !== "idle" && (
-          <div
-            className="self-end text-xs"
-            style={{
-              color:
-                autoSaveStatus === "error"
-                  ? LEGACY_COLORS.red
-                  : autoSaveStatus === "saving"
-                    ? LEGACY_COLORS.muted
-                    : LEGACY_COLORS.green,
-            }}
-          >
-            {AUTO_SAVE_LABEL[autoSaveStatus]}
-          </div>
-        )}
-        <WarehouseStickySummary summary={stickySummary} />
+            {autoSaveStatus !== "idle" && (
+              <div
+                className="self-end text-xs"
+                style={{
+                  color:
+                    autoSaveStatus === "error"
+                      ? LEGACY_COLORS.red
+                      : autoSaveStatus === "saving"
+                        ? LEGACY_COLORS.muted
+                        : LEGACY_COLORS.green,
+                }}
+              >
+                {AUTO_SAVE_LABEL[autoSaveStatus]}
+              </div>
+            )}
+            <WarehouseStickySummary summary={stickySummary} />
 
-        <WarehouseStepLayout
-          wizard={{
-            ...wizard,
-            changeSelectedDept: (d) => {
-              if (wizard.step2Confirmed && d !== wizard.selectedDept) {
-                setPendingDeptChange(d);
-              } else {
-                wizard.changeSelectedDept(d);
-              }
-            },
-          }}
-          filter={filter}
-          availableWorkTypes={availableWorkTypes}
-          refs={refs}
-          step2Summary={step2Summary}
-          step2Accent={step2Accent}
-          onChangeWorkType={changeWorkType}
-          onEditStep2={() => setForcedStep(2)}
-          itemsSummary={itemsSummary}
-          selectedItems={selectedItems}
-          selectedPackage={selectedPackage}
-          onToggleItem={toggleSelectItem}
-          onSelectPackage={setSelectedPackage}
-          productModels={productModels}
-          pendingScrollId={pendingScrollId}
-          onScrolled={() => setPendingScrollId(null)}
-          accent={accent}
-          selectedEntries={selectedEntries}
-          isOutbound={isOutbound}
-          onQuantityChange={setItemQty}
-          onRemoveItem={removeItem}
-          onClearPackage={() => setSelectedPackage(null)}
-          notes={notes}
-          setNotes={setNotes}
-          totalQty={totalQty}
-          shortLabel={shortLabel}
-          canExecute={canExecute}
-          isCaution={isCaution}
-          blockerText={blockerText}
-          submitting={submitting}
-          onSubmit={() => setShowConfirm(true)}
-        />
+            <WarehouseStepLayout
+              wizard={{
+                ...wizard,
+                changeSelectedDept: (d) => {
+                  if (wizard.step2Confirmed && d !== wizard.selectedDept) {
+                    setPendingDeptChange(d);
+                  } else {
+                    wizard.changeSelectedDept(d);
+                  }
+                },
+              }}
+              filter={filter}
+              availableWorkTypes={availableWorkTypes}
+              refs={refs}
+              step2Summary={step2Summary}
+              step2Accent={step2Accent}
+              onChangeWorkType={changeWorkType}
+              onEditStep2={() => setForcedStep(2)}
+              itemsSummary={itemsSummary}
+              selectedItems={selectedItems}
+              selectedPackage={selectedPackage}
+              onToggleItem={toggleSelectItem}
+              onSelectPackage={setSelectedPackage}
+              productModels={productModels}
+              pendingScrollId={pendingScrollId}
+              onScrolled={() => setPendingScrollId(null)}
+              accent={accent}
+              selectedEntries={selectedEntries}
+              isOutbound={isOutbound}
+              onQuantityChange={setItemQty}
+              onRemoveItem={removeItem}
+              onClearPackage={() => setSelectedPackage(null)}
+              notes={notes}
+              setNotes={setNotes}
+              totalQty={totalQty}
+              shortLabel={shortLabel}
+              canExecute={canExecute}
+              isCaution={isCaution}
+              blockerText={blockerText}
+              submitting={submitting}
+              onSubmit={() => setShowConfirm(true)}
+            />
 
-        {error && (
-          <div
-            className="rounded-[14px] border px-4 py-3 text-sm"
-            style={{
-              background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
-              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`,
-              color: LEGACY_COLORS.red,
-            }}
-          >
-            {error}
-          </div>
-        )}
+            {error && (
+              <div
+                className="rounded-[14px] border px-4 py-3 text-sm"
+                style={{
+                  background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
+                  borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`,
+                  color: LEGACY_COLORS.red,
+                }}
+              >
+                {error}
+              </div>
+            )}
           </>
         )}
       </div>
