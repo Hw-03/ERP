@@ -1,29 +1,8 @@
 "use client";
 
-import type { ElementType } from "react";
-import { useEffect, useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  Building2,
-  FileDown,
-  KeyRound,
-  Layers,
-  PackagePlus,
-  PanelRight,
-  Settings2,
-  ShieldCheck,
-  Users,
-} from "lucide-react";
-import {
-  api,
-  type BOMDetailEntry,
-  type BOMEntry,
-  type DepartmentMaster,
-  type Employee,
-  type Item,
-  type ProductModel,
-  type ShipPackage,
-} from "@/lib/api";
+import { useState } from "react";
+import { PanelRight } from "lucide-react";
+import { api } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import { PinLock } from "./PinLock";
 import { LEGACY_COLORS } from "./legacyUi";
@@ -45,24 +24,10 @@ import { AdminDepartmentsSection } from "./_admin_sections/AdminDepartmentsSecti
 import { DeptManagementPanel } from "./_admin_sections/DeptManagementPanel";
 import { OverviewBar } from "./_admin_sections/OverviewBar";
 import { SectionHeader } from "./_admin_sections/SectionHeader";
-import { SidebarButton } from "./_admin_sections/SidebarButton";
+import { AdminSidebar, SECTIONS, SETTINGS_ENTRY } from "./_admin_sections/AdminSidebar";
 import { useAdminBootstrap } from "./_admin_hooks/useAdminBootstrap";
 import { useAdminSettings } from "./_admin_hooks/useAdminSettings";
-import { EMPTY_ADD_FORM, EMPTY_EMPLOYEE_FORM } from "./_admin_sections/adminShared";
-
-type AdminSection = "items" | "employees" | "models" | "bom" | "packages" | "export" | "settings" | "departments";
-
-const SECTIONS: { id: AdminSection; label: string; description: string; icon: ElementType }[] = [
-  { id: "models", label: "모델", description: "제품 모델 추가/삭제", icon: Layers },
-  { id: "items", label: "품목", description: "품목 기본 정보 수정", icon: PackagePlus },
-  { id: "employees", label: "직원", description: "직원 활성 상태 관리", icon: Users },
-  { id: "departments", label: "부서", description: "부서 추가/비활성화", icon: Building2 },
-  { id: "bom", label: "BOM", description: "부모-자식 자재 구성", icon: Settings2 },
-  { id: "packages", label: "출하묶음", description: "패키지 구성 관리", icon: ShieldCheck },
-  { id: "export", label: "내보내기", description: "엑셀 데이터 내보내기", icon: FileDown },
-];
-
-const SETTINGS_ENTRY = { id: "settings" as AdminSection, label: "설정", description: "PIN, CSV, 초기화", icon: KeyRound };
+import { useAdminViewState } from "./_admin_hooks/useAdminViewState";
 
 export function DesktopAdminView({
   globalSearch,
@@ -71,13 +36,19 @@ export function DesktopAdminView({
   globalSearch: string;
   onStatusChange: (status: string) => void;
 }) {
-  const [unlocked, setUnlocked] = useState(false);
-  const [adminPin, setAdminPin] = useState("");
-  const [section, setSection] = useState<AdminSection>("items");
-  const [showRightPanel, setShowRightPanel] = useState(false);
-  const [selectedDept, setSelectedDept] = useState<DepartmentMaster | null>(null);
+  const {
+    unlocked,
+    adminPin,
+    section,
+    showRightPanel,
+    selectedDept,
+    setSelectedDept,
+    unlock,
+    lock,
+    selectSection,
+    togglePanel,
+  } = useAdminViewState();
 
-  // 위젯 외 상태
   const [message, setMessage] = useState("");
 
   // R8-1: 5 도메인 부트스트랩 + BOM refresh hook 으로 분리.
@@ -89,22 +60,14 @@ export function DesktopAdminView({
     packages, setPackages,
     productModels, setProductModels,
     departments, setDepartments,
-    allBomRows, setAllBomRows,
-    loadData,
+    allBomRows,
     refreshAllBom,
+    loadData,
   } = useAdminBootstrap({
     unlocked,
     globalSearch,
     onError: setMessage,
   });
-
-  // BOM/Packages/MasterItems/Employees/Models 의 모든 state·액션은
-  // 각자의 *Provider 안에서 관리한다 (useAdminBom / useAdminPackages / useAdminMasterItems /
-  //  useAdminEmployees / useAdminModels). DesktopAdminView 는 데이터 + 콜백만 제공.
-
-  useEffect(() => {
-    if (section === "departments") setShowRightPanel(true);
-  }, [section]);
 
   // R9-5: pinForm/resetPin/saveMessage + changePin/resetDatabase/showSave 는 hook 으로 분리.
   const {
@@ -120,8 +83,6 @@ export function DesktopAdminView({
     onAfterReset: loadData,
   });
 
-  // BOM, Packages, MasterItems, Employees, Models 의 모든 액션은 각 훅 내부에 있다.
-
   if (!unlocked) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center px-6">
@@ -133,19 +94,14 @@ export function DesktopAdminView({
             boxShadow: "var(--c-card-shadow)",
           }}
         >
-          <PinLock onUnlocked={(pin) => { setAdminPin(pin); setUnlocked(true); }} />
+          <PinLock onUnlocked={unlock} />
         </div>
       </div>
     );
   }
 
-  const activeSection = SECTIONS.find((entry) => entry.id === section) ?? (section === "settings" ? SETTINGS_ENTRY : undefined);
-
-  const SECTION_GROUPS: { title: string; ids: AdminSection[] }[] = [
-    { title: "기준정보", ids: ["models", "items", "employees", "departments"] },
-    { title: "구성관리", ids: ["bom", "packages"] },
-    { title: "시스템", ids: ["export"] },
-  ];
+  const activeSection =
+    SECTIONS.find((entry) => entry.id === section) ?? (section === "settings" ? SETTINGS_ENTRY : undefined);
 
   return (
     <div className="flex min-h-0 flex-1 gap-4 pl-0 pr-4">
@@ -153,64 +109,7 @@ export function DesktopAdminView({
         className="grid min-h-0 flex-1 gap-4"
         style={{ gridTemplateColumns: "220px minmax(0,1fr)", transition: "grid-template-columns 0.2s ease" }}
       >
-        {/* 사이드바 */}
-        <section className="card flex min-h-0 flex-col overflow-hidden">
-          <div className="mb-3 shrink-0">
-            <div className="text-sm font-bold uppercase tracking-[0.22em]" style={{ color: LEGACY_COLORS.muted2 }}>
-              Admin Menu
-            </div>
-            <div className="mt-1 flex items-center gap-2 text-xl font-black">
-              관리자 모드
-              <span
-                className="ml-1 flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold"
-                style={{
-                  background: `color-mix(in srgb, ${LEGACY_COLORS.green} 14%, transparent)`,
-                  color: LEGACY_COLORS.green,
-                }}
-              >
-                <ShieldCheck className="h-3 w-3" />
-                활성
-              </span>
-            </div>
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
-            {SECTION_GROUPS.map((group) => (
-              <div key={group.title}>
-                <div
-                  className="mb-2 px-1 text-[10px] font-black uppercase tracking-[0.24em]"
-                  style={{ color: LEGACY_COLORS.purple, opacity: 0.8 }}
-                >
-                  {group.title}
-                </div>
-                <div className="flex flex-col gap-2">
-                  {SECTIONS.filter((e) => group.ids.includes(e.id)).map((entry) => (
-                    <SidebarButton
-                      key={entry.id}
-                      entry={entry}
-                      active={section === entry.id}
-                      onClick={() => setSection(entry.id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 shrink-0 flex flex-col gap-2">
-            <SidebarButton
-              entry={SETTINGS_ENTRY}
-              active={section === SETTINGS_ENTRY.id}
-              onClick={() => setSection(SETTINGS_ENTRY.id)}
-              danger
-            />
-            <button
-              onClick={() => setUnlocked(false)}
-              className="w-full rounded-[16px] border px-3 py-2.5 text-xs font-semibold transition-colors hover:bg-white/10"
-              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-            >
-              관리자 잠금
-            </button>
-          </div>
-        </section>
+        <AdminSidebar section={section} onSelect={selectSection} onLock={lock} />
 
         {/* 워크스페이스 */}
         <section className="card flex min-h-0 flex-col overflow-hidden">
@@ -225,7 +124,7 @@ export function DesktopAdminView({
                   danger={section === "settings"}
                 />
                 <button
-                  onClick={() => setShowRightPanel((v) => !v)}
+                  onClick={togglePanel}
                   className="mt-1 ml-2 shrink-0 flex items-center justify-center rounded-[12px] border p-2 transition-colors hover:bg-white/10"
                   style={{
                     background: showRightPanel
