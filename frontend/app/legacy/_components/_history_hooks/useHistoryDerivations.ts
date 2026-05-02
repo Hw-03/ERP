@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import type { Item, TransactionLog, TransactionType } from "@/lib/api";
-import { normalizeModel } from "../legacyUi";
+import { normalizeModel } from "@/lib/mes/item";
 import type { HistoryFilters } from "../mobile/screens/HistoryFilterSheet";
 
 /**

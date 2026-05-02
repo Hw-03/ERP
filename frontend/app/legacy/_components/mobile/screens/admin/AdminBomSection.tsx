@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, type BOMEntry, type Item } from "@/lib/api";
 import type { ToastState } from "@/features/mes/shared/Toast";
-import { LEGACY_COLORS, buildItemSearchLabel } from "../../../legacyUi";
+import { LEGACY_COLORS } from "../../../legacyUi";
+import { buildItemSearchLabel } from "@/lib/mes/item";
 import { formatQty } from "@/lib/mes/format";
 export function AdminBomSection({ showToast }: { showToast: (toast: ToastState) => void }) {
   const [items, setItems] = useState<Item[]>([]);

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Check, Search, Trash2, X } from "lucide-react";
-import { LEGACY_COLORS, buildItemSearchLabel } from "../legacyUi";
+import { LEGACY_COLORS } from "../legacyUi";
+import { buildItemSearchLabel } from "@/lib/mes/item";
 import { formatQty } from "@/lib/mes/format";
 import { PKG_CATEGORY_OPTIONS } from "./adminShared";
 import { useAdminPackagesContext } from "./AdminPackagesContext";

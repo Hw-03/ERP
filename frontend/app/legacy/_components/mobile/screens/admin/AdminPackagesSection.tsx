@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { api, type Item, type ShipPackage } from "@/lib/api";
 import { BottomSheet } from "@/features/mes/shared/BottomSheet";
 import type { ToastState } from "@/features/mes/shared/Toast";
-import { LEGACY_COLORS, buildItemSearchLabel } from "../../../legacyUi";
+import { LEGACY_COLORS } from "../../../legacyUi";
+import { buildItemSearchLabel } from "@/lib/mes/item";
 import { formatQty } from "@/lib/mes/format";
 export function AdminPackagesSection({ showToast }: { showToast: (toast: ToastState) => void }) {
   const [packages, setPackages] = useState<ShipPackage[]>([]);

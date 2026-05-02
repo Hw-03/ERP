@@ -5,9 +5,9 @@ import { api, type Item, type StockRequestReservationLine, type TransactionLog }
 import {
   LEGACY_COLORS,
   normalizeDepartment,
-  normalizeModel,
   transactionColor,
 } from "../legacyUi";
+import { normalizeModel } from "@/lib/mes/item";
 import { getTransactionLabel } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "../DepartmentsContext";
