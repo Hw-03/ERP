@@ -12,8 +12,19 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],
-      // 측정 대상은 단위 테스트가 있는 lib/ 만 — app/ 컴포넌트는 manual UI smoke 영역.
-      include: ["lib/**/*.{ts,tsx}"],
+      // 측정 대상 — 단위 테스트가 작성된 정본 모듈만 측정.
+      // lib/api 의 fetch wrapper 들 (admin/catalog/core/departments/operations/
+      // production/queue/stock-requests) 은 별도 라운드에서 mock 테스트 추가 후 포함.
+      include: [
+        "lib/api-core.ts",
+        "lib/mes-department.ts",
+        "lib/mes-format.ts",
+        "lib/mes-status.ts",
+        "lib/api/employees.ts",
+        "lib/api/inventory.ts",
+        "lib/api/items.ts",
+        "lib/mes/**/*.ts",
+      ],
       exclude: [
         "**/*.test.{ts,tsx}",
         "**/__tests__/**",
@@ -26,12 +37,12 @@ export default defineConfig({
         "lib/api.ts",
         "lib/mes/index.ts",
       ],
-      // 첫 게이트 — 보수적 threshold. 향후 라운드에서 상향.
+      // Round-12 (#1) — 50 → 75 상향. 정본 모듈은 모두 80%+ 도달.
       thresholds: {
-        lines: 50,
-        functions: 50,
-        branches: 50,
-        statements: 50,
+        lines: 75,
+        functions: 75,
+        branches: 75,
+        statements: 75,
       },
     },
   },
