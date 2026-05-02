@@ -6,16 +6,11 @@
  *   2. color_hex 가 null/undefined/공백일 때만 본 모듈의 fallback 을 사용한다.
  *   3. 본 모듈은 부서 이름만 가지고 색을 결정한다 — DB 호출이나 캐시 없음.
  *
- * 호환:
- *   - 기존 frontend/app/legacy/_components/legacyUi.ts::employeeColor 와
- *     동일한 hex 를 그대로 쓴다 (값 일치 — 점진 마이그레이션 시 시각 변화 0).
- *   - 본 모듈은 employeeColor 를 import 하지 않는다 (순환 방지 + 단일 소스).
- *   - employeeColor 자체는 호출처 5곳 영향이 있어 이번 PR 에선 유지한다.
- *     다음 단계에서 employeeColor 본문을 본 모듈로 위임하는 wrapper 형태로 정리 예정.
- *
- * 부서 이름 정규화:
- *   - DB / API 가 반환하는 enum value (예: "조립", "고압") 를 입력으로 받는다.
- *   - 빈 값 / 공백 / 별칭 ("연구소" → "연구") 은 normalizeDepartmentName 으로 흡수한다.
+ * Round-10F (#1) 정책 통일:
+ *   - DB DepartmentEnum.value 와 화면 표기 모두 "연구" 단일.
+ *     기존 legacyUi.DEPARTMENT_LABELS["연구"]="연구소" 는 본 라운드에서 폐기.
+ *   - DEPARTMENT_LABELS / DEPARTMENT_ICONS 정본을 본 모듈에 흡수.
+ *   - normalizeDepartment (legacyUi 호환) 는 본 모듈에서 제공.
  */
 
 const FALLBACK_COLOR = "#475569"; // slate-600 — 미정의 부서 기본
@@ -95,4 +90,52 @@ export function getDepartmentFallbackColor(departmentName: string): string {
 export function getDepartmentInitial(departmentName: string): string {
   const key = normalizeDepartmentName(departmentName);
   return MES_DEPARTMENT_INITIALS[key] ?? FALLBACK_INITIAL;
+}
+
+/**
+ * 화면 표기용 부서 라벨 — DB DepartmentEnum.value 그대로 사용.
+ *
+ * Round-10F (#1) 정책 통일:
+ *   - 기존 legacyUi.DEPARTMENT_LABELS 의 "연구"→"연구소" 매핑은 폐기. DB 표기 단일화.
+ *   - 모든 키가 identity 이지만, 향후 부서 추가/별칭 위해 객체 형태 유지.
+ */
+export const DEPARTMENT_LABELS: Record<string, string> = {
+  "조립": "조립",
+  "고압": "고압",
+  "진공": "진공",
+  "튜닝": "튜닝",
+  "튜브": "튜브",
+  "AS": "AS",
+  "연구": "연구",
+  "영업": "영업",
+  "출하": "출하",
+  "기타": "기타",
+};
+
+/**
+ * 부서 한 글자 아이콘 (legacyUi.DEPARTMENT_ICONS 정본 이전).
+ * `MES_DEPARTMENT_INITIALS` 와 다른 점: "서비스" 키 부재 (legacyUi 호환).
+ */
+export const DEPARTMENT_ICONS: Record<string, string> = {
+  "조립": "조",
+  "고압": "고",
+  "진공": "진",
+  "튜닝": "튜",
+  "튜브": "튜",
+  "AS": "A",
+  "연구": "연",
+  "영업": "영",
+  "출하": "출",
+  "기타": "기",
+};
+
+/**
+ * 부서 이름 → 화면 표기 라벨. legacyUi.normalizeDepartment 호환.
+ *   - null/undefined/empty → "기타"
+ *   - DEPARTMENT_LABELS 에 키가 있으면 라벨 반환 (정책 (A) "연구" 통일)
+ *   - 미등록 키는 입력 그대로
+ */
+export function normalizeDepartment(value?: string | null): string {
+  if (!value) return "기타";
+  return DEPARTMENT_LABELS[value] ?? value;
 }

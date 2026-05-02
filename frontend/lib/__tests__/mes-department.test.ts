@@ -4,6 +4,9 @@ import {
   getDepartmentFallbackColor,
   getDepartmentInitial,
   normalizeDepartmentName,
+  DEPARTMENT_LABELS,
+  DEPARTMENT_ICONS,
+  normalizeDepartment,
 } from "../mes-department";
 
 describe("normalizeDepartmentName", () => {
@@ -66,5 +69,42 @@ describe("MES_DEPARTMENT_COLORS", () => {
     for (const key of expected) {
       expect(MES_DEPARTMENT_COLORS[key]).toMatch(/^#[0-9a-fA-F]{6}$/);
     }
+  });
+});
+
+describe("DEPARTMENT_LABELS (Round-10F 정책 (A))", () => {
+  it("'연구' identity (기존 '연구소' 매핑 폐기)", () => {
+    expect(DEPARTMENT_LABELS["연구"]).toBe("연구");
+  });
+  it("나머지 부서도 모두 identity", () => {
+    expect(DEPARTMENT_LABELS["조립"]).toBe("조립");
+    expect(DEPARTMENT_LABELS["AS"]).toBe("AS");
+    expect(DEPARTMENT_LABELS["출하"]).toBe("출하");
+  });
+  it("10 부서 키", () => {
+    expect(Object.keys(DEPARTMENT_LABELS).length).toBe(10);
+  });
+});
+
+describe("DEPARTMENT_ICONS", () => {
+  it("부서 한 글자 아이콘", () => {
+    expect(DEPARTMENT_ICONS["조립"]).toBe("조");
+    expect(DEPARTMENT_ICONS["연구"]).toBe("연");
+    expect(DEPARTMENT_ICONS["AS"]).toBe("A");
+  });
+});
+
+describe("normalizeDepartment", () => {
+  it("null/undefined/empty → '기타'", () => {
+    expect(normalizeDepartment(null)).toBe("기타");
+    expect(normalizeDepartment(undefined)).toBe("기타");
+    expect(normalizeDepartment("")).toBe("기타");
+  });
+  it("등록 부서는 라벨 (정책 (A) - identity)", () => {
+    expect(normalizeDepartment("조립")).toBe("조립");
+    expect(normalizeDepartment("연구")).toBe("연구");
+  });
+  it("미등록 키는 입력 그대로", () => {
+    expect(normalizeDepartment("없는부서")).toBe("없는부서");
   });
 });

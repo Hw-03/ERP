@@ -24,38 +24,15 @@ import type { TransactionType } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 export { LEGACY_COLORS };
 
-// DepartmentEnum.value (str enum) 기준 — DB/API에서 "조립", "고압" 등이 그대로 반환됨.
-// "연구"→"연구소" 정규화는 화면 표시용 alias (Round-10F 에서 정책 통일 예정).
-export const DEPARTMENT_LABELS: Record<string, string> = {
-  "조립": "조립",
-  "고압": "고압",
-  "진공": "진공",
-  "튜닝": "튜닝",
-  "튜브": "튜브",
-  "AS": "AS",
-  "연구": "연구소",
-  "영업": "영업",
-  "출하": "출하",
-  "기타": "기타",
-};
-
-export const DEPARTMENT_ICONS: Record<string, string> = {
-  "조립": "조",
-  "고압": "고",
-  "진공": "진",
-  "튜닝": "튜",
-  "튜브": "튜",
-  "AS": "A",
-  "연구": "연",
-  "영업": "영",
-  "출하": "출",
-  "기타": "기",
-};
-
-export function normalizeDepartment(value?: string | null) {
-  if (!value) return "기타";
-  return DEPARTMENT_LABELS[value] ?? value;
-}
+// Round-10F (#1): DEPARTMENT_LABELS / DEPARTMENT_ICONS / normalizeDepartment 본문은
+// @/lib/mes/department 정본으로 이전. 정책 통일 (A) 적용 — "연구" → "연구" identity.
+// 기존 "연구" → "연구소" 매핑은 폐기 (DB 표기 단일화).
+import {
+  DEPARTMENT_LABELS,
+  DEPARTMENT_ICONS,
+  normalizeDepartment,
+} from "@/lib/mes/department";
+export { DEPARTMENT_LABELS, DEPARTMENT_ICONS, normalizeDepartment };
 
 /**
  * 부서별 색상.
