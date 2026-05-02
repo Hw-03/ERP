@@ -94,15 +94,8 @@ export function displayPart(value?: string | null) {
   return labels[value] ?? value;
 }
 
-export function getStockState(quantity: number, minStock?: number | null) {
-  if (quantity <= 0) {
-    return { label: "품절", color: LEGACY_COLORS.red };
-  }
-  if (minStock != null && quantity < minStock) {
-    return { label: "부족", color: LEGACY_COLORS.yellow };
-  }
-  return { label: "정상", color: LEGACY_COLORS.green };
-}
+// Round-10D #6: 본문 lib/mes/inventory.ts 정본으로 이전. 호환 re-export 만 유지.
+export { getStockState } from "@/lib/mes/inventory";
 
 // Round-10D #2: 본문 lib/mes-format.ts 정본으로 이전. 호환 re-export 만 유지.
 export { formatErpCode } from "@/lib/mes-format";
