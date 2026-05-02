@@ -58,14 +58,16 @@ function LegacyBody() {
   const { dispatch: warehouseDispatch } = useWarehouseWizard();
   const operator = useCurrentOperator();
 
-  // 브라우저 뒤로/앞으로 → URL 변경 시 활성 탭 동기화
+  // 브라우저 뒤로/앞으로 → URL 변경 시 활성 탭 동기화.
+  // activeTab 을 deps 에 넣으면 setActiveTab 이 다시 트리거하는 무한 루프 위험 →
+  // searchParams 만 watch (URL 외부 변경에만 반응). 의도적 Cat-A.
   useEffect(() => {
     const t = searchParams.get("tab") as TabId | null;
     if (t && VALID_MOBILE_TABS.has(t) && t !== activeTab) {
       setActiveTab(t);
       setShowHistory(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- searchParams sync only (Cat-A)
   }, [searchParams]);
 
   const changeTab = useCallback(

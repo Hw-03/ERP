@@ -2,8 +2,10 @@
 
 import { memo } from "react";
 import { LEGACY_COLORS } from "../legacyUi";
+import { inferTone, type MesTone } from "@/lib/mes-status";
 
-export type StatusPillTone = "info" | "success" | "warning" | "danger" | "neutral";
+// 기존 prop 타입을 깨지 않기 위한 alias — MesTone 의 부분 집합.
+export type StatusPillTone = Extract<MesTone, "info" | "success" | "warning" | "danger" | "neutral">;
 
 const TONE_COLOR: Record<StatusPillTone, string> = {
   info: LEGACY_COLORS.blue,
@@ -52,11 +54,12 @@ function StatusPillImpl({
 
 export const StatusPill = memo(StatusPillImpl);
 
+/**
+ * 자유 텍스트 상태 → tone 추론.
+ * mes-status.ts::inferTone 의 wrapper. MesTone 중 "muted" 는 본 컴포넌트가 지원하지 않아
+ * "neutral" 로 떨어뜨린다.
+ */
 export function inferToneFromStatus(status: string | null | undefined): StatusPillTone {
-  if (!status) return "info";
-  if (status === "DEXCOWIN MES System") return "neutral";
-  if (status.startsWith("방금 완료")) return "success";
-  if (/실패|오류|불러오지 못|에러/.test(status)) return "danger";
-  if (/주의|경고|부족|품절/.test(status)) return "warning";
-  return "info";
+  const tone = inferTone(status);
+  return tone === "muted" ? "neutral" : tone;
 }

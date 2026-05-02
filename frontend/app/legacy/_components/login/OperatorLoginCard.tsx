@@ -9,7 +9,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Loader2, Search, UserCheck } from "lucide-react";
 import { api, type DepartmentMaster, type Employee } from "@/lib/api";
 import { setCurrentOperator } from "./useCurrentOperator";
-import { useDepartments, useDeptColor, useDeptColorLookup } from "../DepartmentsContext";
+import { useLoginEmployees } from "./useLoginEmployees";
+import { PinStep } from "./PinStep";
+import { SelectStep } from "./SelectStep";
+import { useDepartments, useDeptColor } from "../DepartmentsContext";
 
 
 interface OperatorLoginCardProps {
@@ -20,7 +23,8 @@ type Step = "dept" | "select" | "pin";
 
 export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
   const [step, setStep] = useState<Step>("dept");
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  // R8-5: employees fetch 는 별도 hook (mount 시 1회)
+  const employees = useLoginEmployees();
   const deptMasters = useDepartments();
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -28,13 +32,6 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    void api
-      .getEmployees({ activeOnly: true })
-      .then((emps) => setEmployees(emps))
-      .catch(() => {});
-  }, []);
 
   // 브라우저 뒤로가기/앞으로가기로 단계 이동 지원
   useEffect(() => {
@@ -219,214 +216,4 @@ function DeptStep({
   );
 }
 
-/* ── 1단계: 담당자 선택 ─────────────────────────────────────────────────────── */
 
-function SelectStep({
-  employees,
-  search,
-  onSearch,
-  onSelect,
-  onBack,
-}: {
-  employees: Employee[];
-  search: string;
-  onSearch: (v: string) => void;
-  onSelect: (e: Employee) => void;
-  onBack: () => void;
-}) {
-  const getDeptColor = useDeptColorLookup();
-  return (
-    <>
-      <div className="mb-6">
-        <button
-          onClick={onBack}
-          className="mb-4 flex items-center gap-1.5 text-sm transition-opacity hover:opacity-70"
-          style={{ color: "var(--c-muted)" }}
-        >
-          <ArrowLeft size={14} />
-          부서 다시 선택
-        </button>
-        <h1 className="text-3xl font-bold" style={{ color: "var(--c-text)" }}>
-          로그인
-        </h1>
-      </div>
-
-      {/* 검색 */}
-      <div
-        className="mb-5 flex items-center gap-2.5 rounded-[14px] border px-4 py-3.5 transition-colors focus-within:border-[var(--c-blue)]"
-        style={{ background: "var(--c-s2)", borderColor: "var(--c-border)" }}
-      >
-        <Search size={16} style={{ color: "var(--c-muted)", flexShrink: 0 }} />
-        <input
-          type="text"
-          placeholder="이름, 코드 검색"
-          value={search}
-          onChange={(e) => onSearch(e.target.value)}
-          className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-[var(--c-muted)]"
-          style={{ color: "var(--c-text)" }}
-          autoFocus
-        />
-      </div>
-
-      {/* 직원 그리드 */}
-      {employees.length === 0 ? (
-        <div
-          className="flex flex-1 items-center justify-center rounded-[16px] border py-16 text-center text-sm"
-          style={{ borderColor: "var(--c-border)", color: "var(--c-muted)" }}
-        >
-          {search ? "검색 결과가 없습니다." : "활성 직원이 없습니다."}
-        </div>
-      ) : (
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2">
-          <div className="grid grid-cols-5 gap-4">
-            {employees.map((emp) => {
-              const color = getDeptColor(emp.department);
-              return (
-                <button
-                  key={emp.employee_id}
-                  onClick={() => onSelect(emp)}
-                  className="group flex flex-col items-center rounded-[18px] border p-5 transition-all hover:scale-[1.02] hover:border-[var(--c-blue)] hover:shadow-md active:scale-[0.98]"
-                  style={{
-                    background: "var(--c-s1)",
-                    borderColor: "var(--c-border)",
-                  }}
-                >
-                  <div
-                    className="mb-3 flex h-20 w-20 shrink-0 items-center justify-center rounded-full text-2xl font-bold transition-transform"
-                    style={{
-                      background: `color-mix(in srgb, ${color} 18%, transparent)`,
-                      color,
-                    }}
-                  >
-                    {emp.name.charAt(0)}
-                  </div>
-                  <div
-                    className="w-full truncate text-center text-base font-semibold"
-                    style={{ color: "var(--c-text)" }}
-                  >
-                    {emp.name}
-                  </div>
-                  <div
-                    className="mt-1 w-full truncate text-center text-xs"
-                    style={{ color: "var(--c-muted)" }}
-                  >
-                    {emp.employee_code}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
-/* ── 2단계: PIN 입력 ──────────────────────────────────────────────────────── */
-
-function PinStep({
-  employee,
-  pin,
-  onPinChange,
-  onSubmit,
-  onBack,
-  error,
-  loading,
-}: {
-  employee: Employee;
-  pin: string;
-  onPinChange: (v: string) => void;
-  onSubmit: () => void;
-  onBack: () => void;
-  error: string;
-  loading: boolean;
-}) {
-  const canSubmit = pin.length > 0 && !loading;
-  const color = useDeptColor(employee.department);
-
-  return (
-    <>
-      {/* 헤더 */}
-      <div className="mb-8">
-        <button
-          onClick={onBack}
-          className="mb-5 flex items-center gap-1.5 text-sm transition-opacity hover:opacity-70"
-          style={{ color: "var(--c-muted)" }}
-        >
-          <ArrowLeft size={14} />
-          담당자 다시 선택
-        </button>
-
-        <div className="flex items-center gap-4">
-          <div
-            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-xl font-bold"
-            style={{ background: `color-mix(in srgb, ${color} 20%, transparent)`, color }}
-          >
-            {employee.name.charAt(0)}
-          </div>
-          <div>
-            <div className="text-2xl font-bold" style={{ color: "var(--c-text)" }}>
-              {employee.name}
-            </div>
-            <div className="text-sm" style={{ color: "var(--c-muted)" }}>
-              {employee.department} · {employee.employee_code}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* PIN 입력 */}
-      <div className="mb-6">
-        <label
-          className="mb-2 block text-sm font-semibold uppercase tracking-[0.12em]"
-          style={{ color: "var(--c-muted)" }}
-        >
-          PIN
-        </label>
-        <div
-          className="flex items-center gap-3 rounded-[16px] border px-5 py-5 transition-colors focus-within:border-[var(--c-blue)]"
-          style={{ background: "var(--c-s2)", borderColor: error ? "var(--c-red, #f87171)" : "var(--c-border)" }}
-        >
-          <UserCheck size={18} style={{ color: "var(--c-muted)", flexShrink: 0 }} />
-          <input
-            type="password"
-            inputMode="numeric"
-            maxLength={20}
-            placeholder="PIN 입력"
-            value={pin}
-            onChange={(e) => onPinChange(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") void onSubmit(); }}
-            className="min-w-0 flex-1 bg-transparent text-base tracking-widest outline-none placeholder:text-[var(--c-muted)]"
-            style={{ color: "var(--c-text)" }}
-            autoFocus
-          />
-        </div>
-        {error && (
-          <p className="mt-2 text-sm" style={{ color: "var(--c-red, #f87171)" }}>
-            {error}
-          </p>
-        )}
-      </div>
-
-      <button
-        onClick={() => void onSubmit()}
-        disabled={!canSubmit}
-        className="mt-auto flex w-full items-center justify-center gap-2 rounded-[16px] py-5 text-base font-semibold text-white transition-opacity"
-        style={{
-          background: "var(--c-blue)",
-          opacity: canSubmit ? 1 : 0.4,
-          cursor: canSubmit ? "pointer" : "not-allowed",
-        }}
-      >
-        {loading ? (
-          <Loader2 size={18} className="animate-spin" />
-        ) : (
-          <>
-            <UserCheck size={18} />
-            확인
-          </>
-        )}
-      </button>
-    </>
-  );
-}

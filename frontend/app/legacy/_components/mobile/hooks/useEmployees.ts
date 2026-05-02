@@ -30,7 +30,7 @@ export function useEmployees(params?: { department?: Department; activeOnly?: bo
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- key = derived filter signature (Cat-A)
   }, [key]);
 
   return { employees, loading, error };

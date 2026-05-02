@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   devIndicators: { buildActivity: false },
+  eslint: {
+    dirs: ["app", "lib", "features", "components"],
+  },
   async rewrites() {
     return [
       {

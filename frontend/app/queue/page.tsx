@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type QueueBatch, type QueueBatchStatus } from "@/lib/api";
 import { LEGACY_COLORS, formatNumber, transactionLabel } from "../legacy/_components/legacyUi";
+import { formatDateTime } from "@/lib/mes-format";
 
 const STATUS_LABEL: Record<QueueBatchStatus, string> = {
   OPEN: "진행중",
@@ -35,7 +36,7 @@ export default function QueuePage() {
   const [status, setStatus] = useState<QueueBatchStatus | "ALL">("OPEN");
   const [error, setError] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -48,12 +49,11 @@ export default function QueuePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [status]);
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  }, [load]);
 
   const doConfirm = async (id: string) => {
     try {
@@ -151,7 +151,7 @@ export default function QueuePage() {
                       {b.parent_quantity != null ? ` × ${formatNumber(b.parent_quantity)}` : ""}
                     </div>
                     <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted }}>
-                      {new Date(b.created_at).toLocaleString("ko-KR")}
+                      {formatDateTime(b.created_at)}
                       {b.reference_no ? ` · ${b.reference_no}` : ""}
                     </div>
                   </div>

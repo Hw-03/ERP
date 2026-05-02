@@ -54,7 +54,7 @@ export function useItems(filters: ItemsFilters) {
         if (!ctrl.signal.aborted) setLoading(false);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- filterKey = JSON.stringify(filters) is the derived deps (Cat-A)
     [filterKey],
   );
 

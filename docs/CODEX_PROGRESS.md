@@ -472,3 +472,78 @@ GPT 외부 리뷰가 운영 readiness 를 A → B+ 로 다운그레이드했다 
 - 출하 스펙/거래처 관리 기능 설계
 - 루트 `erp.db` 정리 + seed 스크립트 이동
 - (위 보류 항목)
+
+## 2026-05-02 안정화 게이트 1차 적용
+
+### 목적
+
+최근 대형 브랜치 변경이 warning 을 허용한 채 누적되는 문제를 막기 위해, 첫 안정화 라운드는 새 기능 없이 검증 게이트와 재발 방지 장치를 추가했다.
+
+### 적용
+
+- 로컬 브랜치명을 `feat/hardening-roadmap`으로 맞추고 `origin/feat/hardening-roadmap` 추적으로 고정
+- `frontend/package.json`: `lint:strict` (`next lint --max-warnings=0`) 추가
+- CI frontend lint 단계: `npm run lint:strict`로 변경
+- `scripts/dev/verify_local.ps1`: backend pytest, frontend strict lint, typecheck, vitest, production build, git status 순차 실행
+- ESLint warning 2건 제거:
+  - `DeptWizardScreen.tsx`: `summaryChips` memo dependency 정합화
+  - `DeptManagementPanel.tsx`: 부서명 변경 시 local color reset dependency 정합화
+- `useItems.test.tsx`: AbortError 테스트의 React `act(...)` warning 제거
+- `frontend/.eslintrc.json`: `features/mes/**/*`에서 `legacyUi` 직접 import 금지
+
+### 검증
+
+- `python -m pytest -q`: 통과
+- `npm run lint:strict`: warning 0, 통과
+- `npx tsc --noEmit`: 통과
+- `npm test`: 93 tests 통과, React `act(...)` warning 0
+- `npm run build`: 통과
+- `scripts/dev/verify_local.ps1`: 통과
+- DB read-only 점검 (`backend/erp.db`):
+  - `items=971`, `employees=9`, `inventory=971`, `transaction_logs=1`, `queue_batches=0`
+  - `inventory_mismatch_count=0`
+  - `open_queue_batches=0`
+
+## 2026-05-02 안정성 90점대 진입 라운드
+
+### 목적
+
+안정성 점수 81점 기준에서 90점 이상으로 올리기 위해, 업무 플로우 회귀를 잡는 backend smoke 테스트와 운영 read-only 점검 자동화를 추가했다. 대형 UI 리팩터, DB repair, PIN hash 전환은 이번 라운드에서 제외했다.
+
+### 적용
+
+- backend smoke/API 테스트 추가:
+  - 재고: 입고 → 창고/부서 이동 → 출하, 부족 수량 rollback
+  - BOM: 생성, flat/tree/where-used 조회, duplicate/circular 방어
+  - health: `/health`, `/health/detailed`, inventory mismatch 시 degraded
+  - settings integrity: POST body PIN 방식, wrong PIN, 기존 GET 호환
+- `POST /api/settings/integrity/inventory` 추가
+  - 기존 GET query PIN 방식은 deprecated 호환으로 유지
+  - GET/POST가 같은 integrity 응답 helper 사용
+- `scripts/dev/verify_local.ps1 -DbReadOnlyCheck` 옵션 추가
+  - `backend/erp.db` read-only 연결
+  - 주요 row count, inventory mismatch, open queue, last transaction 확인
+  - mismatch 가 0이 아니면 실패
+- `features/mes/**/*` 구조 가드 강화
+  - 신규 MES feature 코드에서 legacy component 직접 import 금지
+- `vitest.config.ts` → `vitest.config.mts`
+  - Vite CJS Node API deprecation warning 제거
+
+### 검증
+
+- `python -m pytest -q`: 통과
+- `npm test`: 93 tests 통과, Vite CJS deprecation warning 제거
+- `scripts/dev/verify_local.ps1 -DbReadOnlyCheck`: 통과
+- DB read-only 점검:
+  - `items=971`, `employees=9`, `inventory=971`, `transaction_logs=1`, `queue_batches=0`
+  - `inventory_mismatch_count=0`
+  - `open_queue_batches=0`
+
+### 안정성 점수 갱신
+
+- 검증 게이트: 25/25
+- 정적 품질: 15/15
+- 테스트 신뢰도: 22/25
+- 데이터/운영 안전성: 14/15
+- 구조 안정성: 16/20
+- 총점: **92/100**

@@ -11,7 +11,7 @@ services:
       - "8010:8010"
     volumes:
       - ../backend/erp.db:/app/erp.db
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8010
+    # backend.command 제거 — backend/Dockerfile CMD 와 동일 (8010, no --reload).
 
   frontend:
     build: ../frontend
@@ -23,4 +23,5 @@ services:
       - "3000:3000"
     depends_on:
       - backend
-    command: sh -c "npm run build && npm run start"
+    # frontend.command — npm run start 만. 빌드는 frontend/Dockerfile RUN npm run build 에서 완료.
+    command: npm run start

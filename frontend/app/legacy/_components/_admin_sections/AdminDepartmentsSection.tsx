@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { Building2, GripVertical } from "lucide-react";
-import { LEGACY_COLORS, employeeColor } from "../legacyUi";
+import { LEGACY_COLORS } from "../legacyUi";
 import { useAdminDepartmentsContext } from "./AdminDepartmentsContext";
+import { getDepartmentFallbackColor } from "@/lib/mes-department";
 import type { DepartmentMaster } from "@/lib/api";
 
 function getDeptColor(dept: DepartmentMaster) {
-  return dept.color_hex ?? employeeColor(dept.name);
+  // DB color_hex 우선, 없으면 mes-department fallback (employeeColor 와 동일 hex).
+  return dept.color_hex ?? getDepartmentFallbackColor(dept.name);
 }
 
 function DeptGridButton({

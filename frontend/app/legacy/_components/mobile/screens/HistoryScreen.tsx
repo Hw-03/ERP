@@ -21,7 +21,8 @@ import {
 } from "../../legacyUi";
 import { TYPO } from "../tokens";
 import { EmptyState, IconButton, KpiCard } from "../primitives";
-import { fetchMonthLogs, useTransactions } from "../hooks/useTransactions";
+import { useTransactions } from "../hooks/useTransactions";
+import { useMobileHistoryAux } from "../hooks/useMobileHistoryAux";
 import {
   DEFAULT_HISTORY_FILTERS,
   HistoryFilterSheet,
@@ -59,33 +60,26 @@ function toDateKey(iso: string) {
 
 export function HistoryScreen({ onClose }: { onClose: () => void }) {
   const { logs, loading, hasMore, loadMore } = useTransactions();
-  const [items, setItems] = useState<Item[]>([]);
   const [filters, setFilters] = useState<HistoryFilters>(DEFAULT_HISTORY_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const now = new Date();
   const [calendarYear, setCalendarYear] = useState(now.getFullYear());
   const [calendarMonth, setCalendarMonth] = useState(now.getMonth());
-  const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
-  const [calendarLoading, setCalendarLoading] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
 
-  useEffect(() => {
-    void api
-      .getItems({ limit: 2000 })
-      .then(setItems)
-      .catch(() => {});
-  }, []);
+  // R8-3: items + calendarLogs fetch 는 별도 hook
+  const { items, calendarLogs, calendarLoading } = useMobileHistoryAux({
+    viewMode,
+    calendarYear,
+    calendarMonth,
+  });
 
+  // viewMode === "calendar" 진입 시 selectedDay 초기화 (hook 외부 — 표시 로직)
   useEffect(() => {
-    if (viewMode !== "calendar") return;
-    setCalendarLoading(true);
-    setSelectedDay(null);
-    void fetchMonthLogs(calendarYear, calendarMonth)
-      .then(setCalendarLogs)
-      .finally(() => setCalendarLoading(false));
-  }, [viewMode, calendarYear, calendarMonth]);
+    if (viewMode === "calendar") setSelectedDay(null);
+  }, [viewMode]);
 
   const itemModelMap = useMemo(
     () => new Map(items.map((item) => [item.item_id, normalizeModel(item.legacy_model)])),

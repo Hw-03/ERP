@@ -1,6 +1,8 @@
 "use client";
 
 import type { Item, TransactionType } from "@/lib/api";
+import { formatQty } from "@/lib/mes-format";
+import { getTransactionLabel as mesGetTransactionLabel } from "@/lib/mes-status";
 
 export const LEGACY_COLORS = {
   bg: "var(--c-bg)",
@@ -58,6 +60,17 @@ export function normalizeDepartment(value?: string | null) {
   return DEPARTMENT_LABELS[value] ?? value;
 }
 
+/**
+ * 부서별 색상.
+ *
+ * **호환 보존:** wrapper 화 시도 (mes-department.getDepartmentFallbackColor 위임) 결과
+ * "연구" 부서에서 동작 차이 발생 — DEPARTMENT_LABELS["연구"]="연구소" 정규화 후
+ * 본 switch 의 case "연구" 가 hit 되지 않아 기존 코드는 default slate 를 반환한다.
+ * mes-department 의 별칭 매핑("연구소"→"연구") 과 충돌하므로 본 함수는 본문 유지.
+ *
+ * 통합은 별도 작업으로 분리: docs/research/2026-05-04-transaction-type-drift.md 와 함께
+ * 부서명 정규화 정책을 통일한 뒤 wrapper 화한다.
+ */
 export function employeeColor(value?: string | null) {
   switch (normalizeDepartment(value)) {
     case "조립":
@@ -108,40 +121,22 @@ export function getStockState(quantity: number, minStock?: number | null) {
   return { label: "정상", color: LEGACY_COLORS.green };
 }
 
+/**
+ * 호환 wrapper — 본문은 frontend/lib/mes-format.ts::formatQty 로 위임.
+ * 39 곳 호출처를 한 번에 옮기지 않기 위해 본 export 는 유지한다.
+ * 새 코드는 mes-format.formatQty 를 직접 import 하기를 권장.
+ */
 export function formatNumber(value: number | string | null | undefined) {
-  if (value == null) return "-";
-  const numeric = Number(value);
-  if (Number.isNaN(numeric)) return "-";
-  return numeric.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
+  return formatQty(value);
 }
 
+/**
+ * 호환 wrapper — 본문은 mes-status::getTransactionLabel 로 위임.
+ * R4-5 (TX-DRIFT-001 후) — 16종 매핑은 mes-status TRANSACTION_META 가 정본.
+ * 새 코드는 mes-status.getTransactionLabel 직접 import 권장.
+ */
 export function transactionLabel(type: TransactionType | string) {
-  switch (type) {
-    case "RECEIVE":
-      return "입고";
-    case "SHIP":
-      return "출고";
-    case "ADJUST":
-      return "조정";
-    case "PRODUCE":
-      return "생산입고";
-    case "BACKFLUSH":
-      return "자동차감";
-    case "SCRAP":
-      return "폐기";
-    case "LOSS":
-      return "분실";
-    case "DISASSEMBLE":
-      return "분해";
-    case "RETURN":
-      return "반품";
-    case "RESERVE":
-      return "예약";
-    case "RESERVE_RELEASE":
-      return "예약해제";
-    default:
-      return type;
-  }
+  return mesGetTransactionLabel(type);
 }
 
 export function formatErpCode(code?: string | null, compact = true): string | null {
@@ -229,6 +224,22 @@ export function transactionColor(type: TransactionType) {
       return LEGACY_COLORS.cyan;
     case "BACKFLUSH":
       return "#fb923c";
+    case "SCRAP":
+    case "LOSS":
+    case "MARK_DEFECTIVE":
+      return LEGACY_COLORS.red;
+    case "RESERVE":
+      return LEGACY_COLORS.yellow;
+    case "RESERVE_RELEASE":
+      return LEGACY_COLORS.muted2;
+    case "TRANSFER_TO_PROD":
+    case "TRANSFER_TO_WH":
+    case "TRANSFER_DEPT":
+      return LEGACY_COLORS.blue;
+    case "DISASSEMBLE":
+    case "RETURN":
+    case "SUPPLIER_RETURN":
+      return LEGACY_COLORS.muted;
     default:
       return LEGACY_COLORS.muted2;
   }
@@ -249,6 +260,9 @@ export type TransactionIconName =
   | "Undo2"             // RETURN
   | "BookmarkPlus"      // RESERVE
   | "BookmarkMinus"     // RESERVE_RELEASE
+  | "ArrowRightLeft"    // TRANSFER_TO_PROD / TRANSFER_TO_WH / TRANSFER_DEPT
+  | "ShieldAlert"       // MARK_DEFECTIVE
+  | "PackageX"          // SUPPLIER_RETURN
   | "Activity";         // 기타 / 기본
 
 export function transactionIconName(type: TransactionType | string): TransactionIconName {
@@ -275,6 +289,14 @@ export function transactionIconName(type: TransactionType | string): Transaction
       return "BookmarkPlus";
     case "RESERVE_RELEASE":
       return "BookmarkMinus";
+    case "TRANSFER_TO_PROD":
+    case "TRANSFER_TO_WH":
+    case "TRANSFER_DEPT":
+      return "ArrowRightLeft";
+    case "MARK_DEFECTIVE":
+      return "ShieldAlert";
+    case "SUPPLIER_RETURN":
+      return "PackageX";
     default:
       return "Activity";
   }

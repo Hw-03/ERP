@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api, type Item, type PhysicalCount } from "@/lib/api";
 import { LEGACY_COLORS, formatNumber } from "../legacy/_components/legacyUi";
+import { formatDateTime } from "@/lib/mes-format";
 
 export default function CountsPage() {
   const [items, setItems] = useState<Item[]>([]);
@@ -217,7 +218,7 @@ export default function CountsPage() {
                     {c.reason ? ` · ${c.reason}` : ""}
                   </div>
                   <div className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
-                    {new Date(c.created_at).toLocaleString("ko-KR")}
+                    {formatDateTime(c.created_at)}
                     {c.operator ? ` · ${c.operator}` : ""}
                   </div>
                 </div>

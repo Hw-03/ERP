@@ -1,7 +1,7 @@
 "use client";
 
 import type { ElementType } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Building2,
@@ -26,8 +26,7 @@ import {
 } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import { PinLock } from "./PinLock";
-import { LEGACY_COLORS, employeeColor, formatNumber } from "./legacyUi";
-import { useRefreshDepartments } from "./DepartmentsContext";
+import { LEGACY_COLORS, formatNumber } from "./legacyUi";
 import { AdminMasterItemsSection } from "./_admin_sections/AdminMasterItemsSection";
 import { AdminEmployeesSection } from "./_admin_sections/AdminEmployeesSection";
 import { AdminBomSection } from "./_admin_sections/AdminBomSection";
@@ -42,6 +41,12 @@ import { AdminExportSection } from "./_admin_sections/AdminExportSection";
 import { AdminDangerZone } from "./_admin_sections/AdminDangerZone";
 import { AdminDepartmentsProvider } from "./_admin_sections/AdminDepartmentsContext";
 import { AdminDepartmentsSection } from "./_admin_sections/AdminDepartmentsSection";
+import { DeptManagementPanel } from "./_admin_sections/DeptManagementPanel";
+import { OverviewBar } from "./_admin_sections/OverviewBar";
+import { SectionHeader } from "./_admin_sections/SectionHeader";
+import { SidebarButton } from "./_admin_sections/SidebarButton";
+import { useAdminBootstrap } from "./_admin_hooks/useAdminBootstrap";
+import { useAdminSettings } from "./_admin_hooks/useAdminSettings";
 import { EMPTY_ADD_FORM, EMPTY_EMPLOYEE_FORM } from "./_admin_sections/adminShared";
 
 type AdminSection = "items" | "employees" | "models" | "bom" | "packages" | "export" | "settings" | "departments";
@@ -58,341 +63,6 @@ const SECTIONS: { id: AdminSection; label: string; description: string; icon: El
 
 const SETTINGS_ENTRY = { id: "settings" as AdminSection, label: "설정", description: "PIN, CSV, 초기화", icon: KeyRound };
 
-function SectionHeader({
-  icon: Icon,
-  label,
-  description,
-  danger = false,
-}: {
-  icon: ElementType;
-  label: string;
-  description: string;
-  danger?: boolean;
-}) {
-  return (
-    <div className="mb-4 shrink-0">
-      <div className="text-sm font-bold uppercase tracking-[0.22em]" style={{ color: LEGACY_COLORS.muted2 }}>
-        Workspace
-      </div>
-      <div className="mt-1 flex items-center gap-2">
-        <div
-          className="flex h-9 w-9 items-center justify-center rounded-[14px]"
-          style={{
-            background: danger
-              ? `color-mix(in srgb, ${LEGACY_COLORS.red} 14%, transparent)`
-              : `color-mix(in srgb, ${LEGACY_COLORS.purple} 14%, transparent)`,
-            color: danger ? LEGACY_COLORS.red : LEGACY_COLORS.purple,
-          }}
-        >
-          <Icon className="h-4 w-4" />
-        </div>
-        <div className="text-2xl font-black">{label} 관리</div>
-        {danger && (
-          <span
-            className="ml-1 flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold"
-            style={{
-              background: `color-mix(in srgb, ${LEGACY_COLORS.red} 14%, transparent)`,
-              color: LEGACY_COLORS.red,
-            }}
-          >
-            <AlertTriangle className="h-3 w-3" />
-            위험 영역
-          </span>
-        )}
-      </div>
-      <div className="mt-1 text-base" style={{ color: LEGACY_COLORS.muted2 }}>
-        {description}
-      </div>
-    </div>
-  );
-}
-
-function DeptManagementPanel({
-  dept,
-  adminPin,
-  departments,
-  setDepartments,
-  setSelectedDept,
-  onStatusChange,
-  onError,
-}: {
-  dept: DepartmentMaster;
-  adminPin: string;
-  departments: DepartmentMaster[];
-  setDepartments: (updater: (prev: DepartmentMaster[]) => DepartmentMaster[]) => void;
-  setSelectedDept: (d: DepartmentMaster | null) => void;
-  onStatusChange: (msg: string) => void;
-  onError: (msg: string) => void;
-}) {
-  const savedColor = dept.color_hex ?? employeeColor(dept.name);
-  const colorInputRef = useRef<HTMLInputElement>(null);
-  const [localColor, setLocalColor] = useState(savedColor);
-  const refreshDepartments = useRefreshDepartments();
-
-  useEffect(() => {
-    setLocalColor(dept.color_hex ?? employeeColor(dept.name));
-  }, [dept.id, dept.color_hex]);
-
-  const colorChanged = localColor.toLowerCase() !== savedColor.toLowerCase();
-
-  function applyColor() {
-    void api
-      .updateDepartment(dept.id, { color_hex: localColor, pin: adminPin })
-      .then((updated) => {
-        setDepartments((prev) => prev.map((d) => (d.id === dept.id ? updated : d)));
-        setSelectedDept(updated);
-        void refreshDepartments();
-      })
-      .catch((err: unknown) => onError(err instanceof Error ? err.message : "색상 변경 실패"));
-  }
-
-  function toggleActive() {
-    const next = !dept.is_active;
-    if (next === false && !confirm(`'${dept.name}' 부서를 비활성화하시겠습니까?`)) return;
-    void api
-      .updateDepartment(dept.id, { is_active: next, pin: adminPin })
-      .then((updated) => {
-        setDepartments((prev) => prev.map((d) => (d.id === dept.id ? updated : d)));
-        setSelectedDept(updated);
-        onStatusChange(`'${dept.name}' 부서를 ${next ? "활성화" : "비활성화"}했습니다.`);
-        void refreshDepartments();
-      })
-      .catch((err: unknown) => onError(err instanceof Error ? err.message : "상태 변경 실패"));
-  }
-
-  function deleteDept() {
-    if (!confirm(`'${dept.name}' 부서를 영구 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
-    void api
-      .deleteDepartment(dept.id, adminPin)
-      .then(() => {
-        setDepartments((prev) => prev.filter((d) => d.id !== dept.id));
-        setSelectedDept(null);
-        onStatusChange(`'${dept.name}' 부서를 삭제했습니다.`);
-        void refreshDepartments();
-      })
-      .catch((err: unknown) => onError(err instanceof Error ? err.message : "삭제 실패"));
-  }
-
-  return (
-    <div className="space-y-3">
-      {/* 선택된 부서 헤더 */}
-      <div
-        className="rounded-[20px] border p-4 flex items-center gap-3"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-      >
-        <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base font-black text-white"
-          style={{ background: localColor }}
-        >
-          {dept.name.slice(0, 1)}
-        </div>
-        <div className="min-w-0">
-          <div className="text-base font-black truncate">{dept.name}</div>
-          <span
-            className="inline-block rounded-full px-2 py-0.5 text-[11px] font-bold"
-            style={{
-              background: dept.is_active
-                ? `color-mix(in srgb, ${LEGACY_COLORS.green} 14%, transparent)`
-                : `color-mix(in srgb, ${LEGACY_COLORS.muted2} 14%, transparent)`,
-              color: dept.is_active ? LEGACY_COLORS.green : LEGACY_COLORS.muted2,
-            }}
-          >
-            {dept.is_active ? "활성" : "비활성"}
-          </span>
-        </div>
-      </div>
-
-      {/* 색상 */}
-      <div
-        className="rounded-[20px] border p-4"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-      >
-        <div className="mb-3 text-xs font-bold uppercase tracking-[0.16em]" style={{ color: LEGACY_COLORS.muted2 }}>
-          색상
-        </div>
-        <div className="mb-3 flex items-center gap-3">
-          <div
-            className="h-9 w-9 shrink-0 rounded-full border-2"
-            style={{ background: savedColor, borderColor: LEGACY_COLORS.border }}
-            title="현재 적용된 색상"
-          />
-          {colorChanged && (
-            <>
-              <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>→</span>
-              <div
-                className="h-9 w-9 shrink-0 rounded-full border-2"
-                style={{ background: localColor, borderColor: LEGACY_COLORS.border }}
-                title="선택한 색상"
-              />
-            </>
-          )}
-          <span className="ml-auto font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            {colorChanged ? localColor : savedColor}
-          </span>
-        </div>
-        <button
-          onClick={() => colorInputRef.current?.click()}
-          className="w-full flex items-center justify-center gap-2 rounded-[12px] py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 active:opacity-75"
-          style={{ background: localColor }}
-        >
-          색상 선택
-        </button>
-        <input
-          ref={colorInputRef}
-          type="color"
-          value={localColor}
-          onChange={(e) => setLocalColor(e.target.value)}
-          className="sr-only"
-        />
-        {colorChanged && (
-          <button
-            onClick={applyColor}
-            className="mt-2 w-full rounded-[12px] py-2.5 text-sm font-semibold text-white"
-            style={{ background: LEGACY_COLORS.blue }}
-          >
-            적용
-          </button>
-        )}
-      </div>
-
-      {/* 액션 버튼 */}
-      <div className="flex flex-col gap-2">
-        <button
-          onClick={toggleActive}
-          className="w-full rounded-[14px] border py-2.5 text-sm font-semibold transition-colors hover:bg-white/10"
-          style={{
-            borderColor: dept.is_active
-              ? `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`
-              : LEGACY_COLORS.border,
-            color: dept.is_active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2,
-          }}
-        >
-          {dept.is_active ? "비활성화" : "활성화"}
-        </button>
-        <button
-          onClick={deleteDept}
-          className="w-full rounded-[14px] border py-2.5 text-sm font-semibold transition-colors hover:bg-white/10"
-          style={{
-            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 20%, transparent)`,
-            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
-            color: LEGACY_COLORS.red,
-          }}
-        >
-          영구 삭제
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function OverviewBar({
-  items,
-  employees,
-  productModels,
-  packages,
-  allBomRows,
-}: {
-  items: Item[];
-  employees: Employee[];
-  productModels: ProductModel[];
-  packages: ShipPackage[];
-  allBomRows: BOMDetailEntry[];
-}) {
-  const belowMin = useMemo(
-    () =>
-      items.filter(
-        (i) => i.min_stock != null && Number(i.quantity) < Number(i.min_stock),
-      ).length,
-    [items],
-  );
-  const stats = useMemo(
-    () => [
-      { label: "품목", value: items.length, color: LEGACY_COLORS.blue },
-      { label: "직원", value: employees.length, color: LEGACY_COLORS.green },
-      { label: "모델", value: productModels.length, color: LEGACY_COLORS.purple },
-      { label: "출하묶음", value: packages.length, color: LEGACY_COLORS.cyan },
-      { label: "BOM 구성", value: allBomRows.length, color: LEGACY_COLORS.yellow },
-      { label: "안전재고 미달", value: belowMin, color: LEGACY_COLORS.red },
-    ],
-    [items.length, employees.length, productModels.length, packages.length, allBomRows.length, belowMin],
-  );
-  return (
-    <div
-      className="mb-4 shrink-0 flex flex-wrap gap-2 rounded-[20px] border px-4 py-3"
-      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-    >
-      {stats.map(({ label, value, color }) => (
-        <div
-          key={label}
-          className="flex items-center gap-1.5 rounded-[12px] px-3 py-1.5"
-          style={{ background: `color-mix(in srgb, ${color} 10%, transparent)` }}
-        >
-          <span className="text-sm font-black" style={{ color }}>{formatNumber(value)}</span>
-          <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{label}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function SidebarButton({
-  entry,
-  active,
-  onClick,
-  danger = false,
-}: {
-  entry: { id: AdminSection; label: string; description: string; icon: ElementType };
-  active: boolean;
-  onClick: () => void;
-  danger?: boolean;
-}) {
-  const Icon = entry.icon;
-  const tone = danger ? LEGACY_COLORS.red : LEGACY_COLORS.purple;
-  return (
-    <button
-      onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-[20px] border px-3 py-3 text-left transition-colors hover:bg-white/[0.12]"
-      style={{
-        background: active
-          ? `color-mix(in srgb, ${tone} ${danger ? 14 : 16}%, transparent)`
-          : danger
-          ? `color-mix(in srgb, ${LEGACY_COLORS.red} 5%, transparent)`
-          : LEGACY_COLORS.s2,
-        borderColor: active
-          ? tone
-          : danger
-          ? `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`
-          : LEGACY_COLORS.border,
-      }}
-    >
-      <div
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px]"
-        style={{
-          background: active
-            ? tone
-            : danger
-            ? `color-mix(in srgb, ${LEGACY_COLORS.red} 18%, transparent)`
-            : LEGACY_COLORS.s1,
-          color: active ? "#fff" : danger ? LEGACY_COLORS.red : LEGACY_COLORS.muted2,
-        }}
-      >
-        <Icon className="h-4 w-4" />
-      </div>
-      <div className="min-w-0">
-        <div
-          className="text-base font-bold truncate"
-          style={danger ? { color: LEGACY_COLORS.red } : undefined}
-        >
-          {entry.label}
-        </div>
-        <div className="mt-0.5 text-xs leading-4 truncate" style={{ color: LEGACY_COLORS.muted2 }}>
-          {entry.description}
-        </div>
-      </div>
-    </button>
-  );
-}
-
 export function DesktopAdminView({
   globalSearch,
   onStatusChange,
@@ -406,87 +76,50 @@ export function DesktopAdminView({
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [selectedDept, setSelectedDept] = useState<DepartmentMaster | null>(null);
 
-  // 외부 데이터 (3개 섹션이 공유) — DesktopAdminView 가 한 번만 fetch
-  const [items, setItems] = useState<Item[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [packages, setPackages] = useState<ShipPackage[]>([]);
-  const [productModels, setProductModels] = useState<ProductModel[]>([]);
-  const [allBomRows, setAllBomRows] = useState<BOMDetailEntry[]>([]);
-  const [departments, setDepartments] = useState<DepartmentMaster[]>([]);
-
   // 위젯 외 상태
   const [message, setMessage] = useState("");
-  const [pinForm, setPinForm] = useState({ current_pin: "", new_pin: "", confirm_pin: "" });
-  const [resetPin, setResetPin] = useState("");
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  // R8-1: 5 도메인 부트스트랩 + BOM refresh hook 으로 분리.
+  //   useState 6개 + useEffect 2개 (Cat-C disable 2건) → 1 hook 호출.
+  //   loadData / refreshAllBom 함수도 hook 내부 useCallback.
+  const {
+    items, setItems,
+    employees, setEmployees,
+    packages, setPackages,
+    productModels, setProductModels,
+    departments, setDepartments,
+    allBomRows, setAllBomRows,
+    loadData,
+    refreshAllBom,
+  } = useAdminBootstrap({
+    unlocked,
+    globalSearch,
+    onError: setMessage,
+  });
 
   // BOM/Packages/MasterItems/Employees/Models 의 모든 state·액션은
   // 각자의 *Provider 안에서 관리한다 (useAdminBom / useAdminPackages / useAdminMasterItems /
   //  useAdminEmployees / useAdminModels). DesktopAdminView 는 데이터 + 콜백만 제공.
 
-  async function loadData() {
-    setMessage("");
-    const [nextItems, nextEmployees, nextPackages, nextModels, nextDepts] = await Promise.all([
-      api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
-      api.getEmployees({ activeOnly: false }),
-      api.getShipPackages(),
-      api.getModels(),
-      api.getDepartments(),
-    ]);
-    setItems(nextItems);
-    setEmployees(nextEmployees);
-    setPackages(nextPackages);
-    setProductModels(nextModels);
-    setDepartments(nextDepts);
-  }
-
-  useEffect(() => {
-    if (!unlocked) return;
-    void loadData().catch((nextError) =>
-      setMessage(nextError instanceof Error ? nextError.message : "관리자 데이터를 불러오지 못했습니다."),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unlocked, globalSearch]);
-
   useEffect(() => {
     if (section === "departments") setShowRightPanel(true);
   }, [section]);
 
-  function refreshAllBom() {
-    void api.getAllBOM().then(setAllBomRows).catch(() => setAllBomRows([]));
-  }
-
-  useEffect(() => {
-    if (!unlocked) return;
-    refreshAllBom();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unlocked]);
-
-  function showSave(text: string) {
-    setSaveMessage(text);
-    setTimeout(() => setSaveMessage(null), 2500);
-  }
+  // R9-5: pinForm/resetPin/saveMessage + changePin/resetDatabase/showSave 는 hook 으로 분리.
+  const {
+    pinForm, setPinForm,
+    resetPin, setResetPin,
+    saveMessage,
+    showSave,
+    changePin,
+    resetDatabase,
+  } = useAdminSettings({
+    onStatusChange,
+    onError: setMessage,
+    onAfterReset: loadData,
+  });
 
   // BOM, Packages, MasterItems, Employees, Models 의 모든 액션은 각 훅 내부에 있다.
-
-  async function changePin() {
-    if (pinForm.new_pin !== pinForm.confirm_pin) {
-      setMessage("새 PIN과 확인 PIN이 일치하지 않습니다.");
-      return;
-    }
-    await api.updateAdminPin({ current_pin: pinForm.current_pin, new_pin: pinForm.new_pin });
-    setPinForm({ current_pin: "", new_pin: "", confirm_pin: "" });
-    setMessage("관리자 PIN을 변경했습니다.");
-    onStatusChange("관리자 PIN을 변경했습니다.");
-  }
-
-  async function resetDatabase() {
-    await api.resetDatabase(resetPin);
-    setResetPin("");
-    await loadData();
-    setMessage("기본 데이터 기준으로 다시 적재했습니다.");
-    onStatusChange("기본 데이터 기준으로 다시 적재했습니다.");
-  }
 
   if (!unlocked) {
     return (

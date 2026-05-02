@@ -419,7 +419,7 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
 
     changed: list[str] = []
     for field in (
-        "item_name", "spec", "unit", "barcode",
+        "item_name", "spec", "process_type_code", "unit", "barcode",
         "legacy_file_type", "legacy_part", "legacy_item_type", "legacy_model",
         "supplier", "min_stock",
     ):

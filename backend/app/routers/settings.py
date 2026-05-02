@@ -17,6 +17,7 @@ from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     AdminPinUpdateRequest,
     AdminPinVerifyRequest,
+    IntegrityCheckRequest,
     IntegrityCheckResponse,
     IntegrityRepairResponse,
     MessageResponse,
@@ -114,23 +115,40 @@ def require_admin(db: Session, pin: str) -> None:
 _require_admin = require_admin
 
 
-@router.get("/integrity/inventory", response_model=IntegrityCheckResponse)
-def check_inventory_integrity(
-    pin: str = Query(..., min_length=4, max_length=32, description="관리자 PIN"),
-    limit: int = Query(100, ge=1, le=2000),
-    db: Session = Depends(get_db),
-):
-    """재고 불변식(quantity == warehouse + Σ locations) 미스매치 목록.
-
-    관리자 PIN 필요. 프론트에서 사용하지 않는 운영 도구.
-    """
-    _require_admin(db, pin)
+def _inventory_integrity_payload(db: Session, limit: int) -> dict:
     mismatches = integrity_svc.check_inventory_consistency(db)
     return {
         "checked": db.query(Inventory).count(),
         "mismatched_count": len(mismatches),
         "samples": [m.to_dict() for m in mismatches[:limit]],
     }
+
+
+@router.get("/integrity/inventory", response_model=IntegrityCheckResponse)
+def check_inventory_integrity(
+    pin: str = Query(..., min_length=4, max_length=32, description="관리자 PIN"),
+    limit: int = Query(100, ge=1, le=2000),
+    db: Session = Depends(get_db),
+):
+    """Deprecated compatibility endpoint.
+
+    신규 호출은 PIN 이 query string 에 남지 않도록 POST body 방식을 사용한다.
+    """
+    _require_admin(db, pin)
+    return _inventory_integrity_payload(db, limit)
+
+
+@router.post("/integrity/inventory", response_model=IntegrityCheckResponse)
+def check_inventory_integrity_post(
+    payload: IntegrityCheckRequest,
+    db: Session = Depends(get_db),
+):
+    """재고 불변식(quantity == warehouse + Σ locations) 미스매치 목록.
+
+    관리자 PIN 은 request body 로 전달한다. 신규 호출의 기준 엔드포인트.
+    """
+    _require_admin(db, payload.pin)
+    return _inventory_integrity_payload(db, payload.limit)
 
 
 @router.post("/integrity/repair", response_model=IntegrityRepairResponse)

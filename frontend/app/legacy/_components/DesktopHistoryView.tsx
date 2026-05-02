@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, TrendingDown, TrendingUp } from "lucide-react";
 import { api, type TransactionLog, type TransactionType } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import { LEGACY_COLORS, formatNumber } from "./legacyUi";
 import { HistoryFilterBar } from "./_history_sections/HistoryFilterBar";
 import { HistoryCalendarStrip } from "./_history_sections/HistoryCalendarStrip";
+import { HistoryStatsBar } from "./_history_sections/HistoryStatsBar";
 import { HistoryTable } from "./_history_sections/HistoryTable";
 import { HistoryDetailPanel } from "./_history_sections/HistoryDetailPanel";
+import { useHistoryData } from "./_hooks/useHistoryData";
 import {
   EXCEPTION_TYPES,
-  HISTORY_PAGE_SIZE,
   formatHistoryDate,
   getPeriodStart,
   parseUtc,
@@ -19,15 +19,14 @@ import {
 } from "./_history_sections/historyShared";
 
 export function DesktopHistoryView() {
-  const [logs, setLogs] = useState<TransactionLog[]>([]);
+  // R7-HOOK1: logs/page/loading/loadingMore + 초기 fetch + loadMore 훅으로 분리
+  const { logs, setLogs, loading, loadingMore, canLoadMore, loadMore } = useHistoryData();
+
   const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
   const [selected, setSelected] = useState<TransactionLog | null>(null);
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [dateFilter, setDateFilter] = useState("ALL");
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
   const [itemRecentLogs, setItemRecentLogs] = useState<TransactionLog[]>([]);
@@ -38,17 +37,6 @@ export function DesktopHistoryView() {
   const [calendarMonth, setCalendarMonth] = useState(now.getMonth());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const lastSelectedRef = useRef<TransactionLog | null>(null);
-
-  useEffect(() => {
-    setLoading(true);
-    void api
-      .getTransactions({ limit: HISTORY_PAGE_SIZE, skip: 0 })
-      .then((data) => {
-        setLogs(data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
 
   useEffect(() => {
     if (!selected) {
@@ -152,22 +140,7 @@ export function DesktopHistoryView() {
     return { total: filteredLogs.length, receiveSum, shipSum, exceptionCount };
   }, [filteredLogs]);
 
-  const canLoadMore = logs.length >= page * HISTORY_PAGE_SIZE;
-
-  async function loadMore() {
-    const nextPage = page + 1;
-    setLoadingMore(true);
-    try {
-      const more = await api.getTransactions({
-        limit: HISTORY_PAGE_SIZE,
-        skip: (nextPage - 1) * HISTORY_PAGE_SIZE,
-      });
-      setLogs((prev) => [...prev, ...more]);
-      setPage(nextPage);
-    } finally {
-      setLoadingMore(false);
-    }
-  }
+  // canLoadMore / loadMore 는 useHistoryData 가 제공 (R7-HOOK1).
 
   function handleLogUpdated(updated: TransactionLog) {
     setLogs((prev) => prev.map((l) => (l.log_id === updated.log_id ? updated : l)));
@@ -206,71 +179,8 @@ export function DesktopHistoryView() {
         style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.bg }}
       >
         <div className="flex flex-col gap-3 pb-6">
-          {/* ── 요약 통계 카드 ── */}
-          <section className="card">
-            <div className="grid grid-cols-4 gap-3">
-              <div
-                className="flex flex-col gap-1 rounded-[20px] border p-4"
-                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-              >
-                <div className="text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  조회 건수
-                </div>
-                <div className="text-2xl font-black">{formatNumber(stats.total)}</div>
-                {canLoadMore && (
-                  <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>(+더 불러올 수 있음)</div>
-                )}
-              </div>
-              <div
-                className="flex flex-col gap-1 rounded-[20px] border p-4"
-                style={{ background: "rgba(67,211,157,.06)", borderColor: "rgba(67,211,157,.22)" }}
-              >
-                <div
-                  className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.15em]"
-                  style={{ color: LEGACY_COLORS.green }}
-                >
-                  <TrendingUp className="h-3.5 w-3.5" />
-                  입고 합계
-                </div>
-                <div className="text-2xl font-black" style={{ color: LEGACY_COLORS.green }}>
-                  +{formatNumber(stats.receiveSum)}
-                </div>
-                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>입고 · 생산입고</div>
-              </div>
-              <div
-                className="flex flex-col gap-1 rounded-[20px] border p-4"
-                style={{ background: "rgba(255,123,123,.06)", borderColor: "rgba(255,123,123,.22)" }}
-              >
-                <div
-                  className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.15em]"
-                  style={{ color: LEGACY_COLORS.red }}
-                >
-                  <TrendingDown className="h-3.5 w-3.5" />
-                  출고 합계
-                </div>
-                <div className="text-2xl font-black" style={{ color: LEGACY_COLORS.red }}>
-                  -{formatNumber(stats.shipSum)}
-                </div>
-                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>출고 · 자동차감</div>
-              </div>
-              <div
-                className="flex flex-col gap-1 rounded-[20px] border p-4"
-                style={{ background: "rgba(246,198,103,.06)", borderColor: "rgba(246,198,103,.22)" }}
-              >
-                <div
-                  className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.15em]"
-                  style={{ color: LEGACY_COLORS.yellow }}
-                >
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  예외 거래
-                </div>
-                <div className="text-2xl font-black" style={{ color: LEGACY_COLORS.yellow }}>
-                  {formatNumber(stats.exceptionCount)}
-                </div>
-                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>조정·폐기·손실·예외</div>
-              </div>
-            </div>
-          </section>
+          {/* ── 요약 통계 카드 ── R9-1: HistoryStatsBar 분리 */}
+          <HistoryStatsBar stats={stats} canLoadMore={canLoadMore} />
 
           <HistoryFilterBar
             search={search}

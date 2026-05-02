@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import { LEGACY_COLORS, erpCodeDept, getStockState } from "./legacyUi";
@@ -13,42 +13,12 @@ import {
 } from "./_inventory_sections/InventoryFilterBar";
 import { InventoryItemsTable } from "./_inventory_sections/InventoryItemsTable";
 import { InventoryDetailPanel } from "./_inventory_sections/InventoryDetailPanel";
+import { useInventoryData } from "./_hooks/useInventoryData";
+// R9-2: helper 4개 (getMinStock / safeQty / matchesSearch / matchesKpi) 분리
+import { getMinStock, matchesKpi, matchesSearch, safeQty } from "./_inventory_sections/inventoryFilter";
 
 const DESKTOP_PAGE_SIZE = 100;
 
-function getMinStock(item: Item) {
-  return item.min_stock == null ? 0 : Number(item.min_stock);
-}
-
-function matchesSearch(item: Item, keyword: string) {
-  if (!keyword) return true;
-  const haystack = [
-    item.erp_code,
-    item.item_name,
-    item.spec ?? "",
-    item.location ?? "",
-    item.supplier ?? "",
-    item.legacy_model ?? "",
-    item.barcode ?? "",
-  ]
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(keyword);
-}
-
-function safeQty(item: Item) {
-  const n = Number(item.quantity);
-  return isNaN(n) ? 0 : n;
-}
-
-function matchesKpi(item: Item, kpi: KpiFilter) {
-  const qty = safeQty(item);
-  const min = getMinStock(item);
-  if (kpi === "NORMAL") return qty > 0 && qty >= min;
-  if (kpi === "LOW") return qty > 0 && qty < min;
-  if (kpi === "ZERO") return qty <= 0;
-  return true;
-}
 
 export function DesktopInventoryView({
   globalSearch,
@@ -67,11 +37,21 @@ export function DesktopInventoryView({
   capacityData?: ProductionCapacity | null;
   onCapacityClick?: () => void;
 }) {
-  const [items, setItems] = useState<Item[]>([]);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [itemLogs, setItemLogs] = useState<TransactionLog[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // R7-HOOK2: items/loading/error + loadItems 훅으로 분리
+  const onSelectedSync = useCallback(
+    (next: Item[]) =>
+      setSelectedItem((current) =>
+        current ? next.find((item) => item.item_id === current.item_id) ?? null : null,
+      ),
+    [],
+  );
+  const { items, setItems, loading, error, loadItems } = useInventoryData({
+    globalSearch,
+    onStatusChange,
+    onSelectedSync,
+  });
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [productModels, setProductModels] = useState<ProductModel[]>([]);
@@ -85,24 +65,7 @@ export function DesktopInventoryView({
   const lastSelectedItemRef = useRef<Item | null>(null);
   const deferredLocalSearch = useDeferredValue(localSearch.trim().toLowerCase());
 
-  async function loadItems() {
-    try {
-      setLoading(true);
-      setError(null);
-      const nextItems = await api.getItems({
-        limit: 2000,
-        search: globalSearch.trim() || undefined,
-      });
-      setItems(nextItems);
-      setSelectedItem((current) => (current ? nextItems.find((item) => item.item_id === current.item_id) ?? null : null));
-    } catch (nextError) {
-      const message = nextError instanceof Error ? nextError.message : "재고 데이터를 불러오지 못했습니다.";
-      setError(message);
-      onStatusChange(message);
-    } finally {
-      setLoading(false);
-    }
-  }
+  // loadItems 본문은 useInventoryData 훅이 제공 (R7-HOOK2). 호출만 외부에서 가능.
 
   function toggleDept(v: string) {
     setSelectedDepts((prev) => (prev.includes(v) ? prev.filter((d) => d !== v) : [...prev, v]));
@@ -116,11 +79,6 @@ export function DesktopInventoryView({
   useEffect(() => {
     void api.getModels().then(setProductModels).catch(() => {});
   }, []);
-
-  useEffect(() => {
-    void loadItems();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [globalSearch]);
 
   useEffect(() => {
     if (!selectedItem) {

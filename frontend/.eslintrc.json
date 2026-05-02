@@ -1,3 +1,26 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "overrides": [
+    {
+      "files": ["features/mes/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/legacyUi",
+                  "@/app/legacy/_components/legacyUi",
+                  "@/app/legacy/_components/*",
+                  "@/app/legacy/_components/**/*"
+                ],
+                "message": "New MES feature code must use frontend/features/mes/*, frontend/features/mes/shared, frontend/lib/mes/*, or frontend/lib/api/* instead of legacy components."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

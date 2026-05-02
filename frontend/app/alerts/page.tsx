@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type StockAlert } from "@/lib/api";
 import { LEGACY_COLORS } from "../legacy/_components/legacyUi";
@@ -11,7 +11,7 @@ export default function AlertsPage() {
   const [includeAcked, setIncludeAcked] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -22,12 +22,11 @@ export default function AlertsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [includeAcked]);
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [includeAcked]);
+  }, [load]);
 
   const scan = async () => {
     try {

@@ -41,6 +41,7 @@ class ItemCreate(BaseModel):
 class ItemUpdate(BaseModel):
     item_name: Optional[str] = Field(None, max_length=200)
     spec: Optional[str] = None
+    process_type_code: Optional[str] = Field(None, max_length=2, description="공정 코드 (TR/HR/.../PF 18개)")
     unit: Optional[str] = Field(None, max_length=20)
     barcode: Optional[str] = Field(None, max_length=100)
     legacy_file_type: Optional[str] = Field(None, max_length=50)
@@ -206,6 +207,11 @@ class AdminPinVerifyRequest(BaseModel):
 class AdminPinUpdateRequest(BaseModel):
     current_pin: str = Field(..., min_length=4, max_length=32)
     new_pin: str = Field(..., min_length=4, max_length=32)
+
+
+class IntegrityCheckRequest(BaseModel):
+    pin: str = Field(..., min_length=4, max_length=32)
+    limit: int = Field(100, ge=1, le=2000)
 
 
 class InventoryReceive(BaseModel):

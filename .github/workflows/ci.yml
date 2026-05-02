@@ -36,7 +36,7 @@ jobs:
         run: pytest -q
 
   frontend:
-    name: Frontend (lint + tsc + vitest)
+    name: Frontend (lint + tsc + vitest + build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +53,7 @@ jobs:
 
       - name: Lint
         working-directory: frontend
-        run: npm run lint
+        run: npm run lint:strict
 
       - name: Type check
         working-directory: frontend
@@ -62,3 +62,10 @@ jobs:
       - name: Vitest
         working-directory: frontend
         run: npm test
+
+      - name: Build (Next.js production)
+        working-directory: frontend
+        run: npm run build
+        env:
+          # 빌드 단계는 정적 분석 목적 — 외부 백엔드 호출 없이 상대 경로(rewrites) 사용.
+          NEXT_TELEMETRY_DISABLED: "1"

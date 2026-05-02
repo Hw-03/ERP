@@ -42,7 +42,7 @@ export function LoginIntro({ onSkip, onDone }: LoginIntroProps) {
     }, 3300);
     timersRef.current = [t1, t2, t3];
     return clearTimers;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only intro timer (Cat-A)
   }, []);
 
   const handleSkip = () => {
@@ -61,7 +61,7 @@ export function LoginIntro({ onSkip, onDone }: LoginIntroProps) {
       window.removeEventListener("keydown", onAnyKey);
       window.removeEventListener("pointerdown", onAnyKey);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only global key/pointer listener (Cat-A)
   }, []);
 
   const isShrink = phase === "shrink";

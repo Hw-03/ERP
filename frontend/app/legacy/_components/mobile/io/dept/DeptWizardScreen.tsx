@@ -102,7 +102,7 @@ export function DeptWizardScreen({ showToast }: { showToast: (toast: ToastState)
       }
     }
     return out;
-  }, [state, employee, dispatch]);
+  }, [state, employee, dispatch, deptColor]);
 
   const submit = async () => {
     if (!employee) {
