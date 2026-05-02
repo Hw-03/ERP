@@ -22,9 +22,8 @@ import type { TransactionLog } from "@/lib/api";
 import {
   LEGACY_COLORS,
   transactionColor,
-  transactionIconName,
 } from "../legacyUi";
-import { getTransactionLabel } from "@/lib/mes-status";
+import { getTransactionLabel, transactionIconName } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColor } from "../DepartmentsContext";
 import { PROCESS_TYPE_META, formatHistoryDate, rowTint } from "./historyShared";
