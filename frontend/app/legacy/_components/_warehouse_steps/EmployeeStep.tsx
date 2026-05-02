@@ -3,9 +3,9 @@
 import type { Employee } from "@/lib/api";
 import {
   LEGACY_COLORS,
-  firstEmployeeLetter,
   normalizeDepartment,
 } from "../legacyUi";
+import { firstEmployeeLetter } from "@/lib/mes/employee";
 import { useDeptColorLookup } from "../DepartmentsContext";
 
 export function EmployeeStep({
