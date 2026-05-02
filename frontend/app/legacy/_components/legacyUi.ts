@@ -17,12 +17,8 @@
  * 와 `@/lib/mes/color` 로 흡수 예정.
  */
 
-import type { TransactionType } from "@/lib/api";
-
-// LEGACY_COLORS 본문은 @/lib/mes/color 정본으로 이전됨 (Round-10A #3).
-// 본 파일 내부 함수들이 직접 참조하므로 import 후 re-export.
-import { LEGACY_COLORS } from "@/lib/mes/color";
-export { LEGACY_COLORS };
+// LEGACY_COLORS 본문은 @/lib/mes/color 정본 (Round-10A #3) — wrapper re-export 만 유지.
+export { LEGACY_COLORS } from "@/lib/mes/color";
 
 // Round-10F (#1): DEPARTMENT_LABELS / DEPARTMENT_ICONS / normalizeDepartment 본문은
 // @/lib/mes/department 정본으로 이전. 정책 통일 (A) 적용 — "연구" → "연구" identity.
@@ -38,35 +34,5 @@ export { DEPARTMENT_LABELS, DEPARTMENT_ICONS, normalizeDepartment };
 // 정책 (A) 통일 (Round-10F #1) 결과 mes-department.MES_DEPARTMENT_COLORS 와 hex 일치 확인.
 export { employeeColor } from "@/lib/mes/color";
 
-export function transactionColor(type: TransactionType) {
-  switch (type) {
-    case "RECEIVE":
-      return LEGACY_COLORS.green;
-    case "SHIP":
-      return LEGACY_COLORS.red;
-    case "ADJUST":
-      return LEGACY_COLORS.yellow;
-    case "PRODUCE":
-      return LEGACY_COLORS.cyan;
-    case "BACKFLUSH":
-      return "#fb923c";
-    case "SCRAP":
-    case "LOSS":
-    case "MARK_DEFECTIVE":
-      return LEGACY_COLORS.red;
-    case "RESERVE":
-      return LEGACY_COLORS.yellow;
-    case "RESERVE_RELEASE":
-      return LEGACY_COLORS.muted2;
-    case "TRANSFER_TO_PROD":
-    case "TRANSFER_TO_WH":
-    case "TRANSFER_DEPT":
-      return LEGACY_COLORS.blue;
-    case "DISASSEMBLE":
-    case "RETURN":
-    case "SUPPLIER_RETURN":
-      return LEGACY_COLORS.muted;
-    default:
-      return LEGACY_COLORS.muted2;
-  }
-}
+// Round-10F (#3): transactionColor 본문은 @/lib/mes-status 정본으로 이전.
+export { transactionColor } from "@/lib/mes-status";

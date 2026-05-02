@@ -17,4 +17,5 @@ export {
   getTransactionLabel,
   getTransactionTone,
   transactionIconName,
+  transactionColor,
 } from "../mes-status";

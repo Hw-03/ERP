@@ -5,8 +5,10 @@ import {
   TRANSACTION_META,
   getTransactionLabel,
   getTransactionTone,
+  transactionColor,
   type MesTone,
 } from "../mes-status";
+import { LEGACY_COLORS } from "../mes/color";
 
 describe("toMesTone", () => {
   it("동일한 키는 그대로", () => {
@@ -97,5 +99,42 @@ describe("getTransactionLabel / getTransactionTone", () => {
   it("미지 타입 — 라벨은 입력 그대로, 톤은 info", () => {
     expect(getTransactionLabel("UNKNOWN_KEY")).toBe("UNKNOWN_KEY");
     expect(getTransactionTone("UNKNOWN_KEY")).toBe("info");
+  });
+});
+
+describe("transactionColor", () => {
+  it("정상 거래 → green/blue/cyan", () => {
+    expect(transactionColor("RECEIVE")).toBe(LEGACY_COLORS.green);
+    expect(transactionColor("PRODUCE")).toBe(LEGACY_COLORS.cyan);
+    expect(transactionColor("TRANSFER_TO_PROD")).toBe(LEGACY_COLORS.blue);
+    expect(transactionColor("TRANSFER_TO_WH")).toBe(LEGACY_COLORS.blue);
+    expect(transactionColor("TRANSFER_DEPT")).toBe(LEGACY_COLORS.blue);
+  });
+
+  it("위험 거래 → red", () => {
+    expect(transactionColor("SHIP")).toBe(LEGACY_COLORS.red);
+    expect(transactionColor("SCRAP")).toBe(LEGACY_COLORS.red);
+    expect(transactionColor("LOSS")).toBe(LEGACY_COLORS.red);
+    expect(transactionColor("MARK_DEFECTIVE")).toBe(LEGACY_COLORS.red);
+  });
+
+  it("주의 거래 → yellow", () => {
+    expect(transactionColor("ADJUST")).toBe(LEGACY_COLORS.yellow);
+    expect(transactionColor("RESERVE")).toBe(LEGACY_COLORS.yellow);
+  });
+
+  it("BACKFLUSH 은 고유 색 #fb923c", () => {
+    expect(transactionColor("BACKFLUSH")).toBe("#fb923c");
+  });
+
+  it("muted 거래 → muted/muted2", () => {
+    expect(transactionColor("RESERVE_RELEASE")).toBe(LEGACY_COLORS.muted2);
+    expect(transactionColor("DISASSEMBLE")).toBe(LEGACY_COLORS.muted);
+    expect(transactionColor("RETURN")).toBe(LEGACY_COLORS.muted);
+    expect(transactionColor("SUPPLIER_RETURN")).toBe(LEGACY_COLORS.muted);
+  });
+
+  it("unknown → muted2", () => {
+    expect(transactionColor("UNKNOWN")).toBe(LEGACY_COLORS.muted2);
   });
 });

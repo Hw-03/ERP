@@ -14,6 +14,7 @@
  */
 
 import type { TransactionType } from "@/lib/api";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 export type MesTone = "success" | "warning" | "danger" | "info" | "neutral" | "muted";
 
@@ -119,6 +120,48 @@ export type TransactionIconName =
   | "ShieldAlert"       // MARK_DEFECTIVE
   | "PackageX"          // SUPPLIER_RETURN
   | "Activity";         // 기타 / 기본
+
+/**
+ * 거래 타입 → 표시 색상.
+ *
+ * Round-10F (#3) 정본 이전. 기존 legacyUi.transactionColor 본문 그대로 흡수.
+ * TRANSACTION_META.tone 시스템과는 별도의 색 매핑 (구체적 hex / CSS var 반환).
+ *
+ * `tone` (semantic) vs 본 함수 (concrete color) 의 분리 유지 — UI 가 hex 가 필요한
+ * 일부 위치 (history badge bg, calendar dot 등) 에서 본 함수를 호출.
+ */
+export function transactionColor(type: TransactionType | string): string {
+  switch (type) {
+    case "RECEIVE":
+      return LEGACY_COLORS.green;
+    case "SHIP":
+      return LEGACY_COLORS.red;
+    case "ADJUST":
+      return LEGACY_COLORS.yellow;
+    case "PRODUCE":
+      return LEGACY_COLORS.cyan;
+    case "BACKFLUSH":
+      return "#fb923c";
+    case "SCRAP":
+    case "LOSS":
+    case "MARK_DEFECTIVE":
+      return LEGACY_COLORS.red;
+    case "RESERVE":
+      return LEGACY_COLORS.yellow;
+    case "RESERVE_RELEASE":
+      return LEGACY_COLORS.muted2;
+    case "TRANSFER_TO_PROD":
+    case "TRANSFER_TO_WH":
+    case "TRANSFER_DEPT":
+      return LEGACY_COLORS.blue;
+    case "DISASSEMBLE":
+    case "RETURN":
+    case "SUPPLIER_RETURN":
+      return LEGACY_COLORS.muted;
+    default:
+      return LEGACY_COLORS.muted2;
+  }
+}
 
 export function transactionIconName(type: TransactionType | string): TransactionIconName {
   switch (type) {
