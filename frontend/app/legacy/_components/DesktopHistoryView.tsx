@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type TransactionLog, type TransactionType } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
-import { LEGACY_COLORS, formatNumber } from "./legacyUi";
+import { LEGACY_COLORS } from "./legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { HistoryFilterBar } from "./_history_sections/HistoryFilterBar";
 import { HistoryCalendarStrip } from "./_history_sections/HistoryCalendarStrip";
 import { HistoryStatsBar } from "./_history_sections/HistoryStatsBar";

@@ -26,7 +26,8 @@ import {
 } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import { PinLock } from "./PinLock";
-import { LEGACY_COLORS, formatNumber } from "./legacyUi";
+import { LEGACY_COLORS } from "./legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { AdminMasterItemsSection } from "./_admin_sections/AdminMasterItemsSection";
 import { AdminEmployeesSection } from "./_admin_sections/AdminEmployeesSection";
 import { AdminBomSection } from "./_admin_sections/AdminBomSection";
@@ -399,8 +400,8 @@ export function DesktopAdminView({
                       현재 상태
                     </div>
                     <div className="space-y-1.5 text-sm">
-                      <div>활성 {formatNumber(departments.filter((d) => d.is_active).length)}개</div>
-                      <div>비활성 {formatNumber(departments.filter((d) => !d.is_active).length)}개</div>
+                      <div>활성 {formatQty(departments.filter((d) => d.is_active).length)}개</div>
+                      <div>비활성 {formatQty(departments.filter((d) => !d.is_active).length)}개</div>
                     </div>
                   </div>
                 </div>
@@ -426,10 +427,10 @@ export function DesktopAdminView({
                     현재 상태
                   </div>
                   <div className="space-y-2 text-base">
-                    <div>품목 {formatNumber(items.length)}건</div>
-                    <div>직원 {formatNumber(employees.length)}명</div>
-                    <div>출하묶음 {formatNumber(packages.length)}건</div>
-                    <div>BOM {formatNumber(allBomRows.length)}건</div>
+                    <div>품목 {formatQty(items.length)}건</div>
+                    <div>직원 {formatQty(employees.length)}명</div>
+                    <div>출하묶음 {formatQty(packages.length)}건</div>
+                    <div>BOM {formatQty(allBomRows.length)}건</div>
                   </div>
                 </div>
               </div>

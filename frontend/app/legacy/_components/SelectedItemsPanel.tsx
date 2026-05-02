@@ -2,7 +2,8 @@
 
 import { X } from "lucide-react";
 import { type Item } from "@/lib/api";
-import { LEGACY_COLORS, erpCodeDeptBadge, formatNumber, getStockState } from "./legacyUi";
+import { LEGACY_COLORS, erpCodeDeptBadge, getStockState } from "./legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "./DepartmentsContext";
 
 export type SelectedEntry = { item: Item; quantity: number };
@@ -90,7 +91,7 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
                 현재 재고
               </div>
               <div className="text-base font-black tabular-nums" style={{ color: stock.color }}>
-                {formatNumber(item.quantity)}
+                {formatQty(item.quantity)}
               </div>
             </div>
 
@@ -100,7 +101,7 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
                 실행 후
               </div>
               <div className="text-base font-black tabular-nums" style={{ color: expectedColor }}>
-                {formatNumber(expected)}
+                {formatQty(expected)}
               </div>
               {isShortage && (
                 <div className="text-[9px] font-bold uppercase tracking-[1px]" style={{ color: LEGACY_COLORS.red }}>

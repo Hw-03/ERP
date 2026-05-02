@@ -1,7 +1,8 @@
 "use client";
 
 import type { Employee, Item, ShipPackage } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber, normalizeDepartment } from "../legacyUi";
+import { LEGACY_COLORS, normalizeDepartment } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import type { WorkType } from "../_warehouse_steps";
 
 type Props = {
@@ -43,7 +44,7 @@ export function WarehouseConfirmContent({
             <dd className="font-black" style={{ color: LEGACY_COLORS.text }}>{selectedEntries.length}건</dd>
             <dt className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>총 수량</dt>
             <dd className="font-black tabular-nums" style={{ color: LEGACY_COLORS.text }}>
-              {formatNumber(totalQty)} EA
+              {formatQty(totalQty)} EA
             </dd>
           </>
         ) : (
@@ -76,7 +77,7 @@ export function WarehouseConfirmContent({
                   {entry.item.item_name}
                 </span>
                 <span className="shrink-0 font-black tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>
-                  ×{formatNumber(entry.quantity)}
+                  ×{formatQty(entry.quantity)}
                 </span>
               </li>
             ))}

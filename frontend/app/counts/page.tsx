@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api, type Item, type PhysicalCount } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber } from "../legacy/_components/legacyUi";
+import { LEGACY_COLORS } from "../legacy/_components/legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { formatDateTime } from "@/lib/mes-format";
 
 export default function CountsPage() {
@@ -59,7 +60,7 @@ export default function CountsPage() {
         operator: operator || undefined,
       });
       setInfo(
-        `실사 완료: ${row.item_name} · 시스템 ${formatNumber(row.system_qty)} → 실사 ${formatNumber(row.counted_qty)} (diff ${formatNumber(row.diff)})`,
+        `실사 완료: ${row.item_name} · 시스템 ${formatQty(row.system_qty)} → 실사 ${formatQty(row.counted_qty)} (diff ${formatQty(row.diff)})`,
       );
       setCounted("");
       setReason("");
@@ -114,9 +115,9 @@ export default function CountsPage() {
               className="mb-2 rounded-lg px-3 py-2 text-sm"
               style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}
             >
-              시스템 재고: {formatNumber(selectedItem.quantity)} {selectedItem.unit}
-              {" · "}가용 {formatNumber(selectedItem.available_quantity ?? selectedItem.quantity)}
-              {" · "}예약 {formatNumber(selectedItem.pending_quantity ?? 0)}
+              시스템 재고: {formatQty(selectedItem.quantity)} {selectedItem.unit}
+              {" · "}가용 {formatQty(selectedItem.available_quantity ?? selectedItem.quantity)}
+              {" · "}예약 {formatQty(selectedItem.pending_quantity ?? 0)}
             </div>
           )}
 
@@ -214,7 +215,7 @@ export default function CountsPage() {
                     {c.item_name}
                   </div>
                   <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                    시스템 {formatNumber(c.system_qty)} → 실사 {formatNumber(c.counted_qty)}
+                    시스템 {formatQty(c.system_qty)} → 실사 {formatQty(c.counted_qty)}
                     {c.reason ? ` · ${c.reason}` : ""}
                   </div>
                   <div className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
@@ -234,7 +235,7 @@ export default function CountsPage() {
                   }}
                 >
                   {Number(c.diff) >= 0 ? "+" : ""}
-                  {formatNumber(c.diff)}
+                  {formatQty(c.diff)}
                 </div>
               </div>
             ))}

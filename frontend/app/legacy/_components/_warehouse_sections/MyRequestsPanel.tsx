@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, type StockRequest } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber, normalizeDepartment } from "../legacyUi";
-import { ConfirmModal } from "../common/ConfirmModal";
+import { LEGACY_COLORS, normalizeDepartment } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
+import { ConfirmModal } from "@/features/mes/shared/ConfirmModal";
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "임시",
@@ -177,7 +178,7 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
                 <div key={line.line_id} className="flex flex-wrap items-center gap-2">
                   <span style={{ color: LEGACY_COLORS.muted2 }}>{line.erp_code_snapshot ?? "-"}</span>
                   <span>{line.item_name_snapshot}</span>
-                  <span className="ml-auto font-bold">{formatNumber(line.quantity)}{" "}개</span>
+                  <span className="ml-auto font-bold">{formatQty(line.quantity)}{" "}개</span>
                   {line.to_department && (
                     <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
                       → {normalizeDepartment(line.to_department)}

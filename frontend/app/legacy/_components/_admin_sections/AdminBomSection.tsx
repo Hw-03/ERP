@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
 import type { BOMEntry } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber } from "../legacyUi";
+import { LEGACY_COLORS } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { EmptyState } from "../common/EmptyState";
-import { ConfirmModal } from "../common/ConfirmModal";
+import { ConfirmModal } from "@/features/mes/shared/ConfirmModal";
 import { useAdminBomContext } from "./AdminBomContext";
 import { BomParentPicker } from "./_bom_parts/BomParentPicker";
 import { BomChildPicker } from "./_bom_parts/BomChildPicker";
@@ -132,7 +133,7 @@ export function AdminBomSection() {
               {label}
             </div>
             <div className="mt-1 text-2xl font-bold tabular-nums" style={{ color }}>
-              {formatNumber(value)}
+              {formatQty(value)}
             </div>
           </div>
         ))}
@@ -320,7 +321,7 @@ export function AdminBomSection() {
                               ) : (
                                 <>
                                   <span className="text-sm" style={{ color: LEGACY_COLORS.text }}>
-                                    ×{formatNumber(row.quantity)}
+                                    ×{formatQty(row.quantity)}
                                   </span>
                                   <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{row.unit}</span>
                                   <button
@@ -338,13 +339,13 @@ export function AdminBomSection() {
                               className="text-right text-sm"
                               style={{ color: stock > 0 ? LEGACY_COLORS.text : LEGACY_COLORS.red }}
                             >
-                              {formatNumber(stock)}
+                              {formatQty(stock)}
                             </div>
                             <div
                               className="text-right text-sm font-bold"
                               style={{ color: capacity > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}
                             >
-                              {formatNumber(capacity)}
+                              {formatQty(capacity)}
                             </div>
                             <div className="flex justify-end">
                               <button
@@ -494,7 +495,7 @@ export function AdminBomSection() {
                                 {row.child_erp_code}
                               </div>
                               <div className="text-right text-sm" style={{ color: LEGACY_COLORS.text }}>
-                                ×{formatNumber(row.quantity)}
+                                ×{formatQty(row.quantity)}
                                 <span className="ml-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{row.unit}</span>
                               </div>
                             </div>

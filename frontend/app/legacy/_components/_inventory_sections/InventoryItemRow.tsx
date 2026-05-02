@@ -6,9 +6,9 @@ import type { Item } from "@/lib/api";
 import {
   LEGACY_COLORS,
   erpCodeDept,
-  formatNumber,
   getStockState,
 } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "../DepartmentsContext";
 
 function safeQty(item: Item) {
@@ -41,7 +41,7 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
   let used = 0;
   if (wh > 0) {
     const pct = Math.min(100, (wh / total) * 100);
-    segments.push({ pct, color: "#3ac4b0", label: `창고 ${formatNumber(wh)}` });
+    segments.push({ pct, color: "#3ac4b0", label: `창고 ${formatQty(wh)}` });
     used += pct;
   }
   for (const loc of depts) {
@@ -50,7 +50,7 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
     segments.push({
       pct,
       color: getDeptColor(loc.department),
-      label: `${loc.department} ${formatNumber(loc.quantity)}`,
+      label: `${loc.department} ${formatQty(loc.quantity)}`,
     });
     used += pct;
   }
@@ -167,13 +167,13 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
           color: isCritical ? stock.color : LEGACY_COLORS.text,
         }}
       >
-        {formatNumber(item.quantity)}
+        {formatQty(item.quantity)}
       </td>
       <td
         className="border-b px-4 py-[21px] text-center align-middle whitespace-nowrap text-sm font-bold"
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
       >
-        {item.min_stock == null ? "-" : formatNumber(item.min_stock)}
+        {item.min_stock == null ? "-" : formatQty(item.min_stock)}
       </td>
     </tr>
   );

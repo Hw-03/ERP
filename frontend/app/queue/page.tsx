@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type QueueBatch, type QueueBatchStatus } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber, transactionLabel } from "../legacy/_components/legacyUi";
+import { LEGACY_COLORS, transactionLabel } from "../legacy/_components/legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { formatDateTime } from "@/lib/mes-format";
 
 const STATUS_LABEL: Record<QueueBatchStatus, string> = {
@@ -148,7 +149,7 @@ export default function QueuePage() {
                     </div>
                     <div className="mt-1 truncate text-base font-semibold">
                       {b.parent_item_name ?? "-"}
-                      {b.parent_quantity != null ? ` × ${formatNumber(b.parent_quantity)}` : ""}
+                      {b.parent_quantity != null ? ` × ${formatQty(b.parent_quantity)}` : ""}
                     </div>
                     <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted }}>
                       {formatDateTime(b.created_at)}
@@ -203,10 +204,10 @@ export default function QueuePage() {
                       <span className="flex-1 truncate" style={{ opacity: ln.included ? 1 : 0.4 }}>
                         {ln.item_name ?? ln.item_id}
                       </span>
-                      <span>{formatNumber(ln.quantity)}</span>
+                      <span>{formatQty(ln.quantity)}</span>
                       {ln.bom_expected != null && Number(ln.bom_expected) !== Number(ln.quantity) && (
                         <span className="text-xs" style={{ color: LEGACY_COLORS.yellow }}>
-                          (BOM {formatNumber(ln.bom_expected)})
+                          (BOM {formatQty(ln.bom_expected)})
                         </span>
                       )}
                     </div>

@@ -2,7 +2,8 @@
 
 import { PackagePlus, Search, X } from "lucide-react";
 import type { Item } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber } from "../legacyUi";
+import { LEGACY_COLORS } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { PROCESS_TYPE_OPTIONS, EMPTY_ADD_FORM, MODEL_SLOTS, UNIT_OPTIONS } from "./adminShared";
 import { useAdminMasterItemsContext } from "./AdminMasterItemsContext";
 
@@ -45,7 +46,7 @@ export function AdminMasterItemsSection() {
           </div>
           <div className="mt-2 flex items-center justify-between">
             <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-              {formatNumber(visibleItems.length)}건
+              {formatQty(visibleItems.length)}건
             </span>
             <button
               onClick={() => {

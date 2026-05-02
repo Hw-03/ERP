@@ -8,8 +8,8 @@ import type {
   ProductModel,
   ShipPackage,
 } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber } from "../legacyUi";
-
+import { LEGACY_COLORS } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 export interface OverviewBarProps {
   items: Item[];
   employees: Employee[];
@@ -58,7 +58,7 @@ export function OverviewBar({
           className="flex items-center gap-1.5 rounded-[12px] px-3 py-1.5"
           style={{ background: `color-mix(in srgb, ${color} 10%, transparent)` }}
         >
-          <span className="text-sm font-black" style={{ color }}>{formatNumber(value)}</span>
+          <span className="text-sm font-black" style={{ color }}>{formatQty(value)}</span>
           <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{label}</span>
         </div>
       ))}

@@ -3,7 +3,8 @@
 import { X } from "lucide-react";
 import type { Item, ShipPackage } from "@/lib/api";
 import { SelectedItemsPanel } from "../SelectedItemsPanel";
-import { LEGACY_COLORS, formatNumber } from "../legacyUi";
+import { LEGACY_COLORS } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import type { WorkType } from "./_constants";
 
 export function QuantityStep({
@@ -46,7 +47,7 @@ export function QuantityStep({
             {selectedEntries.length}개 품목 · 총 수량
           </span>
           <span className="text-2xl font-black tabular-nums" style={{ color: LEGACY_COLORS.blue }}>
-            {formatNumber(totalQty)}
+            {formatQty(totalQty)}
           </span>
         </div>
       )}
@@ -95,7 +96,7 @@ export function QuantityStep({
                   >
                     <span className="truncate">{pi.item_name ?? pi.item_id}</span>
                     <span className="shrink-0 font-black tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>
-                      ×{formatNumber(pi.quantity)}
+                      ×{formatQty(pi.quantity)}
                     </span>
                   </li>
                 ))}

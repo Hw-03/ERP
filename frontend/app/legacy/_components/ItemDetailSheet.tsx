@@ -2,16 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { api, type Item, type TransactionLog } from "@/lib/api";
-import { BottomSheet } from "./BottomSheet";
+import { BottomSheet } from "@/features/mes/shared/BottomSheet";
 import { ItemDetailHistoryList } from "./ItemDetailHistoryList";
 import {
   LEGACY_COLORS,
   erpCodeDeptBadge,
-  formatNumber,
   getStockState,
   transactionColor,
   transactionLabel,
 } from "./legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "./DepartmentsContext";
 
 type ActionMode = "ADJUST" | "RECEIVE" | "SHIP";
@@ -138,10 +138,10 @@ export function ItemDetailSheet({
             {[
               ["품목 코드", item.erp_code ?? "-"],
               ["사양", item.spec || "-"],
-              ["총재고", `${formatNumber(item.quantity)} ${item.unit}`],
+              ["총재고", `${formatQty(item.quantity)} ${item.unit}`],
               [
                 "가용 / 예약",
-                `${formatNumber(item.available_quantity ?? item.quantity)} / ${formatNumber(item.pending_quantity ?? 0)} ${item.unit}`,
+                `${formatQty(item.available_quantity ?? item.quantity)} / ${formatQty(item.pending_quantity ?? 0)} ${item.unit}`,
               ],
               ...(item.last_reserver_name && Number(item.pending_quantity ?? 0) > 0
                 ? [["점유자", `🔒 ${item.last_reserver_name}`] as [string, string]]
@@ -151,7 +151,7 @@ export function ItemDetailSheet({
               ["모델", item.legacy_model || "공용"],
               ["공급처", item.supplier || "-"],
               ["바코드", item.barcode || "-"],
-              ["안전재고", item.min_stock != null ? formatNumber(item.min_stock) : "-"],
+              ["안전재고", item.min_stock != null ? formatQty(item.min_stock) : "-"],
             ].map(([label, value], index, array) => (
               <div
                 key={label}

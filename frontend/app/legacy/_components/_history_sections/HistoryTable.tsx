@@ -3,7 +3,8 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState, useMemo } from "react";
 import type { TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber, transactionLabel } from "../legacyUi";
+import { LEGACY_COLORS, transactionLabel } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { EmptyState } from "../common/EmptyState";
 import { formatHistoryDate } from "./historyShared";
 import { HistoryLogRow } from "./HistoryLogRow";
@@ -124,7 +125,7 @@ function BatchHeader({
               className="text-sm font-black"
               style={{ color: totalQty >= 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red }}
             >
-              {totalQty >= 0 ? "+" : ""}{formatNumber(totalQty)}
+              {totalQty >= 0 ? "+" : ""}{formatQty(totalQty)}
             </span>
           </span>
         </div>

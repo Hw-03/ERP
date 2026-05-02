@@ -1,8 +1,8 @@
 "use client";
 
 import { AlertTriangle, ArrowRight } from "lucide-react";
-import { LEGACY_COLORS, formatNumber } from "../legacyUi";
-
+import { LEGACY_COLORS } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 type Props = {
   lowCount: number;
   zeroCount: number;
@@ -26,7 +26,7 @@ export function InventoryActionRequired({ lowCount, zeroCount, onGoToWarehouseTa
         조치 필요
       </span>
       <span className="text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
-        부족 {formatNumber(lowCount)}건 · 품절 {formatNumber(zeroCount)}건
+        부족 {formatQty(lowCount)}건 · 품절 {formatQty(zeroCount)}건
       </span>
       {onGoToWarehouseTab && (
         <button

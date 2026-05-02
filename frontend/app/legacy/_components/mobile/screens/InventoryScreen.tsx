@@ -4,11 +4,12 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { CheckSquare, Filter, History, PackageSearch, X } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { ItemDetailSheet } from "../../ItemDetailSheet";
-import { LEGACY_COLORS, formatNumber, getStockState } from "../../legacyUi";
+import { LEGACY_COLORS, getStockState } from "../../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { ELEVATION, TYPO } from "../tokens";
 import { useItems } from "../hooks/useItems";
 import { useModels } from "../hooks/useModels";
-import type { ToastState } from "../../Toast";
+import type { ToastState } from "@/features/mes/shared/Toast";
 import {
   AsyncState,
   AsyncSkeletonRows,
@@ -271,7 +272,7 @@ export function InventoryScreen({
       <div className="flex flex-col gap-3 px-4 pt-3">
         <div className="flex items-center justify-between px-1">
           <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
-            {formatNumber(totals.count)}개 품목
+            {formatQty(totals.count)}개 품목
           </div>
           {!selecting ? (
             <button

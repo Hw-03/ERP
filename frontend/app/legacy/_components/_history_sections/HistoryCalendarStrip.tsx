@@ -2,7 +2,8 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber, transactionColor, transactionLabel } from "../legacyUi";
+import { LEGACY_COLORS, transactionColor, transactionLabel } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { EmptyState } from "../common/EmptyState";
 import { formatHistoryDate } from "./historyShared";
 
@@ -164,7 +165,7 @@ export function HistoryCalendarStrip({
                         <span className="min-w-0 flex-1 truncate text-sm">{log.item_name}</span>
                         <span className="shrink-0 text-sm font-bold" style={{ color: tcolor }}>
                           {Number(log.quantity_change) >= 0 ? "+" : ""}
-                          {formatNumber(log.quantity_change)}
+                          {formatQty(log.quantity_change)}
                         </span>
                         <span className="shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                           {formatHistoryDate(log.created_at).split(" ")[1]}

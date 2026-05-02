@@ -10,7 +10,8 @@ import { DesktopInventoryView } from "./DesktopInventoryView";
 import { DesktopWarehouseView } from "./DesktopWarehouseView";
 import { DesktopAdminView } from "./DesktopAdminView";
 import { DesktopHistoryView } from "./DesktopHistoryView";
-import { LEGACY_COLORS, formatNumber } from "./legacyUi";
+import { LEGACY_COLORS } from "./legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { api, type ProductionCapacity } from "@/lib/api";
 import type { Item } from "@/lib/api";
 
@@ -156,7 +157,7 @@ export function DesktopLegacyShell() {
                       즉시 생산 가능
                     </div>
                     <div className="mt-1 text-[22px] font-black" style={{ color: LEGACY_COLORS.cyan }}>
-                      {formatNumber(capacityData.immediate)}
+                      {formatQty(capacityData.immediate)}
                     </div>
                   </div>
                   <div className="rounded-[18px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
@@ -164,7 +165,7 @@ export function DesktopLegacyShell() {
                       최대 생산 가능
                     </div>
                     <div className="mt-1 text-[22px] font-black" style={{ color: LEGACY_COLORS.blue }}>
-                      {formatNumber(capacityData.maximum)}
+                      {formatQty(capacityData.maximum)}
                     </div>
                   </div>
                 </div>
@@ -196,10 +197,10 @@ export function DesktopLegacyShell() {
                         <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
                       </div>
                       <div className="text-right text-sm font-bold" style={{ color: LEGACY_COLORS.cyan }}>
-                        {formatNumber(item.immediate)}
+                        {formatQty(item.immediate)}
                       </div>
                       <div className="text-right text-sm" style={{ color: LEGACY_COLORS.blue }}>
-                        {formatNumber(item.maximum)}
+                        {formatQty(item.maximum)}
                       </div>
                     </div>
                   ))}

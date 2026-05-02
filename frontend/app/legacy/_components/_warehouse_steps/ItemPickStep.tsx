@@ -6,9 +6,9 @@ import type { Item, ProductModel, ShipPackage } from "@/lib/api";
 import { EmptyState } from "../common/EmptyState";
 import {
   LEGACY_COLORS,
-  formatNumber,
   getStockState,
 } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { LabeledSelect } from "./_atoms";
 import {
   PROCESS_TYPE_LABEL,
@@ -297,7 +297,7 @@ export function ItemPickStep({
                         borderBottom: `1px solid ${LEGACY_COLORS.border}`,
                       }}
                     >
-                      {formatNumber(item.quantity)}
+                      {formatQty(item.quantity)}
                     </td>
                   </tr>
                 );
@@ -334,7 +334,7 @@ export function ItemPickStep({
               className="w-full rounded-[12px] border py-2.5 text-xs font-semibold"
               style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
             >
-              100개 더 보기 ({formatNumber(Math.min(displayLimit + PAGE_SIZE, filteredItems.length))} / {formatNumber(filteredItems.length)})
+              100개 더 보기 ({formatQty(Math.min(displayLimit + PAGE_SIZE, filteredItems.length))} / {formatQty(filteredItems.length)})
             </button>
           </div>
         )}

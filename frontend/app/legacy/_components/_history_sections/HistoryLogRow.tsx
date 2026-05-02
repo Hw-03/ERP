@@ -21,11 +21,11 @@ import {
 import type { TransactionLog } from "@/lib/api";
 import {
   LEGACY_COLORS,
-  formatNumber,
   transactionColor,
   transactionIconName,
   transactionLabel,
 } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { useDeptColor } from "../DepartmentsContext";
 import { PROCESS_TYPE_META, formatHistoryDate, rowTint } from "./historyShared";
 
@@ -145,15 +145,15 @@ function HistoryLogRowImpl({ log, selected, copiedRef, onSelect, onCopyRef }: Pr
         style={{ borderColor: LEGACY_COLORS.border, color: tcolor }}
       >
         {Number(log.quantity_change) >= 0 ? "+" : ""}
-        {formatNumber(log.quantity_change)}
+        {formatQty(log.quantity_change)}
       </td>
       <td
         className="whitespace-nowrap border-b px-4 py-3 text-xs"
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
       >
-        {log.quantity_before != null ? formatNumber(log.quantity_before) : "-"}
+        {log.quantity_before != null ? formatQty(log.quantity_before) : "-"}
         <span className="mx-1">→</span>
-        {log.quantity_after != null ? formatNumber(log.quantity_after) : "-"}
+        {log.quantity_after != null ? formatQty(log.quantity_after) : "-"}
       </td>
       <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         {producer ? (

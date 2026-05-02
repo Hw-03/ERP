@@ -2,8 +2,8 @@
 
 import { AlertTriangle, Zap } from "lucide-react";
 import type { ProductionCapacity } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber } from "../legacyUi";
-
+import { LEGACY_COLORS } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 export function InventoryCapacityPanel({
   capacityData,
   onClick,
@@ -29,11 +29,11 @@ export function InventoryCapacityPanel({
       ) : (
         <>
           <span className="text-lg font-black" style={{ color: LEGACY_COLORS.cyan }}>
-            즉시 {formatNumber(capacityData.immediate)}
+            즉시 {formatQty(capacityData.immediate)}
           </span>
           <span className="text-base" style={{ color: LEGACY_COLORS.muted2 }}>/</span>
           <span className="text-lg font-black" style={{ color: LEGACY_COLORS.blue }}>
-            최대 {formatNumber(capacityData.maximum)}
+            최대 {formatQty(capacityData.maximum)}
           </span>
         </>
       )}

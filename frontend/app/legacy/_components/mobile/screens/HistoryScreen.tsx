@@ -14,11 +14,11 @@ import {
 import { api, type Item, type TransactionLog, type TransactionType } from "@/lib/api";
 import {
   LEGACY_COLORS,
-  formatNumber,
   normalizeModel,
   transactionColor,
   transactionLabel,
 } from "../../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { TYPO } from "../tokens";
 import { EmptyState, IconButton, KpiCard } from "../primitives";
 import { useTransactions } from "../hooks/useTransactions";
@@ -232,8 +232,8 @@ export function HistoryScreen({ onClose }: { onClose: () => void }) {
         <>
           <div className="grid grid-cols-3 gap-2">
             <KpiCard label="조회 기준" value={summary.total} color={LEGACY_COLORS.blue} />
-            <KpiCard label="입고합" value={formatNumber(summary.inSum)} color={LEGACY_COLORS.green} />
-            <KpiCard label="출고합" value={formatNumber(summary.outSum)} color={LEGACY_COLORS.red} />
+            <KpiCard label="입고합" value={formatQty(summary.inSum)} color={LEGACY_COLORS.green} />
+            <KpiCard label="출고합" value={formatQty(summary.outSum)} color={LEGACY_COLORS.red} />
           </div>
 
           {loading && logs.length === 0 ? (
@@ -560,10 +560,10 @@ function LogRow({
           style={{ color: transactionColor(log.transaction_type) }}
         >
           {log.quantity_change >= 0 ? "+" : ""}
-          {formatNumber(log.quantity_change)}
+          {formatQty(log.quantity_change)}
         </div>
         <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
-          → {formatNumber(log.quantity_after)}
+          → {formatQty(log.quantity_after)}
         </div>
       </div>
     </div>

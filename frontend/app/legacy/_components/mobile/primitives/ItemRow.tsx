@@ -6,10 +6,10 @@ import type { Item } from "@/lib/api";
 import {
   erpCodeDeptBadge,
   formatErpCode,
-  formatNumber,
   getStockState,
   LEGACY_COLORS,
 } from "../../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "../../DepartmentsContext";
 import { TYPO } from "../tokens";
 import { StatusBadge } from "./StatusBadge";
@@ -80,7 +80,7 @@ export function ItemRow({
             className={clsx(TYPO.title, "shrink-0 font-black tabular-nums")}
             style={{ color: state.color }}
           >
-            {formatNumber(item.quantity)}
+            {formatQty(item.quantity)}
           </div>
         </div>
         <div className="mt-[3px] flex items-center gap-[6px]">

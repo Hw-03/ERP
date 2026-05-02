@@ -1,8 +1,8 @@
 "use client";
 
 import { AlertTriangle, TrendingDown, TrendingUp } from "lucide-react";
-import { LEGACY_COLORS, formatNumber } from "../legacyUi";
-
+import { LEGACY_COLORS } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 export interface HistoryStatsBarProps {
   stats: {
     total: number;
@@ -29,7 +29,7 @@ export function HistoryStatsBar({ stats, canLoadMore }: HistoryStatsBarProps) {
           <div className="text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
             조회 건수
           </div>
-          <div className="text-2xl font-black">{formatNumber(stats.total)}</div>
+          <div className="text-2xl font-black">{formatQty(stats.total)}</div>
           {canLoadMore && (
             <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>(+더 불러올 수 있음)</div>
           )}
@@ -46,7 +46,7 @@ export function HistoryStatsBar({ stats, canLoadMore }: HistoryStatsBarProps) {
             입고 합계
           </div>
           <div className="text-2xl font-black" style={{ color: LEGACY_COLORS.green }}>
-            +{formatNumber(stats.receiveSum)}
+            +{formatQty(stats.receiveSum)}
           </div>
           <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>입고 · 생산입고</div>
         </div>
@@ -62,7 +62,7 @@ export function HistoryStatsBar({ stats, canLoadMore }: HistoryStatsBarProps) {
             출고 합계
           </div>
           <div className="text-2xl font-black" style={{ color: LEGACY_COLORS.red }}>
-            -{formatNumber(stats.shipSum)}
+            -{formatQty(stats.shipSum)}
           </div>
           <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>출고 · 자동차감</div>
         </div>
@@ -78,7 +78,7 @@ export function HistoryStatsBar({ stats, canLoadMore }: HistoryStatsBarProps) {
             예외 거래
           </div>
           <div className="text-2xl font-black" style={{ color: LEGACY_COLORS.yellow }}>
-            {formatNumber(stats.exceptionCount)}
+            {formatQty(stats.exceptionCount)}
           </div>
           <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>조정·폐기·손실·예외</div>
         </div>

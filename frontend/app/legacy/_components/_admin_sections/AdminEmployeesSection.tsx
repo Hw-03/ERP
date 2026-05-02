@@ -6,7 +6,7 @@ import type { EmployeeLevel, WarehouseRole } from "@/lib/api";
 import { LEGACY_COLORS, normalizeDepartment } from "../legacyUi";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "./adminShared";
 import { useAdminEmployeesContext } from "./AdminEmployeesContext";
-import { ConfirmModal } from "../common/ConfirmModal";
+import { ConfirmModal } from "@/features/mes/shared/ConfirmModal";
 
 const LEVEL_LABEL: Record<EmployeeLevel, string> = {
   admin: "관리자",

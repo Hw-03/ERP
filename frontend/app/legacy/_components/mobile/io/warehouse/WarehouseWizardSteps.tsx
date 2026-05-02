@@ -3,9 +3,10 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { ChevronRight, Minus, Plus, PackageSearch, ScanLine, Trash2 } from "lucide-react";
 import type { Employee, Item } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber, normalizeDepartment } from "../../../legacyUi";
+import { LEGACY_COLORS, normalizeDepartment } from "../../../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { BarcodeScannerModal } from "../../../BarcodeScannerModal";
-import type { ToastState } from "../../../Toast";
+import type { ToastState } from "@/features/mes/shared/Toast";
 import { TYPO } from "../../tokens";
 import {
   EmptyState,
@@ -282,7 +283,7 @@ export function StepItems({
                     </div>
                   </div>
                   <div className={`${TYPO.caption} shrink-0 tabular-nums`} style={{ color: LEGACY_COLORS.cyan }}>
-                    {formatNumber(item.quantity)} {item.unit}
+                    {formatQty(item.quantity)} {item.unit}
                   </div>
                 </button>
 
@@ -437,7 +438,7 @@ export function StepConfirm({
       </SectionCard>
 
       <SectionCard
-        title={`품목 · ${selectedList.length}건 · 합계 ${formatNumber(totalQty)}`}
+        title={`품목 · ${selectedList.length}건 · 합계 ${formatQty(totalQty)}`}
         padding="none"
       >
         <div className="max-h-[30vh] overflow-y-auto">
@@ -459,7 +460,7 @@ export function StepConfirm({
                 </div>
               </div>
               <div className={`${TYPO.title} shrink-0 font-black tabular-nums`} style={{ color: LEGACY_COLORS.blue }}>
-                {formatNumber(e.qty)} {e.item.unit}
+                {formatQty(e.qty)} {e.item.unit}
               </div>
             </div>
           ))}

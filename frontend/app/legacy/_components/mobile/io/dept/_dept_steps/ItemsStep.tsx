@@ -4,8 +4,9 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { PackageSearch, Package as PackageIcon, ScanLine, Trash2 } from "lucide-react";
 import type { Item, ShipPackage } from "@/lib/api";
 import { BarcodeScannerModal } from "../../../../BarcodeScannerModal";
-import { LEGACY_COLORS, formatNumber } from "../../../../legacyUi";
-import type { ToastState } from "../../../../Toast";
+import { LEGACY_COLORS } from "../../../../legacyUi";
+import { formatQty } from "@/lib/mes/format";
+import type { ToastState } from "@/features/mes/shared/Toast";
 import { TYPO } from "../../../tokens";
 import {
   EmptyState,
@@ -313,7 +314,7 @@ function ItemPicker({ items, loading }: { items: Item[]; loading: boolean }) {
                 className={`${TYPO.caption} shrink-0 tabular-nums`}
                 style={{ color: LEGACY_COLORS.cyan }}
               >
-                {formatNumber(item.quantity)} {item.unit}
+                {formatQty(item.quantity)} {item.unit}
               </div>
             </button>
             {selected ? (

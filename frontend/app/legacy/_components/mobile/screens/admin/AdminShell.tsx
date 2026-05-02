@@ -6,7 +6,7 @@ import { LEGACY_COLORS } from "../../../legacyUi";
 import { ELEVATION, TYPO } from "../../tokens";
 import { IconButton } from "../../primitives";
 import { PinLock } from "../../../PinLock";
-import type { ToastState } from "../../../Toast";
+import type { ToastState } from "@/features/mes/shared/Toast";
 import { AdminBomSection } from "./AdminBomSection";
 import { AdminEmployeesSection } from "./AdminEmployeesSection";
 import { AdminItemsSection } from "./AdminItemsSection";

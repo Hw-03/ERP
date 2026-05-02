@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import { api, type Item, type StockRequestReservationLine, type TransactionLog } from "@/lib/api";
 import {
   LEGACY_COLORS,
-  formatNumber,
   normalizeDepartment,
   normalizeModel,
   transactionColor,
   transactionLabel,
 } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "../DepartmentsContext";
 
 type Props = {
@@ -75,7 +75,7 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
               <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                 현재고
               </div>
-              <div className="mt-1 text-xl font-black">{formatNumber(item.quantity)}</div>
+              <div className="mt-1 text-xl font-black">{formatQty(item.quantity)}</div>
             </div>
             <div
               className="rounded-[18px] border px-4 py-3"
@@ -85,7 +85,7 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
                 안전재고
               </div>
               <div className="mt-1 text-xl font-black">
-                {item.min_stock == null ? "-" : formatNumber(item.min_stock)}
+                {item.min_stock == null ? "-" : formatQty(item.min_stock)}
               </div>
             </div>
           </div>
@@ -106,7 +106,7 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
                 className="mt-1 text-xl font-black"
                 style={{ color: pendingQty > 0 ? LEGACY_COLORS.yellow : LEGACY_COLORS.text }}
               >
-                {formatNumber(pendingQty)}
+                {formatQty(pendingQty)}
               </div>
             </div>
             <div
@@ -117,7 +117,7 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
                 사용 가능 재고
               </div>
               <div className="mt-1 text-xl font-black" style={{ color: LEGACY_COLORS.green }}>
-                {formatNumber(availableQty)}
+                {formatQty(availableQty)}
               </div>
             </div>
           </div>
@@ -189,7 +189,7 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
                 <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                   창고 → {r.to_department ? normalizeDepartment(r.to_department) : "외부"}
                 </span>
-                <span className="ml-auto font-bold">{formatNumber(r.quantity)} 개</span>
+                <span className="ml-auto font-bold">{formatQty(r.quantity)} 개</span>
               </div>
             ))}
           </div>
@@ -214,7 +214,7 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
                 <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.muted2 }} />
                 <span className="flex-1 text-base font-semibold">창고</span>
                 <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
-                  {formatNumber(item.warehouse_qty)}
+                  {formatQty(item.warehouse_qty)}
                 </span>
               </div>
             )}
@@ -229,7 +229,7 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
                   <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: getDeptColor(l.department) }} />
                   <span className="flex-1 text-base font-semibold">{l.department}</span>
                   <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
-                    {formatNumber(l.quantity)}
+                    {formatQty(l.quantity)}
                   </span>
                 </div>
               ))}
@@ -275,7 +275,7 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
                   <span className="text-sm font-bold" style={{ color: transactionColor(log.transaction_type) }}>
                     {transactionLabel(log.transaction_type)}
                   </span>
-                  <span className="text-sm">{formatNumber(log.quantity_change)}</span>
+                  <span className="text-sm">{formatQty(log.quantity_change)}</span>
                 </div>
                 <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                   {log.notes || "메모 없음"}

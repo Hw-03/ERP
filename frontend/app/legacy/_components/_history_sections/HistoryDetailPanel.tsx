@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { Activity, History, Pencil, Wrench } from "lucide-react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber, transactionColor, transactionLabel } from "../legacyUi";
+import { LEGACY_COLORS, transactionColor, transactionLabel } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { PROCESS_TYPE_META, formatHistoryDate, parseUtc } from "./historyShared";
 import { TransactionEditModal } from "./TransactionEditModal";
 import {
@@ -98,7 +99,7 @@ export function HistoryDetailPanel({
         </div>
         <div className="mt-3 text-4xl font-black" style={{ color: tcolor }}>
           {Number(selected.quantity_change) >= 0 ? "+" : ""}
-          {formatNumber(selected.quantity_change)}
+          {formatQty(selected.quantity_change)}
           <span className="ml-2 text-base font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
             {selected.item_unit}
           </span>
@@ -116,7 +117,7 @@ export function HistoryDetailPanel({
                 처리 전
               </div>
               <div className="mt-1 text-lg font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-                {selected.quantity_before != null ? formatNumber(selected.quantity_before) : "-"}
+                {selected.quantity_before != null ? formatQty(selected.quantity_before) : "-"}
               </div>
             </div>
             <span className="text-lg" style={{ color: LEGACY_COLORS.muted2 }}>→</span>
@@ -131,7 +132,7 @@ export function HistoryDetailPanel({
                 처리 후
               </div>
               <div className="mt-1 text-lg font-black" style={{ color: tcolor }}>
-                {selected.quantity_after != null ? formatNumber(selected.quantity_after) : "-"}
+                {selected.quantity_after != null ? formatQty(selected.quantity_after) : "-"}
               </div>
             </div>
           </div>
@@ -276,8 +277,8 @@ export function HistoryDetailPanel({
                   </div>
                   {(log.quantity_before != null || log.quantity_after != null) && (
                     <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                      {log.quantity_before != null ? formatNumber(log.quantity_before) : "-"} →{" "}
-                      {log.quantity_after != null ? formatNumber(log.quantity_after) : "-"}
+                      {log.quantity_before != null ? formatQty(log.quantity_before) : "-"} →{" "}
+                      {log.quantity_after != null ? formatQty(log.quantity_after) : "-"}
                     </div>
                   )}
                 </div>
@@ -286,7 +287,7 @@ export function HistoryDetailPanel({
                   style={{ color: transactionColor(log.transaction_type) }}
                 >
                   {Number(log.quantity_change) >= 0 ? "+" : ""}
-                  {formatNumber(log.quantity_change)}
+                  {formatQty(log.quantity_change)}
                 </div>
               </button>
             ))}

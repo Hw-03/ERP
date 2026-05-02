@@ -1,8 +1,8 @@
 "use client";
 
 import type { TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber, transactionColor, transactionLabel } from "./legacyUi";
-
+import { LEGACY_COLORS, transactionColor, transactionLabel } from "./legacyUi";
+import { formatQty } from "@/lib/mes/format";
 export interface ItemDetailHistoryListProps {
   logs: TransactionLog[];
 }
@@ -62,10 +62,10 @@ export function ItemDetailHistoryList({ logs }: ItemDetailHistoryListProps) {
                   style={{ color: transactionColor(log.transaction_type) }}
                 >
                   {log.quantity_change >= 0 ? "+" : ""}
-                  {formatNumber(log.quantity_change)}
+                  {formatQty(log.quantity_change)}
                 </div>
                 <div className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  → {formatNumber(log.quantity_after)}
+                  → {formatQty(log.quantity_after)}
                 </div>
               </div>
             </div>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AlertTriangle, Check } from "lucide-react";
 import type { Department } from "@/lib/api";
 import { LEGACY_COLORS } from "../legacyUi";
-import { ConfirmModal } from "../common/ConfirmModal";
+import { ConfirmModal } from "@/features/mes/shared/ConfirmModal";
 import { SettingLabel } from "./_atoms";
 import {
   CAUTION_WORK_TYPES,

@@ -4,8 +4,7 @@ import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
 import { LEGACY_COLORS } from "../../legacyUi";
 import { TYPO } from "../tokens";
-import { formatNumber } from "../../legacyUi";
-
+import { formatQty } from "@/lib/mes/format";
 type Intent = "primary" | "success" | "danger" | "neutral";
 
 const INTENT_STYLE: Record<Intent, { bg: string; fg: string }> = {
@@ -79,7 +78,7 @@ export function PrimaryActionButton({
           ) : null}
           {total != null ? (
             <span className={clsx(TYPO.caption, "font-black tabular-nums")}>
-              · {formatNumber(total)}
+              · {formatQty(total)}
               {totalUnit ? ` ${totalUnit}` : ""}
             </span>
           ) : null}

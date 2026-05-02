@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { Check, Search, Trash2, X } from "lucide-react";
-import { LEGACY_COLORS, buildItemSearchLabel, formatNumber } from "../legacyUi";
+import { LEGACY_COLORS, buildItemSearchLabel } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { PKG_CATEGORY_OPTIONS } from "./adminShared";
 import { useAdminPackagesContext } from "./AdminPackagesContext";
-import { ConfirmModal } from "../common";
+import { ConfirmModal } from "@/features/mes/shared/ConfirmModal";
 
 // Props 없음. 모든 상태/액션은 AdminPackagesProvider 의 Context 에서 읽는다.
 // 기존 18-prop drilling → 0.
@@ -171,7 +172,7 @@ export function AdminPackagesSection() {
                   총 수량
                 </div>
                 <div className="mt-1 text-2xl font-black" style={{ color: LEGACY_COLORS.green }}>
-                  {formatNumber(selectedPackage.items.reduce((sum, item) => sum + Number(item.quantity), 0))}
+                  {formatQty(selectedPackage.items.reduce((sum, item) => sum + Number(item.quantity), 0))}
                 </div>
               </div>
             </div>
@@ -199,7 +200,7 @@ export function AdminPackagesSection() {
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-semibold">{item.item_name}</div>
                         <div className="mt-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                          {formatNumber(item.quantity)} {item.item_unit}
+                          {formatQty(item.quantity)} {item.item_unit}
                         </div>
                       </div>
                       <button

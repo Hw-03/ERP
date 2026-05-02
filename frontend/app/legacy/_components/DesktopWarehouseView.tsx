@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Item, type ShipPackage, type StockRequest } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber } from "./legacyUi";
-import { ConfirmModal, ResultModal } from "./common";
+import { LEGACY_COLORS } from "./legacyUi";
+import { formatQty } from "@/lib/mes/format";
+import { ResultModal } from "./common";
+import { ConfirmModal } from "@/features/mes/shared/ConfirmModal";
 import {
   CAUTION_WORK_TYPES,
   canEnterIO,
@@ -440,7 +442,7 @@ export function DesktopWarehouseView({
   const itemsSummary = workType === "package-out"
     ? selectedPackage?.name ?? ""
     : selectedEntries.length > 0
-      ? `${selectedEntries.length}건 · 총 ${formatNumber(totalQty)}`
+      ? `${selectedEntries.length}건 · 총 ${formatQty(totalQty)}`
       : "";
   const stickySummary: { n: number; title: string; text: string } | null =
     showStep4 || showStep5

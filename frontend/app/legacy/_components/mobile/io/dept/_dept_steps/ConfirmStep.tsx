@@ -1,7 +1,8 @@
 "use client";
 
 import type { Employee, Item, ShipPackage } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber } from "../../../../legacyUi";
+import { LEGACY_COLORS } from "../../../../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { TYPO } from "../../../tokens";
 import {
   PrimaryActionButton,
@@ -81,7 +82,7 @@ export function StepConfirm({
         </SectionCard>
       ) : (
         <SectionCard
-          title={`품목 · ${selectedList.length}건 · 합계 ${formatNumber(totalQty)}`}
+          title={`품목 · ${selectedList.length}건 · 합계 ${formatQty(totalQty)}`}
           padding="none"
         >
           <div className="max-h-[30vh] overflow-y-auto">
@@ -105,7 +106,7 @@ export function StepConfirm({
                   className={`${TYPO.title} shrink-0 font-black tabular-nums`}
                   style={{ color: LEGACY_COLORS.blue }}
                 >
-                  {formatNumber(e.qty)} {e.item.unit}
+                  {formatQty(e.qty)} {e.item.unit}
                 </div>
               </div>
             ))}

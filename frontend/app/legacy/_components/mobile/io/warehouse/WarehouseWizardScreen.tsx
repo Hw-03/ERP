@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, X } from "lucide-react";
 import { api, type Item } from "@/lib/api";
 import { LEGACY_COLORS, normalizeDepartment } from "../../../legacyUi";
-import type { ToastState } from "../../../Toast";
+import type { ToastState } from "@/features/mes/shared/Toast";
 import { IconButton, WizardHeader, type SummaryChip } from "../../primitives";
 import { useEmployees } from "../../hooks/useEmployees";
 import { WAREHOUSE_MODE_META, WAREHOUSE_STEPS, type WarehouseMode } from "./warehouseWizardConfig";
 import { useWarehouseWizard } from "./context";
 import { StepConfirm, StepItems, StepType } from "./WarehouseWizardSteps";
-import { ConfirmModal } from "../../../common";
+import { ConfirmModal } from "@/features/mes/shared/ConfirmModal";
 import { useCurrentOperator } from "../../../login/useCurrentOperator";
 
 export function WarehouseWizardScreen({ showToast }: { showToast: (toast: ToastState) => void }) {

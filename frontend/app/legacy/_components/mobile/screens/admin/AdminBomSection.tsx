@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api, type BOMEntry, type Item } from "@/lib/api";
-import type { ToastState } from "../../../Toast";
-import { LEGACY_COLORS, buildItemSearchLabel, formatNumber } from "../../../legacyUi";
-
+import type { ToastState } from "@/features/mes/shared/Toast";
+import { LEGACY_COLORS, buildItemSearchLabel } from "../../../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 export function AdminBomSection({ showToast }: { showToast: (toast: ToastState) => void }) {
   const [items, setItems] = useState<Item[]>([]);
   const [parentId, setParentId] = useState("");
@@ -116,9 +116,9 @@ export function AdminBomSection({ showToast }: { showToast: (toast: ToastState) 
                       <button onClick={() => void removeRow(row.bom_id)} className="font-bold" style={{ color: LEGACY_COLORS.red }}>삭제</button>
                     </div>
                   </div>
-                  <div className="text-right text-xs">{formatNumber(row.quantity)}</div>
-                  <div className="text-right text-xs font-bold" style={{ color: stock > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red }}>{formatNumber(stock)}</div>
-                  <div className="text-right text-xs font-bold" style={{ color: capacity > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}>{formatNumber(capacity)}</div>
+                  <div className="text-right text-xs">{formatQty(row.quantity)}</div>
+                  <div className="text-right text-xs font-bold" style={{ color: stock > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red }}>{formatQty(stock)}</div>
+                  <div className="text-right text-xs font-bold" style={{ color: capacity > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}>{formatQty(capacity)}</div>
                 </div>
               );
             })}

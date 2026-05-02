@@ -13,7 +13,8 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { api, type Employee, type TransactionLog, type TransactionType } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber, transactionLabel } from "../legacyUi";
+import { LEGACY_COLORS, transactionLabel } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 
 interface Props {
@@ -134,7 +135,7 @@ export function TransactionQuantityCorrectModal({ open, log, onClose, onSuccess 
           </div>
           <div className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
             {Number(log.quantity_change) >= 0 ? "+" : ""}
-            {formatNumber(log.quantity_change)} {log.item_unit}
+            {formatQty(log.quantity_change)} {log.item_unit}
           </div>
         </div>
 

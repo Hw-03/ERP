@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, type StockRequest } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber, normalizeDepartment } from "../legacyUi";
-import { ConfirmModal } from "../common";
+import { LEGACY_COLORS, normalizeDepartment } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
+import { ConfirmModal } from "@/features/mes/shared/ConfirmModal";
 
 const REQUEST_TYPE_LABEL: Record<string, string> = {
   raw_receive: "원자재 입고",
@@ -187,7 +188,7 @@ export function DraftCartPanel({
                 {REQUEST_TYPE_LABEL[draft.request_type] ?? draft.request_type}
               </span>
               <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
-                {draft.lines.length}건 · 총 {formatNumber(totalQty)}
+                {draft.lines.length}건 · 총 {formatQty(totalQty)}
               </span>
               <span className="ml-auto text-xs" style={{ color: LEGACY_COLORS.muted }}>
                 {new Date(draft.updated_at).toLocaleString("ko-KR", { hour12: false })}
@@ -209,7 +210,7 @@ export function DraftCartPanel({
                     </span>
                     <span>{line.item_name_snapshot}</span>
                     <span className="ml-auto font-bold">
-                      {formatNumber(line.quantity)} 개
+                      {formatQty(line.quantity)} 개
                     </span>
                     {line.to_department && (
                       <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>

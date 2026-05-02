@@ -3,7 +3,8 @@
 // 5.6-E: 선택된 parent 가 다른 BOM 의 child 로 등록된 위치(역참조) 표시.
 // AdminBomContext 의존. parent 미선택 또는 결과 0건이면 렌더 안 함.
 
-import { LEGACY_COLORS, formatNumber } from "../../legacyUi";
+import { LEGACY_COLORS } from "../../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { useAdminBomContext } from "../AdminBomContext";
 
 export function BomWhereUsedPanel() {
@@ -39,7 +40,7 @@ export function BomWhereUsedPanel() {
               </div>
             </div>
             <div className="shrink-0 text-right text-sm" style={{ color: LEGACY_COLORS.text }}>
-              ×{formatNumber(row.quantity)}
+              ×{formatQty(row.quantity)}
               <span className="ml-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                 {row.unit}
               </span>

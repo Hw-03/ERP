@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api, type Item, type ShipPackage } from "@/lib/api";
-import { BottomSheet } from "../../../BottomSheet";
-import type { ToastState } from "../../../Toast";
-import { LEGACY_COLORS, buildItemSearchLabel, formatNumber } from "../../../legacyUi";
-
+import { BottomSheet } from "@/features/mes/shared/BottomSheet";
+import type { ToastState } from "@/features/mes/shared/Toast";
+import { LEGACY_COLORS, buildItemSearchLabel } from "../../../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 export function AdminPackagesSection({ showToast }: { showToast: (toast: ToastState) => void }) {
   const [packages, setPackages] = useState<ShipPackage[]>([]);
   const [items, setItems] = useState<Item[]>([]);
@@ -113,7 +113,7 @@ export function AdminPackagesSection({ showToast }: { showToast: (toast: ToastSt
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold">{item.item_name}</div>
                 <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {formatNumber(item.quantity)} {item.item_unit}
+                  {formatQty(item.quantity)} {item.item_unit}
                 </div>
               </div>
               <button onClick={() => void removeItem(item.package_item_id)} className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>삭제</button>

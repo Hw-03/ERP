@@ -2,7 +2,8 @@
 
 import { PackageSearch } from "lucide-react";
 import type { Item } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber } from "../legacyUi";
+import { LEGACY_COLORS } from "../legacyUi";
+import { formatQty } from "@/lib/mes/format";
 import { EmptyState } from "../common/EmptyState";
 import { LoadFailureCard } from "../common/LoadFailureCard";
 import { InventoryItemRow } from "./InventoryItemRow";
@@ -123,13 +124,13 @@ export function InventoryItemsTable({
           }}
         >
           100개 더 보기 (
-          {formatNumber(Math.min(displayLimit + PAGE_SIZE, filteredItems.length))} /{" "}
-          {formatNumber(filteredItems.length)})
+          {formatQty(Math.min(displayLimit + PAGE_SIZE, filteredItems.length))} /{" "}
+          {formatQty(filteredItems.length)})
         </button>
       )}
       {filteredItems.length > 0 && (
         <div className="mt-2 text-center text-xs" style={{ color: LEGACY_COLORS.muted }}>
-          {formatNumber(Math.min(displayLimit, filteredItems.length))} / {formatNumber(filteredItems.length)}개 표시
+          {formatQty(Math.min(displayLimit, filteredItems.length))} / {formatQty(filteredItems.length)}개 표시
         </div>
       )}
     </>
