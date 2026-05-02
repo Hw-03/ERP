@@ -10,9 +10,11 @@
  */
 export type {
   TransactionMeta,
+  TransactionIconName,
 } from "../mes-status";
 export {
   TRANSACTION_META,
   getTransactionLabel,
   getTransactionTone,
+  transactionIconName,
 } from "../mes-status";

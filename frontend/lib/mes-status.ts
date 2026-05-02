@@ -96,3 +96,63 @@ export function getTransactionTone(type: TransactionType | string): MesTone {
 export function getTransactionLabel(type: TransactionType | string): string {
   return TRANSACTION_META[type as TransactionType]?.label ?? String(type);
 }
+
+/**
+ * 거래 타입별 lucide-react 아이콘 이름 (Round-10D #4 정본 이전).
+ *
+ * 5.5-G: 색상-only 신호를 두 채널(색+아이콘)로 보강하기 위한 WCAG 1.4.1 대응.
+ * 아이콘 import 는 호출측에서 처리 — 본 모듈은 이름만 반환 (트리쉐이킹 영향 최소화).
+ */
+export type TransactionIconName =
+  | "ArrowDownToLine"   // RECEIVE
+  | "ArrowUpFromLine"   // SHIP
+  | "Sliders"           // ADJUST
+  | "Hammer"            // PRODUCE
+  | "Recycle"           // BACKFLUSH
+  | "Trash2"            // SCRAP
+  | "AlertCircle"       // LOSS
+  | "Wrench"            // DISASSEMBLE
+  | "Undo2"             // RETURN
+  | "BookmarkPlus"      // RESERVE
+  | "BookmarkMinus"     // RESERVE_RELEASE
+  | "ArrowRightLeft"    // TRANSFER_TO_PROD / TRANSFER_TO_WH / TRANSFER_DEPT
+  | "ShieldAlert"       // MARK_DEFECTIVE
+  | "PackageX"          // SUPPLIER_RETURN
+  | "Activity";         // 기타 / 기본
+
+export function transactionIconName(type: TransactionType | string): TransactionIconName {
+  switch (type) {
+    case "RECEIVE":
+      return "ArrowDownToLine";
+    case "SHIP":
+      return "ArrowUpFromLine";
+    case "ADJUST":
+      return "Sliders";
+    case "PRODUCE":
+      return "Hammer";
+    case "BACKFLUSH":
+      return "Recycle";
+    case "SCRAP":
+      return "Trash2";
+    case "LOSS":
+      return "AlertCircle";
+    case "DISASSEMBLE":
+      return "Wrench";
+    case "RETURN":
+      return "Undo2";
+    case "RESERVE":
+      return "BookmarkPlus";
+    case "RESERVE_RELEASE":
+      return "BookmarkMinus";
+    case "TRANSFER_TO_PROD":
+    case "TRANSFER_TO_WH":
+    case "TRANSFER_DEPT":
+      return "ArrowRightLeft";
+    case "MARK_DEFECTIVE":
+      return "ShieldAlert";
+    case "SUPPLIER_RETURN":
+      return "PackageX";
+    default:
+      return "Activity";
+  }
+}

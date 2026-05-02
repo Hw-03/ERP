@@ -196,62 +196,10 @@ export function transactionColor(type: TransactionType) {
   }
 }
 
-// 5.5-G: 거래 유형 아이콘 — 색상-only 신호 보강 (WCAG 1.4.1 두 채널).
-// lucide-react 의 아이콘 이름만 반환하고 import 는 호출측에서 처리 (이 파일은 "use client" 라
-// 트리쉐이킹 영향 최소화). 필요 시 호출측에서 매핑.
-export type TransactionIconName =
-  | "ArrowDownToLine"   // RECEIVE
-  | "ArrowUpFromLine"   // SHIP
-  | "Sliders"           // ADJUST
-  | "Hammer"            // PRODUCE
-  | "Recycle"           // BACKFLUSH
-  | "Trash2"            // SCRAP
-  | "AlertCircle"       // LOSS
-  | "Wrench"            // DISASSEMBLE
-  | "Undo2"             // RETURN
-  | "BookmarkPlus"      // RESERVE
-  | "BookmarkMinus"     // RESERVE_RELEASE
-  | "ArrowRightLeft"    // TRANSFER_TO_PROD / TRANSFER_TO_WH / TRANSFER_DEPT
-  | "ShieldAlert"       // MARK_DEFECTIVE
-  | "PackageX"          // SUPPLIER_RETURN
-  | "Activity";         // 기타 / 기본
-
-export function transactionIconName(type: TransactionType | string): TransactionIconName {
-  switch (type) {
-    case "RECEIVE":
-      return "ArrowDownToLine";
-    case "SHIP":
-      return "ArrowUpFromLine";
-    case "ADJUST":
-      return "Sliders";
-    case "PRODUCE":
-      return "Hammer";
-    case "BACKFLUSH":
-      return "Recycle";
-    case "SCRAP":
-      return "Trash2";
-    case "LOSS":
-      return "AlertCircle";
-    case "DISASSEMBLE":
-      return "Wrench";
-    case "RETURN":
-      return "Undo2";
-    case "RESERVE":
-      return "BookmarkPlus";
-    case "RESERVE_RELEASE":
-      return "BookmarkMinus";
-    case "TRANSFER_TO_PROD":
-    case "TRANSFER_TO_WH":
-    case "TRANSFER_DEPT":
-      return "ArrowRightLeft";
-    case "MARK_DEFECTIVE":
-      return "ShieldAlert";
-    case "SUPPLIER_RETURN":
-      return "PackageX";
-    default:
-      return "Activity";
-  }
-}
+// Round-10D #4: TransactionIconName 타입 + transactionIconName 본문 lib/mes-status.ts 정본으로 이전.
+// 호환 re-export 만 유지.
+export type { TransactionIconName } from "@/lib/mes-status";
+export { transactionIconName } from "@/lib/mes-status";
 
 // Round-10D #1: 본문 lib/mes/employee.ts 정본으로 이전. 호환 re-export 만 유지.
 export { firstEmployeeLetter } from "@/lib/mes/employee";
