@@ -94,16 +94,6 @@ export function displayPart(value?: string | null) {
   return labels[value] ?? value;
 }
 
-// Round-10D #6: 본문 lib/mes/inventory.ts 정본으로 이전. 호환 re-export 만 유지.
-export { getStockState } from "@/lib/mes/inventory";
-
-// Round-10D #2: 본문 lib/mes-format.ts 정본으로 이전. 호환 re-export 만 유지.
-export { formatErpCode } from "@/lib/mes-format";
-
-// Round-10D #5: PROCESS_LABEL/processStageLabel 본문 lib/mes/process.ts 정본으로 이전.
-// PROCESS_LABEL 은 본 파일에서 외부 export 한 적 없어 wrapper 만 노출.
-export { processStageLabel } from "@/lib/mes/process";
-
 const PROCESS_TO_DEPT: Record<string, string> = {
   TR: "튜브", TA: "튜브", TF: "튜브",
   HR: "고압", HA: "고압", HF: "고압",
@@ -129,10 +119,6 @@ export function erpCodeDeptBadge(
   const color = getColor(dept);
   return { label: dept, color, bg: `color-mix(in srgb, ${color} 12%, transparent)` };
 }
-
-// Round-10D #3: optionColor 본문 lib/mes/color.ts 정본으로 이전.
-// OPTION_COLOR 는 본 파일에서 export 한 적 없음 — wrapper 만 노출.
-export { optionColor } from "@/lib/mes/color";
 
 export function transactionColor(type: TransactionType) {
   switch (type) {
@@ -166,14 +152,6 @@ export function transactionColor(type: TransactionType) {
       return LEGACY_COLORS.muted2;
   }
 }
-
-// Round-10D #4: TransactionIconName 타입 + transactionIconName 본문 lib/mes-status.ts 정본으로 이전.
-// 호환 re-export 만 유지.
-export type { TransactionIconName } from "@/lib/mes-status";
-export { transactionIconName } from "@/lib/mes-status";
-
-// Round-10D #1: 본문 lib/mes/employee.ts 정본으로 이전. 호환 re-export 만 유지.
-export { firstEmployeeLetter } from "@/lib/mes/employee";
 
 export function buildItemSearchLabel(item: Item) {
   return `${item.erp_code} / ${item.item_name}`;
