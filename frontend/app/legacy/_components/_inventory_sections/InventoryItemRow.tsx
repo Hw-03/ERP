@@ -6,8 +6,8 @@ import type { Item } from "@/lib/api";
 import {
   LEGACY_COLORS,
   erpCodeDept,
-  getStockState,
 } from "../legacyUi";
+import { getStockState } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "../DepartmentsContext";
 

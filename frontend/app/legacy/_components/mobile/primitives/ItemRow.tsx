@@ -5,9 +5,9 @@ import { Check } from "lucide-react";
 import type { Item } from "@/lib/api";
 import {
   erpCodeDeptBadge,
-  getStockState,
   LEGACY_COLORS,
 } from "../../legacyUi";
+import { getStockState } from "@/lib/mes/inventory";
 import { formatErpCode, formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "../../DepartmentsContext";
 import { TYPO } from "../tokens";

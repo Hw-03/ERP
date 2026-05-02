@@ -7,9 +7,9 @@ import { ItemDetailHistoryList } from "./ItemDetailHistoryList";
 import {
   LEGACY_COLORS,
   erpCodeDeptBadge,
-  getStockState,
   transactionColor,
 } from "./legacyUi";
+import { getStockState } from "@/lib/mes/inventory";
 import { getTransactionLabel } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "./DepartmentsContext";

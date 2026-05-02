@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useMemo } from "react";
 import type { Item } from "@/lib/api";
-import { getStockState } from "../legacyUi";
+import { getStockState } from "@/lib/mes/inventory";
 import { useItems } from "../mobile/hooks/useItems";
 import type { InventoryFilters } from "../mobile/screens/InventoryFilterSheet";
 
