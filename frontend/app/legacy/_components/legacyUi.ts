@@ -1,7 +1,6 @@
 "use client";
 
 import type { Item, TransactionType } from "@/lib/api";
-import { formatQty } from "@/lib/mes-format";
 import { getTransactionLabel as mesGetTransactionLabel } from "@/lib/mes-status";
 
 // LEGACY_COLORS 본문은 @/lib/mes/color 정본으로 이전됨 (Round-10A #3).
@@ -104,15 +103,6 @@ export function getStockState(quantity: number, minStock?: number | null) {
     return { label: "부족", color: LEGACY_COLORS.yellow };
   }
   return { label: "정상", color: LEGACY_COLORS.green };
-}
-
-/**
- * 호환 wrapper — 본문은 frontend/lib/mes-format.ts::formatQty 로 위임.
- * 39 곳 호출처를 한 번에 옮기지 않기 위해 본 export 는 유지한다.
- * 새 코드는 mes-format.formatQty 를 직접 import 하기를 권장.
- */
-export function formatNumber(value: number | string | null | undefined) {
-  return formatQty(value);
 }
 
 /**
