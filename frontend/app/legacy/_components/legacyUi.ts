@@ -267,10 +267,8 @@ export function transactionIconName(type: TransactionType | string): Transaction
   }
 }
 
-export function firstEmployeeLetter(name?: string | null) {
-  if (!name) return "?";
-  return name.trim().slice(0, 1);
-}
+// Round-10D #1: 본문 lib/mes/employee.ts 정본으로 이전. 호환 re-export 만 유지.
+export { firstEmployeeLetter } from "@/lib/mes/employee";
 
 export function buildItemSearchLabel(item: Item) {
   return `${item.erp_code} / ${item.item_name}`;
