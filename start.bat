@@ -38,9 +38,9 @@ rem main.py 의 Base.metadata.create_all 부작용을 제거했으므로,
 rem 신규 모델/컬럼 추가 시 idempotent 하게 반영하기 위해 schema + migrate 둘 다 실행.
 pushd "%~dp0backend"
 echo [ERP] Ensuring DB schema is up to date...
-py bootstrap_db.py --schema --migrate
+py bootstrap_db.py --schema --migrate --seed
 if errorlevel 1 (
-    echo [ERP] ERROR: bootstrap_db.py --schema --migrate failed. Aborting.
+    echo [ERP] ERROR: bootstrap_db.py --schema --migrate --seed failed. Aborting.
     popd
     pause
     exit /b 1

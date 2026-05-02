@@ -17,6 +17,7 @@ frontend/.vitest/
 *.db
 *.db-shm
 *.db-wal
+*.db.backup-*
 
 # Backend runtime logs (Phase 4)
 backend/logs/
