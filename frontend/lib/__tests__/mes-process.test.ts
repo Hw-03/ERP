@@ -5,6 +5,7 @@ import {
   processStageLabel,
   erpCodeDept,
   erpCodeDeptBadge,
+  displayPart,
 } from "../mes/process";
 
 describe("processStageLabel", () => {
@@ -54,6 +55,24 @@ describe("PROCESS_TO_DEPT", () => {
   it("covers 18 stage codes mapping to 6 부서", () => {
     expect(Object.keys(PROCESS_TO_DEPT).length).toBe(18);
     expect(new Set(Object.values(PROCESS_TO_DEPT)).size).toBe(6);
+  });
+});
+
+describe("displayPart", () => {
+  it("returns label for known parts", () => {
+    expect(displayPart("자재창고")).toBe("자재창고");
+    expect(displayPart("조립출하")).toBe("조립출하");
+    expect(displayPart("고압파트")).toBe("고압파트");
+  });
+
+  it("returns input as-is for unknown value", () => {
+    expect(displayPart("XXX")).toBe("XXX");
+  });
+
+  it("returns '-' for empty / null / undefined", () => {
+    expect(displayPart(undefined)).toBe("-");
+    expect(displayPart(null)).toBe("-");
+    expect(displayPart("")).toBe("-");
   });
 });
 

@@ -81,18 +81,8 @@ export function employeeColor(value?: string | null) {
   }
 }
 
-export function displayPart(value?: string | null) {
-  if (!value) return "-";
-  const labels: Record<string, string> = {
-    "자재창고": "자재창고",
-    "조립출하": "조립출하",
-    "고압파트": "고압파트",
-    "진공파트": "진공파트",
-    "튜닝파트": "튜닝파트",
-    "출하": "출하",
-  };
-  return labels[value] ?? value;
-}
+// Round-10E (#2): displayPart 본문은 @/lib/mes/process 정본으로 이전.
+export { displayPart } from "@/lib/mes/process";
 
 // Round-10E (#1): erpCodeDept / erpCodeDeptBadge 본문은 @/lib/mes/process 정본으로 이전.
 // erpCodeDeptBadge 의 default getColor=employeeColor 만 본 wrapper 에서 호환 보존

@@ -76,3 +76,23 @@ export function erpCodeDeptBadge(
   const color = getColor(dept);
   return { label: dept, color, bg: `color-mix(in srgb, ${color} 12%, transparent)` };
 }
+
+/**
+ * legacy_part 필드 → 표시용 라벨. 빈 입력은 "-", 미매핑은 입력 그대로.
+ *
+ * Round-10E (#2) 정본 이전. 현재 매핑 6항목은 모두 identity 변환이지만,
+ * 향후 별칭 (예: "조립" → "조립부") 추가 가능성 위해 분리 유지.
+ */
+export const LEGACY_PART_LABELS: Record<string, string> = {
+  "자재창고": "자재창고",
+  "조립출하": "조립출하",
+  "고압파트": "고압파트",
+  "진공파트": "진공파트",
+  "튜닝파트": "튜닝파트",
+  "출하": "출하",
+};
+
+export function displayPart(value?: string | null): string {
+  if (!value) return "-";
+  return LEGACY_PART_LABELS[value] ?? value;
+}
