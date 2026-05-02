@@ -3,7 +3,8 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
 import { DesktopRightPanel } from "./DesktopRightPanel";
-import { LEGACY_COLORS, erpCodeDept } from "./legacyUi";
+import { LEGACY_COLORS } from "./legacyUi";
+import { erpCodeDept } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
 import { useDepartments } from "./DepartmentsContext";
 import { InventoryKpiPanel, type KpiCard, type KpiFilter } from "./_inventory_sections/InventoryKpiPanel";

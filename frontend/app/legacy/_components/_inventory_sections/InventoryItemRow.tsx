@@ -3,10 +3,8 @@
 import { memo } from "react";
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import type { Item } from "@/lib/api";
-import {
-  LEGACY_COLORS,
-  erpCodeDept,
-} from "../legacyUi";
+import { LEGACY_COLORS } from "../legacyUi";
+import { erpCodeDept } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "../DepartmentsContext";

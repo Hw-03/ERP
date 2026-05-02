@@ -6,9 +6,9 @@ import { BottomSheet } from "@/features/mes/shared/BottomSheet";
 import { ItemDetailHistoryList } from "./ItemDetailHistoryList";
 import {
   LEGACY_COLORS,
-  erpCodeDeptBadge,
   transactionColor,
 } from "./legacyUi";
+import { erpCodeDeptBadge } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
 import { getTransactionLabel } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";

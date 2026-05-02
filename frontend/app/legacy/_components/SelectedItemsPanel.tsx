@@ -2,7 +2,8 @@
 
 import { X } from "lucide-react";
 import { type Item } from "@/lib/api";
-import { LEGACY_COLORS, erpCodeDeptBadge } from "./legacyUi";
+import { LEGACY_COLORS } from "./legacyUi";
+import { erpCodeDeptBadge } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "./DepartmentsContext";
