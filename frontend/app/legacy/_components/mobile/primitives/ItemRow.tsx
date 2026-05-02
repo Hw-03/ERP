@@ -5,11 +5,10 @@ import { Check } from "lucide-react";
 import type { Item } from "@/lib/api";
 import {
   erpCodeDeptBadge,
-  formatErpCode,
   getStockState,
   LEGACY_COLORS,
 } from "../../legacyUi";
-import { formatQty } from "@/lib/mes/format";
+import { formatErpCode, formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "../../DepartmentsContext";
 import { TYPO } from "../tokens";
 import { StatusBadge } from "./StatusBadge";
