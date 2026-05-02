@@ -16,6 +16,7 @@ import { useWarehouseWizardState } from "./_warehouse_hooks/useWarehouseWizardSt
 import { useWarehouseCompletionFeedback } from "./_warehouse_hooks/useWarehouseCompletionFeedback";
 import { useWarehouseData } from "./_warehouse_hooks/useWarehouseData";
 import { useWarehouseScroll } from "./_warehouse_hooks/useWarehouseScroll";
+import { useWarehouseDraft } from "./_warehouse_hooks/useWarehouseDraft";
 import { WarehouseHeader } from "./_warehouse_sections/WarehouseHeader";
 import { WarehouseStickySummary } from "./_warehouse_sections/WarehouseStickySummary";
 import { WarehouseCompletionOverlay } from "./_warehouse_sections/WarehouseCompletionOverlay";
@@ -34,7 +35,6 @@ import { readCurrentOperator } from "./login/useCurrentOperator";
 
 type SectionTab = "compose" | "cart" | "mine" | "queue";
 
-const AUTO_SAVE_DEBOUNCE_MS = 600;
 const AUTO_SAVE_LABEL: Record<"idle" | "saving" | "saved" | "error", string> = {
   idle: "",
   saving: "작업 저장 중...",
@@ -74,15 +74,10 @@ export function DesktopWarehouseView({
     (operator?.warehouse_role ?? "none") === "primary" ||
     (operator?.warehouse_role ?? "none") === "deputy";
 
-  // ─── 장바구니(DRAFT) 자동저장 ───
-  // 서버 DB 에 직원별 + request_type 별 미제출 요청 초안을 저장한다.
-  // 본 컴포넌트는 currentDraftId 만 추적하고, 본문은 모두 서버에 위임한다.
-  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
-  const [autoSaveStatus, setAutoSaveStatus] = useState<
-    "idle" | "saving" | "saved" | "error"
-  >("idle");
-  const restoringRef = useRef(false);
-  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ─── 장바구니(DRAFT) 자동저장 — Round-10A (#4) 에서 useWarehouseDraft 로 추출 ───
+  // currentDraftId / autoSaveStatus / restoringRef / autoSaveTimerRef 와
+  // autosave + restore 두 effect 는 본 hook 안에서 관리. 호출 위치는
+  // currentRequestType useMemo 다음 (필요한 deps 가 모두 정의된 시점).
 
   // 로그인된 직원 정보가 employees 로드 후에도 같은 ID이도록 보장
   useEffect(() => {
@@ -248,56 +243,17 @@ export function DesktopWarehouseView({
     [workType, rawDirection, warehouseDirection, deptDirection, defectiveSource],
   );
 
-  // ─── 장바구니 자동저장 (debounce) ───
-  // 패키지 출고는 selectedPackage 정보가 lines 만으로 복원 불가하므로 제외.
-  useEffect(() => {
-    if (restoringRef.current) return;
-    if (!operator || !selectedEmployee) return;
-    if (workType === "package-out") return;
-
-    const draftLines = buildStockRequestPayload({
-      workType,
-      rawDirection,
-      warehouseDirection,
-      deptDirection,
-      selectedDept,
-      defectiveSource,
-      entries: selectedEntries,
-      selectedPackage,
-      requesterEmployeeId: selectedEmployee.employee_id,
-      referenceNo,
-      notes,
-    }).lines;
-
-    // lines 가 없고 기존 draft 도 없으면 저장 스킵 (workType 전환 직후 ghost draft 방지).
-    if (draftLines.length === 0 && !currentDraftId) return;
-
-    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    autoSaveTimerRef.current = setTimeout(async () => {
-      if (restoringRef.current) return;
-      try {
-        setAutoSaveStatus("saving");
-        const draft = await api.upsertStockRequestDraft({
-          requester_employee_id: selectedEmployee.employee_id,
-          request_type: currentRequestType,
-          reference_no: referenceNo || null,
-          notes: notes || null,
-          lines: draftLines,
-        });
-        setCurrentDraftId(draft.request_id);
-        setAutoSaveStatus("saved");
-      } catch {
-        setAutoSaveStatus("error");
-      }
-    }, AUTO_SAVE_DEBOUNCE_MS);
-
-    return () => {
-      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    operator?.employee_id,
-    selectedEmployee?.employee_id,
+  // ─── 장바구니 autosave / 복원 (Round-10A #4 에서 hook 으로 추출) ───
+  const {
+    currentDraftId,
+    setCurrentDraftId,
+    autoSaveStatus,
+    setAutoSaveStatus,
+    restoringRef,
+    autoSaveTimerRef,
+  } = useWarehouseDraft({
+    operator,
+    selectedEmployee,
     workType,
     rawDirection,
     warehouseDirection,
@@ -309,67 +265,13 @@ export function DesktopWarehouseView({
     notes,
     referenceNo,
     currentRequestType,
-  ]);
-
-  // ─── 작업유형 변경 시 해당 request_type 의 draft 복원 ───
-  // 없으면 currentDraftId 를 반드시 null 로 초기화 (stale id 로 다른 유형 draft 가 submit 되는 사고 방지).
-  useEffect(() => {
-    if (sectionTab !== "compose") return;
-    if (!operator || !selectedEmployee) return;
-    if (workType === "package-out") {
-      setCurrentDraftId(null);
-      setAutoSaveStatus("idle");
-      return;
-    }
-
-    let cancelled = false;
-    api
-      .getStockRequestDraft(selectedEmployee.employee_id, currentRequestType)
-      .then((draft) => {
-        if (cancelled) return;
-        if (!draft) {
-          setSelectedItems(new Map());
-          setSelectedPackage(null);
-          setNotes("");
-          setReferenceNo("");
-          setCurrentDraftId(null);
-          setAutoSaveStatus("idle");
-          restoringRef.current = false;
-          return;
-        }
-        // 복원 동안 autosave 재발동 차단.
-        restoringRef.current = true;
-        if (autoSaveTimerRef.current) {
-          clearTimeout(autoSaveTimerRef.current);
-          autoSaveTimerRef.current = null;
-        }
-        const restored = draftToFormState(draft);
-        if (restored) {
-          setSelectedItems(new Map(restored.selectedItems));
-          setNotes(restored.notes);
-          setReferenceNo(restored.referenceNo);
-        }
-        setCurrentDraftId(draft.request_id);
-        setAutoSaveStatus("saved");
-        setTimeout(() => {
-          restoringRef.current = false;
-        }, 0);
-      })
-      .catch(() => {
-        if (!cancelled) restoringRef.current = false;
-      });
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
     sectionTab,
-    operator?.employee_id,
-    selectedEmployee?.employee_id,
-    currentRequestType,
-    workType,
-  ]);
+    selectedEntries,
+    setSelectedItems,
+    setSelectedPackage,
+    setNotes,
+    setReferenceNo,
+  });
 
   // ─── 장바구니 → "이어서 작성" 핸들러 ───
   const handleContinueDraft = useCallback(
@@ -404,7 +306,8 @@ export function DesktopWarehouseView({
         restoringRef.current = false;
       }, 0);
     },
-    [wizard],
+    // wizard 외 나머지(setter/ref) 는 React 가 stable 보장 — useCallback 재생성 없음.
+    [wizard, autoSaveTimerRef, restoringRef, setAutoSaveStatus, setCurrentDraftId],
   );
 
   // ─── 단일 통합 제출: /api/stock-requests 한 번 호출 ───
