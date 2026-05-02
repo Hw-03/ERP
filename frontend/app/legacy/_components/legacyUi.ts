@@ -1,5 +1,22 @@
 "use client";
 
+/**
+ * legacyUi.ts — DEXCOWIN MES legacy UI 의존 모듈 (정리 완료 후 잔존 부서 의존 함수만 보유).
+ *
+ * Round-10A~D 에서 LEGACY_COLORS / formatErpCode / optionColor / transactionIconName /
+ * processStageLabel / getStockState / firstEmployeeLetter 등 도메인 무관 함수를
+ * `@/lib/mes/*` 정본으로 모두 이전.
+ *
+ * Round-10E 에서 erpCodeDept / erpCodeDeptBadge / displayPart / LEGACY_FILE_TYPES /
+ * LEGACY_PARTS / LEGACY_MODELS / buildItemSearchLabel / normalizeModel / itemMatchesKpi /
+ * groupedItems (Item 도메인 8 항목) 정본 이전 + 호출처 직접 import 마이그레이션 완료 후
+ * 본 파일의 wrapper 일괄 삭제.
+ *
+ * 본 파일에 남은 함수는 모두 **부서명 정규화 충돌 (DEPARTMENT_LABELS["연구"]="연구소"
+ * vs mes-department alias) 의존** — Round-10F 에서 정책 통일 후 `@/lib/mes/department`
+ * 와 `@/lib/mes/color` 로 흡수 예정.
+ */
+
 import type { TransactionType } from "@/lib/api";
 
 // LEGACY_COLORS 본문은 @/lib/mes/color 정본으로 이전됨 (Round-10A #3).
@@ -7,7 +24,8 @@ import type { TransactionType } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 export { LEGACY_COLORS };
 
-// DepartmentEnum.value (str enum) 기준 — DB/API에서 "조립", "고압" 등이 그대로 반환됨
+// DepartmentEnum.value (str enum) 기준 — DB/API에서 "조립", "고압" 등이 그대로 반환됨.
+// "연구"→"연구소" 정규화는 화면 표시용 alias (Round-10F 에서 정책 통일 예정).
 export const DEPARTMENT_LABELS: Record<string, string> = {
   "조립": "조립",
   "고압": "고압",
@@ -34,9 +52,6 @@ export const DEPARTMENT_ICONS: Record<string, string> = {
   "기타": "기",
 };
 
-// Round-10E (#3): legacy 재고 필터 옵션 상수는 @/lib/mes/inventory 정본으로 이전.
-export { LEGACY_FILE_TYPES, LEGACY_PARTS, LEGACY_MODELS } from "@/lib/mes/inventory";
-
 export function normalizeDepartment(value?: string | null) {
   if (!value) return "기타";
   return DEPARTMENT_LABELS[value] ?? value;
@@ -50,8 +65,7 @@ export function normalizeDepartment(value?: string | null) {
  * 본 switch 의 case "연구" 가 hit 되지 않아 기존 코드는 default slate 를 반환한다.
  * mes-department 의 별칭 매핑("연구소"→"연구") 과 충돌하므로 본 함수는 본문 유지.
  *
- * 통합은 별도 작업으로 분리: docs/research/2026-05-04-transaction-type-drift.md 와 함께
- * 부서명 정규화 정책을 통일한 뒤 wrapper 화한다.
+ * 통합은 별도 작업으로 분리: Round-10F 에서 부서명 정규화 정책을 통일한 뒤 wrapper 화.
  */
 export function employeeColor(value?: string | null) {
   switch (normalizeDepartment(value)) {
@@ -78,26 +92,6 @@ export function employeeColor(value?: string | null) {
     default:
       return "#475569"; // slate-600
   }
-}
-
-// Round-10E (#2): displayPart 본문은 @/lib/mes/process 정본으로 이전.
-export { displayPart } from "@/lib/mes/process";
-
-// Round-10E (#1): erpCodeDept / erpCodeDeptBadge 본문은 @/lib/mes/process 정본으로 이전.
-// erpCodeDeptBadge 의 default getColor=employeeColor 만 본 wrapper 에서 호환 보존
-// (정본 모듈은 require parameter — 활성 호출처는 모두 useDeptColorLookup() 명시 전달).
-import {
-  erpCodeDept as erpCodeDeptCanonical,
-  erpCodeDeptBadge as erpCodeDeptBadgeCanonical,
-} from "@/lib/mes/process";
-
-export const erpCodeDept = erpCodeDeptCanonical;
-
-export function erpCodeDeptBadge(
-  erp_code?: string | null,
-  getColor: (name?: string | null) => string = employeeColor,
-) {
-  return erpCodeDeptBadgeCanonical(erp_code, getColor);
 }
 
 export function transactionColor(type: TransactionType) {
@@ -132,12 +126,3 @@ export function transactionColor(type: TransactionType) {
       return LEGACY_COLORS.muted2;
   }
 }
-
-// Round-10E (#6/7/8): Item 도메인 4 함수 (buildItemSearchLabel / normalizeModel /
-// itemMatchesKpi / groupedItems) 본문은 @/lib/mes/item 정본으로 이전.
-export {
-  buildItemSearchLabel,
-  normalizeModel,
-  itemMatchesKpi,
-  groupedItems,
-} from "@/lib/mes/item";
