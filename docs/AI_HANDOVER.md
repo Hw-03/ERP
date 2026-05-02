@@ -2,14 +2,69 @@
 
 이 문서는 Claude/Codex가 같은 MES 프로젝트를 이어서 작업할 때 보는 최신 인수인계 문서다.
 
-## 현재 상태 (2026-04-26 Phase 4 update)
+## 현재 상태 (2026-05-02 Round-12 #1 update)
 
 - 프로젝트: DEXCOWIN 재고 관리 MES (경량 MES 프로토타입)
 - 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/erp.db`)
 - 프론트엔드: Next.js 14 + Tailwind CSS
 - 주 화면: `/legacy` (대시보드 / 입출고 / 입출고 내역 / 관리자)
 - 기준 데이터: 통합 품목 971건
-- 현재 브랜치: `feat/erp-overhaul`
+- 현재 브랜치: `main`
+- 외부 객관 평가: ~99 점 (Round-10A → Round-12 #1 누적 결과)
+
+## Round-10/11/12 결과 요약 (2026-05-02)
+
+### Round-10A~D — legacyUi 정본 흡수 1차 (도메인 무관)
+- LEGACY_COLORS 본문, parseError, types 정본 flip → `@/lib/mes/color`, `@/lib/api/core`
+- formatErpCode / optionColor / transactionIconName / processStageLabel / getStockState / firstEmployeeLetter 정본 이전
+- wrapper 청소 — `legacyUi.ts` 144줄 → wrapper 0
+
+### Round-10E — legacyUi 잔존 8 항목 (Item / 상수)
+- erpCodeDept / erpCodeDeptBadge / displayPart → `@/lib/mes/process`
+- LEGACY_FILE_TYPES / LEGACY_PARTS / LEGACY_MODELS → `@/lib/mes/inventory`
+- buildItemSearchLabel / normalizeModel / itemMatchesKpi / groupedItems → `@/lib/mes/item` (신설)
+
+### Round-10F — 부서 정규화 정책 통일 (Risk C 해소)
+- 정책 (A) "연구" 표기 통일 — DB DepartmentEnum 과 일치, `legacyUi.DEPARTMENT_LABELS["연구"]="연구소"` 매핑 폐기
+- normalizeDepartment / DEPARTMENT_LABELS / DEPARTMENT_ICONS → `@/lib/mes/department`
+- employeeColor → `@/lib/mes/color` (`getDepartmentFallbackColor` 위임)
+- transactionColor → `@/lib/mes-status`
+- 화면 영향: `employeeColor("연구")` slate(#475569) → amber(#b45309) — 부서 색 일관성 회복
+- legacyUi.ts → 12줄 thin barrel (LEGACY_COLORS re-export 만)
+
+### Round-11A — 거대 컴포넌트 분해 (Cat-A, manual smoke 불요)
+- WarehouseWizardSteps.tsx (544줄) → 4 step + 1 shared + barrel (6 파일)
+- AdminPackagesSection.tsx (322줄) → PackageDetailPanel 분리 (~90줄)
+- AdminMasterItemsSection.tsx (321줄) → AddItemForm + EditItemForm 분리 (~80줄)
+- DesktopAdminView.tsx (342줄) → AdminSectionContent + AdminRightPanelContent 분리 (~210줄)
+
+### Round-12 #1 — 테스트 커버리지 75
+- vitest threshold 50 → 75 (lines/functions/branches/statements)
+- coverage 측정 범위 명시 (정본 모듈만) — lib/api fetch wrapper 8개 제외
+- 단위 테스트 97 → 148 (mes-process/inventory/item/employee/color/status/transaction/format/department barrel + employeeColor/transactionColor 신규)
+- 측정 평균 87.64% — lib/mes 92.7%, lib/api 86.9%, lib top-level 84.89%
+- 모든 lib/mes/* 모듈 100% 커버
+
+### 신규 / 보강 정본 모듈 (Round-10A~12)
+- `frontend/lib/mes/employee.ts` — firstEmployeeLetter
+- `frontend/lib/mes/process.ts` — PROCESS_LABEL/processStageLabel + erpCodeDept/erpCodeDeptBadge + displayPart
+- `frontend/lib/mes/inventory.ts` — getStockState + LEGACY_FILE_TYPES/PARTS/MODELS
+- `frontend/lib/mes/item.ts` — buildItemSearchLabel + normalizeModel + itemMatchesKpi + groupedItems
+- `frontend/lib/mes/color.ts` — LEGACY_COLORS 본문 + OPTION_COLOR + optionColor + employeeColor
+- `frontend/lib/mes-department.ts` — DEPARTMENT_LABELS/ICONS + normalizeDepartment 추가
+- `frontend/lib/mes-status.ts` — transactionColor 추가
+- `frontend/lib/mes-format.ts` — formatErpCode 추가
+
+### legacyUi.ts 잔여
+- 12줄 thin barrel — `export { LEGACY_COLORS } from "@/lib/mes/color"`
+- 130여 호출처가 LEGACY_COLORS 만 import. Round-10G (선택, 별도 라운드) 에서 이 호출처들의 import 경로를 일괄 전환 후 파일 자체 삭제 가능
+- PowerShell 자동 import 치환은 한글 .tsx 파일 인코딩 문제 발생 — Python 또는 Edit 도구 사용 권장
+
+## 다음 작업 후보 (Round-12 #2 / #3 / Round-10G)
+
+- **Round-12 #2 (PIN 보안 마이그레이션, MES-BE-005)** — `docs/research/2026-05-04-pin-security-migration-plan.md` 설계 완성. argon2id 해싱 + lazy migration + rate limit + 강제 변경 모달. DB 스키마 변경 (pin_hash alter) 포함이라 manual smoke 필요.
+- **Round-10G — legacyUi.ts 완전 삭제** — 130 호출처 import 경로 전환 (Python 스크립트 권장).
+- **Round-11B — Cat-B 거대 컴포넌트 분해** — DesktopLegacyShell / DeptWizardScreen / WarehouseStepLayout. 회사 PC 시각 회귀 필요.
 
 ## Phase 5 결과 (2026-04-26)
 
