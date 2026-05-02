@@ -1,14 +1,14 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState } from "react";
-import { CheckSquare, Filter, History, PackageSearch, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CheckSquare, Filter, History, PackageSearch } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { ItemDetailSheet } from "../../ItemDetailSheet";
-import { LEGACY_COLORS, getStockState } from "../../legacyUi";
+import { LEGACY_COLORS } from "../../legacyUi";
 import { formatQty } from "@/lib/mes/format";
 import { ELEVATION, TYPO } from "../tokens";
-import { useItems } from "../hooks/useItems";
 import { useModels } from "../hooks/useModels";
+import { useInventoryListData } from "../../_inventory_hooks/useInventoryListData";
 import type { ToastState } from "@/features/mes/shared/Toast";
 import {
   AsyncState,
@@ -29,12 +29,7 @@ import {
   countActiveFilters,
   type InventoryFilters,
 } from "./InventoryFilterSheet";
-
-const R_SUFFIX = (code: string | null) => code?.endsWith("R") ?? false;
-const A_SUFFIX = (code: string | null) => code?.endsWith("A") ?? false;
-const F_SUFFIX = (code: string | null) => code?.endsWith("F") ?? false;
-
-type DisplayRow = { key: string; item: Item; quantity: number; available: number; count: number };
+import { InventorySelectionBanner } from "./_inventory_parts/InventorySelectionBanner";
 
 export function InventoryScreen({
   showToast,
@@ -52,68 +47,9 @@ export function InventoryScreen({
   const [selecting, setSelecting] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
 
-  const deferredSearch = useDeferredValue(search);
   const { models } = useModels();
-
-  const { items, loading, error, hasMore, loadMore, refetch } = useItems({
-    search: deferredSearch,
-    department: filters.department,
-    legacyModel: filters.legacyModel,
-  });
-
-  const filtered = useMemo(() => {
-    return items.filter((item) => {
-      const avail = Number(item.available_quantity ?? item.quantity);
-      const min = item.min_stock == null ? null : Number(item.min_stock);
-      if (filters.kpi === "OK" && !(avail > 0 && !(min != null && avail < min))) return false;
-      if (filters.kpi === "LOW" && !(avail > 0 && min != null && avail < min)) return false;
-      if (filters.kpi === "ZERO" && !(avail <= 0)) return false;
-      if (filters.itemType === "RM" && !R_SUFFIX(item.process_type_code)) return false;
-      if (filters.itemType === "SEMI" && !A_SUFFIX(item.process_type_code)) return false;
-      if (filters.itemType === "FIXED" && !F_SUFFIX(item.process_type_code)) return false;
-      return true;
-    });
-  }, [items, filters.kpi, filters.itemType]);
-
-  const rows: DisplayRow[] = useMemo(() => {
-    if (!filters.grouped) {
-      return filtered.map((item) => ({
-        key: item.item_id,
-        item,
-        quantity: Number(item.quantity),
-        available: Number(item.available_quantity ?? item.quantity),
-        count: 1,
-      }));
-    }
-    const map = new Map<string, DisplayRow>();
-    filtered.forEach((item) => {
-      const key = item.item_name.trim().toLowerCase();
-      const q = Number(item.quantity);
-      const a = Number(item.available_quantity ?? item.quantity);
-      const prev = map.get(key);
-      if (prev) {
-        prev.quantity += q;
-        prev.available += a;
-        prev.count += 1;
-      } else {
-        map.set(key, { key, item, quantity: q, available: a, count: 1 });
-      }
-    });
-    return Array.from(map.values());
-  }, [filtered, filters.grouped]);
-
-  const totals = useMemo(() => {
-    const normal = rows.filter((r) => {
-      const min = r.item.min_stock == null ? null : Number(r.item.min_stock);
-      return getStockState(r.available, min).label === "정상";
-    }).length;
-    const low = rows.filter((r) => {
-      const min = r.item.min_stock == null ? null : Number(r.item.min_stock);
-      return getStockState(r.available, min).label === "부족";
-    }).length;
-    const zero = rows.filter((r) => r.available <= 0).length;
-    return { count: rows.length, normal, low, zero };
-  }, [rows]);
+  const { items, loading, error, hasMore, loadMore, refetch, rows, totals } =
+    useInventoryListData(search, filters);
 
   const activeFilterCount = countActiveFilters(filters);
   const activeChips = useMemo(
@@ -153,48 +89,10 @@ export function InventoryScreen({
         }}
       >
         {selecting ? (
-          <div
-            className="flex items-center justify-between gap-3 px-4 py-3"
-            style={{
-              background: `${LEGACY_COLORS.blue as string}14`,
-              borderBottom: `1px solid ${LEGACY_COLORS.blue as string}44`,
-            }}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <span
-                className="inline-flex h-6 w-6 items-center justify-center rounded-full"
-                style={{ background: LEGACY_COLORS.blue }}
-              >
-                <CheckSquare size={13} strokeWidth={2.5} color="#fff" />
-              </span>
-              <div className="min-w-0">
-                <div
-                  className={`${TYPO.overline} font-bold uppercase tracking-[2px]`}
-                  style={{ color: LEGACY_COLORS.blue }}
-                >
-                  선택 모드
-                </div>
-                <div
-                  className={`${TYPO.body} font-black tabular-nums`}
-                  style={{ color: LEGACY_COLORS.text }}
-                >
-                  {checkedItems.length}개 선택됨
-                </div>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={exitSelecting}
-              className={`${TYPO.caption} flex items-center gap-1 rounded-full border px-3 py-[6px] font-semibold active:scale-95`}
-              style={{
-                background: LEGACY_COLORS.s2,
-                borderColor: LEGACY_COLORS.border,
-                color: LEGACY_COLORS.text,
-              }}
-            >
-              <X size={13} /> 취소
-            </button>
-          </div>
+          <InventorySelectionBanner
+            selectedCount={checkedItems.length}
+            onCancel={exitSelecting}
+          />
         ) : (
           <div className="flex flex-col gap-3 px-4 pt-3 pb-3">
             <div className="flex items-center gap-2">
