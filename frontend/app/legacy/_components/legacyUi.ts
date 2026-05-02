@@ -159,16 +159,9 @@ export function erpCodeDeptBadge(
   return { label: dept, color, bg: `color-mix(in srgb, ${color} 12%, transparent)` };
 }
 
-const OPTION_COLOR: Record<string, string> = {
-  BG: "#60a5fa",
-  WM: "#f97316",
-  SV: "#a3a3a3",
-};
-
-export function optionColor(code?: string | null): string {
-  if (!code) return LEGACY_COLORS.muted2;
-  return OPTION_COLOR[code] ?? LEGACY_COLORS.muted2;
-}
+// Round-10D #3: optionColor 본문 lib/mes/color.ts 정본으로 이전.
+// OPTION_COLOR 는 본 파일에서 export 한 적 없음 — wrapper 만 노출.
+export { optionColor } from "@/lib/mes/color";
 
 export function transactionColor(type: TransactionType) {
   switch (type) {

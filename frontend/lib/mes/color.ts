@@ -3,7 +3,7 @@
  *
  * Round-5 (R5-7) 신설. 색상 상수 / 부서 색상 진입점 통합.
  * Round-10A (#3) 정본 flip — LEGACY_COLORS 본문이 본 파일로 이전됐다.
- * legacyUi.ts 는 이제 본 파일에서 re-export.
+ * Round-10D (#3) — OPTION_COLOR/optionColor 정본 이전.
  *
  * 새 코드는 `@/lib/mes/color` 또는 `@/lib/mes` barrel 사용.
  */
@@ -37,3 +37,20 @@ export const LEGACY_COLORS = {
   muted2: "var(--c-muted2)",
   panelGlow: "var(--c-panel-glow)",
 } as const;
+
+/**
+ * 옵션 코드 (BG/WM/SV) → 색상 매핑.
+ */
+export const OPTION_COLOR: Record<string, string> = {
+  BG: "#60a5fa",
+  WM: "#f97316",
+  SV: "#a3a3a3",
+};
+
+/**
+ * 옵션 코드의 색상 반환. 미매핑 또는 빈 입력 시 muted 색상 fallback.
+ */
+export function optionColor(code?: string | null): string {
+  if (!code) return LEGACY_COLORS.muted2;
+  return OPTION_COLOR[code] ?? LEGACY_COLORS.muted2;
+}
