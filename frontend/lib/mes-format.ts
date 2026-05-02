@@ -67,6 +67,23 @@ export function formatDate(value: string | null | undefined): string {
 }
 
 /**
+ * ERP 코드 표시 포맷 — "DX3000-AA-007" → "DX3000-AA-7" (compact).
+ *   - compact=true (기본): 3번째 segment 의 leading zero 제거 ("0" 자체는 유지).
+ *   - compact=false: 입력 그대로.
+ *   - 빈 입력: null 반환 (formatQty/formatDate 와 달리 placeholder "-" 반환 안 함 — 호출측 분기).
+ *   - segment 가 3개 미만: 입력 그대로.
+ */
+export function formatErpCode(code?: string | null, compact = true): string | null {
+  if (!code) return null;
+  if (!compact) return code;
+  const parts = code.split("-");
+  if (parts.length < 3) return code;
+  const stripped = [...parts];
+  stripped[2] = stripped[2].replace(/^0+(\d)/, "$1") || "0";
+  return stripped.join("-");
+}
+
+/**
  * 퍼센트 — 0.123 또는 12.3 형태 모두 입력 받음.
  *   - |value| <= 1 이면 비율로 보고 ×100
  *   - 그 외엔 이미 퍼센트 단위로 본다

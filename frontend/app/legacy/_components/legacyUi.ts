@@ -104,15 +104,8 @@ export function getStockState(quantity: number, minStock?: number | null) {
   return { label: "정상", color: LEGACY_COLORS.green };
 }
 
-export function formatErpCode(code?: string | null, compact = true): string | null {
-  if (!code) return null;
-  if (!compact) return code;
-  const parts = code.split("-");
-  if (parts.length < 3) return code;
-  const stripped = [...parts];
-  stripped[2] = stripped[2].replace(/^0+(\d)/, "$1") || "0";
-  return stripped.join("-");
-}
+// Round-10D #2: 본문 lib/mes-format.ts 정본으로 이전. 호환 re-export 만 유지.
+export { formatErpCode } from "@/lib/mes-format";
 
 const PROCESS_LABEL: Record<string, string> = {
   TR: "Tube Raw",
