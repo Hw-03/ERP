@@ -5,6 +5,8 @@ import {
   getDepartmentInitial,
   normalizeDepartmentName,
   LEGACY_COLORS,
+  OPTION_COLOR,
+  optionColor,
 } from "../mes/color";
 
 describe("mes/color barrel — department exports", () => {
@@ -43,5 +45,20 @@ describe("mes/color barrel — LEGACY_COLORS", () => {
     expect(LEGACY_COLORS.red).toBe("var(--c-red)");
     expect(LEGACY_COLORS.muted).toBe("var(--c-muted)");
     expect(LEGACY_COLORS.muted2).toBe("var(--c-muted2)");
+  });
+});
+
+describe("optionColor", () => {
+  it("returns mapped color for known codes", () => {
+    expect(optionColor("BG")).toBe(OPTION_COLOR.BG);
+    expect(optionColor("WM")).toBe(OPTION_COLOR.WM);
+    expect(optionColor("SV")).toBe(OPTION_COLOR.SV);
+  });
+
+  it("falls back to muted2 for unknown / empty input", () => {
+    expect(optionColor("UNKNOWN")).toBe(LEGACY_COLORS.muted2);
+    expect(optionColor("")).toBe(LEGACY_COLORS.muted2);
+    expect(optionColor(null)).toBe(LEGACY_COLORS.muted2);
+    expect(optionColor(undefined)).toBe(LEGACY_COLORS.muted2);
   });
 });

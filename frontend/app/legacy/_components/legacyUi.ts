@@ -107,31 +107,9 @@ export function getStockState(quantity: number, minStock?: number | null) {
 // Round-10D #2: 본문 lib/mes-format.ts 정본으로 이전. 호환 re-export 만 유지.
 export { formatErpCode } from "@/lib/mes-format";
 
-const PROCESS_LABEL: Record<string, string> = {
-  TR: "Tube Raw",
-  TA: "Tube Ass'y",
-  TF: "Tube Final",
-  HR: "High-v Raw",
-  HA: "High-v Ass'y",
-  HF: "High-v Final",
-  VR: "Vacuum Raw",
-  VA: "Vacuum Ass'y",
-  VF: "Vacuum Final",
-  NR: "Neck Raw",
-  NA: "Neck Ass'y",
-  NF: "Neck Final",
-  AR: "Assembly Raw",
-  AA: "Assembly",
-  AF: "Assembly Final",
-  PR: "Pack Raw",
-  PA: "Packaging",
-  PF: "Pack Final",
-};
-
-export function processStageLabel(code?: string | null): string {
-  if (!code) return "-";
-  return PROCESS_LABEL[code] ?? code;
-}
+// Round-10D #5: PROCESS_LABEL/processStageLabel 본문 lib/mes/process.ts 정본으로 이전.
+// PROCESS_LABEL 은 본 파일에서 외부 export 한 적 없어 wrapper 만 노출.
+export { processStageLabel } from "@/lib/mes/process";
 
 const PROCESS_TO_DEPT: Record<string, string> = {
   TR: "튜브", TA: "튜브", TF: "튜브",
