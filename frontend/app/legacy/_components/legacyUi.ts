@@ -4,25 +4,10 @@ import type { Item, TransactionType } from "@/lib/api";
 import { formatQty } from "@/lib/mes-format";
 import { getTransactionLabel as mesGetTransactionLabel } from "@/lib/mes-status";
 
-export const LEGACY_COLORS = {
-  bg: "var(--c-bg)",
-  s1: "var(--c-s1)",
-  s2: "var(--c-s2)",
-  s3: "var(--c-s3)",
-  s4: "var(--c-s4)",
-  border: "var(--c-border)",
-  borderStrong: "var(--c-border-strong)",
-  blue: "var(--c-blue)",
-  green: "var(--c-green)",
-  red: "var(--c-red)",
-  yellow: "var(--c-yellow)",
-  purple: "var(--c-purple)",
-  cyan: "var(--c-cyan)",
-  text: "var(--c-text)",
-  muted: "var(--c-muted)",
-  muted2: "var(--c-muted2)",
-  panelGlow: "var(--c-panel-glow)",
-} as const;
+// LEGACY_COLORS 본문은 @/lib/mes/color 정본으로 이전됨 (Round-10A #3).
+// 본 파일 내부 함수들이 직접 참조하므로 import 후 re-export.
+import { LEGACY_COLORS } from "@/lib/mes/color";
+export { LEGACY_COLORS };
 
 // DepartmentEnum.value (str enum) 기준 — DB/API에서 "조립", "고압" 등이 그대로 반환됨
 export const DEPARTMENT_LABELS: Record<string, string> = {

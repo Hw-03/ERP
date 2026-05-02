@@ -2,11 +2,8 @@
  * MES 색상 토큰 — `@/lib/mes/color`.
  *
  * Round-5 (R5-7) 신설. 색상 상수 / 부서 색상 진입점 통합.
- *
- * 흡수 대상:
- *   - LEGACY_COLORS (legacyUi.ts) — CSS variable 기반 토큰
- *   - MES_DEPARTMENT_COLORS (mes-department.ts) — 부서 fallback
- *   - getDepartmentFallbackColor (mes-department.ts) — 단일 호출 진입점
+ * Round-10A (#3) 정본 flip — LEGACY_COLORS 본문이 본 파일로 이전됐다.
+ * legacyUi.ts 는 이제 본 파일에서 re-export.
  *
  * 새 코드는 `@/lib/mes/color` 또는 `@/lib/mes` barrel 사용.
  */
@@ -17,6 +14,26 @@ export {
   normalizeDepartmentName,
 } from "../mes-department";
 
-// LEGACY_COLORS 는 legacyUi.ts 정본 — 호환 위해 re-export.
-// 새 코드는 `@/lib/mes/color` 에서 LEGACY_COLORS 참조 가능.
-export { LEGACY_COLORS } from "@/app/legacy/_components/legacyUi";
+/**
+ * 디자인시스템 CSS 변수 토큰 17종 — light/dark 테마에서 자동 전환.
+ * 컴포넌트는 inline `style={{ background: LEGACY_COLORS.s1 }}` 형태로 참조.
+ */
+export const LEGACY_COLORS = {
+  bg: "var(--c-bg)",
+  s1: "var(--c-s1)",
+  s2: "var(--c-s2)",
+  s3: "var(--c-s3)",
+  s4: "var(--c-s4)",
+  border: "var(--c-border)",
+  borderStrong: "var(--c-border-strong)",
+  blue: "var(--c-blue)",
+  green: "var(--c-green)",
+  red: "var(--c-red)",
+  yellow: "var(--c-yellow)",
+  purple: "var(--c-purple)",
+  cyan: "var(--c-cyan)",
+  text: "var(--c-text)",
+  muted: "var(--c-muted)",
+  muted2: "var(--c-muted2)",
+  panelGlow: "var(--c-panel-glow)",
+} as const;
