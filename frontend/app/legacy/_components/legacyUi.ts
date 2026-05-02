@@ -94,30 +94,21 @@ export function displayPart(value?: string | null) {
   return labels[value] ?? value;
 }
 
-const PROCESS_TO_DEPT: Record<string, string> = {
-  TR: "튜브", TA: "튜브", TF: "튜브",
-  HR: "고압", HA: "고압", HF: "고압",
-  VR: "진공", VA: "진공", VF: "진공",
-  NR: "튜닝", NA: "튜닝", NF: "튜닝",
-  AR: "조립", AA: "조립", AF: "조립",
-  PR: "출하", PA: "출하", PF: "출하",
-};
+// Round-10E (#1): erpCodeDept / erpCodeDeptBadge 본문은 @/lib/mes/process 정본으로 이전.
+// erpCodeDeptBadge 의 default getColor=employeeColor 만 본 wrapper 에서 호환 보존
+// (정본 모듈은 require parameter — 활성 호출처는 모두 useDeptColorLookup() 명시 전달).
+import {
+  erpCodeDept as erpCodeDeptCanonical,
+  erpCodeDeptBadge as erpCodeDeptBadgeCanonical,
+} from "@/lib/mes/process";
 
-export function erpCodeDept(erp_code?: string | null): string | null {
-  if (!erp_code) return null;
-  const parts = erp_code.split("-");
-  if (parts.length < 2) return null;
-  return PROCESS_TO_DEPT[parts[1]] ?? null;
-}
+export const erpCodeDept = erpCodeDeptCanonical;
 
 export function erpCodeDeptBadge(
   erp_code?: string | null,
   getColor: (name?: string | null) => string = employeeColor,
-): { label: string; color: string; bg: string } | null {
-  const dept = erpCodeDept(erp_code);
-  if (!dept) return null;
-  const color = getColor(dept);
-  return { label: dept, color, bg: `color-mix(in srgb, ${color} 12%, transparent)` };
+) {
+  return erpCodeDeptBadgeCanonical(erp_code, getColor);
 }
 
 export function transactionColor(type: TransactionType) {
