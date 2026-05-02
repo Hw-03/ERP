@@ -2,6 +2,8 @@
 
 DEXCOWIN의 품목, 재고, BOM, 입출고를 관리하는 경량 MES 프로토타입.
 
+**현재 안정성 점수**: ~96/100 (Round-10A 완료, 2026-05-02). 세부 추적: [docs/CODEX_PROGRESS.md](docs/CODEX_PROGRESS.md)
+
 ## 현재 기준
 
 - 기준 품목 수: 722건
@@ -106,14 +108,21 @@ ERP/
 │   ├── erp.db            기준 스냅샷 (722 품목, 정리본 기준)
 │   └── requirements.txt
 ├── frontend/             Next.js 14 · Tailwind
-│   └── app/legacy/       현재 활성 셸 (대시보드/입출고/내역/관리자)
+│   ├── app/legacy/       현재 활성 셸 (대시보드/입출고/내역/관리자)
+│   ├── features/mes/     MES feature 정본 (shared 부품 등) — 신규 import 대상
+│   └── lib/
+│       ├── api/          13 도메인 모듈 (admin/catalog/.../stock-requests)
+│       │   └── types/    도메인별 type 정본 (Round-10A #2)
+│       ├── api-core.ts   fetch 헬퍼 (postJson/putJson/deleteJson/parseError)
+│       └── mes/          MES 디자인시스템 (color/format/status/...)
 ├── data/                 입력 자료 (xlsx · csv)
 ├── docs/                 기준 · 운영 · 구조 · 인수인계
+│   ├── openapi.json      FastAPI baseline (CI drift 검사 기준)
 │   └── research/         외부 연구 보고서
 ├── scripts/              보조 스크립트
 │   ├── ops/              백업 · 헬스체크 · 재고 정합
 │   ├── migrations/       DB 스키마 / 코드 정제
-│   └── dev/              개발 보조 · 일회성 임포트
+│   └── dev/              verify_local.ps1 등 개발 보조
 ├── docker/               컨테이너 정의 (선택)
 ├── _archive/, _backup/   보관용 — 작업 대상 아님
 ├── start.bat             통합 실행 (Windows)
@@ -141,14 +150,26 @@ ERP/
 
 ## 검증
 
+### 5게이트 일괄 검증 (commit 전 권장)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
+```
+
+backend pytest / frontend lint:strict / tsc / vitest+coverage / next build / OpenAPI drift 를 CI 와 동일 기준으로 검사. coverage threshold 50/50/50/50.
+
+### 개별 검증
+
 ```bash
 # 백엔드
 python -m compileall backend
+cd backend && pytest -q
 
 # 프론트
 cd frontend
-npm run lint
+npm run lint:strict
 npx tsc --noEmit
+npm run test:coverage
 npm run build
 ```
 
@@ -160,3 +181,16 @@ GET  /api/items
 GET  /api/inventory/summary
 GET  /api/production/capacity
 ```
+
+### API 변경 시 OpenAPI baseline 갱신
+
+backend 라우터/스키마 수정 시 `docs/openapi.json` 갱신 필수 (CI drift 검사):
+
+```bash
+cd backend
+python -c "from app.main import app; import json; \
+  open('../docs/openapi.json','w',encoding='utf-8').write(\
+  json.dumps(app.openapi(),indent=2,sort_keys=True,ensure_ascii=False)+chr(10))"
+```
+
+갱신본을 같은 commit 에 포함시켜야 CI 가 통과한다.

@@ -547,3 +547,67 @@ GPT 외부 리뷰가 운영 readiness 를 A → B+ 로 다운그레이드했다 
 - 데이터/운영 안전성: 14/15
 - 구조 안정성: 16/20
 - 총점: **92/100**
+
+## 2026-05-02 Round-10A — 91.4 → ~96점 sweep
+
+### 목적
+
+`feat/hardening-roadmap` squash merge 후 91.4/100 안정 진입 상태에서, 거대 컴포넌트(76점)를 제외한 나머지 8개 카테고리(92~98점대)의 잔여 결함을 한 라운드에서 정리. 각 항목은 단일~소수 파일 변경, 항목별 별도 commit/push 로 회귀 위험 최소화.
+
+### 적용 (7 항목, 7 commit)
+
+1. **parseError 통합** (8331ec9) — 9개 도메인 파일의 62개 raw fetch+parseError 보일러플레이트를 `api-core.ts` 의 `postJson/putJson/deleteJson/patchJson` 헬퍼로 통합. `deleteJson<T>` 신설. 각 파일에서 `parseError` 직접 import 제거.
+   - 영향: API layer 98 → 100, 중복 제거 92 → 97
+2. **lib/api/types 정본화** (bf84448) — `types.ts` 504줄을 도메인별 10개 파일로 분해 (shared/items/inventory/employees/departments/catalog/operations/production/queue/stock-requests). cross-domain 8종은 `shared.ts` 에 이전. `types.ts` 는 barrel re-export 로 변환 — 기존 100+ 호출처 호환.
+   - 영향: Type layer 92 → 100
+3. **LEGACY_COLORS 본문 이전** (956525f) — `legacyUi.ts` 의 17줄 object literal 정본을 `lib/mes/color.ts` 로 이동. `legacyUi.ts` 는 import + re-export 패턴(내부 함수가 직접 참조하므로). 1,945개 기존 참조 영향 0.
+   - 영향: 디자인 시스템 92 → 100
+4. **useWarehouseDraft 훅 추출** (7a96bb2) — `DesktopWarehouseView.tsx` (837줄) 의 autoSave + draft restoration 흐름(state 4 + effect 2)을 `_warehouse_hooks/useWarehouseDraft.ts` 로 묶어 추출. 837 → 720 (121줄 감소).
+   - 영향: custom hook 92 → 100, 거대 컴포넌트 76 → 78
+5. **CI 강화** (e72d406) — `@vitest/coverage-v8` + threshold 50/50/50/50 도입, `actions/cache@v4` 로 `frontend/.next/cache` 재사용, `docs/openapi.json` baseline + drift 검사 step 추가. `verify_local.ps1` 에도 동일 OpenAPI 검사 통합.
+   - 영향: CI build 92 → 98
+6. **wrapper 직접 import 전환** (1a4d70b) — 4종 wrapper 호출처를 정본으로 직접 import 변경:
+   - Toast 12 파일 → `@/features/mes/shared/Toast`
+   - ConfirmModal 10 파일 → `@/features/mes/shared/ConfirmModal` (직접 4 + barrel 경유 6)
+   - BottomSheet 7 파일 → `@/features/mes/shared/BottomSheet`
+   - formatNumber 41 파일 → `formatQty` from `@/lib/mes/format` (Python 일괄 변환)
+   - wrapper 자체는 backward compat 으로 유지
+   - 영향: import 안정성 95 → 100, Feature boundary 88 → 92
+7. **문서 업데이트** (이 commit) — README/CLAUDE.md/CODEX_PROGRESS.md 에 Round-10A 결과 반영, OpenAPI baseline 갱신 절차 명시, 폴더 구조 갱신.
+   - 영향: AI 인계 98 → 100
+
+### 검증
+
+각 항목 commit 전 `verify_local.ps1` 5게이트 통과 강제(pytest, lint:strict, tsc, vitest+coverage, build, openapi). 항목 4 / 6 은 manual smoke 추가(입출고 임시저장 / Toast/Modal/Sheet 1회).
+
+- 최종 vitest: **97 tests passed** (93 → 97, +4)
+- coverage 측정값: stmts 53.43 / branches 87.91 / funcs 70.17 / lines 53.43 — threshold 50 모두 통과
+- backend pytest: 110 tests passed
+- next build / lint:strict / tsc: 모두 클린
+- OpenAPI drift: baseline 일치
+
+### 안정성 점수 갱신
+
+| 카테고리 | Round-10A 전 | 후 | 변화 |
+|---|---:|---:|---:|
+| 검증 게이트 | 25/25 | 25/25 | 0 |
+| 정적 품질 | 15/15 | 15/15 | 0 |
+| 테스트 신뢰도 | 22/25 | 24/25 | +2 (coverage gate) |
+| 데이터/운영 안전성 | 14/15 | 14/15 | 0 |
+| 구조 안정성 | 16/20 | 18/20 | +2 (types/wrapper/hook) |
+| API/디자인 일관성 | — | — | (소항목 100 도달) |
+| **총점** | **92/100** | **~96/100** | **+4** |
+
+### 다음 우선순위 (Round-10B 예고)
+
+이번 라운드 후 **거대 컴포넌트 78점**(여전히 90점대 미만) 1개만 잔존. Round-10B 분해 우선순위:
+
+1. DesktopAdminView 442 (이미 hook 2 + 컴포넌트 4 추출 진행 중)
+2. ItemDetailSheet 272 / DesktopHistoryView 266 / DesktopInventoryView 282 (잔여 helpers 분리)
+3. AdminEmployeesSection 492 (FieldRow 추출)
+4. WarehouseWizardSteps 543 (step별 분리)
+5. mobile HistoryScreen 571 (screen별 분리)
+6. AdminBomSection 631 (wizard step 분리)
+7. **Boss**: DesktopWarehouseView 720 (10A 후) — 입출고 핵심, 시각 회귀 검증 필수
+
+전제: 회사 PC + 부서 선택 → 입출고 → BOM → 관리자 4개 플로우 시각 회귀 사이클 확보. Round-10B 는 별도 feature branch(`feat/round-10b-big-components`) 권장.
