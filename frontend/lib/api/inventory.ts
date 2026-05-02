@@ -12,7 +12,7 @@
  * 외부 호환을 위해 `frontend/lib/api.ts` 가 spread merge 한다.
  */
 
-import { fetcher, parseError, toApiUrl } from "../api-core";
+import { fetcher, postJson, toApiUrl } from "../api-core";
 import type {
   Department,
   InventoryLocationRow,
@@ -20,116 +20,84 @@ import type {
   InventorySummary,
 } from "./types";
 
+type ShipPackageMutationResponse = {
+  message: string;
+  package_name: string;
+  quantity: number;
+  items: {
+    item_id: string;
+    erp_code: string | null;
+    item_name: string;
+    quantity: number;
+    stock_after: number;
+  }[];
+};
+
 export const inventoryApi = {
   getInventorySummary: () => fetcher<InventorySummary>(toApiUrl("/api/inventory/summary")),
 
-  receiveInventory: async (payload: {
+  receiveInventory: (payload: {
     item_id: string;
     quantity: number;
     location?: string;
     reference_no?: string;
     produced_by?: string;
     notes?: string;
-  }) => {
-    const res = await fetch(toApiUrl("/api/inventory/receive"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<InventoryMutationResponse>;
-  },
+  }) => postJson<InventoryMutationResponse>(toApiUrl("/api/inventory/receive"), payload),
 
-  shipInventory: async (payload: {
+  shipInventory: (payload: {
     item_id: string;
     quantity: number;
     location?: string;
     reference_no?: string;
     produced_by?: string;
     notes?: string;
-  }) => {
-    const res = await fetch(toApiUrl("/api/inventory/ship"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<InventoryMutationResponse>;
-  },
+  }) => postJson<InventoryMutationResponse>(toApiUrl("/api/inventory/ship"), payload),
 
-  shipPackage: async (payload: {
+  shipPackage: (payload: {
     package_id: string;
     quantity: number;
     reference_no?: string;
     produced_by?: string;
     notes?: string;
-  }) => {
-    const res = await fetch(toApiUrl("/api/inventory/ship-package"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<{
-      message: string;
-      package_name: string;
-      quantity: number;
-      items: { item_id: string; erp_code: string | null; item_name: string; quantity: number; stock_after: number }[];
-    }>;
-  },
+  }) => postJson<ShipPackageMutationResponse>(toApiUrl("/api/inventory/ship-package"), payload),
 
-  adjustInventory: async (payload: {
+  adjustInventory: (payload: {
     item_id: string;
     quantity: number;
     reason: string;
     location?: string;
     reference_no?: string;
     produced_by?: string;
-  }) => {
-    const res = await fetch(toApiUrl("/api/inventory/adjust"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<InventoryMutationResponse>;
-  },
+  }) => postJson<InventoryMutationResponse>(toApiUrl("/api/inventory/adjust"), payload),
 
-  transferToProduction: async (payload: {
+  transferToProduction: (payload: {
     item_id: string;
     quantity: number;
     department: Department;
     notes?: string;
     reference_no?: string;
     produced_by?: string;
-  }) => {
-    const res = await fetch(toApiUrl("/api/inventory/transfer-to-production"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<InventoryMutationResponse>;
-  },
+  }) =>
+    postJson<InventoryMutationResponse>(
+      toApiUrl("/api/inventory/transfer-to-production"),
+      payload,
+    ),
 
-  transferToWarehouse: async (payload: {
+  transferToWarehouse: (payload: {
     item_id: string;
     quantity: number;
     department: Department;
     notes?: string;
     reference_no?: string;
     produced_by?: string;
-  }) => {
-    const res = await fetch(toApiUrl("/api/inventory/transfer-to-warehouse"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<InventoryMutationResponse>;
-  },
+  }) =>
+    postJson<InventoryMutationResponse>(
+      toApiUrl("/api/inventory/transfer-to-warehouse"),
+      payload,
+    ),
 
-  transferBetweenDepts: async (payload: {
+  transferBetweenDepts: (payload: {
     item_id: string;
     quantity: number;
     from_department: Department;
@@ -137,17 +105,13 @@ export const inventoryApi = {
     notes?: string;
     reference_no?: string;
     produced_by?: string;
-  }) => {
-    const res = await fetch(toApiUrl("/api/inventory/transfer-between-depts"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<InventoryMutationResponse>;
-  },
+  }) =>
+    postJson<InventoryMutationResponse>(
+      toApiUrl("/api/inventory/transfer-between-depts"),
+      payload,
+    ),
 
-  markDefective: async (payload: {
+  markDefective: (payload: {
     item_id: string;
     quantity: number;
     source: "warehouse" | "production";
@@ -155,32 +119,21 @@ export const inventoryApi = {
     target_department: Department;
     reason?: string;
     operator?: string;
-  }) => {
-    const res = await fetch(toApiUrl("/api/inventory/mark-defective"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<InventoryMutationResponse>;
-  },
+  }) =>
+    postJson<InventoryMutationResponse>(toApiUrl("/api/inventory/mark-defective"), payload),
 
-  returnToSupplier: async (payload: {
+  returnToSupplier: (payload: {
     item_id: string;
     quantity: number;
     from_department: Department;
     reference_no?: string;
     notes?: string;
     operator?: string;
-  }) => {
-    const res = await fetch(toApiUrl("/api/inventory/return-to-supplier"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<InventoryMutationResponse>;
-  },
+  }) =>
+    postJson<InventoryMutationResponse>(
+      toApiUrl("/api/inventory/return-to-supplier"),
+      payload,
+    ),
 
   getItemLocations: (itemId: string) =>
     fetcher<InventoryLocationRow[]>(toApiUrl(`/api/inventory/locations/${itemId}`)),

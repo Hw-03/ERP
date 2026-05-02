@@ -7,6 +7,7 @@ import {
   postJson,
   putJson,
   patchJson,
+  deleteJson,
   FALLBACK_SERVER_API_BASE,
 } from "../api-core";
 
@@ -194,5 +195,54 @@ describe("fetcher / write helpers", () => {
       ),
     ) as unknown as typeof fetch;
     await expect(postJson("/api/items", {})).rejects.toThrow("유효성 실패");
+  });
+
+  it("postJson without body skips Content-Type header", async () => {
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve(makeResponse({ ok: true, body: { ok: true } })),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    await postJson("/api/queue/abc/confirm");
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeUndefined();
+    expect(init.headers).toBeUndefined();
+  });
+
+  it("deleteJson uses DELETE method and parses JSON when present", async () => {
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve(makeResponse({ ok: true, body: { result: "deleted" } })),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const result = await deleteJson<{ result: string }>("/api/employees/abc");
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("DELETE");
+    expect(result).toEqual({ result: "deleted" });
+  });
+
+  it("deleteJson tolerates 204 No Content (returns undefined)", async () => {
+    const res = {
+      ok: true,
+      status: 204,
+      statusText: "No Content",
+      text: () => Promise.resolve(""),
+      json: () => Promise.reject(new Error("should not call json on 204")),
+    } as unknown as Response;
+    globalThis.fetch = vi.fn(() => Promise.resolve(res)) as unknown as typeof fetch;
+    const result = await deleteJson<void>("/api/models/1");
+    expect(result).toBeUndefined();
+  });
+
+  it("write helpers tolerate empty body (returns undefined)", async () => {
+    const res = {
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      text: () => Promise.resolve(""),
+      json: () => Promise.reject(new Error("should not call json on empty body")),
+    } as unknown as Response;
+    globalThis.fetch = vi.fn(() => Promise.resolve(res)) as unknown as typeof fetch;
+    const result = await postJson<void>("/api/employees/abc/reset-pin", { admin_pin: "0000" });
+    expect(result).toBeUndefined();
   });
 });

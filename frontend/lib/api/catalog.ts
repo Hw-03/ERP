@@ -9,7 +9,7 @@
  * 총 16 메소드.
  */
 
-import { fetcher, parseError, toApiUrl } from "../api-core";
+import { deleteJson, fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
 import type {
   BOMDetailEntry,
   BOMEntry,
@@ -22,66 +22,30 @@ export const catalogApi = {
   // Models -----------------------------------------------------------------
   getModels: () => fetcher<ProductModel[]>(toApiUrl("/api/models")),
 
-  createModel: async (payload: { model_name: string; symbol?: string }) => {
-    const res = await fetch(toApiUrl("/api/models"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<ProductModel>;
-  },
+  createModel: (payload: { model_name: string; symbol?: string }) =>
+    postJson<ProductModel>(toApiUrl("/api/models"), payload),
 
-  deleteModel: async (slot: number) => {
-    const res = await fetch(toApiUrl(`/api/models/${slot}`), { method: "DELETE" });
-    if (!res.ok) throw new Error(await parseError(res));
-  },
+  deleteModel: (slot: number) => deleteJson<void>(toApiUrl(`/api/models/${slot}`)),
 
   // Ship packages ----------------------------------------------------------
   getShipPackages: () => fetcher<ShipPackage[]>(toApiUrl("/api/ship-packages")),
 
-  createShipPackage: async (payload: { package_code: string; name: string; notes?: string }) => {
-    const res = await fetch(toApiUrl("/api/ship-packages"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<ShipPackage>;
-  },
+  createShipPackage: (payload: { package_code: string; name: string; notes?: string }) =>
+    postJson<ShipPackage>(toApiUrl("/api/ship-packages"), payload),
 
-  updateShipPackage: async (packageId: string, payload: { name?: string; notes?: string }) => {
-    const res = await fetch(toApiUrl(`/api/ship-packages/${packageId}`), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<ShipPackage>;
-  },
+  updateShipPackage: (packageId: string, payload: { name?: string; notes?: string }) =>
+    putJson<ShipPackage>(toApiUrl(`/api/ship-packages/${packageId}`), payload),
 
-  deleteShipPackage: async (packageId: string) => {
-    const res = await fetch(toApiUrl(`/api/ship-packages/${packageId}`), { method: "DELETE" });
-    if (!res.ok) throw new Error(await parseError(res));
-  },
+  deleteShipPackage: (packageId: string) =>
+    deleteJson<void>(toApiUrl(`/api/ship-packages/${packageId}`)),
 
-  addShipPackageItem: async (packageId: string, payload: { item_id: string; quantity: number }) => {
-    const res = await fetch(toApiUrl(`/api/ship-packages/${packageId}/items`), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<ShipPackage>;
-  },
+  addShipPackageItem: (packageId: string, payload: { item_id: string; quantity: number }) =>
+    postJson<ShipPackage>(toApiUrl(`/api/ship-packages/${packageId}/items`), payload),
 
-  deleteShipPackageItem: async (packageId: string, packageItemId: string) => {
-    const res = await fetch(toApiUrl(`/api/ship-packages/${packageId}/items/${packageItemId}`), {
-      method: "DELETE",
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<ShipPackage>;
-  },
+  deleteShipPackageItem: (packageId: string, packageItemId: string) =>
+    deleteJson<ShipPackage>(
+      toApiUrl(`/api/ship-packages/${packageId}/items/${packageItemId}`),
+    ),
 
   // BOM --------------------------------------------------------------------
   getAllBOM: () => fetcher<BOMDetailEntry[]>(toApiUrl("/api/bom")),
@@ -92,34 +56,16 @@ export const catalogApi = {
   getBOMWhereUsed: (itemId: string) =>
     fetcher<BOMDetailEntry[]>(toApiUrl(`/api/bom/where-used/${itemId}`)),
 
-  createBOM: async (payload: {
+  createBOM: (payload: {
     parent_item_id: string;
     child_item_id: string;
     quantity: number;
     unit: string;
     notes?: string;
-  }) => {
-    const res = await fetch(toApiUrl("/api/bom"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<BOMEntry>;
-  },
+  }) => postJson<BOMEntry>(toApiUrl("/api/bom"), payload),
 
-  deleteBOM: async (bomId: string) => {
-    const res = await fetch(toApiUrl(`/api/bom/${bomId}`), { method: "DELETE" });
-    if (!res.ok) throw new Error(await parseError(res));
-  },
+  deleteBOM: (bomId: string) => deleteJson<void>(toApiUrl(`/api/bom/${bomId}`)),
 
-  updateBOM: async (bomId: string, payload: { quantity?: number; unit?: string }) => {
-    const res = await fetch(toApiUrl(`/api/bom/${bomId}`), {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<BOMEntry>;
-  },
+  updateBOM: (bomId: string, payload: { quantity?: number; unit?: string }) =>
+    patchJson<BOMEntry>(toApiUrl(`/api/bom/${bomId}`), payload),
 };

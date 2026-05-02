@@ -4,7 +4,7 @@
  * Round-6 (R6-D4) 분리. 9 메소드 (queue batch 흐름).
  */
 
-import { fetcher, parseError, toApiUrl } from "../api-core";
+import { deleteJson, fetcher, postJson, putJson, toApiUrl } from "../api-core";
 import type {
   QueueBatch,
   QueueBatchStatus,
@@ -13,7 +13,7 @@ import type {
 } from "./types";
 
 export const queueApi = {
-  createQueueBatch: async (payload: {
+  createQueueBatch: (payload: {
     batch_type: QueueBatchType;
     parent_item_id?: string;
     parent_quantity?: number;
@@ -22,15 +22,7 @@ export const queueApi = {
     reference_no?: string;
     notes?: string;
     load_bom?: boolean;
-  }) => {
-    const res = await fetch(toApiUrl("/api/queue"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<QueueBatch>;
-  },
+  }) => postJson<QueueBatch>(toApiUrl("/api/queue"), payload),
 
   listQueueBatches: (params?: { status?: QueueBatchStatus; ownerEmployeeId?: string }) => {
     const query = new URLSearchParams();
@@ -41,31 +33,16 @@ export const queueApi = {
 
   getQueueBatch: (batchId: string) => fetcher<QueueBatch>(toApiUrl(`/api/queue/${batchId}`)),
 
-  overrideQueueLine: async (batchId: string, lineId: string, quantity: number) => {
-    const res = await fetch(toApiUrl(`/api/queue/${batchId}/lines/${lineId}`), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ quantity }),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<QueueBatch>;
-  },
+  overrideQueueLine: (batchId: string, lineId: string, quantity: number) =>
+    putJson<QueueBatch>(toApiUrl(`/api/queue/${batchId}/lines/${lineId}`), { quantity }),
 
-  toggleQueueLine: async (
+  toggleQueueLine: (
     batchId: string,
     lineId: string,
     payload: { included: boolean; new_direction?: QueueLineDirection },
-  ) => {
-    const res = await fetch(toApiUrl(`/api/queue/${batchId}/lines/${lineId}/toggle`), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<QueueBatch>;
-  },
+  ) => postJson<QueueBatch>(toApiUrl(`/api/queue/${batchId}/lines/${lineId}/toggle`), payload),
 
-  addQueueLine: async (
+  addQueueLine: (
     batchId: string,
     payload: {
       item_id: string;
@@ -74,33 +51,14 @@ export const queueApi = {
       reason?: string;
       process_stage?: string;
     },
-  ) => {
-    const res = await fetch(toApiUrl(`/api/queue/${batchId}/lines`), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<QueueBatch>;
-  },
+  ) => postJson<QueueBatch>(toApiUrl(`/api/queue/${batchId}/lines`), payload),
 
-  deleteQueueLine: async (batchId: string, lineId: string) => {
-    const res = await fetch(toApiUrl(`/api/queue/${batchId}/lines/${lineId}`), {
-      method: "DELETE",
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<QueueBatch>;
-  },
+  deleteQueueLine: (batchId: string, lineId: string) =>
+    deleteJson<QueueBatch>(toApiUrl(`/api/queue/${batchId}/lines/${lineId}`)),
 
-  confirmQueueBatch: async (batchId: string) => {
-    const res = await fetch(toApiUrl(`/api/queue/${batchId}/confirm`), { method: "POST" });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<QueueBatch>;
-  },
+  confirmQueueBatch: (batchId: string) =>
+    postJson<QueueBatch>(toApiUrl(`/api/queue/${batchId}/confirm`)),
 
-  cancelQueueBatch: async (batchId: string) => {
-    const res = await fetch(toApiUrl(`/api/queue/${batchId}/cancel`), { method: "POST" });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<QueueBatch>;
-  },
+  cancelQueueBatch: (batchId: string) =>
+    postJson<QueueBatch>(toApiUrl(`/api/queue/${batchId}/cancel`)),
 };

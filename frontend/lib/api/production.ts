@@ -7,7 +7,7 @@
  *   Exports: getItemsExportUrl / getTransactionsExportUrl
  */
 
-import { fetcher, parseError, toApiUrl } from "../api-core";
+import { fetcher, postJson, toApiUrl } from "../api-core";
 import type {
   ProductionCapacity,
   ProductionCheckResponse,
@@ -18,24 +18,18 @@ import type {
 } from "./types";
 
 export const productionApi = {
-  productionReceipt: async (payload: {
+  productionReceipt: (payload: {
     item_id: string;
     quantity: number;
     reference_no?: string;
     produced_by?: string;
     notes?: string;
-  }) => {
-    const res = await fetch(toApiUrl("/api/production/receipt"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<ProductionReceiptResponse>;
-  },
+  }) => postJson<ProductionReceiptResponse>(toApiUrl("/api/production/receipt"), payload),
 
   checkProduction: (itemId: string, quantity: number) =>
-    fetcher<ProductionCheckResponse>(toApiUrl(`/api/production/bom-check/${itemId}?quantity=${quantity}`)),
+    fetcher<ProductionCheckResponse>(
+      toApiUrl(`/api/production/bom-check/${itemId}?quantity=${quantity}`),
+    ),
 
   getProductionCapacity: () =>
     fetcher<ProductionCapacity>(toApiUrl("/api/production/capacity")),
@@ -58,11 +52,14 @@ export const productionApi = {
     if (params?.search) query.set("search", params.search);
     if (params?.limit !== undefined) query.set("limit", String(params.limit));
     if (params?.skip !== undefined) query.set("skip", String(params.skip));
-    return fetcher<TransactionLog[]>(toApiUrl(`/api/inventory/transactions?${query}`), opts?.signal);
+    return fetcher<TransactionLog[]>(
+      toApiUrl(`/api/inventory/transactions?${query}`),
+      opts?.signal,
+    );
   },
 
   /** 거래 메타데이터(notes/reference_no/produced_by) 수정. reason + PIN 필수. */
-  metaEditTransaction: async (
+  metaEditTransaction: (
     logId: string,
     payload: {
       notes?: string | null;
@@ -72,22 +69,18 @@ export const productionApi = {
       edited_by_employee_id: string;
       edited_by_pin: string;
     },
-  ): Promise<TransactionLog> => {
-    const res = await fetch(toApiUrl(`/api/inventory/transactions/${logId}/meta-edit`), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<TransactionLog>;
-  },
+  ) =>
+    postJson<TransactionLog>(
+      toApiUrl(`/api/inventory/transactions/${logId}/meta-edit`),
+      payload,
+    ),
 
   /** 특정 거래의 수정 이력 (최신순). */
   getTransactionEdits: (logId: string): Promise<TransactionEditLog[]> =>
     fetcher<TransactionEditLog[]>(toApiUrl(`/api/inventory/transactions/${logId}/edits`)),
 
   /** RECEIVE/SHIP 수량 보정. SHIP은 quantity_change가 음수여야 함. */
-  quantityCorrectTransaction: async (
+  quantityCorrectTransaction: (
     logId: string,
     payload: {
       quantity_change: number;
@@ -95,18 +88,11 @@ export const productionApi = {
       edited_by_employee_id: string;
       edited_by_pin: string;
     },
-  ): Promise<{ original: TransactionLog; correction: TransactionLog }> => {
-    const res = await fetch(
+  ) =>
+    postJson<{ original: TransactionLog; correction: TransactionLog }>(
       toApiUrl(`/api/inventory/transactions/${logId}/quantity-correction`),
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      },
-    );
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<{ original: TransactionLog; correction: TransactionLog }>;
-  },
+      payload,
+    ),
 
   getItemsExportUrl: (params?: { category?: string; search?: string }) => {
     const qs = new URLSearchParams();
@@ -120,7 +106,7 @@ export const productionApi = {
     transaction_type?: string;
     search?: string;
     start_date?: string; // YYYY-MM-DD
-    end_date?: string;   // YYYY-MM-DD
+    end_date?: string; // YYYY-MM-DD
   }) => {
     const qs = new URLSearchParams();
     if (params?.transaction_type) qs.set("transaction_type", params.transaction_type);
@@ -131,7 +117,9 @@ export const productionApi = {
     const from = new Date(today);
     from.setDate(today.getDate() - 29);
     const ymd = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate(),
+      ).padStart(2, "0")}`;
     qs.set("start_date", params?.start_date ?? ymd(from));
     qs.set("end_date", params?.end_date ?? ymd(today));
     return toApiUrl(`/api/inventory/transactions/export.xlsx?${qs}`);

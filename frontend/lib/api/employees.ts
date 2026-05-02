@@ -8,7 +8,7 @@
  * 외부 호환을 위해 `frontend/lib/api.ts` 가 spread merge.
  */
 
-import { fetcher, parseError, postJson, toApiUrl } from "../api-core";
+import { deleteJson, fetcher, postJson, putJson, toApiUrl } from "../api-core";
 import type { Department, Employee, EmployeeLevel, WarehouseRole } from "./types";
 
 export const employeesApi = {
@@ -31,7 +31,7 @@ export const employeesApi = {
     is_active?: boolean;
   }) => postJson<Employee>(toApiUrl("/api/employees"), payload),
 
-  updateEmployee: async (
+  updateEmployee: (
     employeeId: string,
     payload: {
       name?: string;
@@ -43,40 +43,16 @@ export const employeesApi = {
       display_order?: number;
       is_active?: boolean;
     },
-  ) => {
-    const res = await fetch(toApiUrl(`/api/employees/${employeeId}`), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<Employee>;
-  },
+  ) => putJson<Employee>(toApiUrl(`/api/employees/${employeeId}`), payload),
 
-  deleteEmployee: async (employeeId: string): Promise<{ result: "deleted" | "deactivated" }> => {
-    const res = await fetch(toApiUrl(`/api/employees/${employeeId}`), { method: "DELETE" });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<{ result: "deleted" | "deactivated" }>;
-  },
+  deleteEmployee: (employeeId: string) =>
+    deleteJson<{ result: "deleted" | "deactivated" }>(toApiUrl(`/api/employees/${employeeId}`)),
 
   // 작업자 식별용 PIN 검증 — 실제 보안 인증이 아님
-  verifyEmployeePin: async (employeeId: string, pin: string) => {
-    const res = await fetch(toApiUrl(`/api/employees/${employeeId}/verify-pin`), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pin }),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<Employee>;
-  },
+  verifyEmployeePin: (employeeId: string, pin: string) =>
+    postJson<Employee>(toApiUrl(`/api/employees/${employeeId}/verify-pin`), { pin }),
 
   // 직원 PIN을 0000으로 초기화 — 관리자 PIN 검증 필요
-  resetEmployeePin: async (employeeId: string, adminPin: string) => {
-    const res = await fetch(toApiUrl(`/api/employees/${employeeId}/reset-pin`), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ admin_pin: adminPin }),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-  },
+  resetEmployeePin: (employeeId: string, adminPin: string) =>
+    postJson<void>(toApiUrl(`/api/employees/${employeeId}/reset-pin`), { admin_pin: adminPin }),
 };

@@ -93,26 +93,37 @@ export async function fetcher<T>(url: string, signal?: AbortSignal): Promise<T> 
 }
 
 /**
- * 쓰기 응답 캐스팅을 한 곳으로 — POST/PUT/PATCH 공통.
- * 외부에서는 postJson / putJson / patchJson 사용.
+ * 쓰기 응답 캐스팅을 한 곳으로 — POST/PUT/PATCH/DELETE 공통.
+ * 외부에서는 postJson / putJson / patchJson / deleteJson 사용.
+ *
+ * body 미지정(undefined) 시 Content-Type 헤더와 body 자체를 생략 — POST no-body
+ * 엔드포인트(예: confirm/cancel queue, scan alerts)와 DELETE 호환.
+ *
+ * 응답이 204 No Content 거나 빈 본문이면 undefined 반환 — void 시그니처 호환.
  */
 async function writeJson<T>(
   url: string,
-  method: "POST" | "PUT" | "PATCH",
-  body: unknown,
+  method: "POST" | "PUT" | "PATCH" | "DELETE",
+  body?: unknown,
 ): Promise<T> {
-  const res = await fetch(url, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const init: RequestInit = { method };
+  if (body !== undefined) {
+    init.headers = { "Content-Type": "application/json" };
+    init.body = JSON.stringify(body);
+  }
+  const res = await fetch(url, init);
   if (!res.ok) throw new Error(await parseError(res));
-  return (await res.json()) as T;
+  if (res.status === 204) return undefined as T;
+  const text = await res.text();
+  if (!text) return undefined as T;
+  return JSON.parse(text) as T;
 }
 
-export const postJson = <T>(url: string, body: unknown): Promise<T> =>
+export const postJson = <T>(url: string, body?: unknown): Promise<T> =>
   writeJson<T>(url, "POST", body);
-export const putJson = <T>(url: string, body: unknown): Promise<T> =>
+export const putJson = <T>(url: string, body?: unknown): Promise<T> =>
   writeJson<T>(url, "PUT", body);
-export const patchJson = <T>(url: string, body: unknown): Promise<T> =>
+export const patchJson = <T>(url: string, body?: unknown): Promise<T> =>
   writeJson<T>(url, "PATCH", body);
+export const deleteJson = <T = void>(url: string, body?: unknown): Promise<T> =>
+  writeJson<T>(url, "DELETE", body);

@@ -9,7 +9,7 @@
  * 총 10 메소드.
  */
 
-import { fetcher, parseError, toApiUrl } from "../api-core";
+import { fetcher, postJson, toApiUrl } from "../api-core";
 import type {
   AlertKind,
   LossLogRow,
@@ -21,21 +21,13 @@ import type {
 
 export const operationsApi = {
   // Scrap / Loss / Variance --------------------------------------------------
-  recordScrap: async (payload: {
+  recordScrap: (payload: {
     item_id: string;
     quantity: number;
     reason: string;
     process_stage?: string;
     operator?: string;
-  }) => {
-    const res = await fetch(toApiUrl("/api/scrap/"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<ScrapLogRow>;
-  },
+  }) => postJson<ScrapLogRow>(toApiUrl("/api/scrap/"), payload),
 
   listScrap: (params?: { itemId?: string; batchId?: string }) => {
     const query = new URLSearchParams();
@@ -44,18 +36,10 @@ export const operationsApi = {
     return fetcher<ScrapLogRow[]>(toApiUrl(`/api/scrap/?${query}`));
   },
 
-  recordLoss: async (
+  recordLoss: (
     payload: { item_id: string; quantity: number; reason: string; operator?: string },
     deduct = false,
-  ) => {
-    const res = await fetch(toApiUrl(`/api/loss/?deduct=${deduct}`), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<LossLogRow>;
-  },
+  ) => postJson<LossLogRow>(toApiUrl(`/api/loss/?deduct=${deduct}`), payload),
 
   listLoss: (params?: { itemId?: string; batchId?: string }) => {
     const query = new URLSearchParams();
@@ -72,11 +56,7 @@ export const operationsApi = {
   },
 
   // Alerts -------------------------------------------------------------------
-  scanSafetyAlerts: async () => {
-    const res = await fetch(toApiUrl("/api/alerts/scan"), { method: "POST" });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<StockAlert[]>;
-  },
+  scanSafetyAlerts: () => postJson<StockAlert[]>(toApiUrl("/api/alerts/scan")),
 
   listAlerts: (params?: {
     kind?: AlertKind;
@@ -91,31 +71,18 @@ export const operationsApi = {
     return fetcher<StockAlert[]>(toApiUrl(`/api/alerts/?${query}`));
   },
 
-  acknowledgeAlert: async (alertId: string, acknowledgedBy?: string) => {
-    const res = await fetch(toApiUrl(`/api/alerts/${alertId}/acknowledge`), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ acknowledged_by: acknowledgedBy ?? null }),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<StockAlert>;
-  },
+  acknowledgeAlert: (alertId: string, acknowledgedBy?: string) =>
+    postJson<StockAlert>(toApiUrl(`/api/alerts/${alertId}/acknowledge`), {
+      acknowledged_by: acknowledgedBy ?? null,
+    }),
 
   // Physical counts ---------------------------------------------------------
-  submitPhysicalCount: async (payload: {
+  submitPhysicalCount: (payload: {
     item_id: string;
     counted_qty: number;
     reason?: string;
     operator?: string;
-  }) => {
-    const res = await fetch(toApiUrl("/api/counts/"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json() as Promise<PhysicalCount>;
-  },
+  }) => postJson<PhysicalCount>(toApiUrl("/api/counts/"), payload),
 
   listPhysicalCounts: (itemId?: string) => {
     const query = new URLSearchParams();
