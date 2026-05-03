@@ -6,12 +6,14 @@ import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "../legacyUi";
 import { getTransactionLabel, transactionColor } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
-import { PROCESS_TYPE_META, formatHistoryDate, parseUtc } from "./historyShared";
+import { PROCESS_TYPE_META, parseUtc } from "./historyShared";
 import { TransactionEditModal } from "./TransactionEditModal";
 import {
   QUANTITY_CORRECTABLE_TYPES,
   TransactionQuantityCorrectModal,
 } from "./TransactionQuantityCorrectModal";
+import { HistoryDetailEditHistory } from "./HistoryDetailEditHistory";
+import { HistoryDetailRecentLogs } from "./HistoryDetailRecentLogs";
 
 const META_CORRECTABLE = new Set([
   "RECEIVE", "SHIP", "ADJUST",
@@ -205,96 +207,9 @@ export function HistoryDetailPanel({
         </div>
       )}
 
-      {/* 수정 이력 */}
-      {editsLoaded && edits.length > 0 && (
-        <div
-          className="rounded-[24px] border p-4"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-        >
-          <div className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
-            <History className="h-3.5 w-3.5" />
-            수정 이력 ({edits.length})
-          </div>
-          <div className="space-y-2">
-            {edits.map((e) => (
-              <div
-                key={e.edit_id}
-                className="rounded-[12px] border p-3 text-sm"
-                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold" style={{ color: LEGACY_COLORS.text }}>
-                    {e.edited_by_name}
-                  </span>
-                  <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {parseUtc(e.created_at).toLocaleString("ko-KR")}
-                  </span>
-                </div>
-                <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                  사유: <span style={{ color: LEGACY_COLORS.text }}>{e.reason}</span>
-                </div>
-                {e.correction_log_id && (
-                  <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.yellow }}>
-                    수량 보정 거래 생성됨
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {editsLoaded && edits.length > 0 && <HistoryDetailEditHistory edits={edits} />}
 
-      {/* 이 품목의 최근 거래 */}
-      <div
-        className="rounded-[24px] border p-4"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-      >
-        <div className="mb-3 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
-          이 품목의 최근 거래
-        </div>
-        {itemRecentLogs.length === 0 ? (
-          <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>최근 거래 없음</div>
-        ) : (
-          <div className="space-y-2">
-            {itemRecentLogs.map((log) => (
-              <button
-                key={log.log_id}
-                onClick={() => onSelectLog(log)}
-                className="flex w-full items-center justify-between rounded-[14px] border p-3 text-left transition-all hover:brightness-110"
-                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-              >
-                <div className="flex-1 min-w-0">
-                  <span
-                    className="inline-flex rounded px-2 py-0.5 text-xs font-bold"
-                    style={{
-                      background: `color-mix(in srgb, ${transactionColor(log.transaction_type)} 14%, transparent)`,
-                      color: transactionColor(log.transaction_type),
-                    }}
-                  >
-                    {getTransactionLabel(log.transaction_type)}
-                  </span>
-                  <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {formatHistoryDate(log.created_at)}
-                  </div>
-                  {(log.quantity_before != null || log.quantity_after != null) && (
-                    <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                      {log.quantity_before != null ? formatQty(log.quantity_before) : "-"} →{" "}
-                      {log.quantity_after != null ? formatQty(log.quantity_after) : "-"}
-                    </div>
-                  )}
-                </div>
-                <div
-                  className="shrink-0 ml-2 text-base font-bold text-right"
-                  style={{ color: transactionColor(log.transaction_type) }}
-                >
-                  {Number(log.quantity_change) >= 0 ? "+" : ""}
-                  {formatQty(log.quantity_change)}
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      <HistoryDetailRecentLogs itemRecentLogs={itemRecentLogs} onSelectLog={onSelectLog} />
 
       <TransactionEditModal
         open={editOpen}
