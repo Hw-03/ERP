@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { ConfirmModal } from "@/features/mes/shared/ConfirmModal";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 
 describe("ConfirmModal", () => {
   it("open=true 시 title 과 children 렌더", () => {

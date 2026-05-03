@@ -9,7 +9,7 @@ import { formatQty } from "@/lib/mes/format";
 import { ELEVATION, TYPO } from "../tokens";
 import { useModels } from "../hooks/useModels";
 import { useInventoryListData } from "../../_inventory_hooks/useInventoryListData";
-import type { ToastState } from "@/features/mes/shared/Toast";
+import type { ToastState } from "@/lib/ui/Toast";
 import {
   AsyncState,
   AsyncSkeletonRows,

@@ -2,7 +2,7 @@
 
 import type { Department, Employee, Item, ShipPackage } from "@/lib/api";
 import { ResultModal } from "../common";
-import { ConfirmModal } from "@/features/mes/shared/ConfirmModal";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { WarehouseConfirmContent } from "./WarehouseConfirmContent";
 import type { WorkType } from "../_warehouse_steps";
 

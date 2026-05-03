@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { BOMEntry } from "@/lib/api";
 import { LEGACY_COLORS } from "../legacyUi";
 import { formatQty } from "@/lib/mes/format";
-import { ConfirmModal } from "@/features/mes/shared/ConfirmModal";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { useAdminBomContext } from "./AdminBomContext";
 import { BomComposeTab } from "./_bom_parts/BomComposeTab";
 import { BomAllListTab } from "./_bom_parts/BomAllListTab";

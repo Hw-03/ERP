@@ -5,7 +5,7 @@ import { ChevronDown, LogOut, RefreshCw } from "lucide-react";
 import { LEGACY_COLORS } from "./legacyUi";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { StatusPill, inferToneFromStatus } from "./common";
-import { ConfirmModal } from "@/features/mes/shared/ConfirmModal";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { clearCurrentOperator, useCurrentOperator } from "./login/useCurrentOperator";
 
 const WAREHOUSE_ROLE_LABEL: Record<string, string | null> = {

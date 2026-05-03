@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
-import type { ToastState } from "@/features/mes/shared/Toast";
+import type { ToastState } from "@/lib/ui/Toast";
 import { LEGACY_COLORS } from "../../../legacyUi";
 
 export function AdminSettingsSection({ showToast }: { showToast: (toast: ToastState) => void }) {

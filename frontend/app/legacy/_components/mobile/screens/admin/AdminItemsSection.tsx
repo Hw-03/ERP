@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api, type Item } from "@/lib/api";
-import { BottomSheet } from "@/features/mes/shared/BottomSheet";
-import type { ToastState } from "@/features/mes/shared/Toast";
+import { BottomSheet } from "@/lib/ui/BottomSheet";
+import type { ToastState } from "@/lib/ui/Toast";
 import { LEGACY_COLORS } from "../../../legacyUi";
 import { CATEGORY_OPTIONS, EMPTY_ADD_FORM, MODEL_SLOTS, UNIT_OPTIONS } from "./_shared";
 

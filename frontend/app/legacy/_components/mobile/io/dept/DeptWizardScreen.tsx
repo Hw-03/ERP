@@ -5,7 +5,7 @@ import { ChevronLeft, X } from "lucide-react";
 import { api, type Item } from "@/lib/api";
 import { LEGACY_COLORS } from "../../../legacyUi";
 import { useDeptColor } from "../../../DepartmentsContext";
-import type { ToastState } from "@/features/mes/shared/Toast";
+import type { ToastState } from "@/lib/ui/Toast";
 import { IconButton, WizardHeader, type SummaryChip } from "../../primitives";
 import { useEmployees } from "../../hooks/useEmployees";
 import { usePackages } from "../../hooks/usePackages";
@@ -18,7 +18,7 @@ import {
   StepDirection,
   StepItems,
 } from "./DeptWizardSteps";
-import { ConfirmModal } from "@/features/mes/shared/ConfirmModal";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { useCurrentOperator } from "../../../login/useCurrentOperator";
 
 export function DeptWizardScreen({ showToast }: { showToast: (toast: ToastState) => void }) {

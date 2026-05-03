@@ -6,13 +6,9 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { useFocusTrap } from "@/lib/mes/useFocusTrap";
 
 /**
- * ConfirmModal — `@/features/mes/shared/ConfirmModal` 정본.
+ * ConfirmModal — `@/lib/ui/ConfirmModal` 정본.
  *
- * Round-7 (R7-FEATURE1) 본문 이전. 기존
- * `frontend/app/legacy/_components/common/ConfirmModal.tsx` 는
- * 본 파일에서 re-export 하는 thin wrapper 로 변환.
- *
- * 호출처 변경 0 — 기존 import 경로 그대로 유효.
+ * Round-14 (#1) feature boundary 정리: `features/mes/shared` 에서 `lib/ui` 로 이동.
  */
 export type ConfirmTone = "normal" | "caution" | "danger";
 

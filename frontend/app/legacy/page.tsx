@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { MobileShell, type TabId } from "./_components/mobile/MobileShell";
 import { InventoryScreen } from "./_components/mobile/screens/InventoryScreen";
 import { HistoryScreen } from "./_components/mobile/screens/HistoryScreen";
-import { Toast, type ToastState } from "@/features/mes/shared/Toast";
+import { Toast, type ToastState } from "@/lib/ui/Toast";
 import { AdminShell } from "./_components/mobile/screens/admin/AdminShell";
 import { DesktopLegacyShell } from "./_components/DesktopLegacyShell";
 import {

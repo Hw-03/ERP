@@ -4,12 +4,9 @@ import { useEffect } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 
 /**
- * Toast — `@/features/mes/shared/Toast` 정본.
+ * Toast — `@/lib/ui/Toast` 정본.
  *
- * Round-5 (R5-9) 본문 이전. 기존 `app/legacy/_components/Toast.tsx` 는
- * 본 파일로부터 re-export 하는 thin wrapper 로 변환된다.
- *
- * 호출처 변경 0 — 기존 import 경로 그대로 사용 가능.
+ * Round-14 (#1) feature boundary 정리: `features/mes/shared` 에서 `lib/ui` 로 이동.
  */
 export interface ToastState {
   message: string;

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, type Item, type TransactionLog } from "@/lib/api";
-import { BottomSheet } from "@/features/mes/shared/BottomSheet";
+import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { ItemDetailHistoryList } from "./ItemDetailHistoryList";
 import { ItemDetailActionForm, type ItemDetailActionMode } from "./ItemDetailActionForm";
 import { LEGACY_COLORS } from "./legacyUi";

@@ -6,7 +6,7 @@ import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { BarcodeScannerModal } from "../../../BarcodeScannerModal";
-import type { ToastState } from "@/features/mes/shared/Toast";
+import type { ToastState } from "@/lib/ui/Toast";
 import { TYPO } from "../../tokens";
 import {
   EmptyState,

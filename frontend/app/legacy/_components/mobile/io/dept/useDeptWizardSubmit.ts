@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { api, type Employee, type Item } from "@/lib/api";
-import type { ToastState } from "@/features/mes/shared/Toast";
+import type { ToastState } from "@/lib/ui/Toast";
 import { useDeptWizard } from "./context";
 
 /**

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "../legacyUi";
-import { ConfirmModal } from "@/features/mes/shared/ConfirmModal";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { MyRequestRow } from "./MyRequestRow";
 
 interface Props {

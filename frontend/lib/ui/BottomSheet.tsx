@@ -5,10 +5,9 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { useFocusTrap } from "@/lib/mes/useFocusTrap";
 
 /**
- * BottomSheet — `@/features/mes/shared/BottomSheet` 정본.
+ * BottomSheet — `@/lib/ui/BottomSheet` 정본.
  *
- * Round-7 (R7-FEATURE2) 본문 이전. 기존
- * `frontend/app/legacy/_components/BottomSheet.tsx` 는 wrapper 로 변환.
+ * Round-14 (#1) feature boundary 정리: `features/mes/shared` 에서 `lib/ui` 로 이동.
  */
 export function BottomSheet({
   open,

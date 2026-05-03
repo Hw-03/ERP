@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api, type BOMEntry, type Item } from "@/lib/api";
-import type { ToastState } from "@/features/mes/shared/Toast";
+import type { ToastState } from "@/lib/ui/Toast";
 import { LEGACY_COLORS } from "../../../legacyUi";
 import { buildItemSearchLabel } from "@/lib/mes/item";
 import { formatQty } from "@/lib/mes/format";

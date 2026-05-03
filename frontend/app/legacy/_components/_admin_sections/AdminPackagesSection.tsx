@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { LEGACY_COLORS } from "../legacyUi";
 import { useAdminPackagesContext } from "./AdminPackagesContext";
-import { ConfirmModal } from "@/features/mes/shared/ConfirmModal";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { PackageDetailPanel } from "./_packages_parts/PackageDetailPanel";
 
 /**
