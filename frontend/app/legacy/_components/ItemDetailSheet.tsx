@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import { api, type Item, type TransactionLog } from "@/lib/api";
 import { BottomSheet } from "@/features/mes/shared/BottomSheet";
 import { ItemDetailHistoryList } from "./ItemDetailHistoryList";
+import { ItemDetailActionForm, type ItemDetailActionMode } from "./ItemDetailActionForm";
 import { LEGACY_COLORS } from "./legacyUi";
 import { erpCodeDeptBadge } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
-import { getTransactionLabel, transactionColor } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "./DepartmentsContext";
 
-type ActionMode = "ADJUST" | "RECEIVE" | "SHIP";
+type ActionMode = ItemDetailActionMode;
 
 export function ItemDetailSheet({
   item,
@@ -168,99 +168,19 @@ export function ItemDetailSheet({
           </div>
         </div>
 
-        <div className="mb-[14px] overflow-hidden rounded-[14px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          <div className="flex gap-2 px-[14px] py-3">
-            {[
-              { id: "ADJUST", label: "조정" },
-              { id: "RECEIVE", label: "입고" },
-              { id: "SHIP", label: "출고" },
-            ].map((action) => (
-              <button
-                key={action.id}
-                onClick={() => {
-                  setMode(action.id as ActionMode);
-                  setQty(action.id === "ADJUST" ? String(Number(item.quantity)) : "1");
-                }}
-                className="flex-1 rounded-xl py-2 text-xs font-bold"
-                style={{
-                  background: mode === action.id ? LEGACY_COLORS.blue : LEGACY_COLORS.s3,
-                  color: mode === action.id ? "#fff" : LEGACY_COLORS.muted2,
-                }}
-              >
-                {action.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="px-[14px] pb-[14px]">
-            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={{ color: LEGACY_COLORS.muted2 }}>
-              {mode === "ADJUST" ? "최종 수량" : "처리 수량"}
-            </div>
-            <input
-              value={qty}
-              onChange={(event) => setQty(event.target.value)}
-              inputMode="numeric"
-              className="mb-[7px] w-full rounded-[11px] border px-[13px] py-[11px] text-center text-[22px] font-bold outline-none"
-              style={{
-                background: LEGACY_COLORS.s1,
-                borderColor: LEGACY_COLORS.border,
-                color: LEGACY_COLORS.text,
-              }}
-            />
-            <div className="mb-3 grid grid-cols-4 gap-[7px]">
-              {[-10, -1, 1, 10].map((delta) => (
-                <button
-                  key={delta}
-                  onClick={() => bump(delta)}
-                  className="rounded-[10px] py-[11px] text-sm font-bold"
-                  style={{
-                    background: delta < 0 ? "rgba(242,95,92,.15)" : "rgba(31,209,122,.12)",
-                    color: delta < 0 ? LEGACY_COLORS.red : LEGACY_COLORS.green,
-                  }}
-                >
-                  {delta > 0 ? `+${delta}` : delta}
-                </button>
-              ))}
-            </div>
-
-            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={{ color: LEGACY_COLORS.muted2 }}>
-              비고
-            </div>
-            <input
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              placeholder="메모 (선택)"
-              className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
-              style={{
-                background: LEGACY_COLORS.s1,
-                borderColor: LEGACY_COLORS.border,
-                color: LEGACY_COLORS.text,
-              }}
-            />
-
-            {error ? (
-              <div
-                className="mt-3 rounded-xl border px-3 py-2 text-xs"
-                style={{
-                  background: "rgba(242,95,92,.12)",
-                  borderColor: "rgba(242,95,92,.25)",
-                  color: LEGACY_COLORS.red,
-                }}
-              >
-                {error}
-              </div>
-            ) : null}
-
-            <button
-              onClick={() => void submit()}
-              disabled={saving}
-              className="mt-3 w-full rounded-xl py-[13px] text-[15px] font-bold disabled:opacity-50"
-              style={{ background: LEGACY_COLORS.blue, color: "#fff" }}
-            >
-              {saving ? "처리 중..." : mode === "ADJUST" ? "수정" : mode === "RECEIVE" ? "입고" : "출고"}
-            </button>
-          </div>
-        </div>
+        <ItemDetailActionForm
+          mode={mode}
+          qty={qty}
+          notes={notes}
+          error={error}
+          saving={saving}
+          initialQuantity={Number(item.quantity)}
+          setMode={setMode}
+          setQty={setQty}
+          setNotes={setNotes}
+          bump={bump}
+          onSubmit={() => void submit()}
+        />
 
         <ItemDetailHistoryList logs={logs} />
       </div>

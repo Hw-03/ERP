@@ -2,18 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type TransactionLog, type TransactionType } from "@/lib/api";
-import { DesktopRightPanel } from "./DesktopRightPanel";
 import { LEGACY_COLORS } from "./legacyUi";
-import { formatQty } from "@/lib/mes/format";
 import { HistoryFilterBar } from "./_history_sections/HistoryFilterBar";
 import { HistoryCalendarStrip } from "./_history_sections/HistoryCalendarStrip";
 import { HistoryStatsBar } from "./_history_sections/HistoryStatsBar";
 import { HistoryTable } from "./_history_sections/HistoryTable";
-import { HistoryDetailPanel } from "./_history_sections/HistoryDetailPanel";
+import { DesktopHistoryRightPanel } from "./_history_sections/DesktopHistoryRightPanel";
 import { useHistoryData } from "./_hooks/useHistoryData";
 import {
   EXCEPTION_TYPES,
-  formatHistoryDate,
   getPeriodStart,
   parseUtc,
   toDateKey,
@@ -229,39 +226,14 @@ export function DesktopHistoryView() {
         </div>
       </div>
 
-      {/* ── 우측: 상세 패널 ── */}
-      <div
-        className="shrink-0 overflow-hidden"
-        style={{
-          width: selected ? 436 : 0,
-          transition: "width 160ms cubic-bezier(0.4, 0, 0.2, 1)",
-        }}
-      >
-        <div
-          className="h-full pl-4"
-          style={{
-            opacity: selected ? 1 : 0,
-            transform: selected ? "translateX(0)" : "translateX(18px)",
-            transition: "opacity 260ms ease, transform 260ms ease",
-            willChange: "transform, opacity",
-          }}
-        >
-          {displaySelected && (
-            <DesktopRightPanel
-              title={displaySelected.item_name}
-              subtitle={`${displaySelected.erp_code ?? "-"} · ${formatHistoryDate(displaySelected.created_at)}`}
-            >
-              <HistoryDetailPanel
-                selected={displaySelected}
-                itemRecentLogs={itemRecentLogs}
-                onSelectLog={(log) => setSelected(log)}
-                onLogUpdated={handleLogUpdated}
-                onLogCorrected={handleLogCorrected}
-              />
-            </DesktopRightPanel>
-          )}
-        </div>
-      </div>
+      <DesktopHistoryRightPanel
+        selected={selected}
+        displaySelected={displaySelected}
+        itemRecentLogs={itemRecentLogs}
+        onSelectLog={(log) => setSelected(log)}
+        onLogUpdated={handleLogUpdated}
+        onLogCorrected={handleLogCorrected}
+      />
     </div>
   );
 }
