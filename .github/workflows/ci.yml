@@ -106,3 +106,8 @@ jobs:
         env:
           # 빌드 단계는 정적 분석 목적 — 외부 백엔드 호출 없이 상대 경로(rewrites) 사용.
           NEXT_TELEMETRY_DISABLED: "1"
+
+      # Round-16 #4 — bundle size gate. 임계 2.0 MB 초과 시 build 실패.
+      - name: Bundle size gate
+        working-directory: frontend
+        run: npm run check:bundle-size

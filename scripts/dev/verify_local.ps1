@@ -41,6 +41,8 @@ Invoke-Check "Frontend type check" $FrontendRoot { npx tsc --noEmit }
 # coverage gate (Round-10A #5) — CI 와 동일한 threshold 50/50/50/50.
 Invoke-Check "Frontend tests + coverage" $FrontendRoot { npm run test:coverage }
 Invoke-Check "Frontend production build" $FrontendRoot { npm run build }
+# Round-16 #4 — bundle size gate (.next/static/chunks 합산 ≤ 2.0 MB).
+Invoke-Check "Frontend bundle size" $FrontendRoot { npm run check:bundle-size }
 # OpenAPI drift check (Round-10A #5) — backend 라우터/스키마 변경 시 docs/openapi.json 갱신 강제.
 Invoke-Check "OpenAPI drift" $BackendRoot {
     $TmpFile = Join-Path $env:TEMP "openapi-current.json"
