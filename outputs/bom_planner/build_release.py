@@ -252,6 +252,7 @@ APP_TEMPLATE = r"""<!doctype html>
     .status-empty{background:var(--bg);color:var(--muted);border:1px solid var(--border)}
     .status-doing{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-border)}
     .status-done{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-border)}
+    .status-error{background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border)}
 
     .switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;color:var(--muted);font-size:14px}
     .switch input{appearance:none;width:38px;height:22px;background:var(--border-strong);border-radius:999px;position:relative;cursor:pointer;transition:background .15s;margin:0;padding:0;border:0}
@@ -261,6 +262,18 @@ APP_TEMPLATE = r"""<!doctype html>
     .switch input:focus{box-shadow:0 0 0 3px rgba(22,124,128,.18)}
 
     .item-list{display:grid;gap:10px}
+    .filter-stack{display:grid;gap:8px}
+    .filter-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .filter-row.tight{gap:6px}
+    .filter-label{font-size:12px;font-weight:700;color:var(--muted-2);text-transform:uppercase;letter-spacing:.06em}
+    .chip{min-height:34px;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;background:var(--surface);color:var(--muted);border:1px solid var(--border)}
+    .chip:hover{background:var(--bg);transform:none}
+    .chip.active{background:var(--primary);border-color:var(--primary);color:#fff}
+    .chip.warn.active{background:var(--warn);border-color:var(--warn)}
+    .chip.good.active{background:var(--ok);border-color:var(--ok)}
+    .tool-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .tool-row .small{font-weight:600}
+    .mini-stat{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:5px 10px}
 
     .edit-top{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:18px 22px 18px 28px;display:grid;gap:6px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden}
     .edit-top::before{content:"";position:absolute;left:0;top:0;bottom:0;width:8px;background:var(--strip,var(--primary))}
@@ -272,10 +285,10 @@ APP_TEMPLATE = r"""<!doctype html>
 
     .edit-cols{display:flex;gap:16px;flex:1;min-height:0;min-width:0}
     .edit-col{flex:1;min-width:0;min-height:0;background:var(--surface);border:1px solid var(--border);border-radius:18px;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-sm)}
-    .col-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fafbfc}
+    .col-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fafbfc;flex-wrap:wrap}
     .col-head h3{margin:0;font-size:16px;font-weight:600}
     .col-head .count{font-size:13px;color:var(--muted)}
-    .col-search{padding:12px 14px 6px;background:#fafbfc;border-bottom:1px solid var(--border)}
+    .col-search{padding:12px 14px;background:#fafbfc;border-bottom:1px solid var(--border);display:grid;gap:8px}
     .col-body{flex:1;min-height:0;overflow:auto;padding:14px 14px 18px;display:flex;flex-direction:column;gap:10px}
 
     .bom-row{background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px 14px 20px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;transition:border-color .15s;position:relative;overflow:hidden}
@@ -314,6 +327,13 @@ APP_TEMPLATE = r"""<!doctype html>
     .candidate .add-icon{flex:0 0 auto;width:36px;height:36px;border-radius:50%;background:var(--primary-soft);color:var(--primary-d);display:grid;place-items:center;font-size:20px;font-weight:700;line-height:1;transition:background .15s,color .15s,transform .12s}
     .candidate:hover:not(:disabled) .add-icon{background:var(--primary);color:#fff;transform:scale(1.05)}
     .candidate.added .add-icon{background:var(--ok-bg);color:var(--ok)}
+    .candidate.warn{border-color:var(--warn-border);background:#fffbeb}
+    .candidate.best{border-color:var(--ok-border)}
+    .tag{display:inline-flex;align-items:center;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700;border:1px solid var(--border);background:var(--bg);color:var(--muted)}
+    .tag.best{background:var(--ok-bg);border-color:var(--ok-border);color:var(--ok)}
+    .tag.ok{background:var(--primary-soft);border-color:#b5e3e0;color:var(--primary-d)}
+    .tag.warn{background:var(--warn-bg);border-color:var(--warn-border);color:var(--warn)}
+    .tag.added{background:var(--bg);border-color:var(--border);color:var(--muted)}
 
     .review-summary{display:grid;grid-template-columns:1fr 1fr;gap:16px}
     .summary-card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:22px;display:grid;gap:6px;box-shadow:var(--shadow-sm)}
@@ -385,6 +405,9 @@ APP_TEMPLATE = r"""<!doctype html>
       .start-card h1{font-size:26px}
       .review-summary{grid-template-columns:1fr}
       .view-title{font-size:18px}
+      .item-card{grid-template-columns:1fr}
+      .item-card .status{justify-self:start}
+      .filter-row{align-items:flex-start}
     }
   </style>
 </head>
@@ -414,6 +437,30 @@ APP_TEMPLATE = r"""<!doctype html>
       {code:"P",name:"출하",emoji:"🚚",processes:["PR","PA","PF"]}
     ];
     const STAGE_NAMES = {R:"준비 단계", A:"중간 단계", F:"마감 단계"};
+    const DEPT_INDEX = Object.fromEntries(DEPARTMENTS.map((d,i)=>[d.code,i]));
+    const PARENT_STATUS_FILTERS = [
+      {code:"all",label:"전체"},
+      {code:"empty",label:"아직 안 함"},
+      {code:"working",label:"작업 중"},
+      {code:"issue",label:"고칠 곳"},
+      {code:"done",label:"끝남"}
+    ];
+    const PARENT_STAGE_FILTERS = [
+      {code:"ALL",label:"전체"},
+      {code:"A",label:"중간"},
+      {code:"F",label:"마감"}
+    ];
+    const CHILD_MODES = [
+      {code:"recommended",label:"추천"},
+      {code:"prevFinal",label:"이전공정 F"},
+      {code:"all",label:"전체"}
+    ];
+    const STAGE_FILTERS = [
+      {code:"ALL",label:"전체"},
+      {code:"R",label:"준비"},
+      {code:"A",label:"중간"},
+      {code:"F",label:"마감"}
+    ];
 
     function deptOf(processCode){
       if(!processCode) return null;
@@ -422,6 +469,13 @@ APP_TEMPLATE = r"""<!doctype html>
     function stageOf(processCode){
       if(!processCode) return "";
       return STAGE_NAMES[processCode.slice(-1)] || "";
+    }
+    function stageCode(processCode){
+      return processCode ? processCode.slice(-1) : "";
+    }
+    function deptIndexOf(processCode){
+      const d = deptOf(processCode);
+      return d ? DEPT_INDEX[d.code] : -1;
     }
     function deptLabel(processCode){
       const d = deptOf(processCode), s = stageOf(processCode);
@@ -447,19 +501,44 @@ APP_TEMPLATE = r"""<!doctype html>
       showAllDepts: false,
       selectedParent: "",
       parentSearch: "",
+      parentStatusFilter: "all",
+      parentStageFilter: "ALL",
       childSearch: "",
+      childMode: "recommended",
+      childDeptFilter: "ALL",
+      childStageFilter: "ALL",
+      hideAdded: true,
       pendingSearch: "",
       relations: [],
       completedParents: [],
       expandedNotesId: null,
+      lastDeletedRelation: null,
       lastSavedAt: null
     };
 
     function esc(v){return String(v??"").replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));}
     function norm(v){return String(v??"").trim().toLowerCase();}
+    function relationRule(parent, child){
+      if(!parent || !child) return {kind:"warn", label:"확인 필요", score:0, reason:"품목 정보를 확인해야 합니다"};
+      const p = PROCESS_INDEX[parent.processType], c = PROCESS_INDEX[child.processType];
+      const pd = deptIndexOf(parent.processType), cd = deptIndexOf(child.processType);
+      const ps = stageCode(parent.processType), cs = stageCode(child.processType);
+      if(p === undefined || c === undefined || pd < 0 || cd < 0){
+        return {kind:"warn", label:"확인 필요", score:0, reason:"공정 코드가 원장 규칙과 다릅니다"};
+      }
+      const previousFinal = cs === "F" && cd === pd - 1 && (ps === "A" || ps === "F");
+      if(previousFinal){
+        return {kind:"best", label:"이전공정 F", score:120, reason:"이전 공정 완료품이라 다음 공정에 바로 넣기 좋습니다"};
+      }
+      if(c < p){
+        if(cd === pd) return {kind:"ok", label:"같은 공정 이전", score:85, reason:"같은 공정의 앞 단계입니다"};
+        return {kind:"ok", label:"이전 공정", score:70, reason:"상위 품목보다 앞 공정입니다"};
+      }
+      if(c === p) return {kind:"warn", label:"같은 단계", score:20, reason:"상위 품목과 같은 공정 단계입니다"};
+      return {kind:"warn", label:"뒤 공정", score:5, reason:"상위 품목보다 뒤 공정이라 확인이 필요합니다"};
+    }
     function allowed(parent, child){
-      const p = PROCESS_INDEX[parent?.processType], c = PROCESS_INDEX[child?.processType];
-      return p !== undefined && c !== undefined && c < p;
+      return relationRule(parent, child).kind !== "warn";
     }
     function fmtQty(n){
       const x = Number(n);
@@ -498,6 +577,12 @@ APP_TEMPLATE = r"""<!doctype html>
           : [];
         if(d.selectedParent && itemByCode.has(d.selectedParent)) state.selectedParent = d.selectedParent;
         if(d.selectedDept && DEPARTMENTS.find(x => x.code === d.selectedDept)) state.selectedDept = d.selectedDept;
+        if(d.parentStatusFilter && PARENT_STATUS_FILTERS.some(x => x.code === d.parentStatusFilter)) state.parentStatusFilter = d.parentStatusFilter;
+        if(d.parentStageFilter && PARENT_STAGE_FILTERS.some(x => x.code === d.parentStageFilter)) state.parentStageFilter = d.parentStageFilter;
+        if(d.childMode && CHILD_MODES.some(x => x.code === d.childMode)) state.childMode = d.childMode;
+        if(d.childDeptFilter && (d.childDeptFilter === "ALL" || DEPARTMENTS.some(x => x.code === d.childDeptFilter))) state.childDeptFilter = d.childDeptFilter;
+        if(d.childStageFilter && STAGE_FILTERS.some(x => x.code === d.childStageFilter)) state.childStageFilter = d.childStageFilter;
+        if(typeof d.hideAdded === "boolean") state.hideAdded = d.hideAdded;
         state.lastSavedAt = d.lastSavedAt || null;
       }catch(e){ console.warn(e); }
     }
@@ -508,6 +593,12 @@ APP_TEMPLATE = r"""<!doctype html>
         catalogSource: CATALOG.sourceFile,
         selectedDept: state.selectedDept,
         selectedParent: state.selectedParent,
+        parentStatusFilter: state.parentStatusFilter,
+        parentStageFilter: state.parentStageFilter,
+        childMode: state.childMode,
+        childDeptFilter: state.childDeptFilter,
+        childStageFilter: state.childStageFilter,
+        hideAdded: state.hideAdded,
         relations: state.relations,
         completedParents: state.completedParents,
         lastSavedAt: state.lastSavedAt
@@ -554,9 +645,10 @@ APP_TEMPLATE = r"""<!doctype html>
         if(!Number.isFinite(Number(rel.quantity)) || Number(rel.quantity) <= 0) out.push({sev:"error",rel:rel.id,parent:rel.parentErpCode,child:rel.childErpCode,
           title:"수량이 잘못됐어요",
           desc:"수량은 1 이상이어야 합니다. ＋ 버튼으로 늘려주세요."});
-        if(p && c && !allowed(p, c)) out.push({sev:"warn",rel:rel.id,parent:rel.parentErpCode,child:rel.childErpCode,
-          title:"공정 순서가 어색해요",
-          desc:`이 부품(${deptLabel(c.processType)})은 보통 상위 품목(${deptLabel(p.processType)})의 하위로 잘 안 들어갑니다. 정말 맞다면 비고에 이유를 적어주세요.`});
+        const rule = relationRule(p, c);
+        if(p && c && rule.kind === "warn") out.push({sev:"warn",rel:rel.id,parent:rel.parentErpCode,child:rel.childErpCode,
+          title:"공정 조합을 확인해주세요",
+          desc:`${rule.reason}. 정말 맞다면 비고에 이유를 적어주세요. (${deptLabel(c.processType)} → ${deptLabel(p.processType)})`});
       }
       for(const [k, n] of dup) if(n > 1){
         const [pp, cc] = k.split("=>");
@@ -764,18 +856,24 @@ APP_TEMPLATE = r"""<!doctype html>
       const kw = norm(state.parentSearch);
       let pool = state.showAllDepts ? parentItems : parentItems.filter(p => dept.processes.includes(p.processType));
       if(kw) pool = pool.filter(p => p.searchText.includes(kw));
+      if(state.parentStageFilter !== "ALL") pool = pool.filter(p => stageCode(p.processType) === state.parentStageFilter);
 
       function statusOf(code){
         const own = state.relations.filter(r => r.parentErpCode === code);
-        if(!own.length) return ["아직 안 함", "status-empty"];
         const errs = issues.filter(i => i.parent === code && i.sev === "error");
-        if(errs.length) return [`고칠 곳 ${errs.length}군데`, "status-doing"];
+        if(!own.length) return {label:"아직 안 함", klass:"status-empty", kind:"empty"};
+        if(errs.length) return {label:`고칠 곳 ${errs.length}군데`, klass:"status-error", kind:"issue"};
         const allConfirmed = own.every(r => r.confirmed);
-        return [allConfirmed ? `끝남 (${own.length}건)` : `작업 중 (${own.length}건)`, allConfirmed ? "status-done" : "status-doing"];
+        if(isCompleted(code)) return {label:`완료 처리됨 (${own.length}건)`, klass:"status-done", kind:"done"};
+        return {label:allConfirmed ? `검수 끝남 (${own.length}건)` : `작업 중 (${own.length}건)`, klass:allConfirmed ? "status-done" : "status-doing", kind:allConfirmed ? "done" : "working"};
       }
+      if(state.parentStatusFilter !== "all") pool = pool.filter(p => statusOf(p.erpCode).kind === state.parentStatusFilter);
+
+      const statusChips = PARENT_STATUS_FILTERS.map(f => `<button class="chip parent-status-chip ${state.parentStatusFilter === f.code ? "active" : ""}" data-value="${f.code}">${esc(f.label)}</button>`).join("");
+      const stageChips = PARENT_STAGE_FILTERS.map(f => `<button class="chip parent-stage-chip ${state.parentStageFilter === f.code ? "active" : ""}" data-value="${f.code}">${esc(f.label)}</button>`).join("");
 
       const list = pool.length ? pool.map(p => {
-        const [label, klass] = statusOf(p.erpCode);
+        const s = statusOf(p.erpCode);
         return `<button class="item-card" data-code="${esc(p.erpCode)}" style="--strip:${stripVar(p.processType)}">
           <div class="body">
             <div class="name">${esc(p.itemName)}</div>
@@ -785,7 +883,7 @@ APP_TEMPLATE = r"""<!doctype html>
               ${p.category ? `<span>${esc(p.category)}</span>` : ""}
             </div>
           </div>
-          <span class="status ${klass}">${esc(label)}</span>
+          <span class="status ${s.klass}">${esc(s.label)}</span>
         </button>`;
       }).join("") : `<div class="empty-state">검색 결과가 없습니다.<br><strong>다른 검색어</strong>로 다시 시도해보세요.</div>`;
 
@@ -802,7 +900,18 @@ APP_TEMPLATE = r"""<!doctype html>
           </label>
         </header>
         <div class="view-body">
-          <input id="parentSearch" type="search" class="big" placeholder="🔍 품명이나 코드로 찾기" value="${esc(state.parentSearch)}" autocomplete="off">
+          <div class="filter-stack">
+            <input id="parentSearch" type="search" class="big" placeholder="🔍 품명이나 코드로 찾기" value="${esc(state.parentSearch)}" autocomplete="off">
+            <div class="filter-row">
+              <span class="filter-label">상태</span>
+              ${statusChips}
+            </div>
+            <div class="filter-row">
+              <span class="filter-label">단계</span>
+              ${stageChips}
+              <span class="mini-stat">${pool.length}개 표시</span>
+            </div>
+          </div>
           <div class="item-list">${list}</div>
         </div>
       `;
@@ -810,6 +919,16 @@ APP_TEMPLATE = r"""<!doctype html>
       document.getElementById("showAll").addEventListener("change", e => { state.showAllDepts = e.target.checked; renderParent(); });
       const search = document.getElementById("parentSearch");
       search.addEventListener("input", e => { state.parentSearch = e.target.value; renderParent(); });
+      document.querySelectorAll("#view-parent .parent-status-chip").forEach(b => b.addEventListener("click", () => {
+        state.parentStatusFilter = b.dataset.value;
+        saveDraft();
+        renderParent();
+      }));
+      document.querySelectorAll("#view-parent .parent-stage-chip").forEach(b => b.addEventListener("click", () => {
+        state.parentStageFilter = b.dataset.value;
+        saveDraft();
+        renderParent();
+      }));
       document.querySelectorAll("#view-parent .item-card").forEach(c => c.addEventListener("click", () => {
         state.selectedParent = c.dataset.code;
         state.expandedNotesId = null;
@@ -871,27 +990,45 @@ APP_TEMPLATE = r"""<!doctype html>
 
       const kw = norm(state.childSearch);
       const selectedSet = new Set(myRels.map(r => r.childErpCode));
-      let candidates = ITEMS.filter(it => it.erpCode !== state.selectedParent && allowed(parent, it));
-      if(kw) candidates = candidates.filter(it => it.searchText.includes(kw));
+      let candidates = ITEMS
+        .filter(it => it.erpCode !== state.selectedParent)
+        .map(it => ({it, rule: relationRule(parent, it)}));
+      if(state.childMode === "recommended") candidates = candidates.filter(x => x.rule.kind !== "warn");
+      if(state.childMode === "prevFinal") candidates = candidates.filter(x => x.rule.kind === "best");
+      if(state.childDeptFilter !== "ALL") candidates = candidates.filter(x => deptOf(x.it.processType)?.code === state.childDeptFilter);
+      if(state.childStageFilter !== "ALL") candidates = candidates.filter(x => stageCode(x.it.processType) === state.childStageFilter);
+      if(state.hideAdded) candidates = candidates.filter(x => !selectedSet.has(x.it.erpCode));
+      if(kw) candidates = candidates.filter(x => x.it.searchText.includes(kw));
       candidates.sort((a, b) => {
-        const ka = (kw && a.itemName.toLowerCase().includes(kw) ? 50 : 0)
-                  + (kw && a.erpCode.toLowerCase().startsWith(kw) ? 80 : 0)
-                  + Math.max(0, 30 - Math.abs(PROCESS_INDEX[parent.processType] - PROCESS_INDEX[a.processType]) * 3);
-        const kb = (kw && b.itemName.toLowerCase().includes(kw) ? 50 : 0)
-                  + (kw && b.erpCode.toLowerCase().startsWith(kw) ? 80 : 0)
-                  + Math.max(0, 30 - Math.abs(PROCESS_INDEX[parent.processType] - PROCESS_INDEX[b.processType]) * 3);
-        return kb - ka || a.sortOrder - b.sortOrder;
+        const ka = a.rule.score
+                  + (kw && a.it.itemName.toLowerCase().includes(kw) ? 50 : 0)
+                  + (kw && a.it.erpCode.toLowerCase().startsWith(kw) ? 80 : 0)
+                  + Math.max(0, 30 - Math.abs(PROCESS_INDEX[parent.processType] - PROCESS_INDEX[a.it.processType]) * 3)
+                  - (selectedSet.has(a.it.erpCode) ? 500 : 0);
+        const kb = b.rule.score
+                  + (kw && b.it.itemName.toLowerCase().includes(kw) ? 50 : 0)
+                  + (kw && b.it.erpCode.toLowerCase().startsWith(kw) ? 80 : 0)
+                  + Math.max(0, 30 - Math.abs(PROCESS_INDEX[parent.processType] - PROCESS_INDEX[b.it.processType]) * 3)
+                  - (selectedSet.has(b.it.erpCode) ? 500 : 0);
+        return kb - ka || a.it.sortOrder - b.it.sortOrder;
       });
       const candidatesShown = candidates.slice(0, 200);
+      const modeChips = CHILD_MODES.map(f => `<button class="chip child-mode-chip ${state.childMode === f.code ? "active" : ""}" data-value="${f.code}">${esc(f.label)}</button>`).join("");
+      const deptChips = [{code:"ALL",name:"전체",emoji:""}].concat(DEPARTMENTS).map(d => `<button class="chip child-dept-chip ${state.childDeptFilter === d.code ? "active" : ""}" data-value="${d.code}">${esc(d.emoji ? d.emoji + " " : "")}${esc(d.name)}</button>`).join("");
+      const stageChips = STAGE_FILTERS.map(f => `<button class="chip child-stage-chip ${state.childStageFilter === f.code ? "active" : ""}" data-value="${f.code}">${esc(f.label)}</button>`).join("");
 
       const candHtml = candidatesShown.length ? candidatesShown.map(it => {
-        const added = selectedSet.has(it.erpCode);
-        return `<button class="candidate ${added ? "added" : ""}" data-code="${esc(it.erpCode)}" ${added ? "disabled" : ""} style="--strip:${stripVar(it.processType)}">
+        const item = it.it;
+        const rule = it.rule;
+        const added = selectedSet.has(item.erpCode);
+        const tagClass = added ? "added" : rule.kind;
+        return `<button class="candidate ${added ? "added" : ""} ${rule.kind === "warn" ? "warn" : ""} ${rule.kind === "best" ? "best" : ""}" data-code="${esc(item.erpCode)}" ${added ? "disabled" : ""} style="--strip:${stripVar(item.processType)}">
           <div class="body">
-            <div class="name">${esc(it.itemName)}</div>
+            <div class="name">${esc(item.itemName)}</div>
             <div class="sub">
-              <span class="code">${esc(it.erpCode)}</span>
-              <span>${esc(deptLabel(it.processType))}</span>
+              <span class="code">${esc(item.erpCode)}</span>
+              <span>${esc(deptLabel(item.processType))}</span>
+              <span class="tag ${tagClass}">${esc(added ? "추가됨" : rule.label)}</span>
             </div>
           </div>
           <div class="add-icon">${added ? "✓" : "＋"}</div>
@@ -924,6 +1061,12 @@ APP_TEMPLATE = r"""<!doctype html>
               <div class="col-head">
                 <h3>📋 추가된 하위 부품</h3>
                 <span class="count">${myRels.length}건</span>
+                <div class="tool-row">
+                  <button id="confirmAllRows" class="small" ${myRels.length ? "" : "disabled"}>모두 검수</button>
+                  <button id="clearConfirmRows" class="small" ${myRels.length ? "" : "disabled"}>검수 해제</button>
+                  <button id="downloadCurrentBom" class="small" ${myRels.length ? "" : "disabled"}>현재 BOM CSV</button>
+                  ${state.lastDeletedRelation && state.lastDeletedRelation.parentErpCode === state.selectedParent ? `<button id="undoDelete" class="small">삭제 취소</button>` : ""}
+                </div>
               </div>
               <div class="col-body" id="editRows">${rowsHtml}</div>
             </div>
@@ -934,6 +1077,23 @@ APP_TEMPLATE = r"""<!doctype html>
               </div>
               <div class="col-search">
                 <input id="childSearch" type="search" placeholder="🔍 품명이나 코드로 찾기" value="${esc(state.childSearch)}" autocomplete="off">
+                <div class="filter-row tight">
+                  <span class="filter-label">후보</span>
+                  ${modeChips}
+                  <label class="switch" style="margin-left:auto">
+                    <input type="checkbox" id="hideAdded" ${state.hideAdded ? "checked" : ""}>
+                    <span>추가된 항목 숨김</span>
+                  </label>
+                </div>
+                <div class="filter-row tight">
+                  <span class="filter-label">부서</span>
+                  ${deptChips}
+                </div>
+                <div class="filter-row tight">
+                  <span class="filter-label">단계</span>
+                  ${stageChips}
+                  <button id="childResetFilters" class="small ghost" style="margin-left:auto">필터 초기화</button>
+                </div>
               </div>
               <div class="col-body" id="editCands">${candHtml}</div>
             </div>
@@ -954,6 +1114,39 @@ APP_TEMPLATE = r"""<!doctype html>
 
       const cs = document.getElementById("childSearch");
       cs.addEventListener("input", e => { state.childSearch = e.target.value; renderEdit(); });
+      document.getElementById("confirmAllRows")?.addEventListener("click", () => confirmAllCurrent(true));
+      document.getElementById("clearConfirmRows")?.addEventListener("click", () => confirmAllCurrent(false));
+      document.getElementById("downloadCurrentBom")?.addEventListener("click", downloadCurrentParent);
+      document.getElementById("undoDelete")?.addEventListener("click", restoreLastDeleted);
+      document.getElementById("hideAdded")?.addEventListener("change", e => {
+        state.hideAdded = e.target.checked;
+        saveDraft();
+        renderEdit();
+      });
+      document.getElementById("childResetFilters")?.addEventListener("click", () => {
+        state.childSearch = "";
+        state.childMode = "recommended";
+        state.childDeptFilter = "ALL";
+        state.childStageFilter = "ALL";
+        state.hideAdded = true;
+        saveDraft();
+        renderEdit();
+      });
+      document.querySelectorAll("#view-edit .child-mode-chip").forEach(b => b.addEventListener("click", () => {
+        state.childMode = b.dataset.value;
+        saveDraft();
+        renderEdit();
+      }));
+      document.querySelectorAll("#view-edit .child-dept-chip").forEach(b => b.addEventListener("click", () => {
+        state.childDeptFilter = b.dataset.value;
+        saveDraft();
+        renderEdit();
+      }));
+      document.querySelectorAll("#view-edit .child-stage-chip").forEach(b => b.addEventListener("click", () => {
+        state.childStageFilter = b.dataset.value;
+        saveDraft();
+        renderEdit();
+      }));
 
       document.querySelectorAll("#editCands .candidate").forEach(c => c.addEventListener("click", () => {
         if(c.disabled) return;
@@ -982,6 +1175,37 @@ APP_TEMPLATE = r"""<!doctype html>
       });
     }
 
+    function confirmAllCurrent(value){
+      const rows = state.relations.filter(r => r.parentErpCode === state.selectedParent);
+      if(!rows.length){ toast("검수할 부품이 없어요", "warn"); return; }
+      rows.forEach(r => r.confirmed = !!value);
+      saveDraft();
+      toast(value ? "현재 BOM을 모두 검수 처리했어요" : "검수 표시를 해제했어요", "ok");
+      renderEdit();
+    }
+    function downloadCurrentParent(){
+      const parent = itemByCode.get(state.selectedParent);
+      const rows = state.relations.filter(r => r.parentErpCode === state.selectedParent);
+      if(!parent || !rows.length){ toast("다운로드할 BOM이 없어요", "warn"); return; }
+      download(`bom_${safeFilename(parent.erpCode)}_${stamp()}.csv`, relationCsv(rows), "text/csv;charset=utf-8");
+      toast("현재 BOM CSV를 저장했어요", "ok");
+    }
+    function restoreLastDeleted(){
+      const rel = state.lastDeletedRelation;
+      if(!rel || rel.parentErpCode !== state.selectedParent){ toast("되돌릴 삭제 항목이 없어요", "warn"); return; }
+      if(state.relations.some(r => r.parentErpCode === rel.parentErpCode && r.childErpCode === rel.childErpCode)){
+        state.lastDeletedRelation = null;
+        saveDraft();
+        toast("이미 다시 들어가 있어요", "warn");
+        renderEdit();
+        return;
+      }
+      state.relations.push({...rel, id: uid()});
+      state.lastDeletedRelation = null;
+      saveDraft();
+      toast("방금 뺀 부품을 되돌렸어요", "ok");
+      renderEdit();
+    }
     function addRelationDirect(childCode){
       if(!itemByCode.has(childCode)){ toast("부품을 찾을 수 없어요", "error"); return; }
       if(state.relations.some(r => r.parentErpCode === state.selectedParent && r.childErpCode === childCode)){
@@ -1022,6 +1246,8 @@ APP_TEMPLATE = r"""<!doctype html>
       saveDraft();
     }
     function deleteRelation(id){
+      const rel = state.relations.find(r => r.id === id);
+      state.lastDeletedRelation = rel ? {...rel} : null;
       state.relations = state.relations.filter(r => r.id !== id);
       if(state.expandedNotesId === id) state.expandedNotesId = null;
       saveDraft();
@@ -1348,10 +1574,13 @@ code{background:#eef3f5;padding:2px 7px;border-radius:6px;font-size:14px;font-fa
   <h2><span class="num">4</span>하위 부품 추가</h2>
   <ul>
     <li>오른쪽 부품 목록에서 <strong>한 번 누르면 즉시 추가</strong>됩니다 (수량 1, 단위 EA 기본).</li>
+    <li><strong>추천 / 이전공정 F / 전체</strong> 필터로 후보를 좁힐 수 있습니다. 이전 공정의 F 품목은 다음 공정 A/F 작업에 추천으로 뜹니다.</li>
+    <li><strong>부서 / 단계</strong> 필터를 같이 쓰면 긴 목록에서도 필요한 부품만 빠르게 찾을 수 있습니다.</li>
     <li>왼쪽에 들어간 부품의 수량은 <strong>＋ / − 버튼</strong>으로 조정합니다.</li>
     <li><strong>「검수 끝남」</strong> 스위치를 켜면 그 줄이 검토 완료로 표시됩니다.</li>
+    <li>왼쪽 위의 <strong>모두 검수 / 검수 해제 / 현재 BOM CSV</strong> 버튼으로 반복 작업을 줄일 수 있습니다.</li>
     <li>비고를 적으려면 줄 오른쪽의 <strong>✎ 아이콘</strong>을 누르세요.</li>
-    <li>잘못 넣었다면 <strong>× 아이콘</strong>으로 뺄 수 있어요.</li>
+    <li>잘못 넣었다면 <strong>× 아이콘</strong>으로 뺄 수 있고, 바로 직전 삭제는 <strong>삭제 취소</strong>로 되돌릴 수 있어요.</li>
   </ul>
   <div class="tip">💡 <strong>팁</strong> — 작업은 자동 저장됩니다. 브라우저를 닫았다 켜도 그대로 이어집니다.</div>
 </div>
