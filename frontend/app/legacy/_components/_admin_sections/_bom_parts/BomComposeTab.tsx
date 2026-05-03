@@ -1,15 +1,14 @@
 "use client";
 
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import type { BOMEntry } from "@/lib/api";
 import { LEGACY_COLORS } from "../../legacyUi";
-import { formatQty } from "@/lib/mes/format";
 import { EmptyState } from "../../common/EmptyState";
 import { useAdminBomContext } from "../AdminBomContext";
 import { BomParentPicker } from "./BomParentPicker";
 import { BomChildPicker } from "./BomChildPicker";
 import { BomStepIndicator } from "./BomStepIndicator";
-import { bomCategoryColor } from "../adminShared";
+import { BomComposeRow } from "./BomComposeRow";
 
 /**
  * AdminBomSection 의 "BOM 작성" 탭.
@@ -140,106 +139,23 @@ export function BomComposeTab({ onEditQty }: Props) {
                   </div>
                   {bomRows.map((row, index) => {
                     const childItem = items.find((item) => item.item_id === row.child_item_id);
-                    const stock = Number(childItem?.quantity ?? 0);
-                    const capacity = row.quantity > 0 ? Math.floor(stock / Number(row.quantity)) : 0;
-                    const catColor = bomCategoryColor(childItem?.process_type_code);
-                    const isEditing = editingBomId === row.bom_id;
                     return (
-                      <div
+                      <BomComposeRow
                         key={row.bom_id}
-                        className="grid items-center px-5 py-3"
-                        style={{
-                          gridTemplateColumns: "36px 1fr 120px 160px 80px 80px 40px",
-                          borderBottom: index === bomRows.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
+                        row={row}
+                        childItem={childItem}
+                        isEditing={editingBomId === row.bom_id}
+                        isLast={index === bomRows.length - 1}
+                        editingQty={editingQty}
+                        setEditingQty={setEditingQty}
+                        onStartEdit={() => { setEditingBomId(row.bom_id); setEditingQty(String(row.quantity)); }}
+                        onCancelEdit={() => setEditingBomId(null)}
+                        onSaveEdit={() => onEditQty(row)}
+                        onDelete={() => {
+                          const childName = childItem?.item_name ?? row.child_item_id;
+                          setDeleteRequest({ bomId: row.bom_id, childName });
                         }}
-                      >
-                        <span
-                          className="rounded px-1 py-0.5 text-xs font-bold w-fit"
-                          style={{
-                            background: `color-mix(in srgb, ${catColor} 12%, transparent)`,
-                            color: catColor,
-                          }}
-                        >
-                          {childItem?.process_type_code ?? "-"}
-                        </span>
-                        <div>
-                          <div className="truncate text-sm font-medium" style={{ color: LEGACY_COLORS.text }}>
-                            {childItem?.item_name || row.child_item_id}
-                          </div>
-                        </div>
-                        <div className="text-right text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                          {childItem?.erp_code ?? "-"}
-                        </div>
-                        {/* 소요량 — 수정 버튼 방식 (blur 자동저장 없음) */}
-                        <div className="flex items-center justify-end gap-1">
-                          {isEditing ? (
-                            <>
-                              <input
-                                autoFocus
-                                type="number"
-                                value={editingQty}
-                                onChange={(e) => setEditingQty(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === "Escape") setEditingBomId(null); }}
-                                className="w-14 rounded border bg-transparent px-1 text-right text-sm outline-none"
-                                style={{ borderColor: LEGACY_COLORS.blue, color: LEGACY_COLORS.text }}
-                              />
-                              <button
-                                onClick={() => onEditQty(row)}
-                                className="rounded-[8px] px-2 py-0.5 text-xs font-bold text-white"
-                                style={{ background: LEGACY_COLORS.blue }}
-                              >
-                                변경 저장
-                              </button>
-                              <button
-                                onClick={() => setEditingBomId(null)}
-                                className="rounded-[8px] px-1.5 py-0.5 text-xs"
-                                style={{ color: LEGACY_COLORS.muted2 }}
-                              >
-                                취소
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-sm" style={{ color: LEGACY_COLORS.text }}>
-                                ×{formatQty(row.quantity)}
-                              </span>
-                              <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{row.unit}</span>
-                              <button
-                                title="소요량 수정"
-                                onClick={() => { setEditingBomId(row.bom_id); setEditingQty(String(row.quantity)); }}
-                                className="ml-1 flex items-center justify-center rounded-full p-1 hover:bg-[var(--c-s3)]"
-                                style={{ color: LEGACY_COLORS.muted2 }}
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                        <div
-                          className="text-right text-sm"
-                          style={{ color: stock > 0 ? LEGACY_COLORS.text : LEGACY_COLORS.red }}
-                        >
-                          {formatQty(stock)}
-                        </div>
-                        <div
-                          className="text-right text-sm font-bold"
-                          style={{ color: capacity > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}
-                        >
-                          {formatQty(capacity)}
-                        </div>
-                        <div className="flex justify-end">
-                          <button
-                            onClick={() => {
-                              const childName = childItem?.item_name ?? row.child_item_id;
-                              setDeleteRequest({ bomId: row.bom_id, childName });
-                            }}
-                            className="flex items-center justify-center rounded-full p-1 hover:bg-red-500/10"
-                            style={{ color: LEGACY_COLORS.red }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </div>
+                      />
                     );
                   })}
                 </div>
