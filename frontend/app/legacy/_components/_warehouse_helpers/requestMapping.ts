@@ -45,13 +45,8 @@ interface LineSpec {
   to_department?: Department | null;
 }
 
-/** 라인 단위 승인 필요 여부 — 백엔드 정책과 동일. */
-export function lineRequiresApproval(
-  from_bucket: RequestBucket,
-  to_bucket: RequestBucket
-): boolean {
-  return from_bucket === "warehouse" || to_bucket === "warehouse";
-}
+// 승인 정책 (lineRequiresApproval / inputRequiresApproval) 은 requestPolicy.ts 로 분리됨 (Round-15 #3).
+export { lineRequiresApproval, inputRequiresApproval } from "./requestPolicy";
 
 /** wizard 입력 → request_type 결정. */
 export function resolveRequestType(input: {
@@ -273,24 +268,4 @@ export function draftToFormState(draft: StockRequest): RestoredFormState | null 
   };
 }
 
-/** wizard 입력만으로 승인 필요 여부 미리 판정 (UI 라벨링용). */
-export function inputRequiresApproval(input: {
-  workType: WorkType;
-  rawDirection: Direction;
-  warehouseDirection: TransferDirection;
-  deptDirection: Direction;
-  defectiveSource: DefectiveSource;
-}): boolean {
-  // 라인을 시뮬레이션할 필요 없이 정책 분기를 그대로 본다.
-  switch (input.workType) {
-    case "raw-io":
-      // return(공급업체 반품)은 from=defective, to=none → warehouse 미포함 → 승인 불필요.
-      return input.rawDirection !== "return";
-    case "warehouse-io":
-    case "dept-io":
-    case "package-out":
-      return true;
-    case "defective-register":
-      return input.defectiveSource === "warehouse";
-  }
-}
+// inputRequiresApproval 도 requestPolicy.ts 로 이동 — 본 파일 상단 re-export 사용.
