@@ -14,25 +14,17 @@ import { useWarehouseScroll } from "./_warehouse_hooks/useWarehouseScroll";
 import { useWarehouseDraft } from "./_warehouse_hooks/useWarehouseDraft";
 import { useWarehouseDerivations } from "./_warehouse_hooks/useWarehouseDerivations";
 import { WarehouseHeader } from "./_warehouse_sections/WarehouseHeader";
-import { WarehouseStickySummary } from "./_warehouse_sections/WarehouseStickySummary";
 import { WarehouseCompletionOverlay } from "./_warehouse_sections/WarehouseCompletionOverlay";
-import { WarehouseStepLayout } from "./_warehouse_sections/WarehouseStepLayout";
 import { WarehouseSectionTabs, type WarehouseSectionTab } from "./_warehouse_sections/WarehouseSectionTabs";
 import { WarehouseAccessDenied } from "./_warehouse_sections/WarehouseAccessDenied";
 import { WarehouseSubmissionModals } from "./_warehouse_modals/WarehouseSubmissionModals";
 import { WarehouseDraftPanelTabs } from "./_warehouse_sections/WarehouseDraftPanelTabs";
+import { WarehouseComposeSection } from "./_warehouse_sections/WarehouseComposeSection";
 import {
   buildStockRequestPayload,
   draftToFormState,
 } from "./_warehouse_helpers/requestMapping";
 import { readCurrentOperator } from "./login/useCurrentOperator";
-
-const AUTO_SAVE_LABEL: Record<"idle" | "saving" | "saved" | "error", string> = {
-  idle: "",
-  saving: "작업 저장 중...",
-  saved: "작업 내용 저장됨",
-  error: "작업 저장 실패",
-};
 
 export function DesktopWarehouseView({
   globalSearch,
@@ -438,81 +430,44 @@ export function DesktopWarehouseView({
           }}
         />
 
-        {sectionTab !== "compose" ? null : (
-          <>
-            {autoSaveStatus !== "idle" && (
-              <div
-                className="self-end text-xs"
-                style={{
-                  color:
-                    autoSaveStatus === "error"
-                      ? LEGACY_COLORS.red
-                      : autoSaveStatus === "saving"
-                        ? LEGACY_COLORS.muted
-                        : LEGACY_COLORS.green,
-                }}
-              >
-                {AUTO_SAVE_LABEL[autoSaveStatus]}
-              </div>
-            )}
-            <WarehouseStickySummary summary={stickySummary} />
-
-            <WarehouseStepLayout
-              wizard={{
-                ...wizard,
-                changeSelectedDept: (d) => {
-                  if (wizard.step2Confirmed && d !== wizard.selectedDept) {
-                    setPendingDeptChange(d);
-                  } else {
-                    wizard.changeSelectedDept(d);
-                  }
-                },
-              }}
-              filter={filter}
-              availableWorkTypes={availableWorkTypes}
-              refs={refs}
-              step2Summary={step2Summary}
-              step2Accent={step2Accent}
-              onChangeWorkType={changeWorkType}
-              onEditStep2={() => setForcedStep(2)}
-              itemsSummary={itemsSummary}
-              selectedItems={selectedItems}
-              selectedPackage={selectedPackage}
-              onToggleItem={toggleSelectItem}
-              onSelectPackage={setSelectedPackage}
-              productModels={productModels}
-              pendingScrollId={pendingScrollId}
-              onScrolled={() => setPendingScrollId(null)}
-              accent={accent}
-              selectedEntries={selectedEntries}
-              isOutbound={isOutbound}
-              onQuantityChange={setItemQty}
-              onRemoveItem={removeItem}
-              onClearPackage={() => setSelectedPackage(null)}
-              notes={notes}
-              setNotes={setNotes}
-              totalQty={totalQty}
-              shortLabel={shortLabel}
-              canExecute={canExecute}
-              isCaution={isCaution}
-              blockerText={blockerText}
-              submitting={submitting}
-              onSubmit={() => setShowConfirm(true)}
-            />
-
-            {error && (
-              <div
-                className="rounded-[14px] border px-4 py-3 text-sm"
-                style={{
-                  background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
-                  borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`,
-                  color: LEGACY_COLORS.red,
-                }}
-              >
-                {error}
-              </div>
-            )}
-          </>
+        {sectionTab === "compose" && (
+          <WarehouseComposeSection
+            autoSaveStatus={autoSaveStatus}
+            stickySummary={stickySummary}
+            error={error}
+            wizard={wizard}
+            setPendingDeptChange={setPendingDeptChange}
+            filter={filter}
+            availableWorkTypes={availableWorkTypes}
+            refs={refs}
+            step2Summary={step2Summary}
+            step2Accent={step2Accent}
+            onChangeWorkType={changeWorkType}
+            onEditStep2={() => setForcedStep(2)}
+            itemsSummary={itemsSummary}
+            selectedItems={selectedItems}
+            selectedPackage={selectedPackage}
+            onToggleItem={toggleSelectItem}
+            onSelectPackage={setSelectedPackage}
+            productModels={productModels}
+            pendingScrollId={pendingScrollId}
+            onScrolled={() => setPendingScrollId(null)}
+            accent={accent}
+            selectedEntries={selectedEntries}
+            isOutbound={isOutbound}
+            onQuantityChange={setItemQty}
+            onRemoveItem={removeItem}
+            onClearPackage={() => setSelectedPackage(null)}
+            notes={notes}
+            setNotes={setNotes}
+            totalQty={totalQty}
+            shortLabel={shortLabel}
+            canExecute={canExecute}
+            isCaution={isCaution}
+            blockerText={blockerText}
+            submitting={submitting}
+            onSubmit={() => setShowConfirm(true)}
+          />
         )}
       </div>
 

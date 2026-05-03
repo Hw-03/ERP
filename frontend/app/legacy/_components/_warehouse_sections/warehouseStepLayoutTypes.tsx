@@ -27,6 +27,7 @@ export type WizardLike = {
   changeDefectiveSource: (s: DefectiveSource) => void;
   confirmStep2: () => void;
   step2Ready: boolean;
+  step2Confirmed: boolean;
   step1State: StepState;
   step2State: StepState;
   hasItems: boolean;
