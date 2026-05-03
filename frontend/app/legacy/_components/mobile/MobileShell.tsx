@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Bell, Lock, Package, Warehouse, Wrench, type LucideIcon } from "lucide-react";
 import clsx from "clsx";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ELEVATION, TYPO } from "./tokens";
 import { AlertsSheet } from "./AlertsSheet";
 import { IconButton } from "./primitives";

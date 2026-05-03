@@ -3,7 +3,7 @@
 import { forwardRef } from "react";
 import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 type Variant = "ghost" | "solid" | "outline";
 type Size = "sm" | "md" | "lg";

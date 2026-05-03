@@ -1,6 +1,6 @@
 "use client";
 
-import { LEGACY_COLORS } from "../../../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "../../../tokens";
 
 export function StepHeading({ title, hint }: { title: string; hint?: string }) {

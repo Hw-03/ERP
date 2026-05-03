@@ -2,7 +2,7 @@
 
 import { useEffect, useId } from "react";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { useFocusTrap } from "../_hooks/useFocusTrap";
 
 export type ResultKind = "success" | "partial" | "fail";

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronLeft, Lock } from "lucide-react";
-import { LEGACY_COLORS } from "../../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ELEVATION, TYPO } from "../../tokens";
 import { IconButton } from "../../primitives";
 import { PinLock } from "../../../PinLock";

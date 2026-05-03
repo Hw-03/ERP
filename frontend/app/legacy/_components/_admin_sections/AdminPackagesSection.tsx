@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { useAdminPackagesContext } from "./AdminPackagesContext";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { PackageDetailPanel } from "./_packages_parts/PackageDetailPanel";

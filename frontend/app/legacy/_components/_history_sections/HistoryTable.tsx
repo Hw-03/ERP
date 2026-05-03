@@ -3,7 +3,7 @@
 import { ChevronDown } from "lucide-react";
 import { useState, useMemo } from "react";
 import type { TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../common/EmptyState";
 import { formatHistoryDate } from "./historyShared";
 import { HistoryLogRow } from "./HistoryLogRow";

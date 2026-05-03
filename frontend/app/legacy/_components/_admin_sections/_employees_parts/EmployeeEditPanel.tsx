@@ -1,7 +1,7 @@
 "use client";
 
 import type { DepartmentMaster, Employee, EmployeeLevel, WarehouseRole } from "@/lib/api";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { EmployeeEditForm } from "../../_admin_hooks/useAdminEmployees";
 
 /**

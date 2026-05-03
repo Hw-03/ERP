@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "../tokens";
 import { formatQty } from "@/lib/mes/format";
 type Intent = "primary" | "success" | "danger" | "neutral";

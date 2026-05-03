@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { firstEmployeeLetter } from "@/lib/mes/employee";
 import { useDeptColor } from "../../DepartmentsContext";
 import { TYPO } from "../tokens";

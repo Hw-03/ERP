@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { PackageSearch } from "lucide-react";
 import type { Department, Employee } from "@/lib/api";
-import { LEGACY_COLORS } from "../../../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "../../../tokens";
 import { EmptyState, PersonAvatar } from "../../../primitives";
 import { useDeptWizard } from "../context";

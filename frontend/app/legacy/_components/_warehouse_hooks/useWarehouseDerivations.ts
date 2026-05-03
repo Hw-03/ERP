@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import type { Department, Employee, Item, ShipPackage } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import {
   CAUTION_WORK_TYPES,
   isWarehouseStaff,

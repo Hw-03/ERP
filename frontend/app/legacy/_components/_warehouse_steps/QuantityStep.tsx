@@ -3,7 +3,7 @@
 import { X } from "lucide-react";
 import type { Item, ShipPackage } from "@/lib/api";
 import { SelectedItemsPanel } from "../SelectedItemsPanel";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import type { WorkType } from "./_constants";
 

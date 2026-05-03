@@ -1,4 +1,4 @@
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 export const HISTORY_PAGE_SIZE = 100;
 

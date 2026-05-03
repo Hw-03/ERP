@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { EmptyState } from "../../common/EmptyState";
 import { useAdminBomContext } from "../AdminBomContext";

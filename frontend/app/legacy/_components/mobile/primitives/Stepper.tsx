@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { Minus, Plus } from "lucide-react";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "../tokens";
 
 export function Stepper({

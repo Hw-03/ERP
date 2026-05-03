@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 export function StickyFooter({
   children,

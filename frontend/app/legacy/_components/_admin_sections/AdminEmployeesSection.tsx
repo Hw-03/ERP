@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { useAdminEmployeesContext } from "./AdminEmployeesContext";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";

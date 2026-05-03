@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   Users,
 } from "lucide-react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { SidebarButton } from "./SidebarButton";
 import type { AdminSection } from "../_admin_hooks/useAdminViewState";
 

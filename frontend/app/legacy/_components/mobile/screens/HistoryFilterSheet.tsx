@@ -2,7 +2,7 @@
 
 import { RotateCcw } from "lucide-react";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "../tokens";
 import { FilterChip, FilterChipRow, SheetHeader } from "../primitives";
 

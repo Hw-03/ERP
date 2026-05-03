@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ElementType, type ReactNode } from "react";
 import { ChevronDown, LogOut, RefreshCw } from "lucide-react";
-import { LEGACY_COLORS } from "./legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { StatusPill, inferToneFromStatus } from "./common";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";

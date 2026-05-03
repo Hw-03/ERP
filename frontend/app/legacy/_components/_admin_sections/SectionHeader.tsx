@@ -2,7 +2,7 @@
 
 import type { ElementType } from "react";
 import { AlertTriangle } from "lucide-react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 export interface SectionHeaderProps {
   icon: ElementType;

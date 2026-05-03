@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ClipboardCheck, RefreshCw, AlertTriangle, ChevronRight } from "lucide-react";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { AlertsBanner } from "../AlertsBanner";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "./tokens";
 import { SheetHeader } from "./primitives";
 

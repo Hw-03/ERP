@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, ArrowRight } from "lucide-react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 type Props = {
   lowCount: number;

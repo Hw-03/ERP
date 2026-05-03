@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDownToLine, ArrowUpFromLine, ChevronRight } from "lucide-react";
-import { LEGACY_COLORS } from "../../../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "../../../tokens";
 import { useDeptWizard } from "../context";
 import { StepHeading } from "./_shared";

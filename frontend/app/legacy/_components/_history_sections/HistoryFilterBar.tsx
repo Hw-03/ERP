@@ -1,7 +1,7 @@
 "use client";
 
 import { CalendarDays, List, Search, X } from "lucide-react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DATE_OPTIONS, TYPE_OPTIONS } from "./historyShared";
 
 function Chip({

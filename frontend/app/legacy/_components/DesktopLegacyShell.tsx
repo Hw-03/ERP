@@ -10,7 +10,7 @@ import { DesktopInventoryView } from "./DesktopInventoryView";
 import { DesktopWarehouseView } from "./DesktopWarehouseView";
 import { DesktopAdminView } from "./DesktopAdminView";
 import { DesktopHistoryView } from "./DesktopHistoryView";
-import { LEGACY_COLORS } from "./legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { api, type ProductionCapacity } from "@/lib/api";
 import type { Item } from "@/lib/api";
 import { CapacityDetailModal } from "./CapacityDetailModal";

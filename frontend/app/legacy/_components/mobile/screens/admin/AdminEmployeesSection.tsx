@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, type Employee } from "@/lib/api";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import type { ToastState } from "@/lib/ui/Toast";
-import { LEGACY_COLORS } from "../../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { useDepartments } from "../../../DepartmentsContext";
 

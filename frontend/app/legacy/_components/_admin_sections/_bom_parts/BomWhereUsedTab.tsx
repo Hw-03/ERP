@@ -1,6 +1,6 @@
 "use client";
 
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../../common/EmptyState";
 import { useAdminBomContext } from "../AdminBomContext";
 import { BomParentPicker } from "./BomParentPicker";

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
-import { LEGACY_COLORS } from "./legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 export function ThemeToggle() {
   const [isLight, setIsLight] = useState(true);

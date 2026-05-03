@@ -19,7 +19,7 @@ import {
   Wrench,
 } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { getTransactionLabel, transactionColor, transactionIconName } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColor } from "../DepartmentsContext";

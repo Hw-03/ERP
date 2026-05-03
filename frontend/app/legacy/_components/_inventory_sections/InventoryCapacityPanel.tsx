@@ -2,7 +2,7 @@
 
 import { AlertTriangle, Zap } from "lucide-react";
 import type { ProductionCapacity } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 export function InventoryCapacityPanel({
   capacityData,

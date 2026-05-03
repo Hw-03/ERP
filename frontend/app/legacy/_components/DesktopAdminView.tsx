@@ -4,7 +4,7 @@ import { useState } from "react";
 import { PanelRight } from "lucide-react";
 import { DesktopRightPanel } from "./DesktopRightPanel";
 import { PinLock } from "./PinLock";
-import { LEGACY_COLORS } from "./legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { OverviewBar } from "./_admin_sections/OverviewBar";
 import { SectionHeader } from "./_admin_sections/SectionHeader";
 import { AdminSidebar, SECTIONS, SETTINGS_ENTRY } from "./_admin_sections/AdminSidebar";

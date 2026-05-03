@@ -2,7 +2,7 @@
 
 import { ChevronDown, Filter, Search, Sparkles, TrendingUp } from "lucide-react";
 import type { DepartmentMaster, ProductModel } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 function Chip({
   active,

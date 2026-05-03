@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type QueueBatch, type QueueBatchStatus } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacy/_components/legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { formatDateTime } from "@/lib/mes-format";
 

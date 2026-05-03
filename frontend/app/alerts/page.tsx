@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type StockAlert } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacy/_components/legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<StockAlert[]>([]);

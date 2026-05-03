@@ -3,7 +3,7 @@
 // AdminBomSection 좌측 — 상위 품목 선택 패널.
 // AdminBomContext 의존 (prop drilling 0).
 
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { BOM_PARENT_CATS } from "../adminShared";
 import { useAdminBomContext } from "../AdminBomContext";
 

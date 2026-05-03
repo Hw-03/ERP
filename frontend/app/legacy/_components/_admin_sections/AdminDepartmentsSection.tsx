@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Building2, GripVertical } from "lucide-react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { useAdminDepartmentsContext } from "./AdminDepartmentsContext";
 import { getDepartmentFallbackColor } from "@/lib/mes-department";
 import type { DepartmentMaster } from "@/lib/api";

@@ -1,7 +1,7 @@
 "use client";
 
 import { DatabaseBackup, KeyRound } from "lucide-react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 type PinForm = { current_pin: string; new_pin: string; confirm_pin: string };
 

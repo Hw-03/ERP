@@ -10,7 +10,7 @@ import {
   Workflow,
   type LucideIcon,
 } from "lucide-react";
-import { LEGACY_COLORS } from "../../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "../../tokens";
 import { IconButton } from "../../primitives";
 

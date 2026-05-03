@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Check, ChevronDown, Pencil } from "lucide-react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 // ─────────────────────── 내부 atom: LabeledSelect ──────────────────
 

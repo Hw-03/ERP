@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, TrendingDown, TrendingUp } from "lucide-react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 export interface HistoryStatsBarProps {
   stats: {

@@ -3,7 +3,7 @@
 import { Check } from "lucide-react";
 import type { ShipPackage } from "@/lib/api";
 import { EmptyState } from "../../common/EmptyState";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 /**
  * ItemPickStep 의 패키지 출고 모드 리스트.

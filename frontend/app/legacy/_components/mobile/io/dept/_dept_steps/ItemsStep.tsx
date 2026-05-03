@@ -4,7 +4,7 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { ScanLine } from "lucide-react";
 import type { Item, ShipPackage } from "@/lib/api";
 import { BarcodeScannerModal } from "../../../../BarcodeScannerModal";
-import { LEGACY_COLORS } from "../../../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { ToastState } from "@/lib/ui/Toast";
 import { TYPO } from "../../../tokens";
 import {

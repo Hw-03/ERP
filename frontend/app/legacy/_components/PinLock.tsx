@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { LockKeyhole } from "lucide-react";
 import { api } from "@/lib/api";
-import { LEGACY_COLORS } from "./legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "삭제"];
 

@@ -10,7 +10,7 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { api, type Employee, type TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { getTransactionLabel } from "@/lib/mes-status";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 

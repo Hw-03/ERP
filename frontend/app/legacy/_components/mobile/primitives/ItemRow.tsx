@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import { Check } from "lucide-react";
 import type { Item } from "@/lib/api";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { erpCodeDeptBadge } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
 import { formatErpCode, formatQty } from "@/lib/mes/format";

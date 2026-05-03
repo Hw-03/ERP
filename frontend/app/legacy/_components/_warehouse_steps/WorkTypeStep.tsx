@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { AlertTriangle, Check } from "lucide-react";
 import type { Department } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { SettingLabel } from "./_atoms";
 import { WorkTypeCardGrid } from "./WorkTypeCardGrid";

@@ -1,6 +1,6 @@
 "use client";
 
-import { LEGACY_COLORS } from "../../../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { useDepartments, useDeptColorLookup } from "../../../../DepartmentsContext";
 import { TYPO } from "../../../tokens";
 import { useDeptWizard } from "../context";

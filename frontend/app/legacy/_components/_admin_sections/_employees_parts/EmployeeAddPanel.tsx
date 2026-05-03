@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 import type { DepartmentMaster, WarehouseRole } from "@/lib/api";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../adminShared";
 
 /**

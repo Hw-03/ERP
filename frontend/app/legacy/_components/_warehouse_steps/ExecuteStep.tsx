@@ -2,7 +2,7 @@
 
 import { AlertTriangle } from "lucide-react";
 import type { Item } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { WorkType } from "./_constants";
 
 export function ExecuteStep({

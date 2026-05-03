@@ -3,7 +3,7 @@
 // 5.6-E: 선택된 parent 가 다른 BOM 의 child 로 등록된 위치(역참조) 표시.
 // AdminBomContext 의존. parent 미선택 또는 결과 0건이면 렌더 안 함.
 
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { useAdminBomContext } from "../AdminBomContext";
 

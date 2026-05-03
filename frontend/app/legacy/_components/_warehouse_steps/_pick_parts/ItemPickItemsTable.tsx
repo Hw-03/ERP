@@ -3,7 +3,7 @@
 import { Check } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { EmptyState } from "../../common/EmptyState";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { getStockState } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";
 import { PROCESS_TYPE_LABEL, PAGE_SIZE } from "../_constants";

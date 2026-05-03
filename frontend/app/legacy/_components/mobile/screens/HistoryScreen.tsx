@@ -8,7 +8,7 @@ import {
   History as HistoryIcon,
   List,
 } from "lucide-react";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { TYPO } from "../tokens";
 import { EmptyState, IconButton, KpiCard } from "../primitives";

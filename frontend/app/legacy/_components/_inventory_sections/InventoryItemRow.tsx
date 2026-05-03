@@ -3,7 +3,7 @@
 import { memo } from "react";
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import type { Item } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { erpCodeDept } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";

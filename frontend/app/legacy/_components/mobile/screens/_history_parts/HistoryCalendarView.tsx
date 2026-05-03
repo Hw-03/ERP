@@ -2,7 +2,7 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS } from "../../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "../../tokens";
 import { IconButton } from "../../primitives";
 import { HistoryLogRow } from "./HistoryLogRow";

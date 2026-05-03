@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, type ReactNode } from "react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 export type EmptyStateVariant = "no-data" | "no-search-result" | "filtered-out";
 

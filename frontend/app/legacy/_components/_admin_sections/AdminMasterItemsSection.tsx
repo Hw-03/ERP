@@ -1,7 +1,7 @@
 "use client";
 
 import { PackagePlus, Search } from "lucide-react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { useAdminMasterItemsContext } from "./AdminMasterItemsContext";
 import { AddItemForm } from "./_master_items_parts/AddItemForm";

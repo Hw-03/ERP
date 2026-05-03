@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, type Item, type StockRequestReservationLine, type TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { normalizeModel } from "@/lib/mes/item";
 import { formatQty } from "@/lib/mes/format";

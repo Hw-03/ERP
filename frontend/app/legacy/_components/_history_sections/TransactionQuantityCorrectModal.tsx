@@ -13,7 +13,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { api, type Employee, type TransactionLog, type TransactionType } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { getTransactionLabel } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import { useCurrentOperator } from "../login/useCurrentOperator";

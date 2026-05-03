@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { CheckSquare, PackageSearch } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { ItemDetailSheet } from "../../ItemDetailSheet";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { ELEVATION, TYPO } from "../tokens";
 import { useModels } from "../hooks/useModels";

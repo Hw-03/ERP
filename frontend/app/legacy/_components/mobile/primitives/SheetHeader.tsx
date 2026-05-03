@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { X } from "lucide-react";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "../tokens";
 import { IconButton } from "./IconButton";
 

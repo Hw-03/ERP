@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { inferTone, type MesTone } from "@/lib/mes-status";
 
 // 기존 prop 타입을 깨지 않기 위한 alias — MesTone 의 부분 집합.

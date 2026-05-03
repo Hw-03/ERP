@@ -1,6 +1,6 @@
 "use client";
 
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 type Flyout = { nonce: number; kind: "in" | "out"; count: number };
 

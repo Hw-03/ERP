@@ -1,7 +1,7 @@
 "use client";
 
 import { Layers, Trash2 } from "lucide-react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { useAdminModelsContext } from "./AdminModelsContext";
 
 // Props 없음. AdminModelsProvider 의 Context 에서 모두 읽는다.

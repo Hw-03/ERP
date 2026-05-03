@@ -2,7 +2,7 @@
 
 // 5.5-E: AdminBomSection 의 4-step 인디케이터 추출 (재사용 + 가독성 향상).
 
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 type Step = {
   step: string;

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Camera, X } from "lucide-react";
-import { LEGACY_COLORS } from "./legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { useBarcodeScanner } from "./_hooks/useBarcodeScanner";
 
 export function BarcodeScannerModal({

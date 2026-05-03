@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type TransactionLog, type TransactionType } from "@/lib/api";
-import { LEGACY_COLORS } from "./legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { HistoryFilterBar } from "./_history_sections/HistoryFilterBar";
 import { HistoryCalendarStrip } from "./_history_sections/HistoryCalendarStrip";
 import { HistoryStatsBar } from "./_history_sections/HistoryStatsBar";

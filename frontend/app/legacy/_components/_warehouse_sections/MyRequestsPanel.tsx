@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, type StockRequest } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { MyRequestRow } from "./MyRequestRow";
 

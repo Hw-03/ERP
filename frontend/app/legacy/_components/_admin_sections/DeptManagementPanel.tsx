@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api, type DepartmentMaster } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { employeeColor } from "@/lib/mes/color";
 import { useRefreshDepartments } from "../DepartmentsContext";
 

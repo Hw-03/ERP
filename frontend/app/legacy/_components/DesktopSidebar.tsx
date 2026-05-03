@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import type { ElementType } from "react";
 import { Boxes, History, Settings2, Warehouse } from "lucide-react";
-import { LEGACY_COLORS } from "./legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ThemeToggle } from "./ThemeToggle";
 
 export type DesktopTabId = "dashboard" | "warehouse" | "history" | "admin";

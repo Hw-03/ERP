@@ -1,7 +1,7 @@
 "use client";
 
 import type { Employee } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { firstEmployeeLetter } from "@/lib/mes/employee";
 import { useDeptColorLookup } from "../DepartmentsContext";

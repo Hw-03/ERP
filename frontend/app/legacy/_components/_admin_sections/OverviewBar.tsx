@@ -8,7 +8,7 @@ import type {
   ProductModel,
   ShipPackage,
 } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 export interface OverviewBarProps {
   items: Item[];

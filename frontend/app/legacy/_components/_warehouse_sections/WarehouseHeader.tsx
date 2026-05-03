@@ -1,6 +1,6 @@
 "use client";
 
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { LoadFailureCard } from "../common/LoadFailureCard";
 
 export function WarehouseHeader({ loadFailure }: { loadFailure: string | null }) {

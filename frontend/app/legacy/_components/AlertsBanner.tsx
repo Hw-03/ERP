@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type StockAlert } from "@/lib/api";
-import { LEGACY_COLORS } from "./legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 /** Lightweight banner that surfaces unacknowledged alerts.
  *  Fetched on mount and re-polled every 60s. Click → /alerts. */

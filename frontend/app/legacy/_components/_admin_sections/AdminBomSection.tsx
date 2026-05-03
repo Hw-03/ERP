@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { BOMEntry } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { useAdminBomContext } from "./AdminBomContext";

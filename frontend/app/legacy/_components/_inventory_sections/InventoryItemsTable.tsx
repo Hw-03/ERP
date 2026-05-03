@@ -2,7 +2,7 @@
 
 import { PackageSearch } from "lucide-react";
 import type { Item } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { EmptyState } from "../common/EmptyState";
 import { LoadFailureCard } from "../common/LoadFailureCard";

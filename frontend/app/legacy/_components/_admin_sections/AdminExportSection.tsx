@@ -1,7 +1,7 @@
 "use client";
 
 import { FileDown } from "lucide-react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 type Props = {
   itemsExportUrl: string;

@@ -1,7 +1,7 @@
 "use client";
 
 import type { Employee, Item, ShipPackage } from "@/lib/api";
-import { LEGACY_COLORS } from "../../../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { TYPO } from "../../../tokens";
 import {

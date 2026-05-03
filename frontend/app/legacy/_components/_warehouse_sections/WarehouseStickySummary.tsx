@@ -1,6 +1,6 @@
 "use client";
 
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 type Summary = { n: number; title: string; text: string };
 

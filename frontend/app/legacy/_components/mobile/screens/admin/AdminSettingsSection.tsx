@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import type { ToastState } from "@/lib/ui/Toast";
-import { LEGACY_COLORS } from "../../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 export function AdminSettingsSection({ showToast }: { showToast: (toast: ToastState) => void }) {
   const [pinForm, setPinForm] = useState({ current_pin: "", new_pin: "", confirm_pin: "" });

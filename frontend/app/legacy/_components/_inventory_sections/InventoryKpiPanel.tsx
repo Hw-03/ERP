@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 export type KpiFilter = "ALL" | "NORMAL" | "LOW" | "ZERO";
 export type KpiCard = { label: string; value: number; hint: string; tone: string; key: KpiFilter };

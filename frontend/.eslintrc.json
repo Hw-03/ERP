@@ -10,12 +10,10 @@
             "patterns": [
               {
                 "group": [
-                  "**/legacyUi",
-                  "@/app/legacy/_components/legacyUi",
                   "@/app/legacy/_components/*",
                   "@/app/legacy/_components/**/*"
                 ],
-                "message": "New MES feature code must use frontend/features/mes/*, frontend/features/mes/shared, frontend/lib/mes/*, or frontend/lib/api/* instead of legacy components."
+                "message": "New MES feature code must use frontend/features/mes/*, frontend/lib/ui/*, frontend/lib/mes/*, or frontend/lib/api/* instead of legacy components."
               }
             ]
           }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Activity, History, Pencil, Wrench } from "lucide-react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { getTransactionLabel, transactionColor } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import { PROCESS_TYPE_META, parseUtc } from "./historyShared";

@@ -5,7 +5,7 @@ import { api, type Item, type TransactionLog } from "@/lib/api";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { ItemDetailHistoryList } from "./ItemDetailHistoryList";
 import { ItemDetailActionForm, type ItemDetailActionMode } from "./ItemDetailActionForm";
-import { LEGACY_COLORS } from "./legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { erpCodeDeptBadge } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";

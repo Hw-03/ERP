@@ -3,7 +3,7 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { AlertTriangle, Search } from "lucide-react";
 import type { Item, ProductModel, ShipPackage } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { LabeledSelect } from "./_atoms";
 import { DEPT_OPTIONS } from "./_constants";
 import type { WorkType } from "./_constants";

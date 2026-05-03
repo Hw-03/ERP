@@ -4,7 +4,7 @@
 // AdminBomContext 의존.
 
 import { X } from "lucide-react";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { BOM_CHILD_CATS } from "../adminShared";
 import { useAdminBomContext } from "../AdminBomContext";
 
