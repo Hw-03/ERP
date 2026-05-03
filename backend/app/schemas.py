@@ -508,6 +508,58 @@ class ProductSymbolUpdate(BaseModel):
     notes: Optional[str] = None
 
 
+# =============================================================================
+# Weekly Report schemas
+# =============================================================================
+
+
+class WeeklyItemReport(BaseModel):
+    item_id: str
+    erp_code: Optional[str]
+    item_name: str
+    prev_qty: Decimal
+    in_qty: Decimal
+    out_qty: Decimal
+    current_qty: Decimal
+    delta: Decimal
+
+
+class WeeklyGroupReport(BaseModel):
+    process_code: str
+    dept_name: str
+    label: str
+    item_count: int
+    prev_qty: Decimal
+    in_qty: Decimal
+    out_qty: Decimal
+    current_qty: Decimal
+    delta: Decimal
+    items: List[WeeklyItemReport]
+
+
+class WeeklyWarning(BaseModel):
+    level: str
+    title: str
+    message: str
+
+
+class WeeklyReportSummary(BaseModel):
+    total_current_qty: Decimal
+    total_in_qty: Decimal
+    total_out_qty: Decimal
+    groups_increasing: int
+    groups_decreasing: int
+    groups_unchanged: int
+
+
+class WeeklyReportResponse(BaseModel):
+    week_start: str
+    week_end: str
+    groups: List[WeeklyGroupReport]
+    summary: WeeklyReportSummary
+    warnings: List[WeeklyWarning]
+
+
 class OptionCodeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

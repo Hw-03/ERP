@@ -3,25 +3,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ElementType } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Boxes, History, Settings2, Warehouse } from "lucide-react";
+import { BarChart2, Boxes, History, Settings2, Warehouse } from "lucide-react";
 import { DesktopSidebar, type DesktopTabId } from "./DesktopSidebar";
 import { DesktopTopbar } from "./DesktopTopbar";
 import { DesktopInventoryView } from "./DesktopInventoryView";
 import { DesktopWarehouseView } from "./DesktopWarehouseView";
 import { DesktopAdminView } from "./DesktopAdminView";
 import { DesktopHistoryView } from "./DesktopHistoryView";
+import { DesktopWeeklyReportView } from "./DesktopWeeklyReportView";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { api, type ProductionCapacity } from "@/lib/api";
 import type { Item } from "@/lib/api";
 import { CapacityDetailModal } from "./CapacityDetailModal";
 
-const VALID_TABS = new Set<DesktopTabId>(["dashboard", "warehouse", "history", "admin"]);
+const VALID_TABS = new Set<DesktopTabId>(["dashboard", "warehouse", "history", "weekly", "admin"]);
 const DEFAULT_STATUS = "DEXCOWIN MES System";
 
 const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
   dashboard: { title: "대시보드", icon: Boxes },
   warehouse: { title: "입출고", icon: Warehouse },
   history: { title: "입출고 내역", icon: History },
+  weekly: { title: "주간보고", icon: BarChart2 },
   admin: { title: "관리자", icon: Settings2 },
 };
 
@@ -128,6 +130,9 @@ export function DesktopLegacyShell() {
     }
     if (activeTab === "history") {
       return <DesktopHistoryView key={key} />;
+    }
+    if (activeTab === "weekly") {
+      return <DesktopWeeklyReportView key={key} />;
     }
     return <DesktopAdminView key={key} globalSearch="" onStatusChange={handleStatusChange} />;
     // eslint-disable-next-line react-hooks/exhaustive-deps

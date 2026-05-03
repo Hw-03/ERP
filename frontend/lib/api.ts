@@ -31,6 +31,8 @@ import { productionApi } from "./api/production";
 import { stockRequestsApi } from "./api/stock-requests";
 // R6-D9: departments + app-session 도메인 분리 (마지막).
 import { departmentsApi } from "./api/departments";
+// weekly-report 도메인.
+import { weeklyApi } from "./api/weekly";
 
 // 외부 import 호환을 위해 동일 이름 그대로 re-export.
 // parseError 는 도메인 API (직접 fetch 사용처) 가 본 파일 내부에서 사용 — 이번 PR 에선 그대로.
@@ -93,6 +95,11 @@ import type {
   ProductionCapacity,
   BackflushDetail,
   ProductionReceiptResponse,
+  WeeklyItemReport,
+  WeeklyGroupReport,
+  WeeklyWarning,
+  WeeklyReportSummary,
+  WeeklyReportResponse,
 } from "./api/types";
 
 export type {
@@ -143,6 +150,11 @@ export type {
   ProductionCapacity,
   BackflushDetail,
   ProductionReceiptResponse,
+  WeeklyItemReport,
+  WeeklyGroupReport,
+  WeeklyWarning,
+  WeeklyReportSummary,
+  WeeklyReportResponse,
 };
 
 export const api = {
@@ -166,4 +178,6 @@ export const api = {
   ...stockRequestsApi,
   // R6-D9: departments + app-session 도메인 분리 (6 메소드).
   ...departmentsApi,
+  // weekly-report 도메인.
+  ...weeklyApi,
 };

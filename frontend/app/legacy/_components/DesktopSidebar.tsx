@@ -3,16 +3,17 @@
 import { useState } from "react";
 import Image from "next/image";
 import type { ElementType } from "react";
-import { Boxes, History, Settings2, Warehouse } from "lucide-react";
+import { BarChart2, Boxes, History, Settings2, Warehouse } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ThemeToggle } from "./ThemeToggle";
 
-export type DesktopTabId = "dashboard" | "warehouse" | "history" | "admin";
+export type DesktopTabId = "dashboard" | "warehouse" | "history" | "weekly" | "admin";
 
 const TABS: { id: DesktopTabId; label: string; subtitle: string; icon: ElementType }[] = [
   { id: "dashboard", label: "대시보드", subtitle: "현황과 안전재고 확인", icon: Boxes },
   { id: "warehouse", label: "입출고", subtitle: "입고와 출고 작업 처리", icon: Warehouse },
   { id: "history", label: "입출고 내역", subtitle: "입출고 이력 조회", icon: History },
+  { id: "weekly", label: "주간보고", subtitle: "생산·재고 흐름", icon: BarChart2 },
   { id: "admin", label: "관리", subtitle: "마스터와 운영 설정", icon: Settings2 },
 ];
 
@@ -156,8 +157,8 @@ export function DesktopSidebar({
         </nav>
 
         {/* 테마 전환 버튼 */}
-        <div className="mt-auto flex items-center justify-center pb-1 pt-3">
-          <ThemeToggle />
+        <div className="mt-auto pt-1.5">
+          <ThemeToggle expanded={expanded} />
         </div>
       </aside>
     </div>

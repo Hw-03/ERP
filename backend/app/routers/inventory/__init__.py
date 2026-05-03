@@ -33,6 +33,7 @@ from . import (
     supplier,
     transactions,
     transfer,
+    weekly_report,
 )
 from ._shared import to_response_bulk
 
@@ -42,6 +43,7 @@ router = APIRouter()
 # 정적 경로(/transactions/*, /summary, /locations/...)를 동적 catch-all("") 보다 먼저 등록.
 router.include_router(transactions.router)
 router.include_router(query.router)
+router.include_router(weekly_report.router)
 router.include_router(receive.router)
 router.include_router(ship.router)
 router.include_router(transfer.router)

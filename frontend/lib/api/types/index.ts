@@ -17,3 +17,4 @@ export type * from "./catalog";
 export type * from "./production";
 export type * from "./stock-requests";
 export type * from "./departments";
+export type * from "./weekly";
