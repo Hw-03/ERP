@@ -59,7 +59,7 @@ export function SidebarButton({
             : danger
             ? `color-mix(in srgb, ${LEGACY_COLORS.red} 18%, transparent)`
             : LEGACY_COLORS.s1,
-          color: active ? "#fff" : danger ? LEGACY_COLORS.red : LEGACY_COLORS.muted2,
+          color: active ? LEGACY_COLORS.white : danger ? LEGACY_COLORS.red : LEGACY_COLORS.muted2,
         }}
       >
         <Icon className="h-4 w-4" />

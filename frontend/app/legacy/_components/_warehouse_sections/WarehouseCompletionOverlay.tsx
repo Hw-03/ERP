@@ -33,7 +33,7 @@ export function WarehouseCompletionOverlay({ flyout, phase }: Props) {
         style={{
           background: `linear-gradient(135deg, ${tone}, color-mix(in srgb, ${tone} 68%, #000 32%))`,
           borderColor: `color-mix(in srgb, ${tone} 55%, #fff 45%)`,
-          color: "#ffffff",
+          color: LEGACY_COLORS.white,
           minWidth: 380,
         }}
       >

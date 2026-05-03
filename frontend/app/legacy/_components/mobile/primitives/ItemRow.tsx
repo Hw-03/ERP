@@ -60,7 +60,7 @@ export function ItemRow({
               borderColor: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
             }}
           >
-            {selected ? <Check size={13} strokeWidth={3} color="#fff" /> : null}
+            {selected ? <Check size={13} strokeWidth={3} color={LEGACY_COLORS.white} /> : null}
           </span>
         </span>
       ) : null}

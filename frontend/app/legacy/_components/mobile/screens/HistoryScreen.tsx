@@ -98,7 +98,7 @@ export function HistoryScreen({ onClose }: { onClose: () => void }) {
             className={`${TYPO.caption} flex items-center gap-1 px-3 py-2 font-bold`}
             style={{
               background: viewMode === "list" ? LEGACY_COLORS.blue : "transparent",
-              color: viewMode === "list" ? "#fff" : LEGACY_COLORS.muted2,
+              color: viewMode === "list" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
             }}
           >
             <List size={14} /> 목록
@@ -109,7 +109,7 @@ export function HistoryScreen({ onClose }: { onClose: () => void }) {
             className={`${TYPO.caption} flex items-center gap-1 px-3 py-2 font-bold`}
             style={{
               background: viewMode === "calendar" ? LEGACY_COLORS.blue : "transparent",
-              color: viewMode === "calendar" ? "#fff" : LEGACY_COLORS.muted2,
+              color: viewMode === "calendar" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
             }}
           >
             <CalendarDays size={14} /> 달력

@@ -38,6 +38,8 @@ export const LEGACY_COLORS = {
   muted: "var(--c-muted)",
   muted2: "var(--c-muted2)",
   panelGlow: "var(--c-panel-glow)",
+  // Round-16 #3: 흰색 (accent foreground 용 — 테마 무관 상수)
+  white: "#ffffff",
 } as const;
 
 /**

@@ -29,7 +29,7 @@ export function FilterChip({
       )}
       style={
         active
-          ? { background: activeColor, borderColor: activeColor, color: "#fff" }
+          ? { background: activeColor, borderColor: activeColor, color: LEGACY_COLORS.white }
           : { background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }
       }
     >

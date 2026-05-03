@@ -167,7 +167,7 @@ export function AdminItemsSection({ showToast }: { showToast: (toast: ToastState
               {MODEL_SLOTS.map(({ slot, label, symbol }) => {
                 const checked = addForm.model_slots.includes(slot);
                 return (
-                  <button key={slot} type="button" onClick={() => setAddForm((f) => ({ ...f, model_slots: checked ? f.model_slots.filter((s) => s !== slot) : [...f.model_slots, slot].sort() }))} className="rounded-full border px-3 py-1.5 text-xs font-bold transition-colors" style={{ background: checked ? LEGACY_COLORS.purple : LEGACY_COLORS.s2, borderColor: checked ? LEGACY_COLORS.purple : LEGACY_COLORS.border, color: checked ? "#fff" : LEGACY_COLORS.muted2 }}>
+                  <button key={slot} type="button" onClick={() => setAddForm((f) => ({ ...f, model_slots: checked ? f.model_slots.filter((s) => s !== slot) : [...f.model_slots, slot].sort() }))} className="rounded-full border px-3 py-1.5 text-xs font-bold transition-colors" style={{ background: checked ? LEGACY_COLORS.purple : LEGACY_COLORS.s2, borderColor: checked ? LEGACY_COLORS.purple : LEGACY_COLORS.border, color: checked ? LEGACY_COLORS.white : LEGACY_COLORS.muted2 }}>
                     {label} ({symbol})
                   </button>
                 );

@@ -136,7 +136,7 @@ export function HistoryCalendarView({
                     className={`${TYPO.caption} font-bold`}
                     style={{
                       color: selected
-                        ? "#fff"
+                        ? LEGACY_COLORS.white
                         : idx % 7 === 0
                           ? LEGACY_COLORS.red
                           : idx % 7 === 6
@@ -152,7 +152,7 @@ export function HistoryCalendarView({
                         className={`${TYPO.caption} mt-[2px] rounded-full px-[5px] font-black`}
                         style={{
                           background: selected ? "rgba(255,255,255,.25)" : `${LEGACY_COLORS.blue as string}22`,
-                          color: selected ? "#fff" : LEGACY_COLORS.blue,
+                          color: selected ? LEGACY_COLORS.white : LEGACY_COLORS.blue,
                         }}
                       >
                         {dayLogs.length}

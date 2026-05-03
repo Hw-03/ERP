@@ -182,7 +182,7 @@ export function InventoryTableStickyHeader({
           {activeFilterCount > 0 && (
             <span
               className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full text-[11px] font-bold leading-none"
-              style={{ background: LEGACY_COLORS.blue, color: "#fff" }}
+              style={{ background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white }}
             >
               {activeFilterCount}
             </span>

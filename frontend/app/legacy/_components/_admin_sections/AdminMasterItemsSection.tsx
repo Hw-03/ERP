@@ -54,7 +54,7 @@ export function AdminMasterItemsSection() {
                 setSelectedItem(null);
               }}
               className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold"
-              style={{ background: LEGACY_COLORS.green, color: "#fff" }}
+              style={{ background: LEGACY_COLORS.green, color: LEGACY_COLORS.white }}
             >
               <PackagePlus className="h-3.5 w-3.5" />
               품목 추가

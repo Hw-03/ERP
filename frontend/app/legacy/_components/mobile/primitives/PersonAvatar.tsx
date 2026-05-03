@@ -47,7 +47,7 @@ export function PersonAvatar({
         )}
         style={{
           background: selected ? color : `${color}22`,
-          color: selected ? "#fff" : color,
+          color: selected ? LEGACY_COLORS.white : color,
           border: `2px solid ${selected ? color : "transparent"}`,
           transition: "background-color .15s, border-color .15s",
         }}

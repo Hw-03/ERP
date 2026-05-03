@@ -92,7 +92,7 @@ export function BomComposeTab({ onEditQty }: Props) {
                   background: childPickerOpen
                     ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 15%, transparent)`
                     : LEGACY_COLORS.blue,
-                  color: childPickerOpen ? LEGACY_COLORS.blue : "#fff",
+                  color: childPickerOpen ? LEGACY_COLORS.blue : LEGACY_COLORS.white,
                   border: `1px solid ${childPickerOpen ? LEGACY_COLORS.blue : "transparent"}`,
                 }}
               >

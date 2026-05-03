@@ -141,7 +141,7 @@ export function BarcodeScannerModal({
               onClick={handleManualSubmit}
               disabled={!manualInput.trim()}
               className="rounded-lg border px-3 py-1.5 text-[13px] font-semibold disabled:opacity-40"
-              style={{ background: LEGACY_COLORS.blue, borderColor: LEGACY_COLORS.blue, color: "#fff" }}
+              style={{ background: LEGACY_COLORS.blue, borderColor: LEGACY_COLORS.blue, color: LEGACY_COLORS.white }}
             >
               적용
             </button>

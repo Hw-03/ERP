@@ -8,9 +8,9 @@ import { formatQty } from "@/lib/mes/format";
 type Intent = "primary" | "success" | "danger" | "neutral";
 
 const INTENT_STYLE: Record<Intent, { bg: string; fg: string }> = {
-  primary: { bg: LEGACY_COLORS.blue, fg: "#fff" },
+  primary: { bg: LEGACY_COLORS.blue, fg: LEGACY_COLORS.white },
   success: { bg: LEGACY_COLORS.green, fg: "#041008" },
-  danger: { bg: LEGACY_COLORS.red, fg: "#fff" },
+  danger: { bg: LEGACY_COLORS.red, fg: LEGACY_COLORS.white },
   neutral: { bg: LEGACY_COLORS.s3, fg: LEGACY_COLORS.text },
 };
 

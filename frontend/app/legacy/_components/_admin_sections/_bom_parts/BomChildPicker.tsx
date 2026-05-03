@@ -91,7 +91,7 @@ export function BomChildPicker({ onClose }: { onClose: () => void }) {
                 className="rounded-full px-2 py-1 text-xs font-bold"
                 style={{
                   background: bomChildCat === cat.value ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
-                  color: bomChildCat === cat.value ? "#fff" : LEGACY_COLORS.muted2,
+                  color: bomChildCat === cat.value ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
                   border: `1px solid ${LEGACY_COLORS.border}`,
                 }}
               >

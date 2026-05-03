@@ -102,7 +102,7 @@ export function HistoryFilterBar({
               className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold transition-colors"
               style={{
                 background: viewMode === "list" ? LEGACY_COLORS.blue : "transparent",
-                color: viewMode === "list" ? "#fff" : LEGACY_COLORS.muted2,
+                color: viewMode === "list" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
               }}
             >
               <List className="h-3.5 w-3.5" />목록
@@ -112,7 +112,7 @@ export function HistoryFilterBar({
               className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold transition-colors"
               style={{
                 background: viewMode === "calendar" ? LEGACY_COLORS.blue : "transparent",
-                color: viewMode === "calendar" ? "#fff" : LEGACY_COLORS.muted2,
+                color: viewMode === "calendar" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
               }}
             >
               <CalendarDays className="h-3.5 w-3.5" />달력

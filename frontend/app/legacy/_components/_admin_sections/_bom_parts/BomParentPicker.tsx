@@ -55,7 +55,7 @@ export function BomParentPicker() {
               className="rounded-full px-2 py-0.5 text-xs font-bold"
               style={{
                 background: bomParentCat === cat ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
-                color: bomParentCat === cat ? "#fff" : LEGACY_COLORS.muted2,
+                color: bomParentCat === cat ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
                 border: `1px solid ${LEGACY_COLORS.border}`,
               }}
             >

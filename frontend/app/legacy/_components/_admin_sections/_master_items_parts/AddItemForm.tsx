@@ -146,7 +146,7 @@ export function AddItemForm() {
                 style={{
                   background: checked ? LEGACY_COLORS.purple : LEGACY_COLORS.s1,
                   borderColor: checked ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
-                  color: checked ? "#fff" : LEGACY_COLORS.muted2,
+                  color: checked ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
                 }}
               >
                 {label} <span style={{ opacity: 0.7 }}>({symbol})</span>

@@ -33,7 +33,7 @@ export function FilterPills({
                 ? {
                     background: activeColor,
                     borderColor: activeColor,
-                    color: "#fff",
+                    color: LEGACY_COLORS.white,
                   }
                 : isHovered
                 ? {

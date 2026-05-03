@@ -29,7 +29,7 @@ export function InventorySelectionBanner({ selectedCount, onCancel }: Props) {
           className="inline-flex h-6 w-6 items-center justify-center rounded-full"
           style={{ background: LEGACY_COLORS.blue }}
         >
-          <CheckSquare size={13} strokeWidth={2.5} color="#fff" />
+          <CheckSquare size={13} strokeWidth={2.5} color={LEGACY_COLORS.white} />
         </span>
         <div className="min-w-0">
           <div

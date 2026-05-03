@@ -51,7 +51,7 @@ export function ItemDetailActionForm({
             className="flex-1 rounded-xl py-2 text-xs font-bold"
             style={{
               background: mode === action.id ? LEGACY_COLORS.blue : LEGACY_COLORS.s3,
-              color: mode === action.id ? "#fff" : LEGACY_COLORS.muted2,
+              color: mode === action.id ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
             }}
           >
             {action.label}
@@ -122,7 +122,7 @@ export function ItemDetailActionForm({
           onClick={onSubmit}
           disabled={saving}
           className="mt-3 w-full rounded-xl py-[13px] text-[15px] font-bold disabled:opacity-50"
-          style={{ background: LEGACY_COLORS.blue, color: "#fff" }}
+          style={{ background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white }}
         >
           {saving ? "처리 중..." : mode === "ADJUST" ? "수정" : mode === "RECEIVE" ? "입고" : "출고"}
         </button>

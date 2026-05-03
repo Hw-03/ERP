@@ -181,7 +181,7 @@ export function HistoryFilterSheet({
           type="button"
           onClick={onClose}
           className={`${TYPO.body} w-full rounded-[14px] py-3 font-black`}
-          style={{ background: LEGACY_COLORS.blue, color: "#fff" }}
+          style={{ background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white }}
         >
           결과 보기
         </button>
