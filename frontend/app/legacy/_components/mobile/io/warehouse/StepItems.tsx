@@ -1,7 +1,7 @@
 "use client";
 
 import { useDeferredValue, useMemo, useState } from "react";
-import { Minus, Plus, PackageSearch, ScanLine, Trash2 } from "lucide-react";
+import { PackageSearch, ScanLine, Trash2 } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
@@ -19,6 +19,7 @@ import {
 } from "../../primitives";
 import { useWarehouseWizard } from "./context";
 import { StepHeading } from "./wizardStepShared";
+import { MiniStepper } from "./MiniStepper";
 
 const ITEM_CATEGORIES = [
   { id: "ALL", label: "전체" },
@@ -222,52 +223,6 @@ export function StepItems({
           onClose={() => setScanOpen(false)}
         />
       ) : null}
-    </div>
-  );
-}
-
-function MiniStepper({ value, onChange }: { value: number; onChange: (n: number) => void }) {
-  const step = (delta: number) => onChange(Math.max(1, value + delta));
-  return (
-    <div className="flex items-center gap-1">
-      <button
-        type="button"
-        onClick={() => step(-10)}
-        className={`${TYPO.caption} rounded-[10px] px-2 py-1 font-bold`}
-        style={{ background: `${LEGACY_COLORS.red as string}22`, color: LEGACY_COLORS.red }}
-      >
-        -10
-      </button>
-      <button
-        type="button"
-        onClick={() => step(-1)}
-        className="flex h-8 w-8 items-center justify-center rounded-[10px]"
-        style={{ background: LEGACY_COLORS.s3, color: LEGACY_COLORS.text }}
-      >
-        <Minus size={14} />
-      </button>
-      <div
-        className={`${TYPO.body} min-w-[54px] rounded-[10px] px-2 py-1 text-center font-black tabular-nums`}
-        style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.blue }}
-      >
-        {value}
-      </div>
-      <button
-        type="button"
-        onClick={() => step(1)}
-        className="flex h-8 w-8 items-center justify-center rounded-[10px]"
-        style={{ background: LEGACY_COLORS.s3, color: LEGACY_COLORS.text }}
-      >
-        <Plus size={14} />
-      </button>
-      <button
-        type="button"
-        onClick={() => step(10)}
-        className={`${TYPO.caption} rounded-[10px] px-2 py-1 font-bold`}
-        style={{ background: `${LEGACY_COLORS.green as string}22`, color: LEGACY_COLORS.green }}
-      >
-        +10
-      </button>
     </div>
   );
 }
