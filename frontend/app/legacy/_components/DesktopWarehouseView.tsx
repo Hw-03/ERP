@@ -4,8 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Item, type ShipPackage, type StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "./legacyUi";
 import { formatQty } from "@/lib/mes/format";
-import { ResultModal } from "./common";
-import { ConfirmModal } from "@/features/mes/shared/ConfirmModal";
 import { type WorkType } from "./_warehouse_steps";
 import { canEnterIO } from "./_warehouse_steps";
 import { useWarehouseFilters } from "./_warehouse_hooks/useWarehouseFilters";
@@ -20,10 +18,9 @@ import { WarehouseStickySummary } from "./_warehouse_sections/WarehouseStickySum
 import { WarehouseCompletionOverlay } from "./_warehouse_sections/WarehouseCompletionOverlay";
 import { WarehouseStepLayout } from "./_warehouse_sections/WarehouseStepLayout";
 import { WarehouseSectionTabs, type WarehouseSectionTab } from "./_warehouse_sections/WarehouseSectionTabs";
-import { WarehouseConfirmContent } from "./_warehouse_modals/WarehouseConfirmContent";
-import { MyRequestsPanel } from "./_warehouse_sections/MyRequestsPanel";
-import { WarehouseQueuePanel } from "./_warehouse_sections/WarehouseQueuePanel";
-import { DraftCartPanel } from "./_warehouse_sections/DraftCartPanel";
+import { WarehouseAccessDenied } from "./_warehouse_sections/WarehouseAccessDenied";
+import { WarehouseSubmissionModals } from "./_warehouse_modals/WarehouseSubmissionModals";
+import { WarehouseDraftPanelTabs } from "./_warehouse_sections/WarehouseDraftPanelTabs";
 import {
   buildStockRequestPayload,
   draftToFormState,
@@ -412,25 +409,7 @@ export function DesktopWarehouseView({
 
   // ─── 진입 차단 (AS/연구/영업/기타 — 입출고 권한 없음) ───
   if (operator && !canEnterIO(operator)) {
-    return (
-      <div className="flex h-full min-h-0 flex-1 items-center justify-center px-6">
-        <div
-          className="max-w-md rounded-[16px] border p-8 text-center"
-          style={{
-            background: LEGACY_COLORS.s2,
-            borderColor: LEGACY_COLORS.border,
-            color: LEGACY_COLORS.text,
-          }}
-        >
-          <div className="mb-2 text-lg font-black">입출고 권한이 없습니다</div>
-          <div className="text-sm" style={{ color: LEGACY_COLORS.muted }}>
-            {operator.department} 부서는 입출고 작업을 사용할 수 없습니다.
-            <br />
-            재고 조회 또는 관리자 탭을 이용해 주세요.
-          </div>
-        </div>
-      </div>
-    );
+    return <WarehouseAccessDenied department={operator.department ?? ""} />;
   }
 
   // ─── render ───
@@ -442,51 +421,22 @@ export function DesktopWarehouseView({
         <WarehouseHeader loadFailure={loadFailure} />
         <WarehouseSectionTabs active={sectionTab} onChange={setSectionTab} showQueue={canSeeQueue} />
 
-        {sectionTab === "cart" && (
-          <DraftCartPanel
-            employeeId={operator?.employee_id ?? employeeId ?? null}
-            refreshNonce={panelRefreshNonce}
-            onContinue={(draft) => {
-              handleContinueDraft(draft);
-              setPanelRefreshNonce((n) => n + 1);
-            }}
-            onChanged={() => {
-              // submit/delete 시 draft 가 사라졌을 수 있으므로 stale 추적 해제.
-              setCurrentDraftId(null);
-              setAutoSaveStatus("idle");
-              setPanelRefreshNonce((n) => n + 1);
-              onSubmitSuccess?.();
-            }}
-          />
-        )}
-
-        {sectionTab === "mine" && (
-          <MyRequestsPanel
-            employeeId={employeeId || operator?.employee_id || null}
-            refreshNonce={panelRefreshNonce}
-            onChanged={() => {
-              setPanelRefreshNonce((n) => n + 1);
-              onSubmitSuccess?.();
-            }}
-          />
-        )}
-
-        {sectionTab === "queue" && canSeeQueue && operator && (
-          <WarehouseQueuePanel
-            approverEmployeeId={operator.employee_id}
-            refreshNonce={panelRefreshNonce}
-            onChanged={async () => {
-              setPanelRefreshNonce((n) => n + 1);
-              try {
-                const refreshed = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
-                setItems(refreshed);
-              } catch {
-                /* 무시 */
-              }
-              onSubmitSuccess?.();
-            }}
-          />
-        )}
+        <WarehouseDraftPanelTabs
+          sectionTab={sectionTab}
+          canSeeQueue={canSeeQueue}
+          operatorEmployeeId={operator?.employee_id}
+          employeeId={employeeId}
+          refreshNonce={panelRefreshNonce}
+          globalSearch={globalSearch}
+          setItems={setItems}
+          onContinueDraft={handleContinueDraft}
+          bumpRefresh={() => setPanelRefreshNonce((n) => n + 1)}
+          onSubmitSuccess={onSubmitSuccess}
+          resetDraftTracking={() => {
+            setCurrentDraftId(null);
+            setAutoSaveStatus("idle");
+          }}
+        />
 
         {sectionTab !== "compose" ? null : (
           <>
@@ -566,80 +516,37 @@ export function DesktopWarehouseView({
         )}
       </div>
 
-      <ResultModal
-        open={!!resultModal}
-        kind={resultModal?.kind ?? "fail"}
-        successCount={resultModal?.successCount ?? 0}
-        failures={resultModal?.failures ?? []}
-        onClose={() => setResultModal(null)}
-        primaryAction={
-          resultModal?.kind === "partial"
-            ? {
-                label: "실패 항목만 재시도",
-                tone: "warning",
-                onClick: () => {
-                  setResultModal(null);
-                  setShowConfirm(true);
-                },
-              }
-            : resultModal?.kind === "fail"
-              ? {
-                  label: "재시도",
-                  tone: "danger",
-                  onClick: () => {
-                    setResultModal(null);
-                    setShowConfirm(true);
-                  },
-                }
-              : undefined
-        }
-      />
-
-      <ConfirmModal
-        open={showConfirm}
-        title={requiresApproval ? "창고 승인 요청 — 최종 확인" : "즉시 처리 — 최종 확인"}
-        tone={isCaution ? "danger" : "normal"}
-        cautionMessage={
-          isCaution
-            ? "되돌릴 수 없는 작업입니다. 내용을 다시 한 번 확인하세요."
-            : requiresApproval
-              ? "제출 후 창고 담당자(정/부)의 승인 전까지 실제 재고는 변경되지 않습니다."
-              : undefined
-        }
-        onClose={() => setShowConfirm(false)}
-        onConfirm={async () => {
+      <WarehouseSubmissionModals
+        resultModal={resultModal}
+        onCloseResult={() => setResultModal(null)}
+        onRetry={() => {
+          setResultModal(null);
+          setShowConfirm(true);
+        }}
+        showConfirm={showConfirm}
+        onCloseConfirm={() => setShowConfirm(false)}
+        onConfirmSubmit={async () => {
           await submit();
           setShowConfirm(false);
         }}
-        busy={submitting}
-        busyLabel="처리 중..."
-        confirmLabel={requiresApproval ? "요청 제출" : "즉시 처리"}
-        confirmAccent={accent}
-      >
-        <WarehouseConfirmContent
-          selectedEmployee={selectedEmployee}
-          effectiveLabel={effectiveLabel}
-          workType={workType}
-          selectedEntries={selectedEntries}
-          selectedPackage={selectedPackage}
-          totalQty={totalQty}
-          notes={notes}
-        />
-      </ConfirmModal>
-
-      <ConfirmModal
-        open={pendingDeptChange !== null}
-        title="대상 부서 변경"
-        tone="caution"
-        confirmLabel="변경"
-        onClose={() => setPendingDeptChange(null)}
-        onConfirm={() => {
+        submitting={submitting}
+        requiresApproval={requiresApproval}
+        isCaution={isCaution}
+        accent={accent}
+        selectedEmployee={selectedEmployee}
+        effectiveLabel={effectiveLabel}
+        workType={workType}
+        selectedEntries={selectedEntries}
+        selectedPackage={selectedPackage}
+        totalQty={totalQty}
+        notes={notes}
+        pendingDeptChange={pendingDeptChange}
+        onClosePendingDept={() => setPendingDeptChange(null)}
+        onConfirmDeptChange={() => {
           if (pendingDeptChange) wizard.changeSelectedDept(pendingDeptChange);
           setPendingDeptChange(null);
         }}
-      >
-        대상 부서를 변경하시겠습니까?
-      </ConfirmModal>
+      />
     </div>
   );
 }
