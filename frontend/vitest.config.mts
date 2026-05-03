@@ -13,16 +13,23 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "html", "lcov"],
       // 측정 대상 — 단위 테스트가 작성된 정본 모듈만 측정.
-      // lib/api 의 fetch wrapper 들 (admin/catalog/core/departments/operations/
-      // production/queue/stock-requests) 은 별도 라운드에서 mock 테스트 추가 후 포함.
+      // Round-16 (#1): admin/catalog/departments/operations/production/queue/stock-requests
+      // mock 테스트 추가하면서 coverage include 에 합류.
       include: [
         "lib/api-core.ts",
         "lib/mes-department.ts",
         "lib/mes-format.ts",
         "lib/mes-status.ts",
+        "lib/api/admin.ts",
+        "lib/api/catalog.ts",
+        "lib/api/departments.ts",
         "lib/api/employees.ts",
         "lib/api/inventory.ts",
         "lib/api/items.ts",
+        "lib/api/operations.ts",
+        "lib/api/production.ts",
+        "lib/api/queue.ts",
+        "lib/api/stock-requests.ts",
         "lib/mes/**/*.ts",
       ],
       exclude: [
