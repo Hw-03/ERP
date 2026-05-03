@@ -4,9 +4,8 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { api, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "./legacyUi";
 import { erpCodeDept } from "@/lib/mes/process";
-import { getStockState } from "@/lib/mes/inventory";
 import { useDepartments } from "./DepartmentsContext";
-import { InventoryKpiPanel, type KpiCard, type KpiFilter } from "./_inventory_sections/InventoryKpiPanel";
+import { InventoryKpiPanel, type KpiFilter } from "./_inventory_sections/InventoryKpiPanel";
 import { InventoryCapacityPanel } from "./_inventory_sections/InventoryCapacityPanel";
 import {
   InventoryFilters,
@@ -15,8 +14,9 @@ import {
 import { InventoryItemsTable } from "./_inventory_sections/InventoryItemsTable";
 import { DesktopInventoryRightPanel } from "./_inventory_sections/DesktopInventoryRightPanel";
 import { useInventoryData } from "./_hooks/useInventoryData";
+import { useDesktopInventoryDerivations } from "./_hooks/useDesktopInventoryDerivations";
 // R9-2: helper 4개 (getMinStock / safeQty / matchesSearch / matchesKpi) 분리
-import { getMinStock, matchesKpi, matchesSearch, safeQty } from "./_inventory_sections/inventoryFilter";
+import { matchesKpi, matchesSearch } from "./_inventory_sections/inventoryFilter";
 
 const DESKTOP_PAGE_SIZE = 100;
 
@@ -128,56 +128,19 @@ export function DesktopInventoryView({
     setDisplayLimit(DESKTOP_PAGE_SIZE);
   }, [filteredItems]);
 
-  const summary = useMemo(() => {
-    const totalQuantity = scopedItems.reduce((acc, item) => acc + safeQty(item), 0);
-    const normalCount = scopedItems.filter((item) => safeQty(item) > 0 && safeQty(item) >= getMinStock(item)).length;
-    const lowCount = scopedItems.filter((item) => safeQty(item) > 0 && safeQty(item) < getMinStock(item)).length;
-    const zeroCount = scopedItems.filter((item) => safeQty(item) <= 0).length;
-    return { totalCount: scopedItems.length, totalQuantity, normalCount, lowCount, zeroCount };
-  }, [scopedItems]);
-
-  useEffect(() => {
-    onSummaryChange?.({ low: summary.lowCount, zero: summary.zeroCount });
-  }, [summary.lowCount, summary.zeroCount, onSummaryChange]);
-
-  const isFiltered = selectedDepts.length > 0 || selectedModels.length > 0 || deferredLocalSearch.length > 0;
-  const activeFilterCount =
-    selectedDepts.length + selectedModels.length + (deferredLocalSearch.length > 0 ? 1 : 0);
-
-  const kpiCards: KpiCard[] = [
-    {
-      label: "전체",
-      value: items.length,
-      hint: isFiltered
-        ? `${filteredItems.length}건 조회 중 · 클릭하면 전체 초기화`
-        : "전체 품목",
-      tone: LEGACY_COLORS.blue,
-      key: "ALL",
-    },
-    { label: "정상", value: summary.normalCount, hint: "운영 가능", tone: LEGACY_COLORS.green, key: "NORMAL" },
-    { label: "부족", value: summary.lowCount, hint: "안전재고 이하", tone: LEGACY_COLORS.yellow, key: "LOW" },
-    { label: "품절", value: summary.zeroCount, hint: "즉시 조치 필요", tone: LEGACY_COLORS.red, key: "ZERO" },
-  ];
-
   if (selectedItem) lastSelectedItemRef.current = selectedItem;
   const displayItem = selectedItem ?? lastSelectedItemRef.current;
 
-  const headerBadge = displayItem
-    ? (() => {
-        const stock = getStockState(
-          Number(displayItem.quantity),
-          displayItem.min_stock == null ? null : Number(displayItem.min_stock),
-        );
-        return (
-          <span
-            className="inline-flex rounded-full px-3 py-1 text-sm font-bold"
-            style={{ color: stock.color, background: `color-mix(in srgb, ${stock.color} 12%, transparent)` }}
-          >
-            {stock.label}
-          </span>
-        );
-      })()
-    : null;
+  const { isFiltered, activeFilterCount, kpiCards, headerBadge } = useDesktopInventoryDerivations({
+    items,
+    scopedItems,
+    filteredItems,
+    selectedDepts,
+    selectedModels,
+    deferredLocalSearch,
+    displayItem,
+    onSummaryChange,
+  });
 
   function resetAllFilters() {
     setSelectedDepts([]);
