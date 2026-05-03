@@ -2,7 +2,6 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
-import { DesktopRightPanel } from "./DesktopRightPanel";
 import { LEGACY_COLORS } from "./legacyUi";
 import { erpCodeDept } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
@@ -14,7 +13,7 @@ import {
   InventoryTableStickyHeader,
 } from "./_inventory_sections/InventoryFilterBar";
 import { InventoryItemsTable } from "./_inventory_sections/InventoryItemsTable";
-import { InventoryDetailPanel } from "./_inventory_sections/InventoryDetailPanel";
+import { DesktopInventoryRightPanel } from "./_inventory_sections/DesktopInventoryRightPanel";
 import { useInventoryData } from "./_hooks/useInventoryData";
 // R9-2: helper 4개 (getMinStock / safeQty / matchesSearch / matchesKpi) 분리
 import { getMinStock, matchesKpi, matchesSearch, safeQty } from "./_inventory_sections/inventoryFilter";
@@ -251,34 +250,13 @@ export function DesktopInventoryView({
         </div>
       </div>
 
-      {/* ── 우측: 품목 상세 패널 ── */}
-      <div
-        className="shrink-0 overflow-hidden"
-        style={{
-          width: selectedItem ? 436 : 0,
-          transition: "width 160ms cubic-bezier(0.4, 0, 0.2, 1)",
-        }}
-      >
-        <div
-          className="h-full pl-4"
-          style={{
-            opacity: selectedItem ? 1 : 0,
-            transform: selectedItem ? "translateX(0)" : "translateX(18px)",
-            transition: "opacity 260ms ease, transform 260ms ease",
-            willChange: "transform, opacity",
-          }}
-        >
-          {displayItem && (
-            <DesktopRightPanel
-              title={displayItem.item_name}
-              subtitle={displayItem.legacy_part ? `${displayItem.erp_code} · ${displayItem.legacy_part}` : (displayItem.erp_code ?? undefined)}
-              headerBadge={headerBadge}
-            >
-              <InventoryDetailPanel item={displayItem} logs={itemLogs} onGoToWarehouse={onGoToWarehouse} />
-            </DesktopRightPanel>
-          )}
-        </div>
-      </div>
+      <DesktopInventoryRightPanel
+        selectedItem={selectedItem}
+        displayItem={displayItem}
+        itemLogs={itemLogs}
+        headerBadge={headerBadge}
+        onGoToWarehouse={onGoToWarehouse}
+      />
     </div>
   );
 }
