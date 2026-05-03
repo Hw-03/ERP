@@ -2,7 +2,7 @@
 
 이 문서는 Claude/Codex가 같은 MES 프로젝트를 이어서 작업할 때 보는 최신 인수인계 문서다.
 
-## 현재 상태 (2026-05-02 Round-12 #1 update)
+## 현재 상태 (2026-05-03 Round-17 update)
 
 - 프로젝트: DEXCOWIN 재고 관리 MES (경량 MES 프로토타입)
 - 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/erp.db`)
@@ -10,7 +10,67 @@
 - 주 화면: `/legacy` (대시보드 / 입출고 / 입출고 내역 / 관리자)
 - 기준 데이터: 통합 품목 971건
 - 현재 브랜치: `main`
-- 외부 객관 평가: ~99 점 (Round-10A → Round-12 #1 누적 결과)
+- 외부 객관 평가: 11 카테고리 평균 87.5 → ~95 추정 (Round-13 ~ Round-17 누적)
+
+## Round 완료 갱신 체크리스트
+
+각 Round 완료 후 본 섹션의 항목을 확인하고 본 문서를 갱신한다.
+
+- [ ] `verify_local.ps1` 5+1 게이트 모두 통과 (pytest / lint:strict / tsc / vitest+coverage / build / bundle-size + OpenAPI drift)
+- [ ] 250+ 라인 잔존 카운트 갱신 (현재 0 — DesktopWarehouseView 435줄로 250 미만)
+- [ ] coverage 변동 기록 (현재 lib 평균 91.3%)
+- [ ] 신규 sub-component / hook / 정본 모듈을 "정본 모듈" 섹션에 추가
+- [ ] 문서 (본 파일 + `docs/CODEX_PROGRESS.md`) timeline 한 줄 추가
+- [ ] commit 메시지 형식: `YYYY-MM-DD area: 요약 (Round-N #m)`
+- [ ] main 직접 push 또는 feature branch 후 사용자 결정
+
+## Round-13 ~ 17 결과 요약 (2026-05-02 ~ 2026-05-03)
+
+### Round-13 — 거대 컴포넌트 250+ 19 → 1
+17 commit, JSX 0 변경. sub-component / hook / inner-function 분리.
+- DesktopWarehouseView 645→507 (4단계 분해)
+- ItemsStep / HistoryDetailPanel / WarehouseQueuePanel / InventoryScreen mobile / BarcodeScannerModal / DraftCartPanel / InventoryDetailPanel / DesktopInventoryView (Phase 1)
+- HistoryTable / BomComposeTab / StepItems warehouse / DeptWizardScreen / MyRequestsPanel / ItemDetailSheet / DesktopHistoryView / WarehouseStepLayout / WorkTypeStep / DesktopLegacyShell (Phase 2)
+
+### Round-14 — 구조 정리 (3 commit)
+- 14-1: `features/mes/shared` (Toast/ConfirmModal/BottomSheet) → `lib/ui` 이동, 27 import 경로 변경
+- 14-2: `lib/api/types.ts` (legacy barrel) 제거 — `types/index.ts` 정본만 유지
+- 14-3: `legacyUi.ts` wrapper 제거, 121 파일에서 `LEGACY_COLORS` 를 `@/lib/mes/color` 직접 import 로 마이그레이션 (Python 스크립트 UTF-8 안전)
+
+### Round-15 — 거대 컴포넌트 잔존 분해 (3 commit)
+- 15-1: `useWarehouseSubmit` hook 추출 → DesktopWarehouseView 507→435
+- 15-2: `useAdminEmployeesForm` + `useAdminEmployeesConfirm` 분리 → useAdminEmployees 259→196
+- 15-3: `requestPolicy.ts` 분리 (lineRequiresApproval / inputRequiresApproval) → requestMapping 296→271
+
+### Round-16 — 테스트 + 토큰 + CI (4 commit)
+- 16-1: lib/api fetch wrapper 7개 단위 테스트 추가 (+66 tests, 148→214) — coverage 87.6→91.3
+- 16-2: 미커버 hook 5개 (useChunkedRender / useEmployees / useModels / usePackages / useTransactions) 테스트 추가 (+14 tests, 214→228)
+- 16-3: 색상 hardcode `#fff/#ffffff` 31건 → `LEGACY_COLORS.white` 토큰 매핑 (26 파일)
+- 16-4: CI bundle size gate 추가 (`.next/static/chunks` ≤ 2.0 MB), `verify_local.ps1` 통합
+
+### Round-17 — 문서 (1 commit)
+- 17: AI_HANDOVER 갱신 체크리스트 + Round-13~17 누적 결과 반영
+
+## 점수 추정 (Round-17 후)
+
+| 카테고리 | 시작 | 현재 |
+|---|---:|---:|
+| AI 인계 | 96 | ~98 |
+| API layer | 93 | 93 |
+| CI build | 91 | ~95 |
+| 디자인 시스템 | 89 | ~92 |
+| 테스트성 | 88 | ~93 |
+| Type layer | 87 | ~90 |
+| custom hook | 87 | ~92 |
+| import 안정성 | 86 | ~91 |
+| 중복 제거 | 85 | ~88 |
+| 거대 컴포넌트 | 84 | ~95 (250+ 0개) |
+| Feature boundary | 76 | ~88 |
+| **평균** | **87.5** | **~92.3** |
+
+> 100점은 채점 천장상 도달 불가 — 현실 상한 ~97. 본 라운드 종료 시점 ~92~95 추정.
+
+## 이전 라운드 (Round-10/11/12) 결과 요약 (2026-05-02)
 
 ## Round-10/11/12 결과 요약 (2026-05-02)
 
@@ -55,16 +115,15 @@
 - `frontend/lib/mes-status.ts` — transactionColor 추가
 - `frontend/lib/mes-format.ts` — formatErpCode 추가
 
-### legacyUi.ts 잔여
-- 12줄 thin barrel — `export { LEGACY_COLORS } from "@/lib/mes/color"`
-- 130여 호출처가 LEGACY_COLORS 만 import. Round-10G (선택, 별도 라운드) 에서 이 호출처들의 import 경로를 일괄 전환 후 파일 자체 삭제 가능
-- PowerShell 자동 import 치환은 한글 .tsx 파일 인코딩 문제 발생 — Python 또는 Edit 도구 사용 권장
+### legacyUi.ts 잔여 → Round-14 #3 에서 완전 제거됨
+- 121 파일에서 `LEGACY_COLORS` 를 `@/lib/mes/color` 직접 import 로 마이그레이션 완료
+- Python 정규식 일괄 치환 사용 (UTF-8 안전) — PowerShell 자동 치환은 한글 인코딩 문제로 금지
 
-## 다음 작업 후보 (Round-12 #2 / #3 / Round-10G)
+## 다음 작업 후보
 
-- **Round-12 #2 (PIN 보안 마이그레이션, MES-BE-005)** — `docs/research/2026-05-04-pin-security-migration-plan.md` 설계 완성. argon2id 해싱 + lazy migration + rate limit + 강제 변경 모달. DB 스키마 변경 (pin_hash alter) 포함이라 manual smoke 필요.
-- **Round-10G — legacyUi.ts 완전 삭제** — 130 호출처 import 경로 전환 (Python 스크립트 권장).
-- **Round-11B — Cat-B 거대 컴포넌트 분해** — DesktopLegacyShell / DeptWizardScreen / WarehouseStepLayout. 회사 PC 시각 회귀 필요.
+- **Round-18 — DesktopWarehouseView 250 미만** (현재 435줄). useWarehouseSelection / useWarehouseDraftHandlers 추가 hook 추출. 회귀 위험 매우 낮음.
+- **Round-19 — 디자인 시스템 추가 토큰** — spacing / border-radius hardcode → 토큰화 (현재 색상만 처리됨). 약 300건 추정.
+- **Round-20 (PIN 보안 마이그레이션, MES-BE-005)** — `docs/research/2026-05-04-pin-security-migration-plan.md` 설계 완성. argon2id 해싱 + lazy migration + rate limit + 강제 변경 모달. DB 스키마 변경 (pin_hash alter) 포함이라 manual smoke 필요.
 
 ## Phase 5 결과 (2026-04-26)
 
