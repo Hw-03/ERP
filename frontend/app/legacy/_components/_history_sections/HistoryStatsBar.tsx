@@ -2,6 +2,7 @@
 
 import { AlertTriangle, TrendingDown, TrendingUp } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 export interface HistoryStatsBarProps {
   stats: {
@@ -36,7 +37,7 @@ export function HistoryStatsBar({ stats, canLoadMore }: HistoryStatsBarProps) {
         </div>
         <div
           className="flex flex-col gap-1 rounded-[20px] border p-4"
-          style={{ background: "rgba(67,211,157,.06)", borderColor: "rgba(67,211,157,.22)" }}
+          style={{ background: tint(LEGACY_COLORS.green, 6), borderColor: tint(LEGACY_COLORS.green, 22) }}
         >
           <div
             className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.15em]"
@@ -52,7 +53,7 @@ export function HistoryStatsBar({ stats, canLoadMore }: HistoryStatsBarProps) {
         </div>
         <div
           className="flex flex-col gap-1 rounded-[20px] border p-4"
-          style={{ background: "rgba(255,123,123,.06)", borderColor: "rgba(255,123,123,.22)" }}
+          style={{ background: tint(LEGACY_COLORS.red, 6), borderColor: tint(LEGACY_COLORS.red, 22) }}
         >
           <div
             className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.15em]"
@@ -68,7 +69,7 @@ export function HistoryStatsBar({ stats, canLoadMore }: HistoryStatsBarProps) {
         </div>
         <div
           className="flex flex-col gap-1 rounded-[20px] border p-4"
-          style={{ background: "rgba(246,198,103,.06)", borderColor: "rgba(246,198,103,.22)" }}
+          style={{ background: tint(LEGACY_COLORS.yellow, 6), borderColor: tint(LEGACY_COLORS.yellow, 22) }}
         >
           <div
             className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.15em]"

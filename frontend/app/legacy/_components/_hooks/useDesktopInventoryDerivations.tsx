@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { getStockState } from "@/lib/mes/inventory";
-import type { KpiCard } from "../_inventory_sections/InventoryKpiPanel";
+import type { KpiCardData as KpiCard } from "../_inventory_sections/InventoryKpiPanel";
 import { getMinStock, safeQty } from "../_inventory_sections/inventoryFilter";
 
 /**

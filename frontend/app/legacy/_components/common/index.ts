@@ -5,3 +5,4 @@ export { LoadingSkeleton } from "./LoadingSkeleton";
 export { StatusPill, type StatusPillTone, inferToneFromStatus } from "./StatusPill";
 export { FilterChip } from "./FilterChip";
 export { SlidePanel } from "./SlidePanel";
+export { KpiCard } from "./KpiCard";
