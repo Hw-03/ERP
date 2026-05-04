@@ -2,6 +2,7 @@
 
 import { Layers, Trash2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { EmptyState } from "../common";
 import { useAdminModelsContext } from "./AdminModelsContext";
 
 // Props 없음. AdminModelsProvider 의 Context 에서 모두 읽는다.
@@ -78,7 +79,7 @@ export function AdminModelsSection() {
             <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{productModels.length}개</span>
           </div>
           {productModels.length === 0 ? (
-            <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>등록된 모델이 없습니다.</div>
+            <EmptyState variant="no-data" compact title="등록된 모델이 없습니다." />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {productModels.map((model) => (

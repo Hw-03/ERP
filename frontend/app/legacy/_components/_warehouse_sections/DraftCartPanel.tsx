@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
+import { EmptyState, LoadingSkeleton } from "../common";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { DraftCartItemRow } from "./DraftCartItemRow";
 
@@ -81,33 +83,24 @@ export function DraftCartPanel({
 
   if (!employeeId) {
     return (
-      <div
-        className="rounded-[14px] border px-5 py-6 text-sm"
-        style={{
-          background: LEGACY_COLORS.s2,
-          borderColor: LEGACY_COLORS.border,
-          color: LEGACY_COLORS.muted,
-        }}
-      >
-        담당자를 먼저 선택하면 내 작업중 내역이 표시됩니다.
-      </div>
+      <EmptyState
+        compact
+        title="담당자를 선택해 주세요."
+        description="담당자를 선택하면 작업 중 내역이 표시됩니다."
+      />
     );
   }
 
   return (
     <div className="flex flex-col gap-3">
-      {loading && (
-        <div className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
-          불러오는 중...
-        </div>
-      )}
+      {loading && <LoadingSkeleton variant="list" rows={2} />}
       {loadError && (
         <div
           className="rounded-[12px] border px-4 py-3 text-sm"
           style={{
-            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`,
+            borderColor: tint(LEGACY_COLORS.red, 30),
             color: LEGACY_COLORS.red,
-            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
+            background: tint(LEGACY_COLORS.red, 10),
           }}
         >
           {loadError}
@@ -117,31 +110,24 @@ export function DraftCartPanel({
         <div
           className="rounded-[12px] border px-4 py-3 text-sm"
           style={{
-            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`,
+            borderColor: tint(LEGACY_COLORS.red, 30),
             color: LEGACY_COLORS.red,
-            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
+            background: tint(LEGACY_COLORS.red, 10),
           }}
         >
           {opError}
-          <button
-            className="ml-2 underline text-xs"
-            onClick={() => setOpError(null)}
-          >
+          <button className="ml-2 text-xs underline" onClick={() => setOpError(null)}>
             닫기
           </button>
         </div>
       )}
       {!loading && drafts.length === 0 && !loadError && (
-        <div
-          className="rounded-[14px] border px-5 py-6 text-sm"
-          style={{
-            background: LEGACY_COLORS.s2,
-            borderColor: LEGACY_COLORS.border,
-            color: LEGACY_COLORS.muted,
-          }}
-        >
-          작업 중인 요청이 없습니다. 요청 작성 화면에서 입력하면 자동으로 저장됩니다.
-        </div>
+        <EmptyState
+          variant="no-data"
+          compact
+          title="작업 중인 요청이 없습니다."
+          description="요청 작성 화면에서 입력하면 자동으로 저장됩니다."
+        />
       )}
       {drafts.map((draft) => (
         <DraftCartItemRow

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Building2, GripVertical } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { EmptyState } from "../common";
 import { useAdminDepartmentsContext } from "./AdminDepartmentsContext";
 import { getDepartmentFallbackColor } from "@/lib/mes-department";
 import type { DepartmentMaster } from "@/lib/api";
@@ -207,7 +208,7 @@ export function AdminDepartmentsSection() {
           </div>
 
           {departments.length === 0 ? (
-            <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>등록된 부서가 없습니다.</div>
+            <EmptyState variant="no-data" compact title="등록된 부서가 없습니다." />
           ) : (
             <div className="space-y-4">
               <DeptGrid

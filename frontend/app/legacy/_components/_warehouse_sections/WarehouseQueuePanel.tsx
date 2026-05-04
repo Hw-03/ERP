@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
+import { EmptyState, LoadingSkeleton } from "../common";
 import { WarehouseQueueRow } from "./WarehouseQueueRow";
 
 interface Props {
@@ -96,30 +98,21 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
 
   return (
     <div className="flex flex-col gap-3">
-      {loading && (
-        <div className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
-          승인함 불러오는 중...
-        </div>
-      )}
+      {loading && <LoadingSkeleton variant="list" rows={2} />}
       {error && (
         <div
           className="rounded-[12px] border px-4 py-3 text-sm"
           style={{
-            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`,
+            borderColor: tint(LEGACY_COLORS.red, 30),
             color: LEGACY_COLORS.red,
-            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
+            background: tint(LEGACY_COLORS.red, 10),
           }}
         >
           {error}
         </div>
       )}
       {!loading && items.length === 0 && !error && (
-        <div
-          className="rounded-[14px] border px-5 py-6 text-sm"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
-        >
-          승인 대기 중인 요청이 없습니다.
-        </div>
+        <EmptyState variant="no-data" compact title="승인 대기 중인 요청이 없습니다." />
       )}
       {items.map((req) => (
         <WarehouseQueueRow

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { EmptyState } from "../common";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { useAdminEmployeesContext } from "./AdminEmployeesContext";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
@@ -117,9 +118,11 @@ export function AdminEmployeesSection() {
           </div>
           <div className="overflow-y-auto">
             {filteredEmployees.length === 0 && (
-              <div className="px-4 py-8 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-                {search ? "검색 결과가 없습니다." : "직원이 없습니다."}
-              </div>
+              <EmptyState
+                compact
+                variant={search ? "no-search-result" : "no-data"}
+                title={search ? "검색 결과가 없습니다." : "직원이 없습니다."}
+              />
             )}
             {filteredEmployees.map((employee, index) => (
               <button

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { EmptyState } from "../common";
 import { useAdminPackagesContext } from "./AdminPackagesContext";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { PackageDetailPanel } from "./_packages_parts/PackageDetailPanel";
@@ -41,9 +42,7 @@ export function AdminPackagesSection() {
             style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
           >
             {packages.length === 0 && (
-              <div className="px-4 py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-                출하묶음이 없습니다.
-              </div>
+              <EmptyState variant="no-data" compact title="출하묶음이 없습니다." />
             )}
             {packages.map((pkg, index) => (
               <div
