@@ -8,7 +8,7 @@ import type { WeeklyReportResponse } from "@/lib/api/types/weekly";
 import { WeeklyGroupCards } from "./_weekly_sections/WeeklyGroupCards";
 import { WeeklyDetailTable } from "./_weekly_sections/WeeklyDetailTable";
 import { WeeklySummaryBand } from "./_weekly_sections/WeeklySummaryBand";
-import { LoadingSkeleton } from "./common/LoadingSkeleton";
+import { LoadingSkeleton, StatusPill } from "./common";
 
 // ─── 주차 계산 ────────────────────────────────────────────────────
 function getWeekStart(d: Date): Date {
@@ -267,18 +267,7 @@ export function DesktopWeeklyReportView() {
           </div>
 
           {/* 이번 주 배지 */}
-          {isThisWeek && (
-            <span
-              className="rounded-full border px-2.5 py-0.5 text-[11px] font-black"
-              style={{
-                borderColor: `color-mix(in srgb, ${LEGACY_COLORS.green} 30%, ${LEGACY_COLORS.border})`,
-                color: LEGACY_COLORS.green,
-                background: `color-mix(in srgb, ${LEGACY_COLORS.green} 10%, transparent)`,
-              }}
-            >
-              이번 주
-            </span>
-          )}
+          {isThisWeek && <StatusPill label="이번 주" tone="success" showDot={false} />}
         </div>
 
         {/* 새로고침 */}

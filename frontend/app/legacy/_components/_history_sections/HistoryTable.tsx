@@ -4,7 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { useState, useMemo } from "react";
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { EmptyState } from "../common/EmptyState";
+import { EmptyState, LoadingSkeleton } from "../common";
 import { formatHistoryDate } from "./historyShared";
 import { HistoryLogRow } from "./HistoryLogRow";
 import { BatchHeader, buildGroups } from "./historyTableHelpers";
@@ -95,9 +95,7 @@ export function HistoryTable({
       </div>
 
       {loading ? (
-        <div className="py-16 text-center text-base" style={{ color: LEGACY_COLORS.muted2 }}>
-          내역을 불러오는 중...
-        </div>
+        <LoadingSkeleton variant="list" rows={8} />
       ) : filteredLogs.length === 0 ? (
         <EmptyState
           variant="no-data"
