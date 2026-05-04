@@ -38,6 +38,38 @@ function weekLabel(mon: Date): string {
   return `${mon.getFullYear()}년 ${week}주차 (${fmt(mon)} ~ ${fmt(sun)})`;
 }
 
+function fmtNum(n: number | string) {
+  return Number(n).toLocaleString("ko-KR");
+}
+
+// ─── 요약 카드 데이터 ─────────────────────────────────────────────
+function buildSummaryCards(data: WeeklyReportResponse) {
+  const { summary } = data;
+  const needCheck = summary.groups_decreasing;
+  return [
+    {
+      label: "현재 재고",
+      value: fmtNum(summary.total_current_qty),
+      color: LEGACY_COLORS.blue,
+    },
+    {
+      label: "생산 / 입고",
+      value: fmtNum(summary.total_in_qty),
+      color: LEGACY_COLORS.cyan,
+    },
+    {
+      label: "출고 / 소비",
+      value: fmtNum(summary.total_out_qty),
+      color: LEGACY_COLORS.muted,
+    },
+    {
+      label: "확인 필요",
+      value: needCheck > 0 ? `${needCheck}개 공정` : "없음",
+      color: needCheck > 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted,
+    },
+  ] as const;
+}
+
 // ─── 컴포넌트 ──────────────────────────────────────────────────────
 export function DesktopWeeklyReportView() {
   const [weekMon, setWeekMon] = useState<Date>(() => getWeekStart(new Date()));
@@ -56,13 +88,13 @@ export function DesktopWeeklyReportView() {
       .getWeeklyReport({ week_start: weekStart, week_end: weekEnd })
       .then((res) => {
         setData(res);
-        // 선택 그룹이 없으면 첫 번째 그룹으로 초기화
         if (res.groups.length > 0 && !res.groups.find((g) => g.process_code === selectedCode)) {
           setSelectedCode(res.groups[0].process_code);
         }
       })
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : "데이터를 불러오지 못했습니다.");
+        setError("주간보고 데이터를 불러오지 못했습니다.");
+        console.error(e);
       })
       .finally(() => setLoading(false));
   }, [weekStart, weekEnd, selectedCode]);
@@ -82,8 +114,8 @@ export function DesktopWeeklyReportView() {
   }
 
   const isThisWeek = toDateStr(getWeekStart(new Date())) === weekStart;
-
   const selectedGroup = data?.groups.find((g) => g.process_code === selectedCode);
+  const summaryCards = data ? buildSummaryCards(data) : null;
 
   function handleExcel() {
     const F_CODES = ["TF", "HF", "VF", "NF", "AF", "PF"];
@@ -96,16 +128,19 @@ export function DesktopWeeklyReportView() {
     window.open(url, "_blank");
   }
 
+  const cardBase = {
+    background: LEGACY_COLORS.s1,
+    borderColor: LEGACY_COLORS.border,
+    boxShadow: "var(--c-card-shadow)",
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-1 pr-1">
-      {/* ── 상단 컨트롤 ── */}
+
+      {/* ── 1행: 상단 컨트롤 ── */}
       <div
         className="flex shrink-0 items-center justify-between gap-3 rounded-[22px] border px-5 py-3"
-        style={{
-          background: LEGACY_COLORS.s1,
-          borderColor: LEGACY_COLORS.border,
-          boxShadow: "var(--c-card-shadow)",
-        }}
+        style={cardBase}
       >
         {/* 주차 네비게이터 */}
         <div className="flex items-center gap-2">
@@ -163,13 +198,13 @@ export function DesktopWeeklyReportView() {
             style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            새로고침
+            최신 데이터 확인
           </button>
           <button
             type="button"
             onClick={handleExcel}
             className="flex h-9 items-center gap-1.5 rounded-[14px] border px-3 text-[13px] font-bold transition-all hover:brightness-95"
-            style={{ background: LEGACY_COLORS.blue, borderColor: LEGACY_COLORS.blue, color: "#ffffff" }}
+            style={{ background: LEGACY_COLORS.blue, borderColor: LEGACY_COLORS.blue, color: LEGACY_COLORS.white }}
           >
             <Download className="h-3.5 w-3.5" />
             엑셀 내보내기
@@ -177,46 +212,60 @@ export function DesktopWeeklyReportView() {
         </div>
       </div>
 
-      {/* ── 콘텐츠 영역 ── */}
+      {/* ── 2행: 핵심 요약 4카드 ── */}
+      <div className="grid shrink-0 gap-3" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+        {summaryCards
+          ? summaryCards.map((card) => (
+              <div
+                key={card.label}
+                className="rounded-[18px] border px-5 py-4"
+                style={cardBase}
+              >
+                <div className="text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted }}>
+                  {card.label}
+                </div>
+                <div className="mt-1 text-[26px] font-black leading-tight" style={{ color: card.color }}>
+                  {card.value}
+                </div>
+              </div>
+            ))
+          : Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="animate-pulse rounded-[18px] border"
+                style={{ height: 80, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+              />
+            ))}
+      </div>
+
+      {/* ── 3행: 본문 ── */}
       <div
         className="min-h-0 flex-1 overflow-hidden"
-        style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 12 }}
+        style={{ display: "grid", gridTemplateColumns: "1fr 260px", gap: 12 }}
       >
-        {/* 좌: 카드 + 상세 테이블 */}
+        {/* 좌: 공정 카드 + 상세 테이블 */}
         <div className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
-          {/* 그룹 카드 */}
+
+          {/* 공정완료품 비교 카드 */}
           <div
             className="shrink-0 rounded-[22px] border p-4"
-            style={{
-              background: LEGACY_COLORS.s1,
-              borderColor: LEGACY_COLORS.border,
-              boxShadow: "var(--c-card-shadow)",
-            }}
+            style={cardBase}
           >
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <h2 className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
-                  부서별 최종 산출물 재고 변화
-                </h2>
-                <p className="mt-0.5 text-[12px]" style={{ color: LEGACY_COLORS.muted }}>
-                  ?F 코드군 중심 요약
-                </p>
-              </div>
+            <div className="mb-3">
+              <h2 className="text-[13px] font-black" style={{ color: LEGACY_COLORS.text }}>
+                부서별 공정완료품 재고 변화
+              </h2>
+              <p className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
+                TF · HF · VF · NF · AF · PF 기준
+              </p>
             </div>
             {loading && !data ? (
-              <div
-                className="grid gap-2.5"
-                style={{ gridTemplateColumns: "repeat(6, minmax(0, 1fr))" }}
-              >
+              <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(6, minmax(0, 1fr))" }}>
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div
                     key={i}
-                    className="animate-pulse rounded-[20px] border"
-                    style={{
-                      height: 128,
-                      background: LEGACY_COLORS.s2,
-                      borderColor: LEGACY_COLORS.border,
-                    }}
+                    className="animate-pulse rounded-[18px] border"
+                    style={{ height: 100, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
                   />
                 ))}
               </div>
@@ -233,9 +282,7 @@ export function DesktopWeeklyReportView() {
           <div
             className="min-h-0 flex-1 overflow-hidden rounded-[22px] border"
             style={{
-              background: LEGACY_COLORS.s1,
-              borderColor: LEGACY_COLORS.border,
-              boxShadow: "var(--c-card-shadow)",
+              ...cardBase,
               display: "flex",
               flexDirection: "column",
             }}
@@ -245,44 +292,44 @@ export function DesktopWeeklyReportView() {
               style={{ borderColor: LEGACY_COLORS.border }}
             >
               <div>
-                <h2 className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
+                <h2 className="text-[13px] font-black" style={{ color: LEGACY_COLORS.text }}>
                   {selectedGroup
-                    ? `${selectedGroup.dept_name} ${selectedGroup.process_code} 상세`
-                    : "상세 테이블"}
+                    ? `${selectedGroup.dept_name} (${selectedGroup.process_code}) 품목 상세`
+                    : "품목 상세"}
                 </h2>
-                <p className="mt-0.5 text-[12px]" style={{ color: LEGACY_COLORS.muted }}>
+                <p className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
                   {selectedGroup?.label ?? "공정 그룹을 선택하세요"} · 품목별 주간 변화
                 </p>
               </div>
-              {/* 탭 버튼 */}
-              <div className="flex gap-1.5 flex-wrap justify-end">
+              {/* 공정 탭 */}
+              <div className="flex flex-wrap justify-end gap-1.5">
                 {(data?.groups ?? []).map((g) => (
                   <button
                     key={g.process_code}
                     type="button"
                     onClick={() => setSelectedCode(g.process_code)}
-                    className="h-[30px] rounded-full border px-3 text-[11px] font-black transition-all"
+                    className="h-[28px] rounded-full border px-3 text-[11px] font-black transition-all"
                     style={{
                       background:
-                        g.process_code === selectedCode ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
+                        g.process_code === selectedCode ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
                       borderColor:
                         g.process_code === selectedCode ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
                       color:
-                        g.process_code === selectedCode ? "#ffffff" : LEGACY_COLORS.muted,
+                        g.process_code === selectedCode ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
                     }}
                   >
-                    {g.dept_name} {g.process_code}
+                    {g.dept_name}
                   </button>
                 ))}
               </div>
             </div>
-            <div className="min-h-0 flex-1 overflow-auto px-5 pb-5 pt-3">
+            <div className="min-h-0 flex-1 overflow-auto px-5 pb-4 pt-3">
               <WeeklyDetailTable group={selectedGroup} />
             </div>
           </div>
         </div>
 
-        {/* 우: KPI + 특이사항 */}
+        {/* 우: 확인 사항 */}
         <div className="min-h-0 overflow-hidden">
           <WeeklyKpiPanel data={data ?? undefined} loading={loading && !data} />
         </div>

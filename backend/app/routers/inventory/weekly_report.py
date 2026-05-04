@@ -204,8 +204,8 @@ def get_weekly_report(
             warnings.append(
                 WeeklyWarning(
                     level="danger",
-                    title=f"{g.dept_name} {g.process_code} 감소",
-                    message=f"현재재고가 전주 대비 {abs(g.delta):.0f} 감소했습니다. 출고/소비 내역을 확인하세요.",
+                    title=f"{g.dept_name} {g.process_code} 재고 감소",
+                    message=f"{g.dept_name} {g.process_code} 재고가 전주 대비 {abs(g.delta):.0f} 감소했습니다.",
                 )
             )
 
@@ -216,7 +216,7 @@ def get_weekly_report(
                 WeeklyWarning(
                     level="warn",
                     title=f"{max_out.dept_name} {max_out.process_code} 출고 집중",
-                    message=f"이번 주 {max_out.process_code} 출고/소비가 {max_out.out_qty:.0f}로 가장 큽니다.",
+                    message=f"출고/소비가 {max_out.dept_name} {max_out.process_code}에 집중되었습니다.",
                 )
             )
         max_delta = max(groups, key=lambda x: x.delta)
@@ -224,8 +224,8 @@ def get_weekly_report(
             warnings.append(
                 WeeklyWarning(
                     level="good",
-                    title=f"{max_delta.dept_name} {max_delta.process_code} 증가",
-                    message=f"{max_delta.process_code} 재고가 {max_delta.delta:.0f} 증가했습니다.",
+                    title=f"{max_delta.dept_name} {max_delta.process_code} 재고 증가",
+                    message=f"{max_delta.dept_name} {max_delta.process_code} 재고가 {max_delta.delta:.0f} 증가했습니다.",
                 )
             )
 
