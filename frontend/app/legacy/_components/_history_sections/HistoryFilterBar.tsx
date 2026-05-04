@@ -2,33 +2,8 @@
 
 import { CalendarDays, List, Search, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { FilterChip } from "../common";
 import { DATE_OPTIONS, TYPE_OPTIONS } from "./historyShared";
-
-function Chip({
-  active,
-  label,
-  onClick,
-  tone = LEGACY_COLORS.blue,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-  tone?: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="whitespace-nowrap rounded-full border px-3 py-1 text-sm font-semibold transition-all hover:brightness-110"
-      style={{
-        background: active ? `color-mix(in srgb, ${tone} 14%, transparent)` : LEGACY_COLORS.s2,
-        borderColor: active ? tone : LEGACY_COLORS.border,
-        color: active ? tone : LEGACY_COLORS.muted2,
-      }}
-    >
-      {label}
-    </button>
-  );
-}
 
 type Props = {
   search: string;
@@ -123,7 +98,7 @@ export function HistoryFilterBar({
         {/* 2줄: 거래 유형 칩 */}
         <div className="flex flex-wrap items-center gap-1.5">
           {TYPE_OPTIONS.map((opt) => (
-            <Chip key={opt.value} active={typeFilter === opt.value} label={opt.label} onClick={() => setTypeFilter(opt.value)} />
+            <FilterChip key={opt.value} active={typeFilter === opt.value} label={opt.label} onClick={() => setTypeFilter(opt.value)} size="sm" />
           ))}
         </div>
 

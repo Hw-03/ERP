@@ -3,32 +3,7 @@
 import { ChevronDown, Filter, Search, Sparkles, TrendingUp } from "lucide-react";
 import type { DepartmentMaster, ProductModel } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-
-function Chip({
-  active,
-  label,
-  onClick,
-  tone,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-  tone: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-full rounded-full border px-4 py-2 text-sm font-semibold transition-all hover:brightness-110"
-      style={{
-        background: active ? `color-mix(in srgb, ${tone} 14%, transparent)` : LEGACY_COLORS.s2,
-        borderColor: active ? tone : LEGACY_COLORS.border,
-        color: active ? tone : LEGACY_COLORS.muted2,
-      }}
-    >
-      {label}
-    </button>
-  );
-}
+import { FilterChip } from "../common";
 
 type FiltersProps = {
   open: boolean;
@@ -62,20 +37,22 @@ export function InventoryFilters({
           부서 구분
         </div>
         <div className="grid grid-cols-3 gap-2">
-          <Chip active={selectedDepts.length === 0} label="전체" onClick={onClearDepts} tone={LEGACY_COLORS.green} />
-          <Chip
+          <FilterChip active={selectedDepts.length === 0} label="전체" onClick={onClearDepts} tone={LEGACY_COLORS.green} className="w-full" />
+          <FilterChip
             active={selectedDepts.includes("창고")}
             label="창고"
             onClick={() => toggleDept("창고")}
             tone={LEGACY_COLORS.green}
+            className="w-full"
           />
           {departments.map((dept) => (
-            <Chip
+            <FilterChip
               key={dept.id}
               active={selectedDepts.includes(dept.name)}
               label={dept.name}
               onClick={() => toggleDept(dept.name)}
               tone={LEGACY_COLORS.green}
+              className="w-full"
             />
           ))}
         </div>
@@ -86,21 +63,23 @@ export function InventoryFilters({
           모델 구분
         </div>
         <div className="grid grid-cols-3 gap-2 overflow-x-auto">
-          <Chip active={selectedModels.length === 0} label="전체" onClick={onClearModels} tone={LEGACY_COLORS.cyan} />
+          <FilterChip active={selectedModels.length === 0} label="전체" onClick={onClearModels} tone={LEGACY_COLORS.cyan} className="w-full" />
           {productModels.map((m) => (
-            <Chip
+            <FilterChip
               key={m.model_name}
               active={selectedModels.includes(m.model_name ?? "")}
               label={m.model_name ?? ""}
               onClick={() => toggleModel(m.model_name ?? "")}
               tone={LEGACY_COLORS.cyan}
+              className="w-full"
             />
           ))}
-          <Chip
+          <FilterChip
             active={selectedModels.includes("미분류")}
             label="미분류"
             onClick={() => toggleModel("미분류")}
             tone={LEGACY_COLORS.muted2}
+            className="w-full"
           />
         </div>
       </div>
