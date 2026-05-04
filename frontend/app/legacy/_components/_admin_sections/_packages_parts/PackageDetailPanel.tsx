@@ -3,6 +3,7 @@
 import { Check, Search, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { buildItemSearchLabel } from "@/lib/mes/item";
+import { EmptyState } from "../../common";
 import { formatQty } from "@/lib/mes/format";
 import { PKG_CATEGORY_OPTIONS } from "../adminShared";
 import { useAdminPackagesContext } from "../AdminPackagesContext";
@@ -135,9 +136,7 @@ export function PackageDetailPanel() {
           구성 품목 ({selectedPackage.items.length}종)
         </div>
         {selectedPackage.items.length === 0 ? (
-          <div className="py-3 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-            아직 품목이 없습니다.
-          </div>
+          <EmptyState variant="no-data" compact title="아직 품목이 없습니다." />
         ) : (
           <div className="space-y-2">
             {selectedPackage.items.map((item) => (

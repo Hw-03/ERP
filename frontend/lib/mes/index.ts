@@ -18,3 +18,4 @@ export * from "./department";
 export * from "./status";
 export * from "./transaction";
 export * from "./color";
+export * from "./colorUtils";
