@@ -69,12 +69,8 @@ export function WorkTypeStep({
             { id: "wh-to-dept", label: `창고→${selectedDept}`, active: warehouseDirection === "wh-to-dept", onClick: () => setWarehouseDirection("wh-to-dept") },
             { id: "dept-to-wh", label: `${selectedDept}→창고`, active: warehouseDirection === "dept-to-wh", onClick: () => setWarehouseDirection("dept-to-wh") },
           ]
-        : workType === "dept-io"
-          ? [
-              { id: "in", label: `${selectedDept}에 입고`, active: deptDirection === "in", onClick: () => setDeptDirection("in") },
-              { id: "out", label: `${selectedDept}에서 출고`, active: deptDirection === "out", onClick: () => setDeptDirection("out") },
-            ]
-          : [];
+        : [];
+  // dept-adjustment는 자체 패널에서 방향/세부유형을 관리하므로 여기서 버튼 없음.
 
   return (
     <div className="space-y-5">

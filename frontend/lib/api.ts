@@ -33,6 +33,8 @@ import { stockRequestsApi } from "./api/stock-requests";
 import { departmentsApi } from "./api/departments";
 // weekly-report 도메인.
 import { weeklyApi } from "./api/weekly";
+// dept-adjustment 도메인.
+import { deptAdjustmentApi } from "./api/dept-adjustment";
 
 // 외부 import 호환을 위해 동일 이름 그대로 re-export.
 // parseError 는 도메인 API (직접 fetch 사용처) 가 본 파일 내부에서 사용 — 이번 PR 에선 그대로.
@@ -180,4 +182,6 @@ export const api = {
   ...departmentsApi,
   // weekly-report 도메인.
   ...weeklyApi,
+  // dept-adjustment 도메인 (부서 재고 조정).
+  ...deptAdjustmentApi,
 };

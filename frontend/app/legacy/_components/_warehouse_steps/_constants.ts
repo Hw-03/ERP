@@ -13,7 +13,7 @@ import type { Department, Item, WarehouseRole } from "@/lib/api";
 export type WorkType =
   | "raw-io"
   | "warehouse-io"
-  | "dept-io"
+  | "dept-adjustment"
   | "package-out"
   | "defective-register";
 export type Direction = "in" | "out" | "return";
@@ -29,11 +29,11 @@ export const PAGE_SIZE = 100;
 export const PROD_DEPTS: Department[] = ["조립", "고압", "진공", "튜닝", "튜브", "출하"];
 
 export const WORK_TYPES: { id: WorkType; label: string; icon: LucideIcon; description: string }[] = [
-  { id: "raw-io", label: "원자재 입출고", icon: Boxes, description: "창고 입고 · 출고 · 공급업체 반품" },
-  { id: "warehouse-io", label: "창고 이동", icon: ArrowLeftRight, description: "창고↔생산부서 이동" },
-  { id: "dept-io", label: "부서 입출고", icon: Workflow, description: "생산부서 기준 입고/출고" },
-  { id: "package-out", label: "패키지 출고", icon: PackageCheck, description: "등록된 묶음 출고" },
-  { id: "defective-register", label: "불량 등록", icon: AlertTriangle, description: "불량 격리 처리" },
+  { id: "raw-io",            label: "공급업체 입출고",  icon: Boxes,         description: "창고 입고 · 출고 · 공급업체 반품" },
+  { id: "warehouse-io",      label: "창고 ↔ 부서 이동", icon: ArrowLeftRight, description: "창고↔생산부서 이동" },
+  { id: "dept-adjustment",   label: "부서 재고 조정",   icon: Workflow,      description: "생산/분해/수량 보정" },
+  { id: "package-out",       label: "패키지 출하",      icon: PackageCheck,  description: "등록된 묶음 출고" },
+  { id: "defective-register",label: "불량 격리",        icon: AlertTriangle, description: "불량 격리 처리" },
 ];
 
 export const CAUTION_WORK_TYPES: WorkType[] = ["defective-register"];
@@ -77,11 +77,8 @@ export function matchesSearch(item: Item, keyword: string) {
 }
 
 export function workTypeNeedsDept(wt: WorkType): boolean {
-  return (
-    wt === "warehouse-io"
-    || wt === "dept-io"
-    || wt === "defective-register"
-  );
+  return wt === "warehouse-io" || wt === "defective-register";
+  // dept-adjustment는 패널이 자체적으로 부서를 관리하므로 여기서 제외
 }
 
 // ───────────── Operator → 작업유형 가시성 매트릭스 ─────────────
@@ -99,13 +96,13 @@ export function canEnterIO(op: OperatorLike): boolean {
 export function workTypesForOperator(op: OperatorLike): WorkType[] {
   if (!op) return [];
   if (isWarehouseStaff(op)) {
-    return ["raw-io", "warehouse-io", "dept-io", "package-out", "defective-register"];
+    return ["raw-io", "warehouse-io", "dept-adjustment", "package-out", "defective-register"];
   }
   if (op.department === "조립" || op.department === "출하") {
-    return ["warehouse-io", "dept-io", "package-out", "defective-register"];
+    return ["warehouse-io", "dept-adjustment", "package-out", "defective-register"];
   }
   if (PROD_DEPTS.includes(op.department)) {
-    return ["warehouse-io", "dept-io", "defective-register"];
+    return ["warehouse-io", "dept-adjustment", "defective-register"];
   }
   return [];
 }

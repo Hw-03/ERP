@@ -39,6 +39,7 @@ from app.routers import (
     codes,
     counts,
     departments,
+    dept_adjustment,
     employees,
     inventory,
     items,
@@ -239,6 +240,7 @@ app.include_router(counts.router, prefix="/api/counts", tags=["Counts"])
 app.include_router(models_router.router, prefix="/api/models", tags=["Models"])
 app.include_router(admin_audit.router, prefix="/api/admin", tags=["Admin Audit"])
 app.include_router(stock_requests.router, prefix="/api/stock-requests", tags=["Stock Requests"])
+app.include_router(dept_adjustment.router, prefix="/api/dept-adjustment", tags=["Dept Adjustment"])
 
 
 @app.get("/health", tags=["System"])

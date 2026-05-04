@@ -39,7 +39,7 @@ export function useWarehouseCompletionFeedback({
     const isIn = (() => {
       if (workType === "raw-io") return rawDirection === "in";
       if (workType === "warehouse-io") return warehouseDirection === "dept-to-wh";
-      if (workType === "dept-io") return deptDirection === "in";
+      if (workType === "dept-adjustment") return false;
       return false;
     })();
 

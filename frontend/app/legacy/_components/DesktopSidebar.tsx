@@ -53,37 +53,36 @@ export function DesktopSidebar({
         }}
       >
         {/* 로고 */}
-        <div className="flex h-12 items-center justify-center py-1">
-          {/* 축소 상태: 작은 아이콘 */}
+        <div
+          className="flex items-center justify-center"
+          style={{ height: expanded ? 68 : 44, transition: "height 180ms ease", flexShrink: 0 }}
+        >
+          {/* 축소 상태: 전체 폭 로고 */}
           <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[14px]"
+            className="flex w-full items-center justify-center"
             style={{
-              background: LEGACY_COLORS.s1,
               opacity: expanded ? 0 : 1,
-              transform: expanded ? "scale(0.8)" : "scale(1)",
-              transition: "opacity 180ms ease, transform 180ms ease",
-              willChange: "transform, opacity",
+              transition: "opacity 180ms ease",
               pointerEvents: expanded ? "none" : "auto",
               position: expanded ? "absolute" : "relative",
             }}
           >
             <Image
               src="/dexcowin-logo.png"
-              alt="DX"
-              width={36}
-              height={36}
-              className="h-9 w-9 object-contain"
+              alt="DEXCOWIN"
+              width={54}
+              height={18}
+              style={{ width: 54, height: "auto" }}
+              className="object-contain"
               priority
             />
           </div>
-          {/* 확장 상태: 큰 로고만 */}
+          {/* 확장 상태: 큰 로고 */}
           <div
-            className="overflow-hidden"
             style={{
               opacity: expanded ? 1 : 0,
               transform: expanded ? "translateX(0)" : "translateX(-8px)",
               transition: "opacity 180ms ease, transform 180ms ease",
-              willChange: "transform, opacity",
               pointerEvents: expanded ? "auto" : "none",
               position: expanded ? "relative" : "absolute",
             }}
@@ -91,9 +90,10 @@ export function DesktopSidebar({
             <Image
               src="/dexcowin-logo.png"
               alt="DEXCOWIN"
-              width={140}
-              height={32}
-              className="h-8 w-auto object-contain"
+              width={168}
+              height={56}
+              style={{ width: 168, height: "auto" }}
+              className="object-contain"
               priority
             />
           </div>

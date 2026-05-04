@@ -1,6 +1,166 @@
 {
   "components": {
     "schemas": {
+      "AdjLineInput": {
+        "properties": {
+          "bom_expected": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bom Expected"
+          },
+          "department": {
+            "title": "Department",
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "in",
+              "out",
+              "defective",
+              "scrap"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "item_id",
+          "direction",
+          "quantity",
+          "department"
+        ],
+        "title": "AdjLineInput",
+        "type": "object"
+      },
+      "AdjLineResponse": {
+        "properties": {
+          "bom_expected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bom Expected"
+          },
+          "department": {
+            "title": "Department",
+            "type": "string"
+          },
+          "direction": {
+            "title": "Direction",
+            "type": "string"
+          },
+          "erp_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Erp Code"
+          },
+          "has_children": {
+            "title": "Has Children",
+            "type": "boolean"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "process_type_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Type Code"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "item_name",
+          "erp_code",
+          "process_type_code",
+          "unit",
+          "direction",
+          "quantity",
+          "bom_expected",
+          "has_children",
+          "department",
+          "reason"
+        ],
+        "title": "AdjLineResponse",
+        "type": "object"
+      },
       "AdminAuditLogResponse": {
         "properties": {
           "action": {
@@ -147,7 +307,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -218,7 +377,6 @@
             "type": "string"
           },
           "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -270,7 +428,6 @@
             "type": "string"
           },
           "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -302,7 +459,6 @@
           },
           "current_stock": {
             "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Current Stock",
             "type": "string"
           },
@@ -338,7 +494,6 @@
             "title": "Process Type Code"
           },
           "required_quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Required Quantity",
             "type": "string"
           },
@@ -361,12 +516,15 @@
           "quantity": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0.0,
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "gt": 0
               },
               {
                 "type": "null"
@@ -424,17 +582,14 @@
             "title": "Process Type Code"
           },
           "required_quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Required Quantity",
             "type": "string"
           },
           "stock_after": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Stock After",
             "type": "string"
           },
           "stock_before": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Stock Before",
             "type": "string"
           }
@@ -553,6 +708,27 @@
           "components"
         ],
         "title": "BomCheckResponse",
+        "type": "object"
+      },
+      "BomTemplateResponse": {
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/AdjLineResponse"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "sub_type": {
+            "title": "Sub Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sub_type",
+          "lines"
+        ],
+        "title": "BomTemplateResponse",
         "type": "object"
       },
       "CapacityResponse": {
@@ -811,6 +987,99 @@
         "title": "DepartmentUpdate",
         "type": "object"
       },
+      "DeptAdjResult": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "processed_count": {
+            "title": "Processed Count",
+            "type": "integer"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "transaction_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Transaction Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "processed_count",
+          "transaction_ids"
+        ],
+        "title": "DeptAdjResult",
+        "type": "object"
+      },
+      "DeptAdjSubmitRequest": {
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/AdjLineInput"
+            },
+            "minItems": 1,
+            "title": "Lines",
+            "type": "array"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "operator_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator Name"
+          },
+          "reference_no": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference No"
+          },
+          "sub_type": {
+            "enum": [
+              "production",
+              "disassembly",
+              "correction"
+            ],
+            "title": "Sub Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sub_type",
+          "lines"
+        ],
+        "title": "DeptAdjSubmitRequest",
+        "type": "object"
+      },
       "DeptTransferRequest": {
         "description": "부서간 이동.",
         "properties": {
@@ -853,7 +1122,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -907,7 +1175,11 @@
             "type": "boolean"
           },
           "level": {
-            "$ref": "#/components/schemas/EmployeeLevelEnum",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmployeeLevelEnum"
+              }
+            ],
             "default": "staff"
           },
           "name": {
@@ -1264,6 +1536,47 @@
         "title": "ErpCodeResponse",
         "type": "object"
       },
+      "ExpandComponentRequest": {
+        "properties": {
+          "department": {
+            "title": "Department",
+            "type": "string"
+          },
+          "direction": {
+            "default": "out",
+            "enum": [
+              "in",
+              "out"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Quantity"
+          }
+        },
+        "required": [
+          "item_id",
+          "quantity",
+          "department"
+        ],
+        "title": "ExpandComponentRequest",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1312,7 +1625,6 @@
           },
           "samples": {
             "items": {
-              "additionalProperties": true,
               "type": "object"
             },
             "title": "Samples",
@@ -1368,7 +1680,6 @@
           },
           "samples": {
             "items": {
-              "additionalProperties": true,
               "type": "object"
             },
             "title": "Samples",
@@ -1426,7 +1737,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -1469,7 +1779,6 @@
             "type": "string"
           },
           "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -1538,7 +1847,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -1570,13 +1878,11 @@
         "properties": {
           "available_quantity": {
             "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Available Quantity",
             "type": "string"
           },
           "defective_total": {
             "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Defective Total",
             "type": "string"
           },
@@ -1622,18 +1928,15 @@
           },
           "pending_quantity": {
             "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Pending Quantity",
             "type": "string"
           },
           "production_total": {
             "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Production Total",
             "type": "string"
           },
           "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -1644,7 +1947,6 @@
           },
           "warehouse_qty": {
             "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Warehouse Qty",
             "type": "string"
           }
@@ -1712,7 +2014,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -1754,7 +2055,6 @@
             "type": "integer"
           },
           "total_quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Quantity",
             "type": "string"
           }
@@ -1787,7 +2087,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -1857,7 +2156,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -2024,7 +2322,6 @@
           "min_stock": {
             "anyOf": [
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -2219,7 +2516,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -2284,7 +2580,6 @@
         "properties": {
           "available_quantity": {
             "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Available Quantity",
             "type": "string"
           },
@@ -2306,7 +2601,6 @@
           },
           "defective_total": {
             "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Defective Total",
             "type": "string"
           },
@@ -2418,7 +2712,6 @@
           "min_stock": {
             "anyOf": [
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -2459,7 +2752,6 @@
           },
           "pending_quantity": {
             "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Pending Quantity",
             "type": "string"
           },
@@ -2476,14 +2768,12 @@
           },
           "production_total": {
             "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Production Total",
             "type": "string"
           },
           "quantity": {
             "anyOf": [
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -2548,7 +2838,6 @@
           },
           "warehouse_qty": {
             "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Warehouse Qty",
             "type": "string"
           }
@@ -2598,7 +2887,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -2681,7 +2969,6 @@
             "title": "Operator"
           },
           "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -2727,7 +3014,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -2867,7 +3153,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -2902,7 +3187,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -2953,7 +3237,6 @@
             "type": "string"
           },
           "counted_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Counted Qty",
             "type": "string"
           },
@@ -2963,7 +3246,6 @@
             "type": "string"
           },
           "diff": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Diff",
             "type": "string"
           },
@@ -3017,7 +3299,6 @@
             "title": "Reason"
           },
           "system_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "System Qty",
             "type": "string"
           }
@@ -3127,7 +3408,6 @@
         "properties": {
           "defective_qty_sum": {
             "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Defective Qty Sum",
             "type": "string"
           },
@@ -3145,18 +3425,15 @@
           },
           "production_qty_sum": {
             "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Production Qty Sum",
             "type": "string"
           },
           "total_quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Quantity",
             "type": "string"
           },
           "warehouse_qty_sum": {
             "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Warehouse Qty Sum",
             "type": "string"
           }
@@ -3400,7 +3677,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -3451,7 +3727,6 @@
             "type": "string"
           },
           "produced_quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Produced Quantity",
             "type": "string"
           },
@@ -3554,7 +3829,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -3688,7 +3962,6 @@
           "parent_quantity": {
             "anyOf": [
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -3768,7 +4041,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -3813,7 +4085,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -3836,7 +4107,6 @@
           "bom_expected": {
             "anyOf": [
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -3901,7 +4171,6 @@
             "title": "Process Stage"
           },
           "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -3979,7 +4248,6 @@
             "type": "string"
           },
           "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -4089,7 +4357,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -4178,7 +4445,6 @@
             "title": "Process Stage"
           },
           "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -4303,7 +4569,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -4360,7 +4625,6 @@
             "type": "string"
           },
           "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           }
@@ -4544,7 +4808,6 @@
           "observed_value": {
             "anyOf": [
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -4556,7 +4819,6 @@
           "threshold": {
             "anyOf": [
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -4740,7 +5002,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -4817,7 +5078,6 @@
             "type": "string"
           },
           "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -5168,7 +5428,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -5336,7 +5595,6 @@
           "quantity_after": {
             "anyOf": [
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -5348,7 +5606,6 @@
           "quantity_before": {
             "anyOf": [
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -5358,7 +5615,6 @@
             "title": "Quantity Before"
           },
           "quantity_change": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity Change",
             "type": "string"
           },
@@ -5476,7 +5732,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -5580,7 +5835,6 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -5643,7 +5897,6 @@
       "VarianceLogResponse": {
         "properties": {
           "actual_used": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Actual Used",
             "type": "string"
           },
@@ -5653,7 +5906,6 @@
             "type": "string"
           },
           "bom_expected": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Bom Expected",
             "type": "string"
           },
@@ -5663,7 +5915,6 @@
             "type": "string"
           },
           "diff": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Diff",
             "type": "string"
           },
@@ -5721,6 +5972,221 @@
           "created_at"
         ],
         "title": "VarianceLogResponse",
+        "type": "object"
+      },
+      "WeeklyGroupReport": {
+        "properties": {
+          "current_qty": {
+            "title": "Current Qty",
+            "type": "string"
+          },
+          "delta": {
+            "title": "Delta",
+            "type": "string"
+          },
+          "dept_name": {
+            "title": "Dept Name",
+            "type": "string"
+          },
+          "in_qty": {
+            "title": "In Qty",
+            "type": "string"
+          },
+          "item_count": {
+            "title": "Item Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WeeklyItemReport"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "out_qty": {
+            "title": "Out Qty",
+            "type": "string"
+          },
+          "prev_qty": {
+            "title": "Prev Qty",
+            "type": "string"
+          },
+          "process_code": {
+            "title": "Process Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "process_code",
+          "dept_name",
+          "label",
+          "item_count",
+          "prev_qty",
+          "in_qty",
+          "out_qty",
+          "current_qty",
+          "delta",
+          "items"
+        ],
+        "title": "WeeklyGroupReport",
+        "type": "object"
+      },
+      "WeeklyItemReport": {
+        "properties": {
+          "current_qty": {
+            "title": "Current Qty",
+            "type": "string"
+          },
+          "delta": {
+            "title": "Delta",
+            "type": "string"
+          },
+          "erp_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Erp Code"
+          },
+          "in_qty": {
+            "title": "In Qty",
+            "type": "string"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "out_qty": {
+            "title": "Out Qty",
+            "type": "string"
+          },
+          "prev_qty": {
+            "title": "Prev Qty",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "erp_code",
+          "item_name",
+          "prev_qty",
+          "in_qty",
+          "out_qty",
+          "current_qty",
+          "delta"
+        ],
+        "title": "WeeklyItemReport",
+        "type": "object"
+      },
+      "WeeklyReportResponse": {
+        "properties": {
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/WeeklyGroupReport"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/WeeklyReportSummary"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/WeeklyWarning"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "week_end": {
+            "title": "Week End",
+            "type": "string"
+          },
+          "week_start": {
+            "title": "Week Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "week_start",
+          "week_end",
+          "groups",
+          "summary",
+          "warnings"
+        ],
+        "title": "WeeklyReportResponse",
+        "type": "object"
+      },
+      "WeeklyReportSummary": {
+        "properties": {
+          "groups_decreasing": {
+            "title": "Groups Decreasing",
+            "type": "integer"
+          },
+          "groups_increasing": {
+            "title": "Groups Increasing",
+            "type": "integer"
+          },
+          "groups_unchanged": {
+            "title": "Groups Unchanged",
+            "type": "integer"
+          },
+          "total_current_qty": {
+            "title": "Total Current Qty",
+            "type": "string"
+          },
+          "total_in_qty": {
+            "title": "Total In Qty",
+            "type": "string"
+          },
+          "total_out_qty": {
+            "title": "Total Out Qty",
+            "type": "string"
+          }
+        },
+        "required": [
+          "total_current_qty",
+          "total_in_qty",
+          "total_out_qty",
+          "groups_increasing",
+          "groups_decreasing",
+          "groups_unchanged"
+        ],
+        "title": "WeeklyReportSummary",
+        "type": "object"
+      },
+      "WeeklyWarning": {
+        "properties": {
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "title",
+          "message"
+        ],
+        "title": "WeeklyWarning",
         "type": "object"
       }
     }
@@ -6924,6 +7390,165 @@
         "summary": "Update Department",
         "tags": [
           "Departments"
+        ]
+      }
+    },
+    "/api/dept-adjustment/bom-template": {
+      "get": {
+        "description": "BOM 기반 초기 라인 세트 반환.",
+        "operationId": "get_bom_template_api_dept_adjustment_bom_template_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sub_type",
+            "required": true,
+            "schema": {
+              "title": "Sub Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "quantity",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "default": "1",
+              "title": "Quantity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BomTemplateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Bom Template",
+        "tags": [
+          "Dept Adjustment"
+        ]
+      }
+    },
+    "/api/dept-adjustment/expand-component": {
+      "post": {
+        "description": "중간공정품 1단계 선택 전개.",
+        "operationId": "expand_component_api_dept_adjustment_expand_component_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpandComponentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdjLineResponse"
+                  },
+                  "title": "Response Expand Component Api Dept Adjustment Expand Component Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Expand Component",
+        "tags": [
+          "Dept Adjustment"
+        ]
+      }
+    },
+    "/api/dept-adjustment/submit": {
+      "post": {
+        "description": "부서 재고 조정 배치 원자 처리.",
+        "operationId": "submit_adjustment_api_dept_adjustment_submit_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeptAdjSubmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeptAdjResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Adjustment",
+        "tags": [
+          "Dept Adjustment"
         ]
       }
     },
@@ -8222,6 +8847,73 @@
         ]
       }
     },
+    "/api/inventory/weekly-report": {
+      "get": {
+        "operationId": "get_weekly_report_api_inventory_weekly_report_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "week_start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Week Start"
+            }
+          },
+          {
+            "in": "query",
+            "name": "week_end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Week End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyReportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Weekly Report",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
     "/api/items": {
       "get": {
         "operationId": "list_items_api_items_get",
@@ -8916,7 +9608,6 @@
                   "type": "number"
                 },
                 {
-                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                   "type": "string"
                 }
               ],

@@ -30,9 +30,10 @@ export function inputRequiresApproval(input: {
       // return(공급업체 반품)은 from=defective, to=none → warehouse 미포함 → 승인 불필요.
       return input.rawDirection !== "return";
     case "warehouse-io":
-    case "dept-io":
     case "package-out":
       return true;
+    case "dept-adjustment":
+      return false; // 부서 재고끼리 즉시 처리 — 승인 불필요
     case "defective-register":
       return input.defectiveSource === "warehouse";
   }

@@ -43,8 +43,8 @@ export function useWarehouseWizardState({
           : true
         : workType === "warehouse-io"
           ? !!selectedDept && !!warehouseDirection
-          : workType === "dept-io"
-            ? !!selectedDept
+          : workType === "dept-adjustment"
+            ? true  // dept-adjustment는 패널이 자체 검증
             : workType === "defective-register"
               ? !!selectedDept && !!defectiveSource
               : false;

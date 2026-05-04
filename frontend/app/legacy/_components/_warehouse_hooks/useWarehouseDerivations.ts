@@ -83,8 +83,8 @@ export function useWarehouseDerivations(
       ? rawDirection !== "in"
       : workType === "warehouse-io"
         ? warehouseDirection === "wh-to-dept"
-        : workType === "dept-io"
-          ? deptDirection === "out"
+        : workType === "dept-adjustment"
+          ? false  // 패널 자체 처리
           : true;
 
   const isRawReturn = workType === "raw-io" && rawDirection === "return";
@@ -101,8 +101,8 @@ export function useWarehouseDerivations(
         ? warehouseDirection === "wh-to-dept"
           ? `창고→${selectedDept} 이동`
           : `${selectedDept}→창고 복귀`
-        : workType === "dept-io"
-          ? `${selectedDept} ${deptDirection === "in" ? "입고" : "출고"}`
+        : workType === "dept-adjustment"
+          ? "부서 재고 조정"
           : workType === "defective-register"
             ? `불량 등록 (${defectiveSource === "warehouse" ? "창고" : selectedDept} → ${selectedDept} 격리)`
             : "패키지 출고";

@@ -64,10 +64,10 @@ export function resolveRequestType(input: {
       return "supplier_return";
     case "warehouse-io":
       return warehouseDirection === "wh-to-dept" ? "warehouse_to_dept" : "dept_to_warehouse";
-    case "dept-io":
-      // 기존 코드에서 dept-io 도 창고 ↔ 부서 이동 (transfer_to_production / transfer_to_warehouse)
-      // 을 호출하므로 동일하게 매핑한다. 향후 진정한 부서 내부 이동 UI는 별도.
-      return deptDirection === "in" ? "warehouse_to_dept" : "dept_to_warehouse";
+    case "dept-adjustment":
+      // 별도 /api/dept-adjustment 엔드포인트로 처리 — stock-request type 없음.
+      // 이 분기는 도달하지 않지만 타입 완전성을 위해 유지.
+      return "dept_internal";
     case "defective-register":
       return defectiveSource === "warehouse" ? "mark_defective_wh" : "mark_defective_prod";
     case "package-out":
@@ -126,23 +126,7 @@ function buildLines(input: BuildPayloadInput): LineSpec[] {
             to_bucket: "warehouse",
           };
     }
-    if (workType === "dept-io") {
-      return deptDirection === "in"
-        ? {
-            item_id: item.item_id,
-            quantity,
-            from_bucket: "warehouse",
-            to_bucket: "production",
-            to_department: selectedDept,
-          }
-        : {
-            item_id: item.item_id,
-            quantity,
-            from_bucket: "production",
-            from_department: selectedDept,
-            to_bucket: "warehouse",
-          };
-    }
+    // dept-adjustment: 자체 패널에서 /api/dept-adjustment/submit 직접 호출 — 여기 도달 안 함.
     // defective-register
     if (defectiveSource === "warehouse") {
       return {

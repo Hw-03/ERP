@@ -117,6 +117,12 @@ class DepartmentEnum(str, enum.Enum):
     ETC = "기타"
 
 
+class DeptAdjSubTypeEnum(str, enum.Enum):
+    PRODUCTION  = "production"    # 생산/조립
+    DISASSEMBLY = "disassembly"   # 분해/회수
+    CORRECTION  = "correction"    # 수량 보정
+
+
 class EmployeeLevelEnum(str, enum.Enum):
     ADMIN = "admin"
     MANAGER = "manager"

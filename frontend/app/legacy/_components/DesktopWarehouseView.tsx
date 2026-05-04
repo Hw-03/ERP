@@ -23,6 +23,8 @@ import { WarehouseComposeSection } from "./_warehouse_sections/WarehouseComposeS
 import { draftToFormState } from "./_warehouse_helpers/requestMapping";
 import { useWarehouseSubmit } from "./_warehouse_helpers/useWarehouseSubmit";
 import { readCurrentOperator } from "./login/useCurrentOperator";
+import { WorkTypeCardGrid } from "./_warehouse_steps/WorkTypeCardGrid";
+import { DeptAdjustmentPanel } from "./_warehouse_steps/DeptAdjustmentPanel";
 
 export function DesktopWarehouseView({
   globalSearch,
@@ -358,7 +360,7 @@ export function DesktopWarehouseView({
           }}
         />
 
-        {sectionTab === "compose" && (
+        {sectionTab === "compose" && workType !== "dept-adjustment" && (
           <WarehouseComposeSection
             autoSaveStatus={autoSaveStatus}
             stickySummary={stickySummary}
@@ -396,6 +398,26 @@ export function DesktopWarehouseView({
             submitting={submitting}
             onSubmit={() => setShowConfirm(true)}
           />
+        )}
+
+        {sectionTab === "compose" && workType === "dept-adjustment" && (
+          <div className="space-y-4 px-1">
+            <WorkTypeCardGrid
+              workType={workType}
+              availableWorkTypes={availableWorkTypes}
+              onWorkTypeChange={changeWorkType}
+            />
+            <DeptAdjustmentPanel
+              items={items}
+              operator={operator}
+              onSuccess={(count, label) => {
+                setLastResult({ count, label });
+                setPanelRefreshNonce((n) => n + 1);
+                onSubmitSuccess?.();
+              }}
+              onError={setError}
+            />
+          </div>
         )}
       </div>
 
