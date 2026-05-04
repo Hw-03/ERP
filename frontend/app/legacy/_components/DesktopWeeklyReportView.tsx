@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
-import { LEGACY_COLORS, employeeColor } from "@/lib/mes/color";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { api } from "@/lib/api";
 import type { WeeklyReportResponse } from "@/lib/api/types/weekly";
+import { WeeklyGroupCards } from "./_weekly_sections/WeeklyGroupCards";
 import { WeeklyDetailTable } from "./_weekly_sections/WeeklyDetailTable";
 import { LoadingSkeleton } from "./common/LoadingSkeleton";
 
@@ -157,47 +158,57 @@ export function DesktopWeeklyReportView() {
         </div>
       </div>
 
-      {/* ── 행2: 메인 카드 ── */}
+      {/* ── 행2: 공정별 변화 카드 ── */}
+      <div
+        className="shrink-0 rounded-[22px] border p-4"
+        style={cardBase}
+      >
+        <div className="mb-3 flex items-baseline gap-2">
+          <h2 className="text-[13px] font-black" style={{ color: LEGACY_COLORS.text }}>
+            공정별 변화
+          </h2>
+          <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
+            순변동 · 생산/입고 · 출고/소비
+          </span>
+        </div>
+        {loading && !data ? (
+          <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(6, minmax(0, 1fr))" }}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="animate-pulse rounded-[18px] border"
+                style={{ height: 96, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+              />
+            ))}
+          </div>
+        ) : (
+          <WeeklyGroupCards
+            groups={data?.groups ?? []}
+            selected={selectedCode}
+            onSelect={setSelectedCode}
+          />
+        )}
+      </div>
+
+      {/* ── 행3: 품목 상세 카드 ── */}
       <div
         className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[22px] border"
         style={cardBase}
       >
-        {/* 헤더: 제목 + 공정 chip */}
+        {/* 헤더 */}
         <div
-          className="flex shrink-0 items-center justify-between border-b px-5 py-3"
+          className="flex shrink-0 items-center border-b px-5 py-3"
           style={{ borderColor: LEGACY_COLORS.border }}
         >
           <div>
             <h2 className="text-[13px] font-black" style={{ color: LEGACY_COLORS.text }}>
-              공정별 주간 재고 변화
+              {selectedGroup
+                ? `${selectedGroup.dept_name} (${selectedGroup.process_code}) 품목 상세`
+                : "품목 상세"}
             </h2>
             <p className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
               {selectedGroup?.label ?? "공정을 선택하세요"} · 선택 주차 품목별 변화
             </p>
-          </div>
-
-          <div className="flex flex-wrap justify-end gap-1.5">
-            {(data?.groups ?? []).map((g) => {
-              const isActive = g.process_code === selectedCode;
-              const tone = g.delta < 0 ? LEGACY_COLORS.red : employeeColor(g.dept_name);
-              return (
-                <button
-                  key={g.process_code}
-                  type="button"
-                  onClick={() => setSelectedCode(g.process_code)}
-                  className="h-[28px] whitespace-nowrap rounded-full border px-3 text-[11px] font-black transition-colors hover:brightness-110"
-                  style={{
-                    background: isActive
-                      ? `color-mix(in srgb, ${tone} 14%, transparent)`
-                      : LEGACY_COLORS.s2,
-                    borderColor: isActive ? tone : LEGACY_COLORS.border,
-                    color: isActive ? tone : LEGACY_COLORS.muted2,
-                  }}
-                >
-                  {g.dept_name}
-                </button>
-              );
-            })}
           </div>
         </div>
 
