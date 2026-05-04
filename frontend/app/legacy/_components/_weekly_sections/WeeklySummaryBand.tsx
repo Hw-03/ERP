@@ -2,6 +2,7 @@
 
 import { memo } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import type { WeeklyReportResponse } from "@/lib/api/types/weekly";
 
@@ -70,9 +71,9 @@ function WeeklySummaryBandImpl({ data }: Props) {
 
   const borderColor =
     info.level === "danger"
-      ? `color-mix(in srgb, ${LEGACY_COLORS.red} 40%, ${LEGACY_COLORS.border})`
+      ? tint(LEGACY_COLORS.red, 40, LEGACY_COLORS.border)
       : info.level === "warn"
-      ? `color-mix(in srgb, ${LEGACY_COLORS.yellow} 40%, ${LEGACY_COLORS.border})`
+      ? tint(LEGACY_COLORS.yellow, 40, LEGACY_COLORS.border)
       : LEGACY_COLORS.border;
 
   return (

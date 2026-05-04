@@ -2,6 +2,7 @@
 
 import { memo, useState } from "react";
 import { LEGACY_COLORS, employeeColor } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import type { WeeklyGroupReport } from "@/lib/api/types/weekly";
 
@@ -37,17 +38,17 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
             className="relative overflow-hidden rounded-[16px] border text-left transition-colors hover:brightness-110"
             style={{
               background: isActive
-                ? `color-mix(in srgb, ${tone} 8%, ${LEGACY_COLORS.s2})`
+                ? tint(tone, 8, LEGACY_COLORS.s2)
                 : isHover
                 ? LEGACY_COLORS.s3
                 : LEGACY_COLORS.s2,
               borderColor: isActive
                 ? tone
                 : isDecreasing
-                ? `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, ${LEGACY_COLORS.border})`
+                ? tint(LEGACY_COLORS.red, 30, LEGACY_COLORS.border)
                 : LEGACY_COLORS.border,
               boxShadow: isActive
-                ? `0 0 0 1.5px color-mix(in srgb, ${tone} 20%, transparent), var(--c-card-shadow)`
+                ? `0 0 0 1.5px ${tint(tone, 20)}, var(--c-card-shadow)`
                 : undefined,
             }}
           >
@@ -55,7 +56,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
             <div
               className="absolute bottom-0 left-0 top-0 w-[3px]"
               style={{
-                background: isActive || isDecreasing ? tone : `color-mix(in srgb, ${accentColor} 35%, transparent)`,
+                background: isActive || isDecreasing ? tone : tint(accentColor, 35),
               }}
             />
             {/* Content */}
@@ -84,7 +85,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
                 <span
                   className="rounded-[6px] px-2 py-0.5 text-[11px] font-black"
                   style={{
-                    background: `color-mix(in srgb, ${tone} 12%, ${LEGACY_COLORS.s2})`,
+                    background: tint(tone, 12, LEGACY_COLORS.s2),
                     color: tone,
                   }}
                 >

@@ -5,6 +5,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { api } from "@/lib/api";
 import type { WeeklyReportResponse } from "@/lib/api/types/weekly";
+import { tint } from "@/lib/mes/colorUtils";
 import { WeeklyGroupCards } from "./_weekly_sections/WeeklyGroupCards";
 import { WeeklyDetailTable } from "./_weekly_sections/WeeklyDetailTable";
 import { WeeklySummaryBand } from "./_weekly_sections/WeeklySummaryBand";
@@ -137,7 +138,7 @@ export function DesktopWeeklyReportView() {
               className="flex items-center gap-2 rounded-[14px] border px-4 py-2 transition-colors hover:brightness-110"
               style={{
                 background: calOpen
-                  ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, ${LEGACY_COLORS.s2})`
+                  ? tint(LEGACY_COLORS.blue, 10, LEGACY_COLORS.s2)
                   : LEGACY_COLORS.s2,
                 borderColor: calOpen ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
                 color: LEGACY_COLORS.text,
@@ -237,7 +238,7 @@ export function DesktopWeeklyReportView() {
                       className="grid grid-cols-7 rounded-[10px] py-1 text-center text-[12px]"
                       style={{
                         background: isSelected
-                          ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 18%, transparent)`
+                          ? tint(LEGACY_COLORS.blue, 18)
                           : "transparent",
                         opacity: isFuture ? 0.3 : 1,
                         cursor: isFuture ? "default" : "pointer",
