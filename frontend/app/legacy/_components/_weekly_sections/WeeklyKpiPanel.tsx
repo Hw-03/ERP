@@ -21,7 +21,7 @@ function WeeklyKpiPanelImpl({ data, loading }: Props) {
           className="flex shrink-0 items-center border-b px-4 py-3"
           style={{ borderColor: LEGACY_COLORS.border }}
         >
-          <h2 className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
+          <h2 className="text-[13px] font-black" style={{ color: LEGACY_COLORS.text }}>
             확인 사항
           </h2>
         </div>
@@ -47,47 +47,74 @@ function WeeklyKpiPanelImpl({ data, loading }: Props) {
         className="flex shrink-0 items-center border-b px-4 py-3"
         style={{ borderColor: LEGACY_COLORS.border }}
       >
-        <h2 className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
+        <h2 className="text-[13px] font-black" style={{ color: LEGACY_COLORS.text }}>
           확인 사항
         </h2>
+        {warnings.length > 0 && (
+          <span
+            className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-black"
+            style={{
+              color: warnings.some((w) => w.level === "danger") ? LEGACY_COLORS.red : LEGACY_COLORS.yellow,
+              background: warnings.some((w) => w.level === "danger")
+                ? `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, ${LEGACY_COLORS.s2})`
+                : `color-mix(in srgb, ${LEGACY_COLORS.yellow} 10%, ${LEGACY_COLORS.s2})`,
+            }}
+          >
+            {warnings.length}건
+          </span>
+        )}
       </div>
 
       <div className="flex flex-col gap-2 overflow-auto p-3">
         {warnings.length === 0 ? (
-          <p
-            className="py-6 text-center text-[12px]"
-            style={{ color: LEGACY_COLORS.muted2 }}
+          <div
+            className="mt-2 rounded-[14px] border px-4 py-5 text-center"
+            style={{
+              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.green} 28%, ${LEGACY_COLORS.border})`,
+              background: `color-mix(in srgb, ${LEGACY_COLORS.green} 5%, ${LEGACY_COLORS.s1})`,
+            }}
           >
-            확인할 특이사항이 없습니다.
-          </p>
-        ) : (
-          warnings.map((w, i) => (
-            <div
-              key={i}
-              className="rounded-[14px] border p-3"
-              style={{
-                borderColor:
-                  w.level === "danger"
-                    ? `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, ${LEGACY_COLORS.border})`
-                    : w.level === "warn"
-                    ? `color-mix(in srgb, ${LEGACY_COLORS.yellow} 30%, ${LEGACY_COLORS.border})`
-                    : `color-mix(in srgb, ${LEGACY_COLORS.green} 25%, ${LEGACY_COLORS.border})`,
-                background:
-                  w.level === "danger"
-                    ? `color-mix(in srgb, ${LEGACY_COLORS.red} 5%, ${LEGACY_COLORS.s1})`
-                    : w.level === "warn"
-                    ? `color-mix(in srgb, ${LEGACY_COLORS.yellow} 5%, ${LEGACY_COLORS.s1})`
-                    : `color-mix(in srgb, ${LEGACY_COLORS.green} 5%, ${LEGACY_COLORS.s1})`,
-              }}
-            >
-              <div
-                className="text-[12px] leading-relaxed"
-                style={{ color: LEGACY_COLORS.text }}
-              >
-                {w.message}
-              </div>
+            <div className="text-[13px] font-black" style={{ color: LEGACY_COLORS.green }}>
+              이상 없음
             </div>
-          ))
+            <div className="mt-1.5 text-[11px] leading-relaxed" style={{ color: LEGACY_COLORS.muted }}>
+              선택 주차 기준<br />
+              공정완료품 재고 변동이<br />
+              안정적입니다.
+            </div>
+          </div>
+        ) : (
+          warnings.map((w, i) => {
+            const levelColor =
+              w.level === "danger"
+                ? LEGACY_COLORS.red
+                : w.level === "warn"
+                ? LEGACY_COLORS.yellow
+                : LEGACY_COLORS.green;
+            return (
+              <div
+                key={i}
+                className="rounded-[14px] border p-3"
+                style={{
+                  borderColor: `color-mix(in srgb, ${levelColor} 28%, ${LEGACY_COLORS.border})`,
+                  background: `color-mix(in srgb, ${levelColor} 5%, ${LEGACY_COLORS.s1})`,
+                }}
+              >
+                <div
+                  className="mb-0.5 text-[11px] font-black"
+                  style={{ color: levelColor }}
+                >
+                  {w.title}
+                </div>
+                <div
+                  className="text-[11px] leading-relaxed"
+                  style={{ color: LEGACY_COLORS.text }}
+                >
+                  {w.message}
+                </div>
+              </div>
+            );
+          })
         )}
       </div>
     </div>

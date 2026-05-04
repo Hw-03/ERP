@@ -42,28 +42,63 @@ function fmtNum(n: number | string) {
   return Number(n).toLocaleString("ko-KR");
 }
 
-// ─── 요약 카드 데이터 ─────────────────────────────────────────────
+// ─── 이번 주 총평 ─────────────────────────────────────────────────
+type StatusLevel = "danger" | "neutral" | "good";
+
+function buildStatusReport(data: WeeklyReportResponse): {
+  main: string;
+  sub: string;
+  level: StatusLevel;
+} {
+  const { summary, warnings } = data;
+  if (summary.groups_decreasing > 0) {
+    const firstDanger = warnings.find((w) => w.level === "danger");
+    return {
+      main: "확인 필요한 공정이 있습니다.",
+      sub: firstDanger?.message ?? `${summary.groups_decreasing}개 공정 재고 감소`,
+      level: "danger",
+    };
+  }
+  if (Number(summary.total_in_qty) === 0 && Number(summary.total_out_qty) === 0) {
+    return {
+      main: "선택 주차에 집계된 입출고 변동이 없습니다.",
+      sub: `현재재고 ${fmtNum(summary.total_current_qty)}`,
+      level: "neutral",
+    };
+  }
+  return {
+    main: "공정완료품 재고 흐름이 안정적입니다.",
+    sub: `현재재고 ${fmtNum(summary.total_current_qty)} · 생산/입고 ${fmtNum(summary.total_in_qty)} · 출고/소비 ${fmtNum(summary.total_out_qty)}`,
+    level: "good",
+  };
+}
+
+// ─── 핵심 지표 카드 데이터 ─────────────────────────────────────────
 function buildSummaryCards(data: WeeklyReportResponse) {
   const { summary } = data;
   const needCheck = summary.groups_decreasing;
   return [
     {
       label: "현재 재고",
+      sub: "공정완료품 총재고",
       value: fmtNum(summary.total_current_qty),
       color: LEGACY_COLORS.blue,
     },
     {
       label: "생산 / 입고",
+      sub: "선택 주차 증가량",
       value: fmtNum(summary.total_in_qty),
-      color: LEGACY_COLORS.cyan,
+      color: Number(summary.total_in_qty) > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted,
     },
     {
       label: "출고 / 소비",
+      sub: "선택 주차 감소량",
       value: fmtNum(summary.total_out_qty),
       color: LEGACY_COLORS.muted,
     },
     {
       label: "확인 필요",
+      sub: "감소 공정 기준",
       value: needCheck > 0 ? `${needCheck}개 공정` : "없음",
       color: needCheck > 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted,
     },
@@ -116,6 +151,14 @@ export function DesktopWeeklyReportView() {
   const isThisWeek = toDateStr(getWeekStart(new Date())) === weekStart;
   const selectedGroup = data?.groups.find((g) => g.process_code === selectedCode);
   const summaryCards = data ? buildSummaryCards(data) : null;
+  const statusReport = data ? buildStatusReport(data) : null;
+
+  const statusColor =
+    statusReport?.level === "danger"
+      ? LEGACY_COLORS.red
+      : statusReport?.level === "good"
+      ? LEGACY_COLORS.green
+      : LEGACY_COLORS.muted;
 
   function handleExcel() {
     const F_CODES = ["TF", "HF", "VF", "NF", "AF", "PF"];
@@ -212,20 +255,62 @@ export function DesktopWeeklyReportView() {
         </div>
       </div>
 
-      {/* ── 2행: 핵심 요약 4카드 ── */}
-      <div className="grid shrink-0 gap-3" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+      {/* ── 2행: 이번 주 총평 + 핵심 지표 ── */}
+      <div
+        className="grid shrink-0 gap-3"
+        style={{ gridTemplateColumns: "minmax(0, 1.8fr) repeat(4, minmax(0, 1fr))" }}
+      >
+        {/* 총평 카드 */}
+        {statusReport ? (
+          <div
+            className="rounded-[18px] border px-5 py-3.5"
+            style={{
+              ...cardBase,
+              borderColor:
+                statusReport.level === "danger"
+                  ? `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, ${LEGACY_COLORS.border})`
+                  : statusReport.level === "good"
+                  ? `color-mix(in srgb, ${LEGACY_COLORS.green} 20%, ${LEGACY_COLORS.border})`
+                  : LEGACY_COLORS.border,
+              background:
+                statusReport.level === "danger"
+                  ? `color-mix(in srgb, ${LEGACY_COLORS.red} 5%, ${LEGACY_COLORS.s1})`
+                  : LEGACY_COLORS.s1,
+            }}
+          >
+            <div className="text-[10px] font-bold" style={{ color: LEGACY_COLORS.muted }}>
+              이번 주 총평
+            </div>
+            <div className="mt-0.5 text-[15px] font-black leading-snug" style={{ color: statusColor }}>
+              {statusReport.main}
+            </div>
+            <div className="mt-1 text-[11px] leading-relaxed" style={{ color: LEGACY_COLORS.muted }}>
+              {statusReport.sub}
+            </div>
+          </div>
+        ) : (
+          <div
+            className="animate-pulse rounded-[18px] border"
+            style={{ minHeight: 76, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+          />
+        )}
+
+        {/* 핵심 지표 4개 */}
         {summaryCards
           ? summaryCards.map((card) => (
               <div
                 key={card.label}
-                className="rounded-[18px] border px-5 py-4"
+                className="rounded-[18px] border px-4 py-3"
                 style={cardBase}
               >
-                <div className="text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted }}>
+                <div className="text-[10px] font-bold" style={{ color: LEGACY_COLORS.muted }}>
                   {card.label}
                 </div>
-                <div className="mt-1 text-[26px] font-black leading-tight" style={{ color: card.color }}>
+                <div className="mt-0.5 text-[20px] font-black leading-tight" style={{ color: card.color }}>
                   {card.value}
+                </div>
+                <div className="mt-0.5 text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  {card.sub}
                 </div>
               </div>
             ))
@@ -233,7 +318,7 @@ export function DesktopWeeklyReportView() {
               <div
                 key={i}
                 className="animate-pulse rounded-[18px] border"
-                style={{ height: 80, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+                style={{ minHeight: 76, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
               />
             ))}
       </div>
@@ -243,21 +328,21 @@ export function DesktopWeeklyReportView() {
         className="min-h-0 flex-1 overflow-hidden"
         style={{ display: "grid", gridTemplateColumns: "1fr 260px", gap: 12 }}
       >
-        {/* 좌: 공정 카드 + 상세 테이블 */}
+        {/* 좌: 공정 카드 + 품목 상세 */}
         <div className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
 
-          {/* 공정완료품 비교 카드 */}
+          {/* 공정별 재고 변화 카드 */}
           <div
             className="shrink-0 rounded-[22px] border p-4"
             style={cardBase}
           >
-            <div className="mb-3">
+            <div className="mb-3 flex items-baseline gap-2">
               <h2 className="text-[13px] font-black" style={{ color: LEGACY_COLORS.text }}>
-                부서별 공정완료품 재고 변화
+                공정별 재고 변화
               </h2>
-              <p className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
-                TF · HF · VF · NF · AF · PF 기준
-              </p>
+              <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
+                TF · HF · VF · NF · AF · PF
+              </span>
             </div>
             {loading && !data ? (
               <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(6, minmax(0, 1fr))" }}>
@@ -265,7 +350,7 @@ export function DesktopWeeklyReportView() {
                   <div
                     key={i}
                     className="animate-pulse rounded-[18px] border"
-                    style={{ height: 100, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+                    style={{ height: 92, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
                   />
                 ))}
               </div>
@@ -278,7 +363,7 @@ export function DesktopWeeklyReportView() {
             )}
           </div>
 
-          {/* 상세 테이블 */}
+          {/* 품목 상세 */}
           <div
             className="min-h-0 flex-1 overflow-hidden rounded-[22px] border"
             style={{
@@ -298,7 +383,7 @@ export function DesktopWeeklyReportView() {
                     : "품목 상세"}
                 </h2>
                 <p className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
-                  {selectedGroup?.label ?? "공정 그룹을 선택하세요"} · 품목별 주간 변화
+                  {selectedGroup?.label ?? "공정 그룹을 선택하세요"} · 선택 주차 품목별 변화
                 </p>
               </div>
               {/* 공정 탭 */}
