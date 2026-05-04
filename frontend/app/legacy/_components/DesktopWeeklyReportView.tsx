@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, ChevronLeft, ChevronRight, Download, RefreshCw, TrendingDown, TrendingUp } from "lucide-react";
-import { LEGACY_COLORS } from "@/lib/mes/color";
+import { LEGACY_COLORS, employeeColor } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { api } from "@/lib/api";
 import type { WeeklyReportResponse } from "@/lib/api/types/weekly";
@@ -206,7 +206,7 @@ export function DesktopWeeklyReportView() {
           <button
             type="button"
             onClick={prevWeek}
-            className="flex h-8 w-8 items-center justify-center rounded-[12px] border transition-all hover:brightness-95"
+            className="flex h-8 w-8 items-center justify-center rounded-[12px] border transition-all hover:brightness-110"
             style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -222,7 +222,7 @@ export function DesktopWeeklyReportView() {
             type="button"
             onClick={nextWeek}
             disabled={isThisWeek}
-            className="flex h-8 w-8 items-center justify-center rounded-[12px] border transition-all hover:brightness-95 disabled:opacity-40"
+            className="flex h-8 w-8 items-center justify-center rounded-[12px] border transition-all hover:brightness-110 disabled:opacity-40"
             style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
           >
             <ChevronRight className="h-4 w-4" />
@@ -253,7 +253,7 @@ export function DesktopWeeklyReportView() {
             type="button"
             onClick={load}
             disabled={loading}
-            className="flex h-9 items-center gap-1.5 rounded-[14px] border px-3 text-[13px] font-bold transition-all hover:brightness-95 disabled:opacity-50"
+            className="flex h-9 items-center gap-1.5 rounded-[14px] border px-3 text-[13px] font-bold transition-all hover:brightness-110 disabled:opacity-50"
             style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -262,7 +262,7 @@ export function DesktopWeeklyReportView() {
           <button
             type="button"
             onClick={handleExcel}
-            className="flex h-9 items-center gap-1.5 rounded-[14px] border px-3 text-[13px] font-bold transition-all hover:brightness-95"
+            className="flex h-9 items-center gap-1.5 rounded-[14px] border px-3 text-[13px] font-bold transition-all hover:brightness-110"
             style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
           >
             <Download className="h-3.5 w-3.5" />
@@ -316,7 +316,7 @@ export function DesktopWeeklyReportView() {
           ? summaryCards.map((card) => (
               <div
                 key={card.label}
-                className="flex flex-col gap-1 rounded-[18px] border px-4 py-3"
+                className="flex flex-col gap-1 rounded-[20px] border px-4 py-3"
                 style={{
                   background: `color-mix(in srgb, ${card.tone} 6%, ${LEGACY_COLORS.s1})`,
                   borderColor: `color-mix(in srgb, ${card.tone} 22%, ${LEGACY_COLORS.border})`,
@@ -422,11 +422,17 @@ export function DesktopWeeklyReportView() {
                     className="h-[28px] rounded-full border px-3 text-[11px] font-black transition-all"
                     style={{
                       background:
-                        g.process_code === selectedCode ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
+                        g.process_code === selectedCode
+                          ? `color-mix(in srgb, ${employeeColor(g.dept_name)} 14%, ${LEGACY_COLORS.s1})`
+                          : LEGACY_COLORS.s2,
                       borderColor:
-                        g.process_code === selectedCode ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+                        g.process_code === selectedCode
+                          ? employeeColor(g.dept_name)
+                          : LEGACY_COLORS.border,
                       color:
-                        g.process_code === selectedCode ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
+                        g.process_code === selectedCode
+                          ? employeeColor(g.dept_name)
+                          : LEGACY_COLORS.muted,
                     }}
                   >
                     {g.dept_name}

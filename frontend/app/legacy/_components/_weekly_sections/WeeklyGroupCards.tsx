@@ -52,7 +52,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
             key={g.process_code}
             type="button"
             onClick={() => onSelect(g.process_code)}
-            className="overflow-hidden rounded-[18px] border text-left transition-all duration-150 hover:brightness-95"
+            className="overflow-hidden rounded-[18px] border text-left transition-colors hover:brightness-110"
             style={{
               padding: 0,
               display: "flex",

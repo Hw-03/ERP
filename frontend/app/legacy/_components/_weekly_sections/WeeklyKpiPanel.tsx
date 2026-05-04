@@ -4,6 +4,7 @@ import { memo } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { WeeklyReportResponse } from "@/lib/api/types/weekly";
 import { LoadingSkeleton } from "../common/LoadingSkeleton";
+import { EmptyState } from "../common/EmptyState";
 
 interface Props {
   data: WeeklyReportResponse | undefined;
@@ -67,22 +68,12 @@ function WeeklyKpiPanelImpl({ data, loading }: Props) {
 
       <div className="flex flex-col gap-2 overflow-auto p-3">
         {warnings.length === 0 ? (
-          <div
-            className="mt-2 rounded-[14px] border px-4 py-5 text-center"
-            style={{
-              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.green} 28%, ${LEGACY_COLORS.border})`,
-              background: `color-mix(in srgb, ${LEGACY_COLORS.green} 5%, ${LEGACY_COLORS.s1})`,
-            }}
-          >
-            <div className="text-[13px] font-black" style={{ color: LEGACY_COLORS.green }}>
-              이상 없음
-            </div>
-            <div className="mt-1.5 text-[11px] leading-relaxed" style={{ color: LEGACY_COLORS.muted }}>
-              선택 주차 기준<br />
-              공정완료품 재고 변동이<br />
-              안정적입니다.
-            </div>
-          </div>
+          <EmptyState
+            variant="no-data"
+            title="확인할 특이사항이 없습니다."
+            description="선택 주차 기준 입출고 변동이 없는 주차입니다."
+            compact
+          />
         ) : (
           warnings.map((w, i) => {
             const levelColor =

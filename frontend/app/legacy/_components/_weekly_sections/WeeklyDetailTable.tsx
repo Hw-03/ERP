@@ -34,7 +34,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                     key={h}
                     className="text-[11px] font-bold"
                     style={{
-                      color: LEGACY_COLORS.muted,
+                      color: LEGACY_COLORS.muted2,
                       textAlign: i < 2 ? "left" : "right",
                       padding: "0 10px 6px",
                       whiteSpace: "nowrap",

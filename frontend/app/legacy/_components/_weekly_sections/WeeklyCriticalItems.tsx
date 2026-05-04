@@ -5,6 +5,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import type { WeeklyItemReport } from "@/lib/api/types/weekly";
 import { LoadingSkeleton } from "../common/LoadingSkeleton";
+import { EmptyState } from "../common/EmptyState";
 
 type CriticalItem = WeeklyItemReport & { process_code: string; dept_name: string };
 
@@ -50,20 +51,12 @@ function WeeklyCriticalItemsImpl({ items, loading }: Props) {
       {loading && <LoadingSkeleton variant="list" rows={3} />}
 
       {!loading && items.length === 0 && (
-        <div
-          className="rounded-[14px] border px-4 py-4 text-center"
-          style={{
-            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.green} 28%, ${LEGACY_COLORS.border})`,
-            background: `color-mix(in srgb, ${LEGACY_COLORS.green} 5%, ${LEGACY_COLORS.s1})`,
-          }}
-        >
-          <div className="text-[12px] font-black" style={{ color: LEGACY_COLORS.green }}>
-            확인 필요한 품목이 없습니다.
-          </div>
-          <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
-            선택 주차 기준 재고 감소 품목이 없습니다.
-          </div>
-        </div>
+        <EmptyState
+          variant="no-data"
+          title="확인 필요한 품목이 없습니다."
+          description="선택 주차 기준 특이 변동이 없습니다."
+          compact
+        />
       )}
 
       {!loading && items.length > 0 && (
