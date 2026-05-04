@@ -227,12 +227,25 @@ _PROCESS_TYPES: list[tuple] = [
 ]
 
 _PROCESS_FLOW_RULES: list[tuple] = [
-    ("TR", "TA", None),
-    ("TA", "HA", "HR"),
-    ("HA", "VA", "VR"),
-    ("VA", "NA", None),
-    ("NA", "AA", "AR"),
-    ("AA", "PA", "PR"),
+    # 부서 내 흐름 (R→A, A→F) — consumes_codes는 OR 조건 (쉼표 구분)
+    ("TR", "TA", "TR"),       # TR + TR → TA
+    ("TA", "TF", "TR,TA"),    # TA + (TR 또는 TA) → TF
+    ("HR", "HA", "HR"),       # HR + HR → HA
+    ("HA", "HF", "HR,HA"),    # HA + (HR 또는 HA) → HF
+    ("VR", "VA", "VR"),       # VR + VR → VA
+    ("VA", "VF", "VR,VA"),    # VA + (VR 또는 VA) → VF
+    ("NR", "NA", "NR"),       # NR + NR → NA
+    ("NA", "NF", "NR,NA"),    # NA + (NR 또는 NA) → NF
+    ("AR", "AA", "AR"),       # AR + AR → AA
+    ("AA", "AF", "AR,AA"),    # AA + (AR 또는 AA) → AF
+    ("PR", "PA", "PR"),       # PR + PR → PA
+    ("PA", "PF", "PR,PA"),    # PA + (PR 또는 PA) → PF
+    # 부서 간 이전 (이전 부서 F → 다음 부서 A)
+    ("TF", "HA", "HR"),       # TF + HR → HA
+    ("HF", "VA", "VR"),       # HF + VR → VA
+    ("VF", "NA", "NR"),       # VF + NR → NA
+    ("NF", "AA", "AR"),       # NF + AR → AA
+    ("AF", "PA", "PR"),       # AF + PR → PA
 ]
 
 
@@ -394,6 +407,20 @@ def check_db() -> dict:
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+def reset_flow_rules() -> int:
+    """process_flow_rules 테이블을 초기화하고 현행 _PROCESS_FLOW_RULES로 재시드."""
+    db = SessionLocal()
+    try:
+        db.query(ProcessFlowRule).delete()
+        db.commit()
+        for src, dst, consumes in _PROCESS_FLOW_RULES:
+            db.add(ProcessFlowRule(from_type=src, to_type=dst, consumes_codes=consumes))
+        db.commit()
+        return len(_PROCESS_FLOW_RULES)
+    finally:
+        db.close()
+
+
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ERP backend DB bootstrap tool")
     parser.add_argument("--all", action="store_true", help="schema + migrate + seed + erp-backfill")
@@ -401,6 +428,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--migrate", action="store_true", help="run ALTER TABLE migrations")
     parser.add_argument("--seed", action="store_true", help="seed reference data")
     parser.add_argument("--erp-backfill", action="store_true", help="backfill ERP codes")
+    parser.add_argument("--reset-flow-rules", action="store_true", help="process_flow_rules 초기화 및 재시드")
     parser.add_argument("--check", action="store_true", help="report DB state without writing")
     return parser.parse_args(argv)
 
@@ -431,6 +459,10 @@ def main(argv: list[str] | None = None) -> None:
     if args.all or args.erp_backfill:
         count = backfill_erp_codes()
         print(f"[erp-backfill] {count} items updated")
+        did_something = True
+    if getattr(args, "reset_flow_rules", False):
+        count = reset_flow_rules()
+        print(f"[reset-flow-rules] {count}개 규칙으로 재시드 완료")
         did_something = True
 
     if not did_something:

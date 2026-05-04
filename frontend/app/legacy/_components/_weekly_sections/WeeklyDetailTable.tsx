@@ -32,7 +32,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                 (h, i) => (
                   <th
                     key={h}
-                    className="text-[11px] font-bold"
+                    className="text-[12px] font-bold"
                     style={{
                       color: LEGACY_COLORS.muted2,
                       textAlign: i < 2 ? "left" : "right",
@@ -61,7 +61,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                 <tr key={row.item_id}>
                   {/* 품목 코드 */}
                   <td
-                    className="rounded-l-[12px] border-y border-l py-2 pl-3 pr-2 text-[11px] font-bold"
+                    className="rounded-l-[12px] border-y border-l py-2 pl-3 pr-2 text-[12px] font-bold"
                     style={{
                       background: rowBg,
                       borderColor: rowBorder,
@@ -73,7 +73,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                   </td>
                   {/* 품명 */}
                   <td
-                    className="border-y px-2 py-2 text-[12px] font-bold"
+                    className="border-y px-2 py-2 text-[13px] font-bold"
                     style={{
                       background: rowBg,
                       borderColor: rowBorder,
@@ -96,7 +96,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                   <Num val={row.current_qty} bg={rowBg} border={rowBorder} />
                   {/* 증감 */}
                   <td
-                    className="rounded-r-[12px] border-y border-r px-2 py-2 text-right text-[12px] font-black"
+                    className="rounded-r-[12px] border-y border-r px-2 py-2 text-right text-[13px] font-black"
                     style={{
                       background: rowBg,
                       borderColor: rowBorder,
@@ -117,12 +117,6 @@ function WeeklyDetailTableImpl({ group }: Props) {
           </tbody>
         </table>
       </div>
-      <p
-        className="mt-2 text-[10px]"
-        style={{ color: LEGACY_COLORS.muted2 }}
-      >
-        * 전주재고는 현재재고와 선택 주차의 입출고 내역을 기준으로 계산한 값입니다.
-      </p>
     </div>
   );
 }
@@ -140,7 +134,7 @@ function Num({
 }) {
   return (
     <td
-      className="border-y px-2 py-2 text-right text-[12px] font-bold"
+      className="border-y px-2 py-2 text-right text-[13px] font-bold"
       style={{
         background: bg,
         borderColor: border,

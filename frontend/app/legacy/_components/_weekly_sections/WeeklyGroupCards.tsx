@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState } from "react";
-import { LEGACY_COLORS } from "@/lib/mes/color";
+import { LEGACY_COLORS, employeeColor } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import type { WeeklyGroupReport } from "@/lib/api/types/weekly";
 
@@ -9,13 +9,6 @@ interface Props {
   groups: WeeklyGroupReport[];
   selected: string;
   onSelect: (code: string) => void;
-}
-
-function getStateTone(g: WeeklyGroupReport): string {
-  if (g.delta < 0) return LEGACY_COLORS.red;
-  if (g.out_qty > 0) return LEGACY_COLORS.yellow;
-  if (g.in_qty > 0) return LEGACY_COLORS.blue;
-  return LEGACY_COLORS.muted2;
 }
 
 function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
@@ -26,8 +19,13 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
       {groups.map((g) => {
         const isActive = g.process_code === selected;
         const isHover = hovered === g.process_code;
-        const isZero = g.in_qty === 0 && g.out_qty === 0 && g.delta === 0;
-        const tone = getStateTone(g);
+        const isDecreasing = g.delta < 0;
+        const accentColor = employeeColor(g.dept_name);
+        const tone = isDecreasing ? LEGACY_COLORS.red : accentColor;
+        const deltaColor =
+          g.delta > 0 ? LEGACY_COLORS.cyan
+          : g.delta < 0 ? LEGACY_COLORS.red
+          : LEGACY_COLORS.muted;
 
         return (
           <button
@@ -44,14 +42,21 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
                 ? LEGACY_COLORS.s3
                 : LEGACY_COLORS.s2,
               borderColor: isActive
-                ? `color-mix(in srgb, ${tone} 60%, ${LEGACY_COLORS.border})`
+                ? tone
+                : isDecreasing
+                ? `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, ${LEGACY_COLORS.border})`
                 : LEGACY_COLORS.border,
+              boxShadow: isActive
+                ? `0 0 0 1.5px color-mix(in srgb, ${tone} 20%, transparent), var(--c-card-shadow)`
+                : undefined,
             }}
           >
             {/* Left accent bar */}
             <div
               className="absolute bottom-0 left-0 top-0 w-[3px]"
-              style={{ background: tone, opacity: isZero ? 0.4 : 1 }}
+              style={{
+                background: isActive || isDecreasing ? tone : `color-mix(in srgb, ${accentColor} 35%, transparent)`,
+              }}
             />
             {/* Content */}
             <div className="flex justify-between gap-3 py-3 pl-5 pr-4">
@@ -64,14 +69,14 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
                   {g.dept_name}
                 </div>
                 <div
-                  className="text-[28px] font-black leading-none"
-                  style={{ color: isZero ? LEGACY_COLORS.muted2 : tone }}
+                  className={`font-black leading-none ${g.delta === 0 ? "text-[14px]" : "text-[28px]"}`}
+                  style={{ color: deltaColor }}
                 >
                   {g.delta > 0
                     ? `+${formatQty(g.delta)}`
                     : g.delta < 0
                     ? formatQty(g.delta)
-                    : "±0"}
+                    : "변동 없음"}
                 </div>
               </div>
               {/* 우: 공정코드 배지 + 입고 + 출고 */}
@@ -79,8 +84,8 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
                 <span
                   className="rounded-[6px] px-2 py-0.5 text-[11px] font-black"
                   style={{
-                    background: `color-mix(in srgb, ${tone} 15%, ${LEGACY_COLORS.s2})`,
-                    color: isZero ? LEGACY_COLORS.muted2 : tone,
+                    background: `color-mix(in srgb, ${tone} 12%, ${LEGACY_COLORS.s2})`,
+                    color: tone,
                   }}
                 >
                   {g.process_code}

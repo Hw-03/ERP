@@ -42,37 +42,67 @@ MES 프로토타입 — 자재·재고·입출고·창고 승인·부서 재고�
 5. Docs < actual live code path
 
 ## Coding Guardrails
-These rules reduce common LLM coding mistakes. They bias toward caution over speed. For trivial tasks, use judgment.
 
-### Think Before Coding
-- Do not assume or hide confusion.
-- State assumptions when they affect implementation.
-- If multiple interpretations exist, present them briefly instead of choosing silently.
-- If a simpler approach exists, mention it.
-- If something is unclear enough to cause wrong work, stop and ask.
+Guidelines to reduce common LLM coding mistakes. **Tradeoff:** biases toward caution over speed — for trivial tasks, use judgment.
 
-### Simplicity First
-- Write the minimum code that solves the request.
-- Do not add features beyond what was asked.
-- Do not create abstractions for single-use code.
-- Do not add flexibility or configurability unless requested.
-- If a solution becomes much larger than necessary, simplify before reporting.
+### 1. Think Before Coding
 
-### Surgical Changes
-- Touch only files and lines needed for the request.
-- Do not refactor adjacent code just because it looks improvable.
-- Match existing style even if another style seems better.
-- If unrelated dead code is found, mention it instead of deleting it.
-- Remove only imports, variables, or functions made unused by the current change.
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
 
-### Goal-Driven Execution
-- Turn work into verifiable goals before editing.
-- Bug fix: reproduce or identify the failing behavior, fix it, then verify.
-- Validation: define invalid cases, add or check tests where appropriate, then verify.
-- Refactor: verify behavior before and after when practical.
-- For multi-step work, use a short plan with verification per step.
+- State assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them — don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
 
-These guidelines are working when diffs stay small, unnecessary rewrites decrease, and clarifying questions happen before implementation mistakes.
+### 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+### 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it — don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: every changed line should trace directly to the user's request.
+
+### 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+---
+
+**These guidelines are working if:** diffs stay small, fewer rewrites due to overcomplication, clarifying questions come before mistakes — not after.
 
 
 ## Do Not Edit

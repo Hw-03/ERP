@@ -181,6 +181,8 @@ function DeptButton({ dept, onSelect }: { dept: DepartmentMaster; onSelect: (nam
 
 /* ── 0단계: 부서 선택 ─────────────────────────────────────────────────────── */
 
+const PRIMARY_DEPTS = ["튜브", "고압", "진공", "튜닝", "조립"];
+
 function DeptStep({
   departments,
   onSelect,
@@ -188,25 +190,54 @@ function DeptStep({
   departments: DepartmentMaster[];
   onSelect: (dept: string) => void;
 }) {
+  const [showAll, setShowAll] = useState(false);
+
+  const primary = departments.filter((d) => PRIMARY_DEPTS.includes(d.name));
+  const secondary = departments.filter((d) => !PRIMARY_DEPTS.includes(d.name));
+
   return (
     <div className="flex flex-1 flex-col">
-      {/* 상단 여백 + 로그인 (상단 공간 약간 위쪽) */}
+      {/* 상단 여백 + 로그인 */}
       <div className="flex flex-1 items-start pt-12">
         <h1 className="text-3xl font-bold" style={{ color: "var(--c-text)" }}>
           로그인
         </h1>
       </div>
 
-      {/* 부서 버튼 — 5열 그리드, 자동 줄바꿈 */}
       {departments.length === 0 ? (
         <div className="text-sm" style={{ color: "var(--c-muted)" }}>
           등록된 부서가 없습니다.
         </div>
       ) : (
-        <div className="grid grid-cols-5 gap-4">
-          {departments.map((dept) => (
-            <DeptButton key={dept.id} dept={dept} onSelect={onSelect} />
-          ))}
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-5 gap-4">
+            {primary.map((dept) => (
+              <DeptButton key={dept.id} dept={dept} onSelect={onSelect} />
+            ))}
+          </div>
+
+          {secondary.length > 0 && (
+            <>
+              {showAll && (
+                <div className="grid grid-cols-5 gap-4">
+                  {secondary.map((dept) => (
+                    <DeptButton key={dept.id} dept={dept} onSelect={onSelect} />
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => setShowAll((v) => !v)}
+                className="self-center rounded-2xl px-6 py-2 text-sm font-medium transition-all hover:brightness-110"
+                style={{
+                  background: "var(--c-s2)",
+                  color: "var(--c-muted)",
+                  border: "1px solid var(--c-border)",
+                }}
+              >
+                {showAll ? "접기" : `더보기 (${secondary.length})`}
+              </button>
+            </>
+          )}
         </div>
       )}
 
