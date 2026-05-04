@@ -2,12 +2,9 @@
 
 import { memo } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { formatQty } from "@/lib/mes/format";
 import type { WeeklyGroupReport } from "@/lib/api/types/weekly";
 import { EmptyState } from "../common/EmptyState";
-
-function fmt(n: number) {
-  return Number(n).toLocaleString("ko-KR");
-}
 
 interface Props {
   group: WeeklyGroupReport | undefined;
@@ -51,7 +48,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
           </thead>
           <tbody>
             {group.items.map((row) => {
-              const delta = Number(row.delta);
+              const delta = row.delta;
               const isDecreasing = delta < 0;
               const rowBg = isDecreasing
                 ? `color-mix(in srgb, ${LEGACY_COLORS.red} 4%, ${LEGACY_COLORS.s1})`
@@ -90,13 +87,13 @@ function WeeklyDetailTableImpl({ group }: Props) {
                     {row.item_name}
                   </td>
                   {/* 전주재고 */}
-                  <Num val={Number(row.prev_qty)} bg={rowBg} border={rowBorder} muted />
+                  <Num val={row.prev_qty} bg={rowBg} border={rowBorder} muted />
                   {/* 생산/입고 */}
-                  <Num val={Number(row.in_qty)} bg={rowBg} border={rowBorder} />
+                  <Num val={row.in_qty} bg={rowBg} border={rowBorder} />
                   {/* 출고/소비 */}
-                  <Num val={Number(row.out_qty)} bg={rowBg} border={rowBorder} />
+                  <Num val={row.out_qty} bg={rowBg} border={rowBorder} />
                   {/* 현재재고 */}
-                  <Num val={Number(row.current_qty)} bg={rowBg} border={rowBorder} />
+                  <Num val={row.current_qty} bg={rowBg} border={rowBorder} />
                   {/* 증감 */}
                   <td
                     className="rounded-r-[12px] border-y border-r px-2 py-2 text-right text-[12px] font-black"
@@ -112,7 +109,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {delta > 0 ? `+${fmt(delta)}` : delta < 0 ? fmt(delta) : "±0"}
+                    {delta > 0 ? `+${formatQty(delta)}` : delta < 0 ? formatQty(delta) : "±0"}
                   </td>
                 </tr>
               );
@@ -151,7 +148,7 @@ function Num({
         whiteSpace: "nowrap",
       }}
     >
-      {Number(val).toLocaleString("ko-KR")}
+      {formatQty(val)}
     </td>
   );
 }

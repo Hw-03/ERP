@@ -1,16 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Activity, ChevronLeft, ChevronRight, Download, RefreshCw, TrendingDown, TrendingUp } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { formatQty } from "@/lib/mes/format";
 import { api } from "@/lib/api";
 import type { WeeklyReportResponse } from "@/lib/api/types/weekly";
 import { toApiUrl } from "@/lib/api-core";
 import { WeeklyGroupCards } from "./_weekly_sections/WeeklyGroupCards";
 import { WeeklyDetailTable } from "./_weekly_sections/WeeklyDetailTable";
 import { WeeklyKpiPanel } from "./_weekly_sections/WeeklyKpiPanel";
+import { WeeklyCriticalItems } from "./_weekly_sections/WeeklyCriticalItems";
+import type { ReactNode } from "react";
 
-// ─── 주차 계산 헬퍼 ────────────────────────────────────────────────
+// ─── 주차 계산 ────────────────────────────────────────────────────
 function getWeekStart(d: Date): Date {
   const mon = new Date(d);
   const dow = d.getDay();
@@ -38,10 +41,6 @@ function weekLabel(mon: Date): string {
   return `${mon.getFullYear()}년 ${week}주차 (${fmt(mon)} ~ ${fmt(sun)})`;
 }
 
-function fmtNum(n: number | string) {
-  return Number(n).toLocaleString("ko-KR");
-}
-
 // ─── 이번 주 총평 ─────────────────────────────────────────────────
 type StatusLevel = "danger" | "neutral" | "good";
 
@@ -59,50 +58,57 @@ function buildStatusReport(data: WeeklyReportResponse): {
       level: "danger",
     };
   }
-  if (Number(summary.total_in_qty) === 0 && Number(summary.total_out_qty) === 0) {
+  if (summary.total_in_qty === 0 && summary.total_out_qty === 0) {
     return {
       main: "선택 주차에 집계된 입출고 변동이 없습니다.",
-      sub: `현재재고 ${fmtNum(summary.total_current_qty)}`,
+      sub: `공정완료품 현재잔량 ${formatQty(summary.total_current_qty)}`,
       level: "neutral",
     };
   }
   return {
     main: "공정완료품 재고 흐름이 안정적입니다.",
-    sub: `현재재고 ${fmtNum(summary.total_current_qty)} · 생산/입고 ${fmtNum(summary.total_in_qty)} · 출고/소비 ${fmtNum(summary.total_out_qty)}`,
+    sub: `생산/입고 ${formatQty(summary.total_in_qty)} · 출고/소비 ${formatQty(summary.total_out_qty)}`,
     level: "good",
   };
 }
 
-// ─── 핵심 지표 카드 데이터 ─────────────────────────────────────────
-function buildSummaryCards(data: WeeklyReportResponse) {
+// ─── 주간 변동 KPI 카드 ───────────────────────────────────────────
+type SummaryCard = { label: string; sub: string; value: string; icon: ReactNode; tone: string };
+
+function buildSummaryCards(data: WeeklyReportResponse): SummaryCard[] {
   const { summary } = data;
+  const netMovement = summary.total_in_qty - summary.total_out_qty;
   const needCheck = summary.groups_decreasing;
   return [
     {
-      label: "현재 재고",
-      sub: "공정완료품 총재고",
-      value: fmtNum(summary.total_current_qty),
-      color: LEGACY_COLORS.blue,
-    },
-    {
       label: "생산 / 입고",
       sub: "선택 주차 증가량",
-      value: fmtNum(summary.total_in_qty),
-      color: Number(summary.total_in_qty) > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted,
+      value: formatQty(summary.total_in_qty),
+      icon: <TrendingUp className="h-3.5 w-3.5" />,
+      tone: summary.total_in_qty > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted,
     },
     {
       label: "출고 / 소비",
       sub: "선택 주차 감소량",
-      value: fmtNum(summary.total_out_qty),
-      color: LEGACY_COLORS.muted,
+      value: formatQty(summary.total_out_qty),
+      icon: <TrendingDown className="h-3.5 w-3.5" />,
+      tone: summary.total_out_qty > 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted,
+    },
+    {
+      label: "순 변동",
+      sub: "입고 − 출고",
+      value: netMovement > 0 ? `+${formatQty(netMovement)}` : netMovement < 0 ? formatQty(netMovement) : "±0",
+      icon: <Activity className="h-3.5 w-3.5" />,
+      tone: netMovement > 0 ? LEGACY_COLORS.green : netMovement < 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted,
     },
     {
       label: "확인 필요",
       sub: "감소 공정 기준",
       value: needCheck > 0 ? `${needCheck}개 공정` : "없음",
-      color: needCheck > 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted,
+      icon: null,
+      tone: needCheck > 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted,
     },
-  ] as const;
+  ];
 }
 
 // ─── 컴포넌트 ──────────────────────────────────────────────────────
@@ -159,6 +165,16 @@ export function DesktopWeeklyReportView() {
       : statusReport?.level === "good"
       ? LEGACY_COLORS.green
       : LEGACY_COLORS.muted;
+
+  // 확인 필요 품목: 전체 공정에서 delta < 0 품목, 감소 순 정렬
+  const criticalItems = useMemo(() => {
+    if (!data) return [];
+    return data.groups
+      .flatMap((g) => g.items.map((item) => ({ ...item, process_code: g.process_code, dept_name: g.dept_name })))
+      .filter((item) => item.delta < 0)
+      .sort((a, b) => a.delta - b.delta)
+      .slice(0, 10);
+  }, [data]);
 
   function handleExcel() {
     const F_CODES = ["TF", "HF", "VF", "NF", "AF", "PF"];
@@ -247,7 +263,7 @@ export function DesktopWeeklyReportView() {
             type="button"
             onClick={handleExcel}
             className="flex h-9 items-center gap-1.5 rounded-[14px] border px-3 text-[13px] font-bold transition-all hover:brightness-95"
-            style={{ background: LEGACY_COLORS.blue, borderColor: LEGACY_COLORS.blue, color: LEGACY_COLORS.white }}
+            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
           >
             <Download className="h-3.5 w-3.5" />
             엑셀 내보내기
@@ -255,7 +271,7 @@ export function DesktopWeeklyReportView() {
         </div>
       </div>
 
-      {/* ── 2행: 이번 주 총평 + 핵심 지표 ── */}
+      {/* ── 2행: 이번 주 총평 + 주간 변동 KPI ── */}
       <div
         className="grid shrink-0 gap-3"
         style={{ gridTemplateColumns: "minmax(0, 1.8fr) repeat(4, minmax(0, 1fr))" }}
@@ -295,21 +311,28 @@ export function DesktopWeeklyReportView() {
           />
         )}
 
-        {/* 핵심 지표 4개 */}
+        {/* 주간 변동 KPI 4개 */}
         {summaryCards
           ? summaryCards.map((card) => (
               <div
                 key={card.label}
-                className="rounded-[18px] border px-4 py-3"
-                style={cardBase}
+                className="flex flex-col gap-1 rounded-[18px] border px-4 py-3"
+                style={{
+                  background: `color-mix(in srgb, ${card.tone} 6%, ${LEGACY_COLORS.s1})`,
+                  borderColor: `color-mix(in srgb, ${card.tone} 22%, ${LEGACY_COLORS.border})`,
+                }}
               >
-                <div className="text-[10px] font-bold" style={{ color: LEGACY_COLORS.muted }}>
+                <div
+                  className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.15em]"
+                  style={{ color: card.tone }}
+                >
+                  {card.icon}
                   {card.label}
                 </div>
-                <div className="mt-0.5 text-[20px] font-black leading-tight" style={{ color: card.color }}>
+                <div className="text-2xl font-black" style={{ color: card.tone }}>
                   {card.value}
                 </div>
-                <div className="mt-0.5 text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                   {card.sub}
                 </div>
               </div>
@@ -328,20 +351,20 @@ export function DesktopWeeklyReportView() {
         className="min-h-0 flex-1 overflow-hidden"
         style={{ display: "grid", gridTemplateColumns: "1fr 260px", gap: 12 }}
       >
-        {/* 좌: 공정 카드 + 품목 상세 */}
+        {/* 좌: 공정 변화 + 확인 필요 품목 + 품목 상세 */}
         <div className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
 
-          {/* 공정별 재고 변화 카드 */}
+          {/* 공정별 변화 */}
           <div
             className="shrink-0 rounded-[22px] border p-4"
             style={cardBase}
           >
             <div className="mb-3 flex items-baseline gap-2">
               <h2 className="text-[13px] font-black" style={{ color: LEGACY_COLORS.text }}>
-                공정별 재고 변화
+                공정별 변화
               </h2>
               <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
-                TF · HF · VF · NF · AF · PF
+                생산/입고 · 출고/소비 · 순변동 기준
               </span>
             </div>
             {loading && !data ? (
@@ -350,7 +373,7 @@ export function DesktopWeeklyReportView() {
                   <div
                     key={i}
                     className="animate-pulse rounded-[18px] border"
-                    style={{ height: 92, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+                    style={{ height: 108, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
                   />
                 ))}
               </div>
@@ -362,6 +385,9 @@ export function DesktopWeeklyReportView() {
               />
             )}
           </div>
+
+          {/* 확인 필요 품목 */}
+          <WeeklyCriticalItems items={criticalItems} loading={loading && !data} />
 
           {/* 품목 상세 */}
           <div
@@ -383,7 +409,7 @@ export function DesktopWeeklyReportView() {
                     : "품목 상세"}
                 </h2>
                 <p className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
-                  {selectedGroup?.label ?? "공정 그룹을 선택하세요"} · 선택 주차 품목별 변화
+                  {selectedGroup?.label ?? "공정을 선택하세요"} · 선택 주차 품목별 변화
                 </p>
               </div>
               {/* 공정 탭 */}
@@ -414,7 +440,7 @@ export function DesktopWeeklyReportView() {
           </div>
         </div>
 
-        {/* 우: 확인 사항 */}
+        {/* 우: 보고 메모 */}
         <div className="min-h-0 overflow-hidden">
           <WeeklyKpiPanel data={data ?? undefined} loading={loading && !data} />
         </div>

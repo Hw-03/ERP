@@ -22,7 +22,7 @@ function WeeklyKpiPanelImpl({ data, loading }: Props) {
           style={{ borderColor: LEGACY_COLORS.border }}
         >
           <h2 className="text-[13px] font-black" style={{ color: LEGACY_COLORS.text }}>
-            확인 사항
+            보고 메모
           </h2>
         </div>
         <div className="p-3">
@@ -48,7 +48,7 @@ function WeeklyKpiPanelImpl({ data, loading }: Props) {
         style={{ borderColor: LEGACY_COLORS.border }}
       >
         <h2 className="text-[13px] font-black" style={{ color: LEGACY_COLORS.text }}>
-          확인 사항
+          보고 메모
         </h2>
         {warnings.length > 0 && (
           <span
@@ -116,6 +116,14 @@ function WeeklyKpiPanelImpl({ data, loading }: Props) {
             );
           })
         )}
+      </div>
+
+      {/* 데이터 기준 */}
+      <div
+        className="shrink-0 border-t px-4 py-3 text-[10px]"
+        style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+      >
+        전주재고는 현재재고와 선택 주차 입출고 내역을 기준으로 계산한 값입니다.
       </div>
     </div>
   );
