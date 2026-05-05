@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Department } from "@/lib/api";
+import type { DeptAdjSubType } from "@/lib/api/types/dept-adjustment";
 import type {
   DefectiveSource,
   Direction,
@@ -29,6 +30,7 @@ export function useWarehouseWizardState({
   const [deptDirection, setDeptDirection] = useState<Direction>("in");
   const [selectedDept, setSelectedDept] = useState<Department>(initialDept ?? "조립");
   const [defectiveSource, setDefectiveSource] = useState<DefectiveSource>("warehouse");
+  const [adjSubType, setAdjSubType] = useState<DeptAdjSubType>("production");
 
   // wizard 단계 제어
   const [forcedStep, setForcedStep] = useState<1 | 2 | null>(null);
@@ -90,6 +92,10 @@ export function useWarehouseWizardState({
     setDefectiveSource(s);
     setStep2Confirmed(false);
   }
+  function changeAdjSubType(s: DeptAdjSubType) {
+    setAdjSubType(s);
+    setStep2Confirmed(false);
+  }
   function confirmStep2() {
     if (!step2Ready) return;
     setStep2Confirmed(true);
@@ -103,6 +109,7 @@ export function useWarehouseWizardState({
     setDeptDirection("in");
     setSelectedDept("조립");
     setDefectiveSource("warehouse");
+    setAdjSubType("production");
     setStep2Confirmed(false);
     setForcedStep(null);
   }
@@ -127,6 +134,8 @@ export function useWarehouseWizardState({
     changeDeptDir,
     changeSelectedDept,
     changeDefectiveSource,
+    changeAdjSubType,
+    adjSubType,
     confirmStep2,
     // step gating
     step2Ready,

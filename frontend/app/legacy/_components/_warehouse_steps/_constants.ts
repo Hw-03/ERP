@@ -77,8 +77,7 @@ export function matchesSearch(item: Item, keyword: string) {
 }
 
 export function workTypeNeedsDept(wt: WorkType): boolean {
-  return wt === "warehouse-io" || wt === "defective-register";
-  // dept-adjustment는 패널이 자체적으로 부서를 관리하므로 여기서 제외
+  return wt === "warehouse-io" || wt === "defective-register" || wt === "dept-adjustment";
 }
 
 // ───────────── Operator → 작업유형 가시성 매트릭스 ─────────────

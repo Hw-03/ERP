@@ -23,8 +23,6 @@ import { WarehouseComposeSection } from "./_warehouse_sections/WarehouseComposeS
 import { draftToFormState } from "./_warehouse_helpers/requestMapping";
 import { useWarehouseSubmit } from "./_warehouse_helpers/useWarehouseSubmit";
 import { readCurrentOperator } from "./login/useCurrentOperator";
-import { WorkTypeCardGrid } from "./_warehouse_steps/WorkTypeCardGrid";
-import { DeptAdjustmentPanel } from "./_warehouse_steps/DeptAdjustmentPanel";
 
 export function DesktopWarehouseView({
   globalSearch,
@@ -154,6 +152,7 @@ export function DesktopWarehouseView({
     deptDirection,
     selectedDept,
     defectiveSource,
+    adjSubType: wizard.adjSubType,
   });
 
   // ─── filters (hook) ───
@@ -260,6 +259,7 @@ export function DesktopWarehouseView({
   const submit = useWarehouseSubmit({
     selectedEmployee,
     workType, rawDirection, warehouseDirection, deptDirection, selectedDept, defectiveSource,
+    adjSubType: wizard.adjSubType,
     selectedEntries, selectedPackage, referenceNo, notes,
     currentDraftId, effectiveLabel, requiresApproval, globalSearch,
     setItems, setError, setSubmitting, setLastResult, setResultModal,
@@ -360,7 +360,7 @@ export function DesktopWarehouseView({
           }}
         />
 
-        {sectionTab === "compose" && workType !== "dept-adjustment" && (
+        {sectionTab === "compose" && (
           <WarehouseComposeSection
             autoSaveStatus={autoSaveStatus}
             stickySummary={stickySummary}
@@ -400,25 +400,6 @@ export function DesktopWarehouseView({
           />
         )}
 
-        {sectionTab === "compose" && workType === "dept-adjustment" && (
-          <div className="space-y-4 px-1">
-            <WorkTypeCardGrid
-              workType={workType}
-              availableWorkTypes={availableWorkTypes}
-              onWorkTypeChange={changeWorkType}
-            />
-            <DeptAdjustmentPanel
-              items={items}
-              operator={operator}
-              onSuccess={(count, label) => {
-                setLastResult({ count, label });
-                setPanelRefreshNonce((n) => n + 1);
-                onSubmitSuccess?.();
-              }}
-              onError={setError}
-            />
-          </div>
-        )}
       </div>
 
       <WarehouseSubmissionModals

@@ -1,5 +1,6 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import type { Department, Item, ProductModel, ShipPackage } from "@/lib/api";
+import type { DeptAdjSubType } from "@/lib/api/types/dept-adjustment";
 import type {
   DefectiveSource,
   Direction,
@@ -25,6 +26,8 @@ export type WizardLike = {
   changeDeptDir: (d: Direction) => void;
   changeSelectedDept: (d: Department) => void;
   changeDefectiveSource: (s: DefectiveSource) => void;
+  adjSubType: DeptAdjSubType;
+  changeAdjSubType: (s: DeptAdjSubType) => void;
   confirmStep2: () => void;
   step2Ready: boolean;
   step2Confirmed: boolean;

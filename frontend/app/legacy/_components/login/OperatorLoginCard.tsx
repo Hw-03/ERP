@@ -197,8 +197,8 @@ function DeptStep({
 
   return (
     <div className="flex flex-1 flex-col">
-      {/* 상단 여백 + 로그인 */}
-      <div className="flex flex-1 items-start pt-12">
+      {/* 상단 여백 + 로그인 — items-center: 버튼 증가 시 flex-1 축소되며 타이틀 자연스럽게 상승 */}
+      <div className="flex flex-1 items-center">
         <h1 className="text-3xl font-bold" style={{ color: "var(--c-text)" }}>
           로그인
         </h1>
@@ -209,7 +209,7 @@ function DeptStep({
           등록된 부서가 없습니다.
         </div>
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col">
           <div className="grid grid-cols-5 gap-4">
             {primary.map((dept) => (
               <DeptButton key={dept.id} dept={dept} onSelect={onSelect} />
@@ -218,16 +218,25 @@ function DeptStep({
 
           {secondary.length > 0 && (
             <>
-              {showAll && (
-                <div className="grid grid-cols-5 gap-4">
-                  {secondary.map((dept) => (
-                    <DeptButton key={dept.id} dept={dept} onSelect={onSelect} />
-                  ))}
+              {/* grid-template-rows 트랜지션: 실제 콘텐츠 높이 기준으로 슬라이드 */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateRows: showAll ? "1fr" : "0fr",
+                  transition: "grid-template-rows 0.35s ease",
+                }}
+              >
+                <div style={{ overflow: "hidden" }}>
+                  <div className="mt-4 grid grid-cols-5 gap-4">
+                    {secondary.map((dept) => (
+                      <DeptButton key={dept.id} dept={dept} onSelect={onSelect} />
+                    ))}
+                  </div>
                 </div>
-              )}
+              </div>
               <button
                 onClick={() => setShowAll((v) => !v)}
-                className="self-center rounded-2xl px-6 py-2 text-sm font-medium transition-all hover:brightness-110"
+                className="mt-4 self-center rounded-2xl px-6 py-2 text-sm font-medium transition-all hover:brightness-110"
                 style={{
                   background: "var(--c-s2)",
                   color: "var(--c-muted)",

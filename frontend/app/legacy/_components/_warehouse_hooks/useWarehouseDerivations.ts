@@ -15,6 +15,7 @@ import {
 } from "../_warehouse_helpers/requestMapping";
 import type { DefectiveSource, Direction, TransferDirection } from "../_warehouse_steps";
 import type { Operator } from "../login/useCurrentOperator";
+import type { DeptAdjSubType } from "@/lib/api/types/dept-adjustment";
 
 /**
  * DesktopWarehouseView 의 wizard state → UI 라벨/조건 derivation.
@@ -42,6 +43,7 @@ export interface UseWarehouseDerivationsInput {
   deptDirection: Direction;
   selectedDept: Department;
   defectiveSource: DefectiveSource;
+  adjSubType: DeptAdjSubType;
 }
 
 export interface UseWarehouseDerivationsResult {
@@ -76,6 +78,7 @@ export function useWarehouseDerivations(
     deptDirection,
     selectedDept,
     defectiveSource,
+    adjSubType,
   } = input;
 
   const isOutbound =
@@ -84,7 +87,7 @@ export function useWarehouseDerivations(
       : workType === "warehouse-io"
         ? warehouseDirection === "wh-to-dept"
         : workType === "dept-adjustment"
-          ? false  // 패널 자체 처리
+          ? adjSubType === "production"
           : true;
 
   const isRawReturn = workType === "raw-io" && rawDirection === "return";
@@ -102,7 +105,11 @@ export function useWarehouseDerivations(
           ? `창고→${selectedDept} 이동`
           : `${selectedDept}→창고 복귀`
         : workType === "dept-adjustment"
-          ? "부서 재고 조정"
+          ? adjSubType === "production"
+            ? "생산 처리"
+            : adjSubType === "disassembly"
+              ? "분해 처리"
+              : "수량 보정"
           : workType === "defective-register"
             ? `불량 등록 (${defectiveSource === "warehouse" ? "창고" : selectedDept} → ${selectedDept} 격리)`
             : "패키지 출고";

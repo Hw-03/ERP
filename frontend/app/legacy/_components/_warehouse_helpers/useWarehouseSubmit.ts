@@ -4,6 +4,8 @@ import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction 
 import { api, type Employee, type Item, type ShipPackage } from "@/lib/api";
 import type { WorkType, Direction, TransferDirection, DefectiveSource } from "../_warehouse_steps";
 import { buildStockRequestPayload } from "./requestMapping";
+import type { DeptAdjSubType } from "@/lib/api/types/dept-adjustment";
+import { deptAdjustmentApi } from "@/lib/api/dept-adjustment";
 
 /**
  * Round-15 (#1) 추출 — DesktopWarehouseView 의 submit 핸들러 hook.
@@ -19,6 +21,7 @@ export interface UseWarehouseSubmitInput {
   deptDirection: Direction;
   selectedDept: import("@/lib/api").Department;
   defectiveSource: DefectiveSource;
+  adjSubType: DeptAdjSubType;
   selectedEntries: { item: Item; quantity: number }[];
   selectedPackage: ShipPackage | null;
   referenceNo: string;
@@ -58,7 +61,7 @@ export function useWarehouseSubmit(input: UseWarehouseSubmitInput) {
   return useCallback(async () => {
     const {
       selectedEmployee, workType, rawDirection, warehouseDirection, deptDirection,
-      selectedDept, defectiveSource, selectedEntries, selectedPackage,
+      selectedDept, defectiveSource, adjSubType, selectedEntries, selectedPackage,
       referenceNo, notes, currentDraftId, effectiveLabel, requiresApproval,
       globalSearch,
       setItems, setError, setSubmitting, setLastResult, setResultModal,
@@ -78,6 +81,38 @@ export function useWarehouseSubmit(input: UseWarehouseSubmitInput) {
     try {
       setSubmitting(true);
       setError(null);
+
+      if (workType === "dept-adjustment") {
+        const direction = adjSubType === "production" ? "out" : "in" as const;
+        const result = await deptAdjustmentApi.submitAdjustment({
+          sub_type: adjSubType,
+          lines: selectedEntries.map(({ item, quantity }) => ({
+            item_id: item.item_id,
+            direction,
+            quantity,
+            department: selectedDept,
+          })),
+          operator_name: selectedEmployee.name ?? null,
+          reference_no: referenceNo || null,
+          notes: notes || null,
+        });
+        if (autoSaveTimerRef.current) {
+          clearTimeout(autoSaveTimerRef.current);
+          autoSaveTimerRef.current = null;
+        }
+        setCurrentDraftId(null);
+        setAutoSaveStatus("idle");
+        setReferenceNo("");
+        setNotes("");
+        setSelectedItems(new Map());
+        setStep2Confirmed(false);
+        setForcedStep(null);
+        setLastResult({ count: result.processed_count, label: effectiveLabel });
+        onStatusChange(`${effectiveLabel} ${result.processed_count}건 처리를 완료했습니다.`);
+        setPanelRefreshNonce((n) => n + 1);
+        onSubmitSuccess?.();
+        return;
+      }
 
       const payload = buildStockRequestPayload({
         workType, rawDirection, warehouseDirection, deptDirection,

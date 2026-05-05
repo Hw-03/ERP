@@ -13,7 +13,6 @@ import type {
   DeptAdjSubType,
 } from "@/lib/api/types/dept-adjustment";
 import type { Department, Item } from "@/lib/api";
-import { PROD_DEPTS } from "./_constants";
 import { SettingLabel } from "./_atoms";
 
 // ──────────────────────── 상수 ────────────────────────
@@ -274,22 +273,20 @@ function AdjLinesTable({
 // ──────────────────────── 메인 패널 ────────────────────────
 
 export function DeptAdjustmentPanel({
+  subType,
+  dept,
   items,
   operator,
   onSuccess,
   onError,
 }: {
+  subType: DeptAdjSubType;
+  dept: Department;
   items: Item[];
   operator: { name?: string; department?: Department } | null;
   onSuccess: (count: number, label: string) => void;
   onError: (msg: string) => void;
 }) {
-  const [subType, setSubType] = useState<DeptAdjSubType>("production");
-  const [dept, setDept] = useState<Department>(
-    (operator?.department && PROD_DEPTS.includes(operator.department as Department)
-      ? operator.department
-      : "조립") as Department,
-  );
   const [rows, setRows] = useState<AdjRow[]>([]);
   const [notes, setNotes] = useState("");
 
@@ -302,13 +299,6 @@ export function DeptAdjustmentPanel({
   const [submitting, setSubmitting] = useState(false);
 
   // ─── 핸들러 ───
-
-  const handleSubTypeChange = useCallback((st: DeptAdjSubType) => {
-    setSubType(st);
-    setRows([]);
-    setTargetItemId("");
-    setTargetQty(1);
-  }, []);
 
   const handleLoadBom = useCallback(async () => {
     if (!targetItemId) return;
@@ -417,56 +407,6 @@ export function DeptAdjustmentPanel({
 
   return (
     <div className="space-y-5 pb-4">
-
-      {/* 세부 유형 선택 */}
-      <div>
-        <SettingLabel label="세부 유형" />
-        <div className="grid grid-cols-3 gap-2">
-          {(["production", "disassembly", "correction"] as DeptAdjSubType[]).map((st) => {
-            const active = st === subType;
-            return (
-              <button
-                key={st}
-                type="button"
-                onClick={() => handleSubTypeChange(st)}
-                className="rounded-[12px] border px-3 py-2.5 text-sm font-bold transition-all hover:brightness-110"
-                style={{
-                  background: active ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)` : LEGACY_COLORS.s2,
-                  borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                  color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
-                }}
-              >
-                {SUB_TYPE_LABELS[st]}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 부서 선택 */}
-      <div>
-        <SettingLabel label="대상 부서" />
-        <div className="grid grid-cols-6 gap-2">
-          {PROD_DEPTS.map((d) => {
-            const active = d === dept;
-            return (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setDept(d)}
-                className="rounded-[12px] border px-1 py-2 text-sm font-bold transition-all hover:brightness-110"
-                style={{
-                  background: active ? `color-mix(in srgb, ${LEGACY_COLORS.purple} 14%, transparent)` : LEGACY_COLORS.s2,
-                  borderColor: active ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
-                  color: active ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2,
-                }}
-              >
-                {d}
-              </button>
-            );
-          })}
-        </div>
-      </div>
 
       {/* 생산/조립 · 분해/회수: 결과/대상품 선택 + BOM 불러오기 */}
       {(subType === "production" || subType === "disassembly") && (

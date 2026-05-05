@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AlertTriangle, Check } from "lucide-react";
 import type { Department } from "@/lib/api";
+import type { DeptAdjSubType } from "@/lib/api/types/dept-adjustment";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { SettingLabel } from "./_atoms";
@@ -32,6 +33,8 @@ export function WorkTypeStep({
   setSelectedDept,
   defectiveSource,
   setDefectiveSource,
+  adjSubType,
+  setAdjSubType,
   availableWorkTypes,
   ready,
   onConfirm,
@@ -48,6 +51,8 @@ export function WorkTypeStep({
   setSelectedDept: (d: Department) => void;
   defectiveSource: DefectiveSource;
   setDefectiveSource: (s: DefectiveSource) => void;
+  adjSubType: DeptAdjSubType;
+  setAdjSubType: (s: DeptAdjSubType) => void;
   availableWorkTypes: WorkType[];
   ready: boolean;
   onConfirm: () => void;
@@ -83,6 +88,39 @@ export function WorkTypeStep({
           onWorkTypeChange={onWorkTypeChange}
         />
       </div>
+
+      {/* 세부 유형 (dept-adjustment 전용) */}
+      {workType === "dept-adjustment" && (
+        <div>
+          <SettingLabel label="세부 유형" />
+          <div className="grid grid-cols-3 gap-2">
+            {(
+              [
+                { id: "production",  label: "생산/조립" },
+                { id: "disassembly", label: "분해/회수" },
+                { id: "correction",  label: "수량 보정" },
+              ] as { id: DeptAdjSubType; label: string }[]
+            ).map((btn) => {
+              const active = btn.id === adjSubType;
+              return (
+                <button
+                  key={btn.id}
+                  onClick={() => setAdjSubType(btn.id)}
+                  className="flex items-center justify-center gap-1.5 rounded-[12px] border px-3 py-2.5 text-sm font-bold transition-all hover:brightness-110"
+                  style={{
+                    background: active ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)` : LEGACY_COLORS.s2,
+                    borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+                    color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
+                  }}
+                >
+                  {active && <Check className="h-3.5 w-3.5" />}
+                  {btn.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 이동 방향 */}
       {directionButtons.length > 0 && (

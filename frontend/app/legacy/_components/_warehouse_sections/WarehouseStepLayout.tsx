@@ -73,6 +73,8 @@ export function WarehouseStepLayout({
             setSelectedDept={w.changeSelectedDept}
             defectiveSource={w.defectiveSource}
             setDefectiveSource={w.changeDefectiveSource}
+            adjSubType={w.adjSubType}
+            setAdjSubType={w.changeAdjSubType}
             availableWorkTypes={availableWorkTypes}
             ready={w.step2Ready}
             onConfirm={w.confirmStep2}

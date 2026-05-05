@@ -100,12 +100,15 @@ export function PinStep({
         className="mt-auto flex w-full items-center justify-center gap-2 rounded-[16px] py-5 text-base font-semibold text-white transition-opacity"
         style={{
           background: "var(--c-blue)",
-          opacity: canSubmit ? 1 : 0.4,
+          opacity: loading ? 1 : canSubmit ? 1 : 0.4,
           cursor: canSubmit ? "pointer" : "not-allowed",
         }}
       >
         {loading ? (
-          <Loader2 size={18} className="animate-spin" />
+          <>
+            <Loader2 size={18} className="animate-spin" />
+            확인 중...
+          </>
         ) : (
           <>
             <UserCheck size={18} />
