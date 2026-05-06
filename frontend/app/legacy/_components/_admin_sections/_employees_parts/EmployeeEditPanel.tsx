@@ -1,6 +1,6 @@
 "use client";
 
-import type { DepartmentMaster, Employee, EmployeeLevel, WarehouseRole } from "@/lib/api";
+import type { DepartmentMaster, Employee, WarehouseRole } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { EmployeeEditForm } from "../../_admin_hooks/useAdminEmployees";
 
@@ -13,12 +13,6 @@ import type { EmployeeEditForm } from "../../_admin_hooks/useAdminEmployees";
  * 시각/className/style 모두 보존. PIN 카드의 default vs 직원 설정 색상
  * 분기, 마지막 변경 일자 포맷도 그대로.
  */
-
-const LEVEL_LABEL: Record<EmployeeLevel, string> = {
-  admin: "관리자",
-  manager: "매니저",
-  staff: "사원",
-};
 
 const WAREHOUSE_ROLE_OPTIONS: { value: WarehouseRole; label: string }[] = [
   { value: "none", label: "없음" },
@@ -57,7 +51,7 @@ export function EmployeeEditPanel({
       </div>
 
       {/* 정보 수정 폼 */}
-      <div className="space-y-3 border-t pt-4" style={{ borderColor: LEGACY_COLORS.border }}>
+      <div className="grid grid-cols-2 gap-3 border-t pt-4" style={{ borderColor: LEGACY_COLORS.border }}>
         <FieldRow label="이름">
           <input
             type="text"
@@ -97,30 +91,20 @@ export function EmployeeEditPanel({
             ))}
           </select>
         </FieldRow>
-        <FieldRow label="권한 (참고용)">
-          <select
-            value={form.level}
-            onChange={(e) => setForm((f) => ({ ...f, level: e.target.value as EmployeeLevel }))}
-            className="w-full rounded-[14px] border px-3 py-2 text-sm outline-none"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-          >
-            {(["admin", "manager", "staff"] as EmployeeLevel[]).map((value) => (
-              <option key={value} value={value}>{LEVEL_LABEL[value]}</option>
-            ))}
-          </select>
-        </FieldRow>
-        <FieldRow label="창고 결재 역할">
-          <select
-            value={form.warehouse_role}
-            onChange={(e) => setForm((f) => ({ ...f, warehouse_role: e.target.value as WarehouseRole }))}
-            className="w-full rounded-[14px] border px-3 py-2 text-sm outline-none"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-          >
-            {WAREHOUSE_ROLE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </FieldRow>
+        <div className="col-span-2">
+          <FieldRow label="창고 결재 역할">
+            <select
+              value={form.warehouse_role}
+              onChange={(e) => setForm((f) => ({ ...f, warehouse_role: e.target.value as WarehouseRole }))}
+              className="w-full rounded-[14px] border px-3 py-2 text-sm outline-none"
+              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+            >
+              {WAREHOUSE_ROLE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </FieldRow>
+        </div>
       </div>
 
       <button

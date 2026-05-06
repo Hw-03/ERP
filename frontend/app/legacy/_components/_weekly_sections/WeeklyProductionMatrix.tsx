@@ -30,6 +30,19 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
 }: Props) {
   const hasAny = rows.some((r) => r.total_qty > 0);
 
+  if (!hasAny) {
+    return (
+      <div className="flex flex-col items-center gap-1 py-4">
+        <span className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.muted }}>
+          이번 주 생산 실적 없음
+        </span>
+        <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+          선택 주차 기준 모델별 생산 완료 기록이 없습니다.
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-[13px]">
@@ -75,7 +88,7 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
                       key={c.key}
                       className="px-3 py-2 text-right tabular-nums"
                       style={{
-                        color: val === 0 ? LEGACY_COLORS.muted : LEGACY_COLORS.text,
+                        color: val === 0 ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
                         fontWeight: isTotal ? 700 : 400,
                       }}
                     >
@@ -86,17 +99,6 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
               </tr>
             );
           })}
-          {!hasAny && (
-            <tr>
-              <td
-                colSpan={6}
-                className="py-6 text-center text-[12px]"
-                style={{ color: LEGACY_COLORS.muted }}
-              >
-                이번 주 생산 실적 없음
-              </td>
-            </tr>
-          )}
         </tbody>
       </table>
     </div>

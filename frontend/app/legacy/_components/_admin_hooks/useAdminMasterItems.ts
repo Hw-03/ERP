@@ -30,7 +30,7 @@ export type AdminMasterItemsState = {
   visibleItems: Item[];
   addItem: () => void;
   saveItemField: (
-    field: "item_name" | "spec" | "barcode" | "legacy_model" | "supplier" | "min_stock",
+    field: "item_name" | "spec" | "barcode" | "legacy_model" | "supplier" | "min_stock" | "unit",
     value: string,
   ) => void;
 };
@@ -84,7 +84,7 @@ export function useAdminMasterItems({
   }
 
   async function _saveItemField(
-    field: "item_name" | "spec" | "barcode" | "legacy_model" | "supplier" | "min_stock",
+    field: "item_name" | "spec" | "barcode" | "legacy_model" | "supplier" | "min_stock" | "unit",
     value: string,
   ) {
     if (!selectedItem) return;

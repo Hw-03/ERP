@@ -42,7 +42,6 @@ function weekLabel(mon: Date): string {
 
 const CAL_MIN = new Date(2026, 0, 1);
 
-// 일요일 시작 주 계산
 function getWeekStartSun(d: Date): Date {
   const sun = new Date(d);
   sun.setDate(d.getDate() - d.getDay());
@@ -131,9 +130,9 @@ export function DesktopWeeklyReportView() {
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-1 pr-1">
+    <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 py-1 pr-1">
 
-      {/* ── 행1: 컨트롤 바 (달력 아코디언) ── */}
+      {/* ── 행1: 주차 선택 (달력 아코디언) ── */}
       <div
         className="shrink-0 rounded-[22px] border"
         style={cardBase}
@@ -157,6 +156,9 @@ export function DesktopWeeklyReportView() {
               className="h-4 w-4 shrink-0"
               style={{ color: LEGACY_COLORS.blue }}
             />
+            <span className="text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted }}>
+              기준 주차
+            </span>
             <span className="text-[15px] font-black">{weekLabel(weekMon)}</span>
             <ChevronRight
               className="h-4 w-4 shrink-0 transition-transform"
@@ -247,8 +249,8 @@ export function DesktopWeeklyReportView() {
             {/* 날짜 셀 그리드 */}
             <div className="grid grid-cols-7 gap-1">
               {getWeeksOfMonth(calMonth.getFullYear(), calMonth.getMonth()).flatMap((week) => {
-                const sun = week[0]; // 일요일 시작
-                const mon = new Date(sun.getTime() + 86400000); // 해당 주의 월요일
+                const sun = week[0];
+                const mon = new Date(sun.getTime() + 86400000);
                 const weekKey = toDateStr(mon);
                 const isSelectedWeek = weekKey === weekStart;
                 const isHovered = hoveredWeek === weekKey;
@@ -267,7 +269,7 @@ export function DesktopWeeklyReportView() {
                       onMouseEnter={() => !isFuture && setHoveredWeek(weekKey)}
                       onMouseLeave={() => setHoveredWeek(null)}
                       disabled={isFuture}
-                      className="flex flex-col items-center rounded-[14px] border p-1.5 transition-colors disabled:opacity-30"
+                      className="flex flex-col items-center rounded-[10px] border px-1 py-2 transition-colors disabled:opacity-30"
                       style={{
                         background: isSelectedWeek
                           ? "rgba(101,169,255,.18)"
@@ -279,7 +281,6 @@ export function DesktopWeeklyReportView() {
                           : isHovered
                           ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 40%, transparent)`
                           : LEGACY_COLORS.border,
-                        height: "100px",
                       }}
                     >
                       <span
@@ -303,7 +304,10 @@ export function DesktopWeeklyReportView() {
         </div>
       </div>
 
-      {/* ── 행1.5: 주간 생산 현황 ── */}
+      {/* ── 행2: 이번 주 총평 ── */}
+      {data && <WeeklySummaryBand data={data} />}
+
+      {/* ── 행3: 생산 현황 ── */}
       <div className="shrink-0 rounded-[22px] border p-4" style={cardBase}>
         <div className="mb-3 flex items-baseline gap-2">
           <h2 className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
@@ -316,22 +320,19 @@ export function DesktopWeeklyReportView() {
         {loading && !data ? (
           <div
             className="animate-pulse rounded-[10px]"
-            style={{ height: 140, background: LEGACY_COLORS.s2 }}
+            style={{ height: 60, background: LEGACY_COLORS.s2 }}
           />
         ) : (
           <WeeklyProductionMatrix rows={data?.production_matrix ?? []} />
         )}
       </div>
 
-      {/* ── 행2: 이번 주 총평 ── */}
-      {data && <WeeklySummaryBand data={data} />}
-
-      {/* ── 행3: 2-column (공정별 변화 | 품목 상세) ── */}
-      <div className="flex gap-3">
+      {/* ── 행4: 2-column (공정별 변화 | 품목 상세) ── */}
+      <div className="flex gap-4">
 
         {/* 좌: 공정별 변화 */}
         <div
-          className="flex w-[360px] shrink-0 flex-col rounded-[22px] border"
+          className="flex w-[330px] shrink-0 flex-col rounded-[22px] border"
           style={cardBase}
         >
           <div
@@ -342,7 +343,7 @@ export function DesktopWeeklyReportView() {
               공정별 변화
             </h2>
             <p className="mt-0.5 text-[12px]" style={{ color: LEGACY_COLORS.muted }}>
-              순변동 · 생산/입고 · 출고
+              순변동 · 생산 내역 · 출고 내역
             </p>
           </div>
           <div className="p-4">
@@ -367,36 +368,36 @@ export function DesktopWeeklyReportView() {
           </div>
         </div>
 
-        {/* 우: 품목 상세 */}
-        <div
-          className="flex flex-1 flex-col rounded-[22px] border"
-          style={cardBase}
-        >
+        {/* 우: 품목 상세 — relative wrapper가 행 높이(= 좌측 카드)를 따르고, 내부 absolute 카드가 그 높이를 꽉 채움 */}
+        <div className="relative flex-1">
           <div
-            className="shrink-0 border-b px-5 py-3"
-            style={{ borderColor: LEGACY_COLORS.border }}
+            className="absolute inset-0 flex flex-col rounded-[22px] border"
+            style={cardBase}
           >
-            <h2 className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
-              {selectedGroup
-                ? `${selectedGroup.dept_name} (${selectedGroup.process_code}) 품목 상세`
-                : "품목 상세"}
-            </h2>
-            <p className="mt-0.5 text-[12px]" style={{ color: LEGACY_COLORS.muted }}>
-              {selectedGroup?.label ?? "공정을 선택하세요"} · 선택 주차 품목별 변화
-            </p>
-          </div>
-          <div className="px-5 pb-4 pt-3">
-            {loading && !data ? (
-              <LoadingSkeleton variant="list" rows={8} />
-            ) : (
-              <WeeklyDetailTable group={selectedGroup} />
-            )}
-          </div>
-          <div
-            className="shrink-0 border-t px-5 py-2.5 text-[10px]"
-            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-          >
-            전주재고는 현재재고와 선택 주차 입출고 내역을 기준으로 계산한 값입니다.
+            <div
+              className="shrink-0 border-b px-5 py-3"
+              style={{ borderColor: LEGACY_COLORS.border }}
+            >
+              <h2 className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
+                {selectedGroup ? `${selectedGroup.dept_name} 품목 상세` : "품목 상세"}
+              </h2>
+              <p className="mt-0.5 text-[12px]" style={{ color: LEGACY_COLORS.muted }}>
+                {selectedGroup?.label ?? "공정을 선택하세요"} · 선택 주차 품목별 변화
+              </p>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-3">
+              {loading && !data ? (
+                <LoadingSkeleton variant="list" rows={8} />
+              ) : (
+                <WeeklyDetailTable group={selectedGroup} />
+              )}
+            </div>
+            <div
+              className="shrink-0 border-t px-5 py-2.5 text-[11px]"
+              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+            >
+              전주 재고는 현재 재고와 선택 주차 입출고 내역을 기준으로 계산한 값입니다.
+            </div>
           </div>
         </div>
       </div>

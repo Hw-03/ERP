@@ -27,7 +27,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
         const deltaColor =
           g.delta > 0 ? LEGACY_COLORS.cyan
           : g.delta < 0 ? LEGACY_COLORS.red
-          : LEGACY_COLORS.muted;
+          : LEGACY_COLORS.muted2;
 
         return (
           <button
@@ -41,8 +41,8 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
               background: isActive
                 ? tint(tone, 8, LEGACY_COLORS.s2)
                 : isHover
-                ? LEGACY_COLORS.s3
-                : LEGACY_COLORS.s2,
+                ? LEGACY_COLORS.s2
+                : LEGACY_COLORS.s1,
               borderColor: isActive
                 ? tone
                 : isDecreasing
@@ -70,18 +70,34 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
                 >
                   {g.dept_name}
                 </div>
-                <div
-                  className={`font-black leading-none ${g.delta === 0 ? "text-[14px]" : "text-[28px]"}`}
-                  style={{ color: deltaColor }}
-                >
-                  {g.delta > 0
-                    ? `+${formatQty(g.delta)}`
-                    : g.delta < 0
-                    ? formatQty(g.delta)
-                    : "변동 없음"}
-                </div>
+                {g.delta !== 0 ? (
+                  <div
+                    className="text-[28px] font-black leading-none"
+                    style={{ color: deltaColor }}
+                  >
+                    {g.delta > 0 ? `+${formatQty(g.delta)}` : formatQty(g.delta)}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="text-[16px] font-black leading-none"
+                      style={{ color: LEGACY_COLORS.muted2 }}
+                    >
+                      ±0
+                    </span>
+                    <span
+                      className="rounded-[5px] px-1.5 py-0.5 text-[10px] font-bold"
+                      style={{
+                        background: tint(LEGACY_COLORS.muted2, 12, LEGACY_COLORS.s2),
+                        color: LEGACY_COLORS.muted2,
+                      }}
+                    >
+                      변동 없음
+                    </span>
+                  </div>
+                )}
               </div>
-              {/* 우: 공정코드 배지 + 입고 + 출고 */}
+              {/* 우: 공정코드 배지 + 입고 + 출고 + 현재 */}
               <div className="flex flex-col items-end gap-1">
                 <span
                   className="rounded-[6px] px-2 py-0.5 text-[11px] font-black"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Employee, EmployeeLevel, WarehouseRole } from "@/lib/api";
+import type { Employee, WarehouseRole } from "@/lib/api";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../_admin_sections/adminShared";
 
 /**
@@ -17,9 +17,7 @@ export type EmployeeEditForm = {
   role: string;
   phone: string;
   department: string;
-  level: EmployeeLevel;
   warehouse_role: WarehouseRole;
-  display_order: number;
 };
 
 const EMPTY_EDIT_FORM: EmployeeEditForm = {
@@ -27,9 +25,7 @@ const EMPTY_EDIT_FORM: EmployeeEditForm = {
   role: "",
   phone: "",
   department: "조립",
-  level: "staff",
   warehouse_role: "none",
-  display_order: 0,
 };
 
 function toEditForm(emp: Employee): EmployeeEditForm {
@@ -38,9 +34,7 @@ function toEditForm(emp: Employee): EmployeeEditForm {
     role: emp.role,
     phone: emp.phone ?? "",
     department: emp.department,
-    level: emp.level,
     warehouse_role: (emp.warehouse_role ?? "none") as WarehouseRole,
-    display_order: emp.display_order,
   };
 }
 

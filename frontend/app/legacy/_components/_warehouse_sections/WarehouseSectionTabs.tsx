@@ -31,6 +31,7 @@ export function WarehouseSectionTabs({ active, onChange, showQueue, cartCount = 
       {tabs.map((t) => {
         const activeState = active === t.id;
         const showBadge = t.id === "cart" && cartCount > 0;
+        const inactiveAlert = !activeState && showBadge;
         return (
           <button
             key={t.id}
@@ -38,12 +39,20 @@ export function WarehouseSectionTabs({ active, onChange, showQueue, cartCount = 
             onClick={() => onChange(t.id)}
             className="relative rounded-full border px-4 py-1.5 text-sm font-bold transition"
             style={{
-              background: activeState ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
-              color: activeState ? "white" : LEGACY_COLORS.text,
+              background: activeState
+                ? LEGACY_COLORS.blue
+                : inactiveAlert
+                ? `color-mix(in srgb, ${LEGACY_COLORS.green} 18%, ${LEGACY_COLORS.s2})`
+                : LEGACY_COLORS.s2,
+              color: activeState
+                ? "white"
+                : inactiveAlert
+                ? LEGACY_COLORS.green
+                : LEGACY_COLORS.text,
               borderColor: activeState
                 ? LEGACY_COLORS.blue
-                : showBadge
-                ? `color-mix(in srgb, ${LEGACY_COLORS.green} 60%, ${LEGACY_COLORS.border})`
+                : inactiveAlert
+                ? LEGACY_COLORS.green
                 : LEGACY_COLORS.border,
             }}
           >

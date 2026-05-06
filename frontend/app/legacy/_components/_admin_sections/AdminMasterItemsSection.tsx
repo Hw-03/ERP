@@ -24,7 +24,7 @@ export function AdminMasterItemsSection() {
   } = useAdminMasterItemsContext();
 
   return (
-    <div className="grid h-full gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+    <div className="grid h-full grid-cols-[360px_minmax(0,1fr)] gap-4">
       {/* 품목 목록 */}
       <div
         className="flex min-h-0 flex-col rounded-[28px] border"
@@ -62,26 +62,46 @@ export function AdminMasterItemsSection() {
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {visibleItems.map((item, index) => (
-            <button
-              key={item.item_id}
-              onClick={() => {
-                setAddMode(false);
-                setSelectedItem(selectedItem?.item_id === item.item_id ? null : item);
-              }}
-              className="block w-full px-4 py-4 text-left"
-              style={{
-                borderBottom: index === visibleItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
-                background:
-                  selectedItem?.item_id === item.item_id
-                    ? `color-mix(in srgb, ${LEGACY_COLORS.purple} 10%, transparent)`
+          {visibleItems.map((item, index) => {
+            const isSelected = selectedItem?.item_id === item.item_id;
+            const isAlt = index % 2 === 1;
+            return (
+              <button
+                key={item.item_id}
+                onClick={() => {
+                  setAddMode(false);
+                  setSelectedItem(isSelected ? null : item);
+                }}
+                className="flex w-full items-center gap-3 px-4 py-2 text-left"
+                style={{
+                  borderBottom: index === visibleItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
+                  background: isSelected
+                    ? `color-mix(in srgb, ${LEGACY_COLORS.purple} 14%, transparent)`
+                    : isAlt
+                    ? LEGACY_COLORS.s1
                     : "transparent",
-              }}
-            >
-              <div className="text-base font-semibold">{item.item_name}</div>
-              <div className="mt-1 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
-            </button>
-          ))}
+                }}
+              >
+                <span
+                  className="shrink-0 rounded-md px-2 py-0.5 text-[11px] font-black tabular-nums"
+                  style={{
+                    background: isSelected
+                      ? LEGACY_COLORS.purple
+                      : `color-mix(in srgb, ${LEGACY_COLORS.muted2} 18%, transparent)`,
+                    color: isSelected ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
+                  }}
+                >
+                  {item.erp_code ?? "—"}
+                </span>
+                <span
+                  className="flex-1 truncate text-sm font-semibold"
+                  style={{ color: isSelected ? LEGACY_COLORS.text : LEGACY_COLORS.text }}
+                >
+                  {item.item_name}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
