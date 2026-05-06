@@ -95,7 +95,7 @@ export function HistoryCalendarStrip({
                 <button
                   key={key}
                   onClick={() => setSelectedDay(selectedDay === key ? null : key)}
-                  className="flex flex-col items-center rounded-[14px] border p-2 transition-colors hover:brightness-110"
+                  className="flex flex-col items-center rounded-[14px] border p-1.5 transition-colors hover:brightness-110"
                   style={{
                     background: isSelected ? "rgba(101,169,255,.18)" : isToday ? "rgba(101,169,255,.08)" : LEGACY_COLORS.s2,
                     borderColor: isSelected
@@ -103,7 +103,7 @@ export function HistoryCalendarStrip({
                       : isToday
                       ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 27%, transparent)`
                       : LEGACY_COLORS.border,
-                    minHeight: "64px",
+                    height: "132px",
                   }}
                 >
                   <span className="text-sm font-bold" style={{ color: isToday ? LEGACY_COLORS.blue : LEGACY_COLORS.text }}>
