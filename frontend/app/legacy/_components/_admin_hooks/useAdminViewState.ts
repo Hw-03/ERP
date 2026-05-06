@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import type { DepartmentMaster } from "@/lib/api";
 
 /**
@@ -41,11 +41,6 @@ export function useAdminViewState(initialSection: AdminSection = "items"): UseAd
   const [section, setSection] = useState<AdminSection>(initialSection);
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [selectedDept, setSelectedDept] = useState<DepartmentMaster | null>(null);
-
-  // 부서 섹션 진입 시 우측 패널을 자동으로 열어 두면 부서 선택 → 관리 흐름이 끊기지 않는다.
-  useEffect(() => {
-    if (section === "departments") setShowRightPanel(true);
-  }, [section]);
 
   const unlock = useCallback((pin: string) => {
     setAdminPin(pin);

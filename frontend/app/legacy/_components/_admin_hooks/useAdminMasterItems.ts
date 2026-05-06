@@ -18,6 +18,19 @@ export type UseAdminMasterItemsArgs = {
   onShowSave?: (msg: string) => void;
 };
 
+type UpdateItemPayload = {
+  item_name?: string;
+  spec?: string;
+  legacy_item_type?: string;
+  supplier?: string;
+  min_stock?: number;
+  process_type_code?: string;
+  unit?: string;
+  model_slots?: number[];
+  option_code?: string;
+  erp_code?: string;
+};
+
 export type AdminMasterItemsState = {
   selectedItem: Item | null;
   setSelectedItem: (i: Item | null) => void;
@@ -30,9 +43,10 @@ export type AdminMasterItemsState = {
   visibleItems: Item[];
   addItem: () => void;
   saveItemField: (
-    field: "item_name" | "spec" | "barcode" | "legacy_model" | "supplier" | "min_stock" | "unit",
+    field: "item_name" | "spec" | "barcode" | "legacy_model" | "supplier" | "min_stock" | "unit" | "erp_code" | "process_type_code",
     value: string,
   ) => void;
+  updateItemFull: (payload: UpdateItemPayload) => void;
 };
 
 export function useAdminMasterItems({
@@ -84,7 +98,7 @@ export function useAdminMasterItems({
   }
 
   async function _saveItemField(
-    field: "item_name" | "spec" | "barcode" | "legacy_model" | "supplier" | "min_stock" | "unit",
+    field: "item_name" | "spec" | "barcode" | "legacy_model" | "supplier" | "min_stock" | "unit" | "erp_code" | "process_type_code",
     value: string,
   ) {
     if (!selectedItem) return;
@@ -92,6 +106,19 @@ export function useAdminMasterItems({
       const payload = field === "min_stock"
         ? { min_stock: value ? Number(value) : undefined }
         : { [field]: value || undefined };
+      const updated = await api.updateItem(selectedItem.item_id, payload);
+      setItems((current) => current.map((item) => (item.item_id === updated.item_id ? updated : item)));
+      setSelectedItem(updated);
+      onStatusChange(`${updated.item_name} 정보를 저장했습니다.`);
+      onShowSave?.("저장됐습니다.");
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "저장에 실패했습니다.");
+    }
+  }
+
+  async function _updateItemFull(payload: UpdateItemPayload) {
+    if (!selectedItem) return;
+    try {
       const updated = await api.updateItem(selectedItem.item_id, payload);
       setItems((current) => current.map((item) => (item.item_id === updated.item_id ? updated : item)));
       setSelectedItem(updated);
@@ -114,5 +141,6 @@ export function useAdminMasterItems({
     visibleItems,
     addItem: () => void _addItem(),
     saveItemField: (f, v) => void _saveItemField(f, v),
+    updateItemFull: (p) => void _updateItemFull(p),
   };
 }

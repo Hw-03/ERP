@@ -113,7 +113,7 @@ export function AdminMasterItemsSection() {
         {addMode ? (
           <AddItemForm />
         ) : selectedItem ? (
-          <EditItemForm selectedItem={selectedItem} />
+          <EditItemForm key={selectedItem.item_id} selectedItem={selectedItem} />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
             <div className="text-base" style={{ color: LEGACY_COLORS.muted2 }}>

@@ -72,6 +72,9 @@ export const itemsApi = {
       legacy_model?: string;
       supplier?: string;
       min_stock?: number;
+      erp_code?: string;
+      option_code?: string;
+      model_slots?: number[];
     },
   ) => putJson<Item>(toApiUrl(`/api/items/${itemId}`), payload),
 };

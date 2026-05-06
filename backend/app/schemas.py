@@ -50,6 +50,9 @@ class ItemUpdate(BaseModel):
     legacy_model: Optional[str] = Field(None, max_length=50)
     supplier: Optional[str] = Field(None, max_length=200)
     min_stock: Optional[Decimal] = None
+    erp_code: Optional[str] = Field(None, max_length=40)
+    option_code: Optional[str] = Field(None, max_length=10)
+    model_slots: Optional[List[int]] = None
 
 
 class ItemResponse(BaseModel):

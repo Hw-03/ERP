@@ -421,12 +421,29 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
     for field in (
         "item_name", "spec", "process_type_code", "unit", "barcode",
         "legacy_file_type", "legacy_part", "legacy_item_type", "legacy_model",
-        "supplier", "min_stock",
+        "supplier", "min_stock", "option_code",
     ):
         new_val = getattr(payload, field)
         if new_val is not None and getattr(item, field) != new_val:
             setattr(item, field, new_val)
             changed.append(field)
+
+    if payload.model_slots is not None:
+        db.query(ItemModel).filter(ItemModel.item_id == item.item_id).delete()
+        for slot in payload.model_slots:
+            db.add(ItemModel(item_id=item.item_id, slot=slot))
+        item.model_symbol = slots_to_model_symbol(payload.model_slots) or None
+        changed.append("model_slots")
+
+    if payload.erp_code is not None and payload.erp_code != item.erp_code:
+        exists = db.query(Item).filter(
+            Item.erp_code == payload.erp_code,
+            Item.item_id != item.item_id,
+        ).first()
+        if exists:
+            raise http_error(409, ErrorCode.CONFLICT, f"'{payload.erp_code}' 코드는 이미 사용 중입니다.")
+        item.erp_code = payload.erp_code
+        changed.append("erp_code")
 
     item.updated_at = datetime.now(UTC).replace(tzinfo=None)
 

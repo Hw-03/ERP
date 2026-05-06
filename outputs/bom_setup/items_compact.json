@@ -72,49 +72,49 @@
   {
     "item_id": "9-TR-0011",
     "item_name": "애노드 (100kV)",
-    "erp_code": "9-TR-0011",
+    "erp_code": "?-TR-0011",
     "process_type_code": "TR",
     "unit": "EA"
   },
   {
     "item_id": "9-TR-0012",
     "item_name": "에노드 링",
-    "erp_code": "9-TR-0012",
+    "erp_code": "?-TR-0012",
     "process_type_code": "TR",
     "unit": "EA"
   },
   {
     "item_id": "9-TR-0013",
     "item_name": "포커서 (100kV)",
-    "erp_code": "9-TR-0013",
+    "erp_code": "?-TR-0013",
     "process_type_code": "TR",
     "unit": "EA"
   },
   {
     "item_id": "9-TR-0014",
     "item_name": "세라믹 바디 (100kV)",
-    "erp_code": "9-TR-0014",
+    "erp_code": "?-TR-0014",
     "process_type_code": "TR",
     "unit": "EA"
   },
   {
     "item_id": "9-TR-0015",
     "item_name": "세라믹 슬리브",
-    "erp_code": "9-TR-0015",
+    "erp_code": "?-TR-0015",
     "process_type_code": "TR",
     "unit": "EA"
   },
   {
     "item_id": "9-TR-0016",
     "item_name": "필러 (100kV)",
-    "erp_code": "9-TR-0016",
+    "erp_code": "?-TR-0016",
     "process_type_code": "TR",
     "unit": "EA"
   },
   {
     "item_id": "9-TR-0017",
     "item_name": "전극 필러 (100kV)",
-    "erp_code": "9-TR-0017",
+    "erp_code": "?-TR-0017",
     "process_type_code": "TR",
     "unit": "EA"
   },
@@ -128,7 +128,7 @@
   {
     "item_id": "9-TF-0002",
     "item_name": "DXDR-100 튜브",
-    "erp_code": "9-TF-0002",
+    "erp_code": "?-TF-0002",
     "process_type_code": "TF",
     "unit": "EA"
   },
@@ -625,7 +625,7 @@
   {
     "item_id": "69-VR-0001",
     "item_name": "알루미늄 필터 (2T * Φ24)",
-    "erp_code": "69-VR-0001",
+    "erp_code": "6?-VR-0001",
     "process_type_code": "VR",
     "unit": "EA"
   },
@@ -646,7 +646,7 @@
   {
     "item_id": "346789-VR-0004",
     "item_name": "방사구 오링 (2*18)",
-    "erp_code": "346789-VR-0004",
+    "erp_code": "34678?-VR-0004",
     "process_type_code": "VR",
     "unit": "EA"
   },
@@ -814,14 +814,14 @@
   {
     "item_id": "389-VR-0028",
     "item_name": "4 PIN 커넥터 [SOLO]",
-    "erp_code": "389-VR-0028",
+    "erp_code": "38?-VR-0028",
     "process_type_code": "VR",
     "unit": "EA"
   },
   {
     "item_id": "389-VR-0029",
     "item_name": "5 PIN 커넥터 [DX3000, SOLO]",
-    "erp_code": "389-VR-0029",
+    "erp_code": "38?-VR-0029",
     "process_type_code": "VR",
     "unit": "EA"
   },
@@ -891,21 +891,21 @@
   {
     "item_id": "VR-0039",
     "item_name": "방사구 [공용]",
-    "erp_code": "VR-0039",
+    "erp_code": "34678?-VR-0039",
     "process_type_code": "VR",
     "unit": "EA"
   },
   {
     "item_id": "346789-VR-0040",
     "item_name": "방사구 (외경 탭 추가) [공용]",
-    "erp_code": "346789-VR-0040",
+    "erp_code": "34678?-VR-0040",
     "process_type_code": "VR",
     "unit": "EA"
   },
   {
     "item_id": "346789-VR-0041",
     "item_name": "방사구 너트 [공용]",
-    "erp_code": "346789-VR-0041",
+    "erp_code": "34678?-VR-0041",
     "process_type_code": "VR",
     "unit": "EA"
   },
@@ -4440,105 +4440,105 @@
   {
     "item_id": "PR-0076",
     "item_name": "iCam 구강 카메라 박스",
-    "erp_code": "PR-0076",
+    "erp_code": "34678-PR-0076",
     "process_type_code": "PR",
     "unit": "EA"
   },
   {
     "item_id": "PR-0077",
     "item_name": "Rex2 Premium 센서 박스",
-    "erp_code": "PR-0077",
+    "erp_code": "34678-PR-0077",
     "process_type_code": "PR",
     "unit": "EA"
   },
   {
     "item_id": "PR-0078",
     "item_name": "iCam 구강 카메라",
-    "erp_code": "PR-0078",
+    "erp_code": "34678-PR-0078",
     "process_type_code": "PR",
     "unit": "EA"
   },
   {
     "item_id": "PR-0079",
     "item_name": "DRTech [330N/10\"x8\"]",
-    "erp_code": "PR-0079",
+    "erp_code": "34678-PR-0079",
     "process_type_code": "PR",
     "unit": "EA"
   },
   {
     "item_id": "PR-0080",
     "item_name": "Rex2 Elite [XVS2530] Size 1.5",
-    "erp_code": "PR-0080",
+    "erp_code": "34678-PR-0080",
     "process_type_code": "PR",
     "unit": "EA"
   },
   {
     "item_id": "PR-0081",
     "item_name": "Rex2 Elite [iRay] Size 2.0",
-    "erp_code": "PR-0081",
+    "erp_code": "34678-PR-0081",
     "process_type_code": "PR",
     "unit": "EA"
   },
   {
     "item_id": "PR-0082",
     "item_name": "HDI-2000 [Rex2 Premium/1.5]",
-    "erp_code": "PR-0082",
+    "erp_code": "34678-PR-0082",
     "process_type_code": "PR",
     "unit": "EA"
   },
   {
     "item_id": "PR-0083",
     "item_name": "HDI-2000 [Rex2 Premium/2.0]",
-    "erp_code": "PR-0083",
+    "erp_code": "34678-PR-0083",
     "process_type_code": "PR",
     "unit": "EA"
   },
   {
     "item_id": "PR-0084",
     "item_name": "HDI-S [Rex2 Premium/1.0]",
-    "erp_code": "PR-0084",
+    "erp_code": "34678-PR-0084",
     "process_type_code": "PR",
     "unit": "EA"
   },
   {
     "item_id": "PR-0085",
     "item_name": "HDI-S [Rex2 Premium/1.5]",
-    "erp_code": "PR-0085",
+    "erp_code": "34678-PR-0085",
     "process_type_code": "PR",
     "unit": "EA"
   },
   {
     "item_id": "PR-0086",
     "item_name": "HDI-S [Rex2 Premium/2.0]",
-    "erp_code": "PR-0086",
+    "erp_code": "34678-PR-0086",
     "process_type_code": "PR",
     "unit": "EA"
   },
   {
     "item_id": "PR-0087",
     "item_name": "E2V CMOS [EV71JU215A-C-00B1/1.0]",
-    "erp_code": "PR-0087",
+    "erp_code": "4-PR-0087",
     "process_type_code": "PR",
     "unit": "EA"
   },
   {
     "item_id": "PR-0088",
     "item_name": "E2V CMOS [EV71JU213A-C-00B1/2.0]",
-    "erp_code": "PR-0088",
+    "erp_code": "4-PR-0088",
     "process_type_code": "PR",
     "unit": "EA"
   },
   {
     "item_id": "PR-0089",
     "item_name": "PIXXGEN [PIXX1717W/17\"x17\"]",
-    "erp_code": "PR-0089",
+    "erp_code": "6-PR-0089",
     "process_type_code": "PR",
     "unit": "EA"
   },
   {
     "item_id": "PR-0090",
     "item_name": "CareRay [CareView1800Cwe/17\"x17\"]",
-    "erp_code": "PR-0090",
+    "erp_code": "6-PR-0090",
     "process_type_code": "PR",
     "unit": "EA"
   },
@@ -4580,7 +4580,7 @@
   {
     "item_id": "PR-0096",
     "item_name": "디텍터 가방 [로고 O]",
-    "erp_code": "PR-0096",
+    "erp_code": "34678-PR-0096",
     "process_type_code": "PR",
     "unit": "EA"
   },
@@ -4799,6 +4799,55 @@
     "item_name": "DX3000M 저가 박스 에어셀 [Main]",
     "erp_code": "3-PR-0127",
     "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-NR-0003",
+    "item_name": "ADX6000s CTR BD (Ver 1.1.1) - 8핀용",
+    "erp_code": "6-NR-0003",
+    "process_type_code": "NR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-NR-0004",
+    "item_name": "ADX6000 CTR BD (Ver 1.5)",
+    "erp_code": "6-NR-0004",
+    "process_type_code": "NR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-NR-0005",
+    "item_name": "COCOON CTR BD (Ver 2.20.5)",
+    "erp_code": "7-NR-0005",
+    "process_type_code": "NR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-NR-0006",
+    "item_name": "ADX6000 INNER USB BD (Ver 2.1)",
+    "erp_code": "6-NR-0006",
+    "process_type_code": "NR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-NR-0007",
+    "item_name": "ADX6000s CTR to GEN BD (Ver 2.0.0) - 8핀용",
+    "erp_code": "6-NR-0007",
+    "process_type_code": "NR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-NR-0008",
+    "item_name": "ADX6000s AIM LIGHT DRIVER BD (Ver 1.0.0) - 9핀용",
+    "erp_code": "6-NR-0008",
+    "process_type_code": "NR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-NR-0009",
+    "item_name": "ADX6000FB CTR to GEN BD (Ver 2.0.1) - 10핀용",
+    "erp_code": "6-NR-0009",
+    "process_type_code": "NR",
     "unit": "EA"
   },
   {
@@ -5093,6 +5142,811 @@
     "item_name": "SOLO 70KV, 2mA / 20cm Black [트리거 에이밍라이트]",
     "erp_code": "8-AF-0042",
     "process_type_code": "AF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "46-AR-0309",
+    "item_name": "텅스텐 필라멘트 [DXDR-100]",
+    "erp_code": "46-AR-0309",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "4-AR-0310",
+    "item_name": "세라믹 작은 콘덴서 Vishay (HVCC203Y6P681MCAX) [COCOON, ADX6000]",
+    "erp_code": "4-AR-0310",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "4-AR-0311",
+    "item_name": "히터트랜스용 고압선(흰색) (DSI HV CABLE 2178) [SOLO]",
+    "erp_code": "4-AR-0311",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "4-PR-0128",
+    "item_name": "DX3000 OLED BD (듀얼 슬라이드)",
+    "erp_code": "4-PR-0128",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "4-PR-0129",
+    "item_name": "DX3000 RELAY 쪽보드",
+    "erp_code": "4-PR-0129",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "4-PR-0130",
+    "item_name": "DX3000 후면전원 DC 잭 2핀 (YH369-02JR) 65mm [하네스 4번]",
+    "erp_code": "4-PR-0130",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "4-PR-0131",
+    "item_name": "DX3000 마그네틱보드 연결 4핀 (12505HS-04 2EA) 123mm [하네스 7번]",
+    "erp_code": "4-PR-0131",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "4-PR-0132",
+    "item_name": "DX3000 LCD GUIDE (반투명) - 사파리 덴탈용",
+    "erp_code": "4-PR-0132",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "4-PR-0133",
+    "item_name": "DX3000 FRONT COVER (듀얼 슬라이드 (외부배터리용 홀)) AS용",
+    "erp_code": "4-PR-0133",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "4-PR-0134",
+    "item_name": "DX3000 X-CAP 체결형 (구형 폭 좁음) AS용",
+    "erp_code": "4-PR-0134",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "4-PR-0135",
+    "item_name": "DX3000 X-CAP 체결형 (구형 폭 좁음) AS용 - 스프레이 X",
+    "erp_code": "4-PR-0135",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-TR-0018",
+    "item_name": "DX3000M CONE 젠더",
+    "erp_code": "7-TR-0018",
+    "process_type_code": "TR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-TR-0019",
+    "item_name": "COCOON FET BD (+56 교체전)",
+    "erp_code": "7-TR-0019",
+    "process_type_code": "TR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-TR-0020",
+    "item_name": "COCOON OP & TOUCH BD (FFC Cable 방향 변경 전)",
+    "erp_code": "7-TR-0020",
+    "process_type_code": "TR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "34-AR-0312",
+    "item_name": "COCOON 18cm FRONT_S (B 무광)",
+    "erp_code": "34-AR-0312",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-AR-0313",
+    "item_name": "SOLO BUTTON INDICATOR (B)",
+    "erp_code": "7-AR-0313",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-AR-0314",
+    "item_name": "ADX4000W 데코 가이드 - 스프레이 X",
+    "erp_code": "8-AR-0314",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-AR-0315",
+    "item_name": "ADX4000W POWER BUTTON - 스프레이 X",
+    "erp_code": "8-AR-0315",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-AR-0316",
+    "item_name": "ADX4000W EXPOSE BUTTON - 스프레이 X",
+    "erp_code": "8-AR-0316",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-AR-0317",
+    "item_name": "ADX4000W NAVI BUTTON (가운데) - 스프레이 X",
+    "erp_code": "8-AR-0317",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-AR-0318",
+    "item_name": "ADX4000W NAVI KEY (방향) - 스프레이 X",
+    "erp_code": "8-AR-0318",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-AR-0319",
+    "item_name": "ADX4000 Q클립",
+    "erp_code": "8-AR-0319",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-AR-0320",
+    "item_name": "ADX4000W L클립",
+    "erp_code": "8-AR-0320",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-AR-0321",
+    "item_name": "ADX4000W HAND STRAP [AL(Cr도금), SUS Φ2.0]-손잡이(터치펜) (유럽용 알코올 번짐)",
+    "erp_code": "8-AR-0321",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0322",
+    "item_name": "ADX6000 CRADLE FOOT RUBBER",
+    "erp_code": "6-AR-0322",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0323",
+    "item_name": "DX3000 내부 배터리 [PF435060]",
+    "erp_code": "6-AR-0323",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0324",
+    "item_name": "COCOON 외부 배터리 [PF605060]",
+    "erp_code": "6-AR-0324",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0325",
+    "item_name": "ADX6000 외부 배터리 [LIP1902A_5035127SH25]",
+    "erp_code": "6-AR-0325",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0326",
+    "item_name": "3구 25.2V 1.7A 충전기 [JBL7451251700002FJ]",
+    "erp_code": "6-AR-0326",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0327",
+    "item_name": "DRTech 15.0V 충전기 (220V)",
+    "erp_code": "6-AR-0327",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-PR-0136",
+    "item_name": "DRTech 15.0V 충전기 (110V)",
+    "erp_code": "3-PR-0136",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-AR-0328",
+    "item_name": "외부 배터리 와이어 케이블",
+    "erp_code": "7-AR-0328",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0137",
+    "item_name": "ADX4000W USB 2.0 CABLE (PMM369-0200) 2M",
+    "erp_code": "6-PR-0137",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0138",
+    "item_name": "ADX4000W USB 2.0 CABLE (PMM369-0100) 1M",
+    "erp_code": "6-PR-0138",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0139",
+    "item_name": "DX3000 외부배터리용 쪽보드",
+    "erp_code": "6-PR-0139",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0140",
+    "item_name": "뱅가드 46F [ADX6000]",
+    "erp_code": "6-PR-0140",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-AR-0329",
+    "item_name": "뱅가드 53F [FDXD-810]",
+    "erp_code": "3-AR-0329",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "34-PR-0141",
+    "item_name": "DX3000, ADX4000W 계란판",
+    "erp_code": "34-PR-0141",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "34-PR-0142",
+    "item_name": "COCOON, ADX6000 계란판",
+    "erp_code": "34-PR-0142",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0143",
+    "item_name": "디텍터 내부폼 상판 [45x55.5x2 mm 접착 O] (뱅가드 53F용)",
+    "erp_code": "6-PR-0143",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0144",
+    "item_name": "디텍터 내부폼 중판 [45x55.5x2 mm 접착 X] (뱅가드 53F용)",
+    "erp_code": "6-PR-0144",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0145",
+    "item_name": "디텍터 내부폼 하판 [45x55.5x8 mm] (뱅가드 53F용)",
+    "erp_code": "6-PR-0145",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0146",
+    "item_name": "ADX6000 제품 박스",
+    "erp_code": "6-PR-0146",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-PR-0147",
+    "item_name": "제품 박스용 무지 박스 [450x260x510 mm] (1개 포장용)",
+    "erp_code": "8-PR-0147",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-PR-0148",
+    "item_name": "저가 박스용 무지 박스 [475x295x220 mm] (2개 포장용)",
+    "erp_code": "8-PR-0148",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0149",
+    "item_name": "저가 박스용 무지 박스 [475x295x430 mm] (4개 포장용)",
+    "erp_code": "6-PR-0149",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0150",
+    "item_name": "저가 박스용 무지 박스 [700x300x430 mm] (6개 포장용)",
+    "erp_code": "6-PR-0150",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-PR-0151",
+    "item_name": "뱅가드 46F 포장용 무지 박스",
+    "erp_code": "3-PR-0151",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-PR-0152",
+    "item_name": "ADX6000 박스 내장재 [상, 하판 60.5x27.5x30 mm] (뱅가드 46F용)",
+    "erp_code": "3-PR-0152",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "34678-PR-0153",
+    "item_name": "ADX6000 박스 내장재 [좌, 우판 42.5x27.5x30 mm] (뱅가드 46F용)",
+    "erp_code": "34678-PR-0153",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "34678-PR-0154",
+    "item_name": "ADX6000 박스 내장재 [전, 후판 42.5x55x35 mm] (뱅가드 46F용)",
+    "erp_code": "34678-PR-0154",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "34678-PR-0155",
+    "item_name": "DRTech 센서 박스 내장재 [상, 하판 45.5x42x30 mm] (뱅가드 53F용)",
+    "erp_code": "34678-PR-0155",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0156",
+    "item_name": "넥스트랩 [포켓 구형]",
+    "erp_code": "6-PR-0156",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0157",
+    "item_name": "넥스트랩 [포켓 X]",
+    "erp_code": "6-PR-0157",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0158",
+    "item_name": "DX3000 포켓 핸드 스트랩",
+    "erp_code": "6-PR-0158",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-PR-0159",
+    "item_name": "연아크릴 [65ɸ 8T] (중국)",
+    "erp_code": "8-PR-0159",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "37-PR-0160",
+    "item_name": "연아크릴 [60ɸ 12T] (중국)",
+    "erp_code": "37-PR-0160",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-AR-0330",
+    "item_name": "ADX6000 연아크릴 [215x195x8mm] 하단 가공된 것 (중국)",
+    "erp_code": "3-AR-0330",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "78-PR-0161",
+    "item_name": "ADX6000 연아크릴 [215x215x8mm] 정사각형-오레곤주용",
+    "erp_code": "78-PR-0161",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0162",
+    "item_name": "ADX6000s NAME PLATE [iRay A6s]",
+    "erp_code": "6-PR-0162",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0163",
+    "item_name": "뱅가드 53F NAME PLATE [DEXCOWIN]",
+    "erp_code": "6-PR-0163",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0164",
+    "item_name": "뱅가드 46F NAME PLATE [DEXCOWIN]",
+    "erp_code": "6-PR-0164",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0165",
+    "item_name": "ADX6000s NAME PLATE [ADX6000s]",
+    "erp_code": "6-PR-0165",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "34678-PR-0166",
+    "item_name": "DX3000 패드",
+    "erp_code": "34678-PR-0166",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0167",
+    "item_name": "PLAATZ 330N 센서 케이스",
+    "erp_code": "6-PR-0167",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-PR-0168",
+    "item_name": "DRTech [FLAATZ 760/17\"x17\"]",
+    "erp_code": "3-PR-0168",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "34678-PR-0169",
+    "item_name": "DRTech [FDXD-810/10\"x8\"]",
+    "erp_code": "34678-PR-0169",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "34678-PR-0170",
+    "item_name": "HDI-1000 [Rex2 Classic/1.5]",
+    "erp_code": "34678-PR-0170",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "4-PR-0171",
+    "item_name": "DX3000, ADX4000W, SOLO 배터리 거치대용 신주핀 (D-910)",
+    "erp_code": "4-PR-0171",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "348-PR-0172",
+    "item_name": "스탠드 브라켓 족의학용",
+    "erp_code": "348-PR-0172",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0173",
+    "item_name": "ADX6000 각도기 홀더",
+    "erp_code": "6-PR-0173",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0174",
+    "item_name": "FOOT SWITCH",
+    "erp_code": "6-PR-0174",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3468-PR-0175",
+    "item_name": "리드스위치",
+    "erp_code": "3468-PR-0175",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "348-PR-0176",
+    "item_name": "DX3000 기본 Battery Pack (사급자재)",
+    "erp_code": "348-PR-0176",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "348-PR-0177",
+    "item_name": "DX3000 기본 Battery Case (사급자재)",
+    "erp_code": "348-PR-0177",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "348-PR-0178",
+    "item_name": "DX3000 기본 배터리 내부 단자대 (사급자재)",
+    "erp_code": "348-PR-0178",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-HR-0052",
+    "item_name": "ADX6000 고압베어 BD",
+    "erp_code": "6-HR-0052",
+    "process_type_code": "HR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-HR-0053",
+    "item_name": "SOLO 고압 다이오드 (SPF01-15)",
+    "erp_code": "8-HR-0053",
+    "process_type_code": "HR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-HR-0054",
+    "item_name": "SOLO 고압용 칩 세라믹 콘덴서 (2220J6K00222KXT)",
+    "erp_code": "8-HR-0054",
+    "process_type_code": "HR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-VR-0042",
+    "item_name": "SOLO 내부 케이스 (HDPE)",
+    "erp_code": "8-VR-0042",
+    "process_type_code": "VR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-VR-0043",
+    "item_name": "SOLO 고압 격벽 (HDPE)",
+    "erp_code": "8-VR-0043",
+    "process_type_code": "VR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-AR-0331",
+    "item_name": "SOLO 에이밍 은경 필터 [40ɸ 0.5T]",
+    "erp_code": "8-AR-0331",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-NR-0010",
+    "item_name": "COCOON ST CTR BD",
+    "erp_code": "7-NR-0010",
+    "process_type_code": "NR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-AR-0332",
+    "item_name": "DX3000 2.42\" OLED PANEL (UG-2864ASWPG01)",
+    "erp_code": "3-AR-0332",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-AR-0333",
+    "item_name": "DX3000 OLED GUIDE",
+    "erp_code": "3-AR-0333",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-AR-0334",
+    "item_name": "DX3000 EX BD FFC CABLE 10핀",
+    "erp_code": "3-AR-0334",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-AR-0335",
+    "item_name": "COCOON FFC CABLE (1mm*30P*A) 200mm [하네스 3-1번] (같은 방향)",
+    "erp_code": "7-AR-0335",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-AR-0336",
+    "item_name": "COCOON ST CTR to OP 케이블 (FLAT 30P 2.0mm 1:1) 205mm [하네스 12번]",
+    "erp_code": "7-AR-0336",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-AR-0337",
+    "item_name": "COCOON ST OP to TOUCH 케이블 (12505HS-05) 70mm [하네스 7-1번]",
+    "erp_code": "7-AR-0337",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0338",
+    "item_name": "ADX6000 FRONT CONNECTOR BD",
+    "erp_code": "6-AR-0338",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0339",
+    "item_name": "ADX6000FB ETC FRONT BD (리모콘 포트 수정 전)",
+    "erp_code": "6-AR-0339",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0340",
+    "item_name": "ADX6000FB ETC FRONT BD (리모콘 포트 수정 두꺼운 것)",
+    "erp_code": "6-AR-0340",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0341",
+    "item_name": "ADX6000 ETC EX BATTERY BD",
+    "erp_code": "6-AR-0341",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0342",
+    "item_name": "ADX6000 ETC RESIST BD",
+    "erp_code": "6-AR-0342",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0343",
+    "item_name": "ADX6000 ETC CAP BANK BD",
+    "erp_code": "6-AR-0343",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "34678-PR-0179",
+    "item_name": "DRTech FDXD-810, FLAATZ-N330 CTR Battery B/D (구형)",
+    "erp_code": "34678-PR-0179",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "34678-PR-0180",
+    "item_name": "DRTech FDXD-810, FLAATZ-N330 CTR Battery B/D (신형)",
+    "erp_code": "34678-PR-0180",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0344",
+    "item_name": "ADX6000FB CAP BANK 케이블 (YH396-04V-2EA) 120mm [하네스 8번]",
+    "erp_code": "6-AR-0344",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0345",
+    "item_name": "ADX6000FB 외부단자 케이블 (YH396-04V-1EA) 200mm [하네스 12번]",
+    "erp_code": "6-AR-0345",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0346",
+    "item_name": "ADX6000FB 외부배터리 케이블 (DC Connector Cable) 360mm [하네스 13번]",
+    "erp_code": "6-AR-0346",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0347",
+    "item_name": "ADX6000 컬리메이터 REAR",
+    "erp_code": "6-AR-0347",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0181",
+    "item_name": "ADX6000 밸크로 스킨가드 FRAME",
+    "erp_code": "6-PR-0181",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0182",
+    "item_name": "ADX6000 밸크로 스킨가드 BODY",
+    "erp_code": "6-PR-0182",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0183",
+    "item_name": "ADX6000 밸크로 스킨가드 STICK",
+    "erp_code": "6-PR-0183",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0348",
+    "item_name": "ADX6000 알루미늄 브라켓 4 HOLE",
+    "erp_code": "6-AR-0348",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0349",
+    "item_name": "ADX6000 외부단자 연결 DC잭 고무링",
+    "erp_code": "6-AR-0349",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0350",
+    "item_name": "ADX6000 외부단자 연결 DC잭 너트",
+    "erp_code": "6-AR-0350",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0351",
+    "item_name": "ADX6000FB Front Port Sticker (수정전 리모콘 위치 상단)",
+    "erp_code": "6-AR-0351",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0352",
+    "item_name": "ADX6000 가죽 손잡이 (외부배터리용) AS용",
+    "erp_code": "6-AR-0352",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0353",
+    "item_name": "ADX6000 BODY LEFT 사출(외부배터리용 단자대 사출커팅) AS용",
+    "erp_code": "6-AR-0353",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0354",
+    "item_name": "ADX6000 BODY RIGHT 사출(외부배터리용) AS용",
+    "erp_code": "6-AR-0354",
+    "process_type_code": "AR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AA-0075",
+    "item_name": "ADX6000s RIGHT ASS'Y",
+    "erp_code": "6-AA-0075",
+    "process_type_code": "AA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AA-0076",
+    "item_name": "ADX6000 컬리메이터 내부하우징 사출 + 납",
+    "erp_code": "6-AA-0076",
+    "process_type_code": "AA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PR-0184",
+    "item_name": "ADX6000 SKIN GUARD FRAME",
+    "erp_code": "6-PR-0184",
+    "process_type_code": "PR",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-AR-0355",
+    "item_name": "ADX6000 BOTTOM BLOCK",
+    "erp_code": "6-AR-0355",
+    "process_type_code": "AR",
     "unit": "EA"
   }
 ]
