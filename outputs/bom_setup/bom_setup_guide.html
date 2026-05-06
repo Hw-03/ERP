@@ -20,12 +20,6 @@
   --c-text: #101a2b;
   --c-muted: #8a96a6;
   --c-muted2: #56657e;
-  --dept-T: #078db0;
-  --dept-H: #b98619;
-  --dept-V: #6f59e8;
-  --dept-N: #f97316;
-  --dept-A: #2f74e7;
-  --dept-P: #179f72;
 }
 html, body {
   font-family: Pretendard, "Noto Sans KR", system-ui, sans-serif;
@@ -36,7 +30,7 @@ html, body {
   -webkit-font-smoothing: antialiased;
   scroll-behavior: smooth;
 }
-.page { max-width: 980px; margin: 0 auto; padding: 56px 28px 100px; }
+.page { max-width: 1040px; margin: 0 auto; padding: 56px 28px 100px; }
 a { color: var(--c-blue); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
@@ -50,486 +44,134 @@ a:hover { text-decoration: underline; }
   box-shadow: 0 16px 40px rgba(47, 116, 231, 0.06);
 }
 .hero-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--c-blue);
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--c-blue);
   background: rgba(47,116,231,0.08);
-  padding: 5px 12px;
-  border-radius: 999px;
+  padding: 5px 12px; border-radius: 999px;
   margin-bottom: 18px;
 }
-.hero h1 {
-  font-size: 34px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  margin-bottom: 14px;
-  line-height: 1.25;
-}
-.hero-sub {
-  font-size: 16px;
-  color: var(--c-muted2);
-  line-height: 1.7;
-  margin-bottom: 28px;
-  max-width: 640px;
-}
+.hero h1 { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 14px; line-height: 1.25; }
+.hero-sub { font-size: 16px; color: var(--c-muted2); line-height: 1.7; margin-bottom: 28px; max-width: 720px; }
 .hero-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
-  background: var(--c-blue);
-  color: #fff;
-  border-radius: 14px;
-  font-weight: 700;
-  font-size: 14px;
-  margin-right: 10px;
-  transition: opacity 120ms;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 20px; background: var(--c-blue); color: #fff;
+  border-radius: 14px; font-weight: 700; font-size: 14px;
+  margin-right: 10px; transition: opacity 120ms;
 }
 .hero-cta:hover { opacity: 0.88; text-decoration: none; }
 .hero-cta-ghost {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
-  background: var(--c-s1);
-  border: 1px solid var(--c-border);
-  color: var(--c-muted2);
-  border-radius: 14px;
-  font-weight: 700;
-  font-size: 14px;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 20px; background: var(--c-s1);
+  border: 1px solid var(--c-border); color: var(--c-muted2);
+  border-radius: 14px; font-weight: 700; font-size: 14px;
 }
 .hero-cta-ghost:hover { border-color: var(--c-blue); color: var(--c-blue); text-decoration: none; }
 
 /* TOC */
-.toc {
-  margin-top: 36px;
-  padding-top: 28px;
-  border-top: 1px solid var(--c-border);
-}
-.toc-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--c-muted2);
-  margin-bottom: 14px;
-}
-.toc-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-}
+.toc { margin-top: 36px; padding-top: 28px; border-top: 1px solid var(--c-border); }
+.toc-label { font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-muted2); margin-bottom: 14px; }
+.toc-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .toc-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: 12px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: 12px;
   background: rgba(255,255,255,0.7);
   border: 1px solid var(--c-border);
-  font-size: 13px;
-  color: var(--c-text);
-  font-weight: 600;
+  font-size: 13px; color: var(--c-text); font-weight: 600;
   transition: all 120ms;
 }
 .toc-item:hover { border-color: var(--c-blue); color: var(--c-blue); text-decoration: none; transform: translateX(2px); }
 .toc-num {
   width: 24px; height: 24px; flex-shrink: 0;
-  border-radius: 50%;
-  background: rgba(47,116,231,0.1);
-  color: var(--c-blue);
-  font-size: 11px;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border-radius: 50%; background: rgba(47,116,231,0.1);
+  color: var(--c-blue); font-size: 11px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
 }
 
-/* ───── Section ───── */
+/* Section */
 .section { margin-bottom: 64px; }
 .section-head { margin-bottom: 28px; }
 .section-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--c-blue);
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--c-blue);
   margin-bottom: 10px;
 }
 .section-eyebrow-num {
-  width: 22px; height: 22px;
-  border-radius: 50%;
-  background: var(--c-blue);
-  color: #fff;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--c-blue); color: #fff;
   display: flex; align-items: center; justify-content: center;
   font-size: 12px; font-weight: 800; letter-spacing: 0;
 }
-.section h2 {
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  margin-bottom: 8px;
-}
-.section-desc {
-  font-size: 15px;
-  color: var(--c-muted2);
-  line-height: 1.7;
-  max-width: 700px;
-}
-.section h3 {
-  font-size: 18px;
-  font-weight: 700;
-  margin: 36px 0 14px;
-}
+.section h2 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px; }
+.section-desc { font-size: 15px; color: var(--c-muted2); line-height: 1.7; max-width: 760px; }
+.section h3 { font-size: 19px; font-weight: 700; margin: 36px 0 14px; }
 .section h4 {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--c-muted2);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  margin: 22px 0 10px;
+  font-size: 13px; font-weight: 700; color: var(--c-muted2);
+  text-transform: uppercase; letter-spacing: 0.12em; margin: 22px 0 10px;
 }
 
-/* ───── Mockup frame (브라우저 창처럼) ───── */
-.mockup {
+/* ───── Screenshot frame ───── */
+.shot {
   position: relative;
-  background: var(--c-bg);
+  background: #fff;
   border: 1px solid var(--c-border);
-  border-radius: 16px;
+  border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 12px 32px rgba(16, 26, 43, 0.08);
+  box-shadow: 0 14px 36px rgba(16,26,43,0.10);
   margin: 18px 0;
 }
-.mockup-chrome {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.shot-chrome {
+  display: flex; align-items: center; gap: 8px;
   padding: 9px 14px;
   background: #e6ecf4;
   border-bottom: 1px solid var(--c-border);
 }
-.mockup-dot { width: 10px; height: 10px; border-radius: 50%; }
-.mockup-dot.r { background: #ff5f56; }
-.mockup-dot.y { background: #ffbd2e; }
-.mockup-dot.g { background: #27c93f; }
-.mockup-url {
-  margin-left: 14px;
-  flex: 1;
-  font-size: 11px;
+.shot-dot { width: 11px; height: 11px; border-radius: 50%; }
+.shot-dot.r { background: #ff5f56; }
+.shot-dot.y { background: #ffbd2e; }
+.shot-dot.g { background: #27c93f; }
+.shot-url {
+  margin-left: 14px; flex: 1; font-size: 11px;
   color: var(--c-muted2);
   background: rgba(255,255,255,0.7);
-  padding: 4px 10px;
-  border-radius: 6px;
+  padding: 4px 10px; border-radius: 6px;
   font-family: ui-monospace, SFMono-Regular, monospace;
 }
-.mockup-body { position: relative; }
+.shot-body { position: relative; line-height: 0; }
+.shot-body img { width: 100%; height: auto; display: block; }
 
-/* ───── App bar (mockup 안 상단바) ───── */
-.mb-appbar {
-  height: 46px;
-  background: #fff;
-  border-bottom: 1px solid var(--c-border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  font-size: 12px;
-}
-.mb-appbar-left { display: flex; align-items: center; gap: 8px; }
-.mb-brand { font-weight: 700; color: var(--c-blue); }
-.mb-divider { color: var(--c-muted); }
-.mb-title { font-weight: 600; color: var(--c-text); }
-.mb-count { font-size: 10px; color: var(--c-muted); margin-left: 4px; }
-.mb-appbar-right { display: flex; align-items: center; gap: 6px; }
-.mb-tag {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 999px;
-}
-.mb-tag.info { background: rgba(47,116,231,0.12); color: var(--c-blue); }
-.mb-tag.success { background: rgba(23,159,114,0.12); color: var(--c-green); }
-.mb-savedot {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 10px;
-  color: var(--c-green);
-  margin: 0 4px;
-}
-.mb-savedot::before {
-  content: ""; width: 5px; height: 5px;
-  border-radius: 50%; background: var(--c-green);
-  box-shadow: 0 0 0 2px rgba(23,159,114,0.18);
-}
-.mb-btn {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 7px;
-  border: 1px solid var(--c-border);
-  background: var(--c-s1);
-  color: var(--c-muted2);
-}
-.mb-btn.primary { background: var(--c-blue); color: #fff; border-color: var(--c-blue); }
-.mb-btn.success { background: var(--c-green); color: #fff; border-color: var(--c-green); }
-
-/* 부서 탭 */
-.mb-depts { display: flex; gap: 4px; padding: 8px 12px; background: var(--c-bg); }
-.mb-dept {
-  display: flex; align-items: center; gap: 5px;
-  padding: 5px 11px;
-  border-radius: 8px;
-  background: var(--c-s1);
-  border: 1px solid var(--c-border);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--c-muted2);
-}
-.mb-dept.active { color: #fff; border-color: transparent; }
-.mb-dept-dot { width: 6px; height: 6px; border-radius: 50%; }
-
-/* 통계 카드 */
-.mb-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 0 12px 10px; background: var(--c-bg); }
-.mb-stat {
-  background: var(--c-s2);
-  border: 1px solid var(--c-border);
-  border-radius: 12px;
-  padding: 10px 12px;
-}
-.mb-stat-label { font-size: 9px; font-weight: 700; color: var(--c-muted2); letter-spacing: 0.06em; text-transform: uppercase; }
-.mb-stat-value { font-size: 22px; font-weight: 800; margin-top: 2px; }
-
-/* 콘텐츠 영역 (좌·우 패널) */
-.mb-content { display: grid; grid-template-columns: 240px 1fr; gap: 10px; padding: 0 12px 12px; background: var(--c-bg); }
-.mb-panel {
-  background: var(--c-s2);
-  border: 1px solid var(--c-border);
-  border-radius: 16px;
-  overflow: hidden;
-}
-.mb-panel-head { padding: 10px 14px; border-bottom: 1px solid var(--c-border); }
-.mb-panel-label { font-size: 10px; font-weight: 700; color: var(--c-muted2); letter-spacing: 0.12em; text-transform: uppercase; }
-.mb-panel-sub { font-size: 10px; color: var(--c-muted); margin-top: 1px; }
-.mb-input {
-  margin: 8px 12px 6px;
-  padding: 6px 10px;
-  background: var(--c-s1);
-  border: 1px solid var(--c-border);
-  border-radius: 8px;
-  font-size: 11px;
-  color: var(--c-muted);
-  display: block;
-}
-.mb-chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px 8px; }
-.mb-chip {
-  font-size: 10px; font-weight: 700;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: var(--c-s1);
-  border: 1px solid var(--c-border);
-  color: var(--c-muted2);
-}
-.mb-chip.active { background: var(--c-blue); color: #fff; border-color: var(--c-blue); }
-
-.mb-itemlist { max-height: 240px; overflow: hidden; }
-.mb-item {
-  padding: 8px 12px;
-  border-top: 1px solid var(--c-border);
-  display: flex; align-items: center; gap: 8px;
-}
-.mb-item:first-child { border-top: none; }
-.mb-item.selected { background: rgba(47,116,231,0.06); }
-.mb-pt {
-  font-size: 9px; font-weight: 800;
-  padding: 2px 6px;
-  border-radius: 5px;
-  color: #fff;
-  background: var(--c-blue);
-}
-.mb-item-name { font-size: 11px; font-weight: 600; color: var(--c-text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mb-item-code { font-size: 10px; color: var(--c-muted); font-family: ui-monospace, monospace; }
-.mb-item-tag {
-  font-size: 9px; font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 5px;
-}
-
-/* 상태 탭 */
-.mb-status-tabs { display: flex; gap: 16px; padding: 0 14px; border-bottom: 1px solid var(--c-border); }
-.mb-status-tab {
-  padding: 9px 0;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--c-muted2);
-  border-bottom: 2px solid transparent;
-}
-.mb-status-tab.active { color: var(--c-blue); border-bottom-color: var(--c-blue); }
-.mb-status-badge {
-  display: inline-block;
-  margin-left: 4px;
-  padding: 1px 6px;
-  background: rgba(47,116,231,0.12);
-  color: var(--c-blue);
-  border-radius: 999px;
-  font-size: 9px;
-  font-weight: 800;
-}
-
-/* ───── Edit view mockup 전용 ───── */
-.mb-editnav {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 14px;
-  background: #fff;
-  border-bottom: 1px solid var(--c-border);
-}
-.mb-editnav-left { display: flex; align-items: center; gap: 8px; font-size: 11px; }
-.mb-editnav-back { color: var(--c-muted2); font-weight: 600; }
-.mb-edit-content { display: grid; grid-template-columns: 1fr 280px; gap: 10px; padding: 10px 12px 12px; background: var(--c-bg); min-height: 280px; }
-.mb-bomgrid { background: var(--c-s2); border: 1px solid var(--c-border); border-radius: 14px; overflow: hidden; }
-.mb-bomhead {
-  display: grid;
-  grid-template-columns: 32px 1fr 80px 90px 56px 28px;
-  gap: 6px;
-  padding: 8px 12px;
-  background: rgba(0,0,0,0.03);
-  border-bottom: 1px solid var(--c-border);
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--c-muted2);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-.mb-bomrow {
-  display: grid;
-  grid-template-columns: 32px 1fr 80px 90px 56px 28px;
-  gap: 6px;
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--c-border);
-  align-items: center;
-  font-size: 11px;
-}
-.mb-bomrow:last-child { border-bottom: none; }
-.mb-qty-btn {
-  background: rgba(47,116,231,0.08);
-  border: 1px solid rgba(47,116,231,0.18);
-  color: var(--c-blue);
-  border-radius: 6px;
-  padding: 2px 6px;
-  font-size: 10px;
-  font-weight: 700;
-  text-align: center;
-}
-.mb-x-btn {
-  width: 18px; height: 18px;
-  border-radius: 5px;
-  background: rgba(217,90,90,0.1);
-  color: var(--c-red);
-  font-size: 11px;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 800;
-}
-
-/* 우측 슬라이드 패널 */
-.mb-slide { background: var(--c-s2); border: 1px solid var(--c-border); border-radius: 14px; overflow: hidden; }
-.mb-slide-head { padding: 10px 12px; border-bottom: 1px solid var(--c-border); display: flex; justify-content: space-between; align-items: center; }
-.mb-cand {
-  padding: 8px 12px;
-  border-top: 1px solid var(--c-border);
-  font-size: 10px;
-}
-.mb-cand:first-child { border-top: none; }
-.mb-cand.selected { background: rgba(47,116,231,0.06); }
-.mb-cand-row { display: flex; align-items: center; gap: 6px; }
-.mb-qty-input {
-  background: rgba(47,116,231,0.04);
-  margin: 8px -12px -8px;
-  padding: 8px 12px;
-  border-top: 1px solid rgba(47,116,231,0.15);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 10px;
-}
-.mb-qty-field {
-  background: #fff;
-  border: 1px solid var(--c-border);
-  border-radius: 5px;
-  padding: 3px 6px;
-  width: 38px;
-  font-size: 10px;
-  text-align: center;
-  font-weight: 700;
-  color: var(--c-text);
-}
-
-/* ───── Review view mockup 전용 ───── */
-.mb-issue {
-  margin: 10px 14px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 11px;
-}
-.mb-issue.ok { background: rgba(23,159,114,0.07); border: 1px solid rgba(23,159,114,0.2); }
-.mb-issue.warn { background: rgba(185,134,25,0.07); border: 1px solid rgba(185,134,25,0.22); }
-.mb-issue.err { background: rgba(217,90,90,0.07); border: 1px solid rgba(217,90,90,0.22); }
-.mb-issue-icon {
-  width: 22px; height: 22px;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 800;
-  flex-shrink: 0;
-}
-.mb-issue.ok .mb-issue-icon { background: var(--c-green); color: #fff; }
-.mb-issue.warn .mb-issue-icon { background: var(--c-yellow); color: #fff; }
-.mb-issue.err .mb-issue-icon { background: var(--c-red); color: #fff; }
-.mb-issue-title { font-weight: 700; }
-.mb-issue.ok .mb-issue-title { color: var(--c-green); }
-.mb-issue.warn .mb-issue-title { color: var(--c-yellow); }
-.mb-issue.err .mb-issue-title { color: var(--c-red); }
-.mb-issue-desc { color: var(--c-muted2); margin-top: 2px; }
-
-/* ───── Hotspot (번호 표식) ───── */
-.hotspot {
+/* Hotspot pin */
+.pin {
   position: absolute;
-  width: 26px; height: 26px;
+  width: 28px; height: 28px;
   border-radius: 50%;
-  background: var(--c-blue);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 800;
+  background: var(--c-blue); color: #fff;
+  font-size: 14px; font-weight: 800;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 0 0 4px rgba(47,116,231,0.25), 0 4px 10px rgba(47,116,231,0.4);
+  box-shadow: 0 0 0 4px rgba(47,116,231,0.28), 0 4px 10px rgba(47,116,231,0.40);
   z-index: 10;
   font-family: Pretendard, sans-serif;
+  transform: translate(-50%, -50%);
   animation: pulseSpot 2.4s ease-in-out infinite;
 }
+.pin.warn   { background: var(--c-yellow); box-shadow: 0 0 0 4px rgba(185,134,25,0.28), 0 4px 10px rgba(185,134,25,0.40); }
+.pin.green  { background: var(--c-green);  box-shadow: 0 0 0 4px rgba(23,159,114,0.28), 0 4px 10px rgba(23,159,114,0.40); }
+.pin.red    { background: var(--c-red);    box-shadow: 0 0 0 4px rgba(217,90,90,0.28), 0 4px 10px rgba(217,90,90,0.40); }
 @keyframes pulseSpot {
-  0%, 100% { box-shadow: 0 0 0 4px rgba(47,116,231,0.25), 0 4px 10px rgba(47,116,231,0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(47,116,231,0.12), 0 4px 10px rgba(47,116,231,0.4); }
+  0%, 100% { box-shadow: 0 0 0 4px rgba(47,116,231,0.28), 0 4px 10px rgba(47,116,231,0.40); }
+  50%      { box-shadow: 0 0 0 9px rgba(47,116,231,0.12), 0 4px 10px rgba(47,116,231,0.40); }
+}
+.shot-caption {
+  font-size: 12px; color: var(--c-muted2);
+  margin-top: 6px; text-align: center;
+  font-style: italic;
 }
 
-/* ───── Callout grid (번호 설명) ───── */
-.callouts {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
-  margin-top: 24px;
-}
+/* Callout grid */
+.callouts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 24px; }
 .callout {
-  display: flex;
-  gap: 12px;
+  display: flex; gap: 12px;
   padding: 16px 18px;
   background: var(--c-s1);
   border: 1px solid var(--c-border);
@@ -537,25 +179,33 @@ a:hover { text-decoration: underline; }
 }
 .callout-num {
   flex-shrink: 0;
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  background: var(--c-blue);
-  color: #fff;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--c-blue); color: #fff;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 800;
-  font-size: 14px;
+  font-weight: 800; font-size: 14px;
 }
+.callout-num.warn  { background: var(--c-yellow); }
+.callout-num.green { background: var(--c-green); }
+.callout-num.red   { background: var(--c-red); }
 .callout-body { flex: 1; }
 .callout-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
 .callout-desc { font-size: 13px; color: var(--c-muted2); line-height: 1.6; }
-
-/* ───── Quick start cards ───── */
-.qs-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-  margin-top: 24px;
+.kbd {
+  display: inline-block;
+  padding: 2px 7px;
+  margin: 0 2px;
+  background: var(--c-s1);
+  border: 1px solid var(--c-border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--c-text);
 }
+
+/* Quick start cards */
+.qs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 24px; }
 .qs-card {
   background: var(--c-s1);
   border: 1px solid var(--c-border);
@@ -566,28 +216,25 @@ a:hover { text-decoration: underline; }
 .qs-step-num {
   position: absolute;
   top: 12px; left: 12px;
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  background: var(--c-blue);
-  color: #fff;
-  font-weight: 800;
-  font-size: 14px;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--c-blue); color: #fff;
+  font-weight: 800; font-size: 14px;
   display: flex; align-items: center; justify-content: center;
   z-index: 5;
   box-shadow: 0 2px 6px rgba(47,116,231,0.3);
 }
 .qs-thumb {
-  height: 130px;
-  background: var(--c-bg);
-  position: relative;
-  overflow: hidden;
+  height: 130px; background: var(--c-bg);
+  position: relative; overflow: hidden;
   border-bottom: 1px solid var(--c-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 38px;
 }
 .qs-body { padding: 14px 16px 16px; }
 .qs-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
 .qs-desc { font-size: 12px; color: var(--c-muted2); line-height: 1.55; }
 
-/* ───── Scenario step ───── */
+/* Scenario */
 .scenario {
   background: var(--c-s1);
   border: 1px solid var(--c-border);
@@ -596,925 +243,526 @@ a:hover { text-decoration: underline; }
   margin-bottom: 22px;
 }
 .scenario-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  color: var(--c-blue);
-  background: rgba(47,116,231,0.08);
-  padding: 4px 10px;
-  border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: rgba(47,116,231,0.1); color: var(--c-blue);
+  padding: 4px 10px; border-radius: 999px;
   margin-bottom: 10px;
 }
-.scenario-title { font-size: 20px; font-weight: 800; margin-bottom: 6px; }
-.scenario-sub { font-size: 13px; color: var(--c-muted2); margin-bottom: 18px; }
-.steplist { display: flex; flex-direction: column; gap: 14px; }
+.scenario-title { font-size: 19px; font-weight: 800; margin-bottom: 4px; }
+.scenario-sub   { font-size: 13px; color: var(--c-muted2); margin-bottom: 18px; }
+
+.steplist { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
 .steprow {
-  display: grid;
-  grid-template-columns: 32px 1fr;
-  gap: 14px;
-  align-items: flex-start;
-  padding: 12px 0;
-  border-top: 1px solid var(--c-border);
-}
-.steprow:first-child { border-top: none; padding-top: 0; }
-.steprow-num {
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  background: rgba(47,116,231,0.1);
-  color: var(--c-blue);
-  font-weight: 800;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px;
-  margin-top: 2px;
-}
-.steprow-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
-.steprow-desc { font-size: 13px; color: var(--c-muted2); line-height: 1.65; }
-
-/* ───── 인포 박스 ───── */
-.box {
+  display: flex; gap: 14px;
+  padding: 14px 16px;
+  background: var(--c-bg);
   border-radius: 14px;
-  padding: 14px 18px;
-  font-size: 13px;
-  line-height: 1.65;
-  margin: 14px 0;
-  display: flex;
-  gap: 12px;
 }
-.box-icon {
-  width: 22px; height: 22px;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 800;
-  font-size: 12px;
+.steprow-num {
   flex-shrink: 0;
-  margin-top: 1px;
-}
-.box-body { color: var(--c-muted2); }
-.box-body strong { color: var(--c-text); display: block; margin-bottom: 2px; }
-.box.tip { background: rgba(47,116,231,0.06); border: 1px solid rgba(47,116,231,0.18); }
-.box.tip .box-icon { background: var(--c-blue); color: #fff; }
-.box.warn { background: rgba(185,134,25,0.06); border: 1px solid rgba(185,134,25,0.2); }
-.box.warn .box-icon { background: var(--c-yellow); color: #fff; }
-.box.ok { background: rgba(23,159,114,0.06); border: 1px solid rgba(23,159,114,0.2); }
-.box.ok .box-icon { background: var(--c-green); color: #fff; }
-.box.danger { background: rgba(217,90,90,0.06); border: 1px solid rgba(217,90,90,0.2); }
-.box.danger .box-icon { background: var(--c-red); color: #fff; }
-
-/* ───── 부서 색상 표 ───── */
-.dept-table { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
-.dept-card {
-  display: flex; align-items: center; gap: 10px;
-  background: var(--c-s1);
-  border: 1px solid var(--c-border);
-  border-radius: 12px;
-  padding: 12px 14px;
-  font-size: 13px;
-}
-.dept-circle { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 3px rgba(0,0,0,0.04); }
-.dept-card-key { font-weight: 800; font-size: 14px; }
-.dept-card-name { font-size: 12px; color: var(--c-muted2); }
-
-/* ───── 검증 오류 카드 ───── */
-.err-card {
-  background: var(--c-s1);
-  border: 1px solid var(--c-border);
-  border-radius: 18px;
-  padding: 22px 24px;
-  margin-bottom: 14px;
-}
-.err-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-.err-icon-big {
-  width: 32px; height: 32px;
-  border-radius: 50%;
-  background: rgba(217,90,90,0.12);
-  color: var(--c-red);
-  font-weight: 800;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--c-blue); color: #fff;
+  font-weight: 800; font-size: 13px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 14px;
 }
-.err-title { font-size: 16px; font-weight: 800; }
-.err-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-.err-block-label { font-size: 11px; font-weight: 700; color: var(--c-muted2); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
-.err-block-text { font-size: 13px; color: var(--c-text); line-height: 1.65; }
+.steprow-title { font-size: 14px; font-weight: 600; line-height: 1.55; }
+.steprow-desc  { font-size: 13px; color: var(--c-muted2); margin-top: 3px; line-height: 1.6; }
 
-/* ───── FAQ ───── */
-.faq-item {
+/* Box (info / warn) */
+.box {
+  display: flex; gap: 12px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  margin-top: 14px;
+}
+.box.info { background: rgba(47,116,231,0.06); border: 1px solid rgba(47,116,231,0.18); }
+.box.warn { background: rgba(185,134,25,0.07); border: 1px solid rgba(185,134,25,0.22); }
+.box.ok   { background: rgba(23,159,114,0.07); border: 1px solid rgba(23,159,114,0.20); }
+.box-icon {
+  flex-shrink: 0;
+  width: 24px; height: 24px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; color: #fff;
+}
+.box.info .box-icon { background: var(--c-blue); }
+.box.warn .box-icon { background: var(--c-yellow); }
+.box.ok   .box-icon { background: var(--c-green); }
+.box-body { flex: 1; font-size: 14px; line-height: 1.65; }
+.box-body strong { color: var(--c-text); }
+
+/* Error encyclopedia */
+.errorlist { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.errcard {
   background: var(--c-s1);
   border: 1px solid var(--c-border);
   border-radius: 16px;
-  padding: 18px 22px;
+  padding: 18px 20px;
+}
+.errcard-head {
+  display: flex; align-items: center; gap: 8px;
   margin-bottom: 10px;
 }
-.faq-q { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
-.faq-q-mark {
-  width: 22px; height: 22px;
-  border-radius: 50%;
-  background: var(--c-blue);
-  color: #fff;
-  font-weight: 800;
-  font-size: 12px;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+.errcard-tag {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.06em;
+  padding: 3px 9px; border-radius: 999px;
+  text-transform: uppercase;
 }
-.faq-q-text { font-weight: 700; font-size: 14px; padding-top: 1px; }
-.faq-a {
-  font-size: 13px;
-  color: var(--c-muted2);
-  line-height: 1.7;
-  padding-left: 32px;
+.errcard-tag.err  { background: rgba(217,90,90,0.12); color: var(--c-red); }
+.errcard-tag.warn { background: rgba(185,134,25,0.14); color: var(--c-yellow); }
+.errcard-title { font-size: 15px; font-weight: 700; }
+.errcard-desc  { font-size: 13px; color: var(--c-muted2); line-height: 1.65; margin-bottom: 8px; }
+.errcard-fix   {
+  font-size: 13px; color: var(--c-text); line-height: 1.65;
+  background: var(--c-bg); border-radius: 10px;
+  padding: 8px 12px;
 }
 
-/* ───── PC 이동 다이어그램 ───── */
-.pcflow {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr auto 1fr;
-  gap: 14px;
-  align-items: center;
-  margin: 24px 0 18px;
-}
-.pcnode {
+/* FAQ accordion */
+.faq { display: flex; flex-direction: column; gap: 10px; }
+.faq details {
   background: var(--c-s1);
   border: 1px solid var(--c-border);
-  border-radius: 16px;
-  padding: 18px 14px;
-  text-align: center;
+  border-radius: 14px;
+  padding: 4px 0;
 }
-.pcnode-icon {
-  width: 44px; height: 44px;
-  border-radius: 12px;
-  background: rgba(47,116,231,0.1);
-  color: var(--c-blue);
-  display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 8px;
-  font-size: 22px;
+.faq summary {
+  cursor: pointer; list-style: none;
+  padding: 14px 20px;
+  font-size: 15px; font-weight: 700;
+  display: flex; justify-content: space-between; align-items: center;
 }
-.pcnode-title { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
-.pcnode-sub { font-size: 11px; color: var(--c-muted2); }
-.pcarrow { color: var(--c-muted); font-size: 22px; font-weight: 300; }
-
-/* ───── Footer ───── */
-footer {
-  text-align: center;
-  margin-top: 48px;
-  padding-top: 28px;
-  border-top: 1px solid var(--c-border);
-  font-size: 12px;
-  color: var(--c-muted);
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after {
+  content: "+"; font-size: 20px; color: var(--c-muted2);
+  transition: transform 200ms;
+}
+.faq details[open] summary::after { content: "−"; }
+.faq .faq-body {
+  padding: 0 20px 16px;
+  font-size: 14px; color: var(--c-muted2); line-height: 1.7;
 }
 
-/* ───── 모바일 대응 ───── */
-@media (max-width: 720px) {
-  .page { padding: 24px 14px 60px; }
-  .hero { padding: 28px 22px; border-radius: 22px; }
-  .hero h1 { font-size: 24px; }
-  .hero-sub { font-size: 14px; }
-  .toc-grid { grid-template-columns: 1fr; }
-  .qs-grid { grid-template-columns: 1fr; }
-  .callouts { grid-template-columns: 1fr; }
-  .dept-table { grid-template-columns: repeat(2, 1fr); }
-  .err-grid { grid-template-columns: 1fr; }
-  .pcflow { grid-template-columns: 1fr; }
-  .pcarrow { transform: rotate(90deg); justify-self: center; }
-  .scenario { padding: 20px 18px; }
-  .section h2 { font-size: 22px; }
-  .mockup { font-size: 11px; }
-  .mb-content { grid-template-columns: 1fr; }
-  .mb-edit-content { grid-template-columns: 1fr; }
-  .mb-stats { grid-template-columns: repeat(2, 1fr); }
+/* Print */
+@media print {
+  body { background: #fff; font-size: 12px; }
+  .page { max-width: none; padding: 0; }
+  .hero, .toc, .qs-card, .callout, .scenario, .errcard, .shot {
+    box-shadow: none !important; page-break-inside: avoid;
+  }
+  .pin { animation: none; }
+  .section { page-break-after: auto; }
+}
+
+/* Responsive */
+@media (max-width: 760px) {
+  .page { padding: 32px 16px 60px; }
+  .hero { padding: 32px 24px; border-radius: 22px; }
+  .hero h1 { font-size: 26px; }
+  .toc-grid, .callouts, .errorlist { grid-template-columns: 1fr; }
+  .qs-grid { grid-template-columns: 1fr 1fr; }
+  .shot { border-radius: 12px; }
+  .pin { width: 22px; height: 22px; font-size: 11px; }
 }
 </style>
 </head>
 <body>
+
 <div class="page">
 
-<!-- ════════════════════════════════════════════════════════════
-     Hero
-     ════════════════════════════════════════════════════════════ -->
-<div class="hero" id="top">
-  <div class="hero-eyebrow">DEXCOWIN MES · 사용 설명서 v1</div>
+<!-- ════════════ Hero ════════════ -->
+<section class="hero">
+  <div class="hero-eyebrow">DEXCOWIN MES · 사용 설명서</div>
   <h1>BOM 세팅 도구<br>사용 설명서</h1>
   <p class="hero-sub">
-    이 도구는 각 완제품·반제품에 필요한 부품 목록(BOM, Bill of Materials)을 처음 세팅할 때 쓰는
-    오프라인 도구입니다. 인터넷이나 서버 없이 파일만 열면 바로 사용할 수 있고, 작업 내용은 자동으로 저장됩니다.
-    이 설명서는 <strong>처음 사용하시는 분도 화면을 그대로 보고 따라할 수 있도록</strong> 만들어졌습니다.
+    부서별 품목의 BOM(Bill of Materials, 자재명세서)을 단계별로 입력하고,
+    검증 후 안전하게 내보내는 오프라인 도구입니다.
+    설치·로그인 없이 <strong>HTML 파일 더블클릭</strong> 한 번이면 시작합니다.
+    <br><br>
+    이 설명서는 <strong>실제 화면 캡쳐</strong>를 기준으로 작성됐습니다.
+    화면에 보이는 것과 다르면 도구가 더 새 버전입니다.
   </p>
-  <a href="#quickstart" class="hero-cta">5분 빠른 시작 →</a>
-  <a href="bom_setup.html" class="hero-cta-ghost">도구 바로 열기</a>
+  <a class="hero-cta" href="bom_setup.html">📂 도구 열기 →</a>
+  <a class="hero-cta-ghost" href="#quickstart">🚀 5분 빠른 시작</a>
 
   <div class="toc">
     <div class="toc-label">목차</div>
     <div class="toc-grid">
-      <a href="#quickstart" class="toc-item"><span class="toc-num">1</span>5분 빠른 시작</a>
-      <a href="#tour" class="toc-item"><span class="toc-num">2</span>화면 둘러보기</a>
-      <a href="#scenarios" class="toc-item"><span class="toc-num">3</span>시나리오별 따라하기</a>
-      <a href="#datasafety" class="toc-item"><span class="toc-num">4</span>저장 · 백업 · PC 이동</a>
-      <a href="#errors" class="toc-item"><span class="toc-num">5</span>검증 오류 도감</a>
-      <a href="#shortcuts" class="toc-item"><span class="toc-num">6</span>마우스 · 키보드 동작</a>
-      <a href="#faq" class="toc-item"><span class="toc-num">7</span>자주 묻는 질문</a>
-      <a href="#trouble" class="toc-item"><span class="toc-num">8</span>문제 해결</a>
+      <a class="toc-item" href="#quickstart"><span class="toc-num">1</span>5분 빠른 시작</a>
+      <a class="toc-item" href="#screens"><span class="toc-num">2</span>화면 둘러보기</a>
+      <a class="toc-item" href="#scenarios"><span class="toc-num">3</span>시나리오별 따라하기</a>
+      <a class="toc-item" href="#datasafety"><span class="toc-num">4</span>저장·백업·PC 이동</a>
+      <a class="toc-item" href="#errors"><span class="toc-num">5</span>검증 오류 도감</a>
+      <a class="toc-item" href="#shortcuts"><span class="toc-num">6</span>마우스·키보드 동작</a>
+      <a class="toc-item" href="#faq"><span class="toc-num">7</span>자주 묻는 질문</a>
+      <a class="toc-item" href="#troubleshoot"><span class="toc-num">8</span>문제 해결</a>
     </div>
   </div>
-</div>
+</section>
 
-<!-- ════════════════════════════════════════════════════════════
-     1. 빠른 시작
-     ════════════════════════════════════════════════════════════ -->
+<!-- ════════════ 1. 빠른 시작 ════════════ -->
 <section class="section" id="quickstart">
   <div class="section-head">
     <div class="section-eyebrow"><span class="section-eyebrow-num">1</span>빠른 시작</div>
     <h2>5분 안에 첫 BOM 만들기</h2>
-    <p class="section-desc">
-      자세한 설명을 읽기 전에, 전체 흐름이 어떻게 흘러가는지 먼저 보여드립니다. 이 4단계만 따라하시면 됩니다.
-    </p>
+    <p class="section-desc">아래 4단계만 따라 하면 BOM 한 건이 완성됩니다. 자세한 설명은 다음 섹션부터 이어집니다.</p>
   </div>
-
   <div class="qs-grid">
-    <!-- step 1 -->
     <div class="qs-card">
       <div class="qs-step-num">1</div>
-      <div class="qs-thumb" style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;">
-        <div style="width:60px;height:50px;background:#fff;border:1px solid var(--c-border);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:24px;">📄</div>
-        <div style="font-size:10px;color:var(--c-muted);font-family:ui-monospace,monospace;">bom_setup.html</div>
-      </div>
+      <div class="qs-thumb">📂</div>
       <div class="qs-body">
         <div class="qs-title">파일 더블클릭</div>
-        <div class="qs-desc">탐색기에서 <code>bom_setup.html</code>을 더블클릭하면 브라우저에서 열립니다.</div>
+        <div class="qs-desc"><code>bom_setup.html</code>을 더블클릭. 기본 브라우저(Chrome / Edge)에서 자동으로 열립니다.</div>
       </div>
     </div>
-    <!-- step 2 -->
     <div class="qs-card">
       <div class="qs-step-num">2</div>
-      <div class="qs-thumb">
-        <div style="position:absolute;inset:8px;background:var(--c-s2);border-radius:8px;padding:6px;">
-          <div style="display:flex;gap:3px;margin-bottom:4px;">
-            <div style="background:var(--dept-A);color:#fff;font-size:8px;padding:2px 6px;border-radius:5px;font-weight:700;">A 조립</div>
-            <div style="background:var(--c-s1);color:var(--c-muted2);font-size:8px;padding:2px 6px;border-radius:5px;font-weight:700;border:1px solid var(--c-border);">P 출하</div>
-          </div>
-          <div style="background:rgba(47,116,231,0.08);border-radius:5px;padding:5px 6px;font-size:9px;color:var(--c-blue);font-weight:700;">▸ 진단킷 본체</div>
-          <div style="padding:5px 6px;font-size:9px;color:var(--c-muted);">  형광튜브 어셈블리</div>
-          <div style="padding:5px 6px;font-size:9px;color:var(--c-muted);">  센서 모듈</div>
-        </div>
-      </div>
+      <div class="qs-thumb">🎯</div>
       <div class="qs-body">
         <div class="qs-title">상위 품목 클릭</div>
-        <div class="qs-desc">왼쪽 목록에서 BOM을 만들 품목을 클릭합니다.</div>
+        <div class="qs-desc">부서 탭 선택 → 좌측 리스트에서 BOM 만들 품목 클릭 → 편집 화면으로 진입.</div>
       </div>
     </div>
-    <!-- step 3 -->
     <div class="qs-card">
       <div class="qs-step-num">3</div>
-      <div class="qs-thumb">
-        <div style="position:absolute;inset:8px;background:var(--c-s2);border-radius:8px;padding:6px;display:flex;flex-direction:column;gap:4px;">
-          <div style="background:#fff;border:1px solid var(--c-border);border-radius:5px;padding:4px 6px;font-size:9px;color:var(--c-muted);">🔍 부품 검색</div>
-          <div style="background:rgba(47,116,231,0.08);border:1px solid rgba(47,116,231,0.2);border-radius:5px;padding:5px 6px;font-size:9px;">선택된 부품</div>
-          <div style="display:flex;gap:4px;align-items:center;">
-            <div style="font-size:8px;color:var(--c-muted);">소요량</div>
-            <div style="background:#fff;border:1px solid var(--c-border);border-radius:4px;padding:2px 5px;font-size:9px;font-weight:700;">2</div>
-            <div style="background:var(--c-blue);color:#fff;font-size:9px;padding:3px 8px;border-radius:5px;font-weight:700;">추가</div>
-          </div>
-        </div>
-      </div>
+      <div class="qs-thumb">➕</div>
       <div class="qs-body">
-        <div class="qs-title">부품 추가</div>
-        <div class="qs-desc">오른쪽 패널에서 부품을 고르고 소요량을 적은 뒤 <strong>추가</strong>를 누릅니다.</div>
+        <div class="qs-title">하위 품목 추가</div>
+        <div class="qs-desc">우측 후보에서 부품 클릭 → 소요량 입력 → "추가" 버튼. 필요한 만큼 반복.</div>
       </div>
     </div>
-    <!-- step 4 -->
     <div class="qs-card">
       <div class="qs-step-num">4</div>
-      <div class="qs-thumb" style="display:flex;align-items:center;justify-content:center;">
-        <div style="background:var(--c-green);color:#fff;font-size:13px;padding:10px 20px;border-radius:10px;font-weight:800;box-shadow:0 6px 18px rgba(23,159,114,0.4);">✓ 완료로 표시</div>
-      </div>
+      <div class="qs-thumb">✓</div>
       <div class="qs-body">
         <div class="qs-title">완료로 표시</div>
-        <div class="qs-desc">검토 화면에서 <strong>완료로 표시</strong>를 누르면 해당 품목 BOM이 마감됩니다.</div>
+        <div class="qs-desc">우상단 "검토 · 완료 →" → 검증 통과 → "완료로 표시". 자동 저장됩니다.</div>
       </div>
     </div>
   </div>
-
-  <div class="box tip">
-    <div class="box-icon">!</div>
+  <div class="box info">
+    <div class="box-icon">i</div>
     <div class="box-body">
-      <strong>모든 입력은 자동으로 저장됩니다.</strong>
-      작업 도중 실수로 창을 닫아도, 같은 PC·같은 브라우저에서 다시 열면 그대로 복원됩니다.
-      다른 PC로 옮길 때만 "진행도 저장" 파일이 추가로 필요합니다 (4번 항목 참고).
+      <strong>중요:</strong> 작업 내용은 브라우저에 자동저장되지만, <strong>다른 PC로 이동</strong>하거나 <strong>최종 결과 정리</strong>가 필요하면 우상단의 <strong>"진행도 저장"</strong>(JSON 다운로드) 버튼을 사용하세요. 자세한 내용은 <a href="#datasafety">4. 저장·백업·PC 이동</a> 섹션을 참고하세요.
     </div>
   </div>
 </section>
 
-
-<!-- ════════════════════════════════════════════════════════════
-     2. 화면 둘러보기
-     ════════════════════════════════════════════════════════════ -->
-<section class="section" id="tour">
+<!-- ════════════ 2. 화면 둘러보기 ════════════ -->
+<section class="section" id="screens">
   <div class="section-head">
     <div class="section-eyebrow"><span class="section-eyebrow-num">2</span>화면 둘러보기</div>
     <h2>화면 구성 한눈에 보기</h2>
-    <p class="section-desc">
-      이 도구는 화면이 3개뿐입니다 — <strong>메인 화면</strong>, <strong>편집 화면</strong>, <strong>검토 화면</strong>.
-      각 화면을 실제 모습 그대로 보여드리고, 어떤 버튼이 무엇을 하는지 번호 표시로 알려드립니다.
-    </p>
+    <p class="section-desc">도구는 <strong>메인 / 편집 / 검토</strong> 3개의 화면으로 구성됩니다. 각 화면의 어떤 부분이 무슨 역할을 하는지 번호와 함께 살펴봅시다.</p>
   </div>
 
-  <!-- ───── 2-1. 메인 화면 ───── -->
+  <!-- 2-1. 메인 화면 -->
   <h3>2-1. 메인 화면 — 작업할 품목 고르기</h3>
-  <p style="font-size:14px;color:var(--c-muted2);">파일을 열면 가장 먼저 보이는 화면입니다. 부서를 고르고, 어떤 품목의 BOM을 만들지 선택합니다.</p>
-
-  <div class="mockup">
-    <div class="mockup-chrome">
-      <div class="mockup-dot r"></div><div class="mockup-dot y"></div><div class="mockup-dot g"></div>
-      <div class="mockup-url">📁 file:///C:/ERP/outputs/bom_setup/bom_setup.html</div>
+  <div class="shot">
+    <div class="shot-chrome">
+      <span class="shot-dot r"></span><span class="shot-dot y"></span><span class="shot-dot g"></span>
+      <span class="shot-url">bom_setup.html — 메인 화면</span>
     </div>
-    <div class="mockup-body">
-      <!-- 앱바 -->
-      <div class="mb-appbar">
-        <div class="mb-appbar-left">
-          <span class="mb-brand">DEXCOWIN MES</span>
-          <span class="mb-divider">›</span>
-          <span class="mb-title">BOM 세팅 도구</span>
-          <span class="mb-count">722개 품목</span>
-        </div>
-        <div class="mb-appbar-right">
-          <span class="mb-tag info">3건 미완료</span>
-          <span class="mb-tag success">12개 완료</span>
-          <span class="mb-savedot">자동저장됨 14:23:15</span>
-          <span class="mb-btn">진행도 불러오기</span>
-          <span class="mb-btn">진행도 저장</span>
-          <span class="mb-btn success">BOM 내보내기</span>
-        </div>
-      </div>
-      <!-- 부서 탭 -->
-      <div class="mb-depts">
-        <div class="mb-dept" style="background:var(--dept-T);color:#fff;border-color:var(--dept-T);"><span class="mb-dept-dot" style="background:rgba(255,255,255,0.7);"></span>T 진단킷</div>
-        <div class="mb-dept"><span class="mb-dept-dot" style="background:var(--dept-H);"></span>H 핸들부</div>
-        <div class="mb-dept"><span class="mb-dept-dot" style="background:var(--dept-V);"></span>V 비전</div>
-        <div class="mb-dept"><span class="mb-dept-dot" style="background:var(--dept-N);"></span>N 신규</div>
-        <div class="mb-dept active" style="background:var(--dept-A);border-color:var(--dept-A);"><span class="mb-dept-dot" style="background:rgba(255,255,255,0.7);"></span>A 조립</div>
-        <div class="mb-dept"><span class="mb-dept-dot" style="background:var(--dept-P);"></span>P 출하</div>
-      </div>
-      <!-- 통계 카드 -->
-      <div class="mb-stats">
-        <div class="mb-stat"><div class="mb-stat-label">전체</div><div class="mb-stat-value" style="color:var(--c-blue);">120</div></div>
-        <div class="mb-stat"><div class="mb-stat-label">완료</div><div class="mb-stat-value" style="color:var(--c-green);">12</div></div>
-        <div class="mb-stat"><div class="mb-stat-label">작업 중</div><div class="mb-stat-value" style="color:var(--c-yellow);">3</div></div>
-        <div class="mb-stat"><div class="mb-stat-label">미착수</div><div class="mb-stat-value" style="color:var(--c-muted2);">105</div></div>
-      </div>
-      <!-- 좌우 패널 -->
-      <div class="mb-content">
-        <!-- 좌측 -->
-        <div class="mb-panel">
-          <div class="mb-panel-head">
-            <div class="mb-panel-label">상위 품목 선택</div>
-            <div class="mb-panel-sub">조립부 · 4/120건 표시</div>
-          </div>
-          <input class="mb-input" placeholder="품목명 / 코드 검색">
-          <div class="mb-chips">
-            <span class="mb-chip active">전체</span>
-            <span class="mb-chip">완성품</span>
-            <span class="mb-chip">중간</span>
-            <span class="mb-chip">원자재</span>
-          </div>
-          <div class="mb-itemlist">
-            <div class="mb-item selected">
-              <span class="mb-pt" style="background:var(--dept-A);">AS</span>
-              <div style="flex:1;min-width:0;">
-                <div class="mb-item-name">진단킷 본체 V2</div>
-                <div class="mb-item-code">7-AS-0023</div>
-              </div>
-              <span class="mb-item-tag" style="background:rgba(47,116,231,0.12);color:var(--c-blue);">+5 대기</span>
-            </div>
-            <div class="mb-item">
-              <span class="mb-pt" style="background:var(--dept-A);">AS</span>
-              <div style="flex:1;min-width:0;">
-                <div class="mb-item-name">검사용 어셈블리</div>
-                <div class="mb-item-code">7-AS-0024</div>
-              </div>
-              <span class="mb-item-tag" style="background:rgba(23,159,114,0.12);color:var(--c-green);">완료</span>
-            </div>
-            <div class="mb-item">
-              <span class="mb-pt" style="background:var(--dept-A);">AS</span>
-              <div style="flex:1;min-width:0;">
-                <div class="mb-item-name">캘리브레이션 모듈</div>
-                <div class="mb-item-code">7-AS-0025</div>
-              </div>
-              <span class="mb-item-tag" style="background:rgba(0,0,0,0.06);color:var(--c-muted2);">미착수</span>
-            </div>
-            <div class="mb-item">
-              <span class="mb-pt" style="background:var(--dept-A);">AS</span>
-              <div style="flex:1;min-width:0;">
-                <div class="mb-item-name">통신 보드 어셈블리</div>
-                <div class="mb-item-code">7-AS-0026</div>
-              </div>
-              <span class="mb-item-tag" style="background:rgba(0,0,0,0.06);color:var(--c-muted2);">미착수</span>
-            </div>
-          </div>
-        </div>
-        <!-- 우측 -->
-        <div class="mb-panel">
-          <div class="mb-status-tabs">
-            <div class="mb-status-tab">미착수<span class="mb-status-badge" style="background:rgba(0,0,0,0.06);color:var(--c-muted2);">105</span></div>
-            <div class="mb-status-tab active">작업 중<span class="mb-status-badge">3</span></div>
-            <div class="mb-status-tab">완료<span class="mb-status-badge" style="background:rgba(23,159,114,0.12);color:var(--c-green);">12</span></div>
-          </div>
-          <div class="mb-itemlist" style="padding:8px 0;">
-            <div class="mb-item">
-              <span class="mb-pt" style="background:var(--dept-A);">AS</span>
-              <div style="flex:1;min-width:0;">
-                <div class="mb-item-name">진단킷 본체 V2</div>
-                <div class="mb-item-code">7-AS-0023 · 5건 추가됨</div>
-              </div>
-            </div>
-            <div class="mb-item">
-              <span class="mb-pt" style="background:var(--dept-A);">AS</span>
-              <div style="flex:1;min-width:0;">
-                <div class="mb-item-name">소형 진단 베이스</div>
-                <div class="mb-item-code">7-AS-0030 · 2건 추가됨</div>
-              </div>
-            </div>
-            <div class="mb-item">
-              <span class="mb-pt" style="background:var(--dept-A);">AS</span>
-              <div style="flex:1;min-width:0;">
-                <div class="mb-item-name">대형 진단 베이스</div>
-                <div class="mb-item-code">7-AS-0031 · 7건 추가됨</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- 핫스팟 -->
-      <div class="hotspot" style="top:8px; left:50%;">⑥</div>
-      <div class="hotspot" style="top:54px; left:188px;">①</div>
-      <div class="hotspot" style="top:108px; left:14px;">②</div>
-      <div class="hotspot" style="top:212px; left:14px;">③</div>
-      <div class="hotspot" style="top:308px; left:60px;">④</div>
-      <div class="hotspot" style="top:204px; left:60%;">⑤</div>
+    <div class="shot-body">
+      <img src="_screens/main.png" alt="메인 화면">
+      <div class="pin" style="top:9.7%;  left:3.5%;">1</div>
+      <div class="pin" style="top:17.5%; left:13.5%;">2</div>
+      <div class="pin" style="top:24.5%; left:40%;">3</div>
+      <div class="pin" style="top:24.5%; left:88%;">4</div>
+      <div class="pin" style="top:38.5%; left:50%;">5</div>
+      <div class="pin" style="top:3.2%;  left:96.5%;">6</div>
+      <div class="pin warn" style="top:96.5%; left:96.5%;">7</div>
     </div>
   </div>
+  <p class="shot-caption">화면 위 파란 동그라미가 가리키는 위치는 아래 설명과 번호가 같습니다.</p>
 
   <div class="callouts">
     <div class="callout">
-      <div class="callout-num">①</div>
+      <div class="callout-num">1</div>
       <div class="callout-body">
-        <div class="callout-title">부서 탭</div>
-        <div class="callout-desc">T 진단킷 / H 핸들부 / V 비전 / N 신규 / A 조립 / P 출하 — 클릭한 부서의 품목만 화면에 표시됩니다. 활성 탭은 부서 색상으로 강조됩니다.</div>
+        <div class="callout-title">부서 탭 (튜브 / 고압 / 진공 / 튜닝 / 조립 / 출하)</div>
+        <div class="callout-desc">한 번에 한 부서씩 작업합니다. 탭을 바꾸면 화면 전체가 그 부서의 품목으로 갱신됩니다.</div>
       </div>
     </div>
     <div class="callout">
-      <div class="callout-num">②</div>
+      <div class="callout-num">2</div>
       <div class="callout-body">
-        <div class="callout-title">통계 카드 (4개)</div>
-        <div class="callout-desc">선택한 부서의 전체 / 완료 / 작업 중 / 미착수 품목 수가 표시됩니다. 진행 상황을 한눈에 확인할 수 있습니다.</div>
+        <div class="callout-title">통계 카드 4개</div>
+        <div class="callout-desc">현재 부서의 <strong>전체 / 완료 / 작업 중 / 미착수</strong> 품목 수. 진행 상황을 한눈에 파악합니다.</div>
       </div>
     </div>
     <div class="callout">
-      <div class="callout-num">③</div>
+      <div class="callout-num">3</div>
       <div class="callout-body">
-        <div class="callout-title">검색 + 필터 칩</div>
-        <div class="callout-desc">품목명이나 코드(예: 7-AS-0023)로 검색하거나, "완성품 / 중간 / 원자재" 칩으로 좁혀볼 수 있습니다.</div>
+        <div class="callout-title">검색창</div>
+        <div class="callout-desc">품목명 또는 ERP 코드로 즉시 필터링. 띄어쓰기 없이 일부만 입력해도 됩니다.</div>
       </div>
     </div>
     <div class="callout">
-      <div class="callout-num">④</div>
+      <div class="callout-num">4</div>
+      <div class="callout-body">
+        <div class="callout-title">단계 필터 (전체 / 중간공정 / 공정완료)</div>
+        <div class="callout-desc">완성품(F)·중간(A)·원자재(R) 단계별로 좁혀 봅니다. 끝의 "고압 · 19건"은 현재 표시 중인 건수.</div>
+      </div>
+    </div>
+    <div class="callout">
+      <div class="callout-num">5</div>
       <div class="callout-body">
         <div class="callout-title">상위 품목 리스트</div>
-        <div class="callout-desc">각 행에 공정 코드 뱃지(AS, TR 등) + 품목명 + ERP 코드 + 상태 태그(완료 / N건 대기 / 미착수). 클릭하면 편집 화면으로 이동합니다.</div>
+        <div class="callout-desc">한 행이 한 품목입니다. 행을 클릭하면 그 품목의 편집 화면으로 들어갑니다. 우측 태그로 <strong>미착수 / 작업 중 / 완료</strong> 상태가 표시됩니다.</div>
       </div>
     </div>
     <div class="callout">
-      <div class="callout-num">⑤</div>
+      <div class="callout-num">6</div>
       <div class="callout-body">
-        <div class="callout-title">상태 탭 (미착수 / 작업 중 / 완료)</div>
-        <div class="callout-desc">우측 패널에서 같은 부서의 품목을 상태별로 볼 수 있습니다. "완료" 탭에서 클릭하면 다시 수정할 수 있습니다.</div>
+        <div class="callout-title">상단 앱바 ("저장 내역 없음" / "진행도 저장")</div>
+        <div class="callout-desc">왼쪽엔 자동저장 시각, 오른쪽엔 수동 백업·불러오기·내보내기 버튼이 모입니다.</div>
       </div>
     </div>
     <div class="callout">
-      <div class="callout-num">⑥</div>
+      <div class="callout-num warn">7</div>
       <div class="callout-body">
-        <div class="callout-title">상단 앱바</div>
-        <div class="callout-desc">자동저장 시각, 진행도 불러오기/저장, BOM 내보내기 버튼이 항상 보입니다. 완료 항목이 1건 이상일 때만 "BOM 내보내기"가 나타납니다.</div>
+        <div class="callout-title">미배치 원자재 (접이식)</div>
+        <div class="callout-desc">현재 부서의 원자재(R 단계) 중 <strong>아직 어떤 BOM의 자식으로도 추가되지 않은 부품</strong>의 수입니다. 빨간 숫자면 누락된 부품이 있다는 뜻 — 클릭하면 펼쳐서 목록을 확인할 수 있습니다.</div>
       </div>
     </div>
   </div>
 
-  <h4>부서 색상</h4>
-  <div class="dept-table">
-    <div class="dept-card"><div class="dept-circle" style="background:var(--dept-T);"></div><div><div class="dept-card-key">T</div><div class="dept-card-name">진단킷</div></div></div>
-    <div class="dept-card"><div class="dept-circle" style="background:var(--dept-H);"></div><div><div class="dept-card-key">H</div><div class="dept-card-name">핸들부</div></div></div>
-    <div class="dept-card"><div class="dept-circle" style="background:var(--dept-V);"></div><div><div class="dept-card-key">V</div><div class="dept-card-name">비전</div></div></div>
-    <div class="dept-card"><div class="dept-circle" style="background:var(--dept-N);"></div><div><div class="dept-card-key">N</div><div class="dept-card-name">신규</div></div></div>
-    <div class="dept-card"><div class="dept-circle" style="background:var(--dept-A);"></div><div><div class="dept-card-key">A</div><div class="dept-card-name">조립</div></div></div>
-    <div class="dept-card"><div class="dept-circle" style="background:var(--dept-P);"></div><div><div class="dept-card-key">P</div><div class="dept-card-name">출하</div></div></div>
+  <h4>"미배치 원자재"를 펼치면</h4>
+  <div class="shot">
+    <div class="shot-chrome">
+      <span class="shot-dot r"></span><span class="shot-dot y"></span><span class="shot-dot g"></span>
+      <span class="shot-url">메인 화면 — 미배치 원자재 펼침</span>
+    </div>
+    <div class="shot-body">
+      <img src="_screens/main_raws_open.png" alt="미배치 원자재 펼침">
+      <div class="pin warn" style="top:39.5%; left:97%;">▲</div>
+    </div>
+  </div>
+  <p class="shot-caption">▲ 표시를 누르면 다시 접힙니다. 부서 탭을 바꾸면 자동으로 다시 접힙니다.</p>
+  <div class="box info">
+    <div class="box-icon">i</div>
+    <div class="box-body">
+      이 목록은 <strong>참고용</strong>입니다 — 행을 클릭해도 편집 화면으로 들어가지 않습니다. 어떤 원자재가 BOM 어딘가에 빠져 있는지 확인하고, 해당하는 상위 품목을 메인 리스트에서 찾아 들어가서 추가하면 됩니다.
+    </div>
   </div>
 
 
-  <!-- ───── 2-2. 편집 화면 ───── -->
+  <!-- 2-2. 편집 화면 -->
   <h3 style="margin-top:48px;">2-2. 편집 화면 — 부품 추가하기</h3>
-  <p style="font-size:14px;color:var(--c-muted2);">메인 화면에서 상위 품목을 클릭하면 이 화면으로 이동합니다. 왼쪽엔 지금까지 추가한 부품 목록, 오른쪽엔 추가할 부품 후보가 보입니다.</p>
-
-  <div class="mockup">
-    <div class="mockup-chrome">
-      <div class="mockup-dot r"></div><div class="mockup-dot y"></div><div class="mockup-dot g"></div>
-      <div class="mockup-url">📁 file:///C:/ERP/outputs/bom_setup/bom_setup.html</div>
+  <div class="shot">
+    <div class="shot-chrome">
+      <span class="shot-dot r"></span><span class="shot-dot y"></span><span class="shot-dot g"></span>
+      <span class="shot-url">편집 화면 — BOM 항목 3건 추가됨</span>
     </div>
-    <div class="mockup-body">
-      <!-- 앱바 -->
-      <div class="mb-appbar">
-        <div class="mb-appbar-left">
-          <span class="mb-brand">DEXCOWIN MES</span>
-          <span class="mb-divider">›</span>
-          <span class="mb-title">BOM 세팅 도구</span>
-        </div>
-        <div class="mb-appbar-right">
-          <span class="mb-savedot">자동저장됨 14:24:02</span>
-          <span class="mb-btn">진행도 저장</span>
-        </div>
-      </div>
-      <!-- 편집 네비 -->
-      <div class="mb-editnav">
-        <div class="mb-editnav-left">
-          <span class="mb-editnav-back">← 목록</span>
-          <span class="mb-divider">›</span>
-          <span class="mb-pt" style="background:var(--dept-A);">AS</span>
-          <span style="font-weight:700;color:var(--c-text);">진단킷 본체 V2</span>
-          <span style="color:var(--c-muted);font-family:ui-monospace,monospace;">7-AS-0023</span>
-        </div>
-        <span class="mb-btn primary">검토 · 완료 →</span>
-      </div>
-      <!-- 본문 -->
-      <div class="mb-edit-content">
-        <!-- 좌측 BOM 그리드 -->
-        <div class="mb-bomgrid">
-          <div class="mb-panel-head" style="display:flex;justify-content:space-between;align-items:center;">
-            <div>
-              <div class="mb-panel-label">현재 구성 목록</div>
-              <div class="mb-panel-sub">5건 등록됨</div>
-            </div>
-            <span class="mb-btn primary" style="font-size:10px;">+ 하위 품목 추가</span>
-          </div>
-          <div class="mb-bomhead">
-            <span>구분</span>
-            <span>자재명</span>
-            <span style="text-align:right;">코드</span>
-            <span style="text-align:right;">소요량</span>
-            <span style="text-align:right;">재고</span>
-            <span></span>
-          </div>
-          <div class="mb-bomrow">
-            <span class="mb-pt" style="background:var(--dept-T);">TR</span>
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">형광튜브 35W</span>
-            <span style="text-align:right;color:var(--c-muted);font-family:ui-monospace,monospace;">7-TR-0001</span>
-            <span style="text-align:right;"><span class="mb-qty-btn">× 2 EA</span></span>
-            <span style="text-align:right;color:var(--c-muted2);">128</span>
-            <span class="mb-x-btn">×</span>
-          </div>
-          <div class="mb-bomrow">
-            <span class="mb-pt" style="background:var(--dept-V);">VS</span>
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">CMOS 센서 모듈 8MP</span>
-            <span style="text-align:right;color:var(--c-muted);font-family:ui-monospace,monospace;">7-VS-0011</span>
-            <span style="text-align:right;"><span class="mb-qty-btn">× 1 EA</span></span>
-            <span style="text-align:right;color:var(--c-muted2);">42</span>
-            <span class="mb-x-btn">×</span>
-          </div>
-          <div class="mb-bomrow">
-            <span class="mb-pt" style="background:var(--dept-H);">HD</span>
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">알루미늄 핸들 그립</span>
-            <span style="text-align:right;color:var(--c-muted);font-family:ui-monospace,monospace;">7-HD-0008</span>
-            <span style="text-align:right;"><span class="mb-qty-btn">× 1 EA</span></span>
-            <span style="text-align:right;color:var(--c-muted2);">87</span>
-            <span class="mb-x-btn">×</span>
-          </div>
-          <div class="mb-bomrow">
-            <span class="mb-pt" style="background:#999;">RM</span>
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">M3 나사 (고정용)</span>
-            <span style="text-align:right;color:var(--c-muted);font-family:ui-monospace,monospace;">7-RM-0042</span>
-            <span style="text-align:right;"><span class="mb-qty-btn">× 12 EA</span></span>
-            <span style="text-align:right;color:var(--c-muted2);">2,340</span>
-            <span class="mb-x-btn">×</span>
-          </div>
-        </div>
-        <!-- 우측 슬라이드 패널 -->
-        <div class="mb-slide">
-          <div class="mb-slide-head">
-            <div>
-              <div class="mb-panel-label">하위 품목 추가</div>
-              <div class="mb-panel-sub">14개 후보</div>
-            </div>
-            <span class="mb-x-btn" style="background:rgba(0,0,0,0.05);color:var(--c-muted2);">×</span>
-          </div>
-          <input class="mb-input" placeholder="부품 검색">
-          <div class="mb-chips">
-            <span class="mb-chip active">추천</span>
-            <span class="mb-chip">이전공정 F</span>
-            <span class="mb-chip">전체</span>
-          </div>
-          <div class="mb-chips" style="padding-bottom:6px;">
-            <span class="mb-chip" style="font-size:9px;padding:2px 7px;">T</span>
-            <span class="mb-chip active" style="font-size:9px;padding:2px 7px;background:var(--dept-V);border-color:var(--dept-V);">V</span>
-            <span class="mb-chip" style="font-size:9px;padding:2px 7px;">H</span>
-            <span class="mb-chip" style="font-size:9px;padding:2px 7px;">A</span>
-          </div>
-          <div>
-            <div class="mb-cand">
-              <div class="mb-cand-row">
-                <span class="mb-pt" style="background:var(--dept-V);">VS</span>
-                <span style="flex:1;font-weight:600;color:var(--c-text);">렌즈 어셈블리 50mm</span>
-                <span style="font-size:9px;background:rgba(47,116,231,0.12);color:var(--c-blue);padding:2px 6px;border-radius:5px;font-weight:700;">85점</span>
-              </div>
-              <div style="font-size:9px;color:var(--c-muted);font-family:ui-monospace,monospace;margin-top:2px;">7-VS-0019</div>
-            </div>
-            <div class="mb-cand selected">
-              <div class="mb-cand-row">
-                <span class="mb-pt" style="background:var(--dept-V);">VS</span>
-                <span style="flex:1;font-weight:600;color:var(--c-text);">광학 필터 UV차단</span>
-                <span style="font-size:9px;background:rgba(47,116,231,0.12);color:var(--c-blue);padding:2px 6px;border-radius:5px;font-weight:700;">120점</span>
-              </div>
-              <div style="font-size:9px;color:var(--c-muted);font-family:ui-monospace,monospace;margin-top:2px;">7-VS-0023</div>
-              <div class="mb-qty-input">
-                <span style="color:var(--c-muted2);font-weight:600;">소요량</span>
-                <input class="mb-qty-field" value="1">
-                <span style="color:var(--c-muted);">EA</span>
-                <span class="mb-btn primary" style="font-size:9px;padding:3px 9px;margin-left:auto;">추가</span>
-                <span style="color:var(--c-muted);font-size:9px;font-weight:600;">취소</span>
-              </div>
-            </div>
-            <div class="mb-cand">
-              <div class="mb-cand-row">
-                <span class="mb-pt" style="background:var(--dept-V);">VS</span>
-                <span style="flex:1;font-weight:600;color:var(--c-text);">이미지 프로세서 보드</span>
-                <span style="font-size:9px;background:rgba(47,116,231,0.12);color:var(--c-blue);padding:2px 6px;border-radius:5px;font-weight:700;">70점</span>
-              </div>
-              <div style="font-size:9px;color:var(--c-muted);font-family:ui-monospace,monospace;margin-top:2px;">7-VS-0027</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- 핫스팟 -->
-      <div class="hotspot" style="top:60px; left:14px;">①</div>
-      <div class="hotspot" style="top:54px; left:200px;">②</div>
-      <div class="hotspot" style="top:54px; right:14px;">③</div>
-      <div class="hotspot" style="top:140px; left:30%;">④</div>
-      <div class="hotspot" style="top:108px; right:36px;">⑤</div>
-      <div class="hotspot" style="top:204px; right:120px;">⑥</div>
-      <div class="hotspot" style="top:340px; right:80px;">⑦</div>
+    <div class="shot-body">
+      <img src="_screens/edit_added.png" alt="편집 화면 (BOM 추가됨)">
+      <div class="pin" style="top:9.7%; left:4%;">1</div>
+      <div class="pin" style="top:9.7%; left:25%;">2</div>
+      <div class="pin" style="top:9.7%; left:94%;">3</div>
+      <div class="pin" style="top:30%;  left:86%;">4</div>
+      <div class="pin red" style="top:30%; left:91%;">5</div>
+      <div class="pin" style="top:17%;  left:8.5%;">6</div>
+      <div class="pin" style="top:36%;  left:65%;">7</div>
+      <div class="pin green" style="top:3.2%; left:82%;">8</div>
     </div>
   </div>
+  <p class="shot-caption">왼쪽이 후보 패널, 오른쪽이 현재 BOM 그리드입니다.</p>
 
   <div class="callouts">
     <div class="callout">
-      <div class="callout-num">①</div>
+      <div class="callout-num">1</div>
       <div class="callout-body">
         <div class="callout-title">"← 목록" — 메인 화면으로 돌아가기</div>
-        <div class="callout-desc">지금까지 추가한 내용은 자동저장되므로 안심하고 누르셔도 됩니다.</div>
+        <div class="callout-desc">현재까지 추가한 항목은 자동 저장됩니다. 단, "완료로 표시"하지 않으면 "작업 중" 상태로 남습니다.</div>
       </div>
     </div>
     <div class="callout">
-      <div class="callout-num">②</div>
+      <div class="callout-num">2</div>
       <div class="callout-body">
         <div class="callout-title">현재 편집 중인 상위 품목</div>
-        <div class="callout-desc">공정 뱃지 + 품목명 + ERP 코드. 어떤 품목 BOM을 만들고 있는지 항상 보입니다.</div>
+        <div class="callout-desc">부서 배지(예: HA) + 품목명 + ERP 코드. 어떤 품목의 BOM을 짜고 있는지 항상 보입니다.</div>
       </div>
     </div>
     <div class="callout">
-      <div class="callout-num">③</div>
+      <div class="callout-num">3</div>
       <div class="callout-body">
         <div class="callout-title">"검토 · 완료 →" 버튼</div>
-        <div class="callout-desc">부품 추가가 끝나면 누릅니다. 검증 결과를 확인하는 검토 화면으로 이동합니다.</div>
+        <div class="callout-desc">BOM 작성을 마쳤으면 클릭. 다음 단계인 검토 화면으로 이동합니다.</div>
       </div>
     </div>
     <div class="callout">
-      <div class="callout-num">④</div>
+      <div class="callout-num">4</div>
+      <div class="callout-body">
+        <div class="callout-title">소요량 — <strong>×N EA</strong></div>
+        <div class="callout-desc">한 단위를 만들 때 필요한 부품 수. <strong>버튼을 클릭하면 즉시 인라인 편집 모드</strong>로 바뀝니다 (시나리오 B 참고).</div>
+      </div>
+    </div>
+    <div class="callout">
+      <div class="callout-num red">5</div>
+      <div class="callout-body">
+        <div class="callout-title">행 삭제 (✕)</div>
+        <div class="callout-desc">한 번 클릭으로 즉시 삭제. <strong>확인 창은 없습니다</strong>. 잘못 누르면 우측 패널에서 다시 추가하세요.</div>
+      </div>
+    </div>
+    <div class="callout">
+      <div class="callout-num">6</div>
+      <div class="callout-body">
+        <div class="callout-title">하위 품목 추가 패널</div>
+        <div class="callout-desc">검색·부서 칩으로 후보를 좁혀 표시. "200개 후보"는 현재 점수 순으로 상위 200개만 표시한다는 뜻.</div>
+      </div>
+    </div>
+    <div class="callout">
+      <div class="callout-num">7</div>
       <div class="callout-body">
         <div class="callout-title">현재 구성 목록 (BOM 그리드)</div>
-        <div class="callout-desc">컬럼: 구분(공정 뱃지) · 자재명 · 코드 · 소요량 · 재고 · 삭제 버튼. 소요량을 클릭하면 그 자리에서 바로 수정됩니다.</div>
+        <div class="callout-desc">4개 열: <strong>구분 / 자재명·코드 / 소요량 / 액션</strong>. 행은 추가한 순서대로 누적됩니다.</div>
       </div>
     </div>
     <div class="callout">
-      <div class="callout-num">⑤</div>
+      <div class="callout-num green">8</div>
       <div class="callout-body">
-        <div class="callout-title">"+ 하위 품목 추가" 토글</div>
-        <div class="callout-desc">우측 슬라이드 패널을 열고/닫습니다. 패널이 열려 있을 땐 다시 누르면 닫힙니다.</div>
-      </div>
-    </div>
-    <div class="callout">
-      <div class="callout-num">⑥</div>
-      <div class="callout-body">
-        <div class="callout-title">필터: 추천 / 이전공정 / 전체 + 부서 칩</div>
-        <div class="callout-desc"><strong>추천</strong>은 점수 순, <strong>이전공정</strong>은 직전 단계 부품만, <strong>전체</strong>는 722개 모두. 부서 칩으로 더 좁힐 수 있습니다.</div>
-      </div>
-    </div>
-    <div class="callout">
-      <div class="callout-num">⑦</div>
-      <div class="callout-body">
-        <div class="callout-title">부품 선택 → 소요량 입력 → 추가</div>
-        <div class="callout-desc">부품을 클릭하면 그 자리에 수량 입력란이 나타납니다. 숫자를 적고 <strong>추가</strong>를 누르면 왼쪽 목록에 즉시 반영됩니다.</div>
+        <div class="callout-title">자동저장 인디케이터</div>
+        <div class="callout-desc">상단 앱바에 "● 저장됨 HH:MM"이 초록 점과 함께 표시되면 자동저장 정상. 시각이 갱신되지 않으면 변경사항이 반영되지 않은 것입니다.</div>
       </div>
     </div>
   </div>
 
-  <div class="box tip">
-    <div class="box-icon">★</div>
-    <div class="box-body">
-      <strong>점수 표시(예: 120점, 85점)는 무엇인가요?</strong>
-      이 상위 품목과 얼마나 잘 어울리는 부품인지 자동 계산한 점수입니다. 공정 단계가 가까울수록 점수가 높습니다 (직전 공정 = 120점).
+  <h4>하위 품목을 클릭한 직후</h4>
+  <div class="shot">
+    <div class="shot-chrome">
+      <span class="shot-dot r"></span><span class="shot-dot y"></span><span class="shot-dot g"></span>
+      <span class="shot-url">편집 화면 — 후보 클릭 + 소요량 입력</span>
+    </div>
+    <div class="shot-body">
+      <img src="_screens/edit_picking.png" alt="후보 클릭 + 소요량 입력">
+      <div class="pin" style="top:42%; left:8.5%;">A</div>
+      <div class="pin" style="top:42%; left:21.5%;">B</div>
+      <div class="pin" style="top:42%; left:26%;">C</div>
     </div>
   </div>
-
-
-  <!-- ───── 2-3. 검토 화면 ───── -->
-  <h3 style="margin-top:48px;">2-3. 검토 화면 — 마지막 확인</h3>
-  <p style="font-size:14px;color:var(--c-muted2);">"검토 · 완료 →"를 누르면 이 화면으로 이동합니다. 입력한 BOM에 문제가 있는지 자동으로 검사한 결과를 보여줍니다.</p>
-
-  <div class="mockup">
-    <div class="mockup-chrome">
-      <div class="mockup-dot r"></div><div class="mockup-dot y"></div><div class="mockup-dot g"></div>
-      <div class="mockup-url">📁 file:///C:/ERP/outputs/bom_setup/bom_setup.html</div>
-    </div>
-    <div class="mockup-body">
-      <div class="mb-appbar">
-        <div class="mb-appbar-left">
-          <span class="mb-brand">DEXCOWIN MES</span>
-          <span class="mb-divider">›</span>
-          <span class="mb-title">BOM 세팅 도구</span>
-        </div>
-        <div class="mb-appbar-right">
-          <span class="mb-savedot">자동저장됨 14:25:18</span>
-        </div>
-      </div>
-      <div class="mb-editnav">
-        <div class="mb-editnav-left">
-          <span class="mb-editnav-back">← 편집으로</span>
-          <span class="mb-divider">›</span>
-          <span class="mb-pt" style="background:var(--dept-A);">AS</span>
-          <span style="font-weight:700;color:var(--c-text);">진단킷 본체 V2</span>
-        </div>
-        <span class="mb-btn success">✓ 완료로 표시</span>
-      </div>
-
-      <!-- 검증 결과 카드 (3종 동시 표시) -->
-      <div style="padding:6px 0;background:var(--c-bg);">
-        <div class="mb-issue ok">
-          <div class="mb-issue-icon">✓</div>
-          <div>
-            <div class="mb-issue-title">정상</div>
-            <div class="mb-issue-desc">필수 검증 통과. "완료로 표시"를 누를 수 있습니다.</div>
-          </div>
-        </div>
-        <div class="mb-issue warn">
-          <div class="mb-issue-icon">!</div>
-          <div>
-            <div class="mb-issue-title">경고</div>
-            <div class="mb-issue-desc">7-RM-0042 (M3 나사) 소요량이 12개 — 평균보다 많습니다. 확인해보세요.</div>
-          </div>
-        </div>
-        <div class="mb-issue err">
-          <div class="mb-issue-icon">⚠</div>
-          <div>
-            <div class="mb-issue-title">오류</div>
-            <div class="mb-issue-desc">7-VS-0011이 두 번 추가되어 있습니다. 한 줄로 합쳐주세요.</div>
-          </div>
-        </div>
-      </div>
-
-      <div style="padding:6px 12px 12px;background:var(--c-bg);">
-        <div class="mb-bomgrid">
-          <div class="mb-panel-head">
-            <div class="mb-panel-label">저장 대상 (5건)</div>
-          </div>
-          <div class="mb-bomhead">
-            <span>구분</span>
-            <span>자재명</span>
-            <span style="text-align:right;">코드</span>
-            <span style="text-align:right;">소요량</span>
-            <span style="text-align:right;">재고</span>
-            <span style="text-align:center;">검증</span>
-          </div>
-          <div class="mb-bomrow">
-            <span class="mb-pt" style="background:var(--dept-T);">TR</span>
-            <span>형광튜브 35W</span>
-            <span style="text-align:right;color:var(--c-muted);font-family:ui-monospace,monospace;">7-TR-0001</span>
-            <span style="text-align:right;font-weight:700;">2 EA</span>
-            <span style="text-align:right;color:var(--c-muted2);">128</span>
-            <span style="text-align:center;color:var(--c-green);font-weight:800;">✓</span>
-          </div>
-          <div class="mb-bomrow" style="background:rgba(217,90,90,0.04);">
-            <span class="mb-pt" style="background:var(--dept-V);">VS</span>
-            <span>CMOS 센서 모듈 8MP</span>
-            <span style="text-align:right;color:var(--c-muted);font-family:ui-monospace,monospace;">7-VS-0011</span>
-            <span style="text-align:right;font-weight:700;">1 EA</span>
-            <span style="text-align:right;color:var(--c-muted2);">42</span>
-            <span style="text-align:center;color:var(--c-red);font-weight:800;">⚠</span>
-          </div>
-          <div class="mb-bomrow">
-            <span class="mb-pt" style="background:var(--dept-H);">HD</span>
-            <span>알루미늄 핸들 그립</span>
-            <span style="text-align:right;color:var(--c-muted);font-family:ui-monospace,monospace;">7-HD-0008</span>
-            <span style="text-align:right;font-weight:700;">1 EA</span>
-            <span style="text-align:right;color:var(--c-muted2);">87</span>
-            <span style="text-align:center;color:var(--c-green);font-weight:800;">✓</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 핫스팟 -->
-      <div class="hotspot" style="top:60px; left:14px;">①</div>
-      <div class="hotspot" style="top:120px; left:50%;">②</div>
-      <div class="hotspot" style="top:60px; right:14px;">④</div>
-      <div class="hotspot" style="top:332px; left:50%;">③</div>
-    </div>
-  </div>
-
   <div class="callouts">
     <div class="callout">
-      <div class="callout-num">①</div>
+      <div class="callout-num">A</div>
+      <div class="callout-body">
+        <div class="callout-title">소요량 입력</div>
+        <div class="callout-desc">기본값은 <strong>1</strong>. 숫자를 직접 타이핑하거나 한 번에 지우고 새 값 입력. <kbd>Enter</kbd>로도 추가 가능.</div>
+      </div>
+    </div>
+    <div class="callout">
+      <div class="callout-num green">B</div>
+      <div class="callout-body">
+        <div class="callout-title">"추가" 버튼</div>
+        <div class="callout-desc">현재 구성 목록 우측에 새 행이 추가되고, 후보에는 "추가됨" 태그가 붙어 흐려집니다.</div>
+      </div>
+    </div>
+    <div class="callout">
+      <div class="callout-num">C</div>
+      <div class="callout-body">
+        <div class="callout-title">"취소"</div>
+        <div class="callout-desc">방금 클릭한 부품을 추가하지 않고 패널을 접습니다. <kbd>Esc</kbd>도 같은 효과.</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 2-3. 검토 화면 -->
+  <h3 style="margin-top:48px;">2-3. 검토 화면 — 마지막 확인</h3>
+  <div class="shot">
+    <div class="shot-chrome">
+      <span class="shot-dot r"></span><span class="shot-dot y"></span><span class="shot-dot g"></span>
+      <span class="shot-url">검토 화면 — 검증 통과</span>
+    </div>
+    <div class="shot-body">
+      <img src="_screens/review_ok.png" alt="검토 화면 (정상)">
+      <div class="pin" style="top:9.7%; left:4%;">1</div>
+      <div class="pin green" style="top:20%; left:5%;">2</div>
+      <div class="pin" style="top:36%; left:50%;">3</div>
+      <div class="pin green" style="top:9.7%; left:94%;">4</div>
+    </div>
+  </div>
+  <div class="callouts">
+    <div class="callout">
+      <div class="callout-num">1</div>
       <div class="callout-body">
         <div class="callout-title">"← 편집으로" — 다시 편집</div>
-        <div class="callout-desc">검증 결과를 보고 수정할 게 있다면 누릅니다. 추가했던 부품이 그대로 남아있습니다.</div>
+        <div class="callout-desc">검증 결과를 보고 빠진 부품을 더하거나 잘못된 행을 빼고 싶을 때 사용. 편집 화면으로 돌아갑니다.</div>
       </div>
     </div>
     <div class="callout">
-      <div class="callout-num">②</div>
+      <div class="callout-num green">2</div>
       <div class="callout-body">
         <div class="callout-title">검증 결과 카드</div>
-        <div class="callout-desc">초록 = 정상, 노랑 = 경고(확인 권장), 빨강 = 오류(수정 권장). 6가지 검사를 자동으로 수행합니다 (5번 항목 참고).</div>
+        <div class="callout-desc"><strong>정상</strong>(녹색)이면 완료 가능. <strong>오류</strong>(빨강)가 하나라도 있으면 "완료로 표시" 버튼이 비활성화됩니다. <strong>경고</strong>(노랑)는 진행은 가능하지만 한 번 더 확인하라는 뜻.</div>
       </div>
     </div>
     <div class="callout">
-      <div class="callout-num">③</div>
+      <div class="callout-num">3</div>
       <div class="callout-body">
         <div class="callout-title">저장 대상 BOM 테이블</div>
-        <div class="callout-desc">완료로 표시할 BOM 전체 목록. 마지막 컬럼에 행별 검증 아이콘이 표시되며, 오류 있는 행은 배경이 연한 빨강으로 강조됩니다.</div>
+        <div class="callout-desc">완료 시 저장될 행들의 미리보기. 검증 컬럼의 <strong>✓</strong>는 정상, <strong>⚠</strong>는 해당 행에 이슈가 있음.</div>
       </div>
     </div>
     <div class="callout">
-      <div class="callout-num">④</div>
+      <div class="callout-num green">4</div>
       <div class="callout-body">
-        <div class="callout-title">"✓ 완료로 표시" 버튼</div>
-        <div class="callout-desc">누르면 이 상위 품목이 "완료" 상태가 되고 메인 화면으로 돌아갑니다. 오류가 있어도 누를 수는 있지만 가급적 수정 후 진행하세요.</div>
+        <div class="callout-title">"완료로 표시" 버튼</div>
+        <div class="callout-desc">클릭하면 그 품목이 "완료" 상태로 바뀌고 메인 화면으로 돌아갑니다. 자동저장도 즉시 갱신.</div>
       </div>
     </div>
   </div>
 </section>
 
 
-<!-- ════════════════════════════════════════════════════════════
-     3. 시나리오별 따라하기
-     ════════════════════════════════════════════════════════════ -->
+<!-- ════════════ 3. 시나리오 ════════════ -->
 <section class="section" id="scenarios">
   <div class="section-head">
     <div class="section-eyebrow"><span class="section-eyebrow-num">3</span>시나리오별 따라하기</div>
     <h2>실제 작업 따라하기</h2>
-    <p class="section-desc">자주 마주치는 4가지 상황을 단계별로 안내합니다. 각 단계의 화면을 보면서 그대로 따라해보세요.</p>
+    <p class="section-desc">자주 쓰는 작업 4가지를 실제 화면 흐름대로 단계별로 안내합니다.</p>
   </div>
 
   <!-- 시나리오 A -->
   <div class="scenario">
     <div class="scenario-eyebrow">시나리오 A</div>
-    <div class="scenario-title">조립 부서의 새 완제품 BOM을 처음부터 만들기</div>
-    <div class="scenario-sub">예시: "진단킷 본체 V2" (7-AS-0023) 의 BOM을 처음 등록한다</div>
+    <div class="scenario-title">새 BOM을 처음부터 만들기</div>
+    <div class="scenario-sub">예시: 고압 부서의 "히터트랜스포머 24턴" BOM에 부품 3종을 처음 등록한다.</div>
     <div class="steplist">
       <div class="steprow">
         <div class="steprow-num">1</div>
         <div>
-          <div class="steprow-title">메인 화면 상단에서 <strong>A 조립</strong> 부서 탭을 클릭</div>
-          <div class="steprow-desc">부서 탭이 파란색으로 강조되고, 좌측 목록과 우측 통계가 조립 부서 기준으로 바뀝니다.</div>
+          <div class="steprow-title">메인 화면에서 <strong>"고압"</strong> 부서 탭 클릭</div>
+          <div class="steprow-desc">통계 카드와 품목 리스트가 고압 부서 기준으로 갱신됩니다.</div>
         </div>
       </div>
       <div class="steprow">
         <div class="steprow-num">2</div>
         <div>
-          <div class="steprow-title">좌측 검색창에 <strong>"진단킷"</strong> 입력 → 목록에서 해당 품목 클릭</div>
-          <div class="steprow-desc">검색은 품목명 일부만 입력해도 즉시 필터링됩니다. ERP 코드(7-AS-0023)로도 검색됩니다. 클릭하면 편집 화면으로 이동합니다.</div>
+          <div class="steprow-title">상위 품목 리스트에서 <strong>"히터트랜스포머 24턴"</strong> 행 클릭</div>
+          <div class="steprow-desc">편집 화면으로 진입. 좌측은 후보, 우측은 빈 BOM 그리드("등록된 BOM 항목이 없습니다").</div>
         </div>
       </div>
       <div class="steprow">
         <div class="steprow-num">3</div>
         <div>
-          <div class="steprow-title">편집 화면에서 <strong>"+ 하위 품목 추가"</strong> 클릭하여 우측 패널 열기</div>
-          <div class="steprow-desc">패널에는 "추천" 탭이 기본 활성화되어, 이 상위 품목과 관련성이 높은 부품이 점수 순으로 정렬됩니다.</div>
+          <div class="steprow-title">좌측에서 부품 클릭 → 소요량 <strong>4</strong> 입력 → <strong>"추가"</strong> 클릭</div>
+          <div class="steprow-desc">우측 그리드에 행이 추가됩니다. <kbd>Enter</kbd> 키로도 추가 가능.</div>
         </div>
       </div>
       <div class="steprow">
         <div class="steprow-num">4</div>
         <div>
-          <div class="steprow-title">부품 한 개씩 클릭 → 소요량 입력 → <strong>추가</strong></div>
-          <div class="steprow-desc">예: "형광튜브 35W" 클릭 → 소요량 "2" 입력 → 추가. 왼쪽 BOM 그리드에 즉시 한 줄이 늘어납니다. 5개 부품을 같은 방법으로 추가합니다.</div>
+          <div class="steprow-title">필요한 부품 수만큼 3번을 반복</div>
+          <div class="steprow-desc">예: 캐논튜브 ×4, 캐논튜브(70KV) ×2, 고압다이오드 ×6 — 총 3개 행.</div>
         </div>
       </div>
       <div class="steprow">
         <div class="steprow-num">5</div>
         <div>
-          <div class="steprow-title">우측 상단 <strong>"검토 · 완료 →"</strong> 클릭</div>
-          <div class="steprow-desc">검증 결과가 나타납니다. 모두 ✓ 정상이면 다음 단계로, 오류가 있다면 "← 편집으로" 눌러서 수정합니다.</div>
-        </div>
-      </div>
-      <div class="steprow">
-        <div class="steprow-num">6</div>
-        <div>
-          <div class="steprow-title">검증 통과 후 <strong>"✓ 완료로 표시"</strong> 클릭</div>
-          <div class="steprow-desc">메인 화면으로 돌아오며, 이 품목이 "완료" 탭으로 이동합니다. 통계 카드의 "완료" 숫자가 +1 됩니다.</div>
+          <div class="steprow-title">우상단 <strong>"검토 · 완료 →"</strong> 클릭</div>
+          <div class="steprow-desc">검증 결과가 녹색 "정상"이면 우상단 <strong>"완료로 표시"</strong> 클릭. 메인 화면으로 돌아오고 통계의 "완료"가 +1.</div>
         </div>
       </div>
     </div>
@@ -1524,27 +772,40 @@ footer {
   <div class="scenario">
     <div class="scenario-eyebrow">시나리오 B</div>
     <div class="scenario-title">추가한 부품의 소요량 수정하기</div>
-    <div class="scenario-sub">예시: "M3 나사" 소요량을 12 → 8로 변경</div>
+    <div class="scenario-sub">예시: "캐논튜브" 소요량을 4 → 8로 변경 (인라인 편집)</div>
+
+    <div class="shot" style="margin: 14px 0 16px;">
+      <div class="shot-chrome">
+        <span class="shot-dot r"></span><span class="shot-dot y"></span><span class="shot-dot g"></span>
+        <span class="shot-url">시나리오 B — 인라인 수량 수정 모드</span>
+      </div>
+      <div class="shot-body">
+        <img src="_screens/edit_qty_inline.png" alt="인라인 수량 수정 모드">
+        <div class="pin" style="top:30%; left:88%;">1</div>
+        <div class="pin green" style="top:30%; left:96%;">2</div>
+      </div>
+    </div>
+
     <div class="steplist">
       <div class="steprow">
         <div class="steprow-num">1</div>
         <div>
-          <div class="steprow-title">편집 화면 좌측 BOM 그리드에서 해당 행의 <strong>"× 12 EA"</strong> 버튼 클릭</div>
-          <div class="steprow-desc">소요량 부분이 입력 가능한 상태로 바뀝니다.</div>
+          <div class="steprow-title">편집 화면 BOM 그리드에서 해당 행의 <strong>"× 4 EA"</strong> 버튼 클릭</div>
+          <div class="steprow-desc">버튼이 입력창으로 바뀝니다. 우측의 ✕(빨강) 버튼이 ✓(녹색) <strong>저장</strong> 버튼으로 자동 교체됩니다.</div>
         </div>
       </div>
       <div class="steprow">
         <div class="steprow-num">2</div>
         <div>
           <div class="steprow-title">숫자를 <strong>"8"</strong>로 수정</div>
-          <div class="steprow-desc">기존 숫자를 지우고 새 값을 입력합니다.</div>
+          <div class="steprow-desc">기존 숫자가 자동 선택되어 있어 바로 새 값 입력 가능.</div>
         </div>
       </div>
       <div class="steprow">
         <div class="steprow-num">3</div>
         <div>
-          <div class="steprow-title">Enter 키를 누르거나 <strong>저장</strong> 버튼 클릭</div>
-          <div class="steprow-desc">즉시 반영되고 자동저장됩니다. 취소하려면 Esc.</div>
+          <div class="steprow-title"><kbd>Enter</kbd> 또는 <strong>✓</strong> 버튼 클릭</div>
+          <div class="steprow-desc">즉시 반영되고 자동저장됩니다. 취소하려면 <kbd>Esc</kbd>.</div>
         </div>
       </div>
     </div>
@@ -1558,23 +819,22 @@ footer {
       <div class="steprow">
         <div class="steprow-num">1</div>
         <div>
-          <div class="steprow-title">편집 화면 좌측 BOM 그리드에서 해당 행 끝의 <strong>×</strong> 버튼 클릭</div>
-          <div class="steprow-desc">빨간색 작은 사각형 버튼입니다. 한 번 클릭하면 즉시 삭제됩니다.</div>
+          <div class="steprow-title">편집 화면 BOM 그리드에서 해당 행 끝의 <strong>✕</strong>(빨강) 버튼 클릭</div>
+          <div class="steprow-desc">한 번 클릭하면 즉시 삭제됩니다. 확인 창은 없습니다.</div>
         </div>
       </div>
       <div class="steprow">
         <div class="steprow-num">2</div>
         <div>
-          <div class="steprow-title">삭제 후 자동저장 시각이 갱신되는지 확인</div>
-          <div class="steprow-desc">상단 앱바의 "자동저장됨 HH:MM:SS" 시각이 변경되었으면 정상 저장된 것입니다.</div>
+          <div class="steprow-title">상단 앱바의 자동저장 시각이 갱신됐는지 확인</div>
+          <div class="steprow-desc">"● 저장됨 HH:MM" 시각이 변경되었으면 정상.</div>
         </div>
       </div>
     </div>
     <div class="box warn">
       <div class="box-icon">!</div>
       <div class="box-body">
-        <strong>실수로 삭제했어요!</strong>
-        삭제는 즉시 적용되며 되돌리기(Undo) 기능은 없습니다. 같은 부품을 우측 패널에서 다시 추가해주세요.
+        <strong>실수로 삭제했어요!</strong> 삭제는 즉시 적용되며 되돌리기(Undo)는 없습니다. 같은 부품을 우측 패널에서 다시 추가해주세요.
       </div>
     </div>
   </div>
@@ -1601,7 +861,7 @@ footer {
       <div class="steprow">
         <div class="steprow-num">3</div>
         <div>
-          <div class="steprow-title">필요한 수정(추가 / 삭제 / 소요량 변경) 후 다시 <strong>"검토 · 완료 →"</strong></div>
+          <div class="steprow-title">필요한 수정 후 다시 <strong>"검토 · 완료 →"</strong></div>
           <div class="steprow-desc">검증 통과 후 "완료로 표시"를 다시 누르면 갱신됩니다.</div>
         </div>
       </div>
@@ -1610,513 +870,294 @@ footer {
 </section>
 
 
-<!-- ════════════════════════════════════════════════════════════
-     4. 데이터 안전
-     ════════════════════════════════════════════════════════════ -->
+<!-- ════════════ 4. 데이터 안전 ════════════ -->
 <section class="section" id="datasafety">
   <div class="section-head">
-    <div class="section-eyebrow"><span class="section-eyebrow-num">4</span>저장 · 백업 · PC 이동</div>
+    <div class="section-eyebrow"><span class="section-eyebrow-num">4</span>저장·백업·PC 이동</div>
     <h2>작업 내용을 안전하게 지키는 법</h2>
-    <p class="section-desc">이 도구는 자동저장과 수동 백업, 두 가지 방식으로 작업 내용을 보호합니다. 두 방식의 차이를 정확히 이해하시면 데이터를 잃을 일이 없습니다.</p>
+    <p class="section-desc">자동저장과 수동 백업, 두 가지를 함께 쓰면 데이터를 잃을 일이 없습니다.</p>
   </div>
 
-  <!-- 4-1. 자동저장 -->
   <h3>4-1. 자동저장 (현재 PC · 같은 브라우저)</h3>
-  <p style="font-size:14px;color:var(--c-muted2);">
-    부품을 추가/삭제/수정하거나 완료로 표시할 때마다, 자동으로 이 브라우저의 저장소에 기록됩니다.
-    실수로 창을 닫거나 컴퓨터를 껐다 켜도 같은 PC·같은 브라우저에서 열면 그대로 복원됩니다.
+  <p style="font-size:14px;color:var(--c-muted2);line-height:1.7;">
+    부품 추가 / 삭제 / 소요량 변경 / 완료 처리 — 어떤 변경이든 즉시 브라우저에
+    <strong>localStorage</strong>로 저장됩니다. 상단 앱바에 <strong>"● 저장됨 HH:MM"</strong>
+    초록 점이 보이면 정상.
   </p>
-
-  <div class="mockup">
-    <div class="mockup-chrome">
-      <div class="mockup-dot r"></div><div class="mockup-dot y"></div><div class="mockup-dot g"></div>
-      <div class="mockup-url">자동저장 표시 위치</div>
-    </div>
-    <div class="mockup-body">
-      <div class="mb-appbar" style="height:60px;">
-        <div class="mb-appbar-left">
-          <span class="mb-brand" style="font-size:13px;">DEXCOWIN MES</span>
-          <span class="mb-divider">›</span>
-          <span class="mb-title" style="font-size:13px;">BOM 세팅 도구</span>
-        </div>
-        <div class="mb-appbar-right">
-          <span class="mb-savedot" style="font-size:12px;">자동저장됨 14:23:15</span>
-          <span class="mb-btn">진행도 저장</span>
-        </div>
+  <div class="callouts" style="margin-top:14px;">
+    <div class="callout">
+      <div class="callout-num green">✓</div>
+      <div class="callout-body">
+        <div class="callout-title">잘 되는 경우</div>
+        <div class="callout-desc">같은 PC, 같은 브라우저에서 다시 열면 작업 그대로 복원됩니다. 인터넷이 끊겨도 OK.</div>
       </div>
-      <div class="hotspot" style="top:18px;right:160px;">★</div>
+    </div>
+    <div class="callout">
+      <div class="callout-num warn">!</div>
+      <div class="callout-body">
+        <div class="callout-title">잘 안 되는 경우</div>
+        <div class="callout-desc">시크릿/InPrivate 모드, 브라우저 데이터 삭제, 다른 PC로 이동 — 이때는 자동저장 내용이 사라집니다. 4-2를 사용하세요.</div>
+      </div>
     </div>
   </div>
 
-  <div class="box ok">
-    <div class="box-icon">✓</div>
-    <div class="box-body">
-      <strong>녹색 점이 깜빡이고 있고 시각이 바뀐다면 정상</strong>
-      "자동저장됨 14:23:15" 시각이 작업할 때마다 갱신되면 모든 변경이 안전하게 기록되고 있는 것입니다.
-    </div>
-  </div>
-  <div class="box warn">
-    <div class="box-icon">!</div>
-    <div class="box-body">
-      <strong>자동저장은 이 브라우저 안에만 보관됩니다</strong>
-      다른 PC나 다른 브라우저(Chrome ↔ Edge)에서 열면 빈 화면이 됩니다. PC를 옮기려면 다음 항목의 "진행도 저장" 파일이 필요합니다.
-    </div>
-  </div>
-
-  <!-- 4-2. PC 이동 -->
   <h3 style="margin-top:36px;">4-2. PC 이동 가이드 (4단계)</h3>
-  <p style="font-size:14px;color:var(--c-muted2);">집에서 회사로, 또는 노트북에서 데스크탑으로 작업을 옮길 때는 이 흐름을 따라하세요.</p>
-
-  <div class="pcflow">
-    <div class="pcnode">
-      <div class="pcnode-icon">💻</div>
-      <div class="pcnode-title">PC1 (현재)</div>
-      <div class="pcnode-sub">"진행도 저장" 클릭</div>
-    </div>
-    <div class="pcarrow">→</div>
-    <div class="pcnode">
-      <div class="pcnode-icon">📄</div>
-      <div class="pcnode-title">JSON 파일</div>
-      <div class="pcnode-sub">bom_draft_2026-05-04.json</div>
-    </div>
-    <div class="pcarrow">→</div>
-    <div class="pcnode">
-      <div class="pcnode-icon">💻</div>
-      <div class="pcnode-title">PC2 (이동 후)</div>
-      <div class="pcnode-sub">"진행도 불러오기" 클릭</div>
-    </div>
-  </div>
-
-  <div class="steplist" style="margin-top:24px;">
+  <div class="steplist">
     <div class="steprow">
       <div class="steprow-num">1</div>
       <div>
-        <div class="steprow-title">PC1: 상단 앱바 <strong>"진행도 저장"</strong> 클릭</div>
-        <div class="steprow-desc"><code>bom_draft_2026-05-04.json</code> 형태의 파일이 다운로드 폴더에 저장됩니다.</div>
+        <div class="steprow-title">기존 PC에서 우상단 <strong>"진행도 저장"</strong> 클릭</div>
+        <div class="steprow-desc"><code>bom_draft_YYYY-MM-DD.json</code> 파일이 다운로드됩니다.</div>
       </div>
     </div>
     <div class="steprow">
       <div class="steprow-num">2</div>
       <div>
-        <div class="steprow-title">JSON 파일을 PC2로 옮기기 (USB · 이메일 · 공유 드라이브 등)</div>
-        <div class="steprow-desc">방법은 무엇이든 상관없습니다. 함께 <code>bom_setup.html</code> 파일도 PC2에 있어야 합니다.</div>
+        <div class="steprow-title">JSON 파일을 USB·메일·메신저로 새 PC로 옮기기</div>
+        <div class="steprow-desc">압축 불필요. 100KB 미만의 텍스트 파일입니다.</div>
       </div>
     </div>
     <div class="steprow">
       <div class="steprow-num">3</div>
       <div>
-        <div class="steprow-title">PC2: <code>bom_setup.html</code> 더블클릭으로 열기</div>
-        <div class="steprow-desc">처음 열린 화면은 비어 있습니다 (자동저장은 PC2에는 없으므로).</div>
+        <div class="steprow-title">새 PC에서 <code>bom_setup.html</code> 실행 → <strong>"진행도 불러오기"</strong> 클릭</div>
+        <div class="steprow-desc">JSON 파일 선택 → 확인 다이얼로그에서 "예". 현재 작업이 덮어쓰여지므로 주의.</div>
       </div>
     </div>
     <div class="steprow">
       <div class="steprow-num">4</div>
       <div>
-        <div class="steprow-title">상단 앱바 <strong>"진행도 불러오기"</strong> 클릭 → JSON 파일 선택</div>
-        <div class="steprow-desc">선택 후 확인을 누르면 PC1에서 작업하던 내용이 그대로 복원됩니다.</div>
+        <div class="steprow-title">통계가 동일한지 확인하고 작업 이어가기</div>
+        <div class="steprow-desc">다음부터는 새 PC에서 자동저장됩니다.</div>
       </div>
     </div>
   </div>
 
-  <div class="box tip">
-    <div class="box-icon">!</div>
-    <div class="box-body">
-      <strong>매일 퇴근 전에 "진행도 저장" 한 번 권장</strong>
-      자동저장이 있긴 하지만, 브라우저 데이터가 갑자기 초기화되는 드문 경우(예: 시크릿 모드 사용, 브라우저 데이터 삭제)에 대비해 습관적으로 백업해두면 안전합니다.
-    </div>
-  </div>
-
-  <!-- 4-3. BOM 내보내기 -->
   <h3 style="margin-top:36px;">4-3. 최종 BOM 내보내기</h3>
-  <p style="font-size:14px;color:var(--c-muted2);">모든 상위 품목의 세팅이 끝나면, 시스템 담당자에게 전달할 최종 데이터를 내보냅니다.</p>
-
-  <div class="steplist">
-    <div class="steprow">
-      <div class="steprow-num">1</div>
-      <div>
-        <div class="steprow-title">상단 앱바 <strong>"BOM 내보내기"</strong> 버튼(녹색) 클릭</div>
-        <div class="steprow-desc">완료된 항목이 1건 이상 있어야 이 버튼이 보입니다.</div>
-      </div>
-    </div>
-    <div class="steprow">
-      <div class="steprow-num">2</div>
-      <div>
-        <div class="steprow-title">JSON + CSV 파일 2개가 자동 다운로드됨</div>
-        <div class="steprow-desc">
-          <strong>bom_export_2026-05-04.json</strong> — 시스템 담당자에게 전달<br>
-          <strong>bom_export_2026-05-04.csv</strong> — 엑셀에서 확인용 (parent_item_id, parent_item_name, child_item_id, child_item_name, quantity 컬럼)
-        </div>
-      </div>
+  <p style="font-size:14px;color:var(--c-muted2);line-height:1.7;">
+    한 품목 이상이 "완료" 상태가 되면 상단에 <strong>"BOM 내보내기"</strong>(녹색 버튼)가 나타납니다.
+    클릭하면 완료된 모든 BOM이 <strong>JSON + CSV 두 형식으로</strong> 동시에 다운로드됩니다.
+  </p>
+  <div class="box info">
+    <div class="box-icon">i</div>
+    <div class="box-body">
+      JSON은 시스템 연동용, CSV는 엑셀에서 바로 열 수 있습니다. 둘 다 <code>parent_erp_code, parent_item_name, parent_process_type, child_erp_code, child_item_name, child_process_type, quantity, unit</code> 8개 컬럼.
     </div>
   </div>
 </section>
 
 
-<!-- ════════════════════════════════════════════════════════════
-     5. 검증 오류 도감
-     ════════════════════════════════════════════════════════════ -->
+<!-- ════════════ 5. 검증 오류 도감 ════════════ -->
 <section class="section" id="errors">
   <div class="section-head">
     <div class="section-eyebrow"><span class="section-eyebrow-num">5</span>검증 오류 도감</div>
-    <h2>검토 화면에서 만날 수 있는 오류</h2>
-    <p class="section-desc">검토 화면은 6가지 검사를 자동으로 수행합니다. 각 오류가 어떻게 보이고, 왜 발생하며, 어떻게 해결하는지 안내합니다.</p>
+    <h2>검토 화면에서 만날 수 있는 메시지</h2>
+    <p class="section-desc">아래 케이스들이 검토 화면에 표시될 수 있습니다. 빨간 카드(오류)는 반드시 고쳐야 완료 처리가 가능합니다.</p>
   </div>
 
-  <!-- 오류 1: 자기 참조 -->
-  <div class="err-card">
-    <div class="err-head">
-      <div class="err-icon-big">⚠</div>
-      <div class="err-title">1. 자기 참조 (Self Reference)</div>
+  <div class="shot">
+    <div class="shot-chrome">
+      <span class="shot-dot r"></span><span class="shot-dot y"></span><span class="shot-dot g"></span>
+      <span class="shot-url">검토 화면 — 오류가 있는 경우</span>
     </div>
-    <div class="mb-issue err" style="margin:0 0 16px;">
-      <div class="mb-issue-icon">⚠</div>
-      <div>
-        <div class="mb-issue-title">오류</div>
-        <div class="mb-issue-desc">상위 품목(7-AS-0023)이 자기 자신을 하위 부품으로 포함하고 있습니다.</div>
-      </div>
-    </div>
-    <div class="err-grid">
-      <div>
-        <div class="err-block-label">왜 발생하나요?</div>
-        <div class="err-block-text">실수로 상위 품목과 같은 부품을 하위 부품 목록에 추가한 경우. 예: "진단킷 본체 V2"를 만들면서 "진단킷 본체 V2"를 부품으로 넣음.</div>
-      </div>
-      <div>
-        <div class="err-block-label">어떻게 해결하나요?</div>
-        <div class="err-block-text">"← 편집으로" 클릭 후, 잘못 추가된 행의 <strong>×</strong> 버튼으로 삭제합니다.</div>
-      </div>
+    <div class="shot-body">
+      <img src="_screens/review_warn.png" alt="검토 화면 (오류 케이스)">
     </div>
   </div>
+  <p class="shot-caption">이런 화면에서는 우상단 "완료로 표시" 버튼이 회색으로 비활성화됩니다.</p>
 
-  <!-- 오류 2: 소요량 오류 -->
-  <div class="err-card">
-    <div class="err-head">
-      <div class="err-icon-big">⚠</div>
-      <div class="err-title">2. 소요량 오류 (Invalid Quantity)</div>
-    </div>
-    <div class="mb-issue err" style="margin:0 0 16px;">
-      <div class="mb-issue-icon">⚠</div>
-      <div>
-        <div class="mb-issue-title">오류</div>
-        <div class="mb-issue-desc">7-RM-0042의 소요량이 0이거나 음수입니다.</div>
+  <div class="errorlist" style="margin-top:24px;">
+    <div class="errcard">
+      <div class="errcard-head">
+        <span class="errcard-tag err">오류</span>
+        <span class="errcard-title">자기 자신을 하위로 지정</span>
       </div>
+      <div class="errcard-desc">상위 품목과 하위 부품의 ID가 동일한 경우. 부모가 자기 자신을 부품으로 가질 수는 없습니다.</div>
+      <div class="errcard-fix"><strong>해결</strong> — 해당 행의 ✕ 버튼으로 삭제하고, 올바른 부품으로 다시 추가하세요.</div>
     </div>
-    <div class="err-grid">
-      <div>
-        <div class="err-block-label">왜 발생하나요?</div>
-        <div class="err-block-text">소요량 입력란에 0이나 -1 같은 값을 입력했거나, 빈 값으로 추가된 경우.</div>
+    <div class="errcard">
+      <div class="errcard-head">
+        <span class="errcard-tag err">오류</span>
+        <span class="errcard-title">수량이 0 이하</span>
       </div>
-      <div>
-        <div class="err-block-label">어떻게 해결하나요?</div>
-        <div class="err-block-text">편집 화면에서 해당 행의 소요량을 클릭하여 1 이상의 정수로 수정합니다.</div>
-      </div>
+      <div class="errcard-desc">소요량 입력란에 0, 음수, 또는 비어있는 값이 들어간 경우. 양수만 허용됩니다.</div>
+      <div class="errcard-fix"><strong>해결</strong> — 해당 행의 <strong>×0 EA</strong> 버튼을 누르고 1 이상의 숫자로 수정.</div>
     </div>
-  </div>
-
-  <!-- 오류 3: 중복 항목 -->
-  <div class="err-card">
-    <div class="err-head">
-      <div class="err-icon-big">⚠</div>
-      <div class="err-title">3. 중복 항목 (Duplicate)</div>
-    </div>
-    <div class="mb-issue err" style="margin:0 0 16px;">
-      <div class="mb-issue-icon">⚠</div>
-      <div>
-        <div class="mb-issue-title">오류</div>
-        <div class="mb-issue-desc">7-VS-0011 (CMOS 센서 모듈 8MP)이 두 번 이상 추가되어 있습니다.</div>
+    <div class="errcard">
+      <div class="errcard-head">
+        <span class="errcard-tag err">오류</span>
+        <span class="errcard-title">중복 관계</span>
       </div>
+      <div class="errcard-desc">같은 상위 품목에 같은 부품을 두 번 이상 추가한 경우. 같은 부품의 소요량은 한 행으로 합쳐야 합니다.</div>
+      <div class="errcard-fix"><strong>해결</strong> — 중복된 행 중 하나는 삭제하고, 남긴 행의 소요량을 두 수량의 합으로 수정.</div>
     </div>
-    <div class="err-grid">
-      <div>
-        <div class="err-block-label">왜 발생하나요?</div>
-        <div class="err-block-text">실수로 같은 부품을 두 번 클릭하여 추가한 경우.</div>
+    <div class="errcard">
+      <div class="errcard-head">
+        <span class="errcard-tag err">오류</span>
+        <span class="errcard-title">순환 참조</span>
       </div>
-      <div>
-        <div class="err-block-label">어떻게 해결하나요?</div>
-        <div class="err-block-text">한 줄만 남기고 나머지는 삭제. 합쳐야 한다면 남긴 한 줄의 소요량을 두 줄의 합으로 수정합니다.</div>
-      </div>
+      <div class="errcard-desc">A의 부품이 B인데, B의 부품이 다시 A를 거쳐 A로 돌아오는 사이클. BOM 트리는 순환할 수 없습니다.</div>
+      <div class="errcard-fix"><strong>해결</strong> — 메시지에 표시되는 ID 체인을 보고, 사이클을 끊을 수 있는 행을 찾아 삭제.</div>
     </div>
-  </div>
-
-  <!-- 오류 4: 순환 참조 -->
-  <div class="err-card">
-    <div class="err-head">
-      <div class="err-icon-big">⚠</div>
-      <div class="err-title">4. 순환 참조 (Cycle)</div>
-    </div>
-    <div class="mb-issue err" style="margin:0 0 16px;">
-      <div class="mb-issue-icon">⚠</div>
-      <div>
-        <div class="mb-issue-title">오류</div>
-        <div class="mb-issue-desc">A → B → C → A 형태로 BOM이 서로 물고 도는 구조가 발견되었습니다.</div>
+    <div class="errcard">
+      <div class="errcard-head">
+        <span class="errcard-tag warn">경고</span>
+        <span class="errcard-title">공정 순서 역방향</span>
       </div>
+      <div class="errcard-desc">하위 부품의 공정 단계가 상위와 같거나 더 뒤인 경우. 예: 출하 단계의 상위에 튜브 단계의 부품이 있어야 정상인데 그 반대인 상황.</div>
+      <div class="errcard-fix"><strong>해결</strong> — 의도한 것이 맞으면 그대로 진행 가능. 실수라면 공정이 더 앞단계인 부품으로 교체.</div>
     </div>
-    <div class="err-grid">
-      <div>
-        <div class="err-block-label">왜 발생하나요?</div>
-        <div class="err-block-text">A의 부품으로 B를 넣고, B의 부품으로 C를 넣었는데, C의 부품으로 다시 A를 넣은 경우. 부품 계층이 무한 반복됩니다.</div>
+    <div class="errcard">
+      <div class="errcard-head">
+        <span class="errcard-tag err">오류</span>
+        <span class="errcard-title">상위 / 하위 품목이 원장에 없음</span>
       </div>
-      <div>
-        <div class="err-block-label">어떻게 해결하나요?</div>
-        <div class="err-block-text">순환 고리를 끊을 수 있는 한 군데를 골라 해당 부품을 제거합니다. 보통은 가장 마지막에 추가한 관계가 잘못된 경우가 많습니다.</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 오류 5: 공정 순서 역전 -->
-  <div class="err-card">
-    <div class="err-head">
-      <div class="err-icon-big" style="background:rgba(185,134,25,0.12);color:var(--c-yellow);">!</div>
-      <div class="err-title">5. 공정 순서 역전 (Process Order)</div>
-    </div>
-    <div class="mb-issue warn" style="margin:0 0 16px;">
-      <div class="mb-issue-icon">!</div>
-      <div>
-        <div class="mb-issue-title">경고</div>
-        <div class="mb-issue-desc">조립(AS) 단계 부품이 원자재(RM) 단계 부품의 하위로 들어가 있습니다.</div>
-      </div>
-    </div>
-    <div class="err-grid">
-      <div>
-        <div class="err-block-label">왜 발생하나요?</div>
-        <div class="err-block-text">예: 포장재(P 부서)를 원자재(RM)보다 먼저 사용해야 하는 듯이 BOM이 짜였을 때. 보통은 분류 실수.</div>
-      </div>
-      <div>
-        <div class="err-block-label">어떻게 해결하나요?</div>
-        <div class="err-block-text">실제로 그 순서가 맞다면 무시하고 진행해도 됩니다 (경고일 뿐 차단 아님). 잘못된 분류라면 부품 코드를 다시 확인 후 교체합니다.</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 오류 6: 미완성 BOM -->
-  <div class="err-card">
-    <div class="err-head">
-      <div class="err-icon-big" style="background:rgba(185,134,25,0.12);color:var(--c-yellow);">!</div>
-      <div class="err-title">6. 미완성 BOM (Empty)</div>
-    </div>
-    <div class="mb-issue warn" style="margin:0 0 16px;">
-      <div class="mb-issue-icon">!</div>
-      <div>
-        <div class="mb-issue-title">경고</div>
-        <div class="mb-issue-desc">하위 부품이 한 개도 추가되지 않았습니다.</div>
-      </div>
-    </div>
-    <div class="err-grid">
-      <div>
-        <div class="err-block-label">왜 발생하나요?</div>
-        <div class="err-block-text">상위 품목을 선택만 하고 부품은 추가하지 않은 채 검토 화면으로 이동한 경우.</div>
-      </div>
-      <div>
-        <div class="err-block-label">어떻게 해결하나요?</div>
-        <div class="err-block-text">"← 편집으로" 클릭 후 부품을 1개 이상 추가합니다. 실제로 부품이 없는 단순 원자재라면 굳이 BOM 세팅을 할 필요가 없으니 메인 화면으로 돌아갑니다.</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="box tip">
-    <div class="box-icon">!</div>
-    <div class="box-body">
-      <strong>오류와 경고의 차이</strong>
-      <strong style="color:var(--c-red);display:inline;">오류(빨강)</strong>는 데이터가 분명히 잘못된 상태 — 가급적 수정하세요.
-      <strong style="color:var(--c-yellow);display:inline;">경고(노랑)</strong>는 의심스러운 부분이 있다는 안내 — 실제로 맞다면 그대로 진행해도 됩니다. 둘 다 "완료로 표시"는 가능합니다.
+      <div class="errcard-desc">예전에 저장한 진행도 파일을 불러왔는데 해당 ID가 현재 품목 마스터에 없을 때 발생.</div>
+      <div class="errcard-fix"><strong>해결</strong> — 해당 행을 삭제하고 현재 마스터에 존재하는 품목으로 다시 추가.</div>
     </div>
   </div>
 </section>
 
 
-<!-- ════════════════════════════════════════════════════════════
-     6. 마우스/키보드
-     ════════════════════════════════════════════════════════════ -->
+<!-- ════════════ 6. 마우스 / 키보드 ════════════ -->
 <section class="section" id="shortcuts">
   <div class="section-head">
-    <div class="section-eyebrow"><span class="section-eyebrow-num">6</span>마우스 · 키보드 동작</div>
+    <div class="section-eyebrow"><span class="section-eyebrow-num">6</span>마우스·키보드 동작</div>
     <h2>알아두면 빠른 동작</h2>
   </div>
-  <div class="qs-grid" style="grid-template-columns:repeat(2,1fr);">
+  <div class="callouts">
     <div class="callout">
-      <div class="callout-num" style="font-family:ui-monospace,monospace;font-size:11px;">Enter</div>
+      <div class="callout-num"><kbd style="font-size:11px;">⏎</kbd></div>
       <div class="callout-body">
-        <div class="callout-title">소요량 입력 후 부품 추가</div>
-        <div class="callout-desc">우측 패널에서 부품을 선택하고 소요량을 입력한 뒤 Enter 키를 누르면 즉시 추가됩니다.</div>
+        <div class="callout-title">소요량 입력 후 <kbd>Enter</kbd></div>
+        <div class="callout-desc">"추가"·"저장" 버튼을 누르지 않아도 즉시 반영됩니다. 후보 선택 시 / 인라인 수량 수정 시 동일.</div>
       </div>
     </div>
     <div class="callout">
-      <div class="callout-num" style="font-family:ui-monospace,monospace;font-size:11px;">Esc</div>
+      <div class="callout-num"><kbd style="font-size:11px;">Esc</kbd></div>
       <div class="callout-body">
-        <div class="callout-title">소요량 수정 / 부품 선택 취소</div>
-        <div class="callout-desc">소요량 편집 중 Esc를 누르면 변경 없이 닫힙니다.</div>
+        <div class="callout-title">취소 / 한 단계 뒤로</div>
+        <div class="callout-desc">소요량 입력 / 인라인 편집을 취소합니다. 검토 화면에서는 편집 화면으로 돌아가고, 편집 화면에서는 메인 화면으로 돌아갑니다.</div>
       </div>
     </div>
     <div class="callout">
-      <div class="callout-num" style="font-family:ui-monospace,monospace;font-size:11px;">클릭</div>
+      <div class="callout-num">×</div>
       <div class="callout-body">
-        <div class="callout-title">소요량 숫자 → 즉시 편집</div>
-        <div class="callout-desc">BOM 그리드에서 "× 12 EA" 같은 버튼을 클릭하면 그 자리에서 숫자가 입력 모드로 바뀝니다.</div>
+        <div class="callout-title">소요량 숫자 → 즉시 인라인 편집</div>
+        <div class="callout-desc">"× 4 EA" 버튼은 단순 표시가 아니라 클릭 가능한 버튼입니다. 누르면 그 자리에서 입력창으로 바뀝니다.</div>
       </div>
     </div>
     <div class="callout">
-      <div class="callout-num" style="font-family:ui-monospace,monospace;font-size:11px;">×</div>
+      <div class="callout-num red">✕</div>
       <div class="callout-body">
         <div class="callout-title">한 번 클릭으로 행 삭제</div>
-        <div class="callout-desc">확인창 없이 즉시 삭제됩니다. 되돌리기는 없으니 주의하세요.</div>
+        <div class="callout-desc">확인 창 없이 즉시 삭제. 신중히 클릭하세요. 자동저장 시각이 갱신되면 삭제 반영된 것.</div>
       </div>
     </div>
   </div>
 </section>
 
 
-<!-- ════════════════════════════════════════════════════════════
-     7. FAQ
-     ════════════════════════════════════════════════════════════ -->
+<!-- ════════════ 7. FAQ ════════════ -->
 <section class="section" id="faq">
   <div class="section-head">
     <div class="section-eyebrow"><span class="section-eyebrow-num">7</span>자주 묻는 질문</div>
     <h2>FAQ</h2>
   </div>
-
-  <div class="faq-item">
-    <div class="faq-q"><div class="faq-q-mark">Q</div><div class="faq-q-text">실수로 창을 닫았어요. 작업 내용이 날아갔나요?</div></div>
-    <div class="faq-a">아닙니다. 자동저장 덕분에 같은 PC·같은 브라우저에서 다시 열면 그대로 복원됩니다. 단 다른 브라우저(Chrome → Edge 등)나 다른 PC에서는 보이지 않으니, 그런 경우엔 "진행도 저장" 파일이 필요합니다.</div>
-  </div>
-
-  <div class="faq-item">
-    <div class="faq-q"><div class="faq-q-mark">Q</div><div class="faq-q-text">완료 처리한 BOM을 다시 수정하고 싶어요.</div></div>
-    <div class="faq-a">메인 화면 우측 상태 탭에서 <strong>"완료"</strong>를 클릭하고, 해당 품목을 다시 클릭하면 편집 화면으로 들어갑니다. 수정 후 다시 "완료로 표시"하면 갱신됩니다.</div>
-  </div>
-
-  <div class="faq-item">
-    <div class="faq-q"><div class="faq-q-mark">Q</div><div class="faq-q-text">처음부터 모든 작업을 초기화하고 싶어요.</div></div>
-    <div class="faq-a">화면에 별도 "초기화" 버튼은 없습니다. 브라우저에서 F12를 눌러 개발자 도구를 열고, Console 탭에서 <code>localStorage.removeItem('bom_setup_v1')</code>을 입력 후 Enter, 그다음 페이지를 새로고침하면 빈 상태로 시작합니다.</div>
-  </div>
-
-  <div class="faq-item">
-    <div class="faq-q"><div class="faq-q-mark">Q</div><div class="faq-q-text">인터넷 연결이 없어도 되나요?</div></div>
-    <div class="faq-a">네. 품목 데이터 722개가 파일 안에 모두 들어있어 인터넷·서버 없이도 완전히 동작합니다. 처음 열 때 폰트만 잠깐 다르게 보일 수 있는데 기능에는 영향 없습니다.</div>
-  </div>
-
-  <div class="faq-item">
-    <div class="faq-q"><div class="faq-q-mark">Q</div><div class="faq-q-text">BOM 내보내기 파일은 어디에 사용하나요?</div></div>
-    <div class="faq-a">JSON은 시스템 담당자(개발팀)에게 전달하면 데이터베이스에 일괄 등록됩니다. CSV는 엑셀에서 바로 열어 확인용으로 사용하세요.</div>
-  </div>
-
-  <div class="faq-item">
-    <div class="faq-q"><div class="faq-q-mark">Q</div><div class="faq-q-text">품목이 722개인데 새 품목을 추가할 수 있나요?</div></div>
-    <div class="faq-a">이 도구에 내장된 품목은 고정된 722개입니다. 새 품목 추가는 HTML 파일 자체를 수정해야 하므로 개발팀에 요청해주세요.</div>
-  </div>
-
-  <div class="faq-item">
-    <div class="faq-q"><div class="faq-q-mark">Q</div><div class="faq-q-text">"BOM 내보내기" 버튼이 보이지 않아요.</div></div>
-    <div class="faq-a">완료로 표시한 항목이 1건 이상 있어야 이 버튼이 나타납니다. 한 건이라도 완료해보세요.</div>
-  </div>
-
-  <div class="faq-item">
-    <div class="faq-q"><div class="faq-q-mark">Q</div><div class="faq-q-text">검토 화면에서 오류가 있어도 "완료로 표시"를 누를 수 있나요?</div></div>
-    <div class="faq-a">네, 누를 수는 있습니다. 다만 빨간색 "오류"는 데이터가 분명히 잘못된 상태이므로, 가급적 수정 후 진행하시는 것을 권장합니다. 노란색 "경고"는 실제로 의도한 게 맞다면 무시해도 됩니다.</div>
+  <div class="faq">
+    <details>
+      <summary>인터넷이 안 돼도 쓸 수 있나요?</summary>
+      <div class="faq-body">네. 도구는 처음 한 번 폰트 CDN을 불러오면 그 다음부터는 완전 오프라인으로 동작합니다. 품목 데이터도 HTML 안에 임베드돼 있어서 별도 접속이 필요 없습니다.</div>
+    </details>
+    <details>
+      <summary>여러 명이 동시에 같은 파일을 작업할 수 있나요?</summary>
+      <div class="faq-body">아니요. 자동저장은 각자의 PC·브라우저에 저장되므로 서로 보이지 않습니다. 협업하려면 한 명이 작업 후 "진행도 저장"으로 JSON을 만들고, 다른 사람이 "진행도 불러오기"로 받아 이어가는 방식이 맞습니다.</div>
+    </details>
+    <details>
+      <summary>한 부서 작업이 끝나면 다른 부서로 어떻게 넘어가나요?</summary>
+      <div class="faq-body">상단의 부서 탭만 클릭하면 됩니다. 부서가 바뀌어도 작업 내용은 모두 보존되며, 통계 카드만 그 부서 기준으로 갱신됩니다.</div>
+    </details>
+    <details>
+      <summary>"미배치 원자재"가 빨간색이면 꼭 다 처리해야 하나요?</summary>
+      <div class="faq-body">의무는 아닙니다. 다만 그 부서의 원자재 중 어떤 BOM에도 포함되지 않은 부품이 있다는 뜻이므로, 누락이 의심되면 한 번씩 점검하시기를 권합니다. 의도적으로 배치하지 않는 부품(예: 단종, 보조 재료)이라면 무시해도 됩니다.</div>
+    </details>
+    <details>
+      <summary>BOM 내보내기를 했는데 어디에 저장됐죠?</summary>
+      <div class="faq-body">브라우저의 기본 다운로드 폴더에 자동 저장됩니다. 파일명은 <code>bom_export_YYYY-MM-DD.json</code>과 <code>bom_export_YYYY-MM-DD.csv</code>. 같은 날 여러 번 받으면 자동으로 (1), (2)가 붙습니다.</div>
+    </details>
+    <details>
+      <summary>완료 처리한 품목을 "미완료"로 되돌리고 싶어요</summary>
+      <div class="faq-body">완료된 품목 클릭 → 편집 화면 진입 → 부품을 모두 삭제 → "← 목록"으로 돌아가면 다시 미착수 상태가 됩니다. 부품을 남기고 싶다면 시나리오 D처럼 수정 후 다시 완료 처리하세요. (직접 "완료 해제" 버튼은 없습니다.)</div>
+    </details>
   </div>
 </section>
 
 
-<!-- ════════════════════════════════════════════════════════════
-     8. 문제 해결
-     ════════════════════════════════════════════════════════════ -->
-<section class="section" id="trouble">
+<!-- ════════════ 8. 문제 해결 ════════════ -->
+<section class="section" id="troubleshoot">
   <div class="section-head">
     <div class="section-eyebrow"><span class="section-eyebrow-num">8</span>문제 해결</div>
     <h2>이런 증상이 보일 때</h2>
   </div>
-
-  <div class="err-card">
-    <div class="err-head">
-      <div class="err-icon-big" style="background:rgba(217,90,90,0.12);color:var(--c-red);">!</div>
-      <div class="err-title">자동저장 녹색 점이 보이지 않아요</div>
+  <div class="errorlist">
+    <div class="errcard">
+      <div class="errcard-head">
+        <span class="errcard-tag warn">증상</span>
+        <span class="errcard-title">파일을 열었는데 빈 화면이 떠요</span>
+      </div>
+      <div class="errcard-desc">브라우저 캐시 문제이거나, JavaScript가 비활성화돼 있을 수 있습니다.</div>
+      <div class="errcard-fix"><strong>해결</strong> — <kbd>Ctrl</kbd>+<kbd>F5</kbd>로 강제 새로고침. 그래도 안 되면 다른 브라우저(Chrome / Edge / Firefox)에서 열어보세요.</div>
     </div>
-    <div class="err-grid">
-      <div>
-        <div class="err-block-label">원인</div>
-        <div class="err-block-text">아직 한 번도 변경한 적이 없거나, 브라우저가 시크릿 모드여서 저장이 거부됨.</div>
+    <div class="errcard">
+      <div class="errcard-head">
+        <span class="errcard-tag warn">증상</span>
+        <span class="errcard-title">"저장됨" 시각이 갱신되지 않아요</span>
       </div>
-      <div>
-        <div class="err-block-label">해결</div>
-        <div class="err-block-text">시크릿/프라이빗 모드를 끄고 일반 모드에서 다시 열어주세요. 부품 한 개를 추가/삭제해보고 시각이 표시되는지 확인합니다.</div>
-      </div>
+      <div class="errcard-desc">시크릿 모드 / 브라우저 저장공간 부족 / localStorage 비활성화 환경일 수 있습니다.</div>
+      <div class="errcard-fix"><strong>해결</strong> — 일반 모드로 다시 열고, 작업이 길어질 것 같으면 중간중간 <strong>"진행도 저장"</strong>으로 JSON 백업을 받아두세요.</div>
     </div>
-  </div>
-
-  <div class="err-card">
-    <div class="err-head">
-      <div class="err-icon-big" style="background:rgba(217,90,90,0.12);color:var(--c-red);">!</div>
-      <div class="err-title">다른 PC에서 열었더니 빈 화면이에요</div>
+    <div class="errcard">
+      <div class="errcard-head">
+        <span class="errcard-tag warn">증상</span>
+        <span class="errcard-title">검색해도 품목이 안 나와요</span>
+      </div>
+      <div class="errcard-desc">단계 필터(전체/중간공정/공정완료)가 켜져 있어 결과를 줄이고 있을 수 있습니다.</div>
+      <div class="errcard-fix"><strong>해결</strong> — 단계 필터를 <strong>"전체"</strong>로, 검색어를 짧게 하거나 코드 일부만 입력해보세요.</div>
     </div>
-    <div class="err-grid">
-      <div>
-        <div class="err-block-label">원인</div>
-        <div class="err-block-text">자동저장은 PC1의 브라우저 안에만 있습니다. PC2에는 데이터가 없으므로 빈 화면이 정상입니다.</div>
+    <div class="errcard">
+      <div class="errcard-head">
+        <span class="errcard-tag warn">증상</span>
+        <span class="errcard-title">"완료로 표시" 버튼이 회색이에요</span>
       </div>
-      <div>
-        <div class="err-block-label">해결</div>
-        <div class="err-block-text">PC1에서 미리 "진행도 저장"한 JSON 파일을 PC2로 옮긴 뒤, "진행도 불러오기"로 복원하세요. (4-2 항목 참고)</div>
-      </div>
+      <div class="errcard-desc">검증 결과에 빨간 "오류" 카드가 하나라도 있으면 비활성화됩니다.</div>
+      <div class="errcard-fix"><strong>해결</strong> — <a href="#errors">5번 섹션</a>을 보고 각 오류를 수정. 노란 "경고"는 진행 가능합니다.</div>
     </div>
-  </div>
-
-  <div class="err-card">
-    <div class="err-head">
-      <div class="err-icon-big" style="background:rgba(217,90,90,0.12);color:var(--c-red);">!</div>
-      <div class="err-title">"BOM 내보내기" 버튼이 안 보여요</div>
+    <div class="errcard">
+      <div class="errcard-head">
+        <span class="errcard-tag warn">증상</span>
+        <span class="errcard-title">"진행도 불러오기"가 실패해요</span>
+      </div>
+      <div class="errcard-desc">이 도구가 만든 JSON 형식이 아니거나, 파일이 손상됐을 수 있습니다.</div>
+      <div class="errcard-fix"><strong>해결</strong> — 파일명이 <code>bom_draft_</code>로 시작하는지 확인. 메모장으로 열어 첫 줄에 <code>"version"</code>이 있어야 정상.</div>
     </div>
-    <div class="err-grid">
-      <div>
-        <div class="err-block-label">원인</div>
-        <div class="err-block-text">완료로 표시된 항목이 0건이면 이 버튼은 표시되지 않습니다.</div>
+    <div class="errcard">
+      <div class="errcard-head">
+        <span class="errcard-tag warn">증상</span>
+        <span class="errcard-title">화면 글씨가 너무 작아요 / 너무 커요</span>
       </div>
-      <div>
-        <div class="err-block-label">해결</div>
-        <div class="err-block-text">상위 품목 1건을 끝까지 완료해보세요 (편집 → 검토 → 완료로 표시). 그러면 버튼이 나타납니다.</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="err-card">
-    <div class="err-head">
-      <div class="err-icon-big" style="background:rgba(217,90,90,0.12);color:var(--c-red);">!</div>
-      <div class="err-title">진행도 불러오기 후 화면이 깨져 보여요</div>
-    </div>
-    <div class="err-grid">
-      <div>
-        <div class="err-block-label">원인</div>
-        <div class="err-block-text">JSON 파일이 손상되었거나, 다른 도구의 파일을 잘못 불러온 경우.</div>
-      </div>
-      <div>
-        <div class="err-block-label">해결</div>
-        <div class="err-block-text">F5(새로고침)으로 페이지를 다시 열고, 정상적인 <code>bom_draft_*.json</code> 파일을 다시 불러옵니다. 백업 파일이 여러 개 있다면 가장 최근 것을 사용하세요.</div>
-      </div>
+      <div class="errcard-desc">브라우저 줌 배율 문제입니다.</div>
+      <div class="errcard-fix"><strong>해결</strong> — <kbd>Ctrl</kbd>+<kbd>0</kbd>으로 100%로 초기화하거나, <kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>−</kbd>로 조절.</div>
     </div>
   </div>
 
-  <div class="err-card">
-    <div class="err-head">
-      <div class="err-icon-big" style="background:rgba(217,90,90,0.12);color:var(--c-red);">!</div>
-      <div class="err-title">하위 품목 추가 우측 패널이 좁아 보여요</div>
-    </div>
-    <div class="err-grid">
-      <div>
-        <div class="err-block-label">원인</div>
-        <div class="err-block-text">브라우저 창이 너무 좁아서 패널이 축소된 상태.</div>
-      </div>
-      <div>
-        <div class="err-block-label">해결</div>
-        <div class="err-block-text">브라우저 창을 최대화(F11 또는 우상단 □ 버튼)하면 됩니다. 권장 해상도: 1280×800 이상.</div>
-      </div>
+  <div class="box info" style="margin-top:24px;">
+    <div class="box-icon">i</div>
+    <div class="box-body">
+      <strong>그래도 해결이 안 되면</strong> — 1) 진행도 JSON으로 백업해두기 → 2) 브라우저의 localStorage에서 키 <code>bom_setup_v1</code> 만 삭제 → 3) 페이지 새로고침 후 JSON 다시 불러오기. 이렇게 하면 대부분의 깨진 상태가 복구됩니다.
     </div>
   </div>
 </section>
 
-
-<footer>
-  DEXCOWIN MES · BOM 세팅 도구 사용 설명서 · 2026-05-04 · v1<br>
-  <a href="bom_setup.html" style="font-weight:700;">도구 열기 →</a>
-  &nbsp;·&nbsp;
-  <a href="#top">맨 위로 ↑</a>
-</footer>
 
 </div>
 </body>
