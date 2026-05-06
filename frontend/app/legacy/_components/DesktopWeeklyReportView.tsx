@@ -303,17 +303,14 @@ export function DesktopWeeklyReportView() {
         </div>
       </div>
 
-      {/* ── 행1.5: 이번 주 총평 ── */}
-      {data && <WeeklySummaryBand data={data} />}
-
-      {/* ── 행2: 주간 생산 현황 ── */}
+      {/* ── 행1.5: 주간 생산 현황 ── */}
       <div className="shrink-0 rounded-[22px] border p-4" style={cardBase}>
         <div className="mb-3 flex items-baseline gap-2">
           <h2 className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
-            주간 생산 현황
+            생산 현황
           </h2>
           <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted }}>
-            모델별 생산 완료 수량 (PRODUCE)
+            선택 주차 모델별 공정 생산 수량
           </span>
         </div>
         {loading && !data ? (
@@ -326,43 +323,59 @@ export function DesktopWeeklyReportView() {
         )}
       </div>
 
-      {/* ── 행3: 공정별 변화 카드 ── */}
-      <div className="shrink-0 rounded-[22px] border p-4" style={cardBase}>
-        <div className="mb-3 flex items-baseline gap-2">
-          <h2 className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
-            공정별 변화
-          </h2>
-          <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted }}>
-            순변동 · 생산/입고 · 출고/소비
-          </span>
-        </div>
-        {loading && !data ? (
-          <div className="grid grid-cols-3 gap-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="animate-pulse rounded-[16px] border"
-                style={{ height: 72, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-              />
-            ))}
-          </div>
-        ) : (
-          <WeeklyGroupCards
-            groups={data?.groups ?? []}
-            selected={selectedCode}
-            onSelect={setSelectedCode}
-          />
-        )}
-      </div>
+      {/* ── 행2: 이번 주 총평 ── */}
+      {data && <WeeklySummaryBand data={data} />}
 
-      {/* ── 행4: 품목 상세 카드 ── */}
-      <div className="flex flex-col rounded-[22px] border" style={cardBase}>
-        {/* 헤더 */}
+      {/* ── 행3: 2-column (공정별 변화 | 품목 상세) ── */}
+      <div className="flex gap-3">
+
+        {/* 좌: 공정별 변화 */}
         <div
-          className="flex shrink-0 items-center border-b px-5 py-3"
-          style={{ borderColor: LEGACY_COLORS.border }}
+          className="flex w-[360px] shrink-0 flex-col rounded-[22px] border"
+          style={cardBase}
         >
-          <div>
+          <div
+            className="shrink-0 border-b px-4 pb-3 pt-4"
+            style={{ borderColor: LEGACY_COLORS.border }}
+          >
+            <h2 className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
+              공정별 변화
+            </h2>
+            <p className="mt-0.5 text-[12px]" style={{ color: LEGACY_COLORS.muted }}>
+              순변동 · 생산/입고 · 출고
+            </p>
+          </div>
+          <div className="p-4">
+            {loading && !data ? (
+              <div className="flex flex-col gap-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="animate-pulse rounded-[16px] border"
+                    style={{ height: 72, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <WeeklyGroupCards
+                groups={data?.groups ?? []}
+                selected={selectedCode}
+                onSelect={setSelectedCode}
+                cols={1}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* 우: 품목 상세 */}
+        <div
+          className="flex flex-1 flex-col rounded-[22px] border"
+          style={cardBase}
+        >
+          <div
+            className="shrink-0 border-b px-5 py-3"
+            style={{ borderColor: LEGACY_COLORS.border }}
+          >
             <h2 className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
               {selectedGroup
                 ? `${selectedGroup.dept_name} (${selectedGroup.process_code}) 품목 상세`
@@ -372,25 +385,22 @@ export function DesktopWeeklyReportView() {
               {selectedGroup?.label ?? "공정을 선택하세요"} · 선택 주차 품목별 변화
             </p>
           </div>
-        </div>
-
-        {/* 바디: 테이블 */}
-        <div className="px-5 pb-4 pt-3">
-          {loading && !data ? (
-            <LoadingSkeleton variant="list" rows={8} />
-          ) : (
-            <WeeklyDetailTable group={selectedGroup} />
-          )}
-        </div>
-
-        {/* 푸터 */}
-        <div
-          className="shrink-0 border-t px-5 py-2.5 text-[10px]"
-          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-        >
-          전주재고는 현재재고와 선택 주차 입출고 내역을 기준으로 계산한 값입니다.
+          <div className="px-5 pb-4 pt-3">
+            {loading && !data ? (
+              <LoadingSkeleton variant="list" rows={8} />
+            ) : (
+              <WeeklyDetailTable group={selectedGroup} />
+            )}
+          </div>
+          <div
+            className="shrink-0 border-t px-5 py-2.5 text-[10px]"
+            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+          >
+            전주재고는 현재재고와 선택 주차 입출고 내역을 기준으로 계산한 값입니다.
+          </div>
         </div>
       </div>
+
     </div>
   );
 }

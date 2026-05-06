@@ -61,13 +61,15 @@ function getSummaryInfo(data: WeeklyReportResponse): SummaryInfo {
 
 function WeeklySummaryBandImpl({ data }: Props) {
   const info = getSummaryInfo(data);
+  const { summary } = data;
+  const hasActivity = summary.total_in_qty > 0 || summary.total_out_qty > 0;
 
   const toneColor =
     info.level === "danger"
       ? LEGACY_COLORS.red
       : info.level === "warn"
       ? LEGACY_COLORS.yellow
-      : LEGACY_COLORS.text;
+      : LEGACY_COLORS.muted;
 
   const borderColor =
     info.level === "danger"
@@ -76,21 +78,77 @@ function WeeklySummaryBandImpl({ data }: Props) {
       ? tint(LEGACY_COLORS.yellow, 40, LEGACY_COLORS.border)
       : LEGACY_COLORS.border;
 
+  const bgColor =
+    info.level === "danger"
+      ? tint(LEGACY_COLORS.red, 5, LEGACY_COLORS.s1)
+      : info.level === "warn"
+      ? tint(LEGACY_COLORS.yellow, 6, LEGACY_COLORS.s1)
+      : LEGACY_COLORS.s1;
+
+  const kpiItems = [
+    {
+      label: "생산 / 입고",
+      value: formatQty(summary.total_in_qty),
+      color: LEGACY_COLORS.green,
+    },
+    {
+      label: "출고 / 소비",
+      value: formatQty(summary.total_out_qty),
+      color: LEGACY_COLORS.red,
+    },
+    {
+      label: "증가 공정",
+      value: `${summary.groups_increasing}개`,
+      color: LEGACY_COLORS.cyan,
+    },
+    {
+      label: "감소 공정",
+      value: `${summary.groups_decreasing}개`,
+      color: summary.groups_decreasing > 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2,
+    },
+  ];
+
   return (
     <div
-      className="shrink-0 rounded-[18px] border px-5 py-3"
-      style={{ background: LEGACY_COLORS.s1, borderColor }}
+      className="shrink-0 rounded-[18px] border"
+      style={{ background: bgColor, borderColor }}
     >
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      {/* KPI 수치 row */}
+      {hasActivity && (
+        <div
+          className="grid grid-cols-4"
+          style={{ borderBottom: `1px solid ${borderColor}` }}
+        >
+          {kpiItems.map((item, i) => (
+            <div
+              key={item.label}
+              className="flex flex-col items-center gap-0.5 px-4 py-3"
+              style={i > 0 ? { borderLeft: `1px solid ${borderColor}` } : undefined}
+            >
+              <span className="text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                {item.label}
+              </span>
+              <span className="text-[22px] font-black leading-none tabular-nums" style={{ color: item.color }}>
+                {item.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 상태 메시지 row */}
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-5 py-3">
         <span className="shrink-0 text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
           이번 주 총평
         </span>
         <span className="text-[13px] font-bold" style={{ color: toneColor }}>
           {info.headline}
         </span>
-        <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-          {info.sub}
-        </span>
+        {hasActivity && (
+          <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+            {info.sub}
+          </span>
+        )}
       </div>
     </div>
   );

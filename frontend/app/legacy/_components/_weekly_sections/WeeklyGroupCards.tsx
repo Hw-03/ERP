@@ -10,13 +10,14 @@ interface Props {
   groups: WeeklyGroupReport[];
   selected: string;
   onSelect: (code: string) => void;
+  cols?: 1 | 3;
 }
 
-function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
+function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
   const [hovered, setHovered] = useState<string | null>(null);
 
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className={`grid ${cols === 1 ? "grid-cols-1" : "grid-cols-3"} gap-3`}>
       {groups.map((g) => {
         const isActive = g.process_code === selected;
         const isHover = hovered === g.process_code;
@@ -102,6 +103,12 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
                   style={{ color: LEGACY_COLORS.muted }}
                 >
                   출고 {formatQty(g.out_qty)}
+                </span>
+                <span
+                  className="text-[11px] font-semibold"
+                  style={{ color: LEGACY_COLORS.muted2 }}
+                >
+                  현재 {formatQty(g.current_qty)}
                 </span>
               </div>
             </div>

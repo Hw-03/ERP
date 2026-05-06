@@ -27,6 +27,37 @@ function WeeklyDetailTableImpl({ group }: Props) {
       <div className="overflow-x-auto">
         <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 3px", minWidth: 680 }}>
           <thead>
+            {/* 컬럼 그룹 헤더 */}
+            <tr>
+              <th
+                colSpan={2}
+                className="pb-0.5 pl-3 pt-2 text-left text-[10px] font-bold"
+                style={{ color: LEGACY_COLORS.muted2 }}
+              >
+                기본 정보
+              </th>
+              <th
+                colSpan={1}
+                className="pb-0.5 px-2 pt-2 text-right text-[10px] font-bold"
+                style={{ color: LEGACY_COLORS.muted2 }}
+              >
+                전주
+              </th>
+              <th
+                colSpan={2}
+                className="pb-0.5 px-2 pt-2 text-right text-[10px] font-bold"
+                style={{ color: LEGACY_COLORS.muted2 }}
+              >
+                이번주 변동
+              </th>
+              <th
+                colSpan={2}
+                className="pb-0.5 px-2 pt-2 text-right text-[10px] font-bold"
+                style={{ color: LEGACY_COLORS.muted2 }}
+              >
+                결과
+              </th>
+            </tr>
             <tr>
               {["품목 코드", "품명", "전주 재고", "생산 내역", "출고 내역", "현재 재고", "증감"].map(
                 (h, i) => (
