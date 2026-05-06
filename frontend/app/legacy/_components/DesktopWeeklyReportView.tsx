@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { api } from "@/lib/api";
@@ -71,7 +71,7 @@ export function DesktopWeeklyReportView() {
   const [data, setData] = useState<WeeklyReportResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedCode, setSelectedCode] = useState("NF");
+  const [selectedCode, setSelectedCode] = useState("TF");
 
   const [calOpen, setCalOpen] = useState(false);
   const [hoveredWeek, setHoveredWeek] = useState<string | null>(null);
@@ -84,27 +84,30 @@ export function DesktopWeeklyReportView() {
   const weekStart = toDateStr(weekMon);
   const weekEnd = toDateStr(new Date(weekMon.getTime() + 6 * 86400000));
 
-  const load = useCallback(() => {
+  useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
     api
       .getWeeklyReport({ week_start: weekStart, week_end: weekEnd })
       .then((res) => {
+        if (cancelled) return;
         setData(res);
-        if (res.groups.length > 0 && !res.groups.find((g) => g.process_code === selectedCode)) {
-          setSelectedCode(res.groups[0].process_code);
-        }
+        setSelectedCode((prev) => {
+          if (res.groups.length > 0 && !res.groups.find((g) => g.process_code === prev)) {
+            return res.groups[0].process_code;
+          }
+          return prev;
+        });
       })
       .catch((e: unknown) => {
-        setError("주간보고 데이터를 불러오지 못했습니다.");
-        console.error(e);
+        if (!cancelled) {
+          setError("주간보고 데이터를 불러오지 못했습니다.");
+          console.error(e);
+        }
       })
-      .finally(() => setLoading(false));
-  }, [weekStart, weekEnd, selectedCode]);
-
-  useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [weekStart, weekEnd]);
 
   useEffect(() => {
