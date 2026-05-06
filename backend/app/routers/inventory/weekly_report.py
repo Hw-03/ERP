@@ -15,6 +15,7 @@ from app.models import Inventory, Item, TransactionLog, TransactionTypeEnum
 from app.schemas import (
     WeeklyGroupReport,
     WeeklyItemReport,
+    WeeklyProductionModelRow,
     WeeklyReportResponse,
     WeeklyReportSummary,
     WeeklyWarning,
@@ -25,6 +26,12 @@ from ._shared import PROCESS_TYPE_LABELS
 router = APIRouter()
 
 _F_CODES = ["TF", "HF", "VF", "NF", "AF", "PF"]
+
+_PROD_CODES = ["HF", "VF", "NF", "AF"]
+
+_FIXED_MODELS = ["DX3000", "ADX4000W", "ADX6000S", "ADX6000", "COCOON"]
+
+_SYMBOL_MAP = {"3": "DX3000", "4": "ADX4000W", "6": "ADX6000", "7": "COCOON"}
 
 _DEPT_NAMES: dict[str, str] = {
     "TF": "튜브",
@@ -49,6 +56,23 @@ _OUT_TYPES = {
     TransactionTypeEnum.SCRAP,
     TransactionTypeEnum.LOSS,
 }
+
+
+def _resolve_model(item_name: str, model_symbol: str | None) -> str:
+    n = (item_name or "").upper()
+    if "ADX6000S" in n:
+        return "ADX6000S"
+    if "ADX6000FB" in n or "ADX6000" in n:
+        return "ADX6000"
+    if "ADX4000" in n:
+        return "ADX4000W"
+    if "DX3000" in n:
+        return "DX3000"
+    if "COCOON" in n:
+        return "COCOON"
+    if model_symbol and len(model_symbol) == 1:
+        return _SYMBOL_MAP.get(model_symbol, "기타/공용")
+    return "기타/공용"
 
 
 def _current_week_bounds() -> tuple[date, date]:
@@ -186,6 +210,54 @@ def get_weekly_report(
             )
         )
 
+    # ── 생산 매트릭스 집계 ────────────────────────────────────────
+    prod_items = (
+        db.query(Item, func.coalesce(func.sum(TransactionLog.quantity_change), 0))
+        .join(TransactionLog, Item.item_id == TransactionLog.item_id)
+        .filter(
+            Item.process_type_code.in_(_PROD_CODES),
+            TransactionLog.transaction_type == TransactionTypeEnum.PRODUCE,
+            TransactionLog.created_at >= dt_start,
+            TransactionLog.created_at <= dt_end,
+        )
+        .group_by(Item.item_id)
+        .all()
+    )
+
+    matrix: dict[str, dict[str, Decimal]] = {}
+    for item, qty_sum in prod_items:
+        model_key = _resolve_model(item.item_name, item.model_symbol)
+        proc = item.process_type_code or ""
+        if proc not in _PROD_CODES:
+            continue
+        val = Decimal(str(qty_sum))
+        if model_key not in matrix:
+            matrix[model_key] = {}
+        matrix[model_key][proc] = matrix[model_key].get(proc, Decimal("0")) + val
+
+    ordered_keys = list(_FIXED_MODELS)
+    if "기타/공용" in matrix:
+        ordered_keys.append("기타/공용")
+
+    production_matrix: list[WeeklyProductionModelRow] = []
+    for key in ordered_keys:
+        row_data = matrix.get(key, {})
+        hf = row_data.get("HF", Decimal("0"))
+        vf = row_data.get("VF", Decimal("0"))
+        nf = row_data.get("NF", Decimal("0"))
+        af = row_data.get("AF", Decimal("0"))
+        production_matrix.append(
+            WeeklyProductionModelRow(
+                model_key=key,
+                model_label=key,
+                hf_qty=hf,
+                vf_qty=vf,
+                nf_qty=nf,
+                af_qty=af,
+                total_qty=hf + vf + nf + af,
+            )
+        )
+
     total_current = sum((g.current_qty for g in groups), Decimal("0"))
     total_in = sum((g.in_qty for g in groups), Decimal("0"))
     total_out = sum((g.out_qty for g in groups), Decimal("0"))
@@ -235,4 +307,5 @@ def get_weekly_report(
         groups=groups,
         summary=summary,
         warnings=warnings,
+        production_matrix=production_matrix,
     )

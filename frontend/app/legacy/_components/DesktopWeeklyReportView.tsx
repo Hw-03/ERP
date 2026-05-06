@@ -9,6 +9,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { WeeklyGroupCards } from "./_weekly_sections/WeeklyGroupCards";
 import { WeeklyDetailTable } from "./_weekly_sections/WeeklyDetailTable";
 import { WeeklySummaryBand } from "./_weekly_sections/WeeklySummaryBand";
+import { WeeklyProductionMatrix } from "./_weekly_sections/WeeklyProductionMatrix";
 import { LoadingSkeleton, StatusPill } from "./common";
 
 // ─── 주차 계산 ────────────────────────────────────────────────────
@@ -305,7 +306,27 @@ export function DesktopWeeklyReportView() {
       {/* ── 행1.5: 이번 주 총평 ── */}
       {data && <WeeklySummaryBand data={data} />}
 
-      {/* ── 행2: 공정별 변화 카드 ── */}
+      {/* ── 행2: 주간 생산 현황 ── */}
+      <div className="shrink-0 rounded-[22px] border p-4" style={cardBase}>
+        <div className="mb-3 flex items-baseline gap-2">
+          <h2 className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
+            주간 생산 현황
+          </h2>
+          <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted }}>
+            모델별 생산 완료 수량 (PRODUCE)
+          </span>
+        </div>
+        {loading && !data ? (
+          <div
+            className="animate-pulse rounded-[10px]"
+            style={{ height: 140, background: LEGACY_COLORS.s2 }}
+          />
+        ) : (
+          <WeeklyProductionMatrix rows={data?.production_matrix ?? []} />
+        )}
+      </div>
+
+      {/* ── 행3: 공정별 변화 카드 ── */}
       <div className="shrink-0 rounded-[22px] border p-4" style={cardBase}>
         <div className="mb-3 flex items-baseline gap-2">
           <h2 className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
@@ -334,7 +355,7 @@ export function DesktopWeeklyReportView() {
         )}
       </div>
 
-      {/* ── 행3: 품목 상세 카드 ── */}
+      {/* ── 행4: 품목 상세 카드 ── */}
       <div className="flex flex-col rounded-[22px] border" style={cardBase}>
         {/* 헤더 */}
         <div

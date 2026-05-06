@@ -108,8 +108,14 @@ class EmployeePinResetRequest(BaseModel):
     admin_pin: str = Field(..., min_length=1, max_length=32)
 
 
+class EmployeePinChangeRequest(BaseModel):
+    # 본인 PIN 변경 — 현재 PIN 검증 필요
+    current_pin: str = Field(..., min_length=1, max_length=20)
+    new_pin: str = Field(..., min_length=1, max_length=20)
+
+
 class EmployeeCreate(BaseModel):
-    employee_code: str = Field(..., max_length=30)
+    employee_code: Optional[str] = Field(None, max_length=30)
     name: str = Field(..., max_length=100)
     role: str = Field(..., max_length=100)
     phone: Optional[str] = Field(None, max_length=30)
@@ -552,12 +558,23 @@ class WeeklyReportSummary(BaseModel):
     groups_unchanged: int
 
 
+class WeeklyProductionModelRow(BaseModel):
+    model_key: str
+    model_label: str
+    hf_qty: Decimal
+    vf_qty: Decimal
+    nf_qty: Decimal
+    af_qty: Decimal
+    total_qty: Decimal
+
+
 class WeeklyReportResponse(BaseModel):
     week_start: str
     week_end: str
     groups: List[WeeklyGroupReport]
     summary: WeeklyReportSummary
     warnings: List[WeeklyWarning]
+    production_matrix: List[WeeklyProductionModelRow] = []
 
 
 class OptionCodeResponse(BaseModel):

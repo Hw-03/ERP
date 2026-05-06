@@ -1165,9 +1165,16 @@
             "type": "integer"
           },
           "employee_code": {
-            "maxLength": 30,
-            "title": "Employee Code",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employee Code"
           },
           "is_active": {
             "default": true,
@@ -1212,7 +1219,6 @@
           }
         },
         "required": [
-          "employee_code",
           "name",
           "role",
           "department"
@@ -1228,6 +1234,28 @@
         ],
         "title": "EmployeeLevelEnum",
         "type": "string"
+      },
+      "EmployeePinChangeRequest": {
+        "properties": {
+          "current_pin": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Current Pin",
+            "type": "string"
+          },
+          "new_pin": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "New Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "current_pin",
+          "new_pin"
+        ],
+        "title": "EmployeePinChangeRequest",
+        "type": "object"
       },
       "EmployeePinResetRequest": {
         "properties": {
@@ -6090,6 +6118,49 @@
         "title": "WeeklyItemReport",
         "type": "object"
       },
+      "WeeklyProductionModelRow": {
+        "properties": {
+          "af_qty": {
+            "title": "Af Qty",
+            "type": "string"
+          },
+          "hf_qty": {
+            "title": "Hf Qty",
+            "type": "string"
+          },
+          "model_key": {
+            "title": "Model Key",
+            "type": "string"
+          },
+          "model_label": {
+            "title": "Model Label",
+            "type": "string"
+          },
+          "nf_qty": {
+            "title": "Nf Qty",
+            "type": "string"
+          },
+          "total_qty": {
+            "title": "Total Qty",
+            "type": "string"
+          },
+          "vf_qty": {
+            "title": "Vf Qty",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_key",
+          "model_label",
+          "hf_qty",
+          "vf_qty",
+          "nf_qty",
+          "af_qty",
+          "total_qty"
+        ],
+        "title": "WeeklyProductionModelRow",
+        "type": "object"
+      },
       "WeeklyReportResponse": {
         "properties": {
           "groups": {
@@ -6097,6 +6168,14 @@
               "$ref": "#/components/schemas/WeeklyGroupReport"
             },
             "title": "Groups",
+            "type": "array"
+          },
+          "production_matrix": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/WeeklyProductionModelRow"
+            },
+            "title": "Production Matrix",
             "type": "array"
           },
           "summary": {
@@ -7741,6 +7820,53 @@
           }
         },
         "summary": "Update Employee",
+        "tags": [
+          "Employees"
+        ]
+      }
+    },
+    "/api/employees/{employee_id}/change-pin": {
+      "post": {
+        "description": "본인 PIN 변경 — 현재 PIN 검증 필요.",
+        "operationId": "change_employee_pin_api_employees__employee_id__change_pin_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmployeePinChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Employee Pin",
         "tags": [
           "Employees"
         ]

@@ -37,10 +37,21 @@ export interface WeeklyReportSummary {
   groups_unchanged: number;
 }
 
+export interface WeeklyProductionModelRow {
+  model_key: string;
+  model_label: string;
+  hf_qty: number;
+  vf_qty: number;
+  nf_qty: number;
+  af_qty: number;
+  total_qty: number;
+}
+
 export interface WeeklyReportResponse {
   week_start: string;
   week_end: string;
   groups: WeeklyGroupReport[];
   summary: WeeklyReportSummary;
   warnings: WeeklyWarning[];
+  production_matrix: WeeklyProductionModelRow[];
 }
