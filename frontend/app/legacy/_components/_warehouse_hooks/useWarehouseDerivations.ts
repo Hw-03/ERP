@@ -129,7 +129,8 @@ export function useWarehouseDerivations(
   const canExecute =
     !!selectedEmployee &&
     (workType === "package-out" ? !!selectedPackage : selectedEntries.length > 0) &&
-    !quantityInvalid;
+    !quantityInvalid &&
+    !stockShortage;
 
   const blockerText = !selectedEmployee
     ? "담당자를 선택하세요"

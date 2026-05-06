@@ -16,6 +16,7 @@ export interface TransactionLog {
   quantity_change: number;
   quantity_before: number | null;
   quantity_after: number | null;
+  transfer_qty: number | null;
   reference_no: string | null;
   produced_by: string | null;
   notes: string | null;

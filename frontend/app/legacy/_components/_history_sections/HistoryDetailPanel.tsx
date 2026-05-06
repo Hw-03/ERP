@@ -101,8 +101,9 @@ export function HistoryDetailPanel({
           )}
         </div>
         <div className="mt-3 text-4xl font-black" style={{ color: tcolor }}>
-          {Number(selected.quantity_change) >= 0 ? "+" : ""}
-          {formatQty(selected.quantity_change)}
+          {selected.transfer_qty != null
+            ? `이동 ${formatQty(selected.transfer_qty)}`
+            : `${Number(selected.quantity_change) >= 0 ? "+" : ""}${formatQty(selected.quantity_change)}`}
           <span className="ml-2 text-base font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
             {selected.item_unit}
           </span>

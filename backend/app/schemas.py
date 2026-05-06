@@ -466,6 +466,7 @@ class TransactionLogResponse(BaseModel):
     quantity_change: Decimal
     quantity_before: Optional[Decimal]
     quantity_after: Optional[Decimal]
+    transfer_qty: Optional[Decimal] = None
     reference_no: Optional[str]
     produced_by: Optional[str]
     notes: Optional[str]

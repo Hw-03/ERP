@@ -395,6 +395,7 @@ class TransactionLog(Base):
     quantity_change = Column(Numeric(15, 4), nullable=False)
     quantity_before = Column(Numeric(15, 4), nullable=True)
     quantity_after = Column(Numeric(15, 4), nullable=True)
+    transfer_qty = Column(Numeric(15, 4), nullable=True)
     reference_no = Column(String(100), nullable=True, index=True)
     produced_by = Column(String(100), nullable=True)
     notes = Column(Text, nullable=True)

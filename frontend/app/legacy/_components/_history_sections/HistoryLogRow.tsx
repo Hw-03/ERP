@@ -140,8 +140,9 @@ function HistoryLogRowImpl({ log, selected, copiedRef, onSelect, onCopyRef }: Pr
         className="whitespace-nowrap border-b px-4 py-3 text-right font-bold"
         style={{ borderColor: LEGACY_COLORS.border, color: tcolor }}
       >
-        {Number(log.quantity_change) >= 0 ? "+" : ""}
-        {formatQty(log.quantity_change)}
+        {log.transfer_qty != null
+          ? `이동 ${formatQty(log.transfer_qty)}`
+          : `${Number(log.quantity_change) >= 0 ? "+" : ""}${formatQty(log.quantity_change)}`}
       </td>
       <td
         className="whitespace-nowrap border-b px-4 py-3 text-xs"
