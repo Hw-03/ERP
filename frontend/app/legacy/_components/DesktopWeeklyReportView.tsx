@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { api } from "@/lib/api";
 import type { WeeklyReportResponse } from "@/lib/api/types/weekly";
@@ -41,8 +41,16 @@ function weekLabel(mon: Date): string {
 
 const CAL_MIN = new Date(2026, 0, 1);
 
+// 일요일 시작 주 계산
+function getWeekStartSun(d: Date): Date {
+  const sun = new Date(d);
+  sun.setDate(d.getDate() - d.getDay());
+  sun.setHours(0, 0, 0, 0);
+  return sun;
+}
+
 function getWeeksOfMonth(year: number, month: number): Date[][] {
-  const start = getWeekStart(new Date(year, month, 1));
+  const start = getWeekStartSun(new Date(year, month, 1));
   const endOfMonth = new Date(year, month + 1, 0);
   const weeks: Date[][] = [];
   const cur = new Date(start);
@@ -66,6 +74,7 @@ export function DesktopWeeklyReportView() {
   const [selectedCode, setSelectedCode] = useState("NF");
 
   const [calOpen, setCalOpen] = useState(false);
+  const [hoveredWeek, setHoveredWeek] = useState<string | null>(null);
   const [calMonth, setCalMonth] = useState<Date>(() => {
     const t = new Date();
     return new Date(t.getFullYear(), t.getMonth(), 1);
@@ -123,175 +132,173 @@ export function DesktopWeeklyReportView() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-1 pr-1">
 
-      {/* ── 행1: 컨트롤 바 ── */}
+      {/* ── 행1: 컨트롤 바 (달력 아코디언) ── */}
       <div
-        className="flex shrink-0 items-center justify-between gap-3 rounded-[22px] border px-5 py-3"
+        className="shrink-0 rounded-[22px] border"
         style={cardBase}
+        ref={calRef}
       >
-        <div className="flex items-center gap-2">
-          {/* 달력 피커 */}
-          <div className="relative" ref={calRef}>
-            {/* 트리거 버튼 */}
-            <button
-              type="button"
-              onClick={() => setCalOpen((v) => !v)}
-              className="flex items-center gap-2 rounded-[14px] border px-4 py-2 transition-colors hover:brightness-110"
+        {/* 트리거 행 */}
+        <div className="flex items-center justify-between px-5 py-3">
+          <button
+            type="button"
+            onClick={() => setCalOpen((v) => !v)}
+            className="flex items-center gap-2 rounded-[14px] border px-4 py-2.5 transition-colors hover:brightness-110"
+            style={{
+              background: calOpen
+                ? tint(LEGACY_COLORS.blue, 10, LEGACY_COLORS.s2)
+                : LEGACY_COLORS.s2,
+              borderColor: calOpen ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+              color: LEGACY_COLORS.text,
+            }}
+          >
+            <CalendarDays
+              className="h-4 w-4 shrink-0"
+              style={{ color: LEGACY_COLORS.blue }}
+            />
+            <span className="text-[15px] font-black">{weekLabel(weekMon)}</span>
+            <ChevronRight
+              className="h-4 w-4 shrink-0 transition-transform"
               style={{
-                background: calOpen
-                  ? tint(LEGACY_COLORS.blue, 10, LEGACY_COLORS.s2)
-                  : LEGACY_COLORS.s2,
-                borderColor: calOpen ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                color: LEGACY_COLORS.text,
+                color: LEGACY_COLORS.muted,
+                transform: calOpen ? "rotate(90deg)" : "rotate(0deg)",
               }}
-            >
-              <CalendarDays
-                className="h-4 w-4 shrink-0"
-                style={{ color: LEGACY_COLORS.blue }}
-              />
-              <span className="text-[15px] font-black">{weekLabel(weekMon)}</span>
-            </button>
+            />
+          </button>
+          <div className="flex items-center gap-2">
+            {isThisWeek && <StatusPill label="이번 주" tone="success" showDot={false} />}
+            {error && (
+              <span className="text-[12px]" style={{ color: LEGACY_COLORS.red }}>
+                {error}
+              </span>
+            )}
+          </div>
+        </div>
 
-            {/* 달력 드롭다운 */}
-            <div
-              className="absolute left-0 top-full z-30 mt-2 overflow-hidden rounded-[20px] border"
-              style={{
-                background: LEGACY_COLORS.s1,
-                borderColor: LEGACY_COLORS.border,
-                width: 308,
-                maxHeight: calOpen ? 360 : 0,
-                opacity: calOpen ? 1 : 0,
-                pointerEvents: calOpen ? "auto" : "none",
-                transition: "max-height 220ms cubic-bezier(0.4,0,0.2,1), opacity 180ms ease",
-              }}
-            >
-              <div className="p-4">
-                {/* 월 헤더 */}
-                <div className="mb-3 flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))
-                    }
-                    disabled={!canPrevMonth}
-                    className="flex h-7 w-7 items-center justify-center rounded-[10px] border transition-colors hover:brightness-110 disabled:opacity-30"
-                    style={{
-                      background: LEGACY_COLORS.s2,
-                      borderColor: LEGACY_COLORS.border,
-                      color: LEGACY_COLORS.muted,
-                    }}
-                  >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                  </button>
-                  <span
-                    className="text-[13px] font-black"
-                    style={{ color: LEGACY_COLORS.text }}
-                  >
-                    {calMonth.getFullYear()}년 {calMonth.getMonth() + 1}월
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))
-                    }
-                    disabled={!canNextMonth}
-                    className="flex h-7 w-7 items-center justify-center rounded-[10px] border transition-colors hover:brightness-110 disabled:opacity-30"
-                    style={{
-                      background: LEGACY_COLORS.s2,
-                      borderColor: LEGACY_COLORS.border,
-                      color: LEGACY_COLORS.muted,
-                    }}
-                  >
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </button>
+        {/* 달력 아코디언 */}
+        <div
+          className="overflow-hidden"
+          style={{
+            maxHeight: calOpen ? 960 : 0,
+            opacity: calOpen ? 1 : 0,
+            transition: "max-height 260ms cubic-bezier(0.4,0,0.2,1), opacity 200ms ease",
+          }}
+        >
+          <div
+            className="border-t px-5 pb-5 pt-4"
+            style={{ borderColor: LEGACY_COLORS.border }}
+          >
+            {/* 월 헤더 */}
+            <div className="mb-4 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))
+                }
+                disabled={!canPrevMonth}
+                className="flex h-8 w-8 items-center justify-center rounded-[10px] border transition-colors hover:brightness-110 disabled:opacity-30"
+                style={{
+                  background: LEGACY_COLORS.s2,
+                  borderColor: LEGACY_COLORS.border,
+                  color: LEGACY_COLORS.muted,
+                }}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span
+                className="text-[14px] font-black"
+                style={{ color: LEGACY_COLORS.text }}
+              >
+                {calMonth.getFullYear()}년 {calMonth.getMonth() + 1}월
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))
+                }
+                disabled={!canNextMonth}
+                className="flex h-8 w-8 items-center justify-center rounded-[10px] border transition-colors hover:brightness-110 disabled:opacity-30"
+                style={{
+                  background: LEGACY_COLORS.s2,
+                  borderColor: LEGACY_COLORS.border,
+                  color: LEGACY_COLORS.muted,
+                }}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* 요일 헤더 */}
+            <div className="mb-1 grid grid-cols-7">
+              {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
+                <div
+                  key={d}
+                  className="py-1 text-center text-xs font-bold"
+                  style={{
+                    color: i === 0 ? "#f25f5c" : i === 6 ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
+                  }}
+                >
+                  {d}
                 </div>
+              ))}
+            </div>
 
-                {/* 요일 헤더 */}
-                <div className="mb-1 grid grid-cols-7 text-center">
-                  {["월", "화", "수", "목", "금", "토", "일"].map((d) => (
-                    <span
-                      key={d}
-                      className="text-[10px] font-bold"
-                      style={{ color: LEGACY_COLORS.muted2 }}
-                    >
-                      {d}
-                    </span>
-                  ))}
-                </div>
-
-                {/* 주 행 */}
-                {getWeeksOfMonth(calMonth.getFullYear(), calMonth.getMonth()).map((week) => {
-                  const mon = week[0];
-                  const isSelected = toDateStr(mon) === weekStart;
-                  const isFuture =
-                    toDateStr(mon) > toDateStr(getWeekStart(new Date()));
+            {/* 날짜 셀 그리드 */}
+            <div className="grid grid-cols-7 gap-1">
+              {getWeeksOfMonth(calMonth.getFullYear(), calMonth.getMonth()).flatMap((week) => {
+                const sun = week[0]; // 일요일 시작
+                const mon = new Date(sun.getTime() + 86400000); // 해당 주의 월요일
+                const weekKey = toDateStr(mon);
+                const isSelectedWeek = weekKey === weekStart;
+                const isHovered = hoveredWeek === weekKey;
+                const isFuture = toDateStr(mon) > toDateStr(getWeekStart(new Date()));
+                return week.map((d) => {
+                  const isOutside = d.getMonth() !== calMonth.getMonth();
                   return (
-                    <div
-                      key={mon.toISOString()}
-                      role="button"
-                      tabIndex={isFuture ? -1 : 0}
+                    <button
+                      key={d.toISOString()}
                       onClick={() => {
                         if (!isFuture) {
                           setWeekMon(new Date(mon));
                           setCalOpen(false);
                         }
                       }}
-                      className="grid grid-cols-7 rounded-[10px] py-1 text-center text-[12px]"
+                      onMouseEnter={() => !isFuture && setHoveredWeek(weekKey)}
+                      onMouseLeave={() => setHoveredWeek(null)}
+                      disabled={isFuture}
+                      className="flex flex-col items-center rounded-[14px] border p-1.5 transition-colors disabled:opacity-30"
                       style={{
-                        background: isSelected
-                          ? tint(LEGACY_COLORS.blue, 18)
-                          : "transparent",
-                        opacity: isFuture ? 0.3 : 1,
-                        cursor: isFuture ? "default" : "pointer",
+                        background: isSelectedWeek
+                          ? "rgba(101,169,255,.18)"
+                          : isHovered
+                          ? "rgba(101,169,255,.08)"
+                          : LEGACY_COLORS.s2,
+                        borderColor: isSelectedWeek
+                          ? LEGACY_COLORS.blue
+                          : isHovered
+                          ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 40%, transparent)`
+                          : LEGACY_COLORS.border,
+                        height: "100px",
                       }}
                     >
-                      {week.map((d) => (
-                        <span
-                          key={d.toISOString()}
-                          style={{
-                            color:
-                              d.getMonth() !== calMonth.getMonth()
-                                ? LEGACY_COLORS.muted2
-                                : isSelected
-                                ? LEGACY_COLORS.blue
-                                : LEGACY_COLORS.text,
-                            fontWeight: isSelected ? 700 : 400,
-                          }}
-                        >
-                          {d.getDate()}
-                        </span>
-                      ))}
-                    </div>
+                      <span
+                        className="text-sm font-bold"
+                        style={{
+                          color: isOutside
+                            ? LEGACY_COLORS.muted2
+                            : isSelectedWeek
+                            ? LEGACY_COLORS.blue
+                            : LEGACY_COLORS.text,
+                        }}
+                      >
+                        {d.getDate()}
+                      </span>
+                    </button>
                   );
-                })}
-              </div>
+                });
+              })}
             </div>
           </div>
-
-          {/* 이번 주 배지 */}
-          {isThisWeek && <StatusPill label="이번 주" tone="success" showDot={false} />}
-        </div>
-
-        {/* 새로고침 */}
-        <div className="flex items-center gap-2">
-          {error && (
-            <span className="text-[12px]" style={{ color: LEGACY_COLORS.red }}>
-              {error}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={load}
-            disabled={loading}
-            className="flex h-9 items-center gap-1.5 rounded-[14px] border px-3 text-[13px] font-bold transition-colors hover:brightness-110 disabled:opacity-50"
-            style={{
-              background: LEGACY_COLORS.s2,
-              borderColor: LEGACY_COLORS.border,
-              color: LEGACY_COLORS.muted,
-            }}
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            최신 데이터 확인
-          </button>
         </div>
       </div>
 

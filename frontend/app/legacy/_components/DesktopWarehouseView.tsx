@@ -52,6 +52,14 @@ export function DesktopWarehouseView({
   // ─── 섹션 탭 (요청 작성 / 장바구니 / 내 요청 / 창고 승인함) ───
   const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>("compose");
   const [panelRefreshNonce, setPanelRefreshNonce] = useState(0);
+  const [cartCount, setCartCount] = useState(0);
+
+  const operatorEmployeeId = operator?.employee_id ?? employeeId;
+  useEffect(() => {
+    if (!operatorEmployeeId) return;
+    api.listStockRequestDrafts(operatorEmployeeId).then((rows) => setCartCount(rows.length)).catch(() => {});
+  }, [operatorEmployeeId]);
+
   const canSeeQueue =
     (operator?.warehouse_role ?? "none") === "primary" ||
     (operator?.warehouse_role ?? "none") === "deputy";
@@ -114,7 +122,7 @@ export function DesktopWarehouseView({
   });
   const {
     workType, rawDirection, warehouseDirection, deptDirection, selectedDept, defectiveSource,
-    setWorkType, setForcedStep, setStep2Confirmed,
+    setWorkType, setForcedStep, setStep2Confirmed, setWorkTypeConfirmed,
     showStep3, showStep4, showStep5, resetWizardConfig,
   } = wizard;
 
@@ -201,6 +209,7 @@ export function DesktopWarehouseView({
 
   // ─── parent-owned wrapped setters (cross-cutting) ───
   function changeWorkType(wt: WorkType) {
+    setWorkTypeConfirmed(true);
     if (wt === workType) return;
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
@@ -233,6 +242,7 @@ export function DesktopWarehouseView({
 
       // wizard state 복원 — 작업유형/방향/부서.
       wizard.setWorkType(restored.workType);
+      wizard.setWorkTypeConfirmed(true);
       wizard.changeRawDir(restored.rawDirection);
       wizard.changeWarehouseDir(restored.warehouseDirection);
       wizard.changeDeptDir(restored.deptDirection);
@@ -341,7 +351,7 @@ export function DesktopWarehouseView({
 
       <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-3 px-6 pb-10 pt-4">
         <WarehouseHeader loadFailure={loadFailure} />
-        <WarehouseSectionTabs active={sectionTab} onChange={setSectionTab} showQueue={canSeeQueue} />
+        <WarehouseSectionTabs active={sectionTab} onChange={setSectionTab} showQueue={canSeeQueue} cartCount={cartCount} />
 
         <WarehouseDraftPanelTabs
           sectionTab={sectionTab}
@@ -358,12 +368,11 @@ export function DesktopWarehouseView({
             setCurrentDraftId(null);
             setAutoSaveStatus("idle");
           }}
+          onCartCountChange={setCartCount}
         />
 
         {sectionTab === "compose" && (
           <WarehouseComposeSection
-            autoSaveStatus={autoSaveStatus}
-            stickySummary={stickySummary}
             error={error}
             wizard={wizard}
             setPendingDeptChange={setPendingDeptChange}
