@@ -190,6 +190,23 @@ a:hover { text-decoration: underline; }
 .callout-body { flex: 1; }
 .callout-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
 .callout-desc { font-size: 13px; color: var(--c-muted2); line-height: 1.6; }
+
+/* Stage code reference (R / A / F) */
+.stage-ref { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 20px 0 8px; }
+.stage-card { background: var(--c-s1); border: 1px solid var(--c-border); border-radius: 14px; padding: 18px 20px; }
+.stage-badge {
+  display: inline-flex; width: 36px; height: 36px;
+  align-items: center; justify-content: center;
+  border-radius: 10px; font-weight: 800; font-size: 18px;
+  margin-bottom: 10px;
+}
+.stage-r .stage-badge { background: rgba(217,90,90,0.12);  color: var(--c-red); }
+.stage-a .stage-badge { background: rgba(47,116,231,0.12); color: var(--c-blue); }
+.stage-f .stage-badge { background: rgba(23,159,114,0.12); color: var(--c-green); }
+.stage-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.stage-desc { font-size: 13px; color: var(--c-muted2); line-height: 1.6; }
+@media (max-width: 720px) { .stage-ref { grid-template-columns: 1fr; } }
+
 .kbd {
   display: inline-block;
   padding: 2px 7px;
@@ -458,6 +475,28 @@ a:hover { text-decoration: underline; }
     <p class="section-desc">도구는 <strong>메인 / 편집 / 검토</strong> 3개의 화면으로 구성됩니다. 각 화면의 어떤 부분이 무슨 역할을 하는지 번호와 함께 살펴봅시다.</p>
   </div>
 
+  <!-- 단계 코드 한눈에 (R / A / F) -->
+  <h3>단계 코드 한눈에 — R / A / F</h3>
+  <p class="section-desc" style="margin-bottom:8px;">도구 곳곳(필터, 미배치 원자재, BOM 그리드 "구분" 칼럼)에서 만나게 되는 <strong>한 글자 단계 코드</strong>입니다. 의미를 알아두면 화면 설명을 따라가기 쉽습니다.</p>
+  <div class="stage-ref">
+    <div class="stage-card stage-r">
+      <div class="stage-badge">R</div>
+      <div class="stage-name">원자재 (Raw)</div>
+      <div class="stage-desc">외부에서 그대로 들어오는 부품. 다른 부품으로 만들어지지 않습니다. 메인 화면 하단 <strong>"미배치 원자재"</strong> 패널에서 BOM 어딘가에 빠진 원자재가 있는지 점검합니다.</div>
+    </div>
+    <div class="stage-card stage-a">
+      <div class="stage-badge">A</div>
+      <div class="stage-name">중간 공정 (Assembly)</div>
+      <div class="stage-desc">하위 부품을 조합해 만드는 중간 산출물. 다른 품목의 자식으로도, 또 자체 BOM의 부모로도 등장합니다. 단계 필터의 "중간공정"이 이 단계입니다.</div>
+    </div>
+    <div class="stage-card stage-f">
+      <div class="stage-badge">F</div>
+      <div class="stage-name">공정 완료 (Finished)</div>
+      <div class="stage-desc">최종 출하·검사 단계의 완성품. 보통 이 품목의 BOM이 가장 위쪽 부모가 됩니다. 단계 필터의 "공정완료"가 이 단계입니다.</div>
+    </div>
+  </div>
+  <p class="shot-caption">BOM 그리드 첫 칼럼 "구분"의 배지(예: <code>HA</code>, <code>HR</code>, <code>TF</code>)는 <strong>앞 글자 = 부서</strong>, <strong>뒷 글자 = 단계 코드</strong>입니다. 색상은 부서별로 정해져 있습니다.</p>
+
   <!-- 2-1. 메인 화면 -->
   <h3>2-1. 메인 화면 — 작업할 품목 고르기</h3>
   <div class="shot">
@@ -504,7 +543,7 @@ a:hover { text-decoration: underline; }
       <div class="callout-num">4</div>
       <div class="callout-body">
         <div class="callout-title">단계 필터 (전체 / 중간공정 / 공정완료)</div>
-        <div class="callout-desc">완성품(F)·중간(A)·원자재(R) 단계별로 좁혀 봅니다. 끝의 "고압 · 19건"은 현재 표시 중인 건수.</div>
+        <div class="callout-desc">중간공정(<strong>A</strong>) / 공정완료(<strong>F</strong>) 단계로 좁혀 봅니다. 원자재(<strong>R</strong>)는 별도 <strong>"미배치 원자재"</strong> 패널에서 확인합니다. 단계 코드 의미는 위쪽 박스 참고. 끝의 "고압 · 19건"은 현재 표시 중인 건수.</div>
       </div>
     </div>
     <div class="callout">
@@ -618,7 +657,7 @@ a:hover { text-decoration: underline; }
       <div class="callout-num">7</div>
       <div class="callout-body">
         <div class="callout-title">현재 구성 목록 (BOM 그리드)</div>
-        <div class="callout-desc">4개 열: <strong>구분 / 자재명·코드 / 소요량 / 액션</strong>. 행은 추가한 순서대로 누적됩니다.</div>
+        <div class="callout-desc">4개 열: <strong>구분 / 자재명·코드 / 소요량 / 액션</strong>. "구분" 칼럼의 배지(예: <code>HA</code>·<code>HR</code>)는 <strong>부서 + 단계 코드(R/A/F)</strong>입니다. 행은 추가한 순서대로 누적됩니다.</div>
       </div>
     </div>
     <div class="callout">
