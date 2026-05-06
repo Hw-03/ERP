@@ -8,26 +8,33 @@ import { CAUTION_WORK_TYPES, WORK_TYPES, type WorkType } from "./_constants";
  */
 export function WorkTypeCardGrid({
   workType,
+  workTypeConfirmed,
   availableWorkTypes,
   onWorkTypeChange,
 }: {
   workType: WorkType;
+  workTypeConfirmed: boolean;
   availableWorkTypes: WorkType[];
   onWorkTypeChange: (wt: WorkType) => void;
 }) {
   const visibleWorkTypes = WORK_TYPES.filter((entry) => availableWorkTypes.includes(entry.id));
+  const n = visibleWorkTypes.length;
+  const cols = n <= 3 ? n : n === 4 ? 2 : 3;
 
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div
+      className="grid gap-3"
+      style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+    >
       {visibleWorkTypes.map((entry) => {
         const Icon = entry.icon;
-        const active = entry.id === workType;
+        const active = workTypeConfirmed && entry.id === workType;
         const cardTone = CAUTION_WORK_TYPES.includes(entry.id) ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
         return (
           <button
             key={entry.id}
             onClick={() => onWorkTypeChange(entry.id)}
-            className="flex flex-col items-start gap-1 rounded-[14px] border p-3 text-left transition-all hover:brightness-110"
+            className="flex flex-col items-start gap-2 rounded-[18px] border p-6 text-left transition-all hover:brightness-110"
             style={{
               background: active ? `color-mix(in srgb, ${cardTone} 14%, transparent)` : LEGACY_COLORS.s2,
               borderColor: active ? cardTone : LEGACY_COLORS.border,
@@ -35,12 +42,12 @@ export function WorkTypeCardGrid({
               color: active ? cardTone : LEGACY_COLORS.text,
             }}
           >
-            <div className="flex items-center gap-1.5">
-              <Icon className="h-4 w-4 shrink-0" />
-              <span className="text-sm font-black leading-tight">{entry.label}</span>
+            <div className="flex items-center gap-2">
+              <Icon className="h-7 w-7 shrink-0" />
+              <span className="text-lg font-black leading-tight">{entry.label}</span>
             </div>
             <span
-              className="text-[10px] font-semibold leading-tight"
+              className="text-sm font-semibold leading-tight"
               style={{ color: active ? cardTone : LEGACY_COLORS.muted2 }}
             >
               {entry.description}

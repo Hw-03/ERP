@@ -65,7 +65,10 @@ export function AdminMasterItemsSection() {
           {visibleItems.map((item, index) => (
             <button
               key={item.item_id}
-              onClick={() => setSelectedItem(item)}
+              onClick={() => {
+                setAddMode(false);
+                setSelectedItem(selectedItem?.item_id === item.item_id ? null : item);
+              }}
               className="block w-full px-4 py-4 text-left"
               style={{
                 borderBottom: index === visibleItems.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,

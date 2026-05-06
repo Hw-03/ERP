@@ -97,7 +97,7 @@ export function EmployeeEditPanel({
             ))}
           </select>
         </FieldRow>
-        <FieldRow label="권한">
+        <FieldRow label="권한 (참고용)">
           <select
             value={form.level}
             onChange={(e) => setForm((f) => ({ ...f, level: e.target.value as EmployeeLevel }))}
@@ -120,15 +120,6 @@ export function EmployeeEditPanel({
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
-        </FieldRow>
-        <FieldRow label="표시 순서">
-          <input
-            type="number"
-            value={form.display_order}
-            onChange={(e) => setForm((f) => ({ ...f, display_order: Number(e.target.value) || 0 }))}
-            className="w-full rounded-[14px] border px-3 py-2 text-sm outline-none"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-          />
         </FieldRow>
       </div>
 

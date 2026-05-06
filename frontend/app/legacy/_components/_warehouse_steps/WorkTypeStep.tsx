@@ -6,6 +6,7 @@ import type { Department } from "@/lib/api";
 import type { DeptAdjSubType } from "@/lib/api/types/dept-adjustment";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
+import { MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
 import { SettingLabel } from "./_atoms";
 import { WorkTypeCardGrid } from "./WorkTypeCardGrid";
 import {
@@ -22,6 +23,7 @@ import type {
 
 export function WorkTypeStep({
   workType,
+  workTypeConfirmed,
   onWorkTypeChange,
   rawDirection,
   setRawDirection,
@@ -40,6 +42,7 @@ export function WorkTypeStep({
   onConfirm,
 }: {
   workType: WorkType;
+  workTypeConfirmed: boolean;
   onWorkTypeChange: (wt: WorkType) => void;
   rawDirection: Direction;
   setRawDirection: (d: Direction) => void;
@@ -81,16 +84,16 @@ export function WorkTypeStep({
     <div className="space-y-5">
       {/* 작업 유형 grid */}
       <div>
-        <SettingLabel label="작업 유형 선택" />
         <WorkTypeCardGrid
           workType={workType}
+          workTypeConfirmed={workTypeConfirmed}
           availableWorkTypes={availableWorkTypes}
           onWorkTypeChange={onWorkTypeChange}
         />
       </div>
 
-      {/* 세부 유형 (dept-adjustment 전용) */}
-      {workType === "dept-adjustment" && (
+      {/* 세부 유형/이동방향/부서 — 작업유형 선택 후에만 표시 */}
+      {workTypeConfirmed && workType === "dept-adjustment" && (
         <div>
           <SettingLabel label="세부 유형" />
           <div className="grid grid-cols-3 gap-2">
@@ -122,128 +125,134 @@ export function WorkTypeStep({
         </div>
       )}
 
-      {/* 이동 방향 */}
-      {directionButtons.length > 0 && (
-        <div>
-          <SettingLabel label="이동 방향" />
-          <div className={`grid gap-2 ${directionButtons.length >= 3 ? "grid-cols-3" : "grid-cols-2"}`}>
-            {directionButtons.map((btn) => (
-              <button
-                key={btn.id}
-                onClick={btn.onClick}
-                className="flex items-center justify-center gap-1.5 rounded-[12px] border px-3 py-2.5 text-sm font-bold transition-all hover:brightness-110"
-                style={{
-                  background: btn.active ? `color-mix(in srgb, ${accent} 14%, transparent)` : LEGACY_COLORS.s2,
-                  borderColor: btn.active ? accent : LEGACY_COLORS.border,
-                  color: btn.active ? accent : LEGACY_COLORS.muted2,
-                }}
-              >
-                {btn.active && <Check className="h-3.5 w-3.5" />}
-                {btn.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* 이동방향/부서/불량위치/주의/진행 — 작업유형 선택 후에만 표시 */}
+      {workTypeConfirmed && (
+        <>
+          {/* 이동 방향 */}
+          {directionButtons.length > 0 && (
+            <div>
+              <SettingLabel label="이동 방향" />
+              <div className={`grid gap-2 ${directionButtons.length >= 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+                {directionButtons.map((btn) => (
+                  <button
+                    key={btn.id}
+                    onClick={btn.onClick}
+                    className="flex items-center justify-center gap-1.5 rounded-[12px] border px-3 py-2.5 text-sm font-bold transition-all hover:brightness-110"
+                    style={{
+                      background: btn.active ? `color-mix(in srgb, ${accent} 14%, transparent)` : LEGACY_COLORS.s2,
+                      borderColor: btn.active ? accent : LEGACY_COLORS.border,
+                      color: btn.active ? accent : LEGACY_COLORS.muted2,
+                    }}
+                  >
+                    {btn.active && <Check className="h-3.5 w-3.5" />}
+                    {btn.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-      {/* 부서 */}
-      {(workTypeNeedsDept(workType) || isRawReturn) && (
-        <div>
-          <SettingLabel
-            label={
-              isRawReturn
-                ? "반품할 부서 (불량 출처)"
-                : workType === "defective-register"
-                  ? "불량 격리 부서"
-                  : "대상 부서"
-            }
-          />
-          <div className="grid grid-cols-6 gap-2">
-            {PROD_DEPTS.map((d) => {
-              const active = d === selectedDept;
-              const handleDeptClick = () => {
-                if (d === selectedDept) return;
-                if (workType === "warehouse-io") {
-                  setPendingDept(d);
-                  return;
+          {/* 부서 */}
+          {(workTypeNeedsDept(workType) || isRawReturn) && (
+            <div>
+              <SettingLabel
+                label={
+                  isRawReturn
+                    ? "반품할 부서 (불량 출처)"
+                    : workType === "defective-register"
+                      ? "불량 격리 부서"
+                      : "대상 부서"
                 }
-                setSelectedDept(d);
-              };
-              return (
-                <button
-                  key={d}
-                  onClick={handleDeptClick}
-                  className="rounded-[12px] border px-1 py-2 text-sm font-bold transition-all hover:brightness-110"
-                  style={{
-                    background: active ? `color-mix(in srgb, ${LEGACY_COLORS.purple} 14%, transparent)` : LEGACY_COLORS.s2,
-                    borderColor: active ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
-                    color: active ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2,
-                  }}
-                >
-                  {d}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+              />
+              <div className="grid grid-cols-6 gap-2">
+                {PROD_DEPTS.map((d) => {
+                  const active = d === selectedDept;
+                  const deptColor = MES_DEPARTMENT_COLORS[d] ?? LEGACY_COLORS.purple;
+                  const handleDeptClick = () => {
+                    if (d === selectedDept) return;
+                    if (workType === "warehouse-io") {
+                      setPendingDept(d);
+                      return;
+                    }
+                    setSelectedDept(d);
+                  };
+                  return (
+                    <button
+                      key={d}
+                      onClick={handleDeptClick}
+                      className="rounded-[12px] border px-1 py-2 text-sm font-bold transition-all hover:brightness-110"
+                      style={{
+                        background: active ? `color-mix(in srgb, ${deptColor} 14%, transparent)` : LEGACY_COLORS.s2,
+                        borderColor: active ? deptColor : LEGACY_COLORS.border,
+                        color: active ? deptColor : LEGACY_COLORS.muted2,
+                      }}
+                    >
+                      {d}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-      {/* 불량 발견 위치 */}
-      {workType === "defective-register" && (
-        <div>
-          <SettingLabel label="불량 발견 위치" />
-          <div className="grid grid-cols-2 gap-2">
-            {(["warehouse", "production"] as DefectiveSource[]).map((src) => {
-              const active = src === defectiveSource;
-              const label = src === "warehouse" ? "창고에서 발견" : `${selectedDept}에서 발견`;
-              return (
-                <button
-                  key={src}
-                  onClick={() => setDefectiveSource(src)}
-                  className="rounded-[12px] border px-3 py-2.5 text-sm font-bold transition-all hover:brightness-110"
-                  style={{
-                    background: active ? `color-mix(in srgb, ${LEGACY_COLORS.red} 14%, transparent)` : LEGACY_COLORS.s2,
-                    borderColor: active ? LEGACY_COLORS.red : LEGACY_COLORS.border,
-                    color: active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2,
-                  }}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+          {/* 불량 발견 위치 */}
+          {workType === "defective-register" && (
+            <div>
+              <SettingLabel label="불량 발견 위치" />
+              <div className="grid grid-cols-2 gap-2">
+                {(["warehouse", "production"] as DefectiveSource[]).map((src) => {
+                  const active = src === defectiveSource;
+                  const label = src === "warehouse" ? "창고에서 발견" : `${selectedDept}에서 발견`;
+                  return (
+                    <button
+                      key={src}
+                      onClick={() => setDefectiveSource(src)}
+                      className="rounded-[12px] border px-3 py-2.5 text-sm font-bold transition-all hover:brightness-110"
+                      style={{
+                        background: active ? `color-mix(in srgb, ${LEGACY_COLORS.red} 14%, transparent)` : LEGACY_COLORS.s2,
+                        borderColor: active ? LEGACY_COLORS.red : LEGACY_COLORS.border,
+                        color: active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2,
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-      {/* 주의 사항 */}
-      {isCaution && (
-        <div
-          className="flex items-start gap-2 rounded-[14px] border p-3"
-          style={{
-            background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 8%, transparent)`,
-            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 40%, transparent)`,
-          }}
-        >
-          <AlertTriangle className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.yellow }} />
-          <div className="text-[12px]" style={{ color: LEGACY_COLORS.text }}>
-            {isRawReturn
-              ? "공급업체 반품은 되돌릴 수 없습니다. 반품 부서(불량 출처)와 수량을 확인하세요."
-              : "불량 등록은 재고가 격리 상태로 이동합니다. 대상 부서·발견 위치를 다시 한 번 확인하세요."}
-          </div>
-        </div>
-      )}
+          {/* 주의 사항 */}
+          {isCaution && (
+            <div
+              className="flex items-start gap-2 rounded-[14px] border p-3"
+              style={{
+                background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 8%, transparent)`,
+                borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 40%, transparent)`,
+              }}
+            >
+              <AlertTriangle className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.yellow }} />
+              <div className="text-[12px]" style={{ color: LEGACY_COLORS.text }}>
+                {isRawReturn
+                  ? "공급업체 반품은 되돌릴 수 없습니다. 반품 부서(불량 출처)와 수량을 확인하세요."
+                  : "불량 등록은 재고가 격리 상태로 이동합니다. 대상 부서·발견 위치를 다시 한 번 확인하세요."}
+              </div>
+            </div>
+          )}
 
-      {/* 진행 버튼 */}
-      <div className="flex justify-end pt-2">
-        <button
-          onClick={onConfirm}
-          disabled={!ready}
-          className="rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
-          style={{ background: accent }}
-        >
-          이 작업으로 진행 →
-        </button>
-      </div>
+          {/* 진행 버튼 */}
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={onConfirm}
+              disabled={!ready}
+              className="rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
+              style={{ background: accent }}
+            >
+              이 작업으로 진행 →
+            </button>
+          </div>
+        </>
+      )}
 
       <ConfirmModal
         open={pendingDept !== null}

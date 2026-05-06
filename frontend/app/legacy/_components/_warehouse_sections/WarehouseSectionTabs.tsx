@@ -15,9 +15,10 @@ interface Props {
   active: WarehouseSectionTab;
   onChange: (next: WarehouseSectionTab) => void;
   showQueue: boolean;
+  cartCount?: number;
 }
 
-export function WarehouseSectionTabs({ active, onChange, showQueue }: Props) {
+export function WarehouseSectionTabs({ active, onChange, showQueue, cartCount = 0 }: Props) {
   const tabs: { id: WarehouseSectionTab; label: string }[] = [
     { id: "compose", label: "요청 작성" },
     { id: "cart", label: "작업 중" },
@@ -29,19 +30,32 @@ export function WarehouseSectionTabs({ active, onChange, showQueue }: Props) {
     <div className="flex items-center gap-2">
       {tabs.map((t) => {
         const activeState = active === t.id;
+        const showBadge = t.id === "cart" && cartCount > 0;
         return (
           <button
             key={t.id}
             type="button"
             onClick={() => onChange(t.id)}
-            className="rounded-full border px-4 py-1.5 text-sm font-bold transition"
+            className="relative rounded-full border px-4 py-1.5 text-sm font-bold transition"
             style={{
               background: activeState ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
               color: activeState ? "white" : LEGACY_COLORS.text,
-              borderColor: activeState ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+              borderColor: activeState
+                ? LEGACY_COLORS.blue
+                : showBadge
+                ? `color-mix(in srgb, ${LEGACY_COLORS.green} 60%, ${LEGACY_COLORS.border})`
+                : LEGACY_COLORS.border,
             }}
           >
             {t.label}
+            {showBadge && (
+              <span
+                className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-black text-white"
+                style={{ background: LEGACY_COLORS.green }}
+              >
+                {cartCount}
+              </span>
+            )}
           </button>
         );
       })}

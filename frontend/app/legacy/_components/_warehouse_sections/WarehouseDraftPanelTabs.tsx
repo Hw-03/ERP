@@ -24,6 +24,7 @@ export interface WarehouseDraftPanelTabsProps {
   bumpRefresh: () => void;
   onSubmitSuccess?: () => void;
   resetDraftTracking: () => void;
+  onCartCountChange?: (n: number) => void;
 }
 
 export function WarehouseDraftPanelTabs({
@@ -38,6 +39,7 @@ export function WarehouseDraftPanelTabs({
   bumpRefresh,
   onSubmitSuccess,
   resetDraftTracking,
+  onCartCountChange,
 }: WarehouseDraftPanelTabsProps) {
   if (sectionTab === "cart") {
     return (
@@ -53,6 +55,7 @@ export function WarehouseDraftPanelTabs({
           bumpRefresh();
           onSubmitSuccess?.();
         }}
+        onCountChange={onCartCountChange}
       />
     );
   }

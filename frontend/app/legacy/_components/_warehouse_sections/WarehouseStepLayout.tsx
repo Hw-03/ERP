@@ -62,6 +62,7 @@ export function WarehouseStepLayout({
         >
           <WorkTypeStep
             workType={w.workType}
+            workTypeConfirmed={w.workTypeConfirmed}
             onWorkTypeChange={onChangeWorkType}
             rawDirection={w.rawDirection}
             setRawDirection={w.changeRawDir}

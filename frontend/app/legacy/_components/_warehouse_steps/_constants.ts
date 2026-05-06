@@ -26,7 +26,7 @@ type OperatorLike = { warehouse_role: WarehouseRole; department: Department } | 
 
 export const PAGE_SIZE = 100;
 
-export const PROD_DEPTS: Department[] = ["조립", "고압", "진공", "튜닝", "튜브", "출하"];
+export const PROD_DEPTS: Department[] = ["튜브", "고압", "진공", "튜닝", "조립", "출하"];
 
 export const WORK_TYPES: { id: WorkType; label: string; icon: LucideIcon; description: string }[] = [
   { id: "raw-io",            label: "공급업체 입출고",  icon: Boxes,         description: "창고 입고 · 출고 · 공급업체 반품" },

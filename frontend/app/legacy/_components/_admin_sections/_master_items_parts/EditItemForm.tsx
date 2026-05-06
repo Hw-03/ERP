@@ -41,10 +41,11 @@ export function EditItemForm({ selectedItem }: { selectedItem: Item }) {
         [
           ["item_name", selectedItem.item_name, "품목명"],
           ["spec", selectedItem.spec || "", "사양"],
+          ["supplier", selectedItem.supplier || "", "공급처"],
+          ["min_stock", String(selectedItem.min_stock ?? ""), "안전재고"],
           ["barcode", selectedItem.barcode || "", "바코드"],
           ["legacy_model", selectedItem.legacy_model || "", "모델"],
-          ["supplier", selectedItem.supplier || "", "공급처"],
-        ] as ["item_name" | "spec" | "barcode" | "legacy_model" | "supplier", string, string][]
+        ] as ["item_name" | "spec" | "barcode" | "legacy_model" | "supplier" | "min_stock", string, string][]
       ).map(([field, value, label]) => (
         <div key={field}>
           <div className="mb-2 text-sm font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>

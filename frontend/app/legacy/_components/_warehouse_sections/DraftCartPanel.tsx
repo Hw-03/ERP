@@ -13,6 +13,7 @@ interface Props {
   refreshNonce: number;
   onContinue: (draft: StockRequest) => void;
   onChanged: () => void;
+  onCountChange?: (n: number) => void;
 }
 
 export function DraftCartPanel({
@@ -20,6 +21,7 @@ export function DraftCartPanel({
   refreshNonce,
   onContinue,
   onChanged,
+  onCountChange,
 }: Props) {
   const [drafts, setDrafts] = useState<StockRequest[]>([]);
   const [loading, setLoading] = useState(false);
@@ -31,6 +33,7 @@ export function DraftCartPanel({
   const reload = useCallback(async () => {
     if (!employeeId) {
       setDrafts([]);
+      onCountChange?.(0);
       return;
     }
     setLoading(true);
@@ -38,6 +41,7 @@ export function DraftCartPanel({
     try {
       const rows = await api.listStockRequestDrafts(employeeId);
       setDrafts(rows);
+      onCountChange?.(rows.length);
     } catch (err) {
       setLoadError(
         err instanceof Error ? err.message : "작업 중 목록을 불러오지 못했습니다.",
@@ -45,7 +49,7 @@ export function DraftCartPanel({
     } finally {
       setLoading(false);
     }
-  }, [employeeId]);
+  }, [employeeId, onCountChange]);
 
   useEffect(() => {
     void reload();

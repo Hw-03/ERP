@@ -43,21 +43,31 @@ export function AdminEmployeesSection() {
   } = ctx;
 
   const [search, setSearch] = useState("");
+  const [deptFilter, setDeptFilter] = useState<string>("ALL");
+
+  const deptOptions = useMemo(() => {
+    const seen = new Set<string>();
+    employees.forEach((e) => { if (e.department) seen.add(normalizeDepartment(e.department)); });
+    return ["ALL", ...Array.from(seen).sort()];
+  }, [employees]);
+
   const filteredEmployees = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return employees;
-    return employees.filter(
-      (e) =>
+    return employees
+      .filter((e) => deptFilter === "ALL" || normalizeDepartment(e.department) === deptFilter)
+      .filter((e) =>
+        !q ||
         e.name.toLowerCase().includes(q) ||
         e.employee_code.toLowerCase().includes(q) ||
         normalizeDepartment(e.department).toLowerCase().includes(q) ||
         (e.role ?? "").toLowerCase().includes(q),
-    );
-  }, [employees, search]);
+      )
+      .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  }, [employees, search, deptFilter]);
 
   return (
     <>
-      <div className="grid h-full gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid h-full gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
         <div
           className="flex flex-col overflow-hidden rounded-[28px] border"
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
@@ -104,6 +114,22 @@ export function AdminEmployeesSection() {
                   <X className="h-3.5 w-3.5" />
                 </button>
               )}
+            </div>
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {deptOptions.map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDeptFilter(d)}
+                  className="rounded-full border px-2.5 py-1 text-xs font-bold transition-colors"
+                  style={{
+                    background: deptFilter === d ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
+                    color: deptFilter === d ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
+                    borderColor: deptFilter === d ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+                  }}
+                >
+                  {d === "ALL" ? "전체" : d}
+                </button>
+              ))}
             </div>
             <button
               onClick={() => {

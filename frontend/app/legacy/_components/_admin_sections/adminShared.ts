@@ -40,7 +40,6 @@ export const EMPTY_ADD_FORM = {
 export type AddForm = typeof EMPTY_ADD_FORM;
 
 export const EMPTY_EMPLOYEE_FORM = {
-  employee_code: "",
   name: "",
   role: "",
   phone: "",

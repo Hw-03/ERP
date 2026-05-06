@@ -62,13 +62,12 @@ export function useAdminEmployees({
   const confirm = useAdminEmployeesConfirm();
 
   async function _addEmployee() {
-    if (!form.empAddForm.employee_code.trim() || !form.empAddForm.name.trim()) {
-      onError("직원코드와 이름은 필수입니다.");
+    if (!form.empAddForm.name.trim()) {
+      onError("이름은 필수입니다.");
       return;
     }
     try {
       const created = await api.createEmployee({
-        employee_code: form.empAddForm.employee_code.trim(),
         name: form.empAddForm.name.trim(),
         role: form.empAddForm.role.trim(),
         department: form.empAddForm.department as Employee["department"],

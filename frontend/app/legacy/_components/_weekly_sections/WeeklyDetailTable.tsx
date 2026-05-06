@@ -28,15 +28,15 @@ function WeeklyDetailTableImpl({ group }: Props) {
         <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 3px", minWidth: 680 }}>
           <thead>
             <tr>
-              {["품목 코드", "품명", "전주재고", "생산/입고", "출고/소비", "현재재고", "증감"].map(
+              {["품목 코드", "품명", "전주 재고", "생산 내역", "출고 내역", "현재 재고", "증감"].map(
                 (h, i) => (
                   <th
                     key={h}
-                    className="text-[12px] font-bold"
+                    className="text-[13px] font-bold"
                     style={{
                       color: LEGACY_COLORS.muted2,
                       textAlign: i < 2 ? "left" : "right",
-                      padding: "0 10px 6px",
+                      padding: "0 10px 8px",
                       whiteSpace: "nowrap",
                     }}
                   >
@@ -47,11 +47,14 @@ function WeeklyDetailTableImpl({ group }: Props) {
             </tr>
           </thead>
           <tbody>
-            {group.items.map((row) => {
+            {group.items.map((row, idx) => {
               const delta = row.delta;
               const isDecreasing = delta < 0;
+              const isEvenRow = idx % 2 === 1;
               const rowBg = isDecreasing
                 ? `color-mix(in srgb, ${LEGACY_COLORS.red} 4%, ${LEGACY_COLORS.s1})`
+                : isEvenRow
+                ? `color-mix(in srgb, ${LEGACY_COLORS.s2} 80%, ${LEGACY_COLORS.s1})`
                 : LEGACY_COLORS.s1;
               const rowBorder = isDecreasing
                 ? `color-mix(in srgb, ${LEGACY_COLORS.red} 22%, ${LEGACY_COLORS.border})`
@@ -61,7 +64,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                 <tr key={row.item_id}>
                   {/* 품목 코드 */}
                   <td
-                    className="rounded-l-[12px] border-y border-l py-2 pl-3 pr-2 text-[12px] font-bold"
+                    className="rounded-l-[12px] border-y border-l py-3 pl-3 pr-2 text-[13px] font-bold"
                     style={{
                       background: rowBg,
                       borderColor: rowBorder,
@@ -73,7 +76,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                   </td>
                   {/* 품명 */}
                   <td
-                    className="border-y px-2 py-2 text-[13px] font-bold"
+                    className="border-y px-2 py-3 text-[14px] font-bold"
                     style={{
                       background: rowBg,
                       borderColor: rowBorder,
@@ -86,17 +89,17 @@ function WeeklyDetailTableImpl({ group }: Props) {
                   >
                     {row.item_name}
                   </td>
-                  {/* 전주재고 */}
+                  {/* 전주 재고 */}
                   <Num val={row.prev_qty} bg={rowBg} border={rowBorder} muted />
-                  {/* 생산/입고 */}
+                  {/* 생산 내역 */}
                   <Num val={row.in_qty} bg={rowBg} border={rowBorder} />
-                  {/* 출고/소비 */}
+                  {/* 출고 내역 */}
                   <Num val={row.out_qty} bg={rowBg} border={rowBorder} />
-                  {/* 현재재고 */}
+                  {/* 현재 재고 */}
                   <Num val={row.current_qty} bg={rowBg} border={rowBorder} />
                   {/* 증감 */}
                   <td
-                    className="rounded-r-[12px] border-y border-r px-2 py-2 text-right text-[13px] font-black"
+                    className="rounded-r-[12px] border-y border-r px-2 py-3 text-right text-[14px] font-black"
                     style={{
                       background: rowBg,
                       borderColor: rowBorder,
@@ -134,7 +137,7 @@ function Num({
 }) {
   return (
     <td
-      className="border-y px-2 py-2 text-right text-[13px] font-bold"
+      className="border-y px-2 py-3 text-right text-[14px] font-bold"
       style={{
         background: bg,
         borderColor: border,

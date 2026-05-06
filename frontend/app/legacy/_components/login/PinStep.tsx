@@ -97,10 +97,12 @@ export function PinStep({
       <button
         onClick={() => void onSubmit()}
         disabled={!canSubmit}
-        className="mt-auto flex w-full items-center justify-center gap-2 rounded-[16px] py-5 text-base font-semibold text-white transition-opacity"
+        className={`mt-auto flex w-full items-center justify-center gap-2 rounded-[16px] py-5 text-base font-semibold text-white transition-all${loading ? " animate-pulse" : ""}`}
         style={{
-          background: "var(--c-blue)",
-          opacity: loading ? 1 : canSubmit ? 1 : 0.4,
+          background: loading
+            ? "color-mix(in srgb, var(--c-blue) 60%, #000)"
+            : "var(--c-blue)",
+          opacity: canSubmit ? 1 : 0.4,
           cursor: canSubmit ? "pointer" : "not-allowed",
         }}
       >

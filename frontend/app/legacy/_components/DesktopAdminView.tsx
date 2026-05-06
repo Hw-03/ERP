@@ -36,7 +36,7 @@ export function DesktopAdminView({
     lock,
     selectSection,
     togglePanel,
-  } = useAdminViewState();
+  } = useAdminViewState("models");
 
   const [message, setMessage] = useState("");
 

@@ -30,7 +30,7 @@ export type AdminMasterItemsState = {
   visibleItems: Item[];
   addItem: () => void;
   saveItemField: (
-    field: "item_name" | "spec" | "barcode" | "legacy_model" | "supplier",
+    field: "item_name" | "spec" | "barcode" | "legacy_model" | "supplier" | "min_stock",
     value: string,
   ) => void;
 };
@@ -50,10 +50,8 @@ export function useAdminMasterItems({
 
   const visibleItems = useMemo(() => {
     const keyword = `${globalSearch} ${itemSearch}`.trim().toLowerCase();
-    if (!keyword) return items.slice(0, 200);
-    return items
-      .filter((item) => `${item.item_name} ${item.erp_code}`.toLowerCase().includes(keyword))
-      .slice(0, 200);
+    if (!keyword) return items;
+    return items.filter((item) => `${item.item_name} ${item.erp_code}`.toLowerCase().includes(keyword));
   }, [globalSearch, itemSearch, items]);
 
   async function _addItem() {
@@ -86,12 +84,15 @@ export function useAdminMasterItems({
   }
 
   async function _saveItemField(
-    field: "item_name" | "spec" | "barcode" | "legacy_model" | "supplier",
+    field: "item_name" | "spec" | "barcode" | "legacy_model" | "supplier" | "min_stock",
     value: string,
   ) {
     if (!selectedItem) return;
     try {
-      const updated = await api.updateItem(selectedItem.item_id, { [field]: value || undefined });
+      const payload = field === "min_stock"
+        ? { min_stock: value ? Number(value) : undefined }
+        : { [field]: value || undefined };
+      const updated = await api.updateItem(selectedItem.item_id, payload);
       setItems((current) => current.map((item) => (item.item_id === updated.item_id ? updated : item)));
       setSelectedItem(updated);
       onStatusChange(`${updated.item_name} 정보를 저장했습니다.`);

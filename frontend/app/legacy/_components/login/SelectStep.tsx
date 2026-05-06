@@ -48,7 +48,7 @@ export function SelectStep({
         <Search size={16} style={{ color: "var(--c-muted)", flexShrink: 0 }} />
         <input
           type="text"
-          placeholder="이름, 코드 검색"
+          placeholder="이름 검색"
           value={search}
           onChange={(e) => onSearch(e.target.value)}
           className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-[var(--c-muted)]"
@@ -94,12 +94,6 @@ export function SelectStep({
                     style={{ color: "var(--c-text)" }}
                   >
                     {emp.name}
-                  </div>
-                  <div
-                    className="mt-1 w-full truncate text-center text-xs"
-                    style={{ color: "var(--c-muted)" }}
-                  >
-                    {emp.employee_code}
                   </div>
                 </button>
               );

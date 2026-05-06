@@ -16,6 +16,7 @@ export type StepState = "active" | "complete" | "locked";
 
 export type WizardLike = {
   workType: WorkType;
+  workTypeConfirmed: boolean;
   rawDirection: Direction;
   warehouseDirection: TransferDirection;
   deptDirection: Direction;

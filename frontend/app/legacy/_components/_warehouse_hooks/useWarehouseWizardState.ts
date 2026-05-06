@@ -35,6 +35,7 @@ export function useWarehouseWizardState({
   // wizard 단계 제어
   const [forcedStep, setForcedStep] = useState<1 | 2 | null>(null);
   const [step2Confirmed, setStep2Confirmed] = useState(false);
+  const [workTypeConfirmed, setWorkTypeConfirmed] = useState(false);
 
   const step2Ready =
     workType === "package-out"
@@ -112,6 +113,7 @@ export function useWarehouseWizardState({
     setAdjSubType("production");
     setStep2Confirmed(false);
     setForcedStep(null);
+    setWorkTypeConfirmed(false);
   }
 
   return {
@@ -124,10 +126,12 @@ export function useWarehouseWizardState({
     defectiveSource,
     forcedStep,
     step2Confirmed,
+    workTypeConfirmed,
     // raw setters (submit() / selectEmployee / render onChange 호환)
     setWorkType,
     setForcedStep,
     setStep2Confirmed,
+    setWorkTypeConfirmed,
     // wrapped setters
     changeRawDir,
     changeWarehouseDir,

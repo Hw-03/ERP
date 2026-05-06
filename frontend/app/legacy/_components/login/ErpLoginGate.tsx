@@ -173,6 +173,18 @@ export function ErpLoginGate({ children }: ErpLoginGateProps) {
         </div>
       </div>
 
+      {/* 배경 패턴 — form 단계에만 표시 */}
+      {phase === "form" && (
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage: `radial-gradient(circle, var(--c-border) 1px, transparent 1px)`,
+            backgroundSize: "28px 28px",
+            opacity: 0.5,
+          }}
+        />
+      )}
+
       {/* 카드 — form 단계에만 등장 (rise 애니메이션) */}
       {phase === "form" && (
         <div

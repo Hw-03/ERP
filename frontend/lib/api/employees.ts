@@ -20,7 +20,7 @@ export const employeesApi = {
   },
 
   createEmployee: (payload: {
-    employee_code: string;
+    employee_code?: string;
     name: string;
     role: string;
     phone?: string;
@@ -55,4 +55,8 @@ export const employeesApi = {
   // 직원 PIN을 0000으로 초기화 — 관리자 PIN 검증 필요
   resetEmployeePin: (employeeId: string, adminPin: string) =>
     postJson<void>(toApiUrl(`/api/employees/${employeeId}/reset-pin`), { admin_pin: adminPin }),
+
+  // 본인 PIN 변경 — 현재 PIN 검증 필요
+  changeMyPin: (employeeId: string, currentPin: string, newPin: string) =>
+    postJson<void>(toApiUrl(`/api/employees/${employeeId}/change-pin`), { current_pin: currentPin, new_pin: newPin }),
 };
