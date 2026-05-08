@@ -830,6 +830,11 @@ def _execute_all_lines(
     approver: Employee,
     is_approval: bool = False,
 ) -> None:
+    lines = list(lines)
+    # 정렬된 순서로 모든 아이템 선락 → 교착 방지 (PostgreSQL only; SQLite는 WAL 직렬화)
+    if not _is_sqlite:
+        all_item_ids = sorted({line.item_id for line in lines})
+        inventory_svc.lock_inventories(db, all_item_ids)
     for line in lines:
         _execute_line(db, request, line, approver=approver, is_approval=is_approval)
 

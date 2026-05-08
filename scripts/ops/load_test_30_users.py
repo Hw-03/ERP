@@ -252,6 +252,76 @@ def _summarize(report: LoadTestReport, results: list[ScenarioResult]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# 재고 무결성 확인 + 마크다운 리포트
+# ---------------------------------------------------------------------------
+
+async def _check_inventory_integrity(base_url: str) -> int:
+    """재고 음수 항목 수 반환. 0이면 PASS."""
+    async with httpx.AsyncClient(timeout=15) as client:
+        try:
+            res = await client.get(f"{base_url}/api/inventory?limit=2000")
+            if res.status_code != 200:
+                print(f"⚠️  재고 조회 실패: HTTP {res.status_code}")
+                return -1
+            items = res.json()
+            negative = [
+                i for i in items
+                if float(i.get("warehouse_qty", 0)) < 0 or float(i.get("quantity", 0)) < 0
+            ]
+            if negative:
+                print(f"❌ 재고 음수 감지: {len(negative)}개 품목")
+            else:
+                print(f"✅ 재고 무결성: {len(items)}개 품목 모두 정상")
+            return len(negative)
+        except Exception as e:
+            print(f"⚠️  재고 무결성 확인 실패: {e}")
+            return -1
+
+
+def _write_markdown_report(report: LoadTestReport, path: Path, negative_count: int) -> None:
+    s = report.summary
+    integrity_line = (
+        "✅ PASS (음수 재고 없음)"
+        if negative_count == 0
+        else f"❌ FAIL ({negative_count}개 음수)" if negative_count > 0
+        else "⚠️ 확인 불가"
+    )
+    md = f"""# 30명 부하 테스트 결과
+**실행 시각**: {report.test_at}
+**대상 서버**: {report.base_url}
+**사용자 수**: {report.num_users}명
+**라운드**: {report.rounds}회
+
+## 요약
+
+| 항목 | 값 |
+|------|-----|
+| 총 요청 수 | {s['total_requests']} |
+| 성공 | {s['successes']} ({s['success_rate_pct']}%) |
+| 실패 | {s['failures']} |
+| 409 Conflict | {s['status_409_count']} |
+| 503 Unavailable | {s['status_503_count']} |
+| 평균 응답시간 | {s['latency_avg_ms']} ms |
+| P95 응답시간 | {s['latency_p95_ms']} ms |
+| 최대 응답시간 | {s['latency_max_ms']} ms |
+| 재고 무결성 | {integrity_line} |
+
+## 판정
+
+"""
+    if s['status_503_count'] > 0:
+        md += "⚠️ **503 발생** — SQLite busy_timeout 초과 또는 서버 과부하. PostgreSQL 전환 권장.\n"
+    elif s['success_rate_pct'] >= 95 and negative_count == 0:
+        md += "✅ **운영 가능** — 성공률 95% 이상, 재고 정합성 유지.\n"
+    elif s['success_rate_pct'] >= 80:
+        md += "⚠️ **주의** — 성공률 80~95%. 원인 분석 후 운영 여부 결정.\n"
+    else:
+        md += "❌ **운영 불가** — 성공률 80% 미만. 원인 파악 필요.\n"
+
+    path.write_text(md, encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -319,6 +389,14 @@ async def main():
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(asdict(report), f, ensure_ascii=False, indent=2, default=str)
     print(f"\n결과 저장: {output_path}")
+
+    # 재고 무결성 확인
+    negative_count = await _check_inventory_integrity(args.url)
+
+    # 마크다운 요약 저장
+    md_path = output_dir / f"{ts}_report.md"
+    _write_markdown_report(report, md_path, negative_count)
+    print(f"요약 저장: {md_path}")
 
 
 if __name__ == "__main__":

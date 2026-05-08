@@ -5,7 +5,7 @@
 
 ## SQLite vs PostgreSQL 안전 범위
 
-| 항목 | SQLite (기본) | PostgreSQL (권장) |
+| 항목 | SQLite (기본) | PostgreSQL (**필수**) |
 |------|--------------|------------------|
 | 동시 쓰기 안전 범위 | **10명 이하** | **30명 이상** |
 | 재고 락 방식 | WAL + busy_timeout 직렬화 | row-level FOR UPDATE |
@@ -13,7 +13,8 @@
 | 503 발생 가능성 | 10명 초과 동시 쓰기 시 높음 | 거의 없음 |
 | 설정 난이도 | 없음 (기본값) | Docker 설치 필요 |
 
-**결론**: 30명 동시 운영은 PostgreSQL을 사용하세요.
+> **30명 실사용 기준: PostgreSQL은 선택이 아닌 필수입니다.**  
+> SQLite는 개발 환경 및 10명 이하 소규모 테스트 전용으로 제한합니다.
 
 ---
 
@@ -120,3 +121,8 @@ python -m pytest tests/concurrency/ -v
 | `test_reserve_concurrent.py` | 30스레드 동시 reserve — 음수 재고 없음 |
 | `test_approve_concurrent.py` | 10스레드 동시 approve — 중복 처리 없음 |
 | `test_request_code_unique.py` | 100스레드 동시 생성 — 코드 중복 없음 |
+| `test_consume_warehouse_concurrent.py` | 30스레드 동시 창고 차감 — 음수 없음 |
+| `test_transfer_concurrent.py` | 20스레드 동시 창고↔부서 이동 — 총량 불변 |
+| `test_defective_concurrent.py` | 20스레드 동시 불량 격리 — 총량 불변 |
+| `test_dept_adjustment_concurrent.py` | 교차 순서 부서 조정 — deadlock 없음 |
+| `test_package_ship_concurrent.py` | 10스레드 동시 패키지 출고 — 음수 없음 |

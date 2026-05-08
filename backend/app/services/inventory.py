@@ -467,15 +467,35 @@ def consume_from_department(
     qty: Decimal,
     dept: DepartmentEnum,
 ) -> Inventory:
-    """특정 부서 PRODUCTION에서 직접 차감 (출고/부서출고용). 총량 감소."""
+    """특정 부서 PRODUCTION에서 직접 차감 (출고/부서출고용). 총량 감소. 원자적 조건부 UPDATE."""
     if qty <= 0:
         raise ValueError("차감 수량은 0보다 커야 합니다.")
-    inv = _lock_inventory(db, item_id)
-    loc = _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
-    cur = loc.quantity or Decimal("0")
-    if cur < qty:
+    # 행이 없으면 생성 (0 qty)
+    _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
+    db.flush()
+
+    result = db.execute(
+        sa_update(InventoryLocation)
+        .where(InventoryLocation.item_id == item_id)
+        .where(InventoryLocation.department == dept)
+        .where(InventoryLocation.status == LocationStatusEnum.PRODUCTION)
+        .where(InventoryLocation.quantity >= qty)
+        .values(quantity=InventoryLocation.quantity - qty)
+        .execution_options(synchronize_session=False)
+    )
+    db.flush()
+
+    if result.rowcount == 0:
+        loc = db.query(InventoryLocation).filter(
+            InventoryLocation.item_id == item_id,
+            InventoryLocation.department == dept,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        ).first()
+        cur = loc.quantity if loc else Decimal("0")
         raise ValueError(f"{dept.value} 생산 재고 부족 (현재 {cur}, 요청 {qty}).")
-    loc.quantity = cur - qty
+
+    db.expire_all()
+    inv = _lock_inventory(db, item_id)
     _sync_total(db, inv)
     return inv
 
@@ -510,7 +530,7 @@ def adjust_warehouse(
 
 
 def consume_warehouse(db: Session, item_id: uuid.UUID, qty: Decimal) -> tuple[Inventory, Decimal]:
-    """창고에서 qty 만큼 차감 (BACKFLUSH / 비예약 창고 출고용).
+    """창고에서 qty 만큼 차감 (BACKFLUSH / 비예약 창고 출고용). 원자적 조건부 UPDATE.
 
     Pending 과 무관하게 warehouse_qty 만 건드린다 (사전 feasibility 는 호출측 책임).
 
@@ -519,13 +539,29 @@ def consume_warehouse(db: Session, item_id: uuid.UUID, qty: Decimal) -> tuple[In
     """
     if qty <= 0:
         raise ValueError("차감 수량은 0보다 커야 합니다.")
-    inv = _lock_inventory(db, item_id)
-    qty_before = inv.quantity or Decimal("0")
-    wh = inv.warehouse_qty or Decimal("0")
-    if wh < qty:
+
+    get_or_create_inventory(db, item_id)
+    db.flush()
+
+    result = db.execute(
+        sa_update(Inventory)
+        .where(Inventory.item_id == item_id)
+        .where(Inventory.warehouse_qty >= qty)
+        .values(warehouse_qty=Inventory.warehouse_qty - qty)
+        .execution_options(synchronize_session=False)
+    )
+    db.flush()
+
+    if result.rowcount == 0:
+        inv_check = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+        wh = inv_check.warehouse_qty if inv_check else Decimal("0")
         raise ValueError(f"창고 재고 부족 (창고 {wh}, 차감 요청 {qty}).")
-    inv.warehouse_qty = wh - qty
+
+    db.expire_all()
+    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    # qty_before: 차감 전 총량 = 차감 후 총량 + qty (sync_total 직전 역산)
     _sync_total(db, inv)
+    qty_before = inv.quantity + qty
     return inv, qty_before
 
 
@@ -540,4 +576,5 @@ def lock_inventories(db: Session, item_ids: list[uuid.UUID]) -> dict[uuid.UUID, 
     q = db.query(Inventory).filter(Inventory.item_id.in_(item_ids))
     if not _is_sqlite:
         q = q.with_for_update()
-    return {inv.item_id: inv for inv in q.all()}
+    # ORDER BY item_id: 모든 호출자가 동일한 순서로 락 획득 → deadlock 방지
+    return {inv.item_id: inv for inv in q.order_by(Inventory.item_id).all()}

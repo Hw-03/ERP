@@ -2,6 +2,7 @@
 
 import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { api, type Employee, type Item, type ShipPackage } from "@/lib/api";
+import { ApiError } from "@/lib/api-core";
 import type { WorkType, Direction, TransferDirection, DefectiveSource } from "../_warehouse_steps";
 import { buildStockRequestPayload } from "./requestMapping";
 import type { DeptAdjSubType } from "@/lib/api/types/dept-adjustment";
@@ -140,12 +141,19 @@ export function useWarehouseSubmit(input: UseWarehouseSubmitInput) {
           );
         } else {
           // draft 가 없는 경우(예: package-out 또는 막 진입) 안전망으로 직접 생성.
-          await api.createStockRequest(payload);
+          // client_request_id: 이 제출 시도에 대한 멱등 키 (네트워크 재전송 시 중복 생성 방지)
+          const clientRequestId = crypto.randomUUID();
+          await api.createStockRequest({ ...payload, client_request_id: clientRequestId });
         }
       } catch (err) {
-        const reason = err instanceof Error ? err.message : "요청 처리를 완료하지 못했습니다.";
-        setResultModal({ kind: "fail", successCount: 0, failures: [{ name: "요청 제출", reason }] });
-        return;
+        // 409: 같은 client_request_id로 이미 생성된 요청 → 정상 처리로 취급
+        if (err instanceof ApiError && err.isConflict) {
+          // 멱등 반환 — 이미 처리됨, 정상 흐름 계속
+        } else {
+          const reason = err instanceof Error ? err.message : "요청 처리를 완료하지 못했습니다.";
+          setResultModal({ kind: "fail", successCount: 0, failures: [{ name: "요청 제출", reason }] });
+          return;
+        }
       }
 
       // 승인 필요/불필요 모두 items 갱신.
