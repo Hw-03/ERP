@@ -83,7 +83,10 @@ export function useWarehouseSubmit(input: UseWarehouseSubmitInput) {
       setError(null);
 
       if (workType === "dept-adjustment") {
-        const direction = adjSubType === "production" ? "out" : "in" as const;
+        // 「입고 진행 / 출고 진행」 2버튼이 결정한 deptDirection 을 그대로 사용.
+        // 모든 sub_type(production/disassembly/correction)에 대해 사용자 선택 방향을 따른다.
+        // (Direction 타입은 raw-io의 "return" 도 포함하지만 dept-adjustment 진입 경로에는 들어오지 않음)
+        const direction: "in" | "out" = deptDirection === "out" ? "out" : "in";
         const result = await deptAdjustmentApi.submitAdjustment({
           sub_type: adjSubType,
           lines: selectedEntries.map(({ item, quantity }) => ({

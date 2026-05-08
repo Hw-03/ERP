@@ -84,10 +84,10 @@ export function DesktopLegacyShell() {
     loadCapacity();
   }, [loadCapacity]);
 
-  // window focus 시 조용한 재조회
+  // window focus 시 capacity 만 백그라운드 갱신 — 자식 컴포넌트는 리마운트하지 않음
+  // (다른 창 갔다 돌아왔을 때 사용자 입력이 사라지는 문제 방지)
   useEffect(() => {
     function handleFocus() {
-      setRefreshNonce((n) => n + 1);
       loadCapacity();
     }
     window.addEventListener("focus", handleFocus);

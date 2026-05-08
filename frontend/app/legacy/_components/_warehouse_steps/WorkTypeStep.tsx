@@ -240,17 +240,38 @@ export function WorkTypeStep({
             </div>
           )}
 
-          {/* 진행 버튼 */}
-          <div className="flex justify-end pt-2">
-            <button
-              onClick={onConfirm}
-              disabled={!ready}
-              className="rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
-              style={{ background: accent }}
-            >
-              이 작업으로 진행 →
-            </button>
-          </div>
+          {/* 진행 버튼 — 부서 재고 조정은 입고/출고 2버튼, 그 외는 단일 버튼 */}
+          {workType === "dept-adjustment" ? (
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <button
+                onClick={() => { setDeptDirection("in"); onConfirm(); }}
+                disabled={!ready}
+                className="rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
+                style={{ background: LEGACY_COLORS.blue }}
+              >
+                입고 진행 →
+              </button>
+              <button
+                onClick={() => { setDeptDirection("out"); onConfirm(); }}
+                disabled={!ready}
+                className="rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
+                style={{ background: LEGACY_COLORS.red }}
+              >
+                출고 진행 →
+              </button>
+            </div>
+          ) : (
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={onConfirm}
+                disabled={!ready}
+                className="rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
+                style={{ background: accent }}
+              >
+                이 작업으로 진행 →
+              </button>
+            </div>
+          )}
         </>
       )}
 

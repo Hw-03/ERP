@@ -12,6 +12,7 @@ export function ExecuteStep({
   canExecute,
   isCaution,
   accent,
+  isOutbound,
   blockerText,
   submitting,
   onSubmit,
@@ -22,13 +23,20 @@ export function ExecuteStep({
   canExecute: boolean;
   isCaution: boolean;
   accent: string;
+  isOutbound: boolean;
   blockerText: string | null;
   submitting: boolean;
   onSubmit: () => void;
 }) {
   const isPackage = workType === "package-out";
+  const isDeptAdj = workType === "dept-adjustment";
   const buttonMulti = !isPackage && selectedEntries.length > 1 ? ` ${selectedEntries.length}건` : "";
-  const buttonLabel = submitting ? "처리 중..." : `${shortLabel}${buttonMulti} 실행`;
+  const deptAdjLabel = isDeptAdj
+    ? `${isOutbound ? "출고" : "입고"} ${selectedEntries.length}건 진행`
+    : null;
+  const buttonLabel = submitting
+    ? "처리 중..."
+    : (deptAdjLabel ?? `${shortLabel}${buttonMulti} 실행`);
 
   return (
     <div className="space-y-3">

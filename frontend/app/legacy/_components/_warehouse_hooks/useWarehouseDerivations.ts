@@ -87,7 +87,7 @@ export function useWarehouseDerivations(
       : workType === "warehouse-io"
         ? warehouseDirection === "wh-to-dept"
         : workType === "dept-adjustment"
-          ? adjSubType === "production"
+          ? deptDirection === "out"
           : true;
 
   const isRawReturn = workType === "raw-io" && rawDirection === "return";
@@ -105,11 +105,13 @@ export function useWarehouseDerivations(
           ? `창고→${selectedDept} 이동`
           : `${selectedDept}→창고 복귀`
         : workType === "dept-adjustment"
-          ? adjSubType === "production"
-            ? "생산 처리"
-            : adjSubType === "disassembly"
-              ? "분해 처리"
-              : "수량 보정"
+          ? `${
+              adjSubType === "production"
+                ? "생산/조립"
+                : adjSubType === "disassembly"
+                  ? "분해/회수"
+                  : "수량 보정"
+            } ${deptDirection === "out" ? "출고" : "입고"}`
           : workType === "defective-register"
             ? `불량 등록 (${defectiveSource === "warehouse" ? "창고" : selectedDept} → ${selectedDept} 격리)`
             : "패키지 출고";

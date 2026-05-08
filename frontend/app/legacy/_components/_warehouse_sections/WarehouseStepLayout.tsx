@@ -151,6 +151,7 @@ export function WarehouseStepLayout({
               canExecute={canExecute}
               isCaution={isCaution}
               accent={accent}
+              isOutbound={isOutbound}
               blockerText={blockerText}
               submitting={submitting}
               onSubmit={onSubmit}
