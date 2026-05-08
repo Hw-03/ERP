@@ -9,11 +9,15 @@
     DATABASE_URL=postgresql://erp_user:erp_pass@localhost:5432/erp_db \
         python scripts/ops/check_inventory_integrity.py
 
+    # --db-url 인수로 직접 지정
+    python scripts/ops/check_inventory_integrity.py --db-url postgresql://...
+
 종료 코드:
     0 = 전체 PASS
     1 = 위반 항목 있음
 """
 
+import argparse
 import os
 import sys
 from decimal import Decimal
@@ -29,9 +33,15 @@ load_dotenv(BACKEND_DIR / ".env")
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    f"sqlite:///{(BACKEND_DIR / 'erp.db').as_posix()}",
+# --db-url 인수 파싱 (main() 이전에 수행해야 DATABASE_URL 오버라이드가 가능)
+_parser = argparse.ArgumentParser(add_help=False)
+_parser.add_argument("--db-url", dest="db_url", default=None)
+_args, _ = _parser.parse_known_args()
+
+DATABASE_URL = (
+    _args.db_url
+    or os.getenv("DATABASE_URL")
+    or f"sqlite:///{(BACKEND_DIR / 'erp.db').as_posix()}"
 )
 
 engine = create_engine(

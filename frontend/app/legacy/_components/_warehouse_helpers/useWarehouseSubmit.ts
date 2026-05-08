@@ -154,6 +154,11 @@ export function useWarehouseSubmit(input: UseWarehouseSubmitInput) {
         if (err instanceof ApiError && err.isConflict) {
           clientRequestIdRef.current = null;
           // 멱등 반환 — 이미 처리됨, 정상 흐름 계속
+        } else if (err instanceof ApiError && err.isUnavailable) {
+          // 503: 서버 과부하 — 재시도 가능 (client_request_id 유지)
+          const reason = "서버가 다른 작업을 처리 중입니다. 잠시 후 다시 시도하세요.";
+          setResultModal({ kind: "fail", successCount: 0, failures: [{ name: "요청 제출", reason }] });
+          return;
         } else {
           const reason = err instanceof Error ? err.message : "요청 처리를 완료하지 못했습니다.";
           setResultModal({ kind: "fail", successCount: 0, failures: [{ name: "요청 제출", reason }] });

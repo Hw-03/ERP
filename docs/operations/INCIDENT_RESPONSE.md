@@ -113,36 +113,70 @@ python scripts/ops/preflight_30_users.py --url http://localhost:8000
 
 ## 4. 데이터 손상 의심 / 백업 복구
 
-### SQLite 복구
+### SQLite 복구 (권장: restore_db.py 사용)
 
 ```bash
 # 최신 백업 확인
-ls -lt outputs/backups/*.db
+ls -lt outputs/backups/erp_*.db | head -5
 
-# 복구 (현재 DB 덮어쓰기)
-cp backend/erp.db backend/erp.db.damaged.$(date +%Y%m%d_%H%M%S)
-cp outputs/backups/erp_YYYYMMDD_HHMMSS.db backend/erp.db
+# 복구 (현재 DB를 .pre-restore로 자동 백업 후 복구)
+python scripts/ops/restore_db.py \
+    --sqlite outputs/backups/erp_YYYYMMDD_HHMMSS.db \
+    --target backend/erp.db \
+    --check
 
-# 무결성 확인
-python scripts/ops/check_inventory_integrity.py
+# 무결성 자동 확인됨 (--check 플래그)
 ```
 
-### PostgreSQL 복구
+### PostgreSQL 복구 (권장: restore_db.py 사용)
 
 ```bash
 # 최신 백업 확인
-ls -lt outputs/backups/*.sql
+ls -lt outputs/backups/erp_*.sql | head -5
 
-# 복구 (DB 전체 재생성)
+# Docker 컨테이너 기준 복구
 CONTAINER=$(docker ps --filter "name=postgres" --format "{{.Names}}" | head -1)
-docker exec -i $CONTAINER psql -U erp_user -c "DROP DATABASE erp_db; CREATE DATABASE erp_db;"
-docker exec -i $CONTAINER psql -U erp_user erp_db < outputs/backups/erp_YYYYMMDD_HHMMSS.sql
+python scripts/ops/restore_db.py \
+    --postgres outputs/backups/erp_YYYYMMDD_HHMMSS.sql \
+    --container $CONTAINER \
+    --check
 
-# 마이그레이션 재실행
-cd backend && python bootstrap_db.py
+# 직접 호스트 기준
+python scripts/ops/restore_db.py \
+    --postgres outputs/backups/erp_YYYYMMDD_HHMMSS.sql \
+    --host localhost --port 5432 --user erp_user --dbname erp_db \
+    --check
+```
 
-# 무결성 확인
+### 복구 후 필수 검증
+
+```bash
+# 무결성 점검
 python scripts/ops/check_inventory_integrity.py
+
+# preflight 전체 통과 확인
+python scripts/ops/preflight_30_users.py --url http://localhost:8000
+```
+
+### 복구 리허설 (매주 금요일 권장)
+
+```bash
+# 1. 현재 상태 백업
+python scripts/ops/backup_db.py
+
+# 2. 임시 경로에 복구 테스트 (운영 DB 미변경)
+python scripts/ops/restore_db.py \
+    --sqlite outputs/backups/erp_LATEST.db \
+    --target /tmp/erp_rehearsal_test.db \
+    --check
+
+# 3. 임시 DB 무결성 직접 확인
+DATABASE_URL=sqlite:////tmp/erp_rehearsal_test.db \
+    python scripts/ops/check_inventory_integrity.py
+
+# 4. 정상 확인 후 임시 파일 삭제
+rm /tmp/erp_rehearsal_test.db
+echo "복구 리허설 완료"
 ```
 
 ---

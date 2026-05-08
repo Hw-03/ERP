@@ -180,8 +180,57 @@ New-NetFirewallRule -DisplayName "MES Server" -Direction Inbound -Protocol TCP -
 
 ---
 
+---
+
+## 11. pg_dump / pg_restore 예시
+
+### 백업 생성
+
+```bash
+# 자동화 스크립트 사용 (권장)
+python scripts/ops/backup_db.py --postgres --container <컨테이너명>
+
+# 또는 직접 실행
+CONTAINER=$(docker ps --filter "name=postgres" --format "{{.Names}}" | head -1)
+docker exec $CONTAINER pg_dump -U erp_user erp_db > outputs/backups/erp_$(date +%Y%m%d_%H%M%S).sql
+```
+
+### 복구 (스크립트 사용)
+
+```bash
+# 운영 DB 복구 (컨테이너 기준)
+python scripts/ops/restore_db.py \
+    --postgres outputs/backups/erp_YYYYMMDD_HHMMSS.sql \
+    --container $CONTAINER \
+    --check
+
+# 복구 후 무결성 자동 확인 포함
+```
+
+### 복구 리허설 (임시 DB로 안전하게 테스트)
+
+```bash
+# 1. 임시 DB 생성
+CONTAINER=$(docker ps --filter "name=postgres" --format "{{.Names}}" | head -1)
+docker exec $CONTAINER createdb -U erp_user erp_db_rehearsal
+
+# 2. 백업 복구 to 임시 DB
+docker cp outputs/backups/erp_LATEST.sql $CONTAINER:/tmp/rehearsal.sql
+docker exec $CONTAINER psql -U erp_user -d erp_db_rehearsal -f /tmp/rehearsal.sql
+
+# 3. 무결성 점검
+DATABASE_URL=postgresql://erp_user:erp_pass@localhost:5432/erp_db_rehearsal \
+    python scripts/ops/check_inventory_integrity.py
+
+# 4. 임시 DB 삭제
+docker exec $CONTAINER dropdb -U erp_user erp_db_rehearsal
+echo "PostgreSQL 복구 리허설 완료"
+```
+
+---
+
 ## 참고 링크
 
 - 동시성 설계 상세: `docs/research/2026-05-08-concurrent-io-hardening-audit.md`
-- 30명 운영 안정성 점수: `docs/research/2026-05-08-30-user-readiness-score.md`
+- 30명 운영 안정성 점수: `docs/research/2026-05-08-30-user-readiness-score-100.md`
 - 동시 운영 가이드: `docs/operations/CONCURRENT_LOCAL_OPERATION.md`

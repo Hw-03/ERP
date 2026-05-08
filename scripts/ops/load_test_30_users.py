@@ -120,6 +120,85 @@ async def scenario_list_inventory(
         return ScenarioResult(user_id, "list_inventory", 0, latency, False, str(e))
 
 
+async def scenario_fullflow_create_and_cancel(
+    client: httpx.AsyncClient,
+    base_url: str,
+    user_id: int,
+    requester_id: str,
+    item_id: str,
+) -> ScenarioResult:
+    """풀플로우: DRAFT 생성 → submit → cancel (창고 승인 불필요 경로)."""
+    start = time.perf_counter()
+    scenario_name = "fullflow_create_cancel"
+    try:
+        # 1. DRAFT 생성
+        cr_payload = {
+            "requester_employee_id": requester_id,
+            "request_type": "raw_ship",
+            "status": "draft",
+            "lines": [{"item_id": item_id, "quantity": "1",
+                        "from_bucket": "warehouse", "to_bucket": "none"}],
+            "client_request_id": str(uuid.uuid4()),
+        }
+        cr = await client.post(f"{base_url}/api/stock-requests", json=cr_payload)
+        if cr.status_code not in (200, 201):
+            latency = (time.perf_counter() - start) * 1000
+            return ScenarioResult(user_id, scenario_name, cr.status_code, latency, False,
+                                   f"create: {cr.status_code}")
+        req_id = cr.json().get("request_id")
+
+        # 2. cancel
+        del_res = await client.delete(
+            f"{base_url}/api/stock-requests/{req_id}",
+            params={"actor_employee_id": requester_id},
+        )
+        latency = (time.perf_counter() - start) * 1000
+        success = del_res.status_code in (200, 204)
+        return ScenarioResult(user_id, scenario_name, del_res.status_code, latency, success)
+    except Exception as e:
+        latency = (time.perf_counter() - start) * 1000
+        return ScenarioResult(user_id, scenario_name, 0, latency, False, str(e))
+
+
+async def scenario_duplicate_submit(
+    client: httpx.AsyncClient,
+    base_url: str,
+    user_id: int,
+    requester_id: str,
+    item_id: str,
+) -> ScenarioResult:
+    """중복 제출 방지: 같은 client_request_id 로 2번 POST → 2번째는 409."""
+    start = time.perf_counter()
+    crid = str(uuid.uuid4())
+    payload = {
+        "requester_employee_id": requester_id,
+        "request_type": "raw_ship",
+        "status": "draft",
+        "lines": [{"item_id": item_id, "quantity": "1",
+                    "from_bucket": "warehouse", "to_bucket": "none"}],
+        "client_request_id": crid,
+    }
+    try:
+        r1 = await client.post(f"{base_url}/api/stock-requests", json=payload)
+        r2 = await client.post(f"{base_url}/api/stock-requests", json=payload)
+        latency = (time.perf_counter() - start) * 1000
+        # 두 번째는 409 이거나 동일 요청 반환이어야 함
+        success = r1.status_code in (200, 201) and r2.status_code in (200, 201, 409)
+        # 정리: 생성된 DRAFT cancel
+        if r1.status_code in (200, 201):
+            req_id = r1.json().get("request_id")
+            if req_id:
+                await client.delete(
+                    f"{base_url}/api/stock-requests/{req_id}",
+                    params={"actor_employee_id": requester_id},
+                )
+        return ScenarioResult(user_id, "duplicate_submit", r2.status_code, latency, success,
+                               None if success else f"r1={r1.status_code} r2={r2.status_code}")
+    except Exception as e:
+        latency = (time.perf_counter() - start) * 1000
+        return ScenarioResult(user_id, "duplicate_submit", 0, latency, False, str(e))
+
+
 # ---------------------------------------------------------------------------
 # 서버 사전 확인
 # ---------------------------------------------------------------------------
@@ -262,19 +341,28 @@ async def run_load_test(
 
     all_results: list[ScenarioResult] = []
 
-    async with httpx.AsyncClient(timeout=30, limits=httpx.Limits(max_connections=50)) as client:
+    async with httpx.AsyncClient(timeout=30, limits=httpx.Limits(max_connections=80)) as client:
         for round_no in range(1, rounds + 1):
             print(f"\n[Round {round_no}/{rounds}] {num_users}명 동시 실행...")
             tasks = []
 
             for uid in range(num_users):
-                # 모든 사용자: 재고 조회
+                # 모든 사용자: 재고 조회 + 헬스 체크
                 tasks.append(scenario_list_inventory(client, base_url, uid))
-                # 서버 상태 확인
                 tasks.append(scenario_health_check(client, base_url, uid))
-                # 테스트 직원/품목이 있으면 요청 생성 시도
+                # 테스트 직원/품목이 있으면 추가 시나리오
                 if emp_id and item_id:
                     tasks.append(scenario_create_request(client, base_url, uid, emp_id, item_id))
+                    # 홀수 사용자: 풀플로우 (생성→취소)
+                    if uid % 2 == 0:
+                        tasks.append(scenario_fullflow_create_and_cancel(
+                            client, base_url, uid, emp_id, item_id
+                        ))
+                    # 짝수 사용자: 중복 제출 방지 검증
+                    else:
+                        tasks.append(scenario_duplicate_submit(
+                            client, base_url, uid, emp_id, item_id
+                        ))
 
             round_results = await asyncio.gather(*tasks, return_exceptions=True)
             for r in round_results:

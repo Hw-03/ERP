@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Trash2, FileEdit } from "lucide-react";
 import { api, type StockRequest, type StockRequestType } from "@/lib/api";
+import { ApiError } from "@/lib/api-core";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatDateTime, formatQty } from "@/lib/mes/format";
 import type { ToastState } from "@/lib/ui/Toast";
@@ -61,10 +62,15 @@ export function DraftsListPanel({
       showToast({ type: "info", message: "장바구니 항목을 삭제했습니다." });
       load();
     } catch (e) {
-      showToast({
-        type: "error",
-        message: e instanceof Error ? e.message : "삭제에 실패했습니다.",
-      });
+      const msg =
+        e instanceof ApiError && e.isConflict
+          ? "이미 처리된 요청입니다."
+          : e instanceof ApiError && e.isUnavailable
+          ? "서버가 다른 작업을 처리 중입니다. 잠시 후 다시 시도하세요."
+          : e instanceof Error
+          ? e.message
+          : "삭제에 실패했습니다.";
+      showToast({ type: "error", message: msg });
     } finally {
       setDeletingId(null);
     }

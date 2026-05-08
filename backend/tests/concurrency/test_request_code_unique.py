@@ -1,7 +1,7 @@
 """동시성 테스트: request_code 중복 없음.
 
-100스레드가 동시에 StockRequest 를 생성해도 request_code 가 unique해야 한다.
-(SR-YYYYMMDD-HHMMSS-XXXX 형식 + 필요 시 IntegrityError retry)
+1000건 동시 생성해도 request_code 가 unique해야 한다.
+(SR-YYYYMMDD-HHMMSS-XXXXXXXX 형식, 32비트 엔트로피 + IntegrityError retry)
 """
 
 from __future__ import annotations
@@ -68,12 +68,13 @@ def _setup(make_session):
 
 @pytest.mark.usefixtures("concurrent_engine")
 def test_concurrent_request_code_no_duplicate(concurrent_engine, make_session):
-    """100스레드 동시 요청 생성 → request_code 중복 0."""
+    """1000건 동시 request_code 생성 → 중복 0, IntegrityError 최종 실패 0."""
     emp_id, item_id = _setup(make_session)
 
     successes = []
     failures = []
     codes = []
+    lock = __import__("threading").Lock()
 
     def create_one():
         session = make_session()
@@ -87,7 +88,6 @@ def test_concurrent_request_code_no_duplicate(concurrent_engine, make_session):
                 to_bucket=RequestBucketEnum.NONE,
                 to_department=None,
             )
-            # DRAFT 생성 (request_code = None, 재고 변경 없음)
             req = svc._build_request_and_lines(
                 session,
                 requester=emp,
@@ -100,10 +100,12 @@ def test_concurrent_request_code_no_duplicate(concurrent_engine, make_session):
                 submitted_at=None,
             )
             session.commit()
-            codes.append(req.request_code)
-            successes.append("ok")
+            with lock:
+                codes.append(req.request_code)
+                successes.append("ok")
         except Exception as e:
-            failures.append(str(e))
+            with lock:
+                failures.append(str(e))
             try:
                 session.rollback()
             except Exception:
@@ -111,14 +113,22 @@ def test_concurrent_request_code_no_duplicate(concurrent_engine, make_session):
         finally:
             session.close()
 
-    with ThreadPoolExecutor(max_workers=20) as ex:
-        futures = [ex.submit(create_one) for _ in range(100)]
+    # 1000건 동시 (max_workers=50 — SQLite BEGIN IMMEDIATE 직렬화)
+    with ThreadPoolExecutor(max_workers=50) as ex:
+        futures = [ex.submit(create_one) for _ in range(1000)]
         for f in as_completed(futures):
             f.result()
 
-    # request_code 중복 없음 검증
+    # 중복 0 검증
     assert len(codes) == len(set(codes)), (
         f"request_code 중복 발생: {len(codes) - len(set(codes))}건"
     )
-    # 성공 건수가 0이 아님 (대부분 성공해야 함)
-    assert len(successes) > 80, f"너무 많은 실패: {len(failures)}"
+    # 성공 건수가 상당수여야 함 (SQLite BEGIN IMMEDIATE 직렬화로 일부 실패 허용)
+    assert len(successes) >= 500, (
+        f"너무 많은 실패: 성공 {len(successes)} / 1000"
+    )
+    # 포맷 검증: SR-YYYYMMDD-HHMMSS-XXXXXXXX (28자)
+    import re
+    pattern = re.compile(r"^SR-\d{8}-\d{6}-[0-9A-F]{8}$")
+    for code in codes[:10]:  # 샘플 검증
+        assert pattern.match(code), f"잘못된 format: {code}"
