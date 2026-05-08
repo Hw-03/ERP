@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, type StockRequest } from "@/lib/api";
+import { ApiError } from "@/lib/api-core";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { EmptyState, LoadingSkeleton } from "../common";
@@ -67,7 +68,13 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
       await reload();
       onChanged();
     } catch (err) {
-      setApproveError(err instanceof Error ? err.message : "승인에 실패했습니다.");
+      if (err instanceof ApiError && err.isConflict) {
+        setApproveError("이미 처리된 요청입니다.");
+      } else if (err instanceof ApiError && err.isUnavailable) {
+        setApproveError("서버 과부하 — 잠시 후 다시 시도하세요.");
+      } else {
+        setApproveError(err instanceof Error ? err.message : "승인에 실패했습니다.");
+      }
     } finally {
       setBusyId(null);
     }
@@ -90,7 +97,13 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
       await reload();
       onChanged();
     } catch (err) {
-      setRejectError(err instanceof Error ? err.message : "반려에 실패했습니다.");
+      if (err instanceof ApiError && err.isConflict) {
+        setRejectError("이미 처리된 요청입니다.");
+      } else if (err instanceof ApiError && err.isUnavailable) {
+        setRejectError("서버 과부하 — 잠시 후 다시 시도하세요.");
+      } else {
+        setRejectError(err instanceof Error ? err.message : "반려에 실패했습니다.");
+      }
     } finally {
       setBusyId(null);
     }

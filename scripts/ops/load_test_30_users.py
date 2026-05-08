@@ -225,6 +225,19 @@ def _summarize(report: LoadTestReport, results: list[ScenarioResult]) -> None:
     for r in results:
         status_counts[r.status_code] = status_counts.get(r.status_code, 0) + 1
 
+    # 시나리오별 집계
+    by_scenario: dict[str, dict] = {}
+    for r in results:
+        s = by_scenario.setdefault(r.scenario, {"total": 0, "success": 0})
+        s["total"] += 1
+        if r.success:
+            s["success"] += 1
+    scenario_summary = {
+        k: {"total": v["total"], "success": v["success"],
+            "rate_pct": round(v["success"] / v["total"] * 100, 1) if v["total"] else 0}
+        for k, v in by_scenario.items()
+    }
+
     report.summary = {
         "total_requests": total,
         "successes": successes,
@@ -233,9 +246,12 @@ def _summarize(report: LoadTestReport, results: list[ScenarioResult]) -> None:
         "status_409_count": status_counts.get(409, 0),
         "status_503_count": status_counts.get(503, 0),
         "latency_avg_ms": round(statistics.mean(latencies), 1) if latencies else 0,
+        "latency_p50_ms": round(statistics.median(latencies), 1) if latencies else 0,
         "latency_p95_ms": round(statistics.quantiles(latencies, n=20)[18], 1) if len(latencies) >= 20 else 0,
+        "latency_p99_ms": round(statistics.quantiles(latencies, n=100)[98], 1) if len(latencies) >= 100 else 0,
         "latency_max_ms": round(max(latencies), 1) if latencies else 0,
         "status_distribution": status_counts,
+        "by_scenario": scenario_summary,
     }
 
     print("\n" + "=" * 50)
@@ -247,8 +263,13 @@ def _summarize(report: LoadTestReport, results: list[ScenarioResult]) -> None:
     print(f"409 충돌: {report.summary['status_409_count']}")
     print(f"503 오류: {report.summary['status_503_count']}")
     print(f"평균 응답시간: {report.summary['latency_avg_ms']}ms")
+    print(f"P50 응답시간: {report.summary['latency_p50_ms']}ms")
     print(f"P95 응답시간: {report.summary['latency_p95_ms']}ms")
+    print(f"P99 응답시간: {report.summary['latency_p99_ms']}ms")
     print(f"최대 응답시간: {report.summary['latency_max_ms']}ms")
+    print("\n시나리오별 성공률:")
+    for sc, sv in scenario_summary.items():
+        print(f"  {sc}: {sv['success']}/{sv['total']} ({sv['rate_pct']}%)")
 
 
 # ---------------------------------------------------------------------------
@@ -286,6 +307,10 @@ def _write_markdown_report(report: LoadTestReport, path: Path, negative_count: i
         else f"❌ FAIL ({negative_count}개 음수)" if negative_count > 0
         else "⚠️ 확인 불가"
     )
+    scenario_rows = ""
+    for sc, sv in s.get("by_scenario", {}).items():
+        scenario_rows += f"| {sc} | {sv['success']}/{sv['total']} ({sv['rate_pct']}%) |\n"
+
     md = f"""# 30명 부하 테스트 결과
 **실행 시각**: {report.test_at}
 **대상 서버**: {report.base_url}
@@ -302,9 +327,17 @@ def _write_markdown_report(report: LoadTestReport, path: Path, negative_count: i
 | 409 Conflict | {s['status_409_count']} |
 | 503 Unavailable | {s['status_503_count']} |
 | 평균 응답시간 | {s['latency_avg_ms']} ms |
+| P50 응답시간 | {s.get('latency_p50_ms', 0)} ms |
 | P95 응답시간 | {s['latency_p95_ms']} ms |
+| P99 응답시간 | {s.get('latency_p99_ms', 0)} ms |
 | 최대 응답시간 | {s['latency_max_ms']} ms |
 | 재고 무결성 | {integrity_line} |
+
+## 시나리오별 성공률
+
+| 시나리오 | 성공/전체 |
+|---------|---------|
+{scenario_rows}
 
 ## 판정
 

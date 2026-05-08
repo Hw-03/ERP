@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { api, type Employee, type Item, type ShipPackage } from "@/lib/api";
 import { ApiError } from "@/lib/api-core";
 import type { WorkType, Direction, TransferDirection, DefectiveSource } from "../_warehouse_steps";
@@ -59,6 +59,8 @@ export interface UseWarehouseSubmitInput {
 }
 
 export function useWarehouseSubmit(input: UseWarehouseSubmitInput) {
+  const clientRequestIdRef = useRef<string | null>(null);
+
   return useCallback(async () => {
     const {
       selectedEmployee, workType, rawDirection, warehouseDirection, deptDirection,
@@ -141,13 +143,16 @@ export function useWarehouseSubmit(input: UseWarehouseSubmitInput) {
           );
         } else {
           // draft 가 없는 경우(예: package-out 또는 막 진입) 안전망으로 직접 생성.
-          // client_request_id: 이 제출 시도에 대한 멱등 키 (네트워크 재전송 시 중복 생성 방지)
-          const clientRequestId = crypto.randomUUID();
-          await api.createStockRequest({ ...payload, client_request_id: clientRequestId });
+          // client_request_id: 폼 세션 내 재사용 — 동일 시도 재전송 시 서버 멱등 처리
+          if (!clientRequestIdRef.current) {
+            clientRequestIdRef.current = crypto.randomUUID();
+          }
+          await api.createStockRequest({ ...payload, client_request_id: clientRequestIdRef.current });
         }
       } catch (err) {
         // 409: 같은 client_request_id로 이미 생성된 요청 → 정상 처리로 취급
         if (err instanceof ApiError && err.isConflict) {
+          clientRequestIdRef.current = null;
           // 멱등 반환 — 이미 처리됨, 정상 흐름 계속
         } else {
           const reason = err instanceof Error ? err.message : "요청 처리를 완료하지 못했습니다.";
@@ -165,6 +170,7 @@ export function useWarehouseSubmit(input: UseWarehouseSubmitInput) {
       }
 
       const doneCount = workType !== "package-out" ? selectedEntries.length : 1;
+      clientRequestIdRef.current = null;
       setCurrentDraftId(null);
       setAutoSaveStatus("idle");
       setReferenceNo("");

@@ -345,16 +345,39 @@ def transfer_to_production(
     """창고 → 부서 PRODUCTION 이동. 총량 변동 없음."""
     if qty <= 0:
         raise ValueError("이동 수량은 0보다 커야 합니다.")
-    inv = _lock_inventory(db, item_id)
-    wh = inv.warehouse_qty or Decimal("0")
-    pending = inv.pending_quantity or Decimal("0")
-    if wh - pending < qty:
+    get_or_create_inventory(db, item_id)
+    _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
+    db.flush()
+
+    result = db.execute(
+        sa_update(Inventory)
+        .where(Inventory.item_id == item_id)
+        .where(
+            Inventory.warehouse_qty - func.coalesce(Inventory.pending_quantity, 0) >= qty
+        )
+        .values(warehouse_qty=Inventory.warehouse_qty - qty)
+        .execution_options(synchronize_session=False)
+    )
+    db.flush()
+    if result.rowcount == 0:
+        inv_check = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+        wh = inv_check.warehouse_qty or Decimal("0")
+        pending = inv_check.pending_quantity or Decimal("0")
         raise ValueError(
             f"창고 가용 재고 부족 (창고 {wh}, 예약중 {pending}, 이동 요청 {qty})."
         )
-    inv.warehouse_qty = wh - qty
-    loc = _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
-    loc.quantity = (loc.quantity or Decimal("0")) + qty
+
+    db.execute(
+        sa_update(InventoryLocation)
+        .where(InventoryLocation.item_id == item_id)
+        .where(InventoryLocation.department == dept)
+        .where(InventoryLocation.status == LocationStatusEnum.PRODUCTION)
+        .values(quantity=func.coalesce(InventoryLocation.quantity, 0) + qty)
+        .execution_options(synchronize_session=False)
+    )
+    db.flush()
+    db.expire_all()
+    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
     _sync_total(db, inv)
     return inv
 
@@ -368,13 +391,38 @@ def transfer_to_warehouse(
     """부서 PRODUCTION → 창고 복귀. 총량 변동 없음."""
     if qty <= 0:
         raise ValueError("이동 수량은 0보다 커야 합니다.")
-    inv = _lock_inventory(db, item_id)
-    loc = _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
-    cur = loc.quantity or Decimal("0")
-    if cur < qty:
+    get_or_create_inventory(db, item_id)
+    _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
+    db.flush()
+
+    result = db.execute(
+        sa_update(InventoryLocation)
+        .where(InventoryLocation.item_id == item_id)
+        .where(InventoryLocation.department == dept)
+        .where(InventoryLocation.status == LocationStatusEnum.PRODUCTION)
+        .where(InventoryLocation.quantity >= qty)
+        .values(quantity=InventoryLocation.quantity - qty)
+        .execution_options(synchronize_session=False)
+    )
+    db.flush()
+    if result.rowcount == 0:
+        loc_check = db.query(InventoryLocation).filter(
+            InventoryLocation.item_id == item_id,
+            InventoryLocation.department == dept,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        ).first()
+        cur = loc_check.quantity if loc_check else Decimal("0")
         raise ValueError(f"{dept.value} 생산 재고 부족 (현재 {cur}, 요청 {qty}).")
-    loc.quantity = cur - qty
-    inv.warehouse_qty = (inv.warehouse_qty or Decimal("0")) + qty
+
+    db.execute(
+        sa_update(Inventory)
+        .where(Inventory.item_id == item_id)
+        .values(warehouse_qty=func.coalesce(Inventory.warehouse_qty, 0) + qty)
+        .execution_options(synchronize_session=False)
+    )
+    db.flush()
+    db.expire_all()
+    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
     _sync_total(db, inv)
     return inv
 
@@ -391,14 +439,42 @@ def transfer_between_departments(
         raise ValueError("이동 수량은 0보다 커야 합니다.")
     if from_dept == to_dept:
         raise ValueError("출발/도착 부서가 동일합니다.")
-    inv = _lock_inventory(db, item_id)
-    src = _lock_location(db, item_id, from_dept, LocationStatusEnum.PRODUCTION)
-    cur = src.quantity or Decimal("0")
-    if cur < qty:
+    get_or_create_inventory(db, item_id)
+    # 데드락 방지: 부서명 정렬 순서로 일괄 선락
+    for d in sorted([from_dept, to_dept], key=lambda x: x.value if hasattr(x, "value") else str(x)):
+        _lock_location(db, item_id, d, LocationStatusEnum.PRODUCTION)
+    db.flush()
+
+    result = db.execute(
+        sa_update(InventoryLocation)
+        .where(InventoryLocation.item_id == item_id)
+        .where(InventoryLocation.department == from_dept)
+        .where(InventoryLocation.status == LocationStatusEnum.PRODUCTION)
+        .where(InventoryLocation.quantity >= qty)
+        .values(quantity=InventoryLocation.quantity - qty)
+        .execution_options(synchronize_session=False)
+    )
+    db.flush()
+    if result.rowcount == 0:
+        src_check = db.query(InventoryLocation).filter(
+            InventoryLocation.item_id == item_id,
+            InventoryLocation.department == from_dept,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        ).first()
+        cur = src_check.quantity if src_check else Decimal("0")
         raise ValueError(f"{from_dept.value} 생산 재고 부족 (현재 {cur}, 요청 {qty}).")
-    src.quantity = cur - qty
-    dst = _lock_location(db, item_id, to_dept, LocationStatusEnum.PRODUCTION)
-    dst.quantity = (dst.quantity or Decimal("0")) + qty
+
+    db.execute(
+        sa_update(InventoryLocation)
+        .where(InventoryLocation.item_id == item_id)
+        .where(InventoryLocation.department == to_dept)
+        .where(InventoryLocation.status == LocationStatusEnum.PRODUCTION)
+        .values(quantity=func.coalesce(InventoryLocation.quantity, 0) + qty)
+        .execution_options(synchronize_session=False)
+    )
+    db.flush()
+    db.expire_all()
+    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
     _sync_total(db, inv)
     return inv
 
@@ -415,29 +491,66 @@ def mark_defective(
     """불량 등록. 총량 변동 없음 (위치만 이동)."""
     if qty <= 0:
         raise ValueError("불량 수량은 0보다 커야 합니다.")
-    inv = _lock_inventory(db, item_id)
+    if source == "production" and source_dept is None:
+        raise ValueError("source=production일 때 source_dept는 필수입니다.")
+    if source not in ("warehouse", "production"):
+        raise ValueError(f"알 수 없는 source: {source} (warehouse 또는 production)")
+
+    get_or_create_inventory(db, item_id)
+    _lock_location(db, item_id, target_dept, LocationStatusEnum.DEFECTIVE)
+    if source == "production":
+        _lock_location(db, item_id, source_dept, LocationStatusEnum.PRODUCTION)
+    db.flush()
 
     if source == "warehouse":
-        wh = inv.warehouse_qty or Decimal("0")
-        pending = inv.pending_quantity or Decimal("0")
-        if wh - pending < qty:
+        result = db.execute(
+            sa_update(Inventory)
+            .where(Inventory.item_id == item_id)
+            .where(
+                Inventory.warehouse_qty - func.coalesce(Inventory.pending_quantity, 0) >= qty
+            )
+            .values(warehouse_qty=Inventory.warehouse_qty - qty)
+            .execution_options(synchronize_session=False)
+        )
+        db.flush()
+        if result.rowcount == 0:
+            inv_check = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+            wh = inv_check.warehouse_qty or Decimal("0")
+            pending = inv_check.pending_quantity or Decimal("0")
             raise ValueError(
                 f"창고 가용 재고 부족 (창고 {wh}, 예약중 {pending}, 불량 처리 요청 {qty})."
             )
-        inv.warehouse_qty = wh - qty
-    elif source == "production":
-        if source_dept is None:
-            raise ValueError("source=production일 때 source_dept는 필수입니다.")
-        src_loc = _lock_location(db, item_id, source_dept, LocationStatusEnum.PRODUCTION)
-        cur = src_loc.quantity or Decimal("0")
-        if cur < qty:
+    else:  # source == "production"
+        result = db.execute(
+            sa_update(InventoryLocation)
+            .where(InventoryLocation.item_id == item_id)
+            .where(InventoryLocation.department == source_dept)
+            .where(InventoryLocation.status == LocationStatusEnum.PRODUCTION)
+            .where(InventoryLocation.quantity >= qty)
+            .values(quantity=InventoryLocation.quantity - qty)
+            .execution_options(synchronize_session=False)
+        )
+        db.flush()
+        if result.rowcount == 0:
+            src_check = db.query(InventoryLocation).filter(
+                InventoryLocation.item_id == item_id,
+                InventoryLocation.department == source_dept,
+                InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+            ).first()
+            cur = src_check.quantity if src_check else Decimal("0")
             raise ValueError(f"{source_dept.value} 생산 재고 부족 (현재 {cur}, 요청 {qty}).")
-        src_loc.quantity = cur - qty
-    else:
-        raise ValueError(f"알 수 없는 source: {source} (warehouse 또는 production)")
 
-    dst = _lock_location(db, item_id, target_dept, LocationStatusEnum.DEFECTIVE)
-    dst.quantity = (dst.quantity or Decimal("0")) + qty
+    db.execute(
+        sa_update(InventoryLocation)
+        .where(InventoryLocation.item_id == item_id)
+        .where(InventoryLocation.department == target_dept)
+        .where(InventoryLocation.status == LocationStatusEnum.DEFECTIVE)
+        .values(quantity=func.coalesce(InventoryLocation.quantity, 0) + qty)
+        .execution_options(synchronize_session=False)
+    )
+    db.flush()
+    db.expire_all()
+    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
     _sync_total(db, inv)
     return inv
 
@@ -451,12 +564,31 @@ def return_to_supplier(
     """공급업체 반품: 부서별 DEFECTIVE 차감, 총량 감소."""
     if qty <= 0:
         raise ValueError("반품 수량은 0보다 커야 합니다.")
-    inv = _lock_inventory(db, item_id)
-    loc = _lock_location(db, item_id, from_dept, LocationStatusEnum.DEFECTIVE)
-    cur = loc.quantity or Decimal("0")
-    if cur < qty:
+    get_or_create_inventory(db, item_id)
+    _lock_location(db, item_id, from_dept, LocationStatusEnum.DEFECTIVE)
+    db.flush()
+
+    result = db.execute(
+        sa_update(InventoryLocation)
+        .where(InventoryLocation.item_id == item_id)
+        .where(InventoryLocation.department == from_dept)
+        .where(InventoryLocation.status == LocationStatusEnum.DEFECTIVE)
+        .where(InventoryLocation.quantity >= qty)
+        .values(quantity=InventoryLocation.quantity - qty)
+        .execution_options(synchronize_session=False)
+    )
+    db.flush()
+    if result.rowcount == 0:
+        loc_check = db.query(InventoryLocation).filter(
+            InventoryLocation.item_id == item_id,
+            InventoryLocation.department == from_dept,
+            InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
+        ).first()
+        cur = loc_check.quantity if loc_check else Decimal("0")
         raise ValueError(f"{from_dept.value} 불량 재고 부족 (현재 {cur}, 요청 {qty}).")
-    loc.quantity = cur - qty
+
+    db.expire_all()
+    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
     _sync_total(db, inv)
     return inv
 
