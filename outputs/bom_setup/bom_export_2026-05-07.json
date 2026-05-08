@@ -1,0 +1,982 @@
+[
+  {
+    "parent_erp_code": "6-PA-0001",
+    "parent_item_name": "ADX6000 스탠드 브라켓 조인트 ASS'Y",
+    "parent_process_type": "PA",
+    "child_erp_code": "6-PR-0001",
+    "child_item_name": "ADX6000 국내용 스탠드 브라켓 1. BLOCK",
+    "child_process_type": "PR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-PA-0001",
+    "parent_item_name": "ADX6000 스탠드 브라켓 조인트 ASS'Y",
+    "parent_process_type": "PA",
+    "child_erp_code": "6-PR-0002",
+    "child_item_name": "ADX6000 국내용 스탠드 브라켓 2. ARM",
+    "child_process_type": "PR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-PA-0001",
+    "parent_item_name": "ADX6000 스탠드 브라켓 조인트 ASS'Y",
+    "parent_process_type": "PA",
+    "child_erp_code": "6-PR-0003",
+    "child_item_name": "ADX6000 국내용 스탠드 브라켓 3. TILT BODY",
+    "child_process_type": "PR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-PA-0001",
+    "parent_item_name": "ADX6000 스탠드 브라켓 조인트 ASS'Y",
+    "parent_process_type": "PA",
+    "child_erp_code": "6-PR-0004",
+    "child_item_name": "ADX6000 국내용 스탠드 브라켓 4. BASE",
+    "child_process_type": "PR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-PA-0001",
+    "parent_item_name": "ADX6000 스탠드 브라켓 조인트 ASS'Y",
+    "parent_process_type": "PA",
+    "child_erp_code": "6-PR-0005",
+    "child_item_name": "ADX6000 국내용 스탠드 브라켓 5. SHAFT",
+    "child_process_type": "PR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-PA-0001",
+    "parent_item_name": "ADX6000 스탠드 브라켓 조인트 ASS'Y",
+    "parent_process_type": "PA",
+    "child_erp_code": "6-PR-0006",
+    "child_item_name": "ADX6000 국내용 스탠드 브라켓 6. PUSH PLATE",
+    "child_process_type": "PR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-PA-0001",
+    "parent_item_name": "ADX6000 스탠드 브라켓 조인트 ASS'Y",
+    "parent_process_type": "PA",
+    "child_erp_code": "6-PR-0008",
+    "child_item_name": "ADX6000 국내용 스탠드 브라켓 8. MOUNT",
+    "child_process_type": "PR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-PA-0001",
+    "parent_item_name": "ADX6000 스탠드 브라켓 조인트 ASS'Y",
+    "parent_process_type": "PA",
+    "child_erp_code": "6-PR-0009",
+    "child_item_name": "ADX6000 국내용 스탠드 브라켓 9. 조임 손잡이",
+    "child_process_type": "PR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0001",
+    "parent_item_name": "DX3000 데코가이드 ASS'Y (손잡이 포함)",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0027",
+    "child_item_name": "DX3000 데코가이드",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0002",
+    "parent_item_name": "DX3000 LCD BD ASS'Y",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0001",
+    "child_item_name": "DX3000 2.35\" LCD 판넬",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0002",
+    "parent_item_name": "DX3000 LCD BD ASS'Y",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0003",
+    "child_item_name": "DX3000 LCD GUIDE",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0002",
+    "parent_item_name": "DX3000 LCD BD ASS'Y",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0004",
+    "child_item_name": "DX3000 NAVI KEY",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0002",
+    "parent_item_name": "DX3000 LCD BD ASS'Y",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0005",
+    "child_item_name": "DX3000 POWER LED",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0002",
+    "parent_item_name": "DX3000 LCD BD ASS'Y",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0006",
+    "child_item_name": "DX3000 POWER BUTTON",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0002",
+    "parent_item_name": "DX3000 LCD BD ASS'Y",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0030",
+    "child_item_name": "DX3000 FFC 20핀 - 하네스1",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0002",
+    "parent_item_name": "DX3000 LCD BD ASS'Y",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0031",
+    "child_item_name": "DX3000 EXP KEY 4핀 케이블 - 하네스5 (개당 2개씩)",
+    "child_process_type": "AR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0002",
+    "parent_item_name": "DX3000 LCD BD ASS'Y",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0035",
+    "child_item_name": "DX3000 LCD BD",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0003",
+    "parent_item_name": "DX3000 LCD BD ASS'Y _사파리_원버턴 타입",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0001",
+    "child_item_name": "DX3000 2.35\" LCD 판넬",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0003",
+    "parent_item_name": "DX3000 LCD BD ASS'Y _사파리_원버턴 타입",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0004",
+    "child_item_name": "DX3000 NAVI KEY",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0003",
+    "parent_item_name": "DX3000 LCD BD ASS'Y _사파리_원버턴 타입",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0005",
+    "child_item_name": "DX3000 POWER LED",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0003",
+    "parent_item_name": "DX3000 LCD BD ASS'Y _사파리_원버턴 타입",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0006",
+    "child_item_name": "DX3000 POWER BUTTON",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0003",
+    "parent_item_name": "DX3000 LCD BD ASS'Y _사파리_원버턴 타입",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0030",
+    "child_item_name": "DX3000 FFC 20핀 - 하네스1",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0003",
+    "parent_item_name": "DX3000 LCD BD ASS'Y _사파리_원버턴 타입",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0335",
+    "child_item_name": "DX3000 EX BD FFC CABLE 10핀",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0003",
+    "parent_item_name": "DX3000 LCD BD ASS'Y _사파리_원버턴 타입",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0036",
+    "child_item_name": "DX3000 LCD BD (사파리) -원버턴타입",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0003",
+    "parent_item_name": "DX3000 LCD BD ASS'Y _사파리_원버턴 타입",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0313",
+    "child_item_name": "DX3000 LCD GUIDE (반투명) - 사파리 덴탈용",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0004",
+    "parent_item_name": "DX3000 LCD BD ASS'Y _TFT",
+    "parent_process_type": "AA",
+    "child_erp_code": "38-AR-0002",
+    "child_item_name": "DX3000, SOLO 2.4\" TFT LCD 판넬",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0004",
+    "parent_item_name": "DX3000 LCD BD ASS'Y _TFT",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0003",
+    "child_item_name": "DX3000 LCD GUIDE",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0004",
+    "parent_item_name": "DX3000 LCD BD ASS'Y _TFT",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0004",
+    "child_item_name": "DX3000 NAVI KEY",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0004",
+    "parent_item_name": "DX3000 LCD BD ASS'Y _TFT",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0005",
+    "child_item_name": "DX3000 POWER LED",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0004",
+    "parent_item_name": "DX3000 LCD BD ASS'Y _TFT",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0006",
+    "child_item_name": "DX3000 POWER BUTTON",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0004",
+    "parent_item_name": "DX3000 LCD BD ASS'Y _TFT",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0030",
+    "child_item_name": "DX3000 FFC 20핀 - 하네스1",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0004",
+    "parent_item_name": "DX3000 LCD BD ASS'Y _TFT",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0031",
+    "child_item_name": "DX3000 EXP KEY 4핀 케이블 - 하네스5 (개당 2개씩)",
+    "child_process_type": "AR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0004",
+    "parent_item_name": "DX3000 LCD BD ASS'Y _TFT",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0037",
+    "child_item_name": "DX3000 TFT LCD BD",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0005",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0008",
+    "child_item_name": "DX3000 FRONT COVER (W)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0005",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0010",
+    "child_item_name": "DX3000 REAR COVER (W)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0005",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0011",
+    "child_item_name": "DX3000 LCD LED",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0005",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0012",
+    "child_item_name": "DX3000 EX LED (L)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0005",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0013",
+    "child_item_name": "DX3000 EX LED (R)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0005",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0014",
+    "child_item_name": "DX3000 EX BUTTON (개당 두개씩)",
+    "child_process_type": "AR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0005",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0015",
+    "child_item_name": "DX3000 HAND STRAP",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0005",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0020",
+    "child_item_name": "DX3000 X-CAP (기본)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0005",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "34-AR-0022",
+    "child_item_name": "DX3000,ADX4000W 가죽손잡이 고리1_ [AL(Cr도금), SUS Φ2.0]",
+    "child_process_type": "AR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0005",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0027",
+    "child_item_name": "DX3000 데코가이드",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0005",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0032",
+    "child_item_name": "DX3000 EX BD (듀얼) - 왼쪽",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0005",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0033",
+    "child_item_name": "DX3000 EX BD (듀얼) - 오른쪽",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0006",
+    "parent_item_name": "DX3000 10cm 한손 B 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0007",
+    "child_item_name": "DX3000 FRONT COVER (B)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0006",
+    "parent_item_name": "DX3000 10cm 한손 B 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0009",
+    "child_item_name": "DX3000 REAR COVER (B)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0006",
+    "parent_item_name": "DX3000 10cm 한손 B 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0011",
+    "child_item_name": "DX3000 LCD LED",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0006",
+    "parent_item_name": "DX3000 10cm 한손 B 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0012",
+    "child_item_name": "DX3000 EX LED (L)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0006",
+    "parent_item_name": "DX3000 10cm 한손 B 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0013",
+    "child_item_name": "DX3000 EX LED (R)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0006",
+    "parent_item_name": "DX3000 10cm 한손 B 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0014",
+    "child_item_name": "DX3000 EX BUTTON (개당 두개씩)",
+    "child_process_type": "AR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0006",
+    "parent_item_name": "DX3000 10cm 한손 B 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0015",
+    "child_item_name": "DX3000 HAND STRAP",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0006",
+    "parent_item_name": "DX3000 10cm 한손 B 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0020",
+    "child_item_name": "DX3000 X-CAP (기본)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0006",
+    "parent_item_name": "DX3000 10cm 한손 B 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "34-AR-0022",
+    "child_item_name": "DX3000,ADX4000W 가죽손잡이 고리1_ [AL(Cr도금), SUS Φ2.0]",
+    "child_process_type": "AR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0006",
+    "parent_item_name": "DX3000 10cm 한손 B 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0027",
+    "child_item_name": "DX3000 데코가이드",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0006",
+    "parent_item_name": "DX3000 10cm 한손 B 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0032",
+    "child_item_name": "DX3000 EX BD (듀얼) - 왼쪽",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0006",
+    "parent_item_name": "DX3000 10cm 한손 B 사출 ASS'Y - 기본",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0033",
+    "child_item_name": "DX3000 EX BD (듀얼) - 오른쪽",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0007",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 태국용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0008",
+    "child_item_name": "DX3000 FRONT COVER (W)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0007",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 태국용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0010",
+    "child_item_name": "DX3000 REAR COVER (W)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0007",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 태국용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0011",
+    "child_item_name": "DX3000 LCD LED",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0007",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 태국용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0012",
+    "child_item_name": "DX3000 EX LED (L)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0007",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 태국용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0013",
+    "child_item_name": "DX3000 EX LED (R)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0007",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 태국용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0014",
+    "child_item_name": "DX3000 EX BUTTON (개당 두개씩)",
+    "child_process_type": "AR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0007",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 태국용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0015",
+    "child_item_name": "DX3000 HAND STRAP",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0007",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 태국용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0017",
+    "child_item_name": "DX3000 20cm CONE (W)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0007",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 태국용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0020",
+    "child_item_name": "DX3000 X-CAP (기본)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0007",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 태국용",
+    "parent_process_type": "AA",
+    "child_erp_code": "34-AR-0021",
+    "child_item_name": "DX3000, ADX4000W X-CAP 체결형 (신형)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0007",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 태국용",
+    "parent_process_type": "AA",
+    "child_erp_code": "34-AR-0022",
+    "child_item_name": "DX3000,ADX4000W 가죽손잡이 고리1_ [AL(Cr도금), SUS Φ2.0]",
+    "child_process_type": "AR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0007",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 태국용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0027",
+    "child_item_name": "DX3000 데코가이드",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0007",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 태국용",
+    "parent_process_type": "AA",
+    "child_erp_code": "34-AR-0028",
+    "child_item_name": "DX3000, ADX4000W 알루미늄 필터 [63ɸ 0.8T]",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0007",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 태국용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0032",
+    "child_item_name": "DX3000 EX BD (듀얼) - 왼쪽",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0007",
+    "parent_item_name": "DX3000 10cm 한손 W 사출 ASS'Y - 태국용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0033",
+    "child_item_name": "DX3000 EX BD (듀얼) - 오른쪽",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0008",
+    "parent_item_name": "DX3000 10cm 양손 B 사출 ASS'Y - CBI (이미지웍스-손잡이 로고 X))",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0007",
+    "child_item_name": "DX3000 FRONT COVER (B)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0008",
+    "parent_item_name": "DX3000 10cm 양손 B 사출 ASS'Y - CBI (이미지웍스-손잡이 로고 X))",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0009",
+    "child_item_name": "DX3000 REAR COVER (B)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0008",
+    "parent_item_name": "DX3000 10cm 양손 B 사출 ASS'Y - CBI (이미지웍스-손잡이 로고 X))",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0011",
+    "child_item_name": "DX3000 LCD LED",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0008",
+    "parent_item_name": "DX3000 10cm 양손 B 사출 ASS'Y - CBI (이미지웍스-손잡이 로고 X))",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0012",
+    "child_item_name": "DX3000 EX LED (L)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0008",
+    "parent_item_name": "DX3000 10cm 양손 B 사출 ASS'Y - CBI (이미지웍스-손잡이 로고 X))",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0013",
+    "child_item_name": "DX3000 EX LED (R)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0008",
+    "parent_item_name": "DX3000 10cm 양손 B 사출 ASS'Y - CBI (이미지웍스-손잡이 로고 X))",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0014",
+    "child_item_name": "DX3000 EX BUTTON (개당 두개씩)",
+    "child_process_type": "AR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0008",
+    "parent_item_name": "DX3000 10cm 양손 B 사출 ASS'Y - CBI (이미지웍스-손잡이 로고 X))",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0016",
+    "child_item_name": "DX3000 HAND STRAP [로고 X]-사파리,이미지웍스용",
+    "child_process_type": "AR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0009",
+    "parent_item_name": "DX3000 10cm 양손  W 사출 ASS'Y - 미국 동물용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0008",
+    "child_item_name": "DX3000 FRONT COVER (W)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0009",
+    "parent_item_name": "DX3000 10cm 양손  W 사출 ASS'Y - 미국 동물용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0010",
+    "child_item_name": "DX3000 REAR COVER (W)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0009",
+    "parent_item_name": "DX3000 10cm 양손  W 사출 ASS'Y - 미국 동물용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0011",
+    "child_item_name": "DX3000 LCD LED",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0009",
+    "parent_item_name": "DX3000 10cm 양손  W 사출 ASS'Y - 미국 동물용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0012",
+    "child_item_name": "DX3000 EX LED (L)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0009",
+    "parent_item_name": "DX3000 10cm 양손  W 사출 ASS'Y - 미국 동물용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0013",
+    "child_item_name": "DX3000 EX LED (R)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0009",
+    "parent_item_name": "DX3000 10cm 양손  W 사출 ASS'Y - 미국 동물용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0014",
+    "child_item_name": "DX3000 EX BUTTON (개당 두개씩)",
+    "child_process_type": "AR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0009",
+    "parent_item_name": "DX3000 10cm 양손  W 사출 ASS'Y - 미국 동물용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0020",
+    "child_item_name": "DX3000 X-CAP (기본)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0009",
+    "parent_item_name": "DX3000 10cm 양손  W 사출 ASS'Y - 미국 동물용",
+    "parent_process_type": "AA",
+    "child_erp_code": "34-AR-0022",
+    "child_item_name": "DX3000,ADX4000W 가죽손잡이 고리1_ [AL(Cr도금), SUS Φ2.0]",
+    "child_process_type": "AR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0009",
+    "parent_item_name": "DX3000 10cm 양손  W 사출 ASS'Y - 미국 동물용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0032",
+    "child_item_name": "DX3000 EX BD (듀얼) - 왼쪽",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0009",
+    "parent_item_name": "DX3000 10cm 양손  W 사출 ASS'Y - 미국 동물용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0033",
+    "child_item_name": "DX3000 EX BD (듀얼) - 오른쪽",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0009",
+    "parent_item_name": "DX3000 10cm 양손  W 사출 ASS'Y - 미국 동물용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0015",
+    "child_item_name": "DX3000 HAND STRAP",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0009",
+    "parent_item_name": "DX3000 10cm 양손  W 사출 ASS'Y - 미국 동물용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0023",
+    "child_item_name": "DX3000 가죽손잡이 고리2_ [AL(Cr도금), SUS Φ2.0 ]",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0009",
+    "parent_item_name": "DX3000 10cm 양손  W 사출 ASS'Y - 미국 동물용",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AA-0001",
+    "child_item_name": "DX3000 데코가이드 ASS'Y (손잡이 포함)",
+    "child_process_type": "AA",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0008",
+    "parent_item_name": "DX3000 10cm 양손 B 사출 ASS'Y - CBI (이미지웍스-손잡이 로고 X))",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0020",
+    "child_item_name": "DX3000 X-CAP (기본)",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0008",
+    "parent_item_name": "DX3000 10cm 양손 B 사출 ASS'Y - CBI (이미지웍스-손잡이 로고 X))",
+    "parent_process_type": "AA",
+    "child_erp_code": "34-AR-0022",
+    "child_item_name": "DX3000,ADX4000W 가죽손잡이 고리1_ [AL(Cr도금), SUS Φ2.0]",
+    "child_process_type": "AR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0008",
+    "parent_item_name": "DX3000 10cm 양손 B 사출 ASS'Y - CBI (이미지웍스-손잡이 로고 X))",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0023",
+    "child_item_name": "DX3000 가죽손잡이 고리2_ [AL(Cr도금), SUS Φ2.0 ]",
+    "child_process_type": "AR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0008",
+    "parent_item_name": "DX3000 10cm 양손 B 사출 ASS'Y - CBI (이미지웍스-손잡이 로고 X))",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0027",
+    "child_item_name": "DX3000 데코가이드",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0008",
+    "parent_item_name": "DX3000 10cm 양손 B 사출 ASS'Y - CBI (이미지웍스-손잡이 로고 X))",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0032",
+    "child_item_name": "DX3000 EX BD (듀얼) - 왼쪽",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-AA-0008",
+    "parent_item_name": "DX3000 10cm 양손 B 사출 ASS'Y - CBI (이미지웍스-손잡이 로고 X))",
+    "parent_process_type": "AA",
+    "child_erp_code": "3-AR-0033",
+    "child_item_name": "DX3000 EX BD (듀얼) - 오른쪽",
+    "child_process_type": "AR",
+    "quantity": 1,
+    "unit": "EA"
+  }
+]
