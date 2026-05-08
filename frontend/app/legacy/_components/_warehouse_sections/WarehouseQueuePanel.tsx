@@ -3,9 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type StockRequest } from "@/lib/api";
 import { ApiError } from "@/lib/api-core";
-import { LEGACY_COLORS } from "@/lib/mes/color";
-import { tint } from "@/lib/mes/colorUtils";
-import { EmptyState, LoadingSkeleton } from "../common";
+import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
 import { WarehouseQueueRow } from "./WarehouseQueueRow";
 
 interface Props {
@@ -112,18 +110,7 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
   return (
     <div className="flex flex-col gap-3">
       {loading && <LoadingSkeleton variant="list" rows={2} />}
-      {error && (
-        <div
-          className="rounded-[12px] border px-4 py-3 text-sm"
-          style={{
-            borderColor: tint(LEGACY_COLORS.red, 30),
-            color: LEGACY_COLORS.red,
-            background: tint(LEGACY_COLORS.red, 10),
-          }}
-        >
-          {error}
-        </div>
-      )}
+      {error && <LoadFailureCard message={error} onRetry={() => void reload()} />}
       {!loading && items.length === 0 && !error && (
         <EmptyState variant="no-data" compact title="승인 대기 중인 요청이 없습니다." />
       )}

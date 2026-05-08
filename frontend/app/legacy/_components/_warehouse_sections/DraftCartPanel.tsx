@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
-import { EmptyState, LoadingSkeleton } from "../common";
+import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { DraftCartItemRow } from "./DraftCartItemRow";
 
@@ -98,18 +98,7 @@ export function DraftCartPanel({
   return (
     <div className="flex flex-col gap-3">
       {loading && <LoadingSkeleton variant="list" rows={2} />}
-      {loadError && (
-        <div
-          className="rounded-[12px] border px-4 py-3 text-sm"
-          style={{
-            borderColor: tint(LEGACY_COLORS.red, 30),
-            color: LEGACY_COLORS.red,
-            background: tint(LEGACY_COLORS.red, 10),
-          }}
-        >
-          {loadError}
-        </div>
-      )}
+      {loadError && <LoadFailureCard message={loadError} onRetry={() => void reload()} />}
       {opError && (
         <div
           className="rounded-[12px] border px-4 py-3 text-sm"

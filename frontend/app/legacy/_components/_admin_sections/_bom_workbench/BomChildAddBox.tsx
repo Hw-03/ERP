@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, Plus, Check } from "lucide-react";
+import { Plus, Check } from "lucide-react";
 import type { BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { BomBadge } from "./BomBadge";
+import { BomSearchInput } from "./BomSearchInput";
 import { DEPT_LETTERS, DEPT_LETTER_TO_NAME, deptColor, deptOf, stageOf, type DeptLetter, type StageLetter } from "./bomDept";
 import { EmptyState } from "../../common";
 
@@ -73,25 +74,7 @@ export function BomChildAddBox({ parent, bomRows, items, onPick }: Props) {
       </div>
 
       <div className="flex flex-col gap-2 px-4 py-3">
-        <div className="relative">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2"
-            style={{ color: LEGACY_COLORS.muted2 }}
-          />
-          <input
-            type="text"
-            placeholder="품목명 / 코드 검색"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border py-1.5 pl-9 pr-3 text-sm outline-none"
-            style={{
-              background: LEGACY_COLORS.s1,
-              borderColor: LEGACY_COLORS.border,
-              color: LEGACY_COLORS.text,
-            }}
-          />
-        </div>
+        <BomSearchInput value={search} onChange={setSearch} bg={LEGACY_COLORS.s1 as string} />
 
         <div className="flex flex-wrap gap-1.5">
           <button

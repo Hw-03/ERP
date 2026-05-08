@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
 import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { BomBadge } from "./BomBadge";
+import { BomSearchInput } from "./BomSearchInput";
 import { stageOf, type DeptLetter, type StageLetter } from "./bomDept";
 import { EmptyState } from "../../common";
 
@@ -77,21 +77,7 @@ export function BomParentList({ dept, items, allBomRows, selectedId, onSelect, m
     >
       {/* 검색 */}
       <div className="flex flex-col gap-2 px-4 py-3" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: LEGACY_COLORS.muted2 }} />
-          <input
-            type="text"
-            placeholder="품목명 / 코드 검색"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border py-1.5 pl-9 pr-3 text-sm outline-none"
-            style={{
-              background: LEGACY_COLORS.s2,
-              borderColor: LEGACY_COLORS.border,
-              color: LEGACY_COLORS.text,
-            }}
-          />
-        </div>
+        <BomSearchInput value={search} onChange={setSearch} />
         <div className="flex flex-wrap gap-1.5">
           {filters.map((f) => {
             const active = stageFilter === f.id;
