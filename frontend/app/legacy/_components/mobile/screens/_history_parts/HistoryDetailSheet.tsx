@@ -10,7 +10,13 @@ import { getTransactionLabel, transactionColor } from "@/lib/mes-status";
 import type { ToastState } from "@/lib/ui/Toast";
 import { useCurrentOperator } from "../../../login/useCurrentOperator";
 import { TYPO } from "../../tokens";
-import { PrimaryActionButton, SectionCard, SheetHeader } from "../../primitives";
+import {
+  ErrorAlert,
+  PinInput,
+  PrimaryActionButton,
+  SectionCard,
+  SheetHeader,
+} from "../../primitives";
 
 const META_EDITABLE_TYPES = new Set([
   "RECEIVE",
@@ -318,33 +324,9 @@ function MetaEditPanel({
           }}
         />
       </FieldLabel>
-      <FieldLabel label="내 PIN">
-        <input
-          type="password"
-          inputMode="numeric"
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 8))}
-          className={`${TYPO.title} rounded-[14px] border px-3 py-2 font-black tabular-nums tracking-[0.4em] outline-none`}
-          style={{
-            background: LEGACY_COLORS.s2,
-            borderColor: LEGACY_COLORS.border,
-            color: LEGACY_COLORS.text,
-          }}
-          placeholder="••••"
-        />
-      </FieldLabel>
+      <PinInput label="내 PIN" value={pin} onChange={setPin} />
 
-      {error ? (
-        <div
-          className={`${TYPO.caption} rounded-[10px] px-3 py-2`}
-          style={{
-            background: `${LEGACY_COLORS.red as string}18`,
-            color: LEGACY_COLORS.red as string,
-          }}
-        >
-          {error}
-        </div>
-      ) : null}
+      <ErrorAlert message={error} />
 
       <div className="flex gap-2 pt-1">
         <button

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { KeyRound, LogOut } from "lucide-react";
-import clsx from "clsx";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { api } from "@/lib/api";
@@ -11,7 +10,12 @@ import {
   type Operator,
 } from "../../../login/useCurrentOperator";
 import { TYPO } from "../../tokens";
-import { PrimaryActionButton, SheetHeader } from "../../primitives";
+import {
+  ErrorAlert,
+  PinInput,
+  PrimaryActionButton,
+  SheetHeader,
+} from "../../primitives";
 
 type Mode = "menu" | "pin" | "logout";
 
@@ -21,18 +25,35 @@ export function OperatorMenuSheet({
   operator,
   onLoggedOut,
   onPinChanged,
+  initialMode = "menu",
 }: {
   open: boolean;
   onClose: () => void;
   operator: Operator | null;
   onLoggedOut: () => void;
   onPinChanged?: () => void;
+  /** 시트 진입 시 어느 화면을 바로 보여줄지. 기본 "menu". */
+  initialMode?: Mode;
 }) {
-  const [mode, setMode] = useState<Mode>("menu");
+  const [mode, setMode] = useState<Mode>(initialMode);
+
+  // open 토글 시 initialMode 동기화 — 진입점마다 다른 시작 화면을 보장.
+  useEffect(() => {
+    if (open) setMode(initialMode);
+  }, [open, initialMode]);
 
   const handleClose = () => {
-    setMode("menu");
+    setMode(initialMode);
     onClose();
+  };
+
+  // initialMode 가 menu 가 아닐 때 취소/뒤로가면 시트 자체를 닫음 (메뉴를 거치지 않음).
+  const handleBack = () => {
+    if (initialMode === "menu") {
+      setMode("menu");
+    } else {
+      handleClose();
+    }
   };
 
   return (
@@ -48,21 +69,19 @@ export function OperatorMenuSheet({
       {mode === "pin" ? (
         <PinChangePanel
           operator={operator}
-          onCancel={() => setMode("menu")}
+          onCancel={handleBack}
           onSuccess={() => {
-            setMode("menu");
             onPinChanged?.();
-            onClose();
+            handleClose();
           }}
         />
       ) : null}
       {mode === "logout" ? (
         <LogoutConfirmPanel
-          onCancel={() => setMode("menu")}
+          onCancel={handleBack}
           onConfirm={() => {
             clearCurrentOperator();
-            setMode("menu");
-            onClose();
+            handleClose();
             onLoggedOut();
           }}
         />
@@ -202,17 +221,7 @@ function PinChangePanel({
         <PinInput label="현재 PIN" value={current} onChange={setCurrent} />
         <PinInput label="새 PIN" value={next} onChange={setNext} />
         <PinInput label="새 PIN 확인" value={confirm} onChange={setConfirm} />
-        {error ? (
-          <div
-            className={`${TYPO.caption} rounded-[12px] px-3 py-2`}
-            style={{
-              background: `${LEGACY_COLORS.red as string}18`,
-              color: LEGACY_COLORS.red as string,
-            }}
-          >
-            {error}
-          </div>
-        ) : null}
+        <ErrorAlert message={error} />
         <div className="flex gap-2 pt-1">
           <button
             type="button"
@@ -237,44 +246,6 @@ function PinChangePanel({
         </div>
       </div>
     </>
-  );
-}
-
-function PinInput({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span
-        className={`${TYPO.caption} font-semibold uppercase tracking-[1px]`}
-        style={{ color: LEGACY_COLORS.muted2 }}
-      >
-        {label}
-      </span>
-      <input
-        type="password"
-        inputMode="numeric"
-        autoComplete="off"
-        value={value}
-        onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 8))}
-        className={clsx(
-          TYPO.title,
-          "rounded-[14px] border px-4 py-3 font-black tabular-nums tracking-[0.4em]",
-        )}
-        style={{
-          background: LEGACY_COLORS.s2,
-          borderColor: LEGACY_COLORS.border,
-          color: LEGACY_COLORS.text,
-        }}
-        placeholder="••••"
-      />
-    </label>
   );
 }
 

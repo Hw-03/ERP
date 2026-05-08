@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CalendarDays, ChevronRight, TrendingDown, TrendingUp } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronRight,
+  Package,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
 import {
   api,
   type WeeklyGroupReport,
@@ -16,10 +22,10 @@ import {
   EmptyState,
   IconButton,
   KpiCard,
-  KpiRow,
   SectionCard,
   SectionHeader,
   SheetHeader,
+  SubScreenHeader,
 } from "../primitives";
 
 interface WeekOption {
@@ -97,34 +103,40 @@ export function WeeklyReportScreen({ onBack }: { onBack: () => void }) {
     [data, selectedGroup],
   );
 
+  // 위중 메시지(있으면 1개) 추출 — danger 우선, 그 다음 warn.
+  const headlineWarning = useMemo(() => {
+    if (!data) return null;
+    return (
+      data.warnings.find((w) => w.level === "danger") ??
+      data.warnings.find((w) => w.level === "warn") ??
+      null
+    );
+  }, [data]);
+
+  const netDelta = data ? data.summary.total_in_qty - data.summary.total_out_qty : 0;
+  const reviewCount = data
+    ? data.warnings.filter((w) => w.level === "danger" || w.level === "warn").length
+    : 0;
+
+  const productionEmpty =
+    data?.production_matrix.length === 0 ||
+    data?.production_matrix.every((r) => Number(r.total_qty || 0) === 0);
+
   return (
     <div className="flex flex-col">
-      {/* 헤더 */}
-      <div
-        className="sticky top-0 z-10 flex items-center gap-2 border-b px-3 py-3"
-        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-      >
-        <IconButton icon={ArrowLeft} label="뒤로" size="md" onClick={onBack} />
-        <button
-          type="button"
-          onClick={() => setSheetOpen(true)}
-          className="flex flex-1 items-center justify-between gap-2 rounded-[14px] border px-3 py-2 text-left active:scale-[0.99]"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-        >
-          <div className="min-w-0">
-            <div
-              className={`${TYPO.overline} font-bold uppercase tracking-[2px]`}
-              style={{ color: LEGACY_COLORS.muted2 }}
-            >
-              주간보고 · {week.isCurrent ? "이번 주" : "지난 주차"}
-            </div>
-            <div className={`${TYPO.body} font-black`} style={{ color: LEGACY_COLORS.text }}>
-              {week.label}
-            </div>
-          </div>
-          <CalendarDays size={18} color={LEGACY_COLORS.muted as string} />
-        </button>
-      </div>
+      <SubScreenHeader
+        title={week.label}
+        subtitle={`주간보고 · ${week.isCurrent ? "이번 주" : "지난 주차"}`}
+        onBack={onBack}
+        right={
+          <IconButton
+            icon={CalendarDays}
+            label="주차 선택"
+            size="md"
+            onClick={() => setSheetOpen(true)}
+          />
+        }
+      />
 
       <div className="flex flex-col gap-4 px-4 py-4">
         <AsyncState
@@ -136,70 +148,137 @@ export function WeeklyReportScreen({ onBack }: { onBack: () => void }) {
         >
           {data ? (
             <>
-              {/* 요약 KPI */}
-              <KpiRow>
-                <KpiCard
-                  label="입고합"
-                  value={formatQty(data.summary.total_in_qty)}
-                  color={LEGACY_COLORS.green as string}
-                />
-                <KpiCard
-                  label="출고합"
-                  value={formatQty(data.summary.total_out_qty)}
-                  color={LEGACY_COLORS.red as string}
-                />
-                <KpiCard
-                  label="현재고"
-                  value={formatQty(data.summary.total_current_qty)}
-                  color={LEGACY_COLORS.blue as string}
-                />
-              </KpiRow>
+              {/* 이번 주 총평 */}
+              <SectionCard padding="md">
+                <div
+                  className={`${TYPO.overline} font-bold uppercase tracking-[2px]`}
+                  style={{ color: LEGACY_COLORS.muted2 }}
+                >
+                  이번 주 총평
+                </div>
+                <div
+                  className={`${TYPO.body} mt-1 font-bold leading-relaxed`}
+                  style={{ color: LEGACY_COLORS.text }}
+                >
+                  증가 {data.summary.groups_increasing}개 공정 · 감소{" "}
+                  {data.summary.groups_decreasing}개 · 변동 없음{" "}
+                  {data.summary.groups_unchanged}개
+                </div>
+                <div
+                  className={`${TYPO.caption} mt-1`}
+                  style={{ color: LEGACY_COLORS.muted2 }}
+                >
+                  현재 잔량 합계 {formatQty(data.summary.total_current_qty)}
+                </div>
+                {headlineWarning ? (
+                  <div
+                    className={`${TYPO.caption} mt-2 rounded-[10px] px-3 py-2`}
+                    style={{
+                      background:
+                        headlineWarning.level === "danger"
+                          ? `${LEGACY_COLORS.red as string}18`
+                          : `${LEGACY_COLORS.yellow as string}18`,
+                      color:
+                        headlineWarning.level === "danger"
+                          ? (LEGACY_COLORS.red as string)
+                          : (LEGACY_COLORS.yellow as string),
+                    }}
+                  >
+                    <span className="font-black">{headlineWarning.title}</span> ·{" "}
+                    {headlineWarning.message}
+                  </div>
+                ) : null}
+              </SectionCard>
 
-              {/* 경고/메시지 */}
-              {data.warnings.length > 0 ? (
+              {/* KPI 4종 (2x2) */}
+              <div className="grid grid-cols-2 gap-2">
+                <KpiCard
+                  label="생산/입고"
+                  value={formatQty(data.summary.total_in_qty)}
+                  color={
+                    data.summary.total_in_qty > 0
+                      ? (LEGACY_COLORS.green as string)
+                      : (LEGACY_COLORS.muted as string)
+                  }
+                />
+                <KpiCard
+                  label="출고/소비"
+                  value={formatQty(data.summary.total_out_qty)}
+                  color={
+                    data.summary.total_out_qty > 0
+                      ? (LEGACY_COLORS.red as string)
+                      : (LEGACY_COLORS.muted as string)
+                  }
+                />
+                <KpiCard
+                  label="순변동"
+                  value={`${netDelta >= 0 ? "+" : ""}${formatQty(netDelta)}`}
+                  color={
+                    netDelta > 0
+                      ? (LEGACY_COLORS.green as string)
+                      : netDelta < 0
+                        ? (LEGACY_COLORS.red as string)
+                        : (LEGACY_COLORS.muted as string)
+                  }
+                />
+                <KpiCard
+                  label="확인 필요"
+                  value={formatQty(reviewCount)}
+                  color={
+                    reviewCount > 0
+                      ? (LEGACY_COLORS.yellow as string)
+                      : (LEGACY_COLORS.muted as string)
+                  }
+                />
+              </div>
+
+              {/* 추가 경고 (총평에 노출 안된 나머지) */}
+              {data.warnings.length > 1 ? (
                 <div className="flex flex-col gap-2">
-                  {data.warnings.map((w, i) => (
-                    <div
-                      key={i}
-                      className="rounded-[14px] border px-3 py-2"
-                      style={{
-                        background:
-                          w.level === "danger"
-                            ? `${LEGACY_COLORS.red as string}14`
-                            : w.level === "warn"
-                              ? `${LEGACY_COLORS.yellow as string}14`
-                              : `${LEGACY_COLORS.green as string}14`,
-                        borderColor:
-                          w.level === "danger"
-                            ? `${LEGACY_COLORS.red as string}55`
-                            : w.level === "warn"
-                              ? `${LEGACY_COLORS.yellow as string}55`
-                              : `${LEGACY_COLORS.green as string}55`,
-                      }}
-                    >
+                  {data.warnings
+                    .filter((w) => w !== headlineWarning)
+                    .map((w, i) => (
                       <div
-                        className={`${TYPO.body} font-black`}
+                        key={i}
+                        className="rounded-[14px] border px-3 py-2"
                         style={{
-                          color:
+                          background:
                             w.level === "danger"
-                              ? (LEGACY_COLORS.red as string)
+                              ? `${LEGACY_COLORS.red as string}14`
                               : w.level === "warn"
-                                ? (LEGACY_COLORS.yellow as string)
-                                : (LEGACY_COLORS.green as string),
+                                ? `${LEGACY_COLORS.yellow as string}14`
+                                : `${LEGACY_COLORS.green as string}14`,
+                          borderColor:
+                            w.level === "danger"
+                              ? `${LEGACY_COLORS.red as string}55`
+                              : w.level === "warn"
+                                ? `${LEGACY_COLORS.yellow as string}55`
+                                : `${LEGACY_COLORS.green as string}55`,
                         }}
                       >
-                        {w.title}
+                        <div
+                          className={`${TYPO.body} font-black`}
+                          style={{
+                            color:
+                              w.level === "danger"
+                                ? (LEGACY_COLORS.red as string)
+                                : w.level === "warn"
+                                  ? (LEGACY_COLORS.yellow as string)
+                                  : (LEGACY_COLORS.green as string),
+                          }}
+                        >
+                          {w.title}
+                        </div>
+                        <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
+                          {w.message}
+                        </div>
                       </div>
-                      <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
-                        {w.message}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               ) : null}
 
               {/* 모델×공정 매트릭스 */}
-              {data.production_matrix.length > 0 ? (
+              {data.production_matrix.length > 0 && !productionEmpty ? (
                 <div className="flex flex-col gap-2">
                   <SectionHeader subtitle="Production" title="모델별 생산" />
                   <div className="-mx-4 overflow-x-auto pb-1">
@@ -210,7 +289,12 @@ export function WeeklyReportScreen({ onBack }: { onBack: () => void }) {
                     </div>
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <EmptyState
+                  icon={Package}
+                  title="이번 주 모델 생산 없음"
+                />
+              )}
 
               {/* 공정별 변화 */}
               <div className="flex flex-col gap-2">

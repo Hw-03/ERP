@@ -143,7 +143,9 @@ function LegacyBody() {
               }}
             />
           )}
-          {activeTab === "warehouse" && <IoHubScreen showToast={showToast} />}
+          {activeTab === "warehouse" && (
+            <IoHubScreen showToast={showToast} onChangeTab={changeTab} />
+          )}
           {activeTab === "dept" && <DeptWizardScreen showToast={showToast} />}
           {activeTab === "history" && (
             <HistoryScreen

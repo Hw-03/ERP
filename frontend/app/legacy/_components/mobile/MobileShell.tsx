@@ -66,13 +66,13 @@ export function MobileShell({
   }, [operator]);
 
   return (
-    <div className="h-screen overflow-hidden bg-black">
+    // 모바일에서는 full width — 검은 프레임은 데스크탑 프리뷰(sm 이상)에만 표시.
+    <div className="h-screen overflow-hidden sm:bg-black">
       <div
-        className="mx-auto flex h-full max-w-[430px] flex-col overflow-hidden"
+        className="mx-auto flex h-full flex-col overflow-hidden sm:max-w-[430px] sm:shadow-[0_0_60px_rgba(0,0,0,.8)]"
         style={{
           background: LEGACY_COLORS.bg,
           color: LEGACY_COLORS.text,
-          boxShadow: "0 0 60px rgba(0,0,0,.8)",
         }}
       >
         <div

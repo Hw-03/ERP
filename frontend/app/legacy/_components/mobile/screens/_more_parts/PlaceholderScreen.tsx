@@ -1,9 +1,7 @@
 "use client";
 
-import { ArrowLeft, Clock, type LucideIcon } from "lucide-react";
-import { LEGACY_COLORS } from "@/lib/mes/color";
-import { TYPO } from "../../tokens";
-import { EmptyState, IconButton } from "../../primitives";
+import { Clock, type LucideIcon } from "lucide-react";
+import { EmptyState, SubScreenHeader } from "../../primitives";
 
 export function PlaceholderScreen({
   title,
@@ -22,25 +20,7 @@ export function PlaceholderScreen({
 }) {
   return (
     <div className="flex h-full flex-col">
-      <div
-        className="flex items-center gap-2 px-4 py-3"
-        style={{ borderBottom: `1px solid ${LEGACY_COLORS.border as string}` }}
-      >
-        <IconButton icon={ArrowLeft} label="뒤로" size="md" onClick={onBack} />
-        <div className="min-w-0">
-          {subtitle ? (
-            <div
-              className={`${TYPO.overline} font-bold uppercase tracking-[2px]`}
-              style={{ color: LEGACY_COLORS.muted2 }}
-            >
-              {subtitle}
-            </div>
-          ) : null}
-          <div className={`${TYPO.title} font-black`} style={{ color: LEGACY_COLORS.text }}>
-            {title}
-          </div>
-        </div>
-      </div>
+      <SubScreenHeader title={title} subtitle={subtitle} onBack={onBack} />
       <div className="flex flex-1 items-center justify-center px-6 py-10">
         <EmptyState
           icon={icon ?? Clock}

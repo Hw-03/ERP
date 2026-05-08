@@ -10,6 +10,7 @@ import { erpCodeDeptBadge } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColor, useDeptColorLookup } from "./DepartmentsContext";
+import { SegmentedControl } from "./mobile/primitives";
 
 type ActionMode = ItemDetailActionMode;
 type DetailTab = "summary" | "locations" | "history";
@@ -116,10 +117,10 @@ export function ItemDetailSheet({
     }
   }
 
-  const tabs: { id: DetailTab; label: string }[] = [
+  const tabs: { id: DetailTab; label: string; badge?: number | null }[] = [
     { id: "summary", label: "요약" },
-    { id: "locations", label: `위치${locations.length > 0 ? ` (${locations.length})` : ""}` },
-    { id: "history", label: `거래${logs.length > 0 ? ` (${logs.length})` : ""}` },
+    { id: "locations", label: "위치", badge: locations.length || null },
+    { id: "history", label: "거래", badge: logs.length || null },
   ];
 
   return (
@@ -151,33 +152,12 @@ export function ItemDetailSheet({
         </div>
 
         {/* 탭 */}
-        <div
-          className="mb-[14px] flex gap-1 rounded-[14px] border p-1"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-          role="tablist"
-        >
-          {tabs.map((t) => {
-            const active = t.id === tab;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setTab(t.id)}
-                className="flex-1 rounded-[10px] px-2 py-[7px] text-xs font-bold transition-[background-color]"
-                style={{
-                  background: active ? (LEGACY_COLORS.s1 as string) : "transparent",
-                  color: active
-                    ? (LEGACY_COLORS.text as string)
-                    : (LEGACY_COLORS.muted2 as string),
-                  boxShadow: active ? "0 1px 6px rgba(0,0,0,.25)" : undefined,
-                }}
-              >
-                {t.label}
-              </button>
-            );
-          })}
+        <div className="mb-[14px]">
+          <SegmentedControl
+            tabs={tabs}
+            active={tab}
+            onChange={(next) => setTab(next as DetailTab)}
+          />
         </div>
 
         {tab === "summary" ? (

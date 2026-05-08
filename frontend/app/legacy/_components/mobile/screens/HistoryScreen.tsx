@@ -1,19 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  ArrowLeft,
-  CalendarDays,
-  Filter,
-  History as HistoryIcon,
-  List,
-} from "lucide-react";
+import { ArrowLeft, Filter, History as HistoryIcon } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import type { ToastState } from "@/lib/ui/Toast";
 import { TYPO } from "../tokens";
-import { EmptyState, IconButton, KpiCard } from "../primitives";
+import { EmptyState, IconButton, KpiCard, SegmentedControl } from "../primitives";
 import { useTransactions } from "../hooks/useTransactions";
 import { useMobileHistoryAux } from "../hooks/useMobileHistoryAux";
 import {
@@ -97,33 +91,15 @@ export function HistoryScreen({
     <div className="flex flex-col gap-3 px-4 pb-6 pt-3">
       <div className="flex items-center gap-2">
         <IconButton icon={ArrowLeft} label="이전" size="md" onClick={onClose} color={LEGACY_COLORS.muted2} />
-        <div className="flex-1" />
-        <div
-          className="flex overflow-hidden rounded-[14px] border"
-          style={{ borderColor: LEGACY_COLORS.border }}
-        >
-          <button
-            type="button"
-            onClick={() => setViewMode("list")}
-            className={`${TYPO.caption} flex items-center gap-1 px-3 py-2 font-bold`}
-            style={{
-              background: viewMode === "list" ? LEGACY_COLORS.blue : "transparent",
-              color: viewMode === "list" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
-            }}
-          >
-            <List size={14} /> 목록
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("calendar")}
-            className={`${TYPO.caption} flex items-center gap-1 px-3 py-2 font-bold`}
-            style={{
-              background: viewMode === "calendar" ? LEGACY_COLORS.blue : "transparent",
-              color: viewMode === "calendar" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
-            }}
-          >
-            <CalendarDays size={14} /> 달력
-          </button>
+        <div className="flex-1">
+          <SegmentedControl
+            tabs={[
+              { id: "list", label: "목록" },
+              { id: "calendar", label: "달력" },
+            ]}
+            active={viewMode}
+            onChange={(next) => setViewMode(next as "list" | "calendar")}
+          />
         </div>
         <IconButton
           icon={Filter}

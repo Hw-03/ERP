@@ -23,7 +23,6 @@ import {
   AsyncState,
   EmptyState,
   KpiCard,
-  KpiRow,
   PersonAvatar,
   QuickActionGrid,
   SectionCard,
@@ -57,8 +56,10 @@ export function HomeScreen({
     setLoading(true);
     setError(null);
     try {
+      // limit=200 으로 한 번 호출 → 오늘 거래 정확 카운트 + 최근 5건 slice 모두 처리.
+      // (백엔드 별도 dashboard API 없음. 200 건이면 평균 일일 거래량을 충분히 커버.)
       const [recent, requests, alerts] = await Promise.all([
-        api.getTransactions({ limit: 5 }),
+        api.getTransactions({ limit: 200 }),
         api.listMyStockRequests(operator.employee_id).catch<StockRequest[]>(() => []),
         api
           .listAlerts({ kind: "SAFETY", includeAcknowledged: false })
@@ -174,7 +175,7 @@ export function HomeScreen({
       </SectionCard>
 
       {/* KPI */}
-      <KpiRow>
+      <div className="flex gap-2">
         <KpiCard
           label="오늘 처리"
           value={loading ? "…" : formatQty(data?.todayCount ?? 0)}
@@ -190,7 +191,7 @@ export function HomeScreen({
           value={loading ? "…" : formatQty(data?.alertCount ?? 0)}
           color={LEGACY_COLORS.red as string}
         />
-      </KpiRow>
+      </div>
 
       {/* 빠른 실행 */}
       <div className="flex flex-col gap-2">

@@ -9,7 +9,6 @@ import {
   KeyRound,
   Lock,
   LogOut,
-  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -18,7 +17,7 @@ import { useCurrentOperator } from "../../login/useCurrentOperator";
 import { isWarehouseStaff, canEnterIO } from "../../_warehouse_steps";
 import type { TabId } from "../MobileShell";
 import { TYPO } from "../tokens";
-import { MoreMenuRow, PersonAvatar, SectionCard, SectionHeader } from "../primitives";
+import { MoreMenuRow, PersonAvatar, SectionHeader } from "../primitives";
 import { OperatorMenuSheet } from "./_more_parts/OperatorMenuSheet";
 import { PlaceholderScreen } from "./_more_parts/PlaceholderScreen";
 import { WeeklyReportScreen } from "./WeeklyReportScreen";
@@ -44,6 +43,8 @@ const PLACEHOLDER_META: Record<
   },
 };
 
+type SheetMode = "menu" | "pin" | "logout";
+
 export function MoreScreen({
   showToast,
   onChangeTab,
@@ -55,7 +56,11 @@ export function MoreScreen({
 }) {
   const operator = useCurrentOperator();
   const [sub, setSub] = useState<Subscreen>({ kind: "menu" });
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [sheet, setSheet] = useState<{ open: boolean; mode: SheetMode }>({
+    open: false,
+    mode: "menu",
+  });
+  const openSheet = (mode: SheetMode) => setSheet({ open: true, mode });
 
   const showApprovals = isWarehouseStaff(operator);
   const showMyRequests = canEnterIO(operator);
@@ -81,10 +86,10 @@ export function MoreScreen({
   return (
     <>
       <div className="flex flex-col gap-4 px-4 py-4">
-        {/* 담당자 카드 */}
+        {/* 담당자 카드 — 전체 메뉴 시트 진입 */}
         <button
           type="button"
-          onClick={() => setMenuOpen(true)}
+          onClick={() => openSheet("menu")}
           className="flex items-center gap-3 rounded-[20px] border px-4 py-4 text-left active:scale-[0.99]"
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
         >
@@ -125,19 +130,10 @@ export function MoreScreen({
           </span>
         </button>
 
-        {/* 업무 */}
+        {/* 업무 — 부서 입출고는 입출고 탭(IoHub)으로 통합. 더보기에서 별도 노출하지 않음. */}
         <div className="flex flex-col gap-2">
           <SectionHeader subtitle="Work" title="업무" />
           <div className="flex flex-col gap-2">
-            {showMyRequests ? (
-              <MoreMenuRow
-                icon={Wrench}
-                label="부서 입출고"
-                description="부서 간 이동·패키지 출하"
-                tone={LEGACY_COLORS.green as string}
-                onClick={() => onChangeTab("dept")}
-              />
-            ) : null}
             <MoreMenuRow
               icon={CalendarDays}
               label="주간보고"
@@ -187,71 +183,32 @@ export function MoreScreen({
           </div>
         </div>
 
-        {/* 시스템 */}
+        {/* 시스템 — PIN 변경/로그아웃은 sheet 의 해당 mode 로 직진입 (메뉴 거치지 않음) */}
         <div className="flex flex-col gap-2 pb-2">
           <SectionHeader subtitle="System" title="시스템" />
-          <SectionCard padding="md">
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => setMenuOpen(true)}
-                className="flex items-center gap-3 rounded-[14px] px-2 py-2 text-left"
-              >
-                <span
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px]"
-                  style={{
-                    background: `${LEGACY_COLORS.blue as string}22`,
-                    color: LEGACY_COLORS.blue as string,
-                  }}
-                >
-                  <KeyRound size={18} strokeWidth={1.85} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div
-                    className={`${TYPO.body} font-black`}
-                    style={{ color: LEGACY_COLORS.text }}
-                  >
-                    내 PIN 변경
-                  </div>
-                  <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
-                    현재 PIN 확인 후 새 PIN 설정
-                  </div>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMenuOpen(true)}
-                className="flex items-center gap-3 rounded-[14px] px-2 py-2 text-left"
-              >
-                <span
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px]"
-                  style={{
-                    background: `${LEGACY_COLORS.red as string}22`,
-                    color: LEGACY_COLORS.red as string,
-                  }}
-                >
-                  <LogOut size={18} strokeWidth={1.85} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div
-                    className={`${TYPO.body} font-black`}
-                    style={{ color: LEGACY_COLORS.red as string }}
-                  >
-                    로그아웃
-                  </div>
-                  <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
-                    세션 종료 후 로그인 화면으로
-                  </div>
-                </div>
-              </button>
-            </div>
-          </SectionCard>
+          <div className="flex flex-col gap-2">
+            <MoreMenuRow
+              icon={KeyRound}
+              label="내 PIN 변경"
+              description="현재 PIN 확인 후 새 PIN 설정"
+              tone={LEGACY_COLORS.blue as string}
+              onClick={() => openSheet("pin")}
+            />
+            <MoreMenuRow
+              icon={LogOut}
+              label="로그아웃"
+              description="세션 종료 후 로그인 화면으로"
+              tone={LEGACY_COLORS.red as string}
+              onClick={() => openSheet("logout")}
+            />
+          </div>
         </div>
       </div>
 
       <OperatorMenuSheet
-        open={menuOpen}
-        onClose={() => setMenuOpen(false)}
+        open={sheet.open}
+        initialMode={sheet.mode}
+        onClose={() => setSheet((s) => ({ ...s, open: false }))}
         operator={operator}
         onLoggedOut={() => {
           showToast({ type: "info", message: "로그아웃 되었습니다." });

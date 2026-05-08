@@ -16,6 +16,8 @@ import { TYPO } from "../../tokens";
 import {
   AsyncState,
   EmptyState,
+  ErrorAlert,
+  PinInput,
   PrimaryActionButton,
   SectionCard,
 } from "../../primitives";
@@ -275,27 +277,7 @@ function ActionSheet({
           </div>
         ) : null}
 
-        <label className="flex flex-col gap-1">
-          <span
-            className={`${TYPO.caption} font-semibold uppercase tracking-[1px]`}
-            style={{ color: LEGACY_COLORS.muted2 }}
-          >
-            내 PIN
-          </span>
-          <input
-            type="password"
-            inputMode="numeric"
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 8))}
-            className={`${TYPO.title} rounded-[14px] border px-4 py-3 font-black tabular-nums tracking-[0.4em]`}
-            style={{
-              background: LEGACY_COLORS.s2,
-              borderColor: LEGACY_COLORS.border,
-              color: LEGACY_COLORS.text,
-            }}
-            placeholder="••••"
-          />
-        </label>
+        <PinInput label="내 PIN" value={pin} onChange={setPin} />
 
         <label className="flex flex-col gap-1">
           <span
@@ -308,7 +290,7 @@ function ActionSheet({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={2}
-            className={`${TYPO.body} rounded-[14px] border px-3 py-2`}
+            className={`${TYPO.body} rounded-[14px] border px-3 py-2 outline-none`}
             style={{
               background: LEGACY_COLORS.s2,
               borderColor: LEGACY_COLORS.border,
@@ -318,17 +300,7 @@ function ActionSheet({
           />
         </label>
 
-        {err ? (
-          <div
-            className={`${TYPO.caption} rounded-[10px] px-3 py-2`}
-            style={{
-              background: `${LEGACY_COLORS.red as string}18`,
-              color: LEGACY_COLORS.red as string,
-            }}
-          >
-            {err}
-          </div>
-        ) : null}
+        <ErrorAlert message={err} />
 
         <div className="flex gap-2 pt-1">
           <button
