@@ -29,29 +29,29 @@ function WeeklyDetailTableImpl({ group }: Props) {
         className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 pb-2"
         style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
       >
-        <span className="text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted }}>
+        <span className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.muted }}>
           {group.dept_name}
         </span>
-        <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+        <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
           품목 {group.items.length}건
         </span>
-        <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+        <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
           현재 재고 {formatQty(group.current_qty)}
         </span>
         <span
-          className="text-[11px]"
+          className="text-[12px]"
           style={{ color: group.in_qty > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.muted2 }}
         >
           생산 {formatQty(group.in_qty)}
         </span>
         <span
-          className="text-[11px]"
+          className="text-[12px]"
           style={{ color: group.out_qty > 0 ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2 }}
         >
           출고 {formatQty(group.out_qty)}
         </span>
         <span
-          className="text-[11px]"
+          className="text-[12px]"
           style={{
             color:
               group.delta > 0
@@ -71,39 +71,17 @@ function WeeklyDetailTableImpl({ group }: Props) {
       </div>
 
       <div className="overflow-x-auto">
-        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 3px", minWidth: 680 }}>
+        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 4px", minWidth: 680, tableLayout: "fixed" }}>
+          <colgroup>
+            <col style={{ width: "100px" }} />
+            <col />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "11%" }} />
+          </colgroup>
           <thead>
-            {/* 컬럼 그룹 헤더 */}
-            <tr>
-              <th
-                colSpan={2}
-                className="pb-0.5 pl-4 pt-2 text-left text-[10px] font-bold"
-                style={{ color: LEGACY_COLORS.muted2 }}
-              >
-                기본 정보
-              </th>
-              <th
-                colSpan={1}
-                className="pb-0.5 px-3 pt-2 text-right text-[10px] font-bold"
-                style={{ color: LEGACY_COLORS.muted2 }}
-              >
-                전주
-              </th>
-              <th
-                colSpan={2}
-                className="pb-0.5 px-3 pt-2 text-right text-[10px] font-bold"
-                style={{ color: LEGACY_COLORS.muted2 }}
-              >
-                이번 주 변동
-              </th>
-              <th
-                colSpan={2}
-                className="pb-0.5 px-3 pt-2 text-right text-[10px] font-bold"
-                style={{ color: LEGACY_COLORS.muted2 }}
-              >
-                결과
-              </th>
-            </tr>
             <tr>
               {["품목 코드", "품명", "전주 재고", "생산 내역", "출고 내역", "현재 재고", "증감"].map(
                 (h, i) => (
@@ -113,7 +91,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                     style={{
                       color: LEGACY_COLORS.muted2,
                       textAlign: i < 2 ? "left" : "right",
-                      padding: "0 12px 8px",
+                      padding: "8px 12px 10px",
                       whiteSpace: "nowrap",
                     }}
                   >
@@ -141,7 +119,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                 <tr key={row.item_id}>
                   {/* 품목 코드 */}
                   <td
-                    className="rounded-l-[12px] border-y border-l py-3.5 pl-4 pr-3 text-[13px] font-bold"
+                    className="rounded-l-[12px] border-y border-l py-3.5 pl-3 pr-3 text-[14px] font-bold"
                     style={{
                       background: rowBg,
                       borderColor: rowBorder,
@@ -153,16 +131,16 @@ function WeeklyDetailTableImpl({ group }: Props) {
                   </td>
                   {/* 품명 */}
                   <td
-                    className="border-y px-3 py-3.5 text-[14px] font-bold"
+                    className="border-y px-3 py-3.5 text-[15px] font-bold"
                     style={{
                       background: rowBg,
                       borderColor: rowBorder,
                       color: LEGACY_COLORS.text,
-                      minWidth: 280,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
+                      whiteSpace: "normal",
+                      wordBreak: "keep-all",
+                      lineHeight: 1.35,
                     }}
+                    title={row.item_name}
                   >
                     {row.item_name}
                   </td>
@@ -176,7 +154,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                   <Num val={row.current_qty} bg={rowBg} border={rowBorder} />
                   {/* 증감 */}
                   <td
-                    className="rounded-r-[12px] border-y border-r px-3 py-3.5 text-right text-[14px] font-black"
+                    className="rounded-r-[12px] border-y border-r pl-3 pr-4 py-3.5 text-right text-[16px] font-black"
                     style={{
                       background: rowBg,
                       borderColor: rowBorder,
@@ -215,7 +193,7 @@ function Num({
   const c = val === 0 ? LEGACY_COLORS.muted2 : (color ?? LEGACY_COLORS.text);
   return (
     <td
-      className="border-y px-3 py-3.5 text-right text-[14px] font-bold"
+      className="border-y px-3 py-3.5 text-right text-[15px] font-bold"
       style={{
         background: bg,
         borderColor: border,

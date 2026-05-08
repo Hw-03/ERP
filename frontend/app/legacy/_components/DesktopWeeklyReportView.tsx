@@ -311,12 +311,12 @@ export function DesktopWeeklyReportView() {
       {data && <WeeklySummaryBand data={data} />}
 
       {/* ── 행3: 생산 현황 ── */}
-      <div className="shrink-0 rounded-[22px] border p-4" style={cardBase}>
-        <div className="mb-3 flex items-baseline gap-2">
-          <h2 className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
+      <div className="shrink-0 rounded-[22px] border py-5 px-5" style={cardBase}>
+        <div className="mb-4 flex items-baseline gap-2">
+          <h2 className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
             생산 현황
           </h2>
-          <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted }}>
+          <span className="text-[13px]" style={{ color: LEGACY_COLORS.muted }}>
             선택 주차 모델별 공정 생산 수량
           </span>
         </div>
@@ -342,10 +342,10 @@ export function DesktopWeeklyReportView() {
             className="shrink-0 border-b px-4 pb-3 pt-4"
             style={{ borderColor: LEGACY_COLORS.border }}
           >
-            <h2 className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
+            <h2 className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
               공정별 변화
             </h2>
-            <p className="mt-0.5 text-[12px]" style={{ color: LEGACY_COLORS.muted }}>
+            <p className="mt-0.5 text-[13px]" style={{ color: LEGACY_COLORS.muted }}>
               순변동 · 생산 내역 · 출고 내역
             </p>
           </div>
@@ -381,10 +381,10 @@ export function DesktopWeeklyReportView() {
               className="shrink-0 border-b px-5 py-3"
               style={{ borderColor: LEGACY_COLORS.border }}
             >
-              <h2 className="text-[14px] font-black" style={{ color: LEGACY_COLORS.text }}>
+              <h2 className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
                 {selectedGroup ? `${selectedGroup.dept_name} 품목 상세` : "품목 상세"}
               </h2>
-              <p className="mt-0.5 text-[12px]" style={{ color: LEGACY_COLORS.muted }}>
+              <p className="mt-0.5 text-[13px]" style={{ color: LEGACY_COLORS.muted }}>
                 {selectedGroup?.label ?? "공정을 선택하세요"} · 선택 주차 품목별 변화
               </p>
             </div>
