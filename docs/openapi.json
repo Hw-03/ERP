@@ -9,6 +9,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -43,6 +44,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -74,6 +76,7 @@
           "bom_expected": {
             "anyOf": [
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -126,6 +129,7 @@
             "title": "Process Type Code"
           },
           "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -307,6 +311,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -377,6 +382,7 @@
             "type": "string"
           },
           "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -428,6 +434,7 @@
             "type": "string"
           },
           "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -459,6 +466,7 @@
           },
           "current_stock": {
             "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Current Stock",
             "type": "string"
           },
@@ -494,6 +502,7 @@
             "title": "Process Type Code"
           },
           "required_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Required Quantity",
             "type": "string"
           },
@@ -516,15 +525,12 @@
           "quantity": {
             "anyOf": [
               {
-                "anyOf": [
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "string"
-                  }
-                ],
-                "gt": 0
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
               },
               {
                 "type": "null"
@@ -582,14 +588,17 @@
             "title": "Process Type Code"
           },
           "required_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Required Quantity",
             "type": "string"
           },
           "stock_after": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Stock After",
             "type": "string"
           },
           "stock_before": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Stock Before",
             "type": "string"
           }
@@ -1122,6 +1131,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -1182,11 +1192,7 @@
             "type": "boolean"
           },
           "level": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/EmployeeLevelEnum"
-              }
-            ],
+            "$ref": "#/components/schemas/EmployeeLevelEnum",
             "default": "staff"
           },
           "name": {
@@ -1591,6 +1597,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -1653,6 +1660,7 @@
           },
           "samples": {
             "items": {
+              "additionalProperties": true,
               "type": "object"
             },
             "title": "Samples",
@@ -1708,6 +1716,7 @@
           },
           "samples": {
             "items": {
+              "additionalProperties": true,
               "type": "object"
             },
             "title": "Samples",
@@ -1765,6 +1774,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -1807,6 +1817,7 @@
             "type": "string"
           },
           "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -1875,6 +1886,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -1906,11 +1918,13 @@
         "properties": {
           "available_quantity": {
             "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Available Quantity",
             "type": "string"
           },
           "defective_total": {
             "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Defective Total",
             "type": "string"
           },
@@ -1956,15 +1970,18 @@
           },
           "pending_quantity": {
             "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Pending Quantity",
             "type": "string"
           },
           "production_total": {
             "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Production Total",
             "type": "string"
           },
           "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -1975,6 +1992,7 @@
           },
           "warehouse_qty": {
             "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Warehouse Qty",
             "type": "string"
           }
@@ -2042,6 +2060,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -2083,6 +2102,7 @@
             "type": "integer"
           },
           "total_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Quantity",
             "type": "string"
           }
@@ -2115,6 +2135,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -2184,6 +2205,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -2350,6 +2372,7 @@
           "min_stock": {
             "anyOf": [
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -2478,6 +2501,18 @@
             ],
             "title": "Barcode"
           },
+          "erp_code": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Erp Code"
+          },
           "item_name": {
             "anyOf": [
               {
@@ -2544,6 +2579,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -2551,6 +2587,32 @@
               }
             ],
             "title": "Min Stock"
+          },
+          "model_slots": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Slots"
+          },
+          "option_code": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Option Code"
           },
           "process_type_code": {
             "anyOf": [
@@ -2608,6 +2670,7 @@
         "properties": {
           "available_quantity": {
             "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Available Quantity",
             "type": "string"
           },
@@ -2629,6 +2692,7 @@
           },
           "defective_total": {
             "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Defective Total",
             "type": "string"
           },
@@ -2740,6 +2804,7 @@
           "min_stock": {
             "anyOf": [
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -2780,6 +2845,7 @@
           },
           "pending_quantity": {
             "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Pending Quantity",
             "type": "string"
           },
@@ -2796,12 +2862,14 @@
           },
           "production_total": {
             "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Production Total",
             "type": "string"
           },
           "quantity": {
             "anyOf": [
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -2866,6 +2934,7 @@
           },
           "warehouse_qty": {
             "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Warehouse Qty",
             "type": "string"
           }
@@ -2915,6 +2984,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -2997,6 +3067,7 @@
             "title": "Operator"
           },
           "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -3042,6 +3113,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -3181,6 +3253,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -3215,6 +3288,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -3265,6 +3339,7 @@
             "type": "string"
           },
           "counted_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Counted Qty",
             "type": "string"
           },
@@ -3274,6 +3349,7 @@
             "type": "string"
           },
           "diff": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Diff",
             "type": "string"
           },
@@ -3327,6 +3403,7 @@
             "title": "Reason"
           },
           "system_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "System Qty",
             "type": "string"
           }
@@ -3436,6 +3513,7 @@
         "properties": {
           "defective_qty_sum": {
             "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Defective Qty Sum",
             "type": "string"
           },
@@ -3453,15 +3531,18 @@
           },
           "production_qty_sum": {
             "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Production Qty Sum",
             "type": "string"
           },
           "total_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Quantity",
             "type": "string"
           },
           "warehouse_qty_sum": {
             "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Warehouse Qty Sum",
             "type": "string"
           }
@@ -3705,6 +3786,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -3755,6 +3837,7 @@
             "type": "string"
           },
           "produced_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Produced Quantity",
             "type": "string"
           },
@@ -3857,6 +3940,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -3990,6 +4074,7 @@
           "parent_quantity": {
             "anyOf": [
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -4069,6 +4154,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -4113,6 +4199,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -4135,6 +4222,7 @@
           "bom_expected": {
             "anyOf": [
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -4199,6 +4287,7 @@
             "title": "Process Stage"
           },
           "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -4276,6 +4365,7 @@
             "type": "string"
           },
           "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -4385,6 +4475,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -4473,6 +4564,7 @@
             "title": "Process Stage"
           },
           "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -4597,6 +4689,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -4653,6 +4746,7 @@
             "type": "string"
           },
           "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           }
@@ -4836,6 +4930,7 @@
           "observed_value": {
             "anyOf": [
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -4847,6 +4942,7 @@
           "threshold": {
             "anyOf": [
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -5030,6 +5126,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -5106,6 +5203,7 @@
             "type": "string"
           },
           "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
           },
@@ -5456,6 +5554,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -5623,6 +5722,7 @@
           "quantity_after": {
             "anyOf": [
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -5634,6 +5734,7 @@
           "quantity_before": {
             "anyOf": [
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -5643,6 +5744,7 @@
             "title": "Quantity Before"
           },
           "quantity_change": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity Change",
             "type": "string"
           },
@@ -5659,6 +5761,18 @@
           },
           "transaction_type": {
             "$ref": "#/components/schemas/TransactionTypeEnum"
+          },
+          "transfer_qty": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transfer Qty"
           }
         },
         "required": [
@@ -5760,6 +5874,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -5863,6 +5978,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -5925,6 +6041,7 @@
       "VarianceLogResponse": {
         "properties": {
           "actual_used": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Actual Used",
             "type": "string"
           },
@@ -5934,6 +6051,7 @@
             "type": "string"
           },
           "bom_expected": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Bom Expected",
             "type": "string"
           },
@@ -5943,6 +6061,7 @@
             "type": "string"
           },
           "diff": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Diff",
             "type": "string"
           },
@@ -6005,10 +6124,12 @@
       "WeeklyGroupReport": {
         "properties": {
           "current_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Current Qty",
             "type": "string"
           },
           "delta": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Delta",
             "type": "string"
           },
@@ -6017,6 +6138,7 @@
             "type": "string"
           },
           "in_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "In Qty",
             "type": "string"
           },
@@ -6036,10 +6158,12 @@
             "type": "string"
           },
           "out_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Out Qty",
             "type": "string"
           },
           "prev_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Prev Qty",
             "type": "string"
           },
@@ -6066,10 +6190,12 @@
       "WeeklyItemReport": {
         "properties": {
           "current_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Current Qty",
             "type": "string"
           },
           "delta": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Delta",
             "type": "string"
           },
@@ -6085,6 +6211,7 @@
             "title": "Erp Code"
           },
           "in_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "In Qty",
             "type": "string"
           },
@@ -6097,10 +6224,12 @@
             "type": "string"
           },
           "out_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Out Qty",
             "type": "string"
           },
           "prev_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Prev Qty",
             "type": "string"
           }
@@ -6121,10 +6250,12 @@
       "WeeklyProductionModelRow": {
         "properties": {
           "af_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Af Qty",
             "type": "string"
           },
           "hf_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Hf Qty",
             "type": "string"
           },
@@ -6137,14 +6268,17 @@
             "type": "string"
           },
           "nf_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Nf Qty",
             "type": "string"
           },
           "total_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Qty",
             "type": "string"
           },
           "vf_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Vf Qty",
             "type": "string"
           }
@@ -6222,14 +6356,17 @@
             "type": "integer"
           },
           "total_current_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Current Qty",
             "type": "string"
           },
           "total_in_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total In Qty",
             "type": "string"
           },
           "total_out_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Out Qty",
             "type": "string"
           }
@@ -7507,6 +7644,7 @@
                   "type": "number"
                 },
                 {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                   "type": "string"
                 }
               ],
@@ -9734,6 +9872,7 @@
                   "type": "number"
                 },
                 {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                   "type": "string"
                 }
               ],
