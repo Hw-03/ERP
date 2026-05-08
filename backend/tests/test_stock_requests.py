@@ -636,12 +636,13 @@ def test_completed_request_cannot_be_processed_again(db_session, client, make_it
     )
     assert res.status_code == 200
 
-    # 재승인 시도
+    # 재승인 시도 — 이미 완료된 요청은 멱등 200 반환 (이중 처리 없음)
     res2 = client.post(
         f"/api/stock-requests/{request_id}/approve",
         json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
     )
-    assert res2.status_code == 422
+    assert res2.status_code == 200
+    assert res2.json()["status"] == "completed"
 
     # 취소 시도
     res3 = client.post(

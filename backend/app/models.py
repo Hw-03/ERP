@@ -714,6 +714,7 @@ class StockRequest(Base):
 
     request_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     request_code = Column(String(40), unique=True, nullable=True, index=True)
+    client_request_id = Column(String(64), unique=True, nullable=True, index=True)
     requester_employee_id = Column(
         UUID(as_uuid=True),
         ForeignKey("employees.employee_id", ondelete="RESTRICT"),

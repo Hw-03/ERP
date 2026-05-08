@@ -31,6 +31,7 @@ export function DraftsListPanel({
   const [drafts, setDrafts] = useState<StockRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = async () => {
     if (!operator) return;
@@ -54,6 +55,7 @@ export function DraftsListPanel({
   const onDelete = async (req: StockRequest) => {
     if (!operator) return;
     if (!confirm("이 장바구니 항목을 삭제할까요?")) return;
+    setDeletingId(req.request_id);
     try {
       await api.deleteStockRequestDraft(req.request_id, operator.employee_id);
       showToast({ type: "info", message: "장바구니 항목을 삭제했습니다." });
@@ -63,6 +65,8 @@ export function DraftsListPanel({
         type: "error",
         message: e instanceof Error ? e.message : "삭제에 실패했습니다.",
       });
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -108,8 +112,9 @@ export function DraftsListPanel({
                 <button
                   type="button"
                   onClick={() => onDelete(d)}
+                  disabled={deletingId === d.request_id}
                   aria-label="장바구니 삭제"
-                  className="shrink-0 rounded-full p-2"
+                  className="shrink-0 rounded-full p-2 disabled:opacity-40"
                   style={{ color: LEGACY_COLORS.red as string }}
                 >
                   <Trash2 size={18} strokeWidth={1.85} />

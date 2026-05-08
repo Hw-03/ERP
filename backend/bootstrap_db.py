@@ -105,6 +105,9 @@ _MIGRATION_DDL: list[str] = [
     "ALTER TABLE employees ADD COLUMN pin_last_changed DATETIME",
     # 부서 대표 색깔 (HEX, NULL = 기본 purple)
     "ALTER TABLE departments ADD COLUMN color_hex VARCHAR(7)",
+    # R10B: 중복 제출 방지용 클라이언트 멱등성 키
+    "ALTER TABLE stock_requests ADD COLUMN client_request_id VARCHAR(64)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ix_stock_requests_client_request_id ON stock_requests(client_request_id)",
 ]
 
 
