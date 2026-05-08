@@ -1,5 +1,7 @@
 # 주말 작업 요약 (금·토·일) — 2026-05-03
 
+> **참고 (2026-05-08 추가):** 본 문서에서 언급되는 `MES_MOBILE_CLAUDE_CODE_EXECUTION_PLAN.md`는 2026-05-08 루트 정리 시 삭제됨 (모바일 작업 완료 후 한물간 일회성 플랜). 필요 시 git history에서 조회. `deep-research-report.md`는 `docs/research/2026-04-26-deep-research-report.md`로 이동됨.
+
 > **작업 ID:** P-SUN-04
 > **작성일:** 2026-05-03 (일)
 > **기간:** 2026-05-01 ~ 2026-05-03 (3일)

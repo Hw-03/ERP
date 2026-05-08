@@ -442,7 +442,7 @@ GPT 외부 리뷰가 운영 readiness 를 A → B+ 로 다운그레이드했다 
 
 ### Phase 3 — DB 백업 + 재생성 + 정리본 적재
 
-- 백업: `backups/erp_before_inventory_reset_20260429T230721Z.db`
+- 백업: `data/db_backups/erp_before_inventory_reset_20260429T230721Z.db`
 - `bootstrap_db.py`: `_PROCESS_TYPES` 11→18개로 확장
 - DB 삭제 → `python bootstrap_db.py --schema --seed` (process_types 18개 포함)
 - 신규 스크립트: `scripts/dev/import_inventory_cleanup.py`

@@ -210,7 +210,7 @@ Avoid vague messages:
 - `docs/AI_HANDOVER.md`
 - `docs/CODEX_PROGRESS.md`
 - `start.bat`
-- `docker-compose.yml`
+- `docker/docker-compose.yml`
 - `backend/app/main.py`
 - `frontend/package.json`
 

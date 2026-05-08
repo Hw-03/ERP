@@ -5,7 +5,8 @@
 > **기준 브랜치:** `feat/hardening-roadmap`  
 > (초기 분석은 `claude/analyze-dexcowin-mes-tGZNI` 에서 시작했으나 fast-forward 머지 후 통일. 이 브랜치는 폐기됨.)  
 > **수정 여부:** 없음 (읽기 전용 분석)  
-> **탐색 깊이:** 루트 기준 4단계
+> **탐색 깊이:** 루트 기준 4단계  
+> **갱신:** 2026-05-08 — 루트 정리 적용 (MES플랜 삭제, deep-research 이동, backups 통합). 자세한 내역: `docs/AI_HANDOVER.md` "2026-05-08 — 루트 정리" 섹션
 
 ---
 
@@ -40,8 +41,8 @@
 | `CLAUDE.md` | 🟢 활성 | 세션 규칙 |
 | `README.md` | 🟢 활성 | 프로젝트 진입점 |
 | `start.bat` | 🟢 활성 | 로컬 실행 스크립트 |
-| `MES_MOBILE_CLAUDE_CODE_EXECUTION_PLAN.md` | 📦 보존 | 이번 주말 실행 플랜 |
-| `deep-research-report.md` | 📦 보존 | 분석 보고서 |
+
+> 2026-05-08 정리: `MES_MOBILE_CLAUDE_CODE_EXECUTION_PLAN.md`(주말 플랜, 완료) 삭제, `deep-research-report.md` → `docs/research/2026-04-26-deep-research-report.md`로 이동, 루트 `backups/` → `data/db_backups/`로 통합.
 
 ---
 
@@ -177,7 +178,7 @@
 | `frontend/_archive/` | CLAUDE.md "Do Not Edit" |
 | `backend/_archive/` | CLAUDE.md "Do Not Edit" |
 | `frontend/app/legacy/_components/_archive/` | CLAUDE.md "Do Not Edit" |
-| `backups/` (있으면) | DB 백업 — 운영 데이터 |
+| `data/db_backups/` | DB 백업 — 운영 데이터 (2026-05-08 통합, 옛 `backups/`는 제거) |
 | `vault/` | `vault-sync` 브랜치 전용 — `main` 미포함 |
 | `docs/regression*/` | 회귀 테스트 근거 |
 | `scripts/migrations/` | 과거 마이그레이션 — 재실행 금지이지만 기록 보존 |

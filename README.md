@@ -115,7 +115,7 @@ ERP/
 │       │   └── types/    도메인별 type 정본 (Round-10A #2)
 │       ├── api-core.ts   fetch 헬퍼 (postJson/putJson/deleteJson/parseError)
 │       └── mes/          MES 디자인시스템 (color/format/status/...)
-├── data/                 입력 자료 (xlsx · csv)
+├── data/                 입력 자료 (xlsx · csv) + db_backups/ (DB 백업 단일 보관소)
 ├── docs/                 기준 · 운영 · 구조 · 인수인계
 │   ├── openapi.json      FastAPI baseline (CI drift 검사 기준)
 │   └── research/         외부 연구 보고서
@@ -123,8 +123,9 @@ ERP/
 │   ├── ops/              백업 · 헬스체크 · 재고 정합
 │   ├── migrations/       DB 스키마 / 코드 정제
 │   └── dev/              verify_local.ps1 등 개발 보조
-├── docker/               컨테이너 정의 (선택)
-├── _archive/, _backup/   보관용 — 작업 대상 아님
+├── outputs/              도구 산출물 (bom_setup/, inventory_cleanup/)
+├── docker/               컨테이너 정의 (docker-compose.yml · docker-compose.nas.yml)
+├── _archive/             보관용 — 작업 대상 아님
 ├── start.bat             통합 실행 (Windows)
 ├── README.md             이 문서
 └── CLAUDE.md             AI/개발자 작업 규칙
