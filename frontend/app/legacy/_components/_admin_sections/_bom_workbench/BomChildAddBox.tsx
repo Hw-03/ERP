@@ -49,8 +49,7 @@ export function BomChildAddBox({ parent, bomRows, items, onPick }: Props) {
       .filter((i) => {
         if (!kw) return true;
         return `${i.item_name} ${i.erp_code ?? ""}`.toLowerCase().includes(kw);
-      })
-      .slice(0, 200);
+      });
   }, [items, parent.item_id, search, deptFilter, stageFilter]);
 
   const availableCount = candidates.filter((c) => !childIdSet.has(c.item_id)).length;
