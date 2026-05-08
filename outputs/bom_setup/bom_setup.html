@@ -271,6 +271,59 @@ function toast(msg,type="info"){
   setTimeout(()=>el.remove(),2800);
 }
 
+function itemRow(item){
+  const compSet=new Set(S.completed);
+  const done=compSet.has(item.item_id);
+  const cnt=S.pending.filter(r=>r.parentItemId===item.item_id).length;
+  return `<div class="item-row" onclick="enterEdit('${item.item_id}')">
+    ${ptBadge(item.process_type_code)}
+    <div style="flex:1;min-width:0;"><div class="item-name">${esc(item.item_name)}</div><div class="item-code">${esc(item.erp_code??"")}</div></div>
+    ${done?`<span class="tag tag-success">완료</span>`:cnt>0?`<span class="tag tag-info">+${cnt} 대기</span>`:`<span class="tag tag-muted">미착수</span>`}
+  </div>`;
+}
+
+function candRow(item){
+  const isPending=S.pendingChildId===item.item_id;
+  return `<div style="border-bottom:1px solid var(--c-border);"><button onclick="${item.alreadyIn?"":``+`selChild('${item.item_id}')`}" style="width:100%;display:flex;align-items:center;gap:10px;padding:15px 14px;text-align:left;background:${isPending?"rgba(47,116,231,0.06)":"transparent"};opacity:${item.alreadyIn?0.45:1};cursor:${item.alreadyIn?"default":"pointer"};">${ptBadge(item.process_type_code)}<div style="flex:1;min-width:0;"><div class="truncate" style="font-size:15px;">${esc(item.item_name)}</div><div style="font-size:13px;color:var(--c-muted2);">${esc(item.erp_code??"")}</div></div>${item.alreadyIn?`<span class="tag tag-success">추가됨</span>`:""}</button>${isPending&&!item.alreadyIn?`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(47,116,231,0.04);"><span style="font-size:14px;color:var(--c-muted2);">소요량</span><input id="qin-${item.item_id}" type="text" inputmode="decimal" value="${esc(S.pendingChildQty)}" oninput="S.pendingChildQty=this.value" onkeydown="if(event.key==='Enter'){addChild('${item.item_id}');event.stopPropagation();}else if(event.key==='Escape'){S.pendingChildId=null;S.pendingChildQty='1';render();event.stopPropagation();}" style="width:100px;text-align:center;background:var(--c-s1);border:1px solid var(--c-blue);border-radius:10px;padding:7px 12px;font-size:15px;"><span style="font-size:14px;color:var(--c-muted2);">EA</span><button class="btn btn-primary" style="margin-left:auto;" onclick="addChild('${item.item_id}')">추가</button><button class="btn btn-ghost" onclick="S.pendingChildId=null;S.pendingChildQty='1';render()">취소</button></div>`:""}</div>`;
+}
+
+function refreshParentList(){
+  const deptItems=ITEMS.filter(i=>deptOf(i.process_type_code)===S.dept);
+  let list=deptItems.filter(i=>stageOf(i.process_type_code)!=="R");
+  if (S.parentFilter!=="ALL") list=list.filter(i=>stageOf(i.process_type_code)===S.parentFilter);
+  if (S.parentSearch.trim()){
+    const q=S.parentSearch.trim().toLowerCase();
+    list=list.filter(i=>i.item_name?.toLowerCase().includes(q)||i.erp_code?.toLowerCase().includes(q));
+  }
+  const compSet=new Set(S.completed);
+  const workList=list.filter(i=>!compSet.has(i.item_id)&&S.pending.some(r=>r.parentItemId===i.item_id));
+  const doneList=list.filter(i=>compSet.has(i.item_id));
+  const pendingList=list.filter(i=>!compSet.has(i.item_id)&&!S.pending.some(r=>r.parentItemId===i.item_id));
+  const tabList=S.activeTab==="all"?[...pendingList,...workList,...doneList]
+    :S.activeTab==="work"?workList:S.activeTab==="done"?doneList:pendingList;
+  const panel=document.getElementById('parent-list-panel');
+  if (panel) {
+    panel.innerHTML=tabList.length===0
+      ?`<div class="empty-state"><span style="font-weight:600;">${S.activeTab==="work"?"작업 중인 BOM 없음":S.activeTab==="done"?"완료된 BOM 없음":S.activeTab==="pending"?"미착수 항목 없음":"등록된 항목 없음"}</span></div>`
+      :tabList.map(itemRow).join("");
+  }
+  const cnt=document.getElementById('parent-count');
+  if (cnt) cnt.textContent=list.length;
+}
+
+function refreshChildList(){
+  const parent=S.parent; if (!parent) return;
+  const cands=getCandidates(parent);
+  const list=document.getElementById('child-cand-list');
+  if (list) {
+    list.innerHTML=cands.length===0
+      ?`<div class="empty-state"><span>결과 없음</span></div>`
+      :cands.map(candRow).join("");
+  }
+  const cnt=document.getElementById('child-cand-count');
+  if (cnt) cnt.textContent=cands.filter(c=>!c.alreadyIn).length;
+}
+
 function renderMain() {
   const deptInfo=DEPTS.find(d=>d.id===S.dept);
   const deptItems=ITEMS.filter(i=>deptOf(i.process_type_code)===S.dept);
@@ -292,15 +345,6 @@ function renderMain() {
     {id:"pending",label:"미착수",val:pendingList.length,total:baseList.filter(i=>!compSet.has(i.item_id)&&!S.pending.some(r=>r.parentItemId===i.item_id)).length,color:"#8a96a6"},
   ];
   const FILTERS=[{id:"ALL",label:"전체"},{id:"A",label:"중간 공정"},{id:"F",label:"공정 완료"}];
-  function itemRow(item){
-    const done=compSet.has(item.item_id);
-    const cnt=S.pending.filter(r=>r.parentItemId===item.item_id).length;
-    return `<div class="item-row" onclick="enterEdit('${item.item_id}')">
-      ${ptBadge(item.process_type_code)}
-      <div style="flex:1;min-width:0;"><div class="item-name">${esc(item.item_name)}</div><div class="item-code">${esc(item.erp_code??"")}</div></div>
-      ${done?`<span class="tag tag-success">완료</span>`:cnt>0?`<span class="tag tag-info">+${cnt} 대기</span>`:`<span class="tag tag-muted">미착수</span>`}
-    </div>`;
-  }
   return `
 <div style="height:100%;display:flex;flex-direction:column;overflow:hidden;">
   <div class="dept-tabs">
@@ -309,11 +353,11 @@ function renderMain() {
   <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:0 16px 16px;overflow:hidden;">
     <div style="display:flex;gap:10px;flex-shrink:0;">${stats.map(s=>`<div class="panel" style="flex:1;padding:12px 16px;cursor:pointer;border:2px solid ${S.activeTab===s.id?"var(--c-blue)":"transparent"};transition:border-color 100ms;" onclick="S.activeTab='${s.id}';render()"><div class="panel-label">${esc(s.label)}</div><div style="font-size:22px;font-weight:700;color:${s.color};margin-top:4px;line-height:1.1;">${s.val}<span style="font-size:12px;font-weight:500;color:var(--c-muted2);margin-left:2px;">건</span></div></div>`).join("")}</div>
     <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
-      <input id="search-parent" class="input" placeholder="품목명 / 코드 검색" value="${esc(S.parentSearch)}" oncompositionend="S.parentSearch=this.value;render()" oninput="S.parentSearch=this.value;if(!event.isComposing)render()" style="flex:1;">
+      <input id="search-parent" class="input" placeholder="품목명 / 코드 검색" value="${esc(S.parentSearch)}" oninput="S.parentSearch=this.value;refreshParentList()" style="flex:1;">
       <div style="display:flex;gap:6px;">${FILTERS.map(f=>`<button class="chip${S.parentFilter===f.id?" active":""}" onclick="S.parentFilter='${f.id}';render()">${esc(f.label)}</button>`).join("")}</div>
-      <span style="font-size:13px;color:var(--c-muted2);white-space:nowrap;">${esc(deptInfo?.label??"")} · ${list.length}건</span>
+      <span style="font-size:13px;color:var(--c-muted2);white-space:nowrap;">${esc(deptInfo?.label??"")} · <span id="parent-count">${list.length}</span>건</span>
     </div>
-    <div class="panel" style="flex:1;min-height:0;overflow-y:auto;">${tabList.length===0?`<div class="empty-state"><span style="font-weight:600;">${S.activeTab==="work"?"작업 중인 BOM 없음":S.activeTab==="done"?"완료된 BOM 없음":S.activeTab==="pending"?"미착수 항목 없음":"등록된 항목 없음"}</span></div>`:tabList.map(itemRow).join("")}</div>
+    <div id="parent-list-panel" class="panel" style="flex:1;min-height:0;overflow-y:auto;">${tabList.length===0?`<div class="empty-state"><span style="font-weight:600;">${S.activeTab==="work"?"작업 중인 BOM 없음":S.activeTab==="done"?"완료된 BOM 없음":S.activeTab==="pending"?"미착수 항목 없음":"등록된 항목 없음"}</span></div>`:tabList.map(itemRow).join("")}</div>
     <div class="panel" style="flex-shrink:0;overflow:hidden;">
       <button onclick="S.rawOpen=!S.rawOpen;render()" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:10px 16px;text-align:left;">
         <span style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--c-muted2);">미배치 원자재</span>
@@ -332,20 +376,17 @@ function renderEdit() {
   const cands=getCandidates(parent);
   const pw=S.childPickerOpen?430:0;
   function bomRow(row){
-    const ci=ITEMS.find(i=>i.item_id===row.childItemId)??{};
-    const qty=Number(row.qty),unit=row.unit||"EA";
-    const isEditing=S.editingQtyId===row.tempId;
+    const cur=S.pending.find(r=>r.tempId===row.tempId)||row;
+    const ci=ITEMS.find(i=>i.item_id===cur.childItemId)??{};
+    const qty=Number(cur.qty),unit=cur.unit||"EA";
+    const isEditing=S.editingQtyId===cur.tempId;
     const qtyCell=isEditing
-      ?`<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;"><input id="qe-${row.tempId}" type="text" inputmode="decimal" value="${esc(S.editingQtyVal)}" oninput="S.editingQtyVal=this.value" onblur="setTimeout(()=>blurEditQty('${row.tempId}'),0)" onkeydown="if(event.key==='Enter')confirmEditQty('${row.tempId}');else if(event.key==='Escape')cancelEditQty();" style="width:100px;text-align:center;background:var(--c-s1);border:1px solid var(--c-blue);border-radius:8px;padding:5px 12px;font-size:14px;"><span style="font-size:13px;color:var(--c-muted2);">${unit}</span></div>`
-      :`<div style="text-align:right;"><button onclick="startEditQty('${row.tempId}')" style="font-size:14px;color:var(--c-text);padding:5px 12px;border-radius:6px;background:var(--c-s1);border:1px solid var(--c-border);cursor:pointer;" title="클릭하여 수량 수정">×${qty} ${unit}</button></div>`;
+      ?`<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;"><input id="qe-${cur.tempId}" type="text" inputmode="decimal" value="${esc(S.editingQtyVal)}" oninput="S.editingQtyVal=this.value" onblur="setTimeout(()=>blurEditQty('${cur.tempId}'),0)" onkeydown="if(event.key==='Enter'){confirmEditQty('${cur.tempId}');event.stopPropagation();}else if(event.key==='Escape'){cancelEditQty();event.stopPropagation();}" style="width:100px;text-align:center;background:var(--c-s1);border:1px solid var(--c-blue);border-radius:8px;padding:5px 12px;font-size:14px;"><span style="font-size:13px;color:var(--c-muted2);">${unit}</span></div>`
+      :`<div style="text-align:right;"><button onclick="startEditQty('${cur.tempId}')" style="font-size:14px;color:var(--c-text);padding:5px 12px;border-radius:6px;background:var(--c-s1);border:1px solid var(--c-border);cursor:pointer;" title="클릭하여 수량 수정">×${qty} ${unit}</button></div>`;
     const actionCell=isEditing
-      ?`<div style="display:flex;align-items:center;justify-content:center;"><button onclick="confirmEditQty('${row.tempId}')" style="color:var(--c-green);padding:6px 11px;border-radius:6px;font-size:16px;background:rgba(23,159,114,0.1);line-height:1;" title="저장 (Enter)">✓</button></div>`
-      :`<div style="display:flex;align-items:center;justify-content:center;"><button onclick="removePending('${row.tempId}')" style="color:var(--c-red);padding:6px 11px;border-radius:6px;font-size:14px;background:rgba(217,90,90,0.08);line-height:1;" title="제거">✕</button></div>`;
+      ?`<div style="display:flex;align-items:center;justify-content:center;"><button onmousedown="event.preventDefault();" onclick="confirmEditQty('${cur.tempId}')" style="color:var(--c-green);padding:6px 11px;border-radius:6px;font-size:16px;background:rgba(23,159,114,0.1);line-height:1;" title="저장 (Enter)">✓</button></div>`
+      :`<div style="display:flex;align-items:center;justify-content:center;"><button onclick="removePending('${cur.tempId}')" style="color:var(--c-red);padding:6px 11px;border-radius:6px;font-size:14px;background:rgba(217,90,90,0.08);line-height:1;" title="제거">✕</button></div>`;
     return `<div class="bom-grid-row">${ptBadge(ci.process_type_code)}<div style="min-width:0;"><div class="truncate" style="font-size:15px;font-weight:500;">${esc(ci.item_name??"")}</div><div style="font-size:13px;color:var(--c-muted2);margin-top:2px;">${esc(ci.erp_code??"")}</div></div>${qtyCell}${actionCell}</div>`;
-  }
-  function candRow(item){
-    const isPending=S.pendingChildId===item.item_id;
-    return `<div style="border-bottom:1px solid var(--c-border);"><button onclick="${item.alreadyIn?"":``+`selChild('${item.item_id}')`}" style="width:100%;display:flex;align-items:center;gap:10px;padding:15px 14px;text-align:left;background:${isPending?"rgba(47,116,231,0.06)":"transparent"};opacity:${item.alreadyIn?0.45:1};cursor:${item.alreadyIn?"default":"pointer"};">${ptBadge(item.process_type_code)}<div style="flex:1;min-width:0;"><div class="truncate" style="font-size:15px;">${esc(item.item_name)}</div><div style="font-size:13px;color:var(--c-muted2);">${esc(item.erp_code??"")}</div></div>${item.alreadyIn?`<span class="tag tag-success">추가됨</span>`:""}</button>${isPending&&!item.alreadyIn?`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(47,116,231,0.04);"><span style="font-size:14px;color:var(--c-muted2);">소요량</span><input id="qin-${item.item_id}" type="text" inputmode="decimal" value="${esc(S.pendingChildQty)}" oninput="S.pendingChildQty=this.value" onkeydown="if(event.key==='Enter')addChild('${item.item_id}')" style="width:100px;text-align:center;background:var(--c-s1);border:1px solid var(--c-blue);border-radius:10px;padding:7px 12px;font-size:15px;"><span style="font-size:14px;color:var(--c-muted2);">EA</span><button class="btn btn-primary" style="margin-left:auto;" onclick="addChild('${item.item_id}')">추가</button><button class="btn btn-ghost" onclick="S.pendingChildId=null;render()">취소</button></div>`:""}</div>`;
   }
   return `
 <div style="height:100%;display:flex;flex-direction:column;overflow:hidden;">
@@ -362,12 +403,12 @@ function renderEdit() {
     <div style="flex-shrink:0;min-height:0;overflow:hidden;width:${pw}px;transition:width 160ms cubic-bezier(0.4,0,0.2,1);">
       <div style="width:430px;height:100%;opacity:${S.childPickerOpen?1:0};transform:${S.childPickerOpen?"translateX(0)":"translateX(-18px)"};transition:opacity 260ms ease,transform 260ms ease;will-change:transform,opacity;">
         <div class="panel" style="height:100%;display:flex;flex-direction:column;">
-          <div class="panel-header" style="flex-shrink:0;"><div class="panel-label">하위 품목 추가</div><div class="panel-sub">${cands.filter(c=>!c.alreadyIn).length}개 후보</div></div>
+          <div class="panel-header" style="flex-shrink:0;"><div class="panel-label">하위 품목 추가</div><div class="panel-sub"><span id="child-cand-count">${cands.filter(c=>!c.alreadyIn).length}</span>개 후보</div></div>
           <div style="padding:8px 12px;flex-shrink:0;">
-            <input id="search-child" class="input" placeholder="품목명 / 코드 검색" value="${esc(S.childSearch)}" oncompositionend="S.childSearch=this.value;render()" oninput="S.childSearch=this.value;if(!event.isComposing)render()" style="margin-bottom:8px;">
+            <input id="search-child" class="input" placeholder="품목명 / 코드 검색" value="${esc(S.childSearch)}" oninput="S.childSearch=this.value;refreshChildList()" style="margin-bottom:8px;">
             <div style="display:flex;flex-wrap:wrap;gap:4px;">${DEPTS.map(d=>`<button class="chip${S.childDept===d.id?" active":""}" style="${S.childDept===d.id?`background:${d.color};border-color:${d.color};`:""}" onclick="togChildDept('${d.id}')">${d.label}</button>`).join("")}</div>
           </div>
-          <div style="overflow-y:auto;flex:1;min-height:0;border-top:1px solid var(--c-border);">${cands.length===0?`<div class="empty-state"><span>결과 없음</span></div>`:cands.map(candRow).join("")}</div>
+          <div id="child-cand-list" style="overflow-y:auto;flex:1;min-height:0;border-top:1px solid var(--c-border);">${cands.length===0?`<div class="empty-state"><span>결과 없음</span></div>`:cands.map(candRow).join("")}</div>
         </div>
       </div>
     </div>
@@ -456,7 +497,9 @@ function selChild(itemId){
 function togChildDept(id){S.childDept=S.childDept===id?"":id;render();}
 function addChild(itemId){
   if (!S.parent) return;
-  const qty=parseFloat(S.pendingChildQty);
+  const el=document.getElementById('qin-'+itemId);
+  const raw=el?el.value:S.pendingChildQty;
+  const qty=parseFloat(raw);
   if (!(qty>0)){toast("수량을 올바르게 입력하세요","error");return;}
   const child=ITEMS.find(i=>i.item_id===itemId); if (!child) return;
   if (S.pending.some(r=>r.parentItemId===S.parent.item_id&&r.childItemId===itemId)){toast("이미 추가된 부품입니다","warning");return;}
@@ -472,6 +515,11 @@ function removePending(tempId){
   saveDraft();render();
 }
 function startEditQty(tempId){
+  if(S.editingQtyId&&S.editingQtyId!==tempId){
+    const prev=S.pending.find(r=>r.tempId===S.editingQtyId);
+    const pv=parseFloat(S.editingQtyVal);
+    if(prev&&!isNaN(pv)&&pv>0){prev.qty=pv;saveDraft();}
+  }
   const rel=S.pending.find(r=>r.tempId===tempId); if(!rel) return;
   S.editingQtyId=tempId; S.editingQtyVal=String(rel.qty); render();
   setTimeout(()=>{const el=document.getElementById("qe-"+tempId);if(el){el.focus();el.select();}},0);
@@ -479,14 +527,19 @@ function startEditQty(tempId){
 function confirmEditQty(tempId){
   if(S.editingQtyId!==tempId) return;
   const rel=S.pending.find(r=>r.tempId===tempId); if(!rel) return;
-  const v=parseFloat(S.editingQtyVal);
+  const el=document.getElementById('qe-'+tempId);
+  const raw=el?el.value:S.editingQtyVal;
+  if(raw.trim()===""){cancelEditQty();return;}
+  const v=parseFloat(raw);
   if(isNaN(v)||v<=0){toast("올바른 수량을 입력하세요","error");return;}
   rel.qty=v; S.editingQtyId=null; S.editingQtyVal=""; saveDraft(); render();
 }
 function blurEditQty(tempId){
   if(S.editingQtyId!==tempId) return;
   const rel=S.pending.find(r=>r.tempId===tempId); if(!rel){cancelEditQty();return;}
-  const v=parseFloat(S.editingQtyVal);
+  const el=document.getElementById('qe-'+tempId);
+  const raw=el?el.value:S.editingQtyVal;
+  const v=parseFloat(raw);
   if(isNaN(v)||v<=0){cancelEditQty();return;}
   rel.qty=v; S.editingQtyId=null; S.editingQtyVal=""; saveDraft(); render();
 }
