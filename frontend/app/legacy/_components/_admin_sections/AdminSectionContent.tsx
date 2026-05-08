@@ -5,8 +5,7 @@ import type { BOMDetailEntry, DepartmentMaster, Employee, Item, ProductModel, Sh
 import { api } from "@/lib/api";
 import { AdminMasterItemsSection } from "./AdminMasterItemsSection";
 import { AdminEmployeesSection } from "./AdminEmployeesSection";
-import { AdminBomSection } from "./AdminBomSection";
-import { AdminBomProvider } from "./AdminBomContext";
+import { BomWorkbench } from "./_bom_workbench/BomWorkbench";
 import { AdminPackagesProvider } from "./AdminPackagesContext";
 import { AdminMasterItemsProvider } from "./AdminMasterItemsContext";
 import { AdminEmployeesProvider } from "./AdminEmployeesContext";
@@ -100,15 +99,13 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
   }
   if (section === "bom") {
     return (
-      <AdminBomProvider
+      <BomWorkbench
         items={items}
         allBomRows={allBomRows}
         refreshAllBom={refreshAllBom}
         onStatusChange={onStatusChange}
         onError={setMessage}
-      >
-        <AdminBomSection />
-      </AdminBomProvider>
+      />
     );
   }
   if (section === "packages") {
