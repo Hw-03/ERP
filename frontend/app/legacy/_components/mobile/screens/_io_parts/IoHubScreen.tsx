@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { Ban, ChevronRight } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { ToastState } from "@/lib/ui/Toast";
 import { useCurrentOperator } from "../../../login/useCurrentOperator";
@@ -14,7 +14,7 @@ import {
 import { useWarehouseWizard } from "../../io/warehouse/context";
 import type { TabId } from "../../MobileShell";
 import { TYPO } from "../../tokens";
-import { SectionHeader, SegmentedControl } from "../../primitives";
+import { EmptyState, SectionHeader, SegmentedControl } from "../../primitives";
 import { WarehouseWizardScreen } from "../../io/warehouse/WarehouseWizardScreen";
 import { ApprovalQueuePanel } from "./ApprovalQueuePanel";
 import { DraftsListPanel } from "./DraftsListPanel";
@@ -129,18 +129,11 @@ function ComposeLanding({
 }) {
   if (allowedWorkTypes.length === 0) {
     return (
-      <div className="px-4 py-6">
-        <div
-          className="rounded-[14px] border px-4 py-6 text-center"
-          style={{
-            background: LEGACY_COLORS.s2,
-            borderColor: LEGACY_COLORS.border,
-            color: LEGACY_COLORS.muted2,
-          }}
-        >
-          현재 권한으로 처리 가능한 입출고 작업유형이 없습니다.
-        </div>
-      </div>
+      <EmptyState
+        icon={Ban}
+        title="처리 가능한 작업유형 없음"
+        description="현재 권한으로 처리 가능한 입출고 작업유형이 없습니다."
+      />
     );
   }
 

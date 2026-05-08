@@ -6,6 +6,7 @@ import type { BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { BomBadge } from "./BomBadge";
 import { DEPT_LETTERS, DEPT_LETTER_TO_NAME, deptColor, deptOf, stageOf, type DeptLetter, type StageLetter } from "./bomDept";
+import { EmptyState } from "../../common";
 
 /**
  * BomEditPanel 하단의 자식 추가 박스.
@@ -153,9 +154,7 @@ export function BomChildAddBox({ parent, bomRows, items, onPick }: Props) {
         style={{ borderTop: `1px solid ${LEGACY_COLORS.border}` }}
       >
         {candidates.length === 0 ? (
-          <div className="px-4 py-8 text-center text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            검색 결과 없음
-          </div>
+          <EmptyState variant="no-search-result" compact />
         ) : (
           candidates.map((c) => {
             const already = childIdSet.has(c.item_id);

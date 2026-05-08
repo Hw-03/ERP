@@ -5,6 +5,7 @@ import { api, type DepartmentMaster } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { employeeColor } from "@/lib/mes/color";
 import { useRefreshDepartments } from "../DepartmentsContext";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 
 /**
  * 우측 패널의 부서 상세 편집 영역.
@@ -37,6 +38,8 @@ export function DeptManagementPanel({
   const savedColor = dept.color_hex ?? employeeColor(dept.name);
   const colorInputRef = useRef<HTMLInputElement>(null);
   const [localColor, setLocalColor] = useState(savedColor);
+  const [deactivateOpen, setDeactivateOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const refreshDepartments = useRefreshDepartments();
 
   useEffect(() => {
@@ -58,7 +61,11 @@ export function DeptManagementPanel({
 
   function toggleActive() {
     const next = !dept.is_active;
-    if (next === false && !confirm(`'${dept.name}' 부서를 비활성화하시겠습니까?`)) return;
+    if (next === false) { setDeactivateOpen(true); return; }
+    _doToggle(true);
+  }
+
+  function _doToggle(next: boolean) {
     void api
       .updateDepartment(dept.id, { is_active: next, pin: adminPin })
       .then((updated) => {
@@ -71,7 +78,10 @@ export function DeptManagementPanel({
   }
 
   function deleteDept() {
-    if (!confirm(`'${dept.name}' 부서를 영구 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+    setDeleteOpen(true);
+  }
+
+  function _doDelete() {
     void api
       .deleteDepartment(dept.id, adminPin)
       .then(() => {
@@ -191,6 +201,24 @@ export function DeptManagementPanel({
           영구 삭제
         </button>
       </div>
+
+      <ConfirmModal
+        open={deactivateOpen}
+        title={`'${dept.name}' 부서를 비활성화하시겠습니까?`}
+        tone="caution"
+        confirmLabel="비활성화"
+        onClose={() => setDeactivateOpen(false)}
+        onConfirm={() => { setDeactivateOpen(false); _doToggle(false); }}
+      />
+      <ConfirmModal
+        open={deleteOpen}
+        title={`'${dept.name}' 부서를 영구 삭제하시겠습니까?`}
+        cautionMessage="이 작업은 되돌릴 수 없습니다."
+        tone="danger"
+        confirmLabel="삭제"
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={() => { setDeleteOpen(false); _doDelete(); }}
+      />
     </div>
   );
 }

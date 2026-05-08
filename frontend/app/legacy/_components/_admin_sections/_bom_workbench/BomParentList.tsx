@@ -6,6 +6,7 @@ import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { BomBadge } from "./BomBadge";
 import { stageOf, type DeptLetter, type StageLetter } from "./bomDept";
+import { EmptyState } from "../../common";
 
 /**
  * 좌측 부모 품목 리스트 — 선택된 부서의 품목을 검색/단계필터링해서 보여줌.
@@ -119,9 +120,7 @@ export function BomParentList({ dept, items, allBomRows, selectedId, onSelect, m
       {/* 리스트 */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {list.length === 0 ? (
-          <div className="px-4 py-8 text-center text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            결과 없음
-          </div>
+          <EmptyState variant="no-search-result" compact />
         ) : (
           list.map((i) => {
             const childCount = childCountMap.get(i.item_id) ?? 0;
