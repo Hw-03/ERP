@@ -11,7 +11,11 @@ import {
   SectionCardRow,
   StickyFooter,
 } from "../../primitives";
-import { WAREHOUSE_MODE_META, type WarehouseMode } from "./warehouseWizardConfig";
+import {
+  CAUTION_WAREHOUSE_MODES,
+  WAREHOUSE_MODE_META,
+  type WarehouseMode,
+} from "./warehouseWizardConfig";
 import { useWarehouseWizard } from "./context";
 
 /**
@@ -30,6 +34,8 @@ export function StepConfirm({
 }) {
   const { state, dispatch } = useWarehouseWizard();
   const meta = state.mode ? WAREHOUSE_MODE_META[state.mode as WarehouseMode] : null;
+  const caution =
+    state.mode != null && CAUTION_WAREHOUSE_MODES.includes(state.mode as WarehouseMode);
 
   const selectedList = Array.from(state.items.entries())
     .map(([id, qty]) => ({ item: items.find((i) => i.item_id === id), qty }))
@@ -44,7 +50,7 @@ export function StepConfirm({
       <div>
         <div
           className={`${TYPO.headline} font-black leading-tight`}
-          style={{ color: LEGACY_COLORS.green }}
+          style={{ color: caution ? (LEGACY_COLORS.red as string) : (LEGACY_COLORS.green as string) }}
         >
           {headline}
         </div>
@@ -52,6 +58,23 @@ export function StepConfirm({
           확정을 누르면 지금 즉시 재고가 반영됩니다.
         </div>
       </div>
+
+      {caution ? (
+        <div
+          className={`${TYPO.body} flex items-start gap-2 rounded-[14px] border px-3 py-3`}
+          style={{
+            background: `${LEGACY_COLORS.red as string}14`,
+            borderColor: `${LEGACY_COLORS.red as string}55`,
+            color: LEGACY_COLORS.red as string,
+          }}
+        >
+          <span className="font-black">⚠</span>
+          <span>
+            <span className="font-black">되돌릴 수 없는 작업입니다.</span> 품목·수량·참조번호를 다시 한번
+            확인해 주세요.
+          </span>
+        </div>
+      ) : null}
 
       <SectionCard title="기본 정보" padding="sm">
         <SectionCardRow label="유형" value={meta?.label ?? "-"} />
@@ -143,7 +166,7 @@ export function StepConfirm({
             </button>
           ) : null}
           <PrimaryActionButton
-            intent="success"
+            intent={caution ? "danger" : "success"}
             label={meta ? `${meta.label} 확정` : "확정"}
             count={selectedList.length}
             total={totalQty}

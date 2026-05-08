@@ -99,16 +99,39 @@ export function WarehouseWizardScreen({ showToast }: { showToast: (toast: ToastS
 
     for (const [itemId, qty] of entries) {
       const item = items.find((i) => i.item_id === itemId);
+      const baseNote = state.note || undefined;
       const payload = {
         item_id: itemId,
         quantity: qty,
         reference_no: state.referenceNo || undefined,
         produced_by: producedBy,
-        notes: state.note || undefined,
+        notes: baseNote,
       };
       try {
-        if (state.mode === "wh2d") await api.shipInventory(payload);
-        else await api.receiveInventory(payload);
+        switch (state.mode) {
+          case "whin":
+            await api.receiveInventory(payload);
+            break;
+          case "d2wh":
+            await api.receiveInventory(payload);
+            break;
+          case "wh2d":
+            await api.shipInventory(payload);
+            break;
+          case "whout":
+            await api.shipInventory(payload);
+            break;
+          case "whreturn":
+            await api.shipInventory({
+              ...payload,
+              notes: baseNote
+                ? `[공급업체 반품] ${baseNote}`
+                : "[공급업체 반품]",
+            });
+            break;
+          default:
+            await api.shipInventory(payload);
+        }
       } catch {
         failures.push(item?.item_name ?? itemId);
       }

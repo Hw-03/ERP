@@ -1,7 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Bell, Lock, Package, Warehouse, Wrench, type LucideIcon } from "lucide-react";
+import {
+  Bell,
+  History as HistoryIcon,
+  Home,
+  MoreHorizontal,
+  Package,
+  Warehouse,
+  type LucideIcon,
+} from "lucide-react";
 import clsx from "clsx";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ELEVATION, TYPO } from "./tokens";
@@ -10,13 +18,25 @@ import { IconButton } from "./primitives";
 import { canEnterIO } from "../_warehouse_steps";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 
-export type TabId = "inventory" | "warehouse" | "dept" | "admin";
+export type TabId =
+  | "home"
+  | "inventory"
+  | "warehouse"
+  | "dept"
+  | "history"
+  | "admin"
+  | "more";
 
+/**
+ * 하단 네비에 노출되는 탭은 5개로 제한. dept/admin 은 더보기 메뉴에서 진입.
+ * Phase 3A 에서 warehouse/dept 를 단일 io 탭으로 통합 후 작성/이어쓰기/내요청/승인함 슬라이드 탭 도입 예정.
+ */
 const ALL_TABS: { id: TabId; label: string; icon: LucideIcon }[] = [
+  { id: "home", label: "홈", icon: Home },
   { id: "inventory", label: "재고", icon: Package },
-  { id: "warehouse", label: "창고입출고", icon: Warehouse },
-  { id: "dept", label: "부서입출고", icon: Wrench },
-  { id: "admin", label: "관리자", icon: Lock },
+  { id: "warehouse", label: "입출고", icon: Warehouse },
+  { id: "history", label: "내역", icon: HistoryIcon },
+  { id: "more", label: "더보기", icon: MoreHorizontal },
 ];
 
 export function MobileShell({

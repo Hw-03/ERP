@@ -8,8 +8,10 @@ import {
   History as HistoryIcon,
   List,
 } from "lucide-react";
+import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
+import type { ToastState } from "@/lib/ui/Toast";
 import { TYPO } from "../tokens";
 import { EmptyState, IconButton, KpiCard } from "../primitives";
 import { useTransactions } from "../hooks/useTransactions";
@@ -26,9 +28,17 @@ import {
 } from "./HistoryFilterSheet";
 import { HistoryLogRow } from "./_history_parts/HistoryLogRow";
 import { HistoryCalendarView } from "./_history_parts/HistoryCalendarView";
+import { HistoryDetailSheet } from "./_history_parts/HistoryDetailSheet";
 
-export function HistoryScreen({ onClose }: { onClose: () => void }) {
-  const { logs, loading, hasMore, loadMore } = useTransactions();
+export function HistoryScreen({
+  onClose,
+  showToast,
+}: {
+  onClose: () => void;
+  showToast?: (toast: ToastState) => void;
+}) {
+  const { logs, loading, hasMore, loadMore, refetch } = useTransactions();
+  const [selectedLog, setSelectedLog] = useState<TransactionLog | null>(null);
   const [filters, setFilters] = useState<HistoryFilters>(DEFAULT_HISTORY_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
@@ -170,7 +180,12 @@ export function HistoryScreen({ onClose }: { onClose: () => void }) {
                             idx === dayLogs.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
                         }}
                       >
-                        <HistoryLogRow log={log} copiedRef={copiedRef} onCopy={copyRef} />
+                        <HistoryLogRow
+                          log={log}
+                          copiedRef={copiedRef}
+                          onCopy={copyRef}
+                          onSelect={setSelectedLog}
+                        />
                       </div>
                     ))}
                   </div>
@@ -218,6 +233,15 @@ export function HistoryScreen({ onClose }: { onClose: () => void }) {
         onReset={() => setFilters(DEFAULT_HISTORY_FILTERS)}
         employeeNames={employeeNames}
         modelNames={modelNames}
+      />
+
+      <HistoryDetailSheet
+        log={selectedLog}
+        onClose={() => setSelectedLog(null)}
+        showToast={(toast) => showToast?.(toast)}
+        onEdited={() => {
+          void refetch();
+        }}
       />
     </div>
   );

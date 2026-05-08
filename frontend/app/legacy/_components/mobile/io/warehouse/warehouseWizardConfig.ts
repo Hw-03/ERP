@@ -1,8 +1,18 @@
 "use client";
 
-import { ArrowDownToLine, ArrowRightLeft, ArrowUpFromLine, type LucideIcon } from "lucide-react";
+import {
+  ArrowDownToLine,
+  ArrowRightLeft,
+  ArrowUpFromLine,
+  PackageX,
+  Undo2,
+  type LucideIcon,
+} from "lucide-react";
 
-export type WarehouseMode = "wh2d" | "d2wh" | "whin";
+export type WarehouseMode = "wh2d" | "d2wh" | "whin" | "whout" | "whreturn";
+
+/** 되돌릴 수 없는 작업 — Confirm 단계에서 빨간 경고 강조. */
+export const CAUTION_WAREHOUSE_MODES: WarehouseMode[] = ["whreturn"];
 
 export const WAREHOUSE_MODE_META: Record<
   WarehouseMode,
@@ -21,10 +31,22 @@ export const WAREHOUSE_MODE_META: Record<
     flow: { from: "생산부", to: "창고" },
   },
   whin: {
-    label: "창고 입고",
+    label: "공급업체 입고",
     description: "외부(공급업체)에서 창고로 입고",
     icon: ArrowDownToLine,
-    flow: { from: "외부", to: "창고" },
+    flow: { from: "공급업체", to: "창고" },
+  },
+  whout: {
+    label: "공급업체 출고",
+    description: "창고에서 외부(공급업체)로 출고",
+    icon: PackageX,
+    flow: { from: "창고", to: "공급업체" },
+  },
+  whreturn: {
+    label: "공급업체 반품",
+    description: "창고 재고를 공급업체로 반품 (되돌릴 수 없음)",
+    icon: Undo2,
+    flow: { from: "창고", to: "공급업체(반품)" },
   },
 };
 

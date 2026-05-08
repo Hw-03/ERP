@@ -18,11 +18,29 @@ interface Props {
   log: TransactionLog;
   copiedRef: string | null;
   onCopy: (ref: string) => void;
+  onSelect?: (log: TransactionLog) => void;
 }
 
-export function HistoryLogRow({ log, copiedRef, onCopy }: Props) {
+export function HistoryLogRow({ log, copiedRef, onCopy, onSelect }: Props) {
+  const interactive = !!onSelect;
+  const wrapperProps = interactive
+    ? {
+        role: "button" as const,
+        tabIndex: 0,
+        onClick: () => onSelect!(log),
+        onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onSelect!(log);
+          }
+        },
+      }
+    : {};
   return (
-    <div className="flex w-full items-start gap-3 px-3 py-3 text-left">
+    <div
+      {...wrapperProps}
+      className={`flex w-full items-start gap-3 px-3 py-3 text-left ${interactive ? "active:bg-black/10 cursor-pointer" : ""}`}
+    >
       <span
         className={`${TYPO.caption} shrink-0 rounded-[8px] px-2 py-[2px] font-bold`}
         style={{
@@ -50,7 +68,10 @@ export function HistoryLogRow({ log, copiedRef, onCopy }: Props) {
           {log.reference_no ? (
             <button
               type="button"
-              onClick={() => onCopy(log.reference_no!)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCopy(log.reference_no!);
+              }}
               className={`${TYPO.caption} flex items-center gap-1 rounded-[8px] px-2 py-[2px] font-semibold`}
               style={{
                 background: LEGACY_COLORS.s3,
@@ -86,6 +107,17 @@ export function HistoryLogRow({ log, copiedRef, onCopy }: Props) {
         <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
           → {formatQty(log.quantity_after)}
         </div>
+        {log.edit_count != null && log.edit_count > 0 ? (
+          <div
+            className={`${TYPO.caption} mt-1 inline-block rounded-full px-2 py-[1px] font-bold`}
+            style={{
+              background: `${LEGACY_COLORS.yellow as string}22`,
+              color: LEGACY_COLORS.yellow as string,
+            }}
+          >
+            수정 {log.edit_count}
+          </div>
+        ) : null}
       </div>
     </div>
   );

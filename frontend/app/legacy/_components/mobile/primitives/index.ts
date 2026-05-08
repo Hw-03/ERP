@@ -16,3 +16,6 @@ export { AsyncState, AsyncSkeletonRows } from "./AsyncState";
 export { SummaryChipBar, type SummaryChip } from "./SummaryChipBar";
 export { SectionCard, SectionCardRow } from "./SectionCard";
 export { PrimaryActionButton } from "./PrimaryActionButton";
+export { KpiRow } from "./KpiRow";
+export { MoreMenuRow } from "./MoreMenuRow";
+export { QuickActionGrid, type QuickAction } from "./QuickActionGrid";

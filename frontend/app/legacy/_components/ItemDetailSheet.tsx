@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type Item, type TransactionLog } from "@/lib/api";
+import { api, type InventoryLocationRow, type Item, type TransactionLog } from "@/lib/api";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { ItemDetailHistoryList } from "./ItemDetailHistoryList";
 import { ItemDetailActionForm, type ItemDetailActionMode } from "./ItemDetailActionForm";
@@ -9,9 +9,10 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { erpCodeDeptBadge } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";
-import { useDeptColorLookup } from "./DepartmentsContext";
+import { useDeptColor, useDeptColorLookup } from "./DepartmentsContext";
 
 type ActionMode = ItemDetailActionMode;
+type DetailTab = "summary" | "locations" | "history";
 
 export function ItemDetailSheet({
   item,
@@ -22,21 +23,34 @@ export function ItemDetailSheet({
   onClose: () => void;
   onSaved: (updated: Item) => void;
 }) {
+  const [tab, setTab] = useState<DetailTab>("summary");
   const [mode, setMode] = useState<ActionMode>("ADJUST");
   const [qty, setQty] = useState("0");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<TransactionLog[]>([]);
+  const [locations, setLocations] = useState<InventoryLocationRow[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(false);
   const getDeptColor = useDeptColorLookup();
 
   useEffect(() => {
     if (!item) return;
+    setTab("summary");
     setMode("ADJUST");
     setQty(String(Number(item.quantity)));
     setNotes("");
     setError(null);
-    void api.getTransactions({ itemId: item.item_id, limit: 10 }).then(setLogs).catch(() => setLogs([]));
+    void api
+      .getTransactions({ itemId: item.item_id, limit: 10 })
+      .then(setLogs)
+      .catch(() => setLogs([]));
+    setLocationsLoading(true);
+    void api
+      .getItemLocations(item.item_id)
+      .then((rows) => setLocations(rows ?? []))
+      .catch(() => setLocations([]))
+      .finally(() => setLocationsLoading(false));
   }, [item]);
 
   if (!item) return null;
@@ -102,88 +116,254 @@ export function ItemDetailSheet({
     }
   }
 
+  const tabs: { id: DetailTab; label: string }[] = [
+    { id: "summary", label: "요약" },
+    { id: "locations", label: `위치${locations.length > 0 ? ` (${locations.length})` : ""}` },
+    { id: "history", label: `거래${logs.length > 0 ? ` (${logs.length})` : ""}` },
+  ];
+
   return (
     <BottomSheet open={!!item} onClose={onClose} title={item.item_name}>
       <div className="px-5 pb-6">
-        <div className="mb-[14px]">
-          <div className="mb-[6px] flex flex-wrap gap-[6px]">
+        <div className="mb-[10px] flex flex-wrap gap-[6px]">
+          <span
+            className="rounded-full px-[7px] py-[2px] text-[9px] font-bold"
+            style={{
+              background:
+                stockState.label === "정상"
+                  ? "rgba(31,209,122,.15)"
+                  : stockState.label === "부족"
+                    ? "rgba(244,185,66,.15)"
+                    : "rgba(242,95,92,.15)",
+              color: stockState.color,
+            }}
+          >
+            {stockState.label}
+          </span>
+          {deptBadge && (
             <span
               className="rounded-full px-[7px] py-[2px] text-[9px] font-bold"
-              style={{
-                background:
-                  stockState.label === "정상"
-                    ? "rgba(31,209,122,.15)"
-                    : stockState.label === "부족"
-                      ? "rgba(244,185,66,.15)"
-                      : "rgba(242,95,92,.15)",
-                color: stockState.color,
-              }}
+              style={{ background: deptBadge.bg, color: deptBadge.color }}
             >
-              {stockState.label}
+              {deptBadge.label}
             </span>
-            {deptBadge && (
-              <span
-                className="rounded-full px-[7px] py-[2px] text-[9px] font-bold"
-                style={{ background: deptBadge.bg, color: deptBadge.color }}
-              >
-                {deptBadge.label}
-              </span>
-            )}
-          </div>
-
-          <div className="overflow-hidden rounded-[14px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-            {[
-              ["품목 코드", item.erp_code ?? "-"],
-              ["사양", item.spec || "-"],
-              ["총재고", `${formatQty(item.quantity)} ${item.unit}`],
-              [
-                "가용 / 예약",
-                `${formatQty(item.available_quantity ?? item.quantity)} / ${formatQty(item.pending_quantity ?? 0)} ${item.unit}`,
-              ],
-              ...(item.last_reserver_name && Number(item.pending_quantity ?? 0) > 0
-                ? [["점유자", `🔒 ${item.last_reserver_name}`] as [string, string]]
-                : []),
-              ["위치", item.location || "-"],
-              ["파트", item.legacy_part || "-"],
-              ["모델", item.legacy_model || "공용"],
-              ["공급처", item.supplier || "-"],
-              ["바코드", item.barcode || "-"],
-              ["안전재고", item.min_stock != null ? formatQty(item.min_stock) : "-"],
-            ].map(([label, value], index, array) => (
-              <div
-                key={label}
-                className="flex items-center justify-between gap-3 px-[14px] py-[10px]"
-                style={{
-                  borderBottom: index === array.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
-                }}
-              >
-                <div className="text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {label}
-                </div>
-                <div className="text-right">
-                  {value}
-                </div>
-              </div>
-            ))}
-          </div>
+          )}
         </div>
 
-        <ItemDetailActionForm
-          mode={mode}
-          qty={qty}
-          notes={notes}
-          error={error}
-          saving={saving}
-          initialQuantity={Number(item.quantity)}
-          setMode={setMode}
-          setQty={setQty}
-          setNotes={setNotes}
-          bump={bump}
-          onSubmit={() => void submit()}
-        />
+        {/* 탭 */}
+        <div
+          className="mb-[14px] flex gap-1 rounded-[14px] border p-1"
+          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+          role="tablist"
+        >
+          {tabs.map((t) => {
+            const active = t.id === tab;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setTab(t.id)}
+                className="flex-1 rounded-[10px] px-2 py-[7px] text-xs font-bold transition-[background-color]"
+                style={{
+                  background: active ? (LEGACY_COLORS.s1 as string) : "transparent",
+                  color: active
+                    ? (LEGACY_COLORS.text as string)
+                    : (LEGACY_COLORS.muted2 as string),
+                  boxShadow: active ? "0 1px 6px rgba(0,0,0,.25)" : undefined,
+                }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
 
-        <ItemDetailHistoryList logs={logs} />
+        {tab === "summary" ? (
+          <>
+            <div
+              className="mb-[14px] overflow-hidden rounded-[14px] border"
+              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+            >
+              {[
+                ["품목 코드", item.erp_code ?? "-"],
+                ["사양", item.spec || "-"],
+                ["총재고", `${formatQty(item.quantity)} ${item.unit}`],
+                [
+                  "가용 / 예약",
+                  `${formatQty(item.available_quantity ?? item.quantity)} / ${formatQty(item.pending_quantity ?? 0)} ${item.unit}`,
+                ],
+                ...(item.last_reserver_name && Number(item.pending_quantity ?? 0) > 0
+                  ? [["점유자", `🔒 ${item.last_reserver_name}`] as [string, string]]
+                  : []),
+                ["위치", item.location || "-"],
+                ["파트", item.legacy_part || "-"],
+                ["모델", item.legacy_model || "공용"],
+                ["공급처", item.supplier || "-"],
+                ["바코드", item.barcode || "-"],
+                ["안전재고", item.min_stock != null ? formatQty(item.min_stock) : "-"],
+              ].map(([label, value], index, array) => (
+                <div
+                  key={label}
+                  className="flex items-center justify-between gap-3 px-[14px] py-[10px]"
+                  style={{
+                    borderBottom:
+                      index === array.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
+                  }}
+                >
+                  <div
+                    className="text-[11px] font-semibold"
+                    style={{ color: LEGACY_COLORS.muted2 }}
+                  >
+                    {label}
+                  </div>
+                  <div className="text-right">{value}</div>
+                </div>
+              ))}
+            </div>
+
+            <ItemDetailActionForm
+              mode={mode}
+              qty={qty}
+              notes={notes}
+              error={error}
+              saving={saving}
+              initialQuantity={Number(item.quantity)}
+              setMode={setMode}
+              setQty={setQty}
+              setNotes={setNotes}
+              bump={bump}
+              onSubmit={() => void submit()}
+            />
+          </>
+        ) : null}
+
+        {tab === "locations" ? (
+          <ItemLocationsPanel
+            loading={locationsLoading}
+            locations={locations}
+            unit={item.unit}
+          />
+        ) : null}
+
+        {tab === "history" ? <ItemDetailHistoryList logs={logs} /> : null}
       </div>
     </BottomSheet>
+  );
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  WAREHOUSE: "창고",
+  PRODUCTION: "생산",
+  DEFECTIVE: "불량",
+  PENDING: "예약",
+};
+
+function ItemLocationsPanel({
+  loading,
+  locations,
+  unit,
+}: {
+  loading: boolean;
+  locations: InventoryLocationRow[];
+  unit: string;
+}) {
+  if (loading) {
+    return (
+      <div
+        className="rounded-[14px] border px-4 py-6 text-center text-sm"
+        style={{
+          background: LEGACY_COLORS.s2,
+          borderColor: LEGACY_COLORS.border,
+          color: LEGACY_COLORS.muted2,
+        }}
+      >
+        위치 정보를 불러오는 중…
+      </div>
+    );
+  }
+  if (locations.length === 0) {
+    return (
+      <div
+        className="rounded-[14px] border px-4 py-6 text-center text-sm"
+        style={{
+          background: LEGACY_COLORS.s2,
+          borderColor: LEGACY_COLORS.border,
+          color: LEGACY_COLORS.muted2,
+        }}
+      >
+        등록된 위치 분포가 없습니다.
+      </div>
+    );
+  }
+
+  const total = locations.reduce((s, r) => s + Number(r.quantity || 0), 0);
+  return (
+    <div
+      className="overflow-hidden rounded-[14px] border"
+      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+    >
+      {locations.map((row, index) => (
+        <LocationRow
+          key={`${row.department}-${row.status}-${index}`}
+          row={row}
+          unit={unit}
+          total={total}
+          isLast={index === locations.length - 1}
+        />
+      ))}
+    </div>
+  );
+}
+
+function LocationRow({
+  row,
+  unit,
+  total,
+  isLast,
+}: {
+  row: InventoryLocationRow;
+  unit: string;
+  total: number;
+  isLast: boolean;
+}) {
+  const deptColor = useDeptColor(row.department);
+  const statusLabel = STATUS_LABEL[row.status] ?? row.status;
+  const pct = total > 0 ? (Number(row.quantity || 0) / total) * 100 : 0;
+  return (
+    <div
+      className="px-[14px] py-[10px]"
+      style={{ borderBottom: isLast ? "none" : `1px solid ${LEGACY_COLORS.border}` }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span
+            className="rounded-full px-2 py-[2px] text-[10px] font-bold"
+            style={{ background: `${deptColor}26`, color: deptColor }}
+          >
+            {row.department}
+          </span>
+          <span
+            className="text-[10px] font-semibold uppercase tracking-[1px]"
+            style={{ color: LEGACY_COLORS.muted2 }}
+          >
+            {statusLabel}
+          </span>
+        </div>
+        <div className="text-right text-sm font-bold tabular-nums" style={{ color: LEGACY_COLORS.text }}>
+          {formatQty(row.quantity)} {unit}
+        </div>
+      </div>
+      <div
+        className="mt-1 h-[3px] w-full overflow-hidden rounded-full"
+        style={{ background: LEGACY_COLORS.s3 }}
+      >
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${Math.min(100, pct)}%`, background: deptColor }}
+        />
+      </div>
+    </div>
   );
 }
