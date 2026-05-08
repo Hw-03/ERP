@@ -12,7 +12,7 @@ from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-OUTPUT_PATH = Path("data/개발현황.xlsx")
+OUTPUT_PATH = Path("docs/개발현황.xlsx")
 
 # ── 색상 상수 ──────────────────────────────────────────────
 HEADER_BG   = "1F4E79"
@@ -73,9 +73,9 @@ def build_dashboard(ws, commits):
     # KPI 영역 (행 3~6)
     ws.row_dimensions[3].height = 22
     kpis = [
-        ("개발 기간", "2026-04-10 ~ 04-30 (21일 · 근무일 15일)"),
+        ("개발 기간", "2026-04-10 ~ 05-08 (29일 · 근무일 18일)"),
         ("총 커밋 수", f"{len(commits)}건"),
-        ("기능 완료", "35 / 42개 (83%)"),
+        ("기능 완료", "41 / 51개 (80%)"),
         ("개발 영역", "Backend · Frontend · Mobile · Admin · Docs"),
     ]
 
@@ -145,6 +145,7 @@ def build_summary(ws, commits):
     c5 = count_commits_in_range(commits, "2026-04-22", "2026-04-24")
     c6 = count_commits_in_range(commits, "2026-04-25", "2026-04-27")
     c7 = count_commits_in_range(commits, "2026-04-28", "2026-04-30")
+    c8 = count_commits_in_range(commits, "2026-05-01", "2026-05-08")
 
     rows = [
         ("2026-04-10 ~ 04-11", "기반 구축",
@@ -161,6 +162,8 @@ def build_summary(ws, commits):
          "입출고 단계형 Wizard UX·BOM Where-Used 조회\n코드 품질 대정비(Phase 5)·CI 도입\n로그인 화면 구현·카테고리 코드 정비", c6, "완료"),
         ("2026-04-28 ~ 04-30", "현장 운영 투입",
          "창고 승인 흐름·장바구니·PIN 로그인\n입출고탭 개편(부서필터·반품·자가승인)\nBOM 플래너·부서 관리 UX 개선\n품목 분류 개편 완료(DB 722건)", c7, "완료"),
+        ("2026-05-01 ~ 05-08", "BOM·UI 정비",
+         "자재 코드/품목명 1차 정비(848건)·BOM 세팅 도구\nBOM 관리자 워크벤치·자재 폼 강화\n주간 재고 변화 보고·부서간 조정 위저드\n공통 UI 5종·테스트 커버리지 91%·거대 파일 21개 분해", c8, "진행 중"),
     ]
 
     for r, (period, cat, work, cnt, status) in enumerate(rows, 2):
@@ -214,6 +217,13 @@ def build_features(ws):
         ("BOM 웹 수정 기능",                  "BOM",   True,  ""),
         ("BOM Where-Used 조회",              "BOM",   True,  ""),
         ("BOM 플래너 (위저드 · 일괄 다운로드)", "BOM",   True,  ""),
+        ("BOM 관리자 워크벤치",                "BOM",   True,  "검색·자재·소요량 통합 화면"),
+        ("BOM 세팅 도구 (오프라인 · 848 품목)", "BOM",   False, "다음 주 마무리 + 실 데이터 입력"),
+        ("자재 폼 ERP/옵션/모델 슬롯 편집",     "재고",   True,  "ItemFormFields 공통화"),
+        ("부서간 재고 조정 4단계 위저드",        "입출고", True,  "흐름 재설계 시 재정리"),
+        ("주간 재고 변화 보고 화면",            "관리",   True,  "공정별 입출고·달력 히스토리"),
+        ("모바일 5탭 + 입출고 허브 (사전)",     "UI",    True,  "최종 사용성은 후순위"),
+        ("공통 UI 컴포넌트 5종",                "인프라", True,  "FilterChip·SlidePanel·KpiCard 등"),
         # ── 직원 · 보안 ──────────────────────────────────
         ("직원 명단 관리",                     "직원",   True,  ""),
         ("부서별 담당 색상 배지 표시",           "직원",   True,  ""),
@@ -231,8 +241,10 @@ def build_features(ws):
         ("테스트 자동화 (CI)",                 "인프라", True,  "pytest 42건 + vitest 12건"),
         ("WAL-safe 백업 / 복구",              "인프라", True,  "ops 스크립트 자동화"),
         # ── 예정 ─────────────────────────────────────────
+        ("입출고 화면·내역 흐름 재설계",        "입출고", False, "담당자 동선 분석 후 (다음 주~다다음주)"),
+        ("실 재고 데이터 입력 + 직원 테스트",    "데이터", False, "BOM·입출고 정리 후"),
+        ("역할별 접근 권한 연동",              "보안",  False, "부서·역할 기반 (PIN 로그인 완료)"),
         ("총재고 / 가용재고 / 예약재고 분리",   "재고",  False, "재고 가용성 계산 고도화"),
-        ("실제 운영 데이터 입력",              "데이터", False, "권동환 사원 협의 후"),
         ("외부 접근 환경 구성",                "인프라", False, "PC 또는 NAS 서버 + API 인증"),
         ("발주 관리",                         "구매",  False, ""),
         ("생산 실적 / 원가 관리",              "생산",  False, ""),
