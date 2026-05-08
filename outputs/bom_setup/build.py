@@ -264,7 +264,7 @@ function getCandidates(parent) {
     const sa=deptOf(a.process_type_code)===parentDept?1:0,sb=deptOf(b.process_type_code)===parentDept?1:0;
     return sb-sa;
   });
-  return cands.slice(0,200);
+  return cands;
 }
 
 let _uid=0; const uid=()=>"t"+(++_uid);
@@ -342,7 +342,7 @@ function renderEdit() {
     const qty=Number(row.qty),unit=row.unit||"EA";
     const isEditing=S.editingQtyId===row.tempId;
     const qtyCell=isEditing
-      ?`<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;"><input id="qe-${row.tempId}" type="text" inputmode="decimal" value="${esc(S.editingQtyVal)}" oninput="S.editingQtyVal=this.value" onkeydown="if(event.key==='Enter')confirmEditQty('${row.tempId}');else if(event.key==='Escape')cancelEditQty();" style="width:100px;text-align:center;background:var(--c-s1);border:1px solid var(--c-blue);border-radius:8px;padding:5px 12px;font-size:14px;"><span style="font-size:13px;color:var(--c-muted2);">${unit}</span></div>`
+      ?`<div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;"><input id="qe-${row.tempId}" type="text" inputmode="decimal" value="${esc(S.editingQtyVal)}" oninput="S.editingQtyVal=this.value" onblur="setTimeout(()=>blurEditQty('${row.tempId}'),0)" onkeydown="if(event.key==='Enter')confirmEditQty('${row.tempId}');else if(event.key==='Escape')cancelEditQty();" style="width:100px;text-align:center;background:var(--c-s1);border:1px solid var(--c-blue);border-radius:8px;padding:5px 12px;font-size:14px;"><span style="font-size:13px;color:var(--c-muted2);">${unit}</span></div>`
       :`<div style="text-align:right;"><button onclick="startEditQty('${row.tempId}')" style="font-size:14px;color:var(--c-text);padding:5px 12px;border-radius:6px;background:var(--c-s1);border:1px solid var(--c-border);cursor:pointer;" title="클릭하여 수량 수정">×${qty} ${unit}</button></div>`;
     const actionCell=isEditing
       ?`<div style="display:flex;align-items:center;justify-content:center;"><button onclick="confirmEditQty('${row.tempId}')" style="color:var(--c-green);padding:6px 11px;border-radius:6px;font-size:16px;background:rgba(23,159,114,0.1);line-height:1;" title="저장 (Enter)">✓</button></div>`
@@ -483,9 +483,17 @@ function startEditQty(tempId){
   setTimeout(()=>{const el=document.getElementById("qe-"+tempId);if(el){el.focus();el.select();}},0);
 }
 function confirmEditQty(tempId){
+  if(S.editingQtyId!==tempId) return;
   const rel=S.pending.find(r=>r.tempId===tempId); if(!rel) return;
   const v=parseFloat(S.editingQtyVal);
   if(isNaN(v)||v<=0){toast("올바른 수량을 입력하세요","error");return;}
+  rel.qty=v; S.editingQtyId=null; S.editingQtyVal=""; saveDraft(); render();
+}
+function blurEditQty(tempId){
+  if(S.editingQtyId!==tempId) return;
+  const rel=S.pending.find(r=>r.tempId===tempId); if(!rel){cancelEditQty();return;}
+  const v=parseFloat(S.editingQtyVal);
+  if(isNaN(v)||v<=0){cancelEditQty();return;}
   rel.qty=v; S.editingQtyId=null; S.editingQtyVal=""; saveDraft(); render();
 }
 function cancelEditQty(){S.editingQtyId=null;S.editingQtyVal="";render();}
