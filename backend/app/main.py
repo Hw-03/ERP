@@ -303,6 +303,17 @@ def health_detailed(db: Session = Depends(get_db)):
     }
 
 
+@app.post("/api/health/write-check", tags=["System"])
+def health_write_check(db: Session = Depends(get_db)):
+    """DB 쓰기 가능 여부 점검 — preflight 전용. SAVEPOINT 기반, 실제 데이터 변경 없음."""
+    try:
+        sp = db.begin_nested()
+        sp.rollback()
+        return {"status": "ok", "writable": True}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"DB 쓰기 테스트 실패: {str(e)}")
+
+
 @app.get("/", tags=["System"])
 def root():
     return {

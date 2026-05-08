@@ -19,6 +19,8 @@ import os
 import sys
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Literal
 
 try:
@@ -161,6 +163,37 @@ async def check_response_time(client: httpx.AsyncClient, base_url: str) -> None:
         record("응답시간", "FAIL", f"평균 {avg:.0f}ms (1000ms 초과 — 서버 응답 불안정)")
 
 
+async def check_db_write(client: httpx.AsyncClient, base_url: str) -> None:
+    """POST /api/health/write-check 로 DB 쓰기 가능 여부 점검."""
+    try:
+        res = await client.post(f"{base_url}/api/health/write-check", timeout=10)
+        if res.status_code == 200:
+            record("DB 쓰기 가능", "PASS", "SAVEPOINT 기반 쓰기 테스트 성공")
+        else:
+            record("DB 쓰기 가능", "FAIL",
+                   f"HTTP {res.status_code} — DB 읽기 전용 또는 권한 부족")
+    except Exception as e:
+        record("DB 쓰기 가능", "WARN", f"엔드포인트 미확인 — {e}")
+
+
+async def check_backup_exists() -> None:
+    """outputs/backups/ 에 최근 7일 이내 백업 파일 존재 확인."""
+    backup_dir = Path(__file__).resolve().parents[2] / "outputs" / "backups"
+    if not backup_dir.exists():
+        record("백업 존재", "WARN", "outputs/backups/ 없음 — backup_db.py 실행 필요")
+        return
+    files = sorted(backup_dir.glob("*.db.backup.*")) + sorted(backup_dir.glob("*.sql"))
+    if not files:
+        record("백업 존재", "WARN", "백업 파일 없음 — python scripts/ops/backup_db.py 실행 필요")
+        return
+    latest = max(f.stat().st_mtime for f in files)
+    age_days = (datetime.now(timezone.utc).timestamp() - latest) / 86400
+    if age_days <= 7:
+        record("백업 존재", "PASS", f"최근 백업: {age_days:.1f}일 전 ({len(files)}개)")
+    else:
+        record("백업 존재", "WARN", f"마지막 백업 {age_days:.0f}일 전 — 7일 이내 백업 권장")
+
+
 async def check_concurrent_30(base_url: str) -> None:
     async with httpx.AsyncClient(timeout=15, limits=httpx.Limits(max_connections=40)) as c:
         try:
@@ -202,12 +235,14 @@ async def main():
             sys.exit(1)
 
         await check_db_engine(base_url)
+        await check_db_write(client, base_url)
         await check_inventory_negative(client, base_url)
         await check_pending_consistency(client, base_url)
         await check_open_requests(client, base_url)
         await check_response_time(client, base_url)
 
     await check_concurrent_30(base_url)
+    await check_backup_exists()
 
     # 집계
     passes = sum(1 for r in results if r.level == "PASS")

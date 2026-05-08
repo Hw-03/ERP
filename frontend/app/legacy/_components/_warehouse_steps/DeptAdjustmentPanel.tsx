@@ -5,6 +5,7 @@ import {
   ChevronDown, ChevronsRight, Plus, Trash2, AlertTriangle,
 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { ApiError } from "@/lib/api-core";
 import { deptAdjustmentApi } from "@/lib/api/dept-adjustment";
 import type {
   AdjDirection,
@@ -395,7 +396,11 @@ export function DeptAdjustmentPanel({
       setNotes("");
       onSuccess(result.processed_count, SUB_TYPE_LABELS[subType]);
     } catch (e) {
-      onError((e as Error).message ?? "처리 실패");
+      if (e instanceof ApiError && e.isUnavailable) {
+        onError("서버가 다른 작업을 처리 중입니다. 잠시 후 다시 시도하세요.");
+      } else {
+        onError((e as Error).message ?? "처리 실패");
+      }
     } finally {
       setSubmitting(false);
     }

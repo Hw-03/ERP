@@ -89,12 +89,12 @@ def request_requires_approval(lines: Sequence[StockRequestLine]) -> bool:
 
 
 def _generate_request_code(ts: datetime) -> str:
-    """SR-YYYYMMDD-HHMMSS-XXXX 형식 (4자리 랜덤 hex).
+    """SR-YYYYMMDD-HHMMSS-XXXXXXXX 형식 (8자리 랜덤 hex, 32비트 엔트로피).
 
-    count+1 방식 제거 — 동시 생성 시 중복 확률 1/65536 수준으로 낮춤.
+    충돌 확률 약 1/4,294,967,296 수준.
     unique constraint 충돌 시 라우터가 1회 retry 한다.
     """
-    suffix = secrets.token_hex(2).upper()
+    suffix = secrets.token_hex(4).upper()
     return f"SR-{ts.strftime('%Y%m%d-%H%M%S')}-{suffix}"
 
 

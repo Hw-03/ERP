@@ -166,6 +166,82 @@ async def get_test_resources(base_url: str) -> tuple[Optional[str], Optional[str
             return None, None
 
 
+async def auto_seed_resources(base_url: str) -> tuple[Optional[str], Optional[str]]:
+    """--auto-seed: TEST- 직원 + 품목이 없으면 생성. 이미 있으면 재사용."""
+    async with httpx.AsyncClient(timeout=15) as client:
+        emp_id = None
+        item_id = None
+
+        # 직원 조회
+        try:
+            res = await client.get(f"{base_url}/api/employees?limit=200")
+            if res.status_code == 200:
+                employees = res.json()
+                test_emp = next(
+                    (e for e in employees if str(e.get("employee_code", "")).startswith("TEST")),
+                    None,
+                )
+                if test_emp:
+                    emp_id = test_emp["employee_id"]
+                    print(f"  테스트 직원 재사용: {test_emp['name']} ({emp_id})")
+        except Exception:
+            pass
+
+        if not emp_id:
+            try:
+                payload = {
+                    "employee_code": "TEST-EMP-001",
+                    "name": "부하테스트담당자",
+                    "role": "조립/사원",
+                    "department": "조립",
+                    "level": "staff",
+                    "is_active": True,
+                    "display_order": 999,
+                }
+                res = await client.post(f"{base_url}/api/employees", json=payload)
+                if res.status_code in (200, 201):
+                    emp_id = res.json().get("employee_id")
+                    print(f"  테스트 직원 생성: TEST-EMP-001 ({emp_id})")
+                else:
+                    print(f"  테스트 직원 생성 실패: HTTP {res.status_code}")
+            except Exception as e:
+                print(f"  테스트 직원 생성 오류: {e}")
+
+        # 품목 조회
+        try:
+            res = await client.get(f"{base_url}/api/items?limit=500")
+            if res.status_code == 200:
+                items = res.json()
+                test_item = next(
+                    (i for i in items if str(i.get("erp_code", "")).startswith("TEST")),
+                    None,
+                )
+                if test_item:
+                    item_id = test_item["item_id"]
+                    print(f"  테스트 품목 재사용: {test_item['item_name']} ({item_id})")
+        except Exception:
+            pass
+
+        if not item_id:
+            try:
+                payload = {
+                    "item_name": "부하테스트품목",
+                    "unit": "EA",
+                    "process_type_code": "TR",
+                    "initial_quantity": 9999,
+                }
+                res = await client.post(f"{base_url}/api/items", json=payload)
+                if res.status_code in (200, 201):
+                    item_id = res.json().get("item_id")
+                    print(f"  테스트 품목 생성: 부하테스트품목 ({item_id})")
+                else:
+                    print(f"  테스트 품목 생성 실패: HTTP {res.status_code}")
+            except Exception as e:
+                print(f"  테스트 품목 생성 오류: {e}")
+
+        return emp_id, item_id
+
+
 # ---------------------------------------------------------------------------
 # 메인 부하 테스트 실행
 # ---------------------------------------------------------------------------
@@ -368,6 +444,7 @@ def parse_args():
     parser.add_argument("--rounds", type=int, default=3, help="라운드 수 (기본: 3)")
     parser.add_argument("--dry-run", action="store_true", help="실제 실행 없이 설정만 출력")
     parser.add_argument("--confirm", action="store_true", help="실제 DB 변경 작업 수행 확인 (필수)")
+    parser.add_argument("--auto-seed", action="store_true", help="TEST- 직원/품목 없으면 자동 생성")
     return parser.parse_args()
 
 
@@ -401,8 +478,12 @@ async def main():
         sys.exit(1)
     print(f"서버 연결 확인: {msg}")
 
-    # 테스트 리소스 조회
-    emp_id, item_id = await get_test_resources(args.url)
+    # 테스트 리소스 조회 (또는 자동 생성)
+    if args.auto_seed:
+        print("테스트 데이터 자동 생성 중...")
+        emp_id, item_id = await auto_seed_resources(args.url)
+    else:
+        emp_id, item_id = await get_test_resources(args.url)
     if emp_id:
         print(f"테스트 직원 ID: {emp_id}")
     else:
