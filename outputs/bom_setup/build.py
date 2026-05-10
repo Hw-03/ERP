@@ -4,6 +4,9 @@ sys.stdout.reconfigure(encoding='utf-8')
 with open('C:/ERP/outputs/bom_setup/items_compact.json', 'r', encoding='utf-8') as f:
     items_json = json.dumps(json.load(f), ensure_ascii=False, separators=(',', ':'))
 
+with open('C:/ERP/outputs/bom_setup/bom.json', 'r', encoding='utf-8') as f:
+    preset_bom_json = json.dumps(json.load(f), ensure_ascii=False, separators=(',', ':'))
+
 html = '''<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -114,6 +117,7 @@ html = '''<!DOCTYPE html>
 <input type="file" id="import-input" accept=".json" style="display:none" onchange="handleImportFile(this)">
 <script>
 const ITEMS = ITEMS_PLACEHOLDER;
+const PRESET_BOM = PRESET_BOM_PLACEHOLDER;
 
 const DEPTS = [
   { id:"T", label:"튜브",  color:"#078db0" },
@@ -565,13 +569,33 @@ window.addEventListener("beforeunload", e => {
   if (S.pending.length > 0) { e.preventDefault(); e.returnValue = ""; }
 });
 
-loadDraft();
+function loadPreset() {
+  const codeToId = new Map();
+  for (const it of ITEMS) if (it.erp_code) codeToId.set(it.erp_code, it.item_id);
+  const pending = [];
+  const completedSet = new Set();
+  let skipped = 0;
+  for (const r of PRESET_BOM) {
+    const pid = codeToId.get(r.parent_erp_code);
+    const cid = codeToId.get(r.child_erp_code);
+    if (!pid || !cid) { skipped++; continue; }
+    pending.push({tempId: uid(), parentItemId: pid, childItemId: cid, qty: r.quantity, unit: r.unit||"EA"});
+    completedSet.add(pid);
+  }
+  S.pending = pending;
+  S.completed = [...completedSet];
+  saveDraft();
+  if (skipped > 0) console.warn(`PRESET_BOM 누락: ${skipped}건 (erp_code unmatched)`);
+}
+
+loadPreset();
 render();
 </script>
 </body>
 </html>'''
 
 html = html.replace('ITEMS_PLACEHOLDER', items_json)
+html = html.replace('PRESET_BOM_PLACEHOLDER', preset_bom_json)
 
 with open('C:/ERP/outputs/bom_setup/bom_setup.html', 'w', encoding='utf-8', newline='') as f:
     f.write(html)
