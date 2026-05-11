@@ -43,6 +43,7 @@ Thumbs.db
 
 # Dev-only generated assets
 .dev/screenshots/
+.dev/*.log
 
 # Playwright MCP regression artifacts (root-level temp output)
 .playwright-mcp/
