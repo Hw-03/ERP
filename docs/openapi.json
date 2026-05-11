@@ -10279,6 +10279,59 @@
         ]
       }
     },
+    "/api/io/draft/{batch_id}/submit": {
+      "post": {
+        "operationId": "submit_io_draft_api_io_draft__batch_id__submit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Batch Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "requester_employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Requester Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IoSubmitResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Io Draft",
+        "tags": [
+          "Inventory IO"
+        ]
+      }
+    },
     "/api/io/drafts": {
       "get": {
         "operationId": "list_io_drafts_api_io_drafts_get",
