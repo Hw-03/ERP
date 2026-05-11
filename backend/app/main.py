@@ -42,6 +42,7 @@ from app.routers import (
     dept_adjustment,
     employees,
     inventory,
+    io,
     items,
     loss,
     models as models_router,
@@ -228,6 +229,7 @@ app.include_router(departments.router, prefix="/api/departments", tags=["Departm
 app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(ship_packages.router, prefix="/api/ship-packages", tags=["Ship Packages"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])
+app.include_router(io.router, prefix="/api/io", tags=["Inventory IO"])
 app.include_router(bom.router, prefix="/api/bom", tags=["BOM"])
 app.include_router(production.router, prefix="/api/production", tags=["Production"])
 app.include_router(codes.router, prefix="/api/codes", tags=["Codes"])

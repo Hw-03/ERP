@@ -814,6 +814,7 @@ def _execute_line(
             reference_no=request.request_code,
             produced_by=approver.name,
             notes=note,
+            operation_batch_id=getattr(request, "operation_batch_id", None),
         )
     )
 
@@ -886,6 +887,10 @@ def approve_request(
     for line in request.lines:
         line.status = StockRequestStatusEnum.COMPLETED
 
+    from app.services import io as io_svc
+
+    io_svc.sync_batch_from_stock_request(db, request)
+
     return request
 
 
@@ -920,6 +925,9 @@ def mark_failed_approval(
     request.rejected_by_name = approver.name
     request.rejected_at = now
     request.rejected_reason = f"승인 실패: {reason}"
+    from app.services import io as io_svc
+
+    io_svc.sync_batch_from_stock_request(db, request)
     return request
 
 
@@ -951,6 +959,9 @@ def reject_request(
     request.rejected_reason = reason.strip()
     for line in request.lines:
         line.status = StockRequestStatusEnum.REJECTED
+    from app.services import io as io_svc
+
+    io_svc.sync_batch_from_stock_request(db, request)
     return request
 
 
@@ -986,6 +997,9 @@ def cancel_request(
     request.cancelled_at = now
     for line in request.lines:
         line.status = StockRequestStatusEnum.CANCELLED
+    from app.services import io as io_svc
+
+    io_svc.sync_batch_from_stock_request(db, request)
     return request
 
 

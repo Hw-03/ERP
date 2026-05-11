@@ -473,6 +473,7 @@ class TransactionLogResponse(BaseModel):
     reference_no: Optional[str]
     produced_by: Optional[str]
     notes: Optional[str]
+    operation_batch_id: Optional[uuid.UUID] = None
     created_at: datetime
     edit_count: int = 0  # 3차: 수정 이력 개수
 
@@ -945,6 +946,7 @@ class StockRequestLineResponse(BaseModel):
     to_bucket: RequestBucketEnum
     to_department: Optional[str] = None
     status: StockRequestStatusEnum
+    operation_line_id: Optional[uuid.UUID] = None
     created_at: datetime
 
 
@@ -972,9 +974,109 @@ class StockRequestResponse(BaseModel):
     completed_at: Optional[datetime] = None
     reference_no: Optional[str] = None
     notes: Optional[str] = None
+    operation_batch_id: Optional[uuid.UUID] = None
     created_at: datetime
     updated_at: datetime
     lines: List[StockRequestLineResponse] = []
+
+
+class IoPreviewTarget(BaseModel):
+    source_kind: str = Field("direct_item", max_length=24)
+    item_id: Optional[uuid.UUID] = None
+    package_id: Optional[uuid.UUID] = None
+    quantity: Decimal = Field(Decimal("1"), gt=0)
+
+
+class IoLinePayload(BaseModel):
+    line_id: uuid.UUID
+    item_id: uuid.UUID
+    item_name: str
+    erp_code: Optional[str] = None
+    unit: str = "EA"
+    direction: str
+    from_bucket: str
+    from_department: Optional[str] = None
+    to_bucket: str
+    to_department: Optional[str] = None
+    quantity: Decimal
+    bom_expected: Optional[Decimal] = None
+    included: bool = True
+    origin: str
+    edited: bool = False
+    has_children: bool = False
+    shortage: Decimal = Decimal("0")
+    exclusion_note: Optional[str] = None
+
+
+class IoBundlePayload(BaseModel):
+    bundle_id: uuid.UUID
+    source_kind: str
+    title: str
+    source_item_id: Optional[uuid.UUID] = None
+    package_id: Optional[uuid.UUID] = None
+    quantity: Decimal
+    expanded_level: int = 1
+    lines: List[IoLinePayload] = Field(default_factory=list)
+
+
+class IoPreviewRequest(BaseModel):
+    requester_employee_id: Optional[uuid.UUID] = None
+    work_type: str
+    sub_type: str
+    from_department: Optional[str] = None
+    to_department: Optional[str] = None
+    targets: List[IoPreviewTarget] = Field(..., min_length=1)
+
+
+class IoPreviewResponse(BaseModel):
+    work_type: str
+    sub_type: str
+    requires_approval: bool
+    bundles: List[IoBundlePayload]
+
+
+class IoDraftUpsert(BaseModel):
+    requester_employee_id: uuid.UUID
+    work_type: str
+    sub_type: str
+    from_department: Optional[str] = None
+    to_department: Optional[str] = None
+    reference_no: Optional[str] = Field(None, max_length=100)
+    notes: Optional[str] = None
+    bundles: List[IoBundlePayload] = Field(default_factory=list)
+
+
+class IoSubmitRequest(IoDraftUpsert):
+    pass
+
+
+class IoBatchResponse(BaseModel):
+    batch_id: uuid.UUID
+    work_type: str
+    sub_type: str
+    status: str
+    requester_employee_id: uuid.UUID
+    requester_name: str
+    requester_department: str
+    from_department: Optional[str] = None
+    to_department: Optional[str] = None
+    requires_approval: bool
+    stock_request_id: Optional[uuid.UUID] = None
+    reference_no: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    submitted_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    bundles: List[IoBundlePayload] = Field(default_factory=list)
+
+
+class IoSubmitResponse(BaseModel):
+    batch: IoBatchResponse
+    status: str
+    requires_approval: bool
+    stock_request_id: Optional[uuid.UUID] = None
+    message: str
 
 
 class ReservationLineResponse(BaseModel):
