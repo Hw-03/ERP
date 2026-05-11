@@ -82,6 +82,7 @@ export interface IoDraftPayload {
   to_department?: Department | string | null;
   reference_no?: string | null;
   notes?: string | null;
+  client_request_id?: string | null;
   bundles: IoBundle[];
 }
 

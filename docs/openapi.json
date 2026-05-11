@@ -2412,6 +2412,18 @@
             "title": "Bundles",
             "type": "array"
           },
+          "client_request_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
           "from_department": {
             "anyOf": [
               {
@@ -2912,6 +2924,18 @@
             },
             "title": "Bundles",
             "type": "array"
+          },
+          "client_request_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
           },
           "from_department": {
             "anyOf": [

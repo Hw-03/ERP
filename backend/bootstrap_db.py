@@ -169,6 +169,9 @@ _MIGRATION_DDL: list[str] = [
     # R10B: 중복 제출 방지용 클라이언트 멱등성 키
     "ALTER TABLE stock_requests ADD COLUMN client_request_id VARCHAR(64)",
     "CREATE UNIQUE INDEX IF NOT EXISTS ix_stock_requests_client_request_id ON stock_requests(client_request_id)",
+    # 입출고 v2 멱등 키 — 제출 더블클릭 시 재고 이중 차감 방지
+    "ALTER TABLE io_batches ADD COLUMN client_request_id VARCHAR(64)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ix_io_batches_client_request_id ON io_batches(client_request_id)",
 ]
 
 

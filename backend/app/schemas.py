@@ -1044,6 +1044,7 @@ class IoDraftUpsert(BaseModel):
     to_department: Optional[str] = None
     reference_no: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
+    client_request_id: Optional[str] = Field(None, max_length=64)
     bundles: List[IoBundlePayload] = Field(default_factory=list)
 
 

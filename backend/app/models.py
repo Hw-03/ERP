@@ -859,6 +859,7 @@ class IoBatch(Base):
     stock_request_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     reference_no = Column(String(100), nullable=True, index=True)
     notes = Column(Text, nullable=True)
+    client_request_id = Column(String(64), nullable=True, unique=True, index=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
     updated_at = Column(
         DateTime,
