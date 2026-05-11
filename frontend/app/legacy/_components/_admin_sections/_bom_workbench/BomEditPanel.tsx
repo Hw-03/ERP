@@ -50,9 +50,9 @@ export function BomEditPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {/* 부모 헤더 */}
+      {/* 부모 헤더 (자연 높이, shrink) */}
       <div
-        className="flex items-center gap-3 rounded-2xl border px-4 py-3"
+        className="flex shrink-0 items-center gap-3 rounded-2xl border px-4 py-3"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
         <BomBadge processTypeCode={parent.process_type_code} />
@@ -66,38 +66,43 @@ export function BomEditPanel({
         </div>
       </div>
 
-      {/* 현재 BOM 그리드 */}
-      <div
-        className="flex flex-col rounded-2xl border"
-        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-      >
+      {/* 본문: BOM 그리드 ↔ 후보 박스 가로 분할 (각 50%) */}
+      <div className="flex min-h-0 flex-1 gap-3">
+        {/* 현재 BOM 그리드 */}
         <div
-          className="px-4 py-2.5 text-xs font-bold uppercase tracking-widest"
-          style={{ color: LEGACY_COLORS.muted2, borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
+          className="flex min-h-0 flex-1 flex-col rounded-2xl border"
+          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
         >
-          현재 구성 ({bomRows.length}건)
+          <div
+            className="shrink-0 px-4 py-2.5 text-xs font-bold uppercase tracking-widest"
+            style={{ color: LEGACY_COLORS.muted2, borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
+          >
+            현재 구성 ({bomRows.length}건)
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {bomRows.length === 0 ? (
+              <div className="px-4 py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+                아직 등록된 자식 품목이 없습니다. 우측에서 추가하세요.
+              </div>
+            ) : (
+              bomRows.map((r) => (
+                <BomRow
+                  key={r.bom_id}
+                  row={r}
+                  childItem={itemMap.get(r.child_item_id)}
+                  onSaveQty={onSaveQty}
+                  onRequestDelete={onRequestDelete}
+                />
+              ))
+            )}
+          </div>
         </div>
-        <div className="max-h-[40vh] overflow-y-auto">
-          {bomRows.length === 0 ? (
-            <div className="px-4 py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-              아직 등록된 자식 품목이 없습니다. 아래에서 추가하세요.
-            </div>
-          ) : (
-            bomRows.map((r) => (
-              <BomRow
-                key={r.bom_id}
-                row={r}
-                childItem={itemMap.get(r.child_item_id)}
-                onSaveQty={onSaveQty}
-                onRequestDelete={onRequestDelete}
-              />
-            ))
-          )}
+
+        {/* 자식 추가 박스 */}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <BomChildAddBox parent={parent} bomRows={bomRows} items={items} onPick={onPickChild} />
         </div>
       </div>
-
-      {/* 자식 추가 박스 */}
-      <BomChildAddBox parent={parent} bomRows={bomRows} items={items} onPick={onPickChild} />
     </div>
   );
 }
