@@ -51,8 +51,8 @@ export const IO_SUB_TYPES: Record<
     { id: "dept_to_warehouse", label: "부서 → 창고", description: "반납할 하위 품목만 체크" },
   ],
   process: [
-    { id: "produce", label: "생산/조립", description: "하위 품목 출고 + 결과 품목 입고" },
-    { id: "disassemble", label: "분해/회수", description: "대상 품목 출고 + 회수 품목 입고" },
+    { id: "produce", label: "생산", description: "하위 품목 출고 + 결과 품목 입고" },
+    { id: "disassemble", label: "분해", description: "대상 품목 출고 + 회수 품목 입고" },
     { id: "adjust", label: "수량 보정", description: "실사 차이를 부서 재고에 반영" },
   ],
   ship: [

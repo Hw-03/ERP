@@ -1,10 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Search } from "lucide-react";
+import { ArrowRight, Plus, Search } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { tint } from "@/lib/mes/colorUtils";
-import { getStockState } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";
 import { EmptyState } from "../common";
 import {
@@ -27,6 +25,7 @@ interface Props {
   onSearchChange: (value: string) => void;
   onAddItem: (item: Item, sourceKind?: "direct_item" | "manual") => void;
   onAddPackage: (pkg: ShipPackage) => void;
+  onAdvance: () => void;
   busy?: boolean;
 }
 
@@ -80,6 +79,7 @@ export function IoTargetPicker({
   onSearchChange,
   onAddItem,
   onAddPackage,
+  onAdvance,
   busy,
 }: Props) {
   const [dept, setDept] = useState("ALL");
@@ -225,25 +225,30 @@ export function IoTargetPicker({
         )}
       </div>
 
-      {/* 하단 "선택 현황 요약" 카드 (옛 패턴) */}
-      <div
-        className="flex items-center justify-between rounded-[12px] border px-3 py-2"
+      {/* 하단 advance 버튼 — 선택 품목 없으면 비활성 */}
+      <button
+        type="button"
+        onClick={onAdvance}
+        disabled={bundles.length === 0}
+        className="flex w-full items-center justify-between rounded-[12px] border px-4 py-3 text-sm font-black transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
         style={{
-          background: tint(LEGACY_COLORS.blue, 6),
-          borderColor: tint(LEGACY_COLORS.blue, 24),
+          background: bundles.length > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
+          borderColor: bundles.length > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+          color: bundles.length > 0 ? "#fff" : LEGACY_COLORS.muted2,
         }}
       >
-        <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+        <span>
           {bundles.length > 0
             ? `선택됨: ${bundles.length}개 묶음 · 라인 ${lineCount}개`
-            : "선택된 품목 없음"}
+            : "품목을 먼저 선택하세요"}
         </span>
         {bundles.length > 0 && (
-          <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>
-            ↓ 다음 단계에서 수량을 조정하세요
+          <span className="flex items-center gap-1.5">
+            수량 조정하기
+            <ArrowRight className="h-4 w-4" />
           </span>
         )}
-      </div>
+      </button>
     </div>
   );
 }
@@ -280,16 +285,16 @@ function ItemTable({
                 borderBottom: `1px solid ${LEGACY_COLORS.border}`,
               }}
             >
-              품목명 (품목 코드)
+              품목명
             </th>
             <th
-              className="px-2 py-2 text-center"
+              className="px-3 py-2"
               style={{
                 background: LEGACY_COLORS.s1,
                 borderBottom: `1px solid ${LEGACY_COLORS.border}`,
               }}
             >
-              상태
+              품목 코드
             </th>
             <th
               className="whitespace-nowrap px-3 py-2 text-right"
@@ -313,10 +318,6 @@ function ItemTable({
         </thead>
         <tbody>
           {items.slice(0, displayLimit).map((item) => {
-            const stock = getStockState(
-              Number(item.quantity),
-              item.min_stock == null ? null : Number(item.min_stock),
-            );
             return (
               <tr
                 key={item.item_id}
@@ -326,22 +327,13 @@ function ItemTable({
                   <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
                     {item.item_name}
                   </span>
-                  <span className="ml-1 text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                    ({item.erp_code ?? "-"})
-                  </span>
                 </td>
                 <td
-                  className="px-2 py-2 text-center"
+                  className="px-3 py-2"
                   style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                 >
-                  <span
-                    className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold"
-                    style={{
-                      color: stock.color,
-                      background: tint(stock.color, 14),
-                    }}
-                  >
-                    {stock.label}
+                  <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+                    {item.erp_code ?? "-"}
                   </span>
                 </td>
                 <td

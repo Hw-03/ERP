@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, ClipboardCheck, PackageCheck, Save } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { api, type IoLine, type IoSourceKind, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
@@ -78,6 +77,7 @@ export function IoComposeView({
 
   async function addItem(item: Item, sourceKind: IoSourceKind = "direct_item") {
     setError(null);
+    const wasEmpty = state.bundles.length === 0;
     try {
       const response = await previewTarget({
         employeeId,
@@ -89,6 +89,11 @@ export function IoComposeView({
       });
       state.setBundles((prev) => [...prev, ...response.bundles]);
       onStatusChange(`${item.item_name} 작업 묶음 생성`);
+      if (wasEmpty && state.step === 3) {
+        // 첫 품목 추가 → step 4(수량 조정) 자동 펼침. picker 위치 유지를 위해 scroll skip.
+        programmaticAdvanceRef.current = true;
+        state.goNext();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "품목 전개에 실패했습니다.");
     }
@@ -245,6 +250,8 @@ export function IoComposeView({
   const stepRefs = useRef<Partial<Record<IoStep, HTMLDivElement | null>>>({});
   // 마지막으로 스크롤 처리한 step — null 이면 아직 마운트만 됨 (첫 마운트는 무조건 skip)
   const lastScrolledStepRef = useRef<IoStep | null>(null);
+  // 첫 품목 추가로 인한 자동 advance 시에는 viewport를 picker 위치에 고정 (사용자가 연속 선택 가능하도록)
+  const programmaticAdvanceRef = useRef(false);
   useEffect(() => {
     const el = stepRefs.current[step];
     if (!el) return;
@@ -259,6 +266,10 @@ export function IoComposeView({
     const prev = lastScrolledStepRef.current;
     lastScrolledStepRef.current = step;
     if (prev === null || prev === step) return;
+    if (programmaticAdvanceRef.current) {
+      programmaticAdvanceRef.current = false;
+      return;
+    }
     const timer = setTimeout(() => {
       if (step === 1) {
         // step 1 로 돌아간 경우 페이지 최상단 (외부 "입출고 작업" 헤더 + 탭 다시 보이게)
@@ -329,7 +340,15 @@ export function IoComposeView({
               onFromDepartmentChange={changeFromDepartment}
               onToDepartmentChange={changeToDepartment}
             />
-            <NavFooter step={2} canAdvance={state.canAdvance[2]} onPrev={state.goPrev} onNext={state.goNext} />
+            <button
+              type="button"
+              onClick={state.goNext}
+              disabled={!state.canAdvance[2]}
+              className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
+              style={{ background: LEGACY_COLORS.blue }}
+            >
+              다음 단계로 →
+            </button>
           </WizardStepCard>
         </div>
       )}
@@ -342,7 +361,7 @@ export function IoComposeView({
           <WizardStepCard
             n={3}
             title="대상을 선택하세요"
-            state={stepState(3)}
+            state={step >= 3 ? "active" : "locked"}
             summary={`${state.bundles.length}개 묶음 · 라인 ${lineCount}개`}
             onChange={() => state.goTo(3)}
             accent={accent}
@@ -357,15 +376,11 @@ export function IoComposeView({
               onSearchChange={setSearch}
               onAddItem={addItem}
               onAddPackage={addPackage}
+              onAdvance={() => {
+                if (state.step === 3) state.goNext();
+                stepRefs.current[4]?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
               busy={previewing}
-            />
-            <NavFooter
-              step={3}
-              canAdvance={state.canAdvance[3]}
-              onPrev={state.goPrev}
-              onNext={state.goNext}
-              onSaveDraft={handleSaveDraft}
-              savingDraft={drafting}
             />
           </WizardStepCard>
         </div>
@@ -418,14 +433,11 @@ export function IoComposeView({
               onRemoveBundle={(bundleId) =>
                 state.setBundles((prev) => prev.filter((bundle) => bundle.bundle_id !== bundleId))
               }
-            />
-            <NavFooter
-              step={4}
+              onAdvance={() => {
+                if (state.step === 4) state.goNext();
+                stepRefs.current[5]?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
               canAdvance={state.canAdvance[4]}
-              onPrev={state.goPrev}
-              onNext={state.goNext}
-              onSaveDraft={handleSaveDraft}
-              savingDraft={drafting}
             />
           </WizardStepCard>
         </div>
@@ -463,87 +475,6 @@ export function IoComposeView({
       )}
 
       <IoSubmitModals result={result} onClose={() => setResult(null)} />
-    </div>
-  );
-}
-
-/* ---- 보조 (한 화면 전용 inline) ---- */
-
-function NavFooter({
-  step,
-  canAdvance,
-  onPrev,
-  onNext,
-  onSaveDraft,
-  savingDraft = false,
-}: {
-  step: IoStep;
-  canAdvance: boolean;
-  onPrev: () => void;
-  onNext: () => void;
-  onSaveDraft?: () => void | Promise<void>;
-  savingDraft?: boolean;
-}) {
-  const nextLabel =
-    step === 4 ? (
-      <>
-        <ClipboardCheck className="h-4 w-4" />
-        제출 확인으로 →
-      </>
-    ) : step === 3 ? (
-      <>
-        <PackageCheck className="h-4 w-4" />
-        실제 반영 보기 →
-      </>
-    ) : (
-      <>
-        다음 단계 →
-      </>
-    );
-  return (
-    <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t pt-4" style={{ borderColor: LEGACY_COLORS.border }}>
-      <button
-        type="button"
-        onClick={onPrev}
-        disabled={step === 1}
-        className="flex items-center gap-1.5 rounded-[14px] border px-4 py-2.5 text-sm font-bold disabled:opacity-40"
-        style={{
-          background: LEGACY_COLORS.s2,
-          borderColor: LEGACY_COLORS.border,
-          color: LEGACY_COLORS.text,
-        }}
-      >
-        <ArrowLeft className="h-4 w-4" />
-        이전
-      </button>
-      <div className="flex items-center gap-2">
-        {onSaveDraft && (
-          <button
-            type="button"
-            onClick={() => void onSaveDraft()}
-            disabled={savingDraft}
-            className="flex items-center gap-1.5 rounded-[14px] border px-4 py-2.5 text-sm font-bold disabled:opacity-40"
-            style={{
-              background: LEGACY_COLORS.s2,
-              borderColor: LEGACY_COLORS.border,
-              color: LEGACY_COLORS.text,
-            }}
-          >
-            <Save className="h-4 w-4" />
-            임시저장
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={!canAdvance}
-          className="flex items-center gap-1.5 rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
-          style={{ background: LEGACY_COLORS.blue }}
-        >
-          {nextLabel}
-          {step !== 3 && step !== 4 && <ArrowRight className="h-4 w-4" />}
-        </button>
-      </div>
     </div>
   );
 }

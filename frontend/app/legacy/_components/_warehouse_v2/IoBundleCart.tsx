@@ -1,5 +1,6 @@
 "use client";
 
+import { ClipboardCheck } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { EmptyState } from "../common";
@@ -15,6 +16,8 @@ interface Props {
   onQuantityChange: (bundleId: string, lineId: string, quantity: number, shortage: number) => void;
   onRemoveLine: (bundleId: string, lineId: string) => void;
   onRemoveBundle: (bundleId: string) => void;
+  onAdvance: () => void;
+  canAdvance: boolean;
 }
 
 export function IoBundleCart({
@@ -25,6 +28,8 @@ export function IoBundleCart({
   onQuantityChange,
   onRemoveLine,
   onRemoveBundle,
+  onAdvance,
+  canAdvance,
 }: Props) {
   const includedCount = bundles.flatMap((bundle) => bundle.lines).filter((line) => line.included).length;
   const totalQty = bundles
@@ -82,6 +87,19 @@ export function IoBundleCart({
             />
           ))}
         </div>
+      )}
+
+      {bundles.length > 0 && (
+        <button
+          type="button"
+          onClick={onAdvance}
+          disabled={!canAdvance}
+          className="flex w-full items-center justify-center gap-1.5 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
+          style={{ background: LEGACY_COLORS.blue }}
+        >
+          <ClipboardCheck className="h-4 w-4" />
+          제출 확인으로 →
+        </button>
       )}
     </div>
   );

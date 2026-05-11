@@ -126,9 +126,6 @@ export function IoSubTypeStep({
             );
           })}
         </div>
-        <p className="mt-2 text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-          {subRows.find((row) => row.id === subType)?.description}
-        </p>
       </div>
 
       {/* 부서 grid (옛 PROD_DEPTS 6 column 패턴) */}
