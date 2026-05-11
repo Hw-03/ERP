@@ -253,3 +253,86 @@ def test_io_submit_draft_endpoint_completes_batch(client, db_session, make_item)
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     assert inv.warehouse_qty == Decimal("7")
     assert db_session.query(IoBatch).count() == 1
+
+
+def test_io_submit_idempotent_with_client_request_id(client, db_session, make_item):
+    """같은 client_request_id로 두 번 submit 시 같은 batch 멱등 반환, 재고 한 번만 차감."""
+    item = make_item(name="Idem Raw", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(item.item_id),
+                    "quantity": "4",
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "receive",
+        "sub_type": "receive_supplier",
+        "client_request_id": "test-idem-key-001",
+        "bundles": preview.json()["bundles"],
+    }
+
+    first = client.post("/api/io/submit", json=payload)
+    assert first.status_code == 201, first.json()
+    first_batch_id = first.json()["batch"]["batch_id"]
+
+    # 같은 키로 재제출 (더블클릭 / 네트워크 retry 시나리오)
+    second = client.post("/api/io/submit", json=payload)
+    assert second.status_code == 201, second.json()
+    assert second.json()["batch"]["batch_id"] == first_batch_id
+
+    # batch가 1건만 존재하고 재고도 4 한 번만 증가
+    assert db_session.query(IoBatch).count() == 1
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+    assert inv.warehouse_qty == Decimal("4")
+
+
+def test_io_submit_without_client_request_id_skips_idempotency(client, db_session, make_item):
+    """client_request_id 미전송 시 매번 신규 batch 생성 — 기존 클라이언트 호환성 보장."""
+    item = make_item(name="No Idem Raw", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    def _fresh_payload():
+        preview = client.post(
+            "/api/io/preview",
+            json={
+                "requester_employee_id": str(requester.employee_id),
+                "work_type": "receive",
+                "sub_type": "receive_supplier",
+                "targets": [
+                    {
+                        "source_kind": "direct_item",
+                        "item_id": str(item.item_id),
+                        "quantity": "2",
+                    }
+                ],
+            },
+        )
+        return {
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "bundles": preview.json()["bundles"],
+        }
+
+    first = client.post("/api/io/submit", json=_fresh_payload())
+    second = client.post("/api/io/submit", json=_fresh_payload())
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.json()["batch"]["batch_id"] != second.json()["batch"]["batch_id"]
+    assert db_session.query(IoBatch).count() == 2

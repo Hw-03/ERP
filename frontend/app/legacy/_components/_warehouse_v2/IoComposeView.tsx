@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, ClipboardCheck, PackageCheck, Save } from "lucid
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { api, type IoLine, type IoSourceKind, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
+import { ApiError } from "@/lib/api-core";
 import { WizardStepCard } from "./_atoms";
 import { IoWorkTypeStep, IoSubTypeStep } from "./IoWorkTypeStep";
 import { IoTargetPicker } from "./IoTargetPicker";
@@ -180,11 +181,10 @@ export function IoComposeView({
       });
       setResult({ kind: "success", title: "임시저장 완료", message: "현재 작업 묶음이 저장되었습니다." });
     } catch (err) {
-      setResult({
-        kind: "error",
-        title: "임시저장 실패",
-        message: err instanceof Error ? err.message : "임시저장 중 오류가 발생했습니다.",
-      });
+      const message = err instanceof ApiError && err.isUnavailable
+        ? "서버가 다른 작업을 처리 중입니다. 잠시 후 다시 시도하세요."
+        : err instanceof Error ? err.message : "임시저장 중 오류가 발생했습니다.";
+      setResult({ kind: "error", title: "임시저장 실패", message });
     }
   }
 
@@ -204,6 +204,7 @@ export function IoComposeView({
         notes: state.notes,
         bundles: state.bundles,
       });
+      // 서버가 멱등 응답(409 → 기존 batch)이든 신규 처리든 동일한 IoSubmitResponse 모양 → 같은 흐름
       setResult({
         kind: "success",
         title: response.requires_approval ? "승인 요청 완료" : "입출고 반영 완료",
@@ -219,11 +220,11 @@ export function IoComposeView({
       }
       onSubmitSuccess?.();
     } catch (err) {
-      setResult({
-        kind: "error",
-        title: "제출 실패",
-        message: err instanceof Error ? err.message : "제출 중 오류가 발생했습니다.",
-      });
+      // 503 과부하 → 친화 메시지 + 같은 client_request_id 유지(useIoSubmit)로 재시도 안전
+      const message = err instanceof ApiError && err.isUnavailable
+        ? "서버가 다른 작업을 처리 중입니다. 잠시 후 다시 시도하세요."
+        : err instanceof Error ? err.message : "제출 중 오류가 발생했습니다.";
+      setResult({ kind: "error", title: "제출 실패", message });
     }
   }
 

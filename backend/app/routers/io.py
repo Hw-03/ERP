@@ -6,6 +6,7 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -103,14 +104,22 @@ def delete_io_draft(
 def submit_io(payload: IoSubmitRequest, db: Session = Depends(get_db)):
     try:
         result = io_svc.submit(db, payload)
+        commit_only(db)
+        return result
     except PermissionError as exc:
         db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except ValueError as exc:
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
-    commit_only(db)
-    return result
+    except IntegrityError as exc:
+        db.rollback()
+        # client_request_id 중복 → 기존 batch 멱등 반환 (더블클릭/네트워크 retry 보호)
+        if payload.client_request_id and "client_request_id" in str(exc).lower():
+            existing = io_svc.find_by_client_request_id(db, payload.client_request_id)
+            if existing is not None:
+                return io_svc.build_idempotent_response(existing)
+        raise http_error(409, ErrorCode.CONFLICT, "중복 제출입니다. 잠시 후 결과를 확인해 주세요.")
 
 
 @router.post(

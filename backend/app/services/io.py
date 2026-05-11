@@ -553,6 +553,7 @@ def _persist_batch(
         requires_approval=payload.sub_type in APPROVAL_SUB_TYPES,
         reference_no=payload.reference_no,
         notes=payload.notes,
+        client_request_id=getattr(payload, "client_request_id", None),
         submitted_at=submitted_at,
         created_at=now,
         updated_at=now,
@@ -921,6 +922,30 @@ def submit(db: Session, payload) -> dict:
         submitted_at=datetime.utcnow(),
     )
     return _execute_submission(db, requester=requester, batch=batch)
+
+
+def find_by_client_request_id(db: Session, client_request_id: str) -> Optional[IoBatch]:
+    """멱등 retry 시 기존 batch 조회. submit IntegrityError 후 라우터가 사용."""
+    return (
+        db.query(IoBatch)
+        .filter(IoBatch.client_request_id == client_request_id)
+        .first()
+    )
+
+
+def build_idempotent_response(batch: IoBatch) -> dict:
+    """이미 처리 완료된 batch에 대해 IoSubmitResponse 모양 dict 생성 (재제출 멱등 응답)."""
+    if batch.requires_approval:
+        message = "승인 요청이 생성되었습니다."
+    else:
+        message = "입출고가 반영되었습니다."
+    return {
+        "batch": _batch_to_payload(batch),
+        "status": batch.status,
+        "requires_approval": batch.requires_approval,
+        "stock_request_id": batch.stock_request_id,
+        "message": message,
+    }
 
 
 def submit_existing_draft(
