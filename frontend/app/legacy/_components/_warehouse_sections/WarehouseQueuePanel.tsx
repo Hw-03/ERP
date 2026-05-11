@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, type StockRequest } from "@/lib/api";
-import { LEGACY_COLORS } from "@/lib/mes/color";
-import { tint } from "@/lib/mes/colorUtils";
-import { EmptyState, LoadingSkeleton } from "../common";
+import { ApiError } from "@/lib/api-core";
+import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
 import { WarehouseQueueRow } from "./WarehouseQueueRow";
 
 interface Props {
@@ -67,7 +66,13 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
       await reload();
       onChanged();
     } catch (err) {
-      setApproveError(err instanceof Error ? err.message : "승인에 실패했습니다.");
+      if (err instanceof ApiError && err.isConflict) {
+        setApproveError("이미 처리된 요청입니다.");
+      } else if (err instanceof ApiError && err.isUnavailable) {
+        setApproveError("서버 과부하 — 잠시 후 다시 시도하세요.");
+      } else {
+        setApproveError(err instanceof Error ? err.message : "승인에 실패했습니다.");
+      }
     } finally {
       setBusyId(null);
     }
@@ -90,7 +95,13 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
       await reload();
       onChanged();
     } catch (err) {
-      setRejectError(err instanceof Error ? err.message : "반려에 실패했습니다.");
+      if (err instanceof ApiError && err.isConflict) {
+        setRejectError("이미 처리된 요청입니다.");
+      } else if (err instanceof ApiError && err.isUnavailable) {
+        setRejectError("서버 과부하 — 잠시 후 다시 시도하세요.");
+      } else {
+        setRejectError(err instanceof Error ? err.message : "반려에 실패했습니다.");
+      }
     } finally {
       setBusyId(null);
     }
@@ -99,18 +110,7 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
   return (
     <div className="flex flex-col gap-3">
       {loading && <LoadingSkeleton variant="list" rows={2} />}
-      {error && (
-        <div
-          className="rounded-[12px] border px-4 py-3 text-sm"
-          style={{
-            borderColor: tint(LEGACY_COLORS.red, 30),
-            color: LEGACY_COLORS.red,
-            background: tint(LEGACY_COLORS.red, 10),
-          }}
-        >
-          {error}
-        </div>
-      )}
+      {error && <LoadFailureCard message={error} onRetry={() => void reload()} />}
       {!loading && items.length === 0 && !error && (
         <EmptyState variant="no-data" compact title="승인 대기 중인 요청이 없습니다." />
       )}

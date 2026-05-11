@@ -25,6 +25,7 @@ from app.models import (
     TransactionLog,
     TransactionTypeEnum,
 )
+from app.database import _is_sqlite
 from app.services import inventory as inventory_svc
 
 AdjDirection = Literal["in", "out", "defective", "scrap"]
@@ -224,6 +225,11 @@ def submit_adjustment(
     """
     if not lines:
         raise ValueError("처리할 라인이 없습니다.")
+
+    # 정렬된 순서로 모든 아이템 선락 → 교착 방지
+    if not _is_sqlite:
+        all_item_ids = sorted({ln.item_id for ln in lines})
+        inventory_svc.lock_inventories(db, all_item_ids)
 
     sub_str = sub_type.value
     ordered = (

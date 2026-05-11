@@ -11,7 +11,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from sqlalchemy.exc import IntegrityError
+
+from app.database import get_db, _is_sqlite
 from app.models import (
     Employee,
     StockRequest,
@@ -64,22 +66,38 @@ def create_stock_request(payload: StockRequestCreate, db: Session = Depends(get_
         for li in payload.lines
     ]
 
-    try:
-        request = svc.create_request(
-            db,
-            requester=requester,
-            request_type=payload.request_type,
-            lines_input=lines_input,
-            reference_no=payload.reference_no,
-            notes=payload.notes,
-        )
-    except ValueError as exc:
-        db.rollback()
-        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
-
-    commit_and_refresh(db, request)
-    db.refresh(request)
-    return request
+    for attempt in range(2):
+        try:
+            request = svc.create_request(
+                db,
+                requester=requester,
+                request_type=payload.request_type,
+                lines_input=lines_input,
+                reference_no=payload.reference_no,
+                notes=payload.notes,
+                client_request_id=payload.client_request_id,
+            )
+            commit_and_refresh(db, request)
+            db.refresh(request)
+            return request
+        except IntegrityError as exc:
+            db.rollback()
+            exc_str = str(exc).lower()
+            # client_request_id 중복 → 기존 요청 멱등 반환
+            if payload.client_request_id and "client_request_id" in exc_str:
+                existing = (
+                    db.query(StockRequest)
+                    .filter(StockRequest.client_request_id == payload.client_request_id)
+                    .first()
+                )
+                if existing:
+                    return existing
+            if attempt == 1 or "request_code" not in exc_str:
+                raise http_error(409, ErrorCode.CONFLICT, "요청 코드 충돌, 다시 시도해 주세요.")
+            # attempt=0, request_code 충돌 → 재시도 (새 suffix 자동 생성)
+        except ValueError as exc:
+            db.rollback()
+            raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
 
 # ---------------------------------------------------------------------------
@@ -262,7 +280,11 @@ def get_stock_request(request_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 def _load_request_for_action(db: Session, request_id: uuid.UUID) -> StockRequest:
-    request = db.query(StockRequest).filter(StockRequest.request_id == request_id).first()
+    """승인/반려/취소 전용 조회 — PostgreSQL: FOR UPDATE 행 잠금으로 중복 처리 방지."""
+    q = db.query(StockRequest).filter(StockRequest.request_id == request_id)
+    if not _is_sqlite:
+        q = q.with_for_update()
+    request = q.first()
     if request is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "요청을 찾을 수 없습니다.")
     return request
@@ -362,21 +384,26 @@ def submit_stock_request_draft(
     db: Session = Depends(get_db),
 ):
     """DRAFT → 제출 전환. status=DRAFT 만 허용, 본인만, 빈 lines 거부."""
-    try:
-        request = svc.submit_draft_request(
-            db,
-            request_id=request_id,
-            requester_employee_id=payload.requester_employee_id,
-        )
-    except svc.RequestNotFoundError as exc:
-        db.rollback()
-        raise http_error(404, ErrorCode.NOT_FOUND, str(exc))
-    except PermissionError as exc:
-        db.rollback()
-        raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
-    except ValueError as exc:
-        db.rollback()
-        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
-
-    commit_and_refresh(db, request)
-    return request
+    for attempt in range(2):
+        try:
+            request = svc.submit_draft_request(
+                db,
+                request_id=request_id,
+                requester_employee_id=payload.requester_employee_id,
+            )
+            commit_and_refresh(db, request)
+            return request
+        except IntegrityError as exc:
+            db.rollback()
+            if attempt == 1 or "request_code" not in str(exc).lower():
+                raise http_error(409, ErrorCode.CONFLICT, "요청 코드 충돌, 다시 시도해 주세요.")
+            # attempt=0, request_code 충돌 → 재시도
+        except svc.RequestNotFoundError as exc:
+            db.rollback()
+            raise http_error(404, ErrorCode.NOT_FOUND, str(exc))
+        except PermissionError as exc:
+            db.rollback()
+            raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
+        except ValueError as exc:
+            db.rollback()
+            raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))

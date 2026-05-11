@@ -909,6 +909,7 @@ class StockRequestCreate(BaseModel):
     reference_no: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
     lines: List[StockRequestLineCreate] = Field(..., min_length=1)
+    client_request_id: Optional[str] = Field(None, max_length=64)
 
 
 class StockRequestDraftUpsert(BaseModel):

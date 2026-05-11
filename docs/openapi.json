@@ -5905,6 +5905,18 @@
       },
       "StockRequestCreate": {
         "properties": {
+          "client_request_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
           "lines": {
             "items": {
               "$ref": "#/components/schemas/StockRequestLineCreate"
@@ -9048,6 +9060,46 @@
         "summary": "Verify Employee Pin",
         "tags": [
           "Employees"
+        ]
+      }
+    },
+    "/api/health/db-info": {
+      "get": {
+        "description": "서버가 실제 연결 중인 DB 정보 반환 — preflight 전용.\nDATABASE_URL 전체 노출 금지. 엔진 종류 + 30명 안전 여부만 반환.",
+        "operationId": "health_db_info_api_health_db_info_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Db Info",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/api/health/write-check": {
+      "post": {
+        "description": "DB 쓰기 가능 여부 점검 — preflight 전용.\nSAVEPOINT 안에서 실제 INSERT 실행 후 rollback. 데이터 변경 없음.",
+        "operationId": "health_write_check_api_health_write_check_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Write Check",
+        "tags": [
+          "System"
         ]
       }
     },
