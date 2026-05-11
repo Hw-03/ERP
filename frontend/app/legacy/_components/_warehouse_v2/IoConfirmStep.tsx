@@ -1,9 +1,12 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, ClipboardCheck } from "lucide-react";
-import type { IoBundle, IoLine, IoSubType } from "./types";
-import { requiresApproval, subTypeLabel } from "./ioWorkType";
+import { AlertTriangle, ArrowLeft, CheckCircle2, ClipboardCheck, Save } from "lucide-react";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
+import type { IoBundle, IoSubType } from "./types";
+import { subTypeLabel } from "./ioWorkType";
 import { formatQty } from "@/lib/mes/format";
+import { SettingLabel } from "./_atoms";
 
 interface Props {
   subType: IoSubType;
@@ -13,24 +16,12 @@ interface Props {
   hasShortage: boolean;
   hasInvalidQuantity: boolean;
   submitting: boolean;
+  approval: boolean;
   onNotesChange: (value: string) => void;
   onReferenceChange: (value: string) => void;
   onSubmit: () => void;
   onSaveDraft: () => void;
-}
-
-function LineSummary({ line }: { line: IoLine }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
-      <div className="min-w-0">
-        <span className="block truncate text-sm font-black text-slate-800">{line.item_name}</span>
-        <span className="block text-xs font-semibold text-slate-500">
-          {line.erp_code || "ERP 미지정"} · {line.origin === "manual" ? "수동" : "자동/직접"}
-        </span>
-      </div>
-      <span className="shrink-0 text-sm font-black text-slate-900">{formatQty(line.quantity)} {line.unit}</span>
-    </div>
-  );
+  onPrev: () => void;
 }
 
 export function IoConfirmStep({
@@ -41,121 +32,185 @@ export function IoConfirmStep({
   hasShortage,
   hasInvalidQuantity,
   submitting,
+  approval,
   onNotesChange,
   onReferenceChange,
   onSubmit,
   onSaveDraft,
+  onPrev,
 }: Props) {
   const allLines = bundles.flatMap((bundle) => bundle.lines);
   const includedLines = allLines.filter((line) => line.included);
-  const excludedLines = allLines.filter((line) => !line.included);
-  const submitDisabled = submitting || includedLines.length === 0 || hasShortage || hasInvalidQuantity;
-  const approval = requiresApproval(subType);
+  const totalQty = includedLines.reduce(
+    (acc, line) => acc + (Number.isFinite(line.quantity) ? line.quantity : 0),
+    0,
+  );
+  const submitDisabled =
+    submitting || includedLines.length === 0 || hasShortage || hasInvalidQuantity;
+  const accent = approval ? LEGACY_COLORS.yellow : LEGACY_COLORS.blue;
+  const isCaution = subType === "defect_quarantine" || subType === "supplier_return";
+  const blockerText = hasShortage
+    ? "재고 부족 라인이 있어 제출할 수 없습니다. Step 4에서 라인을 다시 확인하세요."
+    : hasInvalidQuantity
+    ? "0 이하 수량 라인이 있어 제출할 수 없습니다."
+    : includedLines.length === 0
+    ? "체크된 라인이 없어 제출할 수 없습니다."
+    : null;
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between gap-3">
+    <div className="space-y-4">
+      {/* 작업 요약 */}
+      <div
+        className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border px-4 py-3"
+        style={{
+          background: tint(accent, 6),
+          borderColor: tint(accent, 24),
+        }}
+      >
         <div>
-          <h2 className="text-base font-black text-slate-900">제출 확인</h2>
-          <p className="text-xs font-medium text-slate-500">
-            {subTypeLabel(subType)} · {approval ? "승인 요청으로 저장" : "즉시 재고 반영"}
-          </p>
+          <SettingLabel label={approval ? "승인 요청으로 저장" : "즉시 재고 반영"} />
+          <div className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>
+            {subTypeLabel(subType)} · 반영 {includedLines.length}건 · 총 {formatQty(totalQty)}
+          </div>
         </div>
         {approval ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700">
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-black"
+            style={{ background: tint(LEGACY_COLORS.yellow, 14), color: LEGACY_COLORS.yellow }}
+          >
             <AlertTriangle className="h-4 w-4" />
             승인 필요
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-black"
+            style={{ background: tint(LEGACY_COLORS.green, 14), color: LEGACY_COLORS.green }}
+          >
             <CheckCircle2 className="h-4 w-4" />
             즉시 처리
           </span>
         )}
       </div>
 
+      {/* 참조번호 / 메모 */}
       <div className="grid gap-3 md:grid-cols-2">
-        <label className="block">
-          <span className="mb-1 block text-xs font-black text-slate-500">참조번호</span>
-          <input
-            value={referenceNo}
-            onChange={(event) => onReferenceChange(event.target.value)}
-            className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-semibold outline-none focus:border-blue-500"
-            placeholder="발주/작업/출하 번호"
-          />
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-xs font-black text-slate-500">비고</span>
-          <input
-            value={notes}
-            onChange={(event) => onNotesChange(event.target.value)}
-            className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-semibold outline-none focus:border-blue-500"
-            placeholder="작업 메모"
-          />
-        </label>
+        <Field
+          label="참조번호"
+          value={referenceNo}
+          onChange={onReferenceChange}
+          placeholder="발주/작업/출하 번호"
+        />
+        <Field label="메모 (선택)" value={notes} onChange={onNotesChange} placeholder="작업 메모" />
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-black text-slate-900">재고 반영</h3>
-            <span className="text-xs font-black text-blue-700">{includedLines.length}개</span>
-          </div>
-          <div className="max-h-52 space-y-2 overflow-y-auto">
-            {includedLines.map((line) => (
-              <LineSummary key={line.line_id} line={line} />
-            ))}
-            {includedLines.length === 0 && (
-              <div className="rounded-md bg-slate-50 px-3 py-6 text-center text-sm font-bold text-slate-400">
-                체크된 라인이 없습니다.
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-black text-slate-900">제외 기록</h3>
-            <span className="text-xs font-black text-slate-500">{excludedLines.length}개</span>
-          </div>
-          <div className="max-h-52 space-y-2 overflow-y-auto">
-            {excludedLines.map((line) => (
-              <LineSummary key={line.line_id} line={line} />
-            ))}
-            {excludedLines.length === 0 && (
-              <div className="rounded-md bg-slate-50 px-3 py-6 text-center text-sm font-bold text-slate-400">
-                제외된 라인이 없습니다.
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {(hasShortage || hasInvalidQuantity) && (
-        <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700">
-          재고 부족 또는 0 이하 수량이 있어 제출할 수 없습니다.
-        </div>
-      )}
-
-      <div className="mt-4 flex justify-end gap-2">
+      {/* 보조 액션 (이전 / 임시저장) */}
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={onPrev}
+          disabled={submitting}
+          className="flex items-center gap-1.5 rounded-[12px] border px-4 py-2 text-[12px] font-bold disabled:opacity-40"
+          style={{
+            background: LEGACY_COLORS.s2,
+            borderColor: LEGACY_COLORS.border,
+            color: LEGACY_COLORS.text,
+          }}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          이전 단계
+        </button>
         <button
           type="button"
           onClick={onSaveDraft}
           disabled={submitting || bundles.length === 0}
-          className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-[12px] border px-4 py-2 text-[12px] font-bold disabled:opacity-40"
+          style={{
+            background: LEGACY_COLORS.s2,
+            borderColor: LEGACY_COLORS.border,
+            color: LEGACY_COLORS.text,
+          }}
         >
+          <Save className="h-4 w-4" />
           임시저장
         </button>
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={submitDisabled}
-          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-black text-white hover:bg-blue-700 disabled:bg-slate-300"
-        >
-          <ClipboardCheck className="h-4 w-4" />
-          {approval ? "승인 요청" : "즉시 처리"}
-        </button>
       </div>
-    </section>
+
+      {/* caution */}
+      {isCaution && (
+        <div
+          className="flex items-start gap-2 rounded-[12px] border px-3 py-2 text-xs"
+          style={{
+            background: tint(LEGACY_COLORS.red, 8),
+            borderColor: tint(LEGACY_COLORS.red, 40),
+            color: LEGACY_COLORS.red,
+          }}
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span className="font-bold">
+            되돌릴 수 없습니다. 최종 확인 팝업에서 한 번 더 점검하세요.
+          </span>
+        </div>
+      )}
+
+      {/* blocker */}
+      {blockerText && (
+        <div
+          className="rounded-[12px] border px-3 py-2 text-center text-xs font-bold"
+          style={{
+            background: tint(LEGACY_COLORS.yellow, 10),
+            borderColor: tint(LEGACY_COLORS.yellow, 40),
+            color: LEGACY_COLORS.yellow,
+          }}
+        >
+          {blockerText}
+        </div>
+      )}
+
+      {/* 큰 한 줄 실행 버튼 (옛 ExecuteStep 패턴) */}
+      <button
+        type="button"
+        onClick={onSubmit}
+        disabled={submitDisabled}
+        className="flex w-full items-center justify-center gap-2 rounded-[18px] px-6 py-5 text-lg font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
+        style={{ background: accent }}
+      >
+        {isCaution && !submitting && <AlertTriangle className="h-5 w-5" />}
+        {!isCaution && <ClipboardCheck className="h-5 w-5" />}
+        {submitting
+          ? "처리 중..."
+          : approval
+          ? `승인 요청 보내기 ${includedLines.length}건`
+          : `즉시 반영하기 ${includedLines.length}건`}
+      </button>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <SettingLabel label={label} />
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="h-10 rounded-[12px] border px-3 text-sm font-bold outline-none focus:border-[var(--c-blue)]"
+        style={{
+          background: LEGACY_COLORS.s2,
+          borderColor: LEGACY_COLORS.border,
+          color: LEGACY_COLORS.text,
+        }}
+      />
+    </label>
   );
 }

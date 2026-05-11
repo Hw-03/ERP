@@ -22,7 +22,7 @@ export function DesktopWarehouseView({
   preselectedItem?: Item | null;
   onSubmitSuccess?: () => void;
 }) {
-  const { employees, items, packages, loadFailure, setItems } = useWarehouseData({
+  const { employees, items, packages, productModels, loadFailure, setItems } = useWarehouseData({
     globalSearch,
     onStatusChange,
   });
@@ -99,6 +99,7 @@ export function DesktopWarehouseView({
             employees={employees}
             items={items}
             packages={packages}
+            productModels={productModels}
             setItems={setItems}
             preselectedItem={preselectedItem}
             restoreDraft={restoreIoDraft}

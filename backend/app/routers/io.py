@@ -113,6 +113,32 @@ def submit_io(payload: IoSubmitRequest, db: Session = Depends(get_db)):
     return result
 
 
+@router.post(
+    "/draft/{batch_id}/submit",
+    response_model=IoSubmitResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def submit_io_draft(
+    batch_id: uuid.UUID,
+    requester_employee_id: uuid.UUID = Query(...),
+    db: Session = Depends(get_db),
+):
+    try:
+        result = io_svc.submit_existing_draft(
+            db,
+            batch_id=batch_id,
+            requester_employee_id=requester_employee_id,
+        )
+    except PermissionError as exc:
+        db.rollback()
+        raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
+    except ValueError as exc:
+        db.rollback()
+        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
+    commit_only(db)
+    return result
+
+
 @router.get("/{batch_id}", response_model=IoBatchResponse)
 def get_io_batch(batch_id: uuid.UUID, db: Session = Depends(get_db)):
     batch = io_svc.get_batch(db, batch_id=batch_id)

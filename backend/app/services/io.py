@@ -7,10 +7,11 @@ services.
 
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Iterable, Optional, Sequence
+from typing import Optional, Sequence
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -39,7 +40,14 @@ from app.services import stock_requests as stock_request_svc
 
 WORK_TYPES = {"receive", "warehouse_io", "process", "ship", "defect"}
 APPROVAL_SUB_TYPES = {"warehouse_to_dept", "dept_to_warehouse", "defect_quarantine"}
-SHIPPING_ALLOWED_NAMES = {"김건호", "이필욱"}
+# 출하 권한 fallback 이름 set — warehouse_role(primary/deputy) / level=admin 외 추가 허용자.
+# 운영 환경에선 SHIPPING_ALLOWED_NAMES 환경변수("이름1,이름2")로 override 가능.
+# (TODO 후속: 권한 테이블/role 기반으로 완전 전환)
+SHIPPING_ALLOWED_NAMES = {
+    name.strip()
+    for name in os.getenv("SHIPPING_ALLOWED_NAMES", "김건호,이필욱").split(",")
+    if name.strip()
+}
 
 
 def _d(value) -> Decimal:
@@ -882,15 +890,7 @@ def _submit_immediate(db: Session, *, requester: Employee, batch: IoBatch) -> No
     db.flush()
 
 
-def submit(db: Session, payload) -> dict:
-    requester = _load_requester(db, payload.requester_employee_id)
-    batch = _persist_batch(
-        db,
-        requester=requester,
-        payload=payload,
-        status="submitted",
-        submitted_at=datetime.utcnow(),
-    )
+def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> dict:
     try:
         if batch.sub_type in APPROVAL_SUB_TYPES:
             _submit_approval(db, requester=requester, batch=batch)
@@ -909,6 +909,39 @@ def submit(db: Session, payload) -> dict:
         "stock_request_id": batch.stock_request_id,
         "message": message,
     }
+
+
+def submit(db: Session, payload) -> dict:
+    requester = _load_requester(db, payload.requester_employee_id)
+    batch = _persist_batch(
+        db,
+        requester=requester,
+        payload=payload,
+        status="submitted",
+        submitted_at=datetime.utcnow(),
+    )
+    return _execute_submission(db, requester=requester, batch=batch)
+
+
+def submit_existing_draft(
+    db: Session,
+    *,
+    batch_id: uuid.UUID,
+    requester_employee_id: uuid.UUID,
+) -> dict:
+    """저장된 draft를 재제출. 새 batch 생성 없이 기존 라인을 그대로 실행."""
+    batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
+    if batch is None:
+        raise ValueError("작업 묶음을 찾을 수 없습니다.")
+    if batch.requester_employee_id != requester_employee_id:
+        raise PermissionError("본인 임시저장 작업만 제출할 수 있습니다.")
+    if batch.status != "draft":
+        raise ValueError("임시저장 상태가 아닙니다.")
+    requester = _load_requester(db, requester_employee_id)
+    batch.status = "submitted"
+    batch.submitted_at = datetime.utcnow()
+    db.flush()
+    return _execute_submission(db, requester=requester, batch=batch)
 
 
 def get_batch(db: Session, *, batch_id: uuid.UUID) -> Optional[dict]:

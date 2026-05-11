@@ -6,10 +6,11 @@ import type {
   IoSubType,
   IoWorkType,
   Item,
+  ProductModel,
   ShipPackage,
 } from "@/lib/api";
 
-export type { IoBundle, IoLine, IoSubType, IoWorkType, Item, ShipPackage };
+export type { IoBundle, IoLine, IoSubType, IoWorkType, Item, ProductModel, ShipPackage };
 
 export interface OperatorLike {
   employee_id: string;
@@ -25,6 +26,7 @@ export interface IoComposeViewProps {
   employees: Employee[];
   items: Item[];
   packages: ShipPackage[];
+  productModels?: ProductModel[];
   setItems: (items: Item[]) => void;
   preselectedItem?: Item | null;
   restoreDraft?: IoBatch | null;

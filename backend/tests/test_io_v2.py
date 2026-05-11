@@ -193,3 +193,63 @@ def test_io_submit_receive_is_immediate(client, db_session, make_item):
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     assert inv.warehouse_qty == Decimal("5")
     assert db_session.query(IoBatch).count() == 1
+
+
+def test_io_submit_draft_endpoint_completes_batch(client, db_session, make_item):
+    item = make_item(name="Raw Draft", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(item.item_id),
+                    "quantity": "7",
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+
+    draft_res = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert draft_res.status_code == 200, draft_res.json()
+    batch_id = draft_res.json()["batch_id"]
+
+    drafts_before = client.get(
+        f"/api/io/drafts?requester_employee_id={requester.employee_id}",
+    )
+    assert any(d["batch_id"] == batch_id for d in drafts_before.json())
+
+    submit_res = client.post(
+        f"/api/io/draft/{batch_id}/submit"
+        f"?requester_employee_id={requester.employee_id}",
+    )
+    assert submit_res.status_code == 201, submit_res.json()
+    assert submit_res.json()["status"] == "completed"
+
+    detail = client.get(f"/api/io/{batch_id}")
+    assert detail.status_code == 200
+    assert detail.json()["status"] == "completed"
+
+    drafts_after = client.get(
+        f"/api/io/drafts?requester_employee_id={requester.employee_id}",
+    )
+    assert all(d["batch_id"] != batch_id for d in drafts_after.json())
+
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+    assert inv.warehouse_qty == Decimal("7")
+    assert db_session.query(IoBatch).count() == 1

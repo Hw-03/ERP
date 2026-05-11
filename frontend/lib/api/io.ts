@@ -39,6 +39,14 @@ export const ioApi = {
   submit: (payload: IoDraftPayload) =>
     postJson<IoSubmitResponse>(toApiUrl("/api/io/submit"), payload),
 
+  submitDraft: (batchId: string, employeeId: string) =>
+    postJson<IoSubmitResponse>(
+      toApiUrl(
+        `/api/io/draft/${encodeURIComponent(batchId)}/submit?requester_employee_id=${encodeURIComponent(employeeId)}`,
+      ),
+      {},
+    ),
+
   getBatch: (batchId: string) =>
     fetcher<IoBatch>(toApiUrl(`/api/io/${encodeURIComponent(batchId)}`)),
 };

@@ -1,11 +1,17 @@
 "use client";
 
-import { Check, MinusCircle, Package, Pencil, PlusCircle, Trash2 } from "lucide-react";
-import type { IoLine } from "./types";
+import { Check, MinusCircle, Pencil, Trash2 } from "lucide-react";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
+import { getStockState } from "@/lib/mes/inventory";
+import { erpCodeDeptBadge } from "@/lib/mes/process";
+import { useDeptColorLookup } from "../DepartmentsContext";
+import type { IoLine, Item } from "./types";
 import { formatQty } from "@/lib/mes/format";
 
 interface Props {
   line: IoLine;
+  item?: Item;
   available: number | null;
   onToggle: () => void;
   onQuantityChange: (quantity: number, shortage: number) => void;
@@ -19,115 +25,235 @@ function originLabel(origin: IoLine["origin"]) {
   return "직접 선택";
 }
 
-function directionLabel(line: IoLine) {
-  if (line.direction === "in") return "입고";
-  if (line.direction === "out") return "출고";
-  if (line.direction === "move") return "이동";
-  if (line.direction === "defective") return "불량";
-  return "보정";
+function isOutgoing(line: IoLine) {
+  return line.direction === "out" || line.direction === "move" || line.direction === "defective";
 }
 
-export function IoLineRow({ line, available, onToggle, onQuantityChange, onRemove }: Props) {
+function expectedAfter(line: IoLine, available: number | null) {
+  if (available === null) return null;
+  if (line.direction === "in" || line.direction === "adjust") return available + line.quantity;
+  if (line.direction === "out" || line.direction === "defective" || line.direction === "move")
+    return available - line.quantity;
+  return available;
+}
+
+export function IoLineRow({ line, item, available, onToggle, onQuantityChange, onRemove }: Props) {
+  const getDeptColor = useDeptColorLookup();
   const disabled = !line.included;
   const shortage = line.included && line.shortage > 0;
+  const titleColor = disabled ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text;
+  const rowBackground = shortage ? tint(LEGACY_COLORS.red, 8) : "transparent";
+  const stock = item ? getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock)) : null;
+  const deptBadge = item ? erpCodeDeptBadge(item.erp_code, getDeptColor) : null;
+  const expected = expectedAfter(line, available);
+  const expectedColor =
+    expected === null
+      ? LEGACY_COLORS.muted2
+      : expected < 0
+      ? LEGACY_COLORS.red
+      : expected === 0
+      ? LEGACY_COLORS.yellow
+      : LEGACY_COLORS.green;
+
+  function onStep(delta: number) {
+    const next = Math.max(0, line.quantity + delta);
+    const nextShortage = available === null ? line.shortage : Math.max(0, next - available);
+    onQuantityChange(next, nextShortage);
+  }
+
+  function onInputChange(value: string) {
+    const next = Number(value);
+    const safe = Number.isFinite(next) ? Math.max(0, next) : 0;
+    const nextShortage = available === null ? line.shortage : Math.max(0, safe - available);
+    onQuantityChange(safe, nextShortage);
+  }
 
   return (
     <div
-      className={[
-        "grid grid-cols-[32px_minmax(0,1fr)_96px_96px_32px] items-center gap-2 rounded-md border px-2 py-2",
-        disabled
-          ? "border-slate-200 bg-slate-50 text-slate-400"
-          : shortage
-          ? "border-red-200 bg-red-50"
-          : "border-slate-200 bg-white",
-      ].join(" ")}
+      className="grid items-center gap-3 px-4 py-3"
+      style={{
+        gridTemplateColumns:
+          "32px minmax(0,1.6fr) minmax(70px,auto) auto minmax(80px,auto) minmax(80px,auto) 32px",
+        background: rowBackground,
+      }}
     >
+      {/* 1. 체크박스 */}
       <button
         type="button"
         onClick={onToggle}
-        className={[
-          "flex h-7 w-7 items-center justify-center rounded-md border transition",
-          line.included ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 bg-white text-slate-400",
-        ].join(" ")}
+        className="flex h-6 w-6 items-center justify-center rounded-[6px] border transition-colors"
+        style={{
+          background: line.included ? LEGACY_COLORS.blue : "transparent",
+          borderColor: line.included ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+          color: line.included ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
+        }}
         title={line.included ? "재고 반영 포함" : line.exclusion_note || "이번 작업 제외"}
+        aria-pressed={line.included}
       >
-        {line.included ? <Check className="h-4 w-4" /> : <MinusCircle className="h-4 w-4" />}
+        {line.included ? <Check className="h-4 w-4" /> : <MinusCircle className="h-3.5 w-3.5" />}
       </button>
 
+      {/* 2. 품목명 + 코드 + 메타 */}
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">
-          <Package className="h-4 w-4 shrink-0 text-slate-400" />
-          <span className="truncate text-sm font-black text-slate-900">{line.item_name}</span>
+          <span className="truncate text-sm font-black" style={{ color: titleColor }}>
+            {line.item_name}
+          </span>
           {line.has_children && (
-            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-700">
+            <span
+              className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
+              style={{ background: tint(LEGACY_COLORS.yellow, 14), color: LEGACY_COLORS.yellow }}
+            >
               하위 있음
             </span>
           )}
           {line.edited && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-700">
+            <span
+              className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
+              style={{ background: tint(LEGACY_COLORS.purple, 14), color: LEGACY_COLORS.purple }}
+            >
               <Pencil className="h-3 w-3" />
               수동 수정
             </span>
           )}
         </div>
-        <div className="mt-1 flex flex-wrap gap-1 text-[11px] font-semibold text-slate-500">
-          <span>{line.erp_code || "ERP 미지정"}</span>
-          <span>·</span>
-          <span>{originLabel(line.origin)}</span>
-          <span>·</span>
-          <span>{directionLabel(line)}</span>
-          {available !== null && (
-            <>
-              <span>·</span>
-              <span>가능 {formatQty(available)}</span>
-            </>
-          )}
-          {line.bom_expected !== null && (
-            <>
-              <span>·</span>
-              <span>기준 {formatQty(line.bom_expected)}</span>
-            </>
-          )}
+        <div className="truncate text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+          {line.erp_code ?? "-"} · {originLabel(line.origin)}
         </div>
       </div>
 
-      <input
-        type="number"
-        min={0}
-        step="0.0001"
-        value={Number.isFinite(line.quantity) ? line.quantity : 0}
-        disabled={disabled}
-        onChange={(event) => {
-          const next = Number(event.target.value);
-          const safeNext = Number.isFinite(next) ? next : 0;
-          const nextShortage = available === null ? line.shortage : Math.max(0, safeNext - available);
-          onQuantityChange(safeNext, nextShortage);
-        }}
-        className="h-8 rounded-md border border-slate-200 bg-white px-2 text-right text-sm font-black outline-none focus:border-blue-500 disabled:bg-slate-100"
-      />
+      {/* 3. 분류 배지 */}
+      {deptBadge ? (
+        <span
+          className="justify-self-start rounded-full px-2 py-0.5 text-[10px] font-bold"
+          style={{ color: deptBadge.color, background: deptBadge.bg }}
+        >
+          {deptBadge.label}
+        </span>
+      ) : (
+        <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
+      )}
 
-      <div className="text-right text-xs font-black">
-        {shortage ? (
-          <span className="text-red-600">부족 {formatQty(line.shortage)}</span>
-        ) : line.included ? (
-          <span className="text-emerald-700">반영</span>
-        ) : (
-          <span className="text-slate-400">제외</span>
+      {/* 4. 수량 stepper */}
+      <div className="flex flex-col items-center gap-0.5">
+        <span
+          className="text-[9px] font-bold uppercase tracking-[1.5px]"
+          style={{ color: LEGACY_COLORS.muted2 }}
+        >
+          수량
+        </span>
+        <div className="flex items-center gap-1">
+          <StepBtn tone={LEGACY_COLORS.red} disabled={disabled} onClick={() => onStep(-10)}>
+            -10
+          </StepBtn>
+          <StepBtn tone={LEGACY_COLORS.red} disabled={disabled} onClick={() => onStep(-1)}>
+            -1
+          </StepBtn>
+          <input
+            type="number"
+            min={0}
+            step="0.0001"
+            value={Number.isFinite(line.quantity) ? line.quantity : 0}
+            disabled={disabled}
+            onChange={(e) => onInputChange(e.target.value)}
+            className="w-[72px] rounded-[10px] border px-2 py-1.5 text-center text-sm font-black tabular-nums outline-none focus:border-[var(--c-blue)] disabled:opacity-60"
+            style={{
+              background: LEGACY_COLORS.s2,
+              borderColor: LEGACY_COLORS.border,
+              color: LEGACY_COLORS.text,
+            }}
+          />
+          <StepBtn tone={LEGACY_COLORS.green} disabled={disabled} onClick={() => onStep(1)}>
+            +1
+          </StepBtn>
+          <StepBtn tone={LEGACY_COLORS.green} disabled={disabled} onClick={() => onStep(10)}>
+            +10
+          </StepBtn>
+        </div>
+      </div>
+
+      {/* 5. 현재 재고 */}
+      <div className="text-right">
+        <div
+          className="text-[9px] font-bold uppercase tracking-[1.5px]"
+          style={{ color: LEGACY_COLORS.muted2 }}
+        >
+          {isOutgoing(line) ? "가능 재고" : "현재 재고"}
+        </div>
+        <div
+          className="text-base font-black tabular-nums"
+          style={{ color: stock ? stock.color : available === null ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text }}
+        >
+          {available === null ? "-" : formatQty(available)}
+        </div>
+      </div>
+
+      {/* 6. 실행 후 재고 */}
+      <div className="text-right">
+        <div
+          className="text-[9px] font-bold uppercase tracking-[1.5px]"
+          style={{ color: LEGACY_COLORS.muted2 }}
+        >
+          실행 후
+        </div>
+        <div
+          className="text-base font-black tabular-nums"
+          style={{ color: expectedColor }}
+        >
+          {expected === null ? "-" : formatQty(expected)}
+        </div>
+        {shortage && (
+          <div
+            className="text-[9px] font-bold uppercase tracking-[1px]"
+            style={{ color: LEGACY_COLORS.red }}
+          >
+            재고 부족
+          </div>
         )}
       </div>
 
+      {/* 7. 삭제 (manual만) */}
       {line.origin === "manual" ? (
         <button
           type="button"
           onClick={onRemove}
-          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600"
+          className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-white/10"
+          style={{ color: LEGACY_COLORS.muted2 }}
           title="수동 라인 삭제"
         >
           <Trash2 className="h-4 w-4" />
         </button>
       ) : (
-        <PlusCircle className="mx-auto h-4 w-4 text-slate-300" />
+        <span aria-hidden className="block" />
       )}
     </div>
+  );
+}
+
+function StepBtn({
+  tone,
+  onClick,
+  disabled,
+  children,
+}: {
+  tone: string;
+  onClick: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded-[10px] border px-2 py-1 text-xs font-black transition-colors hover:brightness-110 disabled:opacity-40"
+      style={{
+        background: tint(tone, 10),
+        borderColor: tint(tone, 30),
+        color: tone,
+      }}
+    >
+      {children}
+    </button>
   );
 }

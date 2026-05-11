@@ -15,12 +15,29 @@ export const IO_WORK_TYPES: Array<{
   description: string;
   icon: LucideIcon;
 }> = [
-  { id: "receive", label: "입고", description: "외부에서 들어온 품목 등록", icon: Boxes },
+  { id: "receive", label: "원자재 입고", description: "외부에서 들어온 품목 등록", icon: Boxes },
   { id: "warehouse_io", label: "창고입출고", description: "창고와 부서 사이 이동", icon: ArrowLeftRight },
   { id: "process", label: "공정처리", description: "생산, 조립, 분해, 보정", icon: Wrench },
   { id: "ship", label: "출하", description: "출하부 재고 차감", icon: PackageCheck },
   { id: "defect", label: "불량", description: "정상 재고를 불량으로 격리", icon: AlertTriangle },
 ];
+
+const SHIP_ALLOWED_NAMES = ["김건호", "김현우", "남재원", "김민재", "이형진", "이필욱"];
+
+export function canSeeWorkType(
+  workType: IoWorkType,
+  operator: { warehouse_role?: string | null; name?: string | null } | null | undefined,
+): boolean {
+  if (workType === "receive") {
+    // 원자재 입고는 창고 정/부 만
+    return operator?.warehouse_role === "primary" || operator?.warehouse_role === "deputy";
+  }
+  if (workType === "ship") {
+    // 출하는 지정된 직원 6명만
+    return !!operator?.name && SHIP_ALLOWED_NAMES.includes(operator.name);
+  }
+  return true;
+}
 
 export const IO_SUB_TYPES: Record<
   IoWorkType,
@@ -36,7 +53,6 @@ export const IO_SUB_TYPES: Record<
   process: [
     { id: "produce", label: "생산/조립", description: "하위 품목 출고 + 결과 품목 입고" },
     { id: "disassemble", label: "분해/회수", description: "대상 품목 출고 + 회수 품목 입고" },
-    { id: "dept_transfer", label: "부서간 이동", description: "부서 A에서 부서 B로 이동" },
     { id: "adjust", label: "수량 보정", description: "실사 차이를 부서 재고에 반영" },
   ],
   ship: [

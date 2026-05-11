@@ -2,6 +2,16 @@ import { useMemo, useState } from "react";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
 import { DEFAULT_SUB_TYPE } from "./ioWorkType";
 
+export type IoStep = 1 | 2 | 3 | 4 | 5;
+
+export const IO_STEP_LABELS: Record<IoStep, string> = {
+  1: "작업 유형",
+  2: "세부 작업",
+  3: "대상 선택",
+  4: "실제 반영",
+  5: "제출 확인",
+};
+
 export function useIoWorkState(initialDepartment?: string | null) {
   const [workType, setWorkTypeBase] = useState<IoWorkType>("receive");
   const [subType, setSubType] = useState<IoSubType>("receive_supplier");
@@ -10,11 +20,13 @@ export function useIoWorkState(initialDepartment?: string | null) {
   const [bundles, setBundles] = useState<IoBundle[]>([]);
   const [notes, setNotes] = useState("");
   const [referenceNo, setReferenceNo] = useState("");
+  const [step, setStep] = useState<IoStep>(1);
 
   function setWorkType(next: IoWorkType) {
     setWorkTypeBase(next);
     setSubType(DEFAULT_SUB_TYPE[next]);
     setBundles([]);
+    setStep(1);
   }
 
   const includedLines = useMemo(
@@ -27,6 +39,26 @@ export function useIoWorkState(initialDepartment?: string | null) {
   );
   const hasShortage = includedLines.some((line) => line.shortage > 0);
   const hasInvalidQuantity = includedLines.some((line) => line.quantity <= 0);
+
+  const canAdvance = useMemo<Record<IoStep, boolean>>(() => {
+    return {
+      1: true,
+      2: true,
+      3: bundles.length > 0,
+      4: includedLines.length > 0 && !hasShortage && !hasInvalidQuantity,
+      5: true,
+    };
+  }, [bundles.length, includedLines.length, hasShortage, hasInvalidQuantity]);
+
+  function goNext() {
+    setStep((s) => (s < 5 ? ((s + 1) as IoStep) : s));
+  }
+  function goPrev() {
+    setStep((s) => (s > 1 ? ((s - 1) as IoStep) : s));
+  }
+  function goTo(target: IoStep) {
+    setStep(target);
+  }
 
   function updateLine(bundleId: string, lineId: string, updater: (line: IoLine) => IoLine) {
     setBundles((prev) =>
@@ -54,6 +86,7 @@ export function useIoWorkState(initialDepartment?: string | null) {
     setBundles([]);
     setNotes("");
     setReferenceNo("");
+    setStep(1);
   }
 
   return {
@@ -64,10 +97,12 @@ export function useIoWorkState(initialDepartment?: string | null) {
     bundles,
     notes,
     referenceNo,
+    step,
     includedLines,
     excludedLines,
     hasShortage,
     hasInvalidQuantity,
+    canAdvance,
     setWorkType,
     setSubType,
     setFromDepartment,
@@ -77,6 +112,9 @@ export function useIoWorkState(initialDepartment?: string | null) {
     setReferenceNo,
     updateLine,
     removeLine,
+    goNext,
+    goPrev,
+    goTo,
     reset,
   };
 }
