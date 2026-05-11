@@ -104,7 +104,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
   }
 
   return (
-    <div className="flex min-h-0 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <AdminPageHeader
         icon={Layers}
         title="모델 관리"

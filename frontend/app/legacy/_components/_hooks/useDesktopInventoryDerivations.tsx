@@ -24,6 +24,7 @@ export function useDesktopInventoryDerivations({
   filteredItems,
   selectedDepts,
   selectedModels,
+  selectedProcessSteps,
   deferredLocalSearch,
   displayItem,
   onSummaryChange,
@@ -33,6 +34,7 @@ export function useDesktopInventoryDerivations({
   filteredItems: Item[];
   selectedDepts: string[];
   selectedModels: string[];
+  selectedProcessSteps: string[];
   deferredLocalSearch: string;
   displayItem: Item | null;
   onSummaryChange?: (s: { low: number; zero: number }) => void;
@@ -49,17 +51,22 @@ export function useDesktopInventoryDerivations({
     onSummaryChange?.({ low: summary.lowCount, zero: summary.zeroCount });
   }, [summary.lowCount, summary.zeroCount, onSummaryChange]);
 
-  const isFiltered = selectedDepts.length > 0 || selectedModels.length > 0 || deferredLocalSearch.length > 0;
+  const isFiltered =
+    selectedDepts.length > 0 ||
+    selectedModels.length > 0 ||
+    selectedProcessSteps.length > 0 ||
+    deferredLocalSearch.length > 0;
   const activeFilterCount =
-    selectedDepts.length + selectedModels.length + (deferredLocalSearch.length > 0 ? 1 : 0);
+    selectedDepts.length +
+    selectedModels.length +
+    selectedProcessSteps.length +
+    (deferredLocalSearch.length > 0 ? 1 : 0);
 
   const kpiCards: KpiCard[] = [
     {
       label: "전체",
-      value: items.length,
-      hint: isFiltered
-        ? `${filteredItems.length}건 조회 중 · 클릭하면 전체 초기화`
-        : "전체 품목",
+      value: isFiltered ? scopedItems.length : items.length,
+      hint: isFiltered ? `전체 ${items.length}건 · 클릭하면 초기화` : "전체 품목",
       tone: LEGACY_COLORS.blue,
       key: "ALL",
     },

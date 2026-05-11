@@ -1,36 +1,48 @@
 "use client";
 
-import { ChevronDown, Filter, Search, Sparkles, TrendingUp } from "lucide-react";
-import type { DepartmentMaster, ProductModel } from "@/lib/api";
+import { ChevronDown, Filter, Layers, Search, Sparkles, TrendingUp } from "lucide-react";
+import type { ProductModel } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common";
+
+const DEPT_CHIPS = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
+
+const PROCESS_STEP_CHIPS: { value: "R" | "A" | "F"; label: string }[] = [
+  { value: "R", label: "원자재" },
+  { value: "A", label: "중간공정" },
+  { value: "F", label: "공정완료" },
+];
 
 type FiltersProps = {
   open: boolean;
   selectedDepts: string[];
   selectedModels: string[];
+  selectedProcessSteps: string[];
   productModels: ProductModel[];
-  departments: DepartmentMaster[];
   toggleDept: (v: string) => void;
   toggleModel: (v: string) => void;
+  toggleProcessStep: (v: string) => void;
   onClearDepts: () => void;
   onClearModels: () => void;
+  onClearProcessSteps: () => void;
 };
 
 export function InventoryFilters({
   open,
   selectedDepts,
   selectedModels,
+  selectedProcessSteps,
   productModels,
-  departments,
   toggleDept,
   toggleModel,
+  toggleProcessStep,
   onClearDepts,
   onClearModels,
+  onClearProcessSteps,
 }: FiltersProps) {
   if (!open) return null;
   return (
-    <div className="mt-2.5 grid gap-2.5 xl:grid-cols-2">
+    <div className="mt-2.5 grid gap-2.5 xl:grid-cols-3">
       <div className="rounded-[16px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
         <div className="mb-2 flex items-center gap-2 text-sm font-bold">
           <Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />
@@ -45,12 +57,12 @@ export function InventoryFilters({
             tone={LEGACY_COLORS.green}
             className="w-full"
           />
-          {departments.map((dept) => (
+          {DEPT_CHIPS.map((name) => (
             <FilterChip
-              key={dept.id}
-              active={selectedDepts.includes(dept.name)}
-              label={dept.name}
-              onClick={() => toggleDept(dept.name)}
+              key={name}
+              active={selectedDepts.includes(name)}
+              label={name}
+              onClick={() => toggleDept(name)}
               tone={LEGACY_COLORS.green}
               className="w-full"
             />
@@ -81,6 +93,31 @@ export function InventoryFilters({
             tone={LEGACY_COLORS.muted2}
             className="w-full"
           />
+        </div>
+      </div>
+      <div className="rounded-[16px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <div className="mb-2 flex items-center gap-2 text-sm font-bold">
+          <Layers className="h-4 w-4" style={{ color: LEGACY_COLORS.yellow }} />
+          공정 구분
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <FilterChip
+            active={selectedProcessSteps.length === 0}
+            label="전체"
+            onClick={onClearProcessSteps}
+            tone={LEGACY_COLORS.yellow}
+            className="w-full"
+          />
+          {PROCESS_STEP_CHIPS.map((step) => (
+            <FilterChip
+              key={step.value}
+              active={selectedProcessSteps.includes(step.value)}
+              label={step.label}
+              onClick={() => toggleProcessStep(step.value)}
+              tone={LEGACY_COLORS.yellow}
+              className="w-full"
+            />
+          ))}
         </div>
       </div>
     </div>
