@@ -2115,6 +2115,934 @@
         "title": "InventorySummaryResponse",
         "type": "object"
       },
+      "IoBatchResponse": {
+        "properties": {
+          "batch_id": {
+            "format": "uuid",
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "bundles": {
+            "items": {
+              "$ref": "#/components/schemas/IoBundlePayload-Output"
+            },
+            "title": "Bundles",
+            "type": "array"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "from_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Department"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "reference_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference No"
+          },
+          "requester_department": {
+            "title": "Requester Department",
+            "type": "string"
+          },
+          "requester_employee_id": {
+            "format": "uuid",
+            "title": "Requester Employee Id",
+            "type": "string"
+          },
+          "requester_name": {
+            "title": "Requester Name",
+            "type": "string"
+          },
+          "requires_approval": {
+            "title": "Requires Approval",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Request Id"
+          },
+          "sub_type": {
+            "title": "Sub Type",
+            "type": "string"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "to_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Department"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "work_type": {
+            "title": "Work Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "batch_id",
+          "work_type",
+          "sub_type",
+          "status",
+          "requester_employee_id",
+          "requester_name",
+          "requester_department",
+          "requires_approval",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "IoBatchResponse",
+        "type": "object"
+      },
+      "IoBundlePayload-Input": {
+        "properties": {
+          "bundle_id": {
+            "format": "uuid",
+            "title": "Bundle Id",
+            "type": "string"
+          },
+          "expanded_level": {
+            "default": 1,
+            "title": "Expanded Level",
+            "type": "integer"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/IoLinePayload-Input"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "package_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Id"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "source_item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Item Id"
+          },
+          "source_kind": {
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bundle_id",
+          "source_kind",
+          "title",
+          "quantity"
+        ],
+        "title": "IoBundlePayload",
+        "type": "object"
+      },
+      "IoBundlePayload-Output": {
+        "properties": {
+          "bundle_id": {
+            "format": "uuid",
+            "title": "Bundle Id",
+            "type": "string"
+          },
+          "expanded_level": {
+            "default": 1,
+            "title": "Expanded Level",
+            "type": "integer"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/IoLinePayload-Output"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "package_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Id"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string"
+          },
+          "source_item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Item Id"
+          },
+          "source_kind": {
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bundle_id",
+          "source_kind",
+          "title",
+          "quantity"
+        ],
+        "title": "IoBundlePayload",
+        "type": "object"
+      },
+      "IoDraftUpsert": {
+        "properties": {
+          "bundles": {
+            "items": {
+              "$ref": "#/components/schemas/IoBundlePayload-Input"
+            },
+            "title": "Bundles",
+            "type": "array"
+          },
+          "client_request_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
+          "from_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Department"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "reference_no": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference No"
+          },
+          "requester_employee_id": {
+            "format": "uuid",
+            "title": "Requester Employee Id",
+            "type": "string"
+          },
+          "sub_type": {
+            "title": "Sub Type",
+            "type": "string"
+          },
+          "to_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Department"
+          },
+          "work_type": {
+            "title": "Work Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requester_employee_id",
+          "work_type",
+          "sub_type"
+        ],
+        "title": "IoDraftUpsert",
+        "type": "object"
+      },
+      "IoLinePayload-Input": {
+        "properties": {
+          "bom_expected": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bom Expected"
+          },
+          "direction": {
+            "title": "Direction",
+            "type": "string"
+          },
+          "edited": {
+            "default": false,
+            "title": "Edited",
+            "type": "boolean"
+          },
+          "erp_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Erp Code"
+          },
+          "exclusion_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exclusion Note"
+          },
+          "from_bucket": {
+            "title": "From Bucket",
+            "type": "string"
+          },
+          "from_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Department"
+          },
+          "has_children": {
+            "default": false,
+            "title": "Has Children",
+            "type": "boolean"
+          },
+          "included": {
+            "default": true,
+            "title": "Included",
+            "type": "boolean"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "line_id": {
+            "format": "uuid",
+            "title": "Line Id",
+            "type": "string"
+          },
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "shortage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "0",
+            "title": "Shortage"
+          },
+          "to_bucket": {
+            "title": "To Bucket",
+            "type": "string"
+          },
+          "to_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Department"
+          },
+          "unit": {
+            "default": "EA",
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_id",
+          "item_id",
+          "item_name",
+          "direction",
+          "from_bucket",
+          "to_bucket",
+          "quantity",
+          "origin"
+        ],
+        "title": "IoLinePayload",
+        "type": "object"
+      },
+      "IoLinePayload-Output": {
+        "properties": {
+          "bom_expected": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bom Expected"
+          },
+          "direction": {
+            "title": "Direction",
+            "type": "string"
+          },
+          "edited": {
+            "default": false,
+            "title": "Edited",
+            "type": "boolean"
+          },
+          "erp_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Erp Code"
+          },
+          "exclusion_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exclusion Note"
+          },
+          "from_bucket": {
+            "title": "From Bucket",
+            "type": "string"
+          },
+          "from_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Department"
+          },
+          "has_children": {
+            "default": false,
+            "title": "Has Children",
+            "type": "boolean"
+          },
+          "included": {
+            "default": true,
+            "title": "Included",
+            "type": "boolean"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "line_id": {
+            "format": "uuid",
+            "title": "Line Id",
+            "type": "string"
+          },
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string"
+          },
+          "shortage": {
+            "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Shortage",
+            "type": "string"
+          },
+          "to_bucket": {
+            "title": "To Bucket",
+            "type": "string"
+          },
+          "to_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Department"
+          },
+          "unit": {
+            "default": "EA",
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_id",
+          "item_id",
+          "item_name",
+          "direction",
+          "from_bucket",
+          "to_bucket",
+          "quantity",
+          "origin"
+        ],
+        "title": "IoLinePayload",
+        "type": "object"
+      },
+      "IoPreviewRequest": {
+        "properties": {
+          "from_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Department"
+          },
+          "requester_employee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requester Employee Id"
+          },
+          "sub_type": {
+            "title": "Sub Type",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/IoPreviewTarget"
+            },
+            "minItems": 1,
+            "title": "Targets",
+            "type": "array"
+          },
+          "to_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Department"
+          },
+          "work_type": {
+            "title": "Work Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "work_type",
+          "sub_type",
+          "targets"
+        ],
+        "title": "IoPreviewRequest",
+        "type": "object"
+      },
+      "IoPreviewResponse": {
+        "properties": {
+          "bundles": {
+            "items": {
+              "$ref": "#/components/schemas/IoBundlePayload-Output"
+            },
+            "title": "Bundles",
+            "type": "array"
+          },
+          "requires_approval": {
+            "title": "Requires Approval",
+            "type": "boolean"
+          },
+          "sub_type": {
+            "title": "Sub Type",
+            "type": "string"
+          },
+          "work_type": {
+            "title": "Work Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "work_type",
+          "sub_type",
+          "requires_approval",
+          "bundles"
+        ],
+        "title": "IoPreviewResponse",
+        "type": "object"
+      },
+      "IoPreviewTarget": {
+        "properties": {
+          "item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Id"
+          },
+          "package_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Id"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "1",
+            "title": "Quantity"
+          },
+          "source_kind": {
+            "default": "direct_item",
+            "maxLength": 24,
+            "title": "Source Kind",
+            "type": "string"
+          }
+        },
+        "title": "IoPreviewTarget",
+        "type": "object"
+      },
+      "IoSubmitRequest": {
+        "properties": {
+          "bundles": {
+            "items": {
+              "$ref": "#/components/schemas/IoBundlePayload-Input"
+            },
+            "title": "Bundles",
+            "type": "array"
+          },
+          "client_request_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
+          "from_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Department"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "reference_no": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference No"
+          },
+          "requester_employee_id": {
+            "format": "uuid",
+            "title": "Requester Employee Id",
+            "type": "string"
+          },
+          "sub_type": {
+            "title": "Sub Type",
+            "type": "string"
+          },
+          "to_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Department"
+          },
+          "work_type": {
+            "title": "Work Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requester_employee_id",
+          "work_type",
+          "sub_type"
+        ],
+        "title": "IoSubmitRequest",
+        "type": "object"
+      },
+      "IoSubmitResponse": {
+        "properties": {
+          "batch": {
+            "$ref": "#/components/schemas/IoBatchResponse"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "requires_approval": {
+            "title": "Requires Approval",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Request Id"
+          }
+        },
+        "required": [
+          "batch",
+          "status",
+          "requires_approval",
+          "message"
+        ],
+        "title": "IoSubmitResponse",
+        "type": "object"
+      },
       "ItemCreate": {
         "properties": {
           "barcode": {
@@ -5001,6 +5929,18 @@
       },
       "StockRequestCreate": {
         "properties": {
+          "client_request_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
           "lines": {
             "items": {
               "$ref": "#/components/schemas/StockRequestLineCreate"
@@ -5202,6 +6142,18 @@
             "title": "Line Id",
             "type": "string"
           },
+          "operation_line_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Line Id"
+          },
           "quantity": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
@@ -5328,6 +6280,18 @@
               }
             ],
             "title": "Notes"
+          },
+          "operation_batch_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Batch Id"
           },
           "reference_no": {
             "anyOf": [
@@ -5707,6 +6671,18 @@
               }
             ],
             "title": "Notes"
+          },
+          "operation_batch_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Batch Id"
           },
           "produced_by": {
             "anyOf": [
@@ -8111,6 +9087,46 @@
         ]
       }
     },
+    "/api/health/db-info": {
+      "get": {
+        "description": "서버가 실제 연결 중인 DB 정보 반환 — preflight 전용.\nDATABASE_URL 전체 노출 금지. 엔진 종류 + 30명 안전 여부만 반환.",
+        "operationId": "health_db_info_api_health_db_info_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Db Info",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/api/health/write-check": {
+      "post": {
+        "description": "DB 쓰기 가능 여부 점검 — preflight 전용.\nSAVEPOINT 안에서 실제 INSERT 실행 후 rollback. 데이터 변경 없음.",
+        "operationId": "health_write_check_api_health_write_check_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Write Check",
+        "tags": [
+          "System"
+        ]
+      }
+    },
     "/api/inventory": {
       "get": {
         "operationId": "list_inventory_api_inventory_get",
@@ -9175,6 +10191,392 @@
         "summary": "Get Weekly Report",
         "tags": [
           "Inventory"
+        ]
+      }
+    },
+    "/api/io/draft": {
+      "get": {
+        "operationId": "get_io_draft_api_io_draft_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "requester_employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Requester Employee Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "work_type",
+            "required": true,
+            "schema": {
+              "title": "Work Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sub_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sub Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/IoBatchResponse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Io Draft Api Io Draft Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Io Draft",
+        "tags": [
+          "Inventory IO"
+        ]
+      },
+      "put": {
+        "operationId": "save_io_draft_api_io_draft_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IoDraftUpsert"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IoBatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Io Draft",
+        "tags": [
+          "Inventory IO"
+        ]
+      }
+    },
+    "/api/io/draft/{batch_id}": {
+      "delete": {
+        "operationId": "delete_io_draft_api_io_draft__batch_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Batch Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "requester_employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Requester Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Io Draft",
+        "tags": [
+          "Inventory IO"
+        ]
+      }
+    },
+    "/api/io/draft/{batch_id}/submit": {
+      "post": {
+        "operationId": "submit_io_draft_api_io_draft__batch_id__submit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Batch Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "requester_employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Requester Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IoSubmitResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Io Draft",
+        "tags": [
+          "Inventory IO"
+        ]
+      }
+    },
+    "/api/io/drafts": {
+      "get": {
+        "operationId": "list_io_drafts_api_io_drafts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "requester_employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Requester Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IoBatchResponse"
+                  },
+                  "title": "Response List Io Drafts Api Io Drafts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Io Drafts",
+        "tags": [
+          "Inventory IO"
+        ]
+      }
+    },
+    "/api/io/preview": {
+      "post": {
+        "operationId": "preview_io_api_io_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IoPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IoPreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Io",
+        "tags": [
+          "Inventory IO"
+        ]
+      }
+    },
+    "/api/io/submit": {
+      "post": {
+        "operationId": "submit_io_api_io_submit_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IoSubmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IoSubmitResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Io",
+        "tags": [
+          "Inventory IO"
+        ]
+      }
+    },
+    "/api/io/{batch_id}": {
+      "get": {
+        "operationId": "get_io_batch_api_io__batch_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IoBatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Io Batch",
+        "tags": [
+          "Inventory IO"
         ]
       }
     },

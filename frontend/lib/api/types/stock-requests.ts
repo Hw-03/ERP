@@ -75,6 +75,7 @@ export interface StockRequestCreatePayload {
   request_type: StockRequestType;
   reference_no?: string | null;
   notes?: string | null;
+  client_request_id?: string;
   lines: Array<{
     item_id: string;
     quantity: number;

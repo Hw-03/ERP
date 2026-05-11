@@ -1,28 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRightLeft, Pencil } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Network, Pencil } from "lucide-react";
 import { api } from "@/lib/api";
 import type { BOMDetailEntry, BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
+import {
+  AdminKpiBar,
+  AdminPageHeader,
+} from "../_admin_primitives";
 import { BomDeptTabs } from "./BomDeptTabs";
-import { BomStatsRow } from "./BomStatsRow";
 import { BomParentList } from "./BomParentList";
 import { BomEditPanel } from "./BomEditPanel";
 import { BomWhereUsedPanel } from "./BomWhereUsedPanel";
 import { BomUnmatchedRawsDrawer } from "./BomUnmatchedRawsDrawer";
 import { stageOf, type DeptLetter } from "./bomDept";
 
-/**
- * 관리자 BOM 페이지 — bom_setup.html UX 본떠 부서탭 + split view 로 전면 개편.
- *
- * 모드:
- *   - edit (기본): 좌측에 R 단계 제외한 부모 후보, 우측에 BOM 그리드 + 자식 추가 박스
- *   - whereused: 좌측에 모든 품목, 우측에 "이 품목이 어느 부모의 자식인지" 결과
- *
- * 즉시 서버 저장. 드래프트/대기 상태 없음.
- */
 interface Props {
   items: Item[];
   allBomRows: BOMDetailEntry[];
@@ -42,7 +36,7 @@ export function BomWorkbench({
   onStatusChange,
   onError,
 }: Props) {
-  const [dept, setDept] = useState<DeptLetter>("A"); // 조립이 가장 활용도 높음
+  const [dept, setDept] = useState<DeptLetter>("A");
   const [parentId, setParentId] = useState("");
   const [mode, setMode] = useState<Mode>("edit");
   const [bomRows, setBomRows] = useState<BOMEntry[]>([]);
@@ -52,6 +46,35 @@ export function BomWorkbench({
   const [addBusy, setAddBusy] = useState(false);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+
+  // 부모 후보 (현재 부서 + 모드)
+  const parentCandidates = useMemo(() => {
+    return items.filter((i) => {
+      if (i.process_type_code?.[0] !== dept) return false;
+      if (mode === "edit") return stageOf(i.process_type_code) !== "R";
+      return true;
+    });
+  }, [items, dept, mode]);
+
+  // KPI: 상위 품목 / 완료 BOM / 미매칭
+  const stats = useMemo(() => {
+    const matchedParentIds = new Set(allBomRows.map((r) => r.parent_item_id));
+    const matched = parentCandidates.filter((i) => matchedParentIds.has(i.item_id)).length;
+    const totalParents = new Set(allBomRows.map((r) => r.parent_item_id)).size;
+    return {
+      total: parentCandidates.length,
+      matched,
+      unmatched: parentCandidates.length - matched,
+      totalParents,
+    };
+  }, [parentCandidates, allBomRows]);
+
+  // 첫 부모 자동 선택 (부서/모드 바뀔 때)
+  useEffect(() => {
+    if (parentId && parentCandidates.some((c) => c.item_id === parentId)) return;
+    const first = parentCandidates[0];
+    setParentId(first?.item_id ?? "");
+  }, [dept, mode, parentCandidates, parentId]);
 
   // 선택된 부모의 BOM 직계 자식
   useEffect(() => {
@@ -85,38 +108,28 @@ export function BomWorkbench({
     };
   }, [parentId]);
 
-  // 부서 변경 시 선택 초기화
   function handleDeptChange(next: DeptLetter) {
     setDept(next);
-    setParentId("");
+    setParentId(""); // useEffect가 첫 부모 자동 선택
   }
 
-  const parent = useMemo(() => items.find((i) => i.item_id === parentId) ?? null, [items, parentId]);
+  const parent = useMemo(
+    () => items.find((i) => i.item_id === parentId) ?? null,
+    [items, parentId],
+  );
 
-  // 통계 — 현재 부서 + 모드 기준의 부모 후보
-  const stats = useMemo(() => {
-    const pool = items.filter((i) => {
-      if (i.process_type_code?.[0] !== dept) return false;
-      if (mode === "edit") return stageOf(i.process_type_code) !== "R";
-      return true;
-    });
-    const matchedParentIds = new Set(allBomRows.map((r) => r.parent_item_id));
-    const matched = pool.filter((i) => matchedParentIds.has(i.item_id)).length;
-    return {
-      total: pool.length,
-      matched,
-      unmatched: pool.length - matched,
-    };
-  }, [items, allBomRows, dept, mode]);
-
-  // 미배치 원자재 — 부서 R 단계 ∩ 어떤 BOM 의 자식도 아닌 것
   const rawItems = useMemo(
-    () => items.filter((i) => i.process_type_code?.[0] === dept && stageOf(i.process_type_code) === "R"),
+    () =>
+      items.filter(
+        (i) => i.process_type_code?.[0] === dept && stageOf(i.process_type_code) === "R",
+      ),
     [items, dept],
   );
-  const childIdSet = useMemo(() => new Set(allBomRows.map((r) => r.child_item_id)), [allBomRows]);
+  const childIdSet = useMemo(
+    () => new Set(allBomRows.map((r) => r.child_item_id)),
+    [allBomRows],
+  );
 
-  // 액션
   async function handleAddConfirm() {
     if (!addRequest || !parent) return;
     const qty = parseFloat(addQty);
@@ -172,41 +185,92 @@ export function BomWorkbench({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {/* 상단: 부서탭 + 모드 토글 */}
-      <div className="flex items-center justify-between gap-3">
+    <div className="flex min-h-0 flex-col">
+      <AdminPageHeader
+        icon={Network}
+        title="BOM 관리"
+        description="부모-자식 자재 구성을 편집하고 사용처를 조회합니다."
+        actions={
+          <div className="flex items-center gap-2">
+            {stats.unmatched > 0 && (
+              <span
+                className="flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold"
+                style={{
+                  background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
+                  borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 35%, transparent)`,
+                  color: LEGACY_COLORS.red,
+                }}
+                title="현재 부서에서 BOM이 정의되지 않은 부모 후보 수"
+              >
+                <AlertTriangle className="h-3 w-3" />
+                미매칭 {stats.unmatched}건
+              </span>
+            )}
+            <div
+              className="flex items-center gap-1 rounded-full border p-1"
+              style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
+            >
+              <button
+                type="button"
+                onClick={() => setMode("edit")}
+                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-bold transition-colors"
+                style={{
+                  background: mode === "edit" ? LEGACY_COLORS.blue : "transparent",
+                  color: mode === "edit" ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
+                }}
+              >
+                <Pencil size={13} /> 편집
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("whereused")}
+                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-bold transition-colors"
+                style={{
+                  background: mode === "whereused" ? LEGACY_COLORS.blue : "transparent",
+                  color: mode === "whereused" ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
+                }}
+              >
+                <ArrowRightLeft size={13} /> 사용처
+              </button>
+            </div>
+          </div>
+        }
+      />
+
+      <AdminKpiBar
+        items={[
+          {
+            key: "parents",
+            label: "전체 상위 품목",
+            value: stats.totalParents,
+            hint: "BOM 기준 부모 품목",
+            tone: LEGACY_COLORS.blue,
+          },
+          {
+            key: "matched",
+            label: "완료 BOM",
+            value: stats.matched,
+            hint: `${dept} 부서 부모 중 BOM 정의됨`,
+            tone: LEGACY_COLORS.green,
+          },
+          {
+            key: "unmatched",
+            label: "미매칭 자재",
+            value: stats.unmatched,
+            hint: `${dept} 부서 부모 중 BOM 미정의`,
+            tone: LEGACY_COLORS.red,
+          },
+        ]}
+      />
+
+      {/* 부서 탭 */}
+      <div className="mb-3">
         <BomDeptTabs value={dept} onChange={handleDeptChange} />
-        <div className="flex items-center gap-1 rounded-full border p-1" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}>
-          <button
-            type="button"
-            onClick={() => setMode("edit")}
-            className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold transition-colors"
-            style={{
-              background: mode === "edit" ? LEGACY_COLORS.blue : "transparent",
-              color: mode === "edit" ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
-            }}
-          >
-            <Pencil size={13} /> 편집
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("whereused")}
-            className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold transition-colors"
-            style={{
-              background: mode === "whereused" ? LEGACY_COLORS.blue : "transparent",
-              color: mode === "whereused" ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
-            }}
-          >
-            <ArrowRightLeft size={13} /> 사용처
-          </button>
-        </div>
       </div>
 
       {/* 메인 영역 */}
       <div className="flex min-h-0 flex-1 gap-3">
-        {/* 좌측 (35%) */}
-        <div className="flex w-[35%] min-w-[320px] flex-col gap-2">
-          <BomStatsRow total={stats.total} matched={stats.matched} unmatched={stats.unmatched} />
+        <div className="flex w-[28%] min-w-[280px] flex-col gap-2">
           <BomParentList
             dept={dept}
             items={items}
@@ -217,7 +281,6 @@ export function BomWorkbench({
           />
         </div>
 
-        {/* 우측 (나머지) */}
         <div className="flex min-h-0 flex-1 flex-col">
           {mode === "edit" ? (
             <BomEditPanel

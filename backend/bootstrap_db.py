@@ -105,6 +105,73 @@ _MIGRATION_DDL: list[str] = [
     "ALTER TABLE employees ADD COLUMN pin_last_changed DATETIME",
     # 부서 대표 색깔 (HEX, NULL = 기본 purple)
     "ALTER TABLE departments ADD COLUMN color_hex VARCHAR(7)",
+    # 입출고 2.0 작업 묶음
+    """CREATE TABLE IF NOT EXISTS io_batches (
+        batch_id CHAR(36) PRIMARY KEY,
+        work_type VARCHAR(32) NOT NULL,
+        sub_type VARCHAR(40) NOT NULL,
+        status VARCHAR(24) NOT NULL DEFAULT 'draft',
+        requester_employee_id CHAR(36) NOT NULL REFERENCES employees(employee_id),
+        requester_name VARCHAR(100) NOT NULL,
+        requester_department VARCHAR(50) NOT NULL,
+        from_department VARCHAR(50),
+        to_department VARCHAR(50),
+        requires_approval BOOLEAN NOT NULL DEFAULT 0,
+        stock_request_id CHAR(36),
+        reference_no VARCHAR(100),
+        notes TEXT,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        submitted_at DATETIME,
+        completed_at DATETIME
+    )""",
+    """CREATE TABLE IF NOT EXISTS io_bundles (
+        bundle_id CHAR(36) PRIMARY KEY,
+        batch_id CHAR(36) NOT NULL REFERENCES io_batches(batch_id) ON DELETE CASCADE,
+        source_kind VARCHAR(24) NOT NULL,
+        source_item_id CHAR(36) REFERENCES items(item_id) ON DELETE SET NULL,
+        package_id CHAR(36) REFERENCES ship_packages(package_id) ON DELETE SET NULL,
+        title_snapshot VARCHAR(220) NOT NULL,
+        quantity NUMERIC(15,4) NOT NULL,
+        expanded_level INTEGER NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )""",
+    """CREATE TABLE IF NOT EXISTS io_lines (
+        line_id CHAR(36) PRIMARY KEY,
+        bundle_id CHAR(36) NOT NULL REFERENCES io_bundles(bundle_id) ON DELETE CASCADE,
+        item_id CHAR(36) NOT NULL REFERENCES items(item_id),
+        item_name_snapshot VARCHAR(200) NOT NULL,
+        erp_code_snapshot VARCHAR(50),
+        unit VARCHAR(20) NOT NULL DEFAULT 'EA',
+        direction VARCHAR(20) NOT NULL,
+        from_bucket VARCHAR(20) NOT NULL,
+        from_department VARCHAR(50),
+        to_bucket VARCHAR(20) NOT NULL,
+        to_department VARCHAR(50),
+        quantity NUMERIC(15,4) NOT NULL,
+        bom_expected NUMERIC(15,4),
+        included BOOLEAN NOT NULL DEFAULT 1,
+        origin VARCHAR(24) NOT NULL,
+        edited BOOLEAN NOT NULL DEFAULT 0,
+        has_children_snapshot BOOLEAN NOT NULL DEFAULT 0,
+        shortage NUMERIC(15,4) NOT NULL DEFAULT 0,
+        exclusion_note TEXT,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )""",
+    "ALTER TABLE stock_requests ADD COLUMN operation_batch_id CHAR(36)",
+    "ALTER TABLE stock_request_lines ADD COLUMN operation_line_id CHAR(36)",
+    "ALTER TABLE transaction_logs ADD COLUMN operation_batch_id CHAR(36)",
+    "CREATE INDEX IF NOT EXISTS ix_io_batches_requester_status ON io_batches(requester_employee_id, status)",
+    "CREATE INDEX IF NOT EXISTS ix_io_batches_status ON io_batches(status)",
+    "CREATE INDEX IF NOT EXISTS ix_io_bundles_batch_id ON io_bundles(batch_id)",
+    "CREATE INDEX IF NOT EXISTS ix_io_lines_bundle_id ON io_lines(bundle_id)",
+    "CREATE INDEX IF NOT EXISTS ix_io_line_item_included ON io_lines(item_id, included)",
+    # R10B: 중복 제출 방지용 클라이언트 멱등성 키
+    "ALTER TABLE stock_requests ADD COLUMN client_request_id VARCHAR(64)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ix_stock_requests_client_request_id ON stock_requests(client_request_id)",
+    # 입출고 v2 멱등 키 — 제출 더블클릭 시 재고 이중 차감 방지
+    "ALTER TABLE io_batches ADD COLUMN client_request_id VARCHAR(64)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ix_io_batches_client_request_id ON io_batches(client_request_id)",
 ]
 
 

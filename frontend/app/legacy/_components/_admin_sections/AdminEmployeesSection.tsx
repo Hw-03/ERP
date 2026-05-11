@@ -1,14 +1,33 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Search, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Save, Trash2, Users, X } from "lucide-react";
+import type { DepartmentMaster, Employee, WarehouseRole } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { EmptyState } from "../common";
-import { normalizeDepartment } from "@/lib/mes/department";
-import { useAdminEmployeesContext } from "./AdminEmployeesContext";
+import { normalizeDepartment, getDepartmentFallbackColor } from "@/lib/mes/department";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
-import { EmployeeAddPanel } from "./_employees_parts/EmployeeAddPanel";
-import { EmployeeEditPanel } from "./_employees_parts/EmployeeEditPanel";
+import { EmptyState } from "../common";
+import { FilterChip } from "../common/FilterChip";
+import { StatusPill } from "../common/StatusPill";
+import {
+  AdminDetailCard,
+  AdminKpiBar,
+  AdminListPanel,
+  AdminPageHeader,
+} from "./_admin_primitives";
+import { useAdminEmployeesContext } from "./AdminEmployeesContext";
+
+const WAREHOUSE_ROLE_LABEL: Record<WarehouseRole, { label: string; hint: string; tone: string }> = {
+  none: { label: "승인권 없음", hint: "기본 작업만 수행", tone: LEGACY_COLORS.muted2 },
+  primary: { label: "1차 승인권", hint: "창고 주담당 결재", tone: LEGACY_COLORS.blue },
+  deputy: { label: "2차 승인권", hint: "보조 결재 가능", tone: LEGACY_COLORS.cyan },
+};
+
+const LEVEL_LABEL: Record<string, { label: string; hint: string; tone: string }> = {
+  admin: { label: "관리자", hint: "전체 시스템 관리 권한", tone: LEGACY_COLORS.red },
+  manager: { label: "매니저", hint: "부서 운영·데이터 수정", tone: LEGACY_COLORS.purple },
+  staff: { label: "사원", hint: "기본 작업 권한", tone: LEGACY_COLORS.muted2 },
+};
 
 export function AdminEmployeesSection() {
   const ctx = useAdminEmployeesContext();
@@ -21,8 +40,8 @@ export function AdminEmployeesSection() {
     setEmpAddMode,
     empAddForm,
     setEmpAddForm,
-    addEmployee: onAddEmployee,
-    toggleEmployee: onToggleEmployee,
+    addEmployee,
+    toggleEmployee,
     confirmTarget,
     confirmToggle,
     cancelConfirm,
@@ -47,7 +66,9 @@ export function AdminEmployeesSection() {
 
   const deptOptions = useMemo(() => {
     const seen = new Set<string>();
-    employees.forEach((e) => { if (e.department) seen.add(normalizeDepartment(e.department)); });
+    employees.forEach((e) => {
+      if (e.department) seen.add(normalizeDepartment(e.department));
+    });
     return ["ALL", ...Array.from(seen).sort()];
   }, [employees]);
 
@@ -55,167 +76,226 @@ export function AdminEmployeesSection() {
     const q = search.trim().toLowerCase();
     return employees
       .filter((e) => deptFilter === "ALL" || normalizeDepartment(e.department) === deptFilter)
-      .filter((e) =>
-        !q ||
-        e.name.toLowerCase().includes(q) ||
-        e.employee_code.toLowerCase().includes(q) ||
-        normalizeDepartment(e.department).toLowerCase().includes(q) ||
-        (e.role ?? "").toLowerCase().includes(q),
+      .filter(
+        (e) =>
+          !q ||
+          e.name.toLowerCase().includes(q) ||
+          normalizeDepartment(e.department).toLowerCase().includes(q) ||
+          (e.role ?? "").toLowerCase().includes(q),
       )
       .sort((a, b) => a.name.localeCompare(b.name, "ko"));
   }, [employees, search, deptFilter]);
 
+  // KPI 4개
+  const stats = useMemo(() => {
+    let active = 0;
+    let inactive = 0;
+    let mgrOrWh = 0;
+    for (const e of employees) {
+      if (e.is_active) active += 1;
+      else inactive += 1;
+      if (e.level === "admin" || e.warehouse_role !== "none") mgrOrWh += 1;
+    }
+    return { active, inactive, mgrOrWh };
+  }, [employees]);
+
+  // 첫 활성 직원 자동 선택
+  useEffect(() => {
+    if (empAddMode) return;
+    if (selectedEmployee) return;
+    if (filteredEmployees.length === 0) return;
+    setSelectedEmployee(filteredEmployees[0]);
+  }, [empAddMode, selectedEmployee, filteredEmployees, setSelectedEmployee]);
+
+  function handleStartAdd() {
+    setEmpAddMode(true);
+    setSelectedEmployee(null);
+  }
+
   return (
     <>
-      <div className="grid h-full gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
-        <div
-          className="flex flex-col overflow-hidden rounded-[28px] border"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-        >
-          <div className="shrink-0 border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-            <div
-              className="mb-3 rounded-[12px] border px-3 py-2 flex items-center gap-3 flex-wrap"
-              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-            >
-              <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                전체 <span style={{ color: LEGACY_COLORS.blue, fontWeight: 900 }}>{employees.length}</span>명
-              </span>
-              <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                활성 <span style={{ color: LEGACY_COLORS.green, fontWeight: 900 }}>
-                  {employees.filter((e) => e.is_active).length}
-                </span>명
-              </span>
-              <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                비활성 <span style={{ color: LEGACY_COLORS.red, fontWeight: 900 }}>
-                  {employees.filter((e) => !e.is_active).length}
-                </span>명
-              </span>
-            </div>
-            <div
-              className="mb-3 flex items-center gap-2 rounded-[12px] border px-3 py-2"
-              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-            >
-              <Search className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="이름·코드·부서·역할 검색"
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                style={{ color: LEGACY_COLORS.text }}
-              />
-              {search && (
-                <button
-                  onClick={() => setSearch("")}
-                  className="flex h-5 w-5 items-center justify-center rounded-full hover:bg-white/10"
-                  style={{ color: LEGACY_COLORS.muted2 }}
-                  aria-label="검색 초기화"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-            <div className="mb-3 flex flex-wrap gap-1.5">
-              {deptOptions.map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setDeptFilter(d)}
-                  className="rounded-full border px-2.5 py-1 text-xs font-bold transition-colors"
-                  style={{
-                    background: deptFilter === d ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
-                    color: deptFilter === d ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
-                    borderColor: deptFilter === d ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                  }}
-                >
-                  {d === "ALL" ? "전체" : d}
-                </button>
-              ))}
-            </div>
+      <div className="flex min-h-0 flex-col">
+        <AdminPageHeader
+          icon={Users}
+          title="직원 관리"
+          description="직원 정보·권한·PIN을 등록하고 관리합니다."
+          actions={
             <button
-              onClick={() => {
-                setEmpAddMode(true);
-                setSelectedEmployee(null);
-              }}
-              className="w-full rounded-[14px] border border-dashed py-2.5 text-base font-bold"
-              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+              type="button"
+              onClick={handleStartAdd}
+              className="flex items-center gap-1.5 rounded-[12px] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-110"
+              style={{ background: LEGACY_COLORS.blue }}
             >
-              + 직원 추가
+              <Plus className="h-4 w-4" />
+              직원 추가
             </button>
-          </div>
-          <div className="overflow-y-auto">
-            {filteredEmployees.length === 0 && (
+          }
+        />
+
+        <AdminKpiBar
+          items={[
+            { key: "all", label: "전체 직원", value: employees.length, hint: "등록된 모든 직원", tone: LEGACY_COLORS.blue },
+            { key: "active", label: "활성", value: stats.active, hint: "근무 중", tone: LEGACY_COLORS.green },
+            { key: "inactive", label: "비활성", value: stats.inactive, hint: "사용 중지", tone: LEGACY_COLORS.muted2 },
+            { key: "mgr", label: "관리자·창고담당", value: stats.mgrOrWh, hint: "특별 권한 보유", tone: LEGACY_COLORS.purple },
+          ]}
+        />
+
+        <div className="flex min-h-0 flex-1 gap-4">
+          <AdminListPanel
+            title="직원 목록"
+            countLabel={`${filteredEmployees.length}명`}
+            width={320}
+            searchValue={search}
+            searchPlaceholder="이름·부서·역할 검색"
+            onSearchChange={setSearch}
+            filters={
+              <>
+                {deptOptions.map((d) => (
+                  <FilterChip
+                    key={d}
+                    active={deptFilter === d}
+                    label={d === "ALL" ? "전체" : d}
+                    onClick={() => setDeptFilter(d)}
+                    size="sm"
+                  />
+                ))}
+              </>
+            }
+            items={filteredEmployees}
+            emptyState={
               <EmptyState
-                compact
                 variant={search ? "no-search-result" : "no-data"}
+                compact
                 title={search ? "검색 결과가 없습니다." : "직원이 없습니다."}
               />
-            )}
-            {filteredEmployees.map((employee, index) => (
-              <button
-                key={employee.employee_id}
-                onClick={() => {
-                  setSelectedEmployee(employee);
-                  setEmpAddMode(false);
-                }}
-                className="flex w-full items-center justify-between px-4 py-4 text-left transition-colors hover:bg-white/[0.12]"
-                style={{
-                  borderBottom: index === filteredEmployees.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
-                  background:
-                    selectedEmployee?.employee_id === employee.employee_id
-                      ? `color-mix(in srgb, ${LEGACY_COLORS.purple} 10%, transparent)`
-                      : "transparent",
-                }}
-              >
-                <div>
-                  <div className="text-base font-semibold">{employee.name}</div>
-                  <div className="mt-1 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {employee.employee_code} / {normalizeDepartment(employee.department)}
-                  </div>
-                </div>
-                <span
-                  className="inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-bold"
+            }
+            renderItem={(employee) => {
+              const active = selectedEmployee?.employee_id === employee.employee_id;
+              const deptName = normalizeDepartment(employee.department);
+              const deptColor = getDepartmentFallbackColor(deptName);
+              return (
+                <button
+                  key={employee.employee_id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedEmployee(employee);
+                    setEmpAddMode(false);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-[10px] border px-3 py-2 text-left transition-colors hover:brightness-[1.04]"
                   style={{
-                    background: employee.is_active
-                      ? `color-mix(in srgb, ${LEGACY_COLORS.green} 16%, transparent)`
-                      : `color-mix(in srgb, ${LEGACY_COLORS.red} 14%, transparent)`,
-                    color: employee.is_active ? LEGACY_COLORS.green : LEGACY_COLORS.red,
+                    background: active
+                      ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
+                      : LEGACY_COLORS.s2,
+                    borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
                   }}
                 >
-                  {employee.is_active ? "활성" : "비활성"}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: deptColor }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div
+                      className="truncate text-[13px] font-bold"
+                      style={{ color: LEGACY_COLORS.text }}
+                    >
+                      {employee.name}
+                    </div>
+                    <div
+                      className="truncate text-[11px]"
+                      style={{ color: LEGACY_COLORS.muted2 }}
+                    >
+                      {deptName}
+                      {employee.role ? ` · ${employee.role}` : ""}
+                    </div>
+                  </div>
+                  <StatusPill
+                    label={employee.is_active ? "활성" : "비활성"}
+                    tone={employee.is_active ? "success" : "neutral"}
+                    showDot
+                    maxWidth={70}
+                  />
+                </button>
+              );
+            }}
+          />
 
-        <div
-          className="overflow-y-auto rounded-[28px] border p-5"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-        >
-          {empAddMode ? (
-            <EmployeeAddPanel
-              form={empAddForm}
-              setForm={setEmpAddForm}
-              departments={departments}
-              onClose={() => setEmpAddMode(false)}
-              onSubmit={onAddEmployee}
-            />
-          ) : selectedEmployee ? (
-            <EmployeeEditPanel
-              employee={selectedEmployee}
-              form={editForm}
-              setForm={setEditForm}
-              departments={departments}
-              onSave={saveEmployee}
-              onRequestPinReset={requestPinReset}
-              onToggle={onToggleEmployee}
-              onRequestDelete={requestDelete}
-            />
-          ) : (
-            <div className="text-base" style={{ color: LEGACY_COLORS.muted2 }}>
-              직원을 선택하면 정보를 수정하거나 PIN을 초기화할 수 있습니다.
-            </div>
-          )}
+          <AdminDetailCard
+            title={
+              empAddMode
+                ? "직원 추가"
+                : selectedEmployee
+                  ? selectedEmployee.name
+                  : "직원을 선택하세요"
+            }
+            subtitle={
+              !empAddMode && selectedEmployee
+                ? `${normalizeDepartment(selectedEmployee.department)}${
+                    selectedEmployee.role ? ` · ${selectedEmployee.role}` : ""
+                  }`
+                : undefined
+            }
+            status={
+              !empAddMode && selectedEmployee ? (
+                <StatusPill
+                  label={selectedEmployee.is_active ? "활성" : "비활성"}
+                  tone={selectedEmployee.is_active ? "success" : "neutral"}
+                />
+              ) : null
+            }
+            actions={
+              empAddMode ? (
+                <button
+                  type="button"
+                  onClick={() => setEmpAddMode(false)}
+                  className="flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
+                  style={{
+                    background: LEGACY_COLORS.s2,
+                    borderColor: LEGACY_COLORS.border,
+                    color: LEGACY_COLORS.muted2,
+                  }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                  취소
+                </button>
+              ) : selectedEmployee ? (
+                <button
+                  type="button"
+                  onClick={saveEmployee}
+                  className="flex items-center gap-1 rounded-[10px] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:brightness-110"
+                  style={{ background: LEGACY_COLORS.blue }}
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  저장
+                </button>
+              ) : null
+            }
+          >
+            {empAddMode ? (
+              <EmployeeAddInline
+                form={empAddForm}
+                setForm={setEmpAddForm}
+                departments={departments}
+                onSubmit={addEmployee}
+              />
+            ) : selectedEmployee ? (
+              <EmployeeDetailGrid
+                employee={selectedEmployee}
+                form={editForm}
+                setForm={setEditForm}
+                departments={departments}
+                onRequestPinReset={requestPinReset}
+                onToggle={toggleEmployee}
+                onRequestDelete={requestDelete}
+              />
+            ) : (
+              <EmptyState
+                variant="no-data"
+                title="좌측에서 직원을 선택하세요"
+                description="직원을 클릭하면 권한·PIN·상태 정보를 확인할 수 있습니다."
+              />
+            )}
+          </AdminDetailCard>
         </div>
       </div>
 
@@ -248,7 +328,10 @@ export function AdminEmployeesSection() {
         onConfirm={confirmPinReset}
       >
         <div className="mt-2">
-          <div className="mb-1 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
+          <div
+            className="mb-1 text-xs font-bold uppercase tracking-[0.15em]"
+            style={{ color: LEGACY_COLORS.muted2 }}
+          >
             관리자 PIN
           </div>
           <input
@@ -259,7 +342,11 @@ export function AdminEmployeesSection() {
             onChange={(e) => setPinResetAdminPin(e.target.value)}
             placeholder="0000"
             className="w-full rounded-[12px] border px-3 py-2 text-sm tracking-widest outline-none"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+            style={{
+              background: LEGACY_COLORS.s1,
+              borderColor: LEGACY_COLORS.border,
+              color: LEGACY_COLORS.text,
+            }}
           />
           {pinResetError && (
             <p className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.red }}>
@@ -269,5 +356,372 @@ export function AdminEmployeesSection() {
         </div>
       </ConfirmModal>
     </>
+  );
+}
+
+interface EmployeeAddInlineProps {
+  form: ReturnType<typeof useAdminEmployeesContext>["empAddForm"];
+  setForm: ReturnType<typeof useAdminEmployeesContext>["setEmpAddForm"];
+  departments: DepartmentMaster[];
+  onSubmit: () => void;
+}
+
+function EmployeeAddInline({ form, setForm, departments, onSubmit }: EmployeeAddInlineProps) {
+  return (
+    <form
+      className="flex max-w-[520px] flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit();
+      }}
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <FieldRow label="이름" required>
+          <TextInput
+            value={form.name}
+            onChange={(v) => setForm((f) => ({ ...f, name: v }))}
+            placeholder="예: 홍길동"
+          />
+        </FieldRow>
+        <FieldRow label="역할">
+          <TextInput
+            value={form.role}
+            onChange={(v) => setForm((f) => ({ ...f, role: v }))}
+            placeholder="예: 조립/사원"
+          />
+        </FieldRow>
+        <FieldRow label="연락처">
+          <TextInput
+            value={form.phone}
+            onChange={(v) => setForm((f) => ({ ...f, phone: v }))}
+            placeholder="예: 010-0000-0000"
+          />
+        </FieldRow>
+        <FieldRow label="부서">
+          <SelectInput
+            value={form.department}
+            onChange={(v) => setForm((f) => ({ ...f, department: v }))}
+            options={departments
+              .filter((d) => d.is_active)
+              .map((d) => ({ value: d.name, label: d.name }))}
+          />
+        </FieldRow>
+        <div className="col-span-2">
+          <FieldRow label="창고 결재 역할">
+            <SelectInput
+              value={form.warehouse_role}
+              onChange={(v) => setForm((f) => ({ ...f, warehouse_role: v as WarehouseRole }))}
+              options={(["none", "primary", "deputy"] as WarehouseRole[]).map((r) => ({
+                value: r,
+                label: WAREHOUSE_ROLE_LABEL[r].label,
+              }))}
+            />
+          </FieldRow>
+        </div>
+      </div>
+      <div
+        className="rounded-[10px] border px-3 py-2 text-[12px]"
+        style={{
+          background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`,
+          borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 25%, transparent)`,
+          color: LEGACY_COLORS.muted2,
+        }}
+      >
+        직원 코드는 등록 시 자동으로 부여됩니다. (관리자 모드 외부에 노출되지 않음)
+      </div>
+      <button
+        type="submit"
+        className="rounded-[12px] py-2.5 text-[14px] font-bold text-white transition-colors hover:brightness-110"
+        style={{ background: LEGACY_COLORS.blue }}
+      >
+        직원 추가
+      </button>
+    </form>
+  );
+}
+
+interface EmployeeDetailGridProps {
+  employee: Employee;
+  form: ReturnType<typeof useAdminEmployeesContext>["editForm"];
+  setForm: ReturnType<typeof useAdminEmployeesContext>["setEditForm"];
+  departments: DepartmentMaster[];
+  onRequestPinReset: (e: Employee) => void;
+  onToggle: (e: Employee) => void;
+  onRequestDelete: (e: Employee) => void;
+}
+
+function EmployeeDetailGrid({
+  employee,
+  form,
+  setForm,
+  departments,
+  onRequestPinReset,
+  onToggle,
+  onRequestDelete,
+}: EmployeeDetailGridProps) {
+  const levelMeta = LEVEL_LABEL[employee.level] ?? LEVEL_LABEL.staff;
+  const whMeta = WAREHOUSE_ROLE_LABEL[form.warehouse_role];
+  return (
+    <div className="grid gap-3 lg:grid-cols-2">
+      {/* 카드 1: 기본 정보 */}
+      <DetailCardSlot title="기본 정보">
+        <div className="grid grid-cols-2 gap-3">
+          <FieldRow label="이름">
+            <TextInput
+              value={form.name}
+              onChange={(v) => setForm((f) => ({ ...f, name: v }))}
+            />
+          </FieldRow>
+          <FieldRow label="역할">
+            <TextInput
+              value={form.role}
+              onChange={(v) => setForm((f) => ({ ...f, role: v }))}
+            />
+          </FieldRow>
+          <FieldRow label="부서">
+            <SelectInput
+              value={form.department}
+              onChange={(v) => setForm((f) => ({ ...f, department: v }))}
+              options={departments
+                .filter((d) => d.is_active)
+                .map((d) => ({ value: d.name, label: d.name }))}
+            />
+          </FieldRow>
+          <FieldRow label="연락처">
+            <TextInput
+              value={form.phone}
+              onChange={(v) => setForm((f) => ({ ...f, phone: v }))}
+            />
+          </FieldRow>
+        </div>
+      </DetailCardSlot>
+
+      {/* 카드 2: 권한 */}
+      <DetailCardSlot title="권한">
+        <div className="flex flex-col gap-3">
+          <PermissionRow
+            label="등급"
+            badge={levelMeta.label}
+            tone={levelMeta.tone}
+            hint={levelMeta.hint}
+          />
+          <FieldRow label="창고 결재 역할">
+            <SelectInput
+              value={form.warehouse_role}
+              onChange={(v) => setForm((f) => ({ ...f, warehouse_role: v as WarehouseRole }))}
+              options={(["none", "primary", "deputy"] as WarehouseRole[]).map((r) => ({
+                value: r,
+                label: WAREHOUSE_ROLE_LABEL[r].label,
+              }))}
+            />
+            <div
+              className="mt-1.5 text-[11px]"
+              style={{ color: whMeta.tone }}
+            >
+              {whMeta.hint}
+            </div>
+          </FieldRow>
+        </div>
+      </DetailCardSlot>
+
+      {/* 카드 3: PIN */}
+      <DetailCardSlot title="PIN">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <span
+              className="rounded-full px-2.5 py-0.5 text-[11px] font-bold"
+              style={{
+                background: `color-mix(in srgb, ${
+                  employee.pin_is_default ? LEGACY_COLORS.yellow : LEGACY_COLORS.green
+                } 18%, transparent)`,
+                color: employee.pin_is_default ? LEGACY_COLORS.yellow : LEGACY_COLORS.green,
+              }}
+            >
+              {employee.pin_is_default ? "기본 PIN (0000)" : "직원 설정 PIN"}
+            </span>
+          </div>
+          <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
+            마지막 변경:{" "}
+            {employee.pin_last_changed
+              ? new Date(employee.pin_last_changed).toLocaleDateString("ko-KR")
+              : "변경 이력 없음"}
+          </div>
+          <button
+            type="button"
+            onClick={() => onRequestPinReset(employee)}
+            className="mt-1 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors hover:brightness-110"
+            style={{
+              background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 8%, transparent)`,
+              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 35%, transparent)`,
+              color: LEGACY_COLORS.yellow,
+            }}
+          >
+            PIN 초기화 (0000)
+          </button>
+        </div>
+      </DetailCardSlot>
+
+      {/* 카드 4: 상태 */}
+      <DetailCardSlot title="상태">
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => onToggle(employee)}
+            className="rounded-[10px] px-3 py-2 text-[12px] font-bold text-white transition-colors hover:brightness-110"
+            style={{ background: employee.is_active ? LEGACY_COLORS.red : LEGACY_COLORS.green }}
+          >
+            {employee.is_active ? "직원 비활성화" : "직원 활성화"}
+          </button>
+          <button
+            type="button"
+            onClick={() => onRequestDelete(employee)}
+            className="flex items-center justify-center gap-1.5 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors hover:brightness-110"
+            style={{
+              background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
+              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 35%, transparent)`,
+              color: LEGACY_COLORS.red,
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            직원 삭제
+          </button>
+        </div>
+      </DetailCardSlot>
+    </div>
+  );
+}
+
+function DetailCardSlot({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div
+      className="rounded-[14px] border p-4"
+      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+    >
+      <div
+        className="mb-3 text-[11px] font-black uppercase tracking-[0.18em]"
+        style={{ color: LEGACY_COLORS.muted2 }}
+      >
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function FieldRow({
+  label,
+  required,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div
+        className="text-[11px] font-bold uppercase tracking-[0.08em]"
+        style={{ color: LEGACY_COLORS.muted2 }}
+      >
+        {label}
+        {required && (
+          <span className="ml-1" style={{ color: LEGACY_COLORS.red }}>
+            *
+          </span>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function PermissionRow({
+  label,
+  badge,
+  tone,
+  hint,
+}: {
+  label: string;
+  badge: string;
+  tone: string;
+  hint: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div
+        className="text-[11px] font-bold uppercase tracking-[0.08em]"
+        style={{ color: LEGACY_COLORS.muted2 }}
+      >
+        {label}
+      </div>
+      <div className="flex items-center gap-2">
+        <span
+          className="rounded-full px-2.5 py-0.5 text-[11px] font-black"
+          style={{
+            background: `color-mix(in srgb, ${tone} 14%, transparent)`,
+            color: tone,
+          }}
+        >
+          {badge}
+        </span>
+      </div>
+      <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+        {hint}
+      </div>
+    </div>
+  );
+}
+
+function TextInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none focus:border-[var(--c-blue)]"
+      style={{
+        background: LEGACY_COLORS.s1,
+        borderColor: LEGACY_COLORS.border,
+        color: LEGACY_COLORS.text,
+      }}
+    />
+  );
+}
+
+function SelectInput({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none focus:border-[var(--c-blue)]"
+      style={{
+        background: LEGACY_COLORS.s1,
+        borderColor: LEGACY_COLORS.border,
+        color: LEGACY_COLORS.text,
+      }}
+    >
+      {options.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
   );
 }

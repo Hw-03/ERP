@@ -1,6 +1,6 @@
 "use client";
 
-import { api, type StockRequest } from "@/lib/api";
+import { api, type IoBatch, type StockRequest } from "@/lib/api";
 import { MyRequestsPanel } from "./MyRequestsPanel";
 import { WarehouseQueuePanel } from "./WarehouseQueuePanel";
 import { DraftCartPanel } from "./DraftCartPanel";
@@ -21,6 +21,7 @@ export interface WarehouseDraftPanelTabsProps {
   globalSearch: string;
   setItems: (items: import("@/lib/api").Item[]) => void;
   onContinueDraft: (draft: StockRequest) => void;
+  onContinueIoDraft?: (draft: IoBatch) => void;
   bumpRefresh: () => void;
   onSubmitSuccess?: () => void;
   resetDraftTracking: () => void;
@@ -36,6 +37,7 @@ export function WarehouseDraftPanelTabs({
   globalSearch,
   setItems,
   onContinueDraft,
+  onContinueIoDraft,
   bumpRefresh,
   onSubmitSuccess,
   resetDraftTracking,
@@ -48,6 +50,10 @@ export function WarehouseDraftPanelTabs({
         refreshNonce={refreshNonce}
         onContinue={(draft) => {
           onContinueDraft(draft);
+          bumpRefresh();
+        }}
+        onContinueIo={(draft) => {
+          onContinueIoDraft?.(draft);
           bumpRefresh();
         }}
         onChanged={() => {

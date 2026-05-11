@@ -4,7 +4,6 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { api, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { erpCodeDept } from "@/lib/mes/process";
-import { useDepartments } from "./DepartmentsContext";
 import { InventoryKpiPanel, type KpiFilter } from "./_inventory_sections/InventoryKpiPanel";
 import { InventoryCapacityPanel } from "./_inventory_sections/InventoryCapacityPanel";
 import {
@@ -55,8 +54,8 @@ export function DesktopInventoryView({
   });
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const [selectedProcessSteps, setSelectedProcessSteps] = useState<string[]>([]);
   const [productModels, setProductModels] = useState<ProductModel[]>([]);
-  const departments = useDepartments();
   const [kpi, setKpi] = useState<KpiFilter>("ALL");
   const [localSearch, setLocalSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(DESKTOP_PAGE_SIZE);
@@ -74,6 +73,10 @@ export function DesktopInventoryView({
   }
   function toggleModel(v: string) {
     setSelectedModels((prev) => (prev.includes(v) ? prev.filter((m) => m !== v) : [...prev, v]));
+    setDisplayLimit(DESKTOP_PAGE_SIZE);
+  }
+  function toggleProcessStep(v: string) {
+    setSelectedProcessSteps((prev) => (prev.includes(v) ? prev.filter((p) => p !== v) : [...prev, v]));
     setDisplayLimit(DESKTOP_PAGE_SIZE);
   }
 
@@ -118,9 +121,13 @@ export function DesktopInventoryView({
           const matchesUnclassified = showUnclassified && item.model_slots.length === 0;
           if (!matchesSlot && !matchesUnclassified) return false;
         }
+        if (selectedProcessSteps.length > 0) {
+          const stage = item.process_type_code?.slice(-1).toUpperCase() ?? "";
+          if (!selectedProcessSteps.includes(stage)) return false;
+        }
         return true;
       }),
-    [items, deferredLocalSearch, selectedDepts, selectedSlots, showUnclassified],
+    [items, deferredLocalSearch, selectedDepts, selectedSlots, showUnclassified, selectedProcessSteps],
   );
   const filteredItems = useMemo(() => scopedItems.filter((item) => matchesKpi(item, kpi)), [scopedItems, kpi]);
 
@@ -137,6 +144,7 @@ export function DesktopInventoryView({
     filteredItems,
     selectedDepts,
     selectedModels,
+    selectedProcessSteps,
     deferredLocalSearch,
     displayItem,
     onSummaryChange,
@@ -145,6 +153,7 @@ export function DesktopInventoryView({
   function resetAllFilters() {
     setSelectedDepts([]);
     setSelectedModels([]);
+    setSelectedProcessSteps([]);
     setLocalSearch("");
     setKpi("ALL");
   }
@@ -173,12 +182,14 @@ export function DesktopInventoryView({
               open={filtersOpen}
               selectedDepts={selectedDepts}
               selectedModels={selectedModels}
+              selectedProcessSteps={selectedProcessSteps}
               productModels={productModels}
-              departments={departments}
               toggleDept={toggleDept}
               toggleModel={toggleModel}
+              toggleProcessStep={toggleProcessStep}
               onClearDepts={() => setSelectedDepts([])}
               onClearModels={() => setSelectedModels([])}
+              onClearProcessSteps={() => setSelectedProcessSteps([])}
             />
           </section>
 

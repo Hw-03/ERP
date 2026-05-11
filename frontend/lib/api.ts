@@ -35,6 +35,8 @@ import { departmentsApi } from "./api/departments";
 import { weeklyApi } from "./api/weekly";
 // dept-adjustment 도메인.
 import { deptAdjustmentApi } from "./api/dept-adjustment";
+// 입출고 2.0 도메인.
+import { ioApi } from "./api/io";
 
 // 외부 import 호환을 위해 동일 이름 그대로 re-export.
 // parseError 는 도메인 API (직접 fetch 사용처) 가 본 파일 내부에서 사용 — 이번 PR 에선 그대로.
@@ -102,6 +104,20 @@ import type {
   WeeklyWarning,
   WeeklyReportSummary,
   WeeklyReportResponse,
+  IoWorkType,
+  IoSubType,
+  IoSourceKind,
+  IoLineOrigin,
+  IoLineDirection,
+  IoBucket,
+  IoLine,
+  IoBundle,
+  IoPreviewTarget,
+  IoPreviewPayload,
+  IoPreviewResponse,
+  IoDraftPayload,
+  IoBatch,
+  IoSubmitResponse,
 } from "./api/types";
 
 export type {
@@ -157,6 +173,20 @@ export type {
   WeeklyWarning,
   WeeklyReportSummary,
   WeeklyReportResponse,
+  IoWorkType,
+  IoSubType,
+  IoSourceKind,
+  IoLineOrigin,
+  IoLineDirection,
+  IoBucket,
+  IoLine,
+  IoBundle,
+  IoPreviewTarget,
+  IoPreviewPayload,
+  IoPreviewResponse,
+  IoDraftPayload,
+  IoBatch,
+  IoSubmitResponse,
 };
 
 export const api = {
@@ -184,4 +214,6 @@ export const api = {
   ...weeklyApi,
   // dept-adjustment 도메인 (부서 재고 조정).
   ...deptAdjustmentApi,
+  // 입출고 2.0.
+  ...ioApi,
 };

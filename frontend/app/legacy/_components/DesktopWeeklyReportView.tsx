@@ -321,10 +321,7 @@ export function DesktopWeeklyReportView() {
           </span>
         </div>
         {loading && !data ? (
-          <div
-            className="animate-pulse rounded-[10px]"
-            style={{ height: 60, background: LEGACY_COLORS.s2 }}
-          />
+          <LoadingSkeleton variant="card" rows={1} />
         ) : (
           <WeeklyProductionMatrix rows={data?.production_matrix ?? []} />
         )}
@@ -351,15 +348,7 @@ export function DesktopWeeklyReportView() {
           </div>
           <div className="p-4">
             {loading && !data ? (
-              <div className="flex flex-col gap-3">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="animate-pulse rounded-[16px] border"
-                    style={{ height: 72, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-                  />
-                ))}
-              </div>
+              <LoadingSkeleton variant="card" rows={4} />
             ) : (
               <WeeklyGroupCards
                 groups={data?.groups ?? []}

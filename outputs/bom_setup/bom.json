@@ -7958,5 +7958,95 @@
     "child_process_type": "HA",
     "quantity": 1,
     "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-NF-0008",
+    "parent_item_name": "A6GR + A6CB 90KV 6mA",
+    "parent_process_type": "NF",
+    "child_erp_code": "6-VF-0005",
+    "child_item_name": "A6GR (10핀)",
+    "child_process_type": "VF",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-NF-0008",
+    "parent_item_name": "A6GR + A6CB 90KV 6mA",
+    "parent_process_type": "NF",
+    "child_erp_code": "6-NR-0001",
+    "child_item_name": "A6CB",
+    "child_process_type": "NR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-NF-0009",
+    "parent_item_name": "COGR + COCB + FET BD 70kv, 2mA",
+    "parent_process_type": "NF",
+    "child_erp_code": "7-VF-0007",
+    "child_item_name": "COGR + FET BD",
+    "child_process_type": "VF",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-NF-0009",
+    "parent_item_name": "COGR + COCB + FET BD 70kv, 2mA",
+    "parent_process_type": "NF",
+    "child_erp_code": "7-NR-0002",
+    "child_item_name": "COCB",
+    "child_process_type": "NR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-NF-0001",
+    "parent_item_name": "D3GR + D3CD (해외용) 60KV, 2mA",
+    "parent_process_type": "NF",
+    "child_erp_code": "3-VF-0001",
+    "child_item_name": "D3GR + D3CD (해외용)",
+    "child_process_type": "VF",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-NF-0003",
+    "parent_item_name": "D3GR + D3CL (미국용) 65kv, 1.7mA",
+    "parent_process_type": "NF",
+    "child_erp_code": "3-VF-0002",
+    "child_item_name": "D3GR + D3CL (미국용)",
+    "child_process_type": "VF",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "8-NF-0010",
+    "parent_item_name": "CSGR + CSCB 70KV 2mA",
+    "parent_process_type": "NF",
+    "child_erp_code": "8-VF-0006",
+    "child_item_name": "CSGR + CSCB",
+    "child_process_type": "VF",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-NF-0004",
+    "parent_item_name": "D3GR + D3CT (TFT용) 70kv, 3mA",
+    "parent_process_type": "NF",
+    "child_erp_code": "3-VF-0003",
+    "child_item_name": "D3GR + D3CT (TFT용)",
+    "child_process_type": "VF",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "4-NF-0005",
+    "parent_item_name": "A4GR + A4CB 60KV 2mA",
+    "parent_process_type": "NF",
+    "child_erp_code": "4-VF-0004",
+    "child_item_name": "A4GR + A4CB",
+    "child_process_type": "VF",
+    "quantity": 1,
+    "unit": "EA"
   }
 ]

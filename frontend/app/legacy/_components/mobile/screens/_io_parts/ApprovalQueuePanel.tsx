@@ -7,6 +7,7 @@ import {
   type StockRequest,
   type StockRequestType,
 } from "@/lib/api";
+import { ApiError } from "@/lib/api-core";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatDateTime, formatQty } from "@/lib/mes/format";
 import type { ToastState } from "@/lib/ui/Toast";
@@ -247,7 +248,13 @@ function ActionSheet({
       }
       onDone();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "처리에 실패했습니다.");
+      if (e instanceof ApiError && e.isConflict) {
+        setErr("이미 처리된 요청입니다.");
+      } else if (e instanceof ApiError && e.isUnavailable) {
+        setErr("서버가 다른 작업을 처리 중입니다. 잠시 후 다시 시도하세요.");
+      } else {
+        setErr(e instanceof Error ? e.message : "처리에 실패했습니다.");
+      }
     } finally {
       setBusy(false);
     }

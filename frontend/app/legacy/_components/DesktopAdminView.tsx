@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { PanelRight } from "lucide-react";
 import { DesktopRightPanel } from "./DesktopRightPanel";
-import { PinLock } from "./PinLock";
+import { DesktopPinLock } from "./DesktopPinLock";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { OverviewBar } from "./_admin_sections/OverviewBar";
-import { SectionHeader } from "./_admin_sections/SectionHeader";
-import { AdminSidebar, SECTIONS, SETTINGS_ENTRY } from "./_admin_sections/AdminSidebar";
+import { AdminSidebar } from "./_admin_sections/AdminSidebar";
 import { AdminSectionContent } from "./_admin_sections/AdminSectionContent";
 import { AdminRightPanelContent } from "./_admin_sections/AdminRightPanelContent";
 import { useAdminBootstrap } from "./_admin_hooks/useAdminBootstrap";
@@ -15,8 +14,8 @@ import { useAdminSettings } from "./_admin_hooks/useAdminSettings";
 import { useAdminViewState } from "./_admin_hooks/useAdminViewState";
 
 /**
- * Round-11A (#4) — 섹션 콘텐츠/우측 패널 콘텐츠 sub-component 추출 후 슬림화.
- * 본 파일은 PIN gate, 상단 헤더, 좌/우 레이아웃 wrapper 만 담당.
+ * 섹션 헤더와 KPI는 각 섹션이 직접 그린다 (AdminPageHeader / AdminKpiBar 사용).
+ * 본 파일은 PIN gate, 좌/우 레이아웃 wrapper, 토스트 영역만 담당.
  */
 export function DesktopAdminView({
   globalSearch,
@@ -25,6 +24,7 @@ export function DesktopAdminView({
   globalSearch: string;
   onStatusChange: (status: string) => void;
 }) {
+  const router = useRouter();
   const {
     unlocked,
     adminPin,
@@ -70,88 +70,61 @@ export function DesktopAdminView({
 
   if (!unlocked) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center px-6">
-        <div
-          className="w-full max-w-[460px] rounded-[32px] border p-6"
-          style={{
-            background: LEGACY_COLORS.s1,
-            borderColor: LEGACY_COLORS.border,
-            boxShadow: "var(--c-card-shadow)",
-          }}
-        >
-          <PinLock onUnlocked={unlock} />
-        </div>
-      </div>
+      <DesktopPinLock
+        onUnlocked={unlock}
+        onCancel={() => router.push("/legacy?tab=dashboard", { scroll: false })}
+      />
     );
   }
-
-  const activeSection =
-    SECTIONS.find((entry) => entry.id === section) ?? (section === "settings" ? SETTINGS_ENTRY : undefined);
 
   return (
     <div className="flex min-h-0 flex-1 gap-4 pl-0 pr-4">
       <div
         className="grid min-h-0 flex-1 gap-4"
-        style={{ gridTemplateColumns: "220px minmax(0,1fr)", transition: "grid-template-columns 0.2s ease" }}
+        style={{ gridTemplateColumns: "240px minmax(0,1fr)", transition: "grid-template-columns 0.2s ease" }}
       >
-        <AdminSidebar section={section} onSelect={selectSection} onLock={lock} />
+        <AdminSidebar
+          section={section}
+          onSelect={selectSection}
+          onLock={lock}
+          showRightPanel={showRightPanel}
+          onTogglePanel={togglePanel}
+        />
 
         {/* 워크스페이스 */}
-        <section className="card flex min-h-0 flex-col overflow-hidden">
-          {/* 고정 헤더 */}
-          <div className="mb-4 shrink-0">
-            {activeSection && (
-              <div className="flex items-start justify-between">
-                <SectionHeader
-                  icon={activeSection.icon}
-                  label={activeSection.label}
-                  description={activeSection.description}
-                  danger={section === "settings"}
-                />
-                <button
-                  onClick={togglePanel}
-                  className="mt-1 ml-2 shrink-0 flex items-center justify-center rounded-[12px] border p-2 transition-colors hover:bg-white/10"
+        <section className="flex min-h-0 flex-col overflow-hidden">
+          {/* 토스트 영역 (섹션 헤더는 각 섹션이 직접 렌더링) */}
+          {(saveMessage || message) && (
+            <div className="mb-3 flex shrink-0 flex-col gap-2">
+              {saveMessage && (
+                <div
+                  className="rounded-[14px] border px-4 py-2.5 text-[13px] font-bold"
                   style={{
-                    background: showRightPanel
-                      ? `color-mix(in srgb, ${LEGACY_COLORS.purple} 16%, transparent)`
-                      : LEGACY_COLORS.s2,
-                    borderColor: showRightPanel ? LEGACY_COLORS.purple : LEGACY_COLORS.border,
-                    color: showRightPanel ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2,
+                    background: `color-mix(in srgb, ${LEGACY_COLORS.green} 14%, transparent)`,
+                    borderColor: `color-mix(in srgb, ${LEGACY_COLORS.green} 40%, transparent)`,
+                    color: LEGACY_COLORS.green,
                   }}
-                  title="요약 패널"
                 >
-                  <PanelRight className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-            {section === "items" && (
-              <OverviewBar
-                items={items}
-                employees={employees}
-                productModels={productModels}
-                packages={packages}
-                allBomRows={allBomRows}
-              />
-            )}
-            {saveMessage && (
-              <div
-                className="mb-4 rounded-[16px] border px-4 py-3 text-sm font-bold"
-                style={{
-                  background: `color-mix(in srgb, ${LEGACY_COLORS.green} 14%, transparent)`,
-                  borderColor: `color-mix(in srgb, ${LEGACY_COLORS.green} 40%, transparent)`,
-                  color: LEGACY_COLORS.green,
-                }}
-              >
-                {saveMessage}
-              </div>
-            )}
-            {message ? (
-              <div className="mt-3 text-base" style={{ color: LEGACY_COLORS.red }}>{message}</div>
-            ) : null}
-          </div>
+                  {saveMessage}
+                </div>
+              )}
+              {message && (
+                <div
+                  className="rounded-[14px] border px-4 py-2.5 text-[13px] font-bold"
+                  style={{
+                    background: `color-mix(in srgb, ${LEGACY_COLORS.red} 12%, transparent)`,
+                    borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 35%, transparent)`,
+                    color: LEGACY_COLORS.red,
+                  }}
+                >
+                  {message}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 섹션별 콘텐츠 */}
-          <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <AdminSectionContent
               section={section}
               globalSearch={globalSearch}

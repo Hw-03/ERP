@@ -80,7 +80,7 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
         onError={setMessage}
         onShowSave={showSave}
       >
-        <AdminMasterItemsSection />
+        <AdminMasterItemsSection allBomRows={allBomRows} />
       </AdminMasterItemsProvider>
     );
   }
@@ -129,7 +129,7 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
         onStatusChange={onStatusChange}
         onError={setMessage}
       >
-        <AdminModelsSection />
+        <AdminModelsSection items={items} allBomRows={allBomRows} />
       </AdminModelsProvider>
     );
   }
@@ -144,7 +144,14 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
         onError={setMessage}
         adminPin={adminPin}
       >
-        <AdminDepartmentsSection />
+        <AdminDepartmentsSection
+          employees={employees}
+          items={items}
+          adminPin={adminPin}
+          setDepartments={setDepartments}
+          onStatusChange={onStatusChange}
+          onError={setMessage}
+        />
       </AdminDepartmentsProvider>
     );
   }

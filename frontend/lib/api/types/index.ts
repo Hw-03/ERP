@@ -19,3 +19,4 @@ export type * from "./stock-requests";
 export type * from "./departments";
 export type * from "./weekly";
 export type * from "./dept-adjustment";
+export type * from "./io";

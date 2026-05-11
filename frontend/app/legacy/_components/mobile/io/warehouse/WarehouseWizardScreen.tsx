@@ -81,6 +81,7 @@ export function WarehouseWizardScreen({ showToast }: { showToast: (toast: ToastS
   }, [state.mode, state.step, state.items.size, employee, dispatch]);
 
   const submit = async () => {
+    if (state.submitting) return;
     if (!employee) {
       dispatch({ type: "SET_ERROR", error: "로그인 정보를 확인해 주세요." });
       return;
