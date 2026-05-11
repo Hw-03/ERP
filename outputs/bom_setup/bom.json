@@ -90,16 +90,6 @@
     "unit": "EA"
   },
   {
-    "parent_erp_code": "3-AA-0003",
-    "parent_item_name": "DX3000 LCD BD ASS'Y _사파리_원버턴 타입",
-    "parent_process_type": "AA",
-    "child_erp_code": "4-PR-0132",
-    "child_item_name": "",
-    "child_process_type": "",
-    "quantity": 1,
-    "unit": "EA"
-  },
-  {
     "parent_erp_code": "3-AA-0004",
     "parent_item_name": "DX3000 LCD BD ASS'Y _TFT",
     "parent_process_type": "AA",
@@ -6976,6 +6966,996 @@
     "child_erp_code": "6-VA-0016",
     "child_item_name": "발생부 (10P) (진공) [ADX6000]",
     "child_process_type": "VA",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0001",
+    "parent_item_name": "히터트랜스포머 24턴 [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "34-HR-0026",
+    "child_item_name": "T 코어 (히터트랜스용) [DX3000, ADX4000W]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0001",
+    "parent_item_name": "히터트랜스포머 24턴 [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0023",
+    "child_item_name": "TIW (외경)0.7mm(내경)0.5 5000m(히터트랜스용 선)",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0001",
+    "parent_item_name": "히터트랜스포머 24턴 [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0024",
+    "child_item_name": "40KVDC 22AWG (히터트랜스용 붉은 고압선)",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "8-HA-0003",
+    "parent_item_name": "히터트랜스포머 20턴 [SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "8-HR-0027",
+    "child_item_name": "T 코어 (히터트랜스용) [SOLO]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "8-HA-0003",
+    "parent_item_name": "히터트랜스포머 20턴 [SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0023",
+    "child_item_name": "TIW (외경)0.7mm(내경)0.5 5000m(히터트랜스용 선)",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "8-HA-0003",
+    "parent_item_name": "히터트랜스포머 20턴 [SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0024",
+    "child_item_name": "40KVDC 22AWG (히터트랜스용 붉은 고압선)",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0002",
+    "parent_item_name": "히터트랜스포머 20턴 작업完 [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "34-HR-0026",
+    "child_item_name": "T 코어 (히터트랜스용) [DX3000, ADX4000W]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0002",
+    "parent_item_name": "히터트랜스포머 20턴 작업完 [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0023",
+    "child_item_name": "TIW (외경)0.7mm(내경)0.5 5000m(히터트랜스용 선)",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0002",
+    "parent_item_name": "히터트랜스포머 20턴 작업完 [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0024",
+    "child_item_name": "40KVDC 22AWG (히터트랜스용 붉은 고압선)",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0005",
+    "parent_item_name": "캐논튜브 60KV 하우징 [D-081B] [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "34-HR-0001",
+    "child_item_name": "캐논튜브 [ D-081B ] _ 60KV",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0005",
+    "parent_item_name": "캐논튜브 60KV 하우징 [D-081B] [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0047",
+    "child_item_name": "베이클라이트 하우징 파이프 [DX3000, ADX4000W, ADX6000]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "78-HA-0007",
+    "parent_item_name": "캐논튜브 70KV 하우징 [D-041] [COCOON, SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "78-HR-0002",
+    "child_item_name": "캐논튜브 [ D-041 ] _ 70KV",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "78-HA-0007",
+    "parent_item_name": "캐논튜브 70KV 하우징 [D-041] [COCOON, SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "78-HR-0048",
+    "child_item_name": "70KV 튜브 하우징용 파이프 [COCOON, SOLO]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0008",
+    "parent_item_name": "캐논튜브 80KV 하우징 [D-0813] [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "6-HR-0003",
+    "child_item_name": "캐논튜브 [ D-0813 ] _ 80KV",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0008",
+    "parent_item_name": "캐논튜브 80KV 하우징 [D-0813] [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "6-HR-0051",
+    "child_item_name": "PE 하우징 파이프 [ADX6000]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0010",
+    "parent_item_name": "CEI튜브 90KV 하우징 [OX-70] [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "6-HR-0006",
+    "child_item_name": "CEI튜브 [OX-70] _ 90KV",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0010",
+    "parent_item_name": "CEI튜브 90KV 하우징 [OX-70] [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0047",
+    "child_item_name": "베이클라이트 하우징 파이프 [DX3000, ADX4000W, ADX6000]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3468-HA-0006",
+    "parent_item_name": "세라믹튜브 70KV 하우징 [DXDR-070] [DX3000, ADX4000W, ADX6000, SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "6-HR-0005",
+    "child_item_name": "세라믹튜브 [DXDR-100] _ 100KV",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3468-HA-0006",
+    "parent_item_name": "세라믹튜브 70KV 하우징 [DXDR-070] [DX3000, ADX4000W, ADX6000, SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "8-HR-0049",
+    "child_item_name": "DXDR-070 하우징용 파이프 [SOLO]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0011",
+    "parent_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "34-HR-0007",
+    "child_item_name": "고압다이오드 2CL77 [20KV, 5mA]",
+    "child_process_type": "HR",
+    "quantity": 7,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0011",
+    "parent_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "347-HR-0008",
+    "child_item_name": "네온램프(NEON-5T)",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0011",
+    "parent_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0009",
+    "child_item_name": "RK92-11XD307J (시멘트 저항)",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0011",
+    "parent_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "34-HR-0010",
+    "child_item_name": "고압용 (30㏀)",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0011",
+    "parent_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0011",
+    "child_item_name": "고압용 (15㏀±1％, DIP) - 1/4W",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0011",
+    "parent_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0013",
+    "child_item_name": "고압용(세라믹103)",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0011",
+    "parent_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "34-HR-0014",
+    "child_item_name": "DHR4E4C102K2FB 큰 콘덴서",
+    "child_process_type": "HR",
+    "quantity": 8,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0011",
+    "parent_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0015",
+    "child_item_name": "3216 B 100nF",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0011",
+    "parent_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0016",
+    "child_item_name": "DL1500(다이오드)",
+    "child_process_type": "HR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0011",
+    "parent_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "3467-HR-0017",
+    "child_item_name": "HPC-2C 47k/Surge",
+    "child_process_type": "HR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0011",
+    "parent_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "34-HA-0001",
+    "child_item_name": "히터트랜스포머 24턴 [DX3000, ADX4000W]",
+    "child_process_type": "HA",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0011",
+    "parent_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "34-HR-0028",
+    "child_item_name": "트랜스포머 [DX3000, ADX4000W]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0011",
+    "parent_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "34-HR-0032",
+    "child_item_name": "튜브 고정 보드 에노드 (나사) [DX3000, ADX4000W]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0011",
+    "parent_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "3-HR-0033",
+    "child_item_name": "튜브 고정 보드 케소드 (필라멘트) [DX3000]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0011",
+    "parent_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "4-HR-0034",
+    "child_item_name": "튜브 고정 보드 케소드 (필라멘트) [ADX4000W]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "34-HA-0011",
+    "parent_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "parent_process_type": "HA",
+    "child_erp_code": "34-HR-0038",
+    "child_item_name": "고압베어 B/D (Ver. 2.5) [DX3000, ADX4000W]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0012",
+    "parent_item_name": "고압보드SMT 完 (신형) (Ver. 1.0.1) [DX3000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0009",
+    "child_item_name": "RK92-11XD307J (시멘트 저항)",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0012",
+    "parent_item_name": "고압보드SMT 完 (신형) (Ver. 1.0.1) [DX3000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0016",
+    "child_item_name": "DL1500(다이오드)",
+    "child_process_type": "HR",
+    "quantity": 12,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0012",
+    "parent_item_name": "고압보드SMT 完 (신형) (Ver. 1.0.1) [DX3000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0015",
+    "child_item_name": "3216 B 100nF",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0012",
+    "parent_item_name": "고압보드SMT 完 (신형) (Ver. 1.0.1) [DX3000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "3467-HR-0017",
+    "child_item_name": "HPC-2C 47k/Surge",
+    "child_process_type": "HR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0012",
+    "parent_item_name": "고압보드SMT 完 (신형) (Ver. 1.0.1) [DX3000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "34-HA-0001",
+    "child_item_name": "히터트랜스포머 24턴 [DX3000, ADX4000W]",
+    "child_process_type": "HA",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0012",
+    "parent_item_name": "고압보드SMT 完 (신형) (Ver. 1.0.1) [DX3000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "7-HR-0029",
+    "child_item_name": "트랜스포머 [COCOON]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0012",
+    "parent_item_name": "고압보드SMT 完 (신형) (Ver. 1.0.1) [DX3000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "34-HR-0032",
+    "child_item_name": "튜브 고정 보드 에노드 (나사) [DX3000, ADX4000W]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0012",
+    "parent_item_name": "고압보드SMT 完 (신형) (Ver. 1.0.1) [DX3000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "3-HR-0033",
+    "child_item_name": "튜브 고정 보드 케소드 (필라멘트) [DX3000]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0012",
+    "parent_item_name": "고압보드SMT 完 (신형) (Ver. 1.0.1) [DX3000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "3-HR-0039",
+    "child_item_name": "고압베어B/D (신형) (Ver. 1.0.1) [DX3000]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0014",
+    "parent_item_name": "고압보드SMT 完 (신형) [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0016",
+    "child_item_name": "DL1500(다이오드)",
+    "child_process_type": "HR",
+    "quantity": 13,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0014",
+    "parent_item_name": "고압보드SMT 完 (신형) [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0009",
+    "child_item_name": "RK92-11XD307J (시멘트 저항)",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0014",
+    "parent_item_name": "고압보드SMT 完 (신형) [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0011",
+    "child_item_name": "고압용 (15㏀±1％, DIP) - 1/4W",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0014",
+    "parent_item_name": "고압보드SMT 完 (신형) [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "6-HR-0012",
+    "child_item_name": "고압용 (500Ω±1％, DIP) - 1/4W",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0014",
+    "parent_item_name": "고압보드SMT 完 (신형) [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0013",
+    "child_item_name": "고압용(세라믹103)",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0014",
+    "parent_item_name": "고압보드SMT 完 (신형) [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "3467-HR-0017",
+    "child_item_name": "HPC-2C 47k/Surge",
+    "child_process_type": "HR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0014",
+    "parent_item_name": "고압보드SMT 完 (신형) [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "6-HR-0031",
+    "child_item_name": "트랜스포머 [ADX6000]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0014",
+    "parent_item_name": "고압보드SMT 完 (신형) [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "67-HR-0019",
+    "child_item_name": "680pF DHR4E4C681K2BB 무라타 작은 콘덴서",
+    "child_process_type": "HR",
+    "quantity": 12,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0014",
+    "parent_item_name": "고압보드SMT 完 (신형) [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "6-HA-0002",
+    "child_item_name": "히터트랜스포머 20턴 작업完 [ADX6000]",
+    "child_process_type": "HA",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0014",
+    "parent_item_name": "고압보드SMT 完 (신형) [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0015",
+    "child_item_name": "3216 B 100nF",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0014",
+    "parent_item_name": "고압보드SMT 完 (신형) [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "6-HR-0037",
+    "child_item_name": "ADX6000 신형 고압 베어보드",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0014",
+    "parent_item_name": "고압보드SMT 完 (신형) [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "6-HR-0045",
+    "child_item_name": "튜브 고정 보드 에노드 (나사) [ADX6000]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HA-0014",
+    "parent_item_name": "고압보드SMT 完 (신형) [ADX6000]",
+    "parent_process_type": "HA",
+    "child_erp_code": "6-HR-0046",
+    "child_item_name": "튜브 고정 보드 케소드 (필라멘트) [ADX6000]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-HA-0016",
+    "parent_item_name": "고압보드SMT 完 [Ver 2.12 신형] [COCOON]",
+    "parent_process_type": "HA",
+    "child_erp_code": "3467-HR-0017",
+    "child_item_name": "HPC-2C 47k/Surge",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-HA-0016",
+    "parent_item_name": "고압보드SMT 完 [Ver 2.12 신형] [COCOON]",
+    "parent_process_type": "HA",
+    "child_erp_code": "7-HR-0018",
+    "child_item_name": "RK92-18XD 307J 시멘트저항 긴 것",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-HA-0016",
+    "parent_item_name": "고압보드SMT 完 [Ver 2.12 신형] [COCOON]",
+    "parent_process_type": "HA",
+    "child_erp_code": "67-HR-0019",
+    "child_item_name": "680pF DHR4E4C681K2BB 무라타 작은 콘덴서",
+    "child_process_type": "HR",
+    "quantity": 10,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-HA-0016",
+    "parent_item_name": "고압보드SMT 完 [Ver 2.12 신형] [COCOON]",
+    "parent_process_type": "HA",
+    "child_erp_code": "7-HR-0029",
+    "child_item_name": "트랜스포머 [COCOON]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-HA-0016",
+    "parent_item_name": "고압보드SMT 完 [Ver 2.12 신형] [COCOON]",
+    "parent_process_type": "HA",
+    "child_erp_code": "7-HR-0020",
+    "child_item_name": "LNTK103FW 온도센서",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-HA-0016",
+    "parent_item_name": "고압보드SMT 完 [Ver 2.12 신형] [COCOON]",
+    "parent_process_type": "HA",
+    "child_erp_code": "7-HR-0022",
+    "child_item_name": "DD1800 (신규 다이오드)",
+    "child_process_type": "HR",
+    "quantity": 10,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-HA-0016",
+    "parent_item_name": "고압보드SMT 完 [Ver 2.12 신형] [COCOON]",
+    "parent_process_type": "HA",
+    "child_erp_code": "7-HR-0043",
+    "child_item_name": "튜브 고정 지지대 (Ver 2.12에 사용) [COCOON]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-HA-0016",
+    "parent_item_name": "고압보드SMT 完 [Ver 2.12 신형] [COCOON]",
+    "parent_process_type": "HA",
+    "child_erp_code": "7-HR-0040",
+    "child_item_name": "고압베어B/D [COCOON]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-HA-0016",
+    "parent_item_name": "고압보드SMT 完 [Ver 2.12 신형] [COCOON]",
+    "parent_process_type": "HA",
+    "child_erp_code": "347-HR-0008",
+    "child_item_name": "네온램프(NEON-5T)",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "8-HA-0017",
+    "parent_item_name": "고압보드 SMT (DXDR-070) [SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "347-HR-0008",
+    "child_item_name": "네온램프(NEON-5T)",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "8-HA-0017",
+    "parent_item_name": "고압보드 SMT (DXDR-070) [SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "3467-HR-0017",
+    "child_item_name": "HPC-2C 47k/Surge",
+    "child_process_type": "HR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "8-HA-0017",
+    "parent_item_name": "고압보드 SMT (DXDR-070) [SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "7-HR-0018",
+    "child_item_name": "RK92-18XD 307J 시멘트저항 긴 것",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "8-HA-0017",
+    "parent_item_name": "고압보드 SMT (DXDR-070) [SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "8-HA-0003",
+    "child_item_name": "히터트랜스포머 20턴 [SOLO]",
+    "child_process_type": "HA",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "8-HA-0017",
+    "parent_item_name": "고압보드 SMT (DXDR-070) [SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "8-HR-0030",
+    "child_item_name": "트랜스포머 [SOLO]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "8-HA-0017",
+    "parent_item_name": "고압보드 SMT (DXDR-070) [SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "8-HR-0041",
+    "child_item_name": "고압베어B/D (4개 1세트) [SOLO]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "8-HA-0018",
+    "parent_item_name": "고압보드 SMT (D-041) [SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "347-HR-0008",
+    "child_item_name": "네온램프(NEON-5T)",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "8-HA-0018",
+    "parent_item_name": "고압보드 SMT (D-041) [SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "3467-HR-0017",
+    "child_item_name": "HPC-2C 47k/Surge",
+    "child_process_type": "HR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "8-HA-0018",
+    "parent_item_name": "고압보드 SMT (D-041) [SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "7-HR-0018",
+    "child_item_name": "RK92-18XD 307J 시멘트저항 긴 것",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "8-HA-0018",
+    "parent_item_name": "고압보드 SMT (D-041) [SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "8-HA-0003",
+    "child_item_name": "히터트랜스포머 20턴 [SOLO]",
+    "child_process_type": "HA",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "8-HA-0018",
+    "parent_item_name": "고압보드 SMT (D-041) [SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "8-HR-0041",
+    "child_item_name": "고압베어B/D (4개 1세트) [SOLO]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "8-HA-0018",
+    "parent_item_name": "고압보드 SMT (D-041) [SOLO]",
+    "parent_process_type": "HA",
+    "child_erp_code": "8-HR-0030",
+    "child_item_name": "트랜스포머 [SOLO]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0019",
+    "parent_item_name": "고압보드 SMT 完 (D-0813) (Ver 1.0.0) [DX3000V]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0011",
+    "child_item_name": "고압용 (15㏀±1％, DIP) - 1/4W",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0019",
+    "parent_item_name": "고압보드 SMT 完 (D-0813) (Ver 1.0.0) [DX3000V]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0009",
+    "child_item_name": "RK92-11XD307J (시멘트 저항)",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0019",
+    "parent_item_name": "고압보드 SMT 完 (D-0813) (Ver 1.0.0) [DX3000V]",
+    "parent_process_type": "HA",
+    "child_erp_code": "346-HR-0015",
+    "child_item_name": "3216 B 100nF",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0019",
+    "parent_item_name": "고압보드 SMT 完 (D-0813) (Ver 1.0.0) [DX3000V]",
+    "parent_process_type": "HA",
+    "child_erp_code": "6-HR-0012",
+    "child_item_name": "고압용 (500Ω±1％, DIP) - 1/4W",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0019",
+    "parent_item_name": "고압보드 SMT 完 (D-0813) (Ver 1.0.0) [DX3000V]",
+    "parent_process_type": "HA",
+    "child_erp_code": "3467-HR-0017",
+    "child_item_name": "HPC-2C 47k/Surge",
+    "child_process_type": "HR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0019",
+    "parent_item_name": "고압보드 SMT 完 (D-0813) (Ver 1.0.0) [DX3000V]",
+    "parent_process_type": "HA",
+    "child_erp_code": "6-HA-0002",
+    "child_item_name": "히터트랜스포머 20턴 작업完 [ADX6000]",
+    "child_process_type": "HA",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0019",
+    "parent_item_name": "고압보드 SMT 完 (D-0813) (Ver 1.0.0) [DX3000V]",
+    "parent_process_type": "HA",
+    "child_erp_code": "6-HR-0031",
+    "child_item_name": "트랜스포머 [ADX6000]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0019",
+    "parent_item_name": "고압보드 SMT 完 (D-0813) (Ver 1.0.0) [DX3000V]",
+    "parent_process_type": "HA",
+    "child_erp_code": "67-HR-0019",
+    "child_item_name": "680pF DHR4E4C681K2BB 무라타 작은 콘덴서",
+    "child_process_type": "HR",
+    "quantity": 12,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0019",
+    "parent_item_name": "고압보드 SMT 完 (D-0813) (Ver 1.0.0) [DX3000V]",
+    "parent_process_type": "HA",
+    "child_erp_code": "6-HR-0045",
+    "child_item_name": "튜브 고정 보드 에노드 (나사) [ADX6000]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0019",
+    "parent_item_name": "고압보드 SMT 完 (D-0813) (Ver 1.0.0) [DX3000V]",
+    "parent_process_type": "HA",
+    "child_erp_code": "6-HR-0046",
+    "child_item_name": "튜브 고정 보드 케소드 (필라멘트) [ADX6000]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HA-0019",
+    "parent_item_name": "고압보드 SMT 完 (D-0813) (Ver 1.0.0) [DX3000V]",
+    "parent_process_type": "HA",
+    "child_erp_code": "3-HR-0044",
+    "child_item_name": "고압베어B/D (D-0813) (Ver 1.0.0) [DX3000V]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HF-0001",
+    "parent_item_name": "발생부 고압B/D+튜브 최종 작업完 [DX3000]",
+    "parent_process_type": "HF",
+    "child_erp_code": "34-HA-0005",
+    "child_item_name": "캐논튜브 60KV 하우징 [D-081B] [DX3000, ADX4000W]",
+    "child_process_type": "HA",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HF-0001",
+    "parent_item_name": "발생부 고압B/D+튜브 최종 작업完 [DX3000]",
+    "parent_process_type": "HF",
+    "child_erp_code": "34-HA-0011",
+    "child_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "child_process_type": "HA",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "4-HF-0003",
+    "parent_item_name": "발생부 고압B/D+튜브 최종 작업完 [ADX4000W]",
+    "parent_process_type": "HF",
+    "child_erp_code": "34-HA-0005",
+    "child_item_name": "캐논튜브 60KV 하우징 [D-081B] [DX3000, ADX4000W]",
+    "child_process_type": "HA",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "4-HF-0003",
+    "parent_item_name": "발생부 고압B/D+튜브 최종 작업完 [ADX4000W]",
+    "parent_process_type": "HF",
+    "child_erp_code": "34-HA-0011",
+    "child_item_name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]",
+    "child_process_type": "HA",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HF-0002",
+    "parent_item_name": "발생부 고압B/D+튜브 최종 작업完  [DX3000M]",
+    "parent_process_type": "HF",
+    "child_erp_code": "34-HA-0005",
+    "child_item_name": "캐논튜브 60KV 하우징 [D-081B] [DX3000, ADX4000W]",
+    "child_process_type": "HA",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "3-HF-0002",
+    "parent_item_name": "발생부 고압B/D+튜브 최종 작업完  [DX3000M]",
+    "parent_process_type": "HF",
+    "child_erp_code": "34-HR-0038",
+    "child_item_name": "고압베어 B/D (Ver. 2.5) [DX3000, ADX4000W]",
+    "child_process_type": "HR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HF-0004",
+    "parent_item_name": "발생부 고압B/D+튜브 최종 작업完 [D-0813] [ADX6000]",
+    "parent_process_type": "HF",
+    "child_erp_code": "6-HA-0008",
+    "child_item_name": "캐논튜브 80KV 하우징 [D-0813] [ADX6000]",
+    "child_process_type": "HA",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "6-HF-0004",
+    "parent_item_name": "발생부 고압B/D+튜브 최종 작업完 [D-0813] [ADX6000]",
+    "parent_process_type": "HF",
+    "child_erp_code": "6-HA-0014",
+    "child_item_name": "고압보드SMT 完 (신형) [ADX6000]",
+    "child_process_type": "HA",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-HF-0007",
+    "parent_item_name": "발생부 고압B/D+튜브 최종 작업完 [COCOON]",
+    "parent_process_type": "HF",
+    "child_erp_code": "7-HA-0016",
+    "child_item_name": "고압보드SMT 完 [Ver 2.12 신형] [COCOON]",
+    "child_process_type": "HA",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-HF-0007",
+    "parent_item_name": "발생부 고압B/D+튜브 최종 작업完 [COCOON]",
+    "parent_process_type": "HF",
+    "child_erp_code": "78-HA-0007",
+    "child_item_name": "캐논튜브 70KV 하우징 [D-041] [COCOON, SOLO]",
+    "child_process_type": "HA",
     "quantity": 1,
     "unit": "EA"
   }
