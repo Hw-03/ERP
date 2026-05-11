@@ -166,6 +166,9 @@ _MIGRATION_DDL: list[str] = [
     "CREATE INDEX IF NOT EXISTS ix_io_bundles_batch_id ON io_bundles(batch_id)",
     "CREATE INDEX IF NOT EXISTS ix_io_lines_bundle_id ON io_lines(bundle_id)",
     "CREATE INDEX IF NOT EXISTS ix_io_line_item_included ON io_lines(item_id, included)",
+    # R10B: 중복 제출 방지용 클라이언트 멱등성 키
+    "ALTER TABLE stock_requests ADD COLUMN client_request_id VARCHAR(64)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ix_stock_requests_client_request_id ON stock_requests(client_request_id)",
 ]
 
 

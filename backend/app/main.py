@@ -12,7 +12,7 @@ import datetime as _dt
 import os
 import uuid
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, text
@@ -20,7 +20,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app._logging import get_logger, setup_logging
-from app.database import get_db
+from app.database import _is_sqlite, get_db
 from app.models import (
     Employee,
     Inventory,
@@ -303,6 +303,53 @@ def health_detailed(db: Session = Depends(get_db)):
         "open_queue_batches": open_batches,
         "last_transaction_at": last_tx.isoformat() if last_tx else None,
     }
+
+
+@app.get("/api/health/db-info", tags=["System"])
+def health_db_info():
+    """서버가 실제 연결 중인 DB 정보 반환 — preflight 전용.
+    DATABASE_URL 전체 노출 금지. 엔진 종류 + 30명 안전 여부만 반환.
+    """
+    db_engine = "sqlite" if _is_sqlite else "postgresql"
+    return {
+        "db_engine": db_engine,
+        "is_sqlite": _is_sqlite,
+        "pool_enabled": not _is_sqlite,
+        "safe_for_30_users": not _is_sqlite,
+        "note": (
+            "SQLite는 개발/테스트 전용. 30명 운영은 PostgreSQL 필수."
+            if _is_sqlite else
+            "PostgreSQL 연결 정상. 30명 동시 운영 가능."
+        ),
+    }
+
+
+@app.post("/api/health/write-check", tags=["System"])
+def health_write_check(db: Session = Depends(get_db)):
+    """DB 쓰기 가능 여부 점검 — preflight 전용.
+    SAVEPOINT 안에서 실제 INSERT 실행 후 rollback. 데이터 변경 없음.
+    """
+    import time as _time
+    start = _time.perf_counter()
+    try:
+        sp = db.begin_nested()
+        # Actual write test: INSERT a temporary item row inside SAVEPOINT
+        db.add(Item(item_name="__health_write_test__", unit="EA"))
+        db.flush()
+        sp.rollback()
+        latency_ms = round((_time.perf_counter() - start) * 1000, 1)
+        return {
+            "status": "ok",
+            "db_engine": "sqlite" if _is_sqlite else "postgresql",
+            "writable": True,
+            "latency_ms": latency_ms,
+        }
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        raise HTTPException(status_code=503, detail=f"DB 쓰기 테스트 실패: {str(e)}")
 
 
 @app.get("/", tags=["System"])

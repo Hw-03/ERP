@@ -12,12 +12,12 @@
 
 from __future__ import annotations
 
+import secrets
 import uuid
 from datetime import datetime
 from decimal import Decimal
 from typing import Iterable, List, Optional, Sequence
 
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -34,6 +34,7 @@ from app.models import (
     TransactionLog,
     TransactionTypeEnum,
 )
+from app.database import _is_sqlite
 from app.services import inventory as inventory_svc
 from app.services.pin_auth import verify_pin
 
@@ -87,16 +88,14 @@ def request_requires_approval(lines: Sequence[StockRequestLine]) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _generate_request_code(db: Session, ts: datetime) -> str:
-    """`SR-YYYYMMDD-NNNN` 형식. 단일 사용자 환경 가정 (race condition 무시)."""
-    prefix = f"SR-{ts.strftime('%Y%m%d')}"
-    existing = (
-        db.query(func.count(StockRequest.request_id))
-        .filter(StockRequest.request_code.like(f"{prefix}-%"))
-        .scalar()
-        or 0
-    )
-    return f"{prefix}-{existing + 1:04d}"
+def _generate_request_code(ts: datetime) -> str:
+    """SR-YYYYMMDD-HHMMSS-XXXXXXXX 형식 (8자리 랜덤 hex, 32비트 엔트로피).
+
+    충돌 확률 약 1/4,294,967,296 수준.
+    unique constraint 충돌 시 라우터가 1회 retry 한다.
+    """
+    suffix = secrets.token_hex(4).upper()
+    return f"SR-{ts.strftime('%Y%m%d-%H%M%S')}-{suffix}"
 
 
 # ---------------------------------------------------------------------------
@@ -321,6 +320,7 @@ def _build_request_and_lines(
     status: StockRequestStatusEnum,
     request_code: Optional[str],
     submitted_at: Optional[datetime],
+    client_request_id: Optional[str] = None,
 ) -> StockRequest:
     """StockRequest + StockRequestLine row 생성. 호출자가 사전 검증 책임.
 
@@ -332,6 +332,7 @@ def _build_request_and_lines(
 
     request = StockRequest(
         request_code=request_code,
+        client_request_id=client_request_id,
         requester_employee_id=requester.employee_id,
         requester_name=requester.name,
         requester_department=requester.department,
@@ -435,6 +436,7 @@ def create_request(
     lines_input: Sequence[LineInput],
     reference_no: Optional[str],
     notes: Optional[str],
+    client_request_id: Optional[str] = None,
 ) -> StockRequest:
     """요청 생성. 호출자가 db.commit() 책임.
 
@@ -446,7 +448,7 @@ def create_request(
     _validate_lines(request_type, lines_input)
     _preflight_inventory_check(db, request_type, lines_input)
     now = datetime.utcnow()
-    code = _generate_request_code(db, now)
+    code = _generate_request_code(now)
     request = _build_request_and_lines(
         db,
         requester=requester,
@@ -457,6 +459,7 @@ def create_request(
         status=StockRequestStatusEnum.SUBMITTED,
         request_code=code,
         submitted_at=now,
+        client_request_id=client_request_id,
     )
     return _finalize_submission(db, request=request, requester=requester, now=now)
 
@@ -658,7 +661,7 @@ def submit_draft_request(
 
     now = datetime.utcnow()
     if not request.request_code:
-        request.request_code = _generate_request_code(db, now)
+        request.request_code = _generate_request_code(now)
     request.submitted_at = now
     # lines 가 DRAFT 동안 변경됐을 가능성에 대비해 requires_warehouse_approval 재계산.
     request.requires_warehouse_approval = any(
@@ -828,6 +831,11 @@ def _execute_all_lines(
     approver: Employee,
     is_approval: bool = False,
 ) -> None:
+    lines = list(lines)
+    # 정렬된 순서로 모든 아이템 선락 → 교착 방지 (PostgreSQL only; SQLite는 WAL 직렬화)
+    if not _is_sqlite:
+        all_item_ids = sorted({line.item_id for line in lines})
+        inventory_svc.lock_inventories(db, all_item_ids)
     for line in lines:
         _execute_line(db, request, line, approver=approver, is_approval=is_approval)
 
@@ -857,6 +865,9 @@ def approve_request(
     if not verify_pin(approver.pin_hash, pin):
         raise PermissionError("PIN이 일치하지 않습니다.")
 
+    # 이미 완료된 경우 멱등 반환 (중복 승인 클릭 / 동시 승인 2번째 요청)
+    if request.status == StockRequestStatusEnum.COMPLETED:
+        return request
     if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
         raise ValueError(f"승인할 수 없는 상태입니다: {request.status.value}")
     if not request.requires_warehouse_approval:
@@ -946,6 +957,9 @@ def reject_request(
         raise PermissionError("PIN이 일치하지 않습니다.")
     if not reason or not reason.strip():
         raise ValueError("반려 사유를 입력하세요.")
+    # 이미 반려된 경우 멱등 반환
+    if request.status == StockRequestStatusEnum.REJECTED:
+        return request
     if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
         raise ValueError(f"반려할 수 없는 상태입니다: {request.status.value}")
 
@@ -982,10 +996,12 @@ def cancel_request(
         raise PermissionError("본인 요청 또는 관리자만 취소할 수 있습니다.")
     if not verify_pin(requester.pin_hash, pin):
         raise PermissionError("PIN이 일치하지 않습니다.")
+    # 이미 취소된 경우 멱등 반환
+    if request.status == StockRequestStatusEnum.CANCELLED:
+        return request
     if request.status in (
         StockRequestStatusEnum.COMPLETED,
         StockRequestStatusEnum.REJECTED,
-        StockRequestStatusEnum.CANCELLED,
         StockRequestStatusEnum.FAILED_APPROVAL,
     ):
         raise ValueError(f"취소할 수 없는 상태입니다: {request.status.value}")

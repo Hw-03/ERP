@@ -64,7 +64,8 @@ def production_receipt(
     # 기존엔 component 마다 db.query 가 반복되어 N+1 였음.
     comp_ids = list(merged.keys())
     items_map = {i.item_id: i for i in db.query(Item).filter(Item.item_id.in_(comp_ids)).all()}
-    invs_map = {i.item_id: i for i in db.query(Inventory).filter(Inventory.item_id.in_(comp_ids)).all()}
+    # 다품목 동시 backflush TOCTOU 방지 — 한 번에 FOR UPDATE 잠금
+    invs_map = inventory_svc.lock_inventories(db, comp_ids)
 
     shortage_errors = []
     for comp_item_id, required_qty in merged.items():

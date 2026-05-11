@@ -38,6 +38,19 @@ export function toApiUrl(path: string): string {
  *
  * shortages 가 있으면 줄바꿈으로 추가한다.
  */
+/** HTTP 에러 상태 코드를 보존하는 API 에러 클래스. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+  get isConflict(): boolean { return this.status === 409; }
+  get isUnavailable(): boolean { return this.status === 503; }
+}
+
 export function extractErrorMessage(detail: unknown, fallback = "처리 실패"): string {
   if (typeof detail === "string") return detail;
   if (detail && typeof detail === "object") {
@@ -87,7 +100,7 @@ export async function fetcher<T>(url: string, signal?: AbortSignal): Promise<T> 
     );
   }
   if (!res.ok) {
-    throw new Error(await parseError(res));
+    throw new ApiError(await parseError(res), res.status);
   }
   return res.json();
 }
@@ -112,7 +125,7 @@ async function writeJson<T>(
     init.body = JSON.stringify(body);
   }
   const res = await fetch(url, init);
-  if (!res.ok) throw new Error(await parseError(res));
+  if (!res.ok) throw new ApiError(await parseError(res), res.status);
   if (res.status === 204) return undefined as T;
   const text = await res.text();
   if (!text) return undefined as T;
