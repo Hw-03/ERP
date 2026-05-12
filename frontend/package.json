@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "node scripts/dev.js",
     "dev:raw": "next dev --hostname 0.0.0.0",
-    "build": "next build --distDir .next-prod",
-    "start": "next start --distDir .next-prod",
+    "build": "next build",
+    "start": "next start",
     "lint": "next lint",
     "lint:strict": "next lint --max-warnings=0",
     "test": "vitest run",
