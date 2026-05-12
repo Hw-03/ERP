@@ -1,98 +1,48 @@
 "use client";
 
 /**
- * 작업자 식별용 PIN 로그인 카드 — 실제 보안 인증이 아님.
+ * 작업자 식별용 PIN 로그인 카드 — 단일 카드 구조.
+ *
  * 로그인된 작업자 정보는 입출고/수정 작업의 produced_by 기본값으로 사용된다.
+ * 실제 보안 인증이 아닌 식별용.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Loader2, Search, UserCheck } from "lucide-react";
-import { api, type DepartmentMaster, type Employee } from "@/lib/api";
-import { setCurrentOperator } from "./useCurrentOperator";
+import { useCallback, useRef, useState, type KeyboardEvent } from "react";
+import { ArrowRight, Loader2, Lock, RotateCcw } from "lucide-react";
+import { api, type Employee } from "@/lib/api";
+import { setCurrentOperator, type Operator } from "./useCurrentOperator";
 import { useLoginEmployees } from "./useLoginEmployees";
-import { PinStep } from "./PinStep";
-import { SelectStep } from "./SelectStep";
-import { useDepartments, useDeptColor } from "../DepartmentsContext";
-
+import { EmployeeCombobox } from "./EmployeeCombobox";
 
 interface OperatorLoginCardProps {
   onLogin: () => void;
 }
 
-type Step = "dept" | "select" | "pin";
+const PIN_LENGTH = 4;
 
 export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
-  const [step, setStep] = useState<Step>("dept");
-  // R8-5: employees fetch 는 별도 hook (mount 시 1회)
   const employees = useLoginEmployees();
-  const deptMasters = useDepartments();
-  const [selectedDept, setSelectedDept] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Employee | null>(null);
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const pinInputRef = useRef<HTMLInputElement>(null);
 
-  // 브라우저 뒤로가기/앞으로가기로 단계 이동 지원
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    // 현재 진입 시점을 dept 단계로 표시
-    window.history.replaceState({ loginStep: "dept" }, "");
+  const canSubmit = !!selected && pin.length === PIN_LENGTH && !loading;
 
-    const handlePopState = (e: PopStateEvent) => {
-      const target = e.state?.loginStep as Step | undefined;
-      if (target === "dept" || target === "select" || target === "pin") {
-        setStep(target);
-      }
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
+  const handlePinChange = (raw: string) => {
+    const digits = raw.replace(/\D/g, "").slice(0, PIN_LENGTH);
+    setPin(digits);
+    if (error) setError("");
+  };
 
-  const filtered = useMemo(() => {
-    let list = selectedDept ? employees.filter((e) => e.department === selectedDept) : employees;
-    const q = search.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter(
-      (e) =>
-        e.name.toLowerCase().includes(q) ||
-        e.employee_code.toLowerCase().includes(q) ||
-        e.department.toLowerCase().includes(q),
-    );
-  }, [employees, selectedDept, search]);
-
-  const handleSelectDept = useCallback((dept: string) => {
-    setSelectedDept(dept);
-    setSearch("");
-    setStep("select");
-    if (typeof window !== "undefined") {
-      window.history.pushState({ loginStep: "select" }, "");
-    }
-  }, []);
-
-  const handleSelect = useCallback((emp: Employee) => {
-    setSelected(emp);
-    setPin("");
-    setError("");
-    setStep("pin");
-    if (typeof window !== "undefined") {
-      window.history.pushState({ loginStep: "pin" }, "");
-    }
-  }, []);
-
-  const handleBack = useCallback(() => {
-    if (typeof window !== "undefined") {
-      window.history.back();
-    }
-  }, []);
-
-  const handlePinSubmit = useCallback(async () => {
-    if (!selected || pin.length === 0 || loading) return;
+  const submit = useCallback(async () => {
+    if (!selected || pin.length !== PIN_LENGTH || loading) return;
     setLoading(true);
     setError("");
     try {
       const emp = await api.verifyEmployeePin(selected.employee_id, pin);
-      const op = {
+      const op: Operator = {
         employee_id: emp.employee_id,
         name: emp.name,
         department: emp.department,
@@ -108,152 +58,176 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
       }
       onLogin();
     } catch {
-      setError("PIN이 올바르지 않습니다.");
+      setError("PIN 번호가 올바르지 않습니다.");
       setPin("");
     } finally {
       setLoading(false);
     }
   }, [selected, pin, loading, onLogin]);
 
+  const handlePinKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && canSubmit) {
+      e.preventDefault();
+      void submit();
+    }
+  };
+
   return (
-    <div className="relative mx-auto w-full" style={{ maxWidth: "1100px", padding: "0 16px" }}>
+    <div className="mx-auto w-full" style={{ maxWidth: 440, padding: "0 16px" }}>
       <div
-        className="relative flex w-full flex-col rounded-[28px] border p-12"
+        className="relative flex w-full flex-col rounded-[24px] border"
         style={{
           background: "var(--c-s1)",
           borderColor: "var(--c-border)",
           boxShadow: "var(--c-card-shadow)",
-          minHeight: "560px",
+          padding: "40px 36px 32px",
         }}
       >
-        {step === "dept" && (
-          <DeptStep departments={deptMasters} onSelect={handleSelectDept} />
-        )}
-        {step === "select" && (
-          <SelectStep
-            employees={filtered}
-            search={search}
-            onSearch={setSearch}
-            onSelect={handleSelect}
-            onBack={handleBack}
+        {/* 직원 선택 — 드롭다운이 형제 필드들 위에 오도록 stacking 보장 */}
+        <div
+          style={{
+            animation: "erp-field-rise 0.5s 0.05s ease both",
+            position: "relative",
+            zIndex: 30,
+          }}
+        >
+          <EmployeeCombobox
+            employees={employees}
+            value={selected}
+            onChange={(emp) => {
+              setSelected(emp);
+              setPin("");
+              setError("");
+              // 직원 선택 직후 PIN 입력으로 흐름 자동 연결
+              requestAnimationFrame(() => pinInputRef.current?.focus());
+            }}
+            autoFocus
+            disabled={loading}
           />
-        )}
-        {step === "pin" && (
-          <PinStep
-            employee={selected!}
-            pin={pin}
-            onPinChange={setPin}
-            onSubmit={handlePinSubmit}
-            onBack={handleBack}
-            error={error}
-            loading={loading}
-          />
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ── 부서 버튼 ────────────────────────────────────────────────────────────── */
-
-function DeptButton({ dept, onSelect }: { dept: DepartmentMaster; onSelect: (name: string) => void }) {
-  const color = useDeptColor(dept.name);
-  return (
-    <button
-      onClick={() => onSelect(dept.name)}
-      className="flex w-full items-center justify-center rounded-[20px] border py-8 text-2xl font-bold transition-all active:scale-[0.98]"
-      style={{
-        background: `color-mix(in srgb, ${color} 12%, transparent)`,
-        borderColor: `color-mix(in srgb, ${color} 30%, transparent)`,
-        color,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = `color-mix(in srgb, ${color} 22%, transparent)`;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = `color-mix(in srgb, ${color} 12%, transparent)`;
-      }}
-    >
-      {dept.name}
-    </button>
-  );
-}
-
-/* ── 0단계: 부서 선택 ─────────────────────────────────────────────────────── */
-
-const PRIMARY_DEPTS = ["튜브", "고압", "진공", "튜닝", "조립"];
-
-function DeptStep({
-  departments,
-  onSelect,
-}: {
-  departments: DepartmentMaster[];
-  onSelect: (dept: string) => void;
-}) {
-  const [showAll, setShowAll] = useState(false);
-
-  const primary = departments.filter((d) => PRIMARY_DEPTS.includes(d.name));
-  const secondary = departments.filter((d) => !PRIMARY_DEPTS.includes(d.name));
-
-  return (
-    <div className="flex flex-1 flex-col">
-      {/* 상단 여백 + 로그인 — items-center: 버튼 증가 시 flex-1 축소되며 타이틀 자연스럽게 상승 */}
-      <div className="flex flex-1 items-center">
-        <h1 className="text-3xl font-bold" style={{ color: "var(--c-text)" }}>
-          로그인
-        </h1>
-      </div>
-
-      {departments.length === 0 ? (
-        <div className="text-sm" style={{ color: "var(--c-muted)" }}>
-          등록된 부서가 없습니다.
         </div>
-      ) : (
-        <div className="flex flex-col">
-          <div className="grid grid-cols-5 gap-4">
-            {primary.map((dept) => (
-              <DeptButton key={dept.id} dept={dept} onSelect={onSelect} />
-            ))}
-          </div>
 
-          {secondary.length > 0 && (
-            <>
-              {/* grid-template-rows 트랜지션: 실제 콘텐츠 높이 기준으로 슬라이드 */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateRows: showAll ? "1fr" : "0fr",
-                  transition: "grid-template-rows 0.35s ease",
-                }}
-              >
-                <div style={{ overflow: "hidden" }}>
-                  <div className="mt-4 grid grid-cols-5 gap-4">
-                    {secondary.map((dept) => (
-                      <DeptButton key={dept.id} dept={dept} onSelect={onSelect} />
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowAll((v) => !v)}
-                className="mt-4 self-center rounded-2xl px-6 py-2 text-sm font-medium transition-all hover:brightness-110"
-                style={{
-                  background: "var(--c-s2)",
-                  color: "var(--c-muted)",
-                  border: "1px solid var(--c-border)",
-                }}
-              >
-                {showAll ? "접기" : `더보기 (${secondary.length})`}
-              </button>
-            </>
+        {/* PIN 입력 */}
+        <div
+          className="mt-5"
+          style={{ animation: "erp-field-rise 0.5s 0.15s ease both" }}
+        >
+          <label
+            htmlFor="erp-login-pin"
+            className="mb-2 block text-sm font-semibold"
+            style={{ color: "var(--c-text)" }}
+          >
+            PIN 번호
+          </label>
+          <div
+            className="flex items-center gap-3 rounded-[14px] border px-4 py-3.5 transition-colors focus-within:border-[var(--c-blue)]"
+            style={{
+              background: "var(--c-s2)",
+              borderColor: error ? "var(--c-red)" : "var(--c-border)",
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
+            <Lock size={16} style={{ color: "var(--c-muted)", flexShrink: 0 }} />
+            <input
+              id="erp-login-pin"
+              ref={pinInputRef}
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={PIN_LENGTH}
+              placeholder="숫자 4자리"
+              value={pin}
+              onChange={(e) => handlePinChange(e.target.value)}
+              onKeyDown={handlePinKey}
+              disabled={loading}
+              className="min-w-0 flex-1 bg-transparent text-base tracking-[0.4em] outline-none placeholder:tracking-normal placeholder:text-[var(--c-muted)]"
+              style={{ color: "var(--c-text)" }}
+            />
+          </div>
+          {error && (
+            <p
+              className="mt-2 text-sm"
+              role="alert"
+              style={{ color: "var(--c-red)" }}
+            >
+              {error}
+            </p>
           )}
         </div>
-      )}
 
-      {/* 하단 여백 */}
-      <div className="flex-1" />
+        {/* 로그인 버튼 — wrapper 가 애니메이션, 버튼 inline opacity 보존 */}
+        <div
+          className="mt-6"
+          style={{ animation: "erp-field-rise 0.5s 0.25s ease both" }}
+        >
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={!canSubmit}
+            className="flex w-full items-center justify-center gap-2 rounded-[14px] py-3.5 text-base font-semibold text-white transition-all"
+            style={{
+              background: "var(--c-blue)",
+              opacity: canSubmit ? 1 : 0.45,
+              cursor: canSubmit ? "pointer" : "not-allowed",
+            }}
+          >
+            {loading ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                확인 중...
+              </>
+            ) : (
+              <>
+                로그인
+                <ArrowRight size={18} />
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* PIN 초기화 요청 — 항상 보이는 보조 안내 */}
+        <div
+          className="mt-5"
+          style={{ animation: "erp-field-rise 0.5s 0.30s ease both" }}
+        >
+          <div className="flex flex-col items-center gap-1">
+            <span
+              role="button"
+              tabIndex={-1}
+              aria-disabled="true"
+              title="관리자에게 문의해 주세요."
+              className="inline-flex items-center gap-1.5 text-sm"
+              style={{
+                color: "var(--c-blue)",
+                cursor: "not-allowed",
+                opacity: 0.7,
+              }}
+            >
+              <RotateCcw size={14} />
+              PIN 초기화 요청
+            </span>
+            <span className="text-[11px]" style={{ color: "var(--c-muted)" }}>
+              관리자에게 문의해 주세요.
+            </span>
+          </div>
+        </div>
+
+        {/* 하단 보안 안내 */}
+        <div
+          className="mt-7 border-t pt-5"
+          style={{
+            borderColor: "var(--c-border)",
+            animation: "erp-field-rise 0.5s 0.35s ease both",
+          }}
+        >
+          <div
+            className="text-center text-xs leading-relaxed"
+            style={{ color: "var(--c-muted)" }}
+          >
+            <p>사내 승인된 직원만 접근할 수 있습니다.</p>
+            <p>모든 접속은 보안 정책에 따라 기록 및 관리됩니다.</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
-
-

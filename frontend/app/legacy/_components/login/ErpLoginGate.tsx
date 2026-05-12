@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { OperatorLoginCard } from "./OperatorLoginCard";
 import { clearCurrentOperator, getStoredBootId, readCurrentOperator } from "./useCurrentOperator";
@@ -93,36 +92,14 @@ export function ErpLoginGate({ children }: ErpLoginGateProps) {
     return () => { cancelled = true; };
   }, []);
 
-  // 인트로 단계 진입 → 로고 축소 → 카드 등장
+  // 인트로 단계 진입 → 로고 축소 → 카드 등장 (≤ 1.5s 절제된 시퀀스)
   useEffect(() => {
     if (phase !== "intro") return;
-    const t1 = setTimeout(() => setLogoState("above-card"), 1500);
-    const t2 = setTimeout(() => setPhase("form"), 2400);
+    const t1 = setTimeout(() => setLogoState("above-card"), 600);
+    const t2 = setTimeout(() => setPhase("form"), 1100);
     timersRef.current = [t1, t2];
     return clearTimers;
   }, [phase]);
-
-  // 인트로 중 키/클릭으로 스킵
-  useEffect(() => {
-    if (phase !== "intro") return;
-    const onAnyKey = () => {
-      clearTimers();
-      setLogoState("above-card");
-      setPhase("form");
-    };
-    window.addEventListener("keydown", onAnyKey);
-    window.addEventListener("pointerdown", onAnyKey);
-    return () => {
-      window.removeEventListener("keydown", onAnyKey);
-      window.removeEventListener("pointerdown", onAnyKey);
-    };
-  }, [phase]);
-
-  const handleSkip = () => {
-    clearTimers();
-    setLogoState("above-card");
-    setPhase("form");
-  };
 
   const handleLogin = () => {
     // 작업자 로그인 시 직전 메뉴와 무관하게 항상 대시보드로 진입.
@@ -159,7 +136,7 @@ export function ErpLoginGate({ children }: ErpLoginGateProps) {
       >
         <div
           style={{
-            animation: phase === "intro" ? "erp-logo-fade-in 1s ease both" : undefined,
+            animation: phase === "intro" ? "erp-logo-fade-in 0.5s ease both" : undefined,
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -190,37 +167,14 @@ export function ErpLoginGate({ children }: ErpLoginGateProps) {
         <div
           className="erp-card-anim w-full"
           style={{
-            animation: "erp-card-rise 0.5s ease forwards",
-            // 카드만 top 정렬 + 고정 marginTop → 카드 height 가 step별로 달라져도 카드 상단 위치 일정 (로고 겹침 방지)
+            animation: "erp-card-rise 0.6s ease both",
+            // 카드만 top 정렬 + 고정 marginTop → 카드 height 가 변해도 카드 상단 위치 일정 (로고 겹침 방지)
             alignSelf: "flex-start",
             marginTop: "calc(50vh - 280px)",
           }}
         >
           <OperatorLoginCard onLogin={handleLogin} />
         </div>
-      )}
-
-      {/* 인트로 chrome — SKIP 버튼 + 상태 표시 */}
-      {phase === "intro" && (
-        <>
-          <button
-            onClick={handleSkip}
-            className="absolute right-6 top-5 flex items-center gap-1 rounded border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors hover:border-[var(--c-blue)] hover:text-[var(--c-blue)]"
-            style={{ borderColor: "var(--c-border-strong)", color: "var(--c-muted)" }}
-          >
-            SKIP <ChevronRight size={10} />
-          </button>
-          <div
-            className="absolute bottom-6 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em]"
-            style={{ color: "var(--c-muted)" }}
-          >
-            <span
-              className="inline-block h-1.5 w-1.5 rounded-full"
-              style={{ background: "var(--c-green)", opacity: 0.8 }}
-            />
-            SYSTEM INITIALIZING
-          </div>
-        </>
       )}
     </div>
   );

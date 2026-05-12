@@ -170,6 +170,11 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes erp-field-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* === Admin PIN Lock (DesktopPinLock) === */
 @keyframes admin-pin-shake {
   0%, 100% { transform: translateX(0); }
