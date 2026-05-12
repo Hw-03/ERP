@@ -17,7 +17,7 @@ export const IO_WORK_TYPES: Array<{
 }> = [
   { id: "receive", label: "원자재 입고", description: "외부에서 들어온 품목 등록", icon: Boxes },
   { id: "warehouse_io", label: "창고입출고", description: "창고와 부서 사이 이동", icon: ArrowLeftRight },
-  { id: "process", label: "공정처리", description: "생산, 조립, 분해, 보정", icon: Wrench },
+  { id: "process", label: "부서 입출고", description: "부서 안에서 입고·출고·생산·분해·보정 처리", icon: Wrench },
   { id: "ship", label: "출하", description: "출하부 재고 차감", icon: PackageCheck },
   { id: "defect", label: "불량", description: "정상 재고를 불량으로 격리", icon: AlertTriangle },
 ];
@@ -105,6 +105,30 @@ export function canPickPackages(workType: IoWorkType) {
   return workType === "ship";
 }
 
+export type DeptIoDirection = "in" | "out";
+
+// (방향, 액션) → sub_type 매핑. process workType 한정.
+export function deptIoSubType(direction: DeptIoDirection, mode: "bom" | "single"): IoSubType {
+  if (direction === "in") return mode === "bom" ? "produce" : "adjust_in";
+  return mode === "bom" ? "disassemble" : "adjust_out";
+}
+
+// sub_type → 방향 (draft 복원·표시용)
+export function deptIoDirectionOf(subType: IoSubType): DeptIoDirection | null {
+  if (subType === "produce" || subType === "adjust_in") return "in";
+  if (subType === "disassemble" || subType === "adjust_out") return "out";
+  return null;
+}
+
+// sub_type → 사용자 화면 표시 라벨 (process workType 한정)
+export function deptIoDisplayLabel(subType: IoSubType): string | null {
+  if (subType === "produce") return "입고 · BOM 적용";
+  if (subType === "disassemble") return "출고 · BOM 적용";
+  if (subType === "adjust_in") return "입고 · 이 품목만";
+  if (subType === "adjust_out") return "출고 · 이 품목만";
+  return null;
+}
+
 export type ItemActionMode = "bom_or_single" | "single_only";
 
 // BOM 자동 전개 대상이면 "BOM 적용"/"이 품목만" 2버튼, 그 외는 "선택" 1버튼.
@@ -126,6 +150,12 @@ export type LineTagTone = "green" | "red" | "blue" | "purple" | "muted";
 // 라인의 sub_type/origin/direction 조합으로 현장 친화 태그 결정.
 // IoLineRow / IoBundleCard 표시용.
 export function lineTagLabel(line: IoLine, subType: IoSubType): { text: string; tone: LineTagTone } {
+  if (subType === "adjust_in" && (line.origin === "direct" || line.origin === "manual")) {
+    return { text: "단품 입고", tone: "muted" };
+  }
+  if (subType === "adjust_out" && (line.origin === "direct" || line.origin === "manual")) {
+    return { text: "단품 출고", tone: "muted" };
+  }
   if (line.origin === "manual") return { text: "이 품목만", tone: "muted" };
   if (line.origin === "package_auto") return { text: "패키지 자동", tone: "purple" };
   if (subType === "produce") {

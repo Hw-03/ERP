@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
-import { DEFAULT_SUB_TYPE } from "./ioWorkType";
+import { DEFAULT_SUB_TYPE, type DeptIoDirection } from "./ioWorkType";
 
 export type IoStep = 1 | 2 | 3 | 4 | 5;
 
@@ -21,12 +21,27 @@ export function useIoWorkState(initialDepartment?: string | null) {
   const [notes, setNotes] = useState("");
   const [referenceNo, setReferenceNo] = useState("");
   const [step, setStep] = useState<IoStep>(1);
+  // process workType 한정: 방향(입고/출고) 선택. null = 미선택 → Step 2 advance 차단.
+  const [deptIoDirection, setDeptIoDirectionBase] = useState<DeptIoDirection | null>(null);
 
   function setWorkType(next: IoWorkType) {
     setWorkTypeBase(next);
     setSubType(DEFAULT_SUB_TYPE[next]);
+    setDeptIoDirectionBase(null);
     setBundles([]);
     setStep(1);
+  }
+
+  // process workType 방향 설정 — bundle 비우고 sub_type 기본값 재설정
+  function setDeptIoDirection(dir: DeptIoDirection) {
+    setDeptIoDirectionBase(dir);
+    setBundles([]);
+    setSubType(dir === "in" ? "produce" : "disassemble");
+  }
+
+  // draft 복원 전용 — bundle 보존, raw set
+  function setDeptIoDirectionRaw(dir: DeptIoDirection | null) {
+    setDeptIoDirectionBase(dir);
   }
 
   const includedLines = useMemo(
@@ -43,12 +58,12 @@ export function useIoWorkState(initialDepartment?: string | null) {
   const canAdvance = useMemo<Record<IoStep, boolean>>(() => {
     return {
       1: true,
-      2: true,
+      2: workType !== "process" || deptIoDirection != null,
       3: bundles.length > 0,
       4: includedLines.length > 0 && !hasShortage && !hasInvalidQuantity,
       5: true,
     };
-  }, [bundles.length, includedLines.length, hasShortage, hasInvalidQuantity]);
+  }, [workType, deptIoDirection, bundles.length, includedLines.length, hasShortage, hasInvalidQuantity]);
 
   function goNext() {
     setStep((s) => (s < 5 ? ((s + 1) as IoStep) : s));
@@ -98,6 +113,7 @@ export function useIoWorkState(initialDepartment?: string | null) {
     notes,
     referenceNo,
     step,
+    deptIoDirection,
     includedLines,
     excludedLines,
     hasShortage,
@@ -110,6 +126,8 @@ export function useIoWorkState(initialDepartment?: string | null) {
     setBundles,
     setNotes,
     setReferenceNo,
+    setDeptIoDirection,
+    setDeptIoDirectionRaw,
     updateLine,
     removeLine,
     goNext,

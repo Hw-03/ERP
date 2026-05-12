@@ -1,6 +1,7 @@
 "use client";
 
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { AppSelect } from "../../common/AppSelect";
 import { PROCESS_TYPE_OPTIONS, MODEL_SLOTS, UNIT_OPTIONS } from "../adminShared";
 
 export type ItemFormData = {
@@ -126,29 +127,25 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showErpCode
       {/* 카테고리 */}
       <div>
         <FieldLabel label="카테고리" badge="필수" />
-        <select
+        <AppSelect
           value={form.process_type_code}
-          onChange={(e) => setForm((f) => ({ ...f, process_type_code: e.target.value }))}
-          className="w-full rounded-[18px] border px-4 py-3 text-base outline-none"
-          style={inputStyle}
-        >
-          {PROCESS_TYPE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+          onChange={(v) => setForm((f) => ({ ...f, process_type_code: v }))}
+          size="lg"
+          triggerStyle={{ background: LEGACY_COLORS.s1 }}
+          options={PROCESS_TYPE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+        />
       </div>
 
       {/* 단위 */}
       <div>
         <FieldLabel label="단위" badge="선택" />
-        <select
+        <AppSelect
           value={form.unit}
-          onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
-          className="w-full rounded-[18px] border px-4 py-3 text-base outline-none"
-          style={inputStyle}
-        >
-          {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
-        </select>
+          onChange={(v) => setForm((f) => ({ ...f, unit: v }))}
+          size="lg"
+          triggerStyle={{ background: LEGACY_COLORS.s1 }}
+          options={UNIT_OPTIONS.map((u) => ({ value: u, label: u }))}
+        />
       </div>
 
       {/* 사용 제품 (모델 슬롯) */}

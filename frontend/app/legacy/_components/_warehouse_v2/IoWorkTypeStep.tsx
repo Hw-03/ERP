@@ -1,11 +1,11 @@
 "use client";
 
-import { AlertTriangle, Check } from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Check } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
 import type { IoSubType, IoWorkType, OperatorLike } from "./types";
-import { IO_SUB_TYPES, IO_WORK_TYPES, canSeeWorkType, requiresDepartments } from "./ioWorkType";
+import { IO_SUB_TYPES, IO_WORK_TYPES, canSeeWorkType, requiresDepartments, type DeptIoDirection } from "./ioWorkType";
 import { SettingLabel } from "./_atoms";
 
 interface WorkTypeProps {
@@ -61,9 +61,11 @@ interface SubTypeProps {
   subType: IoSubType;
   fromDepartment: string;
   toDepartment: string;
+  deptIoDirection: DeptIoDirection | null;
   onSubTypeChange: (subType: IoSubType) => void;
   onFromDepartmentChange: (value: string) => void;
   onToDepartmentChange: (value: string) => void;
+  onDeptIoDirectionChange: (dir: DeptIoDirection) => void;
 }
 
 /* sub_type → 어느 부서 grid를 보여줄지 */
@@ -82,17 +84,48 @@ function deptVisibility(subType: IoSubType): { from: boolean; to: boolean } {
   return { from: false, to: false };
 }
 
-const PROD_DEPTS = ["조립", "고압", "진공", "튜닝", "튜브", "출하"];
+const PROD_DEPTS = ["튜브", "고압", "진공", "튜닝", "조립", "출하"];
 
 export function IoSubTypeStep({
   workType,
   subType,
   fromDepartment,
   toDepartment,
+  deptIoDirection,
   onSubTypeChange,
   onFromDepartmentChange,
   onToDepartmentChange,
+  onDeptIoDirectionChange,
 }: SubTypeProps) {
+  // process workType은 (입고/출고) 카드 + 대상 부서 그리드만 노출. 4 chip 숨김.
+  if (workType === "process") {
+    return (
+      <div className="space-y-5">
+        <DeptGrid label="대상 부서" value={toDepartment} onChange={onToDepartmentChange} />
+        <div>
+          <SettingLabel label="방향" />
+          <div className="grid grid-cols-2 gap-3">
+            <DirectionCard
+              dir="in"
+              active={deptIoDirection === "in"}
+              onClick={() => onDeptIoDirectionChange("in")}
+            />
+            <DirectionCard
+              dir="out"
+              active={deptIoDirection === "out"}
+              onClick={() => onDeptIoDirectionChange("out")}
+            />
+          </div>
+          {deptIoDirection == null && (
+            <p className="mt-2 text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+              입고 또는 출고를 선택하세요.
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   const subRows = IO_SUB_TYPES[workType];
   const dept = deptVisibility(subType);
   const showAnyDept = requiresDepartments(subType) && (dept.from || dept.to);
@@ -213,5 +246,34 @@ function DeptGrid({
         })}
       </div>
     </div>
+  );
+}
+
+function DirectionCard({
+  dir,
+  active,
+  onClick,
+}: {
+  dir: DeptIoDirection;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const Icon = dir === "in" ? ArrowDownToLine : ArrowUpFromLine;
+  const label = dir === "in" ? "입고" : "출고";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-2 rounded-[18px] border p-6 text-left transition-all hover:brightness-110"
+      style={{
+        background: active ? tint(LEGACY_COLORS.blue, 14) : LEGACY_COLORS.s2,
+        borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+        borderWidth: active ? 2 : 1,
+        color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.text,
+      }}
+    >
+      <Icon className="h-7 w-7 shrink-0" />
+      <span className="text-lg font-black leading-tight">{label}</span>
+    </button>
   );
 }

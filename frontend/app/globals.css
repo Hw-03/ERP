@@ -30,6 +30,8 @@
     --c-muted2: #56657e;
     --c-panel-glow: radial-gradient(circle at top right, rgba(47, 116, 231, 0.08), transparent 36%);
     --c-card-shadow: 0 24px 64px rgba(45, 70, 106, 0.12);
+    --c-popup-bg: #ffffff;
+    --c-popup-shadow: 0 12px 28px rgba(45, 70, 106, 0.16);
     --c-radius-xl: 32px;
     --c-radius-lg: 24px;
     --c-radius-md: 18px;
@@ -75,6 +77,8 @@
     --c-muted2: #9badc7;
     --c-panel-glow: radial-gradient(circle at top right, rgba(101, 169, 255, 0.16), transparent 32%);
     --c-card-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+    --c-popup-bg: #101a2b;
+    --c-popup-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
     --pill-hover-mix: 55%;
     --pill-glow-strength: 75%;
     --pill-glow-blur: 24px;

@@ -2,6 +2,7 @@
 
 import type { DepartmentMaster, Employee, WarehouseRole } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { AppSelect } from "../../common/AppSelect";
 import type { EmployeeEditForm } from "../../_admin_hooks/useAdminEmployees";
 
 /**
@@ -80,29 +81,23 @@ export function EmployeeEditPanel({
           />
         </FieldRow>
         <FieldRow label="부서">
-          <select
+          <AppSelect
             value={form.department}
-            onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
-            className="w-full rounded-[14px] border px-3 py-2 text-sm outline-none"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-          >
-            {departments.filter((d) => d.is_active).map((d) => (
-              <option key={d.id} value={d.name}>{d.name}</option>
-            ))}
-          </select>
+            onChange={(v) => setForm((f) => ({ ...f, department: v }))}
+            size="md"
+            triggerStyle={{ background: LEGACY_COLORS.s1 }}
+            options={departments.filter((d) => d.is_active).map((d) => ({ value: d.name, label: d.name }))}
+          />
         </FieldRow>
         <div className="col-span-2">
           <FieldRow label="창고 결재 역할">
-            <select
+            <AppSelect
               value={form.warehouse_role}
-              onChange={(e) => setForm((f) => ({ ...f, warehouse_role: e.target.value as WarehouseRole }))}
-              className="w-full rounded-[14px] border px-3 py-2 text-sm outline-none"
-              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-            >
-              {WAREHOUSE_ROLE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+              onChange={(v) => setForm((f) => ({ ...f, warehouse_role: v as WarehouseRole }))}
+              size="md"
+              triggerStyle={{ background: LEGACY_COLORS.s1 }}
+              options={WAREHOUSE_ROLE_OPTIONS}
+            />
           </FieldRow>
         </div>
       </div>

@@ -49,6 +49,21 @@ export const DEPT_OPTIONS = [
   { label: "출하", value: "출하" },
 ];
 
+// 작업자 소속 부서를 PROD 영역 맨 앞으로 끌어올린 부서 옵션. ALL/창고 는 항상 상단 유지.
+// PROD_DEPTS 에 없는 부서는 입력되어도 무시 (기본 순서 반환).
+export function getDeptOptionsForOperator(operatorDept?: string | null) {
+  if (!operatorDept || !PROD_DEPTS.includes(operatorDept as Department)) return DEPT_OPTIONS;
+  const head = [
+    { label: "전체", value: "ALL" },
+    { label: "창고", value: "창고" },
+    { label: operatorDept, value: operatorDept },
+  ];
+  const rest = PROD_DEPTS
+    .filter((d) => d !== operatorDept)
+    .map((d) => ({ label: d, value: d }));
+  return [...head, ...rest];
+}
+
 export const PROCESS_TYPE_LABEL: Record<string, string> = {
   TR: "튜브 원자재", TA: "튜브 중간공정", TF: "튜브 공정완료",
   HR: "고압 원자재", HA: "고압 중간공정", HF: "고압 공정완료",

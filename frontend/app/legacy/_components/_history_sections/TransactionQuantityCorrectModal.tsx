@@ -16,6 +16,7 @@ import { api, type Employee, type TransactionLog, type TransactionType } from "@
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { getTransactionLabel } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
+import { AppSelect } from "../common/AppSelect";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 
 interface Props {
@@ -171,19 +172,16 @@ export function TransactionQuantityCorrectModal({ open, log, onClose, onSuccess 
 
           <div className="grid grid-cols-2 gap-2">
             <FieldRow label="수정자">
-              <select
+              <AppSelect
                 value={editorId}
-                onChange={(e) => setEditorId(e.target.value)}
-                className="w-full rounded-[12px] border px-3 py-2 text-sm outline-none"
-                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-              >
-                <option value="">선택</option>
-                {employees.map((e) => (
-                  <option key={e.employee_id} value={e.employee_id}>
-                    {e.name} ({e.employee_code})
-                  </option>
-                ))}
-              </select>
+                onChange={setEditorId}
+                size="md"
+                placeholder="선택"
+                options={employees.map((e) => ({
+                  value: e.employee_id,
+                  label: `${e.name} (${e.employee_code})`,
+                }))}
+              />
             </FieldRow>
             <FieldRow label="PIN">
               <input

@@ -94,8 +94,11 @@ export function IoLineRow({
       ? LEGACY_COLORS.yellow
       : LEGACY_COLORS.green;
 
+  // line.quantity 는 backend Decimal 직렬화로 string 일 수 있어 Number 강제 변환 (string concat 방지)
+  const currentQty = Number(line.quantity) || 0;
+
   function onStep(delta: number) {
-    const next = Math.max(0, line.quantity + delta);
+    const next = Math.max(0, currentQty + delta);
     const nextShortage = available === null ? line.shortage : Math.max(0, next - available);
     onQuantityChange(next, nextShortage);
   }
@@ -212,10 +215,11 @@ export function IoLineRow({
           <input
             type="number"
             min={0}
-            step="0.0001"
-            value={Number.isFinite(line.quantity) ? line.quantity : 0}
+            step="any"
+            value={currentQty}
             disabled={disabled}
             onChange={(e) => onInputChange(e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
             className="w-[72px] rounded-[10px] border px-2 py-1.5 text-center text-sm font-black tabular-nums outline-none focus:border-[var(--c-blue)] disabled:opacity-60"
             style={{
               background: LEGACY_COLORS.s2,

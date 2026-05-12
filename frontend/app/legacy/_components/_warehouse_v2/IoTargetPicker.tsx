@@ -8,23 +8,37 @@ import { EmptyState } from "../common";
 import {
   DEPT_OPTIONS,
   PAGE_SIZE,
+  PROD_DEPTS,
   matchesSearch,
 } from "../_warehouse_steps/_constants";
 import { deptOf, stageOf, type DeptLetter } from "../_admin_sections/_bom_workbench/bomDept";
 import { LabeledSelect, SettingLabel } from "./_atoms";
 import type { IoBundle, IoSubType, IoWorkType, Item, ProductModel, ShipPackage } from "./types";
-import { canPickPackages, getItemActionMode, type ItemActionMode } from "./ioWorkType";
+import {
+  canPickPackages,
+  deptIoDisplayLabel,
+  deptIoSubType,
+  getItemActionMode,
+  type DeptIoDirection,
+  type ItemActionMode,
+} from "./ioWorkType";
+import { tint } from "@/lib/mes/colorUtils";
 
 interface Props {
   workType: IoWorkType;
   subType: IoSubType;
+  deptIoDirection: DeptIoDirection | null;
+  bundleSubType: IoSubType | null;
+  bomParents: Set<string>;
+  onClearBundles: () => void;
+  targetDepartment?: string | null;
   items: Item[];
   packages: ShipPackage[];
   productModels: ProductModel[];
   bundles: IoBundle[];
   search: string;
   onSearchChange: (value: string) => void;
-  onAddItem: (item: Item, sourceKind?: "direct_item" | "manual") => void;
+  onAddItem: (item: Item, sourceKind?: "direct_item" | "manual", subTypeOverride?: IoSubType) => void;
   onAddPackage: (pkg: ShipPackage) => void;
   onAdvance: () => void;
   busy?: boolean;
@@ -73,6 +87,11 @@ function matchesModel(item: Item, model: string) {
 export function IoTargetPicker({
   workType,
   subType,
+  deptIoDirection,
+  bundleSubType,
+  bomParents,
+  onClearBundles,
+  targetDepartment,
   items,
   packages,
   productModels,
@@ -92,16 +111,41 @@ export function IoTargetPicker({
   const showPackages = canPickPackages(workType);
   const actionMode = getItemActionMode(subType);
   const keyword = search.trim().toLowerCase();
+  const deptOptions = DEPT_OPTIONS;
+
+  // Step 2 에서 선택한 대상 부서 → PROD 부서 순서 기준 우선순위 맵.
+  // 같은 부서 내에서는 서버 정렬 유지 (stable sort).
+  const deptPriorityByLetter = useMemo(() => {
+    const base = [...PROD_DEPTS] as string[];
+    const ordered =
+      targetDepartment && base.includes(targetDepartment)
+        ? [targetDepartment, ...base.filter((d) => d !== targetDepartment)]
+        : base;
+    const map = new Map<string, number>();
+    ordered.forEach((name, idx) => {
+      const letter = NAME_TO_LETTER[name];
+      if (letter) map.set(letter, idx);
+    });
+    return map;
+  }, [targetDepartment]);
 
   const filteredItems = useMemo(() => {
-    return items.filter(
+    const filtered = items.filter(
       (item) =>
         matchesDept(item, dept) &&
         matchesModel(item, model) &&
         matchesStage(item, stage) &&
         matchesSearch(item, keyword),
     );
-  }, [items, dept, model, stage, keyword]);
+    return filtered
+      .map((item, idx) => {
+        const letter = deptOf(item.process_type_code);
+        const priority = letter ? deptPriorityByLetter.get(letter) ?? 999 : 999;
+        return { item, priority, idx };
+      })
+      .sort((a, b) => (a.priority !== b.priority ? a.priority - b.priority : a.idx - b.idx))
+      .map((row) => row.item);
+  }, [items, dept, model, stage, keyword, deptPriorityByLetter]);
 
   const filteredPackages = useMemo(() => {
     if (!keyword) return packages;
@@ -130,7 +174,7 @@ export function IoTargetPicker({
       {/* 필터 */}
       {!showPackages ? (
         <div className="grid grid-cols-[1fr_1fr_1fr_2fr] gap-2">
-          <LabeledSelect label="부서" value={dept} onChange={setDept} options={DEPT_OPTIONS} />
+          <LabeledSelect label="부서" value={dept} onChange={setDept} options={deptOptions} />
           <LabeledSelect label="모델" value={model} onChange={setModel} options={modelOptions} />
           <LabeledSelect label="단계" value={stage} onChange={setStage} options={STAGE_OPTIONS} />
           <label className="flex flex-col gap-0.5">
@@ -168,6 +212,26 @@ export function IoTargetPicker({
             className="flex-1 bg-transparent text-sm outline-none"
             style={{ color: LEGACY_COLORS.text }}
           />
+        </div>
+      )}
+
+      {/* process workType 모드 배지 — 묶음이 있을 때 현재 모드 + 비우기 버튼 */}
+      {workType === "process" && bundleSubType && (
+        <div
+          className="flex items-center gap-2 rounded-[10px] border px-3 py-2 text-xs"
+          style={{ borderColor: LEGACY_COLORS.border, background: tint(LEGACY_COLORS.blue, 8) }}
+        >
+          <span style={{ color: LEGACY_COLORS.blue, fontWeight: 700 }}>
+            현재 모드: {deptIoDisplayLabel(bundleSubType) ?? bundleSubType}
+          </span>
+          <button
+            type="button"
+            onClick={onClearBundles}
+            className="rounded-[8px] border px-2 py-0.5 font-bold transition-all hover:brightness-110"
+            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
+          >
+            묶음 비우기
+          </button>
         </div>
       )}
 
@@ -225,6 +289,10 @@ export function IoTargetPicker({
             hasActiveFilter={hasActiveFilter}
             clearFilters={clearFilters}
             mode={actionMode}
+            workType={workType}
+            deptIoDirection={deptIoDirection}
+            bundleSubType={bundleSubType}
+            bomParents={bomParents}
           />
         )}
       </div>
@@ -266,16 +334,27 @@ function ItemTable({
   hasActiveFilter,
   clearFilters,
   mode,
+  workType,
+  deptIoDirection,
+  bundleSubType,
+  bomParents,
 }: {
   items: Item[];
   displayLimit: number;
   onShowMore: () => void;
-  onAdd: (item: Item, sourceKind?: "direct_item" | "manual") => void;
+  onAdd: (item: Item, sourceKind?: "direct_item" | "manual", subTypeOverride?: IoSubType) => void;
   busy?: boolean;
   hasActiveFilter: boolean;
   clearFilters: () => void;
   mode: ItemActionMode;
+  workType: IoWorkType;
+  deptIoDirection: DeptIoDirection | null;
+  bundleSubType: IoSubType | null;
+  bomParents: Set<string>;
 }) {
+  const isProcess = workType === "process" && deptIoDirection != null;
+  const bomTarget = isProcess ? deptIoSubType(deptIoDirection!, "bom") : null;
+  const singleTarget = isProcess ? deptIoSubType(deptIoDirection!, "single") : null;
   return (
     <>
       <table className="w-full border-collapse text-sm">
@@ -352,39 +431,101 @@ function ItemTable({
                   {formatQty(item.quantity)}
                 </td>
                 <td
-                  className="px-3 py-2 text-right"
+                  className="whitespace-nowrap px-3 py-2 text-right"
                   style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                 >
                   <span className="inline-flex gap-1">
-                    {mode === "bom_or_single" ? (
-                      <>
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => onAdd(item)}
-                          className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[11px] font-black text-white disabled:opacity-50"
-                          style={{ background: LEGACY_COLORS.blue }}
-                          title="BOM 적용 — 하위 자재까지 같이 처리"
-                        >
-                          <Plus className="h-3 w-3" />
-                          BOM 적용
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => onAdd(item, "manual")}
-                          className="rounded-[10px] border px-2.5 py-1 text-[11px] font-black disabled:opacity-50"
-                          style={{
-                            background: LEGACY_COLORS.s2,
-                            borderColor: LEGACY_COLORS.border,
-                            color: LEGACY_COLORS.muted2,
-                          }}
-                          title="이 품목만 — 선택 품목만 처리"
-                        >
-                          이 품목만
-                        </button>
-                      </>
-                    ) : (
+                    {isProcess ? (() => {
+                      const hasBom = bomParents.has(item.item_id);
+                      const bomLockedByMode = bundleSubType != null && bundleSubType !== bomTarget;
+                      const singleLockedByMode = bundleSubType != null && bundleSubType !== singleTarget;
+                      const bomDisabled = busy || bomLockedByMode || !hasBom;
+                      const singleDisabled = busy || singleLockedByMode;
+                      const bomTitle = !hasBom
+                        ? "등록된 BOM이 없습니다"
+                        : bomLockedByMode
+                          ? "이 품목만 모드 진행 중 — 묶음 비우고 변경하세요"
+                          : "BOM 적용 — 하위 자재까지 같이 처리";
+                      const singleTitle = singleLockedByMode
+                        ? "BOM 적용 모드 진행 중 — 묶음 비우고 변경하세요"
+                        : "이 품목만 — 선택 품목만 처리";
+                      return (
+                        <>
+                          <button
+                            type="button"
+                            disabled={bomDisabled}
+                            onClick={() => onAdd(item, "direct_item", bomTarget!)}
+                            className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[11px] font-black text-white disabled:opacity-50"
+                            style={{
+                              background: bomDisabled ? LEGACY_COLORS.s2 : LEGACY_COLORS.blue,
+                              color: bomDisabled ? LEGACY_COLORS.muted2 : "#fff",
+                              borderColor: bomDisabled ? LEGACY_COLORS.border : LEGACY_COLORS.blue,
+                              borderWidth: 1,
+                              borderStyle: "solid",
+                            }}
+                            title={bomTitle}
+                          >
+                            <Plus className="h-3 w-3" />
+                            BOM 적용
+                          </button>
+                          <button
+                            type="button"
+                            disabled={singleDisabled}
+                            onClick={() => onAdd(item, "manual", singleTarget!)}
+                            className="rounded-[10px] border px-2.5 py-1 text-[11px] font-black disabled:opacity-50"
+                            style={{
+                              background: LEGACY_COLORS.s2,
+                              borderColor: LEGACY_COLORS.border,
+                              color: singleDisabled ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
+                            }}
+                            title={singleTitle}
+                          >
+                            이 품목만
+                          </button>
+                        </>
+                      );
+                    })() : mode === "bom_or_single" ? (() => {
+                      const hasBom = bomParents.has(item.item_id);
+                      const bomDisabled = busy || !hasBom;
+                      const bomTitle = hasBom
+                        ? "BOM 적용 — 하위 자재까지 같이 처리"
+                        : "등록된 BOM이 없습니다";
+                      return (
+                        <>
+                          <button
+                            type="button"
+                            disabled={bomDisabled}
+                            onClick={() => onAdd(item)}
+                            className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[11px] font-black disabled:opacity-50"
+                            style={{
+                              background: bomDisabled ? LEGACY_COLORS.s2 : LEGACY_COLORS.blue,
+                              color: bomDisabled ? LEGACY_COLORS.muted2 : "#fff",
+                              borderColor: bomDisabled ? LEGACY_COLORS.border : LEGACY_COLORS.blue,
+                              borderWidth: 1,
+                              borderStyle: "solid",
+                            }}
+                            title={bomTitle}
+                          >
+                            <Plus className="h-3 w-3" />
+                            BOM 적용
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => onAdd(item, "manual")}
+                            className="rounded-[10px] border px-2.5 py-1 text-[11px] font-black disabled:opacity-50"
+                            style={{
+                              background: LEGACY_COLORS.s2,
+                              borderColor: LEGACY_COLORS.border,
+                              color: LEGACY_COLORS.muted2,
+                            }}
+                            title="이 품목만 — 선택 품목만 처리"
+                          >
+                            이 품목만
+                          </button>
+                        </>
+                      );
+                    })() : (
                       <button
                         type="button"
                         disabled={busy}

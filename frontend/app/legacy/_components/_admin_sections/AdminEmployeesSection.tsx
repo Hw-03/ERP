@@ -7,6 +7,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment, getDepartmentFallbackColor } from "@/lib/mes/department";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { EmptyState } from "../common";
+import { AppSelect } from "../common/AppSelect";
 import { FilterChip } from "../common/FilterChip";
 import { StatusPill } from "../common/StatusPill";
 import {
@@ -707,21 +708,12 @@ function SelectInput({
   options: { value: string; label: string }[];
 }) {
   return (
-    <select
+    <AppSelect
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none focus:border-[var(--c-blue)]"
-      style={{
-        background: LEGACY_COLORS.s1,
-        borderColor: LEGACY_COLORS.border,
-        color: LEGACY_COLORS.text,
-      }}
-    >
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+      onChange={onChange}
+      options={options}
+      size="md"
+      triggerStyle={{ background: LEGACY_COLORS.s1 }}
+    />
   );
 }

@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, ClipboardCheck, Save } from "lu
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
-import { subTypeLabel } from "./ioWorkType";
+import { deptIoDisplayLabel, subTypeLabel } from "./ioWorkType";
 import { formatQty } from "@/lib/mes/format";
 import { SettingLabel } from "./_atoms";
 
@@ -33,8 +33,8 @@ function sectionLabels(subType: IoSubType): Record<SectionKind, string | null> {
   if (subType === "warehouse_to_dept") return { in: null, out: null, move: "이동 (창고 → 부서)" };
   if (subType === "dept_to_warehouse") return { in: null, out: null, move: "이동 (부서 → 창고)" };
   if (subType === "dept_transfer") return { in: null, out: null, move: "이동 (부서 ↔ 부서)" };
-  if (subType === "adjust_in") return { in: "수량보정 입고", out: null, move: null };
-  if (subType === "adjust_out") return { in: null, out: "수량보정 출고", move: null };
+  if (subType === "adjust_in") return { in: "단품 입고", out: null, move: null };
+  if (subType === "adjust_out") return { in: null, out: "단품 출고", move: null };
   if (subType === "defect_quarantine") return { in: null, out: "불량 격리", move: null };
   if (subType === "supplier_return") return { in: null, out: "공급처 반품", move: null };
   if (subType === "receive_supplier") return { in: "입고되는 항목", out: null, move: null };
@@ -68,7 +68,7 @@ function signFor(line: IoLine): { sign: "+" | "-" | null; color: string } {
 }
 
 export function IoConfirmStep({
-  workType: _workType,
+  workType,
   subType,
   bundles,
   notes,
@@ -83,7 +83,9 @@ export function IoConfirmStep({
   onSaveDraft,
   onPrev,
 }: Props) {
-  void _workType;
+  const headerLabel = workType === "process"
+    ? (deptIoDisplayLabel(subType) ?? subTypeLabel(subType))
+    : subTypeLabel(subType);
   const allLines = bundles.flatMap((bundle) => bundle.lines);
   const includedLines = allLines.filter((line) => line.included);
   const totalQty = includedLines.reduce(
@@ -127,7 +129,7 @@ export function IoConfirmStep({
         <div>
           <SettingLabel label={approval ? "승인 요청으로 저장" : "즉시 재고 반영"} />
           <div className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>
-            {subTypeLabel(subType)} · 반영 {includedLines.length}건 · 총 {formatQty(totalQty)}
+            {headerLabel} · 반영 {includedLines.length}건 · 총 {formatQty(totalQty)}
           </div>
         </div>
         {approval ? (

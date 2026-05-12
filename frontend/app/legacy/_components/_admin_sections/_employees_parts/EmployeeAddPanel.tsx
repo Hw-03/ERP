@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import type { DepartmentMaster, WarehouseRole } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { AppSelect } from "../../common/AppSelect";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../adminShared";
 
 /**
@@ -84,31 +85,25 @@ export function EmployeeAddPanel({ form, setForm, departments, onClose, onSubmit
         <div className="mb-2 text-sm font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
           부서
         </div>
-        <select
+        <AppSelect
           value={form.department}
-          onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
-          className="w-full rounded-[18px] border px-4 py-3 text-base outline-none"
-          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-        >
-          {departments.filter((d) => d.is_active).map((d) => (
-            <option key={d.id} value={d.name}>{d.name}</option>
-          ))}
-        </select>
+          onChange={(v) => setForm((f) => ({ ...f, department: v }))}
+          size="lg"
+          triggerStyle={{ background: LEGACY_COLORS.s1 }}
+          options={departments.filter((d) => d.is_active).map((d) => ({ value: d.name, label: d.name }))}
+        />
       </div>
       <div>
         <div className="mb-2 text-sm font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
           창고 결재 역할
         </div>
-        <select
+        <AppSelect
           value={form.warehouse_role}
-          onChange={(e) => setForm((f) => ({ ...f, warehouse_role: e.target.value as WarehouseRole }))}
-          className="w-full rounded-[18px] border px-4 py-3 text-base outline-none"
-          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-        >
-          {WAREHOUSE_ROLE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+          onChange={(v) => setForm((f) => ({ ...f, warehouse_role: v as WarehouseRole }))}
+          size="lg"
+          triggerStyle={{ background: LEGACY_COLORS.s1 }}
+          options={WAREHOUSE_ROLE_OPTIONS}
+        />
       </div>
       <button
         onClick={onSubmit}

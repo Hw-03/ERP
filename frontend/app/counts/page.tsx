@@ -6,6 +6,7 @@ import { api, type Item, type PhysicalCount } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { formatDateTime } from "@/lib/mes-format";
+import { AppSelect } from "../legacy/_components/common/AppSelect";
 
 export default function CountsPage() {
   const [items, setItems] = useState<Item[]>([]);
@@ -92,23 +93,18 @@ export default function CountsPage() {
           <div className="mb-2 text-base font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
             실사 입력
           </div>
-          <select
-            value={selectedId}
-            onChange={(e) => setSelectedId(e.target.value)}
-            className="mb-2 w-full rounded-lg border px-2 py-2 text-sm"
-            style={{
-              background: LEGACY_COLORS.s2,
-              borderColor: LEGACY_COLORS.border,
-              color: LEGACY_COLORS.text,
-            }}
-          >
-            <option value="">품목 선택...</option>
-            {items.map((i) => (
-              <option key={i.item_id} value={i.item_id}>
-                [{i.erp_code}] {i.item_name}
-              </option>
-            ))}
-          </select>
+          <div className="mb-2">
+            <AppSelect
+              value={selectedId}
+              onChange={setSelectedId}
+              size="md"
+              placeholder="품목 선택..."
+              options={items.map((i) => ({
+                value: i.item_id,
+                label: `[${i.erp_code}] ${i.item_name}`,
+              }))}
+            />
+          </div>
 
           {selectedItem && (
             <div

@@ -104,6 +104,11 @@ export function EmployeeCombobox({
         e.preventDefault();
         commit(filtered[active]);
       }
+    } else if (e.key === "Tab") {
+      if (open && !e.shiftKey && filtered[active]) {
+        e.preventDefault();
+        commit(filtered[active]);
+      }
     } else if (e.key === "Escape") {
       if (open) {
         e.preventDefault();
@@ -176,9 +181,9 @@ export function EmployeeCombobox({
           role="listbox"
           className="absolute left-0 right-0 z-20 mt-1.5 max-h-64 overflow-y-auto rounded-[14px] border py-1.5"
           style={{
-            background: "var(--c-s1)",
+            background: "var(--c-popup-bg)",
             borderColor: "var(--c-border)",
-            boxShadow: "0 12px 28px rgba(45, 70, 106, 0.16)",
+            boxShadow: "var(--c-popup-shadow)",
           }}
         >
           {filtered.length === 0 ? (

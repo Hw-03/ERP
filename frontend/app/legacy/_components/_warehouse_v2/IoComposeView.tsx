@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
-import { api, type IoLine, type IoSourceKind, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
+import { api, type BOMDetailEntry, type IoBundle, type IoLine, type IoSourceKind, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
 import { ApiError } from "@/lib/api-core";
 import { WizardStepCard } from "./_atoms";
 import { IoWorkTypeStep, IoSubTypeStep } from "./IoWorkTypeStep";
@@ -11,7 +11,7 @@ import { IoTargetPicker } from "./IoTargetPicker";
 import { IoBundleCart } from "./IoBundleCart";
 import { IoConfirmStep } from "./IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "./IoSubmitModals";
-import { IO_WORK_TYPES, requiresApproval, requiresDepartments, subTypeLabel } from "./ioWorkType";
+import { IO_WORK_TYPES, deptIoDirectionOf, requiresApproval, requiresDepartments, subTypeLabel } from "./ioWorkType";
 import { useIoDraft } from "./useIoDraft";
 import { useIoPreview } from "./useIoPreview";
 import { useIoSubmit } from "./useIoSubmit";
@@ -21,6 +21,21 @@ import type { IoComposeViewProps } from "./types";
 function locationQuantity(item: Item, department: string | null | undefined, status: "PRODUCTION" | "DEFECTIVE") {
   if (!department) return 0;
   return item.locations.find((loc) => loc.department === department && loc.status === status)?.quantity ?? 0;
+}
+
+// Pydantic Decimal은 JSON에서 문자열("1.0000")로 직렬화된다 — 프론트는 number 로 타이핑되어 있으나 실값은 string.
+// stepper 산술/합계가 string concat 으로 깨지므로 bundle 수신 즉시 number 로 정규화한다.
+function normalizeBundles(bundles: IoBundle[]): IoBundle[] {
+  return bundles.map((bundle) => ({
+    ...bundle,
+    quantity: Number(bundle.quantity),
+    lines: bundle.lines.map((line) => ({
+      ...line,
+      quantity: Number(line.quantity),
+      shortage: Number(line.shortage),
+      bom_expected: line.bom_expected == null ? null : Number(line.bom_expected),
+    })),
+  }));
 }
 
 function workTypeLabel(workType: IoWorkType) {
@@ -43,6 +58,8 @@ export function IoComposeView({
   const [search, setSearch] = useState(globalSearch);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
+  // BOM 부모 item_id 집합 — process workType에서 "BOM 적용" 버튼 활성 판단용. 마운트 시 1회 fetch.
+  const [bomParents, setBomParents] = useState<Set<string>>(() => new Set());
   const preselectedHandledRef = useRef<string | null>(null);
   const restoredDraftRef = useRef<string | null>(null);
 
@@ -60,34 +77,58 @@ export function IoComposeView({
   }, [globalSearch]);
 
   useEffect(() => {
+    let cancelled = false;
+    api.getAllBOM()
+      .then((rows: BOMDetailEntry[]) => {
+        if (cancelled) return;
+        setBomParents(new Set(rows.map((row) => row.parent_item_id)));
+      })
+      .catch(() => {
+        // BOM 조회 실패 시 빈 set 유지 → "BOM 적용" 버튼은 모든 품목에서 disabled
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!draftToRestore) return;
     if (restoredDraftRef.current === draftToRestore.batch_id) return;
     restoredDraftRef.current = draftToRestore.batch_id;
     state.setWorkType(draftToRestore.work_type);
     state.setSubType(draftToRestore.sub_type);
+    if (draftToRestore.work_type === "process") {
+      const dir = deptIoDirectionOf(draftToRestore.sub_type);
+      state.setDeptIoDirectionRaw(dir);
+    }
     state.setFromDepartment(draftToRestore.from_department || state.fromDepartment);
     state.setToDepartment(draftToRestore.to_department || state.toDepartment);
     state.setReferenceNo(draftToRestore.reference_no || "");
     state.setNotes(draftToRestore.notes || "");
-    state.setBundles(draftToRestore.bundles);
+    state.setBundles(normalizeBundles(draftToRestore.bundles));
     state.goTo(4);
     onStatusChange("임시저장 작업을 불러왔습니다.");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftToRestore?.batch_id]);
 
-  async function addItem(item: Item, sourceKind: IoSourceKind = "direct_item") {
+  async function addItem(item: Item, sourceKind: IoSourceKind = "direct_item", subTypeOverride?: IoSubType) {
     setError(null);
     const wasEmpty = state.bundles.length === 0;
+    // setSubType은 다음 렌더로 미뤄지므로, previewTarget에는 effective 값을 즉시 전달.
+    const effectiveSubType = subTypeOverride ?? state.subType;
+    if (subTypeOverride && subTypeOverride !== state.subType) {
+      state.setSubType(subTypeOverride);
+    }
     try {
       const response = await previewTarget({
         employeeId,
         workType: state.workType,
-        subType: state.subType,
+        subType: effectiveSubType,
         fromDepartment: state.fromDepartment,
         toDepartment: state.toDepartment,
         target: { source_kind: sourceKind, item_id: item.item_id, quantity: 1 },
       });
-      state.setBundles((prev) => [...prev, ...response.bundles]);
+      state.setBundles((prev) => [...prev, ...normalizeBundles(response.bundles)]);
       onStatusChange(`${item.item_name} 작업 묶음 생성`);
       if (wasEmpty && state.step === 3) {
         // 첫 품목 추가 → step 4(수량 조정) 자동 펼침. picker 위치 유지를 위해 scroll skip.
@@ -110,7 +151,7 @@ export function IoComposeView({
         toDepartment: null,
         target: { source_kind: "ship_package", package_id: pkg.package_id, quantity: 1 },
       });
-      state.setBundles((prev) => [...prev, ...response.bundles]);
+      state.setBundles((prev) => [...prev, ...normalizeBundles(response.bundles)]);
       onStatusChange(`${pkg.name} 패키지 전개`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "패키지 전개에 실패했습니다.");
@@ -120,10 +161,12 @@ export function IoComposeView({
   useEffect(() => {
     if (!preselectedItem) return;
     if (preselectedHandledRef.current === preselectedItem.item_id) return;
+    // process workType + 방향 미선택이면 자동 추가 보류 (Step 2에서 방향 선택 후 다시 진입해야 함)
+    if (state.workType === "process" && state.deptIoDirection == null) return;
     preselectedHandledRef.current = preselectedItem.item_id;
     void addItem(preselectedItem);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preselectedItem?.item_id]);
+  }, [preselectedItem?.item_id, state.workType, state.deptIoDirection]);
 
   function getAvailable(line: IoLine) {
     const item = items.find((row) => row.item_id === line.item_id);
@@ -238,6 +281,9 @@ export function IoComposeView({
   const dept = requiresDepartments(state.subType)
     ? `${state.fromDepartment} → ${state.toDepartment}`
     : "부서 무관";
+  const stepTwoSummary = state.workType === "process"
+    ? `${state.deptIoDirection === "in" ? "입고" : state.deptIoDirection === "out" ? "출고" : "미선택"} · ${state.toDepartment}`
+    : `${subTypeText} · ${dept}`;
   const includedCount = state.includedLines.length;
   const excludedCount = state.excludedLines.length;
   const lineCount = state.bundles.reduce((acc, b) => acc + b.lines.length, 0);
@@ -327,7 +373,7 @@ export function IoComposeView({
             n={2}
             title="세부 작업과 부서를 정하세요"
             state={stepState(2)}
-            summary={`${subTypeText} · ${dept}`}
+            summary={stepTwoSummary}
             onChange={() => state.goTo(2)}
             accent={accent}
           >
@@ -336,9 +382,15 @@ export function IoComposeView({
               subType={state.subType}
               fromDepartment={state.fromDepartment}
               toDepartment={state.toDepartment}
+              deptIoDirection={state.deptIoDirection}
               onSubTypeChange={handleSubTypeChange}
               onFromDepartmentChange={changeFromDepartment}
               onToDepartmentChange={changeToDepartment}
+              onDeptIoDirectionChange={(dir) => {
+                const had = state.bundles.length > 0;
+                state.setDeptIoDirection(dir);
+                if (had) onStatusChange("방향 변경으로 작업 묶음을 초기화했습니다.");
+              }}
             />
             <button
               type="button"
@@ -369,13 +421,32 @@ export function IoComposeView({
             <IoTargetPicker
               workType={state.workType}
               subType={state.subType}
+              deptIoDirection={state.deptIoDirection}
+              bundleSubType={state.bundles.length > 0 ? state.subType : null}
+              bomParents={bomParents}
+              onClearBundles={() => {
+                state.setBundles([]);
+                onStatusChange("작업 묶음을 비웠습니다.");
+              }}
+              targetDepartment={(() => {
+                const st = state.subType;
+                // 출발 부서가 대상인 작업
+                if (st === "dept_to_warehouse" || st === "defect_quarantine" || st === "supplier_return") {
+                  return state.fromDepartment;
+                }
+                // 부서 무관 작업
+                if (st === "receive_supplier" || st === "ship") return null;
+                // 그 외 (warehouse_to_dept, produce, disassemble, adjust_in/out, dept_transfer) — toDepartment
+                return state.toDepartment;
+              })()}
               items={items}
               packages={packages}
               productModels={productModels}
               bundles={state.bundles}
               search={search}
               onSearchChange={setSearch}
-              onAddItem={addItem}
+              onAddItem={(item, sourceKind, subTypeOverride) =>
+                addItem(item, sourceKind ?? "direct_item", subTypeOverride)}
               onAddPackage={addPackage}
               onAdvance={() => {
                 if (state.step === 3) state.goNext();

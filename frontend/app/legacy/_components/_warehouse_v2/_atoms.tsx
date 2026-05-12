@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, ChevronDown, Pencil } from "lucide-react";
+import { Check, Pencil } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { AppSelect, type AppSelectOption } from "../common/AppSelect";
 
 // ─────────────────────── 내부 atom: LabeledSelect ──────────────────
 
@@ -15,26 +16,14 @@ export function LabeledSelect({
   label: string;
   value: string;
   onChange: (v: string) => void;
-  options: { value: string; label: string }[];
+  options: AppSelectOption[];
 }) {
   return (
     <label className="flex flex-col gap-0.5">
       <span className="text-[9px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
         {label}
       </span>
-      <div className="relative">
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full appearance-none rounded-[10px] border px-2 py-1.5 pr-6 text-xs font-semibold outline-none"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-        >
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2" style={{ color: LEGACY_COLORS.muted2 }} />
-      </div>
+      <AppSelect value={value} onChange={onChange} options={options} size="sm" />
     </label>
   );
 }
