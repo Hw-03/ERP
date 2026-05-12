@@ -7,10 +7,14 @@ from app.models import (
     Employee,
     EmployeeLevelEnum,
     Inventory,
+    InventoryLocation,
     IoBatch,
     IoLine,
+    LocationStatusEnum,
     StockRequest,
     StockRequestLine,
+    TransactionLog,
+    TransactionTypeEnum,
 )
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
@@ -299,6 +303,192 @@ def test_io_submit_idempotent_with_client_request_id(client, db_session, make_it
     assert db_session.query(IoBatch).count() == 1
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     assert inv.warehouse_qty == Decimal("4")
+
+
+def test_io_immediate_adjust_in_increases_production_quantity(
+    client, db_session, make_item, make_location
+):
+    item = make_item(name="Adj In", warehouse_qty=Decimal("0"))
+    make_location(item.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("0"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "adjust_in",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {
+                    "source_kind": "manual",
+                    "item_id": str(item.item_id),
+                    "quantity": "4",
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+    bundle = preview.json()["bundles"][0]
+    assert len(bundle["lines"]) == 1
+    line = bundle["lines"][0]
+    assert line["direction"] == "adjust"
+    assert line["to_bucket"] == "production"
+    assert line["from_bucket"] == "none"
+
+    res = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "adjust_in",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert res.status_code == 201, res.json()
+    assert res.json()["status"] == "completed"
+
+    loc = (
+        db_session.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == item.item_id,
+            InventoryLocation.department == DepartmentEnum.ASSEMBLY,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        )
+        .first()
+    )
+    assert loc is not None and loc.quantity == Decimal("4")
+
+    tx = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).all()
+    assert len(tx) == 1
+    assert tx[0].transaction_type == TransactionTypeEnum.ADJUST
+
+
+def test_io_immediate_adjust_out_decreases_production_quantity(
+    client, db_session, make_item, make_location
+):
+    item = make_item(name="Adj Out", warehouse_qty=Decimal("0"))
+    make_location(item.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("10"))
+    db_session.flush()
+    # 위치 합과 총량 동기화
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+    inv.quantity = Decimal("10")
+    db_session.flush()
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "adjust_out",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {
+                    "source_kind": "manual",
+                    "item_id": str(item.item_id),
+                    "quantity": "3",
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+    line = preview.json()["bundles"][0]["lines"][0]
+    assert line["direction"] == "adjust"
+    assert line["from_bucket"] == "production"
+    assert line["to_bucket"] == "none"
+
+    res = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "adjust_out",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert res.status_code == 201, res.json()
+    assert res.json()["status"] == "completed"
+
+    loc = (
+        db_session.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == item.item_id,
+            InventoryLocation.department == DepartmentEnum.ASSEMBLY,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        )
+        .first()
+    )
+    assert loc is not None and loc.quantity == Decimal("7")
+
+    tx = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).all()
+    assert len(tx) == 1
+    # adjust_out 은 BACKFLUSH 가 아니라 ADJUST 로 남아야 한다
+    assert tx[0].transaction_type == TransactionTypeEnum.ADJUST
+
+
+def test_io_submit_adjust_out_blocks_on_shortage(
+    client, db_session, make_item, make_location
+):
+    item = make_item(name="Adj Short", warehouse_qty=Decimal("0"))
+    make_location(item.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("2"))
+    db_session.flush()
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+    inv.quantity = Decimal("2")
+    db_session.flush()
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "adjust_out",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {
+                    "source_kind": "manual",
+                    "item_id": str(item.item_id),
+                    "quantity": "5",
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+
+    res = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "adjust_out",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert res.status_code == 422, res.json()
+    body = res.json()
+    detail = body.get("detail")
+    detail_text = detail if isinstance(detail, str) else str(detail)
+    assert "재고 부족" in detail_text
+
+    # 재고 변동 없음
+    loc = (
+        db_session.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == item.item_id,
+            InventoryLocation.department == DepartmentEnum.ASSEMBLY,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        )
+        .first()
+    )
+    assert loc.quantity == Decimal("2")
+    assert db_session.query(TransactionLog).count() == 0
 
 
 def test_io_submit_without_client_request_id_skips_idempotency(client, db_session, make_item):

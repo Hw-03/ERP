@@ -72,7 +72,12 @@ function deptVisibility(subType: IoSubType): { from: boolean; to: boolean } {
   if (subType === "dept_to_warehouse") return { from: true, to: false };
   if (subType === "defect_quarantine" || subType === "supplier_return") return { from: true, to: false };
   if (subType === "dept_transfer") return { from: true, to: true };
-  if (subType === "produce" || subType === "disassemble" || subType === "adjust")
+  if (
+    subType === "produce" ||
+    subType === "disassemble" ||
+    subType === "adjust_in" ||
+    subType === "adjust_out"
+  )
     return { from: false, to: true };
   return { from: false, to: false };
 }
@@ -138,7 +143,16 @@ export function IoSubTypeStep({
       )}
       {showAnyDept && dept.to && (
         <DeptGrid
-          label={subType === "warehouse_to_dept" ? "도착 부서" : subType === "produce" || subType === "disassemble" || subType === "adjust" ? "대상 부서" : "도착 부서"}
+          label={
+            subType === "warehouse_to_dept"
+              ? "도착 부서"
+              : subType === "produce" ||
+                subType === "disassemble" ||
+                subType === "adjust_in" ||
+                subType === "adjust_out"
+              ? "대상 부서"
+              : "도착 부서"
+          }
           value={toDepartment}
           onChange={onToDepartmentChange}
         />

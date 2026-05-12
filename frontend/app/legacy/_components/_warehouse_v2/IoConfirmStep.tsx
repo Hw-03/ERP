@@ -3,12 +3,13 @@
 import { AlertTriangle, ArrowLeft, CheckCircle2, ClipboardCheck, Save } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
-import type { IoBundle, IoSubType } from "./types";
+import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
 import { subTypeLabel } from "./ioWorkType";
 import { formatQty } from "@/lib/mes/format";
 import { SettingLabel } from "./_atoms";
 
 interface Props {
+  workType: IoWorkType;
   subType: IoSubType;
   bundles: IoBundle[];
   notes: string;
@@ -24,7 +25,50 @@ interface Props {
   onPrev: () => void;
 }
 
+type SectionKind = "in" | "out" | "move";
+
+function sectionLabels(subType: IoSubType): Record<SectionKind, string | null> {
+  if (subType === "produce") return { in: "입고되는 결과품", out: "출고되는 하위자재", move: null };
+  if (subType === "disassemble") return { in: "입고되는 회수품목", out: "출고되는 상위품목", move: null };
+  if (subType === "warehouse_to_dept") return { in: null, out: null, move: "이동 (창고 → 부서)" };
+  if (subType === "dept_to_warehouse") return { in: null, out: null, move: "이동 (부서 → 창고)" };
+  if (subType === "dept_transfer") return { in: null, out: null, move: "이동 (부서 ↔ 부서)" };
+  if (subType === "adjust_in") return { in: "수량보정 입고", out: null, move: null };
+  if (subType === "adjust_out") return { in: null, out: "수량보정 출고", move: null };
+  if (subType === "defect_quarantine") return { in: null, out: "불량 격리", move: null };
+  if (subType === "supplier_return") return { in: null, out: "공급처 반품", move: null };
+  if (subType === "receive_supplier") return { in: "입고되는 항목", out: null, move: null };
+  if (subType === "ship") return { in: null, out: "출고되는 항목", move: null };
+  return { in: "입고되는 항목", out: "출고되는 항목", move: "이동 항목" };
+}
+
+function bundleMode(bundle: IoBundle): "bom" | "single" {
+  if (bundle.source_kind === "bom_parent") return "bom";
+  if (bundle.lines.some((line) => line.origin === "bom_auto")) return "bom";
+  return "single";
+}
+
+function classifySection(line: IoLine): SectionKind | null {
+  if (line.direction === "in") return "in";
+  if (line.direction === "out") return "out";
+  if (line.direction === "defective") return "out";
+  if (line.direction === "move") return "move";
+  if (line.direction === "adjust") {
+    if (line.to_bucket === "production") return "in";
+    if (line.from_bucket === "production") return "out";
+  }
+  return null;
+}
+
+function signFor(line: IoLine): { sign: "+" | "-" | null; color: string } {
+  const section = classifySection(line);
+  if (section === "in") return { sign: "+", color: LEGACY_COLORS.green };
+  if (section === "out") return { sign: "-", color: LEGACY_COLORS.red };
+  return { sign: null, color: LEGACY_COLORS.muted2 };
+}
+
 export function IoConfirmStep({
+  workType: _workType,
   subType,
   bundles,
   notes,
@@ -39,12 +83,25 @@ export function IoConfirmStep({
   onSaveDraft,
   onPrev,
 }: Props) {
+  void _workType;
   const allLines = bundles.flatMap((bundle) => bundle.lines);
   const includedLines = allLines.filter((line) => line.included);
   const totalQty = includedLines.reduce(
     (acc, line) => acc + (Number.isFinite(line.quantity) ? line.quantity : 0),
     0,
   );
+
+  const bundleModeMap = new Map(bundles.map((b) => [b.bundle_id, bundleMode(b)]));
+  const lineBundleMap = new Map<string, string>();
+  for (const b of bundles) {
+    for (const l of b.lines) lineBundleMap.set(l.line_id, b.bundle_id);
+  }
+  const sections = sectionLabels(subType);
+  const sectionLines: Record<SectionKind, IoLine[]> = { in: [], out: [], move: [] };
+  for (const line of includedLines) {
+    const kind = classifySection(line);
+    if (kind) sectionLines[kind].push(line);
+  }
   const submitDisabled =
     submitting || includedLines.length === 0 || hasShortage || hasInvalidQuantity;
   const accent = approval ? LEGACY_COLORS.yellow : LEGACY_COLORS.blue;
@@ -90,6 +147,25 @@ export function IoConfirmStep({
             즉시 처리
           </span>
         )}
+      </div>
+
+      {/* 입고/출고/이동 섹션 */}
+      <div className="space-y-3">
+        {(["in", "out", "move"] as SectionKind[]).map((kind) => {
+          const label = sections[kind];
+          const lines = sectionLines[kind];
+          if (!label || lines.length === 0) return null;
+          return (
+            <LineSection
+              key={kind}
+              title={label}
+              kind={kind}
+              lines={lines}
+              bundleModeMap={bundleModeMap}
+              lineBundleMap={lineBundleMap}
+            />
+          );
+        })}
       </div>
 
       {/* 참조번호 / 메모 */}
@@ -182,6 +258,87 @@ export function IoConfirmStep({
           ? `승인 요청 보내기 ${includedLines.length}건`
           : `즉시 반영하기 ${includedLines.length}건`}
       </button>
+    </div>
+  );
+}
+
+function LineSection({
+  title,
+  kind,
+  lines,
+  bundleModeMap,
+  lineBundleMap,
+}: {
+  title: string;
+  kind: SectionKind;
+  lines: IoLine[];
+  bundleModeMap: Map<string, "bom" | "single">;
+  lineBundleMap: Map<string, string>;
+}) {
+  const headerColor =
+    kind === "in" ? LEGACY_COLORS.green : kind === "out" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
+  const totalQty = lines.reduce((acc, l) => acc + (Number.isFinite(l.quantity) ? l.quantity : 0), 0);
+  return (
+    <div
+      className="rounded-[14px] border"
+      style={{ background: LEGACY_COLORS.s2, borderColor: tint(headerColor, 30) }}
+    >
+      <div
+        className="flex items-center justify-between px-4 py-2"
+        style={{ background: tint(headerColor, 6), borderBottom: `1px solid ${tint(headerColor, 30)}` }}
+      >
+        <span className="text-xs font-black uppercase tracking-[1.5px]" style={{ color: headerColor }}>
+          {title} · {lines.length}건
+        </span>
+        <span className="text-sm font-black tabular-nums" style={{ color: headerColor }}>
+          총 {formatQty(totalQty)}
+        </span>
+      </div>
+      <ul className="divide-y" style={{ borderColor: LEGACY_COLORS.border }}>
+        {lines.map((line) => {
+          const mode = bundleModeMap.get(lineBundleMap.get(line.line_id) ?? "") ?? "single";
+          const isChild = line.origin === "bom_auto";
+          const dir = signFor(line);
+          return (
+            <li
+              key={line.line_id}
+              className="flex items-center justify-between gap-3 px-4 py-2"
+              style={{
+                paddingLeft: isChild ? 32 : 16,
+                borderLeft: isChild ? `3px solid ${tint(LEGACY_COLORS.muted2, 30)}` : "none",
+              }}
+            >
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
+                  {line.item_name}
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <span>{line.erp_code ?? "-"}</span>
+                  {(line.from_department || line.to_department) && (
+                    <span>· {line.from_department ?? "-"}{line.direction === "move" ? ` → ${line.to_department ?? "-"}` : ""}</span>
+                  )}
+                  <span
+                    className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                    style={{
+                      background: tint(line.origin === "manual" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.blue, 14),
+                      color: line.origin === "manual" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.blue,
+                    }}
+                  >
+                    {mode === "bom" && line.origin !== "manual" ? "BOM 적용" : "이 품목만"}
+                  </span>
+                </div>
+              </div>
+              <span
+                className="shrink-0 text-base font-black tabular-nums"
+                style={{ color: dir.color }}
+              >
+                {dir.sign ?? ""}
+                {formatQty(line.quantity)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

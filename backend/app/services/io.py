@@ -197,9 +197,12 @@ def _route_for_sub_type(
         return ("in", "none", None, "production", dept)
     if sub_type == "dept_transfer":
         return ("move", "production", from_department, "production", to_department)
-    if sub_type == "adjust":
+    if sub_type == "adjust_in":
         dept = _default_production_dept(item, to_department or from_department)
         return ("adjust", "none", None, "production", dept)
+    if sub_type == "adjust_out":
+        dept = _default_production_dept(item, to_department or from_department)
+        return ("adjust", "production", dept, "none", None)
     if sub_type == "ship":
         return ("out", "production", DepartmentEnum.SHIPPING.value, "none", None)
     if sub_type == "defect_quarantine":
@@ -844,15 +847,25 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
         )
         tx_type = TransactionTypeEnum.MARK_DEFECTIVE
     elif line.direction == "adjust":
-        inventory_svc.receive_confirmed(
-            db,
-            line.item_id,
-            qty,
-            bucket="production" if line.to_bucket == "production" else "warehouse",
-            dept=line.to_department,
-        )
+        if line.to_bucket == "production" and line.from_bucket == "none":
+            inventory_svc.receive_confirmed(
+                db,
+                line.item_id,
+                qty,
+                bucket="production",
+                dept=line.to_department,
+            )
+            quantity_change = qty
+        elif line.from_bucket == "production" and line.to_bucket == "none":
+            inventory_svc.consume_from_department(
+                db, line.item_id, qty, line.from_department
+            )
+            quantity_change = -qty
+        else:
+            raise ValueError(
+                f"잘못된 adjust 라인 구성: from={line.from_bucket} to={line.to_bucket}"
+            )
         tx_type = TransactionTypeEnum.ADJUST
-        quantity_change = qty
     else:
         raise ValueError(f"지원하지 않는 라인 방향입니다: {line.direction}")
 

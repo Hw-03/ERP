@@ -368,6 +368,7 @@ export function IoComposeView({
           >
             <IoTargetPicker
               workType={state.workType}
+              subType={state.subType}
               items={items}
               packages={packages}
               productModels={productModels}
@@ -401,6 +402,7 @@ export function IoComposeView({
           >
             <IoBundleCart
               bundles={state.bundles}
+              subType={state.subType}
               itemMap={itemMap}
               getAvailable={getAvailable}
               onToggleLine={(bundleId, lineId) =>
@@ -456,6 +458,7 @@ export function IoComposeView({
             accent={accent}
           >
             <IoConfirmStep
+              workType={state.workType}
               subType={state.subType}
               bundles={state.bundles}
               notes={state.notes}

@@ -4,12 +4,13 @@ import { ClipboardCheck } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { EmptyState } from "../common";
-import type { IoBundle, IoLine, Item } from "./types";
+import type { IoBundle, IoLine, IoSubType, Item } from "./types";
 import { IoBundleCard } from "./IoBundleCard";
 import { formatQty } from "@/lib/mes/format";
 
 interface Props {
   bundles: IoBundle[];
+  subType: IoSubType;
   itemMap: Map<string, Item>;
   getAvailable: (line: IoLine) => number | null;
   onToggleLine: (bundleId: string, lineId: string) => void;
@@ -22,6 +23,7 @@ interface Props {
 
 export function IoBundleCart({
   bundles,
+  subType,
   itemMap,
   getAvailable,
   onToggleLine,
@@ -76,6 +78,7 @@ export function IoBundleCart({
             <IoBundleCard
               key={bundle.bundle_id}
               bundle={bundle}
+              subType={subType}
               itemMap={itemMap}
               getAvailable={getAvailable}
               onToggleLine={(lineId) => onToggleLine(bundle.bundle_id, lineId)}

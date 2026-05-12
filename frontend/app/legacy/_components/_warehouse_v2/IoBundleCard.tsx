@@ -3,12 +3,13 @@
 import { Layers, PackageCheck, Trash2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
-import type { IoBundle, IoLine, Item } from "./types";
+import type { IoBundle, IoLine, IoSubType, Item } from "./types";
 import { IoLineRow } from "./IoLineRow";
 import { formatQty } from "@/lib/mes/format";
 
 interface Props {
   bundle: IoBundle;
+  subType: IoSubType;
   itemMap: Map<string, Item>;
   getAvailable: (line: IoLine) => number | null;
   onToggleLine: (lineId: string) => void;
@@ -19,6 +20,7 @@ interface Props {
 
 export function IoBundleCard({
   bundle,
+  subType,
   itemMap,
   getAvailable,
   onToggleLine,
@@ -28,8 +30,16 @@ export function IoBundleCard({
 }: Props) {
   const included = bundle.lines.filter((line) => line.included);
   const excluded = bundle.lines.length - included.length;
-  const hasAuto = bundle.lines.some((line) => line.origin === "bom_auto" || line.origin === "package_auto");
+  const autoCount = bundle.lines.filter((line) => line.origin === "bom_auto").length;
+  const hasAuto = autoCount > 0 || bundle.lines.some((line) => line.origin === "package_auto");
   const tone = bundle.source_kind === "ship_package" ? LEGACY_COLORS.purple : LEGACY_COLORS.blue;
+  const compositionLabel = (() => {
+    if (bundle.source_kind === "ship_package") return null;
+    if (bundle.source_kind === "bom_parent" || autoCount > 0) {
+      return `BOM 자동 전개 · 상위 1 + 하위 ${autoCount}`;
+    }
+    return "단품";
+  })();
 
   return (
     <article
@@ -64,10 +74,16 @@ export function IoBundleCard({
                 <span>제외 {excluded}개</span>
               </>
             )}
-            {hasAuto && (
+            {compositionLabel && (
               <>
                 <span>·</span>
-                <span>자동 전개</span>
+                <span>{compositionLabel}</span>
+              </>
+            )}
+            {bundle.source_kind === "ship_package" && hasAuto && (
+              <>
+                <span>·</span>
+                <span>패키지 자동</span>
               </>
             )}
           </div>
@@ -91,6 +107,8 @@ export function IoBundleCard({
           <li key={line.line_id} style={{ borderColor: LEGACY_COLORS.border }}>
             <IoLineRow
               line={line}
+              subType={subType}
+              isChild={line.origin === "bom_auto"}
               item={itemMap.get(line.item_id)}
               available={getAvailable(line)}
               onToggle={() => onToggleLine(line.line_id)}

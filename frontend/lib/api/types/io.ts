@@ -9,7 +9,8 @@ export type IoSubType =
   | "produce"
   | "disassemble"
   | "dept_transfer"
-  | "adjust"
+  | "adjust_in"
+  | "adjust_out"
   | "ship"
   | "defect_quarantine"
   | "supplier_return";

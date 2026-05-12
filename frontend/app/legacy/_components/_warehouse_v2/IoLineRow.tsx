@@ -6,11 +6,14 @@ import { tint } from "@/lib/mes/colorUtils";
 import { getStockState } from "@/lib/mes/inventory";
 import { erpCodeDeptBadge } from "@/lib/mes/process";
 import { useDeptColorLookup } from "../DepartmentsContext";
-import type { IoLine, Item } from "./types";
+import type { IoLine, IoSubType, Item } from "./types";
+import { lineTagLabel, type LineTagTone } from "./ioWorkType";
 import { formatQty } from "@/lib/mes/format";
 
 interface Props {
   line: IoLine;
+  subType: IoSubType;
+  isChild: boolean;
   item?: Item;
   available: number | null;
   onToggle: () => void;
@@ -18,26 +21,59 @@ interface Props {
   onRemove: () => void;
 }
 
-function originLabel(origin: IoLine["origin"]) {
-  if (origin === "bom_auto") return "BOM 자동";
-  if (origin === "package_auto") return "패키지 자동";
-  if (origin === "manual") return "수동 추가";
-  return "직접 선택";
+// originLabel 은 lineTagLabel 로 대체됨 (현장 친화 태그 + 입출고 부호 배지)
+
+function toneToColor(tone: LineTagTone): string {
+  if (tone === "green") return LEGACY_COLORS.green;
+  if (tone === "red") return LEGACY_COLORS.red;
+  if (tone === "blue") return LEGACY_COLORS.blue;
+  if (tone === "purple") return LEGACY_COLORS.purple;
+  return LEGACY_COLORS.muted2;
+}
+
+function directionPrefix(line: IoLine): { sign: "+" | "-" | null; suffix: string } {
+  if (line.direction === "in") return { sign: "+", suffix: "" };
+  if (line.direction === "out" || line.direction === "defective") return { sign: "-", suffix: "" };
+  if (line.direction === "adjust") {
+    if (line.to_bucket === "production") return { sign: "+", suffix: " 보정" };
+    if (line.from_bucket === "production") return { sign: "-", suffix: " 보정" };
+  }
+  return { sign: null, suffix: "" };
 }
 
 function isOutgoing(line: IoLine) {
-  return line.direction === "out" || line.direction === "move" || line.direction === "defective";
+  if (line.direction === "out" || line.direction === "move" || line.direction === "defective") {
+    return true;
+  }
+  if (line.direction === "adjust" && line.from_bucket === "production") {
+    return true;
+  }
+  return false;
 }
 
 function expectedAfter(line: IoLine, available: number | null) {
   if (available === null) return null;
-  if (line.direction === "in" || line.direction === "adjust") return available + line.quantity;
+  if (line.direction === "in") return available + line.quantity;
+  if (line.direction === "adjust") {
+    if (line.to_bucket === "production") return available + line.quantity;
+    if (line.from_bucket === "production") return available - line.quantity;
+    return available;
+  }
   if (line.direction === "out" || line.direction === "defective" || line.direction === "move")
     return available - line.quantity;
   return available;
 }
 
-export function IoLineRow({ line, item, available, onToggle, onQuantityChange, onRemove }: Props) {
+export function IoLineRow({
+  line,
+  subType,
+  isChild,
+  item,
+  available,
+  onToggle,
+  onQuantityChange,
+  onRemove,
+}: Props) {
   const getDeptColor = useDeptColorLookup();
   const disabled = !line.included;
   const shortage = line.included && line.shortage > 0;
@@ -46,6 +82,9 @@ export function IoLineRow({ line, item, available, onToggle, onQuantityChange, o
   const stock = item ? getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock)) : null;
   const deptBadge = item ? erpCodeDeptBadge(item.erp_code, getDeptColor) : null;
   const expected = expectedAfter(line, available);
+  const tag = lineTagLabel(line, subType);
+  const tagColor = toneToColor(tag.tone);
+  const dirInfo = directionPrefix(line);
   const expectedColor =
     expected === null
       ? LEGACY_COLORS.muted2
@@ -70,11 +109,13 @@ export function IoLineRow({ line, item, available, onToggle, onQuantityChange, o
 
   return (
     <div
-      className="grid items-center gap-3 px-4 py-3"
+      className="grid items-center gap-3 py-3 pr-4"
       style={{
         gridTemplateColumns:
           "32px minmax(0,1.6fr) minmax(70px,auto) auto minmax(80px,auto) minmax(80px,auto) 32px",
         background: rowBackground,
+        paddingLeft: isChild ? 32 : 16,
+        borderLeft: isChild ? `3px solid ${tint(LEGACY_COLORS.muted2, 30)}` : "none",
       }}
     >
       {/* 1. 체크박스 */}
@@ -117,8 +158,27 @@ export function IoLineRow({ line, item, available, onToggle, onQuantityChange, o
             </span>
           )}
         </div>
-        <div className="truncate text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-          {line.erp_code ?? "-"} · {originLabel(line.origin)}
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+          <span className="truncate">{line.erp_code ?? "-"}</span>
+          <span
+            className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+            style={{ background: tint(tagColor, 14), color: tagColor }}
+          >
+            {tag.text}
+          </span>
+          {dirInfo.sign && (
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
+              style={{
+                background: tint(dirInfo.sign === "+" ? LEGACY_COLORS.green : LEGACY_COLORS.red, 12),
+                color: dirInfo.sign === "+" ? LEGACY_COLORS.green : LEGACY_COLORS.red,
+              }}
+            >
+              {dirInfo.sign}
+              {formatQty(line.quantity)}
+              {dirInfo.suffix}
+            </span>
+          )}
         </div>
       </div>
 

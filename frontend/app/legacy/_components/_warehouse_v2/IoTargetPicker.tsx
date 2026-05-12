@@ -12,11 +12,12 @@ import {
 } from "../_warehouse_steps/_constants";
 import { deptOf, stageOf, type DeptLetter } from "../_admin_sections/_bom_workbench/bomDept";
 import { LabeledSelect, SettingLabel } from "./_atoms";
-import type { IoBundle, IoWorkType, Item, ProductModel, ShipPackage } from "./types";
-import { canPickPackages } from "./ioWorkType";
+import type { IoBundle, IoSubType, IoWorkType, Item, ProductModel, ShipPackage } from "./types";
+import { canPickPackages, getItemActionMode, type ItemActionMode } from "./ioWorkType";
 
 interface Props {
   workType: IoWorkType;
+  subType: IoSubType;
   items: Item[];
   packages: ShipPackage[];
   productModels: ProductModel[];
@@ -71,6 +72,7 @@ function matchesModel(item: Item, model: string) {
 
 export function IoTargetPicker({
   workType,
+  subType,
   items,
   packages,
   productModels,
@@ -88,6 +90,7 @@ export function IoTargetPicker({
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
 
   const showPackages = canPickPackages(workType);
+  const actionMode = getItemActionMode(subType);
   const keyword = search.trim().toLowerCase();
 
   const filteredItems = useMemo(() => {
@@ -221,6 +224,7 @@ export function IoTargetPicker({
             busy={busy}
             hasActiveFilter={hasActiveFilter}
             clearFilters={clearFilters}
+            mode={actionMode}
           />
         )}
       </div>
@@ -261,6 +265,7 @@ function ItemTable({
   busy,
   hasActiveFilter,
   clearFilters,
+  mode,
 }: {
   items: Item[];
   displayLimit: number;
@@ -269,6 +274,7 @@ function ItemTable({
   busy?: boolean;
   hasActiveFilter: boolean;
   clearFilters: () => void;
+  mode: ItemActionMode;
 }) {
   return (
     <>
@@ -350,31 +356,47 @@ function ItemTable({
                   style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                 >
                   <span className="inline-flex gap-1">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => onAdd(item)}
-                      className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[11px] font-black text-white disabled:opacity-50"
-                      style={{ background: LEGACY_COLORS.blue }}
-                      title="기준 품목 — BOM 자동 전개"
-                    >
-                      <Plus className="h-3 w-3" />
-                      기준
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => onAdd(item, "manual")}
-                      className="rounded-[10px] border px-2.5 py-1 text-[11px] font-black disabled:opacity-50"
-                      style={{
-                        background: LEGACY_COLORS.s2,
-                        borderColor: LEGACY_COLORS.border,
-                        color: LEGACY_COLORS.muted2,
-                      }}
-                      title="수동 추가 — 단품으로만"
-                    >
-                      수동
-                    </button>
+                    {mode === "bom_or_single" ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => onAdd(item)}
+                          className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[11px] font-black text-white disabled:opacity-50"
+                          style={{ background: LEGACY_COLORS.blue }}
+                          title="BOM 적용 — 하위 자재까지 같이 처리"
+                        >
+                          <Plus className="h-3 w-3" />
+                          BOM 적용
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => onAdd(item, "manual")}
+                          className="rounded-[10px] border px-2.5 py-1 text-[11px] font-black disabled:opacity-50"
+                          style={{
+                            background: LEGACY_COLORS.s2,
+                            borderColor: LEGACY_COLORS.border,
+                            color: LEGACY_COLORS.muted2,
+                          }}
+                          title="이 품목만 — 선택 품목만 처리"
+                        >
+                          이 품목만
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => onAdd(item, "manual")}
+                        className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[11px] font-black text-white disabled:opacity-50"
+                        style={{ background: LEGACY_COLORS.blue }}
+                        title="선택 — 선택 품목만 처리"
+                      >
+                        <Plus className="h-3 w-3" />
+                        선택
+                      </button>
+                    )}
                   </span>
                 </td>
               </tr>
