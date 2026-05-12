@@ -18,7 +18,7 @@ from app.schemas import (
 )
 from app.services import inventory as inventory_svc
 from app.services import stock_math
-from app.services.bom import BomCache, build_bom_cache
+from app.services.bom import BomCache, build_bom_cache, direct_children
 from app.services.bom import explode_bom as _explode_bom_svc
 from app.services.bom import merge_requirements
 from app.routers._errors import ErrorCode, http_error
@@ -270,101 +270,148 @@ def _explode_bom(
 )
 @router.get("/possible", response_model=CapacityResponse, summary="Production capacity alias")
 def get_production_capacity(db: Session = Depends(get_db)):
-    """BOM이 등록된 AA 품목들에 대해 즉시/최대 생산 가능수량을 계산한다.
+    """BOM 최상위 완제품들에 대해 즉시/최대 생산 가능수량을 계산한다.
 
-    - **immediate**: warehouse_available (= warehouse_qty - pending) 기준 최소 생산 가능량.
-      production_receipt 의 실제 차감 검사식과 일치 (부서 생산재고/불량은 제외).
-      → "지금 당장 만들 수 있는 수량" 의 정확한 값.
-    - **maximum**: total (= warehouse + production + defective) 기준 이론적 최대.
-      **불량 재고도 포함**되므로 실제 가용량과 다를 수 있음. UI 에서는
-      immediate 와 maximum 의 차이를 운영자에게 분명히 설명해야 한다.
+    - **immediate**: BOM 직계 자식 1단계(AA/TF/HF/VF 등 중간재·반제품)의 가용 재고만으로
+      빠르게 만들 수 있는 수량. 원자재까지 재귀 전개하지 않는다.
+      각 직계 자식의 available(=warehouse+PRODUCTION-pending, 불량 제외) ÷ per-unit 수량의 최솟값.
+    - **maximum**: leaf 까지 전개한 전체 하위 자재의 available 기준 이론 최대.
+      불량(DEFECTIVE) 재고는 제외 — 시스템 표준 available 정의와 일치.
+
+    응답 status 4단계:
+      no_target / bom_not_registered / not_producible / producible.
     """
+    empty_response = {
+        "immediate": 0,
+        "maximum": 0,
+        "limiting_item": None,
+        "status": "no_target",
+        "top_items": [],
+    }
+
     # BOM parent 중 다른 BOM의 child가 아닌 것 = 최상위 품목
     all_parent_ids = {row[0] for row in db.query(BOM.parent_item_id).distinct().all()}
     all_child_ids = {row[0] for row in db.query(BOM.child_item_id).distinct().all()}
     top_level_ids = all_parent_ids - all_child_ids
 
     if not top_level_ids:
-        return {"immediate": 0, "maximum": 0, "limiting_item": None, "top_items": []}
+        return empty_response
 
+    # TODO: 데이터 기준 확인 후 필요 시 finished suffix(AF/PF 등) 필터 도입 검토.
+    # 현재는 BOM 의 최상위 parent 면 모두 포함 (process_type_code 필터 없음).
     top_items_db = (
         db.query(Item)
         .filter(Item.item_id.in_(list(top_level_ids)))
-        .filter(Item.process_type_code == "AA")
         .limit(15)
         .all()
     )
 
-    # 1) BOM 전체를 한 번만 읽어 캐시 만들고 모든 top item 을 펼친다 (N+1 제거)
+    if not top_items_db:
+        return empty_response
+
+    # 1) BOM 전체를 한 번만 읽어 캐시
     bom_cache = build_bom_cache(db)
-    explode_cache: Dict[uuid.UUID, Dict[uuid.UUID, Decimal]] = {}
+
+    # 2) top_item 별로 (a) 직계 자식 → immediate, (b) leaf 전개 → maximum 준비
+    direct_by_top: Dict[uuid.UUID, List[Tuple[uuid.UUID, Decimal]]] = {}
+    leaf_by_top: Dict[uuid.UUID, Dict[uuid.UUID, Decimal]] = {}
     all_comp_ids: set[uuid.UUID] = set()
+
     for item in top_items_db:
-        merged = merge_requirements(_explode_bom(db, item.item_id, Decimal("1"), cache=bom_cache))
-        if not merged:
-            continue
-        explode_cache[item.item_id] = merged
-        all_comp_ids.update(merged.keys())
+        direct = direct_children(db, item.item_id)
+        if direct:
+            direct_by_top[item.item_id] = direct
+            for cid, _ in direct:
+                all_comp_ids.add(cid)
 
-    if not explode_cache:
-        return {"immediate": 0, "maximum": 0, "limiting_item": None, "top_items": []}
+        leaves = merge_requirements(_explode_bom(db, item.item_id, Decimal("1"), cache=bom_cache))
+        if leaves:
+            leaf_by_top[item.item_id] = leaves
+            all_comp_ids.update(leaves.keys())
 
-    # 2) bulk 로 한 번에 재고 + 품목 정보 조회 (N+1 제거)
+    if not direct_by_top and not leaf_by_top:
+        # top item 은 있는데 BOM 전개가 전혀 안 됨
+        return {
+            "immediate": 0,
+            "maximum": 0,
+            "limiting_item": None,
+            "status": "bom_not_registered",
+            "top_items": [],
+        }
+
+    # 3) bulk 로 한 번에 재고 + 품목 정보 조회 (N+1 제거)
     figures_map = stock_math.bulk_compute(db, all_comp_ids)
     items_map = {
         i.item_id: i
         for i in db.query(Item).filter(Item.item_id.in_(list(all_comp_ids))).all()
     }
 
-    top_results = []
-    bottleneck_by_top: Dict[uuid.UUID, str | None] = {}
-    for item in top_items_db:
-        merged = explode_cache.get(item.item_id)
-        if not merged:
-            continue
+    def _component_name(cid: uuid.UUID) -> str | None:
+        comp = items_map.get(cid)
+        return comp.item_name if comp else None
 
-        min_immediate = float("inf")
-        min_maximum = float("inf")
-        limiting_item: str | None = None
-
-        for comp_id, req_qty in merged.items():
+    def _min_by_components(
+        components: List[Tuple[uuid.UUID, Decimal]],
+    ) -> Tuple[int, str | None]:
+        """주어진 (component_id, req_qty) 목록에 대해 available/req 의 최솟값과 병목 부품명."""
+        min_can = float("inf")
+        limiting: str | None = None
+        for cid, req_qty in components:
             req = float(req_qty)
             if req <= 0:
                 continue
-            fig = figures_map.get(comp_id) or stock_math.StockFigures()
-            wh_avail = float(fig.warehouse_available)
-            total = float(fig.total)
-            imm_can = wh_avail / req
-            max_can = total / req
-            if imm_can < min_immediate:
-                min_immediate = imm_can
-                comp_item = items_map.get(comp_id)
-                limiting_item = comp_item.item_name if comp_item else None
-            if max_can < min_maximum:
-                min_maximum = max_can
+            fig = figures_map.get(cid) or stock_math.StockFigures()
+            avail = float(fig.available)
+            can = avail / req
+            if can < min_can:
+                min_can = can
+                limiting = _component_name(cid)
+        if min_can == float("inf"):
+            return 0, None
+        return int(min_can), limiting
 
-        bottleneck_by_top[item.item_id] = limiting_item
+    top_results = []
+    for item in top_items_db:
+        direct = direct_by_top.get(item.item_id, [])
+        leaves = leaf_by_top.get(item.item_id, {})
+        if not direct and not leaves:
+            continue
+
+        immediate_val, immediate_bottleneck = _min_by_components(direct)
+        maximum_val, _ = _min_by_components(list(leaves.items()))
+
         top_results.append({
             "item_id": str(item.item_id),
             "item_name": item.item_name,
             "erp_code": item.erp_code,
-            "immediate": int(min_immediate) if min_immediate != float("inf") else 0,
-            "maximum": int(min_maximum) if min_maximum != float("inf") else 0,
+            "immediate": immediate_val,
+            "maximum": maximum_val,
+            "limiting_item": immediate_bottleneck,
         })
 
     if not top_results:
-        return {"immediate": 0, "maximum": 0, "limiting_item": None, "top_items": []}
+        return {
+            "immediate": 0,
+            "maximum": 0,
+            "limiting_item": None,
+            "status": "bom_not_registered",
+            "top_items": [],
+        }
 
     total_immediate = sum(r["immediate"] for r in top_results)
     total_maximum = sum(r["maximum"] for r in top_results)
 
-    # 가장 즉시 생산 가능량이 작은 top item 의 병목 부품 (이미 위에서 캐시됨)
+    # 전체 병목: immediate 가 가장 작은 top_item 의 직계 자식 병목 부품
     min_item = min(top_results, key=lambda r: r["immediate"])
-    bottleneck_name = bottleneck_by_top.get(uuid.UUID(min_item["item_id"]))
+    bottleneck_name = min_item.get("limiting_item")
+
+    is_producible = any(r["immediate"] > 0 or r["maximum"] > 0 for r in top_results)
+    status_value = "producible" if is_producible else "not_producible"
 
     return {
         "immediate": total_immediate,
         "maximum": total_maximum,
         "limiting_item": bottleneck_name,
+        "status": status_value,
         "top_items": sorted(top_results, key=lambda r: r["immediate"]),
     }

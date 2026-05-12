@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional
+from typing import List, Literal, Optional
 import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -834,38 +834,55 @@ class BomCheckResponse(BaseModel):
     components: List[BomCheckComponent]
 
 
+CapacityStatus = Literal["no_target", "bom_not_registered", "not_producible", "producible"]
+
+
 class CapacityTopItem(BaseModel):
     item_id: str
     item_name: str
     erp_code: Optional[str] = None
     immediate: int = Field(
         ...,
-        description="warehouse_available (= warehouse_qty - pending) 기준 즉시 생산 가능량. production_receipt 의 실제 차감 검사식과 일치.",
+        description="BOM 직계 자식(중간재·반제품)의 available 기준 즉시 생산 가능량.",
     )
     maximum: int = Field(
         ...,
-        description="total (= warehouse + production + defective) 기준 이론적 최대. 불량 재고를 포함하므로 실제 가용량과 다름.",
+        description="BOM leaf 까지 전개한 모든 하위 자재의 available 기준 이론 최대 생산 가능량.",
+    )
+    limiting_item: Optional[str] = Field(
+        None,
+        description="이 완제품의 immediate 를 결정한 가장 부족한 직계 자식 부품명.",
     )
 
 
 class CapacityResponse(BaseModel):
     """전체 생산 가능 수량 응답.
 
-    - **immediate**: 지금 당장 생산 가능한 수량 (창고 가용분 기준).
-    - **maximum**: 모든 위치 (창고 + 부서 생산 + 불량) 합계 기준 이론적 최대.
-      불량 재고도 포함되므로 UI 에 노출할 때는 immediate 와의 차이를 설명해야 한다.
+    - **immediate**: BOM 직계 자식 1단계(AA/TF/HF/VF 등 중간재·반제품)의 가용 재고만으로
+      빠르게 만들 수 있는 수량. 각 직계 자식의 available(=warehouse+PRODUCTION-pending)
+      을 per-unit 수량으로 나눈 값의 최솟값.
+    - **maximum**: leaf 까지 전개한 전체 하위 자재의 available 합계 기준 이론적 최대.
+      불량(DEFECTIVE) 재고는 제외.
     """
     immediate: int = Field(
         ...,
-        description="warehouse_available 기준 즉시 생산 가능량 (production_receipt 와 일치).",
+        description="직계 자식 available 기준 즉시 생산 가능량 (모든 top_item 합).",
     )
     maximum: int = Field(
         ...,
-        description="total (warehouse + production + defective) 기준 이론적 최대. 불량 재고 포함.",
+        description="leaf available 기준 이론 최대 생산 가능량 (모든 top_item 합).",
     )
     limiting_item: Optional[str] = Field(
         None,
-        description="immediate 를 결정한 가장 부족한 부품의 표시 이름.",
+        description="immediate 가 가장 작은 top_item 의 직계 자식 병목 부품 이름.",
+    )
+    status: CapacityStatus = Field(
+        "no_target",
+        description=(
+            "표시 분기용 상태. "
+            "no_target=BOM 자체 없음 / bom_not_registered=top item 있지만 BOM 전개 불가 / "
+            "not_producible=계산 됐지만 모두 0 / producible=하나 이상 생산 가능."
+        ),
     )
     top_items: List[CapacityTopItem] = Field(default_factory=list)
 

@@ -57,18 +57,28 @@ export interface ProductionCheckResponse {
   components: ProductionCheckComponent[];
 }
 
+export type ProductionCapacityStatus =
+  | "no_target"
+  | "bom_not_registered"
+  | "not_producible"
+  | "producible";
+
 export interface ProductionCapacityItem {
   item_id: string;
   item_name: string;
   erp_code: string | null;
   immediate: number;
   maximum: number;
+  /** 이 완제품의 immediate 를 결정한 직계 자식 병목 부품명. */
+  limiting_item?: string | null;
 }
 
 export interface ProductionCapacity {
   immediate: number;
   maximum: number;
   limiting_item: string | null;
+  /** 표시 분기용. 선택 필드 — 백엔드 미배포/오래된 응답을 위한 fallback 허용. */
+  status?: ProductionCapacityStatus;
   top_items: ProductionCapacityItem[];
 }
 
