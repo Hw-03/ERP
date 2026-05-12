@@ -1,5 +1,6 @@
 # Next.js
 .next/
+.next-prod/
 out/
 build/
 

@@ -2,12 +2,15 @@
 /**
  * Round-16 #4 — Bundle size gate.
  *
- * .next/static/chunks 의 *.js 합산 크기가 임계 (default 2.0 MB) 이내인지 검사.
+ * .next-prod/static/chunks 의 *.js 합산 크기가 임계 (default 2.0 MB) 이내인지 검사.
  * Next.js production build 후 실행. 임계 초과 시 exit 1.
  *
  * 사용:
  *   node scripts/check-bundle-size.mjs              # default 임계
  *   node scripts/check-bundle-size.mjs --max 1.5    # 1.5 MB 강제
+ *
+ * 빌드 결과 디렉터리는 package.json 의 build 스크립트에서 --distDir .next-prod 로
+ * 분리되어 있다 (dev 서버의 .next 와 충돌 방지).
  */
 
 import { promises as fs } from "node:fs";
@@ -43,7 +46,8 @@ async function walk(dir) {
 }
 
 async function main() {
-  const chunksDir = path.join(FRONTEND_ROOT, ".next", "static", "chunks");
+  const distDir = ".next-prod";
+  const chunksDir = path.join(FRONTEND_ROOT, distDir, "static", "chunks");
   const files = await walk(chunksDir);
 
   let total = 0;
@@ -54,7 +58,7 @@ async function main() {
 
   const totalMB = total / 1024 / 1024;
   const limitMB = MAX_BYTES / 1024 / 1024;
-  console.log(`Bundle size (.next/static/chunks): ${totalMB.toFixed(2)} MB (limit ${limitMB.toFixed(2)} MB)`);
+  console.log(`Bundle size (${distDir}/static/chunks): ${totalMB.toFixed(2)} MB (limit ${limitMB.toFixed(2)} MB)`);
 
   if (total > MAX_BYTES) {
     console.error(`✗ Bundle size ${totalMB.toFixed(2)} MB exceeds limit ${limitMB.toFixed(2)} MB.`);
