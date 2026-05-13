@@ -8048,5 +8048,95 @@
     "child_process_type": "VF",
     "quantity": 1,
     "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-TF-0001",
+    "parent_item_name": "DXDR-70 튜브",
+    "parent_process_type": "TF",
+    "child_erp_code": "7-TR-0001",
+    "child_item_name": "전극(70kV)",
+    "child_process_type": "TR",
+    "quantity": 2,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-TF-0001",
+    "parent_item_name": "DXDR-70 튜브",
+    "parent_process_type": "TF",
+    "child_erp_code": "7-TR-0002",
+    "child_item_name": "텅스텐 필라멘트",
+    "child_process_type": "TR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-TF-0001",
+    "parent_item_name": "DXDR-70 튜브",
+    "parent_process_type": "TF",
+    "child_erp_code": "7-TR-0003",
+    "child_item_name": "게터",
+    "child_process_type": "TR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-TF-0001",
+    "parent_item_name": "DXDR-70 튜브",
+    "parent_process_type": "TF",
+    "child_erp_code": "7-TR-0005",
+    "child_item_name": "애노드 (70kV)",
+    "child_process_type": "TR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-TF-0001",
+    "parent_item_name": "DXDR-70 튜브",
+    "parent_process_type": "TF",
+    "child_erp_code": "7-TR-0006",
+    "child_item_name": "포커서 (70kV)",
+    "child_process_type": "TR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-TF-0001",
+    "parent_item_name": "DXDR-70 튜브",
+    "parent_process_type": "TF",
+    "child_erp_code": "7-TR-0007",
+    "child_item_name": "세라믹 바디 (70kV)",
+    "child_process_type": "TR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-TF-0001",
+    "parent_item_name": "DXDR-70 튜브",
+    "parent_process_type": "TF",
+    "child_erp_code": "7-TR-0008",
+    "child_item_name": "세라믹 스템 (70kV)",
+    "child_process_type": "TR",
+    "quantity": 1,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-TF-0001",
+    "parent_item_name": "DXDR-70 튜브",
+    "parent_process_type": "TF",
+    "child_erp_code": "7-TR-0009",
+    "child_item_name": "필러 (70kV)",
+    "child_process_type": "TR",
+    "quantity": 6,
+    "unit": "EA"
+  },
+  {
+    "parent_erp_code": "7-TF-0001",
+    "parent_item_name": "DXDR-70 튜브",
+    "parent_process_type": "TF",
+    "child_erp_code": "7-TR-0010",
+    "child_item_name": "전극 필러 (70kV)",
+    "child_process_type": "TR",
+    "quantity": 4,
+    "unit": "EA"
   }
 ]

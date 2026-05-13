@@ -5934,5 +5934,355 @@
     "erp_code": "6-AR-0355",
     "process_type_code": "AR",
     "unit": "EA"
+  },
+  {
+    "item_id": "3-PF-0001",
+    "item_name": "DX3000_60kV, 2mA_러시아_IP Tsizina S. A",
+    "erp_code": "3-PF-0001",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-PA-0002",
+    "item_name": "DX3000_60kV, 2mA_러시아_IP Tsizina S. A_가방 포장 완료",
+    "erp_code": "3-PA-0002",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-PF-0002",
+    "item_name": "DX3000_65kV, 1.7mA_USA_Dexcowin Global",
+    "erp_code": "3-PF-0002",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-PA-0003",
+    "item_name": "DX3000_65kV, 1.7mA_USA_Dexcowin Global_가방 포장 완료",
+    "erp_code": "3-PA-0003",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-PF-0003",
+    "item_name": "DX3000_65kV, 1.7mA_USA_Vector",
+    "erp_code": "3-PF-0003",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-PA-0004",
+    "item_name": "DX3000_65kV, 1.7mA_USA_Vector_가방 포장 완료",
+    "erp_code": "3-PA-0004",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-PF-0004",
+    "item_name": "DX3000M_60kV, 2mA_스페인_RadioMedica",
+    "erp_code": "3-PF-0004",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-PA-0005",
+    "item_name": "DX3000M_60kV, 2mA_스페인_RadioMedica_가방 포장 완료",
+    "erp_code": "3-PA-0005",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-PF-0005",
+    "item_name": "DX3000M_70kV, 3mA_멕시코_Imagen Medica Politecnica",
+    "erp_code": "3-PF-0005",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-PA-0006",
+    "item_name": "DX3000M_70kV, 3mA_멕시코_Imagen Medica Politecnica_가방 포장 완료",
+    "erp_code": "3-PA-0006",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-PF-0006",
+    "item_name": "DX3000M_70kV, 3mA_스페인_RadioMedica",
+    "erp_code": "3-PF-0006",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-PA-0007",
+    "item_name": "DX3000M_70kV, 3mA_스페인_RadioMedica_가방 포장 완료",
+    "erp_code": "3-PA-0007",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-PF-0007",
+    "item_name": "DX3000M_70kV, 3mA_이집트_Technoray",
+    "erp_code": "3-PF-0007",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "3-PA-0008",
+    "item_name": "DX3000M_70kV, 3mA_이집트_Technoray_가방 포장 완료",
+    "erp_code": "3-PA-0008",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "4-PF-0008",
+    "item_name": "ADX4000W_60kV, 2mA_러시아_IP Tsizina S. A",
+    "erp_code": "4-PF-0008",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "4-PA-0009",
+    "item_name": "ADX4000W_60kV, 2mA_러시아_IP Tsizina S. A_가방 포장 완료",
+    "erp_code": "4-PA-0009",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "4-PF-0009",
+    "item_name": "ADX4000W_60kV, 2mA_스위스_Croc La Vie",
+    "erp_code": "4-PF-0009",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "4-PA-0010",
+    "item_name": "ADX4000W_60kV, 2mA_스위스_Croc La Vie_가방 포장 완료",
+    "erp_code": "4-PA-0010",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "4-PF-0010",
+    "item_name": "ADX4000W_60kV, 2mA_일본_Dexcowin Japan",
+    "erp_code": "4-PF-0010",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "4-PA-0011",
+    "item_name": "ADX4000W_60kV, 2mA_일본_Dexcowin Japan_가방 포장 완료",
+    "erp_code": "4-PA-0011",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PF-0011",
+    "item_name": "ADX6000FB_70~90kV, 1~6mA_인도_Analyticals Medical Technologies Pvt Ltd",
+    "erp_code": "6-PF-0011",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PA-0012",
+    "item_name": "ADX6000FB_70~90kV, 1~6mA_인도_Analyticals Medical Technologies Pvt Ltd_가방 포장 완료",
+    "erp_code": "6-PA-0012",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PF-0012",
+    "item_name": "ADX6000FB_80kV, 5mA_카자흐스탄_Medivide",
+    "erp_code": "6-PF-0012",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PA-0013",
+    "item_name": "ADX6000FB_80kV, 5mA_카자흐스탄_Medivide_가방 포장 완료",
+    "erp_code": "6-PA-0013",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PF-0013",
+    "item_name": "ADX6000FB_90kV, 6mA_그리스_Dormed Hellas",
+    "erp_code": "6-PF-0013",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PA-0014",
+    "item_name": "ADX6000FB_90kV, 6mA_그리스_Dormed Hellas_가방 포장 완료",
+    "erp_code": "6-PA-0014",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PF-0014",
+    "item_name": "ADX6000FB_90kV, 6mA_인도_Analyticals Medical Technologies Pvt Ltd",
+    "erp_code": "6-PF-0014",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PA-0015",
+    "item_name": "ADX6000FB_90kV, 6mA_인도_Analyticals Medical Technologies Pvt Ltd_가방 포장 완료",
+    "erp_code": "6-PA-0015",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PF-0015",
+    "item_name": "ADX6000FB_90kV, 6mA_카자흐스탄_Medivide",
+    "erp_code": "6-PF-0015",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PA-0016",
+    "item_name": "ADX6000FB_90kV, 6mA_카자흐스탄_Medivide_가방 포장 완료",
+    "erp_code": "6-PA-0016",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PF-0016",
+    "item_name": "ADX6000FB_90kV, 6mA / 80kV, 5mA 셋팅_그리스_Dormed Hellas",
+    "erp_code": "6-PF-0016",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PA-0017",
+    "item_name": "ADX6000FB_90kV, 6mA / 80kV, 5mA 셋팅_그리스_Dormed Hellas_가방 포장 완료",
+    "erp_code": "6-PA-0017",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PF-0017",
+    "item_name": "ADX6000s_80kV, 5mA_USA_Dexcowin Global",
+    "erp_code": "6-PF-0017",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "6-PA-0018",
+    "item_name": "ADX6000s_80kV, 5mA_USA_Dexcowin Global_가방 포장 완료",
+    "erp_code": "6-PA-0018",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PF-0018",
+    "item_name": "DX-7017_70kV, 1.7mA_USA_Dexcowin Global",
+    "erp_code": "7-PF-0018",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PA-0019",
+    "item_name": "DX-7017_70kV, 1.7mA_USA_Dexcowin Global_가방 포장 완료",
+    "erp_code": "7-PA-0019",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PF-0019",
+    "item_name": "DX-7017_70kV, 1.7mA_USA_Vector",
+    "erp_code": "7-PF-0019",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PA-0020",
+    "item_name": "DX-7017_70kV, 1.7mA_USA_Vector_가방 포장 완료",
+    "erp_code": "7-PA-0020",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PF-0020",
+    "item_name": "DX-7020_70kV, 2mA_USA_Dentimax",
+    "erp_code": "7-PF-0020",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PA-0021",
+    "item_name": "DX-7020_70kV, 2mA_USA_Dentimax_가방 포장 완료",
+    "erp_code": "7-PA-0021",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PF-0021",
+    "item_name": "DX-7020_70kV, 2mA_USA_Dexcowin Global",
+    "erp_code": "7-PF-0021",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PA-0022",
+    "item_name": "DX-7020_70kV, 2mA_USA_Dexcowin Global_가방 포장 완료",
+    "erp_code": "7-PA-0022",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PF-0022",
+    "item_name": "DX-7020_70kV, 2mA_USA_Vector",
+    "erp_code": "7-PF-0022",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PA-0023",
+    "item_name": "DX-7020_70kV, 2mA_USA_Vector_가방 포장 완료",
+    "erp_code": "7-PA-0023",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-PF-0023",
+    "item_name": "DX-7020s_70kV, 2mA_USA_Dexcowin Global",
+    "erp_code": "8-PF-0023",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-PA-0024",
+    "item_name": "DX-7020s_70kV, 2mA_USA_Dexcowin Global_가방 포장 완료",
+    "erp_code": "8-PA-0024",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-PF-0024",
+    "item_name": "DX-7020s_70kV, 2mA_프랑스_TROPHY",
+    "erp_code": "8-PF-0024",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-PA-0025",
+    "item_name": "DX-7020s_70kV, 2mA_프랑스_TROPHY_가방 포장 완료",
+    "erp_code": "8-PA-0025",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-PF-0025",
+    "item_name": "DX-7020s_70kV, 2mA_호주_iM3",
+    "erp_code": "8-PF-0025",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "8-PA-0026",
+    "item_name": "DX-7020s_70kV, 2mA_호주_iM3_가방 포장 완료",
+    "erp_code": "8-PA-0026",
+    "process_type_code": "PA",
+    "unit": "EA"
   }
 ]
