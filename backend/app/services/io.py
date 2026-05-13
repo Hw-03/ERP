@@ -871,9 +871,9 @@ def _log_immediate(
             quantity_before=before,
             quantity_after=after,
             transfer_qty=line.quantity if line.direction == "move" else None,
-            reference_no=batch.reference_no or str(batch.batch_id)[:8],
+            reference_no=batch.reference_no,
             produced_by=operator_name,
-            notes=f"입출고 2.0 즉시 처리: {batch.work_type}/{batch.sub_type}",
+            notes=batch.notes,
             operation_batch_id=batch.batch_id,
         )
     )

@@ -153,10 +153,8 @@ export function HistoryDetailPanel({
             ["품목명", selected.item_name],
             ["품목 코드", selected.erp_code ?? "-"],
             ["분류", (PROCESS_TYPE_META[selected.item_process_type_code ?? ""] ?? { label: selected.item_process_type_code ?? "-" }).label],
-            ["단위", selected.item_unit],
             ["담당자", selected.produced_by ?? "-"],
-            ["참조번호", selected.reference_no ?? "-"],
-            ["메모", selected.notes ?? "-"],
+            ["메모", selected.notes ?? ""],
             ["일시", parseUtc(selected.created_at).toLocaleString("ko-KR")],
           ] as [string, string][]
         ).map(([label, value]) => (
