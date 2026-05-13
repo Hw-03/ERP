@@ -347,7 +347,10 @@ export function IoComposeView({
     // 매 호출마다 모든 wrapper height 초기화 — cleanup 의존하지 않음 (cleanup 누락 시 leftover 거대 height 방지)
     for (const s of allSteps) {
       const w = stepElements[s];
-      if (w) w.style.height = "";
+      if (w) {
+        w.style.height = "";
+        w.style.minHeight = "";
+      }
     }
 
     // step=3+bundles>0 시 Step 3 과 Step 4 둘 다 filled 처리 (사이즈 일관성).
@@ -368,7 +371,10 @@ export function IoComposeView({
 
     // top margin = gap-3 (12px). carbon 을 사이드바 bottom 까지 확장 — BOTTOM 음수 (clientH 측정이 실제 사이드바보다 작은 보정).
     const TOP = 12;
-    const BOTTOM = -21;
+    const BOTTOM = 12;
+    const STEP2_BOTTOM = -21;
+    const STEP3_EMPTY_BOTTOM = -21;
+    const STEP5_BOTTOM = -21;
     const GAP = 12;
 
     for (const s of targetSteps) {
@@ -385,16 +391,28 @@ export function IoComposeView({
         // Step 4 in step=3+bundles>0: picker advance 후 Step 4 가 viewport 차지.
         wrapperTopInContainer = TOP;
       } else {
-        // Step 2/3/5: scroll 후 prev step 이 container top + TOP.
+        // Step 2/3/5: 접힌 이전 단계 카드 아래부터 active 카드가 차도록 계산.
         const prevStep: IoStep = (s - 1) as IoStep;
         const prevCollapsed = stepElements[prevStep];
         if (!prevCollapsed) continue;
         wrapperTopInContainer = TOP + prevCollapsed.offsetHeight + GAP;
       }
 
-      const newHeight = scrollContainer.clientHeight - wrapperTopInContainer - BOTTOM;
+      const bottom =
+        s === 2
+          ? STEP2_BOTTOM
+          : s === 3 && state.bundles.length === 0
+            ? STEP3_EMPTY_BOTTOM
+            : s === 5
+              ? STEP5_BOTTOM
+            : BOTTOM;
+      const newHeight = scrollContainer.clientHeight - wrapperTopInContainer - bottom;
       if (newHeight > 0) {
-        wrapper.style.height = `${newHeight}px`;
+        if (s === 4) {
+          wrapper.style.minHeight = `${newHeight}px`;
+        } else {
+          wrapper.style.height = `${newHeight}px`;
+        }
       }
     }
 
@@ -402,7 +420,10 @@ export function IoComposeView({
       // unmount 시에도 모든 wrapper height 정리
       for (const s of allSteps) {
         const w = stepElements[s];
-        if (w) w.style.height = "";
+        if (w) {
+          w.style.height = "";
+          w.style.minHeight = "";
+        }
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -446,7 +467,7 @@ export function IoComposeView({
   }, [step]);
 
   return (
-    <div className="flex flex-col gap-3 pb-[400px]">
+    <div className={`flex flex-col gap-3 ${step === 1 ? "pb-0" : "pb-[400px]"}`}>
       {error && (
         <div
           className="rounded-[12px] border px-4 py-3 text-sm font-bold"
