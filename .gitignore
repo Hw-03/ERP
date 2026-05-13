@@ -49,7 +49,10 @@ Thumbs.db
 .playwright-mcp/
 /0[0-9]_*.png
 /0[0-9][a-z]_*.png
+/step*.png
+/v[0-9]*.png
 /api_requests.log
+/verify_out.log
 /all_console_errors.log
 /bom-snapshot.yml
 /verify_*.png
