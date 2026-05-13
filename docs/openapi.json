@@ -1189,6 +1189,20 @@
       },
       "EmployeeCreate": {
         "properties": {
+          "assigned_model_slots": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Model Slots"
+          },
           "department": {
             "title": "Department",
             "type": "string"
@@ -1310,6 +1324,13 @@
       },
       "EmployeeResponse": {
         "properties": {
+          "assigned_model_slots": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Assigned Model Slots",
+            "type": "array"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -1409,6 +1430,20 @@
       },
       "EmployeeUpdate": {
         "properties": {
+          "assigned_model_slots": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Model Slots"
+          },
           "department": {
             "anyOf": [
               {

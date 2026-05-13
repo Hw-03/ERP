@@ -128,6 +128,8 @@ class EmployeeCreate(BaseModel):
     department_role: str = Field("none", description="부서 결재 역할 (none/primary/deputy)")
     display_order: int = 0
     is_active: bool = True
+    # 조립 부서 직원의 담당 모델 slot 목록. 리스트 순서 = priority (앞=상위).
+    assigned_model_slots: Optional[List[int]] = None
 
 
 class EmployeeUpdate(BaseModel):
@@ -140,6 +142,8 @@ class EmployeeUpdate(BaseModel):
     department_role: Optional[str] = Field(None, description="부서 결재 역할 (none/primary/deputy)")
     display_order: Optional[int] = None
     is_active: Optional[bool] = None
+    # 조립 부서 직원의 담당 모델 slot 목록. None=변경 없음, []=전부 제거.
+    assigned_model_slots: Optional[List[int]] = None
 
 
 class EmployeeResponse(BaseModel):
@@ -160,6 +164,8 @@ class EmployeeResponse(BaseModel):
     updated_at: datetime
     pin_last_changed: Optional[datetime] = None
     pin_is_default: bool = True
+    # 담당 모델 slot 목록 (priority 순서대로 정렬되어 반환됨)
+    assigned_model_slots: List[int] = Field(default_factory=list)
 
 
 class ShipPackageItemCreate(BaseModel):

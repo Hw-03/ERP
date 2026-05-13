@@ -66,6 +66,7 @@ export function useAdminEmployees({
       onError("이름은 필수입니다.");
       return;
     }
+    const isAssembly = form.empAddForm.department === "조립";
     try {
       const created = await api.createEmployee({
         name: form.empAddForm.name.trim(),
@@ -74,6 +75,7 @@ export function useAdminEmployees({
         phone: form.empAddForm.phone.trim() || undefined,
         warehouse_role: form.empAddForm.warehouse_role,
         department_role: form.empAddForm.department_role,
+        assigned_model_slots: isAssembly ? form.empAddForm.assigned_model_slots : [],
       });
       setEmployees((current) => [...current, created]);
       form.resetAddForm();
@@ -105,6 +107,7 @@ export function useAdminEmployees({
       onError("이름은 필수입니다.");
       return;
     }
+    const isAssembly = form.editForm.department === "조립";
     try {
       const updated = await api.updateEmployee(form.selectedEmployee.employee_id, {
         name: form.editForm.name.trim(),
@@ -113,6 +116,7 @@ export function useAdminEmployees({
         department: form.editForm.department as Employee["department"],
         warehouse_role: form.editForm.warehouse_role,
         department_role: form.editForm.department_role,
+        assigned_model_slots: isAssembly ? form.editForm.assigned_model_slots : [],
       });
       setEmployees((current) =>
         current.map((e) => (e.employee_id === updated.employee_id ? updated : e)),

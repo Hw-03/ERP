@@ -6,6 +6,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { Tooltip } from "@/lib/ui";
 import { EmptyState } from "../common";
+import { useCurrentOperator } from "../login/useCurrentOperator";
 import {
   DEPT_OPTIONS,
   PAGE_SIZE,
@@ -137,6 +138,7 @@ export function IoTargetPicker({
   const [model, setModel] = useState("전체");
   const [stage, setStage] = useState("ALL");
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
+  const operator = useCurrentOperator();
 
   const showPackages = canPickPackages(workType);
   const actionMode = getItemActionMode(subType);
@@ -159,6 +161,13 @@ export function IoTargetPicker({
     return map;
   }, [targetDepartment]);
 
+  // 조립 부서 직원의 담당 모델 slot → priority(0=상위). 배열 순서가 곧 priority.
+  const assignedPriorityBySlot = useMemo(() => {
+    const m = new Map<number, number>();
+    (operator?.assigned_model_slots ?? []).forEach((slot, idx) => m.set(slot, idx));
+    return m;
+  }, [operator]);
+
   const filteredItems = useMemo(() => {
     const filtered = items.filter(
       (item) =>
@@ -171,11 +180,26 @@ export function IoTargetPicker({
       .map((item, idx) => {
         const letter = deptOf(item.process_type_code);
         const priority = letter ? deptPriorityByLetter.get(letter) ?? 999 : 999;
-        return { item, priority, idx };
+        // 조립 그룹(letter "A") 안에서만 담당 모델 매칭 시 그룹 내 추가 우선순위 부여.
+        // 한 부품이 여러 담당 모델에 공통이면 그 중 가장 높은(=값이 작은) priority 사용.
+        let assemblyRank = Number.POSITIVE_INFINITY;
+        if (letter === "A" && assignedPriorityBySlot.size > 0) {
+          for (const slot of item.model_slots ?? []) {
+            const p = assignedPriorityBySlot.get(slot);
+            if (p !== undefined && p < assemblyRank) assemblyRank = p;
+          }
+        }
+        return { item, priority, assemblyRank, idx };
       })
-      .sort((a, b) => (a.priority !== b.priority ? a.priority - b.priority : a.idx - b.idx))
+      .sort((a, b) =>
+        a.priority !== b.priority
+          ? a.priority - b.priority
+          : a.assemblyRank !== b.assemblyRank
+            ? a.assemblyRank - b.assemblyRank
+            : a.idx - b.idx,
+      )
       .map((row) => row.item);
-  }, [items, dept, model, stage, keyword, deptPriorityByLetter]);
+  }, [items, dept, model, stage, keyword, deptPriorityByLetter, assignedPriorityBySlot]);
 
   const filteredPackages = useMemo(() => {
     if (!keyword) return packages;

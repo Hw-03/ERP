@@ -19,6 +19,8 @@ export type EmployeeEditForm = {
   department: string;
   warehouse_role: WarehouseRole;
   department_role: DepartmentRole;
+  /** 조립 부서 직원의 담당 모델 slot 목록 (배열 순서 = 우선순위, 0=1순위). */
+  assigned_model_slots: number[];
 };
 
 const EMPTY_EDIT_FORM: EmployeeEditForm = {
@@ -28,6 +30,7 @@ const EMPTY_EDIT_FORM: EmployeeEditForm = {
   department: "조립",
   warehouse_role: "none",
   department_role: "none",
+  assigned_model_slots: [],
 };
 
 function toEditForm(emp: Employee): EmployeeEditForm {
@@ -38,6 +41,7 @@ function toEditForm(emp: Employee): EmployeeEditForm {
     department: emp.department,
     warehouse_role: (emp.warehouse_role ?? "none") as WarehouseRole,
     department_role: (emp.department_role ?? "none") as DepartmentRole,
+    assigned_model_slots: emp.assigned_model_slots ?? [],
   };
 }
 

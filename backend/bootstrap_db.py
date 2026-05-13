@@ -35,6 +35,7 @@ from app.models import (
     Department,
     DepartmentEnum,
     Employee,
+    EmployeeAssignedModel,  # noqa: F401 — metadata registration
     EmployeeLevelEnum,
     Item,
     OptionCode,

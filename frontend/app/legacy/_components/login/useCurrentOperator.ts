@@ -18,10 +18,15 @@ export interface Operator {
   warehouse_role: WarehouseRole;
   /** 부서 결재 역할 — 낱개(manual/adjust) IO 결재 권한. 누락 시 "none". */
   department_role: DepartmentRole;
+  /** 조립 부서 직원의 담당 모델 slot 목록 (priority 순서). 누락 시 []. */
+  assigned_model_slots: number[];
 }
 
 const OPERATOR_KEY = "dexcowin_erp_operator";
 const BOOT_KEY = "dexcowin_erp_boot_id";
+// 같은 탭에서 setCurrentOperator 가 호출되면 useCurrentOperator 구독자들을 깨우기 위한 이벤트.
+// localStorage `storage` 이벤트는 다른 탭에만 발화하므로 별도 CustomEvent 필요.
+const OPERATOR_CHANGE_EVENT = "dexcowin_operator_change";
 
 function readOperator(): Operator | null {
   if (typeof window === "undefined") return null;
@@ -31,10 +36,15 @@ function readOperator(): Operator | null {
     const parsed = JSON.parse(raw) as Partial<Operator> & {
       warehouse_role?: string | null;
       department_role?: string | null;
+      assigned_model_slots?: unknown;
     };
     if (!parsed.employee_id || !parsed.name) return null;
     const wh = (parsed.warehouse_role ?? "none").toLowerCase();
     const dept = (parsed.department_role ?? "none").toLowerCase();
+    const slotsRaw = parsed.assigned_model_slots;
+    const slots = Array.isArray(slotsRaw)
+      ? slotsRaw.filter((s): s is number => typeof s === "number" && Number.isInteger(s))
+      : [];
     return {
       employee_id: parsed.employee_id,
       name: parsed.name,
@@ -43,6 +53,7 @@ function readOperator(): Operator | null {
       employee_code: parsed.employee_code as string,
       warehouse_role: (wh === "primary" || wh === "deputy" ? wh : "none") as WarehouseRole,
       department_role: (dept === "primary" || dept === "deputy" ? dept : "none") as DepartmentRole,
+      assigned_model_slots: slots,
     };
   } catch {
     return null;
@@ -63,12 +74,14 @@ export function setCurrentOperator(op: Operator, bootId?: string): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(OPERATOR_KEY, JSON.stringify(op));
   if (bootId) window.localStorage.setItem(BOOT_KEY, bootId);
+  window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
 }
 
 export function clearCurrentOperator(): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(OPERATOR_KEY);
   window.localStorage.removeItem(BOOT_KEY);
+  window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
 }
 
 export function useCurrentOperator(): Operator | null {
@@ -76,6 +89,13 @@ export function useCurrentOperator(): Operator | null {
 
   useEffect(() => {
     setOperator(readOperator());
+    const onChange = () => setOperator(readOperator());
+    window.addEventListener(OPERATOR_CHANGE_EVENT, onChange);
+    window.addEventListener("storage", onChange);
+    return () => {
+      window.removeEventListener(OPERATOR_CHANGE_EVENT, onChange);
+      window.removeEventListener("storage", onChange);
+    };
   }, []);
 
   return operator;

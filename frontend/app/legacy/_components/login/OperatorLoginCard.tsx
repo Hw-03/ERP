@@ -50,6 +50,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
         employee_code: emp.employee_code,
         warehouse_role: emp.warehouse_role ?? "none",
         department_role: emp.department_role ?? "none",
+        assigned_model_slots: emp.assigned_model_slots ?? [],
       };
       try {
         const session = await api.getAppSession();

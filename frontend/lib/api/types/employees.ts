@@ -24,4 +24,6 @@ export interface Employee {
   pin_last_changed?: string | null;
   /** true면 기본 PIN(0000) 또는 미설정. false면 직원이 직접 설정한 PIN. */
   pin_is_default?: boolean;
+  /** 조립 부서 직원의 담당 모델 slot 목록. 배열 순서 = 우선순위 (앞=상위). */
+  assigned_model_slots?: number[];
 }

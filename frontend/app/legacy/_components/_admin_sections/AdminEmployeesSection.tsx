@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Save, Trash2, Users, X } from "lucide-react";
-import type { DepartmentMaster, DepartmentRole, Employee, WarehouseRole } from "@/lib/api";
+import { api, type DepartmentMaster, type DepartmentRole, type Employee, type ProductModel, type WarehouseRole } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment, getDepartmentFallbackColor } from "@/lib/mes/department";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
@@ -17,6 +17,9 @@ import {
   AdminPageHeader,
 } from "./_admin_primitives";
 import { useAdminEmployeesContext } from "./AdminEmployeesContext";
+import { AssignedModelsEditor } from "./AssignedModelsEditor";
+
+const ASSEMBLY_DEPT = "조립";
 
 const WAREHOUSE_ROLE_LABEL: Record<WarehouseRole, { label: string; hint: string; tone: string }> = {
   none: { label: "없음", hint: "기본 작업만 수행", tone: LEGACY_COLORS.muted2 },
@@ -70,6 +73,13 @@ export function AdminEmployeesSection() {
 
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState<string>("ALL");
+  const [productModels, setProductModels] = useState<ProductModel[]>([]);
+
+  useEffect(() => {
+    void api.getModels().then((models) =>
+      setProductModels(models.filter((m) => !m.is_reserved && (m.model_name || m.symbol))),
+    );
+  }, []);
 
   const deptOptions = useMemo(() => {
     const seen = new Set<string>();
@@ -283,6 +293,7 @@ export function AdminEmployeesSection() {
                 form={empAddForm}
                 setForm={setEmpAddForm}
                 departments={departments}
+                productModels={productModels}
                 onSubmit={addEmployee}
               />
             ) : selectedEmployee ? (
@@ -291,6 +302,7 @@ export function AdminEmployeesSection() {
                 form={editForm}
                 setForm={setEditForm}
                 departments={departments}
+                productModels={productModels}
                 onRequestPinReset={requestPinReset}
                 onToggle={toggleEmployee}
                 onRequestDelete={requestDelete}
@@ -370,10 +382,11 @@ interface EmployeeAddInlineProps {
   form: ReturnType<typeof useAdminEmployeesContext>["empAddForm"];
   setForm: ReturnType<typeof useAdminEmployeesContext>["setEmpAddForm"];
   departments: DepartmentMaster[];
+  productModels: ProductModel[];
   onSubmit: () => void;
 }
 
-function EmployeeAddInline({ form, setForm, departments, onSubmit }: EmployeeAddInlineProps) {
+function EmployeeAddInline({ form, setForm, departments, productModels, onSubmit }: EmployeeAddInlineProps) {
   return (
     <form
       className="flex max-w-[520px] flex-col gap-4"
@@ -434,6 +447,15 @@ function EmployeeAddInline({ form, setForm, departments, onSubmit }: EmployeeAdd
           />
         </FieldRow>
       </div>
+      {form.department === ASSEMBLY_DEPT ? (
+        <FieldRow label="담당 모델 (우선순위 순)">
+          <AssignedModelsEditor
+            models={productModels}
+            selected={form.assigned_model_slots}
+            onChange={(next) => setForm((f) => ({ ...f, assigned_model_slots: next }))}
+          />
+        </FieldRow>
+      ) : null}
       <div
         className="rounded-[10px] border px-3 py-2 text-[12px]"
         style={{
@@ -460,6 +482,7 @@ interface EmployeeDetailGridProps {
   form: ReturnType<typeof useAdminEmployeesContext>["editForm"];
   setForm: ReturnType<typeof useAdminEmployeesContext>["setEditForm"];
   departments: DepartmentMaster[];
+  productModels: ProductModel[];
   onRequestPinReset: (e: Employee) => void;
   onToggle: (e: Employee) => void;
   onRequestDelete: (e: Employee) => void;
@@ -470,6 +493,7 @@ function EmployeeDetailGrid({
   form,
   setForm,
   departments,
+  productModels,
   onRequestPinReset,
   onToggle,
   onRequestDelete,
@@ -619,6 +643,19 @@ function EmployeeDetailGrid({
           </button>
         </div>
       </DetailCardSlot>
+
+      {/* 카드 5: 담당 모델 — 조립 부서일 때만 노출. 입출고 화면에서 조립 그룹 내 정렬 우선순위로 사용. */}
+      {form.department === ASSEMBLY_DEPT ? (
+        <div className="lg:col-span-2">
+          <DetailCardSlot title="담당 모델 (우선순위 순)">
+            <AssignedModelsEditor
+              models={productModels}
+              selected={form.assigned_model_slots}
+              onChange={(next) => setForm((f) => ({ ...f, assigned_model_slots: next }))}
+            />
+          </DetailCardSlot>
+        </div>
+      ) : null}
     </div>
   );
 }

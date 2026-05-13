@@ -339,6 +339,32 @@ class Employee(Base):
     )
 
 
+class EmployeeAssignedModel(Base):
+    """직원-제품 다대다. 조립 부서 직원에게 담당 모델을 지정하면
+    입출고 목록에서 조립 그룹 내부 정렬 시 담당 모델 부품이 위로 올라간다.
+    priority 가 작을수록 더 위 — 0 이 1순위.
+    """
+
+    __tablename__ = "employee_assigned_models"
+
+    employee_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("employees.employee_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    slot = Column(
+        SmallInteger,
+        ForeignKey("product_symbols.slot", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    priority = Column(Integer, nullable=False, default=0, server_default="0")
+
+    __table_args__ = (
+        Index("ix_eam_employee", "employee_id"),
+        Index("ix_eam_employee_priority", "employee_id", "priority"),
+    )
+
+
 class ShipPackage(Base):
     __tablename__ = "ship_packages"
 

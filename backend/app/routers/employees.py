@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Employee, StockRequest
+from app.models import Employee, EmployeeAssignedModel, ProductSymbol, StockRequest
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     EmployeeCreate,
@@ -27,6 +27,72 @@ from app.services._tx import commit_and_refresh, commit_only
 router = APIRouter()
 
 
+def _assigned_slots_for(db: Session, employee_id: uuid.UUID) -> List[int]:
+    """단일 직원의 담당 모델 slot 목록 (priority asc)."""
+    rows = (
+        db.query(EmployeeAssignedModel.slot)
+        .filter(EmployeeAssignedModel.employee_id == employee_id)
+        .order_by(EmployeeAssignedModel.priority.asc(), EmployeeAssignedModel.slot.asc())
+        .all()
+    )
+    return [row.slot for row in rows]
+
+
+def _assigned_slots_bulk(db: Session, employee_ids: List[uuid.UUID]) -> dict:
+    """다수 직원의 담당 모델 slot을 dict[employee_id] = [slot, ...] 형태로 일괄 조회 (N+1 회피)."""
+    if not employee_ids:
+        return {}
+    rows = (
+        db.query(EmployeeAssignedModel)
+        .filter(EmployeeAssignedModel.employee_id.in_(employee_ids))
+        .order_by(EmployeeAssignedModel.employee_id, EmployeeAssignedModel.priority.asc())
+        .all()
+    )
+    grouped: dict = {}
+    for row in rows:
+        grouped.setdefault(row.employee_id, []).append(row.slot)
+    return grouped
+
+
+def _sync_assigned_models(
+    db: Session, employee_id: uuid.UUID, slots: List[int]
+) -> None:
+    """직원의 담당 모델을 payload 순서(=priority)로 통째 교체.
+
+    - 존재하지 않는 slot, 중복 slot 은 무시한다 (조용히 dedupe).
+    - 빈 리스트면 매핑 전부 제거.
+    """
+    db.query(EmployeeAssignedModel).filter(
+        EmployeeAssignedModel.employee_id == employee_id
+    ).delete(synchronize_session=False)
+
+    if not slots:
+        return
+
+    seen: set = set()
+    unique_ordered: list = []
+    for s in slots:
+        if s in seen:
+            continue
+        seen.add(s)
+        unique_ordered.append(s)
+
+    valid_slots = {
+        row.slot
+        for row in db.query(ProductSymbol.slot)
+        .filter(ProductSymbol.slot.in_(unique_ordered))
+        .all()
+    }
+    for idx, slot in enumerate(unique_ordered):
+        if slot not in valid_slots:
+            continue
+        db.add(
+            EmployeeAssignedModel(
+                employee_id=employee_id, slot=slot, priority=idx
+            )
+        )
+
+
 @router.get("", response_model=List[EmployeeResponse])
 def list_employees(
     department: Optional[str] = Query(None),
@@ -40,7 +106,11 @@ def list_employees(
         query = query.filter(Employee.is_active == "true")
 
     employees = query.order_by(Employee.display_order.asc(), Employee.name.asc()).all()
-    return [_to_response(employee) for employee in employees]
+    slot_map = _assigned_slots_bulk(db, [e.employee_id for e in employees])
+    return [
+        _to_response(employee, slot_map.get(employee.employee_id, []))
+        for employee in employees
+    ]
 
 
 def _auto_employee_code(db: Session) -> str:
@@ -89,6 +159,9 @@ def create_employee(payload: EmployeeCreate, request: Request, db: Session = Dep
     db.add(employee)
     db.flush()
 
+    if payload.assigned_model_slots is not None:
+        _sync_assigned_models(db, employee.employee_id, payload.assigned_model_slots)
+
     audit.record(
         db,
         request=request,
@@ -99,7 +172,7 @@ def create_employee(payload: EmployeeCreate, request: Request, db: Session = Dep
     )
 
     commit_and_refresh(db, employee)
-    return _to_response(employee)
+    return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
 
 
 @router.put("/{employee_id}", response_model=EmployeeResponse)
@@ -147,6 +220,14 @@ def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, request: Re
         if employee.is_active != payload.is_active:
             employee.is_active = payload.is_active; changed.append("is_active")
 
+    if payload.assigned_model_slots is not None:
+        current = _assigned_slots_for(db, employee.employee_id)
+        if current != payload.assigned_model_slots:
+            _sync_assigned_models(
+                db, employee.employee_id, payload.assigned_model_slots
+            )
+            changed.append("assigned_models")
+
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
     if changed:
@@ -160,7 +241,7 @@ def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, request: Re
         )
 
     commit_and_refresh(db, employee)
-    return _to_response(employee)
+    return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
 
 
 @router.delete("/{employee_id}")
@@ -210,7 +291,7 @@ def verify_employee_pin(employee_id: uuid.UUID, payload: PinVerifyRequest, db: S
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원입니다.")
     if not verify_pin(employee.pin_hash, payload.pin):
         raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
-    return _to_response(employee)
+    return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
 
 
 @router.post("/{employee_id}/change-pin", status_code=status.HTTP_204_NO_CONTENT)
@@ -275,7 +356,9 @@ def reset_employee_pin(
     commit_only(db)
 
 
-def _to_response(employee: Employee) -> EmployeeResponse:
+def _to_response(
+    employee: Employee, assigned_model_slots: Optional[List[int]] = None
+) -> EmployeeResponse:
     pin_hash = getattr(employee, "pin_hash", None)
     pin_is_default = pin_hash is None or pin_hash == DEFAULT_PIN_HASH
     return EmployeeResponse(
@@ -294,4 +377,5 @@ def _to_response(employee: Employee) -> EmployeeResponse:
         updated_at=employee.updated_at,
         pin_last_changed=getattr(employee, "pin_last_changed", None),
         pin_is_default=pin_is_default,
+        assigned_model_slots=assigned_model_slots or [],
     )
