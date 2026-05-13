@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
 
 export type WarehouseSectionTab = "compose" | "cart" | "mine" | "queue" | "dept-queue";
 
@@ -16,57 +18,79 @@ interface Props {
   cartCount?: number;
 }
 
+type TabDef = { id: WarehouseSectionTab; label: string; tone: string };
+
 export function WarehouseSectionTabs({ active, onChange, showQueue, showDeptQueue, cartCount = 0 }: Props) {
-  const tabs: { id: WarehouseSectionTab; label: string }[] = [
-    { id: "compose", label: "요청 작성" },
-    { id: "cart", label: "작업 중" },
-    { id: "mine", label: "내 요청" },
+  const tabs: TabDef[] = [
+    { id: "compose", label: "요청 작성", tone: LEGACY_COLORS.blue },
+    { id: "cart", label: "작업 중", tone: LEGACY_COLORS.green },
+    { id: "mine", label: "내 요청", tone: LEGACY_COLORS.purple },
   ];
-  if (showQueue) tabs.push({ id: "queue", label: "창고 승인함" });
-  if (showDeptQueue) tabs.push({ id: "dept-queue", label: "부서 승인함" });
+  if (showQueue) tabs.push({ id: "queue", label: "창고 승인함", tone: LEGACY_COLORS.yellow });
+  if (showDeptQueue) tabs.push({ id: "dept-queue", label: "부서 승인함", tone: LEGACY_COLORS.yellow });
 
   return (
-    <div className="flex items-center gap-2">
+    <div
+      className="grid gap-2"
+      style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
+    >
       {tabs.map((t) => {
-        const activeState = active === t.id;
-        const showBadge = t.id === "cart" && cartCount > 0;
-        const inactiveAlert = !activeState && showBadge;
+        const badge = t.id === "cart" && cartCount > 0 ? cartCount : null;
         return (
-          <button
+          <TabButton
             key={t.id}
-            type="button"
+            label={t.label}
+            badge={badge}
+            tone={t.tone}
+            active={active === t.id}
             onClick={() => onChange(t.id)}
-            className="relative rounded-full border px-4 py-1.5 text-sm font-bold transition"
-            style={{
-              background: activeState
-                ? LEGACY_COLORS.blue
-                : inactiveAlert
-                ? `color-mix(in srgb, ${LEGACY_COLORS.green} 18%, ${LEGACY_COLORS.s2})`
-                : LEGACY_COLORS.s2,
-              color: activeState
-                ? "white"
-                : inactiveAlert
-                ? LEGACY_COLORS.green
-                : LEGACY_COLORS.text,
-              borderColor: activeState
-                ? LEGACY_COLORS.blue
-                : inactiveAlert
-                ? LEGACY_COLORS.green
-                : LEGACY_COLORS.border,
-            }}
-          >
-            {t.label}
-            {showBadge && (
-              <span
-                className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-black text-white"
-                style={{ background: LEGACY_COLORS.green }}
-              >
-                {cartCount}
-              </span>
-            )}
-          </button>
+          />
         );
       })}
     </div>
+  );
+}
+
+function TabButton({
+  label,
+  badge,
+  tone,
+  active,
+  onClick,
+}: {
+  label: string;
+  badge: number | null;
+  tone: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const bg = active ? tint(tone, 22) : hovered ? tint(tone, 16) : tint(tone, 8);
+  const border = active || hovered ? tone : tint(tone, 35);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="relative rounded-[12px] border px-4 py-2.5 transition-colors hover:brightness-110"
+      style={{ background: bg, borderColor: border }}
+    >
+      <div
+        className="text-center text-[22px] font-black leading-tight tracking-[-0.02em]"
+        style={{ color: tone }}
+      >
+        {label}
+      </div>
+      {badge !== null && (
+        <div
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-[28px] font-black leading-none"
+          style={{ color: tone }}
+        >
+          {badge}
+        </div>
+      )}
+    </button>
   );
 }

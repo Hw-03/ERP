@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { api, type BOMDetailEntry, type IoBundle, type IoLine, type IoSourceKind, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
@@ -160,7 +160,6 @@ export function IoComposeView({
 
   async function addItem(item: Item, sourceKind: IoSourceKind = "direct_item", subTypeOverride?: IoSubType) {
     setError(null);
-    const wasEmpty = state.bundles.length === 0;
     // setSubType은 다음 렌더로 미뤄지므로, previewTarget에는 effective 값을 즉시 전달.
     const effectiveSubType = subTypeOverride ?? state.subType;
     if (subTypeOverride && subTypeOverride !== state.subType) {
@@ -177,11 +176,6 @@ export function IoComposeView({
       });
       state.setBundles((prev) => [...prev, ...normalizeBundles(response.bundles)]);
       onStatusChange(`${item.item_name} 작업 묶음 생성`);
-      if (wasEmpty && state.step === 3) {
-        // 첫 품목 추가 → step 4(수량 조정) 자동 펼침. picker 위치 유지를 위해 scroll skip.
-        programmaticAdvanceRef.current = true;
-        state.goNext();
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "품목 전개에 실패했습니다.");
     }
@@ -344,6 +338,75 @@ export function IoComposeView({
   const lastScrolledStepRef = useRef<IoStep | null>(null);
   // 첫 품목 추가로 인한 자동 advance 시에는 viewport를 picker 위치에 고정 (사용자가 연속 선택 가능하도록)
   const programmaticAdvanceRef = useRef(false);
+
+  // active wrapper height 동적 set — carbon bottom 이 컨테이너 bottom (= 사이드바 bottom) 과 정렬되도록.
+  // Step 3+품목>0 시점에는 Step 4 wrapper 가 active.
+  useLayoutEffect(() => {
+    const allSteps: IoStep[] = [1, 2, 3, 4, 5];
+    // 매 호출마다 모든 wrapper height 초기화 — cleanup 의존하지 않음 (cleanup 누락 시 leftover 거대 height 방지)
+    for (const s of allSteps) {
+      const w = stepRefs.current[s];
+      if (w) w.style.height = "";
+    }
+
+    // step=3+bundles>0 시 Step 3 과 Step 4 둘 다 filled 처리 (사이즈 일관성).
+    const targetSteps: IoStep[] =
+      step === 3 && state.bundles.length > 0 ? [3 as IoStep, 4 as IoStep] : [step];
+
+    const firstWrapper = stepRefs.current[targetSteps[0]];
+    if (!firstWrapper) return;
+
+    let container: HTMLElement | null = firstWrapper.parentElement;
+    while (container) {
+      const s = window.getComputedStyle(container);
+      if (s.overflowY === "auto" || s.overflowY === "scroll") break;
+      container = container.parentElement;
+    }
+    if (!container) return;
+    const scrollContainer = container;
+
+    // top margin = gap-3 (12px). carbon 을 사이드바 bottom 까지 확장 — BOTTOM 음수 (clientH 측정이 실제 사이드바보다 작은 보정).
+    const TOP = 12;
+    const BOTTOM = -21;
+    const GAP = 12;
+
+    for (const s of targetSteps) {
+      const wrapper = stepRefs.current[s];
+      if (!wrapper) continue;
+
+      let wrapperTopInContainer: number;
+      if (s === 1) {
+        // Step 1: 자동 스크롤 안 됨. 현재 위치 (외부 헤더+탭 아래) 그대로
+        const wRect = wrapper.getBoundingClientRect();
+        const cRect = scrollContainer.getBoundingClientRect();
+        wrapperTopInContainer = wRect.top - cRect.top + scrollContainer.scrollTop;
+      } else if (s === 4 && step === 3) {
+        // Step 4 in step=3+bundles>0: picker advance 후 Step 4 가 viewport 차지.
+        wrapperTopInContainer = TOP;
+      } else {
+        // Step 2/3/5: scroll 후 prev step 이 container top + TOP.
+        const prevStep: IoStep = (s - 1) as IoStep;
+        const prevCollapsed = stepRefs.current[prevStep];
+        if (!prevCollapsed) continue;
+        wrapperTopInContainer = TOP + prevCollapsed.offsetHeight + GAP;
+      }
+
+      const newHeight = scrollContainer.clientHeight - wrapperTopInContainer - BOTTOM;
+      if (newHeight > 0) {
+        wrapper.style.height = `${newHeight}px`;
+      }
+    }
+
+    return () => {
+      // unmount 시에도 모든 wrapper height 정리
+      for (const s of allSteps) {
+        const w = stepRefs.current[s];
+        if (w) w.style.height = "";
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, state.bundles.length]);
+
   useEffect(() => {
     const el = stepRefs.current[step];
     if (!el) return;
@@ -364,23 +427,25 @@ export function IoComposeView({
     }
     const timer = setTimeout(() => {
       if (step === 1) {
-        // step 1 로 돌아간 경우 페이지 최상단 (외부 "입출고 작업" 헤더 + 탭 다시 보이게)
-        container?.scrollTo({ top: 0, behavior: "smooth" });
+        if (container) container.scrollTop = 0;
       } else {
-        // step 2 이후 — 직전(step-1) 카드 위 여백 = gap-3 (12px) - active 테두리 추가 두께(2px) 보정
-        const targetStep = (step - 1) as IoStep;
-        const targetEl = stepRefs.current[targetStep];
+        // step 2 이후 — 직전(step-1) 카드 를 container top + 12px (gap-3) 위치로 정렬
+        // smooth scroll 은 dynamic height layout shift 와 충돌해 미달함. 즉시 할당.
+        const targetEl = stepRefs.current[(step - 1) as IoStep];
         if (container && targetEl) {
-          const offset = targetEl.offsetTop - container.offsetTop - 10;
-          container.scrollTo({ top: Math.max(0, offset), behavior: "smooth" });
+          const containerRect = container.getBoundingClientRect();
+          const targetRect = targetEl.getBoundingClientRect();
+          const newScrollTop =
+            container.scrollTop + (targetRect.top - containerRect.top) - 12;
+          container.scrollTop = Math.max(0, newScrollTop);
         }
       }
-    }, 100);
+    }, 150);
     return () => clearTimeout(timer);
   }, [step]);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 pb-[400px]">
       {error && (
         <div
           className="rounded-[12px] border px-4 py-3 text-sm font-bold"
@@ -396,7 +461,7 @@ export function IoComposeView({
 
       <div
         ref={(el) => { stepRefs.current[1] = el; }}
-        className={`flex flex-col${step === 1 ? " min-h-screen" : ""}`}
+        className="flex flex-col"
       >
         <WizardStepCard
           n={1}
@@ -405,6 +470,7 @@ export function IoComposeView({
           summary={workTypeLabel(state.workType)}
           onChange={() => state.goTo(1)}
           accent={accent}
+          fill={step === 1}
         >
           <IoWorkTypeStep workType={state.workType} operator={operator} onWorkTypeChange={handleWorkTypeChange} />
         </WizardStepCard>
@@ -413,7 +479,7 @@ export function IoComposeView({
       {step >= 2 && (
         <div
           ref={(el) => { stepRefs.current[2] = el; }}
-          className={`flex flex-col${step === 2 ? " min-h-screen" : ""}`}
+          className="flex flex-col"
         >
           <WizardStepCard
             n={2}
@@ -422,6 +488,7 @@ export function IoComposeView({
             summary={stepTwoSummary}
             onChange={() => state.goTo(2)}
             accent={accent}
+            fill={step === 2}
           >
             <IoSubTypeStep
               workType={state.workType}
@@ -454,15 +521,16 @@ export function IoComposeView({
       {step >= 3 && (
         <div
           ref={(el) => { stepRefs.current[3] = el; }}
-          className={`flex flex-col${step === 3 ? " min-h-screen" : ""}`}
+          className="flex flex-col"
         >
           <WizardStepCard
             n={3}
             title={`${pickerDirectionLabel(state.subType)} 품목 선택`}
-            state={step >= 5 ? "complete" : step >= 3 ? "active" : "locked"}
+            state={stepState(3)}
             summary={`${state.bundles.length}개 묶음 · 라인 ${lineCount}개`}
             onChange={() => state.goTo(3)}
             accent={accent}
+            fill={step === 3}
           >
             <IoTargetPicker
               workType={state.workType}
@@ -491,8 +559,24 @@ export function IoComposeView({
                 addItem(item, sourceKind ?? "direct_item", subTypeOverride)}
               onAddPackage={addPackage}
               onAdvance={() => {
-                if (state.step === 3) state.goNext();
-                stepRefs.current[4]?.scrollIntoView({ behavior: "smooth", block: "start" });
+                const step4El = stepRefs.current[4];
+                if (!step4El) return;
+                let container: HTMLElement | null = step4El.parentElement;
+                while (container) {
+                  const s = window.getComputedStyle(container);
+                  if (s.overflowY === "auto" || s.overflowY === "scroll") break;
+                  container = container.parentElement;
+                }
+                if (!container) return;
+                const scrollContainer = container;
+                // useLayoutEffect 가 set 한 height 가 paint 된 다음 프레임에 측정
+                requestAnimationFrame(() => {
+                  const containerRect = scrollContainer.getBoundingClientRect();
+                  const targetRect = step4El.getBoundingClientRect();
+                  const newScrollTop =
+                    scrollContainer.scrollTop + (targetRect.top - containerRect.top) - 12;
+                  scrollContainer.scrollTop = Math.max(0, newScrollTop);
+                });
               }}
               busy={previewing}
             />
@@ -500,18 +584,19 @@ export function IoComposeView({
         </div>
       )}
 
-      {step >= 4 && (
+      {(step >= 4 || (step === 3 && state.bundles.length > 0)) && (
         <div
           ref={(el) => { stepRefs.current[4] = el; }}
-          className={`flex flex-col${step === 4 ? " min-h-screen" : ""}`}
+          className="flex flex-col"
         >
           <WizardStepCard
             n={4}
             title="품목 확인"
-            state={stepState(4)}
+            state={(step === 3 && state.bundles.length > 0) || step === 4 ? "active" : stepState(4)}
             summary={`반영 ${includedCount}개 · 제외 ${excludedCount}개`}
-            onChange={() => state.goTo(4)}
+            onChange={() => state.goTo(3)}
             accent={accent}
+            fill={step === 4 || (step === 3 && state.bundles.length > 0)}
           >
             <IoBundleCart
               bundles={state.bundles}
@@ -647,8 +732,8 @@ export function IoComposeView({
                 state.setBundles((prev) => prev.filter((bundle) => bundle.bundle_id !== bundleId))
               }
               onAdvance={() => {
-                if (state.step === 4) state.goNext();
-                stepRefs.current[5]?.scrollIntoView({ behavior: "smooth", block: "start" });
+                if (state.step <= 4) state.goTo(5);
+                // state.goTo(5) → step=5 → 자동 스크롤 useEffect 가 Step 4 collapsed top 으로.
               }}
               canAdvance={state.canAdvance[4]}
             />
@@ -659,7 +744,7 @@ export function IoComposeView({
       {step >= 5 && (
         <div
           ref={(el) => { stepRefs.current[5] = el; }}
-          className={`flex flex-col${step === 5 ? " min-h-screen" : ""}`}
+          className="flex flex-col"
         >
           <WizardStepCard
             n={5}
@@ -667,6 +752,7 @@ export function IoComposeView({
             state={stepState(5)}
             summary="제출 준비 완료"
             accent={accent}
+            fill={step === 5}
           >
             <IoConfirmStep
               workType={state.workType}

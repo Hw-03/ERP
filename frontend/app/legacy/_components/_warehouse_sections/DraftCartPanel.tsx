@@ -8,6 +8,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { DraftCartItemRow } from "./DraftCartItemRow";
+import { IoDraftWorkCard } from "./IoDraftWorkCard";
 
 interface Props {
   employeeId: string | null;
@@ -22,12 +23,6 @@ type DeleteTarget =
   | { kind: "stock"; draft: StockRequest }
   | { kind: "io"; draft: IoBatch }
   | null;
-
-function ioDraftTitle(draft: IoBatch) {
-  const first = draft.bundles[0]?.title;
-  const extra = draft.bundles.length > 1 ? ` 외 ${draft.bundles.length - 1}건` : "";
-  return first ? `${first}${extra}` : "입출고 2.0 임시저장";
-}
 
 export function DraftCartPanel({
   employeeId,
@@ -165,72 +160,16 @@ export function DraftCartPanel({
         />
       )}
 
-      {ioDrafts.map((draft) => {
-        const isBusy = busyId === draft.batch_id;
-        return (
-          <div
-            key={draft.batch_id}
-            className="rounded-2xl border p-3"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
-                  {ioDraftTitle(draft)}
-                </p>
-                <p className="mt-1 text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                  입출고 2.0 · {draft.work_type}/{draft.sub_type} · 묶음 {draft.bundles.length}개
-                </p>
-              </div>
-              <span
-                className="rounded-full px-2 py-1 text-[11px] font-black"
-                style={{
-                  background: tint(LEGACY_COLORS.blue, 14),
-                  color: LEGACY_COLORS.blue,
-                }}
-              >
-                새 작업
-              </span>
-            </div>
-            <div className="mt-3 flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                disabled={isBusy}
-                onClick={() => onContinueIo?.(draft)}
-                className="rounded-[10px] border px-3 py-1.5 text-xs font-black disabled:opacity-50"
-                style={{
-                  background: LEGACY_COLORS.s1,
-                  borderColor: LEGACY_COLORS.border,
-                  color: LEGACY_COLORS.text,
-                }}
-              >
-                이어 작성
-              </button>
-              <button
-                type="button"
-                disabled={isBusy}
-                onClick={() => void handleSubmitIo(draft)}
-                className="rounded-[10px] px-3 py-1.5 text-xs font-black text-white disabled:opacity-50"
-                style={{ background: LEGACY_COLORS.blue }}
-              >
-                제출
-              </button>
-              <button
-                type="button"
-                disabled={isBusy}
-                onClick={() => setDeleteTarget({ kind: "io", draft })}
-                className="rounded-[10px] px-3 py-1.5 text-xs font-black disabled:opacity-50"
-                style={{
-                  background: tint(LEGACY_COLORS.red, 10),
-                  color: LEGACY_COLORS.red,
-                }}
-              >
-                삭제
-              </button>
-            </div>
-          </div>
-        );
-      })}
+      {ioDrafts.map((draft) => (
+        <IoDraftWorkCard
+          key={draft.batch_id}
+          draft={draft}
+          isBusy={busyId === draft.batch_id}
+          onContinue={() => onContinueIo?.(draft)}
+          onSubmit={() => void handleSubmitIo(draft)}
+          onRequestDelete={() => setDeleteTarget({ kind: "io", draft })}
+        />
+      ))}
 
       {drafts.map((draft) => (
         <DraftCartItemRow

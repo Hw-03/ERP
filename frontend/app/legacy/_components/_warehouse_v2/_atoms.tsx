@@ -55,6 +55,7 @@ export function WizardStepCard({
   summary,
   onChange,
   accent,
+  fill = false,
   children,
 }: {
   n: number;
@@ -63,6 +64,8 @@ export function WizardStepCard({
   summary?: React.ReactNode;
   onChange?: () => void;
   accent?: string;
+  /** active 상태에서 부모 flex 컬럼 안에서 남은 세로 공간을 모두 차지 (기본 false). */
+  fill?: boolean;
   children?: React.ReactNode;
 }) {
   const tone = accent ?? LEGACY_COLORS.blue;
@@ -82,7 +85,7 @@ export function WizardStepCard({
   if (state === "active") {
     return (
       <section
-        className="rounded-[24px] border-2 p-6"
+        className={`rounded-[24px] border-2 p-6${fill ? " flex flex-1 flex-col min-h-0" : ""}`}
         style={{
           backgroundColor: LEGACY_COLORS.s1,
           borderColor: `color-mix(in srgb, ${tone} 50%, transparent)`,
@@ -104,7 +107,11 @@ export function WizardStepCard({
             </div>
           </div>
         </header>
-        {children}
+        {fill ? (
+          <div className="flex flex-1 flex-col min-h-0">{children}</div>
+        ) : (
+          children
+        )}
       </section>
     );
   }
