@@ -69,6 +69,7 @@ function LegacyBody() {
   const searchParams = useSearchParams();
   const initialTab = normalizeTab(searchParams.get("tab"));
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const [toast, setToast] = useState<ToastState | null>(null);
   const { dispatch: warehouseDispatch } = useWarehouseWizard();
   const operator = useCurrentOperator();
@@ -86,10 +87,17 @@ function LegacyBody() {
 
   const changeTab = useCallback(
     (tab: TabId) => {
+      if (tab === activeTab) {
+        // admin 은 내부 폼 입력 보호를 위해 리셋 제외 (데스크탑과 동일)
+        if (tab !== "admin") {
+          setRefreshNonce((n) => n + 1);
+        }
+        return;
+      }
       setActiveTab(tab);
       router.push(`/legacy?tab=${tab}`, { scroll: false });
     },
-    [router],
+    [router, activeTab],
   );
 
   // 입출고 권한이 없는 부서 사용자가 직접 ?tab=warehouse|dept 로 진입하면 홈 탭으로 강제 이동
@@ -122,10 +130,11 @@ function LegacyBody() {
           title={title.title}
         >
           {activeTab === "home" && (
-            <HomeScreen showToast={showToast} onChangeTab={changeTab} />
+            <HomeScreen key={`home-${refreshNonce}`} showToast={showToast} onChangeTab={changeTab} />
           )}
           {activeTab === "inventory" && (
             <InventoryScreen
+              key={`inventory-${refreshNonce}`}
               showToast={showToast}
               onOpenHistory={() => changeTab("history")}
               onBulkIO={(items) => {
@@ -144,18 +153,20 @@ function LegacyBody() {
             />
           )}
           {activeTab === "warehouse" && (
-            <IoHubScreen showToast={showToast} onChangeTab={changeTab} />
+            <IoHubScreen key={`warehouse-${refreshNonce}`} showToast={showToast} onChangeTab={changeTab} />
           )}
-          {activeTab === "dept" && <DeptWizardScreen showToast={showToast} />}
+          {activeTab === "dept" && <DeptWizardScreen key={`dept-${refreshNonce}`} showToast={showToast} />}
           {activeTab === "history" && (
             <HistoryScreen
+              key={`history-${refreshNonce}`}
               onClose={() => changeTab("home")}
               showToast={showToast}
             />
           )}
-          {activeTab === "admin" && <AdminShell showToast={showToast} />}
+          {activeTab === "admin" && <AdminShell key="admin" showToast={showToast} />}
           {activeTab === "more" && (
             <MoreScreen
+              key={`more-${refreshNonce}`}
               showToast={showToast}
               onChangeTab={changeTab}
               onLoggedOut={handleLoggedOut}
