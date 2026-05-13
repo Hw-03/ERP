@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
-import { canEnterIO } from "./_warehouse_steps";
+import { canEnterIO, isDepartmentApprover } from "./_warehouse_steps";
 import { useWarehouseData } from "./_warehouse_hooks/useWarehouseData";
 import { WarehouseHeader } from "./_warehouse_sections/WarehouseHeader";
 import { WarehouseSectionTabs, type WarehouseSectionTab } from "./_warehouse_sections/WarehouseSectionTabs";
@@ -38,6 +38,7 @@ export function DesktopWarehouseView({
   const canSeeQueue =
     (operator?.warehouse_role ?? "none") === "primary" ||
     (operator?.warehouse_role ?? "none") === "deputy";
+  const canSeeDeptQueue = isDepartmentApprover(operator);
 
   useEffect(() => {
     if (operator && employeeId === "") setEmployeeId(operator.employee_id);
@@ -70,12 +71,14 @@ export function DesktopWarehouseView({
           active={sectionTab}
           onChange={setSectionTab}
           showQueue={canSeeQueue}
+          showDeptQueue={canSeeDeptQueue}
           cartCount={cartCount}
         />
 
         <WarehouseDraftPanelTabs
           sectionTab={sectionTab}
           canSeeQueue={canSeeQueue}
+          canSeeDeptQueue={canSeeDeptQueue}
           operatorEmployeeId={operator?.employee_id}
           employeeId={employeeId}
           refreshNonce={panelRefreshNonce}

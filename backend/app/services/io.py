@@ -11,7 +11,7 @@ import os
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, Sequence
+from typing import Iterable, Optional, Sequence
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -40,6 +40,8 @@ from app.services import stock_requests as stock_request_svc
 
 WORK_TYPES = {"receive", "warehouse_io", "process", "ship", "defect"}
 APPROVAL_SUB_TYPES = {"warehouse_to_dept", "dept_to_warehouse", "defect_quarantine"}
+# 낱개 라인 origin — 부서 결재 정/부 승인 필요.
+MANUAL_LINE_ORIGINS = frozenset({"manual", "adjust_in", "adjust_out"})
 # 출하 권한 fallback 이름 set — warehouse_role(primary/deputy) / level=admin 외 추가 허용자.
 # 운영 환경에선 SHIPPING_ALLOWED_NAMES 환경변수("이름1,이름2")로 override 가능.
 # (TODO 후속: 권한 테이블/role 기반으로 완전 전환)
@@ -719,7 +721,10 @@ def _request_bucket(value: str) -> RequestBucketEnum:
 def _link_stock_request(db: Session, *, batch: IoBatch, request: StockRequest, lines: Sequence[IoLine]) -> None:
     request.operation_batch_id = batch.batch_id
     batch.stock_request_id = request.request_id
-    batch.requires_approval = request.requires_warehouse_approval
+    # 창고 또는 부서 결재 어느 쪽이든 필요하면 결재 대기로 표시.
+    batch.requires_approval = bool(
+        request.requires_warehouse_approval or request.requires_department_approval
+    )
     if request.status == StockRequestStatusEnum.COMPLETED:
         batch.status = "completed"
         batch.completed_at = request.completed_at or datetime.utcnow()
@@ -743,7 +748,13 @@ def _link_stock_request(db: Session, *, batch: IoBatch, request: StockRequest, l
     db.flush()
 
 
-def _submit_approval(db: Session, *, requester: Employee, batch: IoBatch) -> None:
+def _has_manual_line(lines: Iterable[IoLine]) -> bool:
+    return any((getattr(line, "origin", None) or "") in MANUAL_LINE_ORIGINS for line in lines)
+
+
+def _submit_approval(
+    db: Session, *, requester: Employee, batch: IoBatch, force_dept_approval: bool = False
+) -> None:
     lines = _included_lines(batch)
     _validate_included_lines(db, lines)
     inputs = [
@@ -764,8 +775,81 @@ def _submit_approval(db: Session, *, requester: Employee, batch: IoBatch) -> Non
         lines_input=inputs,
         reference_no=batch.reference_no,
         notes=batch.notes,
+        requires_department_approval=force_dept_approval,
     )
     _link_stock_request(db, batch=batch, request=request, lines=lines)
+
+
+def _submit_dept_only_approval(db: Session, *, requester: Employee, batch: IoBatch) -> None:
+    """낱개(manual/adjust) 라인이 포함된 비-APPROVAL_SUB_TYPES 배치 — 부서 결재만 필요.
+
+    실재고 반영은 부서 결재 통과 후 execute_batch_after_dept_approval 가 수행.
+    요청자 본인이 부서 결재 정/부 권한자라면 즉시 실행한다.
+    """
+    # ship 작업은 dept-only 경로에서도 권한 게이트 유지 (_submit_immediate 와 동일).
+    if batch.sub_type == "ship" and not _can_ship(requester):
+        raise PermissionError("출하 작업 권한이 없습니다.")
+    lines = _included_lines(batch)
+    _validate_included_lines(db, lines)
+    inputs = [
+        stock_request_svc.LineInput(
+            item_id=line.item_id,
+            quantity=line.quantity,
+            from_bucket=_request_bucket(line.from_bucket),
+            from_department=line.from_department,
+            to_bucket=_request_bucket(line.to_bucket),
+            to_department=line.to_department,
+        )
+        for line in lines
+    ]
+    request = stock_request_svc.create_manual_adjustment_request(
+        db,
+        requester=requester,
+        lines_input=inputs,
+        reference_no=batch.reference_no,
+        notes=batch.notes,
+    )
+    _link_stock_request(db, batch=batch, request=request, lines=lines)
+
+    # 자가승인 경로 — create_manual_adjustment_request 가 dept_approved 를 이미 마크했으면 즉시 실행.
+    if request.department_approved_by_employee_id is not None:
+        for line in sorted(lines, key=lambda line: 0 if line.direction == "out" else 1):
+            _apply_line(db, batch=batch, line=line, requester=requester)
+        now = datetime.utcnow()
+        request.status = StockRequestStatusEnum.COMPLETED
+        request.completed_at = now
+        for req_line in request.lines:
+            req_line.status = StockRequestStatusEnum.COMPLETED
+        batch.status = "completed"
+        batch.completed_at = now
+        batch.updated_at = now
+        db.flush()
+
+
+def execute_batch_after_dept_approval(
+    db: Session, *, request: StockRequest, approver: Employee
+) -> None:
+    """MANUAL_ADJUSTMENT StockRequest 의 부서 결재 통과 후 실재고 반영.
+
+    stock_requests.approve_request_department 가 status/completed 마킹 직전에 호출.
+    """
+    batch_id = getattr(request, "operation_batch_id", None)
+    if batch_id is None:
+        raise ValueError("배치가 연결되지 않은 결재 요청입니다.")
+    batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
+    if batch is None:
+        raise ValueError("작업 묶음을 찾을 수 없습니다.")
+
+    lines = _included_lines(batch)
+    _validate_included_lines(db, lines)
+    # 부서 결재로 권한 검증이 이미 완료된 시점이므로 ship 권한 재검증 생략.
+    for line in sorted(lines, key=lambda line: 0 if line.direction == "out" else 1):
+        _apply_line(db, batch=batch, line=line, requester=approver)
+    now = datetime.utcnow()
+    batch.status = "completed"
+    batch.completed_at = now
+    batch.updated_at = now
+    db.flush()
 
 
 def _log_immediate(
@@ -906,8 +990,14 @@ def _submit_immediate(db: Session, *, requester: Employee, batch: IoBatch) -> No
 
 def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> dict:
     try:
+        included_lines = _included_lines(batch)
+        has_manual = _has_manual_line(included_lines)
         if batch.sub_type in APPROVAL_SUB_TYPES:
-            _submit_approval(db, requester=requester, batch=batch)
+            _submit_approval(
+                db, requester=requester, batch=batch, force_dept_approval=has_manual
+            )
+        elif has_manual:
+            _submit_dept_only_approval(db, requester=requester, batch=batch)
         else:
             _submit_immediate(db, requester=requester, batch=batch)
     except Exception:

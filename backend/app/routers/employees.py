@@ -66,6 +66,14 @@ def create_employee(payload: EmployeeCreate, request: Request, db: Session = Dep
             "warehouse_role 은 none/primary/deputy 중 하나여야 합니다.",
         )
 
+    dept_role_value = (payload.department_role or "none").lower()
+    if dept_role_value not in ("none", "primary", "deputy"):
+        raise http_error(
+            422,
+            ErrorCode.UNPROCESSABLE,
+            "department_role 은 none/primary/deputy 중 하나여야 합니다.",
+        )
+
     employee = Employee(
         employee_code=code,
         name=payload.name,
@@ -74,6 +82,7 @@ def create_employee(payload: EmployeeCreate, request: Request, db: Session = Dep
         department=payload.department,
         level=payload.level,
         warehouse_role=role_value,
+        department_role=dept_role_value,
         display_order=payload.display_order,
         is_active="true" if payload.is_active else "false",
     )
@@ -121,6 +130,17 @@ def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, request: Re
         if (employee.warehouse_role or "none") != new_role:
             employee.warehouse_role = new_role
             changed.append("warehouse_role")
+    if payload.department_role is not None:
+        new_dept_role = payload.department_role.lower()
+        if new_dept_role not in ("none", "primary", "deputy"):
+            raise http_error(
+                422,
+                ErrorCode.UNPROCESSABLE,
+                "department_role 은 none/primary/deputy 중 하나여야 합니다.",
+            )
+        if (employee.department_role or "none") != new_dept_role:
+            employee.department_role = new_dept_role
+            changed.append("department_role")
     if payload.display_order is not None and employee.display_order != payload.display_order:
         employee.display_order = payload.display_order; changed.append("display_order")
     if payload.is_active is not None:
@@ -267,6 +287,7 @@ def _to_response(employee: Employee) -> EmployeeResponse:
         department=employee.department,
         level=employee.level,
         warehouse_role=(employee.warehouse_role or "none"),
+        department_role=(employee.department_role or "none"),
         display_order=int(employee.display_order),
         is_active=bool(employee.is_active),
         created_at=employee.created_at,

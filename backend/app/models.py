@@ -311,6 +311,8 @@ class Employee(Base):
     # 창고 결재 역할: "none" | "primary" | "deputy". 시스템 권한(level)과 별개의 업무 역할.
     # 소문자 문자열로 통일 (DB / API / 프론트 모두 동일).
     warehouse_role = Column(String(20), nullable=False, default="none", server_default="none")
+    # 부서 결재 역할: 낱개(manual/adjust_in/adjust_out) IO 작업 승인 권한. warehouse_role 와 별개.
+    department_role = Column(String(20), nullable=False, default="none", server_default="none")
     display_order = Column(Integer, nullable=False, default=0)
     is_active = Column(BoolAsString, nullable=False, default=True)
     # 작업자 식별용 PIN 해시 — 실제 보안 인증이 아님. None이면 기본 PIN 0000 적용
@@ -329,6 +331,10 @@ class Employee(Base):
         CheckConstraint(
             "warehouse_role IN ('none', 'primary', 'deputy')",
             name="ck_employee_warehouse_role",
+        ),
+        CheckConstraint(
+            "department_role IN ('none', 'primary', 'deputy')",
+            name="ck_employee_department_role",
         ),
     )
 
@@ -704,6 +710,9 @@ class StockRequestTypeEnum(str, enum.Enum):
     MARK_DEFECTIVE_PROD = "mark_defective_prod"
     SUPPLIER_RETURN = "supplier_return"
     PACKAGE_OUT = "package_out"
+    # 낱개(manual/adjust_in/adjust_out) 라인 포함 IO — 부서 결재 정/부 승인만 필요.
+    # 실제 재고 변동은 io.py 의 _submit_immediate 가 dept 승인 후 실행한다.
+    MANUAL_ADJUSTMENT = "manual_adjustment"
 
 
 class RequestBucketEnum(str, enum.Enum):
@@ -758,6 +767,15 @@ class StockRequest(Base):
     rejected_by_name = Column(String(100), nullable=True)
     rejected_at = Column(DateTime, nullable=True)
     rejected_reason = Column(Text, nullable=True)  # FAILED_APPROVAL 사유도 여기 저장
+    # 부서 결재 (낱개 manual/adjust 라인 포함 시 추가로 요구). warehouse_approval 와 독립적.
+    requires_department_approval = Column(Boolean, nullable=False, default=False, server_default="0")
+    department_approved_by_employee_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    department_approved_by_name = Column(String(100), nullable=True)
+    department_approved_at = Column(DateTime, nullable=True)
     cancelled_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     reference_no = Column(String(100), nullable=True)

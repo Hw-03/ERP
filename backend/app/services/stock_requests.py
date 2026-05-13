@@ -188,7 +188,14 @@ _ALLOWED_SHAPES: dict[StockRequestTypeEnum, dict] = {
         "from_dept_required": False,
         "to_dept_required": False,
     },
+    # 낱개(manual/adjust) 라인 — 어떤 bucket/dept 조합이든 허용 (요청 유형 다양).
+    # 실제 재고 변동은 io.py 의 _submit_immediate 가 dept 승인 후 실행한다.
+    StockRequestTypeEnum.MANUAL_ADJUSTMENT: None,  # 검증 건너뜀
 }
+
+
+# 낱개 라인 origin — io.py 의 IoLine.origin 과 동기화.
+MANUAL_LINE_ORIGINS = frozenset({"manual", "adjust_in", "adjust_out"})
 
 
 def validate_line_shape_for_request_type(
@@ -200,10 +207,13 @@ def validate_line_shape_for_request_type(
     실패 시 ValueError. 호출자(create_request)가 DB row 생성 전에 호출해야 한다.
     이 검증을 통과하지 못하면 StockRequest row 도, pending_quantity 변경도 발생하지 않는다.
     """
-    spec = _ALLOWED_SHAPES.get(request_type)
-    if spec is None:
+    if request_type not in _ALLOWED_SHAPES:
         # 새 request_type 이 추가됐는데 사양표에 없으면 명시적으로 거부 (안전 우선).
         raise ValueError(f"지원하지 않는 요청 유형: {request_type}")
+    spec = _ALLOWED_SHAPES[request_type]
+    if spec is None:
+        # MANUAL_ADJUSTMENT — bucket/dept 조합 임의 허용
+        return
 
     expected_from = spec["from_bucket"]
     expected_to = spec["to_bucket"]
@@ -321,14 +331,19 @@ def _build_request_and_lines(
     request_code: Optional[str],
     submitted_at: Optional[datetime],
     client_request_id: Optional[str] = None,
+    requires_warehouse_approval_override: Optional[bool] = None,
+    requires_department_approval: bool = False,
 ) -> StockRequest:
     """StockRequest + StockRequestLine row 생성. 호출자가 사전 검증 책임.
 
     inventory_svc 호출 / TransactionLog 생성은 절대 하지 않는다 (DRAFT 안전성 보장).
     """
-    requires_approval = any(
-        line_requires_approval(li.from_bucket, li.to_bucket) for li in lines_input
-    )
+    if requires_warehouse_approval_override is None:
+        requires_approval = any(
+            line_requires_approval(li.from_bucket, li.to_bucket) for li in lines_input
+        )
+    else:
+        requires_approval = requires_warehouse_approval_override
 
     request = StockRequest(
         request_code=request_code,
@@ -339,6 +354,7 @@ def _build_request_and_lines(
         request_type=request_type,
         status=status,
         requires_warehouse_approval=requires_approval,
+        requires_department_approval=requires_department_approval,
         submitted_at=submitted_at,
         reference_no=reference_no,
         notes=notes,
@@ -377,25 +393,40 @@ def _finalize_submission(
     """제출 시점 분기 — request 와 lines 가 SUBMITTED 상태로 flush 된 직후 호출.
 
     - 승인 불필요 → 즉시 실행 + COMPLETED
-    - 요청자가 창고 정/부(warehouse_role=primary/deputy) → 자가승인으로 즉시 실행 + COMPLETED
-      (requires_warehouse_approval 컬럼은 그대로 True 로 유지하여 감사 추적 보존)
+    - 요청자가 자가승인 가능(창고 + 부서 모두 충족) → 즉시 실행 + COMPLETED
+      (requires_*_approval 컬럼은 그대로 True 로 유지하여 감사 추적 보존)
     - 승인 필요 + pending 필요 → reserve + RESERVED
     - 승인 필요 + pending 불필요 → SUBMITTED 유지
     """
     lines = list(request.lines)
     requester_role = (requester.warehouse_role or "none").lower()
-    is_self_warehouse_approval = (
-        request.requires_warehouse_approval
-        and requester_role in ("primary", "deputy")
+    requester_dept_role = (getattr(requester, "department_role", None) or "none").lower()
+    requester_level = getattr(getattr(requester, "level", None), "value", requester.level)
+    is_admin = requester_level == "admin"
+
+    warehouse_ok = (
+        (not request.requires_warehouse_approval)
+        or is_admin
+        or requester_role in ("primary", "deputy")
     )
-    if (not request.requires_warehouse_approval) or is_self_warehouse_approval:
+    dept_ok = (
+        (not request.requires_department_approval)
+        or is_admin
+        or requester_dept_role in ("primary", "deputy")
+    )
+    if warehouse_ok and dept_ok:
         _execute_all_lines(
             db, request, lines, operator_name=requester.name, approver=requester
         )
         request.status = StockRequestStatusEnum.COMPLETED
+        # 기존 관례: 즉시 완료 시 approved_at 은 무조건 채워 감사 추적용으로 사용한다.
         request.approved_by_employee_id = requester.employee_id
         request.approved_by_name = requester.name
         request.approved_at = now
+        if request.requires_department_approval:
+            request.department_approved_by_employee_id = requester.employee_id
+            request.department_approved_by_name = requester.name
+            request.department_approved_at = now
         request.completed_at = now
         for line in lines:
             line.status = StockRequestStatusEnum.COMPLETED
@@ -437,6 +468,7 @@ def create_request(
     reference_no: Optional[str],
     notes: Optional[str],
     client_request_id: Optional[str] = None,
+    requires_department_approval: bool = False,
 ) -> StockRequest:
     """요청 생성. 호출자가 db.commit() 책임.
 
@@ -444,6 +476,7 @@ def create_request(
       (호출자 라우터가 rollback)
     - 승인 필요 + 점유 불필요 → SUBMITTED 상태로 저장.
     - 승인 불필요 → 즉시 실행 후 COMPLETED.
+    - requires_department_approval=True 면 부서 결재까지 통과해야 COMPLETED.
     """
     _validate_lines(request_type, lines_input)
     _preflight_inventory_check(db, request_type, lines_input)
@@ -460,8 +493,59 @@ def create_request(
         request_code=code,
         submitted_at=now,
         client_request_id=client_request_id,
+        requires_department_approval=requires_department_approval,
     )
     return _finalize_submission(db, request=request, requester=requester, now=now)
+
+
+def create_manual_adjustment_request(
+    db: Session,
+    *,
+    requester: Employee,
+    lines_input: Sequence[LineInput],
+    reference_no: Optional[str],
+    notes: Optional[str],
+    client_request_id: Optional[str] = None,
+) -> StockRequest:
+    """낱개(manual/adjust) 라인 전용 부서 결재 요청.
+
+    - request_type = MANUAL_ADJUSTMENT (bucket/dept 검증 생략)
+    - requires_warehouse_approval=False, requires_department_approval=True
+    - reserve / 즉시실행 모두 하지 않음. 부서 결재 통과 후 io.py 가 실재고 반영.
+    - 자가승인 가능: 요청자가 부서 정/부 또는 admin 이면 즉시 dept_approved 기록 + 라우터가 io.py 호출
+      (단 이 함수는 dept_approved 만 마크하고 batch 실행은 호출자가 처리)
+    """
+    if not lines_input:
+        raise ValueError("요청 라인이 비어 있습니다.")
+    for li in lines_input:
+        if li.quantity <= 0:
+            raise ValueError("수량은 0보다 커야 합니다.")
+
+    now = datetime.utcnow()
+    code = _generate_request_code(now)
+    request = _build_request_and_lines(
+        db,
+        requester=requester,
+        request_type=StockRequestTypeEnum.MANUAL_ADJUSTMENT,
+        lines_input=lines_input,
+        reference_no=reference_no,
+        notes=notes,
+        status=StockRequestStatusEnum.SUBMITTED,
+        request_code=code,
+        submitted_at=now,
+        client_request_id=client_request_id,
+        requires_warehouse_approval_override=False,
+        requires_department_approval=True,
+    )
+    # 자가승인: 요청자가 부서 결재 권한자라면 dept_approved 즉시 기록.
+    # 실제 batch 실행은 호출자(io.py)가 status 보고 진행.
+    dept_role = (getattr(requester, "department_role", None) or "none").lower()
+    level = getattr(getattr(requester, "level", None), "value", requester.level)
+    if dept_role in ("primary", "deputy") or level == "admin":
+        request.department_approved_by_employee_id = requester.employee_id
+        request.department_approved_by_name = requester.name
+        request.department_approved_at = now
+    return request
 
 
 # ---------------------------------------------------------------------------
@@ -874,6 +958,18 @@ def approve_request(
         raise ValueError("승인이 필요하지 않은 요청입니다.")
 
     now = datetime.utcnow()
+    # 창고 결재 기록 (감사용 — dept 결재 대기 중에도 노출).
+    request.approved_by_employee_id = approver.employee_id
+    request.approved_by_name = approver.name
+    request.approved_at = now
+
+    # 부서 결재가 아직 필요한 경우 — 실행 없이 status 유지 (SUBMITTED/RESERVED).
+    if (
+        request.requires_department_approval
+        and request.department_approved_by_employee_id is None
+    ):
+        return request
+
     try:
         _execute_all_lines(
             db,
@@ -891,9 +987,6 @@ def approve_request(
         raise FailedApprovalError(str(exc))
 
     request.status = StockRequestStatusEnum.COMPLETED
-    request.approved_by_employee_id = approver.employee_id
-    request.approved_by_name = approver.name
-    request.approved_at = now
     request.completed_at = now
     for line in request.lines:
         line.status = StockRequestStatusEnum.COMPLETED
@@ -902,6 +995,80 @@ def approve_request(
 
     io_svc.sync_batch_from_stock_request(db, request)
 
+    return request
+
+
+def approve_request_department(
+    db: Session,
+    request: StockRequest,
+    *,
+    approver: Employee,
+    pin: str,
+) -> StockRequest:
+    """부서 결재 승인.
+
+    - actor: department_role in {primary, deputy} 또는 admin
+    - actor.department == request.requester_department (다른 부서 결재 불가)
+    - MANUAL_ADJUSTMENT 단독: 승인 즉시 io_svc.execute_batch_after_dept_approval 호출
+    - 듀얼(창고+부서): 양쪽 모두 충족 시 _execute_all_lines, 아니면 status 유지
+    """
+    if not request.requires_department_approval:
+        raise ValueError("부서 결재가 필요하지 않은 요청입니다.")
+
+    dept_role = (getattr(approver, "department_role", None) or "none").lower()
+    level = getattr(getattr(approver, "level", None), "value", approver.level)
+    if dept_role not in ("primary", "deputy") and level != "admin":
+        raise PermissionError("부서 결재 정/부 권한이 없습니다.")
+    if approver.department != request.requester_department:
+        raise PermissionError("다른 부서의 요청은 결재할 수 없습니다.")
+    if not verify_pin(approver.pin_hash, pin):
+        raise PermissionError("PIN이 일치하지 않습니다.")
+
+    if request.status == StockRequestStatusEnum.COMPLETED:
+        return request
+    if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
+        raise ValueError(f"승인할 수 없는 상태입니다: {request.status.value}")
+    if request.department_approved_by_employee_id is not None:
+        raise ValueError("이미 부서 결재가 완료된 요청입니다.")
+
+    now = datetime.utcnow()
+    request.department_approved_by_employee_id = approver.employee_id
+    request.department_approved_by_name = approver.name
+    request.department_approved_at = now
+
+    # 창고 결재가 아직 필요한 경우 — 실행 없이 status 유지.
+    if (
+        request.requires_warehouse_approval
+        and request.approved_by_employee_id is None
+    ):
+        return request
+
+    # 실행 경로 분기
+    from app.services import io as io_svc
+
+    if request.request_type == StockRequestTypeEnum.MANUAL_ADJUSTMENT:
+        # io.py 가 원본 IoBatch 라인을 _apply_line 식으로 실행.
+        io_svc.execute_batch_after_dept_approval(db, request=request, approver=approver)
+    else:
+        # 듀얼 승인 케이스 — _execute_all_lines.
+        try:
+            _execute_all_lines(
+                db,
+                request,
+                list(request.lines),
+                operator_name=approver.name,
+                approver=approver,
+                is_approval=True,
+            )
+        except ValueError as exc:
+            raise FailedApprovalError(str(exc))
+
+    request.status = StockRequestStatusEnum.COMPLETED
+    request.completed_at = now
+    for line in request.lines:
+        line.status = StockRequestStatusEnum.COMPLETED
+
+    io_svc.sync_batch_from_stock_request(db, request)
     return request
 
 
@@ -963,6 +1130,51 @@ def reject_request(
     if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
         raise ValueError(f"반려할 수 없는 상태입니다: {request.status.value}")
 
+    release_reservation(db, request)
+
+    now = datetime.utcnow()
+    request.status = StockRequestStatusEnum.REJECTED
+    request.rejected_by_employee_id = approver.employee_id
+    request.rejected_by_name = approver.name
+    request.rejected_at = now
+    request.rejected_reason = reason.strip()
+    for line in request.lines:
+        line.status = StockRequestStatusEnum.REJECTED
+    from app.services import io as io_svc
+
+    io_svc.sync_batch_from_stock_request(db, request)
+    return request
+
+
+def reject_request_department(
+    db: Session,
+    request: StockRequest,
+    *,
+    approver: Employee,
+    pin: str,
+    reason: str,
+) -> StockRequest:
+    """부서 결재 반려. 권한/부서 매칭 + PIN + 사유 필수."""
+    if not request.requires_department_approval:
+        raise ValueError("부서 결재가 필요하지 않은 요청입니다.")
+
+    dept_role = (getattr(approver, "department_role", None) or "none").lower()
+    level = getattr(getattr(approver, "level", None), "value", approver.level)
+    if dept_role not in ("primary", "deputy") and level != "admin":
+        raise PermissionError("부서 결재 정/부 권한이 없습니다.")
+    if approver.department != request.requester_department:
+        raise PermissionError("다른 부서의 요청은 반려할 수 없습니다.")
+    if not verify_pin(approver.pin_hash, pin):
+        raise PermissionError("PIN이 일치하지 않습니다.")
+    if not reason or not reason.strip():
+        raise ValueError("반려 사유를 입력하세요.")
+
+    if request.status == StockRequestStatusEnum.REJECTED:
+        return request
+    if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
+        raise ValueError(f"반려할 수 없는 상태입니다: {request.status.value}")
+
+    # warehouse-reserved 라인 점유 원복 (MANUAL_ADJUSTMENT 는 점유 없음 — release_reservation 가 no-op).
     release_reservation(db, request)
 
     now = datetime.utcnow()

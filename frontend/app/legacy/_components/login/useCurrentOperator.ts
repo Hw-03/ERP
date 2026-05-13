@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from "react";
-import type { Department, EmployeeLevel, WarehouseRole } from "@/lib/api";
+import type { Department, DepartmentRole, EmployeeLevel, WarehouseRole } from "@/lib/api";
 
 export interface Operator {
   employee_id: string;
@@ -16,6 +16,8 @@ export interface Operator {
   employee_code: string;
   /** 창고 결재 역할 — 기존 데이터 호환을 위해 누락 시 "none" 폴백. */
   warehouse_role: WarehouseRole;
+  /** 부서 결재 역할 — 낱개(manual/adjust) IO 결재 권한. 누락 시 "none". */
+  department_role: DepartmentRole;
 }
 
 const OPERATOR_KEY = "dexcowin_erp_operator";
@@ -28,9 +30,11 @@ function readOperator(): Operator | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<Operator> & {
       warehouse_role?: string | null;
+      department_role?: string | null;
     };
     if (!parsed.employee_id || !parsed.name) return null;
     const wh = (parsed.warehouse_role ?? "none").toLowerCase();
+    const dept = (parsed.department_role ?? "none").toLowerCase();
     return {
       employee_id: parsed.employee_id,
       name: parsed.name,
@@ -38,6 +42,7 @@ function readOperator(): Operator | null {
       level: parsed.level as EmployeeLevel,
       employee_code: parsed.employee_code as string,
       warehouse_role: (wh === "primary" || wh === "deputy" ? wh : "none") as WarehouseRole,
+      department_role: (dept === "primary" || dept === "deputy" ? dept : "none") as DepartmentRole,
     };
   } catch {
     return null;

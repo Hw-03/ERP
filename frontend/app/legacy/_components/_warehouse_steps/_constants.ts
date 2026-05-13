@@ -6,7 +6,7 @@ import {
   Workflow,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { Department, Item, WarehouseRole } from "@/lib/api";
+import type { Department, DepartmentRole, EmployeeLevel, Item, WarehouseRole } from "@/lib/api";
 
 // ───────────────────────────── Types ─────────────────────────────
 
@@ -20,7 +20,15 @@ export type Direction = "in" | "out" | "return";
 export type TransferDirection = "wh-to-dept" | "dept-to-wh";
 export type DefectiveSource = "warehouse" | "production";
 
-type OperatorLike = { warehouse_role: WarehouseRole; department: Department } | null | undefined;
+type OperatorLike =
+  | {
+      warehouse_role: WarehouseRole;
+      department_role?: DepartmentRole;
+      level?: EmployeeLevel;
+      department: Department;
+    }
+  | null
+  | undefined;
 
 // ─────────────────────────── Constants ───────────────────────────
 
@@ -99,6 +107,12 @@ export function workTypeNeedsDept(wt: WorkType): boolean {
 
 export function isWarehouseStaff(op: OperatorLike): boolean {
   return op?.warehouse_role === "primary" || op?.warehouse_role === "deputy";
+}
+
+export function isDepartmentApprover(op: OperatorLike): boolean {
+  if (!op) return false;
+  if (op.level === "admin") return true;
+  return op.department_role === "primary" || op.department_role === "deputy";
 }
 
 export function canEnterIO(op: OperatorLike): boolean {

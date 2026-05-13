@@ -45,6 +45,7 @@ export const EMPTY_EMPLOYEE_FORM = {
   phone: "",
   department: "조립",
   warehouse_role: "none" as "none" | "primary" | "deputy",
+  department_role: "none" as "none" | "primary" | "deputy",
 };
 
 export type EmployeeAddForm = typeof EMPTY_EMPLOYEE_FORM;

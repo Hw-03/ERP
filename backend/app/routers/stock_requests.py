@@ -126,11 +126,52 @@ def list_stock_requests(
 
 @router.get("/warehouse-queue", response_model=List[StockRequestResponse])
 def list_warehouse_queue(db: Session = Depends(get_db), limit: int = Query(100, ge=1, le=500)):
-    """창고 담당자 승인 대기 목록 (RESERVED 또는 SUBMITTED, 승인 필요)."""
+    """창고 담당자 승인 대기 목록 (RESERVED 또는 SUBMITTED, 승인 필요).
+
+    창고 결재가 아직 완료되지 않은 요청만 반환 (듀얼 승인 케이스에서 창고는 완료, 부서만 대기인
+    요청은 부서 큐로 노출).
+    """
     rows = (
         db.query(StockRequest)
         .filter(
             StockRequest.requires_warehouse_approval.is_(True),
+            StockRequest.approved_by_employee_id.is_(None),
+            StockRequest.status.in_(
+                (
+                    StockRequestStatusEnum.RESERVED,
+                    StockRequestStatusEnum.SUBMITTED,
+                )
+            ),
+        )
+        .order_by(StockRequest.created_at.asc())
+        .limit(limit)
+        .all()
+    )
+    return rows
+
+
+@router.get("/department-queue", response_model=List[StockRequestResponse])
+def list_department_queue(
+    actor_employee_id: uuid.UUID = Query(..., description="현재 직원 ID — 본인 부서만 노출"),
+    db: Session = Depends(get_db),
+    limit: int = Query(100, ge=1, le=500),
+):
+    """부서 결재 정/부 승인 대기 목록.
+
+    actor 의 부서와 일치하는 요청 중 requires_department_approval=True, 아직 dept 결재 미완료,
+    상태가 RESERVED/SUBMITTED 인 것만 반환.
+    """
+    actor = (
+        db.query(Employee).filter(Employee.employee_id == actor_employee_id).first()
+    )
+    if actor is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    rows = (
+        db.query(StockRequest)
+        .filter(
+            StockRequest.requires_department_approval.is_(True),
+            StockRequest.department_approved_by_employee_id.is_(None),
+            StockRequest.requester_department == actor.department,
             StockRequest.status.in_(
                 (
                     StockRequestStatusEnum.RESERVED,
@@ -342,6 +383,63 @@ def reject_stock_request(
 
     try:
         svc.reject_request(
+            db, request, approver=approver, pin=payload.pin, reason=payload.reason
+        )
+    except PermissionError as exc:
+        db.rollback()
+        raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
+    except ValueError as exc:
+        db.rollback()
+        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
+
+    commit_and_refresh(db, request)
+    return request
+
+
+@router.post("/{request_id}/department-approve", response_model=StockRequestResponse)
+def department_approve_stock_request(
+    request_id: uuid.UUID,
+    payload: StockRequestActionRequest,
+    db: Session = Depends(get_db),
+):
+    """부서 결재 승인 — department_role in (primary/deputy) 또는 admin."""
+    request = _load_request_for_action(db, request_id)
+    approver = _load_actor(db, payload.actor_employee_id)
+
+    try:
+        svc.approve_request_department(db, request, approver=approver, pin=payload.pin)
+    except PermissionError as exc:
+        db.rollback()
+        raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
+    except svc.FailedApprovalError as exc:
+        db.rollback()
+        request = _load_request_for_action(db, request_id)
+        approver = _load_actor(db, payload.actor_employee_id)
+        svc.mark_failed_approval(db, request, approver=approver, reason=str(exc))
+        commit_and_refresh(db, request)
+        raise http_error(409, ErrorCode.CONFLICT, f"승인 실패: {exc}")
+    except ValueError as exc:
+        db.rollback()
+        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
+
+    commit_and_refresh(db, request)
+    return request
+
+
+@router.post("/{request_id}/department-reject", response_model=StockRequestResponse)
+def department_reject_stock_request(
+    request_id: uuid.UUID,
+    payload: StockRequestActionRequest,
+    db: Session = Depends(get_db),
+):
+    """부서 결재 반려."""
+    request = _load_request_for_action(db, request_id)
+    approver = _load_actor(db, payload.actor_employee_id)
+    if not payload.reason or not payload.reason.strip():
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "반려 사유를 입력하세요.")
+
+    try:
+        svc.reject_request_department(
             db, request, approver=approver, pin=payload.pin, reason=payload.reason
         )
     except PermissionError as exc:

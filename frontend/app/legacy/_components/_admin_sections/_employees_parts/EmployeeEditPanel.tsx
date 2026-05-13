@@ -1,6 +1,6 @@
 "use client";
 
-import type { DepartmentMaster, Employee, WarehouseRole } from "@/lib/api";
+import type { DepartmentMaster, DepartmentRole, Employee, WarehouseRole } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { AppSelect } from "../../common/AppSelect";
 import type { EmployeeEditForm } from "../../_admin_hooks/useAdminEmployees";
@@ -17,8 +17,14 @@ import type { EmployeeEditForm } from "../../_admin_hooks/useAdminEmployees";
 
 const WAREHOUSE_ROLE_OPTIONS: { value: WarehouseRole; label: string }[] = [
   { value: "none", label: "없음" },
-  { value: "primary", label: "창고 정담당자" },
-  { value: "deputy", label: "창고 부담당자" },
+  { value: "primary", label: "정" },
+  { value: "deputy", label: "부" },
+];
+
+const DEPARTMENT_ROLE_OPTIONS: { value: DepartmentRole; label: string }[] = [
+  { value: "none", label: "없음" },
+  { value: "primary", label: "정" },
+  { value: "deputy", label: "부" },
 ];
 
 interface Props {
@@ -89,17 +95,24 @@ export function EmployeeEditPanel({
             options={departments.filter((d) => d.is_active).map((d) => ({ value: d.name, label: d.name }))}
           />
         </FieldRow>
-        <div className="col-span-2">
-          <FieldRow label="창고 결재 역할">
-            <AppSelect
-              value={form.warehouse_role}
-              onChange={(v) => setForm((f) => ({ ...f, warehouse_role: v as WarehouseRole }))}
-              size="md"
-              triggerStyle={{ background: LEGACY_COLORS.s1 }}
-              options={WAREHOUSE_ROLE_OPTIONS}
-            />
-          </FieldRow>
-        </div>
+        <FieldRow label="창고 결재 역할">
+          <AppSelect
+            value={form.warehouse_role}
+            onChange={(v) => setForm((f) => ({ ...f, warehouse_role: v as WarehouseRole }))}
+            size="md"
+            triggerStyle={{ background: LEGACY_COLORS.s1 }}
+            options={WAREHOUSE_ROLE_OPTIONS}
+          />
+        </FieldRow>
+        <FieldRow label="부서 결재 역할">
+          <AppSelect
+            value={form.department_role}
+            onChange={(v) => setForm((f) => ({ ...f, department_role: v as DepartmentRole }))}
+            size="md"
+            triggerStyle={{ background: LEGACY_COLORS.s1 }}
+            options={DEPARTMENT_ROLE_OPTIONS}
+          />
+        </FieldRow>
       </div>
 
       <button

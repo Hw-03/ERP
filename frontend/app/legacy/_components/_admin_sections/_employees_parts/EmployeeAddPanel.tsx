@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import type { DepartmentMaster, WarehouseRole } from "@/lib/api";
+import type { DepartmentMaster, DepartmentRole, WarehouseRole } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { AppSelect } from "../../common/AppSelect";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../adminShared";
@@ -18,8 +18,14 @@ import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../adminShared";
 
 const WAREHOUSE_ROLE_OPTIONS: { value: WarehouseRole; label: string }[] = [
   { value: "none", label: "없음" },
-  { value: "primary", label: "창고 정담당자" },
-  { value: "deputy", label: "창고 부담당자" },
+  { value: "primary", label: "정" },
+  { value: "deputy", label: "부" },
+];
+
+const DEPARTMENT_ROLE_OPTIONS: { value: DepartmentRole; label: string }[] = [
+  { value: "none", label: "없음" },
+  { value: "primary", label: "정" },
+  { value: "deputy", label: "부" },
 ];
 
 const TEXT_FIELDS: { key: keyof EmployeeAddForm; label: string; required: boolean; placeholder: string }[] = [
@@ -103,6 +109,18 @@ export function EmployeeAddPanel({ form, setForm, departments, onClose, onSubmit
           size="lg"
           triggerStyle={{ background: LEGACY_COLORS.s1 }}
           options={WAREHOUSE_ROLE_OPTIONS}
+        />
+      </div>
+      <div>
+        <div className="mb-2 text-sm font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
+          부서 결재 역할
+        </div>
+        <AppSelect
+          value={form.department_role}
+          onChange={(v) => setForm((f) => ({ ...f, department_role: v as DepartmentRole }))}
+          size="lg"
+          triggerStyle={{ background: LEGACY_COLORS.s1 }}
+          options={DEPARTMENT_ROLE_OPTIONS}
         />
       </div>
       <button

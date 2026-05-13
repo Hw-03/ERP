@@ -26,6 +26,7 @@ def _make_employee(
     name: str = "IO Tester",
     department: DepartmentEnum = DepartmentEnum.ASSEMBLY,
     warehouse_role: str = "none",
+    department_role: str = "none",
 ) -> Employee:
     employee = Employee(
         employee_code=code,
@@ -34,6 +35,7 @@ def _make_employee(
         department=department,
         level=EmployeeLevelEnum.STAFF,
         warehouse_role=warehouse_role,
+        department_role=department_role,
         display_order=0,
         is_active="true",
         pin_hash=DEFAULT_PIN_HASH,
@@ -310,7 +312,8 @@ def test_io_immediate_adjust_in_increases_production_quantity(
 ):
     item = make_item(name="Adj In", warehouse_qty=Decimal("0"))
     make_location(item.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("0"))
-    requester = _make_employee(db_session)
+    # adjust_in 은 Phase B 부터 부서 결재 정/부 권한자만 즉시 완료된다.
+    requester = _make_employee(db_session, department_role="primary")
     db_session.commit()
 
     preview = client.post(
@@ -376,7 +379,8 @@ def test_io_immediate_adjust_out_decreases_production_quantity(
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     inv.quantity = Decimal("10")
     db_session.flush()
-    requester = _make_employee(db_session)
+    # adjust_out 은 Phase B 부터 부서 결재 정/부 권한자만 즉시 완료된다.
+    requester = _make_employee(db_session, department_role="primary")
     db_session.commit()
 
     preview = client.post(

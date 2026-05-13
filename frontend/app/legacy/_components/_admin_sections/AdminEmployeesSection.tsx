@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Save, Trash2, Users, X } from "lucide-react";
-import type { DepartmentMaster, Employee, WarehouseRole } from "@/lib/api";
+import type { DepartmentMaster, DepartmentRole, Employee, WarehouseRole } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment, getDepartmentFallbackColor } from "@/lib/mes/department";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
@@ -19,9 +19,15 @@ import {
 import { useAdminEmployeesContext } from "./AdminEmployeesContext";
 
 const WAREHOUSE_ROLE_LABEL: Record<WarehouseRole, { label: string; hint: string; tone: string }> = {
-  none: { label: "승인권 없음", hint: "기본 작업만 수행", tone: LEGACY_COLORS.muted2 },
-  primary: { label: "1차 승인권", hint: "창고 주담당 결재", tone: LEGACY_COLORS.blue },
-  deputy: { label: "2차 승인권", hint: "보조 결재 가능", tone: LEGACY_COLORS.cyan },
+  none: { label: "없음", hint: "기본 작업만 수행", tone: LEGACY_COLORS.muted2 },
+  primary: { label: "정", hint: "창고 주담당 결재", tone: LEGACY_COLORS.blue },
+  deputy: { label: "부", hint: "보조 결재 가능", tone: LEGACY_COLORS.cyan },
+};
+
+const DEPARTMENT_ROLE_LABEL: Record<DepartmentRole, { label: string; hint: string; tone: string }> = {
+  none: { label: "없음", hint: "기본 작업만 수행", tone: LEGACY_COLORS.muted2 },
+  primary: { label: "정", hint: "부서 주담당 결재", tone: LEGACY_COLORS.green },
+  deputy: { label: "부", hint: "보조 결재 가능", tone: LEGACY_COLORS.purple },
 };
 
 const LEVEL_LABEL: Record<string, { label: string; hint: string; tone: string }> = {
@@ -407,18 +413,26 @@ function EmployeeAddInline({ form, setForm, departments, onSubmit }: EmployeeAdd
               .map((d) => ({ value: d.name, label: d.name }))}
           />
         </FieldRow>
-        <div className="col-span-2">
-          <FieldRow label="창고 결재 역할">
-            <SelectInput
-              value={form.warehouse_role}
-              onChange={(v) => setForm((f) => ({ ...f, warehouse_role: v as WarehouseRole }))}
-              options={(["none", "primary", "deputy"] as WarehouseRole[]).map((r) => ({
-                value: r,
-                label: WAREHOUSE_ROLE_LABEL[r].label,
-              }))}
-            />
-          </FieldRow>
-        </div>
+        <FieldRow label="창고 결재 역할">
+          <SelectInput
+            value={form.warehouse_role}
+            onChange={(v) => setForm((f) => ({ ...f, warehouse_role: v as WarehouseRole }))}
+            options={(["none", "primary", "deputy"] as WarehouseRole[]).map((r) => ({
+              value: r,
+              label: WAREHOUSE_ROLE_LABEL[r].label,
+            }))}
+          />
+        </FieldRow>
+        <FieldRow label="부서 결재 역할">
+          <SelectInput
+            value={form.department_role}
+            onChange={(v) => setForm((f) => ({ ...f, department_role: v as DepartmentRole }))}
+            options={(["none", "primary", "deputy"] as DepartmentRole[]).map((r) => ({
+              value: r,
+              label: DEPARTMENT_ROLE_LABEL[r].label,
+            }))}
+          />
+        </FieldRow>
       </div>
       <div
         className="rounded-[10px] border px-3 py-2 text-[12px]"
@@ -462,6 +476,7 @@ function EmployeeDetailGrid({
 }: EmployeeDetailGridProps) {
   const levelMeta = LEVEL_LABEL[employee.level] ?? LEVEL_LABEL.staff;
   const whMeta = WAREHOUSE_ROLE_LABEL[form.warehouse_role];
+  const deptMeta = DEPARTMENT_ROLE_LABEL[form.department_role];
   return (
     <div className="grid gap-3 lg:grid-cols-2">
       {/* 카드 1: 기본 정보 */}
@@ -520,6 +535,22 @@ function EmployeeDetailGrid({
               style={{ color: whMeta.tone }}
             >
               {whMeta.hint}
+            </div>
+          </FieldRow>
+          <FieldRow label="부서 결재 역할">
+            <SelectInput
+              value={form.department_role}
+              onChange={(v) => setForm((f) => ({ ...f, department_role: v as DepartmentRole }))}
+              options={(["none", "primary", "deputy"] as DepartmentRole[]).map((r) => ({
+                value: r,
+                label: DEPARTMENT_ROLE_LABEL[r].label,
+              }))}
+            />
+            <div
+              className="mt-1.5 text-[11px]"
+              style={{ color: deptMeta.tone }}
+            >
+              {deptMeta.hint}
             </div>
           </FieldRow>
         </div>

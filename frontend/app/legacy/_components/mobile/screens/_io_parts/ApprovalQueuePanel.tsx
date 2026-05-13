@@ -12,7 +12,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatDateTime, formatQty } from "@/lib/mes/format";
 import type { ToastState } from "@/lib/ui/Toast";
 import { useCurrentOperator } from "../../../login/useCurrentOperator";
-import { isWarehouseStaff } from "../../../_warehouse_steps";
+import { isDepartmentApprover, isWarehouseStaff } from "../../../_warehouse_steps";
 import { TYPO } from "../../tokens";
 import {
   AsyncState,
@@ -34,7 +34,10 @@ const TYPE_LABEL: Record<StockRequestType, string> = {
   mark_defective_prod: "불량 격리(부서)",
   supplier_return: "공급업체 반품",
   package_out: "패키지 출하",
+  manual_adjustment: "낱개 조정",
 };
+
+type QueueKind = "warehouse" | "department";
 
 export function ApprovalQueuePanel({
   showToast,
@@ -42,24 +45,32 @@ export function ApprovalQueuePanel({
   showToast: (toast: ToastState) => void;
 }) {
   const operator = useCurrentOperator();
-  const allowed = isWarehouseStaff(operator);
+  const warehouseAllowed = isWarehouseStaff(operator);
+  const departmentAllowed = isDepartmentApprover(operator);
+  const anyAllowed = warehouseAllowed || departmentAllowed;
+  const [tab, setTab] = useState<QueueKind>(
+    warehouseAllowed ? "warehouse" : "department",
+  );
   const [list, setList] = useState<StockRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [action, setAction] = useState<
-    | { kind: "approve" | "reject"; req: StockRequest }
+    | { kind: "approve" | "reject"; req: StockRequest; queue: QueueKind }
     | null
   >(null);
 
   const load = async () => {
-    if (!allowed) {
+    if (!anyAllowed || !operator) {
       setLoading(false);
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const data = await api.listWarehouseQueue();
+      const data =
+        tab === "warehouse"
+          ? await api.listWarehouseQueue()
+          : await api.listDepartmentQueue(operator.employee_id);
       setList(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "승인함을 불러오지 못했습니다.");
@@ -71,22 +82,50 @@ export function ApprovalQueuePanel({
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allowed]);
+  }, [tab, anyAllowed, operator?.employee_id]);
 
-  if (!allowed) {
+  if (!anyAllowed) {
     return (
       <div className="px-4 py-6">
         <EmptyState
           icon={ShieldCheck}
           title="권한 없음"
-          description="창고 정/부 담당자만 승인함에 접근할 수 있습니다."
+          description="창고 또는 부서 결재 정/부만 승인함에 접근할 수 있습니다."
         />
       </div>
     );
   }
 
+  const showTabs = warehouseAllowed && departmentAllowed;
+
   return (
     <div className="flex flex-col gap-3 px-4 py-3">
+      {showTabs && (
+        <div
+          className="flex rounded-[14px] border p-1"
+          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+        >
+          {(["warehouse", "department"] as QueueKind[]).map((kind) => {
+            const active = tab === kind;
+            const label = kind === "warehouse" ? "창고 결재" : "부서 결재";
+            return (
+              <button
+                key={kind}
+                type="button"
+                onClick={() => setTab(kind)}
+                className="flex-1 rounded-[10px] py-2 text-sm font-bold transition-colors"
+                style={{
+                  background: active ? LEGACY_COLORS.s1 : "transparent",
+                  color: active ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <AsyncState
         loading={loading}
         error={error}
@@ -99,8 +138,8 @@ export function ApprovalQueuePanel({
             <QueueCard
               key={req.request_id}
               req={req}
-              onApprove={() => setAction({ kind: "approve", req })}
-              onReject={() => setAction({ kind: "reject", req })}
+              onApprove={() => setAction({ kind: "approve", req, queue: tab })}
+              onReject={() => setAction({ kind: "reject", req, queue: tab })}
             />
           ))}
         </div>
@@ -199,7 +238,7 @@ function ActionSheet({
   showToast,
   onDone,
 }: {
-  action: { kind: "approve" | "reject"; req: StockRequest } | null;
+  action: { kind: "approve" | "reject"; req: StockRequest; queue: QueueKind } | null;
   onClose: () => void;
   operator: ReturnType<typeof useCurrentOperator>;
   showToast: (toast: ToastState) => void;
@@ -239,11 +278,20 @@ function ActionSheet({
         pin,
         reason: reason.trim() || undefined,
       };
+      const isDept = action.queue === "department";
       if (action.kind === "approve") {
-        await api.approveStockRequest(action.req.request_id, payload);
+        if (isDept) {
+          await api.approveStockRequestDepartment(action.req.request_id, payload);
+        } else {
+          await api.approveStockRequest(action.req.request_id, payload);
+        }
         showToast({ type: "success", message: "요청을 승인했습니다." });
       } else {
-        await api.rejectStockRequest(action.req.request_id, payload);
+        if (isDept) {
+          await api.rejectStockRequestDepartment(action.req.request_id, payload);
+        } else {
+          await api.rejectStockRequest(action.req.request_id, payload);
+        }
         showToast({ type: "info", message: "요청을 반려했습니다." });
       }
       onDone();

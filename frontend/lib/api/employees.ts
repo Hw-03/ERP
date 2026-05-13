@@ -9,7 +9,7 @@
  */
 
 import { deleteJson, fetcher, postJson, putJson, toApiUrl } from "../api-core";
-import type { Department, Employee, EmployeeLevel, WarehouseRole } from "./types";
+import type { Department, DepartmentRole, Employee, EmployeeLevel, WarehouseRole } from "./types";
 
 export const employeesApi = {
   getEmployees: (params?: { department?: Department; activeOnly?: boolean }) => {
@@ -27,6 +27,7 @@ export const employeesApi = {
     department: Department;
     level?: EmployeeLevel;
     warehouse_role?: WarehouseRole;
+    department_role?: DepartmentRole;
     display_order?: number;
     is_active?: boolean;
   }) => postJson<Employee>(toApiUrl("/api/employees"), payload),
@@ -40,6 +41,7 @@ export const employeesApi = {
       department?: Department;
       level?: EmployeeLevel;
       warehouse_role?: WarehouseRole;
+      department_role?: DepartmentRole;
       display_order?: number;
       is_active?: boolean;
     },

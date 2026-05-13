@@ -29,11 +29,38 @@ export const stockRequestsApi = {
   listWarehouseQueue: () =>
     fetcher<StockRequest[]>(toApiUrl("/api/stock-requests/warehouse-queue")),
 
+  listDepartmentQueue: (actorEmployeeId: string) =>
+    fetcher<StockRequest[]>(
+      toApiUrl(
+        `/api/stock-requests/department-queue?actor_employee_id=${encodeURIComponent(
+          actorEmployeeId,
+        )}`,
+      ),
+    ),
+
   approveStockRequest: (requestId: string, payload: StockRequestActionPayload) =>
     postJson<StockRequest>(toApiUrl(`/api/stock-requests/${requestId}/approve`), payload),
 
   rejectStockRequest: (requestId: string, payload: StockRequestActionPayload) =>
     postJson<StockRequest>(toApiUrl(`/api/stock-requests/${requestId}/reject`), payload),
+
+  approveStockRequestDepartment: (
+    requestId: string,
+    payload: StockRequestActionPayload,
+  ) =>
+    postJson<StockRequest>(
+      toApiUrl(`/api/stock-requests/${requestId}/department-approve`),
+      payload,
+    ),
+
+  rejectStockRequestDepartment: (
+    requestId: string,
+    payload: StockRequestActionPayload,
+  ) =>
+    postJson<StockRequest>(
+      toApiUrl(`/api/stock-requests/${requestId}/department-reject`),
+      payload,
+    ),
 
   cancelStockRequest: (requestId: string, payload: StockRequestActionPayload) =>
     postJson<StockRequest>(toApiUrl(`/api/stock-requests/${requestId}/cancel`), payload),

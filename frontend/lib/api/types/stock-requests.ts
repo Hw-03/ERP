@@ -24,7 +24,8 @@ export type StockRequestType =
   | "mark_defective_wh"
   | "mark_defective_prod"
   | "supplier_return"
-  | "package_out";
+  | "package_out"
+  | "manual_adjustment";
 
 export type RequestBucket = "warehouse" | "production" | "defective" | "none";
 
@@ -61,6 +62,10 @@ export interface StockRequest {
   rejected_by_name: string | null;
   rejected_at: string | null;
   rejected_reason: string | null;
+  requires_department_approval: boolean;
+  department_approved_by_employee_id: string | null;
+  department_approved_by_name: string | null;
+  department_approved_at: string | null;
   cancelled_at: string | null;
   completed_at: string | null;
   reference_no: string | null;

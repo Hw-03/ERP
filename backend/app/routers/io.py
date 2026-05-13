@@ -119,7 +119,17 @@ def submit_io(payload: IoSubmitRequest, db: Session = Depends(get_db)):
             existing = io_svc.find_by_client_request_id(db, payload.client_request_id)
             if existing is not None:
                 return io_svc.build_idempotent_response(existing)
-        raise http_error(409, ErrorCode.CONFLICT, "중복 제출입니다. 잠시 후 결과를 확인해 주세요.")
+            raise http_error(
+                409,
+                ErrorCode.CONFLICT,
+                "이미 처리된 요청입니다. 새 작업으로 다시 시도해 주세요.",
+            )
+        # 그 외 unique 제약 위반 (request_code 충돌 등) — 즉시 재시도 권장.
+        raise http_error(
+            409,
+            ErrorCode.CONFLICT,
+            f"제출에 일시적 충돌이 발생했습니다. 잠시 후 다시 시도해 주세요. ({exc.__class__.__name__})",
+        )
 
 
 @router.post(

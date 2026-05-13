@@ -49,6 +49,8 @@ export type EmployeeLevel = "admin" | "manager" | "staff";
 
 export type WarehouseRole = "none" | "primary" | "deputy";
 
+export type DepartmentRole = "none" | "primary" | "deputy";
+
 export interface InventoryLocationRow {
   department: Department;
   status: LocationStatus;

@@ -73,6 +73,7 @@ export function useAdminEmployees({
         department: form.empAddForm.department as Employee["department"],
         phone: form.empAddForm.phone.trim() || undefined,
         warehouse_role: form.empAddForm.warehouse_role,
+        department_role: form.empAddForm.department_role,
       });
       setEmployees((current) => [...current, created]);
       form.resetAddForm();
@@ -111,6 +112,7 @@ export function useAdminEmployees({
         phone: form.editForm.phone.trim() || undefined,
         department: form.editForm.department as Employee["department"],
         warehouse_role: form.editForm.warehouse_role,
+        department_role: form.editForm.department_role,
       });
       setEmployees((current) =>
         current.map((e) => (e.employee_id === updated.employee_id ? updated : e)),

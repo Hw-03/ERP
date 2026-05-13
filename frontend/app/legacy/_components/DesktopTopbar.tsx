@@ -15,6 +15,12 @@ const WAREHOUSE_ROLE_LABEL: Record<string, string | null> = {
   none: null,
 };
 
+const DEPARTMENT_ROLE_LABEL: Record<string, string | null> = {
+  primary: "부서 정",
+  deputy: "부서 부",
+  none: null,
+};
+
 export function DesktopTopbar({
   title,
   icon: Icon,
@@ -32,6 +38,7 @@ export function DesktopTopbar({
 }) {
   const operator = useCurrentOperator();
   const roleLabel = operator ? WAREHOUSE_ROLE_LABEL[operator.warehouse_role] ?? null : null;
+  const deptRoleLabel = operator ? DEPARTMENT_ROLE_LABEL[operator.department_role] ?? null : null;
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -103,6 +110,17 @@ export function DesktopTopbar({
                   }}
                 >
                   {roleLabel}
+                </span>
+              )}
+              {deptRoleLabel && (
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                  style={{
+                    background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 18%, transparent)`,
+                    color: LEGACY_COLORS.blue,
+                  }}
+                >
+                  {deptRoleLabel}
                 </span>
               )}
               <ChevronDown

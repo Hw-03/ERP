@@ -125,6 +125,7 @@ class EmployeeCreate(BaseModel):
     department: str
     level: EmployeeLevelEnum = EmployeeLevelEnum.STAFF
     warehouse_role: str = Field("none", description="창고 결재 역할 (none/primary/deputy)")
+    department_role: str = Field("none", description="부서 결재 역할 (none/primary/deputy)")
     display_order: int = 0
     is_active: bool = True
 
@@ -136,6 +137,7 @@ class EmployeeUpdate(BaseModel):
     department: Optional[str] = None
     level: Optional[EmployeeLevelEnum] = None
     warehouse_role: Optional[str] = Field(None, description="창고 결재 역할 (none/primary/deputy)")
+    department_role: Optional[str] = Field(None, description="부서 결재 역할 (none/primary/deputy)")
     display_order: Optional[int] = None
     is_active: Optional[bool] = None
 
@@ -151,6 +153,7 @@ class EmployeeResponse(BaseModel):
     department: str
     level: EmployeeLevelEnum
     warehouse_role: str = "none"
+    department_role: str = "none"
     display_order: int
     is_active: bool
     created_at: datetime
@@ -988,6 +991,10 @@ class StockRequestResponse(BaseModel):
     rejected_by_name: Optional[str] = None
     rejected_at: Optional[datetime] = None
     rejected_reason: Optional[str] = None
+    requires_department_approval: bool = False
+    department_approved_by_employee_id: Optional[uuid.UUID] = None
+    department_approved_by_name: Optional[str] = None
+    department_approved_at: Optional[datetime] = None
     cancelled_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     reference_no: Optional[str] = None

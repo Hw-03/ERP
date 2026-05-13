@@ -3,6 +3,7 @@
 import { api, type IoBatch, type StockRequest } from "@/lib/api";
 import { MyRequestsPanel } from "./MyRequestsPanel";
 import { WarehouseQueuePanel } from "./WarehouseQueuePanel";
+import { DepartmentQueuePanel } from "./DepartmentQueuePanel";
 import { DraftCartPanel } from "./DraftCartPanel";
 import type { WarehouseSectionTab } from "./WarehouseSectionTabs";
 
@@ -15,6 +16,7 @@ import type { WarehouseSectionTab } from "./WarehouseSectionTabs";
 export interface WarehouseDraftPanelTabsProps {
   sectionTab: WarehouseSectionTab;
   canSeeQueue: boolean;
+  canSeeDeptQueue: boolean;
   operatorEmployeeId: string | undefined;
   employeeId: string;
   refreshNonce: number;
@@ -31,6 +33,7 @@ export interface WarehouseDraftPanelTabsProps {
 export function WarehouseDraftPanelTabs({
   sectionTab,
   canSeeQueue,
+  canSeeDeptQueue,
   operatorEmployeeId,
   employeeId,
   refreshNonce,
@@ -82,6 +85,25 @@ export function WarehouseDraftPanelTabs({
   if (sectionTab === "queue" && canSeeQueue && operatorEmployeeId) {
     return (
       <WarehouseQueuePanel
+        approverEmployeeId={operatorEmployeeId}
+        refreshNonce={refreshNonce}
+        onChanged={async () => {
+          bumpRefresh();
+          try {
+            const refreshed = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
+            setItems(refreshed);
+          } catch {
+            /* 무시 */
+          }
+          onSubmitSuccess?.();
+        }}
+      />
+    );
+  }
+
+  if (sectionTab === "dept-queue" && canSeeDeptQueue && operatorEmployeeId) {
+    return (
+      <DepartmentQueuePanel
         approverEmployeeId={operatorEmployeeId}
         refreshNonce={refreshNonce}
         onChanged={async () => {
