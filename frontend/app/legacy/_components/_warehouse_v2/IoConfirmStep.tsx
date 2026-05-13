@@ -6,7 +6,6 @@ import { tint } from "@/lib/mes/colorUtils";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
 import { deptIoDisplayLabel, subTypeLabel, type ApprovalKind } from "./ioWorkType";
 import { formatQty } from "@/lib/mes/format";
-import { SettingLabel } from "./_atoms";
 
 interface Props {
   workType: IoWorkType;
@@ -151,58 +150,63 @@ export function IoConfirmStep({
     : null;
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-5">
       {/* 작업 요약 */}
       <div
-        className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border px-4 py-3"
+        className="flex flex-wrap items-center justify-between gap-4 rounded-[18px] border px-5 py-4"
         style={{
           background: tint(accent, 6),
           borderColor: tint(accent, 24),
         }}
       >
         <div>
-          <SettingLabel label={meta.summaryLabel} />
-          <div className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>
+          <div className="mb-2 text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
+            {meta.summaryLabel}
+          </div>
+          <div className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
             {headerLabel} · 반영 {includedLines.length}건 · 총 {formatQty(totalQty)}
           </div>
         </div>
         {isApproval ? (
           <span
-            className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-black"
+            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-black"
             style={{ background: tint(LEGACY_COLORS.yellow, 14), color: LEGACY_COLORS.yellow }}
           >
-            <AlertTriangle className="h-4 w-4" />
+            <AlertTriangle className="h-5 w-5" />
             {meta.badgeText}
           </span>
         ) : (
           <span
-            className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-black"
+            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-black"
             style={{ background: tint(LEGACY_COLORS.green, 14), color: LEGACY_COLORS.green }}
           >
-            <CheckCircle2 className="h-4 w-4" />
+            <CheckCircle2 className="h-5 w-5" />
             {meta.badgeText}
           </span>
         )}
       </div>
 
       {/* 입고/출고/이동 섹션 */}
-      <div className="space-y-3">
-        {(["in", "out", "move"] as SectionKind[]).map((kind) => {
-          const label = sections[kind];
-          const lines = sectionLines[kind];
-          if (!label || lines.length === 0) return null;
-          return (
-            <LineSection
-              key={kind}
-              title={label}
-              kind={kind}
-              lines={lines}
-              bundleModeMap={bundleModeMap}
-              lineBundleMap={lineBundleMap}
-            />
-          );
-        })}
-      </div>
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]">
+        <div className="min-w-0 space-y-4">
+          {(["in", "out", "move"] as SectionKind[]).map((kind) => {
+            const label = sections[kind];
+            const lines = sectionLines[kind];
+            if (!label || lines.length === 0) return null;
+            return (
+              <LineSection
+                key={kind}
+                title={label}
+                kind={kind}
+                lines={lines}
+                bundleModeMap={bundleModeMap}
+                lineBundleMap={lineBundleMap}
+              />
+            );
+          })}
+        </div>
+
+        <div className="flex min-h-0 min-w-0 flex-col gap-4">
 
       {/* 메모 */}
       <Field label="메모 (선택)" value={notes} onChange={onNotesChange} placeholder="작업 메모" />
@@ -210,14 +214,14 @@ export function IoConfirmStep({
       {/* caution */}
       {isCaution && (
         <div
-          className="flex items-start gap-2 rounded-[12px] border px-3 py-2 text-xs"
+          className="flex items-start gap-3 rounded-[16px] border px-4 py-3 text-sm"
           style={{
             background: tint(LEGACY_COLORS.red, 8),
             borderColor: tint(LEGACY_COLORS.red, 40),
             color: LEGACY_COLORS.red,
           }}
         >
-          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <AlertTriangle className="h-5 w-5 shrink-0" />
           <span className="font-bold">
             되돌릴 수 없습니다. 최종 확인 팝업에서 한 번 더 점검하세요.
           </span>
@@ -227,7 +231,7 @@ export function IoConfirmStep({
       {/* blocker */}
       {blockerText && (
         <div
-          className="rounded-[12px] border px-3 py-2 text-center text-xs font-bold"
+          className="rounded-[16px] border px-4 py-3 text-center text-sm font-bold"
           style={{
             background: tint(LEGACY_COLORS.yellow, 10),
             borderColor: tint(LEGACY_COLORS.yellow, 40),
@@ -238,18 +242,22 @@ export function IoConfirmStep({
         </div>
       )}
 
-      {/* 큰 한 줄 실행 버튼 (옛 ExecuteStep 패턴) */}
-      <button
-        type="button"
-        onClick={onSubmit}
-        disabled={submitDisabled}
-        className="flex w-full items-center justify-center gap-2 rounded-[18px] px-6 py-5 text-lg font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
-        style={{ background: accent }}
-      >
-        {isCaution && !submitting && <AlertTriangle className="h-5 w-5" />}
-        {!isCaution && <ClipboardCheck className="h-5 w-5" />}
-        {submitting ? "처리 중..." : meta.submitText(includedLines.length)}
-      </button>
+          {/* 큰 한 줄 실행 버튼 (옛 ExecuteStep 패턴) */}
+          <div className="mt-auto pt-2">
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={submitDisabled}
+              className="flex w-full items-center justify-center gap-3 rounded-[22px] px-7 py-7 text-xl font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
+              style={{ background: accent }}
+            >
+              {isCaution && !submitting && <AlertTriangle className="h-6 w-6" />}
+              {!isCaution && <ClipboardCheck className="h-6 w-6" />}
+              {submitting ? "처리 중..." : meta.submitText(includedLines.length)}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -272,17 +280,17 @@ function LineSection({
   const totalQty = lines.reduce((acc, l) => acc + (Number.isFinite(l.quantity) ? l.quantity : 0), 0);
   return (
     <div
-      className="rounded-[14px] border"
+      className="rounded-[18px] border"
       style={{ background: LEGACY_COLORS.s2, borderColor: tint(headerColor, 30) }}
     >
       <div
-        className="flex items-center justify-between px-4 py-2"
+        className="flex items-center justify-between px-5 py-3"
         style={{ background: tint(headerColor, 6), borderBottom: `1px solid ${tint(headerColor, 30)}` }}
       >
-        <span className="text-xs font-black uppercase tracking-[1.5px]" style={{ color: headerColor }}>
+        <span className="text-sm font-black uppercase tracking-[1.5px]" style={{ color: headerColor }}>
           {title} · {lines.length}건
         </span>
-        <span className="text-sm font-black tabular-nums" style={{ color: headerColor }}>
+        <span className="text-lg font-black tabular-nums" style={{ color: headerColor }}>
           총 {formatQty(totalQty)}
         </span>
       </div>
@@ -294,23 +302,23 @@ function LineSection({
           return (
             <li
               key={line.line_id}
-              className="flex items-center justify-between gap-3 px-4 py-2"
+              className="flex min-h-[64px] items-center justify-between gap-4 px-5 py-3"
               style={{
-                paddingLeft: isChild ? 32 : 16,
+                paddingLeft: isChild ? 40 : 20,
                 borderLeft: isChild ? `3px solid ${tint(LEGACY_COLORS.muted2, 30)}` : "none",
               }}
             >
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
+                <div className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
                   {line.item_name}
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
                   <span>{line.erp_code ?? "-"}</span>
                   {(line.from_department || line.to_department) && (
                     <span>· {line.from_department ?? "-"}{line.direction === "move" ? ` → ${line.to_department ?? "-"}` : ""}</span>
                   )}
                   <span
-                    className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                    className="rounded-full px-2.5 py-1 text-[11px] font-bold"
                     style={{
                       background: tint(line.origin === "manual" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.blue, 14),
                       color: line.origin === "manual" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.blue,
@@ -321,7 +329,7 @@ function LineSection({
                 </div>
               </div>
               <span
-                className="shrink-0 text-base font-black tabular-nums"
+                className="shrink-0 text-xl font-black tabular-nums"
                 style={{ color: dir.color }}
               >
                 {dir.sign ?? ""}
@@ -347,13 +355,15 @@ function Field({
   placeholder: string;
 }) {
   return (
-    <label className="flex flex-col gap-1">
-      <SettingLabel label={label} />
+    <label className="flex flex-col gap-2">
+      <div className="text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
+        {label}
+      </div>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-10 rounded-[12px] border px-3 text-sm font-bold outline-none focus:border-[var(--c-blue)]"
+        className="h-14 rounded-[16px] border px-4 text-base font-bold outline-none focus:border-[var(--c-blue)]"
         style={{
           background: LEGACY_COLORS.s2,
           borderColor: LEGACY_COLORS.border,

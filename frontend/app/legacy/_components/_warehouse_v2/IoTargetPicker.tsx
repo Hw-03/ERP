@@ -50,6 +50,8 @@ const STAGE_OPTIONS = [
   { value: "DONE", label: "공정완료" },
 ];
 
+const INITIAL_DISPLAY_LIMIT = PAGE_SIZE * 2;
+
 const NAME_TO_LETTER: Record<string, DeptLetter> = {
   튜브: "T",
   고압: "H",
@@ -116,6 +118,10 @@ function renderDeptBreakdown(prodByDept: Map<string, number>) {
   );
 }
 
+function keepCodeOnOneLine(code: string | null | undefined) {
+  return code ? code.replace(/-/g, "\u2011") : "-";
+}
+
 export function IoTargetPicker({
   workType,
   subType,
@@ -137,7 +143,7 @@ export function IoTargetPicker({
   const [dept, setDept] = useState("ALL");
   const [model, setModel] = useState("전체");
   const [stage, setStage] = useState("ALL");
-  const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
+  const [displayLimit, setDisplayLimit] = useState(INITIAL_DISPLAY_LIMIT);
   const operator = useCurrentOperator();
 
   const showPackages = canPickPackages(workType);
@@ -231,10 +237,10 @@ export function IoTargetPicker({
   }));
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       {/* 필터 */}
       {!showPackages ? (
-        <div className="grid grid-cols-[1fr_1fr_1fr_2fr] gap-2">
+        <div className="grid shrink-0 grid-cols-[1fr_1fr_1fr_2fr] gap-2">
           <LabeledSelect label="부서" value={dept} onChange={setDept} options={deptOptions} />
           <LabeledSelect label="모델" value={model} onChange={setModel} options={modelOptions} />
           <LabeledSelect label="단계" value={stage} onChange={setStage} options={STAGE_OPTIONS} />
@@ -262,7 +268,7 @@ export function IoTargetPicker({
         </div>
       ) : (
         <div
-          className="flex items-center gap-2 rounded-[12px] border px-3 py-2"
+          className="flex shrink-0 items-center gap-2 rounded-[12px] border px-3 py-2"
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
         >
           <Search className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
@@ -278,7 +284,7 @@ export function IoTargetPicker({
 
       {/* 결과 영역 */}
       <div
-        className="scrollbar-hide max-h-[440px] overflow-y-auto rounded-[16px] border"
+        className="scrollbar-hide min-h-0 flex-1 overflow-y-auto rounded-[16px] border"
         style={{
           background: LEGACY_COLORS.s2,
           borderColor: LEGACY_COLORS.border,
@@ -343,7 +349,7 @@ export function IoTargetPicker({
         type="button"
         onClick={onAdvance}
         disabled={bundles.length === 0}
-        className="flex w-full items-center justify-between rounded-[12px] border px-4 py-3 text-sm font-black transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full shrink-0 items-center justify-between rounded-[12px] border px-4 py-3 text-sm font-black transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
         style={{
           background: bundles.length > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
           borderColor: bundles.length > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
@@ -402,6 +408,13 @@ function ItemTable({
   return (
     <>
       <table className="w-full border-collapse text-sm">
+        <colgroup>
+          <col style={{ width: "58%" }} />
+          <col style={{ width: "14%" }} />
+          <col style={{ width: "7%" }} />
+          <col style={{ width: "8%" }} />
+          <col style={{ width: "13%" }} />
+        </colgroup>
         <thead className="sticky top-0 z-10">
           <tr
             className="text-left text-[11px] font-bold uppercase tracking-[1.5px]"
@@ -417,7 +430,7 @@ function ItemTable({
               품목명
             </th>
             <th
-              className="px-3 py-2"
+              className="px-3 py-2 text-center"
               style={{
                 background: "var(--c-popup-bg)",
                 borderBottom: `1px solid ${LEGACY_COLORS.border}`,
@@ -426,7 +439,7 @@ function ItemTable({
               품목 코드
             </th>
             <th
-              className="whitespace-nowrap px-3 py-2 text-right"
+              className="whitespace-nowrap px-3 py-2 text-center"
               style={{
                 background: "var(--c-popup-bg)",
                 borderBottom: `1px solid ${LEGACY_COLORS.border}`,
@@ -435,7 +448,7 @@ function ItemTable({
               창고
             </th>
             <th
-              className="whitespace-nowrap px-3 py-2 text-right"
+              className="whitespace-nowrap px-3 py-2 text-center"
               style={{
                 background: "var(--c-popup-bg)",
                 borderBottom: `1px solid ${LEGACY_COLORS.border}`,
@@ -474,15 +487,15 @@ function ItemTable({
                   </span>
                 </td>
                 <td
-                  className="px-3 py-2"
+                  className="px-3 py-2 text-center"
                   style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                 >
                   <span className="text-sm font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {item.erp_code ?? "-"}
+                    {keepCodeOnOneLine(item.erp_code)}
                   </span>
                 </td>
                 <td
-                  className="px-3 py-2 text-right text-base font-black tabular-nums"
+                  className="px-3 py-2 text-center text-base font-black tabular-nums"
                   style={{
                     color: wQty > 0 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
                     borderBottom: `1px solid ${LEGACY_COLORS.border}`,
@@ -491,7 +504,7 @@ function ItemTable({
                   {formatQty(wQty)}
                 </td>
                 <td
-                  className="px-3 py-2 text-right"
+                  className="px-3 py-2 text-center"
                   style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                 >
                   {noDeptStock ? (

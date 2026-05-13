@@ -42,7 +42,7 @@ export function IoBundleCart({
     .reduce((acc, line) => acc + (Number.isFinite(line.quantity) ? line.quantity : 0), 0);
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       <p className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
         체크된 품목만 재고에 반영됩니다. 체크를 해제하면 이번 작업에서 제외됩니다.
       </p>
@@ -100,16 +100,18 @@ export function IoBundleCart({
       )}
 
       {bundles.length > 0 && (
-        <button
-          type="button"
-          onClick={onAdvance}
-          disabled={!canAdvance}
-          className="flex w-full items-center justify-center gap-1.5 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
-          style={{ background: LEGACY_COLORS.blue }}
-        >
-          <ClipboardCheck className="h-4 w-4" />
-          제출확인 →
-        </button>
+        <div className="mt-auto pt-1">
+          <button
+            type="button"
+            onClick={onAdvance}
+            disabled={!canAdvance}
+            className="flex w-full items-center justify-center gap-1.5 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
+            style={{ background: LEGACY_COLORS.blue }}
+          >
+            <ClipboardCheck className="h-4 w-4" />
+            제출확인 →
+          </button>
+        </div>
       )}
     </div>
   );

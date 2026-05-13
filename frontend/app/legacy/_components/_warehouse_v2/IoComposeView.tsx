@@ -42,6 +42,44 @@ function workTypeLabel(workType: IoWorkType) {
   return IO_WORK_TYPES.find((row) => row.id === workType)?.label ?? workType;
 }
 
+function findScrollContainer(startEl: HTMLElement): HTMLElement | null {
+  let container: HTMLElement | null = startEl.parentElement;
+  while (container) {
+    const style = window.getComputedStyle(container);
+    if (style.overflowY === "auto" || style.overflowY === "scroll") return container;
+    container = container.parentElement;
+  }
+  return null;
+}
+
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function scrollToElement(container: HTMLElement, target: HTMLElement, offset = 12) {
+  const behavior = prefersReducedMotion() ? "auto" : "smooth";
+  const getTop = () => {
+    const containerRect = container.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    return Math.max(0, container.scrollTop + (targetRect.top - containerRect.top) - offset);
+  };
+
+  const top = getTop();
+  container.scrollTo({
+    top,
+    behavior,
+  });
+
+  if (behavior === "smooth") {
+    window.setTimeout(() => {
+      const nextTop = getTop();
+      if (Math.abs(container.scrollTop - nextTop) > 2) {
+        container.scrollTo({ top: nextTop, behavior });
+      }
+    }, 320);
+  }
+}
+
 export function IoComposeView({
   globalSearch,
   operator,
@@ -360,14 +398,8 @@ export function IoComposeView({
     const firstWrapper = stepElements[targetSteps[0]];
     if (!firstWrapper) return;
 
-    let container: HTMLElement | null = firstWrapper.parentElement;
-    while (container) {
-      const s = window.getComputedStyle(container);
-      if (s.overflowY === "auto" || s.overflowY === "scroll") break;
-      container = container.parentElement;
-    }
-    if (!container) return;
-    const scrollContainer = container;
+    const scrollContainer = findScrollContainer(firstWrapper);
+    if (!scrollContainer) return;
 
     // top margin = gap-3 (12px). carbon 을 사이드바 bottom 까지 확장 — BOTTOM 음수 (clientH 측정이 실제 사이드바보다 작은 보정).
     const TOP = 12;
@@ -416,6 +448,35 @@ export function IoComposeView({
       }
     }
 
+    const alignTarget =
+      step === 3 && state.bundles.length > 0
+        ? stepElements[4]
+        : step > 1
+          ? stepElements[(step - 1) as IoStep]
+          : null;
+    const extendStep: IoStep = step === 3 && state.bundles.length > 0 ? 4 : step;
+    const extendWrapper = stepElements[extendStep];
+
+    if (alignTarget && extendWrapper) {
+      const cRect = scrollContainer.getBoundingClientRect();
+      const tRect = alignTarget.getBoundingClientRect();
+      const desiredScrollTop = Math.max(0, scrollContainer.scrollTop + (tRect.top - cRect.top) - TOP);
+      const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+      const scrollDeficit = Math.ceil(desiredScrollTop - maxScrollTop);
+
+      if (scrollDeficit > 0) {
+        const currentSize =
+          parseFloat(extendWrapper.style.minHeight || extendWrapper.style.height) || extendWrapper.offsetHeight;
+        const nextSize = currentSize + scrollDeficit;
+
+        if (extendStep === 4) {
+          extendWrapper.style.minHeight = `${nextSize}px`;
+        } else {
+          extendWrapper.style.height = `${nextSize}px`;
+        }
+      }
+    }
+
     return () => {
       // unmount 시에도 모든 wrapper height 정리
       for (const s of allSteps) {
@@ -433,12 +494,7 @@ export function IoComposeView({
     const el = stepRefs.current[step];
     if (!el) return;
     // 외부 overflow 컨테이너 찾기
-    let container: HTMLElement | null = el.parentElement;
-    while (container) {
-      const s = window.getComputedStyle(container);
-      if (s.overflowY === "auto" || s.overflowY === "scroll") break;
-      container = container.parentElement;
-    }
+    const container = findScrollContainer(el);
     // 스크롤 — 첫 마운트 또는 동일 step 재실행(strict mode 등) 시 skip
     const prev = lastScrolledStepRef.current;
     lastScrolledStepRef.current = step;
@@ -448,26 +504,23 @@ export function IoComposeView({
       return;
     }
     const timer = setTimeout(() => {
+      if (!container) return;
       if (step === 1) {
-        if (container) container.scrollTop = 0;
+        container.scrollTo({
+          top: 0,
+          behavior: prefersReducedMotion() ? "auto" : "smooth",
+        });
       } else {
-        // step 2 이후 — 직전(step-1) 카드 를 container top + 12px (gap-3) 위치로 정렬
-        // smooth scroll 은 dynamic height layout shift 와 충돌해 미달함. 즉시 할당.
+        // step 2 이후 — 직전(step-1) 카드를 container top + 12px (gap-3) 위치로 정렬.
         const targetEl = stepRefs.current[(step - 1) as IoStep];
-        if (container && targetEl) {
-          const containerRect = container.getBoundingClientRect();
-          const targetRect = targetEl.getBoundingClientRect();
-          const newScrollTop =
-            container.scrollTop + (targetRect.top - containerRect.top) - 12;
-          container.scrollTop = Math.max(0, newScrollTop);
-        }
+        if (targetEl) scrollToElement(container, targetEl, 12);
       }
     }, 150);
     return () => clearTimeout(timer);
   }, [step]);
 
   return (
-    <div className={`flex flex-col gap-3 ${step === 1 ? "pb-0" : "pb-[400px]"}`}>
+    <div className="flex flex-col gap-3">
       {error && (
         <div
           className="rounded-[12px] border px-4 py-3 text-sm font-bold"
@@ -512,30 +565,36 @@ export function IoComposeView({
             accent={accent}
             fill={step === 2}
           >
-            <IoSubTypeStep
-              workType={state.workType}
-              subType={state.subType}
-              fromDepartment={state.fromDepartment}
-              toDepartment={state.toDepartment}
-              deptIoDirection={state.deptIoDirection}
-              onSubTypeChange={handleSubTypeChange}
-              onFromDepartmentChange={changeFromDepartment}
-              onToDepartmentChange={changeToDepartment}
-              onDeptIoDirectionChange={(dir) => {
-                const had = state.bundles.length > 0;
-                state.setDeptIoDirection(dir);
-                if (had) onStatusChange("방향 변경으로 작업 묶음을 초기화했습니다.");
-              }}
-            />
-            <button
-              type="button"
-              onClick={state.goNext}
-              disabled={!state.canAdvance[2]}
-              className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
-              style={{ background: LEGACY_COLORS.blue }}
-            >
-              다음 단계로 →
-            </button>
+            <div className="flex h-full min-h-0 flex-col">
+              <div className="min-h-0 flex-1">
+                <IoSubTypeStep
+                  workType={state.workType}
+                  subType={state.subType}
+                  fromDepartment={state.fromDepartment}
+                  toDepartment={state.toDepartment}
+                  deptIoDirection={state.deptIoDirection}
+                  onSubTypeChange={handleSubTypeChange}
+                  onFromDepartmentChange={changeFromDepartment}
+                  onToDepartmentChange={changeToDepartment}
+                  onDeptIoDirectionChange={(dir) => {
+                    const had = state.bundles.length > 0;
+                    state.setDeptIoDirection(dir);
+                    if (had) onStatusChange("방향 변경으로 작업 묶음을 초기화했습니다.");
+                  }}
+                />
+              </div>
+              <div className="mt-auto pt-5">
+                <button
+                  type="button"
+                  onClick={state.goNext}
+                  disabled={!state.canAdvance[2]}
+                  className="flex w-full items-center justify-center gap-2 rounded-[18px] px-7 py-5 text-lg font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
+                  style={{ background: LEGACY_COLORS.blue }}
+                >
+                  다음 단계로 →
+                </button>
+              </div>
+            </div>
           </WizardStepCard>
         </div>
       )}
@@ -583,21 +642,11 @@ export function IoComposeView({
               onAdvance={() => {
                 const step4El = stepRefs.current[4];
                 if (!step4El) return;
-                let container: HTMLElement | null = step4El.parentElement;
-                while (container) {
-                  const s = window.getComputedStyle(container);
-                  if (s.overflowY === "auto" || s.overflowY === "scroll") break;
-                  container = container.parentElement;
-                }
-                if (!container) return;
-                const scrollContainer = container;
+                const scrollContainer = findScrollContainer(step4El);
+                if (!scrollContainer) return;
                 // useLayoutEffect 가 set 한 height 가 paint 된 다음 프레임에 측정
                 requestAnimationFrame(() => {
-                  const containerRect = scrollContainer.getBoundingClientRect();
-                  const targetRect = step4El.getBoundingClientRect();
-                  const newScrollTop =
-                    scrollContainer.scrollTop + (targetRect.top - containerRect.top) - 12;
-                  scrollContainer.scrollTop = Math.max(0, newScrollTop);
+                  scrollToElement(scrollContainer, step4El, 12);
                 });
               }}
               busy={previewing}
