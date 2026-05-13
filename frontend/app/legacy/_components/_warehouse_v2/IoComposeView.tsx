@@ -343,9 +343,10 @@ export function IoComposeView({
   // Step 3+품목>0 시점에는 Step 4 wrapper 가 active.
   useLayoutEffect(() => {
     const allSteps: IoStep[] = [1, 2, 3, 4, 5];
+    const stepElements = { ...stepRefs.current };
     // 매 호출마다 모든 wrapper height 초기화 — cleanup 의존하지 않음 (cleanup 누락 시 leftover 거대 height 방지)
     for (const s of allSteps) {
-      const w = stepRefs.current[s];
+      const w = stepElements[s];
       if (w) w.style.height = "";
     }
 
@@ -353,7 +354,7 @@ export function IoComposeView({
     const targetSteps: IoStep[] =
       step === 3 && state.bundles.length > 0 ? [3 as IoStep, 4 as IoStep] : [step];
 
-    const firstWrapper = stepRefs.current[targetSteps[0]];
+    const firstWrapper = stepElements[targetSteps[0]];
     if (!firstWrapper) return;
 
     let container: HTMLElement | null = firstWrapper.parentElement;
@@ -371,7 +372,7 @@ export function IoComposeView({
     const GAP = 12;
 
     for (const s of targetSteps) {
-      const wrapper = stepRefs.current[s];
+      const wrapper = stepElements[s];
       if (!wrapper) continue;
 
       let wrapperTopInContainer: number;
@@ -386,7 +387,7 @@ export function IoComposeView({
       } else {
         // Step 2/3/5: scroll 후 prev step 이 container top + TOP.
         const prevStep: IoStep = (s - 1) as IoStep;
-        const prevCollapsed = stepRefs.current[prevStep];
+        const prevCollapsed = stepElements[prevStep];
         if (!prevCollapsed) continue;
         wrapperTopInContainer = TOP + prevCollapsed.offsetHeight + GAP;
       }
@@ -400,7 +401,7 @@ export function IoComposeView({
     return () => {
       // unmount 시에도 모든 wrapper height 정리
       for (const s of allSteps) {
-        const w = stepRefs.current[s];
+        const w = stepElements[s];
         if (w) w.style.height = "";
       }
     };
