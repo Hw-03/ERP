@@ -1,0 +1,1371 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DEXCOWIN MES — 사내 발표 2026.05</title>
+  <link rel="icon" type="image/png" href="assets/dexcowin-logo.png" />
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    if (window.tailwind) {
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brand:  { 600: '#2563EB', 700: '#1D4ED8' },
+              danger: { 600: '#DC2626', 500: '#EF4444' },
+              ink:    { 900: '#0F172A', 500: '#64748B', 100: '#F1F5F9' }
+            },
+            fontFamily: {
+              sans: ['Pretendard', 'Noto Sans KR', 'system-ui', 'sans-serif']
+            }
+          }
+        }
+      };
+    }
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root {
+      --c-bg: #FFFFFF;
+      --c-text: #0F172A;
+      --c-red: #DC2626;
+      --c-blue: #2563EB;
+      --c-gray: #64748B;
+      --c-light: #F1F5F9;
+      --c-line: #E2E8F0;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    body {
+      font-family: 'Pretendard', 'Noto Sans KR', system-ui, -apple-system, sans-serif;
+      color: var(--c-text);
+      background: var(--c-bg);
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.01em;
+    }
+
+    /* ----- header / footer ----- */
+    .deck-header,
+    .deck-footer {
+      position: fixed;
+      left: 0; right: 0;
+      z-index: 50;
+      padding: 0 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--c-gray);
+      pointer-events: none;
+    }
+    .deck-header { top: 0; height: 56px; font-size: 13px; }
+    .deck-footer { bottom: 0; height: 36px; font-size: 12px; }
+
+    .header-logo { display: flex; align-items: center; gap: 10px; }
+    .header-logo img { height: 18px; display: block; }
+    .header-logo .reg { color: var(--c-red); font-weight: 700; font-size: 11px; vertical-align: super; }
+    .slide-counter { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+
+    .progress-bar { display: flex; gap: 4px; width: 320px; }
+    .progress-bar > span {
+      flex: 1; height: 2px; background: var(--c-line); border-radius: 2px;
+      transition: background 200ms ease;
+    }
+    .progress-bar > span.done { background: var(--c-red); }
+    .progress-bar > span.current { background: var(--c-red); opacity: 0.4; }
+
+    /* ----- slides ----- */
+    .deck { position: relative; width: 100vw; height: 100vh; }
+    .slide {
+      position: absolute; inset: 0;
+      padding: 96px 96px 72px;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .slide.active { opacity: 1; pointer-events: auto; }
+    .slide.active > * { animation: fadeIn 240ms ease-out both; }
+    .slide.active > *:nth-child(2) { animation-delay: 60ms; }
+    .slide.active > *:nth-child(3) { animation-delay: 120ms; }
+    .slide.active > *:nth-child(4) { animation-delay: 180ms; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ----- typography helpers ----- */
+    .slide-eyebrow {
+      font-size: 13px;
+      color: var(--c-gray);
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .slide-title {
+      font-size: 48px;
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      margin: 0 0 8px;
+    }
+    .slide-subtitle {
+      font-size: 22px;
+      font-weight: 400;
+      color: var(--c-gray);
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    .stat-num {
+      font-size: clamp(80px, 9vw, 128px);
+      font-weight: 600;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-num.accent-red { color: var(--c-red); }
+    .stat-label {
+      font-size: 18px;
+      color: var(--c-gray);
+      margin-top: 12px;
+      font-weight: 500;
+    }
+
+    /* ----- cover (slide 1) ----- */
+    .cover {
+      padding: 80px 120px;
+    }
+    .cover .wordmark {
+      font-size: clamp(80px, 11vw, 160px);
+      font-weight: 800;
+      letter-spacing: -0.045em;
+      line-height: 0.95;
+      color: var(--c-text);
+    }
+    .cover .wordmark .reg {
+      color: var(--c-red);
+      font-size: 0.32em;
+      font-weight: 700;
+      vertical-align: super;
+      margin-left: 6px;
+    }
+    .cover .product {
+      margin-top: 12px;
+      font-size: clamp(28px, 2.6vw, 44px);
+      font-weight: 500;
+      color: var(--c-gray);
+      letter-spacing: -0.02em;
+    }
+    .cover .product strong {
+      color: var(--c-text);
+      font-weight: 700;
+    }
+    .cover .tagline {
+      margin-top: 48px;
+      font-size: 22px;
+      color: var(--c-gray);
+      max-width: 720px;
+      line-height: 1.55;
+    }
+    .cover .meta {
+      margin-top: auto;
+      display: flex;
+      gap: 64px;
+      font-size: 15px;
+      color: var(--c-gray);
+    }
+    .cover .meta .label {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--c-text);
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    /* ----- card grid (slide 3) ----- */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 28px;
+      margin-top: 56px;
+    }
+    .feature-card {
+      border: 1px solid var(--c-line);
+      border-radius: 16px;
+      padding: 32px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      background: #FAFBFC;
+      transition: transform 200ms ease, border-color 200ms ease;
+    }
+    .feature-card .icon {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      background: #EEF2FF;
+      color: var(--c-blue);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .feature-card h3 {
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: -0.02em;
+    }
+    .feature-card p {
+      font-size: 16px;
+      color: var(--c-gray);
+      line-height: 1.6;
+      margin: 0;
+    }
+    .feature-card .badge {
+      align-self: flex-start;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #ECFDF5;
+      color: #047857;
+      letter-spacing: 0.04em;
+    }
+
+    /* ----- stat grid (slide 4) ----- */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: 0;
+      margin-top: 48px;
+      flex: 1;
+      border-top: 1px solid var(--c-line);
+      border-left: 1px solid var(--c-line);
+    }
+    .stat-cell {
+      border-right: 1px solid var(--c-line);
+      border-bottom: 1px solid var(--c-line);
+      padding: 32px 36px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    /* ----- pain points (slide 2) ----- */
+    .pain-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      margin-top: 48px;
+      flex: 1;
+      align-items: center;
+    }
+    .excel-mock {
+      border: 1px solid var(--c-line);
+      border-radius: 8px;
+      overflow: hidden;
+      filter: grayscale(0.4);
+      opacity: 0.85;
+      position: relative;
+    }
+    .excel-mock::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, transparent 60%, rgba(255,255,255,0.85) 100%);
+      pointer-events: none;
+    }
+    .excel-mock svg { display: block; width: 100%; height: auto; }
+    .pain-list { display: flex; flex-direction: column; gap: 24px; }
+    .pain-item {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .pain-item .x {
+      flex: 0 0 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #FEF2F2;
+      color: var(--c-red);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700;
+      font-size: 18px;
+      margin-top: 2px;
+    }
+    .pain-item .body h4 { font-size: 22px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.02em; }
+    .pain-item .body p { font-size: 16px; color: var(--c-gray); margin: 0; line-height: 1.55; }
+
+    /* ----- demo checklist (slide 5) ----- */
+    .demo-wrap {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 80px;
+      align-items: center;
+      margin-top: 32px;
+    }
+    .demo-play {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 24px;
+    }
+    .demo-play .play-icon {
+      width: 200px; height: 200px;
+      border-radius: 50%;
+      background: var(--c-red);
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 88px;
+      padding-left: 14px;
+      box-shadow: 0 24px 48px rgba(220,38,38,0.18);
+    }
+    .demo-play h2 {
+      font-size: 56px;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: -0.02em;
+    }
+    .demo-play p {
+      font-size: 18px;
+      color: var(--c-gray);
+      margin: 0;
+      max-width: 360px;
+      line-height: 1.55;
+    }
+    .demo-checklist {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .demo-checklist-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+    .demo-checklist-header h3 {
+      font-size: 18px;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: 0.02em;
+      color: var(--c-gray);
+      text-transform: uppercase;
+    }
+    .demo-checklist-header .progress {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--c-red);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+    .demo-item {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 18px 24px;
+      border: 1px solid var(--c-line);
+      border-radius: 12px;
+      background: #fff;
+      cursor: pointer;
+      user-select: none;
+      transition: border-color 160ms ease, background 160ms ease;
+    }
+    .demo-item:hover { border-color: var(--c-blue); }
+    .demo-item.done {
+      background: #F0FDF4;
+      border-color: #BBF7D0;
+    }
+    .demo-item.done .demo-item-title { color: var(--c-gray); text-decoration: line-through; text-decoration-color: rgba(100,116,139,0.5); }
+    .demo-item .check {
+      flex: 0 0 28px; height: 28px;
+      border: 2px solid var(--c-line);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: transparent;
+      font-weight: 800;
+      transition: all 160ms ease;
+    }
+    .demo-item.done .check {
+      background: #16A34A;
+      border-color: #16A34A;
+      color: #fff;
+    }
+    .demo-item .demo-item-no {
+      font-size: 13px;
+      color: var(--c-gray);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      min-width: 32px;
+    }
+    .demo-item .demo-item-title { font-size: 19px; font-weight: 600; flex: 1; letter-spacing: -0.01em; }
+    .demo-item .demo-item-time { font-size: 13px; color: var(--c-gray); font-variant-numeric: tabular-nums; }
+
+    /* ----- stability (slide 6) ----- */
+    .stab-layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      margin-top: 48px;
+      align-items: center;
+    }
+    .gauge-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 420px;
+      margin: 0 auto;
+      aspect-ratio: 1;
+    }
+    .gauge-text {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column;
+      pointer-events: none;
+    }
+    .gauge-text .num { font-size: 96px; font-weight: 700; line-height: 1; letter-spacing: -0.04em; color: var(--c-red); }
+    .gauge-text .denom { font-size: 18px; color: var(--c-gray); margin-top: 4px; }
+    .gauge-text .label { font-size: 15px; color: var(--c-text); margin-top: 8px; font-weight: 600; letter-spacing: 0.04em; }
+
+    .gate-list { display: flex; flex-direction: column; gap: 14px; }
+    .gate-item {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 16px 20px;
+      border-left: 3px solid #16A34A;
+      background: #F8FAFC;
+      border-radius: 0 8px 8px 0;
+    }
+    .gate-item .ok {
+      flex: 0 0 28px; height: 28px;
+      background: #16A34A; color: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700;
+    }
+    .gate-item .gate-name { font-size: 18px; font-weight: 600; flex: 1; }
+    .gate-item .gate-meta { font-size: 13px; color: var(--c-gray); font-variant-numeric: tabular-nums; }
+
+    /* ----- roadmap (slide 7) ----- */
+    .roadmap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      margin-top: 48px;
+    }
+    .timeline {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      padding: 40px 0 0;
+    }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      top: 92px;
+      left: 8%; right: 8%;
+      height: 2px;
+      background: var(--c-line);
+    }
+    .timeline-node {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 0 16px;
+    }
+    .timeline-dot {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: var(--c-line);
+      border: 3px solid #fff;
+      position: relative;
+      margin-bottom: 20px;
+      z-index: 2;
+    }
+    .timeline-node.current .timeline-dot {
+      background: var(--c-red);
+      animation: pulse-red 2s ease-in-out infinite;
+    }
+    .timeline-node.done .timeline-dot { background: var(--c-blue); }
+    @keyframes pulse-red {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.55); }
+      50%      { box-shadow: 0 0 0 20px rgba(220,38,38,0); }
+    }
+    .timeline-date {
+      font-size: 14px;
+      color: var(--c-gray);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+      font-variant-numeric: tabular-nums;
+    }
+    .timeline-node.current .timeline-date { color: var(--c-red); }
+    .timeline-title {
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      letter-spacing: -0.02em;
+    }
+    .timeline-desc {
+      font-size: 16px;
+      color: var(--c-gray);
+      line-height: 1.55;
+      max-width: 280px;
+    }
+
+    /* ----- impact 2x2 (slide 8) ----- */
+    .impact-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 24px;
+      margin-top: 48px;
+    }
+    .impact-card {
+      border: 1px solid var(--c-line);
+      border-radius: 16px;
+      padding: 32px 36px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      background: #fff;
+    }
+    .impact-card .head {
+      display: flex; align-items: center; gap: 14px;
+    }
+    .impact-card .icon-box {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--c-blue);
+      background: #EFF6FF;
+    }
+    .impact-card h3 { font-size: 14px; font-weight: 700; color: var(--c-gray); letter-spacing: 0.14em; text-transform: uppercase; margin: 0; }
+    .impact-card .big {
+      font-size: 44px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.1;
+    }
+    .impact-card .big .accent { color: var(--c-red); }
+    .impact-card .note { font-size: 15px; color: var(--c-gray); line-height: 1.55; margin: 0; }
+
+    /* ----- qa (slide 9) ----- */
+    .qa {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      text-align: center;
+      gap: 16px;
+    }
+    .qa-big {
+      font-size: clamp(120px, 14vw, 200px);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+    .qa-big .amp { color: var(--c-red); }
+    .qa-sub { font-size: 22px; color: var(--c-gray); margin-top: 24px; }
+
+    /* ----- notes panel ----- */
+    .notes-panel {
+      display: none;
+      border-top: 1px solid var(--c-line);
+      background: #FAFBFC;
+      padding: 28px 96px 32px;
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--c-text);
+    }
+    .notes-panel h4 {
+      color: var(--c-red);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin: 0 0 6px;
+      font-weight: 700;
+    }
+    .notes-panel h4 + p,
+    .notes-panel h4 + ul { margin: 0 0 16px; }
+    .notes-panel h4 + p.lead { font-size: 17px; font-weight: 600; line-height: 1.5; color: var(--c-text); }
+    .notes-panel ul { padding-left: 18px; }
+    .notes-panel ul li { margin-bottom: 4px; }
+    .notes-panel .audience-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .notes-panel .qa-row li strong { color: var(--c-red); }
+
+    body.notes-mode {
+      overflow: auto;
+      height: auto;
+    }
+    body.notes-mode .deck {
+      width: 100%;
+      height: auto;
+    }
+    body.notes-mode .slide {
+      position: relative;
+      inset: auto;
+      opacity: 1 !important;
+      pointer-events: auto;
+      min-height: 100vh;
+      border-bottom: 1px dashed var(--c-line);
+      padding: 96px 96px 32px;
+    }
+    body.notes-mode .slide > * { animation: none !important; }
+    body.notes-mode .notes-panel { display: block; }
+    body.notes-mode .deck-footer { display: none; }
+    body.notes-mode .deck-header { position: relative; height: 48px; }
+
+    /* ----- print ----- */
+    @media print {
+      @page { size: A4 landscape; margin: 0; }
+      body { overflow: visible; height: auto; }
+      .deck-header, .deck-footer { display: none; }
+      .deck { width: 100%; height: auto; }
+      .slide {
+        position: relative; inset: auto;
+        opacity: 1 !important; pointer-events: auto;
+        page-break-after: always;
+        page-break-inside: avoid;
+        min-height: 100vh;
+      }
+      .slide > * { animation: none !important; }
+      .notes-panel {
+        display: block;
+        page-break-after: always;
+        page-break-inside: avoid;
+        padding: 32px 48px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="deck-header">
+    <div class="header-logo">
+      <img src="assets/dexcowin-logo.png" alt="DEXCOWIN" />
+      <span style="font-weight:600;color:var(--c-text);font-size:13px;letter-spacing:0.04em;">MES</span>
+    </div>
+    <div class="slide-counter"><span id="cur">01</span> / 09</div>
+  </div>
+
+  <div class="deck-footer">
+    <div>2026.05 사내 발표 — DEXCOWIN MES</div>
+    <div class="progress-bar" id="progress"></div>
+  </div>
+
+  <div class="deck" id="deck">
+
+    <!-- ============ Slide 1 — Cover ============ -->
+    <section class="slide cover" data-slide="1">
+      <div>
+        <div class="slide-eyebrow">2026.05 사내 발표</div>
+        <div class="wordmark">
+          DEXCOWIN<span class="reg">®</span>
+        </div>
+        <div class="product"><strong>MES</strong> — 자재 · 재고 · 생산 통합 시스템</div>
+      </div>
+      <div class="tagline">
+        우리 공정에 맞춰 직접 만든, 단일 자재·재고·생산 흐름 관리 플랫폼.
+      </div>
+      <div class="meta">
+        <div>
+          <span class="label">발표</span>
+          2026년 5월
+        </div>
+        <div>
+          <span class="label">대상</span>
+          전사 (사장님 · 현장 · 영업부)
+        </div>
+        <div>
+          <span class="label">소요</span>
+          15분 + Q&amp;A
+        </div>
+      </div>
+      <div class="notes-panel">
+        <h4>말할 한 줄</h4>
+        <p class="lead">"우리 공정에 맞춘, 우리가 직접 만든 MES — 외부 솔루션이 아닙니다."</p>
+        <div class="audience-row">
+          <div>
+            <h4>사장님 반응 포인트</h4>
+            <ul><li>"우리 회사 이름이 표지에 있다 = 자산이다"</li><li>외부 라이선스 도입과 구분</li></ul>
+          </div>
+          <div>
+            <h4>현장 반응 포인트</h4>
+            <ul><li>"새 시스템이 또 들어오나?" 경계감 → 다음 슬라이드에서 풀어줌</li></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Slide 2 — Why ============ -->
+    <section class="slide" data-slide="2">
+      <div>
+        <div class="slide-eyebrow">왜 필요한가</div>
+        <h1 class="slide-title">848개 부품, 15개 공정.<br/>엑셀로는 한계입니다.</h1>
+        <p class="slide-subtitle">제품 5종 · 부서 6개 · 매일 들어오고 나가는 자재를 한 사람이 따라잡을 수 없습니다.</p>
+      </div>
+      <div class="pain-layout">
+        <div class="excel-mock">
+          <svg viewBox="0 0 600 380" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect width="600" height="380" fill="#fff"/>
+            <rect width="600" height="32" fill="#107C41"/>
+            <text x="16" y="22" fill="#fff" font-family="Pretendard, sans-serif" font-size="13" font-weight="600">2026.03_생산부 자재_조립,출하파트.xlsx</text>
+            <g font-family="Pretendard, sans-serif" font-size="11" fill="#374151">
+              <rect x="0" y="32" width="600" height="24" fill="#F3F4F6"/>
+              <text x="16" y="48">품목코드</text><text x="120" y="48">품명</text><text x="280" y="48">규격</text><text x="400" y="48">재고</text><text x="480" y="48">위치</text>
+              <line x1="0" y1="56" x2="600" y2="56" stroke="#E5E7EB"/>
+              <text x="16" y="76">AA-001-001</text><text x="120" y="76">알루미늄 케이스</text><text x="280" y="76">120×80×40</text><text x="400" y="76">14</text><text x="480" y="76">조립부</text>
+              <line x1="0" y1="86" x2="600" y2="86" stroke="#F3F4F6"/>
+              <text x="16" y="106">AA-001-002</text><text x="120" y="106">상부 커버</text><text x="280" y="106">SUS304</text><text x="400" y="106">7</text><text x="480" y="106">조립부</text>
+              <line x1="0" y1="116" x2="600" y2="116" stroke="#F3F4F6"/>
+              <text x="16" y="136">HF-002-014</text><text x="120" y="136">고압 코일 A</text><text x="280" y="136">5kV</text><text x="400" y="136">22</text><text x="480" y="136">고압</text>
+              <line x1="0" y1="146" x2="600" y2="146" stroke="#F3F4F6"/>
+              <text x="16" y="166">HF-002-015</text><text x="120" y="166">고압 코일 B</text><text x="280" y="166">5kV</text><text x="400" y="166" fill="#DC2626">3</text><text x="480" y="166">고압</text>
+              <line x1="0" y1="176" x2="600" y2="176" stroke="#F3F4F6"/>
+              <text x="16" y="196">VF-003-007</text><text x="120" y="196">진공 게이지</text><text x="280" y="196">0.001 Pa</text><text x="400" y="196">9</text><text x="480" y="196">진공</text>
+              <line x1="0" y1="206" x2="600" y2="206" stroke="#F3F4F6"/>
+              <text x="16" y="226">TF-004-021</text><text x="120" y="226">튜브 ASSY</text><text x="280" y="226">DX3000용</text><text x="400" y="226">1</text><text x="480" y="226">튜브</text>
+              <line x1="0" y1="236" x2="600" y2="236" stroke="#F3F4F6"/>
+              <text x="16" y="256" fill="#9CA3AF">...</text><text x="120" y="256" fill="#9CA3AF">(848행)</text>
+            </g>
+          </svg>
+        </div>
+        <div class="pain-list">
+          <div class="pain-item">
+            <div class="x">✕</div>
+            <div class="body">
+              <h4>실시간 재고를 모른다</h4>
+              <p>부서별로 따로 적고 있어서, 지금 이 순간 어디에 몇 개 있는지 합쳐서 보는 것이 어렵습니다.</p>
+            </div>
+          </div>
+          <div class="pain-item">
+            <div class="x">✕</div>
+            <div class="body">
+              <h4>입출고가 누락·중복된다</h4>
+              <p>수기 기록은 빠지거나 두 번 적힙니다. 시간이 지난 뒤 누가 언제 가져갔는지 추적이 안 됩니다.</p>
+            </div>
+          </div>
+          <div class="pain-item">
+            <div class="x">✕</div>
+            <div class="body">
+              <h4>BOM·자재계획이 머릿속에 있다</h4>
+              <p>완제품 1대를 만들 때 무엇이 얼마나 필요한지 — 담당자 한 명에게만 의존하는 구조입니다.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="notes-panel">
+        <h4>말할 한 줄</h4>
+        <p class="lead">"엑셀이 나빠서가 아니라, 848개 × 15공정 × 6부서를 사람이 동시에 따라가는 게 불가능합니다."</p>
+        <div class="audience-row">
+          <div>
+            <h4>사장님</h4>
+            <ul><li>"왜 지금 만들었나"에 대한 답 — 규모가 그 한계를 넘었기 때문</li></ul>
+          </div>
+          <div>
+            <h4>현장</h4>
+            <ul><li>"엑셀 쓰는 게 잘못이라는 게 아니라, 도와줄 도구가 필요하다"는 톤 강조</li></ul>
+          </div>
+        </div>
+        <h4 class="qa-row">Q&amp;A 대비</h4>
+        <ul class="qa-row">
+          <li><strong>Q:</strong> 엑셀은 계속 쓸 수 있나? — A: 마스터 데이터 내보내기·가져오기 지원. 엑셀 활용은 유지하되 일상 운영은 MES로.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============ Slide 3 — Three Pillars ============ -->
+    <section class="slide" data-slide="3">
+      <div>
+        <div class="slide-eyebrow">무엇을 만들었나</div>
+        <h1 class="slide-title">3가지 흐름을 한 시스템에서.</h1>
+        <p class="slide-subtitle">입출고를 기록하고 — 부서 재고를 실시간으로 보고 — BOM으로 자재를 계획합니다.</p>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>
+          </div>
+          <div class="badge">완성도 95%</div>
+          <h3>입출고 추적</h3>
+          <p>작업 유형 선택 → 품목·수량 입력 → 확정. 한 흐름으로 끝나며, 동일 작업이 두 번 기록되지 않도록 멱등성을 보장합니다.</p>
+        </div>
+        <div class="feature-card">
+          <div class="icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          </div>
+          <div class="badge">완성도 100%</div>
+          <h3>부서 재고</h3>
+          <p>6개 부서(튜브·고압·진공·튜닝·조립·출하)별 현재 보유 수량을 실시간으로 조회하고, 조립/분해/수량 보정까지 한 화면에서.</p>
+        </div>
+        <div class="feature-card">
+          <div class="icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6m0 0l3-3m-3 3L9 5"/><path d="M5 9h14l-1 11H6L5 9z"/><path d="M9 13v3M15 13v3"/></svg>
+          </div>
+          <div class="badge">완성도 100%</div>
+          <h3>BOM 자재계획</h3>
+          <p>제품 1대 = 어떤 부품이 몇 개. 805건의 BOM이 트리 구조로 들어 있고, "이 부품이 어디 들어가나" 역추적도 가능합니다.</p>
+        </div>
+      </div>
+      <div class="notes-panel">
+        <h4>말할 한 줄</h4>
+        <p class="lead">"전체 ERP가 아니라, 우리에게 꼭 필요한 3가지 — 입출고·부서재고·BOM — 만 합쳤습니다."</p>
+        <div class="audience-row">
+          <div>
+            <h4>사장님</h4>
+            <ul><li>"왜 직접 만들었나" — 우리 공정에 맞춘 좁고 깊은 시스템</li></ul>
+          </div>
+          <div>
+            <h4>현장</h4>
+            <ul><li>완성도 배지로 신뢰감 부여</li><li>"이미 작동하는 시스템"이라는 톤</li></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Slide 4 — Numbers ============ -->
+    <section class="slide" data-slide="4">
+      <div>
+        <div class="slide-eyebrow">시스템 한눈에</div>
+        <h1 class="slide-title">숫자로 보는 DEXCOWIN MES.</h1>
+        <p class="slide-subtitle">2026년 5월 13일 기준, 실제 데이터베이스에 들어 있는 규모입니다.</p>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-cell">
+          <div class="stat-num accent-red">848</div>
+          <div class="stat-label">관리 부품 (items)</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-num">15</div>
+          <div class="stat-label">공정 코드 (AA · HF · VF · TF …)</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-num">805</div>
+          <div class="stat-label">BOM 프리셋 (제품 ↔ 부품 매핑)</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-num">6</div>
+          <div class="stat-label">부서 (튜브·고압·진공·튜닝·조립·출하)</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-num">5</div>
+          <div class="stat-label">제품군 (DX3000·COCOON·SOLO·ADX4000W·ADX6000FB)</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-num accent-red">96<span style="font-size:0.45em;color:var(--c-gray);font-weight:500;"> / 100</span></div>
+          <div class="stat-label">자체 안정성 지표 (5게이트 + 동시성 테스트)</div>
+        </div>
+      </div>
+      <div class="notes-panel">
+        <h4>말할 한 줄</h4>
+        <p class="lead">"이 숫자는 추정이 아니라, 지금 서버에 실제로 들어 있는 데이터입니다."</p>
+        <div class="audience-row">
+          <div>
+            <h4>사장님</h4>
+            <ul><li>"848과 96에만 빨강" — 규모와 품질을 동시에 강조</li></ul>
+          </div>
+          <div>
+            <h4>영업부</h4>
+            <ul><li>제품군 5종이 회사 홈페이지와 동일 — 자료로 재활용 가능</li></ul>
+          </div>
+        </div>
+        <h4 class="qa-row">Q&amp;A 대비</h4>
+        <ul class="qa-row">
+          <li><strong>Q:</strong> 96점은 누가 매겼나? — A: 자동 검증 게이트 통과율 기준(다음 슬라이드에서 상세).</li>
+          <li><strong>Q:</strong> 부품 848개가 전부인가? — A: 현재 운영 대상. 신규 부품은 마스터 화면에서 즉시 추가 가능.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============ Slide 5 — Live Demo ============ -->
+    <section class="slide" data-slide="5">
+      <div>
+        <div class="slide-eyebrow">▶ 라이브 시연 (약 6분)</div>
+        <h1 class="slide-title">실제 화면에서 보여드립니다.</h1>
+        <p class="slide-subtitle">슬라이드를 잠시 멈추고 시스템으로 이동합니다. <kbd style="border:1px solid var(--c-line);padding:2px 6px;border-radius:4px;font-size:13px;background:#fff;">T</kbd> 키 또는 항목 클릭으로 진행 상태를 표시할 수 있습니다.</p>
+      </div>
+      <div class="demo-wrap">
+        <div class="demo-play">
+          <div class="play-icon">▶</div>
+          <h2>라이브 시연</h2>
+          <p>아래 6개 항목을 순서대로 보여드립니다. 시연 후 이 슬라이드로 돌아옵니다.</p>
+        </div>
+        <div class="demo-checklist">
+          <div class="demo-checklist-header">
+            <h3>시연 항목</h3>
+            <div class="progress"><span id="demo-progress-count">0</span> / 6</div>
+          </div>
+          <div class="demo-item" data-demo="1">
+            <div class="check">✓</div>
+            <div class="demo-item-no">01</div>
+            <div class="demo-item-title">PIN 로그인 (직원 인증)</div>
+            <div class="demo-item-time">20s</div>
+          </div>
+          <div class="demo-item" data-demo="2">
+            <div class="check">✓</div>
+            <div class="demo-item-no">02</div>
+            <div class="demo-item-title">대시보드 KPI</div>
+            <div class="demo-item-time">30s</div>
+          </div>
+          <div class="demo-item" data-demo="3">
+            <div class="check">✓</div>
+            <div class="demo-item-no">03</div>
+            <div class="demo-item-title">창고 입출고 (입고 흐름)</div>
+            <div class="demo-item-time">2m</div>
+          </div>
+          <div class="demo-item" data-demo="4">
+            <div class="check">✓</div>
+            <div class="demo-item-no">04</div>
+            <div class="demo-item-title">부서 재고 조회 + 부서 입출고</div>
+            <div class="demo-item-time">1m</div>
+          </div>
+          <div class="demo-item" data-demo="5">
+            <div class="check">✓</div>
+            <div class="demo-item-no">05</div>
+            <div class="demo-item-title">BOM 트리 + 부품 역참조</div>
+            <div class="demo-item-time">1m</div>
+          </div>
+          <div class="demo-item" data-demo="6">
+            <div class="check">✓</div>
+            <div class="demo-item-no">06</div>
+            <div class="demo-item-title">관리자 — 부서·직원·품목 마스터</div>
+            <div class="demo-item-time">30s</div>
+          </div>
+        </div>
+      </div>
+      <div class="notes-panel">
+        <h4>말할 한 줄</h4>
+        <p class="lead">"여기서부터는 슬라이드가 아니라 실제 시스템입니다. 천천히 따라가시면 됩니다."</p>
+        <div class="audience-row">
+          <div>
+            <h4>발표자 운영 팁</h4>
+            <ul>
+              <li>alt+tab으로 MES 브라우저 탭으로 이동</li>
+              <li>시연 1항 끝날 때마다 <kbd>T</kbd> 또는 클릭 — 어디까지 했는지 표시</li>
+              <li>새로고침해도 진행 상태 유지 (localStorage)</li>
+            </ul>
+          </div>
+          <div>
+            <h4>리스크 관리</h4>
+            <ul>
+              <li>네트워크 끊김 대비: 사전에 입출고 데이터 미리 입력해두기</li>
+              <li>막히면 다음 항목으로 넘어가고 마지막에 돌아오기</li>
+              <li>BOM은 805건 중 DX3000 트리를 기본으로 시연</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Slide 6 — Stability ============ -->
+    <section class="slide" data-slide="6">
+      <div>
+        <div class="slide-eyebrow">안정성 · 품질</div>
+        <h1 class="slide-title">매번 코드를 바꿀 때마다,<br/>5개 검증을 자동으로 통과시킵니다.</h1>
+        <p class="slide-subtitle">한 명의 개발자가 만들어도, 검증은 기계가 빠짐없이 합니다.</p>
+      </div>
+      <div class="stab-layout">
+        <div>
+          <div class="gauge-wrap">
+            <canvas id="gauge"></canvas>
+            <div class="gauge-text">
+              <div class="num">96</div>
+              <div class="denom">/ 100</div>
+              <div class="label">자체 안정성 지표</div>
+            </div>
+          </div>
+        </div>
+        <div class="gate-list">
+          <div class="gate-item">
+            <div class="ok">✓</div>
+            <div class="gate-name">pytest — 백엔드 자동 테스트</div>
+            <div class="gate-meta">36개 파일 · 동시성 12개</div>
+          </div>
+          <div class="gate-item">
+            <div class="ok">✓</div>
+            <div class="gate-name">vitest — 프론트 자동 테스트</div>
+            <div class="gate-meta">109개 · coverage 50%+ gate</div>
+          </div>
+          <div class="gate-item">
+            <div class="ok">✓</div>
+            <div class="gate-name">lint:strict + tsc — 코드 정합성</div>
+            <div class="gate-meta">엄격 모드 · 타입 검사</div>
+          </div>
+          <div class="gate-item">
+            <div class="ok">✓</div>
+            <div class="gate-name">production build — 배포 가능 여부</div>
+            <div class="gate-meta">번들 ≤ 2.0 MB</div>
+          </div>
+          <div class="gate-item">
+            <div class="ok">✓</div>
+            <div class="gate-name">OpenAPI drift — API 변경 추적</div>
+            <div class="gate-meta">baseline 자동 비교</div>
+          </div>
+        </div>
+      </div>
+      <div class="notes-panel">
+        <h4>말할 한 줄</h4>
+        <p class="lead">"신뢰는 약속이 아니라 측정입니다. 매 변경마다 5게이트가 통과되어야만 배포됩니다."</p>
+        <div class="audience-row">
+          <div>
+            <h4>사장님</h4>
+            <ul><li>"개발자 한 명이 만들어도 망가지지 않는 이유" 강조</li></ul>
+          </div>
+          <div>
+            <h4>현장</h4>
+            <ul><li>"수정 후 갑자기 다른 기능이 안 되는 사고" 방지 장치라는 톤</li></ul>
+          </div>
+        </div>
+        <h4 class="qa-row">Q&amp;A 대비</h4>
+        <ul class="qa-row">
+          <li><strong>Q:</strong> 100점이 아니라 96점인 이유? — A: 모바일 일부 미완 + UI 회귀 테스트 추가 여지. 6월까지 보완 예정.</li>
+          <li><strong>Q:</strong> 데이터 손실 가능성? — A: 동시성 테스트로 동시 입출고 충돌 시나리오 모두 검증.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============ Slide 7 — Roadmap ============ -->
+    <section class="slide" data-slide="7">
+      <div>
+        <div class="slide-eyebrow">로드맵</div>
+        <h1 class="slide-title">오늘부터 6월까지.</h1>
+        <p class="slide-subtitle">파일럿 없이 단계적으로 — 부서 단위부터 MES로 옮기고, 6월에 안정 가동에 들어갑니다.</p>
+      </div>
+      <div class="roadmap">
+        <div class="timeline">
+          <div class="timeline-node current">
+            <div class="timeline-dot"></div>
+            <div class="timeline-date">2026 — 05 — 13 · 오늘</div>
+            <div class="timeline-title">기능 완성 단계</div>
+            <div class="timeline-desc">입출고·부서재고·BOM·관리자 기능 데스크탑 완성. 5게이트 통과 중.</div>
+          </div>
+          <div class="timeline-node">
+            <div class="timeline-dot"></div>
+            <div class="timeline-date">2026 — 05 — 31 · D-18</div>
+            <div class="timeline-title">부서·창고 재고를 MES로</div>
+            <div class="timeline-desc">엑셀 수기 기록을 멈추고, 부서·창고 일상 운영을 MES로 전환 (목표).</div>
+          </div>
+          <div class="timeline-node">
+            <div class="timeline-dot"></div>
+            <div class="timeline-date">2026 — 06 · D-49</div>
+            <div class="timeline-title">안정 가동</div>
+            <div class="timeline-desc">실사용 피드백 반영, 모바일 보완, 백업·복구 절차 정착.</div>
+          </div>
+        </div>
+      </div>
+      <div class="notes-panel">
+        <h4>말할 한 줄</h4>
+        <p class="lead">"갑자기 전부 바꾸는 게 아니라, 5월 부서 단위 → 6월 전사 안정 가동 — 2단계입니다."</p>
+        <div class="audience-row">
+          <div>
+            <h4>사장님</h4>
+            <ul><li>"언제 본격적으로 쓰나"에 대한 답이 이 한 슬라이드</li><li>"D-18"이 직관적</li></ul>
+          </div>
+          <div>
+            <h4>현장</h4>
+            <ul><li>"부서별로 먼저 = 갑자기 다 바뀌지 않는다"는 안심</li></ul>
+          </div>
+        </div>
+        <h4 class="qa-row">Q&amp;A 대비</h4>
+        <ul class="qa-row">
+          <li><strong>Q:</strong> 5월 안에 정말 되나? — A: 기능은 이미 완성. 남은 것은 실제 부서에서 1주 운영 검증.</li>
+          <li><strong>Q:</strong> 엑셀 병행 기간은? — A: 5월 말까지 약 2주간 엑셀과 MES 병행, 이후 MES만 사용.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============ Slide 8 — Impact ============ -->
+    <section class="slide" data-slide="8">
+      <div>
+        <div class="slide-eyebrow">도입 효과</div>
+        <h1 class="slide-title">비용 · 일정 · 이관 · 안정성 — 모두 준비됐습니다.</h1>
+        <p class="slide-subtitle">의사결정에 필요한 4가지를 한 페이지에 정리했습니다.</p>
+      </div>
+      <div class="impact-grid">
+        <div class="impact-card">
+          <div class="head">
+            <div class="icon-box">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+            </div>
+            <h3>비용</h3>
+          </div>
+          <div class="big">라이선스 <span class="accent">0원</span></div>
+          <p class="note">자체 개발 · 사내 서버 1대로 운영. 외부 MES 솔루션 도입 대비 연간 라이선스·유지보수 비용 없음.</p>
+        </div>
+        <div class="impact-card">
+          <div class="head">
+            <div class="icon-box">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            </div>
+            <h3>일정</h3>
+          </div>
+          <div class="big">5월 말 <span class="accent">D-18</span></div>
+          <p class="note">부서·창고 재고관리 MES 전환 목표. 6월부터 안정 가동.</p>
+        </div>
+        <div class="impact-card">
+          <div class="head">
+            <div class="icon-box">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </div>
+            <h3>데이터 이관</h3>
+          </div>
+          <div class="big">엑셀 3종 <span class="accent">완료</span></div>
+          <p class="note">원자재 마스터 · 조립/출하 · 고압/진공/튜닝 파트. 기존 데이터 손실 없이 SQLite로 통합 이관 완료.</p>
+        </div>
+        <div class="impact-card">
+          <div class="head">
+            <div class="icon-box">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+            </div>
+            <h3>운영 안정성</h3>
+          </div>
+          <div class="big"><span class="accent">96</span> / 100</div>
+          <p class="note">5게이트 자동 검증 통과 + 동시성 시나리오 테스트 + OpenAPI baseline 추적. 6월까지 100점 목표.</p>
+        </div>
+      </div>
+      <div class="notes-panel">
+        <h4>말할 한 줄</h4>
+        <p class="lead">"외부에서 사면 라이선스만 연간 수천만 원. 우리는 0원, 그리고 5월 말 가동입니다."</p>
+        <div class="audience-row">
+          <div>
+            <h4>사장님 (4가지 모두 답변)</h4>
+            <ul>
+              <li>비용 — 가장 임팩트 큰 메시지, 처음에 강조</li>
+              <li>일정 — D-18 직관성</li>
+              <li>이관 — "이미 완료" 강조 (불안 해소)</li>
+              <li>안정성 — 96점 + 6월 100점 목표 (개선 의지)</li>
+            </ul>
+          </div>
+          <div>
+            <h4>영업부</h4>
+            <ul><li>"우리 회사에서 직접 만든 시스템"이라는 톤 — 고객사 PR 소재로 활용 가능</li></ul>
+          </div>
+        </div>
+        <h4 class="qa-row">Q&amp;A 대비</h4>
+        <ul class="qa-row">
+          <li><strong>Q:</strong> 개발자가 그만두면? — A: 코드와 문서 모두 사내 자산. 외부 의존성 최소화 (오픈소스만 사용).</li>
+          <li><strong>Q:</strong> 서버 비용? — A: 사내 PC 1대로 충분. 클라우드 전환 시에도 월 5만 원 이내 추정.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============ Slide 9 — Q&A ============ -->
+    <section class="slide" data-slide="9">
+      <div class="qa">
+        <div class="slide-eyebrow">마무리</div>
+        <div class="qa-big">Q<span class="amp">&amp;</span>A</div>
+        <div class="qa-sub">궁금하신 부분 — 무엇이든 물어봐주세요.</div>
+      </div>
+      <div class="notes-panel">
+        <h4>예상 질문 베스트 5</h4>
+        <ul class="qa-row">
+          <li><strong>1. 비용:</strong> 라이선스 0원, 사내 PC 1대로 운영. 외부 MES 대비 연 수천만 원 절감.</li>
+          <li><strong>2. 일정:</strong> 5월 말 부서·창고 재고 전환, 6월 안정 가동.</li>
+          <li><strong>3. 데이터:</strong> 엑셀 3종 → SQLite 이관 완료. 기존 데이터 그대로 사용 중.</li>
+          <li><strong>4. 안정성:</strong> 5게이트(pytest 36 + vitest 109 + lint + build + OpenAPI) + 동시성 테스트.</li>
+          <li><strong>5. 담당자 부재 리스크:</strong> 코드·문서 사내 자산. 외부 SaaS 의존 없음.</li>
+        </ul>
+        <h4>덧붙일 메시지</h4>
+        <p>"오늘 보신 것은 시작점입니다. 5월 말 운영 시작 후 현장 피드백을 받아 매주 개선합니다."</p>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    (function () {
+      const TOTAL = 9;
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      const cur = document.getElementById('cur');
+      const progress = document.getElementById('progress');
+
+      // build progress bar segments
+      for (let i = 0; i < TOTAL; i++) {
+        const s = document.createElement('span');
+        progress.appendChild(s);
+      }
+      const segs = Array.from(progress.children);
+
+      let idx = 1;
+
+      function render() {
+        slides.forEach((el, i) => {
+          el.classList.toggle('active', (i + 1) === idx);
+        });
+        cur.textContent = String(idx).padStart(2, '0');
+        segs.forEach((s, i) => {
+          s.classList.remove('done', 'current');
+          if (i + 1 < idx) s.classList.add('done');
+          else if (i + 1 === idx) s.classList.add('current');
+        });
+        try {
+          history.replaceState(null, '', '#' + idx + (new URLSearchParams(location.search).has('notes') ? '?notes=1' : ''));
+        } catch (e) {}
+      }
+
+      function go(n) {
+        idx = Math.max(1, Math.min(TOTAL, n));
+        render();
+      }
+
+      function next() { go(idx + 1); }
+      function prev() { go(idx - 1); }
+
+      // keyboard
+      document.addEventListener('keydown', (e) => {
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+        // number jump 1-9
+        if (e.key >= '1' && e.key <= '9') {
+          go(parseInt(e.key, 10));
+          e.preventDefault();
+          return;
+        }
+
+        switch (e.key) {
+          case 'ArrowRight':
+          case 'PageDown':
+          case ' ':
+            next(); e.preventDefault(); break;
+          case 'ArrowLeft':
+          case 'PageUp':
+            prev(); e.preventDefault(); break;
+          case 'Home':
+            go(1); e.preventDefault(); break;
+          case 'End':
+            go(TOTAL); e.preventDefault(); break;
+          case 'f':
+          case 'F':
+            toggleFullscreen(); e.preventDefault(); break;
+          case 'n':
+          case 'N':
+            toggleNotes(); e.preventDefault(); break;
+          case 't':
+          case 'T':
+            if (idx === 5) toggleNextDemoItem();
+            e.preventDefault();
+            break;
+        }
+      });
+
+      function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen?.().catch(() => {});
+        } else {
+          document.exitFullscreen?.();
+        }
+      }
+
+      function toggleNotes() {
+        document.body.classList.toggle('notes-mode');
+        const has = document.body.classList.contains('notes-mode');
+        const url = new URL(location.href);
+        if (has) url.searchParams.set('notes', '1');
+        else url.searchParams.delete('notes');
+        history.replaceState(null, '', url.toString());
+      }
+
+      // load ?notes=1
+      if (new URLSearchParams(location.search).has('notes')) {
+        document.body.classList.add('notes-mode');
+      }
+
+      // ----- demo checklist (slide 5) -----
+      const STORAGE_KEY = 'dexcowin-mes-demo-progress-v1';
+      const demoItems = Array.from(document.querySelectorAll('.demo-item'));
+      const demoProgress = document.getElementById('demo-progress-count');
+
+      function loadDemoState() {
+        try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+        catch (e) { return {}; }
+      }
+      function saveDemoState(state) {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+      }
+      function renderDemo() {
+        const state = loadDemoState();
+        let count = 0;
+        demoItems.forEach(el => {
+          const key = el.dataset.demo;
+          const done = !!state[key];
+          el.classList.toggle('done', done);
+          if (done) count++;
+        });
+        if (demoProgress) demoProgress.textContent = String(count);
+      }
+      function toggleDemoItem(key) {
+        const state = loadDemoState();
+        state[key] = !state[key];
+        saveDemoState(state);
+        renderDemo();
+      }
+      function toggleNextDemoItem() {
+        const state = loadDemoState();
+        const next = demoItems.find(el => !state[el.dataset.demo]);
+        if (next) toggleDemoItem(next.dataset.demo);
+        else {
+          // all done — reset
+          saveDemoState({});
+          renderDemo();
+        }
+      }
+      demoItems.forEach(el => {
+        el.addEventListener('click', () => toggleDemoItem(el.dataset.demo));
+      });
+      renderDemo();
+
+      // ----- gauge (slide 6) -----
+      function initGauge() {
+        const ctx = document.getElementById('gauge');
+        if (!ctx || typeof Chart === 'undefined') return;
+        new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            datasets: [{
+              data: [96, 4],
+              backgroundColor: ['#DC2626', '#F1F5F9'],
+              borderWidth: 0,
+              circumference: 360,
+              rotation: -90
+            }]
+          },
+          options: {
+            cutout: '78%',
+            responsive: true,
+            maintainAspectRatio: true,
+            animation: { duration: 900, easing: 'easeOutCubic' },
+            plugins: {
+              legend: { display: false },
+              tooltip: { enabled: false }
+            }
+          }
+        });
+      }
+      if (document.readyState === 'complete') initGauge();
+      else window.addEventListener('load', initGauge);
+
+      // initial slide from hash
+      const hashMatch = location.hash.match(/^#(\d+)/);
+      if (hashMatch) idx = Math.max(1, Math.min(TOTAL, parseInt(hashMatch[1], 10)));
+      render();
+    })();
+  </script>
+</body>
+</html>
