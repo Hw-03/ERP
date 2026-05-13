@@ -15,6 +15,7 @@ interface Props {
   getAvailable: (line: IoLine) => number | null;
   onToggleLine: (bundleId: string, lineId: string) => void;
   onQuantityChange: (bundleId: string, lineId: string, quantity: number, shortage: number) => void;
+  onBundleQuantityChange?: (bundleId: string, quantity: number) => void;
   onRemoveLine: (bundleId: string, lineId: string) => void;
   onRemoveBundle: (bundleId: string) => void;
   onAdvance: () => void;
@@ -28,6 +29,7 @@ export function IoBundleCart({
   getAvailable,
   onToggleLine,
   onQuantityChange,
+  onBundleQuantityChange,
   onRemoveLine,
   onRemoveBundle,
   onAdvance,
@@ -42,7 +44,7 @@ export function IoBundleCart({
   return (
     <div className="space-y-4">
       <p className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-        체크된 품목만 재고에 반영됩니다. 체크를 끄면 이번 작업에서 제외됩니다.
+        체크된 품목만 재고에 반영됩니다. 체크를 해제하면 이번 작업에서 제외됩니다.
       </p>
 
       {bundles.length > 0 && (
@@ -85,6 +87,11 @@ export function IoBundleCart({
               onQuantityChange={(lineId, quantity, shortage) =>
                 onQuantityChange(bundle.bundle_id, lineId, quantity, shortage)
               }
+              onBundleQuantityChange={
+                onBundleQuantityChange
+                  ? (quantity) => onBundleQuantityChange(bundle.bundle_id, quantity)
+                  : undefined
+              }
               onRemoveLine={(lineId) => onRemoveLine(bundle.bundle_id, lineId)}
               onRemoveBundle={() => onRemoveBundle(bundle.bundle_id)}
             />
@@ -101,7 +108,7 @@ export function IoBundleCart({
           style={{ background: LEGACY_COLORS.blue }}
         >
           <ClipboardCheck className="h-4 w-4" />
-          제출 확인으로 →
+          제출확인 →
         </button>
       )}
     </div>

@@ -20,10 +20,16 @@ export function LabeledSelect({
 }) {
   return (
     <label className="flex flex-col gap-0.5">
-      <span className="text-[9px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
+      <span className="text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
         {label}
       </span>
-      <AppSelect value={value} onChange={onChange} options={options} size="sm" />
+      <AppSelect
+        value={value}
+        onChange={onChange}
+        options={options}
+        size="sm"
+        triggerStyle={{ fontSize: "0.875rem" }}
+      />
     </label>
   );
 }

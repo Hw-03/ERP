@@ -96,7 +96,7 @@ async function closeBottomSheet(page) {
 }
 
 // 모바일 탭/섹션 버튼 클릭
-// 메인 하단 탭바(재고/창고입출고/부서입출고/관리자)는 이모지+라벨 2-div 구조라
+// 메인 하단 탭바(재고/창고 입출고/부서입출고/관리자)는 이모지+라벨 2-div 구조라
 // textContent 정확매칭이 실패 → 내부 div 텍스트 매칭 우선 시도.
 async function clickMobileSection(page, labelText) {
   const ok = await page.evaluate((text) => {
@@ -304,11 +304,11 @@ async function goto(page, url) {
     await p.close();
   }
 
-  // ── 창고입출고 ──
+  // ── 창고 입출고 ──
   {
     const p = await mob.newPage();
     await goto(p, '/');
-    await clickMobileSection(p, '창고입출고');
+    await clickMobileSection(p, '창고 입출고');
     await p.waitForTimeout(1200);
     await resetMobileScroll(p);
     await shot(p, 'mob_03_warehouse');

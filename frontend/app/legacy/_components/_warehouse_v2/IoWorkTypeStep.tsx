@@ -116,11 +116,6 @@ export function IoSubTypeStep({
               onClick={() => onDeptIoDirectionChange("out")}
             />
           </div>
-          {deptIoDirection == null && (
-            <p className="mt-2 text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-              입고 또는 출고를 선택하세요.
-            </p>
-          )}
         </div>
       </div>
     );

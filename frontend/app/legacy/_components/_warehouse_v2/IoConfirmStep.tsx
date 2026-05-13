@@ -1,10 +1,10 @@
 "use client";
 
-import { AlertTriangle, ArrowLeft, CheckCircle2, ClipboardCheck, Save } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardCheck } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
-import { deptIoDisplayLabel, subTypeLabel } from "./ioWorkType";
+import { deptIoDisplayLabel, subTypeLabel, type ApprovalKind } from "./ioWorkType";
 import { formatQty } from "@/lib/mes/format";
 import { SettingLabel } from "./_atoms";
 
@@ -13,17 +13,48 @@ interface Props {
   subType: IoSubType;
   bundles: IoBundle[];
   notes: string;
-  referenceNo: string;
   hasShortage: boolean;
   hasInvalidQuantity: boolean;
   submitting: boolean;
-  approval: boolean;
+  approvalKind: ApprovalKind;
   onNotesChange: (value: string) => void;
-  onReferenceChange: (value: string) => void;
   onSubmit: () => void;
-  onSaveDraft: () => void;
-  onPrev: () => void;
 }
+
+const APPROVAL_META: Record<
+  ApprovalKind,
+  {
+    summaryLabel: string;
+    badgeText: string;
+    submitText: (n: number) => string;
+    accentColor: "blue" | "yellow" | "green";
+  }
+> = {
+  none: {
+    summaryLabel: "즉시 재고 반영",
+    badgeText: "즉시 처리",
+    submitText: (n) => `즉시 반영하기 ${n}건`,
+    accentColor: "blue",
+  },
+  warehouse: {
+    summaryLabel: "창고 결재 요청",
+    badgeText: "창고 결재 필요",
+    submitText: (n) => `창고 결재 요청 ${n}건`,
+    accentColor: "yellow",
+  },
+  department: {
+    summaryLabel: "부서 결재 요청",
+    badgeText: "부서 결재 필요",
+    submitText: (n) => `부서 결재 요청 ${n}건`,
+    accentColor: "yellow",
+  },
+  both: {
+    summaryLabel: "창고 + 부서 결재 요청",
+    badgeText: "창고 + 부서 결재",
+    submitText: (n) => `결재 요청 ${n}건`,
+    accentColor: "yellow",
+  },
+};
 
 type SectionKind = "in" | "out" | "move";
 
@@ -72,17 +103,15 @@ export function IoConfirmStep({
   subType,
   bundles,
   notes,
-  referenceNo,
   hasShortage,
   hasInvalidQuantity,
   submitting,
-  approval,
+  approvalKind,
   onNotesChange,
-  onReferenceChange,
   onSubmit,
-  onSaveDraft,
-  onPrev,
 }: Props) {
+  const meta = APPROVAL_META[approvalKind];
+  const isApproval = approvalKind !== "none";
   const headerLabel = workType === "process"
     ? (deptIoDisplayLabel(subType) ?? subTypeLabel(subType))
     : subTypeLabel(subType);
@@ -106,7 +135,12 @@ export function IoConfirmStep({
   }
   const submitDisabled =
     submitting || includedLines.length === 0 || hasShortage || hasInvalidQuantity;
-  const accent = approval ? LEGACY_COLORS.yellow : LEGACY_COLORS.blue;
+  const accent =
+    meta.accentColor === "yellow"
+      ? LEGACY_COLORS.yellow
+      : meta.accentColor === "green"
+      ? LEGACY_COLORS.green
+      : LEGACY_COLORS.blue;
   const isCaution = subType === "defect_quarantine" || subType === "supplier_return";
   const blockerText = hasShortage
     ? "재고 부족 라인이 있어 제출할 수 없습니다. Step 4에서 라인을 다시 확인하세요."
@@ -127,18 +161,18 @@ export function IoConfirmStep({
         }}
       >
         <div>
-          <SettingLabel label={approval ? "승인 요청으로 저장" : "즉시 재고 반영"} />
+          <SettingLabel label={meta.summaryLabel} />
           <div className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>
             {headerLabel} · 반영 {includedLines.length}건 · 총 {formatQty(totalQty)}
           </div>
         </div>
-        {approval ? (
+        {isApproval ? (
           <span
             className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-black"
             style={{ background: tint(LEGACY_COLORS.yellow, 14), color: LEGACY_COLORS.yellow }}
           >
             <AlertTriangle className="h-4 w-4" />
-            승인 필요
+            {meta.badgeText}
           </span>
         ) : (
           <span
@@ -146,7 +180,7 @@ export function IoConfirmStep({
             style={{ background: tint(LEGACY_COLORS.green, 14), color: LEGACY_COLORS.green }}
           >
             <CheckCircle2 className="h-4 w-4" />
-            즉시 처리
+            {meta.badgeText}
           </span>
         )}
       </div>
@@ -170,48 +204,8 @@ export function IoConfirmStep({
         })}
       </div>
 
-      {/* 참조번호 / 메모 */}
-      <div className="grid gap-3 md:grid-cols-2">
-        <Field
-          label="참조번호"
-          value={referenceNo}
-          onChange={onReferenceChange}
-          placeholder="발주/작업/출하 번호"
-        />
-        <Field label="메모 (선택)" value={notes} onChange={onNotesChange} placeholder="작업 메모" />
-      </div>
-
-      {/* 보조 액션 (이전 / 임시저장) */}
-      <div className="flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={onPrev}
-          disabled={submitting}
-          className="flex items-center gap-1.5 rounded-[12px] border px-4 py-2 text-[12px] font-bold disabled:opacity-40"
-          style={{
-            background: LEGACY_COLORS.s2,
-            borderColor: LEGACY_COLORS.border,
-            color: LEGACY_COLORS.text,
-          }}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          이전 단계
-        </button>
-        <button
-          type="button"
-          onClick={onSaveDraft}
-          disabled={submitting || bundles.length === 0}
-          className="flex items-center gap-1.5 rounded-[12px] border px-4 py-2 text-[12px] font-bold disabled:opacity-40"
-          style={{
-            background: LEGACY_COLORS.s2,
-            borderColor: LEGACY_COLORS.border,
-            color: LEGACY_COLORS.text,
-          }}
-        >
-          <Save className="h-4 w-4" />
-          임시저장
-        </button>
-      </div>
+      {/* 메모 */}
+      <Field label="메모 (선택)" value={notes} onChange={onNotesChange} placeholder="작업 메모" />
 
       {/* caution */}
       {isCaution && (
@@ -254,11 +248,7 @@ export function IoConfirmStep({
       >
         {isCaution && !submitting && <AlertTriangle className="h-5 w-5" />}
         {!isCaution && <ClipboardCheck className="h-5 w-5" />}
-        {submitting
-          ? "처리 중..."
-          : approval
-          ? `승인 요청 보내기 ${includedLines.length}건`
-          : `즉시 반영하기 ${includedLines.length}건`}
+        {submitting ? "처리 중..." : meta.submitText(includedLines.length)}
       </button>
     </div>
   );
@@ -326,7 +316,7 @@ function LineSection({
                       color: line.origin === "manual" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.blue,
                     }}
                   >
-                    {mode === "bom" && line.origin !== "manual" ? "BOM 적용" : "이 품목만"}
+                    {mode === "bom" && line.origin !== "manual" ? "BOM" : "낱개"}
                   </span>
                 </div>
               </div>

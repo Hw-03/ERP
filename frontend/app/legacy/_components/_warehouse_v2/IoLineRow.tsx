@@ -7,7 +7,7 @@ import { getStockState } from "@/lib/mes/inventory";
 import { erpCodeDeptBadge } from "@/lib/mes/process";
 import { useDeptColorLookup } from "../DepartmentsContext";
 import type { IoLine, IoSubType, Item } from "./types";
-import { lineTagLabel, type LineTagTone } from "./ioWorkType";
+import { isBomForced, lineTagLabel, type LineTagTone } from "./ioWorkType";
 import { formatQty } from "@/lib/mes/format";
 
 interface Props {
@@ -76,6 +76,14 @@ export function IoLineRow({
 }: Props) {
   const getDeptColor = useDeptColorLookup();
   const disabled = !line.included;
+  // BOM 강제 모드: process(produce/disassemble) 한정 — bom_auto 하위는 상위 비례 자동 계산 → 체크/수량 차단.
+  // 창고 입출고는 묶음 선택 후 내부 자유 편집 허용 (qtyLocked=false).
+  const qtyLocked =
+    isBomForced(subType) &&
+    line.origin === "bom_auto" &&
+    line.bom_expected != null &&
+    Number(line.bom_expected) > 0;
+  const stepperDisabled = disabled || qtyLocked;
   const shortage = line.included && line.shortage > 0;
   const titleColor = disabled ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text;
   const rowBackground = shortage ? tint(LEGACY_COLORS.red, 8) : "transparent";
@@ -125,13 +133,20 @@ export function IoLineRow({
       <button
         type="button"
         onClick={onToggle}
-        className="flex h-6 w-6 items-center justify-center rounded-[6px] border transition-colors"
+        disabled={qtyLocked}
+        className="flex h-6 w-6 items-center justify-center rounded-[6px] border transition-colors disabled:cursor-not-allowed"
         style={{
           background: line.included ? LEGACY_COLORS.blue : "transparent",
           borderColor: line.included ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
           color: line.included ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
         }}
-        title={line.included ? "재고 반영 포함" : line.exclusion_note || "이번 작업 제외"}
+        title={
+          qtyLocked
+            ? "상위 품목과 함께 자동 처리"
+            : line.included
+              ? "재고 반영 포함"
+              : line.exclusion_note || "이번 작업 제외"
+        }
         aria-pressed={line.included}
       >
         {line.included ? <Check className="h-4 w-4" /> : <MinusCircle className="h-3.5 w-3.5" />}
@@ -206,10 +221,10 @@ export function IoLineRow({
           수량
         </span>
         <div className="flex items-center gap-1">
-          <StepBtn tone={LEGACY_COLORS.red} disabled={disabled} onClick={() => onStep(-10)}>
+          <StepBtn tone={LEGACY_COLORS.red} disabled={stepperDisabled} onClick={() => onStep(-10)}>
             -10
           </StepBtn>
-          <StepBtn tone={LEGACY_COLORS.red} disabled={disabled} onClick={() => onStep(-1)}>
+          <StepBtn tone={LEGACY_COLORS.red} disabled={stepperDisabled} onClick={() => onStep(-1)}>
             -1
           </StepBtn>
           <input
@@ -217,9 +232,10 @@ export function IoLineRow({
             min={0}
             step="any"
             value={currentQty}
-            disabled={disabled}
+            disabled={stepperDisabled}
             onChange={(e) => onInputChange(e.target.value)}
             onFocus={(e) => e.currentTarget.select()}
+            title={qtyLocked ? "상위 수량에 비례해 자동 계산" : undefined}
             className="w-[72px] rounded-[10px] border px-2 py-1.5 text-center text-sm font-black tabular-nums outline-none focus:border-[var(--c-blue)] disabled:opacity-60"
             style={{
               background: LEGACY_COLORS.s2,
@@ -227,10 +243,10 @@ export function IoLineRow({
               color: LEGACY_COLORS.text,
             }}
           />
-          <StepBtn tone={LEGACY_COLORS.green} disabled={disabled} onClick={() => onStep(1)}>
+          <StepBtn tone={LEGACY_COLORS.green} disabled={stepperDisabled} onClick={() => onStep(1)}>
             +1
           </StepBtn>
-          <StepBtn tone={LEGACY_COLORS.green} disabled={disabled} onClick={() => onStep(10)}>
+          <StepBtn tone={LEGACY_COLORS.green} disabled={stepperDisabled} onClick={() => onStep(10)}>
             +10
           </StepBtn>
         </div>

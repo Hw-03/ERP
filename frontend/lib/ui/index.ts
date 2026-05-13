@@ -7,3 +7,4 @@
 export { Toast, type ToastState } from "./Toast";
 export { ConfirmModal, type ConfirmTone } from "./ConfirmModal";
 export { BottomSheet } from "./BottomSheet";
+export { Tooltip } from "./Tooltip";

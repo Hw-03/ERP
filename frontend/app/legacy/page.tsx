@@ -138,7 +138,7 @@ function LegacyBody() {
                 changeTab("warehouse");
                 showToast({
                   type: "info",
-                  message: `${items.length}건이 창고입출고에 추가되었습니다.`,
+                  message: `${items.length}건이 창고 입출고에 추가되었습니다.`,
                 });
               }}
             />

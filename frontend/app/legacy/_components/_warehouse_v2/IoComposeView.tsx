@@ -11,7 +11,7 @@ import { IoTargetPicker } from "./IoTargetPicker";
 import { IoBundleCart } from "./IoBundleCart";
 import { IoConfirmStep } from "./IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "./IoSubmitModals";
-import { IO_WORK_TYPES, deptIoDirectionOf, requiresApproval, requiresDepartments, subTypeLabel } from "./ioWorkType";
+import { IO_WORK_TYPES, approvalKind, deptIoDirectionOf, isBomForced, pickerDirectionLabel, requiresDepartments, subTypeLabel } from "./ioWorkType";
 import { useIoDraft } from "./useIoDraft";
 import { useIoPreview } from "./useIoPreview";
 import { useIoSubmit } from "./useIoSubmit";
@@ -62,6 +62,8 @@ export function IoComposeView({
   const [bomParents, setBomParents] = useState<Set<string>>(() => new Set());
   const preselectedHandledRef = useRef<string | null>(null);
   const restoredDraftRef = useRef<string | null>(null);
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autosaveBatchIdRef = useRef<string | null>(null);
 
   const state = useIoWorkState(operator?.department);
   const { previewing, previewTarget } = useIoPreview();
@@ -95,6 +97,7 @@ export function IoComposeView({
     if (!draftToRestore) return;
     if (restoredDraftRef.current === draftToRestore.batch_id) return;
     restoredDraftRef.current = draftToRestore.batch_id;
+    autosaveBatchIdRef.current = draftToRestore.batch_id;
     state.setWorkType(draftToRestore.work_type);
     state.setSubType(draftToRestore.sub_type);
     if (draftToRestore.work_type === "process") {
@@ -110,6 +113,50 @@ export function IoComposeView({
     onStatusChange("임시저장 작업을 불러왔습니다.");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftToRestore?.batch_id]);
+
+  // 자동 저장: bundles 가 1개 이상이면 변경 700ms 후 백그라운드 저장.
+  // - workType/subType/dept 변경 → bundles reset → 빈 상태에서는 저장 안 함
+  // - 디바운스로 빠른 연속 입력(수량 +1 +1)은 마지막 한 번만 저장
+  // - 실패해도 다음 변경 사이클에서 자동 재시도
+  useEffect(() => {
+    if (!employeeId) return;
+    if (state.bundles.length === 0) return;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(async () => {
+      try {
+        const result = await saveDraft({
+          employeeId,
+          workType: state.workType,
+          subType: state.subType,
+          fromDepartment: state.fromDepartment,
+          toDepartment: state.toDepartment,
+          referenceNo: state.referenceNo,
+          notes: state.notes,
+          bundles: state.bundles,
+        });
+        autosaveBatchIdRef.current = result.batch_id;
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, "0");
+        const mm = String(now.getMinutes()).padStart(2, "0");
+        onStatusChange(`자동 저장됨 · ${hh}:${mm}`);
+      } catch {
+        onStatusChange("자동 저장 실패 — 잠시 후 재시도");
+      }
+    }, 700);
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    state.bundles,
+    state.notes,
+    state.referenceNo,
+    state.fromDepartment,
+    state.toDepartment,
+    state.workType,
+    state.subType,
+    employeeId,
+  ]);
 
   async function addItem(item: Item, sourceKind: IoSourceKind = "direct_item", subTypeOverride?: IoSubType) {
     setError(null);
@@ -211,37 +258,28 @@ export function IoComposeView({
     state.goTo(2);
   }
 
-  async function handleSaveDraft() {
-    if (!employeeId) {
-      setError("작업자를 선택하세요.");
-      return;
-    }
-    try {
-      await saveDraft({
-        employeeId,
-        workType: state.workType,
-        subType: state.subType,
-        fromDepartment: state.fromDepartment,
-        toDepartment: state.toDepartment,
-        referenceNo: state.referenceNo,
-        notes: state.notes,
-        bundles: state.bundles,
-      });
-      setResult({ kind: "success", title: "임시저장 완료", message: "현재 작업 묶음이 저장되었습니다." });
-    } catch (err) {
-      const message = err instanceof ApiError && err.isUnavailable
-        ? "서버가 다른 작업을 처리 중입니다. 잠시 후 다시 시도하세요."
-        : err instanceof Error ? err.message : "임시저장 중 오류가 발생했습니다.";
-      setResult({ kind: "error", title: "임시저장 실패", message });
-    }
-  }
-
   async function handleSubmit() {
     if (!employeeId) {
       setError("작업자를 선택하세요.");
       return;
     }
+    // 자동 저장 draft 가 동일 line_id 를 점유한 상태에서 submit 하면 IoLine PK 충돌(IntegrityError).
+    // submit 호출 전에 대기 중 autosave 취소 + 기존 draft 삭제로 충돌을 피한다.
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+    if (autosaveBatchIdRef.current) {
+      const staleId = autosaveBatchIdRef.current;
+      autosaveBatchIdRef.current = null;
+      try {
+        await api.deleteDraft(staleId, employeeId);
+      } catch {
+        /* 이미 없거나 권한 변동 — submit 으로 진행 */
+      }
+    }
     try {
+      const kind = approvalKind(state.subType, state.bundles);
       const response = await submit({
         employeeId,
         workType: state.workType,
@@ -252,10 +290,18 @@ export function IoComposeView({
         notes: state.notes,
         bundles: state.bundles,
       });
-      // 서버가 멱등 응답(409 → 기존 batch)이든 신규 처리든 동일한 IoSubmitResponse 모양 → 같은 흐름
+      // 서버가 멱등 응답(409 → 기존 batch)이든 신규 처리든 동일한 IoSubmitResponse 모양 → 같은 흐름.
+      // 결재 종류별로 토스트 문구 분기 (백엔드 response.message 는 fallback).
+      const successTitle = response.requires_approval
+        ? kind === "department"
+          ? "부서 결재 요청 완료"
+          : kind === "both"
+          ? "결재 요청 완료 (창고 + 부서)"
+          : "창고 결재 요청 완료"
+        : "입출고 반영 완료";
       setResult({
         kind: "success",
-        title: response.requires_approval ? "승인 요청 완료" : "입출고 반영 완료",
+        title: successTitle,
         message: response.message,
       });
       state.reset();
@@ -354,7 +400,7 @@ export function IoComposeView({
       >
         <WizardStepCard
           n={1}
-          title="작업 유형을 선택하세요"
+          title="작업 유형 선택"
           state={stepState(1)}
           summary={workTypeLabel(state.workType)}
           onChange={() => state.goTo(1)}
@@ -371,7 +417,7 @@ export function IoComposeView({
         >
           <WizardStepCard
             n={2}
-            title="세부 작업과 부서를 정하세요"
+            title="세부 작업과 부서 선택"
             state={stepState(2)}
             summary={stepTwoSummary}
             onChange={() => state.goTo(2)}
@@ -412,8 +458,8 @@ export function IoComposeView({
         >
           <WizardStepCard
             n={3}
-            title="대상을 선택하세요"
-            state={step >= 3 ? "active" : "locked"}
+            title={`${pickerDirectionLabel(state.subType)} 품목 선택`}
+            state={step >= 5 ? "complete" : step >= 3 ? "active" : "locked"}
             summary={`${state.bundles.length}개 묶음 · 라인 ${lineCount}개`}
             onChange={() => state.goTo(3)}
             accent={accent}
@@ -424,10 +470,6 @@ export function IoComposeView({
               deptIoDirection={state.deptIoDirection}
               bundleSubType={state.bundles.length > 0 ? state.subType : null}
               bomParents={bomParents}
-              onClearBundles={() => {
-                state.setBundles([]);
-                onStatusChange("작업 묶음을 비웠습니다.");
-              }}
               targetDepartment={(() => {
                 const st = state.subType;
                 // 출발 부서가 대상인 작업
@@ -465,7 +507,7 @@ export function IoComposeView({
         >
           <WizardStepCard
             n={4}
-            title="실제 반영 품목을 확인하세요"
+            title="품목 확인"
             state={stepState(4)}
             summary={`반영 ${includedCount}개 · 제외 ${excludedCount}개`}
             onChange={() => state.goTo(4)}
@@ -477,30 +519,128 @@ export function IoComposeView({
               itemMap={itemMap}
               getAvailable={getAvailable}
               onToggleLine={(bundleId, lineId) =>
-                state.updateLine(bundleId, lineId, (line) => ({
-                  ...line,
-                  included: !line.included,
-                  shortage: line.included
-                    ? 0
-                    : Math.max(0, line.quantity - (getAvailable(line) ?? line.quantity)),
-                  exclusion_note:
-                    line.included && state.subType === "disassemble" && line.origin === "bom_auto"
-                      ? "회수 안 됨"
-                      : line.included
-                      ? "이번 작업 제외"
-                      : null,
-                }))
+                state.setBundles((prev) =>
+                  prev.map((bundle) => {
+                    if (bundle.bundle_id !== bundleId) return bundle;
+                    const target = bundle.lines.find((l) => l.line_id === lineId);
+                    if (!target) return bundle;
+                    const isParentToggle = target.origin === "direct";
+                    const newIncluded = !target.included;
+                    return {
+                      ...bundle,
+                      lines: bundle.lines.map((line) => {
+                        const shouldSync =
+                          line.line_id === lineId ||
+                          (isParentToggle &&
+                            line.origin === "bom_auto" &&
+                            line.bom_expected != null &&
+                            Number(line.bom_expected) > 0);
+                        if (!shouldSync) return line;
+                        const avail = getAvailable(line);
+                        return {
+                          ...line,
+                          included: newIncluded,
+                          shortage: newIncluded
+                            ? Math.max(0, line.quantity - (avail ?? line.quantity))
+                            : 0,
+                          exclusion_note: !newIncluded
+                            ? state.subType === "disassemble" && line.origin === "bom_auto"
+                              ? "회수 안 됨"
+                              : "이번 작업 제외"
+                            : null,
+                        };
+                      }),
+                    };
+                  }),
+                )
               }
               onQuantityChange={(bundleId, lineId, quantity, shortage) =>
-                state.updateLine(bundleId, lineId, (line) => ({
-                  ...line,
-                  quantity,
-                  shortage,
-                  edited:
-                    line.bom_expected !== null
-                      ? Math.abs(quantity - line.bom_expected) > 0.0001
-                      : line.origin === "manual" || line.edited,
-                }))
+                state.setBundles((prev) =>
+                  prev.map((bundle) => {
+                    if (bundle.bundle_id !== bundleId) return bundle;
+                    const target = bundle.lines.find((l) => l.line_id === lineId);
+                    if (!target) return bundle;
+                    // 상위(direct) 수량 변경 → 같은 bundle 내 bom_auto 하위 모두 비례 재계산
+                    // 단, 창고 입출고는 사용자가 직접 편집한 하위(edited=true) 는 보존 — process(produce/disassemble) 만 강제 동기화.
+                    if (target.origin === "direct") {
+                      const forced = isBomForced(state.subType);
+                      return {
+                        ...bundle,
+                        lines: bundle.lines.map((line) => {
+                          if (line.line_id === lineId) {
+                            return { ...line, quantity, shortage, edited: false };
+                          }
+                          if (
+                            line.origin === "bom_auto" &&
+                            line.bom_expected != null &&
+                            Number(line.bom_expected) > 0 &&
+                            (forced || !line.edited)
+                          ) {
+                            const ratio = Number(line.bom_expected);
+                            const childQty = quantity * ratio;
+                            const childAvail = getAvailable(line);
+                            const childShortage =
+                              !line.included || childAvail === null
+                                ? 0
+                                : Math.max(0, childQty - childAvail);
+                            return { ...line, quantity: childQty, shortage: childShortage, edited: false };
+                          }
+                          return line;
+                        }),
+                      };
+                    }
+                    // 그 외 (단품/수동): 기존 단순 업데이트
+                    return {
+                      ...bundle,
+                      lines: bundle.lines.map((line) =>
+                        line.line_id === lineId
+                          ? {
+                              ...line,
+                              quantity,
+                              shortage,
+                              edited:
+                                line.bom_expected !== null
+                                  ? Math.abs(quantity - line.bom_expected) > 0.0001
+                                  : line.origin === "manual" || line.edited,
+                            }
+                          : line,
+                      ),
+                    };
+                  }),
+                )
+              }
+              onBundleQuantityChange={(bundleId, newQty) =>
+                state.setBundles((prev) =>
+                  prev.map((bundle) => {
+                    if (bundle.bundle_id !== bundleId) return bundle;
+                    // 부모 라인이 없는 BOM 묶음(창고 입출고) — 기준 수량 변경 시 미편집 자식 라인을
+                    // 원본 per-unit 비례로 재계산. bom_expected 는 preview 시점(parent_qty=1) 값이라
+                    // 그대로 per-unit ratio 로 사용 가능.
+                    const forced = isBomForced(state.subType);
+                    return {
+                      ...bundle,
+                      quantity: newQty,
+                      lines: bundle.lines.map((line) => {
+                        if (
+                          line.origin === "bom_auto" &&
+                          line.bom_expected != null &&
+                          Number(line.bom_expected) > 0 &&
+                          (forced || !line.edited)
+                        ) {
+                          const ratio = Number(line.bom_expected);
+                          const childQty = newQty * ratio;
+                          const childAvail = getAvailable(line);
+                          const childShortage =
+                            !line.included || childAvail === null
+                              ? 0
+                              : Math.max(0, childQty - childAvail);
+                          return { ...line, quantity: childQty, shortage: childShortage, edited: false };
+                        }
+                        return line;
+                      }),
+                    };
+                  }),
+                )
               }
               onRemoveLine={state.removeLine}
               onRemoveBundle={(bundleId) =>
@@ -523,7 +663,7 @@ export function IoComposeView({
         >
           <WizardStepCard
             n={5}
-            title="제출 전 마지막 확인"
+            title="최종 확인"
             state={stepState(5)}
             summary="제출 준비 완료"
             accent={accent}
@@ -533,16 +673,12 @@ export function IoComposeView({
               subType={state.subType}
               bundles={state.bundles}
               notes={state.notes}
-              referenceNo={state.referenceNo}
               hasShortage={state.hasShortage}
               hasInvalidQuantity={state.hasInvalidQuantity}
               submitting={submitting || drafting}
-              approval={requiresApproval(state.subType)}
+              approvalKind={approvalKind(state.subType, state.bundles)}
               onNotesChange={state.setNotes}
-              onReferenceChange={state.setReferenceNo}
-              onSaveDraft={handleSaveDraft}
               onSubmit={handleSubmit}
-              onPrev={state.goPrev}
             />
           </WizardStepCard>
         </div>

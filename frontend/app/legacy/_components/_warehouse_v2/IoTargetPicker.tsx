@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ArrowRight, Plus, Search } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
+import { Tooltip } from "@/lib/ui";
 import { EmptyState } from "../common";
 import {
   DEPT_OPTIONS,
@@ -11,18 +12,16 @@ import {
   PROD_DEPTS,
   matchesSearch,
 } from "../_warehouse_steps/_constants";
-import { deptOf, stageOf, type DeptLetter } from "../_admin_sections/_bom_workbench/bomDept";
+import { DEPT_LETTER_TO_NAME, deptOf, stageOf, type DeptLetter } from "../_admin_sections/_bom_workbench/bomDept";
 import { LabeledSelect, SettingLabel } from "./_atoms";
 import type { IoBundle, IoSubType, IoWorkType, Item, ProductModel, ShipPackage } from "./types";
 import {
   canPickPackages,
-  deptIoDisplayLabel,
   deptIoSubType,
   getItemActionMode,
   type DeptIoDirection,
   type ItemActionMode,
 } from "./ioWorkType";
-import { tint } from "@/lib/mes/colorUtils";
 
 interface Props {
   workType: IoWorkType;
@@ -30,7 +29,6 @@ interface Props {
   deptIoDirection: DeptIoDirection | null;
   bundleSubType: IoSubType | null;
   bomParents: Set<string>;
-  onClearBundles: () => void;
   targetDepartment?: string | null;
   items: Item[];
   packages: ShipPackage[];
@@ -84,13 +82,45 @@ function matchesModel(item: Item, model: string) {
   return item.legacy_model === model;
 }
 
+// PRODUCTION 위치만 부서별로 합산. 0 이하는 제외해 tooltip noise 방지.
+function getProdByDept(item: Item): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const loc of item.locations) {
+    if (loc.status !== "PRODUCTION") continue;
+    const q = Number(loc.quantity) || 0;
+    if (q <= 0) continue;
+    m.set(loc.department, (m.get(loc.department) ?? 0) + q);
+  }
+  return m;
+}
+
+// PROD_DEPTS (튜브→고압→진공→튜닝→조립→출하) 순서 고정. 그 외(AS/기타) 는 그대로 뒤에 알파벳 순.
+const DEPT_ORDER_INDEX = new Map<string, number>(PROD_DEPTS.map((d, i) => [d, i]));
+function renderDeptBreakdown(prodByDept: Map<string, number>) {
+  const entries = Array.from(prodByDept.entries()).sort(([a], [b]) => {
+    const ai = DEPT_ORDER_INDEX.get(a) ?? 100;
+    const bi = DEPT_ORDER_INDEX.get(b) ?? 100;
+    if (ai !== bi) return ai - bi;
+    return a.localeCompare(b);
+  });
+  return (
+    <div className="flex flex-col gap-0.5">
+      {entries.map(([dept, qty]) => (
+        <div key={dept} className="flex justify-between gap-3 tabular-nums">
+          <span>{dept}</span>
+          <span>{formatQty(qty)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function IoTargetPicker({
   workType,
   subType,
   deptIoDirection,
   bundleSubType,
   bomParents,
-  onClearBundles,
   targetDepartment,
   items,
   packages,
@@ -154,7 +184,14 @@ export function IoTargetPicker({
     );
   }, [packages, keyword]);
 
-  const lineCount = bundles.reduce((acc, b) => acc + b.lines.length, 0);
+  const parentCount = bundles.reduce(
+    (acc, b) => acc + b.lines.filter((l) => l.origin === "direct" || l.origin === "manual").length,
+    0,
+  );
+  const childCount = bundles.reduce(
+    (acc, b) => acc + b.lines.filter((l) => l.origin === "bom_auto" || l.origin === "package_auto").length,
+    0,
+  );
   const hasActiveFilter = dept !== "ALL" || model !== "전체" || stage !== "ALL" || keyword.length > 0;
 
   function clearFilters() {
@@ -179,7 +216,7 @@ export function IoTargetPicker({
           <LabeledSelect label="단계" value={stage} onChange={setStage} options={STAGE_OPTIONS} />
           <label className="flex flex-col gap-0.5">
             <span
-              className="text-[9px] font-bold uppercase tracking-[1.5px]"
+              className="text-[10px] font-bold uppercase tracking-[1.5px]"
               style={{ color: LEGACY_COLORS.muted2 }}
             >
               검색
@@ -192,8 +229,8 @@ export function IoTargetPicker({
               <input
                 value={search}
                 onChange={(e) => onSearchChange(e.target.value)}
-                placeholder="품목명 · 품목 코드 · 바코드"
-                className="flex-1 bg-transparent text-xs outline-none"
+                placeholder="품목명 · 품목 코드"
+                className="flex-1 bg-transparent text-sm outline-none"
                 style={{ color: LEGACY_COLORS.text }}
               />
             </div>
@@ -212,26 +249,6 @@ export function IoTargetPicker({
             className="flex-1 bg-transparent text-sm outline-none"
             style={{ color: LEGACY_COLORS.text }}
           />
-        </div>
-      )}
-
-      {/* process workType 모드 배지 — 묶음이 있을 때 현재 모드 + 비우기 버튼 */}
-      {workType === "process" && bundleSubType && (
-        <div
-          className="flex items-center gap-2 rounded-[10px] border px-3 py-2 text-xs"
-          style={{ borderColor: LEGACY_COLORS.border, background: tint(LEGACY_COLORS.blue, 8) }}
-        >
-          <span style={{ color: LEGACY_COLORS.blue, fontWeight: 700 }}>
-            현재 모드: {deptIoDisplayLabel(bundleSubType) ?? bundleSubType}
-          </span>
-          <button
-            type="button"
-            onClick={onClearBundles}
-            className="rounded-[8px] border px-2 py-0.5 font-bold transition-all hover:brightness-110"
-            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
-          >
-            묶음 비우기
-          </button>
         </div>
       )}
 
@@ -309,14 +326,17 @@ export function IoTargetPicker({
           color: bundles.length > 0 ? "#fff" : LEGACY_COLORS.muted2,
         }}
       >
-        <span>
-          {bundles.length > 0
-            ? `선택됨: ${bundles.length}개 묶음 · 라인 ${lineCount}개`
-            : "품목을 먼저 선택하세요"}
-        </span>
-        {bundles.length > 0 && (
-          <span className="flex items-center gap-1.5">
-            수량 조정하기
+        {bundles.length > 0 ? (
+          <>
+            <span>{`상위 ${parentCount}개 · 하위 ${childCount}개`}</span>
+            <span className="flex items-center gap-1.5">
+              수량 조정
+              <ArrowRight className="h-4 w-4" />
+            </span>
+          </>
+        ) : (
+          <span className="ml-auto flex items-center gap-1.5">
+            수량 조정
             <ArrowRight className="h-4 w-4" />
           </span>
         )}
@@ -360,13 +380,13 @@ function ItemTable({
       <table className="w-full border-collapse text-sm">
         <thead className="sticky top-0 z-10">
           <tr
-            className="text-left text-[10px] font-bold uppercase tracking-[1.5px]"
+            className="text-left text-[11px] font-bold uppercase tracking-[1.5px]"
             style={{ color: LEGACY_COLORS.muted2 }}
           >
             <th
               className="px-3 py-2"
               style={{
-                background: LEGACY_COLORS.s1,
+                background: "var(--c-popup-bg)",
                 borderBottom: `1px solid ${LEGACY_COLORS.border}`,
               }}
             >
@@ -375,7 +395,7 @@ function ItemTable({
             <th
               className="px-3 py-2"
               style={{
-                background: LEGACY_COLORS.s1,
+                background: "var(--c-popup-bg)",
                 borderBottom: `1px solid ${LEGACY_COLORS.border}`,
               }}
             >
@@ -384,16 +404,25 @@ function ItemTable({
             <th
               className="whitespace-nowrap px-3 py-2 text-right"
               style={{
-                background: LEGACY_COLORS.s1,
+                background: "var(--c-popup-bg)",
                 borderBottom: `1px solid ${LEGACY_COLORS.border}`,
               }}
             >
-              현재 재고
+              창고
             </th>
             <th
-              className="px-3 py-2 text-right"
+              className="whitespace-nowrap px-3 py-2 text-right"
               style={{
-                background: LEGACY_COLORS.s1,
+                background: "var(--c-popup-bg)",
+                borderBottom: `1px solid ${LEGACY_COLORS.border}`,
+              }}
+            >
+              부서
+            </th>
+            <th
+              className="px-3 py-2 text-center"
+              style={{
+                background: "var(--c-popup-bg)",
                 borderBottom: `1px solid ${LEGACY_COLORS.border}`,
               }}
             >
@@ -403,13 +432,20 @@ function ItemTable({
         </thead>
         <tbody>
           {items.slice(0, displayLimit).map((item) => {
+            const prodByDept = getProdByDept(item);
+            const letter = deptOf(item.process_type_code);
+            const impliedDeptName = letter ? DEPT_LETTER_TO_NAME[letter] : null;
+            const impliedQty = impliedDeptName ? (prodByDept.get(impliedDeptName) ?? 0) : 0;
+            const hasOthers = Array.from(prodByDept.keys()).some((d) => d !== impliedDeptName);
+            const noDeptStock = prodByDept.size === 0;
+            const wQty = Number(item.warehouse_qty) || 0;
             return (
               <tr
                 key={item.item_id}
                 className="transition-colors hover:brightness-110"
               >
                 <td className="px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
-                  <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
+                  <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
                     {item.item_name}
                   </span>
                 </td>
@@ -417,21 +453,45 @@ function ItemTable({
                   className="px-3 py-2"
                   style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                 >
-                  <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <span className="text-sm font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
                     {item.erp_code ?? "-"}
                   </span>
                 </td>
                 <td
-                  className="px-3 py-2 text-right text-sm font-black tabular-nums"
+                  className="px-3 py-2 text-right text-base font-black tabular-nums"
                   style={{
-                    color: Number(item.quantity) > 0 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
+                    color: wQty > 0 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
                     borderBottom: `1px solid ${LEGACY_COLORS.border}`,
                   }}
                 >
-                  {formatQty(item.quantity)}
+                  {formatQty(wQty)}
                 </td>
                 <td
-                  className="whitespace-nowrap px-3 py-2 text-right"
+                  className="px-3 py-2 text-right"
+                  style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
+                >
+                  {noDeptStock ? (
+                    <span className="text-base font-black" style={{ color: LEGACY_COLORS.muted2 }}>
+                      -
+                    </span>
+                  ) : (
+                    <Tooltip content={renderDeptBreakdown(prodByDept)} multiline>
+                      <span
+                        className="text-base font-black tabular-nums"
+                        style={{ color: impliedQty > 0 || hasOthers ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}
+                      >
+                        {formatQty(impliedQty)}
+                        {hasOthers && (
+                          <span className="ml-0.5" style={{ color: LEGACY_COLORS.muted2 }}>
+                            +
+                          </span>
+                        )}
+                      </span>
+                    </Tooltip>
+                  )}
+                </td>
+                <td
+                  className="whitespace-nowrap px-3 py-2 text-center"
                   style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                 >
                   <span className="inline-flex gap-1">
@@ -444,44 +504,45 @@ function ItemTable({
                       const bomTitle = !hasBom
                         ? "등록된 BOM이 없습니다"
                         : bomLockedByMode
-                          ? "이 품목만 모드 진행 중 — 묶음 비우고 변경하세요"
+                          ? "낱개와 BOM은 같이 작업할 수 없습니다. 묶음을 비우고 다시 선택하세요."
                           : "BOM 적용 — 하위 자재까지 같이 처리";
                       const singleTitle = singleLockedByMode
-                        ? "BOM 적용 모드 진행 중 — 묶음 비우고 변경하세요"
-                        : "이 품목만 — 선택 품목만 처리";
+                        ? "낱개와 BOM은 같이 작업할 수 없습니다. 묶음을 비우고 다시 선택하세요."
+                        : "낱개 — 선택 품목만 처리";
                       return (
                         <>
-                          <button
-                            type="button"
-                            disabled={bomDisabled}
-                            onClick={() => onAdd(item, "direct_item", bomTarget!)}
-                            className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[11px] font-black text-white disabled:opacity-50"
-                            style={{
-                              background: bomDisabled ? LEGACY_COLORS.s2 : LEGACY_COLORS.blue,
-                              color: bomDisabled ? LEGACY_COLORS.muted2 : "#fff",
-                              borderColor: bomDisabled ? LEGACY_COLORS.border : LEGACY_COLORS.blue,
-                              borderWidth: 1,
-                              borderStyle: "solid",
-                            }}
-                            title={bomTitle}
-                          >
-                            <Plus className="h-3 w-3" />
-                            BOM 적용
-                          </button>
-                          <button
-                            type="button"
-                            disabled={singleDisabled}
-                            onClick={() => onAdd(item, "manual", singleTarget!)}
-                            className="rounded-[10px] border px-2.5 py-1 text-[11px] font-black disabled:opacity-50"
-                            style={{
-                              background: LEGACY_COLORS.s2,
-                              borderColor: LEGACY_COLORS.border,
-                              color: singleDisabled ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
-                            }}
-                            title={singleTitle}
-                          >
-                            이 품목만
-                          </button>
+                          <Tooltip content={bomTitle}>
+                            <button
+                              type="button"
+                              disabled={bomDisabled}
+                              onClick={() => onAdd(item, "direct_item", bomTarget!)}
+                              className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[12px] font-black text-white disabled:opacity-50"
+                              style={{
+                                background: bomDisabled ? LEGACY_COLORS.s2 : LEGACY_COLORS.blue,
+                                color: bomDisabled ? LEGACY_COLORS.muted2 : "#fff",
+                                borderColor: bomDisabled ? LEGACY_COLORS.border : LEGACY_COLORS.blue,
+                                borderWidth: 1,
+                                borderStyle: "solid",
+                              }}
+                            >
+                              BOM
+                            </button>
+                          </Tooltip>
+                          <Tooltip content={singleTitle}>
+                            <button
+                              type="button"
+                              disabled={singleDisabled}
+                              onClick={() => onAdd(item, "manual", singleTarget!)}
+                              className="rounded-[10px] border px-2.5 py-1 text-[12px] font-black disabled:opacity-50"
+                              style={{
+                                background: LEGACY_COLORS.s2,
+                                borderColor: LEGACY_COLORS.border,
+                                color: singleDisabled ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
+                              }}
+                            >
+                              낱개
+                            </button>
+                          </Tooltip>
                         </>
                       );
                     })() : mode === "bom_or_single" ? (() => {
@@ -492,37 +553,38 @@ function ItemTable({
                         : "등록된 BOM이 없습니다";
                       return (
                         <>
-                          <button
-                            type="button"
-                            disabled={bomDisabled}
-                            onClick={() => onAdd(item)}
-                            className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[11px] font-black disabled:opacity-50"
-                            style={{
-                              background: bomDisabled ? LEGACY_COLORS.s2 : LEGACY_COLORS.blue,
-                              color: bomDisabled ? LEGACY_COLORS.muted2 : "#fff",
-                              borderColor: bomDisabled ? LEGACY_COLORS.border : LEGACY_COLORS.blue,
-                              borderWidth: 1,
-                              borderStyle: "solid",
-                            }}
-                            title={bomTitle}
-                          >
-                            <Plus className="h-3 w-3" />
-                            BOM 적용
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => onAdd(item, "manual")}
-                            className="rounded-[10px] border px-2.5 py-1 text-[11px] font-black disabled:opacity-50"
-                            style={{
-                              background: LEGACY_COLORS.s2,
-                              borderColor: LEGACY_COLORS.border,
-                              color: LEGACY_COLORS.muted2,
-                            }}
-                            title="이 품목만 — 선택 품목만 처리"
-                          >
-                            이 품목만
-                          </button>
+                          <Tooltip content={bomTitle}>
+                            <button
+                              type="button"
+                              disabled={bomDisabled}
+                              onClick={() => onAdd(item)}
+                              className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[12px] font-black disabled:opacity-50"
+                              style={{
+                                background: bomDisabled ? LEGACY_COLORS.s2 : LEGACY_COLORS.blue,
+                                color: bomDisabled ? LEGACY_COLORS.muted2 : "#fff",
+                                borderColor: bomDisabled ? LEGACY_COLORS.border : LEGACY_COLORS.blue,
+                                borderWidth: 1,
+                                borderStyle: "solid",
+                              }}
+                            >
+                              BOM
+                            </button>
+                          </Tooltip>
+                          <Tooltip content="낱개 — 선택 품목만 처리">
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => onAdd(item, "manual")}
+                              className="rounded-[10px] border px-2.5 py-1 text-[12px] font-black disabled:opacity-50"
+                              style={{
+                                background: LEGACY_COLORS.s2,
+                                borderColor: LEGACY_COLORS.border,
+                                color: LEGACY_COLORS.muted2,
+                              }}
+                            >
+                              낱개
+                            </button>
+                          </Tooltip>
                         </>
                       );
                     })() : (
@@ -530,7 +592,7 @@ function ItemTable({
                         type="button"
                         disabled={busy}
                         onClick={() => onAdd(item, "manual")}
-                        className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[11px] font-black text-white disabled:opacity-50"
+                        className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[12px] font-black text-white disabled:opacity-50"
                         style={{ background: LEGACY_COLORS.blue }}
                         title="선택 — 선택 품목만 처리"
                       >
@@ -545,7 +607,7 @@ function ItemTable({
           })}
           {items.length === 0 && (
             <tr>
-              <td colSpan={4} className="px-3 py-6">
+              <td colSpan={5} className="px-3 py-6">
                 <EmptyState
                   variant={hasActiveFilter ? "filtered-out" : "no-data"}
                   compact
@@ -566,7 +628,7 @@ function ItemTable({
           <button
             type="button"
             onClick={onShowMore}
-            className="w-full rounded-[12px] border py-2.5 text-xs font-semibold transition-colors hover:brightness-110"
+            className="w-full rounded-[12px] border py-2.5 text-sm font-semibold transition-colors hover:brightness-110"
             style={{
               background: LEGACY_COLORS.s1,
               borderColor: LEGACY_COLORS.border,

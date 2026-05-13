@@ -14,6 +14,7 @@ interface Props {
   getAvailable: (line: IoLine) => number | null;
   onToggleLine: (lineId: string) => void;
   onQuantityChange: (lineId: string, quantity: number, shortage: number) => void;
+  onBundleQuantityChange?: (quantity: number) => void;
   onRemoveLine: (lineId: string) => void;
   onRemoveBundle: () => void;
 }
@@ -25,6 +26,7 @@ export function IoBundleCard({
   getAvailable,
   onToggleLine,
   onQuantityChange,
+  onBundleQuantityChange,
   onRemoveLine,
   onRemoveBundle,
 }: Props) {
@@ -32,14 +34,32 @@ export function IoBundleCard({
   const excluded = bundle.lines.length - included.length;
   const autoCount = bundle.lines.filter((line) => line.origin === "bom_auto").length;
   const hasAuto = autoCount > 0 || bundle.lines.some((line) => line.origin === "package_auto");
+  const hasDirectLine = bundle.lines.some((line) => line.origin === "direct");
+  // 부모 라인이 없는 BOM 묶음(창고 입출고) — 기준 수량 stepper 로 자식 수량을 일괄 조절.
+  const showBundleQtyStepper =
+    bundle.source_kind === "bom_parent" && !hasDirectLine && !!onBundleQuantityChange;
   const tone = bundle.source_kind === "ship_package" ? LEGACY_COLORS.purple : LEGACY_COLORS.blue;
   const compositionLabel = (() => {
     if (bundle.source_kind === "ship_package") return null;
     if (bundle.source_kind === "bom_parent" || autoCount > 0) {
-      return `BOM 자동 전개 · 상위 1 + 하위 ${autoCount}`;
+      return hasDirectLine
+        ? `BOM 자동 전개 · 상위 1 + 하위 ${autoCount}`
+        : `BOM 자동 전개 · 자재 ${autoCount}`;
     }
     return "단품";
   })();
+  const bundleQty = Number(bundle.quantity) || 0;
+  function stepBundle(delta: number) {
+    if (!onBundleQuantityChange) return;
+    const next = Math.max(0, bundleQty + delta);
+    onBundleQuantityChange(next);
+  }
+  function setBundleFromInput(value: string) {
+    if (!onBundleQuantityChange) return;
+    const next = Number(value);
+    const safe = Number.isFinite(next) ? Math.max(0, next) : 0;
+    onBundleQuantityChange(safe);
+  }
 
   return (
     <article
@@ -62,10 +82,82 @@ export function IoBundleCard({
             </h3>
           </div>
           <div
-            className="mt-1 flex flex-wrap gap-1 text-xs font-semibold"
+            className="mt-1 flex flex-wrap items-center gap-1 text-xs font-semibold"
             style={{ color: LEGACY_COLORS.muted2 }}
           >
-            <span>기준 수량 {formatQty(bundle.quantity)}</span>
+            {showBundleQtyStepper ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-[1.5px]">
+                  기준 수량
+                </span>
+                <button
+                  type="button"
+                  onClick={() => stepBundle(-10)}
+                  className="rounded-[8px] border px-1.5 py-0.5 text-[11px] font-black transition-colors hover:brightness-110 disabled:opacity-40"
+                  style={{
+                    background: tint(LEGACY_COLORS.red, 10),
+                    borderColor: tint(LEGACY_COLORS.red, 30),
+                    color: LEGACY_COLORS.red,
+                  }}
+                  disabled={bundleQty <= 0}
+                >
+                  -10
+                </button>
+                <button
+                  type="button"
+                  onClick={() => stepBundle(-1)}
+                  className="rounded-[8px] border px-1.5 py-0.5 text-[11px] font-black transition-colors hover:brightness-110 disabled:opacity-40"
+                  style={{
+                    background: tint(LEGACY_COLORS.red, 10),
+                    borderColor: tint(LEGACY_COLORS.red, 30),
+                    color: LEGACY_COLORS.red,
+                  }}
+                  disabled={bundleQty <= 0}
+                >
+                  -1
+                </button>
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={bundleQty}
+                  onChange={(e) => setBundleFromInput(e.target.value)}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="w-[64px] rounded-[8px] border px-1.5 py-0.5 text-center text-sm font-black tabular-nums outline-none focus:border-[var(--c-blue)]"
+                  style={{
+                    background: LEGACY_COLORS.s2,
+                    borderColor: LEGACY_COLORS.border,
+                    color: LEGACY_COLORS.text,
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => stepBundle(1)}
+                  className="rounded-[8px] border px-1.5 py-0.5 text-[11px] font-black transition-colors hover:brightness-110"
+                  style={{
+                    background: tint(LEGACY_COLORS.green, 10),
+                    borderColor: tint(LEGACY_COLORS.green, 30),
+                    color: LEGACY_COLORS.green,
+                  }}
+                >
+                  +1
+                </button>
+                <button
+                  type="button"
+                  onClick={() => stepBundle(10)}
+                  className="rounded-[8px] border px-1.5 py-0.5 text-[11px] font-black transition-colors hover:brightness-110"
+                  style={{
+                    background: tint(LEGACY_COLORS.green, 10),
+                    borderColor: tint(LEGACY_COLORS.green, 30),
+                    color: LEGACY_COLORS.green,
+                  }}
+                >
+                  +10
+                </button>
+              </span>
+            ) : (
+              <span>기준 수량 {formatQty(bundle.quantity)}</span>
+            )}
             <span>·</span>
             <span>반영 {included.length}개</span>
             {excluded > 0 && (
