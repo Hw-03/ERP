@@ -1193,6 +1193,12 @@
             "title": "Department",
             "type": "string"
           },
+          "department_role": {
+            "default": "none",
+            "description": "부서 결재 역할 (none/primary/deputy)",
+            "title": "Department Role",
+            "type": "string"
+          },
           "display_order": {
             "default": 0,
             "title": "Display Order",
@@ -1313,6 +1319,11 @@
             "title": "Department",
             "type": "string"
           },
+          "department_role": {
+            "default": "none",
+            "title": "Department Role",
+            "type": "string"
+          },
           "display_order": {
             "title": "Display Order",
             "type": "integer"
@@ -1408,6 +1419,18 @@
               }
             ],
             "title": "Department"
+          },
+          "department_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "부서 결재 역할 (none/primary/deputy)",
+            "title": "Department Role"
           },
           "display_order": {
             "anyOf": [
@@ -6286,6 +6309,41 @@
             "title": "Created At",
             "type": "string"
           },
+          "department_approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Approved At"
+          },
+          "department_approved_by_employee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Approved By Employee Id"
+          },
+          "department_approved_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Approved By Name"
+          },
           "lines": {
             "default": [],
             "items": {
@@ -6406,6 +6464,11 @@
             "title": "Requester Name",
             "type": "string"
           },
+          "requires_department_approval": {
+            "default": false,
+            "title": "Requires Department Approval",
+            "type": "boolean"
+          },
           "requires_warehouse_approval": {
             "title": "Requires Warehouse Approval",
             "type": "boolean"
@@ -6495,7 +6558,8 @@
           "mark_defective_wh",
           "mark_defective_prod",
           "supplier_return",
-          "package_out"
+          "package_out",
+          "manual_adjustment"
         ],
         "title": "StockRequestTypeEnum",
         "type": "string"
@@ -12689,6 +12753,68 @@
         ]
       }
     },
+    "/api/stock-requests/department-queue": {
+      "get": {
+        "description": "부서 결재 정/부 승인 대기 목록.\n\nactor 의 부서와 일치하는 요청 중 requires_department_approval=True, 아직 dept 결재 미완료,\n상태가 RESERVED/SUBMITTED 인 것만 반환.",
+        "operationId": "list_department_queue_api_stock_requests_department_queue_get",
+        "parameters": [
+          {
+            "description": "현재 직원 ID — 본인 부서만 노출",
+            "in": "query",
+            "name": "actor_employee_id",
+            "required": true,
+            "schema": {
+              "description": "현재 직원 ID — 본인 부서만 노출",
+              "format": "uuid",
+              "title": "Actor Employee Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StockRequestResponse"
+                  },
+                  "title": "Response List Department Queue Api Stock Requests Department Queue Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Department Queue",
+        "tags": [
+          "Stock Requests"
+        ]
+      }
+    },
     "/api/stock-requests/draft": {
       "get": {
         "description": "단일 DRAFT 조회. 없으면 200 + null.",
@@ -12932,7 +13058,7 @@
     },
     "/api/stock-requests/warehouse-queue": {
       "get": {
-        "description": "창고 담당자 승인 대기 목록 (RESERVED 또는 SUBMITTED, 승인 필요).",
+        "description": "창고 담당자 승인 대기 목록 (RESERVED 또는 SUBMITTED, 승인 필요).\n\n창고 결재가 아직 완료되지 않은 요청만 반환 (듀얼 승인 케이스에서 창고는 완료, 부서만 대기인\n요청은 부서 큐로 노출).",
         "operationId": "list_warehouse_queue_api_stock_requests_warehouse_queue_get",
         "parameters": [
           {
@@ -13124,6 +13250,114 @@
           }
         },
         "summary": "Cancel Stock Request",
+        "tags": [
+          "Stock Requests"
+        ]
+      }
+    },
+    "/api/stock-requests/{request_id}/department-approve": {
+      "post": {
+        "description": "부서 결재 승인 — department_role in (primary/deputy) 또는 admin.",
+        "operationId": "department_approve_stock_request_api_stock_requests__request_id__department_approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockRequestActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Department Approve Stock Request",
+        "tags": [
+          "Stock Requests"
+        ]
+      }
+    },
+    "/api/stock-requests/{request_id}/department-reject": {
+      "post": {
+        "description": "부서 결재 반려.",
+        "operationId": "department_reject_stock_request_api_stock_requests__request_id__department_reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockRequestActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Department Reject Stock Request",
         "tags": [
           "Stock Requests"
         ]
