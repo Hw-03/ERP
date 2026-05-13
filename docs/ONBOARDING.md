@@ -61,7 +61,7 @@ scripts\ops\verify_backup.bat
 → `backend\_backup\erp_*.db` 생성 확인. integrity 'ok' 출력.
 
 ### 4.2. 입출고 1건 (모바일)
-1. 모바일 화면 (≤480px) → 하단 nav 의 **창고입출고** 진입
+1. 모바일 화면 (≤480px) → 하단 nav 의 **창고 입출고** 진입
 2. Step 1 "창고 → 생산부" 선택
 3. Step 2 부서 선택 → Step 3 품목 1건 + 수량 1
 4. Step 4 확인 → 완료 토스트
@@ -80,7 +80,7 @@ scripts\ops\verify_backup.bat
 | 모바일 | 설명 |
 |---|---|
 | 재고 | 전체 품목 + 부서별 위치 + 가용/예약 |
-| 창고입출고 | 창고 ↔ 부서 wizard (4 step) |
+| 창고 입출고 | 창고 ↔ 부서 wizard (4 step) |
 | 부서입출고 | 부서 → 부서 wizard (4 step) |
 | 관리자 | PIN 잠금 → 상품 / 직원 / BOM / 출하묶음 / 설정 |
 
