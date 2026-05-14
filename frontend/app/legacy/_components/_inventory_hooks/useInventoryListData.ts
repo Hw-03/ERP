@@ -65,7 +65,7 @@ export function useInventoryListData(
       if (filters.kpi === "OK" && !(avail > 0 && !(min != null && avail < min))) return false;
       if (filters.kpi === "LOW" && !(avail > 0 && min != null && avail < min)) return false;
       if (filters.kpi === "ZERO" && !(avail <= 0)) return false;
-      if (filters.itemType === "RM" && !R_SUFFIX(item.process_type_code)) return false;
+      if (filters.itemType === "RAW" && !R_SUFFIX(item.process_type_code)) return false;
       if (filters.itemType === "SEMI" && !A_SUFFIX(item.process_type_code)) return false;
       if (filters.itemType === "FIXED" && !F_SUFFIX(item.process_type_code)) return false;
       if (filters.modelSlot === null && item.model_slots.length !== 0) return false;

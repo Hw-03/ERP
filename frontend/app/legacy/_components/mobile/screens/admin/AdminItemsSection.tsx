@@ -5,7 +5,7 @@ import { api, type Item } from "@/lib/api";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import type { ToastState } from "@/lib/ui/Toast";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { CATEGORY_OPTIONS, EMPTY_ADD_FORM, MODEL_SLOTS, UNIT_OPTIONS } from "./_shared";
+import { PROCESS_TYPE_OPTIONS, EMPTY_ADD_FORM, MODEL_SLOTS, UNIT_OPTIONS } from "./_shared";
 
 export function AdminItemsSection({ showToast }: { showToast: (toast: ToastState) => void }) {
   const [items, setItems] = useState<Item[]>([]);
@@ -141,7 +141,7 @@ export function AdminItemsSection({ showToast }: { showToast: (toast: ToastState
           <div>
             <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={labelStyle}>공정코드 *</div>
             <select value={addForm.process_type_code} onChange={(e) => setAddForm((f) => ({ ...f, process_type_code: e.target.value }))} className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none" style={inputStyle}>
-              {CATEGORY_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+              {PROCESS_TYPE_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
             </select>
           </div>
           <div>

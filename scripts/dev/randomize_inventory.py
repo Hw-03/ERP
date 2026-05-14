@@ -7,7 +7,7 @@ Usage:
 
 규칙:
 - 각 품목의 현재 총 수량을 창고 + 1~3개 부서로 랜덤 분배
-- 카테고리별 주요 부서 가중치 반영 (TA→튜브, HA→고압, VA→진공, AA→조립, FG→출하)
+- process_type_code 별 주요 부서 가중치 반영 (TR/TA/TF→튜브, AA/AF→조립, PA/PF→출하, ...)
 - 10% 확률로 불량 재고 추가 (총량의 2-8%)
 - 안전재고: 70% 품목에 설정, 그 중 30%는 현재 재고 이하로 설정해 경보 테스트
 """
@@ -25,7 +25,6 @@ os.environ["DATABASE_URL"] = f"sqlite:///{(BACKEND_DIR / 'erp.db').as_posix()}"
 
 from app.database import SessionLocal
 from app.models import (
-    CategoryEnum,
     DepartmentEnum,
     Inventory,
     InventoryLocation,
@@ -35,26 +34,43 @@ from app.models import (
 
 random.seed(42)
 
-# 카테고리별 가중 부서 목록 (앞쪽이 더 높은 확률)
-CATEGORY_DEPT_WEIGHTS: dict[str, list[tuple[DepartmentEnum, int]]] = {
-    "RM": [
-        (DepartmentEnum.ASSEMBLY, 3),
-        (DepartmentEnum.HIGH_VOLTAGE, 2),
-        (DepartmentEnum.VACUUM, 2),
-        (DepartmentEnum.TUBE, 2),
-        (DepartmentEnum.TUNING, 1),
-    ],
+# process_type_code 별 가중 부서 목록 (앞쪽이 더 높은 확률)
+# 키는 18종 공정 코드. 사용 0건인 코드(NA, TA)도 정의해 둔다.
+PROCESS_TYPE_DEPT_WEIGHTS: dict[str, list[tuple[DepartmentEnum, int]]] = {
+    # 튜브 (T)
+    "TR": [(DepartmentEnum.TUBE, 4), (DepartmentEnum.ASSEMBLY, 2), (DepartmentEnum.TUNING, 1)],
     "TA": [(DepartmentEnum.TUBE, 5), (DepartmentEnum.ASSEMBLY, 2), (DepartmentEnum.TUNING, 1)],
     "TF": [(DepartmentEnum.TUBE, 5), (DepartmentEnum.ASSEMBLY, 2)],
+    # 고압 (H)
+    "HR": [(DepartmentEnum.HIGH_VOLTAGE, 4), (DepartmentEnum.ASSEMBLY, 2)],
     "HA": [(DepartmentEnum.HIGH_VOLTAGE, 5), (DepartmentEnum.ASSEMBLY, 2), (DepartmentEnum.RESEARCH, 1)],
     "HF": [(DepartmentEnum.HIGH_VOLTAGE, 5), (DepartmentEnum.ASSEMBLY, 2)],
+    # 진공 (V)
+    "VR": [(DepartmentEnum.VACUUM, 4), (DepartmentEnum.ASSEMBLY, 2), (DepartmentEnum.TUNING, 1)],
     "VA": [(DepartmentEnum.VACUUM, 5), (DepartmentEnum.ASSEMBLY, 2), (DepartmentEnum.TUNING, 1)],
     "VF": [(DepartmentEnum.VACUUM, 5), (DepartmentEnum.ASSEMBLY, 2)],
+    # 튜닝 (N)
+    "NR": [(DepartmentEnum.TUNING, 4), (DepartmentEnum.VACUUM, 2), (DepartmentEnum.ASSEMBLY, 1)],
+    "NA": [(DepartmentEnum.TUNING, 5), (DepartmentEnum.VACUUM, 2)],
+    "NF": [(DepartmentEnum.TUNING, 5), (DepartmentEnum.ASSEMBLY, 2)],
+    # 조립 (A)
+    "AR": [(DepartmentEnum.ASSEMBLY, 4), (DepartmentEnum.HIGH_VOLTAGE, 1), (DepartmentEnum.VACUUM, 1), (DepartmentEnum.TUBE, 1)],
     "AA": [(DepartmentEnum.ASSEMBLY, 5), (DepartmentEnum.SHIPPING, 2), (DepartmentEnum.HIGH_VOLTAGE, 1)],
     "AF": [(DepartmentEnum.ASSEMBLY, 5), (DepartmentEnum.SHIPPING, 2)],
-    "FG": [(DepartmentEnum.SHIPPING, 5), (DepartmentEnum.ASSEMBLY, 2), (DepartmentEnum.SALES, 1)],
-    "UK": [(DepartmentEnum.ETC, 3), (DepartmentEnum.ASSEMBLY, 2), (DepartmentEnum.RESEARCH, 1)],
+    # 출하 (P)
+    "PR": [(DepartmentEnum.SHIPPING, 4), (DepartmentEnum.ASSEMBLY, 2)],
+    "PA": [(DepartmentEnum.SHIPPING, 5), (DepartmentEnum.ASSEMBLY, 2)],
+    "PF": [(DepartmentEnum.SHIPPING, 5), (DepartmentEnum.SALES, 1)],
 }
+
+# 매핑 누락 시 폴백 — 어디 분류인지 모를 때 폭넓게 분포
+_FALLBACK_WEIGHTS: list[tuple[DepartmentEnum, int]] = [
+    (DepartmentEnum.ASSEMBLY, 3),
+    (DepartmentEnum.HIGH_VOLTAGE, 2),
+    (DepartmentEnum.VACUUM, 2),
+    (DepartmentEnum.TUBE, 2),
+    (DepartmentEnum.TUNING, 1),
+]
 
 
 def weighted_sample(weights: list[tuple[DepartmentEnum, int]], k: int) -> list[DepartmentEnum]:
@@ -86,7 +102,6 @@ def split_quantity(total: Decimal, n: int) -> list[Decimal]:
     for i in range(1, len(cuts)):
         parts.append(Decimal(cuts[i] - cuts[i - 1]))
     parts.append(total - Decimal(cuts[-1]))
-    # n보다 짧으면 패딩
     while len(parts) < n:
         parts.append(Decimal(0))
     return parts
@@ -136,8 +151,8 @@ def randomize(apply: bool = False) -> None:
                 if apply:
                     inv.quantity = total
 
-            cat_key = item.category.value if item.category else "UK"
-            dept_weights = CATEGORY_DEPT_WEIGHTS.get(cat_key, CATEGORY_DEPT_WEIGHTS["UK"])
+            ptype = item.process_type_code or ""
+            dept_weights = PROCESS_TYPE_DEPT_WEIGHTS.get(ptype, _FALLBACK_WEIGHTS)
 
             # 창고에 30-65% 보관
             wh_ratio = Decimal(str(round(random.uniform(0.30, 0.65), 4)))
@@ -175,7 +190,7 @@ def randomize(apply: bool = False) -> None:
 
             if not apply:
                 if updated < 5:
-                    print(f"[DRY] {item.item_name[:20]:<20} | 창고:{wh_qty:>6} | "
+                    print(f"[DRY] {item.item_name[:20]:<20} | {ptype:>2} | 창고:{wh_qty:>6} | "
                           f"부서:{'+'.join(f'{d.value}:{q}' for d, q in zip(depts, dept_splits))} | "
                           f"불량:{defective_qty} | 안전:{min_stock}")
                 updated += 1

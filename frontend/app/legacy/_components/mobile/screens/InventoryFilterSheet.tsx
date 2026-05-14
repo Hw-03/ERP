@@ -30,7 +30,7 @@ const DEPT_OPTIONS = [
 
 const TYPE_OPTIONS = [
   { label: "전체", value: "ALL" },
-  { label: "원자재(?R)", value: "RM" },
+  { label: "원자재(?R)", value: "RAW" },
   { label: "중간공정(?A)", value: "SEMI" },
   { label: "공정완료(?F)", value: "FIXED" },
 ];

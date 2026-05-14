@@ -17,13 +17,6 @@ export const MODEL_SLOTS = [
 
 export const UNIT_OPTIONS = ["EA", "SET", "kg", "g", "m", "mm", "L", "box"];
 
-export const PKG_CATEGORY_OPTIONS = [
-  { value: "ALL", label: "전체" },
-  { value: "?R",  label: "원자재" },
-  { value: "?A",  label: "중간공정" },
-  { value: "?F",  label: "공정완료" },
-];
-
 export const EMPTY_ADD_FORM = {
   item_name: "",
   process_type_code: "TR",
