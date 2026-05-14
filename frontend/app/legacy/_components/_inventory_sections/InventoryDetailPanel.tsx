@@ -43,50 +43,15 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* 품목 정보 */}
+      {/* 수량 현황 */}
       <section
         className="rounded-[28px] border p-5"
         style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
       >
         <div className="mb-3 text-sm font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
-          품목 정보
+          수량 현황
         </div>
         <div className="grid gap-3 text-base">
-          {item.erp_code && (
-            <div
-              className="rounded-[18px] border px-4 py-3"
-              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-            >
-              <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                품목 코드
-              </div>
-              <div className="mt-1 text-base font-bold" style={{ color: LEGACY_COLORS.blue }}>
-                {item.erp_code}
-              </div>
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <div
-              className="rounded-[18px] border px-4 py-3"
-              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-            >
-              <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                현재고
-              </div>
-              <div className="mt-1 text-xl font-black">{formatQty(item.quantity)}</div>
-            </div>
-            <div
-              className="rounded-[18px] border px-4 py-3"
-              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-            >
-              <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                안전재고
-              </div>
-              <div className="mt-1 text-xl font-black">
-                {item.min_stock == null ? "-" : formatQty(item.min_stock)}
-              </div>
-            </div>
-          </div>
           <div className="grid grid-cols-2 gap-3">
             <div
               className="rounded-[18px] border px-4 py-3"
@@ -128,37 +93,15 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
             </div>
             <div className="mt-1 text-base">{normalizeModel(item.legacy_model)}</div>
           </div>
-          {(item.unit || item.supplier) && (
-            <div className="grid grid-cols-2 gap-3">
-              <div
-                className="rounded-[18px] border px-4 py-3"
-                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-              >
-                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                  단위
-                </div>
-                <div className="mt-1 text-base">{item.unit || "-"}</div>
-              </div>
-              <div
-                className="rounded-[18px] border px-4 py-3"
-                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-              >
-                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                  공급처
-                </div>
-                <div className="mt-1 text-sm truncate">{item.supplier || "-"}</div>
-              </div>
-            </div>
-          )}
-          {item.spec && (
+          {item.supplier && (
             <div
               className="rounded-[18px] border px-4 py-3"
               style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
             >
               <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                스펙
+                공급처
               </div>
-              <div className="mt-1 text-base">{item.spec}</div>
+              <div className="mt-1 text-sm truncate">{item.supplier}</div>
             </div>
           )}
         </div>

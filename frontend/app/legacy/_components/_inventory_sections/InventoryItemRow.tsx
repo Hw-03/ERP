@@ -112,6 +112,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
             alt={item.item_name}
             width={48}
             height={48}
+            unoptimized
             className="inline-block rounded border object-contain"
             style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
           />
