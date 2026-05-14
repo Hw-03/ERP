@@ -93,8 +93,6 @@ export function IoDraftWorkCard({
   const [expanded, setExpanded] = useState(false);
 
   const meta = useMemo(() => {
-    const head = draft.bundles[0]?.title ?? "임시저장";
-    const extra = Math.max(0, draft.bundles.length - 1);
     const qty = draft.bundles.reduce(
       (sum, b) => sum + (Number(b.quantity) || 0),
       0,
@@ -122,8 +120,6 @@ export function IoDraftWorkCard({
         ? `${formatRelative(draft.created_at)} 시작`
         : null;
     return {
-      headTitle: head,
-      extraBundles: extra,
       totalQty: qty,
       lineCount: lines,
       deptLabel: dept,
@@ -183,23 +179,33 @@ export function IoDraftWorkCard({
         </span>
       </div>
 
-      {/* BOM 부모 제목 */}
-      <div className="mt-2">
-        <p
-          className="text-[20px] font-black leading-tight"
-          style={{ color: LEGACY_COLORS.text }}
-        >
-          {meta.headTitle}
-        </p>
-        {meta.extraBundles > 0 && (
-          <p
-            className="mt-0.5 text-[12px] font-semibold"
-            style={{ color: LEGACY_COLORS.muted2 }}
-          >
-            외 {meta.extraBundles}개 묶음
-          </p>
-        )}
-      </div>
+      {/* 묶음 제목 — 모든 묶음을 한 줄씩 나열 */}
+      <ul className="mt-2 space-y-0.5">
+        {draft.bundles.map((b) => {
+          const parentLine =
+            b.source_kind === "bom_parent"
+              ? (b.lines ?? []).find((l) => l.origin === "direct")
+              : null;
+          const displayQty = parentLine
+            ? Number(parentLine.quantity) || 0
+            : Number(b.quantity) || 0;
+          return (
+            <li
+              key={b.bundle_id}
+              className="flex items-baseline gap-1.5 overflow-hidden text-[16px] font-black leading-tight"
+              style={{ color: LEGACY_COLORS.text }}
+            >
+              <span className="min-w-0 truncate">{b.title}</span>
+              <span
+                className="shrink-0 tabular-nums text-[13px] font-bold"
+                style={{ color: LEGACY_COLORS.muted2 }}
+              >
+                ×{formatQty(displayQty)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
 
       {/* 메트릭: 수량(강조) · 자재 종수 · 부서 */}
       <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
