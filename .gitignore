@@ -65,3 +65,6 @@ backend/query_test.py
 
 # Obsidian vault (vault-sync 브랜치 전용, main에서 제외)
 vault/
+
+# 품목 이미지 추출 원본 (scripts/dev/extract_excel_images.py 재실행으로 재생성 가능)
+data/이미지 추출을 위한 원본/
