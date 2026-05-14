@@ -382,18 +382,33 @@ export function IoComposeView({
   useLayoutEffect(() => {
     const allSteps: IoStep[] = [1, 2, 3, 4, 5];
     const stepElements = { ...stepRefs.current };
-    // 매 호출마다 모든 wrapper height 초기화 — cleanup 의존하지 않음 (cleanup 누락 시 leftover 거대 height 방지)
-    for (const s of allSteps) {
-      const w = stepElements[s];
-      if (w) {
-        w.style.height = "";
-        w.style.minHeight = "";
-      }
-    }
 
     // step=3+bundles>0 시 Step 3 과 Step 4 둘 다 filled 처리 (사이즈 일관성).
     const targetSteps: IoStep[] =
       step === 3 && state.bundles.length > 0 ? [3 as IoStep, 4 as IoStep] : [step];
+    const targetSet = new Set<IoStep>(targetSteps);
+
+    // target 외 wrapper 만 reset. target 은 곧 새 height 로 덮어쓰므로 reset 단계 생략 — reset→set
+    // 사이 wrapper 가 자연 높이로 잠시 축소되면서 내부 표 컨테이너 scrollTop 이 clamp 되어
+    // BOM/낱개 추가 시 스크롤이 맨 위로 튀는 문제를 막는다.
+    for (const s of allSteps) {
+      const w = stepElements[s];
+      if (!w) continue;
+      if (targetSet.has(s)) continue;
+      if (w.style.height) w.style.height = "";
+      if (w.style.minHeight) w.style.minHeight = "";
+    }
+
+    // 내부 표/카트의 scrollTop snapshot — height 변동으로 인한 clamp 방지 안전망.
+    // marker: data-keep-scroll
+    const scrollSnapshots: Array<[HTMLElement, number]> = [];
+    for (const s of allSteps) {
+      const w = stepElements[s];
+      if (!w) continue;
+      w.querySelectorAll<HTMLElement>("[data-keep-scroll]").forEach((el) => {
+        if (el.scrollTop > 0) scrollSnapshots.push([el, el.scrollTop]);
+      });
+    }
 
     const firstWrapper = stepElements[targetSteps[0]];
     if (!firstWrapper) return;
@@ -440,10 +455,11 @@ export function IoComposeView({
             : BOTTOM;
       const newHeight = scrollContainer.clientHeight - wrapperTopInContainer - bottom;
       if (newHeight > 0) {
+        const next = `${newHeight}px`;
         if (s === 4) {
-          wrapper.style.minHeight = `${newHeight}px`;
+          if (wrapper.style.minHeight !== next) wrapper.style.minHeight = next;
         } else {
-          wrapper.style.height = `${newHeight}px`;
+          if (wrapper.style.height !== next) wrapper.style.height = next;
         }
       }
     }
@@ -468,13 +484,19 @@ export function IoComposeView({
         const currentSize =
           parseFloat(extendWrapper.style.minHeight || extendWrapper.style.height) || extendWrapper.offsetHeight;
         const nextSize = currentSize + scrollDeficit;
+        const next = `${nextSize}px`;
 
         if (extendStep === 4) {
-          extendWrapper.style.minHeight = `${nextSize}px`;
+          if (extendWrapper.style.minHeight !== next) extendWrapper.style.minHeight = next;
         } else {
-          extendWrapper.style.height = `${nextSize}px`;
+          if (extendWrapper.style.height !== next) extendWrapper.style.height = next;
         }
       }
+    }
+
+    // height 조정 후 표/카트 scrollTop 복원 — BOM/낱개 추가 시 스크롤 위치 유지.
+    for (const [el, top] of scrollSnapshots) {
+      if (el.scrollTop !== top) el.scrollTop = top;
     }
 
     return () => {

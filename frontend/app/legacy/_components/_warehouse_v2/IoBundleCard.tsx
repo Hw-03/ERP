@@ -1,6 +1,7 @@
 "use client";
 
-import { Layers, PackageCheck, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, ChevronUp, Layers, PackageCheck, Trash2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import type { IoBundle, IoLine, IoSubType, Item } from "./types";
@@ -35,9 +36,14 @@ export function IoBundleCard({
   const autoCount = bundle.lines.filter((line) => line.origin === "bom_auto").length;
   const hasAuto = autoCount > 0 || bundle.lines.some((line) => line.origin === "package_auto");
   const hasDirectLine = bundle.lines.some((line) => line.origin === "direct");
-  // 부모 라인이 없는 BOM 묶음(창고 입출고) — 기준 수량 stepper 로 자식 수량을 일괄 조절.
+  const directParentLine =
+    bundle.source_kind === "bom_parent"
+      ? bundle.lines.find((line) => line.origin === "direct")
+      : undefined;
+  // BOM 묶음 — 부모 라인이 있으면 부모 라인 수량을, 없으면 bundle.quantity 를 stepper 로 노출.
   const showBundleQtyStepper =
-    bundle.source_kind === "bom_parent" && !hasDirectLine && !!onBundleQuantityChange;
+    bundle.source_kind === "bom_parent" &&
+    (directParentLine != null || !!onBundleQuantityChange);
   const tone = bundle.source_kind === "ship_package" ? LEGACY_COLORS.purple : LEGACY_COLORS.blue;
   const compositionLabel = (() => {
     if (bundle.source_kind === "ship_package") return null;
@@ -48,17 +54,30 @@ export function IoBundleCard({
     }
     return "단품";
   })();
-  const bundleQty = Number(bundle.quantity) || 0;
+  const visibleLines = directParentLine
+    ? bundle.lines.filter((line) => line.line_id !== directParentLine.line_id)
+    : bundle.lines;
+  const isCollapsible = visibleLines.length > 0;
+  const [collapsed, setCollapsed] = useState(true);
+  const stepperQty = directParentLine
+    ? Number(directParentLine.quantity) || 0
+    : Number(bundle.quantity) || 0;
+  function applyStepperQty(next: number) {
+    const safe = Math.max(0, next);
+    if (directParentLine) {
+      // 부모 라인의 onQuantityChange 가 이미 bom_auto 자식들에게 bom_expected
+      // 비율로 cascade 시키므로 그 경로를 그대로 재사용한다.
+      onQuantityChange(directParentLine.line_id, safe, 0);
+    } else if (onBundleQuantityChange) {
+      onBundleQuantityChange(safe);
+    }
+  }
   function stepBundle(delta: number) {
-    if (!onBundleQuantityChange) return;
-    const next = Math.max(0, bundleQty + delta);
-    onBundleQuantityChange(next);
+    applyStepperQty(stepperQty + delta);
   }
   function setBundleFromInput(value: string) {
-    if (!onBundleQuantityChange) return;
     const next = Number(value);
-    const safe = Number.isFinite(next) ? Math.max(0, next) : 0;
-    onBundleQuantityChange(safe);
+    applyStepperQty(Number.isFinite(next) ? next : 0);
   }
 
   return (
@@ -71,16 +90,31 @@ export function IoBundleCard({
     >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (isCollapsible) setCollapsed((v) => !v);
+            }}
+            disabled={!isCollapsible}
+            className="flex min-w-0 items-center gap-2 text-left disabled:cursor-default"
+            title={isCollapsible ? (collapsed ? "펼치기" : "접기") : undefined}
+            aria-expanded={isCollapsible ? !collapsed : undefined}
+          >
             {bundle.source_kind === "ship_package" ? (
-              <PackageCheck className="h-5 w-5" style={{ color: LEGACY_COLORS.purple }} />
+              <PackageCheck className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.purple }} />
             ) : (
-              <Layers className="h-5 w-5" style={{ color: LEGACY_COLORS.blue }} />
+              <Layers className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
             )}
             <h3 className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
               {bundle.title}
             </h3>
-          </div>
+            {isCollapsible &&
+              (collapsed ? (
+                <ChevronDown className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
+              ) : (
+                <ChevronUp className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
+              ))}
+          </button>
           <div
             className="mt-1 flex flex-wrap items-center gap-1 text-xs font-semibold"
             style={{ color: LEGACY_COLORS.muted2 }}
@@ -99,7 +133,7 @@ export function IoBundleCard({
                     borderColor: tint(LEGACY_COLORS.red, 30),
                     color: LEGACY_COLORS.red,
                   }}
-                  disabled={bundleQty <= 0}
+                  disabled={stepperQty <= 0}
                 >
                   -10
                 </button>
@@ -112,7 +146,7 @@ export function IoBundleCard({
                     borderColor: tint(LEGACY_COLORS.red, 30),
                     color: LEGACY_COLORS.red,
                   }}
-                  disabled={bundleQty <= 0}
+                  disabled={stepperQty <= 0}
                 >
                   -1
                 </button>
@@ -120,7 +154,7 @@ export function IoBundleCard({
                   type="number"
                   min={0}
                   step="any"
-                  value={bundleQty}
+                  value={stepperQty}
                   onChange={(e) => setBundleFromInput(e.target.value)}
                   onFocus={(e) => e.currentTarget.select()}
                   className="w-[64px] rounded-[8px] border px-1.5 py-0.5 text-center text-sm font-black tabular-nums outline-none focus:border-[var(--c-blue)]"
@@ -191,25 +225,27 @@ export function IoBundleCard({
         </button>
       </div>
 
-      <ul
-        className="divide-y rounded-[12px] border"
-        style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
-      >
-        {bundle.lines.map((line) => (
-          <li key={line.line_id} style={{ borderColor: LEGACY_COLORS.border }}>
-            <IoLineRow
-              line={line}
-              subType={subType}
-              isChild={line.origin === "bom_auto"}
-              item={itemMap.get(line.item_id)}
-              available={getAvailable(line)}
-              onToggle={() => onToggleLine(line.line_id)}
-              onQuantityChange={(quantity, shortage) => onQuantityChange(line.line_id, quantity, shortage)}
-              onRemove={() => onRemoveLine(line.line_id)}
-            />
-          </li>
-        ))}
-      </ul>
+      {!collapsed && isCollapsible && (
+        <ul
+          className="divide-y rounded-[12px] border"
+          style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
+        >
+          {visibleLines.map((line) => (
+            <li key={line.line_id} style={{ borderColor: LEGACY_COLORS.border }}>
+              <IoLineRow
+                line={line}
+                subType={subType}
+                isChild={line.origin === "bom_auto"}
+                item={itemMap.get(line.item_id)}
+                available={getAvailable(line)}
+                onToggle={() => onToggleLine(line.line_id)}
+                onQuantityChange={(quantity, shortage) => onQuantityChange(line.line_id, quantity, shortage)}
+                onRemove={() => onRemoveLine(line.line_id)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
     </article>
   );
 }

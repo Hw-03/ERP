@@ -1,6 +1,15 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, ClipboardCheck } from "lucide-react";
+import { useState } from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  ClipboardCheck,
+  Layers,
+  PackageCheck,
+} from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
@@ -57,27 +66,6 @@ const APPROVAL_META: Record<
 
 type SectionKind = "in" | "out" | "move";
 
-function sectionLabels(subType: IoSubType): Record<SectionKind, string | null> {
-  if (subType === "produce") return { in: "입고되는 결과품", out: "출고되는 하위자재", move: null };
-  if (subType === "disassemble") return { in: "입고되는 회수품목", out: "출고되는 상위품목", move: null };
-  if (subType === "warehouse_to_dept") return { in: null, out: null, move: "이동 (창고 → 부서)" };
-  if (subType === "dept_to_warehouse") return { in: null, out: null, move: "이동 (부서 → 창고)" };
-  if (subType === "dept_transfer") return { in: null, out: null, move: "이동 (부서 ↔ 부서)" };
-  if (subType === "adjust_in") return { in: "단품 입고", out: null, move: null };
-  if (subType === "adjust_out") return { in: null, out: "단품 출고", move: null };
-  if (subType === "defect_quarantine") return { in: null, out: "불량 격리", move: null };
-  if (subType === "supplier_return") return { in: null, out: "공급처 반품", move: null };
-  if (subType === "receive_supplier") return { in: "입고되는 항목", out: null, move: null };
-  if (subType === "ship") return { in: null, out: "출고되는 항목", move: null };
-  return { in: "입고되는 항목", out: "출고되는 항목", move: "이동 항목" };
-}
-
-function bundleMode(bundle: IoBundle): "bom" | "single" {
-  if (bundle.source_kind === "bom_parent") return "bom";
-  if (bundle.lines.some((line) => line.origin === "bom_auto")) return "bom";
-  return "single";
-}
-
 function classifySection(line: IoLine): SectionKind | null {
   if (line.direction === "in") return "in";
   if (line.direction === "out") return "out";
@@ -116,22 +104,26 @@ export function IoConfirmStep({
     : subTypeLabel(subType);
   const allLines = bundles.flatMap((bundle) => bundle.lines);
   const includedLines = allLines.filter((line) => line.included);
-  const totalQty = includedLines.reduce(
+  // BOM 부모 라인(생산 결과품 등)은 묶음 카드 헤더에서 이미 표시되므로 표시 라인 목록에선 숨긴다.
+  const bomParentLineIds = new Set<string>();
+  for (const b of bundles) {
+    if (b.source_kind !== "bom_parent") continue;
+    for (const l of b.lines) {
+      if (l.origin === "direct") bomParentLineIds.add(l.line_id);
+    }
+  }
+  const visibleIncludedLines = includedLines.filter(
+    (line) => !bomParentLineIds.has(line.line_id),
+  );
+  const totalQty = visibleIncludedLines.reduce(
     (acc, line) => acc + (Number.isFinite(line.quantity) ? line.quantity : 0),
     0,
   );
 
-  const bundleModeMap = new Map(bundles.map((b) => [b.bundle_id, bundleMode(b)]));
-  const lineBundleMap = new Map<string, string>();
-  for (const b of bundles) {
-    for (const l of b.lines) lineBundleMap.set(l.line_id, b.bundle_id);
-  }
-  const sections = sectionLabels(subType);
-  const sectionLines: Record<SectionKind, IoLine[]> = { in: [], out: [], move: [] };
-  for (const line of includedLines) {
-    const kind = classifySection(line);
-    if (kind) sectionLines[kind].push(line);
-  }
+  const displayBundles = bundles.filter((b) =>
+    b.lines.some((l) => l.included && !bomParentLineIds.has(l.line_id)),
+  );
+
   const submitDisabled =
     submitting || includedLines.length === 0 || hasShortage || hasInvalidQuantity;
   const accent =
@@ -164,7 +156,7 @@ export function IoConfirmStep({
             {meta.summaryLabel}
           </div>
           <div className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
-            {headerLabel} · 반영 {includedLines.length}건 · 총 {formatQty(totalQty)}
+            {headerLabel} · 반영 {visibleIncludedLines.length}건 · 총 {formatQty(totalQty)}
           </div>
         </div>
         {isApproval ? (
@@ -186,27 +178,16 @@ export function IoConfirmStep({
         )}
       </div>
 
-      {/* 입고/출고/이동 섹션 */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]">
-        <div className="min-w-0 space-y-4">
-          {(["in", "out", "move"] as SectionKind[]).map((kind) => {
-            const label = sections[kind];
-            const lines = sectionLines[kind];
-            if (!label || lines.length === 0) return null;
-            return (
-              <LineSection
-                key={kind}
-                title={label}
-                kind={kind}
-                lines={lines}
-                bundleModeMap={bundleModeMap}
-                lineBundleMap={lineBundleMap}
-              />
-            );
-          })}
-        </div>
-
-        <div className="flex min-h-0 min-w-0 flex-col gap-4">
+      {/* 묶음 카드 목록 (1단 세로 스크롤) */}
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+        {displayBundles.map((bundle) => (
+          <ConfirmBundleCard
+            key={bundle.bundle_id}
+            bundle={bundle}
+            bomParentLineIds={bomParentLineIds}
+          />
+        ))}
+      </div>
 
       {/* 메모 */}
       <Field label="메모 (선택)" value={notes} onChange={onNotesChange} placeholder="작업 메모" />
@@ -242,104 +223,190 @@ export function IoConfirmStep({
         </div>
       )}
 
-          {/* 큰 한 줄 실행 버튼 (옛 ExecuteStep 패턴) */}
-          <div className="mt-auto pt-2">
-            <button
-              type="button"
-              onClick={onSubmit}
-              disabled={submitDisabled}
-              className="flex w-full items-center justify-center gap-3 rounded-[22px] px-7 py-7 text-xl font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
-              style={{ background: accent }}
-            >
-              {isCaution && !submitting && <AlertTriangle className="h-6 w-6" />}
-              {!isCaution && <ClipboardCheck className="h-6 w-6" />}
-              {submitting ? "처리 중..." : meta.submitText(includedLines.length)}
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* 큰 한 줄 실행 버튼 (옛 ExecuteStep 패턴) */}
+      <button
+        type="button"
+        onClick={onSubmit}
+        disabled={submitDisabled}
+        className="flex w-full items-center justify-center gap-3 rounded-[22px] px-7 py-7 text-xl font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
+        style={{ background: accent }}
+      >
+        {isCaution && !submitting && <AlertTriangle className="h-6 w-6" />}
+        {!isCaution && <ClipboardCheck className="h-6 w-6" />}
+        {submitting ? "처리 중..." : meta.submitText(includedLines.length)}
+      </button>
     </div>
   );
 }
 
-function LineSection({
-  title,
-  kind,
-  lines,
-  bundleModeMap,
-  lineBundleMap,
+function ConfirmBundleCard({
+  bundle,
+  bomParentLineIds,
 }: {
-  title: string;
-  kind: SectionKind;
-  lines: IoLine[];
-  bundleModeMap: Map<string, "bom" | "single">;
-  lineBundleMap: Map<string, string>;
+  bundle: IoBundle;
+  bomParentLineIds: Set<string>;
 }) {
-  const headerColor =
-    kind === "in" ? LEGACY_COLORS.green : kind === "out" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
-  const totalQty = lines.reduce((acc, l) => acc + (Number.isFinite(l.quantity) ? l.quantity : 0), 0);
+  const directParentLine =
+    bundle.source_kind === "bom_parent"
+      ? bundle.lines.find((line) => line.origin === "direct")
+      : undefined;
+  const visibleLines = bundle.lines.filter(
+    (line) => line.included && !bomParentLineIds.has(line.line_id),
+  );
+  const isSingle = bundle.source_kind === "direct_item";
+  const isCollapsible = !isSingle && visibleLines.length > 0;
+  const [collapsed, setCollapsed] = useState(true);
+
+  const tone =
+    bundle.source_kind === "ship_package" ? LEGACY_COLORS.purple : LEGACY_COLORS.blue;
+  // 헤더 우측 sign + 수량 결정용 대표 라인:
+  //   BOM   → 부모 라인 (생산 결과품 등)
+  //   단품  → 그 자체 단일 included 라인
+  //   패키지 → 첫 included 라인
+  const headerLine =
+    directParentLine ?? bundle.lines.find((line) => line.included) ?? null;
+  const headerDir = headerLine
+    ? signFor(headerLine)
+    : { sign: null as null, color: LEGACY_COLORS.muted2 };
+  const headerQty = headerLine ? formatQty(headerLine.quantity) : "";
+
   return (
-    <div
-      className="rounded-[18px] border"
-      style={{ background: LEGACY_COLORS.s2, borderColor: tint(headerColor, 30) }}
+    <article
+      className="rounded-[18px] border-2 p-4"
+      style={{
+        background: tint(tone, 6),
+        borderColor: tint(tone, 40),
+      }}
     >
-      <div
-        className="flex items-center justify-between px-5 py-3"
-        style={{ background: tint(headerColor, 6), borderBottom: `1px solid ${tint(headerColor, 30)}` }}
-      >
-        <span className="text-sm font-black uppercase tracking-[1.5px]" style={{ color: headerColor }}>
-          {title} · {lines.length}건
-        </span>
-        <span className="text-lg font-black tabular-nums" style={{ color: headerColor }}>
-          총 {formatQty(totalQty)}
-        </span>
+      <div className="flex items-start justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            if (isCollapsible) setCollapsed((v) => !v);
+          }}
+          disabled={!isCollapsible}
+          className="flex min-w-0 items-center gap-2 text-left disabled:cursor-default"
+          title={isCollapsible ? (collapsed ? "펼치기" : "접기") : undefined}
+          aria-expanded={isCollapsible ? !collapsed : undefined}
+        >
+          {bundle.source_kind === "ship_package" ? (
+            <PackageCheck className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.purple }} />
+          ) : (
+            <Layers className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
+          )}
+          <h3 className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
+            {bundle.title}
+          </h3>
+          {isCollapsible &&
+            (collapsed ? (
+              <ChevronDown className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
+            ) : (
+              <ChevronUp className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
+            ))}
+        </button>
+        {headerLine && (
+          <span
+            className="shrink-0 text-xl font-black tabular-nums"
+            style={{ color: headerDir.color }}
+          >
+            {headerDir.sign ?? ""}
+            {headerQty}
+          </span>
+        )}
       </div>
-      <ul className="divide-y" style={{ borderColor: LEGACY_COLORS.border }}>
-        {lines.map((line) => {
-          const mode = bundleModeMap.get(lineBundleMap.get(line.line_id) ?? "") ?? "single";
-          const isChild = line.origin === "bom_auto";
-          const dir = signFor(line);
-          return (
-            <li
+
+      {/* 헤더 메타 한 줄 */}
+      {isSingle && headerLine && (
+        <div
+          className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold"
+          style={{ color: LEGACY_COLORS.muted2 }}
+        >
+          <span>{headerLine.erp_code ?? "-"}</span>
+          {(headerLine.from_department || headerLine.to_department) && (
+            <span>
+              · {headerLine.from_department ?? "-"}
+              {headerLine.direction === "move" ? ` → ${headerLine.to_department ?? "-"}` : ""}
+            </span>
+          )}
+        </div>
+      )}
+
+      {bundle.source_kind === "bom_parent" && (
+        <div
+          className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold"
+          style={{ color: LEGACY_COLORS.muted2 }}
+        >
+          <span>반영 {visibleLines.length}개</span>
+          <span>·</span>
+          <span>BOM 자동 전개 · 상위 1 + 하위 {visibleLines.length}</span>
+        </div>
+      )}
+
+      {bundle.source_kind === "ship_package" && (
+        <div
+          className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold"
+          style={{ color: LEGACY_COLORS.muted2 }}
+        >
+          <span>반영 {visibleLines.length}개</span>
+          <span>·</span>
+          <span>패키지 자동</span>
+        </div>
+      )}
+
+      {/* 자식 ul (조건부) */}
+      {!collapsed && isCollapsible && (
+        <ul
+          className="mt-3 divide-y rounded-[12px] border"
+          style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
+        >
+          {visibleLines.map((line) => (
+            <ConfirmLineRow
               key={line.line_id}
-              className="flex min-h-[64px] items-center justify-between gap-4 px-5 py-3"
-              style={{
-                paddingLeft: isChild ? 40 : 20,
-                borderLeft: isChild ? `3px solid ${tint(LEGACY_COLORS.muted2, 30)}` : "none",
-              }}
-            >
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
-                  {line.item_name}
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                  <span>{line.erp_code ?? "-"}</span>
-                  {(line.from_department || line.to_department) && (
-                    <span>· {line.from_department ?? "-"}{line.direction === "move" ? ` → ${line.to_department ?? "-"}` : ""}</span>
-                  )}
-                  <span
-                    className="rounded-full px-2.5 py-1 text-[11px] font-bold"
-                    style={{
-                      background: tint(line.origin === "manual" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.blue, 14),
-                      color: line.origin === "manual" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.blue,
-                    }}
-                  >
-                    {mode === "bom" && line.origin !== "manual" ? "BOM" : "낱개"}
-                  </span>
-                </div>
-              </div>
-              <span
-                className="shrink-0 text-xl font-black tabular-nums"
-                style={{ color: dir.color }}
-              >
-                {dir.sign ?? ""}
-                {formatQty(line.quantity)}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+              line={line}
+              isChild={line.origin === "bom_auto" || line.origin === "package_auto"}
+            />
+          ))}
+        </ul>
+      )}
+    </article>
+  );
+}
+
+function ConfirmLineRow({ line, isChild }: { line: IoLine; isChild: boolean }) {
+  const dir = signFor(line);
+  return (
+    <li
+      className="flex min-h-[64px] items-center justify-between gap-4 px-5 py-3"
+      style={{
+        paddingLeft: isChild ? 40 : 20,
+        borderLeft: isChild ? `3px solid ${tint(LEGACY_COLORS.muted2, 30)}` : "none",
+      }}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
+          {line.item_name}
+        </div>
+        <div
+          className="flex flex-wrap items-center gap-2 text-xs font-semibold"
+          style={{ color: LEGACY_COLORS.muted2 }}
+        >
+          <span>{line.erp_code ?? "-"}</span>
+          {(line.from_department || line.to_department) && (
+            <span>
+              · {line.from_department ?? "-"}
+              {line.direction === "move" ? ` → ${line.to_department ?? "-"}` : ""}
+            </span>
+          )}
+        </div>
+      </div>
+      <span
+        className="shrink-0 text-xl font-black tabular-nums"
+        style={{ color: dir.color }}
+      >
+        {dir.sign ?? ""}
+        {formatQty(line.quantity)}
+      </span>
+    </li>
   );
 }
 

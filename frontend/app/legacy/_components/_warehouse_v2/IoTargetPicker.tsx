@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Plus, Search } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
@@ -146,6 +146,24 @@ export function IoTargetPicker({
   const [displayLimit, setDisplayLimit] = useState(INITIAL_DISPLAY_LIMIT);
   const operator = useCurrentOperator();
 
+  // 표 컨테이너 scrollTop 자체 보존 — BOM/낱개 추가 시 부모(IoComposeView) 의 wrapper height
+  // 조정 → 내부 maxScrollTop 일시 축소 → 브라우저가 scrollTop 을 0 으로 clamp 하는 현상을
+  // paint 후(useEffect) 시점에 사용자 마지막 위치로 되돌린다.
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const scrollPosRef = useRef(0);
+
+  function handleTableScroll(e: React.UIEvent<HTMLDivElement>) {
+    scrollPosRef.current = e.currentTarget.scrollTop;
+  }
+
+  useEffect(() => {
+    const el = tableContainerRef.current;
+    if (!el) return;
+    if (el.scrollTop !== scrollPosRef.current) {
+      el.scrollTop = scrollPosRef.current;
+    }
+  }, [bundles]);
+
   const showPackages = canPickPackages(workType);
   const actionMode = getItemActionMode(subType);
   const keyword = search.trim().toLowerCase();
@@ -284,6 +302,9 @@ export function IoTargetPicker({
 
       {/* 결과 영역 */}
       <div
+        ref={tableContainerRef}
+        onScroll={handleTableScroll}
+        data-keep-scroll
         className="scrollbar-hide min-h-0 flex-1 overflow-y-auto rounded-[16px] border"
         style={{
           background: LEGACY_COLORS.s2,
@@ -340,6 +361,8 @@ export function IoTargetPicker({
             deptIoDirection={deptIoDirection}
             bundleSubType={bundleSubType}
             bomParents={bomParents}
+            hasBomBundle={bundles.some((b) => b.source_kind === "bom_parent")}
+            hasSingleBundle={bundles.some((b) => b.source_kind === "direct_item")}
           />
         )}
       </div>
@@ -388,6 +411,8 @@ function ItemTable({
   deptIoDirection,
   bundleSubType,
   bomParents,
+  hasBomBundle,
+  hasSingleBundle,
 }: {
   items: Item[];
   displayLimit: number;
@@ -401,6 +426,8 @@ function ItemTable({
   deptIoDirection: DeptIoDirection | null;
   bundleSubType: IoSubType | null;
   bomParents: Set<string>;
+  hasBomBundle: boolean;
+  hasSingleBundle: boolean;
 }) {
   const isProcess = workType === "process" && deptIoDirection != null;
   const bomTarget = isProcess ? deptIoSubType(deptIoDirection!, "bom") : null;
@@ -584,10 +611,20 @@ function ItemTable({
                       );
                     })() : mode === "bom_or_single" ? (() => {
                       const hasBom = bomParents.has(item.item_id);
-                      const bomDisabled = busy || !hasBom;
-                      const bomTitle = hasBom
-                        ? "BOM 적용 — 하위 자재까지 같이 처리"
-                        : "등록된 BOM이 없습니다";
+                      // 한 작업 안에서 BOM 묶음과 낱개 묶음을 섞으면 백엔드가 거절 — 둘 중 한쪽이
+                      // 이미 카트에 있으면 반대쪽 버튼을 잠근다.
+                      const bomLockedByMode = hasSingleBundle;
+                      const singleLockedByMode = hasBomBundle;
+                      const bomDisabled = busy || bomLockedByMode || !hasBom;
+                      const singleDisabled = busy || singleLockedByMode;
+                      const bomTitle = !hasBom
+                        ? "등록된 BOM이 없습니다"
+                        : bomLockedByMode
+                          ? "낱개와 BOM은 같이 작업할 수 없습니다. 묶음을 비우고 다시 선택하세요."
+                          : "BOM 적용 — 하위 자재까지 같이 처리";
+                      const singleTitle = singleLockedByMode
+                        ? "낱개와 BOM은 같이 작업할 수 없습니다. 묶음을 비우고 다시 선택하세요."
+                        : "낱개 — 선택 품목만 처리";
                       return (
                         <>
                           <Tooltip content={bomTitle}>
@@ -607,16 +644,16 @@ function ItemTable({
                               BOM
                             </button>
                           </Tooltip>
-                          <Tooltip content="낱개 — 선택 품목만 처리">
+                          <Tooltip content={singleTitle}>
                             <button
                               type="button"
-                              disabled={busy}
+                              disabled={singleDisabled}
                               onClick={() => onAdd(item, "manual")}
                               className="rounded-[10px] border px-2.5 py-1 text-[12px] font-black disabled:opacity-50"
                               style={{
                                 background: LEGACY_COLORS.s2,
                                 borderColor: LEGACY_COLORS.border,
-                                color: LEGACY_COLORS.muted2,
+                                color: singleDisabled ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
                               }}
                             >
                               낱개
