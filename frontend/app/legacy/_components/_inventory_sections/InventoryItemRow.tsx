@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import Image from "next/image";
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -106,12 +107,11 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
         style={{ borderColor: LEGACY_COLORS.border, width: 60 }}
       >
         {imageFilename ? (
-          <img
+          <Image
             src={`/images/items/${imageFilename}`}
             alt={item.item_name}
             width={48}
             height={48}
-            loading="lazy"
             className="inline-block rounded border object-contain"
             style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
           />
