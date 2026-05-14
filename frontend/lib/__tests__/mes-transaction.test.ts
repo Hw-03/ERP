@@ -18,7 +18,7 @@ describe("mes/transaction barrel", () => {
   });
 
   it("getTransactionLabel returns Korean label for known type", () => {
-    expect(getTransactionLabel("RECEIVE")).toBe("입고");
+    expect(getTransactionLabel("RECEIVE")).toBe("원자재 입고");
     expect(getTransactionLabel("SCRAP")).toBe("폐기");
     expect(getTransactionLabel("TRANSFER_DEPT")).toBe("부서이동");
   });

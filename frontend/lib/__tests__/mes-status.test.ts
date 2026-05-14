@@ -90,7 +90,7 @@ describe("TRANSACTION_META", () => {
 
 describe("getTransactionLabel / getTransactionTone", () => {
   it("정의된 타입 — 매핑 반환", () => {
-    expect(getTransactionLabel("RECEIVE")).toBe("입고");
+    expect(getTransactionLabel("RECEIVE")).toBe("원자재 입고");
     expect(getTransactionTone("RECEIVE")).toBe("success");
     expect(getTransactionLabel("SCRAP")).toBe("폐기");
     expect(getTransactionTone("SCRAP")).toBe("danger");

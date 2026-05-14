@@ -6418,6 +6418,17 @@
             ],
             "title": "Reference No"
           },
+          "requester_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requester Name"
+          },
           "transaction_type": {
             "$ref": "#/components/schemas/TransactionTypeEnum"
           },
@@ -9160,6 +9171,24 @@
             }
           },
           {
+            "description": "쉼표 구분 복수 타입. 예: RECEIVE,SHIP",
+            "in": "query",
+            "name": "transaction_types",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "쉼표 구분 복수 타입. 예: RECEIVE,SHIP",
+              "title": "Transaction Types"
+            }
+          },
+          {
             "in": "query",
             "name": "reference_no",
             "required": false,
@@ -9189,6 +9218,56 @@
                 }
               ],
               "title": "Search"
+            }
+          },
+          {
+            "description": "포함 시작일 YYYY-MM-DD",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "포함 시작일 YYYY-MM-DD",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "포함 종료일 YYYY-MM-DD",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "포함 종료일 YYYY-MM-DD",
+              "title": "Date To"
+            }
+          },
+          {
+            "description": "archived_at 이 있는 레코드 포함 여부",
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "archived_at 이 있는 레코드 포함 여부",
+              "title": "Include Archived",
+              "type": "boolean"
             }
           },
           {
