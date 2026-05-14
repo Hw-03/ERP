@@ -43,7 +43,7 @@ export function HistoryScreen({
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
 
   // R8-3: items + calendarLogs fetch 는 별도 hook
-  const { items, calendarLogs, calendarLoading } = useMobileHistoryAux({
+  const { items, productModels, calendarLogs, calendarLoading } = useMobileHistoryAux({
     viewMode,
     calendarYear,
     calendarMonth,
@@ -62,7 +62,7 @@ export function HistoryScreen({
     groupedByDay,
     calendarDayMap,
     calendarDays,
-  } = useHistoryDerivations(logs, filters, items, calendarLogs, calendarYear, calendarMonth);
+  } = useHistoryDerivations(logs, filters, items, calendarLogs, calendarYear, calendarMonth, productModels);
 
   const activeFilterCount = countActiveHistoryFilters(filters);
   const todayKey = toDateKey(new Date().toISOString());

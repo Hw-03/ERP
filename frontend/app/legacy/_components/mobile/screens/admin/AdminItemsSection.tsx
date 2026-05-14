@@ -20,7 +20,6 @@ export function AdminItemsSection({ showToast }: { showToast: (toast: ToastState
     barcode: "",
     legacy_part: "",
     legacy_item_type: "",
-    legacy_model: "",
     supplier: "",
     min_stock: "",
   });
@@ -44,7 +43,6 @@ export function AdminItemsSection({ showToast }: { showToast: (toast: ToastState
       barcode: item.barcode || "",
       legacy_part: item.legacy_part || "",
       legacy_item_type: item.legacy_item_type || "",
-      legacy_model: item.legacy_model || "",
       supplier: item.supplier || "",
       min_stock: item.min_stock != null ? String(item.min_stock) : "",
     });
@@ -60,7 +58,6 @@ export function AdminItemsSection({ showToast }: { showToast: (toast: ToastState
         barcode: editForm.barcode || undefined,
         legacy_part: editForm.legacy_part || undefined,
         legacy_item_type: editForm.legacy_item_type || undefined,
-        legacy_model: editForm.legacy_model || undefined,
         supplier: editForm.supplier || undefined,
         min_stock: editForm.min_stock ? Number(editForm.min_stock) : undefined,
       });
@@ -125,7 +122,7 @@ export function AdminItemsSection({ showToast }: { showToast: (toast: ToastState
             <div>
               <div className="text-sm font-semibold">{item.item_name}</div>
               <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                {item.erp_code} · {item.legacy_part || "-"} · {item.legacy_model || "공용"}
+                {item.erp_code} · {item.legacy_part || "-"}
               </div>
             </div>
             <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>
@@ -214,7 +211,6 @@ export function AdminItemsSection({ showToast }: { showToast: (toast: ToastState
               ["barcode", "바코드"],
               ["legacy_part", "파트"],
               ["legacy_item_type", "분류"],
-              ["legacy_model", "모델"],
               ["supplier", "공급처"],
               ["min_stock", "안전재고"],
             ] as [keyof typeof editForm, string][]

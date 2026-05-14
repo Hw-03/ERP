@@ -19,13 +19,6 @@ export function buildItemSearchLabel(item: Item): string {
 }
 
 /**
- * Item 의 legacy_model 필드 → 표시용 모델명. 빈/공백은 "공용".
- */
-export function normalizeModel(value?: string | null): string {
-  return value && value.trim() ? value : "공용";
-}
-
-/**
  * Item 이 KPI 라벨 ("정상" / "부족" / "품절") 에 해당하는지 판정.
  *   - 정상: quantity > 0 && (min_stock 무 || quantity >= min_stock)
  *   - 부족: quantity > 0 && min_stock != null && quantity < min_stock

@@ -11,16 +11,6 @@ suffix 'F' = F타입(완성/출하성 — 창고 배치 불가).
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-# legacy_model → product_symbols.slot 매핑 (seed 시 호환용)
-LEGACY_MODEL_TO_SLOT: dict[str, int] = {
-    "DX3000":    1,
-    "COCOON":    2,
-    "SOLO":      3,
-    "ADX4000W":  4,
-    "ADX6000FB": 5,
-    "ADX6000":   5,
-}
-
 # slot → 표시 기호 (ProductSymbol 테이블의 새 값과 동기화)
 SLOT_TO_SYMBOL: dict[int, str] = {
     1: "3",   # DX3000
@@ -29,11 +19,6 @@ SLOT_TO_SYMBOL: dict[int, str] = {
     4: "4",   # ADX4000W
     5: "6",   # ADX6000FB
 }
-
-
-def infer_symbol_slot(legacy_model: str | None) -> int | None:
-    """legacy_model 로 product_symbols slot 번호 추론. 공용/null → None."""
-    return LEGACY_MODEL_TO_SLOT.get(legacy_model or "")
 
 
 def slots_to_model_symbol(slots: list[int]) -> str:

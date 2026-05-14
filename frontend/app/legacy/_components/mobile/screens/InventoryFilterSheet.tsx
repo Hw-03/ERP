@@ -11,7 +11,7 @@ export type KpiKey = "ALL" | "OK" | "LOW" | "ZERO";
 
 export type InventoryFilters = {
   department: string;
-  legacyModel: string;
+  modelSlot: number | null | "ALL";  // "ALL"=전체, null=공용, number=slot
   itemType: string;
   grouped: boolean;
   kpi: KpiKey;
@@ -57,12 +57,12 @@ export function InventoryFilterSheet({
   onReset: () => void;
   models: ProductModel[];
 }) {
-  const modelOptions = [
+  const modelOptions: { label: string; value: number | null | "ALL" }[] = [
     { label: "전체", value: "ALL" },
-    { label: "공용", value: "공용" },
+    { label: "공용", value: null },
     ...models
       .filter((m) => m.model_name)
-      .map((m) => ({ label: m.model_name as string, value: m.model_name as string })),
+      .map((m) => ({ label: m.model_name as string, value: m.slot })),
   ];
 
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
@@ -117,8 +117,8 @@ export function InventoryFilterSheet({
               <FilterChip
                 key={o.value}
                 label={o.label}
-                active={filters.legacyModel === o.value}
-                onClick={() => onChange({ ...filters, legacyModel: o.value })}
+                active={filters.modelSlot === o.value}
+                onClick={() => onChange({ ...filters, modelSlot: o.value })}
                 color={LEGACY_COLORS.cyan}
               />
             ))}
@@ -173,7 +173,7 @@ export function InventoryFilterSheet({
 export function countActiveFilters(f: InventoryFilters) {
   let n = 0;
   if (f.department !== "ALL") n++;
-  if (f.legacyModel !== "ALL") n++;
+  if (f.modelSlot !== "ALL") n++;
   if (f.itemType !== "ALL") n++;
   if (f.grouped) n++;
   if (f.kpi !== "ALL") n++;
@@ -183,6 +183,7 @@ export function countActiveFilters(f: InventoryFilters) {
 export function buildActiveFilterChips(
   f: InventoryFilters,
   onChange: (next: InventoryFilters) => void,
+  models: ProductModel[] = [],
 ): { key: string; label: string; tone: string; onRemove: () => void }[] {
   const chips: { key: string; label: string; tone: string; onRemove: () => void }[] = [];
   if (f.kpi !== "ALL") {
@@ -203,12 +204,16 @@ export function buildActiveFilterChips(
       onRemove: () => onChange({ ...f, department: "ALL" }),
     });
   }
-  if (f.legacyModel !== "ALL") {
+  if (f.modelSlot !== "ALL") {
+    const modelName =
+      f.modelSlot === null
+        ? "공용"
+        : (models.find((m) => m.slot === f.modelSlot)?.model_name ?? String(f.modelSlot));
     chips.push({
-      key: "legacyModel",
-      label: `모델: ${f.legacyModel}`,
+      key: "modelSlot",
+      label: `모델: ${modelName}`,
       tone: LEGACY_COLORS.cyan,
-      onRemove: () => onChange({ ...f, legacyModel: "ALL" }),
+      onRemove: () => onChange({ ...f, modelSlot: "ALL" }),
     });
   }
   if (f.itemType !== "ALL") {
@@ -234,7 +239,7 @@ export function buildActiveFilterChips(
 
 export const DEFAULT_INVENTORY_FILTERS: InventoryFilters = {
   department: "ALL",
-  legacyModel: "ALL",
+  modelSlot: "ALL",
   itemType: "ALL",
   grouped: false,
   kpi: "ALL",

@@ -3,7 +3,6 @@ import {
   getStockState,
   LEGACY_FILE_TYPES,
   LEGACY_PARTS,
-  LEGACY_MODELS,
 } from "../mes/inventory";
 import { LEGACY_COLORS } from "../mes/color";
 
@@ -40,10 +39,4 @@ describe("legacy filter constants", () => {
     expect(LEGACY_PARTS.length).toBe(6);
   });
 
-  it("LEGACY_MODELS includes 전체 + 5 X-Ray 모델", () => {
-    expect(LEGACY_MODELS[0]).toBe("전체");
-    expect(LEGACY_MODELS).toContain("DX3000");
-    expect(LEGACY_MODELS).toContain("ADX6000");
-    expect(LEGACY_MODELS.length).toBe(6);
-  });
 });

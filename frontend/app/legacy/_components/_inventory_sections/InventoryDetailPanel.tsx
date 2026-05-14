@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { api, type Item, type StockRequestReservationLine, type TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
-import { normalizeModel } from "@/lib/mes/item";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "../DepartmentsContext";
 import { InventoryDetailLogList } from "./InventoryDetailLogList";
@@ -83,15 +82,6 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
                 {formatQty(availableQty)}
               </div>
             </div>
-          </div>
-          <div
-            className="rounded-[18px] border px-4 py-3"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-          >
-            <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-              모델
-            </div>
-            <div className="mt-1 text-base">{normalizeModel(item.legacy_model)}</div>
           </div>
           {item.supplier && (
             <div

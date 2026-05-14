@@ -92,7 +92,7 @@ export function DesktopInventoryView({
       return;
     }
     void api
-      .getTransactions({ itemId: selectedItem.item_id, limit: 10 })
+      .getTransactions({ itemId: selectedItem.item_id, limit: 5 })
       .then(setItemLogs)
       .catch(() => setItemLogs([]));
   }, [selectedItem]);

@@ -87,7 +87,6 @@ export function matchesSearch(item: Item, keyword: string) {
     item.item_name,
     item.barcode ?? "",
     item.spec ?? "",
-    item.legacy_model ?? "",
     item.legacy_part ?? "",
     item.location ?? "",
   ]

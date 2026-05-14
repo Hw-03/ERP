@@ -177,7 +177,6 @@ export function ItemDetailSheet({
                   : []),
                 ["위치", item.location || "-"],
                 ["파트", item.legacy_part || "-"],
-                ["모델", item.legacy_model || "공용"],
                 ["공급처", item.supplier || "-"],
                 ["바코드", item.barcode || "-"],
                 ["안전재고", item.min_stock != null ? formatQty(item.min_stock) : "-"],

@@ -30,7 +30,6 @@ class ItemCreate(BaseModel):
     legacy_file_type: Optional[str] = Field(None, max_length=50)
     legacy_part: Optional[str] = Field(None, max_length=50)
     legacy_item_type: Optional[str] = Field(None, max_length=50)
-    legacy_model: Optional[str] = Field(None, max_length=50)
     supplier: Optional[str] = Field(None, max_length=200)
     min_stock: Optional[Decimal] = None
     initial_quantity: Optional[Decimal] = Field(None, description="초기 재고 수량 (기본 0)")
@@ -47,7 +46,6 @@ class ItemUpdate(BaseModel):
     legacy_file_type: Optional[str] = Field(None, max_length=50)
     legacy_part: Optional[str] = Field(None, max_length=50)
     legacy_item_type: Optional[str] = Field(None, max_length=50)
-    legacy_model: Optional[str] = Field(None, max_length=50)
     supplier: Optional[str] = Field(None, max_length=200)
     min_stock: Optional[Decimal] = None
     erp_code: Optional[str] = Field(None, max_length=40)
@@ -66,7 +64,6 @@ class ItemResponse(BaseModel):
     legacy_file_type: Optional[str] = None
     legacy_part: Optional[str] = None
     legacy_item_type: Optional[str] = None
-    legacy_model: Optional[str] = None
     supplier: Optional[str] = None
     min_stock: Optional[Decimal] = None
     # ERP code fields

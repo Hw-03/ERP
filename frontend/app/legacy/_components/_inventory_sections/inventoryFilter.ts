@@ -23,7 +23,6 @@ export function matchesSearch(item: Item, keyword: string): boolean {
     item.spec ?? "",
     item.location ?? "",
     item.supplier ?? "",
-    item.legacy_model ?? "",
     item.barcode ?? "",
   ]
     .join(" ")

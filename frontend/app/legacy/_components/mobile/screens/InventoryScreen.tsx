@@ -50,8 +50,8 @@ export function InventoryScreen({
 
   const activeFilterCount = countActiveFilters(filters);
   const activeChips = useMemo(
-    () => buildActiveFilterChips(filters, setFilters),
-    [filters],
+    () => buildActiveFilterChips(filters, setFilters, models),
+    [filters, models],
   );
   const toggleKpi = (next: InventoryFilters["kpi"]) =>
     setFilters((cur) => ({ ...cur, kpi: cur.kpi === next ? "ALL" : next }));

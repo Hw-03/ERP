@@ -3104,18 +3104,6 @@
             ],
             "title": "Legacy Item Type"
           },
-          "legacy_model": {
-            "anyOf": [
-              {
-                "maxLength": 50,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Legacy Model"
-          },
           "legacy_part": {
             "anyOf": [
               {
@@ -3275,17 +3263,6 @@
               }
             ],
             "title": "Legacy Item Type"
-          },
-          "legacy_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Legacy Model"
           },
           "legacy_part": {
             "anyOf": [
@@ -3477,18 +3454,6 @@
               }
             ],
             "title": "Legacy Item Type"
-          },
-          "legacy_model": {
-            "anyOf": [
-              {
-                "maxLength": 50,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Legacy Model"
           },
           "legacy_part": {
             "anyOf": [
@@ -3688,17 +3653,6 @@
               }
             ],
             "title": "Legacy Item Type"
-          },
-          "legacy_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Legacy Model"
           },
           "legacy_part": {
             "anyOf": [
@@ -10301,24 +10255,6 @@
               ],
               "description": "레거시 파트 필터",
               "title": "Legacy Part"
-            }
-          },
-          {
-            "description": "레거시 모델 필터",
-            "in": "query",
-            "name": "legacy_model",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "레거시 모델 필터",
-              "title": "Legacy Model"
             }
           },
           {

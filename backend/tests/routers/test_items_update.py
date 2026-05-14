@@ -47,7 +47,7 @@ def test_update_item_does_not_clear_process_type_code_when_omitted(client, make_
 
 
 def test_update_item_legacy_fields(client, make_item):
-    """legacy_file_type / legacy_part / legacy_item_type / legacy_model 갱신."""
+    """legacy_file_type / legacy_part / legacy_item_type 갱신."""
     item = make_item(name="레거시필드", process_type_code="TR")
 
     res = client.put(
@@ -56,7 +56,6 @@ def test_update_item_legacy_fields(client, make_item):
             "legacy_file_type": "FILE_A",
             "legacy_part": "PART_B",
             "legacy_item_type": "ITEM_C",
-            "legacy_model": "MODEL_D",
         },
     )
     assert res.status_code == 200, res.text
@@ -64,7 +63,6 @@ def test_update_item_legacy_fields(client, make_item):
     assert body["legacy_file_type"] == "FILE_A"
     assert body["legacy_part"] == "PART_B"
     assert body["legacy_item_type"] == "ITEM_C"
-    assert body["legacy_model"] == "MODEL_D"
     # process_type_code 는 그대로
     assert body["process_type_code"] == "TR"
 

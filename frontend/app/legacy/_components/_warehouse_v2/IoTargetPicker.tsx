@@ -76,10 +76,10 @@ function matchesStage(item: Item, stage: string) {
   return true;
 }
 
-function matchesModel(item: Item, model: string) {
-  if (model === "전체") return true;
-  if (model === "공용") return !item.legacy_model || item.legacy_model.trim() === "";
-  return item.legacy_model === model;
+function matchesModel(item: Item, selectedSlot: number | null | undefined) {
+  if (selectedSlot === undefined) return true;
+  if (selectedSlot === null) return item.model_slots.length === 0;
+  return item.model_slots.includes(selectedSlot);
 }
 
 // PRODUCTION 위치만 부서별로 합산. 0 이하는 제외해 tooltip noise 방지.
@@ -187,10 +187,14 @@ export function IoTargetPicker({
   }, [operator]);
 
   const filteredItems = useMemo(() => {
+    const selectedModelSlot =
+      model === "전체" ? undefined :
+      model === "공용" ? null :
+      (productModels.find((m) => m.model_name === model)?.slot ?? undefined);
     const filtered = items.filter(
       (item) =>
         matchesDept(item, dept) &&
-        matchesModel(item, model) &&
+        matchesModel(item, selectedModelSlot) &&
         matchesStage(item, stage) &&
         matchesSearch(item, keyword),
     );
@@ -217,7 +221,7 @@ export function IoTargetPicker({
             : a.idx - b.idx,
       )
       .map((row) => row.item);
-  }, [items, dept, model, stage, keyword, deptPriorityByLetter, assignedPriorityBySlot]);
+  }, [items, dept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot]);
 
   const parentCount = bundles.reduce(
     (acc, b) => acc + b.lines.filter((l) => l.origin === "direct" || l.origin === "manual").length,

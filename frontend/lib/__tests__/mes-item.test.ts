@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   buildItemSearchLabel,
-  normalizeModel,
   itemMatchesKpi,
   groupedItems,
 } from "../mes/item";
@@ -25,7 +24,6 @@ const stubItem = (overrides: Partial<Item> = {}): Item => ({
   legacy_file_type: null,
   legacy_part: null,
   legacy_item_type: null,
-  legacy_model: null,
   supplier: null,
   min_stock: null,
   erp_code: "ITM-AA-00001",
@@ -44,18 +42,6 @@ const stubItem = (overrides: Partial<Item> = {}): Item => ({
 describe("buildItemSearchLabel", () => {
   it("formats as 'erp / name'", () => {
     expect(buildItemSearchLabel(stubItem())).toBe("ITM-AA-00001 / Widget A");
-  });
-});
-
-describe("normalizeModel", () => {
-  it("returns trimmed model when present", () => {
-    expect(normalizeModel("DX3000")).toBe("DX3000");
-  });
-  it("returns '공용' for empty / null / whitespace", () => {
-    expect(normalizeModel(undefined)).toBe("공용");
-    expect(normalizeModel(null)).toBe("공용");
-    expect(normalizeModel("")).toBe("공용");
-    expect(normalizeModel("   ")).toBe("공용");
   });
 });
 

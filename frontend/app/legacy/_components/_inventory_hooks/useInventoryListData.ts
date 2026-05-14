@@ -56,7 +56,6 @@ export function useInventoryListData(
   const { items, loading, error, hasMore, loadMore, refetch } = useItems({
     search: deferredSearch,
     department: filters.department,
-    legacyModel: filters.legacyModel,
   });
 
   const filtered = useMemo(() => {
@@ -69,9 +68,11 @@ export function useInventoryListData(
       if (filters.itemType === "RM" && !R_SUFFIX(item.process_type_code)) return false;
       if (filters.itemType === "SEMI" && !A_SUFFIX(item.process_type_code)) return false;
       if (filters.itemType === "FIXED" && !F_SUFFIX(item.process_type_code)) return false;
+      if (filters.modelSlot === null && item.model_slots.length !== 0) return false;
+      if (typeof filters.modelSlot === "number" && !item.model_slots.includes(filters.modelSlot)) return false;
       return true;
     });
-  }, [items, filters.kpi, filters.itemType]);
+  }, [items, filters.kpi, filters.itemType, filters.modelSlot]);
 
   const rows: InventoryDisplayRow[] = useMemo(() => {
     if (!filters.grouped) {

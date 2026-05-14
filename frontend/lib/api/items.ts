@@ -21,7 +21,6 @@ export const itemsApi = {
       limit?: number;
       legacyFileType?: string;
       legacyPart?: string;
-      legacyModel?: string;
       legacyItemType?: string;
       barcode?: string;
       department?: string;
@@ -35,7 +34,6 @@ export const itemsApi = {
     if (params?.limit !== undefined) query.set("limit", String(params.limit));
     if (params?.legacyFileType) query.set("legacy_file_type", params.legacyFileType);
     if (params?.legacyPart) query.set("legacy_part", params.legacyPart);
-    if (params?.legacyModel) query.set("legacy_model", params.legacyModel);
     if (params?.legacyItemType) query.set("legacy_item_type", params.legacyItemType);
     if (params?.barcode) query.set("barcode", params.barcode);
     if (params?.department) query.set("department", params.department);
@@ -49,7 +47,6 @@ export const itemsApi = {
     process_type_code?: string;
     spec?: string;
     unit?: string;
-    legacy_model?: string;
     legacy_item_type?: string;
     supplier?: string;
     min_stock?: number;
@@ -69,7 +66,6 @@ export const itemsApi = {
       legacy_file_type?: string;
       legacy_part?: string;
       legacy_item_type?: string;
-      legacy_model?: string;
       supplier?: string;
       min_stock?: number;
       erp_code?: string;

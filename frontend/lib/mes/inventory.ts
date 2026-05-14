@@ -33,11 +33,8 @@ export function getStockState(quantity: number, minStock?: number | null): Stock
  * legacy 재고 필터 옵션 상수.
  *   - LEGACY_FILE_TYPES — 자료 종류 필터 (현재 "전체" 단일)
  *   - LEGACY_PARTS — 파트 (자재창고/조립출하/부서별 파트)
- *   - LEGACY_MODELS — 제품 모델 (X-Ray 장비 모델명)
  *
- * UI 의 select / chip 옵션 메타. Item 자체의 legacy_part / legacy_model 필드 값과
- * 매핑되며, "전체" 는 필터 미적용 의미 (DB 값 아님).
+ * UI 의 select / chip 옵션 메타. "전체" 는 필터 미적용 의미 (DB 값 아님).
  */
 export const LEGACY_FILE_TYPES = ["전체"] as const;
 export const LEGACY_PARTS = ["전체", "자재창고", "조립출하", "고압파트", "진공파트", "튜닝파트"] as const;
-export const LEGACY_MODELS = ["전체", "DX3000", "ADX4000W", "ADX6000", "COCOON", "SOLO"] as const;

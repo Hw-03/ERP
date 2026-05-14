@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type Item, type TransactionLog } from "@/lib/api";
+import { api, type Item, type ProductModel, type TransactionLog } from "@/lib/api";
 import { fetchMonthLogs } from "./useTransactions";
 
 /**
@@ -23,6 +23,7 @@ export interface UseMobileHistoryAuxOptions {
 
 export interface UseMobileHistoryAuxResult {
   items: Item[];
+  productModels: ProductModel[];
   calendarLogs: TransactionLog[];
   calendarLoading: boolean;
 }
@@ -30,15 +31,14 @@ export interface UseMobileHistoryAuxResult {
 export function useMobileHistoryAux(opts: UseMobileHistoryAuxOptions): UseMobileHistoryAuxResult {
   const { viewMode, calendarYear, calendarMonth } = opts;
   const [items, setItems] = useState<Item[]>([]);
+  const [productModels, setProductModels] = useState<ProductModel[]>([]);
   const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
 
-  // items: mount 시 1회 (필터 옵션 용도)
+  // items + productModels: mount 시 1회 (필터 옵션 용도)
   useEffect(() => {
-    void api
-      .getItems({ limit: 2000 })
-      .then(setItems)
-      .catch(() => {});
+    void api.getItems({ limit: 2000 }).then(setItems).catch(() => {});
+    void api.getModels().then(setProductModels).catch(() => {});
   }, []);
 
   // calendar logs: viewMode/year/month 변화 시
@@ -50,5 +50,5 @@ export function useMobileHistoryAux(opts: UseMobileHistoryAuxOptions): UseMobile
       .finally(() => setCalendarLoading(false));
   }, [viewMode, calendarYear, calendarMonth]);
 
-  return { items, calendarLogs, calendarLoading };
+  return { items, productModels, calendarLogs, calendarLoading };
 }

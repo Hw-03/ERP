@@ -44,7 +44,7 @@ from app.models import (
     ProductSymbol,
 )
 from app.services.pin_auth import DEFAULT_PIN_HASH
-from app.utils.erp_code import infer_symbol_slot, make_erp_code
+from app.utils.erp_code import make_erp_code
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +63,6 @@ _MIGRATION_DDL: list[str] = [
     "ALTER TABLE items ADD COLUMN legacy_file_type VARCHAR(50)",
     "ALTER TABLE items ADD COLUMN legacy_part VARCHAR(50)",
     "ALTER TABLE items ADD COLUMN legacy_item_type VARCHAR(50)",
-    "ALTER TABLE items ADD COLUMN legacy_model VARCHAR(50)",
     "ALTER TABLE items ADD COLUMN supplier VARCHAR(200)",
     "ALTER TABLE items ADD COLUMN min_stock NUMERIC(15,4)",
     # M1: 4-part ERP code
@@ -418,7 +417,7 @@ def backfill_erp_codes() -> int:
             if pt is None:
                 continue
 
-            slot = infer_symbol_slot(item.legacy_model)
+            slot = item.symbol_slot
             symbol = symbol_map.get(slot, "공") if slot else "공"
             opt = "BG" if pt == "PA" else None
 

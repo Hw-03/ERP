@@ -23,7 +23,7 @@ from app.schemas import (
     ItemUpdate,
     ItemWithInventory,
 )
-from app.utils.erp_code import infer_symbol_slot, make_erp_code, next_serial_no, slots_to_model_symbol
+from app.utils.erp_code import make_erp_code, next_serial_no, slots_to_model_symbol
 from app.models import ProductSymbol
 from app.services import audit
 from app.services import inventory as inventory_svc
@@ -87,7 +87,6 @@ def _to_item_with_inventory(
         legacy_file_type=item.legacy_file_type,
         legacy_part=item.legacy_part,
         legacy_item_type=item.legacy_item_type,
-        legacy_model=item.legacy_model,
         supplier=item.supplier,
         min_stock=item.min_stock,
         erp_code=item.erp_code,
@@ -124,8 +123,7 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         serial = next_serial_no(model_sym, pt, db)
         erp_code = make_erp_code(model_sym, pt, serial, opt)
 
-    # legacy symbol_slot: 단일 모델 지정 시 이전 호환용으로 유지
-    legacy_slot = infer_symbol_slot(payload.legacy_model) if not model_slots else (model_slots[0] if len(model_slots) == 1 else None)
+    legacy_slot = model_slots[0] if len(model_slots) == 1 else None
 
     item = Item(
         item_name=payload.item_name,
@@ -135,7 +133,6 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         legacy_file_type=payload.legacy_file_type,
         legacy_part=payload.legacy_part,
         legacy_item_type=payload.legacy_item_type,
-        legacy_model=payload.legacy_model,
         supplier=payload.supplier,
         min_stock=payload.min_stock,
         process_type_code=pt,
@@ -174,7 +171,6 @@ def list_items(
     search: Optional[str] = Query(None, description="품목명, 품목코드, 사양, 위치, 바코드 검색"),
     legacy_file_type: Optional[str] = Query(None, description="레거시 파일 구분 필터"),
     legacy_part: Optional[str] = Query(None, description="레거시 파트 필터"),
-    legacy_model: Optional[str] = Query(None, description="레거시 모델 필터"),
     department: Optional[str] = Query(None, description="부서 필터 (창고|조립|고압|진공|튜닝|튜브|출하|…)"),
     legacy_item_type: Optional[str] = Query(None, description="레거시 품목 유형 필터"),
     barcode: Optional[str] = Query(None, description="바코드 검색"),
@@ -192,9 +188,6 @@ def list_items(
 
     if legacy_part:
         query = query.filter(Item.legacy_part == legacy_part)
-
-    if legacy_model:
-        query = query.filter(Item.legacy_model.ilike(f"%{legacy_model}%"))
 
     if department:
         if department == "창고":
@@ -420,7 +413,7 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
     changed: list[str] = []
     for field in (
         "item_name", "spec", "process_type_code", "unit", "barcode",
-        "legacy_file_type", "legacy_part", "legacy_item_type", "legacy_model",
+        "legacy_file_type", "legacy_part", "legacy_item_type",
         "supplier", "min_stock", "option_code",
     ):
         new_val = getattr(payload, field)

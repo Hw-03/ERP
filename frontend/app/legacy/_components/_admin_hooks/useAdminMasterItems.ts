@@ -43,7 +43,7 @@ export type AdminMasterItemsState = {
   visibleItems: Item[];
   addItem: () => void;
   saveItemField: (
-    field: "item_name" | "spec" | "barcode" | "legacy_model" | "supplier" | "min_stock" | "unit" | "erp_code" | "process_type_code",
+    field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "erp_code" | "process_type_code",
     value: string,
   ) => void;
   updateItemFull: (payload: UpdateItemPayload) => void;
@@ -98,7 +98,7 @@ export function useAdminMasterItems({
   }
 
   async function _saveItemField(
-    field: "item_name" | "spec" | "barcode" | "legacy_model" | "supplier" | "min_stock" | "unit" | "erp_code" | "process_type_code",
+    field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "erp_code" | "process_type_code",
     value: string,
   ) {
     if (!selectedItem) return;

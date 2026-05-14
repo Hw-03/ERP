@@ -277,7 +277,6 @@ def seed_from_legacy_html() -> None:
 
             file_type = str(product.get("fileType") or "").strip() or None
             part = str(product.get("part") or "").strip() or None
-            model = str(product.get("model") or "").strip() or "공용"
             quantity = parse_decimal(product.get("stock"))
             min_stock = parse_decimal(product.get("minStock"))
 
@@ -291,7 +290,6 @@ def seed_from_legacy_html() -> None:
                 legacy_file_type=file_type,
                 legacy_part=part,
                 legacy_item_type=str(product.get("itemType") or "").strip() or None,
-                legacy_model=model,
                 supplier=str(product.get("supplier") or "").strip() or None,
                 min_stock=min_stock,
                 created_at=now,
@@ -396,8 +394,6 @@ def seed() -> None:
                 or "자재창고"
             )
             legacy_item_type = (row.get("part_type") or "").strip() or None
-            legacy_model_raw = (row.get("model_ref") or "").strip()
-            legacy_model = legacy_model_raw if legacy_model_raw else "공용"
             supplier = (row.get("supplier") or "").strip() or None
             min_stock = parse_decimal(row.get("safety_stock"))
 
@@ -418,7 +414,6 @@ def seed() -> None:
                 legacy_file_type=legacy_file_type,
                 legacy_part=legacy_part,
                 legacy_item_type=legacy_item_type,
-                legacy_model=legacy_model,
                 supplier=supplier,
                 min_stock=min_stock,
                 created_at=now,

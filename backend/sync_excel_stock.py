@@ -104,7 +104,6 @@ def apply_metadata(db, rows: list[dict[str, str]]) -> int:
                     Item.legacy_file_type: PROCESS_TYPE_TO_FILE_TYPE.get(raw_category_code, "미분류"),
                     Item.legacy_part: PROCESS_TYPE_TO_PART.get(raw_category_code, "자재창고"),
                     Item.legacy_item_type: normalize_text(row.get("part_type")) or None,
-                    Item.legacy_model: normalize_text(row.get("model_ref")) or "공용",
                     Item.supplier: normalize_text(row.get("supplier")) or None,
                     Item.min_stock: to_decimal(row.get("safety_stock")),
                 },

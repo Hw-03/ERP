@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { Item, TransactionLog, TransactionType } from "@/lib/api";
-import { normalizeModel } from "@/lib/mes/item";
+import type { Item, ProductModel, TransactionLog, TransactionType } from "@/lib/api";
 import type { HistoryFilters } from "../mobile/screens/HistoryFilterSheet";
 
 /**
@@ -72,11 +71,18 @@ export function useHistoryDerivations(
   calendarLogs: TransactionLog[],
   calendarYear: number,
   calendarMonth: number,
+  productModels: ProductModel[] = [],
 ): UseHistoryDerivationsResult {
-  const itemModelMap = useMemo(
-    () => new Map(items.map((item) => [item.item_id, normalizeModel(item.legacy_model)])),
-    [items],
-  );
+  const itemModelMap = useMemo(() => {
+    const slotToName = new Map(productModels.map((m) => [m.slot, m.model_name ?? "공용"]));
+    return new Map(
+      items.map((item) => {
+        const firstSlot = item.model_slots[0];
+        const name = firstSlot != null ? (slotToName.get(firstSlot) ?? "공용") : "공용";
+        return [String(item.item_id), name];
+      }),
+    );
+  }, [items, productModels]);
 
   const employeeNames = useMemo(() => {
     const names = Array.from(
