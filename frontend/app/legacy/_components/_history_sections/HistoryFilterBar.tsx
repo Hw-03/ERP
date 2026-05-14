@@ -3,7 +3,17 @@
 import { CalendarDays, List, Search, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common";
-import { DATE_OPTIONS, TYPE_OPTIONS } from "./historyShared";
+import { DATE_OPTIONS, TAB_LABELS, TAB_TYPE_MAP, TYPE_OPTIONS, type HistoryTab } from "./historyShared";
+
+// 탭별로 보여줄 유형 칩 필터링
+const WAREHOUSE_TYPE_VALUES = new Set(TAB_TYPE_MAP.WAREHOUSE?.split(","));
+const DEPT_TYPE_VALUES = new Set(TAB_TYPE_MAP.DEPT?.split(","));
+
+function getTypeOptionsForTab(tab: HistoryTab) {
+  if (tab === "ALL") return TYPE_OPTIONS;
+  const allowed = tab === "WAREHOUSE" ? WAREHOUSE_TYPE_VALUES : DEPT_TYPE_VALUES;
+  return TYPE_OPTIONS.filter((o) => o.value === "ALL" || allowed.has(o.value));
+}
 
 type Props = {
   search: string;
@@ -14,6 +24,8 @@ type Props = {
   setViewMode: (m: "list" | "calendar") => void;
   typeFilter: string;
   setTypeFilter: (v: string) => void;
+  historyTab: HistoryTab;
+  setHistoryTab: (t: HistoryTab) => void;
   totalCount: number;
 };
 
@@ -26,11 +38,35 @@ export function HistoryFilterBar({
   setViewMode,
   typeFilter,
   setTypeFilter,
+  historyTab,
+  setHistoryTab,
   totalCount,
 }: Props) {
+  const typeOptions = getTypeOptionsForTab(historyTab);
+
   return (
     <section className="card" style={{ paddingTop: 14, paddingBottom: 14 }}>
       <div className="flex flex-col gap-2.5">
+        {/* 0줄: 창고/부서 탭 */}
+        <div className="flex overflow-hidden rounded-[12px] border self-start" style={{ borderColor: LEGACY_COLORS.border }}>
+          {(["ALL", "WAREHOUSE", "DEPT"] as HistoryTab[]).map((tab) => {
+            const active = historyTab === tab;
+            return (
+              <button
+                key={tab}
+                onClick={() => { setHistoryTab(tab); setTypeFilter("ALL"); }}
+                className="px-4 py-2 text-xs font-bold transition-colors"
+                style={{
+                  background: active ? LEGACY_COLORS.blue : "transparent",
+                  color: active ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
+                }}
+              >
+                {TAB_LABELS[tab]}
+              </button>
+            );
+          })}
+        </div>
+
         {/* 1줄: 검색 + 기간 세그먼트 + 목록/달력 토글 */}
         <div className="flex items-center gap-2">
           <div
@@ -95,9 +131,9 @@ export function HistoryFilterBar({
           </div>
         </div>
 
-        {/* 2줄: 거래 유형 칩 */}
+        {/* 2줄: 거래 유형 칩 (탭 기준 필터링) */}
         <div className="flex flex-wrap items-center gap-1.5">
-          {TYPE_OPTIONS.map((opt) => (
+          {typeOptions.map((opt) => (
             <FilterChip key={opt.value} active={typeFilter === opt.value} label={opt.label} onClick={() => setTypeFilter(opt.value)} size="sm" />
           ))}
         </div>

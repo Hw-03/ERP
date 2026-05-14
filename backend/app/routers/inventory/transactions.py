@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import (
     Employee,
+    IoBatch,
     Inventory,
     Item,
     TransactionEditLog,
@@ -102,7 +103,9 @@ _TX_ROW_COLOR = {
 }
 
 
-def _to_log_response(log: TransactionLog, item: Item, edit_count: int = 0) -> TransactionLogResponse:
+def _to_log_response(
+    log: TransactionLog, item: Item, edit_count: int = 0, requester_name: Optional[str] = None
+) -> TransactionLogResponse:
     return TransactionLogResponse(
         log_id=log.log_id,
         item_id=log.item_id,
@@ -116,7 +119,9 @@ def _to_log_response(log: TransactionLog, item: Item, edit_count: int = 0) -> Tr
         quantity_after=log.quantity_after,
         reference_no=log.reference_no,
         produced_by=log.produced_by,
+        requester_name=requester_name,
         notes=log.notes,
+        operation_batch_id=log.operation_batch_id,
         created_at=log.created_at,
         edit_count=edit_count,
     )
@@ -149,8 +154,12 @@ def _verify_editor(db: Session, employee_id: uuid.UUID, pin: str) -> Employee:
 def list_transactions(
     item_id: Optional[uuid.UUID] = Query(None),
     transaction_type: Optional[TransactionTypeEnum] = Query(None),
+    transaction_types: Optional[str] = Query(None, description="쉼표 구분 복수 타입. 예: RECEIVE,SHIP"),
     reference_no: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
+    date_from: Optional[date] = Query(None, description="포함 시작일 YYYY-MM-DD"),
+    date_to: Optional[date] = Query(None, description="포함 종료일 YYYY-MM-DD"),
+    include_archived: bool = Query(False, description="archived_at 이 있는 레코드 포함 여부"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=2000),
     db: Session = Depends(get_db),
@@ -170,10 +179,30 @@ def list_transactions(
 
     if item_id:
         query = query.filter(TransactionLog.item_id == item_id)
+
+    # 복수 타입 필터 (transaction_type 단일값과 OR 합산)
+    type_set: set[TransactionTypeEnum] = set()
     if transaction_type:
-        query = query.filter(TransactionLog.transaction_type == transaction_type)
+        type_set.add(transaction_type)
+    if transaction_types:
+        for raw in transaction_types.split(","):
+            raw = raw.strip()
+            if raw:
+                try:
+                    type_set.add(TransactionTypeEnum(raw))
+                except ValueError:
+                    pass  # 잘못된 값 무시
+    if type_set:
+        query = query.filter(TransactionLog.transaction_type.in_(type_set))
+
     if reference_no:
         query = query.filter(TransactionLog.reference_no == reference_no)
+    if date_from:
+        query = query.filter(TransactionLog.created_at >= datetime.combine(date_from, time.min))
+    if date_to:
+        query = query.filter(TransactionLog.created_at <= datetime.combine(date_to, time.max))
+    if not include_archived:
+        query = query.filter(TransactionLog.archived_at.is_(None))
     if search:
         pattern = f"%{search}%"
         query = query.filter(
@@ -188,7 +217,17 @@ def list_transactions(
 
     rows = query.order_by(TransactionLog.created_at.desc()).offset(skip).limit(limit).all()
 
-    return [_to_log_response(log, item, int(edit_count or 0)) for log, item, edit_count in rows]
+    # operation_batch_id 기준으로 IoBatch 일괄 조회 → requester_name 매핑
+    batch_ids = {log.operation_batch_id for log, _, _ in rows if log.operation_batch_id}
+    batch_map: dict[uuid.UUID, str] = {}
+    if batch_ids:
+        batches = db.query(IoBatch.batch_id, IoBatch.requester_name).filter(IoBatch.batch_id.in_(batch_ids)).all()
+        batch_map = {b.batch_id: b.requester_name for b in batches}
+
+    return [
+        _to_log_response(log, item, int(edit_count or 0), requester_name=batch_map.get(log.operation_batch_id))
+        for log, item, edit_count in rows
+    ]
 
 
 @router.get("/transactions/export.csv")

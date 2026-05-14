@@ -42,6 +42,9 @@ function workTypeLabel(workType: IoWorkType) {
   return IO_WORK_TYPES.find((row) => row.id === workType)?.label ?? workType;
 }
 
+const AUTO_SCROLL_OFFSET = -2;
+const STEP4_SCROLL_OFFSET = 0;
+
 function findScrollContainer(startEl: HTMLElement): HTMLElement | null {
   let container: HTMLElement | null = startEl.parentElement;
   while (container) {
@@ -56,7 +59,7 @@ function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-function scrollToElement(container: HTMLElement, target: HTMLElement, offset = 12) {
+function scrollToElement(container: HTMLElement, target: HTMLElement, offset = AUTO_SCROLL_OFFSET) {
   const behavior = prefersReducedMotion() ? "auto" : "smooth";
   const getTop = () => {
     const containerRect = container.getBoundingClientRect();
@@ -349,6 +352,7 @@ export function IoComposeView({
   const stepState = (n: IoStep): "active" | "complete" | "locked" =>
     step === n ? "active" : step > n ? "complete" : "locked";
   const accent = LEGACY_COLORS.blue;
+  const stepWrapperClass = (n: IoStep) => `flex flex-col${step > n ? " pt-[9px]" : ""}`;
 
   // step 변경 시 직전(step-1) 카드를 viewport top으로 스크롤 → 그 아래 active step 카드가 자연스럽게 노출
   const stepRefs = useRef<Partial<Record<IoStep, HTMLDivElement | null>>>({});
@@ -397,10 +401,10 @@ export function IoComposeView({
     if (!scrollContainer) return;
 
     // top margin = gap-3 (12px). carbon 을 사이드바 bottom 까지 확장 — BOTTOM 음수 (clientH 측정이 실제 사이드바보다 작은 보정).
-    const TOP = 12;
     const BOTTOM = 12;
     const STEP2_BOTTOM = -21;
     const STEP3_EMPTY_BOTTOM = -21;
+    const STEP4_BOTTOM = 36;
     const STEP5_BOTTOM = -21;
     const GAP = 12;
 
@@ -416,13 +420,13 @@ export function IoComposeView({
         wrapperTopInContainer = wRect.top - cRect.top + scrollContainer.scrollTop;
       } else if (s === 4 && step === 3) {
         // Step 4 in step=3+bundles>0: picker advance 후 Step 4 가 viewport 차지.
-        wrapperTopInContainer = TOP;
+        wrapperTopInContainer = STEP4_SCROLL_OFFSET;
       } else {
         // Step 2/3/5: 접힌 이전 단계 카드 아래부터 active 카드가 차도록 계산.
         const prevStep: IoStep = (s - 1) as IoStep;
         const prevCollapsed = stepElements[prevStep];
         if (!prevCollapsed) continue;
-        wrapperTopInContainer = TOP + prevCollapsed.offsetHeight + GAP;
+        wrapperTopInContainer = AUTO_SCROLL_OFFSET + prevCollapsed.offsetHeight + GAP;
       }
 
       const bottom =
@@ -430,9 +434,11 @@ export function IoComposeView({
           ? STEP2_BOTTOM
           : s === 3 && state.bundles.length === 0
             ? STEP3_EMPTY_BOTTOM
-            : s === 5
-              ? STEP5_BOTTOM
-            : BOTTOM;
+            : s === 4
+              ? STEP4_BOTTOM
+              : s === 5
+                ? STEP5_BOTTOM
+                : BOTTOM;
       const newHeight = scrollContainer.clientHeight - wrapperTopInContainer - bottom;
       if (newHeight > 0) {
         const next = `${newHeight}px`;
@@ -454,11 +460,15 @@ export function IoComposeView({
           : null;
     const extendStep: IoStep = step === 3 && state.bundles.length > 0 ? 4 : step;
     const extendWrapper = stepElements[extendStep];
+    const alignOffset = step === 3 && state.bundles.length > 0 ? STEP4_SCROLL_OFFSET : AUTO_SCROLL_OFFSET;
 
     if (alignTarget && extendWrapper) {
       const cRect = scrollContainer.getBoundingClientRect();
       const tRect = alignTarget.getBoundingClientRect();
-      const desiredScrollTop = Math.max(0, scrollContainer.scrollTop + (tRect.top - cRect.top) - TOP);
+      const desiredScrollTop = Math.max(
+        0,
+        scrollContainer.scrollTop + (tRect.top - cRect.top) - alignOffset,
+      );
       const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
       const scrollDeficit = Math.ceil(desiredScrollTop - maxScrollTop);
 
@@ -481,16 +491,6 @@ export function IoComposeView({
       if (el.scrollTop !== top) el.scrollTop = top;
     }
 
-    return () => {
-      // unmount 시에도 모든 wrapper height 정리
-      for (const s of allSteps) {
-        const w = stepElements[s];
-        if (w) {
-          w.style.height = "";
-          w.style.minHeight = "";
-        }
-      }
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, state.bundles.length]);
 
@@ -515,9 +515,9 @@ export function IoComposeView({
           behavior: prefersReducedMotion() ? "auto" : "smooth",
         });
       } else {
-        // step 2 이후 — 직전(step-1) 카드를 container top + 12px (gap-3) 위치로 정렬.
+        // step 2 이후 — 직전(step-1) 카드를 container top 보다 살짝 위로 정렬.
         const targetEl = stepRefs.current[(step - 1) as IoStep];
-        if (targetEl) scrollToElement(container, targetEl, 12);
+        if (targetEl) scrollToElement(container, targetEl);
       }
     }, 150);
     return () => clearTimeout(timer);
@@ -540,7 +540,7 @@ export function IoComposeView({
 
       <div
         ref={(el) => { stepRefs.current[1] = el; }}
-        className="flex flex-col"
+        className={stepWrapperClass(1)}
       >
         <WizardStepCard
           n={1}
@@ -558,7 +558,7 @@ export function IoComposeView({
       {step >= 2 && (
         <div
           ref={(el) => { stepRefs.current[2] = el; }}
-          className="flex flex-col"
+          className={stepWrapperClass(2)}
         >
           <WizardStepCard
             n={2}
@@ -606,7 +606,7 @@ export function IoComposeView({
       {step >= 3 && (
         <div
           ref={(el) => { stepRefs.current[3] = el; }}
-          className="flex flex-col"
+          className={stepWrapperClass(3)}
         >
           <WizardStepCard
             n={3}
@@ -648,7 +648,7 @@ export function IoComposeView({
                 if (!scrollContainer) return;
                 // useLayoutEffect 가 set 한 height 가 paint 된 다음 프레임에 측정
                 requestAnimationFrame(() => {
-                  scrollToElement(scrollContainer, step4El, 12);
+                  scrollToElement(scrollContainer, step4El, STEP4_SCROLL_OFFSET);
                 });
               }}
               busy={previewing}
@@ -660,7 +660,7 @@ export function IoComposeView({
       {(step >= 4 || (step === 3 && state.bundles.length > 0)) && (
         <div
           ref={(el) => { stepRefs.current[4] = el; }}
-          className="flex flex-col"
+          className={stepWrapperClass(4)}
         >
           <WizardStepCard
             n={4}
@@ -817,7 +817,7 @@ export function IoComposeView({
       {step >= 5 && (
         <div
           ref={(el) => { stepRefs.current[5] = el; }}
-          className="flex flex-col"
+          className={stepWrapperClass(5)}
         >
           <WizardStepCard
             n={5}

@@ -19,7 +19,9 @@ export interface TransactionLog {
   transfer_qty: number | null;
   reference_no: string | null;
   produced_by: string | null;
+  requester_name: string | null;
   notes: string | null;
+  operation_batch_id: string | null;
   created_at: string;
   /** 3차: 수정 이력 개수 (서버 응답에 포함). */
   edit_count?: number;

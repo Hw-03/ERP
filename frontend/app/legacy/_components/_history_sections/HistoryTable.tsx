@@ -1,21 +1,21 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import type { TransactionLog } from "@/lib/api";
+import type { IoBatch } from "@/lib/api/types";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState, LoadingSkeleton } from "../common";
 import { formatHistoryDate } from "./historyShared";
 import { HistoryLogRow } from "./HistoryLogRow";
-import { BatchHeader, buildGroups } from "./historyTableHelpers";
+import { BatchHeader, OpBatchHeader, buildGroups } from "./historyTableHelpers";
+import { BomBatchDetail } from "./BomBatchDetail";
 
 type Props = {
   loading: boolean;
   filteredLogs: TransactionLog[];
   selectedLogId: string | undefined;
   onSelectLog: (log: TransactionLog) => void;
-  copiedRef: string | null;
-  onCopyRef: (ref: string, e: React.MouseEvent) => void;
   canLoadMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
@@ -23,14 +23,10 @@ type Props = {
 
 const COLUMNS: { label: string; width?: string; minWidth?: string }[] = [
   { label: "일시", width: "140px" },
-  { label: "구분", width: "80px" },
+  { label: "구분", width: "88px" },
   { label: "품목명", minWidth: "160px" },
-  { label: "코드", width: "90px" },
-  { label: "분류", width: "60px" },
-  { label: "수량", width: "70px" },
-  { label: "재고 변화", width: "80px" },
-  { label: "담당자", width: "90px" },
-  { label: "참조번호", width: "90px" },
+  { label: "수량변화", width: "80px" },
+  { label: "담당자", width: "100px" },
   { label: "메모", minWidth: "120px" },
 ];
 
@@ -39,28 +35,33 @@ export function HistoryTable({
   filteredLogs,
   selectedLogId,
   onSelectLog,
-  copiedRef,
-  onCopyRef,
   canLoadMore,
   loadingMore,
   onLoadMore,
 }: Props) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [batchCache, setBatchCache] = useState<Map<string, IoBatch>>(new Map());
 
   const groups = useMemo(() => buildGroups(filteredLogs), [filteredLogs]);
 
   const batchKeys = useMemo(
-    () => groups.flatMap((g) => (g.type === "batch" ? [g.refNo] : [])),
+    () => groups.flatMap((g) =>
+      g.type === "batch" ? [g.refNo] : g.type === "op_batch" ? [g.batchId] : []
+    ),
     [groups],
   );
 
-  function toggleGroup(refNo: string) {
+  function toggleGroup(key: string) {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
-      if (next.has(refNo)) next.delete(refNo);
-      else next.add(refNo);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
+  }
+
+  function handleCacheBatch(batchId: string, batch: IoBatch) {
+    setBatchCache((prev) => new Map(prev).set(batchId, batch));
   }
 
   const allExpanded = batchKeys.length > 0 && batchKeys.every((k) => expandedGroups.has(k));
@@ -126,21 +127,40 @@ export function HistoryTable({
                       key={group.log.log_id}
                       log={group.log}
                       selected={selectedLogId === group.log.log_id}
-                      copiedRef={copiedRef}
                       onSelect={onSelectLog}
-                      onCopyRef={onCopyRef}
                     />
                   );
                 }
+
+                if (group.type === "op_batch") {
+                  const expanded = expandedGroups.has(group.batchId);
+                  return (
+                    <Fragment key={`op-${group.batchId}`}>
+                      <OpBatchHeader
+                        group={group}
+                        expanded={expanded}
+                        onToggle={() => toggleGroup(group.batchId)}
+                      />
+                      {expanded && (
+                        <BomBatchDetail
+                          batchId={group.batchId}
+                          colSpan={COLUMNS.length}
+                          cache={batchCache}
+                          onCached={handleCacheBatch}
+                        />
+                      )}
+                    </Fragment>
+                  );
+                }
+
+                // type === "batch" (reference_no 기준 레거시 그룹)
                 const expanded = expandedGroups.has(group.refNo);
                 return (
-                  <>
+                  <Fragment key={`ref-${group.refNo}`}>
                     <BatchHeader
-                      key={`hdr-${group.refNo}`}
                       group={group}
                       expanded={expanded}
                       onToggle={() => toggleGroup(group.refNo)}
-                      colSpan={COLUMNS.length}
                     />
                     {expanded &&
                       group.logs.map((log) => (
@@ -148,12 +168,10 @@ export function HistoryTable({
                           key={log.log_id}
                           log={log}
                           selected={selectedLogId === log.log_id}
-                          copiedRef={copiedRef}
                           onSelect={onSelectLog}
-                          onCopyRef={onCopyRef}
                         />
                       ))}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>

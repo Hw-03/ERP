@@ -11,22 +11,23 @@ import { DesktopHistoryRightPanel } from "./_history_sections/DesktopHistoryRigh
 import { useHistoryData } from "./_hooks/useHistoryData";
 import {
   EXCEPTION_TYPES,
+  TAB_TYPE_MAP,
   getPeriodStart,
   parseUtc,
   toDateKey,
+  type HistoryTab,
 } from "./_history_sections/historyShared";
 
 export function DesktopHistoryView() {
-  // R7-HOOK1: logs/page/loading/loadingMore + 초기 fetch + loadMore 훅으로 분리
-  const { logs, setLogs, loading, loadingMore, canLoadMore, loadMore } = useHistoryData();
+  const [historyTab, setHistoryTab] = useState<HistoryTab>("ALL");
+  const { logs, setLogs, loading, loadingMore, canLoadMore, loadMore } = useHistoryData(historyTab);
 
   const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
   const [selected, setSelected] = useState<TransactionLog | null>(null);
   const [typeFilter, setTypeFilter] = useState("ALL");
-  const [dateFilter, setDateFilter] = useState("ALL");
+  const [dateFilter, setDateFilter] = useState("MONTH");
   const [search, setSearch] = useState("");
   const [calendarLoading, setCalendarLoading] = useState(false);
-  const [copiedRef, setCopiedRef] = useState<string | null>(null);
   const [itemRecentLogs, setItemRecentLogs] = useState<TransactionLog[]>([]);
 
   const [viewMode, setViewMode] = useState<"list" | "calendar">("calendar");
@@ -53,14 +54,33 @@ export function DesktopHistoryView() {
     if (viewMode !== "calendar") return;
     setCalendarLoading(true);
     setSelectedDay(null);
+
+    const firstDay = new Date(calendarYear, calendarMonth, 1);
+    const lastDay = new Date(calendarYear, calendarMonth + 1, 0);
+    const ymd = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+    const ctrl = new AbortController();
     void api
-      .getTransactions({ limit: 2000, skip: 0 })
+      .getTransactions(
+        {
+          limit: 2000,
+          skip: 0,
+          dateFrom: ymd(firstDay),
+          dateTo: ymd(lastDay),
+          transactionTypes: TAB_TYPE_MAP[historyTab],
+        },
+        { signal: ctrl.signal },
+      )
       .then((data) => {
         setCalendarLogs(data);
         setCalendarLoading(false);
       })
-      .catch(() => setCalendarLoading(false));
-  }, [viewMode]);
+      .catch((err) => {
+        if ((err as Error)?.name !== "AbortError") setCalendarLoading(false);
+      });
+    return () => ctrl.abort();
+  }, [viewMode, calendarYear, calendarMonth, historyTab]);
 
   function prevMonth() {
     if (calendarMonth === 0) {
@@ -154,14 +174,6 @@ export function DesktopHistoryView() {
     setSelected(result.original);
   }
 
-  function copyRef(ref: string, e: React.MouseEvent) {
-    e.stopPropagation();
-    void navigator.clipboard.writeText(ref).then(() => {
-      setCopiedRef(ref);
-      setTimeout(() => setCopiedRef(null), 1500);
-    });
-  }
-
   function handleSelectLog(log: TransactionLog) {
     setSelected((c) => (c?.log_id === log.log_id ? null : log));
   }
@@ -189,25 +201,37 @@ export function DesktopHistoryView() {
             setViewMode={setViewMode}
             typeFilter={typeFilter}
             setTypeFilter={setTypeFilter}
+            historyTab={historyTab}
+            setHistoryTab={setHistoryTab}
             totalCount={stats.total}
           />
 
           {viewMode === "calendar" && (
-            <HistoryCalendarStrip
-              calendarYear={calendarYear}
-              calendarMonth={calendarMonth}
-              prevMonth={prevMonth}
-              nextMonth={nextMonth}
-              calendarLoading={calendarLoading}
-              calendarDays={calendarDays}
-              calendarDayMap={calendarDayMap}
-              todayKey={todayKey}
-              selectedDay={selectedDay}
-              setSelectedDay={setSelectedDay}
-              selectedDayLogs={selectedDayLogs}
-              selectedLogId={selected?.log_id}
-              onSelectLog={handleSelectLog}
-            />
+            <>
+              <HistoryCalendarStrip
+                calendarYear={calendarYear}
+                calendarMonth={calendarMonth}
+                prevMonth={prevMonth}
+                nextMonth={nextMonth}
+                calendarLoading={calendarLoading}
+                calendarDays={calendarDays}
+                calendarDayMap={calendarDayMap}
+                todayKey={todayKey}
+                selectedDay={selectedDay}
+                setSelectedDay={setSelectedDay}
+              />
+              {selectedDay && (
+                <HistoryTable
+                  loading={false}
+                  filteredLogs={selectedDayLogs}
+                  selectedLogId={selected?.log_id}
+                  onSelectLog={handleSelectLog}
+                  canLoadMore={false}
+                  loadingMore={false}
+                  onLoadMore={() => {}}
+                />
+              )}
+            </>
           )}
 
           {viewMode === "list" && (
@@ -216,8 +240,6 @@ export function DesktopHistoryView() {
               filteredLogs={filteredLogs}
               selectedLogId={selected?.log_id}
               onSelectLog={handleSelectLog}
-              copiedRef={copiedRef}
-              onCopyRef={copyRef}
               canLoadMore={canLoadMore}
               loadingMore={loadingMore}
               onLoadMore={() => void loadMore()}

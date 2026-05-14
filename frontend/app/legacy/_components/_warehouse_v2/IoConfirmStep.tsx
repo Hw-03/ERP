@@ -141,7 +141,7 @@ export function IoConfirmStep({
     : null;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex h-full min-h-0 flex-col gap-5">
       {/* 작업 요약 */}
       <div
         className="flex flex-wrap items-center justify-between gap-4 rounded-[18px] border px-5 py-4"
@@ -178,7 +178,7 @@ export function IoConfirmStep({
       </div>
 
       {/* 묶음 카드 목록 (1단 세로 스크롤) */}
-      <div className="space-y-4 pr-1">
+      <div className="min-h-0 flex-1 overflow-y-auto space-y-4 pr-1">
         {displayBundles.map((bundle) => (
           <ConfirmBundleCard
             key={bundle.bundle_id}
@@ -189,7 +189,8 @@ export function IoConfirmStep({
       </div>
 
       {/* 메모 */}
-      <Field label="메모 (선택)" value={notes} onChange={onNotesChange} placeholder="작업 메모" />
+      <div className="mt-auto flex flex-col gap-5">
+        <Field label="메모 (선택)" value={notes} onChange={onNotesChange} placeholder="작업 메모" />
 
       {/* caution */}
       {isCaution && (
@@ -234,6 +235,7 @@ export function IoConfirmStep({
         {!isCaution && <ClipboardCheck className="h-6 w-6" />}
         {submitting ? "처리 중..." : meta.submitText(includedLines.length)}
       </button>
+      </div>
     </div>
   );
 }

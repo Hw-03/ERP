@@ -2,6 +2,21 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 
 export const HISTORY_PAGE_SIZE = 100;
 
+// 창고/부서 탭 구분
+export type HistoryTab = "ALL" | "WAREHOUSE" | "DEPT";
+
+export const TAB_LABELS: Record<HistoryTab, string> = {
+  ALL: "전체",
+  WAREHOUSE: "창고",
+  DEPT: "부서",
+};
+
+export const TAB_TYPE_MAP: Record<HistoryTab, string | undefined> = {
+  ALL: undefined,
+  WAREHOUSE: "RECEIVE,SHIP,ADJUST,SUPPLIER_RETURN,RETURN,RESERVE,RESERVE_RELEASE",
+  DEPT: "TRANSFER_TO_PROD,TRANSFER_TO_WH,TRANSFER_DEPT,MARK_DEFECTIVE,BACKFLUSH,PRODUCE,SCRAP,LOSS,DISASSEMBLE",
+};
+
 export const EXCEPTION_TYPES = new Set(["ADJUST", "SCRAP", "LOSS", "DISASSEMBLE", "MARK_DEFECTIVE"]);
 
 export const TYPE_OPTIONS = [

@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Check } from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
@@ -140,16 +140,26 @@ export function IoSubTypeStep({
   const showAnyDept = requiresDepartments(subType) && (dept.from || dept.to);
   const cautionTone =
     subType === "defect_quarantine" || subType === "supplier_return" ? LEGACY_COLORS.red : null;
+  const deptSectionCount = Number(showAnyDept && dept.from) + Number(showAnyDept && dept.to);
+  const nonProcessRows = !showAnyDept
+    ? "1fr"
+    : cautionTone && deptSectionCount === 1
+      ? "3fr 5fr 2fr"
+      : deptSectionCount >= 2
+        ? cautionTone
+          ? "3fr 3fr 3fr 2fr"
+          : "3fr 1fr 1fr"
+        : "4fr 6fr";
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-7">
+    <div className="grid h-full min-h-0 gap-6" style={{ gridTemplateRows: nonProcessRows }}>
       {/* 세부 작업 칩 */}
-      <div>
+      <div className="flex min-h-0 flex-col">
         <Step2Label label="세부 작업" />
         <div
-          className="grid gap-3"
+          className="grid min-h-0 flex-1 gap-4"
           style={{
-            gridTemplateColumns: `repeat(${Math.min(subRows.length, 4)}, minmax(0, 1fr))`,
+            gridTemplateColumns: `repeat(${Math.max(1, Math.min(subRows.length, 4))}, minmax(0, 1fr))`,
           }}
         >
           {subRows.map((row) => {
@@ -160,15 +170,14 @@ export function IoSubTypeStep({
                 type="button"
                 onClick={() => onSubTypeChange(row.id)}
                 title={row.description}
-                className="flex min-h-[60px] items-center justify-center gap-2 rounded-[16px] border px-4 py-4 text-base font-black transition-all hover:brightness-110"
+                className="flex h-full min-h-[120px] items-center justify-center rounded-[20px] border px-6 py-6 text-center transition-all hover:brightness-110"
                 style={{
                   background: active ? tint(LEGACY_COLORS.blue, 14) : LEGACY_COLORS.s2,
                   borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
                   color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
                 }}
               >
-                {active && <Check className="h-4 w-4" />}
-                {row.label}
+                <span className="text-3xl font-black leading-tight">{row.label}</span>
               </button>
             );
           })}
@@ -181,6 +190,7 @@ export function IoSubTypeStep({
           label={subType === "supplier_return" ? "반품할 부서 (불량 출처)" : subType === "defect_quarantine" ? "불량 격리 부서" : "출발 부서"}
           value={fromDepartment}
           onChange={onFromDepartmentChange}
+          fill
         />
       )}
       {showAnyDept && dept.to && (
@@ -197,20 +207,21 @@ export function IoSubTypeStep({
           }
           value={toDepartment}
           onChange={onToDepartmentChange}
+          fill
         />
       )}
 
       {/* caution */}
       {cautionTone && (
         <div
-          className="flex items-start gap-2 rounded-[14px] border p-3"
+          className="flex h-full min-h-[92px] items-center gap-4 rounded-[18px] border px-6 py-5"
           style={{
             background: tint(cautionTone, 8),
             borderColor: tint(cautionTone, 40),
           }}
         >
-          <AlertTriangle className="h-4 w-4 shrink-0" style={{ color: cautionTone }} />
-          <div className="text-[12px]" style={{ color: LEGACY_COLORS.text }}>
+          <AlertTriangle className="h-8 w-8 shrink-0" style={{ color: cautionTone }} />
+          <div className="text-base font-bold leading-relaxed" style={{ color: LEGACY_COLORS.text }}>
             {subType === "supplier_return"
               ? "공급업체 반품은 되돌릴 수 없습니다. 반품 부서(불량 출처)와 수량을 확인하세요."
               : "불량 격리는 재고가 격리 상태로 이동합니다. 대상 부서를 다시 한 번 확인하세요."}

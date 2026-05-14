@@ -411,6 +411,7 @@ class TransactionLogResponse(BaseModel):
     transfer_qty: Optional[Decimal] = None
     reference_no: Optional[str]
     produced_by: Optional[str]
+    requester_name: Optional[str] = None
     notes: Optional[str]
     operation_batch_id: Optional[uuid.UUID] = None
     created_at: datetime

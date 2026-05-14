@@ -3,10 +3,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { getTransactionLabel, transactionColor } from "@/lib/mes-status";
-import { formatQty } from "@/lib/mes/format";
-import { EmptyState } from "../common/EmptyState";
-import { formatHistoryDate } from "./historyShared";
 
 type Props = {
   calendarYear: number;
@@ -19,9 +15,6 @@ type Props = {
   todayKey: string;
   selectedDay: string | null;
   setSelectedDay: (key: string | null) => void;
-  selectedDayLogs: TransactionLog[];
-  selectedLogId: string | undefined;
-  onSelectLog: (log: TransactionLog) => void;
 };
 
 export function HistoryCalendarStrip({
@@ -35,9 +28,6 @@ export function HistoryCalendarStrip({
   todayKey,
   selectedDay,
   setSelectedDay,
-  selectedDayLogs,
-  selectedLogId,
-  onSelectLog,
 }: Props) {
   return (
     <section className="card">
@@ -88,9 +78,9 @@ export function HistoryCalendarStrip({
               const dayLogs = calendarDayMap.get(key) ?? [];
               const isToday = key === todayKey;
               const isSelected = key === selectedDay;
-              const hasReceive = dayLogs.some((l) => l.transaction_type === "RECEIVE" || l.transaction_type === "PRODUCE");
-              const hasShip = dayLogs.some((l) => l.transaction_type === "SHIP" || l.transaction_type === "BACKFLUSH");
-              const hasAdjust = dayLogs.some((l) => l.transaction_type === "ADJUST");
+              const hasReceive = dayLogs.some((l) => l.transaction_type === "RECEIVE");
+              const hasShip = dayLogs.some((l) => l.transaction_type === "TRANSFER_TO_PROD");
+              const hasException = dayLogs.some((l) => l.transaction_type === "ADJUST" || l.transaction_type === "MARK_DEFECTIVE" || l.transaction_type === "SUPPLIER_RETURN");
               return (
                 <button
                   key={key}
@@ -120,64 +110,13 @@ export function HistoryCalendarStrip({
                   <div className="mt-1 flex gap-0.5">
                     {hasReceive && <span className="h-1.5 w-1.5 rounded-full" style={{ background: LEGACY_COLORS.green }} />}
                     {hasShip && <span className="h-1.5 w-1.5 rounded-full" style={{ background: LEGACY_COLORS.red }} />}
-                    {hasAdjust && <span className="h-1.5 w-1.5 rounded-full" style={{ background: LEGACY_COLORS.yellow }} />}
+                    {hasException && <span className="h-1.5 w-1.5 rounded-full" style={{ background: LEGACY_COLORS.yellow }} />}
                   </div>
                 </button>
               );
             })}
           </div>
 
-          {/* 선택일 거래 목록 */}
-          {selectedDay && (
-            <div
-              className="mt-4 rounded-[20px] border p-4"
-              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-            >
-              <div className="mb-3 text-sm font-bold">
-                {selectedDay} 거래 {selectedDayLogs.length}건
-              </div>
-              {selectedDayLogs.length === 0 ? (
-                <EmptyState
-                  variant="no-data"
-                  compact
-                  title="거래 없음"
-                  description="선택한 날짜에 처리된 거래가 없습니다."
-                />
-              ) : (
-                <div className="space-y-2">
-                  {selectedDayLogs.map((log) => {
-                    const tcolor = transactionColor(log.transaction_type);
-                    return (
-                      <button
-                        key={log.log_id}
-                        onClick={() => onSelectLog(log)}
-                        className="flex w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition-all hover:brightness-110"
-                        style={{
-                          background: selectedLogId === log.log_id ? "rgba(101,169,255,.10)" : LEGACY_COLORS.s1,
-                          borderColor: selectedLogId === log.log_id ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                        }}
-                      >
-                        <span
-                          className="inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-bold"
-                          style={{ background: `color-mix(in srgb, ${tcolor} 14%, transparent)`, color: tcolor }}
-                        >
-                          {getTransactionLabel(log.transaction_type)}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-sm">{log.item_name}</span>
-                        <span className="shrink-0 text-sm font-bold" style={{ color: tcolor }}>
-                          {Number(log.quantity_change) >= 0 ? "+" : ""}
-                          {formatQty(log.quantity_change)}
-                        </span>
-                        <span className="shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                          {formatHistoryDate(log.created_at).split(" ")[1]}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
         </>
       )}
     </section>

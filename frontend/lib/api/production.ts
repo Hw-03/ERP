@@ -38,8 +38,12 @@ export const productionApi = {
     params?: {
       itemId?: string;
       transactionType?: TransactionType;
+      transactionTypes?: string; // 쉼표 구분 복수값. 예: "RECEIVE,SHIP"
       referenceNo?: string;
       search?: string;
+      dateFrom?: string; // YYYY-MM-DD
+      dateTo?: string;   // YYYY-MM-DD
+      includeArchived?: boolean;
       limit?: number;
       skip?: number;
     },
@@ -48,8 +52,12 @@ export const productionApi = {
     const query = new URLSearchParams();
     if (params?.itemId) query.set("item_id", params.itemId);
     if (params?.transactionType) query.set("transaction_type", params.transactionType);
+    if (params?.transactionTypes) query.set("transaction_types", params.transactionTypes);
     if (params?.referenceNo) query.set("reference_no", params.referenceNo);
     if (params?.search) query.set("search", params.search);
+    if (params?.dateFrom) query.set("date_from", params.dateFrom);
+    if (params?.dateTo) query.set("date_to", params.dateTo);
+    if (params?.includeArchived) query.set("include_archived", "true");
     if (params?.limit !== undefined) query.set("limit", String(params.limit));
     if (params?.skip !== undefined) query.set("skip", String(params.skip));
     return fetcher<TransactionLog[]>(

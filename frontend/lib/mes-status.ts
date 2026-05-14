@@ -66,7 +66,7 @@ export interface TransactionMeta {
 }
 
 export const TRANSACTION_META: Record<TransactionType, TransactionMeta> = {
-  RECEIVE: { label: "입고", tone: "success" },
+  RECEIVE: { label: "원자재 입고", tone: "success" },
   PRODUCE: { label: "생산입고", tone: "info" },
   SHIP: { label: "출고", tone: "info" },
   ADJUST: { label: "조정", tone: "warning" },
@@ -77,11 +77,11 @@ export const TRANSACTION_META: Record<TransactionType, TransactionMeta> = {
   RETURN: { label: "반품", tone: "neutral" },
   RESERVE: { label: "예약", tone: "warning" },
   RESERVE_RELEASE: { label: "예약해제", tone: "muted" },
-  TRANSFER_TO_PROD: { label: "생산이동", tone: "info" },
+  TRANSFER_TO_PROD: { label: "창고 반출", tone: "info" },
   TRANSFER_TO_WH: { label: "창고이동", tone: "info" },
   TRANSFER_DEPT: { label: "부서이동", tone: "info" },
-  MARK_DEFECTIVE: { label: "불량격리", tone: "danger" },
-  SUPPLIER_RETURN: { label: "공급반품", tone: "neutral" },
+  MARK_DEFECTIVE: { label: "불량", tone: "danger" },
+  SUPPLIER_RETURN: { label: "원자재 반품", tone: "neutral" },
 };
 
 /**

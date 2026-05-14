@@ -414,14 +414,18 @@ class TransactionLog(Base):
         server_default=func.now(),
         index=True,
     )
+    archived_at = Column(DateTime, nullable=True, index=True)
 
     item = relationship("Item", back_populates="transaction_logs")
     batch = relationship("QueueBatch", back_populates="transaction_logs")
 
     __table_args__ = (
         # 5.5-A: "품목 X 의 최근 거래 N건" / "기간 export" 쿼리 가속.
-        # 단일 item_id 인덱스 + created_at 인덱스 조합보다 복합이 효율적.
         Index("ix_tx_item_created", "item_id", "created_at"),
+        # 창고/부서 탭 필터 쿼리 가속 (transaction_type IN (...) + 날짜 정렬).
+        Index("ix_tx_type_created", "transaction_type", "created_at"),
+        # operation_batch_id 기반 배치 그룹 조회 가속.
+        Index("ix_tx_batch_created", "operation_batch_id", "created_at"),
     )
 
 
