@@ -1,28 +1,8 @@
 /**
  * Catalog 도메인 타입 — `@/lib/api/types/catalog`.
- * (ShipPackages + BOM)
+ * (BOM)
  * Round-10A (#2) 본문 이전.
  */
-
-export interface ShipPackageItemDetail {
-  package_item_id: string;
-  item_id: string;
-  erp_code: string | null;
-  item_name: string;
-  item_process_type_code: string | null;
-  item_unit: string;
-  quantity: number;
-}
-
-export interface ShipPackage {
-  package_id: string;
-  package_code: string;
-  name: string;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-  items: ShipPackageItemDetail[];
-}
 
 export interface BOMEntry {
   bom_id: string;

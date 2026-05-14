@@ -2,7 +2,7 @@
 
 import { LEGACY_COLORS } from "@/lib/mes/color";
 
-export type ItemDetailActionMode = "ADJUST" | "RECEIVE" | "SHIP";
+export type ItemDetailActionMode = "ADJUST" | "RECEIVE";
 
 /**
  * Round-13 (#14) 추출 — ItemDetailSheet 의 mode 선택 + 수량 입력 + 비고 + 제출 폼.
@@ -40,7 +40,6 @@ export function ItemDetailActionForm({
         {[
           { id: "ADJUST", label: "조정" },
           { id: "RECEIVE", label: "입고" },
-          { id: "SHIP", label: "출고" },
         ].map((action) => (
           <button
             key={action.id}
@@ -124,7 +123,7 @@ export function ItemDetailActionForm({
           className="mt-3 w-full rounded-xl py-[13px] text-[15px] font-bold disabled:opacity-50"
           style={{ background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white }}
         >
-          {saving ? "처리 중..." : mode === "ADJUST" ? "수정" : mode === "RECEIVE" ? "입고" : "출고"}
+          {saving ? "처리 중..." : mode === "ADJUST" ? "수정" : "입고"}
         </button>
       </div>
     </div>

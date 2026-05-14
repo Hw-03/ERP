@@ -97,10 +97,8 @@ export function ItemDetailSheet({
           quantity: numericQty,
           reason: notes || "레거시 UI 조정",
         });
-      } else if (mode === "RECEIVE") {
-        response = await api.receiveInventory(payload);
       } else {
-        response = await api.shipInventory(payload);
+        response = await api.receiveInventory(payload);
       }
 
       onSaved({

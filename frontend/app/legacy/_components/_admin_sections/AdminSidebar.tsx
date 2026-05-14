@@ -9,7 +9,6 @@ import {
   Layers,
   Lock,
   Network,
-  PackageOpen,
   PanelRight,
   ShieldCheck,
   Users,
@@ -31,7 +30,6 @@ export const SECTIONS: SectionMeta[] = [
   { id: "employees", label: "직원 관리", description: "직원 활성·권한·PIN 관리", icon: Users },
   { id: "departments", label: "부서 관리", description: "부서 추가·색상·구성원 관리", icon: Building2 },
   { id: "bom", label: "BOM 관리", description: "부모-자식 자재 구성 편집", icon: Network },
-  { id: "packages", label: "출하묶음 관리", description: "패키지 구성·포함 품목 편집", icon: PackageOpen },
   { id: "export", label: "내보내기", description: "엑셀 / CSV 데이터 내보내기", icon: Download },
 ];
 
@@ -44,7 +42,7 @@ export const SETTINGS_ENTRY: SectionMeta = {
 
 const SECTION_GROUPS: { title: string; ids: AdminSection[] }[] = [
   { title: "기준 정보", ids: ["models", "items", "employees", "departments"] },
-  { title: "구성 관리", ids: ["bom", "packages"] },
+  { title: "구성 관리", ids: ["bom"] },
   { title: "시스템", ids: ["export"] },
 ];
 

@@ -41,14 +41,13 @@
 |---|---|---|
 | `services/_tx.py` 의 `commit_and_refresh` / `commit_only` | ✅ Phase 3 | inventory 10곳 적용. |
 | `services/export_helpers.py` 의 `csv_streaming_response` | ✅ Phase 3 | inventory + items 보일러플레이트 단축. |
-| **에러 응답 dict 표준화 (`_errors.py`)** | ✅ **Phase 4** | `routers/_errors.py` + `ErrorCode` 신설. ship-package + production produce 가 `{code, message, extra}` 사용. 프론트 `extractErrorMessage` 가 str/dict 양쪽 처리. |
+| **에러 응답 dict 표준화 (`_errors.py`)** | ✅ **Phase 4** | `routers/_errors.py` + `ErrorCode` 신설. production produce 등이 `{code, message, extra}` 사용. 프론트 `extractErrorMessage` 가 str/dict 양쪽 처리. |
 | **전역 예외 핸들러 + 로그 회전** | ✅ **Phase 4** | `app/_logging.py` (RotatingFileHandler 5MB×5), `main.py` 에 ValueError/IntegrityError/OperationalError/Exception 핸들러. |
-| **inventory 라우터 패키지 분할** | ✅ **Phase 4** | 단일 807줄 → `routers/inventory/` 9개 파일 (query, receive, ship, transfer, defective, supplier, transactions, _shared, __init__). |
+| **inventory 라우터 패키지 분할** | ✅ **Phase 4** | 단일 807줄 → `routers/inventory/` (query, receive, transfer, defective, supplier, transactions, _shared, __init__). |
 | **export endpoint limit 강제** | ✅ **Phase 4** | `/transactions/export.csv|.xlsx` 가 `start_date/end_date` 필수 + 50,000행 상한. `EXPORT_RANGE_REQUIRED` / `EXPORT_RANGE_TOO_LARGE`. |
 | **stock_math bulk_compute 통일** | ✅ **Phase 4** | `get_item` 단건 + `list_inventory` 다건 모두 `bulk_compute` 경유. `to_response_bulk` 로 N+1 제거. |
 | **BOM Where-Used (read-only) API** | ✅ **Phase 4** | `GET /api/bom/where-used/{item_id}` 추가. DB 스키마 변경 없음. |
 | `transactional` 컨텍스트 매니저로 교체 | ⏸ 보류 | 책임 경계 재배치(서비스가 commit 소유)는 다음 사이클. 현재 라우터-주도 commit 으로도 이번 Phase 의 회귀 0건이 검증됨. |
-| `ship_package` 실제 bulk transaction 구현 | ⏸ 보류 | Phase 4 평가 제외 항목. 응답 dict 모양만 표준화하고 query 패턴은 유지. |
 | 운영 파일 위생(seed 폴더, alembic) | ⏸ 보류 | docker-compose 포트, 루트 erp.db 정리 등은 별도 사이클. Phase 4 는 .env.example 확장 + reconcile 스크립트만 추가. |
 
 이번 Phase 에서는 라우터의 `db.commit() + db.refresh(...)` 18회 반복 중 inventory.py의 10건을 `commit_and_refresh(db, *objs)` 단일 호출로 대체했다. **transaction 의미·commit 위치는 동일**(여전히 라우터 책임), 단지 호출 코드가 1줄로 단축됐다.
@@ -125,7 +124,7 @@ def post_receive(body: InventoryReceive, db: Session = Depends(get_db)):
 ### 진입 단위
 
 - 라우터 1개씩(`inventory.py` → `production.py` → `queue.py` → `items.py` → `bom.py` → ...) 점진 변환
-- 각 변환 후 통합 smoke 호출(`/api/inventory/receive`, `/ship`, `/transfer-*`, `/mark-defective`, `/return-to-supplier`, `/ship-package`) 으로 회귀 확인
+- 각 변환 후 통합 smoke 호출(`/api/inventory/receive`, `/transfer-*`, `/mark-defective`, `/return-to-supplier`) 으로 회귀 확인
 
 ## 2. 에러 응답 표준화
 
@@ -177,25 +176,8 @@ function extractErrorMessage(data: unknown): string {
 
 ### 우선 마이그레이션 대상
 
-- `POST /inventory/ship-package` (이미 dict 반환 — 정형화)
 - `POST /production/produce` (이미 shortages 반환 — 정형화)
-- `POST /inventory/ship`, `/transfer-to-production`, `/mark-defective`, `/return-to-supplier` 등 부분 실패가 의미 있는 엔드포인트
-
-## 3. ship-package N+1 / 부분 실패 롤백
-
-### 현재 상태
-
-`POST /inventory/ship-package` 가 패키지 안의 각 자재에 대해 루프로 `consume_from_department()` 를 호출한다. 매 호출마다 `_get_or_create_location` → 단건 SELECT 가 발생한다.
-
-또한 루프 도중 한 건이 실패하면 그 시점까지 수행된 차감이 롤백되지 않을 수 있다(서비스가 `db.flush()` 만 호출).
-
-### 권장
-
-1. `services.inventory.bulk_consume_from_department(db, items: list[(item_id, dept, qty)])` 신설
-   - 한 번의 SELECT로 (item_id, dept) 조합의 InventoryLocation 을 prefetch
-   - 한 번의 검증 라운드로 모든 부족분 수집 → 부족분이 있으면 차감 시작 전에 422 반환 (선처리 후 롤백 회피)
-   - 모든 검증 통과 후 일괄 차감 + transactional context 마감
-2. ship-package 라우터는 위 bulk 함수 1회 호출로 단순화
+- `POST /transfer-to-production`, `/mark-defective`, `/return-to-supplier` 등 부분 실패가 의미 있는 엔드포인트
 
 ## 4. CSV/XLSX export 중복
 
@@ -244,7 +226,6 @@ def write_xlsx(rows: Iterable[dict], headers: list[str], sheet_name: str) -> Str
 |---|---|---|---|
 | 1. commit/refresh 표준화 | 유지 | 유지 | 없음(응답 동일) |
 | 2. 에러 detail 표준화 | 유지(추가) | 유지 | 신규 detail 인식 추가 — 기존 str detail 는 그대로 처리 |
-| 3. ship-package bulk | 유지 | 유지 | 응답 모양 동일 |
 | 4. export 헬퍼 | 유지 | 유지 | 없음 |
 | 5. 운영 파일 위생 | 유지 | 유지 | 없음 |
 | 6. 로깅 | 유지 | 유지 | Topbar 점등과 연동만 |
@@ -265,11 +246,9 @@ GET  /health/detailed
 GET  /api/items
 GET  /api/inventory/summary
 POST /api/inventory/receive          (1건)
-POST /api/inventory/ship             (1건)
 POST /api/inventory/transfer-to-production
 POST /api/inventory/mark-defective
 POST /api/inventory/return-to-supplier
-POST /api/inventory/ship-package
 ```
 
 프론트 회귀:

@@ -1,6 +1,6 @@
 "use client";
 
-import type { Employee, Item, ShipPackage } from "@/lib/api";
+import type { Employee, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { TYPO } from "../../../tokens";
@@ -15,22 +15,17 @@ import { useDeptWizard } from "../context";
 export function StepConfirm({
   items,
   employee,
-  packages,
   onSubmit,
   onBack,
 }: {
   items: Item[];
   employee: Employee | null;
-  packages: ShipPackage[];
   onSubmit: () => void;
   onBack?: () => void;
 }) {
   const { state, dispatch } = useDeptWizard();
-  const pkg = packages.find((p) => p.package_id === state.packageId) ?? null;
-  const pkgQty = state.items.get("__PACKAGE__") ?? 1;
 
   const selectedList = Array.from(state.items.entries())
-    .filter(([id]) => id !== "__PACKAGE__")
     .map(([id, q]) => ({ item: items.find((i) => i.item_id === id), qty: q }))
     .filter((e): e is { item: Item; qty: number } => !!e.item);
 
@@ -64,55 +59,37 @@ export function StepConfirm({
         />
       </SectionCard>
 
-      {state.usePackage ? (
-        <SectionCard title="패키지" padding="sm">
-          <SectionCardRow label="이름" value={pkg ? pkg.name : "-"} />
-          <SectionCardRow
-            label="출하 수량"
-            value={pkg ? `${pkgQty}회` : "-"}
-            valueColor={LEGACY_COLORS.purple}
-          />
-          {pkg ? (
-            <SectionCardRow
-              label="구성"
-              value={`${pkg.items.length}개`}
-              valueColor={LEGACY_COLORS.muted2}
-            />
-          ) : null}
-        </SectionCard>
-      ) : (
-        <SectionCard
-          title={`품목 · ${selectedList.length}건 · 합계 ${formatQty(totalQty)}`}
-          padding="none"
-        >
-          <div className="max-h-[30vh] overflow-y-auto">
-            {selectedList.map((e, idx) => (
-              <div
-                key={e.item.item_id}
-                className="flex items-center justify-between px-4 py-2"
-                style={{
-                  borderBottom: idx === selectedList.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
-                }}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className={`${TYPO.body} truncate font-black`} style={{ color: LEGACY_COLORS.text }}>
-                    {e.item.item_name}
-                  </div>
-                  <div className={`${TYPO.caption} truncate`} style={{ color: LEGACY_COLORS.muted }}>
-                    {e.item.erp_code}
-                  </div>
+      <SectionCard
+        title={`품목 · ${selectedList.length}건 · 합계 ${formatQty(totalQty)}`}
+        padding="none"
+      >
+        <div className="max-h-[30vh] overflow-y-auto">
+          {selectedList.map((e, idx) => (
+            <div
+              key={e.item.item_id}
+              className="flex items-center justify-between px-4 py-2"
+              style={{
+                borderBottom: idx === selectedList.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
+              }}
+            >
+              <div className="min-w-0 flex-1">
+                <div className={`${TYPO.body} truncate font-black`} style={{ color: LEGACY_COLORS.text }}>
+                  {e.item.item_name}
                 </div>
-                <div
-                  className={`${TYPO.title} shrink-0 font-black tabular-nums`}
-                  style={{ color: LEGACY_COLORS.blue }}
-                >
-                  {formatQty(e.qty)} {e.item.unit}
+                <div className={`${TYPO.caption} truncate`} style={{ color: LEGACY_COLORS.muted }}>
+                  {e.item.erp_code}
                 </div>
               </div>
-            ))}
-          </div>
-        </SectionCard>
-      )}
+              <div
+                className={`${TYPO.title} shrink-0 font-black tabular-nums`}
+                style={{ color: LEGACY_COLORS.blue }}
+              >
+                {formatQty(e.qty)} {e.item.unit}
+              </div>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
 
       <SectionCard title="참조번호 · 비고" padding="sm">
         <div className="flex flex-col gap-2">
@@ -162,13 +139,9 @@ export function StepConfirm({
           ) : null}
           <PrimaryActionButton
             intent={intent}
-            label={
-              state.usePackage
-                ? `패키지 출하 확정 · ${pkgQty}회`
-                : `부서 ${directionLabel} 확정`
-            }
-            count={state.usePackage ? undefined : selectedList.length}
-            total={state.usePackage ? undefined : totalQty}
+            label={`부서 ${directionLabel} 확정`}
+            count={selectedList.length}
+            total={totalQty}
             onClick={onSubmit}
             disabled={state.submitting}
             loadingText="처리 중…"

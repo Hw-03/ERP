@@ -17,7 +17,6 @@ export type AdminSection =
   | "employees"
   | "models"
   | "bom"
-  | "packages"
   | "export"
   | "settings"
   | "departments";

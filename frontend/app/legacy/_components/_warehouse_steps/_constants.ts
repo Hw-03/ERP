@@ -2,7 +2,6 @@ import {
   AlertTriangle,
   ArrowLeftRight,
   Boxes,
-  PackageCheck,
   Workflow,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -14,7 +13,6 @@ export type WorkType =
   | "raw-io"
   | "warehouse-io"
   | "dept-adjustment"
-  | "package-out"
   | "defective-register";
 export type Direction = "in" | "out" | "return";
 export type TransferDirection = "wh-to-dept" | "dept-to-wh";
@@ -40,7 +38,6 @@ export const WORK_TYPES: { id: WorkType; label: string; icon: LucideIcon; descri
   { id: "raw-io",            label: "공급업체 입출고",  icon: Boxes,         description: "창고 입고 · 출고 · 공급업체 반품" },
   { id: "warehouse-io",      label: "창고 ↔ 부서 이동", icon: ArrowLeftRight, description: "창고↔생산부서 이동" },
   { id: "dept-adjustment",   label: "부서 재고 조정",   icon: Workflow,      description: "생산/분해/수량 보정" },
-  { id: "package-out",       label: "패키지 출하",      icon: PackageCheck,  description: "등록된 묶음 출고" },
   { id: "defective-register",label: "불량 격리",        icon: AlertTriangle, description: "불량 격리 처리" },
 ];
 
@@ -124,10 +121,7 @@ export function canEnterIO(op: OperatorLike): boolean {
 export function workTypesForOperator(op: OperatorLike): WorkType[] {
   if (!op) return [];
   if (isWarehouseStaff(op)) {
-    return ["raw-io", "warehouse-io", "dept-adjustment", "package-out", "defective-register"];
-  }
-  if (op.department === "조립" || op.department === "출하") {
-    return ["warehouse-io", "dept-adjustment", "package-out", "defective-register"];
+    return ["raw-io", "warehouse-io", "dept-adjustment", "defective-register"];
   }
   if (PROD_DEPTS.includes(op.department)) {
     return ["warehouse-io", "dept-adjustment", "defective-register"];

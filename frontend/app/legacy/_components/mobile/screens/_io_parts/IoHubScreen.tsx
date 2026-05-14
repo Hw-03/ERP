@@ -22,7 +22,7 @@ import { MyRequestsPanel } from "./MyRequestsPanel";
 
 export type IoHubTab = "compose" | "drafts" | "myRequests" | "approvals";
 
-const CAUTION_WORK_TYPES: WorkType[] = ["defective-register", "package-out"];
+const CAUTION_WORK_TYPES: WorkType[] = ["defective-register"];
 
 export function IoHubScreen({
   showToast,
@@ -69,12 +69,6 @@ export function IoHubScreen({
           message: "부서 입출고 화면으로 이동합니다.",
         });
         onChangeTab("dept");
-        break;
-      case "package-out":
-        showToast({
-          type: "info",
-          message: "패키지 출하 정밀 wizard 는 후속 라운드 예정 — 임시로 데스크탑에서 처리해 주세요.",
-        });
         break;
       case "defective-register":
         showToast({

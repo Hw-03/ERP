@@ -1,7 +1,7 @@
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
-import type { BOMDetailEntry, DepartmentMaster, Employee, Item, ShipPackage } from "@/lib/api";
+import type { BOMDetailEntry, DepartmentMaster, Employee, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { DeptManagementPanel } from "./DeptManagementPanel";
@@ -24,7 +24,6 @@ export interface AdminRightPanelContentProps {
 
   items: Item[];
   employees: Employee[];
-  packages: ShipPackage[];
   allBomRows: BOMDetailEntry[];
 }
 
@@ -39,7 +38,6 @@ export function AdminRightPanelContent({
   setMessage,
   items,
   employees,
-  packages,
   allBomRows,
 }: AdminRightPanelContentProps) {
   if (section === "departments") {
@@ -89,7 +87,6 @@ export function AdminRightPanelContent({
         {section === "items" && "품목 섹션에서는 이름, 바코드, 공급처, 모델 정보를 바로 수정할 수 있습니다."}
         {section === "employees" && "직원 섹션에서는 직원의 운영 상태를 빠르게 전환할 수 있습니다."}
         {section === "bom" && "BOM 섹션에서는 상위 품목을 기준으로 하위 자재를 추가하거나 제거할 수 있습니다."}
-        {section === "packages" && "출하묶음 섹션에서는 패키지를 만들고 구성 품목을 빠르게 추가할 수 있습니다."}
         {section === "export" && "엑셀 내보내기 섹션에서 품목·거래 데이터를 엑셀 파일로 다운로드할 수 있습니다."}
         {section === "settings" && "설정 섹션에서는 관리자 PIN 변경, 초기화를 관리합니다."}
       </div>
@@ -103,7 +100,6 @@ export function AdminRightPanelContent({
         <div className="space-y-2 text-base">
           <div>품목 {formatQty(items.length)}건</div>
           <div>직원 {formatQty(employees.length)}명</div>
-          <div>출하묶음 {formatQty(packages.length)}건</div>
           <div>BOM {formatQty(allBomRows.length)}건</div>
         </div>
       </div>

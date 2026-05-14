@@ -53,13 +53,6 @@
 | Backflush | `TransactionTypeEnum.BACKFLUSH` | 생산 입고 시 BOM 자식들을 자동 차감하는 동작. |
 | Where-Used | `/api/bom/where-used/{item_id}` | 역방향 추적. 이 자식이 어떤 parent 들에 들어가는지. (Phase 4 추가) |
 
-## 패키지 (출하 묶음)
-
-| 용어 | 코드 | 설명 |
-|---|---|---|
-| 패키지 | `ShipPackage` | 출하용 품목 묶음. BOM 과 별개. |
-| 패키지 출고 | `/api/inventory/ship-package` | 묶음 1건당 구성품을 한 번에 차감. 부족 시 `STOCK_SHORTAGE` 422. |
-
 ## 트랜잭션
 
 | 코드 | 의미 |

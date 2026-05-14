@@ -1,9 +1,9 @@
 /**
  * Inventory 도메인 API — `@/lib/api/inventory`.
  *
- * Round-6 (R6-D1) 분리. 11개 메소드:
+ * Round-6 (R6-D1) 분리. 9개 메소드:
  *   - getInventorySummary
- *   - receiveInventory / shipInventory / shipPackage
+ *   - receiveInventory
  *   - adjustInventory
  *   - transferToProduction / transferToWarehouse / transferBetweenDepts
  *   - markDefective / returnToSupplier
@@ -20,19 +20,6 @@ import type {
   InventorySummary,
 } from "./types";
 
-type ShipPackageMutationResponse = {
-  message: string;
-  package_name: string;
-  quantity: number;
-  items: {
-    item_id: string;
-    erp_code: string | null;
-    item_name: string;
-    quantity: number;
-    stock_after: number;
-  }[];
-};
-
 export const inventoryApi = {
   getInventorySummary: () => fetcher<InventorySummary>(toApiUrl("/api/inventory/summary")),
 
@@ -44,23 +31,6 @@ export const inventoryApi = {
     produced_by?: string;
     notes?: string;
   }) => postJson<InventoryMutationResponse>(toApiUrl("/api/inventory/receive"), payload),
-
-  shipInventory: (payload: {
-    item_id: string;
-    quantity: number;
-    location?: string;
-    reference_no?: string;
-    produced_by?: string;
-    notes?: string;
-  }) => postJson<InventoryMutationResponse>(toApiUrl("/api/inventory/ship"), payload),
-
-  shipPackage: (payload: {
-    package_id: string;
-    quantity: number;
-    reference_no?: string;
-    produced_by?: string;
-    notes?: string;
-  }) => postJson<ShipPackageMutationResponse>(toApiUrl("/api/inventory/ship-package"), payload),
 
   adjustInventory: (payload: {
     item_id: string;

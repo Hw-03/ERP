@@ -15,9 +15,8 @@ import {
 } from "../_warehouse_steps/_constants";
 import { DEPT_LETTER_TO_NAME, deptOf, stageOf, type DeptLetter } from "../_admin_sections/_bom_workbench/bomDept";
 import { LabeledSelect, SettingLabel } from "./_atoms";
-import type { IoBundle, IoSubType, IoWorkType, Item, ProductModel, ShipPackage } from "./types";
+import type { IoBundle, IoSubType, IoWorkType, Item, ProductModel } from "./types";
 import {
-  canPickPackages,
   deptIoSubType,
   getItemActionMode,
   type DeptIoDirection,
@@ -32,13 +31,11 @@ interface Props {
   bomParents: Set<string>;
   targetDepartment?: string | null;
   items: Item[];
-  packages: ShipPackage[];
   productModels: ProductModel[];
   bundles: IoBundle[];
   search: string;
   onSearchChange: (value: string) => void;
   onAddItem: (item: Item, sourceKind?: "direct_item" | "manual", subTypeOverride?: IoSubType) => void;
-  onAddPackage: (pkg: ShipPackage) => void;
   onAdvance: () => void;
   busy?: boolean;
 }
@@ -130,13 +127,11 @@ export function IoTargetPicker({
   bomParents,
   targetDepartment,
   items,
-  packages,
   productModels,
   bundles,
   search,
   onSearchChange,
   onAddItem,
-  onAddPackage,
   onAdvance,
   busy,
 }: Props) {
@@ -164,7 +159,6 @@ export function IoTargetPicker({
     }
   }, [bundles]);
 
-  const showPackages = canPickPackages(workType);
   const actionMode = getItemActionMode(subType);
   const keyword = search.trim().toLowerCase();
   const deptOptions = DEPT_OPTIONS;
@@ -225,13 +219,6 @@ export function IoTargetPicker({
       .map((row) => row.item);
   }, [items, dept, model, stage, keyword, deptPriorityByLetter, assignedPriorityBySlot]);
 
-  const filteredPackages = useMemo(() => {
-    if (!keyword) return packages;
-    return packages.filter((pkg) =>
-      `${pkg.package_code} ${pkg.name}`.toLowerCase().includes(keyword),
-    );
-  }, [packages, keyword]);
-
   const parentCount = bundles.reduce(
     (acc, b) => acc + b.lines.filter((l) => l.origin === "direct" || l.origin === "manual").length,
     0,
@@ -257,48 +244,32 @@ export function IoTargetPicker({
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       {/* 필터 */}
-      {!showPackages ? (
-        <div className="grid shrink-0 grid-cols-[1fr_1fr_1fr_2fr] gap-2">
-          <LabeledSelect label="부서" value={dept} onChange={setDept} options={deptOptions} />
-          <LabeledSelect label="모델" value={model} onChange={setModel} options={modelOptions} />
-          <LabeledSelect label="단계" value={stage} onChange={setStage} options={STAGE_OPTIONS} />
-          <label className="flex flex-col gap-0.5">
-            <span
-              className="text-[10px] font-bold uppercase tracking-[1.5px]"
-              style={{ color: LEGACY_COLORS.muted2 }}
-            >
-              검색
-            </span>
-            <div
-              className="flex items-center gap-1.5 rounded-[10px] border px-2 py-1.5"
-              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-            >
-              <Search className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-              <input
-                value={search}
-                onChange={(e) => onSearchChange(e.target.value)}
-                placeholder="품목명 · 품목 코드"
-                className="flex-1 bg-transparent text-sm outline-none"
-                style={{ color: LEGACY_COLORS.text }}
-              />
-            </div>
-          </label>
-        </div>
-      ) : (
-        <div
-          className="flex shrink-0 items-center gap-2 rounded-[12px] border px-3 py-2"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-        >
-          <Search className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-          <input
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="패키지명 · 코드"
-            className="flex-1 bg-transparent text-sm outline-none"
-            style={{ color: LEGACY_COLORS.text }}
-          />
-        </div>
-      )}
+      <div className="grid shrink-0 grid-cols-[1fr_1fr_1fr_2fr] gap-2">
+        <LabeledSelect label="부서" value={dept} onChange={setDept} options={deptOptions} />
+        <LabeledSelect label="모델" value={model} onChange={setModel} options={modelOptions} />
+        <LabeledSelect label="단계" value={stage} onChange={setStage} options={STAGE_OPTIONS} />
+        <label className="flex flex-col gap-0.5">
+          <span
+            className="text-[10px] font-bold uppercase tracking-[1.5px]"
+            style={{ color: LEGACY_COLORS.muted2 }}
+          >
+            검색
+          </span>
+          <div
+            className="flex items-center gap-1.5 rounded-[10px] border px-2 py-1.5"
+            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+          >
+            <Search className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
+            <input
+              value={search}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="품목명 · 품목 코드"
+              className="flex-1 bg-transparent text-sm outline-none"
+              style={{ color: LEGACY_COLORS.text }}
+            />
+          </div>
+        </label>
+      </div>
 
       {/* 결과 영역 */}
       <div
@@ -312,59 +283,22 @@ export function IoTargetPicker({
           overscrollBehavior: "contain",
         }}
       >
-        {showPackages ? (
-          filteredPackages.length === 0 ? (
-            <div className="px-3 py-6">
-              <EmptyState compact title="검색 결과 없음" description="다른 키워드를 시도하세요." />
-            </div>
-          ) : (
-            <ul className="divide-y" style={{ borderColor: LEGACY_COLORS.border }}>
-              {filteredPackages.map((pkg) => (
-                <li key={pkg.package_id}>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => onAddPackage(pkg)}
-                    className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left transition-colors hover:brightness-110 disabled:opacity-50"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
-                        {pkg.name}
-                      </span>
-                      <span className="block truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                        {pkg.package_code} · 구성 {pkg.items.length}개
-                      </span>
-                    </span>
-                    <span
-                      className="flex h-7 items-center gap-1 rounded-[10px] px-3 text-[11px] font-black text-white"
-                      style={{ background: LEGACY_COLORS.blue }}
-                    >
-                      <Plus className="h-3 w-3" />
-                      추가
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )
-        ) : (
-          <ItemTable
-            items={filteredItems}
-            displayLimit={displayLimit}
-            onShowMore={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
-            onAdd={onAddItem}
-            busy={busy}
-            hasActiveFilter={hasActiveFilter}
-            clearFilters={clearFilters}
-            mode={actionMode}
-            workType={workType}
-            deptIoDirection={deptIoDirection}
-            bundleSubType={bundleSubType}
-            bomParents={bomParents}
-            hasBomBundle={bundles.some((b) => b.source_kind === "bom_parent")}
-            hasSingleBundle={bundles.some((b) => b.source_kind === "direct_item")}
-          />
-        )}
+        <ItemTable
+          items={filteredItems}
+          displayLimit={displayLimit}
+          onShowMore={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
+          onAdd={onAddItem}
+          busy={busy}
+          hasActiveFilter={hasActiveFilter}
+          clearFilters={clearFilters}
+          mode={actionMode}
+          workType={workType}
+          deptIoDirection={deptIoDirection}
+          bundleSubType={bundleSubType}
+          bomParents={bomParents}
+          hasBomBundle={bundles.some((b) => b.source_kind === "bom_parent")}
+          hasSingleBundle={bundles.some((b) => b.source_kind === "direct_item")}
+        />
       </div>
 
       {/* 하단 advance 버튼 — 선택 품목 없으면 비활성 */}

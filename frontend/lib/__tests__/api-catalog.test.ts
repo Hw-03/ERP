@@ -36,17 +36,6 @@ describe("catalogApi.createModel", () => {
   });
 });
 
-describe("catalogApi.deleteShipPackage", () => {
-  it("DELETE /api/ship-packages/{id}", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await catalogApi.deleteShipPackage("pkg-1");
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/ship-packages/pkg-1");
-    const init = fetchSpy.mock.calls[0][1] as RequestInit;
-    expect(init.method).toBe("DELETE");
-  });
-});
-
 describe("catalogApi.getBOM", () => {
   it("GET /api/bom/{parentId}", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
@@ -74,43 +63,6 @@ describe("catalogApi 잔여 메소드", () => {
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
     await catalogApi.deleteModel(3);
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/models/3");
-  });
-
-  it("getShipPackages GET /api/ship-packages", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await catalogApi.getShipPackages();
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/ship-packages");
-  });
-
-  it("createShipPackage POST", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await catalogApi.createShipPackage({ package_code: "P1", name: "팩1" });
-    const init = fetchSpy.mock.calls[0][1] as RequestInit;
-    expect(init.method).toBe("POST");
-  });
-
-  it("updateShipPackage PUT /api/ship-packages/{id}", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await catalogApi.updateShipPackage("pkg-1", { name: "renamed" });
-    const init = fetchSpy.mock.calls[0][1] as RequestInit;
-    expect(init.method).toBe("PUT");
-  });
-
-  it("addShipPackageItem POST /api/ship-packages/{id}/items", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await catalogApi.addShipPackageItem("pkg-1", { item_id: "i1", quantity: 2 });
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/ship-packages/pkg-1/items");
-  });
-
-  it("deleteShipPackageItem DELETE", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await catalogApi.deleteShipPackageItem("pkg-1", "pi-1");
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/ship-packages/pkg-1/items/pi-1");
   });
 
   it("getAllBOM GET /api/bom", async () => {

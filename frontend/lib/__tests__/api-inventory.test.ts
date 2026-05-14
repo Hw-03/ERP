@@ -33,7 +33,7 @@ describe("inventoryApi.getInventorySummary", () => {
   });
 });
 
-describe("inventoryApi.receiveInventory / shipInventory", () => {
+describe("inventoryApi.receiveInventory", () => {
   it("receiveInventory POSTs to /api/inventory/receive", async () => {
     const fetchSpy = vi.fn(() =>
       Promise.resolve(makeResponse({ message: "ok" })),
@@ -44,15 +44,6 @@ describe("inventoryApi.receiveInventory / shipInventory", () => {
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/inventory/receive");
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body as string)).toEqual({ item_id: "i1", quantity: 5 });
-  });
-
-  it("shipInventory POSTs to /api/inventory/ship", async () => {
-    const fetchSpy = vi.fn(() =>
-      Promise.resolve(makeResponse({ message: "ok" })),
-    );
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await inventoryApi.shipInventory({ item_id: "i1", quantity: 5 });
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/inventory/ship");
   });
 });
 

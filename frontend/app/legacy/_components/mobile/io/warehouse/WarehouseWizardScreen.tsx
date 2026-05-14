@@ -111,27 +111,28 @@ export function WarehouseWizardScreen({ showToast }: { showToast: (toast: ToastS
       try {
         switch (state.mode) {
           case "whin":
-            await api.receiveInventory(payload);
-            break;
           case "d2wh":
             await api.receiveInventory(payload);
             break;
           case "wh2d":
-            await api.shipInventory(payload);
-            break;
           case "whout":
-            await api.shipInventory(payload);
-            break;
-          case "whreturn":
-            await api.shipInventory({
-              ...payload,
-              notes: baseNote
-                ? `[공급업체 반품] ${baseNote}`
-                : "[공급업체 반품]",
+          case "whreturn": {
+            // /api/inventory/ship 제거에 따라 창고 수량을 절대값으로 조정.
+            const currentWh = Number(item?.warehouse_qty ?? 0);
+            const next = Math.max(0, currentWh - qty);
+            const reasonPrefix =
+              state.mode === "whreturn" ? "[공급업체 반품]"
+                : state.mode === "whout" ? "[공급업체 출고]"
+                : "[창고→생산부]";
+            await api.adjustInventory({
+              item_id: itemId,
+              quantity: next,
+              reason: baseNote ? `${reasonPrefix} ${baseNote}` : reasonPrefix,
+              reference_no: state.referenceNo || undefined,
+              produced_by: producedBy,
             });
             break;
-          default:
-            await api.shipInventory(payload);
+          }
         }
       } catch {
         failures.push(item?.item_name ?? itemId);

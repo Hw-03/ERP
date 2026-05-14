@@ -6,7 +6,6 @@ Phase 4 에서 단일 파일(routers/inventory.py 807줄)을 책임 단위로 �
 서브 모듈:
 - query        — /summary, /locations/{item_id}
 - receive      — /receive, /adjust
-- ship         — /ship, /ship-package
 - transfer     — /transfer-to-production, /transfer-to-warehouse, /transfer-between-depts
 - defective    — /mark-defective
 - supplier     — /return-to-supplier
@@ -29,7 +28,6 @@ from . import (
     defective,
     query,
     receive,
-    ship,
     supplier,
     transactions,
     transfer,
@@ -45,7 +43,6 @@ router.include_router(transactions.router)
 router.include_router(query.router)
 router.include_router(weekly_report.router)
 router.include_router(receive.router)
-router.include_router(ship.router)
 router.include_router(transfer.router)
 router.include_router(defective.router)
 router.include_router(supplier.router)

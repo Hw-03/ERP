@@ -1,16 +1,14 @@
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
-import type { BOMDetailEntry, DepartmentMaster, Employee, Item, ProductModel, ShipPackage } from "@/lib/api";
+import type { BOMDetailEntry, DepartmentMaster, Employee, Item, ProductModel } from "@/lib/api";
 import { api } from "@/lib/api";
 import { AdminMasterItemsSection } from "./AdminMasterItemsSection";
 import { AdminEmployeesSection } from "./AdminEmployeesSection";
 import { BomWorkbench } from "./_bom_workbench/BomWorkbench";
-import { AdminPackagesProvider } from "./AdminPackagesContext";
 import { AdminMasterItemsProvider } from "./AdminMasterItemsContext";
 import { AdminEmployeesProvider } from "./AdminEmployeesContext";
 import { AdminModelsProvider } from "./AdminModelsContext";
-import { AdminPackagesSection } from "./AdminPackagesSection";
 import { AdminModelsSection } from "./AdminModelsSection";
 import { AdminExportSection } from "./AdminExportSection";
 import { AdminDangerZone } from "./AdminDangerZone";
@@ -20,7 +18,7 @@ import { AdminDepartmentsSection } from "./AdminDepartmentsSection";
 /**
  * Round-11A (#4) 추출 — DesktopAdminView 의 section 별 콘텐츠 분기.
  *
- * 8 section (items / employees / bom / packages / models / departments / export / settings)
+ * 7 section (items / employees / bom / models / departments / export / settings)
  * 의 Provider + Section 매핑을 부모 파일에서 분리해 본 컴포넌트로 흡수.
  */
 type PinForm = { current_pin: string; new_pin: string; confirm_pin: string };
@@ -36,8 +34,6 @@ export interface AdminSectionContentProps {
   setItems: Dispatch<SetStateAction<Item[]>>;
   employees: Employee[];
   setEmployees: Dispatch<SetStateAction<Employee[]>>;
-  packages: ShipPackage[];
-  setPackages: Dispatch<SetStateAction<ShipPackage[]>>;
   productModels: ProductModel[];
   setProductModels: Dispatch<SetStateAction<ProductModel[]>>;
   departments: DepartmentMaster[];
@@ -61,7 +57,6 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
     section, globalSearch, onStatusChange, setMessage, showSave,
     items, setItems,
     employees, setEmployees,
-    packages, setPackages,
     productModels, setProductModels,
     departments, setDepartments,
     selectedDept, setSelectedDept,
@@ -106,19 +101,6 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
         onStatusChange={onStatusChange}
         onError={setMessage}
       />
-    );
-  }
-  if (section === "packages") {
-    return (
-      <AdminPackagesProvider
-        items={items}
-        packages={packages}
-        setPackages={setPackages}
-        onStatusChange={onStatusChange}
-        onError={setMessage}
-      >
-        <AdminPackagesSection />
-      </AdminPackagesProvider>
     );
   }
   if (section === "models") {

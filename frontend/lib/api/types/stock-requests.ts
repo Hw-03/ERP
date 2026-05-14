@@ -24,7 +24,6 @@ export type StockRequestType =
   | "mark_defective_wh"
   | "mark_defective_prod"
   | "supplier_return"
-  | "package_out"
   | "manual_adjustment";
 
 export type RequestBucket = "warehouse" | "production" | "defective" | "none";

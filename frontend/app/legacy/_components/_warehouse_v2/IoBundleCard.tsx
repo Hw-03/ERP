@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Layers, PackageCheck, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Layers, Trash2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import type { IoBundle, IoLine, IoSubType, Item } from "./types";
@@ -34,7 +34,6 @@ export function IoBundleCard({
   const included = bundle.lines.filter((line) => line.included);
   const excluded = bundle.lines.length - included.length;
   const autoCount = bundle.lines.filter((line) => line.origin === "bom_auto").length;
-  const hasAuto = autoCount > 0 || bundle.lines.some((line) => line.origin === "package_auto");
   const hasDirectLine = bundle.lines.some((line) => line.origin === "direct");
   const directParentLine =
     bundle.source_kind === "bom_parent"
@@ -44,9 +43,8 @@ export function IoBundleCard({
   const showBundleQtyStepper =
     bundle.source_kind === "bom_parent" &&
     (directParentLine != null || !!onBundleQuantityChange);
-  const tone = bundle.source_kind === "ship_package" ? LEGACY_COLORS.purple : LEGACY_COLORS.blue;
+  const tone = LEGACY_COLORS.blue;
   const compositionLabel = (() => {
-    if (bundle.source_kind === "ship_package") return null;
     if (bundle.source_kind === "bom_parent" || autoCount > 0) {
       return hasDirectLine
         ? `BOM 자동 전개 · 상위 1 + 하위 ${autoCount}`
@@ -100,11 +98,7 @@ export function IoBundleCard({
             title={isCollapsible ? (collapsed ? "펼치기" : "접기") : undefined}
             aria-expanded={isCollapsible ? !collapsed : undefined}
           >
-            {bundle.source_kind === "ship_package" ? (
-              <PackageCheck className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.purple }} />
-            ) : (
-              <Layers className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-            )}
+            <Layers className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
             <h3 className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
               {bundle.title}
             </h3>
@@ -204,12 +198,6 @@ export function IoBundleCard({
               <>
                 <span>·</span>
                 <span>{compositionLabel}</span>
-              </>
-            )}
-            {bundle.source_kind === "ship_package" && hasAuto && (
-              <>
-                <span>·</span>
-                <span>패키지 자동</span>
               </>
             )}
           </div>

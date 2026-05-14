@@ -4,7 +4,6 @@ import {
   Boxes,
   ChevronRight,
   Lock,
-  Package as PackageIcon,
   Settings2,
   Users,
   Workflow,
@@ -14,7 +13,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "../../tokens";
 import { IconButton } from "../../primitives";
 
-export type AdminSection = "items" | "employees" | "bom" | "packages" | "settings";
+export type AdminSection = "items" | "employees" | "bom" | "settings";
 
 export const ADMIN_SECTION_META: Record<
   AdminSection,
@@ -38,12 +37,6 @@ export const ADMIN_SECTION_META: Record<
     icon: Workflow,
     tone: LEGACY_COLORS.cyan,
   },
-  packages: {
-    label: "출하묶음",
-    description: "패키지 생성 및 구성 품목 편집",
-    icon: PackageIcon,
-    tone: LEGACY_COLORS.purple,
-  },
   settings: {
     label: "설정",
     description: "PIN 변경, 엑셀 내보내기, 안전 초기화",
@@ -52,7 +45,7 @@ export const ADMIN_SECTION_META: Record<
   },
 };
 
-const SECTION_ORDER: AdminSection[] = ["items", "employees", "bom", "packages", "settings"];
+const SECTION_ORDER: AdminSection[] = ["items", "employees", "bom", "settings"];
 
 export function AdminHomeScreen({
   onOpen,

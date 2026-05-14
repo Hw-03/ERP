@@ -1,6 +1,6 @@
 import type { Department } from "./shared";
 
-export type IoWorkType = "receive" | "warehouse_io" | "process" | "ship" | "defect";
+export type IoWorkType = "receive" | "warehouse_io" | "process" | "defect";
 
 export type IoSubType =
   | "receive_supplier"
@@ -11,11 +11,10 @@ export type IoSubType =
   | "dept_transfer"
   | "adjust_in"
   | "adjust_out"
-  | "ship"
   | "defect_quarantine"
   | "supplier_return";
 
-export type IoSourceKind = "direct_item" | "bom_parent" | "ship_package" | "manual";
+export type IoSourceKind = "direct_item" | "bom_parent" | "manual";
 export type IoLineOrigin = "direct" | "bom_auto" | "package_auto" | "manual";
 export type IoLineDirection = "in" | "out" | "move" | "defective" | "adjust";
 export type IoBucket = "warehouse" | "production" | "defective" | "none";
@@ -46,7 +45,6 @@ export interface IoBundle {
   source_kind: IoSourceKind;
   title: string;
   source_item_id: string | null;
-  package_id: string | null;
   quantity: number;
   expanded_level: number;
   lines: IoLine[];
@@ -55,7 +53,6 @@ export interface IoBundle {
 export interface IoPreviewTarget {
   source_kind: IoSourceKind;
   item_id?: string | null;
-  package_id?: string | null;
   quantity: number;
 }
 

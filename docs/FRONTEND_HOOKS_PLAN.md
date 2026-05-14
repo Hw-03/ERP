@@ -17,12 +17,11 @@
 | `_history_sections/` 분할 | ✅ 4 섹션 + shared 분리 완료 |
 | `_admin_sections/` 분할 | ✅ 7 섹션 + shared 분리 완료 |
 | **`useResource` 헬퍼** | ✅ **Phase 4** — `_components/_hooks/useResource.ts` 신설 (외부 라이브러리 미도입). 기존 3 View 데이터 페칭 적용은 Phase 5 에서 검토했으나 미세 동작 차이 가능성으로 **신규 코드 전용 인프라**로만 보존 (회귀 0 원칙). |
-| **AdminPackagesContext + useAdminPackages** | ✅ Phase 5 — Props 18 → 0 |
 | **AdminMasterItemsContext + useAdminMasterItems** | ✅ Phase 5 — Props 9 → 0 |
 | **AdminEmployeesContext + useAdminEmployees** | ✅ Phase 5 — Props 8 → 0 |
 | **AdminModelsContext + useAdminModels** | ✅ Phase 5 — Props 6 → 0 |
 | **BOM Where-Used UI** | ✅ Phase 5 — 관리자 BOM 우측 패널에 추가 |
-| **`erp_code` 타입 백엔드 정합** | ✅ Phase 5.1 — `TransactionLog / ShipPackageItemDetail / ProductionCheckComponent / BackflushDetail` 등 4 타입을 `string \| null` 로 정정 (백엔드 응답이 Optional). HistoryDetailPanel 의 `[string,string][]` 단언 자리에 `?? "-"` 가드 추가. |
+| **`erp_code` 타입 백엔드 정합** | ✅ Phase 5.1 — `TransactionLog / ProductionCheckComponent / BackflushDetail` 등 타입을 `string \| null` 로 정정 (백엔드 응답이 Optional). HistoryDetailPanel 의 `[string,string][]` 단언 자리에 `?? "-"` 가드 추가. |
 | **`useAdminBom.saveBomQty` 후 전체 BOM 갱신** | ✅ Phase 5.1 — 수량 수정 후 `refreshAllBom()` 호출 누락 수정. add/delete 와 동일하게 우측 "전체 BOM 현황" 즉시 갱신. |
 | **`useChunkedRender` 가상 스크롤 hook** | ✅ Phase 5.2 — IntersectionObserver 기반 chunked 누적 렌더. 외부 의존성 0. |
 | **InventoryItemRow / HistoryLogRow 추출 + memo** | ✅ Phase 5.2 — 거대 IIFE 행 로직을 `React.memo` 래핑된 행 컴포넌트로 추출. 부모 리렌더 시 변경 없는 행 재렌더 차단. |
@@ -92,7 +91,6 @@ changeDefectiveSource, selectEmployee, confirmStep2
 ```ts
 type WizardArgs = {
   items: Item[];
-  packages: ShipPackage[];
   employees: Employee[];
   preselectedItem?: Item | null;
 };
@@ -136,7 +134,6 @@ type SubmitArgs = {
   selectedDept: Department;
   defectiveSource: DefectiveSource;
   selectedItems: Map<string, number>;
-  selectedPackage: ShipPackage | null;
   notes: string;
   referenceNo: string;
   effectiveLabel: string;
@@ -170,7 +167,7 @@ export function useWarehouseSubmit(args: SubmitArgs): SubmitState
 
 ### 주의
 
-- API 호출 시그니처(`shipInventory`, `transferToProduction`, ...) 는 그대로 사용
+- API 호출 시그니처(`transferToProduction`, ...) 는 그대로 사용
 - `successIds.delete` 후 selectedItems에 실패 항목만 남는 동작 유지(이중 commit 방지)
 - 자동 refresh: 부분 성공 시에도 `getItems()` 재호출
 
@@ -184,7 +181,6 @@ type FilterState = {
   localSearch: string; setLocalSearch: (v: string) => void;
   displayLimit: number; setDisplayLimit: Dispatch<SetStateAction<number>>;
   filteredItems: Item[];
-  filteredPackages: ShipPackage[];
   hiddenSelectedCount: number;
   hasActiveFilter: boolean;
   clearFilters: () => void;
@@ -192,7 +188,6 @@ type FilterState = {
 
 export function useWarehouseFilters(args: {
   items: Item[];
-  packages: ShipPackage[];
   selectedItems: Map<string, number>;
   globalSearch: string;
 }): FilterState
@@ -269,7 +264,7 @@ export function useResource<T>(
 ## 7. 변경 금지 항목
 
 - `selectedItems: Map<string, number>` 구조
-- API 호출 시그니처(`api.shipInventory` 등)
+- API 호출 시그니처(`api.receiveInventory` 등)
 - 부분 성공 시 successIds 제거 동작
 - Topbar pill 메시지 형식("방금 완료 · ...")
 - completionFlyout 1.1s + 380ms 애니메이션 타이밍

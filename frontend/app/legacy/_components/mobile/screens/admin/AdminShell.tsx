@@ -10,7 +10,6 @@ import type { ToastState } from "@/lib/ui/Toast";
 import { AdminBomSection } from "./AdminBomSection";
 import { AdminEmployeesSection } from "./AdminEmployeesSection";
 import { AdminItemsSection } from "./AdminItemsSection";
-import { AdminPackagesSection } from "./AdminPackagesSection";
 import { AdminSettingsSection } from "./AdminSettingsSection";
 import { AdminHomeScreen, type AdminSection, ADMIN_SECTION_META } from "./AdminHomeScreen";
 
@@ -81,7 +80,6 @@ export function AdminShell({ showToast }: { showToast: (toast: ToastState) => vo
         {section === "items" && <AdminItemsSection showToast={showToast} />}
         {section === "employees" && <AdminEmployeesSection showToast={showToast} />}
         {section === "bom" && <AdminBomSection showToast={showToast} />}
-        {section === "packages" && <AdminPackagesSection showToast={showToast} />}
         {section === "settings" && <AdminSettingsSection showToast={showToast} />}
       </div>
     </div>

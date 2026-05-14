@@ -22,7 +22,7 @@ ERP/
 │       │   ├── items.py             # 품목 CRUD (~430줄)
 │       │   ├── production.py        # 생산 입고 + BOM 자동 차감
 │       │   ├── queue.py             # 큐 배치 생성/확정/취소
-│       │   ├── bom.py / codes.py / employees.py / ship_packages.py / alerts.py
+│       │   ├── bom.py / codes.py / employees.py / alerts.py
 │       └── services/
 │           ├── inventory.py         # 입출고 비즈니스 로직 (445줄, 12 함수)
 │           ├── stock_math.py        # 재고 계산 일원화 (151줄)
@@ -102,13 +102,11 @@ available = total - pending_quantity   # 예약 차감 후 가용 재고
 | GET | `/api/items` | 품목 목록 (bulk_compute로 N+1 제거) |
 | GET | `/api/inventory/summary` | 공정코드별 재고 요약 (`process_types` 18개 기준) |
 | POST | `/api/inventory/receive` | 창고 입고 |
-| POST | `/api/inventory/ship` | 창고 출고 (출하부) |
 | POST | `/api/inventory/transfer-to-production` | 창고 → 부서 이동 |
 | POST | `/api/inventory/transfer-to-warehouse` | 부서 → 창고 복귀 |
 | POST | `/api/inventory/transfer-between-depts` | 부서간 이동 |
 | POST | `/api/inventory/mark-defective` | 불량 격리 |
 | POST | `/api/inventory/return-to-supplier` | 공급업체 반품 |
-| POST | `/api/inventory/ship-package` | 패키지 출고 (bulk · shortages dict 응답) |
 | GET | `/api/inventory/transactions` | 거래 이력 |
 
 응답·에러 detail의 표준화는 다음 작업에서 진행 예정. 현재는 단순 문자열 detail 95% + 일부 dict detail (shortages 등) 5% 가 공존한다.
@@ -196,5 +194,5 @@ DesktopWarehouseView.submit()
 
 본 문서가 다루지 않는 항목과 미구현 개선은 다음 설계서에 정리되어 있다.
 
-- `docs/BACKEND_REFACTOR_PLAN.md` — 에러 detail dict 표준화, ship-package N+1, 운영 파일 정리 (이번에 commit/refresh helper만 도입)
+- `docs/BACKEND_REFACTOR_PLAN.md` — 에러 detail dict 표준화, 운영 파일 정리 (이번에 commit/refresh helper만 도입)
 - `docs/FRONTEND_HOOKS_PLAN.md` — 추가 hook 후보 / `useApi` 헬퍼 (이번에 wizard / data / scroll / filter / completion feedback hook은 모두 도입)

@@ -254,7 +254,7 @@
 
 `docs/BACKEND_REFACTOR_PLAN.md`, `docs/FRONTEND_HOOKS_PLAN.md` 참고.
 
-- 백엔드: 에러 detail dict 표준화, ship-package N+1, transactional context manager, 운영 파일 위생 (이번 Phase 3에서 commit/refresh helper + CSV export helper만 도입됨)
+- 백엔드: 에러 detail dict 표준화, transactional context manager, 운영 파일 위생 (이번 Phase 3에서 commit/refresh helper + CSV export helper만 도입됨)
 - 프론트: `useResource` 데이터 페칭 헬퍼 (외부 라이브러리 도입 정책 검토 필요)
 - 운영: docker-compose 포트 정렬, 루트 `erp.db` 정리, seed 스크립트 위치 정리
 

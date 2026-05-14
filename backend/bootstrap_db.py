@@ -131,7 +131,6 @@ _MIGRATION_DDL: list[str] = [
         batch_id CHAR(36) NOT NULL REFERENCES io_batches(batch_id) ON DELETE CASCADE,
         source_kind VARCHAR(24) NOT NULL,
         source_item_id CHAR(36) REFERENCES items(item_id) ON DELETE SET NULL,
-        package_id CHAR(36) REFERENCES ship_packages(package_id) ON DELETE SET NULL,
         title_snapshot VARCHAR(220) NOT NULL,
         quantity NUMERIC(15,4) NOT NULL,
         expanded_level INTEGER NOT NULL DEFAULT 1,

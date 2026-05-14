@@ -188,7 +188,6 @@ class Item(Base):
         back_populates="item",
         cascade="all, delete-orphan",
     )
-    package_items = relationship("ShipPackageItem", back_populates="item")
 
 
 class Inventory(Base):
@@ -363,41 +362,6 @@ class EmployeeAssignedModel(Base):
         Index("ix_eam_employee", "employee_id"),
         Index("ix_eam_employee_priority", "employee_id", "priority"),
     )
-
-
-class ShipPackage(Base):
-    __tablename__ = "ship_packages"
-
-    package_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    package_code = Column(String(40), unique=True, nullable=False, index=True)
-    name = Column(String(200), nullable=False)
-    notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
-    updated_at = Column(
-        DateTime,
-        nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-        server_default=func.now(),
-    )
-
-    items = relationship("ShipPackageItem", back_populates="package", cascade="all, delete-orphan")
-
-
-class ShipPackageItem(Base):
-    __tablename__ = "ship_package_items"
-
-    package_item_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    package_id = Column(UUID(as_uuid=True), ForeignKey("ship_packages.package_id", ondelete="CASCADE"), nullable=False, index=True)
-    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
-    quantity = Column(Numeric(15, 4), nullable=False, default=Decimal("1"))
-
-    __table_args__ = (
-        UniqueConstraint("package_id", "item_id", name="uq_ship_package_item"),
-    )
-
-    package = relationship("ShipPackage", back_populates="items")
-    item = relationship("Item", back_populates="package_items")
 
 
 class SystemSetting(Base):
@@ -946,12 +910,6 @@ class IoBundle(Base):
         nullable=True,
         index=True,
     )
-    package_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("ship_packages.package_id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
     title_snapshot = Column(String(220), nullable=False)
     quantity = Column(Numeric(15, 4), nullable=False)
     expanded_level = Column(Integer, nullable=False, default=1)
@@ -965,7 +923,6 @@ class IoBundle(Base):
         order_by="IoLine.created_at",
     )
     source_item = relationship("Item", foreign_keys=[source_item_id])
-    package = relationship("ShipPackage")
 
 
 class IoLine(Base):

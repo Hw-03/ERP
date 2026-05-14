@@ -8,7 +8,6 @@ import {
   type Employee,
   type Item,
   type ProductModel,
-  type ShipPackage,
 } from "@/lib/api";
 
 /**
@@ -32,8 +31,6 @@ export interface UseAdminBootstrapResult {
   setItems: React.Dispatch<React.SetStateAction<Item[]>>;
   employees: Employee[];
   setEmployees: React.Dispatch<React.SetStateAction<Employee[]>>;
-  packages: ShipPackage[];
-  setPackages: React.Dispatch<React.SetStateAction<ShipPackage[]>>;
   productModels: ProductModel[];
   setProductModels: React.Dispatch<React.SetStateAction<ProductModel[]>>;
   departments: DepartmentMaster[];
@@ -49,22 +46,19 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
 
   const [items, setItems] = useState<Item[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [packages, setPackages] = useState<ShipPackage[]>([]);
   const [productModels, setProductModels] = useState<ProductModel[]>([]);
   const [allBomRows, setAllBomRows] = useState<BOMDetailEntry[]>([]);
   const [departments, setDepartments] = useState<DepartmentMaster[]>([]);
 
   const loadData = useCallback(async () => {
-    const [nextItems, nextEmployees, nextPackages, nextModels, nextDepts] = await Promise.all([
+    const [nextItems, nextEmployees, nextModels, nextDepts] = await Promise.all([
       api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
       api.getEmployees({ activeOnly: false }),
-      api.getShipPackages(),
       api.getModels(),
       api.getDepartments(),
     ]);
     setItems(nextItems);
     setEmployees(nextEmployees);
-    setPackages(nextPackages);
     setProductModels(nextModels);
     setDepartments(nextDepts);
   }, [globalSearch]);
@@ -90,7 +84,6 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
   return {
     items, setItems,
     employees, setEmployees,
-    packages, setPackages,
     productModels, setProductModels,
     departments, setDepartments,
     allBomRows, setAllBomRows,

@@ -20,7 +20,6 @@ const TYPE_LABEL: Record<StockRequestType, string> = {
   mark_defective_wh: "불량 격리(창고)",
   mark_defective_prod: "불량 격리(부서)",
   supplier_return: "공급업체 반품",
-  package_out: "패키지 출하",
   manual_adjustment: "낱개 조정",
 };
 

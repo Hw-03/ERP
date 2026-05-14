@@ -8,7 +8,6 @@ import {
   ChevronUp,
   ClipboardCheck,
   Layers,
-  PackageCheck,
 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -142,7 +141,7 @@ export function IoConfirmStep({
     : null;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-5">
+    <div className="flex flex-col gap-5">
       {/* 작업 요약 */}
       <div
         className="flex flex-wrap items-center justify-between gap-4 rounded-[18px] border px-5 py-4"
@@ -179,7 +178,7 @@ export function IoConfirmStep({
       </div>
 
       {/* 묶음 카드 목록 (1단 세로 스크롤) */}
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+      <div className="space-y-4 pr-1">
         {displayBundles.map((bundle) => (
           <ConfirmBundleCard
             key={bundle.bundle_id}
@@ -257,8 +256,7 @@ function ConfirmBundleCard({
   const isCollapsible = !isSingle && visibleLines.length > 0;
   const [collapsed, setCollapsed] = useState(true);
 
-  const tone =
-    bundle.source_kind === "ship_package" ? LEGACY_COLORS.purple : LEGACY_COLORS.blue;
+  const tone = LEGACY_COLORS.blue;
   // 헤더 우측 sign + 수량 결정용 대표 라인:
   //   BOM   → 부모 라인 (생산 결과품 등)
   //   단품  → 그 자체 단일 included 라인
@@ -289,11 +287,7 @@ function ConfirmBundleCard({
           title={isCollapsible ? (collapsed ? "펼치기" : "접기") : undefined}
           aria-expanded={isCollapsible ? !collapsed : undefined}
         >
-          {bundle.source_kind === "ship_package" ? (
-            <PackageCheck className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.purple }} />
-          ) : (
-            <Layers className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-          )}
+          <Layers className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
           <h3 className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
             {bundle.title}
           </h3>
@@ -339,17 +333,6 @@ function ConfirmBundleCard({
           <span>반영 {visibleLines.length}개</span>
           <span>·</span>
           <span>BOM 자동 전개 · 상위 1 + 하위 {visibleLines.length}</span>
-        </div>
-      )}
-
-      {bundle.source_kind === "ship_package" && (
-        <div
-          className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold"
-          style={{ color: LEGACY_COLORS.muted2 }}
-        >
-          <span>반영 {visibleLines.length}개</span>
-          <span>·</span>
-          <span>패키지 자동</span>
         </div>
       )}
 

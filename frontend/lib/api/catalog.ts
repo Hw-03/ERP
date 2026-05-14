@@ -3,19 +3,17 @@
  *
  * Round-6 (R6-D6) 분리. 마스터 데이터 관련:
  *   - Models (3 메소드)
- *   - ShipPackages (6 메소드)
  *   - BOM (7 메소드)
  *
- * 총 16 메소드.
+ * 총 10 메소드.
  */
 
-import { deleteJson, fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
+import { deleteJson, fetcher, patchJson, postJson, toApiUrl } from "../api-core";
 import type {
   BOMDetailEntry,
   BOMEntry,
   BOMTreeNode,
   ProductModel,
-  ShipPackage,
 } from "./types";
 
 export const catalogApi = {
@@ -26,26 +24,6 @@ export const catalogApi = {
     postJson<ProductModel>(toApiUrl("/api/models"), payload),
 
   deleteModel: (slot: number) => deleteJson<void>(toApiUrl(`/api/models/${slot}`)),
-
-  // Ship packages ----------------------------------------------------------
-  getShipPackages: () => fetcher<ShipPackage[]>(toApiUrl("/api/ship-packages")),
-
-  createShipPackage: (payload: { package_code: string; name: string; notes?: string }) =>
-    postJson<ShipPackage>(toApiUrl("/api/ship-packages"), payload),
-
-  updateShipPackage: (packageId: string, payload: { name?: string; notes?: string }) =>
-    putJson<ShipPackage>(toApiUrl(`/api/ship-packages/${packageId}`), payload),
-
-  deleteShipPackage: (packageId: string) =>
-    deleteJson<void>(toApiUrl(`/api/ship-packages/${packageId}`)),
-
-  addShipPackageItem: (packageId: string, payload: { item_id: string; quantity: number }) =>
-    postJson<ShipPackage>(toApiUrl(`/api/ship-packages/${packageId}/items`), payload),
-
-  deleteShipPackageItem: (packageId: string, packageItemId: string) =>
-    deleteJson<ShipPackage>(
-      toApiUrl(`/api/ship-packages/${packageId}/items/${packageItemId}`),
-    ),
 
   // BOM --------------------------------------------------------------------
   getAllBOM: () => fetcher<BOMDetailEntry[]>(toApiUrl("/api/bom")),

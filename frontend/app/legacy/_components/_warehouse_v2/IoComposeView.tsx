@@ -84,7 +84,6 @@ export function IoComposeView({
   globalSearch,
   operator,
   items,
-  packages,
   productModels = [],
   setItems,
   preselectedItem,
@@ -219,24 +218,6 @@ export function IoComposeView({
     }
   }
 
-  async function addPackage(pkg: (typeof packages)[number]) {
-    setError(null);
-    try {
-      const response = await previewTarget({
-        employeeId,
-        workType: state.workType,
-        subType: "ship",
-        fromDepartment: null,
-        toDepartment: null,
-        target: { source_kind: "ship_package", package_id: pkg.package_id, quantity: 1 },
-      });
-      state.setBundles((prev) => [...prev, ...normalizeBundles(response.bundles)]);
-      onStatusChange(`${pkg.name} 패키지 전개`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "패키지 전개에 실패했습니다.");
-    }
-  }
-
   useEffect(() => {
     if (!preselectedItem) return;
     if (preselectedHandledRef.current === preselectedItem.item_id) return;
@@ -281,7 +262,6 @@ export function IoComposeView({
   function handleSubTypeChange(next: IoSubType) {
     state.setSubType(next);
     state.setBundles([]);
-    if (next === "ship") state.setWorkType("ship");
   }
 
   function handleWorkTypeChange(next: IoWorkType) {
@@ -456,9 +436,11 @@ export function IoComposeView({
       const newHeight = scrollContainer.clientHeight - wrapperTopInContainer - bottom;
       if (newHeight > 0) {
         const next = `${newHeight}px`;
-        if (s === 4) {
+        if (s === 4 || s === 5) {
+          if (wrapper.style.height) wrapper.style.height = "";
           if (wrapper.style.minHeight !== next) wrapper.style.minHeight = next;
         } else {
+          if (wrapper.style.minHeight) wrapper.style.minHeight = "";
           if (wrapper.style.height !== next) wrapper.style.height = next;
         }
       }
@@ -648,19 +630,17 @@ export function IoComposeView({
                   return state.fromDepartment;
                 }
                 // 부서 무관 작업
-                if (st === "receive_supplier" || st === "ship") return null;
+                if (st === "receive_supplier") return null;
                 // 그 외 (warehouse_to_dept, produce, disassemble, adjust_in/out, dept_transfer) — toDepartment
                 return state.toDepartment;
               })()}
               items={items}
-              packages={packages}
               productModels={productModels}
               bundles={state.bundles}
               search={search}
               onSearchChange={setSearch}
               onAddItem={(item, sourceKind, subTypeOverride) =>
                 addItem(item, sourceKind ?? "direct_item", subTypeOverride)}
-              onAddPackage={addPackage}
               onAdvance={() => {
                 const step4El = stepRefs.current[4];
                 if (!step4El) return;

@@ -6,7 +6,6 @@ import type {
   Employee,
   Item,
   ProductModel,
-  ShipPackage,
 } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
@@ -14,7 +13,6 @@ export interface OverviewBarProps {
   items: Item[];
   employees: Employee[];
   productModels: ProductModel[];
-  packages: ShipPackage[];
   allBomRows: BOMDetailEntry[];
 }
 
@@ -26,7 +24,6 @@ export function OverviewBar({
   items,
   employees,
   productModels,
-  packages,
   allBomRows,
 }: OverviewBarProps) {
   const belowMin = useMemo(
@@ -41,11 +38,10 @@ export function OverviewBar({
       { label: "품목", value: items.length, color: LEGACY_COLORS.blue },
       { label: "직원", value: employees.length, color: LEGACY_COLORS.green },
       { label: "모델", value: productModels.length, color: LEGACY_COLORS.purple },
-      { label: "출하묶음", value: packages.length, color: LEGACY_COLORS.cyan },
       { label: "BOM 구성", value: allBomRows.length, color: LEGACY_COLORS.yellow },
       { label: "안전재고 미달", value: belowMin, color: LEGACY_COLORS.red },
     ],
-    [items.length, employees.length, productModels.length, packages.length, allBomRows.length, belowMin],
+    [items.length, employees.length, productModels.length, allBomRows.length, belowMin],
   );
   return (
     <div

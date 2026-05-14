@@ -7,7 +7,6 @@ services.
 
 from __future__ import annotations
 
-import os
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -26,7 +25,6 @@ from app.models import (
     Item,
     LocationStatusEnum,
     RequestBucketEnum,
-    ShipPackage,
     StockRequest,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
@@ -38,18 +36,10 @@ from app.services import inventory as inventory_svc
 from app.services import stock_requests as stock_request_svc
 
 
-WORK_TYPES = {"receive", "warehouse_io", "process", "ship", "defect"}
+WORK_TYPES = {"receive", "warehouse_io", "process", "defect"}
 APPROVAL_SUB_TYPES = {"warehouse_to_dept", "dept_to_warehouse", "defect_quarantine"}
 # 낱개 라인 origin — 부서 결재 정/부 승인 필요.
 MANUAL_LINE_ORIGINS = frozenset({"manual", "adjust_in", "adjust_out"})
-# 출하 권한 fallback 이름 set — warehouse_role(primary/deputy) / level=admin 외 추가 허용자.
-# 운영 환경에선 SHIPPING_ALLOWED_NAMES 환경변수("이름1,이름2")로 override 가능.
-# (TODO 후속: 권한 테이블/role 기반으로 완전 전환)
-SHIPPING_ALLOWED_NAMES = {
-    name.strip()
-    for name in os.getenv("SHIPPING_ALLOWED_NAMES", "김건호,이필욱").split(",")
-    if name.strip()
-}
 
 
 def _d(value) -> Decimal:
@@ -205,8 +195,6 @@ def _route_for_sub_type(
     if sub_type == "adjust_out":
         dept = _default_production_dept(item, to_department or from_department)
         return ("adjust", "production", dept, "none", None)
-    if sub_type == "ship":
-        return ("out", "production", DepartmentEnum.SHIPPING.value, "none", None)
     if sub_type == "defect_quarantine":
         target = to_department or from_department or DepartmentEnum.ASSEMBLY.value
         return ("defective", "warehouse", None, "defective", target)
@@ -241,7 +229,6 @@ def _direct_item_bundle(
         "source_kind": "bom_parent" if should_expand else source_kind,
         "title": item.item_name,
         "source_item_id": item.item_id,
-        "package_id": None,
         "quantity": quantity,
         "expanded_level": 1,
         "lines": [],
@@ -390,48 +377,6 @@ def _direct_item_bundle(
     return bundle
 
 
-def _package_bundle(
-    db: Session,
-    *,
-    package: ShipPackage,
-    quantity: Decimal,
-) -> dict:
-    bundle = {
-        "bundle_id": _new_id(),
-        "source_kind": "ship_package",
-        "title": package.name,
-        "source_item_id": None,
-        "package_id": package.package_id,
-        "quantity": quantity,
-        "expanded_level": 1,
-        "lines": [],
-    }
-    for package_item in package.items:
-        item = package_item.item
-        qty = _d(package_item.quantity) * quantity
-        route = _route_for_sub_type(
-            "ship",
-            item=item,
-            from_department=None,
-            to_department=None,
-        )
-        bundle["lines"].append(
-            _line_dict(
-                db,
-                item=item,
-                quantity=qty,
-                direction=route[0],
-                from_bucket=route[1],
-                from_department=route[2],
-                to_bucket=route[3],
-                to_department=route[4],
-                origin="package_auto",
-                bom_expected=qty,
-            )
-        )
-    return bundle
-
-
 def preview(
     db: Session,
     *,
@@ -447,14 +392,6 @@ def preview(
     for target in targets:
         source_kind = getattr(target, "source_kind", "direct_item")
         qty = _d(getattr(target, "quantity", Decimal("1")))
-        if source_kind == "ship_package" or getattr(target, "package_id", None):
-            package_id = getattr(target, "package_id", None)
-            package = db.query(ShipPackage).filter(ShipPackage.package_id == package_id).first()
-            if package is None:
-                raise ValueError(f"출하 패키지를 찾을 수 없습니다: {package_id}")
-            bundles.append(_package_bundle(db, package=package, quantity=qty))
-            continue
-
         item_id = getattr(target, "item_id", None)
         if item_id is None:
             raise ValueError("품목 선택 정보가 없습니다.")
@@ -504,7 +441,6 @@ def _batch_to_payload(batch: IoBatch) -> dict:
                 "source_kind": bundle.source_kind,
                 "title": bundle.title_snapshot,
                 "source_item_id": bundle.source_item_id,
-                "package_id": bundle.package_id,
                 "quantity": bundle.quantity,
                 "expanded_level": bundle.expanded_level,
                 "lines": [
@@ -572,7 +508,6 @@ def _persist_batch(
             batch_id=batch.batch_id,
             source_kind=incoming_bundle.source_kind,
             source_item_id=incoming_bundle.source_item_id,
-            package_id=incoming_bundle.package_id,
             title_snapshot=incoming_bundle.title,
             quantity=incoming_bundle.quantity,
             expanded_level=incoming_bundle.expanded_level,
@@ -786,9 +721,6 @@ def _submit_dept_only_approval(db: Session, *, requester: Employee, batch: IoBat
     실재고 반영은 부서 결재 통과 후 execute_batch_after_dept_approval 가 수행.
     요청자 본인이 부서 결재 정/부 권한자라면 즉시 실행한다.
     """
-    # ship 작업은 dept-only 경로에서도 권한 게이트 유지 (_submit_immediate 와 동일).
-    if batch.sub_type == "ship" and not _can_ship(requester):
-        raise PermissionError("출하 작업 권한이 없습니다.")
     lines = _included_lines(batch)
     _validate_included_lines(db, lines)
     inputs = [
@@ -906,7 +838,7 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
             tx_type = TransactionTypeEnum.SUPPLIER_RETURN
         else:
             inventory_svc.consume_from_department(db, line.item_id, qty, line.from_department)
-            tx_type = TransactionTypeEnum.SHIP if batch.sub_type == "ship" else TransactionTypeEnum.BACKFLUSH
+            tx_type = TransactionTypeEnum.BACKFLUSH
         quantity_change = -qty
     elif line.direction == "move":
         if line.from_bucket == "production" and line.to_bucket == "production":
@@ -968,15 +900,7 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
     )
 
 
-def _can_ship(requester: Employee) -> bool:
-    role = (requester.warehouse_role or "none").lower()
-    level = getattr(getattr(requester, "level", None), "value", requester.level)
-    return requester.name in SHIPPING_ALLOWED_NAMES or role in {"primary", "deputy"} or level == "admin"
-
-
 def _submit_immediate(db: Session, *, requester: Employee, batch: IoBatch) -> None:
-    if batch.sub_type == "ship" and not _can_ship(requester):
-        raise PermissionError("출하 작업 권한이 없습니다.")
     lines = _included_lines(batch)
     _validate_included_lines(db, lines)
     for line in sorted(lines, key=lambda line: 0 if line.direction == "out" else 1):

@@ -8,7 +8,6 @@ import { useDeptColor } from "../../../DepartmentsContext";
 import type { ToastState } from "@/lib/ui/Toast";
 import { IconButton, WizardHeader, type SummaryChip } from "../../primitives";
 import { useEmployees } from "../../hooks/useEmployees";
-import { usePackages } from "../../hooks/usePackages";
 import { DEPT_STEPS } from "./deptWizardConfig";
 import { useDeptWizard } from "./context";
 import { useDeptWizardSubmit } from "./useDeptWizardSubmit";
@@ -24,7 +23,6 @@ import { useCurrentOperator } from "../../../login/useCurrentOperator";
 export function DeptWizardScreen({ showToast }: { showToast: (toast: ToastState) => void }) {
   const { state, dispatch } = useDeptWizard();
   const { employees } = useEmployees({ activeOnly: true });
-  const { packages, loading: packagesLoading } = usePackages();
   const [items, setItems] = useState<Item[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
@@ -85,22 +83,13 @@ export function DeptWizardScreen({ showToast }: { showToast: (toast: ToastState)
         onClick: state.step > 1 ? () => dispatch({ type: "GO", step: 1 }) : undefined,
       });
     }
-    if (state.step > 2) {
-      if (state.usePackage && state.packageId) {
-        out.push({
-          key: "items",
-          label: "패키지",
-          tone: LEGACY_COLORS.purple,
-          onClick: () => dispatch({ type: "GO", step: 2 }),
-        });
-      } else if (state.items.size > 0) {
-        out.push({
-          key: "items",
-          label: `${state.items.size}건`,
-          tone: LEGACY_COLORS.cyan,
-          onClick: () => dispatch({ type: "GO", step: 2 }),
-        });
-      }
+    if (state.step > 2 && state.items.size > 0) {
+      out.push({
+        key: "items",
+        label: `${state.items.size}건`,
+        tone: LEGACY_COLORS.cyan,
+        onClick: () => dispatch({ type: "GO", step: 2 }),
+      });
     }
     return out;
   }, [state, employee, dispatch, deptColor]);
@@ -153,15 +142,9 @@ export function DeptWizardScreen({ showToast }: { showToast: (toast: ToastState)
           <StepItems
             items={items}
             itemsLoading={itemsLoading}
-            packages={packages}
-            packagesLoading={packagesLoading}
             showToast={showToast}
             onNext={() => {
-              if (state.usePackage && !state.packageId) {
-                dispatch({ type: "SET_ERROR", error: "패키지를 선택해 주세요." });
-                return;
-              }
-              if (!state.usePackage && state.items.size === 0) {
+              if (state.items.size === 0) {
                 dispatch({ type: "SET_ERROR", error: "품목을 1개 이상 선택해 주세요." });
                 return;
               }
@@ -173,7 +156,6 @@ export function DeptWizardScreen({ showToast }: { showToast: (toast: ToastState)
           <StepConfirm
             items={items}
             employee={employee}
-            packages={packages}
             onSubmit={() => void submit()}
             onBack={() => dispatch({ type: "PREV" })}
           />

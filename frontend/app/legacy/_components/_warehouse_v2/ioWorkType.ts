@@ -2,7 +2,6 @@ import {
   AlertTriangle,
   ArrowLeftRight,
   Boxes,
-  PackageCheck,
   RefreshCcw,
   Wrench,
 } from "lucide-react";
@@ -20,11 +19,8 @@ export const IO_WORK_TYPES: Array<{
   { id: "receive", label: "원자재 입고", description: "발주 품목 입고", icon: Boxes },
   { id: "warehouse_io", label: "창고 입출고", description: "창고↔부서", icon: ArrowLeftRight },
   { id: "process", label: "부서 입출고", description: "부서 내 작업", icon: Wrench },
-  { id: "ship", label: "완제품 출하", description: "출하부 재고 차감", icon: PackageCheck },
   { id: "defect", label: "불량", description: "불량 재고 격리", icon: AlertTriangle },
 ];
-
-const SHIP_ALLOWED_NAMES = ["김건호", "김현우", "남재원", "김민재", "이형진", "이필욱"];
 
 export function canSeeWorkType(
   workType: IoWorkType,
@@ -33,10 +29,6 @@ export function canSeeWorkType(
   if (workType === "receive") {
     // 원자재 입고는 창고 정/부 만
     return operator?.warehouse_role === "primary" || operator?.warehouse_role === "deputy";
-  }
-  if (workType === "ship") {
-    // 출하는 지정된 직원 6명만
-    return !!operator?.name && SHIP_ALLOWED_NAMES.includes(operator.name);
   }
   return true;
 }
@@ -58,9 +50,6 @@ export const IO_SUB_TYPES: Record<
     { id: "adjust_in", label: "수량보정 입고", description: "선택 품목 수량 증가" },
     { id: "adjust_out", label: "수량보정 출고", description: "선택 품목 수량 감소" },
   ],
-  ship: [
-    { id: "ship", label: "출하", description: "패키지 또는 단품을 출하부에서 차감" },
-  ],
   defect: [
     { id: "defect_quarantine", label: "불량 격리", description: "창고 승인 요청으로 격리" },
     { id: "supplier_return", label: "공급처 반품", description: "불량 재고를 반품 처리" },
@@ -71,7 +60,6 @@ export const DEFAULT_SUB_TYPE: Record<IoWorkType, IoSubType> = {
   receive: "receive_supplier",
   warehouse_io: "warehouse_to_dept",
   process: "produce",
-  ship: "ship",
   defect: "defect_quarantine",
 };
 
@@ -128,10 +116,6 @@ export function approvalKind(subType: IoSubType, bundles: IoBundle[]): ApprovalK
   if (wh) return "warehouse";
   if (dept) return "department";
   return "none";
-}
-
-export function canPickPackages(workType: IoWorkType) {
-  return workType === "ship";
 }
 
 // BOM 강제 모드: 부서 입출고 BOM(produce/disassemble) 에서만 하위 라인 잠금 (체크/수량 편집 차단).
@@ -204,7 +188,6 @@ export function lineTagLabel(line: IoLine, subType: IoSubType): { text: string; 
     return { text: "단품 출고", tone: "muted" };
   }
   if (line.origin === "manual") return { text: "이 품목만", tone: "muted" };
-  if (line.origin === "package_auto") return { text: "패키지 자동", tone: "purple" };
   if (subType === "produce") {
     if (line.origin === "direct") return { text: "생산 결과품", tone: "green" };
     if (line.origin === "bom_auto") return { text: "투입 자재", tone: "red" };
@@ -217,7 +200,6 @@ export function lineTagLabel(line: IoLine, subType: IoSubType): { text: string; 
     if (line.origin === "direct") return { text: "상위", tone: "blue" };
     if (line.origin === "bom_auto") return { text: "하위", tone: "muted" };
   }
-  if (subType === "ship") return { text: "패키지 항목", tone: "purple" };
   return { text: "직접 선택", tone: "blue" };
 }
 

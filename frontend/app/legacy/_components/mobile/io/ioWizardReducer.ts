@@ -20,13 +20,11 @@ export function ioWizardReducer(state: IOWizardState, action: IOWizardAction): I
       return { ...state, step: Math.max(0, action.step), error: null };
 
     case "SET_MODE":
-      // Changing mode invalidates item/package selection to avoid stale state.
+      // Changing mode invalidates item selection to avoid stale state.
       return {
         ...state,
         mode: action.mode,
         items: new Map(),
-        packageId: null,
-        usePackage: false,
         error: null,
       };
 
@@ -41,7 +39,6 @@ export function ioWizardReducer(state: IOWizardState, action: IOWizardAction): I
         department: action.department,
         employeeId: null,
         items: new Map(),
-        packageId: null,
         error: null,
       };
 
@@ -49,23 +46,8 @@ export function ioWizardReducer(state: IOWizardState, action: IOWizardAction): I
       return {
         ...state,
         direction: action.direction,
-        // Packages are ship-only, so switching to "in" disables them.
-        usePackage: action.direction === "in" ? false : state.usePackage,
-        packageId: action.direction === "in" ? null : state.packageId,
         error: null,
       };
-
-    case "SET_USE_PACKAGE":
-      return {
-        ...state,
-        usePackage: action.value,
-        items: action.value ? new Map() : state.items,
-        packageId: action.value ? state.packageId : null,
-        error: null,
-      };
-
-    case "SET_PACKAGE":
-      return { ...state, packageId: action.packageId, error: null };
 
     case "ADD_ITEM": {
       const next = new Map(state.items);

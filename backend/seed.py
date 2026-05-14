@@ -42,8 +42,6 @@ from app.models import (
     InventoryLocation,
     Item,
     LocationStatusEnum,
-    ShipPackage,
-    ShipPackageItem,
     TransactionLog,
 )
 from app.services.inventory import PROCESS_TYPE_TO_DEPT
@@ -180,8 +178,6 @@ def extract_legacy_init_db() -> dict:
 
 
 def reset_core_tables(db) -> None:
-    db.query(ShipPackageItem).delete()
-    db.query(ShipPackage).delete()
     db.query(BOM).delete()
     db.query(TransactionLog).delete()
     db.query(Inventory).delete()

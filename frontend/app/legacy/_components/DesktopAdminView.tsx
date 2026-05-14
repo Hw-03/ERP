@@ -43,7 +43,6 @@ export function DesktopAdminView({
   const {
     items, setItems,
     employees, setEmployees,
-    packages, setPackages,
     productModels, setProductModels,
     departments, setDepartments,
     allBomRows,
@@ -135,8 +134,6 @@ export function DesktopAdminView({
               setItems={setItems}
               employees={employees}
               setEmployees={setEmployees}
-              packages={packages}
-              setPackages={setPackages}
               productModels={productModels}
               setProductModels={setProductModels}
               departments={departments}
@@ -185,7 +182,6 @@ export function DesktopAdminView({
               setMessage={setMessage}
               items={items}
               employees={employees}
-              packages={packages}
               allBomRows={allBomRows}
             />
           </DesktopRightPanel>

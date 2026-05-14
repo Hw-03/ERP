@@ -168,56 +168,6 @@ class EmployeeResponse(BaseModel):
     assigned_model_slots: List[int] = Field(default_factory=list)
 
 
-class ShipPackageItemCreate(BaseModel):
-    item_id: uuid.UUID
-    quantity: Decimal = Field(..., gt=0)
-
-
-class ShipPackageCreate(BaseModel):
-    package_code: str = Field(..., max_length=40)
-    name: str = Field(..., max_length=200)
-    notes: Optional[str] = None
-
-
-class ShipPackageUpdate(BaseModel):
-    name: Optional[str] = Field(None, max_length=200)
-    notes: Optional[str] = None
-
-
-class ShipPackageItemResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    package_item_id: uuid.UUID
-    package_id: uuid.UUID
-    item_id: uuid.UUID
-    quantity: Decimal
-
-
-class ShipPackageResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    package_id: uuid.UUID
-    package_code: str
-    name: str
-    notes: Optional[str]
-    created_at: datetime
-    updated_at: datetime
-
-
-class ShipPackageItemDetail(BaseModel):
-    package_item_id: uuid.UUID
-    item_id: uuid.UUID
-    erp_code: Optional[str] = None
-    item_name: str
-    item_process_type_code: Optional[str] = None
-    item_unit: str
-    quantity: Decimal
-
-
-class ShipPackageDetailResponse(ShipPackageResponse):
-    items: List[ShipPackageItemDetail]
-
-
 class AdminPinVerifyRequest(BaseModel):
     pin: str = Field(..., min_length=4, max_length=32)
 
@@ -241,15 +191,6 @@ class InventoryReceive(BaseModel):
     notes: Optional[str] = Field(None, description="비고")
 
 
-class InventoryShip(BaseModel):
-    item_id: uuid.UUID = Field(..., description="출고 대상 품목 ID")
-    quantity: Decimal = Field(..., gt=0, description="출고 수량")
-    location: Optional[str] = Field(None, max_length=100, description="출고 위치")
-    reference_no: Optional[str] = Field(None, max_length=100, description="참조 번호")
-    produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
-    notes: Optional[str] = Field(None, description="비고")
-
-
 class InventoryAdjust(BaseModel):
     item_id: uuid.UUID = Field(..., description="재고 조정 대상 품목 ID")
     quantity: Decimal = Field(..., ge=0, description="조정 후 최종 수량")
@@ -257,14 +198,6 @@ class InventoryAdjust(BaseModel):
     location: Optional[str] = Field(None, max_length=100, description="보관 위치")
     reference_no: Optional[str] = Field(None, max_length=100, description="참조 번호")
     produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
-
-
-class PackageShipRequest(BaseModel):
-    package_id: uuid.UUID
-    quantity: Decimal = Field(..., gt=0)
-    reference_no: Optional[str] = Field(None, max_length=100)
-    produced_by: Optional[str] = Field(None, max_length=100)
-    notes: Optional[str] = None
 
 
 class InventoryResponse(BaseModel):

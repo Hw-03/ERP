@@ -10,9 +10,6 @@ erDiagram
     Item ||--o{ ItemModel : "모델 슬롯"
     Item ||--o{ BOM : "parent"
     Item ||--o{ BOM : "child"
-    Item ||--o{ ShipPackageItem : "포함"
-
-    ShipPackage ||--o{ ShipPackageItem : "구성"
 
     Employee ||--o{ TransactionLog : "produced_by"
     ProductModel ||--o{ ItemModel : "slot"
@@ -53,19 +50,6 @@ erDiagram
         string unit
     }
 
-    ShipPackage {
-        uuid package_id PK
-        string package_code
-        string name
-    }
-
-    ShipPackageItem {
-        uuid id PK
-        uuid package_id FK
-        uuid item_id FK
-        decimal quantity
-    }
-
     TransactionLog {
         uuid log_id PK
         uuid item_id FK
@@ -87,7 +71,7 @@ erDiagram
 2. **생산 이동**: `POST /api/inventory/transfer-to-production` → `InventoryLocation(department=조립, status=PRODUCTION)` 생성/증가, `warehouse_qty` 감소.
 3. **생산 입고**: `POST /api/production/receipt` → 대상 품목 `production_total` 증가 + BOM 자식들 `BACKFLUSH` 자동 차감.
 4. **출하부 모음**: `POST /api/inventory/transfer-between-depts` → `SHIPPING/PRODUCTION` 으로 이동.
-5. **출하**: `POST /api/inventory/ship` 또는 `/ship-package` → 출하부 차감 + `TransactionLog(SHIP)`.
+5. **출하**: 출하부 SHIPPING 부서에 PA(가방 포장)/PF(박스 포장) 완제품을 보관 → 일반 부서 출고 흐름으로 차감 (`/io/submit`).
 
 ### 불량 / 반품
 
@@ -103,7 +87,6 @@ erDiagram
 - `Inventory.quantity == warehouse_qty + sum(InventoryLocation.quantity for that item_id)`
   - `/health/detailed` 의 `inventory_mismatch_count` 가 이 식의 위반 수.
 - `BOM` 은 순환 참조 금지 (`_is_circular`, `RecursionError` → `BOM 구조에 순환 참조` 400).
-- `ship-package` 의 모든 구성품에 출하부 보유분이 충분해야 — 한 건이라도 부족하면 `STOCK_SHORTAGE` 422 (선처리 후 롤백 회피).
 
 ## 변경 시 주의
 

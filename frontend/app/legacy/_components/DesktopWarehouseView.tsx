@@ -22,7 +22,7 @@ export function DesktopWarehouseView({
   preselectedItem?: Item | null;
   onSubmitSuccess?: () => void;
 }) {
-  const { employees, items, packages, productModels, loadFailure, setItems } = useWarehouseData({
+  const { employees, items, productModels, loadFailure, setItems } = useWarehouseData({
     globalSearch,
     onStatusChange,
   });
@@ -64,8 +64,8 @@ export function DesktopWarehouseView({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-1 justify-center overflow-y-auto pr-4">
-      <div className="mx-auto flex min-h-full w-full max-w-[1240px] flex-col gap-3 px-6 pb-10 pt-4">
+    <div className="flex h-full min-h-0 flex-1 overflow-y-auto pr-4">
+      <div className="flex min-h-full w-full flex-col gap-3 px-6 pb-10 pt-4">
         <WarehouseHeader loadFailure={loadFailure} />
         <WarehouseSectionTabs
           active={sectionTab}
@@ -101,7 +101,6 @@ export function DesktopWarehouseView({
             operator={operator}
             employees={employees}
             items={items}
-            packages={packages}
             productModels={productModels}
             setItems={setItems}
             preselectedItem={preselectedItem}
