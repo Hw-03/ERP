@@ -14,7 +14,6 @@ import { InventoryItemsTable } from "./_inventory_sections/InventoryItemsTable";
 import { DesktopInventoryRightPanel } from "./_inventory_sections/DesktopInventoryRightPanel";
 import { useInventoryData } from "./_hooks/useInventoryData";
 import { useDesktopInventoryDerivations } from "./_hooks/useDesktopInventoryDerivations";
-import { useItemImageManifest } from "./_hooks/useItemImageManifest";
 // R9-2: helper 4개 (getMinStock / safeQty / matchesSearch / matchesKpi) 분리
 import { matchesKpi, matchesSearch } from "./_inventory_sections/inventoryFilter";
 
@@ -53,7 +52,6 @@ export function DesktopInventoryView({
     onStatusChange,
     onSelectedSync,
   });
-  const imageManifest = useItemImageManifest();
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [selectedProcessSteps, setSelectedProcessSteps] = useState<string[]>([]);
@@ -221,7 +219,6 @@ export function DesktopInventoryView({
               hasKpiFilter={kpi !== "ALL"}
               onRetry={() => void loadItems()}
               onResetAllFilters={resetAllFilters}
-              imageManifest={imageManifest}
             />
           </section>
         </div>
