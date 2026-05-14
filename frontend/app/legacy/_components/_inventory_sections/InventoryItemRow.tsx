@@ -22,9 +22,10 @@ type Props = {
   item: Item;
   selected: boolean;
   onSelect: (item: Item | null) => void;
+  imageFilename?: string;
 };
 
-function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
+function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props) {
   const getDeptColor = useDeptColorLookup();
   const minStock = getMinStock(item);
   const stock = getStockState(safeQty(item), minStock === 0 ? null : minStock);
@@ -99,6 +100,22 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
           <StockIcon className="h-3.5 w-3.5" aria-hidden="true" />
           {stock.label}
         </span>
+      </td>
+      <td
+        className="border-b px-1 py-[21px] text-center align-middle"
+        style={{ borderColor: LEGACY_COLORS.border, width: 60 }}
+      >
+        {imageFilename ? (
+          <img
+            src={`/images/items/${imageFilename}`}
+            alt={item.item_name}
+            width={48}
+            height={48}
+            loading="lazy"
+            className="inline-block rounded border object-contain"
+            style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
+          />
+        ) : null}
       </td>
       <td className="border-b px-4 py-[21px] align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="font-semibold">{item.item_name}</div>

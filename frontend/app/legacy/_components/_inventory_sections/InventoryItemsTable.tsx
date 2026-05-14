@@ -22,6 +22,7 @@ type Props = {
   hasKpiFilter: boolean;
   onRetry: () => void;
   onResetAllFilters: () => void;
+  imageManifest?: Record<string, string>;
 };
 
 export function InventoryItemsTable({
@@ -36,6 +37,7 @@ export function InventoryItemsTable({
   hasKpiFilter,
   onRetry,
   onResetAllFilters,
+  imageManifest,
 }: Props) {
   if (error) {
     return <LoadFailureCard message={error} onRetry={onRetry} />;
@@ -78,7 +80,8 @@ export function InventoryItemsTable({
               {(
                 [
                   { label: "상태", nowrap: true, width: "90px" },
-                  { label: "품목명", nowrap: false, minWidth: "180px" },
+                  { label: "이미지", nowrap: true, width: "60px", center: true },
+                  { label: "품목명", nowrap: false, minWidth: "140px" },
                   { label: "품목 코드", nowrap: true, width: "160px" },
                   { label: "부서", nowrap: true, width: "160px", center: true },
                   { label: "현재고", nowrap: true, width: "160px", center: true },
@@ -107,6 +110,7 @@ export function InventoryItemsTable({
                 item={item}
                 selected={selectedItem?.item_id === item.item_id}
                 onSelect={onSelectItem}
+                imageFilename={item.erp_code ? imageManifest?.[item.erp_code] : undefined}
               />
             ))}
           </tbody>
