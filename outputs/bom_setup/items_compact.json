@@ -5936,6 +5936,76 @@
     "unit": "EA"
   },
   {
+    "item_id": "7-PF-0001",
+    "item_name": "DX-7017_70kV, 1.7mA_USA_Dexcowin Global",
+    "erp_code": "7-PF-0001",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PA-0001",
+    "item_name": "DX-7017_70kV, 1.7mA_USA_Dexcowin Global_가방 포장 완료",
+    "erp_code": "7-PA-0001",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PF-0002",
+    "item_name": "DX-7017_70kV, 1.7mA_USA_Vector",
+    "erp_code": "7-PF-0002",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PA-0002",
+    "item_name": "DX-7017_70kV, 1.7mA_USA_Vector_가방 포장 완료",
+    "erp_code": "7-PA-0002",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PF-0003",
+    "item_name": "DX-7020_70kV, 2mA_USA_Dentimax",
+    "erp_code": "7-PF-0003",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PA-0003",
+    "item_name": "DX-7020_70kV, 2mA_USA_Dentimax_가방 포장 완료",
+    "erp_code": "7-PA-0003",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PF-0004",
+    "item_name": "DX-7020_70kV, 2mA_USA_Dexcowin Global",
+    "erp_code": "7-PF-0004",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PA-0004",
+    "item_name": "DX-7020_70kV, 2mA_USA_Dexcowin Global_가방 포장 완료",
+    "erp_code": "7-PA-0004",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PF-0005",
+    "item_name": "DX-7020_70kV, 2mA_USA_Vector",
+    "erp_code": "7-PF-0005",
+    "process_type_code": "PF",
+    "unit": "EA"
+  },
+  {
+    "item_id": "7-PA-0005",
+    "item_name": "DX-7020_70kV, 2mA_USA_Vector_가방 포장 완료",
+    "erp_code": "7-PA-0005",
+    "process_type_code": "PA",
+    "unit": "EA"
+  },
+  {
     "item_id": "3-PF-0001",
     "item_name": "DX3000_60kV, 2mA_러시아_IP Tsizina S. A",
     "erp_code": "3-PF-0001",
