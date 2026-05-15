@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { useFocusTrap } from "@/lib/mes/useFocusTrap";
@@ -47,26 +48,44 @@ export function ConfirmModal({
   busyLabel = "처리 중...",
   confirmAccent,
 }: Props) {
-  // ESC 닫기 — busy 중에는 잠금
+  // ESC 닫기 / Enter 확인 — busy 중에는 잠금
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) onClose();
+      if (busy) return;
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key === "Enter") {
+        const target = e.target as HTMLElement | null;
+        // 다행 텍스트는 Enter 가 줄바꿈
+        if (target?.tagName === "TEXTAREA") return;
+        if (target instanceof HTMLElement && target.isContentEditable) return;
+        // 한글 IME 조합 중 Enter 는 자모 확정 신호 — 무시
+        if (e.isComposing) return;
+        e.preventDefault();
+        void onConfirm();
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [open, busy, onClose]);
+  }, [open, busy, onClose, onConfirm]);
 
   const titleId = useId();
   const panelRef = useFocusTrap<HTMLDivElement>(open);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
   const toneAccent = TONE_ACCENT[tone];
   const accent = confirmAccent ?? toneAccent;
   const isCautionLike = tone === "caution" || tone === "danger";
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[400] flex items-center justify-center px-4"
       style={{ background: "rgba(0,0,0,.55)" }}
@@ -136,6 +155,7 @@ export function ConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

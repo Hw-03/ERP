@@ -309,7 +309,17 @@ function ActionSheet({
 
   return (
     <BottomSheet open={!!action} onClose={onClose} title={submitTitle}>
-      <div className="flex flex-col gap-3 px-5 pb-4">
+      <div
+        className="flex flex-col gap-3 px-5 pb-4"
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" || busy) return;
+          const target = e.target as HTMLElement | null;
+          if (target?.tagName === "TEXTAREA") return;
+          if (e.nativeEvent.isComposing) return;
+          e.preventDefault();
+          void submit();
+        }}
+      >
         {meta ? (
           <div
             className="rounded-[14px] border px-3 py-3"

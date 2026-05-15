@@ -34,7 +34,7 @@ describe("ConfirmModal", () => {
 
   it("busy=true 면 backdrop 클릭 무시 + Escape 무시", () => {
     const onClose = vi.fn();
-    const { container } = render(
+    render(
       <ConfirmModal
         open
         busy
@@ -43,9 +43,8 @@ describe("ConfirmModal", () => {
         onConfirm={() => {}}
       />
     );
-    // backdrop 클릭
-    const backdrop = container.querySelector('[role="dialog"]') as HTMLElement;
-    fireEvent.click(backdrop);
+    // backdrop 클릭 (portal 로 document.body 에 그려지므로 screen 으로 조회)
+    fireEvent.click(screen.getByRole("dialog"));
     expect(onClose).not.toHaveBeenCalled();
 
     // Escape
@@ -54,7 +53,7 @@ describe("ConfirmModal", () => {
   });
 
   it("open=false 면 아무것도 렌더 안 함", () => {
-    const { container } = render(
+    render(
       <ConfirmModal
         open={false}
         title="hidden"
@@ -62,6 +61,52 @@ describe("ConfirmModal", () => {
         onConfirm={() => {}}
       />
     );
-    expect(container.firstChild).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("Enter 키 onConfirm 호출", () => {
+    const onConfirm = vi.fn();
+    render(
+      <ConfirmModal
+        open
+        title="확인"
+        onClose={() => {}}
+        onConfirm={onConfirm}
+      />
+    );
+    fireEvent.keyDown(window, { key: "Enter" });
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("busy=true 면 Enter 무시", () => {
+    const onConfirm = vi.fn();
+    render(
+      <ConfirmModal
+        open
+        busy
+        title="처리 중"
+        onClose={() => {}}
+        onConfirm={onConfirm}
+      />
+    );
+    fireEvent.keyDown(window, { key: "Enter" });
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("Enter 타깃이 TEXTAREA 면 onConfirm 호출 안 함 (줄바꿈 유지)", () => {
+    const onConfirm = vi.fn();
+    render(
+      <ConfirmModal
+        open
+        title="사유 입력"
+        onClose={() => {}}
+        onConfirm={onConfirm}
+      >
+        <textarea data-testid="ta" />
+      </ConfirmModal>
+    );
+    const ta = screen.getByTestId("ta");
+    fireEvent.keyDown(ta, { key: "Enter" });
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 });

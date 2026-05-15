@@ -128,6 +128,12 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
             inputMode="numeric"
             value={approvePin}
             onChange={(e) => setApprovePin(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing && approvePin) {
+                e.preventDefault();
+                submitApprove(req.request_id);
+              }
+            }}
             className="rounded border px-2 py-1 text-sm"
             style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text, width: "8rem" }}
             placeholder="0000"
@@ -176,6 +182,17 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
               inputMode="numeric"
               value={rejectPin}
               onChange={(e) => setRejectPin(e.target.value)}
+              onKeyDown={(e) => {
+                if (
+                  e.key === "Enter" &&
+                  !e.nativeEvent.isComposing &&
+                  rejectPin &&
+                  rejectReason.trim()
+                ) {
+                  e.preventDefault();
+                  submitReject(req.request_id);
+                }
+              }}
               className="rounded border px-2 py-1 text-sm"
               style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text, width: "8rem" }}
               placeholder="0000"
