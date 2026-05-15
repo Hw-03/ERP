@@ -573,21 +573,29 @@ window.addEventListener("beforeunload", e => {
 });
 
 function loadPreset() {
+  loadDraft();
   const codeToId = new Map();
   for (const it of ITEMS) if (it.erp_code) codeToId.set(it.erp_code, it.item_id);
-  const pending = [];
-  const completedSet = new Set();
-  let skipped = 0;
+  const existingPairs = new Set(S.pending.map(r => r.parentItemId+"|"+r.childItemId));
+  const presetParents = new Set();
+  let added = 0, skipped = 0;
   for (const r of PRESET_BOM) {
     const pid = codeToId.get(r.parent_erp_code);
     const cid = codeToId.get(r.child_erp_code);
     if (!pid || !cid) { skipped++; continue; }
-    pending.push({tempId: uid(), parentItemId: pid, childItemId: cid, qty: r.quantity, unit: r.unit||"EA"});
-    completedSet.add(pid);
+    presetParents.add(pid);
+    const key = pid+"|"+cid;
+    if (existingPairs.has(key)) continue;
+    S.pending.push({tempId: uid(), parentItemId: pid, childItemId: cid, qty: r.quantity, unit: r.unit||"EA"});
+    existingPairs.add(key);
+    added++;
   }
-  S.pending = pending;
+  const parentIds = new Set(S.pending.map(r => r.parentItemId));
+  const completedSet = new Set(S.completed.filter(id => parentIds.has(id)));
+  for (const pid of presetParents) completedSet.add(pid);
   S.completed = [...completedSet];
   saveDraft();
+  if (added > 0)   console.info(`PRESET_BOM 병합: ${added}건 추가`);
   if (skipped > 0) console.warn(`PRESET_BOM 누락: ${skipped}건 (erp_code unmatched)`);
 }
 
