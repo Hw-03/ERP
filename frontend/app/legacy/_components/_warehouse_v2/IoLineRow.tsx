@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, MinusCircle, Pencil, Trash2 } from "lucide-react";
+import { Check, MinusCircle, Trash2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { getStockState } from "@/lib/mes/inventory";
@@ -16,6 +16,7 @@ interface Props {
   isChild: boolean;
   item?: Item;
   available: number | null;
+  forceShowRemove?: boolean;
   onToggle: () => void;
   onQuantityChange: (quantity: number, shortage: number) => void;
   onRemove: () => void;
@@ -31,17 +32,7 @@ function toneToColor(tone: LineTagTone): string {
   return LEGACY_COLORS.muted2;
 }
 
-function directionPrefix(line: IoLine): { sign: "+" | "-" | null; suffix: string } {
-  if (line.direction === "in") return { sign: "+", suffix: "" };
-  if (line.direction === "out" || line.direction === "defective") return { sign: "-", suffix: "" };
-  if (line.direction === "adjust") {
-    if (line.to_bucket === "production") return { sign: "+", suffix: " 보정" };
-    if (line.from_bucket === "production") return { sign: "-", suffix: " 보정" };
-  }
-  return { sign: null, suffix: "" };
-}
-
-function isOutgoing(line: IoLine) {
+export function isOutgoing(line: IoLine) {
   if (line.direction === "out" || line.direction === "move" || line.direction === "defective") {
     return true;
   }
@@ -51,16 +42,17 @@ function isOutgoing(line: IoLine) {
   return false;
 }
 
-function expectedAfter(line: IoLine, available: number | null) {
+export function expectedAfter(line: IoLine, available: number | null) {
   if (available === null) return null;
-  if (line.direction === "in") return available + line.quantity;
+  const qty = Number(line.quantity) || 0;
+  if (line.direction === "in") return available + qty;
   if (line.direction === "adjust") {
-    if (line.to_bucket === "production") return available + line.quantity;
-    if (line.from_bucket === "production") return available - line.quantity;
+    if (line.to_bucket === "production") return available + qty;
+    if (line.from_bucket === "production") return available - qty;
     return available;
   }
   if (line.direction === "out" || line.direction === "defective" || line.direction === "move")
-    return available - line.quantity;
+    return available - qty;
   return available;
 }
 
@@ -70,6 +62,7 @@ export function IoLineRow({
   isChild,
   item,
   available,
+  forceShowRemove,
   onToggle,
   onQuantityChange,
   onRemove,
@@ -92,7 +85,6 @@ export function IoLineRow({
   const expected = expectedAfter(line, available);
   const tag = lineTagLabel(line, subType);
   const tagColor = toneToColor(tag.tone);
-  const dirInfo = directionPrefix(line);
   const expectedColor =
     expected === null
       ? LEGACY_COLORS.muted2
@@ -166,15 +158,6 @@ export function IoLineRow({
               하위 있음
             </span>
           )}
-          {line.edited && (
-            <span
-              className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
-              style={{ background: tint(LEGACY_COLORS.purple, 14), color: LEGACY_COLORS.purple }}
-            >
-              <Pencil className="h-3 w-3" />
-              수동 수정
-            </span>
-          )}
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
           <span className="truncate">{line.erp_code ?? "-"}</span>
@@ -184,19 +167,6 @@ export function IoLineRow({
           >
             {tag.text}
           </span>
-          {dirInfo.sign && (
-            <span
-              className="rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
-              style={{
-                background: tint(dirInfo.sign === "+" ? LEGACY_COLORS.green : LEGACY_COLORS.red, 12),
-                color: dirInfo.sign === "+" ? LEGACY_COLORS.green : LEGACY_COLORS.red,
-              }}
-            >
-              {dirInfo.sign}
-              {formatQty(line.quantity)}
-              {dirInfo.suffix}
-            </span>
-          )}
         </div>
       </div>
 
@@ -292,14 +262,14 @@ export function IoLineRow({
         )}
       </div>
 
-      {/* 7. 삭제 (manual만) */}
-      {line.origin === "manual" ? (
+      {/* 7. 삭제 (manual 또는 forceShowRemove) */}
+      {line.origin === "manual" || forceShowRemove ? (
         <button
           type="button"
           onClick={onRemove}
           className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-white/10"
           style={{ color: LEGACY_COLORS.muted2 }}
-          title="수동 라인 삭제"
+          title="삭제"
         >
           <Trash2 className="h-4 w-4" />
         </button>

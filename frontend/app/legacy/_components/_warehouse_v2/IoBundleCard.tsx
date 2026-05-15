@@ -5,7 +5,7 @@ import { ChevronDown, ChevronUp, Layers, Trash2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import type { IoBundle, IoLine, IoSubType, Item } from "./types";
-import { IoLineRow } from "./IoLineRow";
+import { IoLineRow, isOutgoing, expectedAfter } from "./IoLineRow";
 import { formatQty } from "@/lib/mes/format";
 
 interface Props {
@@ -31,6 +31,30 @@ export function IoBundleCard({
   onRemoveLine,
   onRemoveBundle,
 }: Props) {
+  const tone = LEGACY_COLORS.blue;
+  // React Hook 규칙: 조건부 early return 전에 호출해야 하므로 항상 선언.
+  // 단품 분기에서는 사용되지 않지만 hook 호출 순서를 안정시키려는 용도.
+  const [collapsed, setCollapsed] = useState(true);
+
+  // 단일 라인 비-BOM 묶음(낱개 manual + "이 품목만" direct_item) 은 헤더/카드 래퍼 생략하고
+  // IoLineRow 만 단독 노출. trash 는 forceShowRemove 로 항상 보이게 하고 onRemoveBundle 연결.
+  if (bundle.source_kind !== "bom_parent" && bundle.lines.length === 1) {
+    const line = bundle.lines[0];
+    return (
+      <IoLineRow
+        line={line}
+        subType={subType}
+        isChild={false}
+        item={itemMap.get(line.item_id)}
+        available={getAvailable(line)}
+        forceShowRemove
+        onToggle={() => onToggleLine(line.line_id)}
+        onQuantityChange={(quantity, shortage) => onQuantityChange(line.line_id, quantity, shortage)}
+        onRemove={onRemoveBundle}
+      />
+    );
+  }
+
   const included = bundle.lines.filter((line) => line.included);
   const excluded = bundle.lines.length - included.length;
   const autoCount = bundle.lines.filter((line) => line.origin === "bom_auto").length;
@@ -39,11 +63,22 @@ export function IoBundleCard({
     bundle.source_kind === "bom_parent"
       ? bundle.lines.find((line) => line.origin === "direct")
       : undefined;
+  const parentAvailable = directParentLine ? getAvailable(directParentLine) : null;
+  const parentExpected = directParentLine
+    ? expectedAfter(directParentLine, parentAvailable)
+    : null;
+  const parentExpectedColor =
+    parentExpected === null
+      ? LEGACY_COLORS.muted2
+      : parentExpected < 0
+      ? LEGACY_COLORS.red
+      : parentExpected === 0
+      ? LEGACY_COLORS.yellow
+      : LEGACY_COLORS.green;
   // BOM 묶음 — 부모 라인이 있으면 부모 라인 수량을, 없으면 bundle.quantity 를 stepper 로 노출.
   const showBundleQtyStepper =
     bundle.source_kind === "bom_parent" &&
     (directParentLine != null || !!onBundleQuantityChange);
-  const tone = LEGACY_COLORS.blue;
   const compositionLabel = (() => {
     if (bundle.source_kind === "bom_parent" || autoCount > 0) {
       return hasDirectLine
@@ -56,7 +91,6 @@ export function IoBundleCard({
     ? bundle.lines.filter((line) => line.line_id !== directParentLine.line_id)
     : bundle.lines;
   const isCollapsible = visibleLines.length > 0;
-  const [collapsed, setCollapsed] = useState(true);
   const stepperQty = directParentLine
     ? Number(directParentLine.quantity) || 0
     : Number(bundle.quantity) || 0;
@@ -202,6 +236,38 @@ export function IoBundleCard({
             )}
           </div>
         </div>
+        {directParentLine && (
+          <div className="flex shrink-0 items-center gap-6 self-center">
+            <div className="text-right">
+              <div
+                className="text-[9px] font-bold uppercase tracking-[1.5px]"
+                style={{ color: LEGACY_COLORS.muted2 }}
+              >
+                {isOutgoing(directParentLine) ? "가능 재고" : "현재 재고"}
+              </div>
+              <div
+                className="text-base font-black tabular-nums"
+                style={{ color: LEGACY_COLORS.text }}
+              >
+                {parentAvailable === null ? "-" : formatQty(parentAvailable)}
+              </div>
+            </div>
+            <div className="text-right">
+              <div
+                className="text-[9px] font-bold uppercase tracking-[1.5px]"
+                style={{ color: LEGACY_COLORS.muted2 }}
+              >
+                실행 후
+              </div>
+              <div
+                className="text-base font-black tabular-nums"
+                style={{ color: parentExpectedColor }}
+              >
+                {parentExpected === null ? "-" : formatQty(parentExpected)}
+              </div>
+            </div>
+          </div>
+        )}
         <button
           type="button"
           onClick={onRemoveBundle}

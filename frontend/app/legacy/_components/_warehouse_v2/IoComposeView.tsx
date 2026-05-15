@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { api, type BOMDetailEntry, type IoBundle, type IoLine, type IoSourceKind, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
@@ -109,6 +110,59 @@ export function IoComposeView({
   const { previewing, previewTarget } = useIoPreview();
   const { drafting, saveDraft } = useIoDraft();
   const { submitting, submit } = useIoSubmit();
+
+  // 브라우저 뒤로/앞으로 ↔ step 동기화. URL ?step=N 으로 history 엔트리를 쌓아 입출고 위저드 내부에서도
+  // 뒤/앞 버튼이 작동하게 함.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const urlStep = useMemo<IoStep>(() => {
+    const raw = Number(searchParams.get("step"));
+    return raw >= 1 && raw <= 5 ? (raw as IoStep) : 1;
+  }, [searchParams]);
+  // URL→state 동기화 직후 state→URL effect 가 다시 push 하는 것을 1회 차단.
+  const skipNextPushRef = useRef(false);
+  // step 을 2 단계 이상 점프할 때(예: 3 → 5) 중간 단계도 history 에 쌓기 위한 deferred target.
+  // URL 이 중간 step 으로 갱신되는 것을 기다린 뒤 최종 step 으로 advance.
+  const pendingFinalStepRef = useRef<IoStep | null>(null);
+
+  // state.step 변경 → URL push
+  useEffect(() => {
+    if (skipNextPushRef.current) {
+      skipNextPushRef.current = false;
+      return;
+    }
+    if (urlStep === state.step) return;
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("step", String(state.step));
+    router.push(`${pathname}?${next.toString()}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.step]);
+
+  // URL step 변경 (뒤로/앞으로) → state.goTo (도달 불가 step 은 clamp)
+  useEffect(() => {
+    if (urlStep === state.step) {
+      // URL 이 state 를 따라잡았을 때 — 보류된 다음 단계가 있으면 advance.
+      if (pendingFinalStepRef.current != null && pendingFinalStepRef.current !== state.step) {
+        const target = pendingFinalStepRef.current;
+        pendingFinalStepRef.current = null;
+        state.goTo(target);
+      }
+      return;
+    }
+    let target: IoStep = urlStep;
+    for (let s = 1; s < target; s += 1) {
+      if (!state.canAdvance[s as IoStep]) {
+        target = s as IoStep;
+        break;
+      }
+    }
+    // URL 으로 들어온 변경은 pending 을 취소 (사용자가 뒤로/앞으로 누른 경우 자동 advance 중단).
+    pendingFinalStepRef.current = null;
+    skipNextPushRef.current = true;
+    state.goTo(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlStep]);
 
   useEffect(() => {
     if (operator?.employee_id && !employeeId) setEmployeeId(operator.employee_id);
@@ -231,17 +285,29 @@ export function IoComposeView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preselectedItem?.item_id, state.workType, state.deptIoDirection]);
 
-  function getAvailable(line: IoLine) {
+  function getAvailable(line: IoLine): number | null {
     const item = items.find((row) => row.item_id === line.item_id);
-    if (!item || line.from_bucket === "none") return null;
-    if (line.from_bucket === "warehouse") {
-      return Math.max(0, (item.warehouse_qty || 0) - (item.pending_quantity || 0));
-    }
+    if (!item) return null;
+    // 백엔드 Decimal 직렬화가 문자열로 내려와 산술이 string concat 으로 깨지는 것 방지 — Number 강제 변환.
+    const warehouseAvail = () => {
+      const wh = Number(item.warehouse_qty) || 0;
+      const pending = Number(item.pending_quantity) || 0;
+      return Math.max(0, wh - pending);
+    };
+    if (line.from_bucket === "warehouse") return warehouseAvail();
     if (line.from_bucket === "production") {
-      return locationQuantity(item, line.from_department, "PRODUCTION");
+      return Number(locationQuantity(item, line.from_department, "PRODUCTION")) || 0;
     }
     if (line.from_bucket === "defective") {
-      return locationQuantity(item, line.from_department, "DEFECTIVE");
+      return Number(locationQuantity(item, line.from_department, "DEFECTIVE")) || 0;
+    }
+    // 입고 (from_bucket="none"): to_bucket 의 목적지 현재 재고
+    if (line.to_bucket === "warehouse") return warehouseAvail();
+    if (line.to_bucket === "production") {
+      return Number(locationQuantity(item, line.to_department, "PRODUCTION")) || 0;
+    }
+    if (line.to_bucket === "defective") {
+      return Number(locationQuantity(item, line.to_department, "DEFECTIVE")) || 0;
     }
     return null;
   }
@@ -667,7 +733,7 @@ export function IoComposeView({
             title="품목 확인"
             state={(step === 3 && state.bundles.length > 0) || step === 4 ? "active" : stepState(4)}
             summary={`반영 ${includedCount}개 · 제외 ${excludedCount}개`}
-            onChange={() => state.goTo(3)}
+            onChange={() => state.goTo(4)}
             accent={accent}
             fill={step === 4 || (step === 3 && state.bundles.length > 0)}
           >
@@ -805,6 +871,15 @@ export function IoComposeView({
                 state.setBundles((prev) => prev.filter((bundle) => bundle.bundle_id !== bundleId))
               }
               onAdvance={() => {
+                // state.step=3 (bundles>0 로 Step 4 카드만 자동 노출된 상태) 에서 곧장 5 로 점프하면
+                // URL history 에 step=4 가 안 쌓여 뒤로 가기가 step=3 으로 떨어진다.
+                // pendingFinalStepRef 에 5 를 예약해두고 먼저 goTo(4) — URL 이 step=4 로 갱신된 뒤
+                // urlStep effect 가 pending 을 보고 자동으로 goTo(5) 호출.
+                if (state.step < 4) {
+                  pendingFinalStepRef.current = 5;
+                  state.goTo(4);
+                  return;
+                }
                 if (state.step <= 4) state.goTo(5);
                 // state.goTo(5) → step=5 → 자동 스크롤 useEffect 가 Step 4 collapsed top 으로.
               }}

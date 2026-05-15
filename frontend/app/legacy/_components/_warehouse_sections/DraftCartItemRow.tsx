@@ -21,14 +21,13 @@ const REQUEST_TYPE_LABEL: Record<string, string> = {
 /**
  * Round-13 (#7) 추출 — DraftCartPanel 의 단일 draft 카드.
  *
- * draft 메타 + lines 미리보기 (최대 5건) + 이어서/삭제/제출 버튼 3개 행.
+ * draft 메타 + lines 미리보기 (최대 5건) + 이어서/삭제 버튼 2개 행.
  */
 export interface DraftCartItemRowProps {
   draft: StockRequest;
   isBusy: boolean;
   onContinue: () => void;
   onRequestDelete: () => void;
-  onSubmit: () => void;
 }
 
 export function DraftCartItemRow({
@@ -36,10 +35,8 @@ export function DraftCartItemRow({
   isBusy,
   onContinue,
   onRequestDelete,
-  onSubmit,
 }: DraftCartItemRowProps) {
   const totalQty = draft.lines.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
-  const canSubmit = draft.lines.length > 0 && !isBusy;
 
   return (
     <div
@@ -113,7 +110,7 @@ export function DraftCartItemRow({
             opacity: isBusy ? 0.5 : 1,
           }}
         >
-          이어서 작성
+          이어서 작업
         </button>
         <button
           type="button"
@@ -128,19 +125,6 @@ export function DraftCartItemRow({
           }}
         >
           삭제
-        </button>
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={!canSubmit}
-          className="rounded-[10px] px-3 py-1.5 text-xs font-bold text-white"
-          style={{
-            background: LEGACY_COLORS.blue,
-            opacity: canSubmit ? 1 : 0.4,
-            cursor: canSubmit ? "pointer" : "not-allowed",
-          }}
-        >
-          {isBusy ? "처리 중..." : "요청 제출"}
         </button>
       </div>
     </div>

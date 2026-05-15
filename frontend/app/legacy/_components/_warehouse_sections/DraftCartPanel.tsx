@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, type IoBatch, type StockRequest } from "@/lib/api";
-import { ApiError } from "@/lib/api-core";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
@@ -88,38 +87,6 @@ export function DraftCartPanel({
     }
   };
 
-  const handleSubmit = async (draft: StockRequest) => {
-    if (!employeeId) return;
-    try {
-      setBusyId(draft.request_id);
-      await api.submitStockRequestDraft(draft.request_id, employeeId);
-      await reload();
-      onChanged();
-    } catch (err) {
-      setOpError(err instanceof Error ? err.message : "요청 제출에 실패했습니다.");
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleSubmitIo = async (draft: IoBatch) => {
-    if (!employeeId) return;
-    try {
-      setBusyId(draft.batch_id);
-      await api.submitDraft(draft.batch_id, employeeId);
-      await reload();
-      onChanged();
-    } catch (err) {
-      if (err instanceof ApiError && err.isUnavailable) {
-        setOpError("서버가 다른 작업을 처리 중입니다. 잠시 후 다시 시도하세요.");
-      } else {
-        setOpError(err instanceof Error ? err.message : "입출고 작업 제출에 실패했습니다.");
-      }
-    } finally {
-      setBusyId(null);
-    }
-  };
-
   if (!employeeId) {
     return (
       <EmptyState
@@ -166,7 +133,6 @@ export function DraftCartPanel({
           draft={draft}
           isBusy={busyId === draft.batch_id}
           onContinue={() => onContinueIo?.(draft)}
-          onSubmit={() => void handleSubmitIo(draft)}
           onRequestDelete={() => setDeleteTarget({ kind: "io", draft })}
         />
       ))}
@@ -178,7 +144,6 @@ export function DraftCartPanel({
           isBusy={busyId === draft.request_id}
           onContinue={() => onContinue(draft)}
           onRequestDelete={() => setDeleteTarget({ kind: "stock", draft })}
-          onSubmit={() => void handleSubmit(draft)}
         />
       ))}
 

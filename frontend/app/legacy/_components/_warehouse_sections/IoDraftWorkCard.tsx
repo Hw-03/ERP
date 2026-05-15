@@ -16,7 +16,6 @@ interface Props {
   draft: IoBatch;
   isBusy: boolean;
   onContinue: () => void;
-  onSubmit: () => void;
   onRequestDelete: () => void;
 }
 
@@ -87,7 +86,6 @@ export function IoDraftWorkCard({
   draft,
   isBusy,
   onContinue,
-  onSubmit,
   onRequestDelete,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
@@ -320,16 +318,7 @@ export function IoDraftWorkCard({
             color: LEGACY_COLORS.text,
           }}
         >
-          이어서 작성
-        </button>
-        <button
-          type="button"
-          disabled={isBusy}
-          onClick={onSubmit}
-          className="rounded-[10px] px-3 py-1.5 text-xs font-black text-white disabled:opacity-50"
-          style={{ background: LEGACY_COLORS.blue }}
-        >
-          제출
+          이어서 작업
         </button>
         <button
           type="button"
