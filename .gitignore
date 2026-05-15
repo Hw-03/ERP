@@ -53,6 +53,7 @@ Thumbs.db
 /v[0-9]*.png
 /api_requests.log
 /verify_out.log
+/verify-history-*.log
 /all_console_errors.log
 /bom-snapshot.yml
 /verify_*.png
