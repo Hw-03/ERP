@@ -10,6 +10,7 @@ import { getTransactionLabel, transactionColor } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import {
   PROCESS_TYPE_META,
+  getBatchFlowEndpoints,
   getHistoryActor,
   getHistoryFlowLabel,
   parseUtc,
@@ -308,8 +309,7 @@ function FlowCard({ flow, log }: { flow: FlowState; log: TransactionLog }) {
 
   if (flow.status === "available") {
     const batch = flow.batch;
-    const fromDept = typeof batch.from_department === "string" ? batch.from_department : null;
-    const toDept = typeof batch.to_department === "string" ? batch.to_department : null;
+    const eps = getBatchFlowEndpoints(batch);
     let bundleCount = batch.bundles.length;
     let lineCount = 0, included = 0, excluded = 0;
     for (const b of batch.bundles) {
@@ -318,20 +318,30 @@ function FlowCard({ flow, log }: { flow: FlowState; log: TransactionLog }) {
         if (l.included) included++; else excluded++;
       }
     }
+    // helper 가 명확한 흐름을 못 만들면 type fallback 라벨로.
+    const fallbackLabel = !eps ? getHistoryFlowLabel(log) : null;
     return (
       <div className={baseClass} style={baseStyle}>
         <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider" style={{ color: LEGACY_COLORS.muted2 }}>
           <Workflow className="h-3.5 w-3.5" />
           작업 흐름
         </div>
-        <div className="mt-2 flex items-center gap-2">
-          <span className="rounded-full border px-2.5 py-0.5 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-            {fromDept ?? "?"}
-          </span>
-          <ArrowRight className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />
-          <span className="rounded-full border px-2.5 py-0.5 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-            {toDept ?? "?"}
-          </span>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {eps ? (
+            <>
+              <span className="rounded-full border px-2.5 py-0.5 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+                {eps.from}
+              </span>
+              <ArrowRight className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />
+              <span className="rounded-full border px-2.5 py-0.5 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+                {eps.to}
+              </span>
+            </>
+          ) : (
+            <span className="rounded-full border px-2.5 py-0.5 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+              {fallbackLabel}
+            </span>
+          )}
           <span className="ml-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
             ({batch.work_type} · {batch.sub_type})
           </span>

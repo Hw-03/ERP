@@ -3,6 +3,11 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import {
+  isDepartmentInternalType,
+  isExceptionLike,
+  isWarehouseInvolvedType,
+} from "./historyShared";
 
 type Props = {
   calendarYear: number;
@@ -78,9 +83,15 @@ export function HistoryCalendarStrip({
               const dayLogs = calendarDayMap.get(key) ?? [];
               const isToday = key === todayKey;
               const isSelected = key === selectedDay;
-              const receiveCount = dayLogs.filter((l) => l.transaction_type === "RECEIVE").length;
-              const shipCount = dayLogs.filter((l) => l.transaction_type === "TRANSFER_TO_PROD").length;
-              const exceptionCount = dayLogs.filter((l) => l.transaction_type === "ADJUST" || l.transaction_type === "MARK_DEFECTIVE" || l.transaction_type === "SUPPLIER_RETURN").length;
+              // 새 KPI 와 일치 — isWarehouseInvolvedType / isDepartmentInternalType / isExceptionLike.
+              let warehouseCount = 0;
+              let deptCount = 0;
+              let exceptionCount = 0;
+              for (const l of dayLogs) {
+                if (isWarehouseInvolvedType(l.transaction_type)) warehouseCount++;
+                if (isDepartmentInternalType(l.transaction_type)) deptCount++;
+                if (isExceptionLike(l)) exceptionCount++;
+              }
               return (
                 <button
                   key={key}
@@ -108,14 +119,14 @@ export function HistoryCalendarStrip({
                     </span>
                   )}
                   <div className="mt-1 flex w-full flex-col gap-0.5 px-1">
-                    {receiveCount > 0 && (
+                    {warehouseCount > 0 && (
                       <span className="text-[10px] font-bold leading-tight" style={{ color: LEGACY_COLORS.green }}>
-                        입 {receiveCount}건
+                        창 {warehouseCount}건
                       </span>
                     )}
-                    {shipCount > 0 && (
-                      <span className="text-[10px] font-bold leading-tight" style={{ color: LEGACY_COLORS.red }}>
-                        출 {shipCount}건
+                    {deptCount > 0 && (
+                      <span className="text-[10px] font-bold leading-tight" style={{ color: LEGACY_COLORS.cyan }}>
+                        부 {deptCount}건
                       </span>
                     )}
                     {exceptionCount > 0 && (

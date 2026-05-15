@@ -116,7 +116,7 @@ export function HistoryFilterBar({
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="품명 · 품목 코드 · 담당자 · 참조번호 · 메모 검색 (전체 DB)"
+              placeholder="품명 · 품목 코드 · 담당자(요청자/처리자) · 참조번호 · 메모 (전체 DB 검색)"
               className="flex-1 bg-transparent text-sm outline-none"
               style={{ color: LEGACY_COLORS.text }}
             />

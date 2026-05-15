@@ -93,17 +93,115 @@ function _deptName(dept: Department | string | null | undefined): string | null 
   return typeof dept === "string" ? dept : null;
 }
 
-/** 작업 흐름 라벨. batch 가 있으면 정확한 부서명, 없으면 거래 타입 추론. */
+// ──────────────────────────────────────────────────────────────────
+// Batch flow endpoints — IoLine.from_bucket/to_bucket + batch.sub_type 컨텍스트로
+// "창고/부서명/불량/외부/생산/분해/수량 조정" 라벨을 만든다. 명확하지 않으면 null.
+// ──────────────────────────────────────────────────────────────────
+
+export interface BatchFlowEndpoints {
+  from: string;
+  to: string;
+  /** 끝점 중 하나 이상이 라인마다 다른 위치를 가질 때. 그 끝점은 "여러 위치"로 표시됨. */
+  mixed: boolean;
+}
+
+type BucketSlot = { bucket: string; dept: string | null };
+
+function _bucketSlotKey(s: BucketSlot): string {
+  return `${s.bucket}|${s.dept ?? ""}`;
+}
+
+/** none bucket 라벨 — sub_type 컨텍스트 의존. 매핑 안 되면 null. */
+function _labelNoneBucket(subType: string | null | undefined, side: "from" | "to"): string | null {
+  switch (subType) {
+    case "receive_supplier":
+      // 공급사 → 창고 — none 은 from(공급사 측)
+      return side === "from" ? "외부" : null;
+    case "supplier_return":
+      // 창고/부서 → 공급사 — none 은 to(공급사 측)
+      return side === "to" ? "외부" : null;
+    case "produce":
+      // BOM 소비/생산: none → "생산" (방향성)
+      return "생산";
+    case "disassemble":
+      return "분해";
+    case "adjust_in":
+    case "adjust_out":
+      return "수량 조정";
+    default:
+      return null;
+  }
+}
+
+function _labelBucketSlot(slot: BucketSlot, subType: string | null | undefined, side: "from" | "to"): string | null {
+  switch (slot.bucket) {
+    case "warehouse": return "창고";
+    case "production": return slot.dept || "부서";
+    case "defective": return slot.dept ? `${slot.dept} 불량` : "불량";
+    case "none": return _labelNoneBucket(subType, side);
+    default: return null;
+  }
+}
+
+export function getBatchFlowEndpoints(batch: IoBatch): BatchFlowEndpoints | null {
+  const fromSlots = new Map<string, BucketSlot>();
+  const toSlots = new Map<string, BucketSlot>();
+
+  for (const bundle of batch.bundles) {
+    for (const line of bundle.lines) {
+      const fs: BucketSlot = { bucket: line.from_bucket, dept: _deptName(line.from_department) };
+      const ts: BucketSlot = { bucket: line.to_bucket, dept: _deptName(line.to_department) };
+      fromSlots.set(_bucketSlotKey(fs), fs);
+      toSlots.set(_bucketSlotKey(ts), ts);
+    }
+  }
+
+  // 라인이 0 건이면 batch.from_department/to_department 텍스트 fallback
+  if (fromSlots.size === 0 && toSlots.size === 0) {
+    const f = _deptName(batch.from_department);
+    const t = _deptName(batch.to_department);
+    if (f && t) return { from: f, to: t, mixed: false };
+    return null;
+  }
+
+  const subType = batch.sub_type ?? null;
+
+  let fromLabel: string;
+  let mixedFrom = false;
+  if (fromSlots.size === 1) {
+    const slot = fromSlots.values().next().value as BucketSlot;
+    const lbl = _labelBucketSlot(slot, subType, "from");
+    if (!lbl) return null;
+    fromLabel = lbl;
+  } else {
+    fromLabel = "여러 위치";
+    mixedFrom = true;
+  }
+
+  let toLabel: string;
+  let mixedTo = false;
+  if (toSlots.size === 1) {
+    const slot = toSlots.values().next().value as BucketSlot;
+    const lbl = _labelBucketSlot(slot, subType, "to");
+    if (!lbl) return null;
+    toLabel = lbl;
+  } else {
+    toLabel = "여러 위치";
+    mixedTo = true;
+  }
+
+  return { from: fromLabel, to: toLabel, mixed: mixedFrom || mixedTo };
+}
+
+/** 작업 흐름 라벨. batch 있고 명확하면 부서/창고/불량/생산 등으로, 그 외 거래 타입 추론. */
 export function getHistoryFlowLabel(
   log: { transaction_type: string },
   batch?: IoBatch | null,
 ): string {
   if (batch) {
-    const fromDept = _deptName(batch.from_department);
-    const toDept = _deptName(batch.to_department);
-    if (fromDept && toDept) return `${fromDept} → ${toDept}`;
-    if (fromDept) return `${fromDept} → ?`;
-    if (toDept) return `? → ${toDept}`;
+    const eps = getBatchFlowEndpoints(batch);
+    if (eps) return `${eps.from} → ${eps.to}`;
+    // helper 가 null 이면 batch 무시, type fallback 으로 떨어짐.
   }
   switch (log.transaction_type) {
     case "RECEIVE": return "공급사 → 창고";

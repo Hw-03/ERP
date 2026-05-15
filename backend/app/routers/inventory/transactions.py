@@ -172,9 +172,13 @@ def list_transactions(
         .scalar_subquery()
     )
 
+    # IoBatch outerjoin — search 에서 IoBatch.requester_name 까지 매칭하기 위함.
+    # operation_batch_id 가 NULL 인 row 도 보존하기 위해 outerjoin.
+    # IoBatch.batch_id 가 PK 라 1:1 join → row 중복 없음, 정렬/페이지네이션 영향 없음.
     query = (
         db.query(TransactionLog, Item, edit_count_sq.label("edit_count"))
         .join(Item, TransactionLog.item_id == Item.item_id)
+        .outerjoin(IoBatch, TransactionLog.operation_batch_id == IoBatch.batch_id)
     )
 
     if item_id:
@@ -212,9 +216,13 @@ def list_transactions(
                 TransactionLog.reference_no.ilike(pattern),
                 TransactionLog.notes.ilike(pattern),
                 TransactionLog.produced_by.ilike(pattern),
+                # 화면에 우선 표시되는 요청자(IoBatch.requester_name) 도 검색 대상.
+                IoBatch.requester_name.ilike(pattern),
             )
         )
 
+    # TODO(history-overhaul-fixup): export.csv/xlsx 도 동일하게
+    # IoBatch outerjoin + requester_name search 적용 검토.
     rows = query.order_by(TransactionLog.created_at.desc()).offset(skip).limit(limit).all()
 
     # operation_batch_id 기준으로 IoBatch 일괄 조회 → requester_name 매핑

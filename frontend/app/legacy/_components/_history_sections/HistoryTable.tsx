@@ -55,11 +55,15 @@ export function HistoryTable({
   );
 
   // ── visible op_batch lazy fetch ──
+  // observer 는 마운트 시 한 번만 만든다. batchCache 변경마다 재생성하지 않게
+  // 클로저는 ref 만 본다 — batchCacheRef 가 최신 cache 를 가리킨다.
   const mountedRef = useRef(true);
   const pendingFetchesRef = useRef<Set<string>>(new Set());
   const fetchQueueRef = useRef<string[]>([]);
   const inFlightRef = useRef(0);
   const observerRef = useRef<IntersectionObserver | null>(null);
+  const batchCacheRef = useRef(batchCache);
+  batchCacheRef.current = batchCache;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -91,17 +95,17 @@ export function HistoryTable({
   }, []);
 
   const enqueueBatchFetch = useCallback((batchId: string) => {
-    if (batchCache.has(batchId)) return;
+    if (batchCacheRef.current.has(batchId)) return;
     if (pendingFetchesRef.current.has(batchId)) return;
     pendingFetchesRef.current.add(batchId);
     fetchQueueRef.current.push(batchId);
     tryDrainQueue();
-  }, [batchCache, tryDrainQueue]);
+  }, [tryDrainQueue]);
 
-  // 그룹 변경 시 옵저버 재구성
+  // 마운트 시 한 번만 옵저버 생성. cache 변경에도 재생성하지 않으므로
+  // 이미 등록된 모든 row 가 계속 옵저베이션된다.
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return;
-    observerRef.current?.disconnect();
     observerRef.current = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -112,7 +116,10 @@ export function HistoryTable({
       },
       { rootMargin: "120px" },
     );
-    return () => observerRef.current?.disconnect();
+    return () => {
+      observerRef.current?.disconnect();
+      observerRef.current = null;
+    };
   }, [enqueueBatchFetch]);
 
   const opBatchRowRef = useCallback((el: HTMLTableRowElement | null) => {
