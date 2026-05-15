@@ -28,6 +28,7 @@ export function DesktopTopbar({
   actionSlot,
   status,
   statusNonce,
+  titleAddon,
 }: {
   title: string;
   icon?: ElementType;
@@ -35,6 +36,7 @@ export function DesktopTopbar({
   actionSlot?: ReactNode;
   status?: string;
   statusNonce?: number;
+  titleAddon?: ReactNode;
 }) {
   const operator = useCurrentOperator();
   const roleLabel = operator ? WAREHOUSE_ROLE_LABEL[operator.warehouse_role] ?? null : null;
@@ -77,6 +79,7 @@ export function DesktopTopbar({
               </div>
             )}
             <div className="text-[24px] font-black tracking-[-0.02em]">{title}</div>
+            {titleAddon}
           </div>
         </div>
 

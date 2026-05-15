@@ -17,11 +17,12 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
   const [hovered, setHovered] = useState<string | null>(null);
 
   return (
-    <div className={`grid ${cols === 1 ? "grid-cols-1" : "grid-cols-3"} gap-3`}>
+    <div className={`grid ${cols === 1 ? "grid-cols-1" : "grid-cols-3"} gap-2`}>
       {groups.map((g) => {
         const isActive = g.process_code === selected;
         const isHover = hovered === g.process_code;
         const isDecreasing = g.delta < 0;
+        const isQuiet = g.delta === 0 && !isActive;
         const accentColor = employeeColor(g.dept_name);
         const tone = isDecreasing ? LEGACY_COLORS.red : accentColor;
         const deltaColor =
@@ -60,32 +61,43 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
                 background: isActive || isDecreasing ? tone : tint(accentColor, 35),
               }}
             />
-            {/* 상단 행: 부서명·순변동 + 공정코드 배지 */}
-            <div className="flex items-start justify-between gap-3 py-2.5 pl-5 pr-4">
-              <div className="flex flex-col gap-1">
-                <div
-                  className="text-[19px] font-black tracking-[-0.02em] leading-none"
-                  style={{ color: LEGACY_COLORS.text }}
-                >
-                  {g.dept_name}
-                </div>
+            {/* 상단 행 한 줄: 부서명 · 공정코드 · 증감 */}
+            <div className="flex items-center gap-2 py-1.5 pl-4 pr-3">
+              <span
+                className="text-[16px] font-black tracking-[-0.01em] leading-none"
+                style={{ color: isQuiet ? LEGACY_COLORS.muted : LEGACY_COLORS.text }}
+              >
+                {g.dept_name}
+              </span>
+              <span
+                className="shrink-0 rounded-[5px] px-1.5 py-0.5 text-[10px] font-black"
+                style={{
+                  background: isQuiet
+                    ? tint(LEGACY_COLORS.muted2, 10, LEGACY_COLORS.s2)
+                    : tint(tone, 12, LEGACY_COLORS.s2),
+                  color: isQuiet ? LEGACY_COLORS.muted2 : tone,
+                }}
+              >
+                {g.process_code}
+              </span>
+              <div className="ml-auto flex items-center gap-1.5">
                 {g.delta !== 0 ? (
-                  <div
-                    className="text-[26px] font-black leading-none tabular-nums"
+                  <span
+                    className="text-[20px] font-black leading-none tabular-nums"
                     style={{ color: deltaColor }}
                   >
                     {g.delta > 0 ? `+${formatQty(g.delta)}` : formatQty(g.delta)}
-                  </div>
+                  </span>
                 ) : (
-                  <div className="flex items-center gap-1.5">
+                  <>
                     <span
-                      className="text-[16px] font-black leading-none"
+                      className="text-[15px] font-black leading-none"
                       style={{ color: LEGACY_COLORS.muted2 }}
                     >
                       ±0
                     </span>
                     <span
-                      className="rounded-[5px] px-1.5 py-0.5 text-[10px] font-bold"
+                      className="rounded-[4px] px-1 py-0.5 text-[10px] font-bold"
                       style={{
                         background: tint(LEGACY_COLORS.muted2, 12, LEGACY_COLORS.s2),
                         color: LEGACY_COLORS.muted2,
@@ -93,22 +105,13 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
                     >
                       변동 없음
                     </span>
-                  </div>
+                  </>
                 )}
               </div>
-              <span
-                className="shrink-0 rounded-[6px] px-2 py-0.5 text-[11px] font-black"
-                style={{
-                  background: tint(tone, 12, LEGACY_COLORS.s2),
-                  color: tone,
-                }}
-              >
-                {g.process_code}
-              </span>
             </div>
-            {/* 하단 행: 입고 · 출고 · 현재 */}
+            {/* 하단 행 한 줄: 입고 · 출고 · 현재 */}
             <div
-              className="flex items-center justify-between gap-2 border-t px-5 py-1.5 text-[12px] font-semibold tabular-nums"
+              className="flex items-center justify-between gap-2 border-t px-4 py-1 text-[12px] font-semibold tabular-nums"
               style={{ borderColor: tint(LEGACY_COLORS.border, 60, "transparent") }}
             >
               <span
@@ -120,7 +123,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
               </span>
               <span
                 style={{
-                  color: g.out_qty > 0 ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2,
+                  color: g.out_qty > 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2,
                 }}
               >
                 출고 {formatQty(g.out_qty)}

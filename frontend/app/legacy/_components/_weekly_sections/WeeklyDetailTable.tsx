@@ -26,11 +26,17 @@ function WeeklyDetailTableImpl({ group }: Props) {
     <div className="flex flex-col gap-0">
       {/* 공정 요약 */}
       <div
-        className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 pb-2"
+        className="mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 pb-1.5"
         style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
       >
         <span className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.muted }}>
           {group.dept_name}
+          <span
+            className="ml-1 text-[11px] font-bold"
+            style={{ color: LEGACY_COLORS.muted2 }}
+          >
+            · {group.process_code}
+          </span>
         </span>
         <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
           현재 재고 {formatQty(group.current_qty)}
@@ -43,7 +49,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
         </span>
         <span
           className="text-[12px]"
-          style={{ color: group.out_qty > 0 ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2 }}
+          style={{ color: group.out_qty > 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}
         >
           출고 {formatQty(group.out_qty)}
         </span>
@@ -77,7 +83,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
       </div>
 
       <div className="overflow-x-auto">
-        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 3px", minWidth: 680, tableLayout: "fixed" }}>
+        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 2px", minWidth: 680, tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: "100px" }} />
             <col />
@@ -96,10 +102,15 @@ function WeeklyDetailTableImpl({ group }: Props) {
                     className="text-[13px] font-bold"
                     style={{
                       color: LEGACY_COLORS.muted2,
-                      textAlign: i < 2 ? "left" : "right",
-                      padding: "6px 12px 8px",
+                      textAlign: i < 2 ? "left" : "center",
+                      padding: "4px 12px 6px",
                       whiteSpace: "nowrap",
                     }}
+                    title={
+                      h === "전주 재고"
+                        ? "현재 재고와 선택 주차 입출고 내역을 기준으로 계산한 값입니다."
+                        : undefined
+                    }
                   >
                     {h}
                   </th>
@@ -125,7 +136,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                 <tr key={row.item_id}>
                   {/* 품목 코드 */}
                   <td
-                    className="rounded-l-[12px] border-y border-l py-2.5 pl-3 pr-3 text-[14px] font-bold"
+                    className="rounded-l-[12px] border-y border-l py-1.5 pl-3 pr-3 text-[14px] font-bold"
                     style={{
                       background: rowBg,
                       borderColor: rowBorder,
@@ -137,7 +148,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                   </td>
                   {/* 품명 */}
                   <td
-                    className="border-y px-3 py-2.5 text-[15px] font-bold"
+                    className="border-y px-3 py-1.5 text-[15px] font-bold"
                     style={{
                       background: rowBg,
                       borderColor: rowBorder,
@@ -153,28 +164,48 @@ function WeeklyDetailTableImpl({ group }: Props) {
                   {/* 전주 재고 */}
                   <Num val={row.prev_qty} bg={rowBg} border={rowBorder} />
                   {/* 생산 내역 */}
-                  <Num val={row.in_qty} bg={rowBg} border={rowBorder} color={LEGACY_COLORS.green} />
+                  <Num
+                    val={row.in_qty}
+                    bg={rowBg}
+                    border={rowBorder}
+                    color={LEGACY_COLORS.green}
+                    highlightColor={LEGACY_COLORS.green}
+                  />
                   {/* 출고 내역 */}
-                  <Num val={row.out_qty} bg={rowBg} border={rowBorder} color={LEGACY_COLORS.yellow} />
+                  <Num
+                    val={row.out_qty}
+                    bg={rowBg}
+                    border={rowBorder}
+                    color={LEGACY_COLORS.red}
+                    highlightColor={LEGACY_COLORS.red}
+                  />
                   {/* 현재 재고 */}
                   <Num val={row.current_qty} bg={rowBg} border={rowBorder} />
                   {/* 증감 */}
-                  <td
-                    className="rounded-r-[12px] border-y border-r pl-3 pr-4 py-2.5 text-right text-[16px] font-black"
-                    style={{
-                      background: rowBg,
-                      borderColor: rowBorder,
-                      color:
-                        delta > 0
-                          ? LEGACY_COLORS.green
-                          : delta < 0
-                          ? LEGACY_COLORS.red
-                          : LEGACY_COLORS.muted2,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {delta > 0 ? `+${formatQty(delta)}` : delta < 0 ? formatQty(delta) : "±0"}
-                  </td>
+                  {(() => {
+                    const deltaTone =
+                      delta > 0
+                        ? LEGACY_COLORS.green
+                        : delta < 0
+                        ? LEGACY_COLORS.red
+                        : null;
+                    const deltaCellBg = deltaTone
+                      ? `color-mix(in srgb, ${deltaTone} 8%, ${rowBg})`
+                      : rowBg;
+                    return (
+                      <td
+                        className="rounded-r-[12px] border-y border-r px-3 py-1.5 text-center text-[16px] font-black"
+                        style={{
+                          background: deltaCellBg,
+                          borderColor: rowBorder,
+                          color: deltaTone ?? LEGACY_COLORS.muted2,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {delta > 0 ? `+${formatQty(delta)}` : delta < 0 ? formatQty(delta) : "±0"}
+                      </td>
+                    );
+                  })()}
                 </tr>
               );
             })}
@@ -190,18 +221,25 @@ function Num({
   bg,
   border,
   color,
+  highlightColor,
 }: {
   val: number;
   bg: string;
   border: string;
   color?: string;
+  highlightColor?: string;
 }) {
-  const c = val === 0 ? LEGACY_COLORS.muted2 : (color ?? LEGACY_COLORS.text);
+  const isZero = Number(val) === 0;
+  const c = isZero ? LEGACY_COLORS.muted2 : (color ?? LEGACY_COLORS.text);
+  const cellBg =
+    !isZero && highlightColor
+      ? `color-mix(in srgb, ${highlightColor} 8%, ${bg})`
+      : bg;
   return (
     <td
-      className="border-y px-3 py-2.5 text-right text-[15px] font-bold"
+      className="border-y px-3 py-1.5 text-center text-[15px] font-bold"
       style={{
-        background: bg,
+        background: cellBg,
         borderColor: border,
         color: c,
         whiteSpace: "nowrap",

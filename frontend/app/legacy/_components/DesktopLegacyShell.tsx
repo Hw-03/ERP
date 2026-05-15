@@ -11,6 +11,10 @@ import { DesktopWarehouseView } from "./DesktopWarehouseView";
 import { DesktopAdminView } from "./DesktopAdminView";
 import { DesktopHistoryView } from "./DesktopHistoryView";
 import { DesktopWeeklyReportView } from "./DesktopWeeklyReportView";
+import {
+  WeeklyWeekPicker,
+  getWeekStartMonday,
+} from "./_weekly_sections/WeeklyWeekPicker";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { api, type ProductionCapacity } from "@/lib/api";
 import type { Item } from "@/lib/api";
@@ -77,6 +81,8 @@ export function DesktopLegacyShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
+  const [weekMon, setWeekMon] = useState<Date>(() => getWeekStartMonday(new Date()));
+
   const [warehousePreselected, setWarehousePreselected] = useState<Item | null>(null);
   const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
   const [capacityModal, setCapacityModal] = useState(false);
@@ -138,11 +144,11 @@ export function DesktopLegacyShell() {
       return <DesktopHistoryView key={key} />;
     }
     if (activeTab === "weekly") {
-      return <DesktopWeeklyReportView key={key} />;
+      return <DesktopWeeklyReportView key={key} weekMon={weekMon} />;
     }
     return <DesktopAdminView key={key} globalSearch="" onStatusChange={handleStatusChange} />;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse, capacityData, loadCapacity]);
+  }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse, capacityData, loadCapacity, weekMon]);
 
   return (
     <>
@@ -160,7 +166,7 @@ export function DesktopLegacyShell() {
           alertCount={{ dashboard: stockWarnings ? stockWarnings.zero + stockWarnings.low : 0 }}
         />
 
-        <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
+        <div className="min-w-0 flex-1 flex flex-col">
           <DesktopTopbar
             title={activeMeta.title}
             icon={activeMeta.icon}
@@ -170,6 +176,11 @@ export function DesktopLegacyShell() {
             }}
             status={status}
             statusNonce={statusNonce}
+            titleAddon={
+              activeTab === "weekly" ? (
+                <WeeklyWeekPicker weekMon={weekMon} onChange={setWeekMon} />
+              ) : undefined
+            }
           />
 
           <div className="mt-1 min-h-0 flex-1 overflow-hidden flex">{content}</div>

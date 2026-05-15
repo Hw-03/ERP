@@ -1,0 +1,249 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
+import { StatusPill } from "../common";
+
+const CAL_MIN = new Date(2026, 0, 1);
+
+export function getWeekStartMonday(d: Date): Date {
+  const mon = new Date(d);
+  const dow = d.getDay();
+  mon.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
+  mon.setHours(0, 0, 0, 0);
+  return mon;
+}
+
+function getWeekStartSun(d: Date): Date {
+  const sun = new Date(d);
+  sun.setDate(d.getDate() - d.getDay());
+  sun.setHours(0, 0, 0, 0);
+  return sun;
+}
+
+function toDateStr(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function getWeeksOfMonth(year: number, month: number): Date[][] {
+  const start = getWeekStartSun(new Date(year, month, 1));
+  const endOfMonth = new Date(year, month + 1, 0);
+  const weeks: Date[][] = [];
+  const cur = new Date(start);
+  while (cur <= endOfMonth) {
+    const week: Date[] = [];
+    for (let i = 0; i < 7; i++) {
+      week.push(new Date(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    weeks.push(week);
+  }
+  return weeks;
+}
+
+export function monthlyWeekLabel(weekMon: Date): string {
+  const year = weekMon.getFullYear();
+  const month = weekMon.getMonth();
+  const first = new Date(year, month, 1);
+  const dow = first.getDay();
+  const daysToFirstMon = (1 - dow + 7) % 7;
+  const firstMonday = new Date(year, month, 1 + daysToFirstMon);
+  const diffDays = Math.round(
+    (weekMon.getTime() - firstMonday.getTime()) / 86400000
+  );
+  const weekNum = Math.floor(diffDays / 7) + 1;
+  const sun = new Date(weekMon);
+  sun.setDate(weekMon.getDate() + 6);
+  const fmt = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
+  return `${year}년 ${month + 1}월 ${weekNum}주차 (${fmt(weekMon)} ~ ${fmt(sun)})`;
+}
+
+interface Props {
+  weekMon: Date;
+  onChange: (d: Date) => void;
+}
+
+export function WeeklyWeekPicker({ weekMon, onChange }: Props) {
+  const [open, setOpen] = useState(false);
+  const [hoveredWeek, setHoveredWeek] = useState<string | null>(null);
+  const [calMonth, setCalMonth] = useState<Date>(
+    () => new Date(weekMon.getFullYear(), weekMon.getMonth(), 1)
+  );
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setCalMonth(new Date(weekMon.getFullYear(), weekMon.getMonth(), 1));
+  }, [weekMon]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const weekStartStr = toDateStr(weekMon);
+  const isThisWeek = toDateStr(getWeekStartMonday(new Date())) === weekStartStr;
+
+  const today = new Date();
+  const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const canPrevMonth = calMonth > CAL_MIN;
+  const canNextMonth = calMonth < thisMonthStart;
+
+  return (
+    <div ref={rootRef} className="relative flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 rounded-[12px] border px-3 py-1.5 transition-colors hover:brightness-110"
+        style={{
+          background: open
+            ? tint(LEGACY_COLORS.blue, 10, LEGACY_COLORS.s2)
+            : LEGACY_COLORS.s2,
+          borderColor: open ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+          color: LEGACY_COLORS.text,
+        }}
+      >
+        <CalendarDays className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
+        <span className="text-[13px] font-black">{monthlyWeekLabel(weekMon)}</span>
+        <ChevronDown
+          className="h-3.5 w-3.5 shrink-0 transition-transform"
+          style={{
+            color: LEGACY_COLORS.muted,
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+          }}
+        />
+      </button>
+
+      {isThisWeek && <StatusPill label="이번 주" tone="success" showDot={false} />}
+
+      {open && (
+        <div
+          className="absolute left-0 top-full z-50 mt-2 rounded-[16px] border p-4 shadow-lg"
+          style={{
+            background: LEGACY_COLORS.s1,
+            borderColor: LEGACY_COLORS.border,
+            minWidth: 320,
+          }}
+        >
+          <div className="mb-3 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))
+              }
+              disabled={!canPrevMonth}
+              className="flex h-7 w-7 items-center justify-center rounded-[10px] border transition-colors hover:brightness-110 disabled:opacity-30"
+              style={{
+                background: LEGACY_COLORS.s2,
+                borderColor: LEGACY_COLORS.border,
+                color: LEGACY_COLORS.muted,
+              }}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span
+              className="text-[14px] font-black"
+              style={{ color: LEGACY_COLORS.text }}
+            >
+              {calMonth.getFullYear()}년 {calMonth.getMonth() + 1}월
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))
+              }
+              disabled={!canNextMonth}
+              className="flex h-7 w-7 items-center justify-center rounded-[10px] border transition-colors hover:brightness-110 disabled:opacity-30"
+              style={{
+                background: LEGACY_COLORS.s2,
+                borderColor: LEGACY_COLORS.border,
+                color: LEGACY_COLORS.muted,
+              }}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mb-1 grid grid-cols-7">
+            {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
+              <div
+                key={d}
+                className="py-1 text-center text-xs font-bold"
+                style={{
+                  color:
+                    i === 0 ? "#f25f5c" : i === 6 ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
+                }}
+              >
+                {d}
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1">
+            {getWeeksOfMonth(calMonth.getFullYear(), calMonth.getMonth()).flatMap(
+              (week) => {
+                const sun = week[0];
+                const mon = new Date(sun.getTime() + 86400000);
+                const weekKey = toDateStr(mon);
+                const isSelectedWeek = weekKey === weekStartStr;
+                const isHovered = hoveredWeek === weekKey;
+                const isFuture =
+                  toDateStr(mon) > toDateStr(getWeekStartMonday(new Date()));
+                return week.map((d) => {
+                  const isOutside = d.getMonth() !== calMonth.getMonth();
+                  return (
+                    <button
+                      key={d.toISOString()}
+                      onClick={() => {
+                        if (!isFuture) {
+                          onChange(new Date(mon));
+                          setOpen(false);
+                        }
+                      }}
+                      onMouseEnter={() => !isFuture && setHoveredWeek(weekKey)}
+                      onMouseLeave={() => setHoveredWeek(null)}
+                      disabled={isFuture}
+                      className="flex flex-col items-center rounded-[10px] border px-1 py-1.5 transition-colors disabled:opacity-30"
+                      style={{
+                        background: isSelectedWeek
+                          ? "rgba(101,169,255,.18)"
+                          : isHovered
+                          ? "rgba(101,169,255,.08)"
+                          : LEGACY_COLORS.s2,
+                        borderColor: isSelectedWeek
+                          ? LEGACY_COLORS.blue
+                          : isHovered
+                          ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 40%, transparent)`
+                          : LEGACY_COLORS.border,
+                      }}
+                    >
+                      <span
+                        className="text-sm font-bold"
+                        style={{
+                          color: isOutside
+                            ? LEGACY_COLORS.muted2
+                            : isSelectedWeek
+                            ? LEGACY_COLORS.blue
+                            : LEGACY_COLORS.text,
+                        }}
+                      >
+                        {d.getDate()}
+                      </span>
+                    </button>
+                  );
+                });
+              }
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

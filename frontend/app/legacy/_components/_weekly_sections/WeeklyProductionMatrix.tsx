@@ -49,11 +49,11 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-[14px]">
+      <table className="w-full border-collapse">
         <thead>
           <tr style={{ background: LEGACY_COLORS.s2 }}>
             <th
-              className="py-1.5 px-2 text-center text-[12px] font-bold tracking-wide"
+              className="py-2 px-3 text-center text-[13px] font-bold tracking-wide"
               style={{ color: LEGACY_COLORS.muted2 }}
             >
               모델
@@ -63,7 +63,7 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
               return (
                 <th
                   key={c.key}
-                  className="px-3 py-2 text-center text-[12px] font-black tracking-wide"
+                  className="px-3 py-2 text-center text-[14px] font-black tracking-wide"
                   style={{ color: deptColor }}
                 >
                   {c.label}
@@ -82,7 +82,7 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
                 style={{ background: isAlt ? altBg : LEGACY_COLORS.s1 }}
               >
                 <td
-                  className="py-1.5 px-2 text-center font-black"
+                  className="py-2.5 px-3 text-center text-[15px] font-black"
                   style={{ color: hasData ? LEGACY_COLORS.text : LEGACY_COLORS.muted }}
                 >
                   {row.model_label}
@@ -90,12 +90,16 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
                 {COLS.map((c) => {
                   const val = row[c.key];
                   const deptColor = getDepartmentFallbackColor(c.dept);
+                  const hasVal = val > 0;
                   return (
                     <td
                       key={c.key}
-                      className="px-3 py-2 text-center font-bold tabular-nums"
+                      className="px-3 py-2.5 text-center text-[16px] font-black tabular-nums"
                       style={{
-                        color: val === 0 ? LEGACY_COLORS.muted2 : deptColor,
+                        color: hasVal ? deptColor : LEGACY_COLORS.muted2,
+                        background: hasVal
+                          ? `color-mix(in srgb, ${deptColor} 12%, transparent)`
+                          : undefined,
                       }}
                     >
                       {fmt(val)}
