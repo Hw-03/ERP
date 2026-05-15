@@ -1,6 +1,16 @@
+import type { TransactionLog } from "@/lib/api";
 import type { Department, TransactionType } from "@/lib/api/types/shared";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+
+// ──────────────────────────────────────────────────────────────────
+// 우측 상세 패널 선택 모델 (history-batch-detail-2026-05-15)
+// 단일 거래 행과 op_batch 묶음 행 둘 다 우측 패널을 열 수 있도록 union.
+// batch 객체 자체는 batchCache 에서 조회 — selection 에는 키만.
+// ──────────────────────────────────────────────────────────────────
+export type HistorySelection =
+  | { kind: "log"; log: TransactionLog }
+  | { kind: "batch"; batchId: string; logs: TransactionLog[] };
 
 export const HISTORY_PAGE_SIZE = 100;
 

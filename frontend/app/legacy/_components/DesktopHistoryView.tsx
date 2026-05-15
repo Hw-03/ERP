@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type TransactionLog } from "@/lib/api";
+import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { HistoryFilterBar } from "./_history_sections/HistoryFilterBar";
 import { HistoryCalendarStrip } from "./_history_sections/HistoryCalendarStrip";
@@ -18,6 +19,7 @@ import {
   parseUtc,
   toDateKey,
   type HistoryScope,
+  type HistorySelection,
 } from "./_history_sections/historyShared";
 
 const SEARCH_DEBOUNCE_MS = 350;
@@ -43,29 +45,34 @@ export function DesktopHistoryView() {
   });
 
   const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
-  const [selected, setSelected] = useState<TransactionLog | null>(null);
+  const [selection, setSelection] = useState<HistorySelection | null>(null);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [itemRecentLogs, setItemRecentLogs] = useState<TransactionLog[]>([]);
+
+  // batchCache — HistoryTable 의 visible lazy fetch + 우측 batch 상세 패널이 공유.
+  const [batchCache, setBatchCache] = useState<Map<string, IoBatch>>(new Map());
 
   const [viewMode, setViewMode] = useState<"list" | "calendar">("calendar");
   const now = new Date();
   const [calendarYear, setCalendarYear] = useState(now.getFullYear());
   const [calendarMonth, setCalendarMonth] = useState(now.getMonth());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const lastSelectedRef = useRef<TransactionLog | null>(null);
+  const lastSelectionRef = useRef<HistorySelection | null>(null);
 
+  // selection.kind === "log" 일 때만 같은 품목 최근 거래 로드.
   useEffect(() => {
-    if (!selected) {
+    if (selection?.kind !== "log") {
       setItemRecentLogs([]);
       return;
     }
+    const log = selection.log;
     void api
-      .getTransactions({ itemId: selected.item_id, limit: 6 })
+      .getTransactions({ itemId: log.item_id, limit: 6 })
       .then((data) => {
-        setItemRecentLogs(data.filter((l) => l.log_id !== selected.log_id).slice(0, 5));
+        setItemRecentLogs(data.filter((l) => l.log_id !== log.log_id).slice(0, 5));
       })
       .catch(() => setItemRecentLogs([]));
-  }, [selected]);
+  }, [selection]);
 
   // 달력 fetch — 목록과 같은 scope/typeFilter/debouncedSearch 적용.
   useEffect(() => {
@@ -165,7 +172,7 @@ export function DesktopHistoryView() {
 
   function handleLogUpdated(updated: TransactionLog) {
     setLogs((prev) => prev.map((l) => (l.log_id === updated.log_id ? updated : l)));
-    setSelected(updated);
+    setSelection({ kind: "log", log: updated });
   }
 
   function handleLogCorrected(result: { original: TransactionLog; correction: TransactionLog }) {
@@ -173,15 +180,23 @@ export function DesktopHistoryView() {
       const without = prev.filter((l) => l.log_id !== result.original.log_id);
       return [result.correction, result.original, ...without];
     });
-    setSelected(result.original);
+    setSelection({ kind: "log", log: result.original });
   }
 
   function handleSelectLog(log: TransactionLog) {
-    setSelected((c) => (c?.log_id === log.log_id ? null : log));
+    setSelection((c) =>
+      c?.kind === "log" && c.log.log_id === log.log_id ? null : { kind: "log", log },
+    );
   }
 
-  if (selected) lastSelectedRef.current = selected;
-  const displaySelected = selected ?? lastSelectedRef.current;
+  function handleSelectBatch(batchId: string, logs: TransactionLog[]) {
+    setSelection((c) =>
+      c?.kind === "batch" && c.batchId === batchId ? null : { kind: "batch", batchId, logs },
+    );
+  }
+
+  if (selection) lastSelectionRef.current = selection;
+  const displaySelection = selection ?? lastSelectionRef.current;
 
   return (
     <div className="flex min-h-0 flex-1 pl-0 pr-4">
@@ -225,8 +240,11 @@ export function DesktopHistoryView() {
                 <HistoryTable
                   loading={false}
                   filteredLogs={selectedDayLogs}
-                  selectedLogId={selected?.log_id}
+                  selection={selection}
                   onSelectLog={handleSelectLog}
+                  onSelectBatch={handleSelectBatch}
+                  batchCache={batchCache}
+                  setBatchCache={setBatchCache}
                   canLoadMore={false}
                   loadingMore={false}
                   onLoadMore={() => {}}
@@ -239,8 +257,11 @@ export function DesktopHistoryView() {
             <HistoryTable
               loading={loading}
               filteredLogs={logs}
-              selectedLogId={selected?.log_id}
+              selection={selection}
               onSelectLog={handleSelectLog}
+              onSelectBatch={handleSelectBatch}
+              batchCache={batchCache}
+              setBatchCache={setBatchCache}
               canLoadMore={canLoadMore}
               loadingMore={loadingMore}
               onLoadMore={() => void loadMore()}
@@ -250,10 +271,12 @@ export function DesktopHistoryView() {
       </div>
 
       <DesktopHistoryRightPanel
-        selected={selected}
-        displaySelected={displaySelected}
+        selection={selection}
+        displaySelection={displaySelection}
+        batchCache={batchCache}
+        setBatchCache={setBatchCache}
         itemRecentLogs={itemRecentLogs}
-        onSelectLog={(log) => setSelected(log)}
+        onSelectLog={handleSelectLog}
         onLogUpdated={handleLogUpdated}
         onLogCorrected={handleLogCorrected}
       />

@@ -1,13 +1,13 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState, LoadingSkeleton } from "../common";
-import { formatHistoryDate } from "./historyShared";
+import { formatHistoryDate, type HistorySelection } from "./historyShared";
 import { HistoryLogRow } from "./HistoryLogRow";
 import { BatchHeader, OpBatchHeader, buildGroups } from "./historyTableHelpers";
 import { BomBatchDetail } from "./BomBatchDetail";
@@ -15,8 +15,12 @@ import { BomBatchDetail } from "./BomBatchDetail";
 type Props = {
   loading: boolean;
   filteredLogs: TransactionLog[];
-  selectedLogId: string | undefined;
+  selection: HistorySelection | null;
   onSelectLog: (log: TransactionLog) => void;
+  onSelectBatch: (batchId: string, logs: TransactionLog[]) => void;
+  /** 부모(DesktopHistoryView)가 들고 있는 batchCache — 우측 패널과 공유. */
+  batchCache: Map<string, IoBatch>;
+  setBatchCache: React.Dispatch<React.SetStateAction<Map<string, IoBatch>>>;
   canLoadMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
@@ -36,14 +40,16 @@ const VISIBLE_FETCH_CONCURRENCY = 4;
 export function HistoryTable({
   loading,
   filteredLogs,
-  selectedLogId,
+  selection,
   onSelectLog,
+  onSelectBatch,
+  batchCache,
+  setBatchCache,
   canLoadMore,
   loadingMore,
   onLoadMore,
 }: Props) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [batchCache, setBatchCache] = useState<Map<string, IoBatch>>(new Map());
 
   const groups = useMemo(() => buildGroups(filteredLogs), [filteredLogs]);
 
@@ -55,8 +61,7 @@ export function HistoryTable({
   );
 
   // ── visible op_batch lazy fetch ──
-  // observer 는 마운트 시 한 번만 만든다. batchCache 변경마다 재생성하지 않게
-  // 클로저는 ref 만 본다 — batchCacheRef 가 최신 cache 를 가리킨다.
+  // observer 는 마운트 시 한 번만. batchCache 변경마다 재생성하지 않게 ref 만 본다.
   const mountedRef = useRef(true);
   const pendingFetchesRef = useRef<Set<string>>(new Set());
   const fetchQueueRef = useRef<string[]>([]);
@@ -92,7 +97,7 @@ export function HistoryTable({
           if (mountedRef.current) tryDrainQueue();
         });
     }
-  }, []);
+  }, [setBatchCache]);
 
   const enqueueBatchFetch = useCallback((batchId: string) => {
     if (batchCacheRef.current.has(batchId)) return;
@@ -102,8 +107,6 @@ export function HistoryTable({
     tryDrainQueue();
   }, [tryDrainQueue]);
 
-  // 마운트 시 한 번만 옵저버 생성. cache 변경에도 재생성하지 않으므로
-  // 이미 등록된 모든 row 가 계속 옵저베이션된다.
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return;
     observerRef.current = new IntersectionObserver(
@@ -151,6 +154,10 @@ export function HistoryTable({
     if (allExpanded) setExpandedGroups(new Set());
     else setExpandedGroups(new Set(batchKeys));
   }
+
+  // selection helpers
+  const selectedLogId = selection?.kind === "log" ? selection.log.log_id : undefined;
+  const selectedBatchId = selection?.kind === "batch" ? selection.batchId : undefined;
 
   return (
     <section className="card" style={{ backgroundImage: "linear-gradient(rgba(101,169,255,.04), rgba(101,169,255,.04))" }}>
@@ -216,12 +223,15 @@ export function HistoryTable({
                 if (group.type === "op_batch") {
                   const expanded = expandedGroups.has(group.batchId);
                   const batch = batchCache.get(group.batchId) ?? null;
+                  const isSelected = selectedBatchId === group.batchId;
                   return (
                     <Fragment key={`op-${group.batchId}`}>
                       <OpBatchHeader
                         group={group}
                         expanded={expanded}
                         onToggle={() => toggleGroup(group.batchId)}
+                        selected={isSelected}
+                        onSelect={() => onSelectBatch(group.batchId, group.logs)}
                         batch={batch}
                         rowRef={opBatchRowRef}
                       />
@@ -238,13 +248,17 @@ export function HistoryTable({
                 }
 
                 // type === "batch" (reference_no 기준 레거시 그룹)
+                // op_batch 가 아니라 IoBatch 가 없으므로 클릭 시 첫 로그 상세를 연다.
                 const expanded = expandedGroups.has(group.refNo);
+                const isSelected = selectedLogId === group.logs[0]?.log_id;
                 return (
                   <Fragment key={`ref-${group.refNo}`}>
                     <BatchHeader
                       group={group}
                       expanded={expanded}
                       onToggle={() => toggleGroup(group.refNo)}
+                      selected={isSelected}
+                      onSelect={() => onSelectLog(group.logs[0])}
                     />
                     {expanded &&
                       group.logs.map((log) => (

@@ -124,18 +124,46 @@ function ActorCell({ name }: { name: string }) {
   );
 }
 
+function ChevronToggleBtn({
+  expanded,
+  onToggle,
+}: { expanded: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={expanded ? "묶음 접기" : "묶음 펼치기"}
+      aria-expanded={expanded}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] hover:brightness-125"
+      style={{ background: "rgba(101,169,255,.10)" }}
+    >
+      {expanded
+        ? <ChevronDown className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.blue }} />
+        : <ChevronRight className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />}
+    </button>
+  );
+}
+
 /**
  * 레거시 reference_no 기반 묶음 헤더.
  * 같은 item_id 묶음일 때만 합산 수량 표시. 혼합이면 "하위 N건".
+ * row click → onSelect (상세 열기), chevron click → onToggle (펼치기/접기).
  */
 export function BatchHeader({
   group,
   expanded,
   onToggle,
+  selected,
+  onSelect,
 }: {
   group: Extract<LogGroup, { type: "batch" }>;
   expanded: boolean;
   onToggle: () => void;
+  selected: boolean;
+  onSelect: () => void;
 }) {
   const first = group.logs[0];
   const homogeneous = isHomogeneousItemGroup(group.logs);
@@ -148,15 +176,25 @@ export function BatchHeader({
 
   return (
     <tr
-      onClick={onToggle}
-      className="cursor-pointer select-none hover:brightness-110"
-      style={{ background: "rgba(101,169,255,.06)" }}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      tabIndex={0}
+      role="button"
+      aria-pressed={selected}
+      className="cursor-pointer select-none transition-colors hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+      style={{
+        background: selected ? "rgba(101,169,255,.10)" : "rgba(101,169,255,.06)",
+        outline: selected ? `1.5px solid ${LEGACY_COLORS.blue}` : "none",
+      }}
     >
       <td className="whitespace-nowrap border-b px-4 py-3 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
         <div className="flex items-center gap-1.5">
-          {expanded
-            ? <ChevronDown className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-            : <ChevronRight className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
+          <ChevronToggleBtn expanded={expanded} onToggle={onToggle} />
           {formatHistoryDate(first.created_at)}
         </div>
       </td>
@@ -198,17 +236,22 @@ export function BatchHeader({
  * operation_batch_id 기반 묶음 헤더.
  * batch (IoBatch) 가 cache hit 이면 정확한 from→to/title/포함·제외 라인 수 표시.
  * 없으면 TransactionLog 기반 추론으로 fallback.
+ * row click → onSelect (우측 batch 상세 열기), chevron click → onToggle (펼치기/접기).
  */
 export function OpBatchHeader({
   group,
   expanded,
   onToggle,
+  selected,
+  onSelect,
   batch,
   rowRef,
 }: {
   group: Extract<LogGroup, { type: "op_batch" }>;
   expanded: boolean;
   onToggle: () => void;
+  selected: boolean;
+  onSelect: () => void;
   batch?: IoBatch | null;
   /** visible 진입 감지용 ref. */
   rowRef?: (el: HTMLTableRowElement | null) => void;
@@ -251,15 +294,25 @@ export function OpBatchHeader({
     <tr
       ref={rowRef}
       data-batch-id={group.batchId}
-      onClick={onToggle}
-      className="cursor-pointer select-none hover:brightness-110"
-      style={{ background: "rgba(101,169,255,.08)" }}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      tabIndex={0}
+      role="button"
+      aria-pressed={selected}
+      className="cursor-pointer select-none transition-colors hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+      style={{
+        background: selected ? "rgba(101,169,255,.14)" : "rgba(101,169,255,.08)",
+        outline: selected ? `1.5px solid ${LEGACY_COLORS.blue}` : "none",
+      }}
     >
       <td className="whitespace-nowrap border-b px-4 py-3 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
         <div className="flex items-center gap-1.5">
-          {expanded
-            ? <ChevronDown className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-            : <ChevronRight className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
+          <ChevronToggleBtn expanded={expanded} onToggle={onToggle} />
           {formatHistoryDate(first.created_at)}
         </div>
       </td>
