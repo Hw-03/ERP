@@ -1,5 +1,13 @@
 "use client";
 
+// TODO(history-overhaul-2026-05-15): 데스크탑이 KPI를 건수 기준으로 통일했음.
+// useHistoryDerivations.summary 의 inSum/outSum (수량 합계) 을 receiveCount/shipCount 로 교체하고
+// KpiCard 라벨/값을 "N건" 표기로 맞출 것. 현재 데스크탑은 건수, 모바일은 수량 합계라 의미가 다름
+// (의도적 임시 상태 — 후속 작업).
+//
+// 또한 데스크탑 useHistoryData 와 마찬가지로 search/scope/typeFilter/dateFilter 를 서버 쿼리로 전환할 것.
+// 현재 모바일은 클라이언트 메모리 필터일 가능성이 높음.
+
 import { useEffect, useState } from "react";
 import { ArrowLeft, Filter, History as HistoryIcon } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";

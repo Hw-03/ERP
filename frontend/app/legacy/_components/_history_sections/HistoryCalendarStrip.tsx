@@ -78,9 +78,9 @@ export function HistoryCalendarStrip({
               const dayLogs = calendarDayMap.get(key) ?? [];
               const isToday = key === todayKey;
               const isSelected = key === selectedDay;
-              const hasReceive = dayLogs.some((l) => l.transaction_type === "RECEIVE");
-              const hasShip = dayLogs.some((l) => l.transaction_type === "TRANSFER_TO_PROD");
-              const hasException = dayLogs.some((l) => l.transaction_type === "ADJUST" || l.transaction_type === "MARK_DEFECTIVE" || l.transaction_type === "SUPPLIER_RETURN");
+              const receiveCount = dayLogs.filter((l) => l.transaction_type === "RECEIVE").length;
+              const shipCount = dayLogs.filter((l) => l.transaction_type === "TRANSFER_TO_PROD").length;
+              const exceptionCount = dayLogs.filter((l) => l.transaction_type === "ADJUST" || l.transaction_type === "MARK_DEFECTIVE" || l.transaction_type === "SUPPLIER_RETURN").length;
               return (
                 <button
                   key={key}
@@ -107,10 +107,22 @@ export function HistoryCalendarStrip({
                       {dayLogs.length}
                     </span>
                   )}
-                  <div className="mt-1 flex gap-0.5">
-                    {hasReceive && <span className="h-1.5 w-1.5 rounded-full" style={{ background: LEGACY_COLORS.green }} />}
-                    {hasShip && <span className="h-1.5 w-1.5 rounded-full" style={{ background: LEGACY_COLORS.red }} />}
-                    {hasException && <span className="h-1.5 w-1.5 rounded-full" style={{ background: LEGACY_COLORS.yellow }} />}
+                  <div className="mt-1 flex w-full flex-col gap-0.5 px-1">
+                    {receiveCount > 0 && (
+                      <span className="text-[10px] font-bold leading-tight" style={{ color: LEGACY_COLORS.green }}>
+                        입 {receiveCount}건
+                      </span>
+                    )}
+                    {shipCount > 0 && (
+                      <span className="text-[10px] font-bold leading-tight" style={{ color: LEGACY_COLORS.red }}>
+                        출 {shipCount}건
+                      </span>
+                    )}
+                    {exceptionCount > 0 && (
+                      <span className="text-[10px] font-bold leading-tight" style={{ color: LEGACY_COLORS.yellow }}>
+                        예 {exceptionCount}건
+                      </span>
+                    )}
                   </div>
                 </button>
               );

@@ -1,9 +1,10 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useState, useMemo, Fragment } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from "react";
 import type { TransactionLog } from "@/lib/api";
-import type { IoBatch } from "@/lib/api/types";
+import { ioApi } from "@/lib/api/io";
+import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState, LoadingSkeleton } from "../common";
 import { formatHistoryDate } from "./historyShared";
@@ -23,12 +24,14 @@ type Props = {
 
 const COLUMNS: { label: string; width?: string; minWidth?: string }[] = [
   { label: "일시", width: "140px" },
-  { label: "구분", width: "88px" },
+  { label: "구분", width: "120px" },
   { label: "품목명", minWidth: "160px" },
-  { label: "수량변화", width: "80px" },
+  { label: "수량변화", width: "140px" },
   { label: "담당자", width: "100px" },
   { label: "메모", minWidth: "120px" },
 ];
+
+const VISIBLE_FETCH_CONCURRENCY = 4;
 
 export function HistoryTable({
   loading,
@@ -51,6 +54,72 @@ export function HistoryTable({
     [groups],
   );
 
+  // ── visible op_batch lazy fetch ──
+  const mountedRef = useRef(true);
+  const pendingFetchesRef = useRef<Set<string>>(new Set());
+  const fetchQueueRef = useRef<string[]>([]);
+  const inFlightRef = useRef(0);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  const tryDrainQueue = useCallback(() => {
+    while (inFlightRef.current < VISIBLE_FETCH_CONCURRENCY && fetchQueueRef.current.length > 0) {
+      const next = fetchQueueRef.current.shift()!;
+      inFlightRef.current++;
+      void ioApi.getBatch(next)
+        .then((b) => {
+          if (mountedRef.current) {
+            setBatchCache((prev) => {
+              if (prev.has(next)) return prev;
+              const m = new Map(prev);
+              m.set(next, b);
+              return m;
+            });
+          }
+        })
+        .catch(() => { /* 무시 — 다음 시도에서 재요청 가능. */ })
+        .finally(() => {
+          pendingFetchesRef.current.delete(next);
+          inFlightRef.current--;
+          if (mountedRef.current) tryDrainQueue();
+        });
+    }
+  }, []);
+
+  const enqueueBatchFetch = useCallback((batchId: string) => {
+    if (batchCache.has(batchId)) return;
+    if (pendingFetchesRef.current.has(batchId)) return;
+    pendingFetchesRef.current.add(batchId);
+    fetchQueueRef.current.push(batchId);
+    tryDrainQueue();
+  }, [batchCache, tryDrainQueue]);
+
+  // 그룹 변경 시 옵저버 재구성
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    observerRef.current?.disconnect();
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const id = (entry.target as HTMLElement).dataset.batchId;
+          if (id) enqueueBatchFetch(id);
+        }
+      },
+      { rootMargin: "120px" },
+    );
+    return () => observerRef.current?.disconnect();
+  }, [enqueueBatchFetch]);
+
+  const opBatchRowRef = useCallback((el: HTMLTableRowElement | null) => {
+    if (!el || !observerRef.current) return;
+    observerRef.current.observe(el);
+  }, []);
+
   function toggleGroup(key: string) {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
@@ -61,7 +130,12 @@ export function HistoryTable({
   }
 
   function handleCacheBatch(batchId: string, batch: IoBatch) {
-    setBatchCache((prev) => new Map(prev).set(batchId, batch));
+    setBatchCache((prev) => {
+      if (prev.has(batchId)) return prev;
+      const m = new Map(prev);
+      m.set(batchId, batch);
+      return m;
+    });
   }
 
   const allExpanded = batchKeys.length > 0 && batchKeys.every((k) => expandedGroups.has(k));
@@ -134,12 +208,15 @@ export function HistoryTable({
 
                 if (group.type === "op_batch") {
                   const expanded = expandedGroups.has(group.batchId);
+                  const batch = batchCache.get(group.batchId) ?? null;
                   return (
                     <Fragment key={`op-${group.batchId}`}>
                       <OpBatchHeader
                         group={group}
                         expanded={expanded}
                         onToggle={() => toggleGroup(group.batchId)}
+                        batch={batch}
+                        rowRef={opBatchRowRef}
                       />
                       {expanded && (
                         <BomBatchDetail

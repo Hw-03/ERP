@@ -1,19 +1,39 @@
 "use client";
 
-import { CalendarDays, List, Search, X } from "lucide-react";
+import { CalendarDays, HelpCircle, List, Search, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common";
-import { DATE_OPTIONS, TAB_LABELS, TAB_TYPE_MAP, TYPE_OPTIONS, type HistoryTab } from "./historyShared";
+import {
+  DATE_OPTIONS,
+  DEPT_INTERNAL_TYPES,
+  SCOPE_LABELS,
+  TYPE_OPTIONS,
+  WAREHOUSE_INVOLVED_TYPES,
+  type HistoryScope,
+  type TypeOption,
+} from "./historyShared";
 
-// 탭별로 보여줄 유형 칩 필터링
-const WAREHOUSE_TYPE_VALUES = new Set(TAB_TYPE_MAP.WAREHOUSE?.split(","));
-const DEPT_TYPE_VALUES = new Set(TAB_TYPE_MAP.DEPT?.split(","));
+const _wh = new Set<string>(WAREHOUSE_INVOLVED_TYPES);
+const _dept = new Set<string>(DEPT_INTERNAL_TYPES);
 
-function getTypeOptionsForTab(tab: HistoryTab) {
-  if (tab === "ALL") return TYPE_OPTIONS;
-  const allowed = tab === "WAREHOUSE" ? WAREHOUSE_TYPE_VALUES : DEPT_TYPE_VALUES;
-  return TYPE_OPTIONS.filter((o) => o.value === "ALL" || allowed.has(o.value));
+/**
+ * scope 안에서 노출할 칩 옵션.
+ * - ALL → 전체 옵션
+ * - WAREHOUSE_INVOLVED → transactionTypes 가 모두 WAREHOUSE_INVOLVED_TYPES 부분집합인 옵션 + "전체"
+ * - DEPT_INTERNAL → 동일 (DEPT_INTERNAL_TYPES 부분집합) + "전체"
+ * "예외/정정"(EXCEPTION) 칩은 ambiguous 타입만 가지므로 ALL scope 외에서는 자동 제외됨.
+ */
+function getTypeOptionsForScope(scope: HistoryScope): TypeOption[] {
+  if (scope === "ALL") return TYPE_OPTIONS;
+  const base = scope === "WAREHOUSE_INVOLVED" ? _wh : _dept;
+  return TYPE_OPTIONS.filter((o) => {
+    if (o.value === "ALL") return true;
+    if (o.transactionTypes.length === 0) return true;
+    return o.transactionTypes.every((t) => base.has(t));
+  });
 }
+
+const SCOPE_ORDER: HistoryScope[] = ["ALL", "WAREHOUSE_INVOLVED", "DEPT_INTERNAL"];
 
 type Props = {
   search: string;
@@ -24,8 +44,8 @@ type Props = {
   setViewMode: (m: "list" | "calendar") => void;
   typeFilter: string;
   setTypeFilter: (v: string) => void;
-  historyTab: HistoryTab;
-  setHistoryTab: (t: HistoryTab) => void;
+  scope: HistoryScope;
+  setScope: (s: HistoryScope) => void;
   totalCount: number;
 };
 
@@ -38,33 +58,52 @@ export function HistoryFilterBar({
   setViewMode,
   typeFilter,
   setTypeFilter,
-  historyTab,
-  setHistoryTab,
+  scope,
+  setScope,
   totalCount,
 }: Props) {
-  const typeOptions = getTypeOptionsForTab(historyTab);
+  const typeOptions = getTypeOptionsForScope(scope);
+
+  function handleScopeChange(next: HistoryScope) {
+    setScope(next);
+    // ambiguous 타입 칩(EXCEPTION)이 새 scope 에서 빈 결과가 되므로 안전 리셋.
+    if (next !== "ALL" && typeFilter === "EXCEPTION") setTypeFilter("ALL");
+    // 새 scope 에서 노출 안 되는 옵션이면 ALL 로 리셋.
+    const next_chips = getTypeOptionsForScope(next);
+    if (!next_chips.some((o) => o.value === typeFilter)) setTypeFilter("ALL");
+  }
 
   return (
     <section className="card" style={{ paddingTop: 14, paddingBottom: 14 }}>
       <div className="flex flex-col gap-2.5">
-        {/* 0줄: 창고/부서 탭 */}
-        <div className="flex overflow-hidden rounded-[12px] border self-start" style={{ borderColor: LEGACY_COLORS.border }}>
-          {(["ALL", "WAREHOUSE", "DEPT"] as HistoryTab[]).map((tab) => {
-            const active = historyTab === tab;
-            return (
-              <button
-                key={tab}
-                onClick={() => { setHistoryTab(tab); setTypeFilter("ALL"); }}
-                className="px-4 py-2 text-xs font-bold transition-colors"
-                style={{
-                  background: active ? LEGACY_COLORS.blue : "transparent",
-                  color: active ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
-                }}
-              >
-                {TAB_LABELS[tab]}
-              </button>
-            );
-          })}
+        {/* 0줄: scope 탭 (전체 / 창고 포함 / 부서 내부) */}
+        <div className="flex items-center gap-2 self-start">
+          <div className="flex overflow-hidden rounded-[12px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+            {SCOPE_ORDER.map((s) => {
+              const active = scope === s;
+              return (
+                <button
+                  key={s}
+                  onClick={() => handleScopeChange(s)}
+                  className="px-4 py-2 text-xs font-bold transition-colors"
+                  style={{
+                    background: active ? LEGACY_COLORS.blue : "transparent",
+                    color: active ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
+                  }}
+                >
+                  {SCOPE_LABELS[s]}
+                </button>
+              );
+            })}
+          </div>
+          <span
+            className="inline-flex items-center gap-1 text-[11px]"
+            style={{ color: LEGACY_COLORS.muted2 }}
+            title="ADJUST/MARK_DEFECTIVE/SUPPLIER_RETURN/SCRAP/LOSS는 거래 타입만으로 창고/부서를 단정할 수 없어 '전체' scope에서 '예외/정정' 칩으로만 보입니다."
+          >
+            <HelpCircle className="h-3 w-3" />
+            예외 거래는 &apos;전체&apos;에서 확인
+          </span>
         </div>
 
         {/* 1줄: 검색 + 기간 세그먼트 + 목록/달력 토글 */}
@@ -77,12 +116,14 @@ export function HistoryFilterBar({
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="품명 · 품목 코드 · 담당자 · 참조번호 · 메모 검색"
+              placeholder="품명 · 품목 코드 · 담당자 · 참조번호 · 메모 검색 (전체 DB)"
               className="flex-1 bg-transparent text-sm outline-none"
               style={{ color: LEGACY_COLORS.text }}
             />
             {search && (
-              <button onClick={() => setSearch("")} className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>✕</button>
+              <button onClick={() => setSearch("")} className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                ✕
+              </button>
             )}
           </div>
 
@@ -131,10 +172,16 @@ export function HistoryFilterBar({
           </div>
         </div>
 
-        {/* 2줄: 거래 유형 칩 (탭 기준 필터링) */}
+        {/* 2줄: 거래 유형 칩 (scope 기준 필터링) */}
         <div className="flex flex-wrap items-center gap-1.5">
           {typeOptions.map((opt) => (
-            <FilterChip key={opt.value} active={typeFilter === opt.value} label={opt.label} onClick={() => setTypeFilter(opt.value)} size="sm" />
+            <FilterChip
+              key={opt.value}
+              active={typeFilter === opt.value}
+              label={opt.label}
+              onClick={() => setTypeFilter(opt.value)}
+              size="sm"
+            />
           ))}
         </div>
 
@@ -151,7 +198,7 @@ export function HistoryFilterBar({
                   color: LEGACY_COLORS.blue,
                 }}
               >
-                유형: {TYPE_OPTIONS.find((opt) => opt.value === typeFilter)?.label}
+                유형: {TYPE_OPTIONS.find((opt) => opt.value === typeFilter)?.label ?? typeFilter}
                 <button onClick={() => setTypeFilter("ALL")}><X className="h-3 w-3" /></button>
               </span>
             )}

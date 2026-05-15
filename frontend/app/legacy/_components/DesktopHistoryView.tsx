@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type TransactionLog, type TransactionType } from "@/lib/api";
+import { api, type TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { HistoryFilterBar } from "./_history_sections/HistoryFilterBar";
 import { HistoryCalendarStrip } from "./_history_sections/HistoryCalendarStrip";
@@ -10,23 +10,40 @@ import { HistoryTable } from "./_history_sections/HistoryTable";
 import { DesktopHistoryRightPanel } from "./_history_sections/DesktopHistoryRightPanel";
 import { useHistoryData } from "./_hooks/useHistoryData";
 import {
-  EXCEPTION_TYPES,
-  TAB_TYPE_MAP,
-  getPeriodStart,
+  TRANSACTION_TYPES_NONE,
+  intersectTransactionTypes,
+  isDepartmentInternalType,
+  isExceptionLike,
+  isWarehouseInvolvedType,
   parseUtc,
   toDateKey,
-  type HistoryTab,
+  type HistoryScope,
 } from "./_history_sections/historyShared";
 
-export function DesktopHistoryView() {
-  const [historyTab, setHistoryTab] = useState<HistoryTab>("ALL");
-  const { logs, setLogs, loading, loadingMore, canLoadMore, loadMore } = useHistoryData(historyTab);
+const SEARCH_DEBOUNCE_MS = 350;
 
-  const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
-  const [selected, setSelected] = useState<TransactionLog | null>(null);
+export function DesktopHistoryView() {
+  const [scope, setScope] = useState<HistoryScope>("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [dateFilter, setDateFilter] = useState("MONTH");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // search debounce — 목록과 달력 fetch 가 같은 값을 공유.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { logs, setLogs, loading, loadingMore, canLoadMore, loadMore } = useHistoryData({
+    scope,
+    typeFilter,
+    dateFilter,
+    debouncedSearch,
+  });
+
+  const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
+  const [selected, setSelected] = useState<TransactionLog | null>(null);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [itemRecentLogs, setItemRecentLogs] = useState<TransactionLog[]>([]);
 
@@ -50,11 +67,19 @@ export function DesktopHistoryView() {
       .catch(() => setItemRecentLogs([]));
   }, [selected]);
 
+  // 달력 fetch — 목록과 같은 scope/typeFilter/debouncedSearch 적용.
   useEffect(() => {
     if (viewMode !== "calendar") return;
-    setCalendarLoading(true);
     setSelectedDay(null);
 
+    const transactionTypes = intersectTransactionTypes(scope, typeFilter);
+    if (transactionTypes === TRANSACTION_TYPES_NONE) {
+      setCalendarLogs([]);
+      setCalendarLoading(false);
+      return;
+    }
+
+    setCalendarLoading(true);
     const firstDay = new Date(calendarYear, calendarMonth, 1);
     const lastDay = new Date(calendarYear, calendarMonth + 1, 0);
     const ymd = (d: Date) =>
@@ -68,7 +93,8 @@ export function DesktopHistoryView() {
           skip: 0,
           dateFrom: ymd(firstDay),
           dateTo: ymd(lastDay),
-          transactionTypes: TAB_TYPE_MAP[historyTab],
+          transactionTypes,
+          search: debouncedSearch || undefined,
         },
         { signal: ctrl.signal },
       )
@@ -80,7 +106,7 @@ export function DesktopHistoryView() {
         if ((err as Error)?.name !== "AbortError") setCalendarLoading(false);
       });
     return () => ctrl.abort();
-  }, [viewMode, calendarYear, calendarMonth, historyTab]);
+  }, [viewMode, calendarYear, calendarMonth, scope, typeFilter, debouncedSearch]);
 
   function prevMonth() {
     if (calendarMonth === 0) {
@@ -124,41 +150,18 @@ export function DesktopHistoryView() {
 
   const todayKey = toDateKey(new Date().toISOString());
 
-  const filteredLogs = useMemo(() => {
-    const start = getPeriodStart(dateFilter);
-    return logs.filter((log) => {
-      if (typeFilter === "EXCEPTION") {
-        if (!EXCEPTION_TYPES.has(log.transaction_type)) return false;
-      } else if (typeFilter !== "ALL" && log.transaction_type !== (typeFilter as TransactionType)) return false;
-      if (start && parseUtc(log.created_at) < start) return false;
-      if (search.trim()) {
-        const kw = search.trim().toLowerCase();
-        const hay = `${log.item_name} ${log.erp_code} ${log.reference_no ?? ""} ${log.notes ?? ""} ${log.produced_by ?? ""}`.toLowerCase();
-        if (!hay.includes(kw)) return false;
-      }
-      return true;
-    });
-  }, [logs, typeFilter, dateFilter, search]);
-
+  // 서버사이드 필터링이라 클라 메모리 추가 필터 없음. logs 그대로 표시.
   const stats = useMemo(() => {
-    let receiveSum = 0;
-    let shipSum = 0;
+    let warehouseCount = 0;
+    let deptCount = 0;
     let exceptionCount = 0;
-    for (const log of filteredLogs) {
-      if (log.transaction_type === "RECEIVE" || log.transaction_type === "PRODUCE") {
-        receiveSum += Number(log.quantity_change);
-      }
-      if (log.transaction_type === "SHIP" || log.transaction_type === "BACKFLUSH") {
-        shipSum += Math.abs(Number(log.quantity_change));
-      }
-      if (EXCEPTION_TYPES.has(log.transaction_type) || log.transaction_type === "BACKFLUSH") {
-        exceptionCount++;
-      }
+    for (const log of logs) {
+      if (isWarehouseInvolvedType(log.transaction_type)) warehouseCount++;
+      if (isDepartmentInternalType(log.transaction_type)) deptCount++;
+      if (isExceptionLike(log)) exceptionCount++;
     }
-    return { total: filteredLogs.length, receiveSum, shipSum, exceptionCount };
-  }, [filteredLogs]);
-
-  // canLoadMore / loadMore 는 useHistoryData 가 제공 (R7-HOOK1).
+    return { total: logs.length, warehouseCount, deptCount, exceptionCount };
+  }, [logs]);
 
   function handleLogUpdated(updated: TransactionLog) {
     setLogs((prev) => prev.map((l) => (l.log_id === updated.log_id ? updated : l)));
@@ -166,7 +169,6 @@ export function DesktopHistoryView() {
   }
 
   function handleLogCorrected(result: { original: TransactionLog; correction: TransactionLog }) {
-    // 원본 로그 갱신 + 보정 거래 prepend
     setLogs((prev) => {
       const without = prev.filter((l) => l.log_id !== result.original.log_id);
       return [result.correction, result.original, ...without];
@@ -189,7 +191,6 @@ export function DesktopHistoryView() {
         style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.bg }}
       >
         <div className="flex flex-col gap-3 pb-6">
-          {/* ── 요약 통계 카드 ── R9-1: HistoryStatsBar 분리 */}
           <HistoryStatsBar stats={stats} canLoadMore={canLoadMore} />
 
           <HistoryFilterBar
@@ -201,8 +202,8 @@ export function DesktopHistoryView() {
             setViewMode={setViewMode}
             typeFilter={typeFilter}
             setTypeFilter={setTypeFilter}
-            historyTab={historyTab}
-            setHistoryTab={setHistoryTab}
+            scope={scope}
+            setScope={setScope}
             totalCount={stats.total}
           />
 
@@ -237,7 +238,7 @@ export function DesktopHistoryView() {
           {viewMode === "list" && (
             <HistoryTable
               loading={loading}
-              filteredLogs={filteredLogs}
+              filteredLogs={logs}
               selectedLogId={selected?.log_id}
               onSelectLog={handleSelectLog}
               canLoadMore={canLoadMore}

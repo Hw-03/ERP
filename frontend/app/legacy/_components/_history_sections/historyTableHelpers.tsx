@@ -6,10 +6,15 @@ import {
   PackageX, Recycle, ShieldAlert, Sliders, Trash2, Undo2, Wrench,
 } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
+import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { getTransactionLabel, transactionColor, transactionIconName } from "@/lib/mes-status";
+import { transactionColor, transactionIconName } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
-import { formatHistoryDate } from "./historyShared";
+import {
+  formatHistoryDate,
+  getHistoryActor,
+  getHistoryFlowLabel,
+} from "./historyShared";
 
 const TX_ICON = {
   ArrowDownToLine, ArrowUpFromLine, Sliders, Hammer, Recycle, Trash2,
@@ -17,7 +22,15 @@ const TX_ICON = {
   ShieldAlert, PackageX, Activity,
 } as const;
 
-function TypeBadge({ type, label, color }: { type: TransactionLog["transaction_type"] | null; label: string; color: string }) {
+function FlowBadge({
+  type,
+  label,
+  color,
+}: {
+  type: TransactionLog["transaction_type"] | null;
+  label: string;
+  color: string;
+}) {
   const Icon = type ? TX_ICON[transactionIconName(type)] : null;
   return (
     <span
@@ -36,9 +49,7 @@ export type LogGroup =
   | { type: "op_batch"; batchId: string; refNo: string | null; logs: TransactionLog[] };
 
 export function buildGroups(logs: TransactionLog[]): LogGroup[] {
-  // 1순위: operation_batch_id 기준 그룹
   const opBatches = new Map<string, TransactionLog[]>();
-  // 2순위: reference_no 기준 그룹 (operation_batch_id 없는 레거시)
   const refBatches = new Map<string, TransactionLog[]>();
 
   for (const log of logs) {
@@ -88,8 +99,18 @@ export function buildGroups(logs: TransactionLog[]): LogGroup[] {
   return groups;
 }
 
-function RequesterCell({ name }: { name: string | null }) {
-  if (!name) return <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>;
+/** 묶음 안 모든 로그가 같은 item_id 인지. 합산 수량 표시 안전 가드. */
+export function isHomogeneousItemGroup(logs: TransactionLog[]): boolean {
+  if (logs.length === 0) return false;
+  const first = logs[0].item_id;
+  for (let i = 1; i < logs.length; i++) {
+    if (logs[i].item_id !== first) return false;
+  }
+  return true;
+}
+
+function ActorCell({ name }: { name: string }) {
+  if (!name || name === "-") return <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>;
   return (
     <div className="flex items-center gap-1.5">
       <span
@@ -103,6 +124,10 @@ function RequesterCell({ name }: { name: string | null }) {
   );
 }
 
+/**
+ * 레거시 reference_no 기반 묶음 헤더.
+ * 같은 item_id 묶음일 때만 합산 수량 표시. 혼합이면 "하위 N건".
+ */
 export function BatchHeader({
   group,
   expanded,
@@ -113,9 +138,13 @@ export function BatchHeader({
   onToggle: () => void;
 }) {
   const first = group.logs[0];
-  const totalQty = group.logs.reduce((s, l) => s + Number(l.quantity_change), 0);
+  const homogeneous = isHomogeneousItemGroup(group.logs);
+  const totalQty = homogeneous
+    ? group.logs.reduce((s, l) => s + Number(l.quantity_change), 0)
+    : null;
   const primaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
-  const requesterName = first.requester_name ?? first.produced_by?.split("(")[0]?.trim() ?? null;
+  const actor = getHistoryActor(first);
+  const flowColor = transactionColor(primaryType);
 
   return (
     <tr
@@ -123,7 +152,6 @@ export function BatchHeader({
       className="cursor-pointer select-none hover:brightness-110"
       style={{ background: "rgba(101,169,255,.06)" }}
     >
-      {/* 일시 */}
       <td className="whitespace-nowrap border-b px-4 py-3 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
         <div className="flex items-center gap-1.5">
           {expanded
@@ -132,56 +160,101 @@ export function BatchHeader({
           {formatHistoryDate(first.created_at)}
         </div>
       </td>
-      {/* 구분 */}
       <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <TypeBadge
-          type={primaryType}
-          label={getTransactionLabel(primaryType)}
-          color={transactionColor(primaryType)}
-        />
+        <FlowBadge type={primaryType} label={getHistoryFlowLabel(first)} color={flowColor} />
       </td>
-      {/* 품목명 → N건 묶음 */}
       <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-          {group.logs.length}건 묶음
-        </span>
+        <div className="flex items-center gap-1.5">
+          <Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
+          <span className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
+            {homogeneous ? first.item_name : `하위 ${group.logs.length}건 (혼합)`}
+          </span>
+        </div>
       </td>
-      {/* 수량변화 */}
-      <td className="whitespace-nowrap border-b px-4 py-3 text-right font-bold" style={{ borderColor: LEGACY_COLORS.border, color: totalQty >= 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red }}>
-        {totalQty >= 0 ? "+" : ""}{formatQty(totalQty)}
+      <td
+        className="whitespace-nowrap border-b px-4 py-3 text-right font-bold"
+        style={{
+          borderColor: LEGACY_COLORS.border,
+          color: totalQty == null
+            ? LEGACY_COLORS.muted2
+            : totalQty >= 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red,
+        }}
+      >
+        {totalQty == null
+          ? <span className="text-xs">하위 {group.logs.length}건</span>
+          : <>{totalQty >= 0 ? "+" : ""}{formatQty(totalQty)}</>}
       </td>
-      {/* 담당자 */}
       <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <RequesterCell name={requesterName} />
+        <ActorCell name={actor} />
       </td>
-      {/* 메모 */}
       <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
+        <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{first.notes ?? "-"}</span>
       </td>
     </tr>
   );
 }
 
+/**
+ * operation_batch_id 기반 묶음 헤더.
+ * batch (IoBatch) 가 cache hit 이면 정확한 from→to/title/포함·제외 라인 수 표시.
+ * 없으면 TransactionLog 기반 추론으로 fallback.
+ */
 export function OpBatchHeader({
   group,
   expanded,
   onToggle,
+  batch,
+  rowRef,
 }: {
   group: Extract<LogGroup, { type: "op_batch" }>;
   expanded: boolean;
   onToggle: () => void;
+  batch?: IoBatch | null;
+  /** visible 진입 감지용 ref. */
+  rowRef?: (el: HTMLTableRowElement | null) => void;
 }) {
   const first = group.logs[0];
   const primaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
-  const requesterName = first.requester_name ?? first.produced_by?.split("(")[0]?.trim() ?? null;
+  const actor = getHistoryActor(first);
+  const flowLabel = getHistoryFlowLabel(first, batch);
+  const flowColor = transactionColor(primaryType);
+
+  // 품목명 영역
+  let titleText: string;
+  if (batch && batch.bundles.length > 0) {
+    const head = batch.bundles[0].title;
+    titleText = batch.bundles.length > 1 ? `${head} 외 ${batch.bundles.length - 1}건` : head;
+  } else {
+    titleText = `${first.item_name} 외 ${group.logs.length - 1}건`;
+  }
+
+  // 수량 영역
+  let qtyEl: React.ReactNode;
+  if (batch) {
+    let included = 0, excluded = 0, shortage = 0;
+    for (const b of batch.bundles) {
+      for (const l of b.lines) {
+        if (l.included) included++; else excluded++;
+        if (l.shortage > 0) shortage++;
+      }
+    }
+    qtyEl = (
+      <span className="whitespace-nowrap text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+        포함 {included} · 제외 {excluded}{shortage > 0 ? ` · 부족 ${shortage}` : ""}
+      </span>
+    );
+  } else {
+    qtyEl = <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>하위 {group.logs.length}건</span>;
+  }
 
   return (
     <tr
+      ref={rowRef}
+      data-batch-id={group.batchId}
       onClick={onToggle}
       className="cursor-pointer select-none hover:brightness-110"
       style={{ background: "rgba(101,169,255,.08)" }}
     >
-      {/* 일시 */}
       <td className="whitespace-nowrap border-b px-4 py-3 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
         <div className="flex items-center gap-1.5">
           {expanded
@@ -190,34 +263,25 @@ export function OpBatchHeader({
           {formatHistoryDate(first.created_at)}
         </div>
       </td>
-      {/* 구분 */}
       <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <TypeBadge
-          type={primaryType}
-          label={getTransactionLabel(primaryType)}
-          color={transactionColor(primaryType)}
-        />
+        <FlowBadge type={primaryType} label={flowLabel} color={flowColor} />
       </td>
-      {/* 품목명 → N건 묶음 */}
       <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex items-center gap-1.5">
           <Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-          <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-            {group.logs.length}건 묶음
+          <span className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
+            {titleText}
           </span>
         </div>
       </td>
-      {/* 수량변화 — 여러 품목 합산은 의미 없어 생략 */}
       <td className="whitespace-nowrap border-b px-4 py-3 text-right" style={{ borderColor: LEGACY_COLORS.border }}>
-        <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
+        {qtyEl}
       </td>
-      {/* 담당자 */}
       <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <RequesterCell name={requesterName} />
+        <ActorCell name={actor} />
       </td>
-      {/* 메모 */}
       <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
+        <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{first.notes ?? "-"}</span>
       </td>
     </tr>
   );

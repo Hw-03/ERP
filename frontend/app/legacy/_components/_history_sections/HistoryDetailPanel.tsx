@@ -1,12 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, History, Pencil, Wrench } from "lucide-react";
+import { Activity, ArrowRight, History, Pencil, Workflow, Wrench } from "lucide-react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
+import { ioApi } from "@/lib/api/io";
+import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { getTransactionLabel, transactionColor } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
-import { PROCESS_TYPE_META, parseUtc } from "./historyShared";
+import {
+  PROCESS_TYPE_META,
+  getHistoryActor,
+  getHistoryFlowLabel,
+  parseUtc,
+} from "./historyShared";
 import { TransactionEditModal } from "./TransactionEditModal";
 import {
   QUANTITY_CORRECTABLE_TYPES,
@@ -29,6 +36,12 @@ type Props = {
   onLogCorrected: (result: { original: TransactionLog; correction: TransactionLog }) => void;
 };
 
+type FlowState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "available"; batch: IoBatch }
+  | { status: "unavailable"; reason: "no_batch_id" | "fetch_failed" };
+
 export function HistoryDetailPanel({
   selected,
   itemRecentLogs,
@@ -40,6 +53,7 @@ export function HistoryDetailPanel({
   const [qtyOpen, setQtyOpen] = useState(false);
   const [edits, setEdits] = useState<TransactionEditLog[]>([]);
   const [editsLoaded, setEditsLoaded] = useState(false);
+  const [flow, setFlow] = useState<FlowState>({ status: "idle" });
 
   // 선택 거래가 바뀌면 수정 이력 로드
   useEffect(() => {
@@ -57,6 +71,30 @@ export function HistoryDetailPanel({
       .catch(() => setEditsLoaded(true));
   }, [selected?.log_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 선택 거래가 바뀌면 흐름(IoBatch) lazy fetch
+  useEffect(() => {
+    if (!selected) {
+      setFlow({ status: "idle" });
+      return;
+    }
+    if (!selected.operation_batch_id) {
+      setFlow({ status: "unavailable", reason: "no_batch_id" });
+      return;
+    }
+    setFlow({ status: "loading" });
+    let cancelled = false;
+    void ioApi.getBatch(selected.operation_batch_id)
+      .then((b) => {
+        if (cancelled) return;
+        setFlow({ status: "available", batch: b });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFlow({ status: "unavailable", reason: "fetch_failed" });
+      });
+    return () => { cancelled = true; };
+  }, [selected?.log_id, selected?.operation_batch_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!selected) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -72,6 +110,12 @@ export function HistoryDetailPanel({
   const canMetaEdit = META_CORRECTABLE.has(selected.transaction_type);
   const canQtyCorrect = QUANTITY_CORRECTABLE_TYPES.has(selected.transaction_type);
   const editCount = selected.edit_count ?? edits.length;
+
+  // 표시자: requester / produced 가 다르면 둘 다.
+  const requester = selected.requester_name?.trim() ?? null;
+  const producedRaw = selected.produced_by ?? null;
+  const producedClean = producedRaw ? (producedRaw.split("(")[0]?.trim() || producedRaw) : null;
+  const showBoth = requester && producedClean && requester !== producedClean;
 
   return (
     <div className="space-y-4">
@@ -143,6 +187,9 @@ export function HistoryDetailPanel({
         )}
       </div>
 
+      {/* 흐름 카드 */}
+      <FlowCard flow={flow} log={selected} />
+
       {/* 상세 정보 */}
       <div
         className="space-y-2.5 rounded-[24px] border p-4"
@@ -153,7 +200,9 @@ export function HistoryDetailPanel({
             ["품목명", selected.item_name],
             ["품목 코드", selected.erp_code ?? "-"],
             ["분류", (PROCESS_TYPE_META[selected.item_process_type_code ?? ""] ?? { label: selected.item_process_type_code ?? "-" }).label],
-            ["담당자", selected.produced_by ?? "-"],
+            ["담당자", showBoth
+              ? `요청자 ${requester} / 처리자 ${producedClean}`
+              : getHistoryActor(selected)],
             ["메모", selected.notes ?? ""],
             ["일시", parseUtc(selected.created_at).toLocaleString("ko-KR")],
           ] as [string, string][]
@@ -169,41 +218,50 @@ export function HistoryDetailPanel({
         ))}
       </div>
 
-      {/* 수정 / 수량 보정 액션 */}
+      {/* 정정 작업 — 일반 조회와 분리, 접힘 영역 */}
       {(canMetaEdit || canQtyCorrect) && (
-        <div className="grid grid-cols-2 gap-2">
-          {canMetaEdit && (
-            <button
-              onClick={() => setEditOpen(true)}
-              className="flex items-center justify-center gap-1.5 rounded-[14px] border px-3 py-2.5 text-sm font-bold"
-              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              정보 수정
-            </button>
-          )}
-          {canQtyCorrect && (
-            <button
-              onClick={() => setQtyOpen(true)}
-              className="flex items-center justify-center gap-1.5 rounded-[14px] border px-3 py-2.5 text-sm font-bold"
-              style={{
-                borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 40%, transparent)`,
-                color: LEGACY_COLORS.yellow,
-              }}
-            >
-              <Wrench className="h-3.5 w-3.5" />
-              수량 보정
-            </button>
-          )}
-          {!canQtyCorrect && canMetaEdit && (
-            <span
-              className="flex items-center justify-center text-xs"
-              style={{ color: LEGACY_COLORS.muted2 }}
-            >
-              수량 보정 불가
-            </span>
-          )}
-        </div>
+        <details className="group rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
+          <summary
+            className="flex cursor-pointer items-center justify-between rounded-[24px] px-4 py-3 text-xs font-bold"
+            style={{ color: LEGACY_COLORS.muted2 }}
+          >
+            <span>정정 작업</span>
+            <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>(수정 / 수량 보정)</span>
+          </summary>
+          <div className="grid grid-cols-2 gap-2 px-4 pb-4">
+            {canMetaEdit && (
+              <button
+                onClick={() => setEditOpen(true)}
+                className="flex items-center justify-center gap-1.5 rounded-[14px] border px-3 py-2.5 text-sm font-bold"
+                style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                정보 수정
+              </button>
+            )}
+            {canQtyCorrect && (
+              <button
+                onClick={() => setQtyOpen(true)}
+                className="flex items-center justify-center gap-1.5 rounded-[14px] border px-3 py-2.5 text-sm font-bold"
+                style={{
+                  borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 40%, transparent)`,
+                  color: LEGACY_COLORS.yellow,
+                }}
+              >
+                <Wrench className="h-3.5 w-3.5" />
+                수량 보정
+              </button>
+            )}
+            {!canQtyCorrect && canMetaEdit && (
+              <span
+                className="flex items-center justify-center text-xs"
+                style={{ color: LEGACY_COLORS.muted2 }}
+              >
+                수량 보정 불가
+              </span>
+            )}
+          </div>
+        </details>
       )}
 
       {editsLoaded && edits.length > 0 && <HistoryDetailEditHistory edits={edits} />}
@@ -216,7 +274,6 @@ export function HistoryDetailPanel({
         onClose={() => setEditOpen(false)}
         onSuccess={(updated) => {
           onLogUpdated(updated);
-          // 이력 재로드
           api.getTransactionEdits(updated.log_id).then(setEdits).catch(() => {});
         }}
       />
@@ -230,6 +287,78 @@ export function HistoryDetailPanel({
           api.getTransactionEdits(result.original.log_id).then(setEdits).catch(() => {});
         }}
       />
+    </div>
+  );
+}
+
+function FlowCard({ flow, log }: { flow: FlowState; log: TransactionLog }) {
+  const baseClass = "rounded-[20px] border p-4";
+  const baseStyle = { background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border };
+
+  if (flow.status === "loading") {
+    return (
+      <div className={baseClass} style={baseStyle}>
+        <div className="flex items-center gap-2 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+          <Workflow className="h-3.5 w-3.5" />
+          흐름 정보 불러오는 중...
+        </div>
+      </div>
+    );
+  }
+
+  if (flow.status === "available") {
+    const batch = flow.batch;
+    const fromDept = typeof batch.from_department === "string" ? batch.from_department : null;
+    const toDept = typeof batch.to_department === "string" ? batch.to_department : null;
+    let bundleCount = batch.bundles.length;
+    let lineCount = 0, included = 0, excluded = 0;
+    for (const b of batch.bundles) {
+      lineCount += b.lines.length;
+      for (const l of b.lines) {
+        if (l.included) included++; else excluded++;
+      }
+    }
+    return (
+      <div className={baseClass} style={baseStyle}>
+        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider" style={{ color: LEGACY_COLORS.muted2 }}>
+          <Workflow className="h-3.5 w-3.5" />
+          작업 흐름
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <span className="rounded-full border px-2.5 py-0.5 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+            {fromDept ?? "?"}
+          </span>
+          <ArrowRight className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />
+          <span className="rounded-full border px-2.5 py-0.5 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+            {toDept ?? "?"}
+          </span>
+          <span className="ml-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+            ({batch.work_type} · {batch.sub_type})
+          </span>
+        </div>
+        <div className="mt-2 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+          총 {bundleCount}개 묶음 / {lineCount}개 라인 · 포함 {included} · 제외 {excluded}
+          {batch.requester_name && <> · 요청자 {batch.requester_name}</>}
+        </div>
+      </div>
+    );
+  }
+
+  // unavailable
+  return (
+    <div className={baseClass} style={baseStyle}>
+      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider" style={{ color: LEGACY_COLORS.muted2 }}>
+        <Workflow className="h-3.5 w-3.5" />
+        작업 흐름
+      </div>
+      <div className="mt-2 text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
+        {getHistoryFlowLabel(log)}
+      </div>
+      <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+        {flow.status === "unavailable" && flow.reason === "no_batch_id"
+          ? "이 거래는 작업 묶음 정보가 없습니다 (단건 거래 또는 레거시 데이터)"
+          : "작업 묶음 정보를 불러올 수 없습니다 — 거래 타입 기반 추정"}
+      </div>
     </div>
   );
 }
