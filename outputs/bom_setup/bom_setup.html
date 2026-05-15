@@ -172,19 +172,38 @@ async function _idbPut(key, val) {
 }
 
 async function setupAutosave() {
+  if (location.protocol === "file:") {
+    toast("file:// 환경에서는 자동저장 불가. start_bom_setup.bat 으로 열어주세요","error");
+    return;
+  }
   if (!window.showDirectoryPicker) {
     toast("이 브라우저는 자동저장 미지원 (Chrome/Edge 필요)","warning"); return;
   }
   try {
     const handle = await window.showDirectoryPicker({mode:"readwrite"});
+    // Test write: confirm we can actually create+write the target file
+    try {
+      const fh = await handle.getFileHandle("bom_draft_current.json", {create:true});
+      const w = await fh.createWritable();
+      await w.write(JSON.stringify({
+        pending: S.pending, completed: S.completed,
+        savedAt: new Date().toISOString(), note: "setup-test-write"
+      }, null, 2));
+      await w.close();
+    } catch(wErr) {
+      console.error("setupAutosave test-write failed:", wErr);
+      toast(`쓰기 실패 (${wErr.name||"error"}): ${wErr.message||"폴더 권한 확인 필요"}`,"error");
+      return;
+    }
     _autosaveHandle = handle;
     await _idbPut("autosaveDir", handle);
     _autosaveStatus = "ok";
-    toast(`자동저장 폴더: ${handle.name}`,"success");
-    writeAutosaveFile();
+    toast(`자동저장 활성: ${handle.name}`,"success");
     render();
   } catch(e) {
-    if (e.name !== "AbortError") toast("폴더 선택 실패","error");
+    if (e.name === "AbortError") return;
+    console.error("setupAutosave picker failed:", e);
+    toast(`폴더 선택 실패 (${e.name||"error"}): ${e.message||""}`,"error");
   }
 }
 async function clearAutosave() {
@@ -234,7 +253,8 @@ async function writeAutosaveFile() {
     }, null, 2));
     await w.close();
   } catch(e) {
-    console.warn("autosave failed:", e);
+    console.error("writeAutosaveFile failed:", e);
+    toast(`자동저장 쓰기 실패 (${e.name||"error"}): ${e.message||""}`,"error");
     _autosaveStatus = "err"; render();
   } finally {
     _autosaveBusy = false;
@@ -585,7 +605,8 @@ function render() {
       <div style="display:flex;align-items:center;gap:8px;">
         ${totalDone>0?`<span class="tag tag-success">${totalDone}개 완료</span>`:""}
         ${_lastSavedAt?`<span style="font-size:13px;color:var(--c-green);display:flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--c-green);display:inline-block;"></span>저장됨 ${_lastSavedAt.toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}</span>`:`<span style="font-size:13px;color:var(--c-muted);">저장 내역 없음</span>`}
-        ${_autosaveStatus==="ok"?`<button class="btn btn-outline" style="color:var(--c-green);border-color:var(--c-green);" onclick="clearAutosave()" title="${esc(_autosaveHandle?.name||'')} 자동저장 활성 (클릭하여 해제)">자동저장 ✓</button>`
+        ${location.protocol==="file:"?`<button class="btn btn-outline" style="color:var(--c-red);border-color:var(--c-red);" onclick="setupAutosave()" title="file:// 에서는 작동 안 됨 — start_bom_setup.bat 으로 열어주세요">자동저장 불가 (file://)</button>`
+          :_autosaveStatus==="ok"?`<button class="btn btn-outline" style="color:var(--c-green);border-color:var(--c-green);" onclick="clearAutosave()" title="${esc(_autosaveHandle?.name||'')} 자동저장 활성 (클릭하여 해제)">자동저장 ✓</button>`
           :_autosaveHandle?`<button class="btn btn-outline" style="color:var(--c-yellow);border-color:var(--c-yellow);" onclick="reGrantAutosave()" title="${esc(_autosaveHandle.name)} 권한 재확인 필요">자동저장 ⚠</button>`
           :`<button class="btn btn-outline" onclick="setupAutosave()" title="폴더 지정 시 매 변경마다 bom_draft_current.json 자동 저장">자동저장 OFF</button>`}
         <button class="btn btn-outline" onclick="document.getElementById('import-input').click()">진행도 불러오기</button>
