@@ -165,7 +165,15 @@ function loadDraft() {
 }
 function exportDraft() {
   saveDraft();
-  toast("진행도 저장됨","success");
+  const draft = {pending: S.pending, completed: S.completed, exportedAt: new Date().toISOString()};
+  const blob = new Blob([JSON.stringify(draft, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url;
+  const ts = new Date(); const pad = n=>String(n).padStart(2,"0");
+  a.download = `bom_draft_${ts.getFullYear()}-${pad(ts.getMonth()+1)}-${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast(`진행도 저장 + 다운로드 (대기 ${S.pending.length}건)`,"success");
 }
 function handleImportFile(input) {
   const file = input.files[0]; if (!file) return;
