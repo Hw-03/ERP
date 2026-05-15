@@ -38,6 +38,18 @@ export const stockRequestsApi = {
       ),
     ),
 
+  countWarehouseQueue: () =>
+    fetcher<{ count: number }>(toApiUrl("/api/stock-requests/warehouse-queue/count")),
+
+  countDepartmentQueue: (actorEmployeeId: string) =>
+    fetcher<{ count: number }>(
+      toApiUrl(
+        `/api/stock-requests/department-queue/count?actor_employee_id=${encodeURIComponent(
+          actorEmployeeId,
+        )}`,
+      ),
+    ),
+
   approveStockRequest: (requestId: string, payload: StockRequestActionPayload) =>
     postJson<StockRequest>(toApiUrl(`/api/stock-requests/${requestId}/approve`), payload),
 

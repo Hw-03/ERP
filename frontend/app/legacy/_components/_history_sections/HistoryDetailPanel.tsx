@@ -6,13 +6,14 @@ import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { getTransactionLabel, transactionColor } from "@/lib/mes-status";
+import { transactionColor } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import {
   PROCESS_TYPE_META,
+  formatHistoryDateTimeLong,
   getBatchFlowEndpoints,
   getHistoryActor,
-  getHistoryFlowLabel,
+  getHistoryDisplayLabel,
   parseUtc,
 } from "./historyShared";
 import { TransactionEditModal } from "./TransactionEditModal";
@@ -130,7 +131,7 @@ export function HistoryDetailPanel({
             className="inline-flex rounded-full px-4 py-1.5 text-sm font-bold"
             style={{ background: `color-mix(in srgb, ${tcolor} 14%, transparent)`, color: tcolor }}
           >
-            {getTransactionLabel(selected.transaction_type)}
+            {getHistoryDisplayLabel(selected)}
           </span>
           {editCount > 0 && (
             <span
@@ -205,7 +206,7 @@ export function HistoryDetailPanel({
               ? `요청자 ${requester} / 처리자 ${producedClean}`
               : getHistoryActor(selected)],
             ["메모", selected.notes ?? ""],
-            ["일시", parseUtc(selected.created_at).toLocaleString("ko-KR")],
+            ["일시", formatHistoryDateTimeLong(selected.created_at)],
           ] as [string, string][]
         ).map(([label, value]) => (
           <div key={label} className="flex items-start justify-between gap-3">
@@ -318,8 +319,8 @@ function FlowCard({ flow, log }: { flow: FlowState; log: TransactionLog }) {
         if (l.included) included++; else excluded++;
       }
     }
-    // helper 가 명확한 흐름을 못 만들면 type fallback 라벨로.
-    const fallbackLabel = !eps ? getHistoryFlowLabel(log) : null;
+    // helper 가 명확한 흐름을 못 만들면 의도 라벨로.
+    const fallbackLabel = !eps ? getHistoryDisplayLabel(log, batch) : null;
     return (
       <div className={baseClass} style={baseStyle}>
         <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -362,7 +363,7 @@ function FlowCard({ flow, log }: { flow: FlowState; log: TransactionLog }) {
         작업 흐름
       </div>
       <div className="mt-2 text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
-        {getHistoryFlowLabel(log)}
+        {getHistoryDisplayLabel(log)}
       </div>
       <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
         {flow.status === "unavailable" && flow.reason === "no_batch_id"

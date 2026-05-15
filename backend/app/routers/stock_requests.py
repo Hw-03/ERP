@@ -150,6 +150,26 @@ def list_warehouse_queue(db: Session = Depends(get_db), limit: int = Query(100, 
     return rows
 
 
+@router.get("/warehouse-queue/count")
+def count_warehouse_queue(db: Session = Depends(get_db)) -> dict:
+    """창고 승인함 대기 건수 — `list_warehouse_queue` 와 동일 필터."""
+    n = (
+        db.query(StockRequest)
+        .filter(
+            StockRequest.requires_warehouse_approval.is_(True),
+            StockRequest.approved_by_employee_id.is_(None),
+            StockRequest.status.in_(
+                (
+                    StockRequestStatusEnum.RESERVED,
+                    StockRequestStatusEnum.SUBMITTED,
+                )
+            ),
+        )
+        .count()
+    )
+    return {"count": int(n)}
+
+
 @router.get("/department-queue", response_model=List[StockRequestResponse])
 def list_department_queue(
     actor_employee_id: uuid.UUID = Query(..., description="현재 직원 ID — 본인 부서만 노출"),
@@ -170,6 +190,8 @@ def list_department_queue(
         db.query(StockRequest)
         .filter(
             StockRequest.requires_department_approval.is_(True),
+            # 새 정책 방어선: 창고 승인 필요한 요청은 부서 큐에 노출하지 않음.
+            StockRequest.requires_warehouse_approval.is_(False),
             StockRequest.department_approved_by_employee_id.is_(None),
             StockRequest.requester_department == actor.department,
             StockRequest.status.in_(
@@ -184,6 +206,36 @@ def list_department_queue(
         .all()
     )
     return rows
+
+
+@router.get("/department-queue/count")
+def count_department_queue(
+    actor_employee_id: uuid.UUID = Query(..., description="현재 직원 ID — 본인 부서만 카운트"),
+    db: Session = Depends(get_db),
+) -> dict:
+    """부서 승인함 대기 건수 — `list_department_queue` 와 동일 필터."""
+    actor = (
+        db.query(Employee).filter(Employee.employee_id == actor_employee_id).first()
+    )
+    if actor is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    n = (
+        db.query(StockRequest)
+        .filter(
+            StockRequest.requires_department_approval.is_(True),
+            StockRequest.requires_warehouse_approval.is_(False),
+            StockRequest.department_approved_by_employee_id.is_(None),
+            StockRequest.requester_department == actor.department,
+            StockRequest.status.in_(
+                (
+                    StockRequestStatusEnum.RESERVED,
+                    StockRequestStatusEnum.SUBMITTED,
+                )
+            ),
+        )
+        .count()
+    )
+    return {"count": int(n)}
 
 
 @router.get("/reservations", response_model=List[ReservationLineResponse])

@@ -5,7 +5,7 @@ import { api, type TransactionLog } from "@/lib/api";
 import {
   HISTORY_PAGE_SIZE,
   TRANSACTION_TYPES_NONE,
-  getPeriodStart,
+  dateFilterToFrom,
   intersectTransactionTypes,
   type HistoryScope,
 } from "../_history_sections/historyShared";
@@ -16,6 +16,8 @@ export interface UseHistoryDataArgs {
   dateFilter: string;
   /** 부모(DesktopHistoryView)에서 350ms debounce 후 set 한 값. 목록/달력이 같은 값을 공유. */
   debouncedSearch: string;
+  /** 달력에서 선택한 날짜 (YYYY-MM-DD). 있으면 dateFilter 무시하고 그날만 fetch. */
+  selectedDateKey: string | null;
 }
 
 export interface UseHistoryDataResult {
@@ -25,14 +27,6 @@ export interface UseHistoryDataResult {
   loadingMore: boolean;
   canLoadMore: boolean;
   loadMore: () => Promise<void>;
-}
-
-function dateFilterToFrom(dateFilter: string): string | undefined {
-  const d = getPeriodStart(dateFilter);
-  if (!d) return undefined;
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
 /**
@@ -47,6 +41,7 @@ export function useHistoryData({
   typeFilter,
   dateFilter,
   debouncedSearch,
+  selectedDateKey,
 }: UseHistoryDataArgs): UseHistoryDataResult {
   const [logs, setLogs] = useState<TransactionLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,11 +50,13 @@ export function useHistoryData({
   const skipRef = useRef(0);
 
   const transactionTypes = intersectTransactionTypes(scope, typeFilter);
-  const dateFrom = dateFilterToFrom(dateFilter);
+  // selectedDateKey 가 있으면 dateFilter 를 무시하고 그날 단일로 좁힌다.
+  const dateFrom = selectedDateKey ?? dateFilterToFrom(dateFilter);
+  const dateTo = selectedDateKey ?? undefined;
   const search = debouncedSearch.trim() || undefined;
 
   // queryKey: 조건 변화를 한 문자열로. stale 응답 가드용.
-  const queryKey = `${transactionTypes ?? ""}|${dateFrom ?? ""}|${search ?? ""}`;
+  const queryKey = `${transactionTypes ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${search ?? ""}`;
   const queryKeyRef = useRef(queryKey);
   // loadMore 가 사용하는 abort controller. 새 조건 effect 발동 시 abort.
   const loadMoreCtrlRef = useRef<AbortController | null>(null);
@@ -90,6 +87,7 @@ export function useHistoryData({
           skip: 0,
           transactionTypes,
           dateFrom,
+          dateTo,
           search,
         },
         { signal: ctrl.signal },
@@ -124,6 +122,7 @@ export function useHistoryData({
           skip: nextSkip,
           transactionTypes,
           dateFrom,
+          dateTo,
           search,
         },
         { signal: ctrl.signal },
@@ -140,7 +139,7 @@ export function useHistoryData({
       if (queryKeyRef.current === myKey) setLoadingMore(false);
       if (loadMoreCtrlRef.current === ctrl) loadMoreCtrlRef.current = null;
     }
-  }, [transactionTypes, dateFrom, search, queryKey]);
+  }, [transactionTypes, dateFrom, dateTo, search, queryKey]);
 
   const canLoadMore = lastBatchSize === HISTORY_PAGE_SIZE;
 

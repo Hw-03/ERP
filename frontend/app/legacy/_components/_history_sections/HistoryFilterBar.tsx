@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, HelpCircle, List, Search, X } from "lucide-react";
+import { HelpCircle, Search, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common";
 import {
@@ -21,7 +21,7 @@ const _dept = new Set<string>(DEPT_INTERNAL_TYPES);
  * - ALL → 전체 옵션
  * - WAREHOUSE_INVOLVED → transactionTypes 가 모두 WAREHOUSE_INVOLVED_TYPES 부분집합인 옵션 + "전체"
  * - DEPT_INTERNAL → 동일 (DEPT_INTERNAL_TYPES 부분집합) + "전체"
- * "예외/정정"(EXCEPTION) 칩은 ambiguous 타입만 가지므로 ALL scope 외에서는 자동 제외됨.
+ * 수량 조정/불량 처리/공급사 반품(ambiguous)은 ALL scope 에서만 노출.
  */
 function getTypeOptionsForScope(scope: HistoryScope): TypeOption[] {
   if (scope === "ALL") return TYPE_OPTIONS;
@@ -40,8 +40,6 @@ type Props = {
   setSearch: (v: string) => void;
   dateFilter: string;
   setDateFilter: (v: string) => void;
-  viewMode: "list" | "calendar";
-  setViewMode: (m: "list" | "calendar") => void;
   typeFilter: string;
   setTypeFilter: (v: string) => void;
   scope: HistoryScope;
@@ -54,8 +52,6 @@ export function HistoryFilterBar({
   setSearch,
   dateFilter,
   setDateFilter,
-  viewMode,
-  setViewMode,
   typeFilter,
   setTypeFilter,
   scope,
@@ -66,8 +62,6 @@ export function HistoryFilterBar({
 
   function handleScopeChange(next: HistoryScope) {
     setScope(next);
-    // ambiguous 타입 칩(EXCEPTION)이 새 scope 에서 빈 결과가 되므로 안전 리셋.
-    if (next !== "ALL" && typeFilter === "EXCEPTION") setTypeFilter("ALL");
     // 새 scope 에서 노출 안 되는 옵션이면 ALL 로 리셋.
     const next_chips = getTypeOptionsForScope(next);
     if (!next_chips.some((o) => o.value === typeFilter)) setTypeFilter("ALL");
@@ -99,14 +93,14 @@ export function HistoryFilterBar({
           <span
             className="inline-flex items-center gap-1 text-[11px]"
             style={{ color: LEGACY_COLORS.muted2 }}
-            title="ADJUST/MARK_DEFECTIVE/SUPPLIER_RETURN/SCRAP/LOSS는 거래 타입만으로 창고/부서를 단정할 수 없어 '전체' scope에서 '예외/정정' 칩으로만 보입니다."
+            title="수량 조정/불량 처리/공급사 반품은 거래 타입만으로 창고/부서를 단정할 수 없어 '전체' scope에서만 별도 칩으로 노출됩니다."
           >
             <HelpCircle className="h-3 w-3" />
-            예외 거래는 &apos;전체&apos;에서 확인
+            수량 조정/불량 처리/공급사 반품은 &apos;전체&apos;에서 확인
           </span>
         </div>
 
-        {/* 1줄: 검색 + 기간 세그먼트 + 목록/달력 토글 */}
+        {/* 1줄: 검색 + 기간 세그먼트 */}
         <div className="flex items-center gap-2">
           <div
             className="flex flex-1 items-center gap-2 rounded-[12px] border px-3 py-2"
@@ -147,29 +141,6 @@ export function HistoryFilterBar({
             })}
           </div>
 
-          {/* 목록/달력 토글 */}
-          <div className="flex overflow-hidden rounded-[12px] border" style={{ borderColor: LEGACY_COLORS.border }}>
-            <button
-              onClick={() => setViewMode("list")}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold transition-colors"
-              style={{
-                background: viewMode === "list" ? LEGACY_COLORS.blue : "transparent",
-                color: viewMode === "list" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
-              }}
-            >
-              <List className="h-3.5 w-3.5" />목록
-            </button>
-            <button
-              onClick={() => setViewMode("calendar")}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold transition-colors"
-              style={{
-                background: viewMode === "calendar" ? LEGACY_COLORS.blue : "transparent",
-                color: viewMode === "calendar" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
-              }}
-            >
-              <CalendarDays className="h-3.5 w-3.5" />달력
-            </button>
-          </div>
         </div>
 
         {/* 2줄: 거래 유형 칩 (scope 기준 필터링) */}

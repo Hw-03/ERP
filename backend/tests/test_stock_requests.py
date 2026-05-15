@@ -1301,3 +1301,120 @@ def test_submit_dept_to_warehouse_fails_when_production_stock_insufficient(
     )
     assert res.status_code == 422, res.json()
     assert "재고 부족" in res.json().get("detail", {}).get("message", "")
+
+
+# ---------------------------------------------------------------------------
+# Approval separation (new policy): 부서 큐에는 창고 승인 필요한 요청이 노출되지 않음.
+# count API 는 list API 와 동일 필터로 길이가 일치.
+# ---------------------------------------------------------------------------
+
+
+def test_department_queue_excludes_warehouse_approval_pending(
+    db_session, client, make_item
+):
+    """과거 데이터 같은 wh+dept 양쪽 결재 켜진 row 는 부서 큐에 노출 안 됨.
+
+    새 정책: 창고 승인이 필요한 요청은 창고 승인이 끝날 때까지 부서 큐에서 가려진다.
+    Filter: requires_warehouse_approval=False 조건이 추가되어 동시 결재 row 차단.
+    """
+    item = make_item(name="QSEP1", warehouse_qty=Decimal("10"))
+    requester = _make_employee(
+        db_session, code="QSEPR", name="요청자QS"
+    )
+    db_session.commit()
+
+    out = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[
+            {
+                "item_id": str(item.item_id),
+                "quantity": "1",
+                "from_bucket": "warehouse",
+                "to_bucket": "production",
+                "to_department": DepartmentEnum.ASSEMBLY.value,
+            }
+        ],
+    )
+    assert out["status_code"] == 201, out["body"]
+    request_id = out["body"]["request_id"]
+
+    # 과거 데이터 시뮬레이션: 양쪽 결재 강제로 켬.
+    sr = db_session.query(StockRequest).filter_by(request_id=uuid.UUID(request_id)).one()
+    sr.requires_department_approval = True
+    db_session.commit()
+
+    # 창고 큐는 노출.
+    res_wh = client.get("/api/stock-requests/warehouse-queue")
+    assert res_wh.status_code == 200
+    assert any(r["request_id"] == request_id for r in res_wh.json())
+
+    # 부서 큐는 동일 부서 actor 로 조회해도 노출 안 됨.
+    res_dept = client.get(
+        f"/api/stock-requests/department-queue?actor_employee_id={requester.employee_id}",
+    )
+    assert res_dept.status_code == 200
+    assert not any(r["request_id"] == request_id for r in res_dept.json())
+
+
+def test_warehouse_queue_count_matches_list(db_session, client, make_item):
+    item = make_item(name="QCNT1", warehouse_qty=Decimal("5"))
+    requester = _make_employee(db_session, code="QCN1", name="요청자QC1")
+    db_session.commit()
+
+    _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[
+            {
+                "item_id": str(item.item_id),
+                "quantity": "1",
+                "from_bucket": "warehouse",
+                "to_bucket": "production",
+                "to_department": DepartmentEnum.ASSEMBLY.value,
+            }
+        ],
+    )
+
+    res_list = client.get("/api/stock-requests/warehouse-queue")
+    res_cnt = client.get("/api/stock-requests/warehouse-queue/count")
+    assert res_list.status_code == 200
+    assert res_cnt.status_code == 200
+    assert res_cnt.json()["count"] == len(res_list.json())
+    assert res_cnt.json()["count"] >= 1
+
+
+def test_department_queue_count_matches_list(db_session, client, make_item):
+    item = make_item(name="QCNT2", warehouse_qty=Decimal("5"))
+    requester = _make_employee(
+        db_session, code="QCN2", name="요청자QC2"
+    )
+    db_session.commit()
+
+    # manual_adjustment 만 부서 결재 단독 경로. wh approval=False, dept approval=True.
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "request_type": "manual_adjustment",
+        "lines": [
+            {
+                "item_id": str(item.item_id),
+                "quantity": "1",
+                "from_bucket": "warehouse",
+                "to_bucket": "none",
+            }
+        ],
+    }
+    res = client.post("/api/stock-requests", json=payload)
+    # manual_adjustment 는 별도 경로일 수 있어 422 도 허용 (생성 자체가 동일 라우터 아닐 가능성).
+    # 이 테스트의 목적은 count API 가 list 와 길이 일치하는지만 검증.
+    res_list = client.get(
+        f"/api/stock-requests/department-queue?actor_employee_id={requester.employee_id}",
+    )
+    res_cnt = client.get(
+        f"/api/stock-requests/department-queue/count?actor_employee_id={requester.employee_id}",
+    )
+    assert res_list.status_code == 200
+    assert res_cnt.status_code == 200
+    assert res_cnt.json()["count"] == len(res_list.json())

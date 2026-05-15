@@ -16,11 +16,21 @@ interface Props {
   showQueue: boolean;
   showDeptQueue: boolean;
   cartCount?: number;
+  queueCount?: number;
+  deptQueueCount?: number;
 }
 
 type TabDef = { id: WarehouseSectionTab; label: string; tone: string };
 
-export function WarehouseSectionTabs({ active, onChange, showQueue, showDeptQueue, cartCount = 0 }: Props) {
+export function WarehouseSectionTabs({
+  active,
+  onChange,
+  showQueue,
+  showDeptQueue,
+  cartCount = 0,
+  queueCount = 0,
+  deptQueueCount = 0,
+}: Props) {
   const tabs: TabDef[] = [
     { id: "compose", label: "요청 작성", tone: LEGACY_COLORS.blue },
     { id: "cart", label: "작업 중", tone: LEGACY_COLORS.green },
@@ -29,24 +39,28 @@ export function WarehouseSectionTabs({ active, onChange, showQueue, showDeptQueu
   if (showQueue) tabs.push({ id: "queue", label: "창고 승인함", tone: LEGACY_COLORS.yellow });
   if (showDeptQueue) tabs.push({ id: "dept-queue", label: "부서 승인함", tone: LEGACY_COLORS.yellow });
 
+  const badgeFor = (id: WarehouseSectionTab): number | null => {
+    if (id === "cart" && cartCount > 0) return cartCount;
+    if (id === "queue" && queueCount > 0) return queueCount;
+    if (id === "dept-queue" && deptQueueCount > 0) return deptQueueCount;
+    return null;
+  };
+
   return (
     <div
       className="grid gap-2"
       style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
     >
-      {tabs.map((t) => {
-        const badge = t.id === "cart" && cartCount > 0 ? cartCount : null;
-        return (
-          <TabButton
-            key={t.id}
-            label={t.label}
-            badge={badge}
-            tone={t.tone}
-            active={active === t.id}
-            onClick={() => onChange(t.id)}
-          />
-        );
-      })}
+      {tabs.map((t) => (
+        <TabButton
+          key={t.id}
+          label={t.label}
+          badge={badgeFor(t.id)}
+          tone={t.tone}
+          active={active === t.id}
+          onClick={() => onChange(t.id)}
+        />
+      ))}
     </div>
   );
 }

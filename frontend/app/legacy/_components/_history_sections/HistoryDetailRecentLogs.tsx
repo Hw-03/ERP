@@ -2,9 +2,9 @@
 
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { getTransactionLabel, transactionColor } from "@/lib/mes-status";
+import { transactionColor } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
-import { formatHistoryDate } from "./historyShared";
+import { formatHistoryDate, getHistoryDisplayLabel } from "./historyShared";
 
 /**
  * Round-13 (#3) 추출 — HistoryDetailPanel 의 "이 품목의 최근 거래" 리스트.
@@ -43,7 +43,7 @@ export function HistoryDetailRecentLogs({
                     color: transactionColor(log.transaction_type),
                   }}
                 >
-                  {getTransactionLabel(log.transaction_type)}
+                  {getHistoryDisplayLabel(log)}
                 </span>
                 <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                   {formatHistoryDate(log.created_at)}

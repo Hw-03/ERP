@@ -9,7 +9,7 @@ import { HistoryBatchDetailPanel } from "./HistoryBatchDetailPanel";
 import {
   formatHistoryDate,
   getHistoryActor,
-  getHistoryFlowLabel,
+  getHistoryDisplayLabel,
   type HistorySelection,
 } from "./historyShared";
 
@@ -64,7 +64,7 @@ export function DesktopHistoryRightPanel({
               ? `${batch.bundles[0].title} 외 ${batch.bundles.length - 1}건`
               : batch.bundles[0].title)
           : `${first.item_name} 외 ${displaySelection.logs.length - 1}건`;
-        const subtitleText = `${getHistoryFlowLabel(first, batch)} · ${formatHistoryDate(first.created_at)} · ${getHistoryActor(first)}`;
+        const subtitleText = `${getHistoryDisplayLabel(first, batch)} · ${formatHistoryDate(first.created_at)} · ${getHistoryActor(first)}`;
         return (
           <DesktopRightPanel title={titleText} subtitle={subtitleText}>
             <HistoryBatchDetailPanel

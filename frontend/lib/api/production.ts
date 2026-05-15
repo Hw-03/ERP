@@ -17,6 +17,14 @@ import type {
   TransactionType,
 } from "./types";
 
+/** 입출고 내역 KPI 응답 — 카운트 4개. */
+export interface TransactionSummary {
+  total: number;
+  warehouseCount: number;
+  deptCount: number;
+  adjustCount: number;
+}
+
 export const productionApi = {
   productionReceipt: (payload: {
     item_id: string;
@@ -64,6 +72,40 @@ export const productionApi = {
       toApiUrl(`/api/inventory/transactions?${query}`),
       opts?.signal,
     );
+  },
+
+  /** 입출고 내역 KPI 카드 — 조건 전체 카운트 (페이지네이션과 무관). */
+  getTransactionsSummary: (
+    params?: {
+      transactionTypes?: string;
+      search?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      includeArchived?: boolean;
+    },
+    opts?: { signal?: AbortSignal },
+  ): Promise<TransactionSummary> => {
+    const query = new URLSearchParams();
+    if (params?.transactionTypes) query.set("transaction_types", params.transactionTypes);
+    if (params?.search) query.set("search", params.search);
+    if (params?.dateFrom) query.set("date_from", params.dateFrom);
+    if (params?.dateTo) query.set("date_to", params.dateTo);
+    if (params?.includeArchived) query.set("include_archived", "true");
+    const qs = query.toString();
+    return fetcher<{
+      total: number;
+      warehouse_count: number;
+      dept_count: number;
+      adjust_count: number;
+    }>(
+      toApiUrl(`/api/inventory/transactions/summary${qs ? `?${qs}` : ""}`),
+      opts?.signal,
+    ).then((res) => ({
+      total: res.total,
+      warehouseCount: res.warehouse_count,
+      deptCount: res.dept_count,
+      adjustCount: res.adjust_count,
+    }));
   },
 
   /** 거래 메타데이터(notes/reference_no/produced_by) 수정. reason + PIN 필수. */

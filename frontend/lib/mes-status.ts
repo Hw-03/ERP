@@ -73,7 +73,7 @@ export const TRANSACTION_META: Record<TransactionType, TransactionMeta> = {
   BACKFLUSH: { label: "자동차감", tone: "info" },
   SCRAP: { label: "폐기", tone: "danger" },
   LOSS: { label: "분실", tone: "danger" },
-  DISASSEMBLE: { label: "분해", tone: "neutral" },
+  DISASSEMBLE: { label: "재작업", tone: "danger" },
   RETURN: { label: "반품", tone: "neutral" },
   RESERVE: { label: "예약", tone: "warning" },
   RESERVE_RELEASE: { label: "예약해제", tone: "muted" },
@@ -155,6 +155,7 @@ export function transactionColor(type: TransactionType | string): string {
     case "TRANSFER_DEPT":
       return LEGACY_COLORS.blue;
     case "DISASSEMBLE":
+      return LEGACY_COLORS.red;
     case "RETURN":
     case "SUPPLIER_RETURN":
       return LEGACY_COLORS.muted;

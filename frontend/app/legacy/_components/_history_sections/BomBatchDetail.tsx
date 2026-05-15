@@ -6,6 +6,19 @@ import { ioApi } from "@/lib/api/io";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
+import {
+  getHistoryBomParentLine,
+  getHistoryLineSignedQuantity,
+  getHistoryLineStatusLabel,
+  type LineSignTone,
+} from "./historyShared";
+
+const SIGN_TONE_HEX: Record<LineSignTone, string> = {
+  increase: LEGACY_COLORS.blue,
+  decrease: LEGACY_COLORS.red,
+  move: LEGACY_COLORS.cyan,
+  muted: LEGACY_COLORS.muted2,
+};
 
 type Props = {
   batchId: string;
@@ -72,6 +85,7 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached }: Props) {
         <BundleRows
           key={bundle.bundle_id}
           bundle={bundle}
+          batch={batch}
           expanded={expandedBundles.has(bundle.bundle_id)}
           onToggle={() => toggleBundle(bundle.bundle_id)}
         />
@@ -81,51 +95,48 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached }: Props) {
 }
 
 function StatusBadge({ included, shortage }: { included: boolean; shortage: number }) {
-  if (!included) {
-    return (
-      <span
-        className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold"
-        style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 18%, transparent)`, color: LEGACY_COLORS.muted2 }}
-      >
-        제외
-      </span>
-    );
-  }
-  if (shortage > 0) {
-    return (
-      <span
-        className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold"
-        style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.red} 18%, transparent)`, color: LEGACY_COLORS.red }}
-      >
-        부족 {formatQty(shortage)}
-      </span>
-    );
-  }
+  const status = getHistoryLineStatusLabel({ included, shortage });
+  const color =
+    status.tone === "danger" ? LEGACY_COLORS.red
+    : status.tone === "ok" ? LEGACY_COLORS.green
+    : LEGACY_COLORS.muted2;
+  // shortage 표기는 formatQty 적용 — helper 의 정수 라벨을 덮어쓴다.
+  const label = status.tone === "danger" ? `부족 ${formatQty(shortage)}` : status.label;
   return (
     <span
       className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold"
-      style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.green} 18%, transparent)`, color: LEGACY_COLORS.green }}
+      style={{ background: `color-mix(in srgb, ${color} 18%, transparent)`, color }}
     >
-      포함
+      {label}
     </span>
   );
 }
 
 function BundleRows({
   bundle,
+  batch,
   expanded,
   onToggle,
 }: {
   bundle: IoBundle;
+  batch: IoBatch;
   expanded: boolean;
   onToggle: () => void;
 }) {
   const isBomParent = bundle.source_kind === "bom_parent";
-  const includedLines = bundle.lines.filter((l) => l.included);
+  // BOM 부모 라인은 헤더로 흡수 — 자식 목록에서 제외. helper 단일 진입.
+  const parentLine = getHistoryBomParentLine(bundle);
+  const childLines = parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines;
+  const includedChildLines = childLines.filter((l) => l.included);
+
+  // 헤더 우측 수량 — 부모 라인 있으면 sub_type 기반 부호+색, 없으면 bundle.quantity (단품).
+  const headerSigned = parentLine ? getHistoryLineSignedQuantity(parentLine, batch, bundle) : null;
+  const headerQtyText = headerSigned ? headerSigned.label : `${formatQty(bundle.quantity)}`;
+  const headerQtyColor = headerSigned ? SIGN_TONE_HEX[headerSigned.tone] : LEGACY_COLORS.muted2;
 
   return (
     <>
-      {/* 번들 헤더 — 6컬럼 정렬 */}
+      {/* 번들 헤더 — 5컬럼 정렬 */}
       <tr
         onClick={isBomParent ? onToggle : undefined}
         className={isBomParent ? "cursor-pointer hover:brightness-105" : undefined}
@@ -148,7 +159,7 @@ function BundleRows({
             {isBomParent ? "BOM" : "단품"}
           </span>
         </td>
-        {/* 품목명 (toggle + title) */}
+        {/* 품목명 (toggle + title + N개 포함) */}
         <td className="border-b px-4 py-2" style={{ borderColor: LEGACY_COLORS.border, paddingLeft: "1.5rem" }}>
           <div className="flex items-center gap-1.5">
             {isBomParent ? (
@@ -159,36 +170,35 @@ function BundleRows({
             <span className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
               {bundle.title}
             </span>
+            {isBomParent && (
+              <span className="shrink-0 text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                ({includedChildLines.length}개 포함)
+              </span>
+            )}
           </div>
         </td>
-        {/* 수량변화 */}
-        <td className="whitespace-nowrap border-b px-4 py-2 text-right text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-          × {formatQty(bundle.quantity)}
+        {/* 수량변화 — 부모 라인 있으면 실제 입고 수량(파랑), 없으면 bundle.quantity */}
+        <td className="whitespace-nowrap border-b px-4 py-2 text-center text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: headerQtyColor }}>
+          {headerQtyText}
         </td>
         {/* 담당자 */}
-        <td className="border-b px-4 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
+        <td className="border-b px-4 py-2 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
           <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
-        </td>
-        {/* 메모 */}
-        <td className="border-b px-4 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
-          {isBomParent && (
-            <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-              ({includedLines.length}개 포함)
-            </span>
-          )}
         </td>
       </tr>
 
-      {/* BOM 하위 라인 — 6컬럼 정렬 */}
-      {isBomParent && expanded && bundle.lines.map((line) => (
-        <BomLineRow key={line.line_id} line={line} />
+      {/* BOM 하위 라인 — 부모 자기 자신 제외, 5컬럼 정렬 */}
+      {isBomParent && expanded && childLines.map((line) => (
+        <BomLineRow key={line.line_id} line={line} batch={batch} bundle={bundle} />
       ))}
     </>
   );
 }
 
-function BomLineRow({ line }: { line: IoLine }) {
+function BomLineRow({ line, batch, bundle }: { line: IoLine; batch: IoBatch; bundle: IoBundle }) {
   const dim = !line.included;
+  const signed = getHistoryLineSignedQuantity(line, batch, bundle);
+  const qtyColor = SIGN_TONE_HEX[signed.tone];
   return (
     <tr
       style={{
@@ -214,19 +224,13 @@ function BomLineRow({ line }: { line: IoLine }) {
           )}
         </div>
       </td>
-      {/* 수량변화 */}
-      <td className="whitespace-nowrap border-b px-4 py-1.5 text-right text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-        × {formatQty(line.quantity)} {line.unit ?? ""}
+      {/* 수량변화 — sub_type + 부모/자식 역할 기반 부호 + 색 */}
+      <td className="whitespace-nowrap border-b px-4 py-1.5 text-center text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: qtyColor }}>
+        {signed.label}
       </td>
       {/* 담당자 */}
-      <td className="border-b px-4 py-1.5" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className="border-b px-4 py-1.5 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
         <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
-      </td>
-      {/* 메모 (exclusion_note) */}
-      <td className="border-b px-4 py-1.5" style={{ borderColor: LEGACY_COLORS.border }}>
-        <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-          {line.exclusion_note ?? "-"}
-        </span>
       </td>
     </tr>
   );

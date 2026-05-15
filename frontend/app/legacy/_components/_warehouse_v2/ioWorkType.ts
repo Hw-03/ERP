@@ -102,19 +102,17 @@ export function hasManualLine(bundles: IoBundle[]): boolean {
   return false;
 }
 
-export type ApprovalKind = "none" | "warehouse" | "department" | "both";
+export type ApprovalKind = "none" | "warehouse" | "department";
 
 /** subType + 라인 origin 으로 결재 종류 판정.
- *  - warehouse: warehouse_to_dept/dept_to_warehouse/defect_quarantine
- *  - department: 낱개(manual/adjust_in/adjust_out) 라인 포함
- *  - both: 둘 다
+ *  새 정책: 모든 요청은 창고 또는 부서 중 하나로만 결재 (동시 결재 금지).
+ *  - warehouse: warehouse_to_dept/dept_to_warehouse/defect_quarantine (manual line 섞여도 창고 승인 1회로만)
+ *  - department: manual_adjustment 등 낱개 라인 단독
+ *  - none: 즉시 반영
  */
 export function approvalKind(subType: IoSubType, bundles: IoBundle[]): ApprovalKind {
-  const wh = requiresApproval(subType);
-  const dept = hasManualLine(bundles);
-  if (wh && dept) return "both";
-  if (wh) return "warehouse";
-  if (dept) return "department";
+  if (requiresApproval(subType)) return "warehouse";
+  if (hasManualLine(bundles)) return "department";
   return "none";
 }
 

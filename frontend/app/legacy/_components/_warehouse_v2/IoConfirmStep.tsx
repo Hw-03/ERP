@@ -56,12 +56,6 @@ const APPROVAL_META: Record<
     submitText: (n) => `부서 결재 요청 ${n}건`,
     accentColor: "yellow",
   },
-  both: {
-    summaryLabel: "창고 + 부서 결재 요청",
-    badgeText: "창고 + 부서 결재",
-    submitText: (n) => `결재 요청 ${n}건`,
-    accentColor: "yellow",
-  },
 };
 
 function directionAccent(subType: IoSubType): string {

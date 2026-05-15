@@ -915,12 +915,12 @@ def _submit_immediate(db: Session, *, requester: Employee, batch: IoBatch) -> No
 def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> dict:
     try:
         included_lines = _included_lines(batch)
-        has_manual = _has_manual_line(included_lines)
         if batch.sub_type in APPROVAL_SUB_TYPES:
-            _submit_approval(
-                db, requester=requester, batch=batch, force_dept_approval=has_manual
-            )
-        elif has_manual:
+            # 창고 승인 sub_type — manual line 유무 무관, 창고 승인 1회로만.
+            # 새 정책: 모든 요청은 창고 또는 부서 중 하나로만 결재.
+            _submit_approval(db, requester=requester, batch=batch)
+        elif _has_manual_line(included_lines):
+            # 부서 승인만 필요 — manual_adjustment 등.
             _submit_dept_only_approval(db, requester=requester, batch=batch)
         else:
             _submit_immediate(db, requester=requester, batch=batch)

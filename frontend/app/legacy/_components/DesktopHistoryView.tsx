@@ -2,20 +2,21 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type TransactionLog } from "@/lib/api";
+import { productionApi, type TransactionSummary } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { HistoryFilterBar } from "./_history_sections/HistoryFilterBar";
-import { HistoryCalendarStrip } from "./_history_sections/HistoryCalendarStrip";
+import { HistoryCalendarPanel } from "./_history_sections/HistoryCalendarPanel";
 import { HistoryStatsBar } from "./_history_sections/HistoryStatsBar";
 import { HistoryTable } from "./_history_sections/HistoryTable";
 import { DesktopHistoryRightPanel } from "./_history_sections/DesktopHistoryRightPanel";
 import { useHistoryData } from "./_hooks/useHistoryData";
+import { useCurrentOperator } from "./login/useCurrentOperator";
 import {
   TRANSACTION_TYPES_NONE,
+  dateFilterToFrom,
+  getDefaultHistoryScopeForOperator,
   intersectTransactionTypes,
-  isDepartmentInternalType,
-  isExceptionLike,
-  isWarehouseInvolvedType,
   parseUtc,
   toDateKey,
   type HistoryScope,
@@ -37,27 +38,40 @@ export function DesktopHistoryView() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { logs, setLogs, loading, loadingMore, canLoadMore, loadMore } = useHistoryData({
-    scope,
-    typeFilter,
-    dateFilter,
-    debouncedSearch,
-  });
+  // 사용자별 기본 scope — operator 로드 후 1회만 적용.
+  // 사용자가 칩으로 직접 바꾼 뒤에는 didApplyDefaultScopeRef 가드로 덮어쓰지 않음.
+  const operator = useCurrentOperator();
+  const didApplyDefaultScopeRef = useRef(false);
+  useEffect(() => {
+    if (didApplyDefaultScopeRef.current) return;
+    if (!operator) return;
+    didApplyDefaultScopeRef.current = true;
+    setScope(getDefaultHistoryScopeForOperator(operator));
+  }, [operator]);
 
-  const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
   const [selection, setSelection] = useState<HistorySelection | null>(null);
-  const [calendarLoading, setCalendarLoading] = useState(false);
   const [itemRecentLogs, setItemRecentLogs] = useState<TransactionLog[]>([]);
 
   // batchCache — HistoryTable 의 visible lazy fetch + 우측 batch 상세 패널이 공유.
   const [batchCache, setBatchCache] = useState<Map<string, IoBatch>>(new Map());
 
-  const [viewMode, setViewMode] = useState<"list" | "calendar">("calendar");
+  // 달력 — 상단 접이식 패널. 기본 접힘. 펼쳤을 때만 월간 fetch.
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
   const now = new Date();
   const [calendarYear, setCalendarYear] = useState(now.getFullYear());
   const [calendarMonth, setCalendarMonth] = useState(now.getMonth());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const lastSelectionRef = useRef<HistorySelection | null>(null);
+
+  const { logs, setLogs, loading, loadingMore, canLoadMore, loadMore } = useHistoryData({
+    scope,
+    typeFilter,
+    dateFilter,
+    debouncedSearch,
+    selectedDateKey: selectedDay,
+  });
 
   // selection.kind === "log" 일 때만 같은 품목 최근 거래 로드.
   useEffect(() => {
@@ -74,10 +88,10 @@ export function DesktopHistoryView() {
       .catch(() => setItemRecentLogs([]));
   }, [selection]);
 
-  // 달력 fetch — 목록과 같은 scope/typeFilter/debouncedSearch 적용.
+  // 달력 fetch — 패널이 펼쳐진 동안에만. 목록과 같은 scope/typeFilter/debouncedSearch 적용.
+  // 선택 날짜는 fetch 조건에 포함하지 않음 — 달력은 월 전체 카운트 표시.
   useEffect(() => {
-    if (viewMode !== "calendar") return;
-    setSelectedDay(null);
+    if (!calendarOpen) return;
 
     const transactionTypes = intersectTransactionTypes(scope, typeFilter);
     if (transactionTypes === TRANSACTION_TYPES_NONE) {
@@ -113,7 +127,7 @@ export function DesktopHistoryView() {
         if ((err as Error)?.name !== "AbortError") setCalendarLoading(false);
       });
     return () => ctrl.abort();
-  }, [viewMode, calendarYear, calendarMonth, scope, typeFilter, debouncedSearch]);
+  }, [calendarOpen, calendarYear, calendarMonth, scope, typeFilter, debouncedSearch]);
 
   function prevMonth() {
     if (calendarMonth === 0) {
@@ -150,25 +164,48 @@ export function DesktopHistoryView() {
     return cells;
   }, [calendarYear, calendarMonth]);
 
-  const selectedDayLogs = useMemo(
-    () => (selectedDay ? calendarDayMap.get(selectedDay) ?? [] : []),
-    [selectedDay, calendarDayMap],
-  );
-
   const todayKey = toDateKey(new Date().toISOString());
 
-  // 서버사이드 필터링이라 클라 메모리 추가 필터 없음. logs 그대로 표시.
-  const stats = useMemo(() => {
-    let warehouseCount = 0;
-    let deptCount = 0;
-    let exceptionCount = 0;
-    for (const log of logs) {
-      if (isWarehouseInvolvedType(log.transaction_type)) warehouseCount++;
-      if (isDepartmentInternalType(log.transaction_type)) deptCount++;
-      if (isExceptionLike(log)) exceptionCount++;
+  // KPI summary — 조건 전체 카운트. 백엔드 /transactions/summary 호출.
+  // 100건 페이지네이션과 무관하게 "이번 달 전체"를 보여줌.
+  const [summary, setSummary] = useState<TransactionSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const summaryKeyRef = useRef("");
+
+  useEffect(() => {
+    const transactionTypes = intersectTransactionTypes(scope, typeFilter);
+    const dateFrom = selectedDay ?? dateFilterToFrom(dateFilter);
+    const dateTo = selectedDay ?? undefined;
+    const search = debouncedSearch.trim() || undefined;
+
+    const myKey = `${transactionTypes ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${search ?? ""}`;
+    summaryKeyRef.current = myKey;
+
+    if (transactionTypes === TRANSACTION_TYPES_NONE) {
+      setSummary({ total: 0, warehouseCount: 0, deptCount: 0, adjustCount: 0 });
+      setSummaryLoading(false);
+      return;
     }
-    return { total: logs.length, warehouseCount, deptCount, exceptionCount };
-  }, [logs]);
+
+    setSummaryLoading(true);
+    const ctrl = new AbortController();
+    void productionApi
+      .getTransactionsSummary(
+        { transactionTypes, dateFrom, dateTo, search },
+        { signal: ctrl.signal },
+      )
+      .then((s) => {
+        if (summaryKeyRef.current !== myKey) return;
+        setSummary(s);
+        setSummaryLoading(false);
+      })
+      .catch((err) => {
+        if ((err as Error)?.name === "AbortError") return;
+        if (summaryKeyRef.current !== myKey) return;
+        setSummaryLoading(false);
+      });
+    return () => ctrl.abort();
+  }, [scope, typeFilter, dateFilter, selectedDay, debouncedSearch]);
 
   function handleLogUpdated(updated: TransactionLog) {
     setLogs((prev) => prev.map((l) => (l.log_id === updated.log_id ? updated : l)));
@@ -190,9 +227,17 @@ export function DesktopHistoryView() {
   }
 
   function handleSelectBatch(batchId: string, logs: TransactionLog[]) {
+    // 같은 묶음 재클릭 → 우측 패널 닫기 (단일 행 토글과 일관). HistoryTable 에서
+    // 펼침 상태도 collapseGroup 으로 동시에 닫음 (selection 닫힘과 BOM 접힘 동기화).
     setSelection((c) =>
       c?.kind === "batch" && c.batchId === batchId ? null : { kind: "batch", batchId, logs },
     );
+  }
+
+  // 기간 칩 변경 시 선택 날짜 해제 — 동시에 두 날짜 필터가 살아있으면 사용자가 혼란.
+  function handleDateFilterChange(v: string) {
+    setDateFilter(v);
+    setSelectedDay(null);
   }
 
   if (selection) lastSelectionRef.current = selection;
@@ -206,67 +251,53 @@ export function DesktopHistoryView() {
         style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.bg }}
       >
         <div className="flex flex-col gap-3 pb-6">
-          <HistoryStatsBar stats={stats} canLoadMore={canLoadMore} />
+          <HistoryStatsBar
+            summary={summary}
+            summaryLoading={summaryLoading}
+            loadedCount={logs.length}
+            canLoadMore={canLoadMore}
+          />
 
           <HistoryFilterBar
             search={search}
             setSearch={setSearch}
             dateFilter={dateFilter}
-            setDateFilter={setDateFilter}
-            viewMode={viewMode}
-            setViewMode={setViewMode}
+            setDateFilter={handleDateFilterChange}
             typeFilter={typeFilter}
             setTypeFilter={setTypeFilter}
             scope={scope}
             setScope={setScope}
-            totalCount={stats.total}
+            totalCount={summary?.total ?? logs.length}
           />
 
-          {viewMode === "calendar" && (
-            <>
-              <HistoryCalendarStrip
-                calendarYear={calendarYear}
-                calendarMonth={calendarMonth}
-                prevMonth={prevMonth}
-                nextMonth={nextMonth}
-                calendarLoading={calendarLoading}
-                calendarDays={calendarDays}
-                calendarDayMap={calendarDayMap}
-                todayKey={todayKey}
-                selectedDay={selectedDay}
-                setSelectedDay={setSelectedDay}
-              />
-              {selectedDay && (
-                <HistoryTable
-                  loading={false}
-                  filteredLogs={selectedDayLogs}
-                  selection={selection}
-                  onSelectLog={handleSelectLog}
-                  onSelectBatch={handleSelectBatch}
-                  batchCache={batchCache}
-                  setBatchCache={setBatchCache}
-                  canLoadMore={false}
-                  loadingMore={false}
-                  onLoadMore={() => {}}
-                />
-              )}
-            </>
-          )}
+          <HistoryCalendarPanel
+            open={calendarOpen}
+            onToggle={() => setCalendarOpen((o) => !o)}
+            calendarYear={calendarYear}
+            calendarMonth={calendarMonth}
+            prevMonth={prevMonth}
+            nextMonth={nextMonth}
+            calendarLoading={calendarLoading}
+            calendarDays={calendarDays}
+            calendarDayMap={calendarDayMap}
+            todayKey={todayKey}
+            selectedDay={selectedDay}
+            setSelectedDay={setSelectedDay}
+          />
 
-          {viewMode === "list" && (
-            <HistoryTable
-              loading={loading}
-              filteredLogs={logs}
-              selection={selection}
-              onSelectLog={handleSelectLog}
-              onSelectBatch={handleSelectBatch}
-              batchCache={batchCache}
-              setBatchCache={setBatchCache}
-              canLoadMore={canLoadMore}
-              loadingMore={loadingMore}
-              onLoadMore={() => void loadMore()}
-            />
-          )}
+          <HistoryTable
+            loading={loading}
+            filteredLogs={logs}
+            totalCount={summary?.total}
+            selection={selection}
+            onSelectLog={handleSelectLog}
+            onSelectBatch={handleSelectBatch}
+            batchCache={batchCache}
+            setBatchCache={setBatchCache}
+            canLoadMore={canLoadMore}
+            loadingMore={loadingMore}
+            onLoadMore={() => void loadMore()}
+          />
         </div>
       </div>
 

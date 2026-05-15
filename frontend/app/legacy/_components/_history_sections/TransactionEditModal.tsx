@@ -11,9 +11,9 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { api, type Employee, type TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { getTransactionLabel } from "@/lib/mes-status";
 import { AppSelect } from "../common/AppSelect";
 import { useCurrentOperator } from "../login/useCurrentOperator";
+import { getHistoryDisplayLabel } from "./historyShared";
 
 interface Props {
   open: boolean;
@@ -94,7 +94,7 @@ export function TransactionEditModal({ open, log, onClose, onSuccess }: Props) {
               거래 정보 수정
             </div>
             <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-              {getTransactionLabel(log.transaction_type)} · {log.item_name}
+              {getHistoryDisplayLabel(log)} · {log.item_name}
             </div>
           </div>
           <button onClick={onClose} className="rounded-full p-1 hover:bg-white/10">

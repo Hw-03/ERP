@@ -11,7 +11,8 @@ from io import StringIO
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from sqlalchemy import func, or_, select
+from pydantic import BaseModel
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -65,6 +66,32 @@ QUANTITY_CORRECTABLE = {
     TransactionTypeEnum.RECEIVE,
     TransactionTypeEnum.SHIP,
 }
+
+# /transactions/summary 카테고리 — 프론트 historyShared.ts 의 scope 멤버와 일치.
+_SUMMARY_WAREHOUSE_TYPES = [
+    TransactionTypeEnum.RECEIVE,
+    TransactionTypeEnum.SHIP,
+    TransactionTypeEnum.TRANSFER_TO_PROD,
+    TransactionTypeEnum.TRANSFER_TO_WH,
+    TransactionTypeEnum.RESERVE,
+    TransactionTypeEnum.RESERVE_RELEASE,
+    TransactionTypeEnum.RETURN,
+]
+_SUMMARY_DEPT_TYPES = [
+    TransactionTypeEnum.TRANSFER_DEPT,
+    TransactionTypeEnum.BACKFLUSH,
+    TransactionTypeEnum.PRODUCE,
+    TransactionTypeEnum.DISASSEMBLE,
+]
+_SUMMARY_ADJUST_TYPES = [TransactionTypeEnum.ADJUST]
+
+
+class TransactionSummaryResponse(BaseModel):
+    """입출고 내역 화면 KPI — 조건 전체 카운트(페이지네이션과 무관)."""
+    total: int
+    warehouse_count: int
+    dept_count: int
+    adjust_count: int
 
 
 def _require_export_range(start_date: Optional[date], end_date: Optional[date]) -> tuple[datetime, datetime]:
@@ -236,6 +263,81 @@ def list_transactions(
         _to_log_response(log, item, int(edit_count or 0), requester_name=batch_map.get(log.operation_batch_id))
         for log, item, edit_count in rows
     ]
+
+
+@router.get("/transactions/summary", response_model=TransactionSummaryResponse)
+def get_transactions_summary(
+    transaction_types: Optional[str] = Query(None, description="쉼표 구분 복수 타입"),
+    search: Optional[str] = Query(None),
+    date_from: Optional[date] = Query(None, description="포함 시작일 YYYY-MM-DD"),
+    date_to: Optional[date] = Query(None, description="포함 종료일 YYYY-MM-DD"),
+    include_archived: bool = Query(False),
+    db: Session = Depends(get_db),
+):
+    """KPI 카드용 카운트 집계. list_transactions 와 동일한 필터를 받지만 row 가 아니라
+    숫자 4개만 반환 — 화면에 로드된 100건이 아니라 조건 전체를 보여주기 위함.
+    """
+    # list_transactions 와 동일한 join 패턴 — search 가 IoBatch.requester_name 까지 닿게.
+    query = (
+        db.query(TransactionLog)
+        .join(Item, TransactionLog.item_id == Item.item_id)
+        .outerjoin(IoBatch, TransactionLog.operation_batch_id == IoBatch.batch_id)
+    )
+
+    type_set: set[TransactionTypeEnum] = set()
+    if transaction_types:
+        for raw in transaction_types.split(","):
+            raw = raw.strip()
+            if raw:
+                try:
+                    type_set.add(TransactionTypeEnum(raw))
+                except ValueError:
+                    pass
+    if type_set:
+        query = query.filter(TransactionLog.transaction_type.in_(type_set))
+
+    if date_from:
+        query = query.filter(TransactionLog.created_at >= datetime.combine(date_from, time.min))
+    if date_to:
+        query = query.filter(TransactionLog.created_at <= datetime.combine(date_to, time.max))
+    if not include_archived:
+        query = query.filter(TransactionLog.archived_at.is_(None))
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                Item.item_name.ilike(pattern),
+                Item.erp_code.ilike(pattern),
+                TransactionLog.reference_no.ilike(pattern),
+                TransactionLog.notes.ilike(pattern),
+                TransactionLog.produced_by.ilike(pattern),
+                IoBatch.requester_name.ilike(pattern),
+            )
+        )
+
+    # 한 번의 집계 쿼리로 4개 카운트.
+    agg = query.with_entities(
+        func.count(TransactionLog.log_id).label("total"),
+        func.coalesce(
+            func.sum(case((TransactionLog.transaction_type.in_(_SUMMARY_WAREHOUSE_TYPES), 1), else_=0)),
+            0,
+        ).label("warehouse_count"),
+        func.coalesce(
+            func.sum(case((TransactionLog.transaction_type.in_(_SUMMARY_DEPT_TYPES), 1), else_=0)),
+            0,
+        ).label("dept_count"),
+        func.coalesce(
+            func.sum(case((TransactionLog.transaction_type.in_(_SUMMARY_ADJUST_TYPES), 1), else_=0)),
+            0,
+        ).label("adjust_count"),
+    ).one()
+
+    return TransactionSummaryResponse(
+        total=int(agg.total or 0),
+        warehouse_count=int(agg.warehouse_count or 0),
+        dept_count=int(agg.dept_count or 0),
+        adjust_count=int(agg.adjust_count or 0),
+    )
 
 
 @router.get("/transactions/export.csv")

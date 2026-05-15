@@ -376,8 +376,6 @@ export function IoComposeView({
       const successTitle = response.requires_approval
         ? kind === "department"
           ? "부서 결재 요청 완료"
-          : kind === "both"
-          ? "결재 요청 완료 (창고 + 부서)"
           : "창고 결재 요청 완료"
         : "입출고 반영 완료";
       setResult({

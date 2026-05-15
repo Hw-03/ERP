@@ -11,9 +11,14 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { transactionColor, transactionIconName } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import {
+  describeBatchFlow,
   formatHistoryDate,
   getHistoryActor,
-  getHistoryFlowLabel,
+  getHistoryDisplayLabel,
+  getHistoryMovementSummary,
+  isReworkOperation,
+  type MovementSummary,
+  type MovementTone,
 } from "./historyShared";
 
 const TX_ICON = {
@@ -39,6 +44,48 @@ function FlowBadge({
     >
       {Icon && <Icon className="h-3.5 w-3.5" />}
       {label}
+    </span>
+  );
+}
+
+const TONE_COLOR: Record<MovementTone, string> = {
+  primary: LEGACY_COLORS.blue,
+  success: LEGACY_COLORS.green,
+  info: LEGACY_COLORS.cyan,
+  warning: LEGACY_COLORS.yellow,
+  danger: LEGACY_COLORS.red,
+  muted: LEGACY_COLORS.muted2,
+};
+
+function MovementSummaryCell({ summary }: { summary: MovementSummary }) {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+      {summary.parts.map((p, i) => {
+        const color = TONE_COLOR[p.tone];
+        return (
+          <span
+            key={i}
+            className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold"
+            style={{
+              background: `color-mix(in srgb, ${color} 16%, transparent)`,
+              color,
+            }}
+          >
+            {p.label}
+          </span>
+        );
+      })}
+      {summary.warning && (
+        <span
+          className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold"
+          style={{
+            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 18%, transparent)`,
+            color: LEGACY_COLORS.red,
+          }}
+        >
+          {summary.warning}
+        </span>
+      )}
     </span>
   );
 }
@@ -110,9 +157,11 @@ export function isHomogeneousItemGroup(logs: TransactionLog[]): boolean {
 }
 
 function ActorCell({ name }: { name: string }) {
-  if (!name || name === "-") return <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>;
+  if (!name || name === "-") {
+    return <span className="block text-center text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>;
+  }
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center justify-center gap-1.5">
       <span
         className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black text-white"
         style={{ background: LEGACY_COLORS.muted2 }}
@@ -172,7 +221,8 @@ export function BatchHeader({
     : null;
   const primaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
   const actor = getHistoryActor(first);
-  const flowColor = transactionColor(primaryType);
+  // 재작업(DISASSEMBLE) 묶음은 빨간색 강제. transactionColor 의 muted/회색 fallback 덮어씀.
+  const flowColor = isReworkOperation(first) ? LEGACY_COLORS.red : transactionColor(primaryType);
 
   return (
     <tr
@@ -199,7 +249,7 @@ export function BatchHeader({
         </div>
       </td>
       <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <FlowBadge type={primaryType} label={getHistoryFlowLabel(first)} color={flowColor} />
+        <FlowBadge type={primaryType} label={getHistoryDisplayLabel(first)} color={flowColor} />
       </td>
       <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex items-center gap-1.5">
@@ -210,7 +260,7 @@ export function BatchHeader({
         </div>
       </td>
       <td
-        className="whitespace-nowrap border-b px-4 py-3 text-right font-bold"
+        className="whitespace-nowrap border-b px-4 py-3 text-center font-bold"
         style={{
           borderColor: LEGACY_COLORS.border,
           color: totalQty == null
@@ -224,9 +274,6 @@ export function BatchHeader({
       </td>
       <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         <ActorCell name={actor} />
-      </td>
-      <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{first.notes ?? "-"}</span>
       </td>
     </tr>
   );
@@ -259,8 +306,9 @@ export function OpBatchHeader({
   const first = group.logs[0];
   const primaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
   const actor = getHistoryActor(first);
-  const flowLabel = getHistoryFlowLabel(first, batch);
-  const flowColor = transactionColor(primaryType);
+  const flow = describeBatchFlow(first, batch);
+  // 재작업(disassemble) 묶음은 빨간색 강제.
+  const flowColor = isReworkOperation(first, batch) ? LEGACY_COLORS.red : transactionColor(primaryType);
 
   // 품목명 영역
   let titleText: string;
@@ -271,24 +319,8 @@ export function OpBatchHeader({
     titleText = `${first.item_name} 외 ${group.logs.length - 1}건`;
   }
 
-  // 수량 영역
-  let qtyEl: React.ReactNode;
-  if (batch) {
-    let included = 0, excluded = 0, shortage = 0;
-    for (const b of batch.bundles) {
-      for (const l of b.lines) {
-        if (l.included) included++; else excluded++;
-        if (l.shortage > 0) shortage++;
-      }
-    }
-    qtyEl = (
-      <span className="whitespace-nowrap text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-        포함 {included} · 제외 {excluded}{shortage > 0 ? ` · 부족 ${shortage}` : ""}
-      </span>
-    );
-  } else {
-    qtyEl = <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>하위 {group.logs.length}건</span>;
-  }
+  // 변동요약 — 작업 종류별 의미 라벨. 부족 라인 있으면 빨간 경고 인라인.
+  const summary = getHistoryMovementSummary(first, batch, group.logs.length);
 
   return (
     <tr
@@ -317,7 +349,7 @@ export function OpBatchHeader({
         </div>
       </td>
       <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <FlowBadge type={primaryType} label={flowLabel} color={flowColor} />
+        <FlowBadge type={primaryType} label={flow.primary} color={flowColor} />
       </td>
       <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex items-center gap-1.5">
@@ -327,14 +359,11 @@ export function OpBatchHeader({
           </span>
         </div>
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3 text-right" style={{ borderColor: LEGACY_COLORS.border }}>
-        {qtyEl}
+      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+        <MovementSummaryCell summary={summary} />
       </td>
       <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         <ActorCell name={actor} />
-      </td>
-      <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-        <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{first.notes ?? "-"}</span>
       </td>
     </tr>
   );

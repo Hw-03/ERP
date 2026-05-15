@@ -4,8 +4,8 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import {
+  isAdjustmentLike,
   isDepartmentInternalType,
-  isExceptionLike,
   isWarehouseInvolvedType,
 } from "./historyShared";
 
@@ -83,14 +83,14 @@ export function HistoryCalendarStrip({
               const dayLogs = calendarDayMap.get(key) ?? [];
               const isToday = key === todayKey;
               const isSelected = key === selectedDay;
-              // 새 KPI 와 일치 — isWarehouseInvolvedType / isDepartmentInternalType / isExceptionLike.
+              // KPI 와 일치 — isWarehouseInvolvedType / isDepartmentInternalType / isAdjustmentLike.
               let warehouseCount = 0;
               let deptCount = 0;
-              let exceptionCount = 0;
+              let adjustCount = 0;
               for (const l of dayLogs) {
                 if (isWarehouseInvolvedType(l.transaction_type)) warehouseCount++;
                 if (isDepartmentInternalType(l.transaction_type)) deptCount++;
-                if (isExceptionLike(l)) exceptionCount++;
+                if (isAdjustmentLike(l)) adjustCount++;
               }
               return (
                 <button
@@ -120,18 +120,18 @@ export function HistoryCalendarStrip({
                   )}
                   <div className="mt-1 flex w-full flex-col gap-0.5 px-1">
                     {warehouseCount > 0 && (
-                      <span className="text-[10px] font-bold leading-tight" style={{ color: LEGACY_COLORS.green }}>
-                        창 {warehouseCount}건
+                      <span className="text-[11px] font-bold leading-tight" style={{ color: LEGACY_COLORS.green }}>
+                        창고 {warehouseCount}건
                       </span>
                     )}
                     {deptCount > 0 && (
-                      <span className="text-[10px] font-bold leading-tight" style={{ color: LEGACY_COLORS.cyan }}>
-                        부 {deptCount}건
+                      <span className="text-[11px] font-bold leading-tight" style={{ color: LEGACY_COLORS.cyan }}>
+                        부서 {deptCount}건
                       </span>
                     )}
-                    {exceptionCount > 0 && (
-                      <span className="text-[10px] font-bold leading-tight" style={{ color: LEGACY_COLORS.yellow }}>
-                        예 {exceptionCount}건
+                    {adjustCount > 0 && (
+                      <span className="text-[11px] font-bold leading-tight" style={{ color: LEGACY_COLORS.yellow }}>
+                        조정 {adjustCount}건
                       </span>
                     )}
                   </div>

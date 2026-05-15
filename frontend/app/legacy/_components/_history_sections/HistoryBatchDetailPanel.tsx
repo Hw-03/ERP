@@ -1,18 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight, GitBranch, Layers, Package, Workflow } from "lucide-react";
+import { GitBranch, Layers, Package } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import {
-  getBatchFlowEndpoints,
+  describeBatchFlow,
+  formatHistoryDateTimeLong,
   getHistoryActor,
-  getHistoryFlowLabel,
-  parseUtc,
+  getHistoryBomParentLine,
+  getHistoryDisplayLabel,
+  getHistoryLineSignedQuantity,
+  getHistoryLineStatusLabel,
+  type LineSignTone,
 } from "./historyShared";
+
+const SIGN_TONE_HEX: Record<LineSignTone, string> = {
+  increase: LEGACY_COLORS.blue,
+  decrease: LEGACY_COLORS.red,
+  move: LEGACY_COLORS.cyan,
+  muted: LEGACY_COLORS.muted2,
+};
 
 type Props = {
   batchId: string;
@@ -81,13 +92,15 @@ export function HistoryBatchDetailPanel({
     if (matched) onSelectLog(matched);
   }
 
-  // 헤더 강조 박스: 작업 종류 + 라인 요약
+  // 헤더 강조 박스: 작업 종류 + 라인 요약 (BOM 부모 자기 자신은 카운트에서 제외 — 헤더로 흡수됨).
   let summaryEl: React.ReactNode;
   if (batch) {
     let included = 0, excluded = 0, shortage = 0, lineCount = 0;
     for (const b of batch.bundles) {
-      lineCount += b.lines.length;
+      const parent = getHistoryBomParentLine(b);
       for (const l of b.lines) {
+        if (l === parent) continue;
+        lineCount += 1;
         if (l.included) included++; else excluded++;
         if (l.shortage > 0) shortage++;
       }
@@ -105,9 +118,22 @@ export function HistoryBatchDetailPanel({
     );
   }
 
+  // 작업 묶음 카드 안에 합칠 흐름 보조문구 (batch 있을 때만 의미).
+  const flow = batch ? describeBatchFlow(first, batch) : null;
+
+  // 메타 정보 — 참조번호는 값이 있을 때만 노출.
+  const refNo = batch?.reference_no ?? first.reference_no;
+  const metaRows: [string, string][] = [
+    ["요청자", batch?.requester_name ?? getHistoryActor(first)],
+    ["처리자", first.produced_by ?? "-"],
+    ...(refNo ? [["참조번호", refNo] as [string, string]] : []),
+    ["메모", batch?.notes ?? first.notes ?? "-"],
+    ["일시", formatHistoryDateTimeLong(first.created_at)],
+  ];
+
   return (
     <div className="space-y-4">
-      {/* 작업 종류 + 요약 */}
+      {/* 작업 묶음 — 작업명 + 흐름 보조문구 + work_type/sub_type + 라인 요약 한꺼번에 */}
       <div
         className="rounded-[24px] border p-5"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
@@ -119,28 +145,24 @@ export function HistoryBatchDetailPanel({
           </span>
         </div>
         <div className="mt-2 text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>
-          {getHistoryFlowLabel(first, batch)}
+          {getHistoryDisplayLabel(first, batch)}
         </div>
+        {batch && (
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+            {flow?.secondary && <span>{flow.secondary}</span>}
+            {flow?.secondary && <span>·</span>}
+            <span>{batch.work_type} · {batch.sub_type}</span>
+          </div>
+        )}
         <div className="mt-1">{summaryEl}</div>
       </div>
-
-      {/* 흐름 카드 */}
-      <FlowCard state={state} log={first} />
 
       {/* 메타 정보 */}
       <div
         className="space-y-2.5 rounded-[24px] border p-4"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
-        {(
-          [
-            ["요청자", batch?.requester_name ?? getHistoryActor(first)],
-            ["처리자", first.produced_by ?? "-"],
-            ["참조번호", batch?.reference_no ?? first.reference_no ?? "-"],
-            ["메모", batch?.notes ?? first.notes ?? "-"],
-            ["일시", parseUtc(first.created_at).toLocaleString("ko-KR")],
-          ] as [string, string][]
-        ).map(([label, value]) => (
+        {metaRows.map(([label, value]) => (
           <div key={label} className="flex items-start justify-between gap-3">
             <span className="shrink-0 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
               {label}
@@ -167,6 +189,7 @@ export function HistoryBatchDetailPanel({
               <BundleBlock
                 key={bundle.bundle_id}
                 bundle={bundle}
+                batch={batch}
                 onLineClick={handleLineClick}
                 isLineClickable={(line) => logByItemId.has(line.item_id)}
               />
@@ -178,83 +201,28 @@ export function HistoryBatchDetailPanel({
   );
 }
 
-function FlowCard({ state, log }: { state: FetchState; log: TransactionLog }) {
-  const baseClass = "rounded-[20px] border p-4";
-  const baseStyle = { background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border };
-
-  if (state.status === "loading") {
-    return (
-      <div className={baseClass} style={baseStyle}>
-        <div className="flex items-center gap-2 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-          <Workflow className="h-3.5 w-3.5" />
-          흐름 정보 불러오는 중...
-        </div>
-      </div>
-    );
-  }
-
-  if (state.status === "available") {
-    const eps = getBatchFlowEndpoints(state.batch);
-    const fallbackLabel = !eps ? getHistoryFlowLabel(log) : null;
-    return (
-      <div className={baseClass} style={baseStyle}>
-        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider" style={{ color: LEGACY_COLORS.muted2 }}>
-          <Workflow className="h-3.5 w-3.5" />
-          작업 흐름
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {eps ? (
-            <>
-              <span className="rounded-full border px-2.5 py-0.5 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-                {eps.from}
-              </span>
-              <ArrowRight className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />
-              <span className="rounded-full border px-2.5 py-0.5 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-                {eps.to}
-              </span>
-            </>
-          ) : (
-            <span className="rounded-full border px-2.5 py-0.5 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-              {fallbackLabel}
-            </span>
-          )}
-          <span className="ml-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-            ({state.batch.work_type} · {state.batch.sub_type})
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={baseClass} style={baseStyle}>
-      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider" style={{ color: LEGACY_COLORS.muted2 }}>
-        <Workflow className="h-3.5 w-3.5" />
-        작업 흐름
-      </div>
-      <div className="mt-2 text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
-        {getHistoryFlowLabel(log)}
-      </div>
-      <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-        작업 묶음 정보를 불러올 수 없습니다 — 거래 타입 기반 추정
-      </div>
-    </div>
-  );
-}
-
 function BundleBlock({
   bundle,
+  batch,
   onLineClick,
   isLineClickable,
 }: {
   bundle: IoBundle;
+  batch: IoBatch;
   onLineClick: (line: IoLine) => void;
   isLineClickable: (line: IoLine) => boolean;
 }) {
   const isBomParent = bundle.source_kind === "bom_parent";
+  // BOM 부모 자기 자신은 헤더로 흡수, 자식 목록에서 제외. helper 단일 진입.
+  const parentLine = getHistoryBomParentLine(bundle);
+  const childLines = parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines;
+  const headerSigned = parentLine ? getHistoryLineSignedQuantity(parentLine, batch, bundle) : null;
+  const headerQtyText = headerSigned ? headerSigned.label : formatQty(bundle.quantity);
+  const headerQtyColor = headerSigned ? SIGN_TONE_HEX[headerSigned.tone] : LEGACY_COLORS.muted2;
+
   return (
     <div className="rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }}>
-      {/* 번들 헤더 */}
+      {/* 번들 헤더 — 부모 라인 있으면 실제 입고 수량(파랑)을 헤더가 흡수 */}
       <div className="flex items-center gap-2 px-3 py-2" style={{ background: "rgba(101,169,255,.05)" }}>
         <span
           className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
@@ -271,16 +239,18 @@ function BundleBlock({
         <span className="flex-1 truncate text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
           {bundle.title}
         </span>
-        <span className="whitespace-nowrap text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-          × {formatQty(bundle.quantity)}
+        <span className="whitespace-nowrap text-[11px] font-bold" style={{ color: headerQtyColor }}>
+          {headerQtyText}
         </span>
       </div>
 
-      {/* 라인 목록 */}
+      {/* 라인 목록 — 부모 자기 자신 제외 */}
       <div>
-        {bundle.lines.map((line) => {
+        {childLines.map((line) => {
           const clickable = isLineClickable(line);
           const dim = !line.included;
+          const signed = getHistoryLineSignedQuantity(line, batch, bundle);
+          const qtyColor = SIGN_TONE_HEX[signed.tone];
           return (
             <button
               key={line.line_id}
@@ -305,8 +275,8 @@ function BundleBlock({
                   {line.erp_code}
                 </span>
               )}
-              <span className="whitespace-nowrap text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                × {formatQty(line.quantity)} {line.unit ?? ""}
+              <span className="whitespace-nowrap text-[11px] font-bold" style={{ color: qtyColor }}>
+                {signed.label}
               </span>
               <LineStatusBadge included={line.included} shortage={line.shortage} />
               {!clickable && (
@@ -323,32 +293,18 @@ function BundleBlock({
 }
 
 function LineStatusBadge({ included, shortage }: { included: boolean; shortage: number }) {
-  if (!included) {
-    return (
-      <span
-        className="inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
-        style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 18%, transparent)`, color: LEGACY_COLORS.muted2 }}
-      >
-        제외
-      </span>
-    );
-  }
-  if (shortage > 0) {
-    return (
-      <span
-        className="inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
-        style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.red} 18%, transparent)`, color: LEGACY_COLORS.red }}
-      >
-        부족 {formatQty(shortage)}
-      </span>
-    );
-  }
+  const status = getHistoryLineStatusLabel({ included, shortage });
+  const color =
+    status.tone === "danger" ? LEGACY_COLORS.red
+    : status.tone === "ok" ? LEGACY_COLORS.green
+    : LEGACY_COLORS.muted2;
+  const label = status.tone === "danger" ? `부족 ${formatQty(shortage)}` : status.label;
   return (
     <span
       className="inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
-      style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.green} 18%, transparent)`, color: LEGACY_COLORS.green }}
+      style={{ background: `color-mix(in srgb, ${color} 18%, transparent)`, color }}
     >
-      포함
+      {label}
     </span>
   );
 }

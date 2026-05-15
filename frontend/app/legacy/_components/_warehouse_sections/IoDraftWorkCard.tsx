@@ -110,13 +110,7 @@ export function IoDraftWorkCard({
         if (l.included && Number(l.shortage) > 0) shortage += 1;
       }
     }
-    const elapsed = formatRelative(draft.updated_at);
-    const createdMs = parseServerTime(draft.created_at);
-    const updatedMs = parseServerTime(draft.updated_at);
-    const started =
-      updatedMs - createdMs >= 30 * 60_000
-        ? `${formatRelative(draft.created_at)} 시작`
-        : null;
+    const startedText = formatRelative(draft.created_at);
     return {
       totalQty: qty,
       lineCount: lines,
@@ -124,8 +118,7 @@ export function IoDraftWorkCard({
       subLabel: sub,
       workMeta: work,
       shortageCount: shortage,
-      elapsedText: elapsed,
-      startedText: started,
+      startedText,
     };
   }, [draft]);
 
@@ -190,60 +183,33 @@ export function IoDraftWorkCard({
           return (
             <li
               key={b.bundle_id}
-              className="flex items-baseline gap-1.5 overflow-hidden text-[16px] font-black leading-tight"
+              className="flex items-baseline gap-2 overflow-hidden text-[22px] font-black leading-tight"
               style={{ color: LEGACY_COLORS.text }}
             >
               <span className="min-w-0 truncate">{b.title}</span>
               <span
-                className="shrink-0 tabular-nums text-[13px] font-bold"
-                style={{ color: LEGACY_COLORS.muted2 }}
+                className="shrink-0 tabular-nums text-[24px] font-black leading-none"
+                style={{ color: accent }}
               >
-                ×{formatQty(displayQty)}
+                {formatQty(displayQty)}
+                <span className="ml-0.5 text-[16px] font-black">EA</span>
               </span>
             </li>
           );
         })}
       </ul>
 
-      {/* 메트릭: 수량(강조) · 자재 종수 · 부서 */}
-      <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <span className="inline-flex items-baseline gap-1">
-          <span
-            className="text-[28px] font-black leading-none tracking-[-0.02em]"
-            style={{ color: accent }}
-          >
-            {formatQty(meta.totalQty)}
-          </span>
-          <span className="text-[13px] font-bold" style={{ color: accent }}>
-            개
-          </span>
+      {/* 메트릭: 총 수량 + 자재 종수 + 부서 (제목보다 약하게 — 보조 정보) */}
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[13px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+        <span>
+          총 <span className="tabular-nums" style={{ color: LEGACY_COLORS.text }}>{formatQty(meta.totalQty)}</span>개
         </span>
-        <span
-          className="text-[12px] font-bold"
-          style={{ color: LEGACY_COLORS.muted2 }}
-        >
-          ·
-        </span>
-        <span
-          className="text-[14px] font-bold"
-          style={{ color: LEGACY_COLORS.text }}
-        >
-          자재 {meta.lineCount}종
-        </span>
+        <span aria-hidden>·</span>
+        <span>자재 {meta.lineCount}종</span>
         {meta.deptLabel && (
           <>
-            <span
-              className="text-[12px] font-bold"
-              style={{ color: LEGACY_COLORS.muted2 }}
-            >
-              ·
-            </span>
-            <span
-              className="text-[14px] font-bold"
-              style={{ color: LEGACY_COLORS.text }}
-            >
-              {meta.deptLabel}
-            </span>
+            <span aria-hidden>·</span>
+            <span>{meta.deptLabel}</span>
           </>
         )}
       </div>
@@ -254,8 +220,7 @@ export function IoDraftWorkCard({
           className="text-[11px] font-semibold"
           style={{ color: LEGACY_COLORS.muted2 }}
         >
-          {meta.elapsedText} 수정
-          {meta.startedText ? ` · ${meta.startedText}` : ""}
+          {meta.startedText} 작업 시작
         </span>
         {meta.shortageCount > 0 && (
           <span

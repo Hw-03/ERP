@@ -116,6 +116,8 @@ describe("transactionColor", () => {
     expect(transactionColor("SCRAP")).toBe(LEGACY_COLORS.red);
     expect(transactionColor("LOSS")).toBe(LEGACY_COLORS.red);
     expect(transactionColor("MARK_DEFECTIVE")).toBe(LEGACY_COLORS.red);
+    // history-rework-color-2026-05-15: DISASSEMBLE("재작업") 은 되돌림 성격이라 red 로 격상.
+    expect(transactionColor("DISASSEMBLE")).toBe(LEGACY_COLORS.red);
   });
 
   it("주의 거래 → yellow", () => {
@@ -129,7 +131,6 @@ describe("transactionColor", () => {
 
   it("muted 거래 → muted/muted2", () => {
     expect(transactionColor("RESERVE_RELEASE")).toBe(LEGACY_COLORS.muted2);
-    expect(transactionColor("DISASSEMBLE")).toBe(LEGACY_COLORS.muted);
     expect(transactionColor("RETURN")).toBe(LEGACY_COLORS.muted);
     expect(transactionColor("SUPPLIER_RETURN")).toBe(LEGACY_COLORS.muted);
   });

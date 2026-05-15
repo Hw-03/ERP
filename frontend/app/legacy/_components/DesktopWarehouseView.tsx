@@ -11,6 +11,12 @@ import { WarehouseDraftPanelTabs } from "./_warehouse_sections/WarehouseDraftPan
 import { IoComposeView } from "./_warehouse_v2/IoComposeView";
 import { readCurrentOperator } from "./login/useCurrentOperator";
 
+// 탭 전환 remount 사이 직전 카운트 보존 (세션 내 메모리 캐시).
+// 새로고침 시 휘발 — 첫 진입은 항상 fresh fetch.
+const cartCountCache = new Map<string, number>();
+const warehouseQueueCountCache = { value: 0 };
+const deptQueueCountCache = new Map<string, number>();
+
 export function DesktopWarehouseView({
   globalSearch,
   onStatusChange,
@@ -31,7 +37,17 @@ export function DesktopWarehouseView({
   const [employeeId, setEmployeeId] = useState<string>(operator?.employee_id ?? "");
   const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>("compose");
   const [panelRefreshNonce, setPanelRefreshNonce] = useState(0);
-  const [cartCount, setCartCount] = useState(0);
+  const [cartCount, setCartCount] = useState(() => {
+    const eid = operator?.employee_id ?? "";
+    return eid ? cartCountCache.get(eid) ?? 0 : 0;
+  });
+  const [warehouseQueueCount, setWarehouseQueueCount] = useState(
+    () => warehouseQueueCountCache.value,
+  );
+  const [deptQueueCount, setDeptQueueCount] = useState(() => {
+    const eid = operator?.employee_id ?? "";
+    return eid ? deptQueueCountCache.get(eid) ?? 0 : 0;
+  });
   const [restoreIoDraft, setRestoreIoDraft] = useState<IoBatch | null>(null);
 
   const operatorEmployeeId = operator?.employee_id ?? employeeId;
@@ -50,9 +66,35 @@ export function DesktopWarehouseView({
       api.listStockRequestDrafts(operatorEmployeeId),
       api.listDrafts(operatorEmployeeId),
     ])
-      .then(([legacyRows, ioRows]) => setCartCount(legacyRows.length + ioRows.length))
+      .then(([legacyRows, ioRows]) => {
+        const n = legacyRows.length + ioRows.length;
+        setCartCount(n);
+        cartCountCache.set(operatorEmployeeId, n);
+      })
       .catch(() => {});
   }, [operatorEmployeeId, panelRefreshNonce]);
+
+  useEffect(() => {
+    if (!canSeeQueue) return;
+    api
+      .countWarehouseQueue()
+      .then(({ count }) => {
+        setWarehouseQueueCount(count);
+        warehouseQueueCountCache.value = count;
+      })
+      .catch(() => {});
+  }, [canSeeQueue, panelRefreshNonce]);
+
+  useEffect(() => {
+    if (!canSeeDeptQueue || !operatorEmployeeId) return;
+    api
+      .countDepartmentQueue(operatorEmployeeId)
+      .then(({ count }) => {
+        setDeptQueueCount(count);
+        deptQueueCountCache.set(operatorEmployeeId, count);
+      })
+      .catch(() => {});
+  }, [canSeeDeptQueue, operatorEmployeeId, panelRefreshNonce]);
 
   if (operator && !canEnterIO(operator)) {
     return <WarehouseAccessDenied department={operator.department ?? ""} />;
@@ -73,6 +115,8 @@ export function DesktopWarehouseView({
           showQueue={canSeeQueue}
           showDeptQueue={canSeeDeptQueue}
           cartCount={cartCount}
+          queueCount={warehouseQueueCount}
+          deptQueueCount={deptQueueCount}
         />
 
         <WarehouseDraftPanelTabs
@@ -92,7 +136,10 @@ export function DesktopWarehouseView({
           bumpRefresh={() => setPanelRefreshNonce((n) => n + 1)}
           onSubmitSuccess={onSubmitSuccess}
           resetDraftTracking={() => {}}
-          onCartCountChange={setCartCount}
+          onCartCountChange={(n) => {
+            setCartCount(n);
+            if (operatorEmployeeId) cartCountCache.set(operatorEmployeeId, n);
+          }}
         />
 
         {sectionTab === "compose" && (

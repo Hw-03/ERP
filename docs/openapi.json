@@ -6583,6 +6583,35 @@
         "title": "TransactionQuantityCorrectionResponse",
         "type": "object"
       },
+      "TransactionSummaryResponse": {
+        "description": "입출고 내역 화면 KPI — 조건 전체 카운트(페이지네이션과 무관).",
+        "properties": {
+          "adjust_count": {
+            "title": "Adjust Count",
+            "type": "integer"
+          },
+          "dept_count": {
+            "title": "Dept Count",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "warehouse_count": {
+            "title": "Warehouse Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "warehouse_count",
+          "dept_count",
+          "adjust_count"
+        ],
+        "title": "TransactionSummaryResponse",
+        "type": "object"
+      },
       "TransactionTypeEnum": {
         "enum": [
           "RECEIVE",
@@ -9540,6 +9569,122 @@
         ]
       }
     },
+    "/api/inventory/transactions/summary": {
+      "get": {
+        "description": "KPI 카드용 카운트 집계. list_transactions 와 동일한 필터를 받지만 row 가 아니라\n숫자 4개만 반환 — 화면에 로드된 100건이 아니라 조건 전체를 보여주기 위함.",
+        "operationId": "get_transactions_summary_api_inventory_transactions_summary_get",
+        "parameters": [
+          {
+            "description": "쉼표 구분 복수 타입",
+            "in": "query",
+            "name": "transaction_types",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "쉼표 구분 복수 타입",
+              "title": "Transaction Types"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "description": "포함 시작일 YYYY-MM-DD",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "포함 시작일 YYYY-MM-DD",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "포함 종료일 YYYY-MM-DD",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "포함 종료일 YYYY-MM-DD",
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Transactions Summary",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
     "/api/inventory/transactions/{log_id}/edits": {
       "get": {
         "description": "특정 거래의 수정 이력 (최신순).",
@@ -12143,6 +12288,54 @@
         ]
       }
     },
+    "/api/stock-requests/department-queue/count": {
+      "get": {
+        "description": "부서 승인함 대기 건수 — `list_department_queue` 와 동일 필터.",
+        "operationId": "count_department_queue_api_stock_requests_department_queue_count_get",
+        "parameters": [
+          {
+            "description": "현재 직원 ID — 본인 부서만 카운트",
+            "in": "query",
+            "name": "actor_employee_id",
+            "required": true,
+            "schema": {
+              "description": "현재 직원 ID — 본인 부서만 카운트",
+              "format": "uuid",
+              "title": "Actor Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Count Department Queue Api Stock Requests Department Queue Count Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Count Department Queue",
+        "tags": [
+          "Stock Requests"
+        ]
+      }
+    },
     "/api/stock-requests/draft": {
       "get": {
         "description": "단일 DRAFT 조회. 없으면 200 + null.",
@@ -12429,6 +12622,30 @@
           }
         },
         "summary": "List Warehouse Queue",
+        "tags": [
+          "Stock Requests"
+        ]
+      }
+    },
+    "/api/stock-requests/warehouse-queue/count": {
+      "get": {
+        "description": "창고 승인함 대기 건수 — `list_warehouse_queue` 와 동일 필터.",
+        "operationId": "count_warehouse_queue_api_stock_requests_warehouse_queue_count_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Count Warehouse Queue Api Stock Requests Warehouse Queue Count Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Count Warehouse Queue",
         "tags": [
           "Stock Requests"
         ]
