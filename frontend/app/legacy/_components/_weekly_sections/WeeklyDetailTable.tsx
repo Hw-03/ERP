@@ -33,9 +33,6 @@ function WeeklyDetailTableImpl({ group }: Props) {
           {group.dept_name}
         </span>
         <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-          품목 {group.items.length}건
-        </span>
-        <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
           현재 재고 {formatQty(group.current_qty)}
         </span>
         <span
@@ -68,10 +65,19 @@ function WeeklyDetailTableImpl({ group }: Props) {
             ? formatQty(group.delta)
             : "±0"}
         </span>
+        <span
+          className="ml-auto rounded-[6px] px-2 py-0.5 text-[11px] font-bold tabular-nums"
+          style={{
+            background: LEGACY_COLORS.s2,
+            color: LEGACY_COLORS.muted2,
+          }}
+        >
+          품목 {group.items.length}건
+        </span>
       </div>
 
       <div className="overflow-x-auto">
-        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 4px", minWidth: 680, tableLayout: "fixed" }}>
+        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 3px", minWidth: 680, tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: "100px" }} />
             <col />
@@ -91,7 +97,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                     style={{
                       color: LEGACY_COLORS.muted2,
                       textAlign: i < 2 ? "left" : "right",
-                      padding: "8px 12px 10px",
+                      padding: "6px 12px 8px",
                       whiteSpace: "nowrap",
                     }}
                   >
@@ -119,7 +125,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                 <tr key={row.item_id}>
                   {/* 품목 코드 */}
                   <td
-                    className="rounded-l-[12px] border-y border-l py-3.5 pl-3 pr-3 text-[14px] font-bold"
+                    className="rounded-l-[12px] border-y border-l py-2.5 pl-3 pr-3 text-[14px] font-bold"
                     style={{
                       background: rowBg,
                       borderColor: rowBorder,
@@ -131,7 +137,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                   </td>
                   {/* 품명 */}
                   <td
-                    className="border-y px-3 py-3.5 text-[15px] font-bold"
+                    className="border-y px-3 py-2.5 text-[15px] font-bold"
                     style={{
                       background: rowBg,
                       borderColor: rowBorder,
@@ -154,7 +160,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                   <Num val={row.current_qty} bg={rowBg} border={rowBorder} />
                   {/* 증감 */}
                   <td
-                    className="rounded-r-[12px] border-y border-r pl-3 pr-4 py-3.5 text-right text-[16px] font-black"
+                    className="rounded-r-[12px] border-y border-r pl-3 pr-4 py-2.5 text-right text-[16px] font-black"
                     style={{
                       background: rowBg,
                       borderColor: rowBorder,
@@ -193,7 +199,7 @@ function Num({
   const c = val === 0 ? LEGACY_COLORS.muted2 : (color ?? LEGACY_COLORS.text);
   return (
     <td
-      className="border-y px-3 py-3.5 text-right text-[15px] font-bold"
+      className="border-y px-3 py-2.5 text-right text-[15px] font-bold"
       style={{
         background: bg,
         borderColor: border,

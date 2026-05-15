@@ -3,7 +3,6 @@
 import { memo } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
-import { formatQty } from "@/lib/mes/format";
 import type { WeeklyReportResponse } from "@/lib/api/types/weekly";
 
 interface Props {
@@ -71,37 +70,22 @@ function WeeklySummaryBandImpl({ data }: Props) {
 
   const bgColor =
     info.level === "danger"
-      ? tint(LEGACY_COLORS.red, 5, LEGACY_COLORS.s1)
+      ? tint(LEGACY_COLORS.red, 10, LEGACY_COLORS.s1)
       : info.level === "warn"
-      ? tint(LEGACY_COLORS.yellow, 6, LEGACY_COLORS.s1)
+      ? tint(LEGACY_COLORS.yellow, 10, LEGACY_COLORS.s1)
       : LEGACY_COLORS.s1;
-
-  const statParts = [
-    `생산/입고 ${formatQty(summary.total_in_qty)}`,
-    `출고/소비 ${formatQty(summary.total_out_qty)}`,
-    summary.groups_decreasing > 0
-      ? `감소 공정 ${summary.groups_decreasing}개`
-      : `증가 공정 ${summary.groups_increasing}개`,
-  ];
-  const statLine = statParts.join(" · ");
 
   return (
     <div
-      className="shrink-0 rounded-[18px] border px-5 py-3.5"
+      className="shrink-0 rounded-[18px] border px-5 py-3"
       style={{ background: bgColor, borderColor }}
     >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="shrink-0 text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
           이번 주 총평
         </span>
-        <span className="text-[14px] font-black" style={{ color: toneColor }}>
+        <span className="text-[15px] font-black" style={{ color: toneColor }}>
           {info.headline}
-        </span>
-        <span
-          className="ml-auto shrink-0 text-[11px] tabular-nums"
-          style={{ color: LEGACY_COLORS.muted2 }}
-        >
-          {statLine}
         </span>
       </div>
       {noActivity && (

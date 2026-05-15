@@ -10,6 +10,7 @@ import { WeeklyGroupCards } from "./_weekly_sections/WeeklyGroupCards";
 import { WeeklyDetailTable } from "./_weekly_sections/WeeklyDetailTable";
 import { WeeklySummaryBand } from "./_weekly_sections/WeeklySummaryBand";
 import { WeeklyProductionMatrix } from "./_weekly_sections/WeeklyProductionMatrix";
+import { WeeklyKpiStrip } from "./_weekly_sections/WeeklyKpiStrip";
 import { LoadingSkeleton, StatusPill } from "./common";
 
 // ─── 주차 계산 ────────────────────────────────────────────────────
@@ -307,46 +308,79 @@ export function DesktopWeeklyReportView() {
         </div>
       </div>
 
-      {/* ── 행2: 이번 주 총평 ── */}
+      {/* ── 행2: KPI 4종 ── */}
+      {data && <WeeklyKpiStrip data={data} />}
+
+      {/* ── 행3: 이번 주 총평 ── */}
       {data && <WeeklySummaryBand data={data} />}
 
-      {/* ── 행3: 생산 현황 ── */}
-      <div className="shrink-0 rounded-[22px] border py-5 px-5" style={cardBase}>
-        <div className="mb-4 flex items-baseline gap-2">
-          <h2 className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
-            생산 현황
-          </h2>
-          <span className="text-[13px]" style={{ color: LEGACY_COLORS.muted }}>
-            선택 주차 모델별 공정 생산 수량
-          </span>
-        </div>
-        {loading && !data ? (
-          <LoadingSkeleton variant="card" rows={1} />
-        ) : (
-          <WeeklyProductionMatrix rows={data?.production_matrix ?? []} />
-        )}
-      </div>
+      {/* ── 행4: 생산 현황 (빈 상태는 얇은 노트로 축소) ── */}
+      {(() => {
+        if (loading && !data) {
+          return (
+            <div className="shrink-0 rounded-[18px] border py-3.5 px-4" style={cardBase}>
+              <LoadingSkeleton variant="card" rows={1} />
+            </div>
+          );
+        }
+        const rows = data?.production_matrix ?? [];
+        const hasProduction = rows.some((r) => r.total_qty > 0);
+        if (!hasProduction) {
+          return (
+            <div
+              className="flex shrink-0 items-center justify-between rounded-[12px] border px-4 py-2"
+              style={cardBase}
+            >
+              <span
+                className="text-[11px] font-bold tracking-wide"
+                style={{ color: LEGACY_COLORS.muted }}
+              >
+                생산 현황
+              </span>
+              <span
+                className="text-[12px]"
+                style={{ color: LEGACY_COLORS.muted2 }}
+              >
+                이번 주 생산 실적 없음 · 모델별 공정 생산 기록이 없습니다.
+              </span>
+            </div>
+          );
+        }
+        return (
+          <div className="shrink-0 rounded-[18px] border py-3.5 px-4" style={cardBase}>
+            <div className="mb-2.5 flex items-baseline gap-2">
+              <h2 className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
+                생산 현황
+              </h2>
+              <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted }}>
+                선택 주차 모델별 공정 생산 수량
+              </span>
+            </div>
+            <WeeklyProductionMatrix rows={rows} />
+          </div>
+        );
+      })()}
 
-      {/* ── 행4: 2-column (공정별 변화 | 품목 상세) ── */}
+      {/* ── 행5: 2-column (공정별 변화 | 품목 상세) ── */}
       <div className="flex gap-4">
 
         {/* 좌: 공정별 변화 */}
         <div
-          className="flex w-[330px] shrink-0 flex-col rounded-[22px] border"
+          className="flex w-[330px] shrink-0 flex-col rounded-[18px] border"
           style={cardBase}
         >
           <div
-            className="shrink-0 border-b px-4 pb-3 pt-4"
+            className="shrink-0 border-b px-4 pb-3 pt-3.5"
             style={{ borderColor: LEGACY_COLORS.border }}
           >
             <h2 className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
               공정별 변화
             </h2>
-            <p className="mt-0.5 text-[13px]" style={{ color: LEGACY_COLORS.muted }}>
+            <p className="mt-0.5 text-[12px]" style={{ color: LEGACY_COLORS.muted }}>
               순변동 · 생산 내역 · 출고 내역
             </p>
           </div>
-          <div className="p-4">
+          <div className="p-3">
             {loading && !data ? (
               <LoadingSkeleton variant="card" rows={4} />
             ) : (
@@ -363,7 +397,7 @@ export function DesktopWeeklyReportView() {
         {/* 우: 품목 상세 — relative wrapper가 행 높이(= 좌측 카드)를 따르고, 내부 absolute 카드가 그 높이를 꽉 채움 */}
         <div className="relative flex-1">
           <div
-            className="absolute inset-0 flex flex-col rounded-[22px] border"
+            className="absolute inset-0 flex flex-col rounded-[18px] border"
             style={cardBase}
           >
             <div

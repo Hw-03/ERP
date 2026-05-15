@@ -36,7 +36,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
             onClick={() => onSelect(g.process_code)}
             onMouseEnter={() => setHovered(g.process_code)}
             onMouseLeave={() => setHovered(null)}
-            className="relative overflow-hidden rounded-[16px] border text-left transition-colors hover:brightness-110"
+            className="relative overflow-hidden rounded-[12px] border text-left transition-colors hover:brightness-110"
             style={{
               background: isActive
                 ? tint(tone, 8, LEGACY_COLORS.s2)
@@ -49,7 +49,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
                 ? tint(LEGACY_COLORS.red, 30, LEGACY_COLORS.border)
                 : LEGACY_COLORS.border,
               boxShadow: isActive
-                ? `0 0 0 1.5px ${tint(tone, 20)}, var(--c-card-shadow)`
+                ? `0 0 0 1px ${tint(tone, 20)}, var(--c-card-shadow)`
                 : undefined,
             }}
           >
@@ -60,19 +60,18 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
                 background: isActive || isDecreasing ? tone : tint(accentColor, 35),
               }}
             />
-            {/* Content */}
-            <div className="flex justify-between gap-3 py-3 pl-5 pr-4">
-              {/* 좌: 부서명 + 순변동 */}
+            {/* 상단 행: 부서명·순변동 + 공정코드 배지 */}
+            <div className="flex items-start justify-between gap-3 py-2.5 pl-5 pr-4">
               <div className="flex flex-col gap-1">
                 <div
-                  className="text-[20px] font-black tracking-[-0.02em]"
+                  className="text-[19px] font-black tracking-[-0.02em] leading-none"
                   style={{ color: LEGACY_COLORS.text }}
                 >
                   {g.dept_name}
                 </div>
                 {g.delta !== 0 ? (
                   <div
-                    className="text-[28px] font-black leading-none"
+                    className="text-[26px] font-black leading-none tabular-nums"
                     style={{ color: deltaColor }}
                   >
                     {g.delta > 0 ? `+${formatQty(g.delta)}` : formatQty(g.delta)}
@@ -97,36 +96,38 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
                   </div>
                 )}
               </div>
-              {/* 우: 공정코드 배지 + 입고 + 출고 + 현재 */}
-              <div className="flex flex-col items-end gap-1">
-                <span
-                  className="rounded-[6px] px-2 py-0.5 text-[11px] font-black"
-                  style={{
-                    background: tint(tone, 12, LEGACY_COLORS.s2),
-                    color: tone,
-                  }}
-                >
-                  {g.process_code}
-                </span>
-                <span
-                  className="text-[11px] font-semibold"
-                  style={{ color: LEGACY_COLORS.muted }}
-                >
-                  입고 {formatQty(g.in_qty)}
-                </span>
-                <span
-                  className="text-[11px] font-semibold"
-                  style={{ color: LEGACY_COLORS.muted }}
-                >
-                  출고 {formatQty(g.out_qty)}
-                </span>
-                <span
-                  className="text-[11px] font-semibold"
-                  style={{ color: LEGACY_COLORS.muted2 }}
-                >
-                  현재 {formatQty(g.current_qty)}
-                </span>
-              </div>
+              <span
+                className="shrink-0 rounded-[6px] px-2 py-0.5 text-[11px] font-black"
+                style={{
+                  background: tint(tone, 12, LEGACY_COLORS.s2),
+                  color: tone,
+                }}
+              >
+                {g.process_code}
+              </span>
+            </div>
+            {/* 하단 행: 입고 · 출고 · 현재 */}
+            <div
+              className="flex items-center justify-between gap-2 border-t px-5 py-1.5 text-[12px] font-semibold tabular-nums"
+              style={{ borderColor: tint(LEGACY_COLORS.border, 60, "transparent") }}
+            >
+              <span
+                style={{
+                  color: g.in_qty > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.muted2,
+                }}
+              >
+                입고 {formatQty(g.in_qty)}
+              </span>
+              <span
+                style={{
+                  color: g.out_qty > 0 ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2,
+                }}
+              >
+                출고 {formatQty(g.out_qty)}
+              </span>
+              <span style={{ color: LEGACY_COLORS.muted }}>
+                현재 {formatQty(g.current_qty)}
+              </span>
             </div>
           </button>
         );
