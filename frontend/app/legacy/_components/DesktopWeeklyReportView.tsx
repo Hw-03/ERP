@@ -8,9 +8,7 @@ import type { WeeklyReportResponse } from "@/lib/api/types/weekly";
 import { tint } from "@/lib/mes/colorUtils";
 import { WeeklyGroupCards } from "./_weekly_sections/WeeklyGroupCards";
 import { WeeklyDetailTable } from "./_weekly_sections/WeeklyDetailTable";
-import { WeeklySummaryBand } from "./_weekly_sections/WeeklySummaryBand";
 import { WeeklyProductionMatrix } from "./_weekly_sections/WeeklyProductionMatrix";
-import { WeeklyKpiStrip } from "./_weekly_sections/WeeklyKpiStrip";
 import { LoadingSkeleton, StatusPill } from "./common";
 
 // ─── 주차 계산 ────────────────────────────────────────────────────
@@ -308,13 +306,7 @@ export function DesktopWeeklyReportView() {
         </div>
       </div>
 
-      {/* ── 행2: KPI 4종 ── */}
-      {data && <WeeklyKpiStrip data={data} />}
-
-      {/* ── 행3: 이번 주 총평 ── */}
-      {data && <WeeklySummaryBand data={data} />}
-
-      {/* ── 행4: 생산 현황 (빈 상태는 얇은 노트로 축소) ── */}
+      {/* ── 행2: 생산 현황 (빈 상태는 얇은 노트로 축소) ── */}
       {(() => {
         if (loading && !data) {
           return (
@@ -361,7 +353,7 @@ export function DesktopWeeklyReportView() {
         );
       })()}
 
-      {/* ── 행5: 2-column (공정별 변화 | 품목 상세) ── */}
+      {/* ── 행3: 2-column (공정별 변화 | 품목 상세) ── */}
       <div className="flex gap-4">
 
         {/* 좌: 공정별 변화 */}

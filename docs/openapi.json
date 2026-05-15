@@ -6942,6 +6942,16 @@
             "title": "Nf Qty",
             "type": "string"
           },
+          "pf_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Pf Qty",
+            "type": "string"
+          },
+          "tf_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Tf Qty",
+            "type": "string"
+          },
           "total_qty": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Qty",
@@ -6956,10 +6966,12 @@
         "required": [
           "model_key",
           "model_label",
+          "tf_qty",
           "hf_qty",
           "vf_qty",
           "nf_qty",
           "af_qty",
+          "pf_qty",
           "total_qty"
         ],
         "title": "WeeklyProductionModelRow",

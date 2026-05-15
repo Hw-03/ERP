@@ -506,10 +506,12 @@ class WeeklyReportSummary(BaseModel):
 class WeeklyProductionModelRow(BaseModel):
     model_key: str
     model_label: str
+    tf_qty: Decimal
     hf_qty: Decimal
     vf_qty: Decimal
     nf_qty: Decimal
     af_qty: Decimal
+    pf_qty: Decimal
     total_qty: Decimal
 
 

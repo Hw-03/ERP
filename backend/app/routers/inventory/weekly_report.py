@@ -27,7 +27,7 @@ router = APIRouter()
 
 _F_CODES = ["TF", "HF", "VF", "NF", "AF", "PF"]
 
-_PROD_CODES = ["HF", "VF", "NF", "AF"]
+_PROD_CODES = ["TF", "HF", "VF", "NF", "AF", "PF"]
 
 _FIXED_MODELS = ["DX3000", "ADX4000W", "ADX6000S", "ADX6000", "COCOON"]
 
@@ -242,19 +242,23 @@ def get_weekly_report(
     production_matrix: list[WeeklyProductionModelRow] = []
     for key in ordered_keys:
         row_data = matrix.get(key, {})
+        tf = row_data.get("TF", Decimal("0"))
         hf = row_data.get("HF", Decimal("0"))
         vf = row_data.get("VF", Decimal("0"))
         nf = row_data.get("NF", Decimal("0"))
         af = row_data.get("AF", Decimal("0"))
+        pf = row_data.get("PF", Decimal("0"))
         production_matrix.append(
             WeeklyProductionModelRow(
                 model_key=key,
                 model_label=key,
+                tf_qty=tf,
                 hf_qty=hf,
                 vf_qty=vf,
                 nf_qty=nf,
                 af_qty=af,
-                total_qty=hf + vf + nf + af,
+                pf_qty=pf,
+                total_qty=tf + hf + vf + nf + af + pf,
             )
         )
 

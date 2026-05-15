@@ -63,9 +63,31 @@ def test_production_matrix_basic(client, db_session):
     matrix = {r["model_key"]: r for r in resp.json()["production_matrix"]}
 
     assert _dec(matrix["DX3000"]["hf_qty"]) == _dec(5)
+    assert _dec(matrix["DX3000"]["tf_qty"]) == _dec(0)
+    assert _dec(matrix["DX3000"]["pf_qty"]) == _dec(0)
     assert _dec(matrix["DX3000"]["total_qty"]) == _dec(5)
     assert _dec(matrix["ADX6000S"]["vf_qty"]) == _dec(3)
     assert _dec(matrix["ADX6000S"]["total_qty"]) == _dec(3)
+
+
+def test_production_matrix_includes_tf_pf(client, db_session):
+    """TF·PF PRODUCE 로그도 production_matrix에 합산되고 total_qty는 6개 합계다."""
+    tf_item = _make_prod_item(db_session, name="DX3000 TF 튜브완료", process_code="TF", qty=_dec(7))
+    pf_item = _make_prod_item(db_session, name="DX3000 PF 출하완료", process_code="PF", qty=_dec(2))
+    hf_item = _make_prod_item(db_session, name="DX3000 HF 조립완료", process_code="HF", qty=_dec(4))
+    _add_log(db_session, tf_item.item_id, tx_type=TransactionTypeEnum.PRODUCE, qty=_dec(7), at=_WEEK_MID)
+    _add_log(db_session, pf_item.item_id, tx_type=TransactionTypeEnum.PRODUCE, qty=_dec(2), at=_WEEK_MID)
+    _add_log(db_session, hf_item.item_id, tx_type=TransactionTypeEnum.PRODUCE, qty=_dec(4), at=_WEEK_MID)
+    db_session.commit()
+
+    resp = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+    assert resp.status_code == 200
+    row = {r["model_key"]: r for r in resp.json()["production_matrix"]}["DX3000"]
+
+    assert _dec(row["tf_qty"]) == _dec(7)
+    assert _dec(row["hf_qty"]) == _dec(4)
+    assert _dec(row["pf_qty"]) == _dec(2)
+    assert _dec(row["total_qty"]) == _dec(13)  # 7 + 4 + 0 + 0 + 0 + 2
 
 
 def test_production_matrix_always_has_fixed_models(client, db_session):

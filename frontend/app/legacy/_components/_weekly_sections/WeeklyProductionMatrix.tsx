@@ -7,14 +7,16 @@ import type { WeeklyProductionModelRow } from "@/lib/api/types/weekly";
 
 type NumCol = keyof Pick<
   WeeklyProductionModelRow,
-  "hf_qty" | "vf_qty" | "nf_qty" | "af_qty"
+  "tf_qty" | "hf_qty" | "vf_qty" | "nf_qty" | "af_qty" | "pf_qty"
 >;
 
 const COLS: { key: NumCol; label: string; dept: string }[] = [
-  { key: "hf_qty", label: "고압보드", dept: "고압" },
-  { key: "vf_qty", label: "고압발생부", dept: "진공" },
-  { key: "nf_qty", label: "발생부 테스트", dept: "튜닝" },
-  { key: "af_qty", label: "완제품조립", dept: "조립" },
+  { key: "tf_qty", label: "튜브", dept: "튜브" },
+  { key: "hf_qty", label: "고압", dept: "고압" },
+  { key: "vf_qty", label: "진공", dept: "진공" },
+  { key: "nf_qty", label: "튜닝", dept: "튜닝" },
+  { key: "af_qty", label: "조립", dept: "조립" },
+  { key: "pf_qty", label: "출하", dept: "출하" },
 ];
 
 function fmt(n: number): string {
@@ -51,7 +53,7 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
         <thead>
           <tr style={{ background: LEGACY_COLORS.s2 }}>
             <th
-              className="py-2 px-3 text-center text-[12px] font-bold tracking-wide"
+              className="py-1.5 px-2 text-center text-[12px] font-bold tracking-wide"
               style={{ color: LEGACY_COLORS.muted2 }}
             >
               모델
@@ -80,7 +82,7 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
                 style={{ background: isAlt ? altBg : LEGACY_COLORS.s1 }}
               >
                 <td
-                  className="py-2 px-3 text-center font-black"
+                  className="py-1.5 px-2 text-center font-black"
                   style={{ color: hasData ? LEGACY_COLORS.text : LEGACY_COLORS.muted }}
                 >
                   {row.model_label}

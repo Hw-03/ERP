@@ -40,10 +40,12 @@ export interface WeeklyReportSummary {
 export interface WeeklyProductionModelRow {
   model_key: string;
   model_label: string;
+  tf_qty: number;
   hf_qty: number;
   vf_qty: number;
   nf_qty: number;
   af_qty: number;
+  pf_qty: number;
   total_qty: number;
 }
 
