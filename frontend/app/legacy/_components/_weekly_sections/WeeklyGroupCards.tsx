@@ -6,6 +6,8 @@ import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import type { WeeklyGroupReport } from "@/lib/api/types/weekly";
 
+const ZERO_FADE = `color-mix(in srgb, ${LEGACY_COLORS.muted2} 30%, transparent)`;
+
 interface Props {
   groups: WeeklyGroupReport[];
   selected: string;
@@ -26,9 +28,9 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
         const accentColor = employeeColor(g.dept_name);
         const tone = isDecreasing ? LEGACY_COLORS.red : accentColor;
         const deltaColor =
-          g.delta > 0 ? LEGACY_COLORS.cyan
+          g.delta > 0 ? LEGACY_COLORS.green
           : g.delta < 0 ? LEGACY_COLORS.red
-          : LEGACY_COLORS.muted2;
+          : ZERO_FADE;
 
         return (
           <button
@@ -48,6 +50,8 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
                 ? tone
                 : isDecreasing
                 ? tint(LEGACY_COLORS.red, 30, LEGACY_COLORS.border)
+                : isQuiet
+                ? tint(LEGACY_COLORS.border, 60, "transparent")
                 : LEGACY_COLORS.border,
               boxShadow: isActive
                 ? `0 0 0 1px ${tint(tone, 20)}, var(--c-card-shadow)`
@@ -58,7 +62,11 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
             <div
               className="absolute bottom-0 left-0 top-0 w-[3px]"
               style={{
-                background: isActive || isDecreasing ? tone : tint(accentColor, 35),
+                background: isActive || isDecreasing
+                  ? tone
+                  : isQuiet
+                  ? tint(accentColor, 15)
+                  : tint(accentColor, 35),
               }}
             />
             {/* 상단 행 한 줄: 부서명 · 공정코드 · 증감 */}
@@ -91,16 +99,16 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
                 ) : (
                   <>
                     <span
-                      className="text-[15px] font-black leading-none"
-                      style={{ color: LEGACY_COLORS.muted2 }}
+                      className="text-[15px] font-semibold leading-none"
+                      style={{ color: ZERO_FADE }}
                     >
                       ±0
                     </span>
                     <span
-                      className="rounded-[4px] px-1 py-0.5 text-[10px] font-bold"
+                      className="rounded-[4px] px-1 py-0.5 text-[10px] font-semibold"
                       style={{
-                        background: tint(LEGACY_COLORS.muted2, 12, LEGACY_COLORS.s2),
-                        color: LEGACY_COLORS.muted2,
+                        background: tint(LEGACY_COLORS.muted2, 6, LEGACY_COLORS.s2),
+                        color: ZERO_FADE,
                       }}
                     >
                       변동 없음
@@ -111,24 +119,31 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
             </div>
             {/* 하단 행 한 줄: 입고 · 출고 · 현재 */}
             <div
-              className="flex items-center justify-between gap-2 border-t px-4 py-1 text-[12px] font-semibold tabular-nums"
+              className="flex items-center justify-between gap-2 border-t px-4 py-1 text-[12px] tabular-nums"
               style={{ borderColor: tint(LEGACY_COLORS.border, 60, "transparent") }}
             >
               <span
+                className={g.in_qty > 0 ? "font-semibold" : "font-medium"}
                 style={{
-                  color: g.in_qty > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.muted2,
+                  color: g.in_qty > 0 ? LEGACY_COLORS.green : ZERO_FADE,
                 }}
               >
                 입고 {formatQty(g.in_qty)}
               </span>
               <span
+                className={g.out_qty > 0 ? "font-semibold" : "font-medium"}
                 style={{
-                  color: g.out_qty > 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2,
+                  color: g.out_qty > 0 ? LEGACY_COLORS.red : ZERO_FADE,
                 }}
               >
                 출고 {formatQty(g.out_qty)}
               </span>
-              <span style={{ color: LEGACY_COLORS.muted }}>
+              <span
+                className={g.current_qty > 0 ? "font-semibold" : "font-medium"}
+                style={{
+                  color: g.current_qty > 0 ? LEGACY_COLORS.muted : ZERO_FADE,
+                }}
+              >
                 현재 {formatQty(g.current_qty)}
               </span>
             </div>

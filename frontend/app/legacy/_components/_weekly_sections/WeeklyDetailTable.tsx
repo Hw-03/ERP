@@ -6,6 +6,8 @@ import { formatQty } from "@/lib/mes/format";
 import type { WeeklyGroupReport } from "@/lib/api/types/weekly";
 import { EmptyState } from "../common/EmptyState";
 
+const ZERO_FADE = `color-mix(in srgb, ${LEGACY_COLORS.muted2} 30%, transparent)`;
+
 interface Props {
   group: WeeklyGroupReport | undefined;
 }
@@ -43,13 +45,13 @@ function WeeklyDetailTableImpl({ group }: Props) {
         </span>
         <span
           className="text-[12px]"
-          style={{ color: group.in_qty > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.muted2 }}
+          style={{ color: group.in_qty > 0 ? LEGACY_COLORS.green : ZERO_FADE }}
         >
           생산 {formatQty(group.in_qty)}
         </span>
         <span
           className="text-[12px]"
-          style={{ color: group.out_qty > 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}
+          style={{ color: group.out_qty > 0 ? LEGACY_COLORS.red : ZERO_FADE }}
         >
           출고 {formatQty(group.out_qty)}
         </span>
@@ -61,7 +63,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                 ? LEGACY_COLORS.green
                 : group.delta < 0
                 ? LEGACY_COLORS.red
-                : LEGACY_COLORS.muted2,
+                : ZERO_FADE,
           }}
         >
           증감{" "}
@@ -194,11 +196,11 @@ function WeeklyDetailTableImpl({ group }: Props) {
                       : rowBg;
                     return (
                       <td
-                        className="rounded-r-[12px] border-y border-r px-3 py-1.5 text-center text-[16px] font-black"
+                        className={`rounded-r-[12px] border-y border-r px-3 py-1.5 text-center text-[16px] ${deltaTone ? "font-black" : "font-semibold"}`}
                         style={{
                           background: deltaCellBg,
                           borderColor: rowBorder,
-                          color: deltaTone ?? LEGACY_COLORS.muted2,
+                          color: deltaTone ?? ZERO_FADE,
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -230,14 +232,14 @@ function Num({
   highlightColor?: string;
 }) {
   const isZero = Number(val) === 0;
-  const c = isZero ? LEGACY_COLORS.muted2 : (color ?? LEGACY_COLORS.text);
+  const c = isZero ? ZERO_FADE : (color ?? LEGACY_COLORS.text);
   const cellBg =
     !isZero && highlightColor
       ? `color-mix(in srgb, ${highlightColor} 8%, ${bg})`
       : bg;
   return (
     <td
-      className="border-y px-3 py-1.5 text-center text-[15px] font-bold"
+      className={`border-y px-3 py-1.5 text-center text-[15px] ${isZero ? "font-medium" : "font-bold"}`}
       style={{
         background: cellBg,
         borderColor: border,

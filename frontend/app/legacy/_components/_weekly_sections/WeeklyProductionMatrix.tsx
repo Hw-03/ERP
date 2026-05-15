@@ -23,6 +23,8 @@ function fmt(n: number): string {
   return n === 0 ? "—" : Math.round(n).toLocaleString();
 }
 
+const ZERO_FADE = `color-mix(in srgb, ${LEGACY_COLORS.muted2} 30%, transparent)`;
+
 interface Props {
   rows: WeeklyProductionModelRow[];
 }
@@ -82,7 +84,7 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
                 style={{ background: isAlt ? altBg : LEGACY_COLORS.s1 }}
               >
                 <td
-                  className="py-2.5 px-3 text-center text-[15px] font-black"
+                  className={`py-2.5 px-3 text-center text-[15px] ${hasData ? "font-black" : "font-semibold"}`}
                   style={{ color: hasData ? LEGACY_COLORS.text : LEGACY_COLORS.muted }}
                 >
                   {row.model_label}
@@ -94,11 +96,11 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
                   return (
                     <td
                       key={c.key}
-                      className="px-3 py-2.5 text-center text-[16px] font-black tabular-nums"
+                      className={`px-3 py-2.5 text-center text-[16px] tabular-nums ${hasVal ? "font-black" : "font-medium"}`}
                       style={{
-                        color: hasVal ? deptColor : LEGACY_COLORS.muted2,
+                        color: hasVal ? deptColor : ZERO_FADE,
                         background: hasVal
-                          ? `color-mix(in srgb, ${deptColor} 12%, transparent)`
+                          ? `color-mix(in srgb, ${deptColor} 15%, transparent)`
                           : undefined,
                       }}
                     >
