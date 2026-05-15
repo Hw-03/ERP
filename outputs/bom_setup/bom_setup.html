@@ -458,6 +458,8 @@ function render() {
   const _focusId=(_ae&&_ae.id&&(_ae.id==="search-parent"||_ae.id==="search-child"))?_ae.id:null;
   const _selStart=_focusId?_ae.selectionStart:0;
   const _selEnd=_focusId?_ae.selectionEnd:0;
+  const _candList=document.getElementById('child-cand-list');
+  const _candScroll=_candList?_candList.scrollTop:0;
   const totalDone=S.completed.length;
   let body=S.view==="edit"?renderEdit():S.view==="review"?renderReview():renderMain();
   document.getElementById("app").innerHTML=`
@@ -478,6 +480,7 @@ function render() {
     </div>
     <div class="content-area">${body}</div>`;
   if(_focusId){const el=document.getElementById(_focusId);if(el){el.focus();try{el.setSelectionRange(_selStart,_selEnd);}catch(e){}}}
+  if(_candScroll>0){const nl=document.getElementById('child-cand-list');if(nl)nl.scrollTop=_candScroll;}
   if(S.editingQtyId){setTimeout(()=>{const el=document.getElementById("qe-"+S.editingQtyId);if(el){el.focus();el.select();}},0);}
 }
 
