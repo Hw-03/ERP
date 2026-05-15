@@ -148,11 +148,115 @@ const S = {
 
 const DRAFT_KEY = "bom_setup_v1";
 let _lastSavedAt = null;
+let _autosaveHandle = null;
+let _autosaveBusy = false;
+let _autosavePending = false;
+let _autosaveStatus = null;  // null|"ok"|"err"
+
+function _idbOpen() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open("bom_setup_db", 1);
+    req.onupgradeneeded = () => req.result.createObjectStore("kv");
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+async function _idbGet(key) {
+  try {
+    const db = await _idbOpen();
+    return await new Promise((res, rej) => {
+      const r = db.transaction("kv","readonly").objectStore("kv").get(key);
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+  } catch(_) { return null; }
+}
+async function _idbPut(key, val) {
+  try {
+    const db = await _idbOpen();
+    return await new Promise((res, rej) => {
+      const r = db.transaction("kv","readwrite").objectStore("kv").put(val, key);
+      r.onsuccess = () => res(); r.onerror = () => rej(r.error);
+    });
+  } catch(_){}
+}
+
+async function setupAutosave() {
+  if (!window.showDirectoryPicker) {
+    toast("이 브라우저는 자동저장 미지원 (Chrome/Edge 필요)","warning"); return;
+  }
+  try {
+    const handle = await window.showDirectoryPicker({mode:"readwrite"});
+    _autosaveHandle = handle;
+    await _idbPut("autosaveDir", handle);
+    _autosaveStatus = "ok";
+    toast(`자동저장 폴더: ${handle.name}`,"success");
+    writeAutosaveFile();
+    render();
+  } catch(e) {
+    if (e.name !== "AbortError") toast("폴더 선택 실패","error");
+  }
+}
+async function clearAutosave() {
+  _autosaveHandle = null;
+  _autosaveStatus = null;
+  await _idbPut("autosaveDir", null);
+  toast("자동저장 해제","success"); render();
+}
+async function restoreAutosave() {
+  const handle = await _idbGet("autosaveDir");
+  if (!handle) return;
+  try {
+    const perm = await handle.queryPermission({mode:"readwrite"});
+    if (perm === "granted") {
+      _autosaveHandle = handle;
+      _autosaveStatus = "ok";
+      render();
+    } else {
+      _autosaveHandle = handle;
+      _autosaveStatus = null;  // needs re-grant via user click
+      render();
+    }
+  } catch(_){}
+}
+async function reGrantAutosave() {
+  if (!_autosaveHandle) return setupAutosave();
+  try {
+    const perm = await _autosaveHandle.requestPermission({mode:"readwrite"});
+    if (perm === "granted") {
+      _autosaveStatus = "ok"; toast(`자동저장 활성화: ${_autosaveHandle.name}`,"success");
+      writeAutosaveFile(); render();
+    } else {
+      toast("권한 거부됨","error");
+    }
+  } catch(e) { toast("권한 요청 실패","error"); }
+}
+async function writeAutosaveFile() {
+  if (!_autosaveHandle || _autosaveStatus !== "ok") return;
+  if (_autosaveBusy) { _autosavePending = true; return; }
+  _autosaveBusy = true;
+  try {
+    const fh = await _autosaveHandle.getFileHandle("bom_draft_current.json", {create:true});
+    const w = await fh.createWritable();
+    await w.write(JSON.stringify({
+      pending: S.pending, completed: S.completed,
+      savedAt: new Date().toISOString()
+    }, null, 2));
+    await w.close();
+  } catch(e) {
+    console.warn("autosave failed:", e);
+    _autosaveStatus = "err"; render();
+  } finally {
+    _autosaveBusy = false;
+    if (_autosavePending) { _autosavePending = false; writeAutosaveFile(); }
+  }
+}
+
 function saveDraft() {
   try {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({pending:S.pending,completed:S.completed}));
     _lastSavedAt = new Date();
   } catch(_){}
+  writeAutosaveFile();
 }
 function loadDraft() {
   try {
@@ -490,6 +594,9 @@ function render() {
       <div style="display:flex;align-items:center;gap:8px;">
         ${totalDone>0?`<span class="tag tag-success">${totalDone}개 완료</span>`:""}
         ${_lastSavedAt?`<span style="font-size:13px;color:var(--c-green);display:flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--c-green);display:inline-block;"></span>저장됨 ${_lastSavedAt.toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}</span>`:`<span style="font-size:13px;color:var(--c-muted);">저장 내역 없음</span>`}
+        ${_autosaveStatus==="ok"?`<button class="btn btn-outline" style="color:var(--c-green);border-color:var(--c-green);" onclick="clearAutosave()" title="${esc(_autosaveHandle?.name||'')} 자동저장 활성 (클릭하여 해제)">자동저장 ✓</button>`
+          :_autosaveHandle?`<button class="btn btn-outline" style="color:var(--c-yellow);border-color:var(--c-yellow);" onclick="reGrantAutosave()" title="${esc(_autosaveHandle.name)} 권한 재확인 필요">자동저장 ⚠</button>`
+          :`<button class="btn btn-outline" onclick="setupAutosave()" title="폴더 지정 시 매 변경마다 bom_draft_current.json 자동 저장">자동저장 OFF</button>`}
         <button class="btn btn-outline" onclick="document.getElementById('import-input').click()">진행도 불러오기</button>
         <button class="btn btn-outline" onclick="exportDraft()">진행도 저장</button>
         ${totalDone>0?`<button class="btn btn-success" onclick="exportBom()">BOM 내보내기</button>`:""}
@@ -609,6 +716,7 @@ function loadPreset() {
 
 loadPreset();
 render();
+restoreAutosave();
 </script>
 </body>
 </html>'''
