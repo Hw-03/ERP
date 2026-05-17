@@ -5,22 +5,26 @@ import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { BomBadge } from "./BomBadge";
 import { BomSearchInput } from "./BomSearchInput";
-import { stageOf, type DeptLetter, type StageLetter } from "./bomDept";
+import { BOM_STATUS_META, bomStatusOf, stageOf, type DeptLetter, type StageLetter } from "./bomDept";
+import type { StatusFilter } from "./BomStatsRow";
 import { EmptyState } from "../../common";
 
 /**
- * 좌측 부모 품목 리스트 — 선택된 부서의 품목을 검색/단계필터링해서 보여줌.
+ * 좌측 부모 품목 리스트 — 선택된 부서의 품목을 검색/단계/상태 필터링.
  *
  * 모드:
  *   - "edit"     : R 단계 제외 (BOM 부모로만 가능)
  *   - "whereused": 모든 단계 포함 (자식이 될 수 있는 품목 전체)
  *
- * 자식 통계는 allBomRows 에서 계산 (해당 부모의 자식 개수).
+ * 상태(완료/작업중/미착수)는 completedSet + 부서 내 자식 count 로 계산.
+ * statusFilter 는 상단 KPI(BomStatsRow) 가 제어.
  */
 interface Props {
   dept: DeptLetter;
   items: Item[];
   allBomRows: BOMDetailEntry[];
+  completedSet: Set<string>;
+  statusFilter: StatusFilter;
   selectedId: string;
   onSelect: (id: string) => void;
   mode: "edit" | "whereused";
@@ -28,22 +32,31 @@ interface Props {
 
 const STAGE_FILTERS: { id: "ALL" | StageLetter; label: string }[] = [
   { id: "ALL", label: "전체" },
-  { id: "A", label: "중간" },
-  { id: "F", label: "완료" },
+  { id: "A", label: "중간공정" },
+  { id: "F", label: "공정완료" },
 ];
 
 const STAGE_FILTERS_WHEREUSED: { id: "ALL" | StageLetter; label: string }[] = [
   { id: "ALL", label: "전체" },
   { id: "R", label: "원자재" },
-  { id: "A", label: "중간" },
-  { id: "F", label: "완료" },
+  { id: "A", label: "중간공정" },
+  { id: "F", label: "공정완료" },
 ];
 
-export function BomParentList({ dept, items, allBomRows, selectedId, onSelect, mode }: Props) {
+export function BomParentList({
+  dept,
+  items,
+  allBomRows,
+  completedSet,
+  statusFilter,
+  selectedId,
+  onSelect,
+  mode,
+}: Props) {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<"ALL" | StageLetter>("ALL");
 
-  // 부서 내 자식 count 맵 (부모별)
+  // 부모별 자식 count 맵 (전체 BOM 기준)
   const childCountMap = useMemo(() => {
     const m = new Map<string, number>();
     for (const r of allBomRows) m.set(r.parent_item_id, (m.get(r.parent_item_id) ?? 0) + 1);
@@ -63,10 +76,14 @@ export function BomParentList({ dept, items, allBomRows, selectedId, onSelect, m
         return stageOf(i.process_type_code) === stageFilter;
       })
       .filter((i) => {
+        if (mode !== "edit" || statusFilter === "ALL") return true;
+        return bomStatusOf(i.item_id, completedSet, childCountMap) === statusFilter;
+      })
+      .filter((i) => {
         if (!kw) return true;
         return `${i.item_name} ${i.erp_code ?? ""}`.toLowerCase().includes(kw);
       });
-  }, [items, dept, search, stageFilter, mode]);
+  }, [items, dept, search, stageFilter, mode, statusFilter, completedSet, childCountMap]);
 
   const filters = mode === "whereused" ? STAGE_FILTERS_WHEREUSED : STAGE_FILTERS;
 
@@ -109,8 +126,9 @@ export function BomParentList({ dept, items, allBomRows, selectedId, onSelect, m
           <EmptyState variant="no-search-result" compact />
         ) : (
           list.map((i) => {
-            const childCount = childCountMap.get(i.item_id) ?? 0;
             const isSelected = i.item_id === selectedId;
+            const status = bomStatusOf(i.item_id, completedSet, childCountMap);
+            const meta = BOM_STATUS_META[status];
             return (
               <button
                 key={i.item_id}
@@ -136,15 +154,15 @@ export function BomParentList({ dept, items, allBomRows, selectedId, onSelect, m
                     </div>
                   )}
                 </div>
-                {mode === "edit" && childCount > 0 ? (
+                {mode === "edit" ? (
                   <span
                     className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold"
                     style={{
-                      background: `color-mix(in srgb, ${LEGACY_COLORS.green} 14%, transparent)`,
-                      color: LEGACY_COLORS.green,
+                      background: `color-mix(in srgb, ${meta.color} 14%, transparent)`,
+                      color: meta.color,
                     }}
                   >
-                    {childCount}
+                    {meta.label}
                   </span>
                 ) : null}
               </button>

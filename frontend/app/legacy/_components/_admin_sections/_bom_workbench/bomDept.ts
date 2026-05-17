@@ -9,6 +9,7 @@
  * 우선이지만 본 도구는 정적 매핑(부서명 → fallback)만으로 충분.
  */
 import { getDepartmentFallbackColor } from "@/lib/mes-department";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 export const DEPT_LETTERS = ["T", "H", "V", "N", "A", "P"] as const;
 export type DeptLetter = (typeof DEPT_LETTERS)[number];
@@ -57,3 +58,26 @@ export function deptLabel(letter: DeptLetter): string {
 export function deptBadgeBg(letter: DeptLetter): string {
   return `color-mix(in srgb, ${deptColor(letter)} 12%, transparent)`;
 }
+
+/**
+ * BOM 완료 워크플로우 상태.
+ *   - done : bom_completed_at 있음 (사용자가 명시적으로 완료 표시)
+ *   - wip  : 미완료 + BOM 자식 1개 이상
+ *   - todo : 미완료 + BOM 자식 0개
+ */
+export type BomStatus = "done" | "wip" | "todo";
+
+export function bomStatusOf(
+  itemId: string,
+  completedSet: Set<string>,
+  childCountMap: Map<string, number>,
+): BomStatus {
+  if (completedSet.has(itemId)) return "done";
+  return (childCountMap.get(itemId) ?? 0) > 0 ? "wip" : "todo";
+}
+
+export const BOM_STATUS_META: Record<BomStatus, { label: string; color: string }> = {
+  done: { label: "완료", color: LEGACY_COLORS.green },
+  wip: { label: "작업중", color: LEGACY_COLORS.blue },
+  todo: { label: "미착수", color: LEGACY_COLORS.muted2 },
+};
