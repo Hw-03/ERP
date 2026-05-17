@@ -719,6 +719,20 @@
         "title": "BomCheckResponse",
         "type": "object"
       },
+      "BomCompletionUpdate": {
+        "properties": {
+          "completed": {
+            "description": "True=완료로 표시, False=완료 해제",
+            "title": "Completed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "completed"
+        ],
+        "title": "BomCompletionUpdate",
+        "type": "object"
+      },
       "BomTemplateResponse": {
         "properties": {
           "lines": {
@@ -3217,6 +3231,18 @@
             ],
             "title": "Barcode"
           },
+          "bom_completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bom Completed At"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -3578,6 +3604,18 @@
               }
             ],
             "title": "Barcode"
+          },
+          "bom_completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bom Completed At"
           },
           "created_at": {
             "format": "date-time",
@@ -10815,6 +10853,60 @@
           }
         },
         "summary": "Update Item",
+        "tags": [
+          "Items"
+        ]
+      }
+    },
+    "/api/items/{item_id}/bom-completion": {
+      "patch": {
+        "description": "BOM 완료 상태 토글 — 사용자가 명시적으로 누를 때만 set/clear.",
+        "operationId": "update_bom_completion_api_items__item_id__bom_completion_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BomCompletionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Bom Completion",
         "tags": [
           "Items"
         ]

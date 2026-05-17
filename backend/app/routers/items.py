@@ -17,6 +17,7 @@ from app.database import get_db
 from app.models import Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
+    BomCompletionUpdate,
     InventoryLocationResponse,
     ItemCreate,
     ItemResponse,
@@ -449,6 +450,34 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
             target_id=str(item.item_id),
             payload_summary=f"{item.item_name}: {', '.join(changed)}",
         )
+
+    commit_and_refresh(db, item)
+    return item
+
+
+@router.patch("/{item_id}/bom-completion", response_model=ItemResponse)
+def update_bom_completion(
+    item_id: uuid.UUID,
+    payload: BomCompletionUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """BOM 완료 상태 토글 — 사용자가 명시적으로 누를 때만 set/clear."""
+    item = db.query(Item).filter(Item.item_id == item_id).first()
+    if not item:
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+
+    item.bom_completed_at = datetime.now(UTC).replace(tzinfo=None) if payload.completed else None
+    item.updated_at = datetime.now(UTC).replace(tzinfo=None)
+
+    audit.record(
+        db,
+        request=request,
+        action="item.bom_completion",
+        target_type="item",
+        target_id=str(item.item_id),
+        payload_summary=f"{item.item_name}: {'완료' if payload.completed else '완료 해제'}",
+    )
 
     commit_and_refresh(db, item)
     return item
