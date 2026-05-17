@@ -9,7 +9,7 @@
  *   import { api } from "@/lib/api";  // ...itemsApi 포함됨 (호환)
  */
 
-import { fetcher, postJson, putJson, toApiUrl } from "../api-core";
+import { fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
 import type { Item } from "./types";
 
 export const itemsApi = {
@@ -73,4 +73,8 @@ export const itemsApi = {
       model_slots?: number[];
     },
   ) => putJson<Item>(toApiUrl(`/api/items/${itemId}`), payload),
+
+  /** BOM 완료 상태 토글 — 사용자가 명시적으로 "완료로 표시"/"완료 해제"를 누를 때만 호출. */
+  updateBomCompletion: async (itemId: string, completed: boolean) =>
+    patchJson<Item>(toApiUrl(`/api/items/${itemId}/bom-completion`), { completed }),
 };
