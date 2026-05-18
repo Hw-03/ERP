@@ -30,6 +30,7 @@ export default defineConfig({
         "lib/api/production.ts",
         "lib/api/queue.ts",
         "lib/api/stock-requests.ts",
+        "lib/api/io.ts",
         "lib/mes/**/*.ts",
       ],
       exclude: [
