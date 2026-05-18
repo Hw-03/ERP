@@ -5,7 +5,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
 import type { IoSubType, IoWorkType, OperatorLike } from "./types";
-import { IO_SUB_TYPES, IO_WORK_TYPES, canSeeWorkType, isExitWorkType, requiresDepartments, type DeptIoDirection } from "./ioWorkType";
+import { IO_SUB_TYPES, IO_WORK_TYPES, canSeeWorkType, deptVisibility, isExitWorkType, requiresDepartments, type DeptIoDirection } from "./ioWorkType";
 
 interface WorkTypeProps {
   workType: IoWorkType;
@@ -74,22 +74,6 @@ interface SubTypeProps {
   onFromDepartmentChange: (value: string) => void;
   onToDepartmentChange: (value: string) => void;
   onDeptIoDirectionChange: (dir: DeptIoDirection) => void;
-}
-
-/* sub_type → 어느 부서 grid를 보여줄지 */
-function deptVisibility(subType: IoSubType): { from: boolean; to: boolean } {
-  if (subType === "warehouse_to_dept") return { from: false, to: true };
-  if (subType === "dept_to_warehouse") return { from: true, to: false };
-  if (subType === "defect_quarantine" || subType === "supplier_return") return { from: true, to: false };
-  if (subType === "dept_transfer") return { from: true, to: true };
-  if (
-    subType === "produce" ||
-    subType === "disassemble" ||
-    subType === "adjust_in" ||
-    subType === "adjust_out"
-  )
-    return { from: false, to: true };
-  return { from: false, to: false };
 }
 
 const PROD_DEPTS = ["튜브", "고압", "진공", "튜닝", "조립", "출하"];

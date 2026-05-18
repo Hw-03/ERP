@@ -12,7 +12,7 @@ import { IoTargetPicker } from "./IoTargetPicker";
 import { IoBundleCart } from "./IoBundleCart";
 import { IoConfirmStep } from "./IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "./IoSubmitModals";
-import { IO_WORK_TYPES, approvalKind, deptIoDirectionOf, isBomForced, isExitWorkType, pickerDirectionLabel, requiresDepartments, subTypeLabel } from "./ioWorkType";
+import { IO_WORK_TYPES, approvalKind, deptIoDirectionOf, directionWord, exclusionNoteFor, isBomForced, isExitWorkType, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
 import { useIoDraft } from "./useIoDraft";
 import { useIoPreview } from "./useIoPreview";
 import { useIoSubmit } from "./useIoSubmit";
@@ -407,7 +407,7 @@ export function IoComposeView({
     ? `${state.fromDepartment} → ${state.toDepartment}`
     : "부서 무관";
   const stepTwoSummary = state.workType === "process"
-    ? `${state.deptIoDirection === "in" ? "입고" : state.deptIoDirection === "out" ? "출고" : "미선택"} · ${state.toDepartment}`
+    ? `${directionWord(state.deptIoDirection)} · ${state.toDepartment}`
     : `${subTypeText} · ${dept}`;
   const includedCount = state.includedLines.length;
   const excludedCount = state.excludedLines.length;
@@ -687,17 +687,7 @@ export function IoComposeView({
               deptIoDirection={state.deptIoDirection}
               bundleSubType={state.bundles.length > 0 ? state.subType : null}
               bomParents={bomParents}
-              targetDepartment={(() => {
-                const st = state.subType;
-                // 출발 부서가 대상인 작업
-                if (st === "dept_to_warehouse" || st === "defect_quarantine" || st === "supplier_return") {
-                  return state.fromDepartment;
-                }
-                // 부서 무관 작업
-                if (st === "receive_supplier") return null;
-                // 그 외 (warehouse_to_dept, produce, disassemble, adjust_in/out, dept_transfer) — toDepartment
-                return state.toDepartment;
-              })()}
+              targetDepartment={targetDepartmentOf(state.subType, state.fromDepartment, state.toDepartment)}
               items={items}
               productModels={productModels}
               bundles={state.bundles}
@@ -765,11 +755,7 @@ export function IoComposeView({
                           shortage: newIncluded
                             ? Math.max(0, line.quantity - (avail ?? line.quantity))
                             : 0,
-                          exclusion_note: !newIncluded
-                            ? state.subType === "disassemble" && line.origin === "bom_auto"
-                              ? "회수 안 됨"
-                              : "이번 작업 제외"
-                            : null,
+                          exclusion_note: exclusionNoteFor(state.subType, line.origin, newIncluded),
                         };
                       }),
                     };

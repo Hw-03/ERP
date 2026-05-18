@@ -32,6 +32,10 @@ import {
   getItemActionMode,
   lineTagLabel,
   isExitWorkType,
+  targetDepartmentOf,
+  directionWord,
+  deptVisibility,
+  exclusionNoteFor,
 } from "../ioWorkType";
 import { useIoWorkState, IO_STEP_LABELS, type IoStep } from "../useIoWorkState";
 
@@ -712,23 +716,11 @@ describe("useIoWorkState step/line 조작", () => {
 // 결과가 아래 기대값과 동일해야 패리티 보장.
 // ══════════════════════════════════════════════════════════════════
 
-// ── (A) Step 3 targetDepartment 결정 (IoComposeView.tsx:690-700) ──
-function currentTargetDepartment(
-  subType: IoSubType,
-  fromDepartment: string,
-  toDepartment: string,
-): string | null {
-  if (subType === "dept_to_warehouse" || subType === "defect_quarantine" || subType === "supplier_return") {
-    return fromDepartment;
-  }
-  if (subType === "receive_supplier") return null;
-  return toDepartment;
-}
-
-describe("[인라인 골든] Step3 targetDepartment 결정", () => {
+// ── (A) Step 3 targetDepartment 결정 (IoComposeView.tsx:690-700 → targetDepartmentOf) ──
+describe("[추출 골든] targetDepartmentOf — Step3 대상 부서", () => {
   it("subType별 대상 부서 (from=출발, to=도착)", () => {
     const map = Object.fromEntries(
-      ALL_SUB_TYPES.map((s) => [s, currentTargetDepartment(s, "출발", "도착")]),
+      ALL_SUB_TYPES.map((s) => [s, targetDepartmentOf(s, "출발", "도착")]),
     );
     expect(map).toEqual({
       receive_supplier: null,
@@ -745,38 +737,19 @@ describe("[인라인 골든] Step3 targetDepartment 결정", () => {
   });
 });
 
-// ── (B) stepTwoSummary process 방향 라벨 (IoComposeView.tsx:409-411) ──
-function stepTwoDirectionWord(dir: "in" | "out" | null): string {
-  return dir === "in" ? "입고" : dir === "out" ? "출고" : "미선택";
-}
-
-describe("[인라인 골든] stepTwoSummary 방향 단어", () => {
+// ── (B) stepTwoSummary process 방향 라벨 (IoComposeView.tsx:409-411 → directionWord) ──
+describe("[추출 골든] directionWord — stepTwoSummary 방향 단어", () => {
   it("in/out/null", () => {
-    expect(stepTwoDirectionWord("in")).toBe("입고");
-    expect(stepTwoDirectionWord("out")).toBe("출고");
-    expect(stepTwoDirectionWord(null)).toBe("미선택");
+    expect(directionWord("in")).toBe("입고");
+    expect(directionWord("out")).toBe("출고");
+    expect(directionWord(null)).toBe("미선택");
   });
 });
 
-// ── (C) deptVisibility (IoWorkTypeStep.tsx:80-93) ──
-function deptVisibilityLocal(subType: IoSubType): { from: boolean; to: boolean } {
-  if (subType === "warehouse_to_dept") return { from: false, to: true };
-  if (subType === "dept_to_warehouse") return { from: true, to: false };
-  if (subType === "defect_quarantine" || subType === "supplier_return") return { from: true, to: false };
-  if (subType === "dept_transfer") return { from: true, to: true };
-  if (
-    subType === "produce" ||
-    subType === "disassemble" ||
-    subType === "adjust_in" ||
-    subType === "adjust_out"
-  )
-    return { from: false, to: true };
-  return { from: false, to: false };
-}
-
-describe("[인라인 골든] deptVisibility", () => {
+// ── (C) deptVisibility (IoWorkTypeStep.tsx:80-93 → ioWorkType.deptVisibility) ──
+describe("[추출 골든] deptVisibility", () => {
   it("subType별 from/to 노출", () => {
-    const map = Object.fromEntries(ALL_SUB_TYPES.map((s) => [s, deptVisibilityLocal(s)]));
+    const map = Object.fromEntries(ALL_SUB_TYPES.map((s) => [s, deptVisibility(s)]));
     expect(map).toEqual({
       receive_supplier: { from: false, to: false },
       warehouse_to_dept: { from: false, to: true },
@@ -792,13 +765,8 @@ describe("[인라인 골든] deptVisibility", () => {
   });
 });
 
-// ── (D) toggle 시 exclusion_note (IoComposeView.tsx:768-772) ──
-function exclusionNoteFor(subType: IoSubType, lineOrigin: IoLine["origin"], nowIncluded: boolean): string | null {
-  if (nowIncluded) return null;
-  return subType === "disassemble" && lineOrigin === "bom_auto" ? "회수 안 됨" : "이번 작업 제외";
-}
-
-describe("[인라인 골든] toggle exclusion_note", () => {
+// ── (D) toggle 시 exclusion_note (IoComposeView.tsx:768-772 → exclusionNoteFor) ──
+describe("[추출 골든] exclusionNoteFor — toggle 제외 문구", () => {
   it("included=true → null", () => {
     expect(exclusionNoteFor("produce", "direct", true)).toBeNull();
   });

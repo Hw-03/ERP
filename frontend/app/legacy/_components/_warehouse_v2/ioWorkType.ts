@@ -158,6 +158,54 @@ export function deptIoDisplayLabel(subType: IoSubType): string | null {
   return null;
 }
 
+// Step 3 picker 의 대상 부서 결정 — sub_type 으로 어느 부서(출발/도착/없음) 가
+// picker 정렬·필터 기준이 되는지. IoComposeView Step 3 targetDepartment 단일 소스.
+export function targetDepartmentOf(
+  subType: IoSubType,
+  fromDepartment: string,
+  toDepartment: string,
+): string | null {
+  // 출발 부서가 대상인 작업
+  if (subType === "dept_to_warehouse" || subType === "defect_quarantine" || subType === "supplier_return") {
+    return fromDepartment;
+  }
+  // 부서 무관 작업
+  if (subType === "receive_supplier") return null;
+  // 그 외 (warehouse_to_dept, produce, disassemble, adjust_in/out, dept_transfer) — toDepartment
+  return toDepartment;
+}
+
+// process workType 방향(in/out/null) → 사용자 표시 단어. Step 2 요약 표기 단일 소스.
+export function directionWord(dir: DeptIoDirection | null): "입고" | "출고" | "미선택" {
+  return dir === "in" ? "입고" : dir === "out" ? "출고" : "미선택";
+}
+
+// sub_type → Step 2 에서 노출할 부서 grid (출발/도착). IoSubTypeStep 단일 소스.
+export function deptVisibility(subType: IoSubType): { from: boolean; to: boolean } {
+  if (subType === "warehouse_to_dept") return { from: false, to: true };
+  if (subType === "dept_to_warehouse") return { from: true, to: false };
+  if (subType === "defect_quarantine" || subType === "supplier_return") return { from: true, to: false };
+  if (subType === "dept_transfer") return { from: true, to: true };
+  if (
+    subType === "produce" ||
+    subType === "disassemble" ||
+    subType === "adjust_in" ||
+    subType === "adjust_out"
+  )
+    return { from: false, to: true };
+  return { from: false, to: false };
+}
+
+// 라인 제외(체크 해제) 시 exclusion_note 문구. IoBundleCart onToggleLine 단일 소스.
+export function exclusionNoteFor(
+  subType: IoSubType,
+  lineOrigin: IoLine["origin"],
+  nowIncluded: boolean,
+): string | null {
+  if (nowIncluded) return null;
+  return subType === "disassemble" && lineOrigin === "bom_auto" ? "회수 안 됨" : "이번 작업 제외";
+}
+
 export type ItemActionMode = "bom_or_single" | "single_only";
 
 // BOM 자동 전개 대상이면 "BOM 적용"/"이 품목만" 2버튼, 그 외는 "선택" 1버튼.
