@@ -20,6 +20,7 @@ from app.schemas import (
     PinVerifyRequest,
 )
 from app.routers.settings import require_admin
+from app.services import rate_limit
 from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin, verify_pin
 from app.services import audit
 from app.services._tx import commit_and_refresh, commit_only
@@ -282,15 +283,37 @@ def delete_employee(employee_id: uuid.UUID, request: Request, db: Session = Depe
 
 
 @router.post("/{employee_id}/verify-pin", response_model=EmployeeResponse)
-def verify_employee_pin(employee_id: uuid.UUID, payload: PinVerifyRequest, db: Session = Depends(get_db)):
-    """작업자 식별용 PIN 검증 — 실제 보안 인증이 아님."""
+def verify_employee_pin(
+    employee_id: uuid.UUID,
+    payload: PinVerifyRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """작업자 식별용 PIN 검증 — 실제 보안 인증이 아님.
+
+    무차별 대입 완화를 위해 (직원ID + 클라이언트 IP) 키로 실패 시도를 제한한다.
+    실패만 카운트하며 성공 시 키를 리셋한다.
+    """
+    client_ip = getattr(getattr(request, "client", None), "host", None) or "unknown"
+    rl_key = f"verify_pin:{employee_id}:{client_ip}"
+
+    if rate_limit.is_blocked(rl_key):
+        raise http_error(
+            429,
+            ErrorCode.TOO_MANY_REQUESTS,
+            "PIN 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+        )
+
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
     if not bool(employee.is_active):
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원입니다.")
     if not verify_pin(employee.pin_hash, payload.pin):
+        rate_limit.record_failure(rl_key)
         raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
+
+    rate_limit.record_success(rl_key)
     return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
 
 

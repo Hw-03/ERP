@@ -40,12 +40,15 @@ describe("departmentsApi", () => {
     expect(String(fetchSpy.mock.calls[0][0])).toContain("is_active=true");
   });
 
-  it("deleteDepartment DELETE with pin in query", async () => {
+  it("deleteDepartment DELETE with pin in body (not query)", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
     await departmentsApi.deleteDepartment(7, "0000");
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/departments/7");
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("pin=0000");
+    expect(String(fetchSpy.mock.calls[0][0])).not.toContain("pin=0000");
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("DELETE");
+    expect(JSON.parse(init.body as string)).toEqual({ pin: "0000" });
   });
 
   it("reorderDepartments PATCH /api/departments/reorder", async () => {

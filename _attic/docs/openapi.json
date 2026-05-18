@@ -896,6 +896,25 @@
         "title": "DepartmentCreate",
         "type": "object"
       },
+      "DepartmentDeleteRequest": {
+        "description": "DELETE /departments/{id} 의 선택적 body — PIN 을 query 대신 body 로 전달.",
+        "properties": {
+          "pin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "관리자 PIN",
+            "title": "Pin"
+          }
+        },
+        "title": "DepartmentDeleteRequest",
+        "type": "object"
+      },
       "DepartmentReorderItem": {
         "properties": {
           "display_order": {
@@ -1719,6 +1738,26 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "IntegrityCheckBody": {
+        "description": "Deprecated GET /integrity/inventory 의 선택적 body — PIN 을 query 대신 body 로 전달.",
+        "properties": {
+          "pin": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "minLength": 4,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pin"
+          }
+        },
+        "title": "IntegrityCheckBody",
         "type": "object"
       },
       "IntegrityCheckRequest": {
@@ -8272,6 +8311,7 @@
     },
     "/api/departments/{dept_id}": {
       "delete": {
+        "description": "관리자 PIN 으로 부서 삭제.\n\nPIN 은 request body(`{\"pin\": \"...\"}`) 로 전달하면 access log 에 남지 않는다.\n하위호환을 위해 body 가 없으면 query string `pin` 으로 폴백한다.",
         "operationId": "delete_department_api_departments__dept_id__delete",
         "parameters": [
           {
@@ -8284,17 +8324,41 @@
             }
           },
           {
-            "description": "관리자 PIN",
+            "description": "관리자 PIN (deprecated — body 사용 권장)",
             "in": "query",
             "name": "pin",
-            "required": true,
+            "required": false,
             "schema": {
-              "description": "관리자 PIN",
-              "title": "Pin",
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "관리자 PIN (deprecated — body 사용 권장)",
+              "title": "Pin"
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/DepartmentDeleteRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "204": {
             "description": "Successful Response"
@@ -8816,7 +8880,7 @@
     },
     "/api/employees/{employee_id}/verify-pin": {
       "post": {
-        "description": "작업자 식별용 PIN 검증 — 실제 보안 인증이 아님.",
+        "description": "작업자 식별용 PIN 검증 — 실제 보안 인증이 아님.\n\n무차별 대입 완화를 위해 (직원ID + 클라이언트 IP) 키로 실패 시도를 제한한다.\n실패만 카운트하며 성공 시 키를 리셋한다.",
         "operationId": "verify_employee_pin_api_employees__employee_id__verify_pin_post",
         "parameters": [
           {
@@ -12019,20 +12083,27 @@
     },
     "/api/settings/integrity/inventory": {
       "get": {
-        "description": "Deprecated compatibility endpoint.\n\n신규 호출은 PIN 이 query string 에 남지 않도록 POST body 방식을 사용한다.",
+        "description": "Deprecated compatibility endpoint.\n\nPIN 은 request body(`{\"pin\": \"...\"}`) 로 전달하면 access log 에 남지 않는다.\n하위호환을 위해 body 가 없으면 query string `pin` 으로 폴백한다.",
         "operationId": "check_inventory_integrity_api_settings_integrity_inventory_get",
         "parameters": [
           {
-            "description": "관리자 PIN",
+            "description": "관리자 PIN (deprecated — body 사용 권장)",
             "in": "query",
             "name": "pin",
-            "required": true,
+            "required": false,
             "schema": {
-              "description": "관리자 PIN",
-              "maxLength": 32,
-              "minLength": 4,
-              "title": "Pin",
-              "type": "string"
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "minLength": 4,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "관리자 PIN (deprecated — body 사용 권장)",
+              "title": "Pin"
             }
           },
           {
@@ -12048,6 +12119,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/IntegrityCheckBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {

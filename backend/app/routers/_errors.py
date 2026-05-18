@@ -32,6 +32,7 @@ class ErrorCode:
     UNPROCESSABLE = "UNPROCESSABLE"              # 422 — 비즈니스 검증 실패 (구체 코드가 없는 경우)
     BUSINESS_RULE = "BUSINESS_RULE"              # 422 — 도메인 규칙 위반
     FORBIDDEN = "FORBIDDEN"                      # 403 — 접근 거부 (PIN 불일치, 비활성 직원 등)
+    TOO_MANY_REQUESTS = "TOO_MANY_REQUESTS"      # 429 — 요청 과다 (PIN 무차별 시도 등)
 
 
 def http_error(

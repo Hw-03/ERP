@@ -180,6 +180,12 @@ class IntegrityCheckRequest(BaseModel):
     limit: int = Field(100, ge=1, le=2000)
 
 
+class IntegrityCheckBody(BaseModel):
+    """Deprecated GET /integrity/inventory 의 선택적 body — PIN 을 query 대신 body 로 전달."""
+
+    pin: Optional[str] = Field(None, min_length=4, max_length=32)
+
+
 class InventoryReceive(BaseModel):
     item_id: uuid.UUID = Field(..., description="입고 대상 품목 ID")
     quantity: Decimal = Field(..., gt=0, description="입고 수량")
@@ -1098,3 +1104,9 @@ class DepartmentReorderItem(BaseModel):
 class DepartmentReorderPayload(BaseModel):
     items: List[DepartmentReorderItem]
     pin: str
+
+
+class DepartmentDeleteRequest(BaseModel):
+    """DELETE /departments/{id} 의 선택적 body — PIN 을 query 대신 body 로 전달."""
+
+    pin: Optional[str] = Field(None, description="관리자 PIN")

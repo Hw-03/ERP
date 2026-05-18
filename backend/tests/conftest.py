@@ -31,6 +31,19 @@ from app.database import Base  # noqa: E402  (path 보강 후 import)
 from app import models  # noqa: F401, E402  (Base.metadata 등록을 위해 import)
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limit():
+    """매 테스트마다 in-process PIN 레이트 리미터 상태 초기화.
+
+    실패-시도 카운터가 테스트 간 누수되어 의도치 않은 429 가 나지 않도록 보장한다.
+    """
+    from app.services import rate_limit
+
+    rate_limit.reset_all()
+    yield
+    rate_limit.reset_all()
+
+
 @pytest.fixture()
 def db_session() -> Session:
     """함수당 신규 in-memory SQLite + 모든 테이블 생성 + 세션 yield."""

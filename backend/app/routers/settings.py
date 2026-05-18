@@ -6,7 +6,9 @@
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, Query, Request
+from typing import Optional
+
+from fastapi import APIRouter, Body, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from pydantic import BaseModel, Field
@@ -17,6 +19,7 @@ from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     AdminPinUpdateRequest,
     AdminPinVerifyRequest,
+    IntegrityCheckBody,
     IntegrityCheckRequest,
     IntegrityCheckResponse,
     IntegrityRepairResponse,
@@ -126,15 +129,22 @@ def _inventory_integrity_payload(db: Session, limit: int) -> dict:
 
 @router.get("/integrity/inventory", response_model=IntegrityCheckResponse)
 def check_inventory_integrity(
-    pin: str = Query(..., min_length=4, max_length=32, description="관리자 PIN"),
+    pin: Optional[str] = Query(
+        None, min_length=4, max_length=32, description="관리자 PIN (deprecated — body 사용 권장)"
+    ),
     limit: int = Query(100, ge=1, le=2000),
+    body: Optional[IntegrityCheckBody] = Body(None),
     db: Session = Depends(get_db),
 ):
     """Deprecated compatibility endpoint.
 
-    신규 호출은 PIN 이 query string 에 남지 않도록 POST body 방식을 사용한다.
+    PIN 은 request body(`{"pin": "..."}`) 로 전달하면 access log 에 남지 않는다.
+    하위호환을 위해 body 가 없으면 query string `pin` 으로 폴백한다.
     """
-    _require_admin(db, pin)
+    effective_pin = (body.pin if body and body.pin else None) or pin
+    if not effective_pin:
+        raise http_error(400, ErrorCode.BAD_REQUEST, "관리자 PIN 이 필요합니다.")
+    _require_admin(db, effective_pin)
     return _inventory_integrity_payload(db, limit)
 
 
