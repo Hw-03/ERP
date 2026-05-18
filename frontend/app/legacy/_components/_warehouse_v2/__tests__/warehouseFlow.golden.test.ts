@@ -38,6 +38,11 @@ import {
   exclusionNoteFor,
 } from "../ioWorkType";
 import { useIoWorkState, IO_STEP_LABELS, type IoStep } from "../useIoWorkState";
+import {
+  applyToggleLine,
+  applyLineQuantityChange,
+  applyBundleQuantityChange,
+} from "../bomSync";
 
 // ──────────────────────────────────────────────────────────────────
 // 픽스처 빌더
@@ -961,5 +966,143 @@ describe("[인라인 골든] toggle 동기화 대상 판정", () => {
   it("부모 토글이지만 bom_expected null/0 → no sync", () => {
     expect(shouldSyncOnToggle(true, { line_id: "Y", origin: "bom_auto", bom_expected: null }, "X")).toBe(false);
     expect(shouldSyncOnToggle(true, { line_id: "Y", origin: "bom_auto", bom_expected: 0 }, "X")).toBe(false);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// bomSync.ts 통합 골든 — 추출 함수가 bundle 단위로 원본과 동일 동작
+// (위 (E)(F)(G) 인라인 알고리즘과 동일 결과여야 패리티 보장)
+// ══════════════════════════════════════════════════════════════════
+
+// 단순 가용재고 stub — 라인별 고정 가용량.
+const availMap = (m: Record<string, number | null>) => (line: IoLine) =>
+  line.line_id in m ? m[line.line_id] : null;
+
+describe("[bomSync] applyToggleLine", () => {
+  it("부모(direct) 토글 → 활성 bom_auto 자식도 함께 토글 + exclusion_note", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        lines: [
+          makeLine({ line_id: "P", origin: "direct", included: true }),
+          makeLine({ line_id: "C", origin: "bom_auto", bom_expected: 2, included: true, quantity: 4 }),
+          makeLine({ line_id: "M", origin: "manual", included: true }),
+        ],
+      }),
+    ];
+    const next = applyToggleLine(bundles, "B", "P", "disassemble", availMap({ C: 1 }));
+    const [p, c, mm] = next[0].lines;
+    expect(p.included).toBe(false);
+    expect(p.exclusion_note).toBe("이번 작업 제외");
+    expect(c.included).toBe(false); // 부모 토글로 자식 동기화
+    expect(c.shortage).toBe(0);
+    expect(c.exclusion_note).toBe("회수 안 됨"); // disassemble + bom_auto
+    expect(mm.included).toBe(true); // manual 은 동기화 안 됨
+  });
+
+  it("자식 단독 토글(다시 포함) → shortage 재계산", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        lines: [makeLine({ line_id: "C", origin: "bom_auto", bom_expected: 2, included: false, quantity: 10 })],
+      }),
+    ];
+    const next = applyToggleLine(bundles, "B", "C", "produce", availMap({ C: 7 }));
+    const c = next[0].lines[0];
+    expect(c.included).toBe(true);
+    expect(c.shortage).toBe(3); // max(0, 10 - 7)
+    expect(c.exclusion_note).toBeNull();
+  });
+
+  it("대상 번들/라인 없음 → 원본 그대로", () => {
+    const bundles = [makeBundle({ bundle_id: "B", lines: [makeLine({ line_id: "L1" })] })];
+    expect(applyToggleLine(bundles, "ZZ", "L1", "produce", availMap({}))).toEqual(bundles);
+    expect(applyToggleLine(bundles, "B", "ZZ", "produce", availMap({}))).toEqual(bundles);
+  });
+});
+
+describe("[bomSync] applyLineQuantityChange", () => {
+  it("상위(direct) 변경 → produce(forced) 자식 강제 비례 재계산", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        lines: [
+          makeLine({ line_id: "P", origin: "direct", quantity: 1 }),
+          makeLine({ line_id: "C", origin: "bom_auto", bom_expected: 3, included: true, edited: true, quantity: 3 }),
+        ],
+      }),
+    ];
+    const next = applyLineQuantityChange(bundles, "B", "P", 5, 0, "produce", availMap({ C: 100 }));
+    const [p, c] = next[0].lines;
+    expect(p.quantity).toBe(5);
+    expect(p.edited).toBe(false);
+    expect(c.quantity).toBe(15); // 5 * 3, forced 이므로 edited 무시
+    expect(c.shortage).toBe(0);
+    expect(c.edited).toBe(false);
+  });
+
+  it("상위 변경 → warehouse_to_dept(미강제) edited 자식 보존", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        lines: [
+          makeLine({ line_id: "P", origin: "direct", quantity: 1 }),
+          makeLine({ line_id: "C", origin: "bom_auto", bom_expected: 3, included: true, edited: true, quantity: 99 }),
+        ],
+      }),
+    ];
+    const next = applyLineQuantityChange(bundles, "B", "P", 5, 0, "warehouse_to_dept", availMap({ C: 100 }));
+    expect(next[0].lines[1].quantity).toBe(99); // edited 보존
+  });
+
+  it("비-direct(단품) 변경 → 단순 갱신 + edited 산정", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        lines: [makeLine({ line_id: "S", origin: "bom_auto", bom_expected: 5, quantity: 5, edited: false })],
+      }),
+    ];
+    const next = applyLineQuantityChange(bundles, "B", "S", 8, 1, "warehouse_to_dept", availMap({}));
+    const s = next[0].lines[0];
+    expect(s.quantity).toBe(8);
+    expect(s.shortage).toBe(1);
+    expect(s.edited).toBe(true); // 8 != bom_expected 5
+  });
+});
+
+describe("[bomSync] applyBundleQuantityChange", () => {
+  it("기준수량 변경 → 미편집 bom_auto 자식 per-unit 비례", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        quantity: 1,
+        lines: [
+          makeLine({ line_id: "C1", origin: "bom_auto", bom_expected: 2, included: true, edited: false }),
+          makeLine({ line_id: "C2", origin: "bom_auto", bom_expected: 4, included: true, edited: true }),
+          makeLine({ line_id: "M", origin: "manual", quantity: 7 }),
+        ],
+      }),
+    ];
+    const next = applyBundleQuantityChange(bundles, "B", 3, "warehouse_to_dept", availMap({ C1: 100 }));
+    const b = next[0];
+    expect(b.quantity).toBe(3);
+    expect(b.lines[0].quantity).toBe(6); // 3 * 2 (미편집 → 재계산)
+    expect(b.lines[0].shortage).toBe(0);
+    expect(b.lines[1].quantity).toBe(10); // edited → 미강제이므로 원본 보존
+    expect(b.lines[2].quantity).toBe(7); // manual 보존
+  });
+
+  it("forced(produce) → edited 자식도 강제 재계산", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        lines: [makeLine({ line_id: "C", origin: "bom_auto", bom_expected: 2, included: true, edited: true })],
+      }),
+    ];
+    const next = applyBundleQuantityChange(bundles, "B", 5, "produce", availMap({ C: 3 }));
+    const c = next[0].lines[0];
+    expect(c.quantity).toBe(10); // 5 * 2 강제
+    expect(c.shortage).toBe(7); // max(0, 10 - 3)
+    expect(c.edited).toBe(false);
   });
 });

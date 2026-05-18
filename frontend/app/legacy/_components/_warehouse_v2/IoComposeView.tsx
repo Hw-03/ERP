@@ -12,7 +12,9 @@ import { IoTargetPicker } from "./IoTargetPicker";
 import { IoBundleCart } from "./IoBundleCart";
 import { IoConfirmStep } from "./IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "./IoSubmitModals";
-import { IO_WORK_TYPES, approvalKind, deptIoDirectionOf, directionWord, exclusionNoteFor, isBomForced, isExitWorkType, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
+import { IO_WORK_TYPES, approvalKind, directionWord, isExitWorkType, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
+import { applyBundleQuantityChange, applyLineQuantityChange, applyToggleLine } from "./bomSync";
+import { useIoDraftRestore } from "./useIoDraftRestore";
 import { useIoDraft } from "./useIoDraft";
 import { useIoPreview } from "./useIoPreview";
 import { useIoSubmit } from "./useIoSubmit";
@@ -187,26 +189,14 @@ export function IoComposeView({
     };
   }, []);
 
-  useEffect(() => {
-    if (!draftToRestore) return;
-    if (restoredDraftRef.current === draftToRestore.batch_id) return;
-    restoredDraftRef.current = draftToRestore.batch_id;
-    autosaveBatchIdRef.current = draftToRestore.batch_id;
-    state.setWorkType(draftToRestore.work_type);
-    state.setSubType(draftToRestore.sub_type);
-    if (draftToRestore.work_type === "process") {
-      const dir = deptIoDirectionOf(draftToRestore.sub_type);
-      state.setDeptIoDirectionRaw(dir);
-    }
-    state.setFromDepartment(draftToRestore.from_department || state.fromDepartment);
-    state.setToDepartment(draftToRestore.to_department || state.toDepartment);
-    state.setReferenceNo(draftToRestore.reference_no || "");
-    state.setNotes(draftToRestore.notes || "");
-    state.setBundles(normalizeBundles(draftToRestore.bundles));
-    state.goTo(4);
-    onStatusChange("임시저장 작업을 불러왔습니다.");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftToRestore?.batch_id]);
+  useIoDraftRestore({
+    draftToRestore,
+    restoredDraftRef,
+    autosaveBatchIdRef,
+    state,
+    normalizeBundles,
+    onStatusChange,
+  });
 
   // 자동 저장: bundles 가 1개 이상이면 변경 700ms 후 백그라운드 저장.
   // - workType/subType/dept 변경 → bundles reset → 빈 상태에서는 저장 안 함
@@ -732,122 +722,17 @@ export function IoComposeView({
               getAvailable={getAvailable}
               onToggleLine={(bundleId, lineId) =>
                 state.setBundles((prev) =>
-                  prev.map((bundle) => {
-                    if (bundle.bundle_id !== bundleId) return bundle;
-                    const target = bundle.lines.find((l) => l.line_id === lineId);
-                    if (!target) return bundle;
-                    const isParentToggle = target.origin === "direct";
-                    const newIncluded = !target.included;
-                    return {
-                      ...bundle,
-                      lines: bundle.lines.map((line) => {
-                        const shouldSync =
-                          line.line_id === lineId ||
-                          (isParentToggle &&
-                            line.origin === "bom_auto" &&
-                            line.bom_expected != null &&
-                            Number(line.bom_expected) > 0);
-                        if (!shouldSync) return line;
-                        const avail = getAvailable(line);
-                        return {
-                          ...line,
-                          included: newIncluded,
-                          shortage: newIncluded
-                            ? Math.max(0, line.quantity - (avail ?? line.quantity))
-                            : 0,
-                          exclusion_note: exclusionNoteFor(state.subType, line.origin, newIncluded),
-                        };
-                      }),
-                    };
-                  }),
+                  applyToggleLine(prev, bundleId, lineId, state.subType, getAvailable),
                 )
               }
               onQuantityChange={(bundleId, lineId, quantity, shortage) =>
                 state.setBundles((prev) =>
-                  prev.map((bundle) => {
-                    if (bundle.bundle_id !== bundleId) return bundle;
-                    const target = bundle.lines.find((l) => l.line_id === lineId);
-                    if (!target) return bundle;
-                    // 상위(direct) 수량 변경 → 같은 bundle 내 bom_auto 하위 모두 비례 재계산
-                    // 단, 창고 입출고는 사용자가 직접 편집한 하위(edited=true) 는 보존 — process(produce/disassemble) 만 강제 동기화.
-                    if (target.origin === "direct") {
-                      const forced = isBomForced(state.subType);
-                      return {
-                        ...bundle,
-                        lines: bundle.lines.map((line) => {
-                          if (line.line_id === lineId) {
-                            return { ...line, quantity, shortage, edited: false };
-                          }
-                          if (
-                            line.origin === "bom_auto" &&
-                            line.bom_expected != null &&
-                            Number(line.bom_expected) > 0 &&
-                            (forced || !line.edited)
-                          ) {
-                            const ratio = Number(line.bom_expected);
-                            const childQty = quantity * ratio;
-                            const childAvail = getAvailable(line);
-                            const childShortage =
-                              !line.included || childAvail === null
-                                ? 0
-                                : Math.max(0, childQty - childAvail);
-                            return { ...line, quantity: childQty, shortage: childShortage, edited: false };
-                          }
-                          return line;
-                        }),
-                      };
-                    }
-                    // 그 외 (단품/수동): 기존 단순 업데이트
-                    return {
-                      ...bundle,
-                      lines: bundle.lines.map((line) =>
-                        line.line_id === lineId
-                          ? {
-                              ...line,
-                              quantity,
-                              shortage,
-                              edited:
-                                line.bom_expected !== null
-                                  ? Math.abs(quantity - line.bom_expected) > 0.0001
-                                  : line.origin === "manual" || line.edited,
-                            }
-                          : line,
-                      ),
-                    };
-                  }),
+                  applyLineQuantityChange(prev, bundleId, lineId, quantity, shortage, state.subType, getAvailable),
                 )
               }
               onBundleQuantityChange={(bundleId, newQty) =>
                 state.setBundles((prev) =>
-                  prev.map((bundle) => {
-                    if (bundle.bundle_id !== bundleId) return bundle;
-                    // 부모 라인이 없는 BOM 묶음(창고 입출고) — 기준 수량 변경 시 미편집 자식 라인을
-                    // 원본 per-unit 비례로 재계산. bom_expected 는 preview 시점(parent_qty=1) 값이라
-                    // 그대로 per-unit ratio 로 사용 가능.
-                    const forced = isBomForced(state.subType);
-                    return {
-                      ...bundle,
-                      quantity: newQty,
-                      lines: bundle.lines.map((line) => {
-                        if (
-                          line.origin === "bom_auto" &&
-                          line.bom_expected != null &&
-                          Number(line.bom_expected) > 0 &&
-                          (forced || !line.edited)
-                        ) {
-                          const ratio = Number(line.bom_expected);
-                          const childQty = newQty * ratio;
-                          const childAvail = getAvailable(line);
-                          const childShortage =
-                            !line.included || childAvail === null
-                              ? 0
-                              : Math.max(0, childQty - childAvail);
-                          return { ...line, quantity: childQty, shortage: childShortage, edited: false };
-                        }
-                        return line;
-                      }),
-                    };
-                  }),
+                  applyBundleQuantityChange(prev, bundleId, newQty, state.subType, getAvailable),
                 )
               }
               onRemoveLine={state.removeLine}
