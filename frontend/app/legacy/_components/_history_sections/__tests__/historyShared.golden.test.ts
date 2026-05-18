@@ -16,20 +16,21 @@ import {
   getHistoryMovementSummary,
   getHistoryBomParentLine,
   getHistoryLineStatusLabel,
+} from "../historyBatchInterpreter";
+import {
   classifyHistoryScope,
   getDefaultHistoryScopeForOperator,
   isExceptionLike,
   isAdjustmentLike,
   isReworkOperation,
+} from "../transactionTaxonomy";
+import {
   intersectTransactionTypes,
-  rowTint,
-  parseUtc,
-  formatHistoryDate,
-  formatHistoryDateTimeLong,
-  toDateKey,
   getPeriodStart,
   dateFilterToFrom,
-} from "../historyShared";
+} from "../historyQuery";
+import { rowTint } from "../historyTheme";
+import { parseUtc, formatHistoryDate, formatHistoryDateTimeLong, toDateKey } from "../historyFormat";
 
 // ──────────────────────────────────────────────────────────────────
 // 공통 픽스처 빌더
