@@ -4,6 +4,7 @@
 무결성 점검 · 복구는 운영자가 명시적으로 호출하는 관리자 도구이며 프론트엔드는 사용하지 않는다.
 """
 
+import logging
 from datetime import UTC, datetime
 
 from typing import Optional
@@ -29,6 +30,8 @@ from app.services import audit
 from app.services import integrity as integrity_svc
 from app.services._tx import commit_and_refresh, commit_only
 from app.services.pin_auth import hash_pin
+
+logger = logging.getLogger("erp")
 
 
 class ResetRequest(BaseModel):
@@ -218,4 +221,6 @@ def reset_database(payload: ResetRequest, request: Request, db: Session = Depend
         msg = f"데이터베이스를 초기화하고 722 정리본을 재적재했습니다. (rows={result['rows']}, total_qty={result['total_qty']})"
         return MessageResponse(message=msg)
     except Exception as exc:
+        # WS8: 재던지기 전 풀스택 보존(기존엔 str(exc) 만 남고 트레이스 소실).
+        logger.exception("DB 초기화 중 예기치 못한 오류")
         raise http_error(500, ErrorCode.INTERNAL, f"초기화 중 오류가 발생했습니다: {exc}")

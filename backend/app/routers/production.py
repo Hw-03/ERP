@@ -1,5 +1,6 @@
 """Production router for production receipts and BOM-based backflush."""
 
+import logging
 import uuid
 from decimal import Decimal
 from typing import Dict, List, Tuple
@@ -24,6 +25,8 @@ from app.services.bom import merge_requirements
 from app.routers._errors import ErrorCode, http_error
 
 router = APIRouter()
+
+logger = logging.getLogger("erp")
 
 
 @router.post(
@@ -161,6 +164,8 @@ def production_receipt(
 
         db.commit()
     except Exception as exc:
+        # WS8: 재던지기 전 풀스택 보존(기존엔 str(exc) 만 남고 트레이스 소실).
+        logger.exception("생산 처리 중 예기치 못한 오류")
         db.rollback()
         raise http_error(
             status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from decimal import Decimal
 from typing import Literal, List, Optional
@@ -22,6 +23,8 @@ from app.routers._errors import ErrorCode, http_error
 from app.services import dept_adjustment as svc
 
 router = APIRouter()
+
+logger = logging.getLogger("erp")
 
 
 # ──────────────────────────── Schemas ────────────────────────────
@@ -185,6 +188,8 @@ def submit_adjustment(
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
     except Exception as exc:
+        # WS8: 재던지기 전 풀스택 보존(기존엔 str(exc) 만 남고 트레이스 소실).
+        logger.exception("부서 조정 처리 중 예기치 못한 오류")
         db.rollback()
         raise http_error(500, ErrorCode.INTERNAL, f"처리 중 오류: {exc}")
 
