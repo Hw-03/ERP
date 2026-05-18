@@ -1,5 +1,3 @@
-import type { TransactionLog } from "@/lib/api";
-
 export { parseUtc, formatHistoryDate, formatHistoryDateTimeLong, toDateKey } from "./historyFormat";
 export { rowTint, PROCESS_TYPE_META } from "./historyTheme";
 export {
@@ -48,13 +46,7 @@ export {
   getPeriodStart,
   dateFilterToFrom,
 } from "./historyQuery";
-
-// ──────────────────────────────────────────────────────────────────
-// 우측 상세 패널 선택 모델 (history-batch-detail-2026-05-15)
-// ──────────────────────────────────────────────────────────────────
-export type HistorySelection =
-  | { kind: "log"; log: TransactionLog }
-  | { kind: "batch"; batchId: string; logs: TransactionLog[] };
-
-export const HISTORY_PAGE_SIZE = 100;
-
+export {
+  type HistorySelection,
+  HISTORY_PAGE_SIZE,
+} from "./historyConstants";
