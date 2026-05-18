@@ -4,6 +4,28 @@ import type { IoBatch } from "@/lib/api/types/io";
 import { formatQty } from "@/lib/mes/format";
 export { parseUtc, formatHistoryDate, formatHistoryDateTimeLong, toDateKey } from "./historyFormat";
 export { rowTint, PROCESS_TYPE_META } from "./historyTheme";
+export {
+  type HistoryScope,
+  SCOPE_LABELS,
+  getDefaultHistoryScopeForOperator,
+  WAREHOUSE_INVOLVED_TYPES,
+  DEPT_INTERNAL_TYPES,
+  AMBIGUOUS_TYPES,
+  EXCEPTION_LIKE_TYPES,
+  isWarehouseInvolvedType,
+  isDepartmentInternalType,
+  isAmbiguousType,
+  isExceptionLike,
+  isAdjustmentLike,
+  isHiddenHistoryType,
+  isReworkOperation,
+  classifyHistoryScope,
+} from "./transactionTaxonomy";
+import {
+  type HistoryScope,
+  WAREHOUSE_INVOLVED_TYPES,
+  DEPT_INTERNAL_TYPES,
+} from "./transactionTaxonomy";
 
 // ──────────────────────────────────────────────────────────────────
 // 우측 상세 패널 선택 모델 (history-batch-detail-2026-05-15)
@@ -15,103 +37,6 @@ export type HistorySelection =
   | { kind: "batch"; batchId: string; logs: TransactionLog[] };
 
 export const HISTORY_PAGE_SIZE = 100;
-
-// ──────────────────────────────────────────────────────────────────
-// history-overhaul-2026-05-15: 업무 기준 분류 (Scope)
-// 기존 HistoryTab/TAB_TYPE_MAP/EXCEPTION_TYPES 는 점진 폐기 — alias 유지.
-// ──────────────────────────────────────────────────────────────────
-
-export type HistoryScope = "ALL" | "WAREHOUSE_INVOLVED" | "DEPT_INTERNAL";
-
-export const SCOPE_LABELS: Record<HistoryScope, string> = {
-  ALL: "전체",
-  WAREHOUSE_INVOLVED: "창고",
-  DEPT_INTERNAL: "부서",
-};
-
-/**
- * 사용자별 입출고 내역 기본 scope.
- * warehouse_role 이 "primary" 또는 "deputy" 이면 창고 담당 → WAREHOUSE_INVOLVED.
- * 그 외(none 포함) → DEPT_INTERNAL.
- * Operator 타입 import는 의도적으로 안 함 (순환 import 회피).
- */
-export function getDefaultHistoryScopeForOperator(
-  operator: { warehouse_role?: string | null } | null,
-): HistoryScope {
-  const role = operator?.warehouse_role?.toLowerCase();
-  if (role === "primary" || role === "deputy") return "WAREHOUSE_INVOLVED";
-  return "DEPT_INTERNAL";
-}
-
-// 거래 타입만으로 확정 가능한 분류 (좁게 정의)
-export const WAREHOUSE_INVOLVED_TYPES: readonly TransactionType[] = [
-  "RECEIVE", "SHIP", "TRANSFER_TO_PROD", "TRANSFER_TO_WH",
-  "RESERVE", "RESERVE_RELEASE", "RETURN",
-] as const;
-
-export const DEPT_INTERNAL_TYPES: readonly TransactionType[] = [
-  "TRANSFER_DEPT", "BACKFLUSH", "PRODUCE", "DISASSEMBLE",
-] as const;
-
-// 타입만으로 scope 확정 불가 — IoBatch.lines.from_bucket/to_bucket 참고 필요.
-// 정확한 scope 분류는 후속 작업의 백엔드 join 필요.
-export const AMBIGUOUS_TYPES: readonly TransactionType[] = [
-  "ADJUST", "MARK_DEFECTIVE", "SUPPLIER_RETURN", "SCRAP", "LOSS",
-] as const;
-
-// "예외/정정" 칩/카드 기준 (UX). KPI 카운트에는 edit_count>0 도 포함됨.
-export const EXCEPTION_LIKE_TYPES: readonly TransactionType[] = [
-  "ADJUST", "MARK_DEFECTIVE", "SUPPLIER_RETURN", "SCRAP", "LOSS",
-] as const;
-
-const _wh = new Set<string>(WAREHOUSE_INVOLVED_TYPES);
-const _dept = new Set<string>(DEPT_INTERNAL_TYPES);
-const _amb = new Set<string>(AMBIGUOUS_TYPES);
-const _exc = new Set<string>(EXCEPTION_LIKE_TYPES);
-
-export function isWarehouseInvolvedType(t: string): boolean { return _wh.has(t); }
-export function isDepartmentInternalType(t: string): boolean { return _dept.has(t); }
-export function isAmbiguousType(t: string): boolean { return _amb.has(t); }
-export function isExceptionLike(log: { transaction_type: string; edit_count?: number | null }): boolean {
-  if (_exc.has(log.transaction_type)) return true;
-  if ((log.edit_count ?? 0) > 0) return true;
-  return false;
-}
-
-/**
- * 화면 표시용 "수량 조정" 카운트 — ADJUST 거래만.
- * label-followup-2026-05-15: KPI/달력 카드 라벨이 "수량 조정"으로 좁혀졌으므로
- * 카운트 기준도 좁혀 사용자 표시 숫자가 의미와 일치.
- */
-export function isAdjustmentLike(log: { transaction_type: string }): boolean {
-  return log.transaction_type === "ADJUST";
-}
-
-/**
- * IoBatch 보강 분류. batch.lines 의 bucket 으로 정확히 판단.
- * batch 가 없으면 거래 타입 기반 (ambiguous 는 그대로).
- */
-export function classifyHistoryScope(
-  log: { transaction_type: string },
-  batch?: IoBatch | null,
-): "warehouse_involved" | "department_internal" | "ambiguous" {
-  if (batch) {
-    let touchesWarehouse = false;
-    let onlyProduction = true;
-    for (const bundle of batch.bundles) {
-      for (const line of bundle.lines) {
-        if (line.from_bucket === "warehouse" || line.to_bucket === "warehouse") touchesWarehouse = true;
-        if (line.from_bucket !== "production" || line.to_bucket !== "production") onlyProduction = false;
-      }
-    }
-    if (touchesWarehouse) return "warehouse_involved";
-    if (onlyProduction) return "department_internal";
-    return "ambiguous";
-  }
-  if (isWarehouseInvolvedType(log.transaction_type)) return "warehouse_involved";
-  if (isDepartmentInternalType(log.transaction_type)) return "department_internal";
-  return "ambiguous";
-}
 
 /** 표시자: requester_name 우선, 없으면 produced_by 의 괄호 부분 제거. */
 export function getHistoryActor(log: { requester_name?: string | null; produced_by?: string | null }): string {
@@ -372,24 +297,6 @@ export function getHistoryLineStatusLabel(line: {
   const shortage = line.shortage ?? 0;
   if (shortage > 0) return { label: `부족 ${shortage}`, tone: "danger" };
   return { label: "포함", tone: "ok" };
-}
-
-const _HIDDEN_TYPES = new Set<string>([
-  "SCRAP", "LOSS", "DISASSEMBLE", "RETURN", "RESERVE", "RESERVE_RELEASE", "TRANSFER_DEPT",
-]);
-
-/** 주요 칩에서 숨길 타입 여부. fallback 표시는 historyDisplay 가 처리. */
-export function isHiddenHistoryType(type: string): boolean {
-  return _HIDDEN_TYPES.has(type);
-}
-
-/** 재작업 (DISASSEMBLE/disassemble) 여부 — 라벨/색 빨강 처리 분기용. */
-export function isReworkOperation(
-  log: { transaction_type: string },
-  batch?: { sub_type?: string | null } | null,
-): boolean {
-  if (batch?.sub_type === "disassemble") return true;
-  return log.transaction_type === "DISASSEMBLE";
 }
 
 /**
