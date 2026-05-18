@@ -18,7 +18,7 @@ import { formatQty } from "@/lib/mes/format";
 import { useFocusTrap } from "@/lib/mes/useFocusTrap";
 import { AppSelect } from "../common/AppSelect";
 import { useCurrentOperator } from "../login/useCurrentOperator";
-import { getHistoryDisplayLabel } from "./historyShared";
+import { getHistoryDisplayLabel } from "./historyBatchInterpreter";
 
 interface Props {
   open: boolean;

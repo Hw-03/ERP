@@ -12,14 +12,12 @@ import { HistoryTable } from "./_history_sections/HistoryTable";
 import { DesktopHistoryRightPanel } from "./_history_sections/DesktopHistoryRightPanel";
 import { useHistoryData } from "./_hooks/useHistoryData";
 import { useCurrentOperator } from "./login/useCurrentOperator";
+import { parseUtc, toDateKey } from "./_history_sections/historyFormat";
+import { getDefaultHistoryScopeForOperator, type HistoryScope } from "./_history_sections/transactionTaxonomy";
 import {
   TRANSACTION_TYPES_NONE,
   dateFilterToFrom,
-  getDefaultHistoryScopeForOperator,
   intersectTransactionTypes,
-  parseUtc,
-  toDateKey,
-  type HistoryScope,
   type HistorySelection,
 } from "./_history_sections/historyShared";
 

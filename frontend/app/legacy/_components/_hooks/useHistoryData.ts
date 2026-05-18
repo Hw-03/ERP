@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type TransactionLog } from "@/lib/api";
+import { type HistoryScope } from "../_history_sections/transactionTaxonomy";
 import {
   HISTORY_PAGE_SIZE,
   TRANSACTION_TYPES_NONE,
   dateFilterToFrom,
   intersectTransactionTypes,
-  type HistoryScope,
 } from "../_history_sections/historyShared";
 
 export interface UseHistoryDataArgs {

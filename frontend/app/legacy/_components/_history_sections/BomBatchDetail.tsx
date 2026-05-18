@@ -11,7 +11,7 @@ import {
   getHistoryLineSignedQuantity,
   getHistoryLineStatusLabel,
   type LineSignTone,
-} from "./historyShared";
+} from "./historyBatchInterpreter";
 
 const SIGN_TONE_HEX: Record<LineSignTone, string> = {
   increase: LEGACY_COLORS.blue,

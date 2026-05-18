@@ -6,12 +6,9 @@ import { SlidePanel } from "../common";
 import { DesktopRightPanel } from "../DesktopRightPanel";
 import { HistoryDetailPanel } from "./HistoryDetailPanel";
 import { HistoryBatchDetailPanel } from "./HistoryBatchDetailPanel";
-import {
-  formatHistoryDate,
-  getHistoryActor,
-  getHistoryDisplayLabel,
-  type HistorySelection,
-} from "./historyShared";
+import { formatHistoryDate } from "./historyFormat";
+import { getHistoryActor, getHistoryDisplayLabel } from "./historyBatchInterpreter";
+import type { HistorySelection } from "./historyShared";
 
 /**
  * Round-13 (#15) 추출 — DesktopHistoryView 우측 슬라이딩 상세 패널.

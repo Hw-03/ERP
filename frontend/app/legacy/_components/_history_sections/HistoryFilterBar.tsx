@@ -4,14 +4,12 @@ import { HelpCircle, Search, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common";
 import {
-  DATE_OPTIONS,
   DEPT_INTERNAL_TYPES,
   SCOPE_LABELS,
-  TYPE_OPTIONS,
   WAREHOUSE_INVOLVED_TYPES,
   type HistoryScope,
-  type TypeOption,
-} from "./historyShared";
+} from "./transactionTaxonomy";
+import { DATE_OPTIONS, TYPE_OPTIONS, type TypeOption } from "./historyShared";
 
 const _wh = new Set<string>(WAREHOUSE_INVOLVED_TYPES);
 const _dept = new Set<string>(DEPT_INTERNAL_TYPES);

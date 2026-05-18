@@ -7,7 +7,7 @@ import {
   isAdjustmentLike,
   isDepartmentInternalType,
   isWarehouseInvolvedType,
-} from "./historyShared";
+} from "./transactionTaxonomy";
 
 type Props = {
   calendarYear: number;

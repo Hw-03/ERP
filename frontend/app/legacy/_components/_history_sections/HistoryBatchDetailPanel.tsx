@@ -9,14 +9,14 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import {
   describeBatchFlow,
-  formatHistoryDateTimeLong,
   getHistoryActor,
   getHistoryBomParentLine,
   getHistoryDisplayLabel,
   getHistoryLineSignedQuantity,
   getHistoryLineStatusLabel,
   type LineSignTone,
-} from "./historyShared";
+} from "./historyBatchInterpreter";
+import { formatHistoryDateTimeLong } from "./historyFormat";
 
 const SIGN_TONE_HEX: Record<LineSignTone, string> = {
   increase: LEGACY_COLORS.blue,

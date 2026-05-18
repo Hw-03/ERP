@@ -4,7 +4,8 @@ import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { transactionColor } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
-import { formatHistoryDate, getHistoryDisplayLabel } from "./historyShared";
+import { formatHistoryDate } from "./historyFormat";
+import { getHistoryDisplayLabel } from "./historyBatchInterpreter";
 
 /**
  * Round-13 (#3) 추출 — HistoryDetailPanel 의 "이 품목의 최근 거래" 리스트.

@@ -24,7 +24,10 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { transactionColor, transactionIconName } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColor } from "../DepartmentsContext";
-import { formatHistoryDate, getHistoryDisplayLabel, isReworkOperation, rowTint } from "./historyShared";
+import { formatHistoryDate } from "./historyFormat";
+import { rowTint } from "./historyTheme";
+import { getHistoryDisplayLabel } from "./historyBatchInterpreter";
+import { isReworkOperation } from "./transactionTaxonomy";
 
 const TX_ICON = {
   ArrowDownToLine,

@@ -3,7 +3,7 @@
 import { History } from "lucide-react";
 import type { TransactionEditLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { parseUtc } from "./historyShared";
+import { parseUtc } from "./historyFormat";
 
 /**
  * Round-13 (#3) 추출 — HistoryDetailPanel 의 수정 이력 카드.

@@ -11,14 +11,14 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { transactionColor, transactionIconName } from "@/lib/mes-status";
 import {
   describeBatchFlow,
-  formatHistoryDate,
   getHistoryActor,
   getHistoryDisplayLabel,
   getHistoryMovementSummary,
-  isReworkOperation,
   type MovementSummary,
   type MovementTone,
-} from "./historyShared";
+} from "./historyBatchInterpreter";
+import { isReworkOperation } from "./transactionTaxonomy";
+import { formatHistoryDate } from "./historyFormat";
 
 const TX_ICON = {
   ArrowDownToLine, ArrowUpFromLine, Sliders, Hammer, Recycle, Trash2,
