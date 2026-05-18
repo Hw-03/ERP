@@ -107,25 +107,6 @@ export const TYPE_OPTIONS: TypeOption[] = [
   { label: "공급사 반품", value: "SUPPLIER_RETURN", transactionTypes: ["SUPPLIER_RETURN"] },
 ];
 
-// ──────────────────────────────────────────────────────────────────
-// 점진 폐기 alias (다른 archive/모바일 파일 호환). 후속에서 제거.
-// ──────────────────────────────────────────────────────────────────
-
-/** @deprecated history-overhaul-2026-05: HistoryScope 사용. */
-export type HistoryTab = "ALL" | "WAREHOUSE" | "DEPT";
-/** @deprecated */
-export const TAB_LABELS: Record<HistoryTab, string> = {
-  ALL: "전체", WAREHOUSE: "창고", DEPT: "부서",
-};
-/** @deprecated */
-export const TAB_TYPE_MAP: Record<HistoryTab, string | undefined> = {
-  ALL: undefined,
-  WAREHOUSE: "RECEIVE,SHIP,ADJUST,SUPPLIER_RETURN,RETURN,RESERVE,RESERVE_RELEASE",
-  DEPT: "TRANSFER_TO_PROD,TRANSFER_TO_WH,TRANSFER_DEPT,MARK_DEFECTIVE,BACKFLUSH,PRODUCE,SCRAP,LOSS,DISASSEMBLE",
-};
-/** @deprecated isExceptionLike 사용. */
-export const EXCEPTION_TYPES = new Set(["ADJUST", "SCRAP", "LOSS", "DISASSEMBLE", "MARK_DEFECTIVE"]);
-
 export const DATE_OPTIONS = [
   { label: "전체", value: "ALL" },
   { label: "오늘", value: "TODAY" },
