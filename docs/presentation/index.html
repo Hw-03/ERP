@@ -34,7 +34,7 @@
     .slide {
       position: absolute;
       inset: 0;
-      padding: 80px 96px 64px;
+      padding: 72px 88px 60px;
       display: flex;
       flex-direction: column;
       opacity: 0;
@@ -47,259 +47,291 @@
       from { opacity: 0; transform: translateY(8px); }
       to   { opacity: 1; transform: translateY(0); }
     }
-    .slide.active > *:not(.notes-panel) { animation: fadeIn 240ms ease-out both; }
-    .slide.active > *:nth-child(2):not(.notes-panel) { animation-delay: 60ms; }
-    .slide.active > *:nth-child(3):not(.notes-panel) { animation-delay: 120ms; }
-    .slide.active > *:nth-child(4):not(.notes-panel) { animation-delay: 180ms; }
+    .slide.active > *:not(.notes-panel) { animation: fadeIn 220ms ease-out both; }
+    .slide.active > *:nth-child(2):not(.notes-panel) { animation-delay: 55ms; }
+    .slide.active > *:nth-child(3):not(.notes-panel) { animation-delay: 110ms; }
 
-    /* ---------- header ---------- */
+    /* ---------- header / footer ---------- */
     .deck-header {
-      position: fixed; top: 0; left: 0; right: 0; height: 52px;
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 40px; z-index: 50; pointer-events: none;
+      position: fixed; top: 0; right: 0; height: 52px;
+      display: flex; align-items: center; padding: 0 40px;
+      z-index: 50; pointer-events: none;
     }
-    .header-logo { display: flex; align-items: center; gap: 10px; }
-    .header-logo img { height: 22px; width: auto; }
-    .slide-counter { font-size: 13px; font-weight: 600; color: var(--c-gray); letter-spacing: 0.06em; }
+    .slide-counter { font-size: 16px; font-weight: 700; color: var(--c-gray); letter-spacing: 0.06em; }
+    .slide-counter b { color: var(--c-red); }
 
-    /* ---------- footer ---------- */
     .deck-footer {
       position: fixed; bottom: 0; left: 0; right: 0; height: 34px;
       display: flex; align-items: center; justify-content: space-between;
       padding: 0 40px; z-index: 50; pointer-events: none;
-      font-size: 12px; color: var(--c-gray); letter-spacing: 0.04em;
+      font-size: 14px; color: var(--c-gray); letter-spacing: 0.03em;
     }
     .progress-bar { display: flex; gap: 4px; }
     .progress-bar span {
-      display: block; width: 28px; height: 3px;
+      display: block; width: 26px; height: 4px;
       background: var(--c-line); border-radius: 2px; transition: background 200ms;
     }
-    .progress-bar span.done    { background: var(--c-red); opacity: 0.35; }
+    .progress-bar span.done    { background: var(--c-red); opacity: 0.4; }
     .progress-bar span.current { background: var(--c-red); opacity: 1; }
 
     /* ---------- common ---------- */
     .slide-eyebrow {
-      font-size: 12px; font-weight: 700; letter-spacing: 0.14em;
-      text-transform: uppercase; color: var(--c-gray); margin-bottom: 6px;
+      font-size: 17px; font-weight: 800; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--c-red); margin-bottom: 10px;
     }
     .slide-title {
-      font-size: 36px; font-weight: 800; letter-spacing: -0.03em;
-      color: var(--c-text); line-height: 1.2;
+      font-size: 48px; font-weight: 900; letter-spacing: -0.03em;
+      color: var(--c-text); line-height: 1.18;
     }
+    .slide-title .hl { color: var(--c-blue); }
+    .body-area { flex: 1; display: flex; flex-direction: column; justify-content: center; }
 
     /* ---------- cover (slide 1) ---------- */
-    .cover { padding: 80px 120px; justify-content: space-between; }
-    .wordmark {
-      font-size: clamp(56px, 7vw, 96px);
-      font-weight: 900; letter-spacing: -0.04em; color: var(--c-text); line-height: 1;
-    }
-    .wordmark .reg { color: var(--c-red); font-size: 0.45em; vertical-align: super; }
-    .cover-mes {
-      font-size: clamp(40px, 5vw, 68px);
-      font-weight: 900; letter-spacing: -0.03em; color: var(--c-blue); margin-top: 8px;
-    }
-    .cover-sub { font-size: 20px; color: var(--c-gray); margin-top: 16px; letter-spacing: -0.01em; }
-    .cover-tagline { font-size: 18px; color: var(--c-gray); max-width: 480px; line-height: 1.65; }
-    .cover-meta { font-size: 14px; color: var(--c-gray); letter-spacing: 0.04em; }
+    .cover { padding: 96px 110px; justify-content: space-between; }
+    .cover-logo { max-width: 540px; width: 46vw; height: auto; }
+    .cover-sub { font-size: 30px; font-weight: 700; color: var(--c-blue); margin-top: 28px; letter-spacing: -0.01em; }
+    .cover-sub small { display:block; font-size: 22px; font-weight: 500; color: var(--c-gray); letter-spacing: 0.12em; text-transform: uppercase; margin-top: 8px; }
+    .cover-tagline { font-size: 33px; color: var(--c-text); font-weight: 600; max-width: 720px; line-height: 1.6; }
+    .cover-meta { font-size: 20px; color: var(--c-gray); letter-spacing: 0.06em; font-weight: 600; }
 
     /* ---------- pain grid (slide 2) ---------- */
     .pain-grid {
       flex: 1; display: grid; grid-template-columns: 1fr 1fr;
-      gap: 18px; margin-top: 28px;
+      grid-template-rows: 1fr 1fr; gap: 22px; margin-top: 30px;
     }
     .pain-card {
-      border: 1px solid var(--c-line); border-radius: 14px;
-      padding: 24px 26px 22px; display: flex; flex-direction: column; gap: 10px;
+      border: 2px solid var(--c-line); border-radius: 16px;
+      padding: 30px 32px; display: flex; flex-direction: column;
+      justify-content: center; gap: 14px;
     }
-    .pain-head { display: flex; align-items: center; gap: 12px; }
+    .pain-head { display: flex; align-items: center; gap: 16px; }
     .pain-icon {
-      width: 34px; height: 34px; border-radius: 8px;
-      background: #FEF2F2; display: flex; align-items: center;
-      justify-content: center; font-size: 17px; flex-shrink: 0;
+      width: 48px; height: 48px; border-radius: 12px;
+      background: #FEE2E2; display: flex; align-items: center;
+      justify-content: center; font-size: 24px; flex-shrink: 0;
     }
-    .pain-title { font-size: 16px; font-weight: 700; color: var(--c-text); letter-spacing: -0.01em; }
-    .pain-body { font-size: 14px; color: var(--c-gray); line-height: 1.65; }
+    .pain-title { font-size: 26px; font-weight: 800; color: var(--c-text); letter-spacing: -0.02em; }
+    .pain-body { font-size: 25px; color: var(--c-gray); line-height: 1.55; }
     .pain-tag {
-      display: inline-flex; align-items: center;
-      padding: 3px 10px; background: #FEF2F2; border-radius: 20px;
-      font-size: 11px; font-weight: 700; color: var(--c-red);
-      letter-spacing: 0.06em; text-transform: uppercase; width: fit-content; margin-top: 2px;
+      align-self: flex-start; padding: 7px 18px; background: var(--c-red); border-radius: 999px;
+      font-size: 19px; font-weight: 800; color: #fff; letter-spacing: 0.04em;
     }
 
-    /* ---------- classify grid (slide 3) ---------- */
+    /* ---------- classify (slide 3) ---------- */
+    .classify-lead { font-size: 29px; color: var(--c-gray); font-weight: 600; margin-top: 18px; }
     .classify-grid {
       flex: 1; display: grid; grid-template-columns: 1fr 1fr 1fr;
-      gap: 22px; margin-top: 30px;
+      gap: 28px; align-items: center;
     }
     .classify-card {
-      border: 1px solid var(--c-line); border-radius: 14px;
-      padding: 32px 26px; display: flex; flex-direction: column; gap: 16px;
+      border: 2px solid var(--c-line); border-radius: 18px;
+      padding: 44px 32px; display: flex; flex-direction: column; gap: 22px;
+      text-align: center; align-items: center;
     }
     .classify-badge {
-      width: 46px; height: 46px; border-radius: 12px;
+      width: 84px; height: 84px; border-radius: 22px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 20px; font-weight: 800;
+      font-size: 40px; font-weight: 900;
     }
     .badge-r { background: #F1F5F9; color: var(--c-gray); }
-    .badge-a { background: #EFF6FF; color: var(--c-blue); }
-    .badge-f { background: #F0FDF4; color: #059669; }
-    .classify-title { font-size: 22px; font-weight: 800; color: var(--c-text); letter-spacing: -0.02em; }
-    .classify-code { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--c-gray); margin-top: -8px; }
-    .classify-body { font-size: 14px; color: var(--c-gray); line-height: 1.65; }
-    .classify-ex {
-      margin-top: auto; padding: 12px 14px; background: var(--c-light);
-      border-radius: 8px; font-size: 13px; color: var(--c-text); line-height: 1.5;
-    }
-    .classify-ex strong { font-weight: 700; font-family: monospace; font-size: 14px; }
+    .badge-a { background: #DBEAFE; color: var(--c-blue); }
+    .badge-f { background: #DCFCE7; color: #059669; }
+    .classify-name { font-size: 34px; font-weight: 900; color: var(--c-text); letter-spacing: -0.02em; }
+    .classify-desc { font-size: 26px; color: var(--c-gray); line-height: 1.6; }
 
-    /* ---------- before/after (slides 4, 5) ---------- */
+    /* ---------- code system (slide 4) ---------- */
+    .code-anatomy {
+      display: flex; align-items: stretch; justify-content: center; gap: 14px;
+      margin: 22px 0 26px;
+    }
+    .code-seg { text-align: center; display: flex; flex-direction: column; gap: 8px; }
+    .code-seg .glyph {
+      font-size: 56px; font-weight: 900;
+      padding: 14px 26px; border-radius: 14px; letter-spacing: 0.02em;
+    }
+    .seg-model .glyph { background: #FEE2E2; color: var(--c-red); }
+    .seg-proc  .glyph { background: #DBEAFE; color: var(--c-blue); }
+    .seg-ser   .glyph { background: var(--c-light); color: var(--c-gray); }
+    .code-seg .lbl { font-size: 21px; font-weight: 800; color: var(--c-text); }
+    .code-dash { font-size: 56px; font-weight: 900; color: var(--c-gray); align-self: flex-start; padding-top: 14px; }
+
+    .code-cols { display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 36px; flex: 1; align-items: start; }
+    .model-legend { display: flex; flex-direction: column; gap: 10px; }
+    .ml-title, .matrix-title { font-size: 21px; font-weight: 800; color: var(--c-red); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
+    .ml-row { font-size: 25px; color: var(--c-text); font-weight: 600; display: flex; gap: 14px; }
+    .ml-row b { color: var(--c-red); font-size: 26px; min-width: 26px; }
+    .code-ex { margin-top: 20px; font-size: 24px; line-height: 1.7; color: var(--c-text); }
+    .code-ex .ex { display:block; }
+    .code-ex code { font-weight:800; color: var(--c-blue); font-size: 25px; }
+
+    .matrix { width: 100%; border-collapse: collapse; }
+    .matrix th, .matrix td { border: 1px solid var(--c-line); text-align: center; padding: 11px 6px; }
+    .matrix thead th { background: var(--c-blue); color:#fff; font-size: 22px; font-weight: 800; }
+    .matrix tbody th { background: var(--c-light); font-size: 24px; font-weight: 800; color: var(--c-text); white-space: nowrap; padding: 13px 16px; }
+    .matrix td { font-size: 27px; font-weight: 800; color: var(--c-blue); }
+
+    /* ---------- before/after (slides 5,6) ---------- */
     .ba-wrap {
       flex: 1; display: grid; grid-template-columns: 1fr 1fr;
-      gap: 20px; margin-top: 28px;
+      gap: 24px; margin-top: 28px; align-items: stretch;
     }
     .ba-col {
       display: flex; flex-direction: column;
-      border-radius: 12px; overflow: hidden; border: 1px solid var(--c-line);
+      border-radius: 16px; overflow: hidden; border: 2px solid var(--c-line);
     }
     .ba-col-head {
-      padding: 13px 20px; font-size: 12px; font-weight: 700;
-      letter-spacing: 0.1em; text-transform: uppercase;
-      display: flex; align-items: center; gap: 8px;
+      padding: 18px 26px; font-size: 23px; font-weight: 800;
+      letter-spacing: 0.04em; display: flex; align-items: center; gap: 10px;
     }
     .ba-head-before { background: var(--c-light); color: var(--c-gray); }
     .ba-head-after  { background: var(--c-blue); color: #fff; }
     .ba-item {
-      display: flex; align-items: flex-start; gap: 14px;
-      padding: 14px 18px; border-top: 1px solid var(--c-line); flex: 1;
+      display: flex; align-items: flex-start; gap: 18px;
+      padding: 20px 26px; border-top: 1px solid var(--c-line); flex: 1;
+      justify-content: flex-start; flex-direction: column;
     }
-    .ba-item-before { background: #FAFBFC; }
+    .ba-row { display:flex; align-items:flex-start; gap:18px; }
+    .ba-item-before { background: #FFF7F7; }
     .ba-item-after  { background: #fff; }
     .ba-check {
-      flex: 0 0 26px; height: 26px; border-radius: 50%;
+      flex: 0 0 34px; height: 34px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 13px; margin-top: 2px; flex-shrink: 0;
+      font-weight: 900; font-size: 18px; flex-shrink: 0;
     }
-    .ba-item-before .ba-check { background: #FEF2F2; color: var(--c-red); }
-    .ba-ok { background: #D1FAE5; color: #059669; }
-    .ba-task { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
-    .ba-item-before .ba-task { color: var(--c-gray); text-decoration: line-through; text-decoration-color: rgba(100,116,139,0.35); }
+    .ba-item-before .ba-check { background: var(--c-red); color: #fff; }
+    .ba-ok { background: #059669; color: #fff; }
+    .ba-task { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; }
+    .ba-item-before .ba-task { color: var(--c-gray); }
     .ba-item-after  .ba-task { color: var(--c-text); }
-    .ba-desc { font-size: 12px; color: var(--c-gray); margin-top: 2px; line-height: 1.45; }
+    .ba-desc { font-size: 22px; color: var(--c-gray); margin-top: 7px; line-height: 1.5; }
 
-    /* ---------- rule grid (slide 6) ---------- */
+    /* ---------- rule grid (slide 7) ---------- */
     .rule-grid {
       flex: 1; display: grid; grid-template-columns: 1fr 1fr 1fr;
-      gap: 22px; margin-top: 30px;
+      gap: 26px; margin-top: 28px; align-items: center;
     }
     .rule-card {
-      border: 1px solid var(--c-line); border-radius: 14px;
-      padding: 30px 26px; display: flex; flex-direction: column; gap: 16px;
+      border: 2px solid var(--c-line); border-radius: 18px;
+      padding: 40px 32px; display: flex; flex-direction: column; gap: 20px;
+      height: 100%; justify-content: center;
     }
     .rule-num {
-      width: 44px; height: 44px; border-radius: 50%;
+      width: 60px; height: 60px; border-radius: 50%;
       background: var(--c-blue); color: #fff;
       display: flex; align-items: center; justify-content: center;
-      font-size: 20px; font-weight: 800;
+      font-size: 28px; font-weight: 900;
     }
-    .rule-title { font-size: 20px; font-weight: 800; color: var(--c-text); letter-spacing: -0.02em; }
+    .rule-title { font-size: 28px; font-weight: 900; color: var(--c-text); letter-spacing: -0.02em; }
     .rule-who {
-      padding: 10px 14px; background: #EFF6FF;
-      border-radius: 8px; border-left: 3px solid var(--c-blue);
-      font-size: 14px; font-weight: 600; color: var(--c-blue); line-height: 1.55;
+      padding: 14px 18px; background: #DBEAFE;
+      border-radius: 12px; border-left: 5px solid var(--c-blue);
+      font-size: 23px; font-weight: 700; color: var(--c-blue); line-height: 1.55;
     }
-    .rule-body { font-size: 14px; color: var(--c-gray); line-height: 1.65; }
+    .rule-body { font-size: 25px; color: var(--c-gray); line-height: 1.6; }
     .rule-card.rule-scrap .rule-num { background: var(--c-red); }
-    .rule-card.rule-scrap .rule-who { background: #FEF2F2; border-left-color: var(--c-red); color: var(--c-red); }
+    .rule-card.rule-scrap .rule-who { background: #FEE2E2; border-left-color: var(--c-red); color: var(--c-red); }
 
-    /* ---------- demo (slide 7) ---------- */
-    .demo-wrap {
-      flex: 1; display: flex; flex-direction: column;
-      justify-content: center; align-items: center; gap: 28px;
+    /* ---------- timeline (slide 8) ---------- */
+    .tl-wrap { flex: 1; display: flex; align-items: center; margin-top: 24px; }
+    .tl { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; width: 100%; position: relative; }
+    .tl::before {
+      content:''; position:absolute; left: 6%; right: 6%; top: 42px;
+      height: 4px; background: var(--c-line); z-index: 0;
     }
-    .demo-header { display: flex; align-items: center; gap: 20px; }
-    .demo-play {
-      width: 68px; height: 68px; border-radius: 50%;
-      background: var(--c-red); display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
+    .tl-node { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
+    .tl-dot {
+      width: 84px; height: 84px; border-radius: 50%; background: #fff;
+      border: 4px solid var(--c-blue); color: var(--c-blue);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px; font-weight: 900;
     }
-    .demo-play svg { width: 30px; height: 30px; fill: #fff; margin-left: 4px; }
-    .demo-title-wrap .demo-title { font-size: 26px; font-weight: 800; color: var(--c-text); letter-spacing: -0.02em; }
-    .demo-title-wrap .demo-sub  { font-size: 15px; color: var(--c-gray); margin-top: 2px; }
-    .demo-progress { font-size: 13px; font-weight: 700; color: var(--c-gray); letter-spacing: 0.1em; align-self: flex-end; max-width: 600px; width: 100%; }
-    .demo-progress .cnt { color: var(--c-red); font-size: 17px; }
-    .demo-list { width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 8px; }
+    .tl-node.hot .tl-dot { background: var(--c-red); border-color: var(--c-red); color:#fff; box-shadow: 0 0 0 8px #FEE2E2; }
+    .tl-h { font-size: 25px; font-weight: 900; color: var(--c-text); }
+    .tl-node.hot .tl-h { color: var(--c-red); }
+    .tl-p { font-size: 21px; color: var(--c-gray); line-height: 1.5; }
+
+    /* ---------- demo (slide 9) ---------- */
+    .demo-wrap { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 26px; }
+    .demo-header { display: flex; align-items: center; gap: 22px; }
+    .demo-play { width: 76px; height: 76px; border-radius: 50%; background: var(--c-red); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .demo-play svg { width: 34px; height: 34px; fill: #fff; margin-left: 5px; }
+    .demo-title { font-size: 34px; font-weight: 900; color: var(--c-text); letter-spacing: -0.02em; }
+    .demo-sub  { font-size: 23px; color: var(--c-gray); margin-top: 4px; }
+    .demo-progress { font-size: 22px; font-weight: 800; color: var(--c-gray); align-self: flex-end; max-width: 760px; width: 100%; }
+    .demo-progress .cnt { color: var(--c-red); font-size: 24px; }
+    .demo-list { width: 100%; max-width: 760px; display: flex; flex-direction: column; gap: 14px; }
     .demo-item {
-      display: flex; align-items: center; gap: 14px;
-      padding: 12px 18px; border: 1px solid var(--c-line); border-radius: 10px;
+      display: flex; align-items: center; gap: 20px;
+      padding: 18px 26px; border: 2px solid var(--c-line); border-radius: 14px;
       cursor: pointer; transition: background 150ms, border-color 150ms; user-select: none;
     }
     .demo-item:hover { background: var(--c-light); }
-    .demo-item.done { background: #F0FDF4; border-color: #A7F3D0; }
+    .demo-item.done { background: #ECFDF5; border-color: #6EE7B7; }
     .demo-check {
-      width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--c-line);
+      width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--c-line);
       flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-      font-size: 13px; color: transparent; transition: all 150ms;
+      font-size: 17px; color: transparent; transition: all 150ms;
     }
     .demo-item.done .demo-check { background: #059669; border-color: #059669; color: #fff; }
-    .demo-item-text { font-size: 15px; font-weight: 600; color: var(--c-text); }
+    .demo-item-text { font-size: 27px; font-weight: 700; color: var(--c-text); }
     .demo-item.done .demo-item-text { color: var(--c-gray); text-decoration: line-through; }
 
-    /* ---------- feedback (slide 8) ---------- */
-    .feedback-wrap {
-      flex: 1; display: grid; grid-template-columns: 1fr 1fr;
-      gap: 60px; margin-top: 36px; align-items: start;
-    }
-    .feedback-form-card { border: 1px solid var(--c-line); border-radius: 16px; overflow: hidden; }
-    .feedback-form-head { background: var(--c-text); color: #fff; padding: 13px 22px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
-    .feedback-form-body { padding: 22px; display: flex; flex-direction: column; gap: 16px; }
-    .feedback-field { display: flex; flex-direction: column; gap: 5px; }
-    .feedback-field label { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-gray); }
-    .field-line { height: 32px; border-bottom: 2px solid var(--c-line); }
-    .field-check { display: flex; gap: 18px; font-size: 14px; color: var(--c-text); padding: 4px 0; }
-    .field-check span { display: flex; align-items: center; gap: 7px; }
-    .check-box { width: 15px; height: 15px; border: 2px solid var(--c-gray); border-radius: 3px; flex-shrink: 0; }
-    .field-area { height: 46px; border-bottom: 2px solid var(--c-line); }
-    .feedback-steps { display: flex; flex-direction: column; gap: 22px; }
-    .feedback-step { display: flex; gap: 16px; align-items: flex-start; }
+    /* ---------- feedback (slide 10) ---------- */
+    .feedback-wrap { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 56px; margin-top: 26px; align-items: center; }
+    .feedback-form-card { border: 2px solid var(--c-line); border-radius: 18px; overflow: hidden; }
+    .feedback-form-head { background: var(--c-text); color: #fff; padding: 16px 26px; font-size: 20px; font-weight: 800; letter-spacing: 0.06em; }
+    .feedback-form-body { padding: 28px; display: flex; flex-direction: column; gap: 20px; }
+    .feedback-field { display: flex; flex-direction: column; gap: 8px; }
+    .feedback-field label { font-size: 18px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--c-gray); }
+    .field-line { height: 34px; border-bottom: 2px solid var(--c-line); }
+    .field-check { display: flex; gap: 24px; font-size: 23px; color: var(--c-text); padding: 4px 0; }
+    .field-check span { display: flex; align-items: center; gap: 9px; }
+    .check-box { width: 20px; height: 20px; border: 2px solid var(--c-gray); border-radius: 4px; flex-shrink: 0; }
+    .field-area { height: 50px; border-bottom: 2px solid var(--c-line); }
+    .feedback-steps { display: flex; flex-direction: column; gap: 24px; }
+    .feedback-step { display: flex; gap: 20px; align-items: flex-start; }
     .step-num {
-      flex: 0 0 36px; height: 36px; border-radius: 50%;
-      background: var(--c-blue); color: #fff;
-      font-size: 16px; font-weight: 700;
+      flex: 0 0 46px; height: 46px; border-radius: 50%;
+      background: var(--c-blue); color: #fff; font-size: 21px; font-weight: 900;
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
-    .step-body h4 { font-size: 17px; font-weight: 700; margin: 0 0 3px; letter-spacing: -0.01em; }
-    .step-body p  { font-size: 14px; color: var(--c-gray); margin: 0; line-height: 1.5; }
+    .step-body h4 { font-size: 23px; font-weight: 800; margin: 0 0 4px; letter-spacing: -0.01em; }
+    .step-body p  { font-size: 23px; color: var(--c-gray); margin: 0; line-height: 1.5; }
     .feedback-email {
-      margin-top: 6px; padding: 14px 18px; background: #EFF6FF;
-      border-radius: 10px; border-left: 3px solid var(--c-blue);
-      font-size: 16px; font-weight: 700; color: var(--c-blue); letter-spacing: -0.01em;
+      margin-top: 6px; padding: 18px 22px; background: #DBEAFE;
+      border-radius: 12px; border-left: 5px solid var(--c-blue);
+      font-size: 22px; font-weight: 800; color: var(--c-blue); letter-spacing: -0.01em;
     }
-    .feedback-email span { color: var(--c-gray); font-weight: 400; font-size: 10px; display: block; margin-bottom: 3px; letter-spacing: 0.1em; text-transform: uppercase; }
+    .feedback-email span { color: var(--c-gray); font-weight: 600; font-size: 14px; display: block; margin-bottom: 4px; letter-spacing: 0.1em; text-transform: uppercase; }
+    .feedback-note {
+      grid-column: 1 / -1; margin-top: 4px; padding: 16px 22px;
+      background: #FEE2E2; border-radius: 12px; color: var(--c-red);
+      font-size: 23px; font-weight: 700; text-align: center;
+    }
 
-    /* ---------- Q&A (slide 9) ---------- */
+    /* ---------- Q&A (slide 11) ---------- */
     .qa { justify-content: center; align-items: center; }
-    .qa-big { font-size: clamp(80px, 12vw, 140px); font-weight: 900; color: var(--c-text); letter-spacing: -0.05em; line-height: 1; }
+    .qa-big { font-size: clamp(96px, 14vw, 168px); font-weight: 900; color: var(--c-text); letter-spacing: -0.05em; line-height: 1; }
     .qa-big .red { color: var(--c-red); }
-    .qa-sub { font-size: 18px; color: var(--c-gray); margin-top: 20px; text-align: center; }
+    .qa-sub { font-size: 30px; color: var(--c-gray); margin-top: 24px; text-align: center; font-weight: 600; }
 
     /* ---------- notes panel ---------- */
     .notes-panel {
       display: none;
       border-top: 1px solid var(--c-line);
-      background: #FAFBFC; padding: 22px 96px 26px;
-      font-size: 14px; line-height: 1.6; color: var(--c-text);
+      background: #FAFBFC; padding: 24px 88px 28px;
+      font-size: 15px; line-height: 1.6; color: var(--c-text);
     }
     .notes-panel h4 {
-      color: var(--c-red); font-size: 10px; letter-spacing: 0.14em;
-      text-transform: uppercase; margin: 0 0 4px; font-weight: 700;
+      color: var(--c-red); font-size: 11px; letter-spacing: 0.14em;
+      text-transform: uppercase; margin: 0 0 5px; font-weight: 800;
     }
-    .notes-panel .lead { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
-    .audience-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 8px; }
-    .notes-panel ul { padding-left: 16px; margin: 3px 0; }
-    .notes-panel li { font-size: 13px; color: var(--c-gray); margin-bottom: 2px; }
+    .notes-panel .lead { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+    .audience-row { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-top: 8px; }
+    .notes-panel ul { padding-left: 17px; margin: 4px 0; }
+    .notes-panel li { font-size: 14px; color: var(--c-gray); margin-bottom: 3px; }
     .notes-panel li strong { color: var(--c-red); }
 
-    /* notes mode */
     body.notes-mode { overflow: auto; height: auto; }
     body.notes-mode .deck { width: 100%; height: auto; }
     body.notes-mode .slide {
@@ -307,10 +339,9 @@
       pointer-events: auto; min-height: 100vh;
     }
     body.notes-mode .notes-panel { display: block; }
-    body.notes-mode .deck-header { position: relative; height: 48px; }
+    body.notes-mode .deck-header { position: relative; height: 46px; }
     body.notes-mode .deck-footer { display: none; }
 
-    /* print */
     @media print {
       @page { size: A4 landscape; margin: 0; }
       body { overflow: visible; height: auto; }
@@ -329,16 +360,10 @@
 <body>
 <div class="deck">
 
-  <!-- 헤더 -->
   <div class="deck-header">
-    <div class="header-logo">
-      <img src="../../frontend/public/dexcowin-logo.png" alt="DEXCOWIN">
-      <span style="font-weight:700;color:var(--c-text);font-size:13px;letter-spacing:0.05em;">MES</span>
-    </div>
-    <div class="slide-counter"><span id="cur">01</span> / 09</div>
+    <div class="slide-counter"><b><span id="cur">01</span></b> / 11</div>
   </div>
 
-  <!-- 푸터 -->
   <div class="deck-footer">
     <div>2026.05 사내 발표 — DEXCOWIN MES</div>
     <div class="progress-bar" id="progress"></div>
@@ -348,29 +373,28 @@
   <section class="slide cover" data-slide="1">
     <div>
       <div class="slide-eyebrow">2026.05 사내 발표</div>
-      <div class="wordmark">DEXCOWIN<span class="reg">®</span></div>
-      <div class="cover-mes">MES</div>
-      <div class="cover-sub">Manufacturing Execution System</div>
+      <img class="cover-logo" src="assets/dexcowin-logo.png" alt="DEXCOWIN">
+      <div class="cover-sub">MES<small>Manufacturing Execution System</small></div>
     </div>
     <div class="cover-tagline">재고·입출고·BOM을<br>하나의 시스템으로 관리합니다.</div>
     <div class="cover-meta">2026년 5월</div>
     <div class="notes-panel">
       <h4>말할 한 줄</h4>
-      <p class="lead">"오늘은 DEXCOWIN MES를 처음 소개하는 자리입니다. 15분이면 충분합니다."</p>
+      <p class="lead">"오늘은 DEXCOWIN MES를 처음 소개하는 자리입니다. 길지 않게, 보시는 게 빠릅니다."</p>
       <div class="audience-row">
         <div>
-          <h4>사장님 대본 포인트</h4>
+          <h4>사장님 대본 포인트 (말로만)</h4>
           <ul>
             <li><strong>비용:</strong> 외부 솔루션 없이 자체 개발, 라이선스 0원</li>
-            <li><strong>일정:</strong> 5월 말 실사용 전환 목표</li>
-            <li><strong>안정성:</strong> 검증 5게이트 통과, 96/100점</li>
+            <li><strong>일정:</strong> 5월 말 전환 목표 (슬라이드 8에서 구체화)</li>
+            <li><strong>안정성:</strong> 전환 직전 실물 재실사 + 2주 병행 검증</li>
           </ul>
         </div>
         <div>
           <h4>현장 포인트</h4>
           <ul>
-            <li>엑셀·대장 쓰던 작업이 어떻게 달라지는지 설명할 것</li>
-            <li>어렵지 않다 — 오히려 더 간편해진다는 메시지 강조</li>
+            <li>엑셀·대장이 어떻게 달라지는지 중심으로</li>
+            <li>"어렵지 않다, 오히려 더 간편하다" 톤 유지</li>
           </ul>
         </div>
       </div>
@@ -380,14 +404,14 @@
   <!-- ============ Slide 2 — 기존 방식의 문제점 ============ -->
   <section class="slide" data-slide="2">
     <div class="slide-eyebrow">기존 방식의 문제점</div>
-    <div class="slide-title">왜 바꿔야 했을까요?</div>
+    <div class="slide-title">왜 바꿔야 할까요?</div>
     <div class="pain-grid">
       <div class="pain-card">
         <div class="pain-head">
           <div class="pain-icon">📋</div>
-          <div class="pain-title">담당자 없을 때 — 3개 파일 관리</div>
+          <div class="pain-title">담당자 없을 때 — 3개 파일</div>
         </div>
-        <div class="pain-body">물건을 이동할 때마다 창고 대장 작성 → 부서 재고 파일 수정 → 창고 재고 파일 수정. 세 단계 중 하나라도 빠지면 실재고와 기록이 맞지 않는 일이 빈번했습니다.</div>
+        <div class="pain-body">창고 대장 → 부서 재고 파일 → 창고 재고 파일. 하나만 빠져도 재고가 안 맞습니다.</div>
         <div class="pain-tag">재고 불일치</div>
       </div>
       <div class="pain-card">
@@ -395,15 +419,15 @@
           <div class="pain-icon">🔁</div>
           <div class="pain-title">담당자 있어도 — 이중 작업</div>
         </div>
-        <div class="pain-body">창고 담당자가 생긴 후에도 창고 대장 작성과 부서 재고 파일 수정, 똑같은 내용을 두 곳에 입력해야 했습니다.</div>
+        <div class="pain-body">창고 대장과 부서 재고 파일, 같은 내용을 두 번 입력해야 했습니다.</div>
         <div class="pain-tag">이중 업무</div>
       </div>
       <div class="pain-card">
         <div class="pain-head">
           <div class="pain-icon">⚠️</div>
-          <div class="pain-title">불일치 시 임의 조작</div>
+          <div class="pain-title">안 맞으면 — 임의로 숫자 맞춤</div>
         </div>
-        <div class="pain-body">실재고와 엑셀 재고가 안 맞으면, 원인을 파악하지 않고 입출고로 숫자를 맞추는 경우가 있었습니다. 이력이 남지 않아 데이터 신뢰성이 없어집니다.</div>
+        <div class="pain-body">원인은 안 보고 입출고로 수량만 맞춥니다. 이력이 없어 신뢰가 무너집니다.</div>
         <div class="pain-tag">신뢰성 제로</div>
       </div>
       <div class="pain-card">
@@ -411,242 +435,179 @@
           <div class="pain-icon">🔧</div>
           <div class="pain-title">BOM — 하위 부품 수동 출고</div>
         </div>
-        <div class="pain-body">완제품·공정완료품을 입고 처리할 때, 들어간 하위 부품을 엑셀에서 하나하나 찾아 수동으로 출고해야 했습니다. 누락이 생기기 쉬웠습니다.</div>
+        <div class="pain-body">완제품 입고 시 하위 부품을 엑셀에서 하나하나 빼야 합니다. 누락이 잦습니다.</div>
         <div class="pain-tag">누락 위험</div>
       </div>
     </div>
     <div class="notes-panel">
       <h4>말할 한 줄</h4>
-      <p class="lead">"이 네 가지 문제가 엑셀로 재고를 관리할 때 생기는 한계입니다."</p>
+      <p class="lead">"이 네 가지가 엑셀로 재고 관리할 때 늘 생기는 한계입니다."</p>
       <div class="audience-row">
-        <div>
-          <h4>현장 공감 유도</h4>
-          <ul>
-            <li>재고 불일치 경험 있는지 청중 반응 확인</li>
-            <li>"이런 상황 많이 있으셨죠?" 한 마디 추가 가능</li>
-          </ul>
-        </div>
-        <div>
-          <h4>Q&A 대비</h4>
-          <ul>
-            <li>Q: 담당자 있으면 해결 안 되나? → 이중 작업·BOM 문제는 여전히 남음</li>
-            <li>Q: 엑셀이 더 편하지 않나? → 불일치·이력 없음 문제 강조</li>
-          </ul>
-        </div>
+        <div><h4>현장 공감</h4><ul><li>"이런 상황 많으셨죠?" 반응 확인</li><li>불일치 경험 끄덕임 유도</li></ul></div>
+        <div><h4>Q&A 대비</h4><ul><li>담당자 있으면 되지 않나 → 이중작업·BOM은 그대로</li><li>엑셀이 편하지 않나 → 이력·불일치 문제</li></ul></div>
       </div>
     </div>
   </section>
 
-  <!-- ============ Slide 3 — 품목 분류 ============ -->
+  <!-- ============ Slide 3 — 품목 분류 (개념) ============ -->
   <section class="slide" data-slide="3">
     <div class="slide-eyebrow">품목 분류</div>
-    <div class="slide-title">재고는 세 단계로 나눠 관리합니다.</div>
+    <div class="slide-title">재고는 <span class="hl">세 단계</span>로 나눠 관리합니다.</div>
+    <div class="classify-lead">작업이 어디까지 됐는지에 따라 — 코드만 봐도 단계를 알 수 있게.</div>
     <div class="classify-grid">
       <div class="classify-card">
         <div class="classify-badge badge-r">R</div>
-        <div>
-          <div class="classify-title">원자재</div>
-          <div class="classify-code">Raw Material</div>
-        </div>
-        <div class="classify-body">외부에서 발주한 후 입고된 그 상태의 부품입니다. 아직 아무 가공도 하지 않은 상태입니다.</div>
-        <div class="classify-ex">예: <strong>HR</strong> · <strong>VR</strong> · <strong>AR</strong> (고압·진공·조립 원자재)</div>
+        <div class="classify-name">원자재</div>
+        <div class="classify-desc">외부에서 발주해<br>입고된 그 상태.<br>아직 가공 전.</div>
       </div>
       <div class="classify-card">
         <div class="classify-badge badge-a">A</div>
-        <div>
-          <div class="classify-title">중간공정</div>
-          <div class="classify-code">Assembly / Work-in-Process</div>
-        </div>
-        <div class="classify-body">ass'y 완제품이 되기 전에 미리 작업을 해둔 것입니다. 다음 공정에서 사용할 준비가 된 중간 결과물입니다.</div>
-        <div class="classify-ex">예: <strong>HA</strong> · <strong>VA</strong> · <strong>AA</strong> (고압·진공·조립 중간공정)</div>
+        <div class="classify-name">중간공정</div>
+        <div class="classify-desc">완제품 되기 전<br>미리 작업해 둔 것.<br>다음 공정 준비물.</div>
       </div>
       <div class="classify-card">
         <div class="classify-badge badge-f">F</div>
-        <div>
-          <div class="classify-title">공정완료</div>
-          <div class="classify-code">Finished Process</div>
-        </div>
-        <div class="classify-body">다음 공정으로 넘길 준비가 완전히 된 것입니다. 해당 부서에서의 작업이 끝난 상태입니다.</div>
-        <div class="classify-ex">예: <strong>HF</strong> · <strong>VF</strong> · <strong>AF</strong> (고압·진공·조립 공정완료)</div>
+        <div class="classify-name">공정완료</div>
+        <div class="classify-desc">다음 공정으로<br>넘길 준비 완료.<br>해당 부서 작업 끝.</div>
       </div>
     </div>
     <div class="notes-panel">
       <h4>말할 한 줄</h4>
-      <p class="lead">"코드 뒤 알파벳 하나로 이 부품이 어느 단계인지 바로 알 수 있습니다."</p>
+      <p class="lead">"재고를 원자재·중간공정·공정완료 세 단계로 봅니다. 다음 장에서 이게 코드에 그대로 들어갑니다."</p>
       <div class="audience-row">
-        <div>
-          <h4>설명 포인트</h4>
-          <ul>
-            <li>앞 알파벳 = 부서 (H:고압, V:진공, A:조립, T:튜브, N:튜닝, P:출하)</li>
-            <li>뒤 알파벳 = 단계 (R:원자재, A:중간공정, F:공정완료)</li>
-            <li>기존 공정 분류 체계를 그대로 반영한 것</li>
-          </ul>
-        </div>
-        <div>
-          <h4>Q&A 대비</h4>
-          <ul>
-            <li>Q: 코드는 누가 정했나? → 기존 공정 분류 체계 기반, 이미 정해진 것</li>
-            <li>Q: 직접 외워야 하나? → 시스템이 이름+코드 함께 표시함</li>
-          </ul>
-        </div>
+        <div><h4>설명 포인트</h4><ul><li>여기선 개념만 — 코드 표기는 다음 슬라이드</li><li>R/A/F = 이 세 단계의 머리글자</li></ul></div>
+        <div><h4>Q&A 대비</h4><ul><li>왜 나누나 → 단계별 재고·진행 파악 위해</li></ul></div>
       </div>
     </div>
   </section>
 
-  <!-- ============ Slide 4 — 창고 ↔ 부서 입출고 ============ -->
+  <!-- ============ Slide 4 — 품목 코드 체계 (신설) ============ -->
   <section class="slide" data-slide="4">
-    <div class="slide-eyebrow">창고 ↔ 부서 입출고</div>
-    <div class="slide-title">요청하면 담당자가 승인합니다.</div>
-    <div class="ba-wrap">
-      <div class="ba-col">
-        <div class="ba-col-head ba-head-before">⬛ 지금까지 (엑셀·대장)</div>
-        <div class="ba-item ba-item-before">
-          <div class="ba-check">✕</div>
-          <div>
-            <div class="ba-task">창고 대장 직접 작성</div>
-            <div class="ba-desc">물건 이동할 때마다 종이 대장에 수기 기입</div>
-          </div>
-        </div>
-        <div class="ba-item ba-item-before">
-          <div class="ba-check">✕</div>
-          <div>
-            <div class="ba-task">부서 재고 파일 별도 수정</div>
-            <div class="ba-desc">엑셀에서 해당 품목 찾아 수량 직접 변경</div>
-          </div>
-        </div>
-        <div class="ba-item ba-item-before">
-          <div class="ba-check">✕</div>
-          <div>
-            <div class="ba-task">창고 재고 파일 별도 수정</div>
-            <div class="ba-desc">대장 보고 누군가 다시 창고 파일에 반영</div>
-          </div>
-        </div>
-        <div class="ba-item ba-item-before">
-          <div class="ba-check">✕</div>
-          <div>
-            <div class="ba-task">3개 파일 불일치 위험 상시 존재</div>
-            <div class="ba-desc">하나라도 빠지면 실재고와 기록이 달라짐</div>
-          </div>
+    <div class="slide-eyebrow">품목 코드 체계</div>
+    <div class="slide-title">코드만 봐도 <span class="hl">무엇인지</span> 알 수 있습니다.</div>
+    <div class="code-anatomy">
+      <div class="code-seg seg-model"><div class="glyph">3</div><div class="lbl">모델</div></div>
+      <div class="code-dash">-</div>
+      <div class="code-seg seg-proc"><div class="glyph">HF</div><div class="lbl">공정 (부서 + 단계)</div></div>
+      <div class="code-dash">-</div>
+      <div class="code-seg seg-ser"><div class="glyph">0001</div><div class="lbl">일련번호</div></div>
+    </div>
+    <div class="code-cols">
+      <div class="model-legend">
+        <div class="ml-title">모델 번호</div>
+        <div class="ml-row"><b>3</b> DX3000</div>
+        <div class="ml-row"><b>7</b> COCOON</div>
+        <div class="ml-row"><b>8</b> SOLO</div>
+        <div class="ml-row"><b>4</b> ADX4000W</div>
+        <div class="ml-row"><b>6</b> ADX6000FB</div>
+        <div class="code-ex">
+          <span class="ex"><code>3-HF-0001</code> = DX3000 · 고압 공정완료 · 1번</span>
+          <span class="ex"><code>7-TR-0005</code> = COCOON · 튜브 원자재 · 5번</span>
         </div>
       </div>
-      <div class="ba-col">
-        <div class="ba-col-head ba-head-after">✦ DEXCOWIN MES</div>
-        <div class="ba-item ba-item-after">
-          <div class="ba-check ba-ok">✓</div>
-          <div>
-            <div class="ba-task">프로그램에서 품목 선택 후 요청</div>
-            <div class="ba-desc">몇 번의 클릭으로 입출고 요청 완료</div>
-          </div>
-        </div>
-        <div class="ba-item ba-item-after">
-          <div class="ba-check ba-ok">✓</div>
-          <div>
-            <div class="ba-task">창고 정·부에게 요청 자동 전송</div>
-            <div class="ba-desc">권동환 사원(정) / 이필욱 부장(부) 확인 후 승인</div>
-          </div>
-        </div>
-        <div class="ba-item ba-item-after">
-          <div class="ba-check ba-ok">✓</div>
-          <div>
-            <div class="ba-task">승인 즉시 창고·부서 재고 자동 동기화</div>
-            <div class="ba-desc">두 곳의 재고가 동시에 정확하게 반영됨</div>
-          </div>
-        </div>
-        <div class="ba-item ba-item-after">
-          <div class="ba-check ba-ok">✓</div>
-          <div>
-            <div class="ba-task">대장 작성·파일 수정 불필요</div>
-            <div class="ba-desc">요청 올리고 물건 가지러 가면 끝</div>
-          </div>
-        </div>
+      <div>
+        <div class="matrix-title">부서(앞) × 단계(뒤) — 전 18코드</div>
+        <table class="matrix">
+          <thead>
+            <tr><th></th><th>R 원자재</th><th>A 중간공정</th><th>F 공정완료</th></tr>
+          </thead>
+          <tbody>
+            <tr><th>조립 A</th><td>AR</td><td>AA</td><td>AF</td></tr>
+            <tr><th>고압 H</th><td>HR</td><td>HA</td><td>HF</td></tr>
+            <tr><th>진공 V</th><td>VR</td><td>VA</td><td>VF</td></tr>
+            <tr><th>튜닝 N</th><td>NR</td><td>NA</td><td>NF</td></tr>
+            <tr><th>튜브 T</th><td>TR</td><td>TA</td><td>TF</td></tr>
+            <tr><th>출하 P</th><td>PR</td><td>PA</td><td>PF</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
     <div class="notes-panel">
       <h4>말할 한 줄</h4>
-      <p class="lead">"창고에서 물건 가져올 때 이제 대장 안 써도 됩니다. 앱에서 요청하면 권동환 사원이 확인하고 승인합니다."</p>
+      <p class="lead">"규칙은 다 보여드리지만 — 쓰실 땐 외울 필요 없습니다. 시스템이 이름이랑 같이 보여줍니다."</p>
       <div class="audience-row">
-        <div>
-          <h4>현장 포인트</h4>
-          <ul>
-            <li>앱 요청 → 창고 담당자 승인 → 수령 순서 강조</li>
-            <li>승인 없이는 재고 변동 없음 = 무단 반출 방지</li>
-          </ul>
-        </div>
-        <div>
-          <h4>Q&A 대비</h4>
-          <ul>
-            <li>Q: 담당자 없을 때는? → 창고 부(이필욱 부장) 대행 승인 가능</li>
-            <li>Q: 긴급 상황엔? → 별도 프로세스 추후 논의 예정</li>
-          </ul>
-        </div>
+        <div><h4>설명 포인트</h4><ul><li>3조각: 모델 - 공정(부서+단계) - 일련번호</li><li>앞글자=부서, 뒷글자=단계(R/A/F는 3번 슬라이드 그 단계)</li><li>매트릭스 = 18개 전부, 한눈에</li></ul></div>
+        <div><h4>Q&A 대비</h4><ul><li>외워야 하나 → 아니오, 시스템이 표시</li><li>코드 누가 정하나 → 기존 공정 분류 체계 그대로</li></ul></div>
       </div>
     </div>
   </section>
 
-  <!-- ============ Slide 5 — 부서 내 입출고 ============ -->
+  <!-- ============ Slide 5 — 창고 ↔ 부서 입출고 ============ -->
   <section class="slide" data-slide="5">
-    <div class="slide-eyebrow">부서 내 입출고</div>
-    <div class="slide-title">부서 안에서도 달라집니다.</div>
+    <div class="slide-eyebrow">창고 ↔ 부서 입출고</div>
+    <div class="slide-title">요청하면 <span class="hl">담당자가 승인</span>합니다.</div>
     <div class="ba-wrap">
       <div class="ba-col">
-        <div class="ba-col-head ba-head-before">⬛ 지금까지 (엑셀)</div>
+        <div class="ba-col-head ba-head-before">지금까지 — 엑셀·대장</div>
         <div class="ba-item ba-item-before">
-          <div class="ba-check">✕</div>
-          <div>
-            <div class="ba-task">BOM — 하위 부품 하나하나 수동 출고</div>
-            <div class="ba-desc">완제품 입고 시 들어간 부품을 엑셀에서 직접 찾아 하나씩 빼야 함 → 누락 위험</div>
-          </div>
+          <div class="ba-row"><div class="ba-check">✕</div><div><div class="ba-task">창고 대장 직접 작성</div><div class="ba-desc">이동할 때마다 종이에 수기 기입</div></div></div>
         </div>
         <div class="ba-item ba-item-before">
-          <div class="ba-check">✕</div>
-          <div>
-            <div class="ba-task">재고 불일치 시 임의로 숫자 맞추기</div>
-            <div class="ba-desc">원인 파악 없이 입출고로 수량 조작 → 이력 없음, 데이터 신뢰성 없어짐</div>
-          </div>
+          <div class="ba-row"><div class="ba-check">✕</div><div><div class="ba-task">부서·창고 재고 파일 따로 수정</div><div class="ba-desc">같은 내용을 파일 두 곳에 또 입력</div></div></div>
+        </div>
+        <div class="ba-item ba-item-before">
+          <div class="ba-row"><div class="ba-check">✕</div><div><div class="ba-task">3개 파일 불일치 위험 상시</div><div class="ba-desc">하나만 빠져도 실재고와 어긋남</div></div></div>
         </div>
       </div>
       <div class="ba-col">
-        <div class="ba-col-head ba-head-after">✦ DEXCOWIN MES</div>
+        <div class="ba-col-head ba-head-after">DEXCOWIN MES</div>
         <div class="ba-item ba-item-after">
-          <div class="ba-check ba-ok">✓</div>
-          <div>
-            <div class="ba-task">BOM — 완제품 입고 시 하위 자동 출고</div>
-            <div class="ba-desc">예) 발생부 고압B/D(3-HF-0001) 입고 → 하위 2개 부품 자동 차감<br>DXDR-70 튜브(7-TF-0001) 입고 → 하위 9개 자동 처리</div>
-          </div>
+          <div class="ba-row"><div class="ba-check ba-ok">✓</div><div><div class="ba-task">프로그램에서 품목 선택 후 요청</div><div class="ba-desc">클릭 몇 번이면 요청 완료</div></div></div>
         </div>
         <div class="ba-item ba-item-after">
-          <div class="ba-check ba-ok">✓</div>
-          <div>
-            <div class="ba-task">낱개 조정은 부서 정·부 승인 필수</div>
-            <div class="ba-desc">임의 조작 차단 — 승인 이력으로 "누가 왜 조정했는지" 추적 가능</div>
-          </div>
+          <div class="ba-row"><div class="ba-check ba-ok">✓</div><div><div class="ba-task">창고 정·부에게 자동 전송 → 승인</div><div class="ba-desc">권동환 사원(정) / 이필욱 부장(부) 확인 후</div></div></div>
+        </div>
+        <div class="ba-item ba-item-after">
+          <div class="ba-row"><div class="ba-check ba-ok">✓</div><div><div class="ba-task">승인 즉시 재고 자동 동기화</div><div class="ba-desc">창고·부서 동시 반영, 대장·파일 불필요</div></div></div>
         </div>
       </div>
     </div>
     <div class="notes-panel">
       <h4>말할 한 줄</h4>
-      <p class="lead">"공정완료품을 입고하면 들어간 부품이 알아서 빠집니다. 낱개 조정은 부서장 확인을 받아야 합니다."</p>
+      <p class="lead">"이제 대장 안 씁니다. 앱에서 요청 → 권동환 사원 승인 → 물건 가지러 가면 끝."</p>
       <div class="audience-row">
-        <div>
-          <h4>현장 포인트</h4>
-          <ul>
-            <li>BOM 자동출고는 직접 해봐야 편함이 느껴짐 → 시연에서 보여줄 것</li>
-            <li>낱개 승인: 각 부서 정/부가 누구인지 사전 안내 필요</li>
-          </ul>
-        </div>
-        <div>
-          <h4>Q&A 대비</h4>
-          <ul>
-            <li>Q: BOM이 틀리면? → 관리자 페이지에서 수정 가능</li>
-            <li>Q: 낱개 승인 안 받으면? → 시스템에서 반려 처리됨</li>
-          </ul>
-        </div>
+        <div><h4>현장 포인트</h4><ul><li>요청 → 승인 → 수령 순서 강조</li><li>승인 없이는 재고 변동 없음 = 무단 반출 차단</li></ul></div>
+        <div><h4>Q&A 대비</h4><ul><li>담당자 부재 시 → 창고 부(이필욱 부장) 대행</li></ul></div>
       </div>
     </div>
   </section>
 
-  <!-- ============ Slide 6 — 앞으로 관리 방식 ============ -->
+  <!-- ============ Slide 6 — 부서 내 입출고 ============ -->
   <section class="slide" data-slide="6">
+    <div class="slide-eyebrow">부서 내 입출고</div>
+    <div class="slide-title">부서 안에서도 <span class="hl">달라집니다.</span></div>
+    <div class="ba-wrap">
+      <div class="ba-col">
+        <div class="ba-col-head ba-head-before">지금까지 — 엑셀</div>
+        <div class="ba-item ba-item-before">
+          <div class="ba-row"><div class="ba-check">✕</div><div><div class="ba-task">BOM — 하위 부품 수동 출고</div><div class="ba-desc">완제품 입고 시 들어간 부품을 엑셀에서 하나하나 빼야 함 → 누락</div></div></div>
+        </div>
+        <div class="ba-item ba-item-before">
+          <div class="ba-row"><div class="ba-check">✕</div><div><div class="ba-task">불일치 시 임의로 숫자 맞춤</div><div class="ba-desc">원인 없이 수량 조작 → 이력 없음, 신뢰 붕괴</div></div></div>
+        </div>
+      </div>
+      <div class="ba-col">
+        <div class="ba-col-head ba-head-after">DEXCOWIN MES</div>
+        <div class="ba-item ba-item-after">
+          <div class="ba-row"><div class="ba-check ba-ok">✓</div><div><div class="ba-task">완제품 입고 → 하위 자동 출고</div><div class="ba-desc">예) 3-HF-0001 입고 시 하위 자동 차감 · 7-TF-0001 입고 시 하위 9개 자동</div></div></div>
+        </div>
+        <div class="ba-item ba-item-after">
+          <div class="ba-row"><div class="ba-check ba-ok">✓</div><div><div class="ba-task">낱개 조정은 부서 정·부 승인 필수</div><div class="ba-desc">임의 조작 차단 — "누가 왜 조정했는지" 이력으로 추적</div></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="notes-panel">
+      <h4>말할 한 줄</h4>
+      <p class="lead">"공정완료품 입고하면 들어간 부품이 알아서 빠집니다. 낱개 조정만 부서장 확인."</p>
+      <div class="audience-row">
+        <div><h4>현장 포인트</h4><ul><li>BOM 자동출고는 시연에서 직접 보여줄 것</li><li>낱개 승인 = 생산부 정/부(이필욱·김건호)</li></ul></div>
+        <div><h4>Q&A 대비</h4><ul><li>BOM 틀리면 → 관리자 페이지 수정</li><li>낱개 승인 안 받으면 → 시스템 반려</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Slide 7 — 앞으로 관리 방식 ============ -->
+  <section class="slide" data-slide="7">
     <div class="slide-eyebrow">앞으로 관리 방식</div>
     <div class="slide-title">이렇게 운영합니다.</div>
     <div class="rule-grid">
@@ -654,52 +615,95 @@
         <div class="rule-num">1</div>
         <div class="rule-title">창고 이동</div>
         <div class="rule-who">창고 정 — 권동환 사원<br>창고 부 — 이필욱 부장</div>
-        <div class="rule-body">창고에서 물건을 가져가거나 반납할 때는 반드시 창고 정/부의 승인이 있어야 재고가 변동됩니다.</div>
+        <div class="rule-body">창고에서 가져가거나 반납할 때 창고 정/부 승인이 있어야 재고가 변동됩니다.</div>
       </div>
       <div class="rule-card">
         <div class="rule-num">2</div>
         <div class="rule-title">부서 낱개 입출고</div>
-        <div class="rule-who">각 부서 정 / 부 승인 필수</div>
-        <div class="rule-body">BOM을 통하지 않는 개별 품목 조정은 부서 정/부의 승인이 필요합니다. 임의 수량 조작을 막고 이력을 남깁니다.</div>
+        <div class="rule-who">생산부 정/부 승인 필수</div>
+        <div class="rule-body">BOM 아닌 개별 조정은 승인이 필요합니다. 임의 조작을 막고 이력을 남깁니다.</div>
       </div>
       <div class="rule-card rule-scrap">
         <div class="rule-num">3</div>
         <div class="rule-title">불량 등록</div>
-        <div class="rule-who">발생 즉시 등록 — 승인 없음</div>
-        <div class="rule-body">불량이 생기면 바로 시스템에 등록합니다. 별도 승인 없이 재고에서 자동으로 차감됩니다.</div>
+        <div class="rule-who">발생 즉시 — 승인 없음</div>
+        <div class="rule-body">불량은 바로 등록. 별도 승인 없이 재고에서 자동 차감됩니다.</div>
       </div>
     </div>
     <div class="notes-panel">
       <h4>말할 한 줄</h4>
-      <p class="lead">"창고 이동은 권동환 사원, 부서 낱개 조정은 각 부서장, 불량은 바로 등록. 이 세 가지입니다."</p>
+      <p class="lead">"창고 이동은 권동환 사원, 낱개는 생산부장, 불량은 바로 등록. 셋입니다."</p>
+      <div class="audience-row">
+        <div><h4>현장 포인트</h4><ul><li>불량 등록 습관화가 핵심 — 발생 즉시</li></ul></div>
+        <div><h4>Q&A 대비</h4><ul><li>불량 실수 → 관리자 페이지 수정</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Slide 8 — 전환 계획 (신설) ============ -->
+  <section class="slide" data-slide="8">
+    <div class="slide-eyebrow">전환 계획</div>
+    <div class="slide-title">엑셀은 <span class="hl">검증되면</span> 내립니다.</div>
+    <div class="tl-wrap">
+      <div class="tl">
+        <div class="tl-node">
+          <div class="tl-dot">1</div>
+          <div class="tl-h">발표 (5월 중)</div>
+          <div class="tl-p">시연 · 피드백 수집 시작</div>
+        </div>
+        <div class="tl-node">
+          <div class="tl-dot">2</div>
+          <div class="tl-h">실사 재고 입력</div>
+          <div class="tl-p">현재 엑셀 데이터 MES 반영</div>
+        </div>
+        <div class="tl-node hot">
+          <div class="tl-dot">3</div>
+          <div class="tl-h">5월 말 전환</div>
+          <div class="tl-p">전환 직전 실물 재실사로<br>출발값 맞추고 MES 시작</div>
+        </div>
+        <div class="tl-node">
+          <div class="tl-dot">4</div>
+          <div class="tl-h">2주 병행 검증</div>
+          <div class="tl-p">엑셀+MES 동시 · 일일 대조<br>이상 수량만 실물 재확인</div>
+        </div>
+        <div class="tl-node">
+          <div class="tl-dot">5</div>
+          <div class="tl-h">엑셀 폐기</div>
+          <div class="tl-p">5영업일 연속 불일치 0이면<br>공식 폐기 선언</div>
+        </div>
+      </div>
+    </div>
+    <div class="notes-panel">
+      <h4>말할 한 줄</h4>
+      <p class="lead">"5월 말 전환이 목표지만, 엑셀을 바로 안 버립니다. 2주 병행해서 검증되면 그때 내립니다."</p>
       <div class="audience-row">
         <div>
-          <h4>현장 포인트</h4>
+          <h4>사장님 핵심 (일정+안정성 동시 답)</h4>
           <ul>
-            <li>부서 정/부 지정이 아직 안 된 부서는 발표 후 별도 안내</li>
-            <li>불량 등록은 습관화가 핵심 — 발생 즉시 바로 할 것</li>
+            <li>"언제부터?" → 5월 말 목표</li>
+            <li>"안 맞으면?" → 전환 직전 실물 재실사가 기준점, 2주 병행이 안전망</li>
+            <li>"엑셀 언제 없애?" → 5영업일 연속 불일치 0이면 폐기</li>
           </ul>
         </div>
         <div>
-          <h4>Q&A 대비</h4>
+          <h4>운영 디테일</h4>
           <ul>
-            <li>Q: 부서 정/부는 누가 정하나? → 각 부서에서 지정 후 관리자에게 전달</li>
-            <li>Q: 불량 등록 실수하면? → 관리자 페이지에서 수정 가능</li>
+            <li>병행 중 일일 엑셀↔MES 대조 (드리프트 탐지)</li>
+            <li>차이 뜬 품목만 사람이 실물 기준 판단·정정</li>
+            <li>엑셀은 용의자, 실물이 기준 (엑셀에 MES 맞추는 함정 회피)</li>
           </ul>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ============ Slide 7 — 라이브 시연 ============ -->
-  <section class="slide" data-slide="7">
-    <div class="slide-eyebrow">라이브 시연 · 약 6분</div>
+  <!-- ============ Slide 9 — 라이브 시연 ============ -->
+  <section class="slide" data-slide="9">
+    <div class="slide-eyebrow">라이브 시연</div>
     <div class="demo-wrap">
       <div class="demo-header">
-        <div class="demo-play">
-          <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-        </div>
-        <div class="demo-title-wrap">
+        <div class="demo-play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+        <div>
           <div class="demo-title">직접 보여드리겠습니다.</div>
           <div class="demo-sub">데스크탑 시연 · 샘플 데이터</div>
         </div>
@@ -707,69 +711,45 @@
       <div class="demo-progress">완료 <span class="cnt" id="demo-cnt">0</span> / 6</div>
       <div class="demo-list">
         <div class="demo-item" data-demo="login" onclick="toggleDemoItem('login')">
-          <div class="demo-check">✓</div>
-          <div class="demo-item-text">1. PIN 로그인</div>
+          <div class="demo-check">✓</div><div class="demo-item-text">1. PIN 로그인</div>
         </div>
         <div class="demo-item" data-demo="request" onclick="toggleDemoItem('request')">
-          <div class="demo-check">✓</div>
-          <div class="demo-item-text">2. 창고 입출고 요청</div>
+          <div class="demo-check">✓</div><div class="demo-item-text">2. 창고 입출고 요청</div>
         </div>
         <div class="demo-item" data-demo="approve" onclick="toggleDemoItem('approve')">
-          <div class="demo-check">✓</div>
-          <div class="demo-item-text">3. 창고 정/부 승인 처리</div>
+          <div class="demo-check">✓</div><div class="demo-item-text">3. 창고 정/부 승인 처리</div>
         </div>
         <div class="demo-item" data-demo="stock" onclick="toggleDemoItem('stock')">
-          <div class="demo-check">✓</div>
-          <div class="demo-item-text">4. 부서 재고 현황 확인</div>
+          <div class="demo-check">✓</div><div class="demo-item-text">4. 부서 재고 현황 확인</div>
         </div>
         <div class="demo-item" data-demo="bom" onclick="toggleDemoItem('bom')">
-          <div class="demo-check">✓</div>
-          <div class="demo-item-text">5. BOM 입고 → 하위 자동출고 확인</div>
+          <div class="demo-check">✓</div><div class="demo-item-text">5. BOM 입고 → 하위 자동출고</div>
         </div>
         <div class="demo-item" data-demo="scrap" onclick="toggleDemoItem('scrap')">
-          <div class="demo-check">✓</div>
-          <div class="demo-item-text">6. 불량 등록</div>
+          <div class="demo-check">✓</div><div class="demo-item-text">6. 불량 등록</div>
         </div>
       </div>
     </div>
     <div class="notes-panel">
       <h4>말할 한 줄</h4>
-      <p class="lead">"설명만으론 느낌이 안 오죠. 직접 보여드리겠습니다."</p>
+      <p class="lead">"설명만으론 감이 안 오죠. 직접 보여드리겠습니다."</p>
       <div class="audience-row">
-        <div>
-          <h4>시연 중 포인트</h4>
-          <ul>
-            <li>alt+tab으로 MES 전환, 복귀 시 T키로 체크</li>
-            <li>BOM 자동출고는 천천히 — "하위 부품이 자동으로 빠집니다" 강조</li>
-          </ul>
-        </div>
-        <div>
-          <h4>비상 대비</h4>
-          <ul>
-            <li>인터넷 없을 경우 로컬 서버(localhost)로 동작 확인</li>
-            <li>시연 데이터 사전 입력 필수 — 발표 30분 전 점검</li>
-          </ul>
-        </div>
+        <div><h4>시연 포인트</h4><ul><li>alt+tab으로 MES 전환, 복귀 시 T키 체크</li><li>BOM 자동출고는 천천히 강조</li></ul></div>
+        <div><h4>비상 대비</h4><ul><li>인터넷 없으면 localhost로</li><li>시연 데이터 30분 전 점검</li></ul></div>
       </div>
     </div>
   </section>
 
-  <!-- ============ Slide 8 — 피드백 수집 ============ -->
-  <section class="slide" data-slide="8">
+  <!-- ============ Slide 10 — 피드백 수집 ============ -->
+  <section class="slide" data-slide="10">
     <div class="slide-eyebrow">피드백 수집</div>
-    <div class="slide-title">사용해 보시고 의견을 주세요.</div>
+    <div class="slide-title">사용해 보시고 <span class="hl">의견을 주세요.</span></div>
     <div class="feedback-wrap">
       <div class="feedback-form-card">
         <div class="feedback-form-head">피드백 양식</div>
         <div class="feedback-form-body">
-          <div class="feedback-field">
-            <label>부서</label>
-            <div class="field-line"></div>
-          </div>
-          <div class="feedback-field">
-            <label>이름</label>
-            <div class="field-line"></div>
-          </div>
+          <div class="feedback-field"><label>부서</label><div class="field-line"></div></div>
+          <div class="feedback-field"><label>이름</label><div class="field-line"></div></div>
           <div class="feedback-field">
             <label>구분</label>
             <div class="field-check">
@@ -778,82 +758,53 @@
               <span><div class="check-box"></div> 기타</span>
             </div>
           </div>
-          <div class="feedback-field">
-            <label>내용</label>
-            <div class="field-area"></div>
-          </div>
+          <div class="feedback-field"><label>내용</label><div class="field-area"></div></div>
         </div>
       </div>
       <div class="feedback-steps">
         <div class="feedback-step">
           <div class="step-num">1</div>
-          <div class="step-body">
-            <h4>양식 작성</h4>
-            <p>불편한 점 또는 추가하고 싶은 기능을 양식에 작성해 주세요.</p>
-          </div>
+          <div class="step-body"><h4>양식 작성</h4><p>불편한 점·추가하고 싶은 기능을 적어 주세요.</p></div>
         </div>
         <div class="feedback-step">
           <div class="step-num">2</div>
-          <div class="step-body">
-            <h4>부서별 취합</h4>
-            <p>부서 담당자가 부서원 피드백을 모아서 취합합니다.</p>
-          </div>
+          <div class="step-body"><h4>부서별 취합</h4><p>부서 담당자가 부서원 의견을 모읍니다.</p></div>
         </div>
         <div class="feedback-step">
           <div class="step-num">3</div>
-          <div class="step-body">
-            <h4>메일로 전달</h4>
-            <p>취합한 내용을 아래 메일로 첨부해서 보내주시면 반영하겠습니다.</p>
-          </div>
+          <div class="step-body"><h4>메일로 전달</h4><p>취합본을 아래 메일로 첨부해 보내주세요.</p></div>
         </div>
-        <div class="feedback-email">
-          <span>담당자 이메일</span>
-          hwhyun@dexcowin.com
-        </div>
+        <div class="feedback-email"><span>담당자 이메일</span>hwhyun@dexcowin.com</div>
       </div>
+      <div class="feedback-note">전환은 예정대로 진행합니다 · 피드백은 우선순위대로 순차 반영 (안전 관련은 즉시)</div>
     </div>
     <div class="notes-panel">
       <h4>말할 한 줄</h4>
-      <p class="lead">"사용해 보시고 불편하거나 필요한 기능이 있으면 양식에 적어서 부서별로 취합 후 메일로 보내주세요."</p>
+      <p class="lead">"써보시고 불편하거나 필요한 게 있으면 양식으로 부서별 취합 후 메일 주세요."</p>
       <div class="audience-row">
-        <div>
-          <h4>현장 포인트</h4>
-          <ul>
-            <li>양식 인쇄본 미리 배포하면 응답률 높아짐</li>
-            <li>제출 기한 언급 권장</li>
-          </ul>
-        </div>
-        <div>
-          <h4>Q&A 대비</h4>
-          <ul>
-            <li>Q: 피드백 반영까지 얼마나 걸리나? → 우선순위 따라 다르나 빠른 것은 즉시 반영</li>
-          </ul>
-        </div>
+        <div><h4>현장 포인트</h4><ul><li>양식 인쇄본 미리 배포 시 응답률 ↑</li><li>제출 기한 언급 권장</li></ul></div>
+        <div><h4>Q&A 대비</h4><ul><li>반영 언제 → 안전 관련 즉시, 그 외 우선순위</li><li>전환이 미뤄지나 → 아니오, 예정대로</li></ul></div>
       </div>
     </div>
   </section>
 
-  <!-- ============ Slide 9 — Q&A ============ -->
-  <section class="slide qa" data-slide="9">
+  <!-- ============ Slide 11 — Q&A ============ -->
+  <section class="slide qa" data-slide="11">
     <div class="qa-big">Q<span class="red">&</span>A</div>
     <div class="qa-sub">궁금하신 점이 있으시면 편하게 질문해 주세요.</div>
     <div class="notes-panel">
       <h4>예상 질문 대비</h4>
       <div class="audience-row">
-        <div>
-          <ul>
-            <li><strong>언제부터 쓰나?</strong> → 5월 말 전환 목표</li>
-            <li><strong>교육은?</strong> → 오늘 발표가 교육, 추가 필요 시 개별 안내</li>
-            <li><strong>모바일 지원?</strong> → 추후 확장 예정, 현재 데스크탑</li>
-          </ul>
-        </div>
-        <div>
-          <ul>
-            <li><strong>데이터 백업은?</strong> → 서버 파일 백업, 별도 안내 예정</li>
-            <li><strong>비용?</strong> → 자체 개발, 라이선스 0원</li>
-            <li><strong>오류 생기면?</strong> → hwhyun@dexcowin.com 연락</li>
-          </ul>
-        </div>
+        <div><ul>
+          <li><strong>언제부터?</strong> → 5월 말 목표, 2주 병행 후 엑셀 폐기</li>
+          <li><strong>교육은?</strong> → 오늘 발표가 교육, 필요 시 개별 안내</li>
+          <li><strong>모바일?</strong> → 추후 확장, 현재 데스크탑</li>
+        </ul></div>
+        <div><ul>
+          <li><strong>데이터 백업?</strong> → 서버 파일 백업, 별도 안내</li>
+          <li><strong>비용?</strong> → 자체 개발, 라이선스 0원</li>
+          <li><strong>오류 시?</strong> → hwhyun@dexcowin.com</li>
+        </ul></div>
       </div>
     </div>
   </section>
@@ -861,17 +812,15 @@
 </div><!-- /.deck -->
 
 <script>
-  const TOTAL = 9;
-  const STORAGE_KEY = 'dexcowin-mes-demo-v2';
+  const TOTAL = 11;
+  const STORAGE_KEY = 'dexcowin-mes-demo-v3';
+  const DEMO_SLIDE = 9;
   const slides = Array.from(document.querySelectorAll('.slide'));
   const cur = document.getElementById('cur');
   const progress = document.getElementById('progress');
   let idx = 1;
 
-  for (let i = 0; i < TOTAL; i++) {
-    const s = document.createElement('span');
-    progress.appendChild(s);
-  }
+  for (let i = 0; i < TOTAL; i++) progress.appendChild(document.createElement('span'));
 
   function render() {
     slides.forEach((s, i) => s.classList.toggle('active', i + 1 === idx));
@@ -880,7 +829,7 @@
       s.className = i + 1 < idx ? 'done' : i + 1 === idx ? 'current' : '';
     });
     history.replaceState(null, '', location.search + '#' + idx);
-    if (idx === 7) renderDemoProgress();
+    if (idx === DEMO_SLIDE) renderDemoProgress();
   }
 
   function go(n) { idx = Math.max(1, Math.min(TOTAL, n)); render(); }
@@ -890,17 +839,15 @@
   document.addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     switch (e.key) {
-      case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown':
-        next(); e.preventDefault(); break;
-      case 'ArrowLeft': case 'ArrowUp': case 'PageUp':
-        prev(); e.preventDefault(); break;
+      case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': next(); e.preventDefault(); break;
+      case 'ArrowLeft': case 'ArrowUp': case 'PageUp': prev(); e.preventDefault(); break;
       case 'Home': go(1); e.preventDefault(); break;
       case 'End':  go(TOTAL); e.preventDefault(); break;
       case 'f': case 'F': toggleFullscreen(); break;
       case 'n': case 'N': toggleNotes(); break;
-      case 't': case 'T':
-        if (idx === 7) toggleNextDemoItem();
-        break;
+      case 't': case 'T': if (idx === DEMO_SLIDE) toggleNextDemoItem(); break;
+      case '0': go(10); e.preventDefault(); break;
+      case '-': go(11); e.preventDefault(); break;
       default:
         if (e.key >= '1' && e.key <= '9') { go(parseInt(e.key, 10)); e.preventDefault(); }
     }
@@ -914,48 +861,28 @@
   function toggleNotes() {
     const on = document.body.classList.toggle('notes-mode');
     const u = new URL(location.href);
-    if (on) u.searchParams.set('notes', '1');
-    else u.searchParams.delete('notes');
+    if (on) u.searchParams.set('notes', '1'); else u.searchParams.delete('notes');
     history.replaceState(null, '', u.pathname + (u.search || '') + '#' + idx);
   }
 
   const DEMO_KEYS = ['login', 'request', 'approve', 'stock', 'bom', 'scrap'];
-
-  function loadDemoState() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
-  }
-  function saveDemoState(s) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {}
-  }
-
+  function loadDemoState() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; } }
+  function saveDemoState(s) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {} }
   function renderDemoProgress() {
-    const state = loadDemoState();
-    const done = DEMO_KEYS.filter(k => state[k]).length;
+    const st = loadDemoState();
     const el = document.getElementById('demo-cnt');
-    if (el) el.textContent = done;
+    if (el) el.textContent = DEMO_KEYS.filter(k => st[k]).length;
     DEMO_KEYS.forEach(k => {
-      const item = document.querySelector(`[data-demo="${k}"]`);
-      if (item) item.classList.toggle('done', !!state[k]);
+      const it = document.querySelector('[data-demo="' + k + '"]');
+      if (it) it.classList.toggle('done', !!st[k]);
     });
   }
-
-  function toggleDemoItem(key) {
-    const state = loadDemoState();
-    state[key] = !state[key];
-    saveDemoState(state);
-    renderDemoProgress();
-  }
-
+  function toggleDemoItem(key) { const s = loadDemoState(); s[key] = !s[key]; saveDemoState(s); renderDemoProgress(); }
   function toggleNextDemoItem() {
-    const state = loadDemoState();
-    if (DEMO_KEYS.every(k => state[k])) {
-      DEMO_KEYS.forEach(k => state[k] = false);
-    } else {
-      const next = DEMO_KEYS.find(k => !state[k]);
-      if (next) state[next] = true;
-    }
-    saveDemoState(state);
-    renderDemoProgress();
+    const s = loadDemoState();
+    if (DEMO_KEYS.every(k => s[k])) DEMO_KEYS.forEach(k => s[k] = false);
+    else { const n = DEMO_KEYS.find(k => !s[k]); if (n) s[n] = true; }
+    saveDemoState(s); renderDemoProgress();
   }
 
   const m = location.hash.match(/^#(\d+)/);
