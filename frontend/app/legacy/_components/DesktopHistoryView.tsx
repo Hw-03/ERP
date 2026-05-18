@@ -14,12 +14,12 @@ import { useHistoryData } from "./_hooks/useHistoryData";
 import { useCurrentOperator } from "./login/useCurrentOperator";
 import { parseUtc, toDateKey } from "./_history_sections/historyFormat";
 import { getDefaultHistoryScopeForOperator, type HistoryScope } from "./_history_sections/transactionTaxonomy";
+import { type HistorySelection } from "./_history_sections/historyConstants";
 import {
   TRANSACTION_TYPES_NONE,
   dateFilterToFrom,
   intersectTransactionTypes,
-  type HistorySelection,
-} from "./_history_sections/historyShared";
+} from "./_history_sections/historyQuery";
 
 const SEARCH_DEBOUNCE_MS = 350;
 

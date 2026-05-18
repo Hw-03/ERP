@@ -8,7 +8,7 @@ import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState, LoadingSkeleton } from "../common";
 import { formatHistoryDate } from "./historyFormat";
-import type { HistorySelection } from "./historyShared";
+import type { HistorySelection } from "./historyConstants";
 import { HistoryLogRow } from "./HistoryLogRow";
 import { BatchHeader, OpBatchHeader, buildGroups } from "./historyTableHelpers";
 import { BomBatchDetail } from "./BomBatchDetail";

@@ -8,7 +8,7 @@ import { HistoryDetailPanel } from "./HistoryDetailPanel";
 import { HistoryBatchDetailPanel } from "./HistoryBatchDetailPanel";
 import { formatHistoryDate } from "./historyFormat";
 import { getHistoryActor, getHistoryDisplayLabel } from "./historyBatchInterpreter";
-import type { HistorySelection } from "./historyShared";
+import type { HistorySelection } from "./historyConstants";
 
 /**
  * Round-13 (#15) 추출 — DesktopHistoryView 우측 슬라이딩 상세 패널.

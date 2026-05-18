@@ -9,7 +9,7 @@ import {
   WAREHOUSE_INVOLVED_TYPES,
   type HistoryScope,
 } from "./transactionTaxonomy";
-import { DATE_OPTIONS, TYPE_OPTIONS, type TypeOption } from "./historyShared";
+import { DATE_OPTIONS, TYPE_OPTIONS, type TypeOption } from "./historyQuery";
 
 const _wh = new Set<string>(WAREHOUSE_INVOLVED_TYPES);
 const _dept = new Set<string>(DEPT_INTERNAL_TYPES);
