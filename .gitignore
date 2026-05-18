@@ -69,3 +69,11 @@ vault/
 
 # 품목 이미지 추출 원본 (scripts/dev/extract_excel_images.py 재실행으로 재생성 가능)
 data/이미지 추출을 위한 원본/
+
+# ── 배포 전 정리 (predeploy-cleanup) ──────────────────────────────
+# 백업 스냅샷 — *.db.backup-* 만 있던 구멍 보강 (erp.db.bak-YYYYMMDD-... 등).
+# DB 류는 처음부터 커밋 안 하는 관례 유지 (*.db / *.db.backup-* 와 동일 취지).
+*.bak-*
+backend/_backup/
+# _attic/ 은 의도적으로 추적·커밋한다(정리 후 나중에 일괄 삭제 예정).
+# DB 백업만 위 규칙으로 자동 제외되고 나머지(스크립트·문서·데이터·카탈로그)는 커밋됨.
