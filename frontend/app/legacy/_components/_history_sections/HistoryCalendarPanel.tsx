@@ -41,7 +41,7 @@ export function HistoryCalendarPanel({
   setSelectedDay,
 }: HistoryCalendarPanelProps) {
   return (
-    <section className="card" style={{ paddingTop: 14, paddingBottom: open ? 14 : 10 }}>
+    <section className="card" style={{ paddingTop: open ? 14 : 10, paddingBottom: open ? 14 : 8 }}>
       {/* 헤더 — 항상 노출 */}
       <div className="flex items-center gap-3">
         <CalendarDays className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />

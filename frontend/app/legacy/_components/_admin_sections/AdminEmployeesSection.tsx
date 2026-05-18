@@ -2,13 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Save, Trash2, Users, X } from "lucide-react";
-import { api, type DepartmentMaster, type DepartmentRole, type Employee, type ProductModel, type WarehouseRole } from "@/lib/api";
+import { api, type DepartmentMaster, type DepartmentRole, type Employee, type EmployeeLevel, type ProductModel, type WarehouseRole } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment, getDepartmentFallbackColor } from "@/lib/mes/department";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { EmptyState } from "../common";
 import { AppSelect } from "../common/AppSelect";
-import { FilterChip } from "../common/FilterChip";
 import { StatusPill } from "../common/StatusPill";
 import {
   AdminDetailCard,
@@ -167,17 +166,13 @@ export function AdminEmployeesSection() {
             searchPlaceholder="이름·부서·역할 검색"
             onSearchChange={setSearch}
             filters={
-              <>
-                {deptOptions.map((d) => (
-                  <FilterChip
-                    key={d}
-                    active={deptFilter === d}
-                    label={d === "ALL" ? "전체" : d}
-                    onClick={() => setDeptFilter(d)}
-                    size="sm"
-                  />
-                ))}
-              </>
+              <AppSelect
+                value={deptFilter}
+                onChange={setDeptFilter}
+                options={deptOptions.map((d) => ({ value: d, label: d === "ALL" ? "전체 부서" : d }))}
+                size="sm"
+                triggerStyle={{ background: LEGACY_COLORS.s2 }}
+              />
             }
             items={filteredEmployees}
             emptyState={
@@ -396,22 +391,25 @@ function EmployeeAddInline({ form, setForm, departments, productModels, onSubmit
       }}
     >
       <div className="grid grid-cols-2 gap-3">
-        <FieldRow label="이름" required>
+        <FieldRow label="이름" htmlFor="emp-add-name" required>
           <TextInput
+            id="emp-add-name"
             value={form.name}
             onChange={(v) => setForm((f) => ({ ...f, name: v }))}
             placeholder="예: 홍길동"
           />
         </FieldRow>
-        <FieldRow label="역할">
+        <FieldRow label="역할" htmlFor="emp-add-role">
           <TextInput
+            id="emp-add-role"
             value={form.role}
             onChange={(v) => setForm((f) => ({ ...f, role: v }))}
             placeholder="예: 조립/사원"
           />
         </FieldRow>
-        <FieldRow label="연락처">
+        <FieldRow label="연락처" htmlFor="emp-add-phone">
           <TextInput
+            id="emp-add-phone"
             value={form.phone}
             onChange={(v) => setForm((f) => ({ ...f, phone: v }))}
             placeholder="예: 010-0000-0000"
@@ -498,7 +496,7 @@ function EmployeeDetailGrid({
   onToggle,
   onRequestDelete,
 }: EmployeeDetailGridProps) {
-  const levelMeta = LEVEL_LABEL[employee.level] ?? LEVEL_LABEL.staff;
+  const levelMeta = LEVEL_LABEL[form.level] ?? LEVEL_LABEL.staff;
   const whMeta = WAREHOUSE_ROLE_LABEL[form.warehouse_role];
   const deptMeta = DEPARTMENT_ROLE_LABEL[form.department_role];
   return (
@@ -506,14 +504,16 @@ function EmployeeDetailGrid({
       {/* 카드 1: 기본 정보 */}
       <DetailCardSlot title="기본 정보">
         <div className="grid grid-cols-2 gap-3">
-          <FieldRow label="이름">
+          <FieldRow label="이름" htmlFor="emp-edit-name">
             <TextInput
+              id="emp-edit-name"
               value={form.name}
               onChange={(v) => setForm((f) => ({ ...f, name: v }))}
             />
           </FieldRow>
-          <FieldRow label="역할">
+          <FieldRow label="역할" htmlFor="emp-edit-role">
             <TextInput
+              id="emp-edit-role"
               value={form.role}
               onChange={(v) => setForm((f) => ({ ...f, role: v }))}
             />
@@ -527,8 +527,9 @@ function EmployeeDetailGrid({
                 .map((d) => ({ value: d.name, label: d.name }))}
             />
           </FieldRow>
-          <FieldRow label="연락처">
+          <FieldRow label="연락처" htmlFor="emp-edit-phone">
             <TextInput
+              id="emp-edit-phone"
               value={form.phone}
               onChange={(v) => setForm((f) => ({ ...f, phone: v }))}
             />
@@ -539,12 +540,19 @@ function EmployeeDetailGrid({
       {/* 카드 2: 권한 */}
       <DetailCardSlot title="권한">
         <div className="flex flex-col gap-3">
-          <PermissionRow
-            label="등급"
-            badge={levelMeta.label}
-            tone={levelMeta.tone}
-            hint={levelMeta.hint}
-          />
+          <FieldRow label="등급">
+            <SelectInput
+              value={form.level}
+              onChange={(v) => setForm((f) => ({ ...f, level: v as EmployeeLevel }))}
+              options={(["staff", "manager", "admin"] as EmployeeLevel[]).map((l) => ({
+                value: l,
+                label: LEVEL_LABEL[l].label,
+              }))}
+            />
+            <div className="mt-1.5 text-[11px]" style={{ color: levelMeta.tone }}>
+              {levelMeta.hint}
+            </div>
+          </FieldRow>
           <FieldRow label="창고 결재 역할">
             <SelectInput
               value={form.warehouse_role}
@@ -679,16 +687,19 @@ function DetailCardSlot({ title, children }: { title: string; children: React.Re
 
 function FieldRow({
   label,
+  htmlFor,
   required,
   children,
 }: {
   label: string;
+  htmlFor?: string;
   required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <div
+      <label
+        htmlFor={htmlFor}
         className="text-[11px] font-bold uppercase tracking-[0.08em]"
         style={{ color: LEGACY_COLORS.muted2 }}
       >
@@ -698,60 +709,26 @@ function FieldRow({
             *
           </span>
         )}
-      </div>
+      </label>
       {children}
     </div>
   );
 }
 
-function PermissionRow({
-  label,
-  badge,
-  tone,
-  hint,
-}: {
-  label: string;
-  badge: string;
-  tone: string;
-  hint: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <div
-        className="text-[11px] font-bold uppercase tracking-[0.08em]"
-        style={{ color: LEGACY_COLORS.muted2 }}
-      >
-        {label}
-      </div>
-      <div className="flex items-center gap-2">
-        <span
-          className="rounded-full px-2.5 py-0.5 text-[11px] font-black"
-          style={{
-            background: `color-mix(in srgb, ${tone} 14%, transparent)`,
-            color: tone,
-          }}
-        >
-          {badge}
-        </span>
-      </div>
-      <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-        {hint}
-      </div>
-    </div>
-  );
-}
-
 function TextInput({
+  id,
   value,
   onChange,
   placeholder,
 }: {
+  id?: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
 }) {
   return (
     <input
+      id={id}
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}

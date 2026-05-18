@@ -37,7 +37,7 @@ export function WarehouseSectionTabs({
     { id: "mine", label: "내 요청", tone: LEGACY_COLORS.purple },
   ];
   if (showQueue) tabs.push({ id: "queue", label: "창고 승인함", tone: LEGACY_COLORS.yellow });
-  if (showDeptQueue) tabs.push({ id: "dept-queue", label: "부서 승인함", tone: LEGACY_COLORS.yellow });
+  if (showDeptQueue) tabs.push({ id: "dept-queue", label: "부서 승인함", tone: LEGACY_COLORS.purple });
 
   const badgeFor = (id: WarehouseSectionTab): number | null => {
     if (id === "cart" && cartCount > 0) return cartCount;
@@ -48,6 +48,7 @@ export function WarehouseSectionTabs({
 
   return (
     <div
+      role="tablist"
       className="grid gap-2"
       style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
     >
@@ -84,7 +85,9 @@ function TabButton({
 
   return (
     <button
+      role="tab"
       type="button"
+      aria-selected={active}
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -99,8 +102,8 @@ function TabButton({
       </div>
       {badge !== null && (
         <div
-          className="absolute right-4 top-1/2 -translate-y-1/2 text-[28px] font-black leading-none"
-          style={{ color: tone }}
+          className="absolute right-3 top-1/2 -translate-y-1/2 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-black leading-none text-white"
+          style={{ background: tone }}
         >
           {badge}
         </div>

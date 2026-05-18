@@ -94,7 +94,7 @@ export function DesktopAdminView({
         <section className="flex min-h-0 flex-col overflow-hidden">
           {/* 토스트 영역 (섹션 헤더는 각 섹션이 직접 렌더링) */}
           {(saveMessage || message) && (
-            <div className="mb-3 flex shrink-0 flex-col gap-2">
+            <div role="alert" aria-live="polite" className="mb-3 flex shrink-0 flex-col gap-2">
               {saveMessage && (
                 <div
                   className="rounded-[14px] border px-4 py-2.5 text-[13px] font-bold"

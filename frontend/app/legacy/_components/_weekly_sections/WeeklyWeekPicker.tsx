@@ -96,8 +96,38 @@ export function WeeklyWeekPicker({ weekMon, onChange }: Props) {
   const canPrevMonth = calMonth > CAL_MIN;
   const canNextMonth = calMonth < thisMonthStart;
 
+  // 이전/다음 주 이동 핸들러
+  const thisWeekMon = getWeekStartMonday(new Date());
+  const canPrevWeek = weekMon > CAL_MIN;
+  const canNextWeek = weekMon < thisWeekMon;
+
+  function handlePrevWeek() {
+    if (!canPrevWeek) return;
+    onChange(new Date(weekMon.getTime() - 7 * 86400000));
+  }
+  function handleNextWeek() {
+    if (!canNextWeek) return;
+    onChange(new Date(weekMon.getTime() + 7 * 86400000));
+  }
+
   return (
     <div ref={rootRef} className="relative flex items-center gap-2">
+      {/* 이전 주 */}
+      <button
+        type="button"
+        onClick={handlePrevWeek}
+        disabled={!canPrevWeek}
+        title="이전 주"
+        className="flex h-8 w-8 items-center justify-center rounded-[10px] border transition-colors hover:brightness-110 disabled:opacity-30"
+        style={{
+          background: LEGACY_COLORS.s2,
+          borderColor: LEGACY_COLORS.border,
+          color: LEGACY_COLORS.muted,
+        }}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -119,6 +149,22 @@ export function WeeklyWeekPicker({ weekMon, onChange }: Props) {
             transform: open ? "rotate(180deg)" : "rotate(0deg)",
           }}
         />
+      </button>
+
+      {/* 다음 주 */}
+      <button
+        type="button"
+        onClick={handleNextWeek}
+        disabled={!canNextWeek}
+        title={!canNextWeek ? "미래 주차는 선택 불가" : "다음 주"}
+        className="flex h-8 w-8 items-center justify-center rounded-[10px] border transition-colors hover:brightness-110 disabled:opacity-30"
+        style={{
+          background: LEGACY_COLORS.s2,
+          borderColor: LEGACY_COLORS.border,
+          color: LEGACY_COLORS.muted,
+        }}
+      >
+        <ChevronRight className="h-4 w-4" />
       </button>
 
       {isThisWeek && <StatusPill label="이번 주" tone="success" showDot={false} />}
@@ -186,18 +232,21 @@ export function WeeklyWeekPicker({ weekMon, onChange }: Props) {
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-y-0.5 gap-x-0">
             {getWeeksOfMonth(calMonth.getFullYear(), calMonth.getMonth()).flatMap(
               (week) => {
                 const sun = week[0];
+                // 일~토 구성이므로 월(index 1)이 주차 기준 시작일
                 const mon = new Date(sun.getTime() + 86400000);
                 const weekKey = toDateStr(mon);
                 const isSelectedWeek = weekKey === weekStartStr;
                 const isHovered = hoveredWeek === weekKey;
                 const isFuture =
                   toDateStr(mon) > toDateStr(getWeekStartMonday(new Date()));
-                return week.map((d) => {
+                return week.map((d, dayIdx) => {
                   const isOutside = d.getMonth() !== calMonth.getMonth();
+                  const isFirst = dayIdx === 0;
+                  const isLast = dayIdx === 6;
                   return (
                     <button
                       key={d.toISOString()}
@@ -210,7 +259,10 @@ export function WeeklyWeekPicker({ weekMon, onChange }: Props) {
                       onMouseEnter={() => !isFuture && setHoveredWeek(weekKey)}
                       onMouseLeave={() => setHoveredWeek(null)}
                       disabled={isFuture}
-                      className="flex flex-col items-center rounded-[10px] border px-1 py-1.5 transition-colors disabled:opacity-30"
+                      title={isFuture ? "미래 주차는 선택 불가" : undefined}
+                      className={`flex flex-col items-center border-y px-1 py-1.5 transition-colors disabled:opacity-30 ${
+                        isFirst ? "rounded-l-[10px] border-l" : ""
+                      } ${isLast ? "rounded-r-[10px] border-r" : "border-r-0"}`}
                       style={{
                         background: isSelectedWeek
                           ? "rgba(101,169,255,.18)"

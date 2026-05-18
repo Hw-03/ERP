@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { DepartmentRole, Employee, WarehouseRole } from "@/lib/api";
+import type { DepartmentRole, Employee, EmployeeLevel, WarehouseRole } from "@/lib/api";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../_admin_sections/adminShared";
 
 /**
@@ -17,6 +17,7 @@ export type EmployeeEditForm = {
   role: string;
   phone: string;
   department: string;
+  level: EmployeeLevel;
   warehouse_role: WarehouseRole;
   department_role: DepartmentRole;
   /** 조립 부서 직원의 담당 모델 slot 목록 (배열 순서 = 우선순위, 0=1순위). */
@@ -28,6 +29,7 @@ const EMPTY_EDIT_FORM: EmployeeEditForm = {
   role: "",
   phone: "",
   department: "조립",
+  level: "staff",
   warehouse_role: "none",
   department_role: "none",
   assigned_model_slots: [],
@@ -39,6 +41,7 @@ function toEditForm(emp: Employee): EmployeeEditForm {
     role: emp.role,
     phone: emp.phone ?? "",
     department: emp.department,
+    level: (emp.level ?? "staff") as EmployeeLevel,
     warehouse_role: (emp.warehouse_role ?? "none") as WarehouseRole,
     department_role: (emp.department_role ?? "none") as DepartmentRole,
     assigned_model_slots: emp.assigned_model_slots ?? [],

@@ -53,9 +53,9 @@ export function BomUnmatchedRawsDrawer({ rawItems, childIdSet }: Props) {
           </span>
         </div>
         {open ? (
-          <ChevronDown size={16} style={{ color: LEGACY_COLORS.muted2 }} />
-        ) : (
           <ChevronUp size={16} style={{ color: LEGACY_COLORS.muted2 }} />
+        ) : (
+          <ChevronDown size={16} style={{ color: LEGACY_COLORS.muted2 }} />
         )}
       </button>
       {open && !isEmpty && (

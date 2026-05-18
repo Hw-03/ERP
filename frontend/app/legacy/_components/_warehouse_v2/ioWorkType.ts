@@ -201,4 +201,9 @@ export function lineTagLabel(line: IoLine, subType: IoSubType): { text: string; 
   return { text: "직접 선택", tone: "blue" };
 }
 
+/** workType 이 출고/비가역 계열이면 true — Step 1 카드 accent 색 결정에 사용. */
+export function isExitWorkType(workType: IoWorkType): boolean {
+  return workType === "defect";
+}
+
 export { RefreshCcw };

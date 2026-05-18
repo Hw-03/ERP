@@ -12,7 +12,7 @@ import { IoTargetPicker } from "./IoTargetPicker";
 import { IoBundleCart } from "./IoBundleCart";
 import { IoConfirmStep } from "./IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "./IoSubmitModals";
-import { IO_WORK_TYPES, approvalKind, deptIoDirectionOf, isBomForced, pickerDirectionLabel, requiresDepartments, subTypeLabel } from "./ioWorkType";
+import { IO_WORK_TYPES, approvalKind, deptIoDirectionOf, isBomForced, isExitWorkType, pickerDirectionLabel, requiresDepartments, subTypeLabel } from "./ioWorkType";
 import { useIoDraft } from "./useIoDraft";
 import { useIoPreview } from "./useIoPreview";
 import { useIoSubmit } from "./useIoSubmit";
@@ -415,7 +415,7 @@ export function IoComposeView({
   const itemMap = useMemo(() => new Map(items.map((item) => [item.item_id, item])), [items]);
   const stepState = (n: IoStep): "active" | "complete" | "locked" =>
     step === n ? "active" : step > n ? "complete" : "locked";
-  const accent = LEGACY_COLORS.blue;
+  const accent = isExitWorkType(state.workType) ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   const stepWrapperClass = (n: IoStep) => `flex flex-col${step > n ? " pt-[9px]" : ""}`;
 
   // step 변경 시 직전(step-1) 카드를 viewport top으로 스크롤 → 그 아래 active step 카드가 자연스럽게 노출
@@ -657,9 +657,9 @@ export function IoComposeView({
                   onClick={state.goNext}
                   disabled={!state.canAdvance[2]}
                   className="flex w-full items-center justify-center gap-2 rounded-[18px] px-7 py-5 text-lg font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
-                  style={{ background: LEGACY_COLORS.blue }}
+                  style={{ background: accent }}
                 >
-                  다음 단계로 →
+                  {state.canAdvance[2] ? "다음 단계로 →" : "세부 작업과 부서를 선택하세요"}
                 </button>
               </div>
             </div>

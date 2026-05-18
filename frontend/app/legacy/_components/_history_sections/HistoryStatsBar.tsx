@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Building2, FileSearch, Workflow } from "lucide-react";
+import { Building2, FileSearch, Sliders, Workflow } from "lucide-react";
 import type { TransactionSummary } from "@/lib/api/production";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -91,7 +91,7 @@ export function HistoryStatsBar({ summary, summaryLoading, loadedCount, canLoadM
             className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.15em]"
             style={{ color: LEGACY_COLORS.yellow }}
           >
-            <AlertTriangle className="h-3.5 w-3.5" />
+            <Sliders className="h-3.5 w-3.5" />
             수량 조정
           </div>
           <div className="text-2xl font-black" style={{ color: LEGACY_COLORS.yellow }}>

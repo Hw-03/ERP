@@ -32,22 +32,13 @@ interface Props {
 export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix({
   rows,
 }: Props) {
-  const hasAny = rows.some((r) => r.total_qty > 0);
-
-  if (!hasAny) {
-    return (
-      <div className="flex flex-col items-center gap-1 py-4">
-        <span className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.muted }}>
-          이번 주 생산 실적 없음
-        </span>
-        <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-          선택 주차 기준 모델별 생산 완료 기록이 없습니다.
-        </span>
-      </div>
-    );
-  }
-
   const altBg = tint(LEGACY_COLORS.s2, 50, LEGACY_COLORS.s1);
+
+  // 열별 최댓값 계산 (농도 비례 히트맵용)
+  const colMax: Record<NumCol, number> = {} as Record<NumCol, number>;
+  for (const c of COLS) {
+    colMax[c.key] = Math.max(...rows.map((r) => r[c.key]), 1);
+  }
 
   return (
     <div className="overflow-x-auto">
@@ -55,6 +46,7 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
         <thead>
           <tr style={{ background: LEGACY_COLORS.s2 }}>
             <th
+              scope="col"
               className="py-2 px-3 text-center text-[13px] font-bold tracking-wide"
               style={{ color: LEGACY_COLORS.muted2 }}
             >
@@ -65,6 +57,7 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
               return (
                 <th
                   key={c.key}
+                  scope="col"
                   className="px-3 py-2 text-center text-[14px] font-black tracking-wide"
                   style={{ color: deptColor }}
                 >
@@ -93,6 +86,10 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
                   const val = row[c.key];
                   const deptColor = getDepartmentFallbackColor(c.dept);
                   const hasVal = val > 0;
+                  // 열 최댓값 대비 비율로 8~40% 선형 보간
+                  const tintPct = hasVal
+                    ? Math.round(8 + (val / colMax[c.key]) * 32)
+                    : 0;
                   return (
                     <td
                       key={c.key}
@@ -100,7 +97,7 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
                       style={{
                         color: hasVal ? deptColor : ZERO_FADE,
                         background: hasVal
-                          ? `color-mix(in srgb, ${deptColor} 15%, transparent)`
+                          ? `color-mix(in srgb, ${deptColor} ${tintPct}%, transparent)`
                           : undefined,
                       }}
                     >

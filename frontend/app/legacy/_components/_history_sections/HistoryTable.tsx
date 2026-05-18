@@ -227,6 +227,7 @@ export function HistoryTable({
                 {COLUMNS.map(({ label, width, minWidth, align }) => (
                   <th
                     key={label}
+                    scope="col"
                     className={`whitespace-nowrap border-b px-4 py-3 text-xs font-bold ${align === "center" ? "text-center" : "text-left"}`}
                     style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth }}
                   >

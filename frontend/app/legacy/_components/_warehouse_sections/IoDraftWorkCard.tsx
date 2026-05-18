@@ -28,7 +28,8 @@ const TAG_TONE: Record<string, string> = {
 };
 
 // 백엔드(services/io.py)가 datetime.utcnow() 로 timezone-naive UTC 를 저장하므로
-// 응답 ISO 문자열에 "Z" 가 없으면 UTC 로 간주하고 보정. (백엔드 광역 수정 전 임시)
+// 응답 ISO 문자열에 "Z" 가 없으면 UTC 로 간주하고 보정.
+// TODO(backend UTC 정리 후 제거): datetime.now(timezone.utc) 전환 완료 시 이 함수 불필요.
 function parseServerTime(iso: string): number {
   const hasTz = /Z$|[+-]\d{2}:?\d{2}$/.test(iso);
   return new Date(hasTz ? iso : iso + "Z").getTime();
@@ -183,16 +184,16 @@ export function IoDraftWorkCard({
           return (
             <li
               key={b.bundle_id}
-              className="flex items-baseline gap-2 overflow-hidden text-[22px] font-black leading-tight"
+              className="flex items-baseline gap-2 overflow-hidden text-base font-black leading-tight"
               style={{ color: LEGACY_COLORS.text }}
             >
               <span className="min-w-0 truncate">{b.title}</span>
               <span
-                className="shrink-0 tabular-nums text-[24px] font-black leading-none"
+                className="shrink-0 tabular-nums text-lg font-black leading-none"
                 style={{ color: accent }}
               >
                 {formatQty(displayQty)}
-                <span className="ml-0.5 text-[16px] font-black">EA</span>
+                <span className="ml-0.5 text-sm font-black">EA</span>
               </span>
             </li>
           );
@@ -274,6 +275,7 @@ export function IoDraftWorkCard({
       >
         <button
           type="button"
+          aria-label="이어서 작업"
           disabled={isBusy}
           onClick={onContinue}
           className="rounded-[10px] border px-3 py-1.5 text-xs font-black disabled:opacity-50"
@@ -287,6 +289,7 @@ export function IoDraftWorkCard({
         </button>
         <button
           type="button"
+          aria-label="작업 삭제"
           disabled={isBusy}
           onClick={onRequestDelete}
           className="rounded-[10px] px-3 py-1.5 text-xs font-black disabled:opacity-50"

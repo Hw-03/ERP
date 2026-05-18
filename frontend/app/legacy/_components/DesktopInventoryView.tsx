@@ -232,6 +232,7 @@ export function DesktopInventoryView({
         displayItem={displayItem}
         itemLogs={itemLogs}
         headerBadge={headerBadge}
+        onClose={() => setSelectedItem(null)}
         onGoToWarehouse={onGoToWarehouse}
       />
     </div>

@@ -5,7 +5,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
 import type { IoSubType, IoWorkType, OperatorLike } from "./types";
-import { IO_SUB_TYPES, IO_WORK_TYPES, canSeeWorkType, requiresDepartments, type DeptIoDirection } from "./ioWorkType";
+import { IO_SUB_TYPES, IO_WORK_TYPES, canSeeWorkType, isExitWorkType, requiresDepartments, type DeptIoDirection } from "./ioWorkType";
 
 interface WorkTypeProps {
   workType: IoWorkType;
@@ -32,26 +32,28 @@ export function IoWorkTypeStep({ workType, operator, onWorkTypeChange }: WorkTyp
       {visibleWorkTypes.map((row) => {
         const Icon = row.icon;
         const active = workType === row.id;
+        const cardAccent = isExitWorkType(row.id) ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
         return (
           <button
             key={row.id}
             type="button"
+            aria-pressed={active}
             onClick={() => onWorkTypeChange(row.id)}
             className="flex h-full min-h-0 flex-col items-start justify-between gap-6 rounded-[22px] border p-10 text-left transition-all hover:brightness-110"
             style={{
-              background: active ? tint(LEGACY_COLORS.blue, 14) : LEGACY_COLORS.s2,
-              borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+              background: active ? tint(cardAccent, 14) : LEGACY_COLORS.s2,
+              borderColor: active ? cardAccent : LEGACY_COLORS.border,
               borderWidth: active ? 2 : 1,
-              color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.text,
+              color: active ? cardAccent : LEGACY_COLORS.text,
             }}
           >
             <div className="flex items-center gap-5">
-              <Icon className="h-14 w-14 shrink-0" />
+              <Icon className="h-10 w-10 shrink-0" />
               <span className="text-4xl font-black leading-tight">{row.label}</span>
             </div>
             <span
               className="text-xl font-bold leading-tight"
-              style={{ color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
+              style={{ color: active ? cardAccent : LEGACY_COLORS.muted2 }}
             >
               {row.description}
             </span>
@@ -254,6 +256,8 @@ function DeptGrid({
             <button
               key={d}
               type="button"
+              aria-label={d}
+              aria-pressed={active}
               onClick={() => onChange(d)}
               className={`border font-black transition-all hover:brightness-110 ${
                 fill

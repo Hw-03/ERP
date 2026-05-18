@@ -101,6 +101,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                 (h, i) => (
                   <th
                     key={h}
+                    scope="col"
                     className="text-[13px] font-bold"
                     style={{
                       color: LEGACY_COLORS.muted2,

@@ -4,6 +4,7 @@ import type { StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { formatQty } from "@/lib/mes/format";
+import { REQUEST_TYPE_LABEL } from "./ioRequestLabels";
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "임시저장",
@@ -23,19 +24,6 @@ const STATUS_COLOR: Record<string, string> = {
   cancelled: LEGACY_COLORS.muted2,
   completed: LEGACY_COLORS.green,
   failed_approval: LEGACY_COLORS.red,
-};
-
-const REQUEST_TYPE_LABEL: Record<string, string> = {
-  raw_receive: "원자재 입고",
-  raw_ship: "원자재 출고",
-  warehouse_to_dept: "창고 → 부서 이동",
-  dept_to_warehouse: "부서 → 창고 복귀",
-  dept_internal: "부서 내부 이동",
-  mark_defective_wh: "창고 불량 등록",
-  mark_defective_prod: "생산 불량 등록",
-  supplier_return: "공급업체 반품",
-  package_out: "패키지 출고",
-  manual_adjustment: "수동 조정",
 };
 
 function formatRelative(iso: string): string {
@@ -148,15 +136,15 @@ export function MyRequestRow({
         {cancelable && (
           <button
             type="button"
-            className="rounded-[10px] border px-3 py-1.5 text-xs"
+            className="rounded-[10px] border px-3 py-1.5 text-xs font-bold"
             style={{
-              borderColor: LEGACY_COLORS.borderStrong,
-              color: LEGACY_COLORS.text,
+              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 50%, transparent)`,
+              color: LEGACY_COLORS.red,
               background: LEGACY_COLORS.s1,
             }}
             onClick={onCancelRequest}
           >
-            취소
+            요청 취소
           </button>
         )}
       </div>

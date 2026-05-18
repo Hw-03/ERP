@@ -10,11 +10,12 @@
  *   - 백엔드 전송: -abs(input) 으로 음수 변환
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { api, type Employee, type TransactionLog, type TransactionType } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
+import { useFocusTrap } from "@/lib/mes/useFocusTrap";
 import { AppSelect } from "../common/AppSelect";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { getHistoryDisplayLabel } from "./historyShared";
@@ -31,9 +32,13 @@ export const QUANTITY_CORRECTABLE_TYPES: ReadonlySet<TransactionType> = new Set<
   "SHIP",
 ]);
 
+const TITLE_ID = "transaction-qty-correct-modal-title";
+
 export function TransactionQuantityCorrectModal({ open, log, onClose, onSuccess }: Props) {
   const operator = useCurrentOperator();
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
+  const firstInputRef = useRef<HTMLInputElement>(null);
   const [qty, setQty] = useState(""); // 항상 양수 입력
   const [reason, setReason] = useState("");
   const [editorId, setEditorId] = useState("");
@@ -54,7 +59,15 @@ export function TransactionQuantityCorrectModal({ open, log, onClose, onSuccess 
     setPin("");
     setError("");
     setEditorId(operator?.employee_id ?? "");
+    setTimeout(() => firstInputRef.current?.focus(), 0);
   }, [open, log, operator]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   if (!open || !log) return null;
 
@@ -90,18 +103,22 @@ export function TransactionQuantityCorrectModal({ open, log, onClose, onSuccess 
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={TITLE_ID}
       className="fixed inset-0 z-[400] flex items-center justify-center"
       style={{ background: "rgba(0,0,0,.55)" }}
       onClick={onClose}
     >
       <div
+        ref={trapRef}
         className="w-full max-w-[480px] rounded-[24px] border p-6"
         style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <div className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>
+            <div id={TITLE_ID} className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>
               수량 보정
             </div>
             <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -144,6 +161,7 @@ export function TransactionQuantityCorrectModal({ open, log, onClose, onSuccess 
         <div className="space-y-3">
           <FieldRow label={`보정 수량 (${isShip ? "양수 입력 → 음수 저장" : "양수만"})`}>
             <input
+              ref={firstInputRef}
               type="number"
               min="0"
               step="any"

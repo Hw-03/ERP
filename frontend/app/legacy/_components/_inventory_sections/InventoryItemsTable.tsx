@@ -1,12 +1,25 @@
 "use client";
 
-import { PackageSearch } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, ChevronUp, PackageSearch } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { EmptyState } from "../common/EmptyState";
 import { LoadFailureCard } from "../common/LoadFailureCard";
 import { InventoryItemRow } from "./InventoryItemRow";
+
+type SortCol = "quantity" | "min_stock";
+type SortDir = "asc" | "desc";
+
+function sortItems(items: Item[], col: SortCol | null, dir: SortDir): Item[] {
+  if (!col) return items;
+  return [...items].sort((a, b) => {
+    const av = Number(a[col] ?? 0);
+    const bv = Number(b[col] ?? 0);
+    return dir === "asc" ? av - bv : bv - av;
+  });
+}
 
 const PAGE_SIZE = 100;
 
@@ -39,6 +52,19 @@ export function InventoryItemsTable({
   onResetAllFilters,
   imageManifest,
 }: Props) {
+  const [sortCol, setSortCol] = useState<SortCol | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  function handleSort(col: SortCol) {
+    if (sortCol === col) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortCol(col);
+      setSortDir("desc");
+    }
+  }
+
+  const sortedItems = sortItems(filteredItems, sortCol, sortDir);
   if (error) {
     return <LoadFailureCard message={error} onRetry={onRetry} />;
   }
@@ -84,12 +110,11 @@ export function InventoryItemsTable({
                   { label: "품목명", nowrap: false, minWidth: "140px" },
                   { label: "품목 코드", nowrap: true, width: "160px" },
                   { label: "부서", nowrap: true, width: "160px", center: true },
-                  { label: "현재고", nowrap: true, width: "160px", center: true },
-                  { label: "안전재고", nowrap: true, width: "160px", center: true },
                 ] as { label: string; nowrap: boolean; width?: string; minWidth?: string; center?: boolean }[]
               ).map(({ label, nowrap, width, minWidth, center }) => (
                 <th
                   key={label}
+                  scope="col"
                   className={`border-b px-4 py-2.5 text-sm font-bold${nowrap ? " whitespace-nowrap" : ""}${center ? " text-center" : " text-left"}`}
                   style={{
                     borderColor: LEGACY_COLORS.border,
@@ -101,10 +126,52 @@ export function InventoryItemsTable({
                   {label}
                 </th>
               ))}
+              {/* 현재고 — 정렬 가능 */}
+              <th
+                scope="col"
+                className="border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap text-center cursor-pointer select-none hover:brightness-110"
+                style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: "160px" }}
+                onClick={() => handleSort("quantity")}
+                aria-sort={sortCol === "quantity" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+              >
+                <span className="inline-flex items-center justify-center gap-1">
+                  현재고
+                  {sortCol === "quantity" ? (
+                    sortDir === "asc" ? (
+                      <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                    )
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5 opacity-30" aria-hidden="true" />
+                  )}
+                </span>
+              </th>
+              {/* 안전재고 — 정렬 가능 */}
+              <th
+                scope="col"
+                className="border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap text-center cursor-pointer select-none hover:brightness-110"
+                style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: "160px" }}
+                onClick={() => handleSort("min_stock")}
+                aria-sort={sortCol === "min_stock" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+              >
+                <span className="inline-flex items-center justify-center gap-1">
+                  안전재고
+                  {sortCol === "min_stock" ? (
+                    sortDir === "asc" ? (
+                      <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                    )
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5 opacity-30" aria-hidden="true" />
+                  )}
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody>
-            {filteredItems.slice(0, displayLimit).map((item) => (
+            {sortedItems.slice(0, displayLimit).map((item) => (
               <InventoryItemRow
                 key={item.item_id}
                 item={item}
@@ -117,7 +184,7 @@ export function InventoryItemsTable({
         </table>
       </div>
 
-      {filteredItems.length > displayLimit && (
+      {sortedItems.length > displayLimit && (
         <button
           onClick={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
           className="mt-4 w-full rounded-[24px] border py-4 text-base font-semibold"
@@ -128,13 +195,13 @@ export function InventoryItemsTable({
           }}
         >
           100개 더 보기 (
-          {formatQty(Math.min(displayLimit + PAGE_SIZE, filteredItems.length))} /{" "}
-          {formatQty(filteredItems.length)})
+          {formatQty(Math.min(displayLimit + PAGE_SIZE, sortedItems.length))} /{" "}
+          {formatQty(sortedItems.length)})
         </button>
       )}
-      {filteredItems.length > 0 && (
+      {sortedItems.length > 0 && (
         <div className="mt-2 text-center text-xs" style={{ color: LEGACY_COLORS.muted }}>
-          {formatQty(Math.min(displayLimit, filteredItems.length))} / {formatQty(filteredItems.length)}개 표시
+          {formatQty(Math.min(displayLimit, sortedItems.length))} / {formatQty(sortedItems.length)}개 표시
         </div>
       )}
     </>

@@ -91,7 +91,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
       }}
     >
       <td
-        className="border-b px-4 py-[21px] align-middle whitespace-nowrap"
+        className="border-b px-4 py-5 align-middle whitespace-nowrap"
         style={{ borderColor: LEGACY_COLORS.border }}
       >
         <span
@@ -103,7 +103,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
         </span>
       </td>
       <td
-        className="border-b px-1 py-[21px] text-center align-middle"
+        className="border-b px-1 py-5 text-center align-middle"
         style={{ borderColor: LEGACY_COLORS.border, width: 60 }}
       >
         {imageFilename ? (
@@ -118,7 +118,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
           />
         ) : null}
       </td>
-      <td className="border-b px-4 py-[21px] align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className="border-b px-4 py-5 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="font-semibold">{item.item_name}</div>
         {item.spec && (
           <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -127,13 +127,13 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
         )}
         {Number(item.quantity) === 0 ? (
           <div
-            className="mt-[20px] h-[4px] overflow-hidden rounded-full"
+            className="mt-[20px] h-[6px] overflow-hidden rounded-full"
             style={{ background: "#ef4444" }}
             title="품절"
           />
         ) : (
           <div
-            className="mt-[20px] flex h-[4px] overflow-hidden rounded-full"
+            className="mt-[20px] flex h-[6px] overflow-hidden rounded-full"
             style={{ background: LEGACY_COLORS.s3 }}
             title={segments.map((s) => s.label).join(" / ")}
             role="img"
@@ -150,13 +150,13 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
         )}
       </td>
       <td
-        className="border-b px-4 py-[21px] align-middle whitespace-nowrap text-sm"
+        className="border-b px-4 py-5 align-middle whitespace-nowrap text-sm"
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
       >
         {item.erp_code ?? "-"}
       </td>
       <td
-        className="border-b px-4 py-[21px] align-middle whitespace-nowrap"
+        className="border-b px-4 py-5 align-middle whitespace-nowrap"
         style={{ borderColor: LEGACY_COLORS.border }}
       >
         <div className="flex items-center justify-center gap-1.5">
@@ -177,16 +177,19 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
         </div>
       </td>
       <td
-        className="border-b px-4 py-[21px] text-center align-middle whitespace-nowrap text-sm font-bold"
+        className="border-b px-4 py-5 text-center align-middle whitespace-nowrap text-sm font-bold"
         style={{
           borderColor: LEGACY_COLORS.border,
           color: isCritical ? stock.color : LEGACY_COLORS.text,
         }}
       >
-        {formatQty(item.quantity)}
+        {formatQty(item.quantity)}{" "}
+        <span className="text-xs font-normal" style={{ color: LEGACY_COLORS.muted2 }}>
+          {item.unit ?? "개"}
+        </span>
       </td>
       <td
-        className="border-b px-4 py-[21px] text-center align-middle whitespace-nowrap text-sm font-bold"
+        className="border-b px-4 py-5 text-center align-middle whitespace-nowrap text-sm font-bold"
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
       >
         {item.min_stock == null ? "-" : formatQty(item.min_stock)}

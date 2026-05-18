@@ -77,11 +77,19 @@ export function InventoryCapacityPanel({
       </span>
       {status === "producible" ? (
         <>
-          <span className="text-lg font-black" style={{ color: LEGACY_COLORS.cyan }}>
+          <span
+            className="text-lg font-black"
+            style={{ color: LEGACY_COLORS.cyan }}
+            title="즉시: 중간재 활용"
+          >
             즉시 {formatQty(capacityData.immediate)}
           </span>
           <span className="text-base" style={{ color: LEGACY_COLORS.muted2 }}>/</span>
-          <span className="text-lg font-black" style={{ color: LEGACY_COLORS.blue }}>
+          <span
+            className="text-lg font-black"
+            style={{ color: LEGACY_COLORS.blue }}
+            title="최대: 원자재 전량 투입"
+          >
             최대 {formatQty(capacityData.maximum)}
           </span>
         </>

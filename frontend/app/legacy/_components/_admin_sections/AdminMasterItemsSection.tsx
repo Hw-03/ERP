@@ -23,7 +23,7 @@ const DETAIL_TABS: { id: DetailTab; label: string }[] = [
   { id: "info", label: "기본 정보" },
   { id: "stock", label: "재고 정보" },
   { id: "bom", label: "BOM / 사용처" },
-  { id: "history", label: "변경 이력" },
+  { id: "history", label: "변경 이력 (준비 중)" },
 ];
 
 interface Props {
@@ -326,6 +326,11 @@ function BomList({
   rows: { code: string | null; name: string; qty: number; unit: string }[];
   emptyHint: string;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const PAGE = 8;
+  const visible = expanded ? rows : rows.slice(0, PAGE);
+  const remaining = rows.length - PAGE;
+
   return (
     <div>
       <div className="mb-2 text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -340,7 +345,7 @@ function BomList({
             {emptyHint}
           </div>
         ) : (
-          rows.slice(0, 8).map((row, idx) => (
+          visible.map((row, idx) => (
             <div
               key={`${row.code}-${idx}`}
               className="flex items-center gap-2 px-4 py-2 text-[13px]"
@@ -366,13 +371,19 @@ function BomList({
             </div>
           ))
         )}
-        {rows.length > 8 && (
-          <div
-            className="px-4 py-2 text-[11px]"
-            style={{ borderTop: `1px solid ${LEGACY_COLORS.border}`, color: LEGACY_COLORS.muted2 }}
+        {rows.length > PAGE && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="w-full px-4 py-2 text-left text-[11px] font-bold transition-colors hover:brightness-105"
+            style={{
+              borderTop: `1px solid ${LEGACY_COLORS.border}`,
+              color: LEGACY_COLORS.blue,
+              background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 5%, transparent)`,
+            }}
           >
-            외 {rows.length - 8}건
-          </div>
+            {expanded ? "접기" : `더보기 (${remaining}건 더)`}
+          </button>
         )}
       </div>
     </div>

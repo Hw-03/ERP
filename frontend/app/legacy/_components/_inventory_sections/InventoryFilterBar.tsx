@@ -42,7 +42,7 @@ export function InventoryFilters({
 }: FiltersProps) {
   if (!open) return null;
   return (
-    <div className="mt-2.5 grid gap-2.5 xl:grid-cols-3">
+    <div id="inventory-filter-panel" className="mt-2.5 grid gap-2.5 xl:grid-cols-3">
       <div className="rounded-[16px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
         <div className="mb-2 flex items-center gap-2 text-sm font-bold">
           <Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />
@@ -179,6 +179,7 @@ export function InventoryTableStickyHeader({
             placeholder="품명 · 품목 코드 · 위치 · 공급처 검색"
             className="flex-1 bg-transparent text-base outline-none"
             style={{ color: LEGACY_COLORS.text }}
+            aria-label="자재 검색"
           />
         </div>
         <button
@@ -192,6 +193,7 @@ export function InventoryTableStickyHeader({
             color: filtersOpen ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
           }}
           aria-expanded={filtersOpen}
+          aria-controls="inventory-filter-panel"
         >
           <Filter className="h-3.5 w-3.5" />
           필터

@@ -78,6 +78,11 @@ export function AdminRightPanelContent({
     );
   }
 
+  const activeEmployees = employees.filter((e) => e.is_active).length;
+  const lowStockItems = items.filter(
+    (i) => i.min_stock != null && Number(i.quantity) < Number(i.min_stock),
+  ).length;
+
   return (
     <div className="space-y-4">
       <div
@@ -98,8 +103,20 @@ export function AdminRightPanelContent({
           현재 상태
         </div>
         <div className="space-y-2 text-base">
-          <div>품목 {formatQty(items.length)}건</div>
-          <div>직원 {formatQty(employees.length)}명</div>
+          <div>
+            품목 {formatQty(items.length)}건
+            {lowStockItems > 0 && (
+              <span className="ml-2 text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>
+                (재고부족 {formatQty(lowStockItems)})
+              </span>
+            )}
+          </div>
+          <div>
+            직원 {formatQty(employees.length)}명
+            <span className="ml-2 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+              활성 {formatQty(activeEmployees)}
+            </span>
+          </div>
           <div>BOM {formatQty(allBomRows.length)}건</div>
         </div>
       </div>

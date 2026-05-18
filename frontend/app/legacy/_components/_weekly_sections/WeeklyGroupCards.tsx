@@ -12,14 +12,14 @@ interface Props {
   groups: WeeklyGroupReport[];
   selected: string;
   onSelect: (code: string) => void;
-  cols?: 1 | 3;
+  cols?: 1;
 }
 
-function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
+function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
   const [hovered, setHovered] = useState<string | null>(null);
 
   return (
-    <div className={`grid ${cols === 1 ? "grid-cols-1" : "grid-cols-3"} gap-2`}>
+    <div className="grid grid-cols-1 gap-2">
       {groups.map((g) => {
         const isActive = g.process_code === selected;
         const isHover = hovered === g.process_code;
@@ -39,6 +39,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect, cols = 3 }: Props) {
             onClick={() => onSelect(g.process_code)}
             onMouseEnter={() => setHovered(g.process_code)}
             onMouseLeave={() => setHovered(null)}
+            aria-pressed={isActive}
             className="relative overflow-hidden rounded-[12px] border text-left transition-colors hover:brightness-110"
             style={{
               background: isActive

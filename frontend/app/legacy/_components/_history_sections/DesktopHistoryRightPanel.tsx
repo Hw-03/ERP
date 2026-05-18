@@ -27,6 +27,8 @@ export interface DesktopHistoryRightPanelProps {
   onSelectLog: (log: TransactionLog) => void;
   onLogUpdated: (updated: TransactionLog) => void;
   onLogCorrected: (result: { original: TransactionLog; correction: TransactionLog }) => void;
+  /** 패널 닫기 (선택 해제). */
+  onClose: () => void;
 }
 
 export function DesktopHistoryRightPanel({
@@ -38,9 +40,10 @@ export function DesktopHistoryRightPanel({
   onSelectLog,
   onLogUpdated,
   onLogCorrected,
+  onClose,
 }: DesktopHistoryRightPanelProps) {
   return (
-    <SlidePanel open={!!selection}>
+    <SlidePanel open={!!selection} onClose={onClose}>
       {displaySelection?.kind === "log" && (
         <DesktopRightPanel
           title={displaySelection.log.item_name}

@@ -7,10 +7,11 @@
  * 작업자 식별용 PIN — 실제 보안 인증이 아님.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { api, type Employee, type TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { useFocusTrap } from "@/lib/mes/useFocusTrap";
 import { AppSelect } from "../common/AppSelect";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { getHistoryDisplayLabel } from "./historyShared";
@@ -22,9 +23,13 @@ interface Props {
   onSuccess: (updated: TransactionLog) => void;
 }
 
+const TITLE_ID = "transaction-edit-modal-title";
+
 export function TransactionEditModal({ open, log, onClose, onSuccess }: Props) {
   const operator = useCurrentOperator();
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
+  const firstInputRef = useRef<HTMLTextAreaElement>(null);
   const [notes, setNotes] = useState("");
   const [refNo, setRefNo] = useState("");
   const [producedBy, setProducedBy] = useState("");
@@ -48,7 +53,16 @@ export function TransactionEditModal({ open, log, onClose, onSuccess }: Props) {
     setPin("");
     setError("");
     setEditorId(operator?.employee_id ?? "");
+    // 첫 입력 포커스 (useFocusTrap 이 처리하지만 textarea 는 별도 ref로 지정)
+    setTimeout(() => firstInputRef.current?.focus(), 0);
   }, [open, log, operator]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   if (!open || !log) return null;
 
@@ -79,18 +93,22 @@ export function TransactionEditModal({ open, log, onClose, onSuccess }: Props) {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={TITLE_ID}
       className="fixed inset-0 z-[400] flex items-center justify-center"
       style={{ background: "rgba(0,0,0,.55)" }}
       onClick={onClose}
     >
       <div
+        ref={trapRef}
         className="w-full max-w-[520px] rounded-[24px] border p-6"
         style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <div className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>
+            <div id={TITLE_ID} className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>
               거래 정보 수정
             </div>
             <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -116,6 +134,7 @@ export function TransactionEditModal({ open, log, onClose, onSuccess }: Props) {
         <div className="space-y-3">
           <FieldRow label="메모">
             <textarea
+              ref={firstInputRef}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="min-h-[60px] w-full rounded-[12px] border px-3 py-2 text-sm outline-none"

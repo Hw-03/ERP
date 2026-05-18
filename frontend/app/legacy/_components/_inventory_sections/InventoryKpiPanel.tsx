@@ -14,7 +14,7 @@ type Props = {
 
 export function InventoryKpiPanel({ cards, activeKey, onChange }: Props) {
   return (
-    <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
       {cards.map((card) => (
         <KpiCard
           key={card.key}

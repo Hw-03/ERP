@@ -9,7 +9,6 @@ import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { transactionColor, transactionIconName } from "@/lib/mes-status";
-import { formatQty } from "@/lib/mes/format";
 import {
   describeBatchFlow,
   formatHistoryDate,
@@ -216,13 +215,11 @@ export function BatchHeader({
 }) {
   const first = group.logs[0];
   const homogeneous = isHomogeneousItemGroup(group.logs);
-  const totalQty = homogeneous
-    ? group.logs.reduce((s, l) => s + Number(l.quantity_change), 0)
-    : null;
   const primaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
   const actor = getHistoryActor(first);
   // 재작업(DISASSEMBLE) 묶음은 빨간색 강제. transactionColor 의 muted/회색 fallback 덮어씀.
   const flowColor = isReworkOperation(first) ? LEGACY_COLORS.red : transactionColor(primaryType);
+  const summary = getHistoryMovementSummary(first, null, group.logs.length);
 
   return (
     <tr
@@ -259,18 +256,8 @@ export function BatchHeader({
           </span>
         </div>
       </td>
-      <td
-        className="whitespace-nowrap border-b px-4 py-3 text-center font-bold"
-        style={{
-          borderColor: LEGACY_COLORS.border,
-          color: totalQty == null
-            ? LEGACY_COLORS.muted2
-            : totalQty >= 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red,
-        }}
-      >
-        {totalQty == null
-          ? <span className="text-xs">하위 {group.logs.length}건</span>
-          : <>{totalQty >= 0 ? "+" : ""}{formatQty(totalQty)}</>}
+      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+        <MovementSummaryCell summary={summary} />
       </td>
       <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         <ActorCell name={actor} />

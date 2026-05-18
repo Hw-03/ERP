@@ -15,7 +15,7 @@ import { BomParentList } from "./BomParentList";
 import { BomEditPanel } from "./BomEditPanel";
 import { BomWhereUsedPanel } from "./BomWhereUsedPanel";
 import { BomUnmatchedRawsDrawer } from "./BomUnmatchedRawsDrawer";
-import { stageOf, type DeptLetter } from "./bomDept";
+import { DEPT_LETTERS, stageOf, type DeptLetter } from "./bomDept";
 
 interface Props {
   items: Item[];
@@ -68,6 +68,20 @@ export function BomWorkbench({
       totalParents,
     };
   }, [parentCandidates, allBomRows]);
+
+  // 탭별 통계: 각 부서의 편집 모드 기준 부모 수 / 미완료 수
+  const deptStats = useMemo(() => {
+    const matchedParentIds = new Set(allBomRows.map((r) => r.parent_item_id));
+    return Object.fromEntries(
+      DEPT_LETTERS.map((letter) => {
+        const parents = items.filter(
+          (i) => i.process_type_code?.[0] === letter && stageOf(i.process_type_code) !== "R",
+        );
+        const unmatched = parents.filter((i) => !matchedParentIds.has(i.item_id)).length;
+        return [letter, { total: parents.length, unmatched }];
+      }),
+    ) as Record<DeptLetter, { total: number; unmatched: number }>;
+  }, [items, allBomRows]);
 
   // 첫 부모 자동 선택 (부서/모드 바뀔 때)
   useEffect(() => {
@@ -265,7 +279,7 @@ export function BomWorkbench({
 
       {/* 부서 탭 */}
       <div className="mb-3">
-        <BomDeptTabs value={dept} onChange={handleDeptChange} />
+        <BomDeptTabs value={dept} onChange={handleDeptChange} deptStats={deptStats} />
       </div>
 
       {/* 메인 영역 */}
@@ -310,8 +324,10 @@ export function BomWorkbench({
         </div>
       </div>
 
-      {/* 하단: 미배치 원자재 (편집 모드에서만) */}
-      {mode === "edit" && <BomUnmatchedRawsDrawer rawItems={rawItems} childIdSet={childIdSet} />}
+      {/* 하단: 미배치 원자재 (편집 모드에서만; visibility로 공간 유지) */}
+      <div style={{ visibility: mode === "edit" ? "visible" : "hidden" }}>
+        <BomUnmatchedRawsDrawer rawItems={rawItems} childIdSet={childIdSet} />
+      </div>
 
       {/* 추가 확인 모달 */}
       <ConfirmModal

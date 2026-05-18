@@ -30,14 +30,15 @@ export const SCOPE_LABELS: Record<HistoryScope, string> = {
 
 /**
  * 사용자별 입출고 내역 기본 scope.
- * 현재는 권동환만 창고 담당 → WAREHOUSE_INVOLVED, 그 외 DEPT_INTERNAL.
- * employee_id 기준 전환 대비 단일 helper 안에 isolate.
+ * warehouse_role 이 "primary" 또는 "deputy" 이면 창고 담당 → WAREHOUSE_INVOLVED.
+ * 그 외(none 포함) → DEPT_INTERNAL.
  * Operator 타입 import는 의도적으로 안 함 (순환 import 회피).
  */
 export function getDefaultHistoryScopeForOperator(
-  operator: { name?: string | null } | null,
+  operator: { warehouse_role?: string | null } | null,
 ): HistoryScope {
-  if (operator?.name?.trim() === "권동환") return "WAREHOUSE_INVOLVED";
+  const role = operator?.warehouse_role?.toLowerCase();
+  if (role === "primary" || role === "deputy") return "WAREHOUSE_INVOLVED";
   return "DEPT_INTERNAL";
 }
 
@@ -868,6 +869,10 @@ export function rowTint(type: string) {
       return "rgba(255,123,123,.05)";
     case "ADJUST":
       return "rgba(101,169,255,.05)";
+    case "TRANSFER_TO_PROD":
+    case "TRANSFER_TO_WH":
+    case "TRANSFER_DEPT":
+      return "rgba(78,201,245,.05)";
     default:
       return "transparent";
   }

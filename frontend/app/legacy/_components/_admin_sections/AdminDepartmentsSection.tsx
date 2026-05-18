@@ -339,10 +339,11 @@ function DeptAddForm({
       }}
     >
       <div>
-        <label className="mb-1 block text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+        <label htmlFor="dept-add-name" className="mb-1 block text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
           부서명 <span style={{ color: LEGACY_COLORS.red }}>*</span>
         </label>
         <input
+          id="dept-add-name"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="예: 설계"
@@ -396,6 +397,7 @@ function DeptDetailView({
   const savedColor = deptColor(dept);
   const colorInputRef = useRef<HTMLInputElement>(null);
   const [localColor, setLocalColor] = useState(savedColor);
+  const [toggleConfirmOpen, setToggleConfirmOpen] = useState(false);
   const refreshDepartments = useRefreshDepartments();
 
   useEffect(() => {
@@ -524,7 +526,13 @@ function DeptDetailView({
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={onToggleActive}
+          onClick={() => {
+            if (dept.is_active) {
+              setToggleConfirmOpen(true);
+            } else {
+              onToggleActive();
+            }
+          }}
           className="flex-1 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors hover:brightness-110"
           style={{
             background: dept.is_active
@@ -552,6 +560,15 @@ function DeptDetailView({
           영구 삭제
         </button>
       </div>
+
+      <ConfirmModal
+        open={toggleConfirmOpen}
+        title={`'${dept.name}' 부서를 비활성화하시겠습니까?`}
+        tone="caution"
+        confirmLabel="비활성화"
+        onClose={() => setToggleConfirmOpen(false)}
+        onConfirm={() => { setToggleConfirmOpen(false); onToggleActive(); }}
+      />
     </div>
   );
 }

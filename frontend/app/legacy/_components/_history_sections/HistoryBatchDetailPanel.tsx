@@ -281,7 +281,7 @@ function BundleBlock({
               <LineStatusBadge included={line.included} shortage={line.shortage} />
               {!clickable && (
                 <span className="ml-1 text-[10px]" style={{ color: LEGACY_COLORS.muted2 }} title="이 라인에 대응하는 거래 행이 현재 표시 목록에 없습니다.">
-                  표시 외
+                  현재 필터 목록에 없음
                 </span>
               )}
             </button>

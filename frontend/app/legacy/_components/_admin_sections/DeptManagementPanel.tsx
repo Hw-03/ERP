@@ -151,6 +151,7 @@ export function DeptManagementPanel({
           </span>
         </div>
         <button
+          type="button"
           onClick={() => colorInputRef.current?.click()}
           className="w-full flex items-center justify-center gap-2 rounded-[12px] py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 active:opacity-75"
           style={{ background: localColor }}
@@ -166,6 +167,7 @@ export function DeptManagementPanel({
         />
         {colorChanged && (
           <button
+            type="button"
             onClick={applyColor}
             className="mt-2 w-full rounded-[12px] py-2.5 text-sm font-semibold text-white"
             style={{ background: LEGACY_COLORS.blue }}
@@ -178,6 +180,7 @@ export function DeptManagementPanel({
       {/* 액션 버튼 */}
       <div className="flex flex-col gap-2">
         <button
+          type="button"
           onClick={toggleActive}
           className="w-full rounded-[14px] border py-2.5 text-sm font-semibold transition-colors hover:bg-white/10"
           style={{
@@ -190,6 +193,7 @@ export function DeptManagementPanel({
           {dept.is_active ? "비활성화" : "활성화"}
         </button>
         <button
+          type="button"
           onClick={deleteDept}
           className="w-full rounded-[14px] border py-2.5 text-sm font-semibold transition-colors hover:bg-white/10"
           style={{

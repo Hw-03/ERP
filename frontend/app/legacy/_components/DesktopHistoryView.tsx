@@ -310,6 +310,7 @@ export function DesktopHistoryView() {
         onSelectLog={handleSelectLog}
         onLogUpdated={handleLogUpdated}
         onLogCorrected={handleLogCorrected}
+        onClose={() => setSelection(null)}
       />
     </div>
   );

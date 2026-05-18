@@ -95,6 +95,8 @@ export function HistoryCalendarStrip({
               return (
                 <button
                   key={key}
+                  aria-label={`${calendarYear}년 ${calendarMonth + 1}월 ${day}일${isSelected ? " (선택됨)" : ""}`}
+                  aria-pressed={isSelected}
                   onClick={() => setSelectedDay(selectedDay === key ? null : key)}
                   className="flex flex-col items-center rounded-[14px] border p-1.5 transition-colors hover:brightness-110"
                   style={{
@@ -104,7 +106,7 @@ export function HistoryCalendarStrip({
                       : isToday
                       ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 27%, transparent)`
                       : LEGACY_COLORS.border,
-                    height: "132px",
+                    minHeight: "132px",
                   }}
                 >
                   <span className="text-sm font-bold" style={{ color: isToday ? LEGACY_COLORS.blue : LEGACY_COLORS.text }}>
