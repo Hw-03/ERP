@@ -163,6 +163,23 @@ def production_receipt(
         transaction_ids.append(produce_log.log_id)
 
         db.commit()
+    except HTTPException:
+        # WS9: 엔드포인트가 의도적으로 던진 404/4xx(예: 부품 미존재, 위 분기)를
+        # 아래 except Exception 이 500 으로 재포장하지 않도록 그대로 통과.
+        raise
+    except ValueError as exc:
+        # WS9: 동시 같은-부품 입고 경합에서 진 쪽 — consume_warehouse 의
+        # 원자적 가드(UPDATE ... WHERE qty>=n)가 늦게 ValueError 를 던진다.
+        # 사전 검사와 동일하게 깨끗한 422 STOCK_SHORTAGE 로 매핑(기존엔 아래
+        # except Exception 이 삼켜 500 으로 나갔음). db 는 롤백되어 loser 의
+        # 부분 배치/orphan TransactionLog 가 남지 않는다.
+        db.rollback()
+        raise http_error(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            code=ErrorCode.STOCK_SHORTAGE,
+            message="재고 부족으로 생산 입고를 진행할 수 없습니다.",
+            shortages=[str(exc)],
+        )
     except Exception as exc:
         # WS8: 재던지기 전 풀스택 보존(기존엔 str(exc) 만 남고 트레이스 소실).
         logger.exception("생산 처리 중 예기치 못한 오류")
