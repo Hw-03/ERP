@@ -101,6 +101,8 @@ _MIGRATION_DDL: list[str] = [
     "CREATE INDEX IF NOT EXISTS ix_tel_original ON transaction_edit_logs(original_log_id)",
     # 창고 결재 역할 — 직원 업무 역할(시스템 권한 level과 별개)
     "ALTER TABLE employees ADD COLUMN warehouse_role VARCHAR(20) NOT NULL DEFAULT 'none'",
+    # 부서 결재 역할 — 낱개 IO 작업 승인 권한 (warehouse_role 와 별개)
+    "ALTER TABLE employees ADD COLUMN department_role VARCHAR(20) NOT NULL DEFAULT 'none'",
     # PIN 마지막 변경 일시 (NULL = 변경 이력 없음)
     "ALTER TABLE employees ADD COLUMN pin_last_changed DATETIME",
     # 부서 대표 색깔 (HEX, NULL = 기본 purple)
@@ -171,6 +173,17 @@ _MIGRATION_DDL: list[str] = [
     # 입출고 v2 멱등 키 — 제출 더블클릭 시 재고 이중 차감 방지
     "ALTER TABLE io_batches ADD COLUMN client_request_id VARCHAR(64)",
     "CREATE UNIQUE INDEX IF NOT EXISTS ix_io_batches_client_request_id ON io_batches(client_request_id)",
+    # 05-18 라인 추가 컬럼 (모델에는 있으나 마이그레이션 누락분 — 구 DB 호환용)
+    # BOM 완료 워크플로우 — 명시적 "완료로 표시" 시각
+    "ALTER TABLE items ADD COLUMN bom_completed_at DATETIME",
+    # 거래 로그 아카이브 시각 (NULL = 미아카이브)
+    "ALTER TABLE transaction_logs ADD COLUMN archived_at DATETIME",
+    "CREATE INDEX IF NOT EXISTS ix_transaction_logs_archived_at ON transaction_logs(archived_at)",
+    # 부서 결재 — 낱개 manual/adjust 라인 포함 시 추가 승인 (warehouse_approval 와 독립)
+    "ALTER TABLE stock_requests ADD COLUMN requires_department_approval BOOLEAN NOT NULL DEFAULT 0",
+    "ALTER TABLE stock_requests ADD COLUMN department_approved_by_employee_id CHAR(36)",
+    "ALTER TABLE stock_requests ADD COLUMN department_approved_by_name VARCHAR(100)",
+    "ALTER TABLE stock_requests ADD COLUMN department_approved_at DATETIME",
 ]
 
 
