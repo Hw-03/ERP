@@ -20,6 +20,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import sys
 from pathlib import Path
@@ -45,6 +46,31 @@ from app.models import (
 )
 from app.services.pin_auth import DEFAULT_PIN_HASH
 from app.utils.erp_code import make_erp_code
+
+# bootstrap_db 는 uvicorn 밖에서 단독 실행되므로 setup_logging() 호출 없이도
+# 동작해야 한다. 백엔드 표준 로거("erp") 네임스페이스를 그대로 쓰되,
+# 핸들러 미설정 환경(=단독 CLI)에서도 메시지가 죽지 않도록 NullHandler 보강.
+logger = logging.getLogger("erp")
+if not logger.handlers:
+    logger.addHandler(logging.NullHandler())
+
+# 재실행 시 정상적으로 발생하는 "이미 존재" 류 — 에러가 아니라 멱등 스킵.
+# SQLAlchemy 래핑 예외의 .orig (DBAPI 원본) 문자열을 소문자로 보고 판정.
+# SQLite: "duplicate column name: x"
+# PostgreSQL: 'column "x" of relation "t" already exists',
+#             'relation "ix_..." already exists'
+_BENIGN_MIGRATION_PATTERNS: tuple[str, ...] = (
+    "duplicate column name",
+    "duplicate column",
+    "already exists",
+)
+
+
+def _is_benign_migration_skip(exc: Exception) -> bool:
+    """예외가 '이미 적용됨'(멱등 재실행) 인지 판정. 아니면 실제 실패."""
+    orig = getattr(exc, "orig", exc)
+    msg = str(orig).lower()
+    return any(pat in msg for pat in _BENIGN_MIGRATION_PATTERNS)
 
 
 # ---------------------------------------------------------------------------
@@ -187,55 +213,75 @@ _MIGRATION_DDL: list[str] = [
 ]
 
 
-def run_migrations() -> dict[str, int]:
-    """누락된 컬럼을 ADD. 이미 있으면 조용히 스킵.
+def run_migrations() -> dict[str, object]:
+    """누락된 컬럼/인덱스/테이블을 반영. 각 문장을 3분류한다.
+
+    - applied: 실제로 적용됨
+    - skipped: 멱등 스킵 (이미 존재 — 재실행 시 정상, 에러 아님)
+    - errors:  진짜 실패 (락/타입불일치/선행 오브젝트 누락 등). SQL+예외를
+               WARNING 으로 로깅하고 errors 리스트에 수집한다.
+
+    실서버에서 진짜 실패가 무성(silent) 스킵으로 묻히던 문제(WS5) 수정.
 
     Returns:
-        {'applied': N, 'skipped': M}
+        {'applied': int, 'skipped': int, 'failed': int, 'errors': list[str]}
+        (기존 'applied'/'skipped' 키는 그대로 유지 — 하위호환 SUPERSET)
     """
     applied = 0
     skipped = 0
-    with engine.connect() as conn:
-        for sql in _MIGRATION_DDL:
-            try:
-                conn.execute(text(sql))
+    errors: list[str] = []
+
+    def _run(sql: str, *, params: dict | None = None, label: str) -> None:
+        nonlocal applied, skipped
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(sql), params or {})
                 conn.commit()
-                applied += 1
-            except Exception:
+            applied += 1
+        except Exception as exc:  # noqa: BLE001 — 분류 목적 광범위 캐치
+            if _is_benign_migration_skip(exc):
                 skipped += 1
+                return
+            orig = getattr(exc, "orig", exc)
+            msg = f"[migrate] REAL FAILURE ({label}): {sql!r} -> {orig}"
+            errors.append(msg)
+            logger.warning(msg, exc_info=False)
 
-        # pending_quantity NULL 기본값 채우기
-        try:
-            conn.execute(
-                text("UPDATE inventory SET pending_quantity = 0 WHERE pending_quantity IS NULL")
-            )
-            conn.commit()
-        except Exception:
-            pass
+    for sql in _MIGRATION_DDL:
+        _run(sql, label="ddl")
 
-        # 기존 직원에 PIN 기본값 0000 적용 (pin_hash NULL인 경우만)
-        try:
-            conn.execute(
-                text("UPDATE employees SET pin_hash = :h WHERE pin_hash IS NULL"),
-                {"h": DEFAULT_PIN_HASH},
-            )
-            conn.commit()
-        except Exception:
-            pass
+    # pending_quantity NULL 기본값 채우기
+    _run(
+        "UPDATE inventory SET pending_quantity = 0 WHERE pending_quantity IS NULL",
+        label="post-update:pending_quantity",
+    )
 
-        # warehouse_role NULL/empty → 'none' 보정 (ALTER 가 idempotent 하지 않은 환경 대비)
-        try:
-            conn.execute(
-                text(
-                    "UPDATE employees SET warehouse_role = 'none' "
-                    "WHERE warehouse_role IS NULL OR warehouse_role = ''"
-                )
-            )
-            conn.commit()
-        except Exception:
-            pass
+    # 기존 직원에 PIN 기본값 0000 적용 (pin_hash NULL인 경우만)
+    _run(
+        "UPDATE employees SET pin_hash = :h WHERE pin_hash IS NULL",
+        params={"h": DEFAULT_PIN_HASH},
+        label="post-update:pin_hash",
+    )
 
-    return {"applied": applied, "skipped": skipped}
+    # warehouse_role NULL/empty → 'none' 보정 (ALTER 가 idempotent 하지 않은 환경 대비)
+    _run(
+        "UPDATE employees SET warehouse_role = 'none' "
+        "WHERE warehouse_role IS NULL OR warehouse_role = ''",
+        label="post-update:warehouse_role",
+    )
+
+    if errors:
+        logger.error(
+            "[migrate] %d real migration failure(s) — see WARNING lines above.",
+            len(errors),
+        )
+
+    return {
+        "applied": applied,
+        "skipped": skipped,
+        "failed": len(errors),
+        "errors": errors,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -512,7 +558,13 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: list[str] | None = None) -> None:
+def main(argv: list[str] | None = None) -> int:
+    """CLI 진입점.
+
+    Returns:
+        프로세스 종료 코드. 마이그레이션 진짜 실패가 있으면 1
+        (start.bat 의 `if errorlevel 1` 가 부트스트랩을 중단하도록).
+    """
     args = _parse_args(argv if argv is not None else sys.argv[1:])
 
     if args.check:
@@ -520,8 +572,9 @@ def main(argv: list[str] | None = None) -> None:
         print("[check] DB state:")
         for key, val in report.items():
             print(f"  {key}: {val}")
-        return
+        return 0
 
+    exit_code = 0
     did_something = False
     if args.all or args.schema:
         run_schema_create_all()
@@ -529,7 +582,16 @@ def main(argv: list[str] | None = None) -> None:
         did_something = True
     if args.all or args.migrate:
         result = run_migrations()
-        print(f"[migrate] applied={result['applied']} skipped={result['skipped']}")
+        errs = result.get("errors") or []
+        print(
+            f"[migrate] applied={result['applied']} skipped={result['skipped']} "
+            f"failed={len(errs)}"
+        )
+        if errs:
+            print(f"[migrate] ERROR: {len(errs)} real migration failure(s):")
+            for e in errs:
+                print(f"  - {e}")
+            exit_code = 1
         did_something = True
     if args.all or args.seed:
         seeded = seed_reference_data()
@@ -547,6 +609,8 @@ def main(argv: list[str] | None = None) -> None:
     if not did_something:
         print("Nothing to do. Try: python bootstrap_db.py --all  (or --help)")
 
+    return exit_code
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
