@@ -42,6 +42,7 @@ export interface AdminSectionContentProps {
   setSelectedDept: Dispatch<SetStateAction<DepartmentMaster | null>>;
   allBomRows: BOMDetailEntry[];
   refreshAllBom: () => void;
+  refreshItems: () => Promise<void>;
 
   pinForm: PinForm;
   setPinForm: Dispatch<SetStateAction<PinForm>>;
@@ -60,7 +61,7 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
     productModels, setProductModels,
     departments, setDepartments,
     selectedDept, setSelectedDept,
-    allBomRows, refreshAllBom,
+    allBomRows, refreshAllBom, refreshItems,
     pinForm, setPinForm, resetPin, setResetPin,
     changePin, resetDatabase, adminPin,
   } = props;
@@ -98,6 +99,7 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
         items={items}
         allBomRows={allBomRows}
         refreshAllBom={refreshAllBom}
+        refreshItems={refreshItems}
         onStatusChange={onStatusChange}
         onError={setMessage}
       />

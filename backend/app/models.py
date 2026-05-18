@@ -174,6 +174,9 @@ class Item(Base):
     option_code = Column(String(10), nullable=True)  # 자유 텍스트 (FK 제거)
     serial_no = Column(Integer, nullable=True)
 
+    # BOM 완료 워크플로우 — 사용자가 명시적으로 "완료로 표시"를 누를 때만 set/clear
+    bom_completed_at = Column(DateTime, nullable=True)
+
     inventory = relationship("Inventory", back_populates="item", uselist=False, cascade="all, delete-orphan")
     bom_as_parent = relationship(
         "BOM",

@@ -74,6 +74,7 @@ class ItemResponse(BaseModel):
     process_type_code: Optional[str] = None
     option_code: Optional[str] = None
     serial_no: Optional[int] = None
+    bom_completed_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
@@ -288,6 +289,10 @@ class BOMCreate(BaseModel):
 class BOMUpdate(BaseModel):
     quantity: Optional[Decimal] = Field(None, gt=0)
     unit: Optional[str] = Field(None, max_length=20)
+
+
+class BomCompletionUpdate(BaseModel):
+    completed: bool = Field(..., description="True=완료로 표시, False=완료 해제")
 
 
 class BOMResponse(BaseModel):

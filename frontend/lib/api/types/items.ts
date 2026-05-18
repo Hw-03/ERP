@@ -34,6 +34,7 @@ export interface Item {
   process_type_code: string | null;
   option_code: string | null;
   serial_no: number | null;
+  bom_completed_at: string | null;
   created_at: string;
   updated_at: string;
   department: Department | string | null;

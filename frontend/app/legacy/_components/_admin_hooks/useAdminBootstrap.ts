@@ -39,6 +39,7 @@ export interface UseAdminBootstrapResult {
   setAllBomRows: React.Dispatch<React.SetStateAction<BOMDetailEntry[]>>;
   loadData: () => Promise<void>;
   refreshAllBom: () => void;
+  refreshItems: () => Promise<void>;
 }
 
 export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBootstrapResult {
@@ -67,6 +68,12 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
     void api.getAllBOM().then(setAllBomRows).catch(() => setAllBomRows([]));
   }, []);
 
+  // 품목만 재조회 — BOM 완료 토글 후 bom_completed_at 반영용
+  const refreshItems = useCallback(async () => {
+    const next = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
+    setItems(next);
+  }, [globalSearch]);
+
   // 5 도메인 부트스트랩 — unlocked + globalSearch 변화 시
   useEffect(() => {
     if (!unlocked) return;
@@ -89,5 +96,6 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
     allBomRows, setAllBomRows,
     loadData,
     refreshAllBom,
+    refreshItems,
   };
 }
