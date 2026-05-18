@@ -71,5 +71,12 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        # WS4: 핸들러 중간 예외 시 세션을 명시적으로 롤백한 뒤 반환.
+        # 미롤백 시 풀드 PostgreSQL(pool_size=10) 경로에서 aborted-transaction
+        # 상태의 커넥션이 풀로 반환돼 다음 요청을 오염시킨다(SQLite/NullPool 은
+        # 커넥션 폐기로 가려졌을 뿐). 재던지기로 기존 예외 핸들러 체인은 유지.
+        db.rollback()
+        raise
     finally:
         db.close()
