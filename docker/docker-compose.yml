@@ -37,6 +37,8 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://erp_user:erp_pass@postgres:5432/erp_db
+      # WS2 가드: 운영 표식. SQLite/DATABASE_URL 미설정 시 backend 기동 거부(fail-fast).
+      APP_ENV: production
     ports:
       - "8010:8010"
     depends_on:

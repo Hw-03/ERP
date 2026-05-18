@@ -12,6 +12,10 @@
 분류 체계: PARA 변형 — **운영 · 참고 · 기록 · 보관**.
 (PARA의 P=마감 있는 능동 프로젝트는 격리소 정의상 존재하지 않아 생략.)
 
+> 📌 WS2(2026-05-18)에서 **운영 도구는 runtime 복귀**: `scripts/ops/`(백업/복구/
+> 헬스/preflight/load_test), `docs/operations/`(런북 4종), `docs/OPERATIONS.md`
+> 는 더 이상 `_attic/`에 없다(실서버 운영 필수라 원위치). 아래 카탈로그에서 제외됨.
+
 ---
 
 ## 1. 운영 (Operational) — 가끔 실행한다. 경로결합, 이동 금지
@@ -19,7 +23,6 @@
 | 위치 | 용도 / 실행법 |
 |---|---|
 | `scripts/dev/verify_local.ps1` | 커밋 게이트(경로조정본). `powershell -ExecutionPolicy Bypass -File .\_attic\scripts\dev\verify_local.ps1` |
-| `scripts/ops/` | 서버 운영: backup_db · restore_db · healthcheck · cleanup_backups · verify_backup · reconcile_inventory · check_inventory_integrity · preflight/load_test |
 | `scripts/dev/import_real_inventory.py` | `data/재고_입력_양식.xlsx` → DB 일괄 반영 (`--apply`) |
 | `scripts/dev/generate_inventory_template.py` | 입력 템플릿 재생성 |
 | `scripts/dev/extract_io_bom_parents.py` | 입출고 관리대장 → BOM 부모후보 추출 |
@@ -36,7 +39,8 @@
 
 - `docs/`: ARCHITECTURE · ERD · GLOSSARY · ITEM_CODE_RULES · USER_GUIDE ·
   ONBOARDING · API_CHANGELOG · BACKEND_REFACTOR_PLAN · FRONTEND_HOOKS_PLAN ·
-  OPERATIONS · MOBILE_SCAN_TESTING · README · 주간보고.md · `operations/`(런북 4종)
+  MOBILE_SCAN_TESTING · README · 주간보고.md
+  (OPERATIONS.md·operations/ 는 WS2에서 runtime 복귀 — 여기 없음)
 - `docs/research/`(설계·감사 메모 40), `docs/design/`(로그인 디자인), `docs/presentation/`
 - `_archive/`(bom-family-draft.html, reference/), `CODEX_HANDOFF_scroll_reset.md`
 - `.dev/`(Playwright 스크린샷 자동화 셋업)

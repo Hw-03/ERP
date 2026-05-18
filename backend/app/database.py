@@ -19,6 +19,23 @@ DATABASE_URL = os.getenv(
 
 _is_sqlite = DATABASE_URL.startswith("sqlite")
 
+# 실서버 가드(WS2): 운영 환경에서 SQLite/DATABASE_URL 미설정이면 즉시 기동 거부.
+# SQLite 는 다중 사용자 동시성(락) 한계로 운영 불가 — '무성(silent) SQLite prod'
+# 가 가장 위험한 실패 모드. import 시점 raise → uvicorn 기동 실패 → 컨테이너
+# fail-fast(헬스 never green). dev/test/start.bat 는 플래그 미설정 시 기존 동작
+# (SQLite 허용) 그대로 유지하므로 pytest·로컬 개발에 영향 없음.
+_require_postgres = (
+    os.getenv("APP_ENV", "").strip().lower() == "production"
+    or os.getenv("REQUIRE_POSTGRES", "").strip().lower() in ("1", "true", "yes")
+)
+if _require_postgres and _is_sqlite:
+    raise RuntimeError(
+        "운영 환경(APP_ENV=production 또는 REQUIRE_POSTGRES) 인데 DATABASE_URL 이 "
+        "SQLite 이거나 미설정입니다. SQLite 는 다중 사용자 운영 불가입니다 — "
+        "PostgreSQL DATABASE_URL 을 설정하세요. "
+        "(개발/테스트는 APP_ENV/REQUIRE_POSTGRES 를 비우면 SQLite 가 허용됩니다.)"
+    )
+
 connect_args = {"check_same_thread": False} if _is_sqlite else {}
 
 engine = create_engine(
