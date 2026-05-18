@@ -35,7 +35,8 @@ jobs:
         working-directory: backend
         run: pytest -q
 
-      # docs/openapi.json baseline 과 현재 FastAPI app.openapi() 결과 비교.
+      # _attic/docs/openapi.json baseline 과 현재 FastAPI app.openapi() 결과 비교.
+      # (배포 정리로 docs/openapi.json → _attic/docs/openapi.json 이동됨.)
       # 라우터/스키마 변경 시 baseline 미갱신이면 실패 — 갱신 절차는 README 참조.
       - name: OpenAPI drift check
         working-directory: backend
@@ -48,11 +49,11 @@ jobs:
               json.dump(app.openapi(), f, indent=2, sort_keys=True, ensure_ascii=False)
               f.write('\n')
           "
-          diff -u ../docs/openapi.json /tmp/openapi-current.json \
+          diff -u ../_attic/docs/openapi.json /tmp/openapi-current.json \
             && echo "✓ OpenAPI spec matches baseline." \
             || (echo "" && echo "✗ OpenAPI drift detected." \
                 && echo "라우터 또는 스키마가 변경됐습니다. 다음 명령으로 baseline 갱신 후 commit:" \
-                && echo "  cd backend && python -c \"from app.main import app; import json; open('../docs/openapi.json','w',encoding='utf-8').write(json.dumps(app.openapi(),indent=2,sort_keys=True,ensure_ascii=False)+chr(10))\"" \
+                && echo "  cd backend && python -c \"from app.main import app; import json; open('../_attic/docs/openapi.json','w',encoding='utf-8').write(json.dumps(app.openapi(),indent=2,sort_keys=True,ensure_ascii=False)+chr(10))\"" \
                 && exit 1)
 
   frontend:
