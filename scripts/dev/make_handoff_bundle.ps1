@@ -81,27 +81,10 @@ if ($LASTEXITCODE -ge 8) { throw "robocopy failed (code $LASTEXITCODE)" }
 Get-ChildItem $appDir -Recurse -Directory -Filter "__pycache__" -ErrorAction SilentlyContinue |
   Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
-# 6) RUN.bat (ASCII only) + Korean readme (byte-exact copy)
-$runBat = @'
-@echo off
-setlocal
-set "ROOT=%~dp0"
-set "PATH=%ROOT%node;%ROOT%python;%ROOT%python\Scripts;%PATH%"
-
-echo ============================================
-echo  DEXCOWIN MES - starting (two windows open)
-echo  To stop: close the two black windows.
-echo ============================================
-
-start "MES Backend"  cmd /k "cd /d "%ROOT%app\backend" && "%ROOT%python\python.exe" -m uvicorn app.main:app --host 0.0.0.0 --port 8010"
-start "MES Frontend" cmd /k "cd /d "%ROOT%app\frontend" && "%ROOT%node\npm.cmd" run start"
-
-echo Waiting for servers (~12s) ...
-timeout /t 12 /nobreak >nul
-start "" "http://localhost:3000/legacy?tab=admin"
-endlocal
-'@
-[IO.File]::WriteAllText((Join-Path $STAGE "RUN.bat"), $runBat, [Text.Encoding]::ASCII)
+# 6) launchers (space/Korean-path safe, copied byte-exact) + Korean readme
+Copy-Item (Join-Path $PSScriptRoot "bundle_RUN.bat")      (Join-Path $STAGE "RUN.bat")
+Copy-Item (Join-Path $PSScriptRoot "bundle_backend.bat")  (Join-Path $STAGE "_backend.bat")
+Copy-Item (Join-Path $PSScriptRoot "bundle_frontend.bat") (Join-Path $STAGE "_frontend.bat")
 Copy-Item $README (Join-Path $STAGE "READ_ME_first.txt")
 
 # 7) zip
