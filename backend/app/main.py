@@ -248,6 +248,21 @@ def health_check():
     return {"status": "ok", "service": "DEXCOWIN MES API"}
 
 
+@app.get("/health/live", tags=["System"])
+def health_live(db: Session = Depends(get_db)):
+    """경량 liveness — 컨테이너/오케스트레이터 프로브 전용 (WS3).
+
+    정적 `/health` 와 달리 DB-down 을 구분: DB 미연결이면 503.
+    `/health/detailed` 와 달리 row count·무결성 스캔을 하지 않아 30s 주기
+    프로브에 적합(가벼움).
+    """
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as e:  # noqa: BLE001 — 프로브는 사유 무관 비가용이면 503
+        raise HTTPException(status_code=503, detail=f"DB unreachable: {e}")
+    return {"status": "live"}
+
+
 @app.get("/api/app-session", tags=["System"])
 def app_session():
     return {"boot_id": _BOOT_ID, "started_at": _BOOT_STARTED_AT}

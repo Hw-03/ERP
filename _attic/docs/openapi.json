@@ -13283,6 +13283,26 @@
           "System"
         ]
       }
+    },
+    "/health/live": {
+      "get": {
+        "description": "경량 liveness — 컨테이너/오케스트레이터 프로브 전용 (WS3).\n\n정적 `/health` 와 달리 DB-down 을 구분: DB 미연결이면 503.\n`/health/detailed` 와 달리 row count·무결성 스캔을 하지 않아 30s 주기\n프로브에 적합(가벼움).",
+        "operationId": "health_live_health_live_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Live",
+        "tags": [
+          "System"
+        ]
+      }
     }
   },
   "tags": [

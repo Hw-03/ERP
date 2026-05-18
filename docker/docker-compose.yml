@@ -44,6 +44,22 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      # 경량 liveness: DB-down 시 /health/live 가 503 → unhealthy (정적 /health 아님).
+      # python:slim 에 curl 없음 → urllib. 503/연결실패 시 예외→비0 종료.
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8010/health/live',timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    volumes:
+      # 로그 영속화 — 재시작 시 backend/logs/erp.log 유지(컨테이너 ephemeral 방지).
+      - ../backend/logs:/app/logs
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     # 운영: Dockerfile CMD(uvicorn app.main:app :8010, --reload 없음) 사용.
     # 소스 bind-mount/--reload 금지(이미지에 구운 코드로 구동). 포트는 8010 통일
     # (backend/Dockerfile · next.config.js BACKEND_INTERNAL_URL 와 일치).
@@ -60,7 +76,20 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      # node:alpine 에 wget 존재. 비200/연결실패 시 비0 종료.
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     # 운영: Dockerfile CMD(npm run start, .next-prod 산출물) 사용.
     # next dev/소스 bind-mount 금지. NEXT_PUBLIC_API_URL 제거(next.config 미사용).
 
