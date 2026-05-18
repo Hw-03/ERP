@@ -14,6 +14,7 @@ import {
   getHistoryDisplayLabel,
   getHistoryLineSignedQuantity,
   getHistoryLineStatusLabel,
+  getHistoryWorkTypeLabel,
   type LineSignTone,
 } from "./historyBatchInterpreter";
 import { formatHistoryDateTimeLong } from "./historyFormat";
@@ -133,7 +134,7 @@ export function HistoryBatchDetailPanel({
 
   return (
     <div className="space-y-4">
-      {/* 작업 묶음 — 작업명 + 흐름 보조문구 + work_type/sub_type + 라인 요약 한꺼번에 */}
+      {/* 작업 묶음 — 작업명 + 흐름 보조문구 + 작업 종류(한글) + 라인 요약 한꺼번에 */}
       <div
         className="rounded-[24px] border p-5"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
@@ -151,7 +152,7 @@ export function HistoryBatchDetailPanel({
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
             {flow?.secondary && <span>{flow.secondary}</span>}
             {flow?.secondary && <span>·</span>}
-            <span>{batch.work_type} · {batch.sub_type}</span>
+            <span>{getHistoryWorkTypeLabel(batch.work_type)}</span>
           </div>
         )}
         <div className="mt-1">{summaryEl}</div>

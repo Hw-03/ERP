@@ -18,6 +18,8 @@ export interface UseHistoryDataArgs {
   debouncedSearch: string;
   /** 달력에서 선택한 날짜 (YYYY-MM-DD). 있으면 dateFilter 무시하고 그날만 fetch. */
   selectedDateKey: string | null;
+  /** 상단 부서칩에서 선택한 부서. null = 전체. dept-bucket 거래를 그 부서로 좁힘. */
+  department: string | null;
 }
 
 export interface UseHistoryDataResult {
@@ -42,6 +44,7 @@ export function useHistoryData({
   dateFilter,
   debouncedSearch,
   selectedDateKey,
+  department,
 }: UseHistoryDataArgs): UseHistoryDataResult {
   const [logs, setLogs] = useState<TransactionLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,9 +57,10 @@ export function useHistoryData({
   const dateFrom = selectedDateKey ?? dateFilterToFrom(dateFilter);
   const dateTo = selectedDateKey ?? undefined;
   const search = debouncedSearch.trim() || undefined;
+  const departmentParam = department ?? undefined;
 
   // queryKey: 조건 변화를 한 문자열로. stale 응답 가드용.
-  const queryKey = `${transactionTypes ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${search ?? ""}`;
+  const queryKey = `${transactionTypes ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${search ?? ""}|${departmentParam ?? ""}`;
   const queryKeyRef = useRef(queryKey);
   // loadMore 가 사용하는 abort controller. 새 조건 effect 발동 시 abort.
   const loadMoreCtrlRef = useRef<AbortController | null>(null);
@@ -89,6 +93,7 @@ export function useHistoryData({
           dateFrom,
           dateTo,
           search,
+          department: departmentParam,
         },
         { signal: ctrl.signal },
       )
@@ -124,6 +129,7 @@ export function useHistoryData({
           dateFrom,
           dateTo,
           search,
+          department: departmentParam,
         },
         { signal: ctrl.signal },
       );
@@ -139,7 +145,7 @@ export function useHistoryData({
       if (queryKeyRef.current === myKey) setLoadingMore(false);
       if (loadMoreCtrlRef.current === ctrl) loadMoreCtrlRef.current = null;
     }
-  }, [transactionTypes, dateFrom, dateTo, search, queryKey]);
+  }, [transactionTypes, dateFrom, dateTo, search, departmentParam, queryKey]);
 
   const canLoadMore = lastBatchSize === HISTORY_PAGE_SIZE;
 

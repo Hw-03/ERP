@@ -7,15 +7,15 @@ import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { HistoryFilterBar } from "./_history_sections/HistoryFilterBar";
 import { HistoryCalendarPanel } from "./_history_sections/HistoryCalendarPanel";
-import { HistoryStatsBar } from "./_history_sections/HistoryStatsBar";
+import { HistoryStatsBar, type HistoryBucket } from "./_history_sections/HistoryStatsBar";
 import { HistoryTable } from "./_history_sections/HistoryTable";
 import { DesktopHistoryRightPanel } from "./_history_sections/DesktopHistoryRightPanel";
 import { useHistoryData } from "./_hooks/useHistoryData";
-import { useCurrentOperator } from "./login/useCurrentOperator";
 import { parseUtc, toDateKey } from "./_history_sections/historyFormat";
-import { getDefaultHistoryScopeForOperator, type HistoryScope } from "./_history_sections/transactionTaxonomy";
+import { type HistoryScope } from "./_history_sections/transactionTaxonomy";
 import { type HistorySelection } from "./_history_sections/historyConstants";
 import {
+  DATE_OPTIONS,
   TRANSACTION_TYPES_NONE,
   dateFilterToFrom,
   intersectTransactionTypes,
@@ -24,8 +24,11 @@ import {
 const SEARCH_DEBOUNCE_MS = 350;
 
 export function DesktopHistoryView() {
+  // scope/typeFilter 는 상단 박스 클릭이 세팅(별도 scope 탭 줄 없음).
+  // 역할 기반 기본 scope 미적용 — 항상 "전체"로 시작 (grill 합의: 처음엔 그냥 전체).
   const [scope, setScope] = useState<HistoryScope>("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
+  const [activeDept, setActiveDept] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState("MONTH");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -36,16 +39,32 @@ export function DesktopHistoryView() {
     return () => clearTimeout(t);
   }, [search]);
 
-  // 사용자별 기본 scope — operator 로드 후 1회만 적용.
-  // 사용자가 칩으로 직접 바꾼 뒤에는 didApplyDefaultScopeRef 가드로 덮어쓰지 않음.
-  const operator = useCurrentOperator();
-  const didApplyDefaultScopeRef = useRef(false);
-  useEffect(() => {
-    if (didApplyDefaultScopeRef.current) return;
-    if (!operator) return;
-    didApplyDefaultScopeRef.current = true;
-    setScope(getDefaultHistoryScopeForOperator(operator));
-  }, [operator]);
+  // 상단 박스 = 곧 필터. 박스/부서칩 클릭이 scope/typeFilter/activeDept 를 세팅.
+  function handlePickBucket(bucket: HistoryBucket) {
+    setActiveDept(null);
+    setTypeFilter("ALL");
+    if (bucket === "warehouse") setScope("WAREHOUSE_INVOLVED");
+    else if (bucket === "dept") setScope("DEPT_INTERNAL");
+    else if (bucket === "adjust") {
+      setScope("ALL");
+      setTypeFilter("ADJUST");
+    } else setScope("ALL");
+  }
+  function handlePickDept(name: string) {
+    setScope("DEPT_INTERNAL");
+    setTypeFilter("ALL");
+    setActiveDept((cur) => (cur === name ? null : name));
+  }
+
+  // 현재 박스 상태 — HistoryStatsBar 하이라이트/전개 판정.
+  const activeBucket: HistoryBucket =
+    activeDept || scope === "DEPT_INTERNAL"
+      ? "dept"
+      : scope === "WAREHOUSE_INVOLVED"
+        ? "warehouse"
+        : typeFilter === "ADJUST"
+          ? "adjust"
+          : "all";
 
   const [selection, setSelection] = useState<HistorySelection | null>(null);
   const [itemRecentLogs, setItemRecentLogs] = useState<TransactionLog[]>([]);
@@ -63,12 +82,17 @@ export function DesktopHistoryView() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const lastSelectionRef = useRef<HistorySelection | null>(null);
 
+  const periodLabel = selectedDay
+    ? selectedDay
+    : (DATE_OPTIONS.find((o) => o.value === dateFilter)?.label ?? "전체");
+
   const { logs, setLogs, loading, loadingMore, canLoadMore, loadMore } = useHistoryData({
     scope,
     typeFilter,
     dateFilter,
     debouncedSearch,
     selectedDateKey: selectedDay,
+    department: activeDept,
   });
 
   // selection.kind === "log" 일 때만 같은 품목 최근 거래 로드.
@@ -164,8 +188,7 @@ export function DesktopHistoryView() {
 
   const todayKey = toDateKey(new Date().toISOString());
 
-  // KPI summary — 조건 전체 카운트. 백엔드 /transactions/summary 호출.
-  // 100건 페이지네이션과 무관하게 "이번 달 전체"를 보여줌.
+  // X(분자) summary — 현재 필터(유형/박스/검색/부서) 전체 카운트. 페이지네이션 무관.
   const [summary, setSummary] = useState<TransactionSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const summaryKeyRef = useRef("");
@@ -175,12 +198,13 @@ export function DesktopHistoryView() {
     const dateFrom = selectedDay ?? dateFilterToFrom(dateFilter);
     const dateTo = selectedDay ?? undefined;
     const search = debouncedSearch.trim() || undefined;
+    const department = activeDept ?? undefined;
 
-    const myKey = `${transactionTypes ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${search ?? ""}`;
+    const myKey = `${transactionTypes ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${search ?? ""}|${department ?? ""}`;
     summaryKeyRef.current = myKey;
 
     if (transactionTypes === TRANSACTION_TYPES_NONE) {
-      setSummary({ total: 0, warehouseCount: 0, deptCount: 0, adjustCount: 0 });
+      setSummary({ total: 0, warehouseCount: 0, deptCount: 0, adjustCount: 0, departmentCounts: {} });
       setSummaryLoading(false);
       return;
     }
@@ -189,7 +213,7 @@ export function DesktopHistoryView() {
     const ctrl = new AbortController();
     void productionApi
       .getTransactionsSummary(
-        { transactionTypes, dateFrom, dateTo, search },
+        { transactionTypes, dateFrom, dateTo, search, department },
         { signal: ctrl.signal },
       )
       .then((s) => {
@@ -203,7 +227,36 @@ export function DesktopHistoryView() {
         setSummaryLoading(false);
       });
     return () => ctrl.abort();
-  }, [scope, typeFilter, dateFilter, selectedDay, debouncedSearch]);
+  }, [scope, typeFilter, dateFilter, selectedDay, debouncedSearch, activeDept]);
+
+  // Y(분모) baseline summary — 선택한 기간만 필터. 유형/박스/검색/부서 무시.
+  // 상단 박스 숫자·부서칩·"{기간} Y건 중 X건"의 Y 를 고정 제공.
+  const [baselineSummary, setBaselineSummary] = useState<TransactionSummary | null>(null);
+  const [baselineLoading, setBaselineLoading] = useState(false);
+  const baselineKeyRef = useRef("");
+
+  useEffect(() => {
+    const dateFrom = selectedDay ?? dateFilterToFrom(dateFilter);
+    const dateTo = selectedDay ?? undefined;
+    const myKey = `${dateFrom ?? ""}|${dateTo ?? ""}`;
+    baselineKeyRef.current = myKey;
+
+    setBaselineLoading(true);
+    const ctrl = new AbortController();
+    void productionApi
+      .getTransactionsSummary({ dateFrom, dateTo }, { signal: ctrl.signal })
+      .then((s) => {
+        if (baselineKeyRef.current !== myKey) return;
+        setBaselineSummary(s);
+        setBaselineLoading(false);
+      })
+      .catch((err) => {
+        if ((err as Error)?.name === "AbortError") return;
+        if (baselineKeyRef.current !== myKey) return;
+        setBaselineLoading(false);
+      });
+    return () => ctrl.abort();
+  }, [dateFilter, selectedDay]);
 
   function handleLogUpdated(updated: TransactionLog) {
     setLogs((prev) => prev.map((l) => (l.log_id === updated.log_id ? updated : l)));
@@ -250,10 +303,14 @@ export function DesktopHistoryView() {
       >
         <div className="flex flex-col gap-3 pb-6">
           <HistoryStatsBar
-            summary={summary}
-            summaryLoading={summaryLoading}
-            loadedCount={logs.length}
-            canLoadMore={canLoadMore}
+            baseline={baselineSummary}
+            currentCount={summary?.total ?? null}
+            loading={summaryLoading || baselineLoading}
+            periodLabel={periodLabel}
+            activeBucket={activeBucket}
+            activeDept={activeDept}
+            onPick={handlePickBucket}
+            onPickDept={handlePickDept}
           />
 
           <HistoryFilterBar
@@ -263,8 +320,6 @@ export function DesktopHistoryView() {
             setDateFilter={handleDateFilterChange}
             typeFilter={typeFilter}
             setTypeFilter={setTypeFilter}
-            scope={scope}
-            setScope={setScope}
             totalCount={summary?.total ?? logs.length}
           />
 

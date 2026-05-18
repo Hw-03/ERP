@@ -140,7 +140,7 @@ export function TransactionQuantityCorrectModal({ open, log, onClose, onSuccess 
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.yellow }} />
           <p className="text-xs" style={{ color: LEGACY_COLORS.text }}>
-            이 작업은 실제 창고 재고 수량을 변경합니다. 차액만큼 ADJUST 보정 거래가 생성되며, 원본 거래는 보존됩니다.
+            이 작업은 실제 창고 재고 수량을 변경합니다. 차액만큼 수량 보정 거래가 생성되며, 원본 거래는 보존됩니다.
           </p>
         </div>
 
@@ -172,7 +172,7 @@ export function TransactionQuantityCorrectModal({ open, log, onClose, onSuccess 
             />
             {qtyValid && (
               <p className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                저장값: {willSendQty > 0 ? "+" : ""}{willSendQty} · 차액(delta): {delta > 0 ? "+" : ""}{delta}
+                저장값: {willSendQty > 0 ? "+" : ""}{willSendQty} · 차액: {delta > 0 ? "+" : ""}{delta}
               </p>
             )}
           </FieldRow>

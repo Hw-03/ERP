@@ -86,12 +86,31 @@ _SUMMARY_DEPT_TYPES = [
 _SUMMARY_ADJUST_TYPES = [TransactionTypeEnum.ADJUST]
 
 
+def _department_label_expr():
+    """dept-bucket 거래 한 건의 단일 부서 라벨 식.
+
+    PRODUCE(to_dept)·BACKFLUSH(from_dept) 등 한 배치 내 라인이 같은 부서라
+    COALESCE(to_department, from_department) 로 단일 부서가 잡힌다. dept-bucket
+    인데 배치/부서가 없으면 '미상'. 그 외 타입은 NULL → 부서 집계/필터에서 제외.
+    summary 의 부서별 카운트와 summary/list 의 department 필터가 같은 식을 공유.
+    """
+    return case(
+        (
+            TransactionLog.transaction_type.in_(_SUMMARY_DEPT_TYPES),
+            func.coalesce(IoBatch.to_department, IoBatch.from_department, "미상"),
+        ),
+        else_=None,
+    )
+
+
 class TransactionSummaryResponse(BaseModel):
     """입출고 내역 화면 KPI — 조건 전체 카운트(페이지네이션과 무관)."""
     total: int
     warehouse_count: int
     dept_count: int
     adjust_count: int
+    # dept-bucket 거래의 부서별 카운트 {부서명: 건수}. 배치/부서 없으면 '미상' 키.
+    department_counts: dict[str, int] = {}
 
 
 def _require_export_range(start_date: Optional[date], end_date: Optional[date]) -> tuple[datetime, datetime]:
@@ -184,6 +203,9 @@ def list_transactions(
     transaction_types: Optional[str] = Query(None, description="쉼표 구분 복수 타입. 예: RECEIVE,SHIP"),
     reference_no: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
+    department: Optional[str] = Query(
+        None, description="부서 라벨 필터 (dept-bucket 거래 한정, '미상' 포함)"
+    ),
     date_from: Optional[date] = Query(None, description="포함 시작일 YYYY-MM-DD"),
     date_to: Optional[date] = Query(None, description="포함 종료일 YYYY-MM-DD"),
     include_archived: bool = Query(False, description="archived_at 이 있는 레코드 포함 여부"),
@@ -228,6 +250,8 @@ def list_transactions(
 
     if reference_no:
         query = query.filter(TransactionLog.reference_no == reference_no)
+    if department:
+        query = query.filter(_department_label_expr() == department)
     if date_from:
         query = query.filter(TransactionLog.created_at >= datetime.combine(date_from, time.min))
     if date_to:
@@ -269,13 +293,17 @@ def list_transactions(
 def get_transactions_summary(
     transaction_types: Optional[str] = Query(None, description="쉼표 구분 복수 타입"),
     search: Optional[str] = Query(None),
+    department: Optional[str] = Query(
+        None, description="부서 라벨 필터 (dept-bucket 거래 한정, '미상' 포함)"
+    ),
     date_from: Optional[date] = Query(None, description="포함 시작일 YYYY-MM-DD"),
     date_to: Optional[date] = Query(None, description="포함 종료일 YYYY-MM-DD"),
     include_archived: bool = Query(False),
     db: Session = Depends(get_db),
 ):
     """KPI 카드용 카운트 집계. list_transactions 와 동일한 필터를 받지만 row 가 아니라
-    숫자 4개만 반환 — 화면에 로드된 100건이 아니라 조건 전체를 보여주기 위함.
+    숫자만 반환 — 화면에 로드된 100건이 아니라 조건 전체를 보여주기 위함.
+    department_counts 는 dept-bucket 거래를 부서별로 묶은 카운트.
     """
     # list_transactions 와 동일한 join 패턴 — search 가 IoBatch.requester_name 까지 닿게.
     query = (
@@ -314,6 +342,8 @@ def get_transactions_summary(
                 IoBatch.requester_name.ilike(pattern),
             )
         )
+    if department:
+        query = query.filter(_department_label_expr() == department)
 
     # 한 번의 집계 쿼리로 4개 카운트.
     agg = query.with_entities(
@@ -332,11 +362,22 @@ def get_transactions_summary(
         ).label("adjust_count"),
     ).one()
 
+    # dept-bucket 거래 부서별 카운트 (같은 필터 적용). NULL(비-dept-bucket)은 제외.
+    dexpr = _department_label_expr()
+    dept_rows = (
+        query.with_entities(dexpr.label("dept"), func.count(TransactionLog.log_id).label("c"))
+        .filter(TransactionLog.transaction_type.in_(_SUMMARY_DEPT_TYPES))
+        .group_by(dexpr)
+        .all()
+    )
+    department_counts = {r.dept: int(r.c) for r in dept_rows if r.dept is not None}
+
     return TransactionSummaryResponse(
         total=int(agg.total or 0),
         warehouse_count=int(agg.warehouse_count or 0),
         dept_count=int(agg.dept_count or 0),
         adjust_count=int(agg.adjust_count or 0),
+        department_counts=department_counts,
     )
 
 

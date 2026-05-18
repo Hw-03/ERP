@@ -187,6 +187,18 @@ export function getHistoryOperationLabel(
   return _TX_OPERATION[log.transaction_type] ?? log.transaction_type;
 }
 
+const _WORK_TYPE_LABEL: Record<string, string> = {
+  receive: "원자재 입고",
+  warehouse_io: "창고 입출고",
+  process: "부서 작업",
+  defect: "불량",
+};
+
+/** IoBatch.work_type 코드의 한글 라벨. 미매핑이면 원문 그대로(안전). */
+export function getHistoryWorkTypeLabel(workType: string): string {
+  return _WORK_TYPE_LABEL[workType] ?? workType;
+}
+
 /** 화면 정본 메인 라벨. 의도 우선. 모든 row/패널이 같은 정책으로 보이도록. */
 export function getHistoryDisplayLabel(
   log: { transaction_type: string },

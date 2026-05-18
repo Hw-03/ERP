@@ -6590,6 +6590,14 @@
             "title": "Adjust Count",
             "type": "integer"
           },
+          "department_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "default": {},
+            "title": "Department Counts",
+            "type": "object"
+          },
           "dept_count": {
             "title": "Dept Count",
             "type": "integer"
@@ -9262,6 +9270,24 @@
             }
           },
           {
+            "description": "부서 라벨 필터 (dept-bucket 거래 한정, '미상' 포함)",
+            "in": "query",
+            "name": "department",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "부서 라벨 필터 (dept-bucket 거래 한정, '미상' 포함)",
+              "title": "Department"
+            }
+          },
+          {
             "description": "포함 시작일 YYYY-MM-DD",
             "in": "query",
             "name": "date_from",
@@ -9571,7 +9597,7 @@
     },
     "/api/inventory/transactions/summary": {
       "get": {
-        "description": "KPI 카드용 카운트 집계. list_transactions 와 동일한 필터를 받지만 row 가 아니라\n숫자 4개만 반환 — 화면에 로드된 100건이 아니라 조건 전체를 보여주기 위함.",
+        "description": "KPI 카드용 카운트 집계. list_transactions 와 동일한 필터를 받지만 row 가 아니라\n숫자만 반환 — 화면에 로드된 100건이 아니라 조건 전체를 보여주기 위함.\ndepartment_counts 는 dept-bucket 거래를 부서별로 묶은 카운트.",
         "operationId": "get_transactions_summary_api_inventory_transactions_summary_get",
         "parameters": [
           {
@@ -9606,6 +9632,24 @@
                 }
               ],
               "title": "Search"
+            }
+          },
+          {
+            "description": "부서 라벨 필터 (dept-bucket 거래 한정, '미상' 포함)",
+            "in": "query",
+            "name": "department",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "부서 라벨 필터 (dept-bucket 거래 한정, '미상' 포함)",
+              "title": "Department"
             }
           },
           {

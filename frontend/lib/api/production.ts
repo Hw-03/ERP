@@ -23,6 +23,8 @@ export interface TransactionSummary {
   warehouseCount: number;
   deptCount: number;
   adjustCount: number;
+  /** dept-bucket 거래의 부서별 카운트 {부서명: 건수}. 배치/부서 없으면 '미상'. */
+  departmentCounts: Record<string, number>;
 }
 
 export const productionApi = {
@@ -49,6 +51,7 @@ export const productionApi = {
       transactionTypes?: string; // 쉼표 구분 복수값. 예: "RECEIVE,SHIP"
       referenceNo?: string;
       search?: string;
+      department?: string;
       dateFrom?: string; // YYYY-MM-DD
       dateTo?: string;   // YYYY-MM-DD
       includeArchived?: boolean;
@@ -63,6 +66,7 @@ export const productionApi = {
     if (params?.transactionTypes) query.set("transaction_types", params.transactionTypes);
     if (params?.referenceNo) query.set("reference_no", params.referenceNo);
     if (params?.search) query.set("search", params.search);
+    if (params?.department) query.set("department", params.department);
     if (params?.dateFrom) query.set("date_from", params.dateFrom);
     if (params?.dateTo) query.set("date_to", params.dateTo);
     if (params?.includeArchived) query.set("include_archived", "true");
@@ -79,6 +83,7 @@ export const productionApi = {
     params?: {
       transactionTypes?: string;
       search?: string;
+      department?: string;
       dateFrom?: string;
       dateTo?: string;
       includeArchived?: boolean;
@@ -88,6 +93,7 @@ export const productionApi = {
     const query = new URLSearchParams();
     if (params?.transactionTypes) query.set("transaction_types", params.transactionTypes);
     if (params?.search) query.set("search", params.search);
+    if (params?.department) query.set("department", params.department);
     if (params?.dateFrom) query.set("date_from", params.dateFrom);
     if (params?.dateTo) query.set("date_to", params.dateTo);
     if (params?.includeArchived) query.set("include_archived", "true");
@@ -97,6 +103,7 @@ export const productionApi = {
       warehouse_count: number;
       dept_count: number;
       adjust_count: number;
+      department_counts: Record<string, number>;
     }>(
       toApiUrl(`/api/inventory/transactions/summary${qs ? `?${qs}` : ""}`),
       opts?.signal,
@@ -105,6 +112,7 @@ export const productionApi = {
       warehouseCount: res.warehouse_count,
       deptCount: res.dept_count,
       adjustCount: res.adjust_count,
+      departmentCounts: res.department_counts ?? {},
     }));
   },
 

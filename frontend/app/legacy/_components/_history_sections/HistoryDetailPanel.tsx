@@ -14,6 +14,7 @@ import {
   getBatchFlowEndpoints,
   getHistoryActor,
   getHistoryDisplayLabel,
+  getHistoryWorkTypeLabel,
 } from "./historyBatchInterpreter";
 import { TransactionEditModal } from "./TransactionEditModal";
 import {
@@ -341,7 +342,7 @@ function FlowCard({ flow, log }: { flow: FlowState; log: TransactionLog }) {
             </span>
           )}
           <span className="ml-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-            ({batch.work_type} · {batch.sub_type})
+({getHistoryWorkTypeLabel(batch.work_type)})
           </span>
         </div>
         <div className="mt-2 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>

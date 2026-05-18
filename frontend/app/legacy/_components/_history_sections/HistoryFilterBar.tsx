@@ -1,38 +1,12 @@
 "use client";
 
-import { HelpCircle, Search, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common";
-import {
-  DEPT_INTERNAL_TYPES,
-  SCOPE_LABELS,
-  WAREHOUSE_INVOLVED_TYPES,
-  type HistoryScope,
-} from "./transactionTaxonomy";
-import { DATE_OPTIONS, TYPE_OPTIONS, type TypeOption } from "./historyQuery";
+import { DATE_OPTIONS, TYPE_OPTIONS } from "./historyQuery";
 
-const _wh = new Set<string>(WAREHOUSE_INVOLVED_TYPES);
-const _dept = new Set<string>(DEPT_INTERNAL_TYPES);
-
-/**
- * scope 안에서 노출할 칩 옵션.
- * - ALL → 전체 옵션
- * - WAREHOUSE_INVOLVED → transactionTypes 가 모두 WAREHOUSE_INVOLVED_TYPES 부분집합인 옵션 + "전체"
- * - DEPT_INTERNAL → 동일 (DEPT_INTERNAL_TYPES 부분집합) + "전체"
- * 수량 조정/불량 처리/공급사 반품(ambiguous)은 ALL scope 에서만 노출.
- */
-function getTypeOptionsForScope(scope: HistoryScope): TypeOption[] {
-  if (scope === "ALL") return TYPE_OPTIONS;
-  const base = scope === "WAREHOUSE_INVOLVED" ? _wh : _dept;
-  return TYPE_OPTIONS.filter((o) => {
-    if (o.value === "ALL") return true;
-    if (o.transactionTypes.length === 0) return true;
-    return o.transactionTypes.every((t) => base.has(t));
-  });
-}
-
-const SCOPE_ORDER: HistoryScope[] = ["ALL", "WAREHOUSE_INVOLVED", "DEPT_INTERNAL"];
-
+// scope(창고/부서/수량조정)는 상단 HistoryStatsBar 박스가 담당.
+// 여기 거래 유형 칩은 전체 옵션을 그대로 노출(불량 처리/공급사 반품 포함).
 type Props = {
   search: string;
   setSearch: (v: string) => void;
@@ -40,8 +14,6 @@ type Props = {
   setDateFilter: (v: string) => void;
   typeFilter: string;
   setTypeFilter: (v: string) => void;
-  scope: HistoryScope;
-  setScope: (s: HistoryScope) => void;
   totalCount: number;
 };
 
@@ -52,52 +24,11 @@ export function HistoryFilterBar({
   setDateFilter,
   typeFilter,
   setTypeFilter,
-  scope,
-  setScope,
   totalCount,
 }: Props) {
-  const typeOptions = getTypeOptionsForScope(scope);
-
-  function handleScopeChange(next: HistoryScope) {
-    setScope(next);
-    // 새 scope 에서 노출 안 되는 옵션이면 ALL 로 리셋.
-    const next_chips = getTypeOptionsForScope(next);
-    if (!next_chips.some((o) => o.value === typeFilter)) setTypeFilter("ALL");
-  }
-
   return (
     <section className="card" style={{ paddingTop: 14, paddingBottom: 14 }}>
       <div className="flex flex-col gap-2.5">
-        {/* 0줄: scope 탭 (전체 / 창고 포함 / 부서 내부) */}
-        <div className="flex items-center gap-2 self-start">
-          <div className="flex overflow-hidden rounded-[12px] border" style={{ borderColor: LEGACY_COLORS.border }}>
-            {SCOPE_ORDER.map((s) => {
-              const active = scope === s;
-              return (
-                <button
-                  key={s}
-                  onClick={() => handleScopeChange(s)}
-                  className="px-4 py-2 text-xs font-bold transition-colors"
-                  style={{
-                    background: active ? LEGACY_COLORS.blue : "transparent",
-                    color: active ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
-                  }}
-                >
-                  {SCOPE_LABELS[s]}
-                </button>
-              );
-            })}
-          </div>
-          <span
-            className="inline-flex items-center gap-1 text-[11px]"
-            style={{ color: LEGACY_COLORS.muted2 }}
-            title="수량 조정/불량 처리/공급사 반품은 거래 타입만으로 창고/부서를 단정할 수 없어 '전체' scope에서만 별도 칩으로 노출됩니다."
-          >
-            <HelpCircle className="h-3 w-3" />
-            수량 조정/불량 처리/공급사 반품은 &apos;전체&apos;에서 확인
-          </span>
-        </div>
-
         {/* 1줄: 검색 + 기간 세그먼트 */}
         <div className="flex items-center gap-2">
           <div
@@ -141,9 +72,9 @@ export function HistoryFilterBar({
 
         </div>
 
-        {/* 2줄: 거래 유형 칩 (scope 기준 필터링) */}
+        {/* 2줄: 거래 유형 칩 */}
         <div className="flex flex-wrap items-center gap-1.5">
-          {typeOptions.map((opt) => (
+          {TYPE_OPTIONS.map((opt) => (
             <FilterChip
               key={opt.value}
               active={typeFilter === opt.value}
