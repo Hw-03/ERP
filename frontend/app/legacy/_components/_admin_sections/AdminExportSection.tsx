@@ -210,7 +210,8 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
   ): Promise<{ csv: string; fileName: string }> {
     if (scope === "items") {
       const items = await api.getItems({ limit: 5000 });
-      const filtered = inactive ? items : items;
+      // Item 타입에 is_active 필드가 없어 클라이언트 필터 불가 — 전체 반환
+      const filtered = items;
       const headers = ["품목 코드", "품명", "단위", "현재고", "안전재고", "부서", "공급처"];
       const rows = filtered.map((it) => [
         it.erp_code,

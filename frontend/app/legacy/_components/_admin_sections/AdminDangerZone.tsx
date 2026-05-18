@@ -189,8 +189,9 @@ export function AdminDangerZone({
                 </button>
                 <button
                   type="button"
-                  onClick={openResetWarn}
-                  className="flex items-center gap-1.5 rounded-[12px] border px-4 py-2.5 text-[13px] font-bold transition-colors hover:brightness-110"
+                  disabled
+                  title="준비 중"
+                  className="flex cursor-not-allowed items-center gap-1.5 rounded-[12px] border px-4 py-2.5 text-[13px] font-bold opacity-40"
                   style={{
                     background: LEGACY_COLORS.s1,
                     borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 35%, transparent)`,

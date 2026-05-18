@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Layers, Plus, Trash2, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { BOMDetailEntry, Item, ProductModel } from "@/lib/api";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { EmptyState } from "../common";
 import { StatusPill } from "../common/StatusPill";
 import {
@@ -33,6 +34,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
 
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [addMode, setAddMode] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
   const inUse = useMemo(
     () => productModels.filter((m) => Boolean(m.model_name)),
@@ -99,11 +101,20 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
   }
 
   function handleDelete(slot: number) {
-    deleteModel(slot);
-    if (selectedSlot === slot) setSelectedSlot(null);
+    setDeleteTarget(slot);
   }
 
+  function handleConfirmDelete() {
+    if (deleteTarget === null) return;
+    deleteModel(deleteTarget);
+    if (selectedSlot === deleteTarget) setSelectedSlot(null);
+    setDeleteTarget(null);
+  }
+
+  const deleteTargetModel = deleteTarget !== null ? productModels.find((m) => m.slot === deleteTarget) : null;
+
   return (
+    <>
     <div className="flex min-h-0 flex-1 flex-col">
       <AdminPageHeader
         icon={Layers}
@@ -256,6 +267,17 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
         </AdminDetailCard>
       </div>
     </div>
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title={`'${deleteTargetModel?.model_name ?? `슬롯 ${deleteTarget}`}' 모델을 삭제하시겠습니까?`}
+        tone="danger"
+        cautionMessage="이 작업은 되돌릴 수 없습니다. 연결된 BOM·품목 매핑이 해제됩니다."
+        confirmLabel="삭제"
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+      />
+    </>
   );
 }
 
