@@ -54,13 +54,18 @@ export function WarehouseWizardScreen({ showToast }: { showToast: (toast: ToastS
   const summaryChips: SummaryChip[] = useMemo(() => {
     const out: SummaryChip[] = [];
     if (state.mode) {
+      // WS10: 미지 mode 면 WAREHOUSE_MODE_META[...] 가 undefined → meta.label 에서
+      // TypeError. 가드해 안전 스킵(정상 모드는 기존과 동일). 전역
+      // noUncheckedIndexedAccess(81곳)는 범위 폭주라 미적용 — 이 deref 만 차단.
       const meta = WAREHOUSE_MODE_META[state.mode as WarehouseMode];
-      out.push({
-        key: "mode",
-        label: meta.label,
-        tone: LEGACY_COLORS.blue,
-        onClick: state.step > 0 ? () => dispatch({ type: "GO", step: 0 }) : undefined,
-      });
+      if (meta) {
+        out.push({
+          key: "mode",
+          label: meta.label,
+          tone: LEGACY_COLORS.blue,
+          onClick: state.step > 0 ? () => dispatch({ type: "GO", step: 0 }) : undefined,
+        });
+      }
     }
     if (employee) {
       out.push({
