@@ -97,6 +97,7 @@ def _to_item_with_inventory(
         process_type_code=item.process_type_code,
         option_code=item.option_code,
         serial_no=item.serial_no,
+        bom_completed_at=item.bom_completed_at,
         created_at=item.created_at,
         updated_at=item.updated_at,
         quantity=fig.total,

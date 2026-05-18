@@ -149,6 +149,19 @@ export function BomWorkbench({
     [allBomRows],
   );
 
+  // 선택된 부모의 BOM 을 서버 기준으로 재동기화 (낙관적 갱신 desync·stale bom_id 차단)
+  async function reloadBom() {
+    if (!parentId) {
+      setBomRows([]);
+      return;
+    }
+    try {
+      setBomRows(await api.getBOM(parentId));
+    } catch {
+      setBomRows([]);
+    }
+  }
+
   async function handleAdd(childId: string, childName: string, qty: number): Promise<boolean> {
     if (!parent) return false;
     if (!Number.isFinite(qty) || qty <= 0) {
@@ -156,13 +169,13 @@ export function BomWorkbench({
       return false;
     }
     try {
-      const created = await api.createBOM({
+      await api.createBOM({
         parent_item_id: parent.item_id,
         child_item_id: childId,
         quantity: qty,
         unit: "EA",
       });
-      setBomRows((cur) => [...cur, created]);
+      await reloadBom();
       refreshAllBom();
       onStatusChange(`"${childName}" 을(를) 추가했습니다.`);
       return true;
@@ -174,12 +187,13 @@ export function BomWorkbench({
 
   async function handleSaveQty(bomId: string, qty: number) {
     try {
-      const updated = await api.updateBOM(bomId, { quantity: qty });
-      setBomRows((cur) => cur.map((r) => (r.bom_id === updated.bom_id ? updated : r)));
+      await api.updateBOM(bomId, { quantity: qty });
+      await reloadBom();
       refreshAllBom();
       onStatusChange("수량을 변경했습니다.");
     } catch (err) {
-      onError(err instanceof Error ? err.message : "수량 변경 실패");
+      await reloadBom();
+      onError(err instanceof Error ? err.message : "수량 변경 실패 — 목록을 새로고침했습니다.");
     }
   }
 
@@ -188,11 +202,12 @@ export function BomWorkbench({
     setDeleteBusy(true);
     try {
       await api.deleteBOM(deleteRequest.bomId);
-      setBomRows((cur) => cur.filter((r) => r.bom_id !== deleteRequest.bomId));
+      await reloadBom();
       refreshAllBom();
       onStatusChange(`"${deleteRequest.childName}" 을(를) 삭제했습니다.`);
     } catch (err) {
-      onError(err instanceof Error ? err.message : "삭제 실패");
+      await reloadBom();
+      onError(err instanceof Error ? err.message : "삭제 실패 — 목록을 새로고침했습니다.");
     } finally {
       setDeleteBusy(false);
       setDeleteRequest(null);
