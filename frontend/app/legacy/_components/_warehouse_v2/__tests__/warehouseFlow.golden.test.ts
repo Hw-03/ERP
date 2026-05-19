@@ -506,7 +506,7 @@ describe("useIoWorkState 초기 상태", () => {
   });
 
   it("initialDepartment='고압' → from/to 모두 고압", () => {
-    const { result } = renderHook(() => useIoWorkState("고압"));
+    const { result } = renderHook(() => useIoWorkState(undefined, "고압"));
     expect(result.current.fromDepartment).toBe("고압");
     expect(result.current.toDepartment).toBe("고압");
   });
