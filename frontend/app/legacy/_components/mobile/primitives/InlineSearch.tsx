@@ -62,7 +62,7 @@ export function InlineSearch({
           onChange(next);
         }}
         placeholder={placeholder}
-        className={clsx("h-10 min-w-0 flex-1 bg-transparent outline-none", TYPO.body)}
+        className={clsx("h-11 min-w-0 flex-1 bg-transparent outline-none", TYPO.body)}
         style={{ color: LEGACY_COLORS.text }}
       />
       {draft ? (

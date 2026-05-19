@@ -154,7 +154,8 @@ export function BottomSheet({
   return (
     <div
       className="fixed inset-0 z-[200] flex items-end justify-center"
-      style={{ background: `rgba(0,0,0,${(0.6 * dimFactor).toFixed(3)})` }}
+      // zIndex 인라인 — 모달 스택은 Tailwind 스캔 여부와 무관히 항상 최상위.
+      style={{ zIndex: 200, background: `rgba(0,0,0,${(0.6 * dimFactor).toFixed(3)})` }}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -165,7 +166,10 @@ export function BottomSheet({
         ref={sheetRef}
         className="w-full max-w-full overflow-y-auto rounded-t-[22px] border-t"
         style={{
-          background: LEGACY_COLORS.s1,
+          // 모달 시트는 불투명해야 함 — --c-s1 은 반투명이라 뒤 화면이 비친다.
+          // 불투명 --c-bg 위에 s1 표면 틴트를 합성해 불투명 + 표면감 유지.
+          backgroundColor: LEGACY_COLORS.bg,
+          backgroundImage: `linear-gradient(${LEGACY_COLORS.s1}, ${LEGACY_COLORS.s1})`,
           borderColor: LEGACY_COLORS.border,
           maxHeight: "92vh",
           paddingBottom: "calc(env(safe-area-inset-bottom, 16px) + 20px)",
