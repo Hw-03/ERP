@@ -91,18 +91,23 @@ function TabButton({
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="relative rounded-[12px] border px-4 py-2.5 transition-colors hover:brightness-110"
+      className="relative min-h-[44px] rounded-[12px] border px-2 py-2 transition-colors hover:brightness-110 lg:px-4 lg:py-2.5"
       style={{ background: bg, borderColor: border }}
     >
       <div
-        className="text-center text-[22px] font-black leading-tight tracking-[-0.02em]"
-        style={{ color: tone }}
+        className="text-center text-xs leading-tight tracking-[-0.02em] break-keep lg:text-[22px]"
+        style={{
+          // WCAG AA: brand 컬러 텍스트는 연한 틴트 위 4.5:1 미달 → 다크 text 색.
+          // 활성 구분은 배경 틴트(22%)+보더(tone)+굵기로.
+          color: LEGACY_COLORS.text,
+          fontWeight: active ? 900 : 700,
+        }}
       >
         {label}
       </div>
       {badge !== null && (
         <div
-          className="absolute right-3 top-1/2 -translate-y-1/2 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-black leading-none text-white"
+          className="absolute right-0.5 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-black leading-none text-white lg:right-3 lg:top-1/2 lg:h-5 lg:min-w-[20px] lg:-translate-y-1/2 lg:px-1.5 lg:text-[11px]"
           style={{ background: tone }}
         >
           {badge}

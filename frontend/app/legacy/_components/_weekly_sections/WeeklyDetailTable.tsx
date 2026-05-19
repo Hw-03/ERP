@@ -6,7 +6,8 @@ import { formatQty } from "@/lib/mes/format";
 import type { WeeklyGroupReport } from "@/lib/api/types/weekly";
 import { EmptyState } from "../common/EmptyState";
 
-const ZERO_FADE = `color-mix(in srgb, ${LEGACY_COLORS.muted2} 30%, transparent)`;
+// 0 값 de-emphasis — WCAG AA 충족(투명 30% 는 미달) → 솔리드 muted2(5.55:1).
+const ZERO_FADE = LEGACY_COLORS.muted2;
 
 interface Props {
   group: WeeklyGroupReport | undefined;
@@ -31,7 +32,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
         className="mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 pb-1.5"
         style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
       >
-        <span className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.muted }}>
+        <span className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
           {group.dept_name}
           <span
             className="ml-1 text-[11px] font-bold"
@@ -84,7 +85,72 @@ function WeeklyDetailTableImpl({ group }: Props) {
         </span>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* 모바일(<lg): 카드 리스트 — 데스크탑 와이드 테이블(minWidth 680)이
+          393px 에서 가로 오버플로/스크롤영역 a11y 위반을 일으켜 카드로 대체. */}
+      <div className="flex flex-col gap-2 lg:hidden">
+        {group.items.map((row) => {
+          const d = row.delta;
+          const deltaColor =
+            d > 0 ? LEGACY_COLORS.green : d < 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2;
+          return (
+            <div
+              key={row.item_id}
+              className="rounded-[14px] border p-3"
+              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div
+                    className="truncate text-sm font-black"
+                    style={{ color: LEGACY_COLORS.text }}
+                  >
+                    {row.item_name}
+                  </div>
+                  <div
+                    className="text-[11px] font-semibold"
+                    style={{ color: LEGACY_COLORS.muted2 }}
+                  >
+                    {row.erp_code ?? "—"}
+                  </div>
+                </div>
+                <div
+                  className="shrink-0 text-base font-black tabular-nums"
+                  style={{ color: deltaColor }}
+                >
+                  {d > 0 ? `+${formatQty(d)}` : d < 0 ? formatQty(d) : "±0"}
+                </div>
+              </div>
+              <div
+                className="mt-2 grid grid-cols-4 gap-1 text-center text-[11px] font-bold tabular-nums"
+              >
+                {[
+                  { l: "전주", v: row.prev_qty, c: LEGACY_COLORS.muted2 },
+                  { l: "생산", v: row.in_qty, c: LEGACY_COLORS.green },
+                  { l: "출고", v: row.out_qty, c: LEGACY_COLORS.red },
+                  { l: "현재", v: row.current_qty, c: LEGACY_COLORS.text },
+                ].map((x) => (
+                  <div key={x.l}>
+                    <div style={{ color: LEGACY_COLORS.muted2 }}>{x.l}</div>
+                    <div
+                      className="text-sm"
+                      style={{ color: Number(x.v) === 0 ? ZERO_FADE : x.c }}
+                    >
+                      {Number(x.v) === 0 ? "—" : formatQty(x.v)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div
+        className="hidden overflow-x-auto lg:block"
+        role="region"
+        aria-label={`${group.dept_name} 품목 상세`}
+        tabIndex={0}
+      >
         <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 2px", minWidth: 680, tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: "100px" }} />

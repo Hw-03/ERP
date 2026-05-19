@@ -23,7 +23,8 @@ function fmt(n: number): string {
   return n === 0 ? "—" : Math.round(n).toLocaleString();
 }
 
-const ZERO_FADE = `color-mix(in srgb, ${LEGACY_COLORS.muted2} 30%, transparent)`;
+// 0 값 de-emphasis — WCAG AA 충족(투명 30% 는 미달) → 솔리드 muted2(5.55:1).
+const ZERO_FADE = LEGACY_COLORS.muted2;
 
 interface Props {
   rows: WeeklyProductionModelRow[];
@@ -41,7 +42,12 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div
+      className="overflow-x-auto"
+      role="region"
+      aria-label="모델별 공정 생산 매트릭스"
+      tabIndex={0}
+    >
       <table className="w-full border-collapse">
         <thead>
           <tr style={{ background: LEGACY_COLORS.s2 }}>
@@ -58,8 +64,8 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
                 <th
                   key={c.key}
                   scope="col"
-                  className="px-3 py-2 text-center text-[14px] font-black tracking-wide"
-                  style={{ color: deptColor }}
+                  className="whitespace-nowrap px-1.5 py-2 text-center text-[12px] font-black tracking-tight lg:px-3 lg:text-[14px]"
+                  style={{ color: `color-mix(in srgb, ${deptColor} 42%, ${LEGACY_COLORS.text})` }}
                 >
                   {c.label}
                 </th>
@@ -78,7 +84,7 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
               >
                 <td
                   className={`py-2.5 px-3 text-center text-[15px] ${hasData ? "font-black" : "font-semibold"}`}
-                  style={{ color: hasData ? LEGACY_COLORS.text : LEGACY_COLORS.muted }}
+                  style={{ color: hasData ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}
                 >
                   {row.model_label}
                 </td>
@@ -95,7 +101,9 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
                       key={c.key}
                       className={`px-3 py-2.5 text-center text-[16px] tabular-nums ${hasVal ? "font-black" : "font-medium"}`}
                       style={{
-                        color: hasVal ? deptColor : ZERO_FADE,
+                        color: hasVal
+                          ? `color-mix(in srgb, ${deptColor} 45%, ${LEGACY_COLORS.text})`
+                          : ZERO_FADE,
                         background: hasVal
                           ? `color-mix(in srgb, ${deptColor} ${tintPct}%, transparent)`
                           : undefined,

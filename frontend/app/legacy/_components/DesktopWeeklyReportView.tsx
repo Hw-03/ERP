@@ -138,7 +138,7 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
             >
               <span
                 className="text-[11px] font-bold tracking-wide"
-                style={{ color: LEGACY_COLORS.muted }}
+                style={{ color: LEGACY_COLORS.muted2 }}
               >
                 생산 현황
               </span>
@@ -172,7 +172,7 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
               )}
               <span
                 className="rounded-[7px] px-2 py-0.5 text-[12px] font-bold tabular-nums"
-                style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted }}
+                style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}
               >
                 생산 부서 {activeDepts}/{totalDepts}
               </span>
@@ -187,7 +187,7 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
                   style={{
                     background: LEGACY_COLORS.s2,
                     borderColor: LEGACY_COLORS.border,
-                    color: LEGACY_COLORS.muted,
+                    color: LEGACY_COLORS.muted2,
                   }}
                 >
                   <Download className="h-3.5 w-3.5" />
@@ -201,7 +201,7 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
                   style={{
                     background: LEGACY_COLORS.s2,
                     borderColor: LEGACY_COLORS.border,
-                    color: LEGACY_COLORS.muted,
+                    color: LEGACY_COLORS.muted2,
                   }}
                 >
                   <Printer className="h-3.5 w-3.5" />

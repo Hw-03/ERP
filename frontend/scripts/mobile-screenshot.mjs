@@ -8,8 +8,11 @@
 import { chromium } from 'playwright';
 import * as fs from 'fs';
 import * as path from 'path';
+import { seedOperator } from './_mobile-auth.mjs';
 
-const BASE_URL = 'http://localhost:3000/legacy';
+// page.path 가 이미 '/legacy?tab=...' 를 포함하므로 BASE_URL 에는 /legacy 를 붙이지 않는다.
+// MOBILE_BASE_URL 로 포트/호스트 오버라이드 가능(기본 localhost:3000).
+const BASE_URL = process.env.MOBILE_BASE_URL || 'http://localhost:3000';
 const SCREENSHOTS_DIR = path.resolve('./frontend/screenshots');
 const OUTPUT_FILE = path.join(SCREENSHOTS_DIR, 'measurements.json');
 
@@ -32,7 +35,7 @@ async function ensureScreenshotsDir() {
   }
 }
 
-async function captureMeasurements(page, screenName, pageName) {
+async function captureMeasurements(page) {
   const measurements = await page.evaluate(() => {
     const root = document.querySelector('[data-testid="screen-root"]') ||
                  document.querySelector('main') ||
@@ -49,7 +52,69 @@ async function captureMeasurements(page, screenName, pageName) {
 
     const style = root ? getComputedStyle(root) : {};
 
+    // ── 하드페일 #1: 가로 오버플로 ──────────────────────────
+    const vw = document.documentElement.clientWidth;
+    const scrollW = Math.max(
+      document.documentElement.scrollWidth,
+      document.body ? document.body.scrollWidth : 0,
+    );
+    const hasHorizontalOverflow = scrollW > vw + 1;
+
+    // 뷰포트 밖으로 삐져나간 요소 표본(셀렉터/우측좌표) — 평가자가 핀포인트
+    const cssPath = (el) => {
+      if (!(el instanceof Element)) return '';
+      const parts = [];
+      let cur = el;
+      let depth = 0;
+      while (cur && cur.nodeType === 1 && depth < 4) {
+        let seg = cur.tagName.toLowerCase();
+        if (cur.id) { seg += `#${cur.id}`; parts.unshift(seg); break; }
+        const cls = (cur.className && typeof cur.className === 'string')
+          ? '.' + cur.className.trim().split(/\s+/).slice(0, 2).join('.')
+          : '';
+        parts.unshift(seg + cls);
+        cur = cur.parentElement;
+        depth += 1;
+      }
+      return parts.join(' > ');
+    };
+
+    const overflowingElements = [];
+    const smallTouchTargets = [];
+    const INTERACTIVE = 'button, a[href], input, select, textarea, [role="button"], [role="tab"], [tabindex]:not([tabindex="-1"])';
+    const all = document.body ? document.body.querySelectorAll('*') : [];
+    for (const el of all) {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      if (r.right > vw + 1 && overflowingElements.length < 12) {
+        overflowingElements.push({
+          selector: cssPath(el),
+          right: Math.round(r.right),
+          width: Math.round(r.width),
+        });
+      }
+    }
+    for (const el of document.querySelectorAll(INTERACTIVE)) {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      const cs = getComputedStyle(el);
+      if (cs.visibility === 'hidden' || cs.display === 'none') continue;
+      if ((r.width < 44 || r.height < 44) && smallTouchTargets.length < 15) {
+        smallTouchTargets.push({
+          selector: cssPath(el),
+          w: Math.round(r.width),
+          h: Math.round(r.height),
+          text: (el.textContent || '').trim().slice(0, 24),
+        });
+      }
+    }
+
     return {
+      viewportWidth: vw,
+      documentScrollWidth: scrollW,
+      hasHorizontalOverflow,
+      overflowingElements,
+      smallTouchTargets,
       containerPaddingLeft: root ? style.paddingLeft : '0px',
       containerPaddingRight: root ? style.paddingRight : '0px',
       containerPaddingTop: root ? style.paddingTop : '0px',
@@ -76,6 +141,9 @@ async function captureScreenshots() {
         viewport: { width: screen.width, height: screen.height },
       });
 
+      const op = await seedOperator(context, BASE_URL);
+      if (op) console.log(`  🔑 세션: ${op.name}(${op.department}) wh=${op.warehouse_role}`);
+
       for (const page of PAGES) {
         const screenshotPath = path.join(
           SCREENSHOTS_DIR,
@@ -95,7 +163,7 @@ async function captureScreenshots() {
 
           // Capture measurements
           const key = `${screen.name}-${page.id}`;
-          measurements[key] = await captureMeasurements(browserPage, screen.name, page.label);
+          measurements[key] = await captureMeasurements(browserPage);
 
           // Capture screenshot
           await browserPage.screenshot({

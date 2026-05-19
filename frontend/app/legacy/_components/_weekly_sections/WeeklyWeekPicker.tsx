@@ -43,21 +43,29 @@ function getWeeksOfMonth(year: number, month: number): Date[][] {
   return weeks;
 }
 
-export function monthlyWeekLabel(weekMon: Date): string {
+function weekNumOf(weekMon: Date): { year: number; month: number; weekNum: number } {
   const year = weekMon.getFullYear();
   const month = weekMon.getMonth();
   const first = new Date(year, month, 1);
   const dow = first.getDay();
   const daysToFirstMon = (1 - dow + 7) % 7;
   const firstMonday = new Date(year, month, 1 + daysToFirstMon);
-  const diffDays = Math.round(
-    (weekMon.getTime() - firstMonday.getTime()) / 86400000
-  );
-  const weekNum = Math.floor(diffDays / 7) + 1;
+  const diffDays = Math.round((weekMon.getTime() - firstMonday.getTime()) / 86400000);
+  return { year, month, weekNum: Math.floor(diffDays / 7) + 1 };
+}
+
+export function monthlyWeekLabel(weekMon: Date): string {
+  const { year, month, weekNum } = weekNumOf(weekMon);
   const sun = new Date(weekMon);
   sun.setDate(weekMon.getDate() + 6);
   const fmt = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
   return `${year}년 ${month + 1}월 ${weekNum}주차 (${fmt(weekMon)} ~ ${fmt(sun)})`;
+}
+
+/** 모바일 헤더용 축약 라벨 — "5월 3주차" */
+export function shortWeekLabel(weekMon: Date): string {
+  const { month, weekNum } = weekNumOf(weekMon);
+  return `${month + 1}월 ${weekNum}주차`;
 }
 
 interface Props {
@@ -118,7 +126,7 @@ export function WeeklyWeekPicker({ weekMon, onChange }: Props) {
         onClick={handlePrevWeek}
         disabled={!canPrevWeek}
         title="이전 주"
-        className="flex h-8 w-8 items-center justify-center rounded-[10px] border transition-colors hover:brightness-110 disabled:opacity-30"
+        className="flex h-11 w-11 items-center justify-center rounded-[10px] border transition-colors hover:brightness-110 disabled:opacity-30 lg:h-8 lg:w-8"
         style={{
           background: LEGACY_COLORS.s2,
           borderColor: LEGACY_COLORS.border,
@@ -131,7 +139,7 @@ export function WeeklyWeekPicker({ weekMon, onChange }: Props) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-[12px] border px-3 py-1.5 transition-colors hover:brightness-110"
+        className="flex min-h-[44px] items-center gap-2 rounded-[12px] border px-3 py-1.5 transition-colors hover:brightness-110 lg:min-h-0"
         style={{
           background: open
             ? tint(LEGACY_COLORS.blue, 10, LEGACY_COLORS.s2)
@@ -141,7 +149,12 @@ export function WeeklyWeekPicker({ weekMon, onChange }: Props) {
         }}
       >
         <CalendarDays className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-        <span className="text-[13px] font-black">{monthlyWeekLabel(weekMon)}</span>
+        <span className="whitespace-nowrap text-[13px] font-black lg:hidden">
+          {shortWeekLabel(weekMon)}
+        </span>
+        <span className="hidden whitespace-nowrap text-[13px] font-black lg:inline">
+          {monthlyWeekLabel(weekMon)}
+        </span>
         <ChevronDown
           className="h-3.5 w-3.5 shrink-0 transition-transform"
           style={{
@@ -157,7 +170,7 @@ export function WeeklyWeekPicker({ weekMon, onChange }: Props) {
         onClick={handleNextWeek}
         disabled={!canNextWeek}
         title={!canNextWeek ? "미래 주차는 선택 불가" : "다음 주"}
-        className="flex h-8 w-8 items-center justify-center rounded-[10px] border transition-colors hover:brightness-110 disabled:opacity-30"
+        className="flex h-11 w-11 items-center justify-center rounded-[10px] border transition-colors hover:brightness-110 disabled:opacity-30 lg:h-8 lg:w-8"
         style={{
           background: LEGACY_COLORS.s2,
           borderColor: LEGACY_COLORS.border,
@@ -167,7 +180,11 @@ export function WeeklyWeekPicker({ weekMon, onChange }: Props) {
         <ChevronRight className="h-4 w-4" />
       </button>
 
-      {isThisWeek && <StatusPill label="이번 주" tone="success" showDot={false} />}
+      {isThisWeek && (
+        <span className="hidden lg:inline-flex">
+          <StatusPill label="이번 주" tone="success" showDot={false} />
+        </span>
+      )}
 
       {open && (
         <div

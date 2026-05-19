@@ -40,7 +40,7 @@ export function HistoryFilterBar({
     <section className="card" style={{ paddingTop: 14, paddingBottom: 14 }}>
       <div className="flex flex-wrap items-center gap-2">
         <div
-          className="flex flex-1 items-center gap-2 rounded-[12px] border px-3 py-2"
+          className="flex min-h-[44px] flex-1 items-center gap-2 rounded-[12px] border px-3 py-2 lg:min-h-0"
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
         >
           <Search className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
@@ -48,7 +48,7 @@ export function HistoryFilterBar({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="품명 · 코드 · 담당자 · 참조번호 · 메모"
-            className="flex-1 bg-transparent text-sm outline-none"
+            className="h-11 flex-1 bg-transparent text-sm outline-none lg:h-auto"
             style={{ color: LEGACY_COLORS.text }}
           />
           {search && (
@@ -83,7 +83,7 @@ export function HistoryFilterBar({
               <button
                 key={opt.value}
                 onClick={() => setDateFilter(opt.value)}
-                className="px-3 py-2 text-xs font-bold transition-colors"
+                className="flex min-h-[44px] items-center justify-center px-3 py-2 text-xs font-bold transition-colors lg:min-h-0"
                 style={{
                   background: active ? `color-mix(in srgb, ${LEGACY_COLORS.purple} 20%, transparent)` : "transparent",
                   color: active ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2,
@@ -100,7 +100,7 @@ export function HistoryFilterBar({
           type="button"
           onClick={onToggleFilterPanel}
           aria-expanded={filterPanelOpen}
-          className="flex shrink-0 items-center gap-1.5 rounded-[12px] border px-3 py-2 text-xs font-bold transition-colors"
+          className="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[12px] border px-3 py-2 text-xs font-bold transition-colors lg:min-h-0"
           style={{
             background: filterPanelOpen
               ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
@@ -130,7 +130,7 @@ export function HistoryFilterBar({
           type="button"
           onClick={onToggleCalendar}
           aria-expanded={calendarOpen}
-          className="flex shrink-0 items-center gap-1.5 rounded-[12px] border px-3 py-2 text-xs font-bold transition-colors"
+          className="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[12px] border px-3 py-2 text-xs font-bold transition-colors lg:min-h-0"
           style={{
             background: calendarOpen
               ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`

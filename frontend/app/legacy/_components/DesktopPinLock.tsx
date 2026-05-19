@@ -264,7 +264,7 @@ export function DesktopPinLock({
               type="button"
               onClick={onCancel}
               disabled={loading}
-              className="group inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] text-[color:var(--c-muted2)] transition-colors hover:text-[color:var(--c-blue)] disabled:opacity-40 disabled:hover:text-[color:var(--c-muted2)]"
+              className="group inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-3 py-2 text-[13px] text-[color:var(--c-muted2)] transition-colors hover:text-[color:var(--c-blue)] disabled:opacity-40 disabled:hover:text-[color:var(--c-muted2)] lg:min-h-0 lg:px-2 lg:py-1"
             >
               <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
               <span className="underline-offset-4 group-hover:underline">
