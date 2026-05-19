@@ -98,7 +98,8 @@
   body {
     background: var(--c-bg);
     color: var(--c-text);
-    min-height: 100vh;
+    min-height: 100vh; /* fallback */
+    min-height: 100dvh; /* iOS Safari: 하단 툴바 포함 동적 뷰포트 — 하단 탭바 가림 방지 */
   }
 
   /* 스크롤바 스타일 */

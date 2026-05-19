@@ -164,7 +164,7 @@ export function MobileShell() {
   ]);
 
   return (
-    <div className="h-screen overflow-hidden sm:bg-black" data-testid="mobile-shell">
+    <div className="h-[100dvh] overflow-hidden sm:bg-black" data-testid="mobile-shell">
       <div
         className="flex h-full flex-col overflow-hidden"
         style={{
