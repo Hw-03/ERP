@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Filter } from "lucide-react";
 import { api, type TransactionLog } from "@/lib/api";
 import { productionApi, type TransactionSummary } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
@@ -342,60 +341,36 @@ export function DesktopHistoryView() {
             setSearch={setSearch}
             dateFilter={dateFilter}
             setDateFilter={handleDateFilterChange}
+            filterPanelOpen={filterPanelOpen}
+            onToggleFilterPanel={() => setFilterPanelOpen((o) => !o)}
+            activeFilterCount={activeFilterCount}
+            calendarOpen={calendarOpen}
+            onToggleCalendar={() => setCalendarOpen((o) => !o)}
+            selectedDay={selectedDay}
+            onClearSelectedDay={() => setSelectedDay(null)}
           />
 
-          <section className="card" style={{ paddingTop: 12, paddingBottom: 12 }}>
-            <button
-              type="button"
-              onClick={() => setFilterPanelOpen((o) => !o)}
-              className="flex items-center gap-1.5 rounded-[14px] border px-3 py-2 text-sm font-semibold"
-              style={{
-                background: filterPanelOpen
-                  ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
-                  : LEGACY_COLORS.s2,
-                borderColor: filterPanelOpen ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                color: filterPanelOpen ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
-              }}
-              aria-expanded={filterPanelOpen}
-            >
-              <Filter className="h-3.5 w-3.5" />
-              필터
-              {activeFilterCount > 0 && (
-                <span
-                  className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[11px] font-bold leading-none text-white"
-                  style={{ background: LEGACY_COLORS.blue }}
-                >
-                  {activeFilterCount}
-                </span>
-              )}
-              <ChevronDown
-                className="h-3.5 w-3.5 transition-transform"
-                style={{ transform: filterPanelOpen ? "rotate(180deg)" : undefined }}
+          {filterPanelOpen && (
+            <section className="card" style={{ paddingTop: 12, paddingBottom: 12 }}>
+              <HistoryFilterPanel
+                open={filterPanelOpen}
+                departmentCounts={baselineSummary?.departmentCounts ?? {}}
+                selectedDepts={selectedDepts}
+                toggleDept={toggleDept}
+                clearDepts={() => setSelectedDepts([])}
+                models={availableModels}
+                selectedModels={selectedModels}
+                toggleModel={toggleModel}
+                clearModels={() => setSelectedModels([])}
+                selectedOps={selectedOps}
+                toggleOp={toggleOp}
+                clearOps={() => setSelectedOps([])}
               />
-            </button>
-            {filterPanelOpen && (
-              <div className="mt-2.5">
-                <HistoryFilterPanel
-                  open={filterPanelOpen}
-                  departmentCounts={baselineSummary?.departmentCounts ?? {}}
-                  selectedDepts={selectedDepts}
-                  toggleDept={toggleDept}
-                  clearDepts={() => setSelectedDepts([])}
-                  models={availableModels}
-                  selectedModels={selectedModels}
-                  toggleModel={toggleModel}
-                  clearModels={() => setSelectedModels([])}
-                  selectedOps={selectedOps}
-                  toggleOp={toggleOp}
-                  clearOps={() => setSelectedOps([])}
-                />
-              </div>
-            )}
-          </section>
+            </section>
+          )}
 
           <HistoryCalendarPanel
             open={calendarOpen}
-            onToggle={() => setCalendarOpen((o) => !o)}
             calendarYear={calendarYear}
             calendarMonth={calendarMonth}
             prevMonth={prevMonth}
