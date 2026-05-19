@@ -93,6 +93,7 @@ export function AdminRightPanelContent({
         {section === "employees" && "직원 섹션에서는 직원의 운영 상태를 빠르게 전환할 수 있습니다."}
         {section === "bom" && "BOM 섹션에서는 상위 품목을 기준으로 하위 자재를 추가하거나 제거할 수 있습니다."}
         {section === "export" && "엑셀 내보내기 섹션에서 품목·거래 데이터를 엑셀 파일로 다운로드할 수 있습니다."}
+        {section === "audit" && "외부 제출용 로그 섹션에서 심사 대비 월별 입출고 CSV 를 다운로드할 수 있습니다."}
         {section === "settings" && "설정 섹션에서는 관리자 PIN 변경, 초기화를 관리합니다."}
       </div>
       <div

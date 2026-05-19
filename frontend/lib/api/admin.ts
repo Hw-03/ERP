@@ -5,7 +5,19 @@
  *   - verifyAdminPin / updateAdminPin / resetDatabase
  */
 
-import { postJson, putJson, toApiUrl } from "../api-core";
+import { fetcher, postJson, putJson, toApiUrl } from "../api-core";
+
+export interface AuditCsvFile {
+  month: string;
+  file_name: string;
+  size_bytes: number;
+  row_count: number;
+}
+
+export interface AuditCsvBackfillResult {
+  total_rows: number;
+  months: string[];
+}
 
 export const adminApi = {
   verifyAdminPin: (pin: string) =>
@@ -16,4 +28,16 @@ export const adminApi = {
 
   updateAdminPin: (payload: { current_pin: string; new_pin: string }) =>
     putJson<{ message: string }>(toApiUrl("/api/settings/admin-pin"), payload),
+
+  listAuditCsvFiles: () =>
+    fetcher<AuditCsvFile[]>(toApiUrl("/api/admin/audit-csv/files")),
+
+  auditCsvDownloadUrl: (month: string) =>
+    toApiUrl(`/api/admin/audit-csv/${month}.csv`),
+
+  auditXlsxDownloadUrl: (month: string) =>
+    toApiUrl(`/api/admin/audit-csv/${month}.xlsx`),
+
+  triggerAuditCsvBackfill: () =>
+    postJson<AuditCsvBackfillResult>(toApiUrl("/api/admin/audit-csv/backfill")),
 };

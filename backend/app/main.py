@@ -34,6 +34,7 @@ from app.services import integrity as integrity_svc
 
 from app.routers import (
     admin_audit,
+    admin_audit_csv,
     alerts,
     bom,
     codes,
@@ -53,6 +54,9 @@ from app.routers import (
     stock_requests,
     variance,
 )
+from app.services import audit_csv as audit_csv_svc
+
+audit_csv_svc.register_session_listeners()
 
 
 _BOOT_ID: str = uuid.uuid4().hex
@@ -239,6 +243,7 @@ app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 app.include_router(counts.router, prefix="/api/counts", tags=["Counts"])
 app.include_router(models_router.router, prefix="/api/models", tags=["Models"])
 app.include_router(admin_audit.router, prefix="/api/admin", tags=["Admin Audit"])
+app.include_router(admin_audit_csv.router, prefix="/api/admin", tags=["Admin Audit"])
 app.include_router(stock_requests.router, prefix="/api/stock-requests", tags=["Stock Requests"])
 app.include_router(dept_adjustment.router, prefix="/api/dept-adjustment", tags=["Dept Adjustment"])
 
