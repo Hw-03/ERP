@@ -85,12 +85,12 @@ export function MoreScreen({
 
   return (
     <>
-      <div className="flex flex-col gap-4 px-4 py-4">
+      <div className="flex flex-col gap-3 px-3 py-3">
         {/* 담당자 카드 — 전체 메뉴 시트 진입 */}
         <button
           type="button"
           onClick={() => openSheet("menu")}
-          className="flex items-center gap-3 rounded-[20px] border px-4 py-4 text-left active:scale-[0.99]"
+          className="flex items-center gap-3 rounded-[20px] border px-3 py-3 text-left active:scale-[0.99]"
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
         >
           <PersonAvatar
@@ -131,9 +131,9 @@ export function MoreScreen({
         </button>
 
         {/* 업무 — 부서 입출고는 입출고 탭(IoHub)으로 통합. 더보기에서 별도 노출하지 않음. */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           <SectionHeader subtitle="Work" title="업무" />
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             <MoreMenuRow
               icon={CalendarDays}
               label="주간보고"
@@ -163,9 +163,9 @@ export function MoreScreen({
         </div>
 
         {/* 관리 */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           <SectionHeader subtitle="Manage" title="관리" />
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             <MoreMenuRow
               icon={Lock}
               label="관리자"
@@ -184,9 +184,9 @@ export function MoreScreen({
         </div>
 
         {/* 시스템 — PIN 변경/로그아웃은 sheet 의 해당 mode 로 직진입 (메뉴 거치지 않음) */}
-        <div className="flex flex-col gap-2 pb-2">
+        <div className="flex flex-col gap-1.5 pb-2">
           <SectionHeader subtitle="System" title="시스템" />
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             <MoreMenuRow
               icon={KeyRound}
               label="내 PIN 변경"
