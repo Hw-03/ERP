@@ -280,7 +280,7 @@ export function IoTargetPicker({
         ref={tableContainerRef}
         onScroll={handleTableScroll}
         data-keep-scroll
-        className="scrollbar-hide min-h-0 flex-1 overflow-y-auto rounded-[16px] border"
+        className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overflow-x-auto rounded-[16px] border"
         style={{
           background: LEGACY_COLORS.s2,
           borderColor: LEGACY_COLORS.border,

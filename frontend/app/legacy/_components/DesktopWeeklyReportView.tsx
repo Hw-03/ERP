@@ -107,7 +107,7 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 py-1 pr-1 lg:overflow-hidden">
+    <div className="flex-1 min-h-0 min-w-0 overflow-y-auto flex flex-col gap-3 py-1 pr-1 lg:overflow-hidden">
       {error && (
         <div
           className="shrink-0 rounded-[10px] border px-3 py-1.5 text-[12px]"
@@ -244,7 +244,7 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
         </div>
 
         {/* 우: 품목 상세 */}
-        <div className="flex flex-1 flex-col rounded-[18px] border min-h-[280px] lg:min-h-0" style={cardBase}>
+        <div className="flex flex-1 flex-col min-w-0 rounded-[18px] border min-h-[280px] lg:min-h-0" style={cardBase}>
           <div
             className="flex flex-1 flex-col"
           >

@@ -38,7 +38,7 @@ export function HistoryFilterBar({
 }: Props) {
   return (
     <section className="card" style={{ paddingTop: 14, paddingBottom: 14 }}>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <div
           className="flex flex-1 items-center gap-2 rounded-[12px] border px-3 py-2"
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}

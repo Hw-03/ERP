@@ -25,7 +25,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-0">
+    <div className="flex flex-col gap-0 min-w-0">
       {/* 공정 요약 */}
       <div
         className="mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 pb-1.5"

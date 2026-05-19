@@ -280,10 +280,10 @@ export function BatchHeader({
       <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
         <MovementSummaryCell summary={summary} />
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className="hidden sm:table-cell whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         <ActorCell name={actor} />
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className="hidden sm:table-cell whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         <MemoCell notes={first.notes} />
       </td>
     </tr>
@@ -373,10 +373,10 @@ export function OpBatchHeader({
       <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
         <MovementSummaryCell summary={summary} />
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className="hidden sm:table-cell whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         <ActorCell name={actor} />
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className="hidden sm:table-cell whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         <MemoCell notes={first.notes} />
       </td>
     </tr>

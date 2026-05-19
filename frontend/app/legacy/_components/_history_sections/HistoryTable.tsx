@@ -29,13 +29,13 @@ type Props = {
   onLoadMore: () => void;
 };
 
-const COLUMNS: { label: string; width?: string; minWidth?: string; align?: "left" | "center" }[] = [
+const COLUMNS: { label: string; width?: string; minWidth?: string; align?: "left" | "center"; hidden?: boolean }[] = [
   { label: "일시", width: "140px" },
   { label: "구분", width: "130px" },
   { label: "품목명", minWidth: "180px" },
   { label: "변동요약", width: "150px", align: "center" },
-  { label: "담당자", width: "130px", align: "center" },
-  { label: "메모", width: "70px", align: "center" },
+  { label: "담당자", width: "130px", align: "center", hidden: true },
+  { label: "메모", width: "70px", align: "center", hidden: true },
 ];
 
 const VISIBLE_FETCH_CONCURRENCY = 4;
@@ -235,11 +235,11 @@ export function HistoryTable({
           <table className="min-w-full border-separate border-spacing-0 text-sm">
             <thead className="sticky top-0 z-10">
               <tr style={{ background: LEGACY_COLORS.s2 }}>
-                {COLUMNS.map(({ label, width, minWidth, align }) => (
+                {COLUMNS.map(({ label, width, minWidth, align, hidden }) => (
                   <th
                     key={label}
                     scope="col"
-                    className={`whitespace-nowrap border-b px-4 py-3 text-xs font-bold ${align === "center" ? "text-center" : "text-left"}`}
+                    className={`whitespace-nowrap border-b px-4 py-3 text-xs font-bold${hidden ? " hidden sm:table-cell" : ""} ${align === "center" ? "text-center" : "text-left"}`}
                     style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth }}
                   >
                     {label}

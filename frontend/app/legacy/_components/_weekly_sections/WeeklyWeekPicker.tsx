@@ -171,11 +171,12 @@ export function WeeklyWeekPicker({ weekMon, onChange }: Props) {
 
       {open && (
         <div
-          className="absolute left-0 top-full z-50 mt-2 rounded-[16px] border p-4 shadow-lg"
+          className="absolute right-0 top-full z-50 mt-2 rounded-[16px] border p-4 shadow-lg"
           style={{
             background: LEGACY_COLORS.s1,
             borderColor: LEGACY_COLORS.border,
-            minWidth: 320,
+            minWidth: 280,
+            maxWidth: "calc(100vw - 32px)",
           }}
         >
           <div className="mb-3 flex items-center justify-center gap-3">

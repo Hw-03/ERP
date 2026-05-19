@@ -322,7 +322,7 @@ export function DesktopHistoryView() {
   const activeFilterCount = selectedDepts.length + selectedModels.length + selectedOps.length;
 
   return (
-    <div className="flex min-h-0 flex-1 pl-0 pr-4">
+    <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4">
       {/* ── 좌측: 스크롤 영역 ── */}
       <div
         className="scrollbar-hide min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px] border"

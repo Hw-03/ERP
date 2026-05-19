@@ -45,7 +45,7 @@ export function HistoryStatsBar({
       </div>
 
       {/* 3박스 — 건수 표시 전용 */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2">
         <StatBox
           icon={<Building2 className="h-3.5 w-3.5" />}
           label="창고"
@@ -87,7 +87,7 @@ function StatBox({
 }) {
   return (
     <div
-      className="flex flex-col gap-1 rounded-[20px] border p-4 text-left"
+      className="flex flex-col gap-1 rounded-[20px] border p-3 lg:p-4 text-left"
       style={{ background: tint(color, 6), borderColor: tint(color, 22) }}
     >
       <div

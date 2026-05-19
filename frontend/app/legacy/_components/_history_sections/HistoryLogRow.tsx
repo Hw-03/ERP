@@ -134,7 +134,7 @@ function HistoryLogRowImpl({ log, selected, onSelect }: Props) {
       >
         <MovementSummaryCell summary={{ parts: [getSingleLogMovement(log)] }} />
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className="hidden sm:table-cell whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         {producer ? (
           <div className="flex items-center justify-center gap-1.5">
             <span
@@ -153,7 +153,7 @@ function HistoryLogRowImpl({ log, selected, onSelect }: Props) {
           </span>
         )}
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className="hidden sm:table-cell whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         <MemoCell notes={log.notes} />
       </td>
     </tr>

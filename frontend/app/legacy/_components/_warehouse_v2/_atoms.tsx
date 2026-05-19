@@ -85,7 +85,7 @@ export function WizardStepCard({
   if (state === "active") {
     return (
       <section
-        className={`rounded-[24px] border-2 p-6${fill ? " flex flex-1 flex-col min-h-0" : ""}`}
+        className={`rounded-[24px] border-2 p-4 lg:p-6${fill ? " flex flex-1 flex-col min-h-0" : ""}`}
         style={{
           backgroundColor: LEGACY_COLORS.s1,
           borderColor: `color-mix(in srgb, ${tone} 50%, transparent)`,

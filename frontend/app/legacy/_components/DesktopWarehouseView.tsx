@@ -106,8 +106,8 @@ export function DesktopWarehouseView({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-1 overflow-y-auto pr-4">
-      <div className="flex min-h-full w-full flex-col gap-3 px-6 pb-10 pt-4">
+    <div className="flex h-full min-h-0 flex-1 min-w-0 overflow-y-auto lg:pr-4">
+      <div className="flex min-h-full w-full flex-col gap-3 px-3 lg:px-6 pb-10 pt-4">
         <WarehouseHeader loadFailure={loadFailure} />
         <WarehouseSectionTabs
           active={sectionTab}
