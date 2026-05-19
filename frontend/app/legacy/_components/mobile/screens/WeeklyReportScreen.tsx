@@ -138,7 +138,7 @@ export function WeeklyReportScreen({ onBack }: { onBack: () => void }) {
         }
       />
 
-      <div className="flex flex-col gap-4 px-4 py-4">
+      <div className="flex flex-col gap-3 px-3 py-3">
         <AsyncState
           loading={loading}
           error={error}
@@ -191,7 +191,7 @@ export function WeeklyReportScreen({ onBack }: { onBack: () => void }) {
               </SectionCard>
 
               {/* KPI 4종 (2x2) */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-1.5">
                 <KpiCard
                   label="생산/입고"
                   value={formatQty(data.summary.total_in_qty)}
@@ -234,7 +234,7 @@ export function WeeklyReportScreen({ onBack }: { onBack: () => void }) {
 
               {/* 추가 경고 (총평에 노출 안된 나머지) */}
               {data.warnings.length > 1 ? (
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1.5">
                   {data.warnings
                     .filter((w) => w !== headlineWarning)
                     .map((w, i) => (
@@ -279,10 +279,10 @@ export function WeeklyReportScreen({ onBack }: { onBack: () => void }) {
 
               {/* 모델×공정 매트릭스 */}
               {data.production_matrix.length > 0 && !productionEmpty ? (
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1.5">
                   <SectionHeader subtitle="Production" title="모델별 생산" />
-                  <div className="-mx-4 overflow-x-auto pb-1">
-                    <div className="flex gap-2 px-4">
+                  <div className="-mx-3 overflow-x-auto pb-1">
+                    <div className="flex gap-1.5 px-4">
                       {data.production_matrix.map((row) => (
                         <ProductionMatrixCard key={row.model_key} row={row} />
                       ))}
@@ -297,9 +297,9 @@ export function WeeklyReportScreen({ onBack }: { onBack: () => void }) {
               )}
 
               {/* 공정별 변화 */}
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1.5">
                 <SectionHeader subtitle="By Process" title="공정별 변화" />
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1.5">
                   {data.groups.map((g) => (
                     <GroupCard
                       key={g.process_code}
@@ -313,7 +313,7 @@ export function WeeklyReportScreen({ onBack }: { onBack: () => void }) {
 
               {/* 선택 공정 품목 상세 */}
               {selected ? (
-                <div className="flex flex-col gap-2 pb-4">
+                <div className="flex flex-col gap-1.5 pb-4">
                   <SectionHeader
                     subtitle="Items"
                     title={`${selected.label} 품목 상세`}
@@ -353,7 +353,7 @@ export function WeeklyReportScreen({ onBack }: { onBack: () => void }) {
                   setWeek(w);
                   setSheetOpen(false);
                 }}
-                className="flex items-center justify-between gap-2 rounded-[14px] border px-4 py-3 text-left active:scale-[0.99]"
+                className="flex items-center justify-between gap-1.5 rounded-[14px] border px-4 py-3 text-left active:scale-[0.99]"
                 style={{
                   background: active
                     ? `${LEGACY_COLORS.blue as string}14`
@@ -533,7 +533,7 @@ function ItemDeltaRow({
         <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
           {item.erp_code ?? "-"}
         </div>
-        <div className="mt-1 flex flex-wrap gap-2">
+        <div className="mt-1 flex flex-wrap gap-1.5">
           <span className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
             전주 {formatQty(item.prev_qty)}
           </span>
