@@ -103,7 +103,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
         </span>
       </td>
       <td
-        className="border-b px-1 py-5 text-center align-middle"
+        className="hidden sm:table-cell border-b px-1 py-5 text-center align-middle"
         style={{ borderColor: LEGACY_COLORS.border, width: 60 }}
       >
         {imageFilename ? (
@@ -150,13 +150,13 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
         )}
       </td>
       <td
-        className="border-b px-4 py-5 align-middle whitespace-nowrap text-sm"
+        className="hidden sm:table-cell border-b px-4 py-5 align-middle whitespace-nowrap text-sm"
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
       >
         {item.erp_code ?? "-"}
       </td>
       <td
-        className="border-b px-4 py-5 align-middle whitespace-nowrap"
+        className="hidden sm:table-cell border-b px-4 py-5 align-middle whitespace-nowrap"
         style={{ borderColor: LEGACY_COLORS.border }}
       >
         <div className="flex items-center justify-center gap-1.5">
@@ -189,7 +189,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
         </span>
       </td>
       <td
-        className="border-b px-4 py-5 text-center align-middle whitespace-nowrap text-sm font-bold"
+        className="hidden sm:table-cell border-b px-4 py-5 text-center align-middle whitespace-nowrap text-sm font-bold"
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
       >
         {item.min_stock == null ? "-" : formatQty(item.min_stock)}

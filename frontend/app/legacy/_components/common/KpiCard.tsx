@@ -25,7 +25,7 @@ function KpiCardImpl({ label, value, hint, tone, active = false, onClick, compac
 
   const boxCls = compact
     ? "rounded-[12px] border px-4 py-2.5"
-    : "rounded-[16px] border px-5 py-5";
+    : "rounded-[16px] border px-3 py-3 lg:px-5 lg:py-5";
 
   const content = compact ? (
     <div className="flex items-center justify-between gap-3">

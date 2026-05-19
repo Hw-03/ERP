@@ -38,7 +38,7 @@ export function InventoryCapacityPanel({
     borderColor: `color-mix(in srgb, ${accent} 30%, transparent)`,
   };
   const className =
-    "mt-3 flex w-full flex-wrap items-center gap-4 rounded-[14px] border px-5 py-4 text-left" +
+    "mt-3 flex w-full flex-wrap items-center gap-2 rounded-[14px] border px-3 py-3 text-left lg:gap-4 lg:px-5 lg:py-4" +
     (interactive ? " cursor-pointer transition-opacity hover:opacity-90" : "");
 
   const heading = (() => {

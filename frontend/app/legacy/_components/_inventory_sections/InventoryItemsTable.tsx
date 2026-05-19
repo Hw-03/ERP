@@ -106,16 +106,16 @@ export function InventoryItemsTable({
               {(
                 [
                   { label: "상태", nowrap: true, width: "90px" },
-                  { label: "이미지", nowrap: true, width: "60px", center: true },
+                  { label: "이미지", nowrap: true, width: "60px", center: true, hidden: true },
                   { label: "품목명", nowrap: false, minWidth: "140px" },
-                  { label: "품목 코드", nowrap: true, width: "160px" },
-                  { label: "부서", nowrap: true, width: "160px", center: true },
-                ] as { label: string; nowrap: boolean; width?: string; minWidth?: string; center?: boolean }[]
-              ).map(({ label, nowrap, width, minWidth, center }) => (
+                  { label: "품목 코드", nowrap: true, width: "160px", hidden: true },
+                  { label: "부서", nowrap: true, width: "160px", center: true, hidden: true },
+                ] as { label: string; nowrap: boolean; width?: string; minWidth?: string; center?: boolean; hidden?: boolean }[]
+              ).map(({ label, nowrap, width, minWidth, center, hidden }) => (
                 <th
                   key={label}
                   scope="col"
-                  className={`border-b px-4 py-2.5 text-sm font-bold${nowrap ? " whitespace-nowrap" : ""}${center ? " text-center" : " text-left"}`}
+                  className={`border-b px-4 py-2.5 text-sm font-bold${nowrap ? " whitespace-nowrap" : ""}${center ? " text-center" : " text-left"}${hidden ? " hidden sm:table-cell" : ""}`}
                   style={{
                     borderColor: LEGACY_COLORS.border,
                     color: LEGACY_COLORS.muted2,
@@ -150,7 +150,7 @@ export function InventoryItemsTable({
               {/* 안전재고 — 정렬 가능 */}
               <th
                 scope="col"
-                className="border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap text-center cursor-pointer select-none hover:brightness-110"
+                className="hidden sm:table-cell border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap text-center cursor-pointer select-none hover:brightness-110"
                 style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: "160px" }}
                 onClick={() => handleSort("min_stock")}
                 aria-sort={sortCol === "min_stock" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}

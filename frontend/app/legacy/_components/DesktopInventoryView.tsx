@@ -161,7 +161,7 @@ export function DesktopInventoryView({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 pl-0 pr-4">
+    <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4">
       {/* ── 좌측: 스크롤 컨테이너 ── */}
       <div
         ref={scrollRef}
