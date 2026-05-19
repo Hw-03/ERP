@@ -12,7 +12,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from pydantic import BaseModel
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import and_, case, false, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -89,11 +89,13 @@ _SUMMARY_ADJUST_TYPES = [TransactionTypeEnum.ADJUST]
 
 
 def _department_label_expr():
-    """dept-bucket 거래 한 건의 단일 부서 라벨 식.
+    """거래 한 건의 부서 라벨 식 — 3단계 판정.
 
-    PRODUCE(to_dept)·BACKFLUSH(from_dept) 등 한 배치 내 라인이 같은 부서라
-    COALESCE(to_department, from_department) 로 단일 부서가 잡힌다. dept-bucket
-    인데 배치/부서가 없으면 '미상'. 그 외 타입은 NULL → 부서 집계/필터에서 제외.
+    1) _SUMMARY_DEPT_TYPES(부서계열): IoBatch.to/from_department 가 있으면 그 부서,
+       배치/부서 없으면 '미상'.
+    2) _SUMMARY_WAREHOUSE_TYPES(창고계열): 부서 개념이 없으므로 고정 '창고'.
+    3) 그 외(ADJUST/MARK_DEFECTIVE/SUPPLIER_RETURN/SCRAP … 무-맥락): '미상'.
+
     summary 의 부서별 카운트와 summary/list 의 department 필터가 같은 식을 공유.
     """
     return case(
@@ -101,7 +103,8 @@ def _department_label_expr():
             TransactionLog.transaction_type.in_(_SUMMARY_DEPT_TYPES),
             func.coalesce(IoBatch.to_department, IoBatch.from_department, "미상"),
         ),
-        else_=None,
+        (TransactionLog.transaction_type.in_(_SUMMARY_WAREHOUSE_TYPES), "창고"),
+        else_="미상",
     )
 
 
@@ -138,6 +141,113 @@ def _model_filter(model: Optional[str]):
         )
         .exists()
     )
+
+
+def _department_filter(department: Optional[str]):
+    """부서 라벨 IN 필터. 쉼표 복수 가능. 없으면 None.
+    _department_label_expr() 기준(부서계열→부서명·창고계열→'창고'·그외→'미상').
+    """
+    if not department:
+        return None
+    depts = [d.strip() for d in department.split(",") if d.strip()]
+    if not depts:
+        return None
+    return _department_label_expr().in_(depts)
+
+
+# 단일 출처: historyBatchInterpreter.ts:120-150 — 분기 시 구분/필터 불일치 재발
+# IoBatch.sub_type → 화면 표시 라벨 매핑 (프론트 _SUB_TYPE_OPERATION 동일)
+_SUBTYPE_OP: dict[str, str] = {
+    "produce": "생산 등록",
+    "disassemble": "재작업",
+    "warehouse_to_dept": "창고 반출",
+    "dept_to_warehouse": "창고 반입",
+    "dept_transfer": "부서 이동",
+    "adjust_in": "수량 조정",
+    "adjust_out": "수량 조정",
+    "receive_supplier": "원자재 입고",
+    "supplier_return": "공급사 반품",
+    "defect_quarantine": "불량 처리",
+}
+
+# TransactionLog.transaction_type → 화면 표시 라벨 매핑 (프론트 _TX_OPERATION 동일)
+_TX_OP: dict[str, str] = {
+    "RECEIVE": "원자재 입고",
+    "SHIP": "출고",
+    "TRANSFER_TO_PROD": "창고 반출",
+    "TRANSFER_TO_WH": "창고 반입",
+    "TRANSFER_DEPT": "부서 이동",
+    "BACKFLUSH": "자동 차감",
+    "PRODUCE": "생산 등록",
+    "DISASSEMBLE": "재작업",
+    "ADJUST": "수량 조정",
+    "MARK_DEFECTIVE": "불량 처리",
+    "SUPPLIER_RETURN": "공급사 반품",
+    "SCRAP": "폐기",
+    "LOSS": "손실",
+    "RETURN": "반품",
+    "RESERVE": "예약",
+    "RESERVE_RELEASE": "예약 해제",
+}
+
+# sub_type 이 있으면 라벨을 결정하는 키 집합 (tx 기반 라벨을 덮어쓴다)
+_DETERMINING_SUBTYPES: set[str] = set(_SUBTYPE_OP)
+
+
+def _operation_filter(transaction_types: Optional[str]):
+    """화면 표시 구분 기준 operation-aware 필터.
+
+    transaction_types 가 쉼표로 들어오면 각 tx 코드가 가리키는 화면 라벨 L 을 구해,
+    해당 라벨로 표시되는 row 를 OR 로 묶는다.
+
+    row 의 화면 라벨 = IoBatch.sub_type 이 _DETERMINING_SUBTYPES 에 있으면
+    _SUBTYPE_OP[sub_type], 없으면 _TX_OP[transaction_type].
+
+    없거나 알 수 없는 코드는 무시. 유효한 코드가 없으면 None 반환.
+    """
+    if not transaction_types:
+        return None
+
+    clauses = []
+    for raw in transaction_types.split(","):
+        code = raw.strip()
+        if not code:
+            continue
+        label = _TX_OP.get(code)
+        if label is None:
+            continue  # 알 수 없는 코드 무시
+
+        # 이 라벨에 해당하는 sub_type 키 목록
+        sub_set = [s for s, lbl in _SUBTYPE_OP.items() if lbl == label]
+        # 이 라벨에 해당하는 tx 코드 목록
+        tx_set = [t for t, lbl in _TX_OP.items() if lbl == label]
+
+        parts = []
+        if sub_set:
+            # sub_type 이 결정적인 경우: sub_type 으로 직접 매칭
+            parts.append(IoBatch.sub_type.in_(sub_set))
+
+        # tx 코드 기반: batch 없거나 sub_type 이 결정적이지 않은 경우
+        if tx_set:
+            parts.append(
+                and_(
+                    TransactionLog.transaction_type.in_(
+                        [TransactionTypeEnum(t) for t in tx_set if t in TransactionTypeEnum._value2member_map_]
+                    ),
+                    or_(
+                        IoBatch.batch_id.is_(None),
+                        IoBatch.sub_type.is_(None),
+                        IoBatch.sub_type.notin_(list(_DETERMINING_SUBTYPES)),
+                    ),
+                )
+            )
+
+        if parts:
+            clauses.append(or_(*parts))
+
+    if not clauses:
+        return None
+    return or_(*clauses)
 
 
 class TransactionSummaryResponse(BaseModel):
@@ -200,6 +310,7 @@ def _to_log_response(
         quantity_change=log.quantity_change,
         quantity_before=log.quantity_before,
         quantity_after=log.quantity_after,
+        transfer_qty=log.transfer_qty,
         reference_no=log.reference_no,
         produced_by=log.produced_by,
         requester_name=requester_name,
@@ -241,7 +352,7 @@ def list_transactions(
     reference_no: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     department: Optional[str] = Query(
-        None, description="부서 라벨 필터 (dept-bucket 거래 한정, '미상' 포함)"
+        None, description="부서 라벨 필터 (쉼표 복수). 예: 조립,고압. '창고'·'미상' 포함 가능"
     ),
     model: Optional[str] = Query(None, description="제품 모델명 필터 (쉼표 복수)"),
     process_step: Optional[str] = Query(
@@ -274,25 +385,22 @@ def list_transactions(
     if item_id:
         query = query.filter(TransactionLog.item_id == item_id)
 
-    # 복수 타입 필터 (transaction_type 단일값과 OR 합산)
-    type_set: set[TransactionTypeEnum] = set()
+    # 단수 transaction_type: 타 화면 호환용 — 원시 IN 필터 유지
     if transaction_type:
-        type_set.add(transaction_type)
+        query = query.filter(TransactionLog.transaction_type == transaction_type)
+
+    # 복수 transaction_types: 화면 표시 구분 기준 operation-aware 필터
+    # (sub_type 우선 라벨 → 재작업 묶음 내 BACKFLUSH 도 DISASSEMBLE 로 잡힘)
     if transaction_types:
-        for raw in transaction_types.split(","):
-            raw = raw.strip()
-            if raw:
-                try:
-                    type_set.add(TransactionTypeEnum(raw))
-                except ValueError:
-                    pass  # 잘못된 값 무시
-    if type_set:
-        query = query.filter(TransactionLog.transaction_type.in_(type_set))
+        _op_f = _operation_filter(transaction_types)
+        if _op_f is not None:
+            query = query.filter(_op_f)
 
     if reference_no:
         query = query.filter(TransactionLog.reference_no == reference_no)
-    if department:
-        query = query.filter(_department_label_expr() == department)
+    _dept_f = _department_filter(department)
+    if _dept_f is not None:
+        query = query.filter(_dept_f)
     _ps = _process_step_filter(process_step)
     if _ps is not None:
         query = query.filter(_ps)
@@ -341,7 +449,7 @@ def get_transactions_summary(
     transaction_types: Optional[str] = Query(None, description="쉼표 구분 복수 타입"),
     search: Optional[str] = Query(None),
     department: Optional[str] = Query(
-        None, description="부서 라벨 필터 (dept-bucket 거래 한정, '미상' 포함)"
+        None, description="부서 라벨 필터 (쉼표 복수). 예: 조립,고압. '창고'·'미상' 포함 가능"
     ),
     model: Optional[str] = Query(None, description="제품 모델명 필터 (쉼표 복수)"),
     process_step: Optional[str] = Query(
@@ -354,7 +462,7 @@ def get_transactions_summary(
 ):
     """KPI 카드용 카운트 집계. list_transactions 와 동일한 필터를 받지만 row 가 아니라
     숫자만 반환 — 화면에 로드된 100건이 아니라 조건 전체를 보여주기 위함.
-    department_counts 는 dept-bucket 거래를 부서별로 묶은 카운트.
+    department_counts 는 전 거래를 3단계 라벨(부서명·'창고'·'미상')로 묶은 카운트.
     """
     # list_transactions 와 동일한 join 패턴 — search 가 IoBatch.requester_name 까지 닿게.
     query = (
@@ -363,17 +471,11 @@ def get_transactions_summary(
         .outerjoin(IoBatch, TransactionLog.operation_batch_id == IoBatch.batch_id)
     )
 
-    type_set: set[TransactionTypeEnum] = set()
+    # 복수 transaction_types: operation-aware 필터
     if transaction_types:
-        for raw in transaction_types.split(","):
-            raw = raw.strip()
-            if raw:
-                try:
-                    type_set.add(TransactionTypeEnum(raw))
-                except ValueError:
-                    pass
-    if type_set:
-        query = query.filter(TransactionLog.transaction_type.in_(type_set))
+        _op_f = _operation_filter(transaction_types)
+        if _op_f is not None:
+            query = query.filter(_op_f)
 
     if date_from:
         query = query.filter(TransactionLog.created_at >= datetime.combine(date_from, time.min))
@@ -393,8 +495,9 @@ def get_transactions_summary(
                 IoBatch.requester_name.ilike(pattern),
             )
         )
-    if department:
-        query = query.filter(_department_label_expr() == department)
+    _dept_f = _department_filter(department)
+    if _dept_f is not None:
+        query = query.filter(_dept_f)
     _ps = _process_step_filter(process_step)
     if _ps is not None:
         query = query.filter(_ps)
@@ -419,11 +522,11 @@ def get_transactions_summary(
         ).label("adjust_count"),
     ).one()
 
-    # dept-bucket 거래 부서별 카운트 (같은 필터 적용). NULL(비-dept-bucket)은 제외.
+    # 전 거래 부서별 카운트 (3단계 라벨 기준: 부서명·'창고'·'미상').
+    # 제한 필터 없음 — '창고' 도 집계됨. NULL 반환은 없지만 방어 가드 유지.
     dexpr = _department_label_expr()
     dept_rows = (
         query.with_entities(dexpr.label("dept"), func.count(TransactionLog.log_id).label("c"))
-        .filter(TransactionLog.transaction_type.in_(_SUMMARY_DEPT_TYPES))
         .group_by(dexpr)
         .all()
     )
