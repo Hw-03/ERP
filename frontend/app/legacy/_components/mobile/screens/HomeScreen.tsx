@@ -143,7 +143,7 @@ export function HomeScreen({
   };
 
   return (
-    <div className="flex flex-col gap-4 px-4 py-4">
+    <div className="flex flex-col gap-3 px-3 py-3">
       {/* 인사말 + 작업자 */}
       <SectionCard className="flex items-center gap-3" padding="md">
         <PersonAvatar
@@ -175,7 +175,7 @@ export function HomeScreen({
       </SectionCard>
 
       {/* KPI */}
-      <div className="flex gap-2">
+      <div className="flex gap-1.5">
         <KpiCard
           label="오늘 처리"
           value={loading ? "…" : formatQty(data?.todayCount ?? 0)}
@@ -194,13 +194,13 @@ export function HomeScreen({
       </div>
 
       {/* 빠른 실행 */}
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         <SectionHeader subtitle="Quick" title="빠른 실행" />
         <QuickActionGrid actions={quickActions} columns={2} />
       </div>
 
       {/* 최근 작업 */}
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         <SectionHeader
           subtitle="Recent"
           title="최근 작업"
@@ -241,7 +241,7 @@ export function HomeScreen({
       </div>
 
       {/* 재고 알림 */}
-      <div className="flex flex-col gap-2 pb-4">
+      <div className="flex flex-col gap-1.5 pb-4">
         <SectionHeader subtitle="Alerts" title="재고 경고" />
         <SectionCard padding="none">
           <AsyncState
@@ -259,7 +259,7 @@ export function HomeScreen({
                   key={alert.alert_id}
                   type="button"
                   onClick={() => onChangeTab("inventory")}
-                  className="flex items-center gap-3 px-4 py-3 text-left active:bg-black/10"
+                  className="flex items-center gap-3 px-3 py-3 text-left active:bg-black/10"
                 >
                   <span
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px]"
