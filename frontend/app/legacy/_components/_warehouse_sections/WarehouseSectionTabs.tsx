@@ -94,16 +94,18 @@ function TabButton({
       className="relative min-h-[44px] rounded-[12px] border px-2 py-2 transition-colors hover:brightness-110 lg:px-4 lg:py-2.5"
       style={{ background: bg, borderColor: border }}
     >
-      <div
-        className="text-center text-xs leading-tight tracking-[-0.02em] break-keep lg:text-[22px]"
-        style={{
-          // WCAG AA: brand 컬러 텍스트는 연한 틴트 위 4.5:1 미달 → 다크 text 색.
-          // 활성 구분은 배경 틴트(22%)+보더(tone)+굵기로.
-          color: LEGACY_COLORS.text,
-          fontWeight: active ? 900 : 700,
-        }}
-      >
-        {label}
+      <div className="text-center text-xs leading-tight tracking-[-0.02em] break-keep lg:text-[22px]">
+        {/* 모바일: WCAG AA — 다크 text + 활성=900/비활성=700 */}
+        <span
+          className="lg:hidden"
+          style={{ color: LEGACY_COLORS.text, fontWeight: active ? 900 : 700 }}
+        >
+          {label}
+        </span>
+        {/* 데스크탑: 브랜드 tone 컬러 + font-black (어제 이전 룩 원복) */}
+        <span className="hidden font-black lg:inline" style={{ color: tone }}>
+          {label}
+        </span>
       </div>
       {badge !== null && (
         <div

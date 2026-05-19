@@ -20,7 +20,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
   const [hovered, setHovered] = useState<string | null>(null);
 
   return (
-    <div className="grid grid-cols-1 gap-2">
+    <div className="grid grid-cols-1 gap-1.5">
       {groups.map((g) => {
         const isActive = g.process_code === selected;
         const isHover = hovered === g.process_code;
@@ -72,9 +72,9 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
               }}
             />
             {/* 상단 행 한 줄: 부서명 · 공정코드 · 증감 */}
-            <div className="flex items-center gap-2 py-1.5 pl-4 pr-3">
+            <div className="flex items-center gap-2 py-1 pl-3 pr-2">
               <span
-                className="text-[16px] font-black tracking-[-0.01em] leading-none"
+                className="text-[15px] font-black tracking-[-0.01em] leading-none"
                 style={{ color: isQuiet ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text }}
               >
                 {g.dept_name}
@@ -95,7 +95,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
               <div className="ml-auto flex items-center gap-1.5">
                 {g.delta !== 0 ? (
                   <span
-                    className="text-[20px] font-black leading-none tabular-nums"
+                    className="text-[19px] font-black leading-none tabular-nums"
                     style={{ color: deltaColor }}
                   >
                     {g.delta > 0 ? `+${formatQty(g.delta)}` : formatQty(g.delta)}
@@ -123,7 +123,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
             </div>
             {/* 하단 행 한 줄: 입고 · 출고 · 현재 */}
             <div
-              className="flex items-center justify-between gap-2 border-t px-4 py-1 text-[12px] tabular-nums"
+              className="flex items-center justify-between gap-2 border-t px-3 py-1 text-[12px] tabular-nums"
               style={{ borderColor: tint(LEGACY_COLORS.border, 60, "transparent") }}
             >
               <span

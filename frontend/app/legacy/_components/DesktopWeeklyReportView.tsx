@@ -151,7 +151,7 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
         return (
           <div className="shrink-0 rounded-[18px] border py-3 px-4" style={cardBase}>
             {/* 헤더: 타이틀 + KPI 배지 + Export */}
-            <div className="mb-2 flex flex-wrap items-center gap-2">
+            <div className="mb-2 flex flex-wrap items-center gap-2 lg:flex-nowrap lg:whitespace-nowrap">
               <h2 className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
                 생산 현황
               </h2>
@@ -218,7 +218,7 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
       <div className="flex flex-col gap-3 lg:flex-row lg:flex-1 lg:min-h-0">
         {/* 좌: 공정별 변화 */}
         <div
-          className="flex w-full shrink-0 flex-col overflow-hidden rounded-[18px] border min-h-[220px] lg:w-[330px] lg:min-h-0"
+          className="flex w-full shrink-0 flex-col overflow-hidden rounded-[18px] border min-h-[220px] lg:w-[330px] lg:min-h-0 lg:max-h-full"
           style={cardBase}
         >
           <div
