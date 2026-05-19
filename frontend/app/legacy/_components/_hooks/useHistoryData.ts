@@ -2,24 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type TransactionLog } from "@/lib/api";
-import { type HistoryScope } from "../_history_sections/transactionTaxonomy";
 import { HISTORY_PAGE_SIZE } from "../_history_sections/historyConstants";
-import {
-  TRANSACTION_TYPES_NONE,
-  dateFilterToFrom,
-  intersectTransactionTypes,
-} from "../_history_sections/historyQuery";
+import { dateFilterToFrom } from "../_history_sections/historyQuery";
 
 export interface UseHistoryDataArgs {
-  scope: HistoryScope;
-  typeFilter: string;
+  /** 거래 종류(필터 패널) 쉼표 결합. "" = 미적용(전체). 백엔드가 화면-구분 기준으로 해석. */
+  operations: string;
   dateFilter: string;
   /** 부모(DesktopHistoryView)에서 350ms debounce 후 set 한 값. 목록/달력이 같은 값을 공유. */
   debouncedSearch: string;
   /** 달력에서 선택한 날짜 (YYYY-MM-DD). 있으면 dateFilter 무시하고 그날만 fetch. */
   selectedDateKey: string | null;
-  /** 상단 부서칩에서 선택한 부서. null = 전체. dept-bucket 거래를 그 부서로 좁힘. */
-  department: string | null;
+  /** 필터 패널 — 부서 쉼표 결합(다중). "" = 전체. */
+  department: string;
+  /** 필터 패널 — 제품 모델명 쉼표 결합. "" / 미지정 = 미적용. */
+  model?: string;
 }
 
 export interface UseHistoryDataResult {
@@ -33,18 +30,17 @@ export interface UseHistoryDataResult {
 
 /**
  * 서버사이드 필터로 입출고 내역을 페이지네이션 조회.
- * - scope/typeFilter/dateFilter/debouncedSearch 변경 시 logs 초기화 + 재조회.
+ * - operations/dateFilter/debouncedSearch/department/model 변경 시 logs 초기화 + 재조회.
  * - canLoadMore = 마지막 응답 길이 === HISTORY_PAGE_SIZE.
- * - "__NONE__" 교집합이면 fetch 생략하고 빈 배열.
  * - loadMore 중 조건이 바뀌면 stale 응답을 logs 에 append 하지 않음 (queryKey ref 가드).
  */
 export function useHistoryData({
-  scope,
-  typeFilter,
+  operations,
   dateFilter,
   debouncedSearch,
   selectedDateKey,
   department,
+  model = "",
 }: UseHistoryDataArgs): UseHistoryDataResult {
   const [logs, setLogs] = useState<TransactionLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,15 +48,16 @@ export function useHistoryData({
   const [lastBatchSize, setLastBatchSize] = useState<number | null>(null);
   const skipRef = useRef(0);
 
-  const transactionTypes = intersectTransactionTypes(scope, typeFilter);
+  const transactionTypes = operations || undefined;
   // selectedDateKey 가 있으면 dateFilter 를 무시하고 그날 단일로 좁힌다.
   const dateFrom = selectedDateKey ?? dateFilterToFrom(dateFilter);
   const dateTo = selectedDateKey ?? undefined;
   const search = debouncedSearch.trim() || undefined;
-  const departmentParam = department ?? undefined;
+  const departmentParam = department || undefined;
+  const modelParam = model || undefined;
 
   // queryKey: 조건 변화를 한 문자열로. stale 응답 가드용.
-  const queryKey = `${transactionTypes ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${search ?? ""}|${departmentParam ?? ""}`;
+  const queryKey = `${transactionTypes ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${search ?? ""}|${departmentParam ?? ""}|${modelParam ?? ""}`;
   const queryKeyRef = useRef(queryKey);
   // loadMore 가 사용하는 abort controller. 새 조건 effect 발동 시 abort.
   const loadMoreCtrlRef = useRef<AbortController | null>(null);
@@ -76,11 +73,6 @@ export function useHistoryData({
     loadMoreCtrlRef.current?.abort();
     loadMoreCtrlRef.current = null;
 
-    if (transactionTypes === TRANSACTION_TYPES_NONE) {
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     const ctrl = new AbortController();
     const myKey = queryKey;
@@ -94,6 +86,7 @@ export function useHistoryData({
           dateTo,
           search,
           department: departmentParam,
+          model: modelParam,
         },
         { signal: ctrl.signal },
       )
@@ -114,7 +107,6 @@ export function useHistoryData({
   }, [queryKey]);
 
   const loadMore = useCallback(async () => {
-    if (transactionTypes === TRANSACTION_TYPES_NONE) return;
     const myKey = queryKey;
     const nextSkip = skipRef.current + HISTORY_PAGE_SIZE;
     setLoadingMore(true);
@@ -130,6 +122,7 @@ export function useHistoryData({
           dateTo,
           search,
           department: departmentParam,
+          model: modelParam,
         },
         { signal: ctrl.signal },
       );
@@ -145,7 +138,7 @@ export function useHistoryData({
       if (queryKeyRef.current === myKey) setLoadingMore(false);
       if (loadMoreCtrlRef.current === ctrl) loadMoreCtrlRef.current = null;
     }
-  }, [transactionTypes, dateFrom, dateTo, search, departmentParam, queryKey]);
+  }, [transactionTypes, dateFrom, dateTo, search, departmentParam, modelParam, queryKey]);
 
   const canLoadMore = lastBatchSize === HISTORY_PAGE_SIZE;
 

@@ -25,7 +25,6 @@ import {
   isReworkOperation,
 } from "../transactionTaxonomy";
 import {
-  intersectTransactionTypes,
   getPeriodStart,
   dateFilterToFrom,
 } from "../historyQuery";
@@ -790,44 +789,6 @@ describe("isReworkOperation", () => {
 
   it("tx=PRODUCE, batch.sub_type=produce → false", () => {
     expect(isReworkOperation({ transaction_type: "PRODUCE" }, { sub_type: "produce" })).toBe(false);
-  });
-});
-
-// ──────────────────────────────────────────────────────────────────
-// intersectTransactionTypes
-// ──────────────────────────────────────────────────────────────────
-describe("intersectTransactionTypes", () => {
-  it("scope=ALL, filter=ALL → undefined (필터 없음)", () => {
-    expect(intersectTransactionTypes("ALL", "ALL")).toBeUndefined();
-  });
-
-  it("scope=WAREHOUSE_INVOLVED, filter=ALL → 창고 타입 쉼표 문자열", () => {
-    const result = intersectTransactionTypes("WAREHOUSE_INVOLVED", "ALL");
-    expect(result).toBeDefined();
-    expect(result).toContain("RECEIVE");
-    expect(result).toContain("SHIP");
-  });
-
-  it("scope=DEPT_INTERNAL, filter=ALL → 부서 타입 문자열", () => {
-    const result = intersectTransactionTypes("DEPT_INTERNAL", "ALL");
-    expect(result).toContain("PRODUCE");
-    expect(result).toContain("BACKFLUSH");
-  });
-
-  it("scope=ALL, filter=RECEIVE → 'RECEIVE'", () => {
-    expect(intersectTransactionTypes("ALL", "RECEIVE")).toBe("RECEIVE");
-  });
-
-  it("scope=DEPT_INTERNAL, filter=RECEIVE → __NONE__ (교집합 없음)", () => {
-    expect(intersectTransactionTypes("DEPT_INTERNAL", "RECEIVE")).toBe("__NONE__");
-  });
-
-  it("scope=WAREHOUSE_INVOLVED, filter=PRODUCE → __NONE__", () => {
-    expect(intersectTransactionTypes("WAREHOUSE_INVOLVED", "PRODUCE")).toBe("__NONE__");
-  });
-
-  it("scope=WAREHOUSE_INVOLVED, filter=SHIP → 'SHIP'", () => {
-    expect(intersectTransactionTypes("WAREHOUSE_INVOLVED", "SHIP")).toBe("SHIP");
   });
 });
 

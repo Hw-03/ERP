@@ -6,29 +6,30 @@ import { productionApi, type TransactionSummary } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { HistoryFilterBar } from "./_history_sections/HistoryFilterBar";
+import { HistoryFilterPanel } from "./_history_sections/HistoryFilterPanel";
 import { HistoryCalendarPanel } from "./_history_sections/HistoryCalendarPanel";
-import { HistoryStatsBar, type HistoryBucket } from "./_history_sections/HistoryStatsBar";
+import { HistoryStatsBar } from "./_history_sections/HistoryStatsBar";
 import { HistoryTable } from "./_history_sections/HistoryTable";
 import { DesktopHistoryRightPanel } from "./_history_sections/DesktopHistoryRightPanel";
 import { useHistoryData } from "./_hooks/useHistoryData";
 import { parseUtc, toDateKey } from "./_history_sections/historyFormat";
-import { type HistoryScope } from "./_history_sections/transactionTaxonomy";
 import { type HistorySelection } from "./_history_sections/historyConstants";
-import {
-  DATE_OPTIONS,
-  TRANSACTION_TYPES_NONE,
-  dateFilterToFrom,
-  intersectTransactionTypes,
-} from "./_history_sections/historyQuery";
+import { DATE_OPTIONS, dateFilterToFrom } from "./_history_sections/historyQuery";
 
 const SEARCH_DEBOUNCE_MS = 350;
 
 export function DesktopHistoryView() {
-  // scope/typeFilter 는 상단 박스 클릭이 세팅(별도 scope 탭 줄 없음).
-  // 역할 기반 기본 scope 미적용 — 항상 "전체"로 시작 (grill 합의: 처음엔 그냥 전체).
-  const [scope, setScope] = useState<HistoryScope>("ALL");
-  const [typeFilter, setTypeFilter] = useState("ALL");
-  const [activeDept, setActiveDept] = useState<string | null>(null);
+  // 3차: 상단 KPI 박스는 표시 전용(클릭 필터 폐기). 필터는 "필터" 패널 단일.
+  // scope/typeFilter/activeBucket·부서 전개 상태 없음 — 항상 "전체"로 시작.
+  // 대시보드식 독립 필터 패널 (부서·모델·거래종류 다중 선택).
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
+  const [selectedOps, setSelectedOps] = useState<string[]>([]);
+  const modelParam = selectedModels.join(",");
+  const deptParam = selectedDepts.join(",");
+  const opParam = selectedOps.join(",");
   const [dateFilter, setDateFilter] = useState("MONTH");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -39,34 +40,32 @@ export function DesktopHistoryView() {
     return () => clearTimeout(t);
   }, [search]);
 
-  // 상단 박스 = 곧 필터. 박스/부서칩 클릭이 scope/typeFilter/activeDept 를 세팅.
-  function handlePickBucket(bucket: HistoryBucket) {
-    setActiveDept(null);
-    setTypeFilter("ALL");
-    if (bucket === "warehouse") setScope("WAREHOUSE_INVOLVED");
-    else if (bucket === "dept") setScope("DEPT_INTERNAL");
-    else if (bucket === "adjust") {
-      setScope("ALL");
-      setTypeFilter("ADJUST");
-    } else setScope("ALL");
-  }
-  function handlePickDept(name: string) {
-    setScope("DEPT_INTERNAL");
-    setTypeFilter("ALL");
-    setActiveDept((cur) => (cur === name ? null : name));
-  }
+  // 필터 패널 "모델 구분" 칩 소스 — 1회 로드.
+  useEffect(() => {
+    void api
+      .getModels()
+      .then((ms) => {
+        const names = Array.from(
+          new Set(ms.map((m) => m.model_name).filter((n): n is string => !!n)),
+        );
+        setAvailableModels(names);
+      })
+      .catch(() => {});
+  }, []);
 
-  // 현재 박스 상태 — HistoryStatsBar 하이라이트/전개 판정.
-  const activeBucket: HistoryBucket =
-    activeDept || scope === "DEPT_INTERNAL"
-      ? "dept"
-      : scope === "WAREHOUSE_INVOLVED"
-        ? "warehouse"
-        : typeFilter === "ADJUST"
-          ? "adjust"
-          : "all";
+  function toggleModel(v: string) {
+    setSelectedModels((s) => (s.includes(v) ? s.filter((x) => x !== v) : [...s, v]));
+  }
+  function toggleDept(v: string) {
+    setSelectedDepts((s) => (s.includes(v) ? s.filter((x) => x !== v) : [...s, v]));
+  }
+  function toggleOp(v: string) {
+    setSelectedOps((s) => (s.includes(v) ? s.filter((x) => x !== v) : [...s, v]));
+  }
 
   const [selection, setSelection] = useState<HistorySelection | null>(null);
+  // 우측 패널 내 드릴(BOM 하위·최근거래) 뒤로가기 스택. 표 행 클릭은 top-level 이라 스택 비움.
+  const [selectionStack, setSelectionStack] = useState<HistorySelection[]>([]);
   const [itemRecentLogs, setItemRecentLogs] = useState<TransactionLog[]>([]);
 
   // batchCache — HistoryTable 의 visible lazy fetch + 우측 batch 상세 패널이 공유.
@@ -87,12 +86,12 @@ export function DesktopHistoryView() {
     : (DATE_OPTIONS.find((o) => o.value === dateFilter)?.label ?? "전체");
 
   const { logs, setLogs, loading, loadingMore, canLoadMore, loadMore } = useHistoryData({
-    scope,
-    typeFilter,
+    operations: opParam,
     dateFilter,
     debouncedSearch,
     selectedDateKey: selectedDay,
-    department: activeDept,
+    department: deptParam,
+    model: modelParam,
   });
 
   // selection.kind === "log" 일 때만 같은 품목 최근 거래 로드.
@@ -110,17 +109,10 @@ export function DesktopHistoryView() {
       .catch(() => setItemRecentLogs([]));
   }, [selection]);
 
-  // 달력 fetch — 패널이 펼쳐진 동안에만. 목록과 같은 scope/typeFilter/debouncedSearch 적용.
-  // 선택 날짜는 fetch 조건에 포함하지 않음 — 달력은 월 전체 카운트 표시.
+  // 달력 fetch — 패널이 펼쳐진 동안에만. 위 필터(거래종류·부서·모델·검색)와
+  // 무관하게 그 달 전체 거래를 표시 (2차 #4). 보는 "달"만 따라감. 선택 날짜는 조건 아님.
   useEffect(() => {
     if (!calendarOpen) return;
-
-    const transactionTypes = intersectTransactionTypes(scope, typeFilter);
-    if (transactionTypes === TRANSACTION_TYPES_NONE) {
-      setCalendarLogs([]);
-      setCalendarLoading(false);
-      return;
-    }
 
     setCalendarLoading(true);
     const firstDay = new Date(calendarYear, calendarMonth, 1);
@@ -136,8 +128,6 @@ export function DesktopHistoryView() {
           skip: 0,
           dateFrom: ymd(firstDay),
           dateTo: ymd(lastDay),
-          transactionTypes,
-          search: debouncedSearch || undefined,
         },
         { signal: ctrl.signal },
       )
@@ -149,7 +139,7 @@ export function DesktopHistoryView() {
         if ((err as Error)?.name !== "AbortError") setCalendarLoading(false);
       });
     return () => ctrl.abort();
-  }, [calendarOpen, calendarYear, calendarMonth, scope, typeFilter, debouncedSearch]);
+  }, [calendarOpen, calendarYear, calendarMonth]);
 
   function prevMonth() {
     if (calendarMonth === 0) {
@@ -188,32 +178,27 @@ export function DesktopHistoryView() {
 
   const todayKey = toDateKey(new Date().toISOString());
 
-  // X(분자) summary — 현재 필터(유형/박스/검색/부서) 전체 카운트. 페이지네이션 무관.
+  // X(분자) summary — 현재 필터(거래종류/검색/부서/모델) 전체 카운트. 페이지네이션 무관.
   const [summary, setSummary] = useState<TransactionSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const summaryKeyRef = useRef("");
 
   useEffect(() => {
-    const transactionTypes = intersectTransactionTypes(scope, typeFilter);
+    const transactionTypes = opParam || undefined;
     const dateFrom = selectedDay ?? dateFilterToFrom(dateFilter);
     const dateTo = selectedDay ?? undefined;
-    const search = debouncedSearch.trim() || undefined;
-    const department = activeDept ?? undefined;
+    const searchParam = debouncedSearch.trim() || undefined;
+    const department = deptParam || undefined;
+    const model = modelParam || undefined;
 
-    const myKey = `${transactionTypes ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${search ?? ""}|${department ?? ""}`;
+    const myKey = `${transactionTypes ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${searchParam ?? ""}|${department ?? ""}|${model ?? ""}`;
     summaryKeyRef.current = myKey;
-
-    if (transactionTypes === TRANSACTION_TYPES_NONE) {
-      setSummary({ total: 0, warehouseCount: 0, deptCount: 0, adjustCount: 0, departmentCounts: {} });
-      setSummaryLoading(false);
-      return;
-    }
 
     setSummaryLoading(true);
     const ctrl = new AbortController();
     void productionApi
       .getTransactionsSummary(
-        { transactionTypes, dateFrom, dateTo, search, department },
+        { transactionTypes, dateFrom, dateTo, search: searchParam, department, model },
         { signal: ctrl.signal },
       )
       .then((s) => {
@@ -227,9 +212,9 @@ export function DesktopHistoryView() {
         setSummaryLoading(false);
       });
     return () => ctrl.abort();
-  }, [scope, typeFilter, dateFilter, selectedDay, debouncedSearch, activeDept]);
+  }, [dateFilter, selectedDay, debouncedSearch, deptParam, modelParam, opParam]);
 
-  // Y(분모) baseline summary — 선택한 기간만 필터. 유형/박스/검색/부서 무시.
+  // Y(분모) baseline summary — 선택한 기간만 필터. 거래종류/검색/부서/모델 무시.
   // 상단 박스 숫자·부서칩·"{기간} Y건 중 X건"의 Y 를 고정 제공.
   const [baselineSummary, setBaselineSummary] = useState<TransactionSummary | null>(null);
   const [baselineLoading, setBaselineLoading] = useState(false);
@@ -271,7 +256,9 @@ export function DesktopHistoryView() {
     setSelection({ kind: "log", log: result.original });
   }
 
+  // 표 행 클릭(top-level) — 드릴 스택 초기화.
   function handleSelectLog(log: TransactionLog) {
+    setSelectionStack([]);
     setSelection((c) =>
       c?.kind === "log" && c.log.log_id === log.log_id ? null : { kind: "log", log },
     );
@@ -280,10 +267,48 @@ export function DesktopHistoryView() {
   function handleSelectBatch(batchId: string, logs: TransactionLog[]) {
     // 같은 묶음 재클릭 → 우측 패널 닫기 (단일 행 토글과 일관). HistoryTable 에서
     // 펼침 상태도 collapseGroup 으로 동시에 닫음 (selection 닫힘과 BOM 접힘 동기화).
+    setSelectionStack([]);
     setSelection((c) =>
       c?.kind === "batch" && c.batchId === batchId ? null : { kind: "batch", batchId, logs },
     );
   }
+
+  // 우측 패널 내부 드릴(BOM 하위 라인·이 품목 최근 거래) — 현재 선택을 스택에 쌓고 이동.
+  function navigateToLog(log: TransactionLog) {
+    setSelection((cur) => {
+      if (cur && !(cur.kind === "log" && cur.log.log_id === log.log_id)) {
+        setSelectionStack((s) => [...s, cur]);
+        if (typeof window !== "undefined") {
+          window.history.pushState({ historyDrill: true }, "");
+        }
+      }
+      return { kind: "log", log };
+    });
+  }
+
+  // 한 단계 뒤로 — 스택 pop. 비면 무시(패널 유지).
+  function goBack() {
+    setSelectionStack((s) => {
+      if (s.length === 0) return s;
+      const prev = s[s.length - 1];
+      setSelection(prev);
+      return s.slice(0, -1);
+    });
+  }
+
+  // 브라우저 뒤로가기 → 드릴 스택이 있으면 그걸 pop (탭 URL 네비 방해 최소화: 스택 있을 때만 관여).
+  useEffect(() => {
+    const onPop = () => {
+      setSelectionStack((s) => {
+        if (s.length === 0) return s;
+        const prev = s[s.length - 1];
+        setSelection(prev);
+        return s.slice(0, -1);
+      });
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   // 기간 칩 변경 시 선택 날짜 해제 — 동시에 두 날짜 필터가 살아있으면 사용자가 혼란.
   function handleDateFilterChange(v: string) {
@@ -293,6 +318,8 @@ export function DesktopHistoryView() {
 
   if (selection) lastSelectionRef.current = selection;
   const displaySelection = selection ?? lastSelectionRef.current;
+
+  const activeFilterCount = selectedDepts.length + selectedModels.length + selectedOps.length;
 
   return (
     <div className="flex min-h-0 flex-1 pl-0 pr-4">
@@ -307,10 +334,6 @@ export function DesktopHistoryView() {
             currentCount={summary?.total ?? null}
             loading={summaryLoading || baselineLoading}
             periodLabel={periodLabel}
-            activeBucket={activeBucket}
-            activeDept={activeDept}
-            onPick={handlePickBucket}
-            onPickDept={handlePickDept}
           />
 
           <HistoryFilterBar
@@ -318,14 +341,36 @@ export function DesktopHistoryView() {
             setSearch={setSearch}
             dateFilter={dateFilter}
             setDateFilter={handleDateFilterChange}
-            typeFilter={typeFilter}
-            setTypeFilter={setTypeFilter}
-            totalCount={summary?.total ?? logs.length}
+            filterPanelOpen={filterPanelOpen}
+            onToggleFilterPanel={() => setFilterPanelOpen((o) => !o)}
+            activeFilterCount={activeFilterCount}
+            calendarOpen={calendarOpen}
+            onToggleCalendar={() => setCalendarOpen((o) => !o)}
+            selectedDay={selectedDay}
+            onClearSelectedDay={() => setSelectedDay(null)}
           />
+
+          {filterPanelOpen && (
+            <section className="card" style={{ paddingTop: 12, paddingBottom: 12 }}>
+              <HistoryFilterPanel
+                open={filterPanelOpen}
+                departmentCounts={baselineSummary?.departmentCounts ?? {}}
+                selectedDepts={selectedDepts}
+                toggleDept={toggleDept}
+                clearDepts={() => setSelectedDepts([])}
+                models={availableModels}
+                selectedModels={selectedModels}
+                toggleModel={toggleModel}
+                clearModels={() => setSelectedModels([])}
+                selectedOps={selectedOps}
+                toggleOp={toggleOp}
+                clearOps={() => setSelectedOps([])}
+              />
+            </section>
+          )}
 
           <HistoryCalendarPanel
             open={calendarOpen}
-            onToggle={() => setCalendarOpen((o) => !o)}
             calendarYear={calendarYear}
             calendarMonth={calendarMonth}
             prevMonth={prevMonth}
@@ -360,10 +405,15 @@ export function DesktopHistoryView() {
         batchCache={batchCache}
         setBatchCache={setBatchCache}
         itemRecentLogs={itemRecentLogs}
-        onSelectLog={handleSelectLog}
+        onSelectLog={navigateToLog}
+        canGoBack={selectionStack.length > 0}
+        onBack={goBack}
         onLogUpdated={handleLogUpdated}
         onLogCorrected={handleLogCorrected}
-        onClose={() => setSelection(null)}
+        onClose={() => {
+          setSelectionStack([]);
+          setSelection(null);
+        }}
       />
     </div>
   );

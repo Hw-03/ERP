@@ -35,6 +35,7 @@ const COLUMNS: { label: string; width?: string; minWidth?: string; align?: "left
   { label: "품목명", minWidth: "180px" },
   { label: "변동요약", width: "150px", align: "center" },
   { label: "담당자", width: "130px", align: "center" },
+  { label: "메모", width: "70px", align: "center" },
 ];
 
 const VISIBLE_FETCH_CONCURRENCY = 4;
@@ -138,6 +139,15 @@ export function HistoryTable({
     observedRowsRef.current.add(el);
     observerRef.current?.observe(el);
   }, []);
+
+  // op_batch IoBatch eager 프리페치 — 접힌 묶음도 batch.sub_type 기준 구분 라벨/
+  // 변동요약이 즉시 정확해지도록(재작업 묶음이 접힘에서 "생산 등록"으로 오표시 방지, 3차 C7).
+  // 동시성 큐(VISIBLE_FETCH_CONCURRENCY)·dedup 은 enqueueBatchFetch 가 처리.
+  useEffect(() => {
+    for (const g of groups) {
+      if (g.type === "op_batch") enqueueBatchFetch(g.batchId);
+    }
+  }, [groups, enqueueBatchFetch]);
 
   function toggleGroup(key: string) {
     setExpandedGroups((prev) => {

@@ -603,3 +603,52 @@ export function getHistoryMovementSummary(
   if (shortageCount > 0) summary.warning = `부족 ${shortageCount}`;
   return summary;
 }
+
+// ──────────────────────────────────────────────────────────────────
+// 단건(낱개) 변동요약 — BOM 묶음과 같은 알약/tone 으로 통일 (3차 C6).
+// 의미를 "총재고 증감(+0/+N)" → "무슨 작업으로 몇 개 움직였나"로 재정의.
+// 수량 출처: transfer_qty ?? abs(quantity_change). ADJUST 만 부호 유지.
+// 둘 다 0/null 인 레거시는 동사만(절대 "+0" 표기 안 함).
+// ──────────────────────────────────────────────────────────────────
+
+const _SINGLE_OP: Record<string, { verb: string; tone: MovementTone; signed?: boolean }> = {
+  RECEIVE: { verb: "입고", tone: "success" },
+  SHIP: { verb: "출고", tone: "danger" },
+  SUPPLIER_RETURN: { verb: "반품", tone: "danger" },
+  ADJUST: { verb: "조정", tone: "warning", signed: true },
+  TRANSFER_TO_PROD: { verb: "이동", tone: "info" },
+  TRANSFER_TO_WH: { verb: "이동", tone: "info" },
+  TRANSFER_DEPT: { verb: "이동", tone: "info" },
+  MARK_DEFECTIVE: { verb: "불량", tone: "danger" },
+  BACKFLUSH: { verb: "자동 차감", tone: "danger" },
+  PRODUCE: { verb: "생산", tone: "success" },
+  DISASSEMBLE: { verb: "재작업", tone: "danger" },
+  SCRAP: { verb: "폐기", tone: "danger" },
+  LOSS: { verb: "손실", tone: "danger" },
+  RETURN: { verb: "반품", tone: "muted" },
+  RESERVE: { verb: "예약", tone: "muted" },
+  RESERVE_RELEASE: { verb: "예약 해제", tone: "muted" },
+};
+
+export function getSingleLogMovement(log: {
+  transaction_type: string;
+  transfer_qty?: number | null;
+  quantity_change: number | string;
+  item_unit?: string | null;
+}): MovementSummaryPart {
+  const conf = _SINGLE_OP[log.transaction_type] ?? { verb: "변동", tone: "muted" as MovementTone };
+  const unit = (log.item_unit ?? "").trim();
+  const suffix = unit ? ` ${unit}` : "";
+  const qc = Number(log.quantity_change);
+
+  if (conf.signed) {
+    const sign = qc >= 0 ? "+" : "-";
+    return { label: `${conf.verb} ${sign}${formatQty(Math.abs(qc))}${suffix}`, tone: conf.tone };
+  }
+
+  const moved = log.transfer_qty != null ? Number(log.transfer_qty) : Math.abs(qc);
+  if (!Number.isFinite(moved) || moved === 0) {
+    return { label: conf.verb, tone: conf.tone };
+  }
+  return { label: `${conf.verb} ${formatQty(moved)}${suffix}`, tone: conf.tone };
+}

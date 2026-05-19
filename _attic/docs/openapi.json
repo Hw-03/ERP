@@ -9372,7 +9372,7 @@
             }
           },
           {
-            "description": "부서 라벨 필터 (dept-bucket 거래 한정, '미상' 포함)",
+            "description": "부서 라벨 필터 (쉼표 복수). 예: 조립,고압. '창고'·'미상' 포함 가능",
             "in": "query",
             "name": "department",
             "required": false,
@@ -9385,8 +9385,44 @@
                   "type": "null"
                 }
               ],
-              "description": "부서 라벨 필터 (dept-bucket 거래 한정, '미상' 포함)",
+              "description": "부서 라벨 필터 (쉼표 복수). 예: 조립,고압. '창고'·'미상' 포함 가능",
               "title": "Department"
+            }
+          },
+          {
+            "description": "제품 모델명 필터 (쉼표 복수)",
+            "in": "query",
+            "name": "model",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "제품 모델명 필터 (쉼표 복수)",
+              "title": "Model"
+            }
+          },
+          {
+            "description": "공정 구분 필터 R/A/F (쉼표 복수)",
+            "in": "query",
+            "name": "process_step",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "공정 구분 필터 R/A/F (쉼표 복수)",
+              "title": "Process Step"
             }
           },
           {
@@ -9699,7 +9735,7 @@
     },
     "/api/inventory/transactions/summary": {
       "get": {
-        "description": "KPI 카드용 카운트 집계. list_transactions 와 동일한 필터를 받지만 row 가 아니라\n숫자만 반환 — 화면에 로드된 100건이 아니라 조건 전체를 보여주기 위함.\ndepartment_counts 는 dept-bucket 거래를 부서별로 묶은 카운트.",
+        "description": "KPI 카드용 카운트 집계. list_transactions 와 동일한 필터를 받지만 row 가 아니라\n숫자만 반환 — 화면에 로드된 100건이 아니라 조건 전체를 보여주기 위함.\ndepartment_counts 는 전 거래를 3단계 라벨(부서명·'창고'·'미상')로 묶은 카운트.",
         "operationId": "get_transactions_summary_api_inventory_transactions_summary_get",
         "parameters": [
           {
@@ -9737,7 +9773,7 @@
             }
           },
           {
-            "description": "부서 라벨 필터 (dept-bucket 거래 한정, '미상' 포함)",
+            "description": "부서 라벨 필터 (쉼표 복수). 예: 조립,고압. '창고'·'미상' 포함 가능",
             "in": "query",
             "name": "department",
             "required": false,
@@ -9750,8 +9786,44 @@
                   "type": "null"
                 }
               ],
-              "description": "부서 라벨 필터 (dept-bucket 거래 한정, '미상' 포함)",
+              "description": "부서 라벨 필터 (쉼표 복수). 예: 조립,고압. '창고'·'미상' 포함 가능",
               "title": "Department"
+            }
+          },
+          {
+            "description": "제품 모델명 필터 (쉼표 복수)",
+            "in": "query",
+            "name": "model",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "제품 모델명 필터 (쉼표 복수)",
+              "title": "Model"
+            }
+          },
+          {
+            "description": "공정 구분 필터 R/A/F (쉼표 복수)",
+            "in": "query",
+            "name": "process_step",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "공정 구분 필터 R/A/F (쉼표 복수)",
+              "title": "Process Step"
             }
           },
           {

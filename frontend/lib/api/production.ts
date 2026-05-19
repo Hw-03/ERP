@@ -52,6 +52,8 @@ export const productionApi = {
       referenceNo?: string;
       search?: string;
       department?: string;
+      model?: string;        // 제품 모델명 (쉼표 복수)
+      processStep?: string;  // 공정 구분 R/A/F (쉼표 복수)
       dateFrom?: string; // YYYY-MM-DD
       dateTo?: string;   // YYYY-MM-DD
       includeArchived?: boolean;
@@ -67,6 +69,8 @@ export const productionApi = {
     if (params?.referenceNo) query.set("reference_no", params.referenceNo);
     if (params?.search) query.set("search", params.search);
     if (params?.department) query.set("department", params.department);
+    if (params?.model) query.set("model", params.model);
+    if (params?.processStep) query.set("process_step", params.processStep);
     if (params?.dateFrom) query.set("date_from", params.dateFrom);
     if (params?.dateTo) query.set("date_to", params.dateTo);
     if (params?.includeArchived) query.set("include_archived", "true");
@@ -84,6 +88,8 @@ export const productionApi = {
       transactionTypes?: string;
       search?: string;
       department?: string;
+      model?: string;
+      processStep?: string;
       dateFrom?: string;
       dateTo?: string;
       includeArchived?: boolean;
@@ -94,6 +100,8 @@ export const productionApi = {
     if (params?.transactionTypes) query.set("transaction_types", params.transactionTypes);
     if (params?.search) query.set("search", params.search);
     if (params?.department) query.set("department", params.department);
+    if (params?.model) query.set("model", params.model);
+    if (params?.processStep) query.set("process_step", params.processStep);
     if (params?.dateFrom) query.set("date_from", params.dateFrom);
     if (params?.dateTo) query.set("date_to", params.dateTo);
     if (params?.includeArchived) query.set("include_archived", "true");

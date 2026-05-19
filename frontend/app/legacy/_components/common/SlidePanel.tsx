@@ -46,7 +46,7 @@ function SlidePanelImpl({ open, width = 436, onClose, children }: Props) {
     >
       <div
         ref={panelRef}
-        className="h-full pl-4"
+        className="relative flex h-full min-h-0 flex-col pl-4"
         style={{
           opacity: open ? 1 : 0,
           transform: open ? "translateX(0)" : "translateX(18px)",
@@ -55,23 +55,22 @@ function SlidePanelImpl({ open, width = 436, onClose, children }: Props) {
         }}
         {...dialogProps}
       >
+        {/* 닫기 ✕ — 콘텐츠 우상단 모서리에 겹침(별도 줄을 안 먹어 카드 높이 보존). 신규 absolute-close 패턴. */}
         {onClose && open && (
-          <div className="flex justify-end pb-1 pt-0.5">
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="패널 닫기"
-              className="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:brightness-110"
-              style={{
-                background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 15%, transparent)`,
-                color: LEGACY_COLORS.muted2,
-              }}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="패널 닫기"
+            className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:brightness-110"
+            style={{
+              background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 15%, transparent)`,
+              color: LEGACY_COLORS.muted2,
+            }}
+          >
+            <X className="h-4 w-4" />
+          </button>
         )}
-        {children}
+        <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
       </div>
     </div>
   );

@@ -802,7 +802,7 @@ def _log_immediate(
             quantity_change=quantity_change,
             quantity_before=before,
             quantity_after=after,
-            transfer_qty=line.quantity if line.direction == "move" else None,
+            transfer_qty=line.quantity if line.direction in ("move", "defective") else None,
             reference_no=batch.reference_no,
             produced_by=operator_name,
             notes=batch.notes,
