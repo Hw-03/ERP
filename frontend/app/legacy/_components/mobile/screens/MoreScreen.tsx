@@ -176,9 +176,9 @@ export function MoreScreen({
             <MoreMenuRow
               icon={GitBranch}
               label="BOM Workbench"
-              description="모델·공정 BOM 매핑 (Phase 6 예정)"
+              description="모델·공정 BOM 매핑"
               tone={LEGACY_COLORS.green as string}
-              onClick={() => setSub({ kind: "placeholder", key: "bom" })}
+              onClick={() => onChangeTab("admin")}
             />
           </div>
         </div>
