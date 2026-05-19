@@ -109,7 +109,7 @@ export function InventoryScreen({
       </div>
 
       {/* List area */}
-      <div className="flex flex-col gap-3 px-4 pt-3">
+      <div className="flex flex-col gap-3 px-3 pt-3">
         <div className="flex items-center justify-between px-1">
           <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
             {formatQty(totals.count)}개 품목
@@ -161,7 +161,7 @@ export function InventoryScreen({
           }
         >
           <>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               {rows.map((row) => (
                 <ItemRow
                   key={row.key}

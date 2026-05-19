@@ -51,7 +51,7 @@ export function InventoryStickyHeader({
   setFilters,
 }: InventoryStickyHeaderProps) {
   return (
-    <div className="flex flex-col gap-3 px-4 pt-3 pb-3">
+    <div className="flex flex-col gap-3 px-3 pt-3 pb-3">
       <div className="flex items-center gap-2">
         <div className="flex-1">
           <InlineSearch
@@ -77,7 +77,7 @@ export function InventoryStickyHeader({
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-1.5">
         <KpiCard
           label="정상"
           value={totalsNormal}
