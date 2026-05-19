@@ -122,14 +122,15 @@ export function HistoryBatchDetailPanel({
   // 작업 묶음 카드 안에 합칠 흐름 보조문구 (batch 있을 때만 의미).
   const flow = batch ? describeBatchFlow(first, batch) : null;
 
-  // 메타 정보 — 참조번호는 값이 있을 때만 노출.
+  // 메타 정보 슬림 — 목록 중복(담당자/일시) 제거, 메모는 목록 열로 이동, 참조번호만 카드 전용.
+  // 일시는 아래 식별 헤더 1줄로 이동. 담당자는 요청/처리 1줄 압축.
   const refNo = batch?.reference_no ?? first.reference_no;
+  const reqName = batch?.requester_name ?? getHistoryActor(first);
+  const procName = first.produced_by ?? null;
+  const actorText = procName && procName !== reqName ? `${reqName} · 처리 ${procName}` : reqName;
   const metaRows: [string, string][] = [
-    ["요청자", batch?.requester_name ?? getHistoryActor(first)],
-    ["처리자", first.produced_by ?? "-"],
+    ["담당자", actorText],
     ...(refNo ? [["참조번호", refNo] as [string, string]] : []),
-    ["메모", batch?.notes ?? first.notes ?? "-"],
-    ["일시", formatHistoryDateTimeLong(first.created_at)],
   ];
 
   return (
@@ -156,6 +157,9 @@ export function HistoryBatchDetailPanel({
           </div>
         )}
         <div className="mt-1">{summaryEl}</div>
+        <div className="mt-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+          {formatHistoryDateTimeLong(first.created_at)}
+        </div>
       </div>
 
       {/* 메타 정보 */}

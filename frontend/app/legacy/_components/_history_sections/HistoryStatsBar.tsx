@@ -59,10 +59,16 @@ export function HistoryStatsBar({
     <section className="card" style={{ paddingTop: 16, paddingBottom: 16 }}>
       {/* 정직 카운트 + 활성 필터 칩 */}
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-          {periodLabel}{" "}
-          <b style={{ color: LEGACY_COLORS.text }}>{NUM(loading, baseline?.total)}건</b> 중{" "}
-          <b style={{ color: LEGACY_COLORS.text }}>{NUM(loading, currentCount)}건</b> 보는 중
+        <div className="flex items-baseline gap-2">
+          <span className="text-sm font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+            {periodLabel}
+          </span>
+          <span className="text-3xl font-black leading-none" style={{ color: LEGACY_COLORS.blue }}>
+            {NUM(loading, currentCount)}건
+          </span>
+          <span className="text-base font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+            / 전체 {NUM(loading, baseline?.total)}건
+          </span>
         </div>
         {activeLabel && (
           <span

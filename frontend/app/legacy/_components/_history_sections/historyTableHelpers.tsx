@@ -172,6 +172,27 @@ function ActorCell({ name }: { name: string }) {
   );
 }
 
+/** 목록 메모 셀 — 내용은 안 펼치고 "메모" 표시만, 호버(title)로 전문. 없으면 "-". */
+export function MemoCell({ notes }: { notes?: string | null }) {
+  const text = notes?.trim();
+  if (!text) {
+    return <span className="block text-center text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>;
+  }
+  return (
+    <div className="flex justify-center" title={text}>
+      <span
+        className="inline-flex cursor-default items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
+        style={{
+          background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`,
+          color: LEGACY_COLORS.blue,
+        }}
+      >
+        메모
+      </span>
+    </div>
+  );
+}
+
 function ChevronToggleBtn({
   expanded,
   onToggle,
@@ -262,6 +283,9 @@ export function BatchHeader({
       <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         <ActorCell name={actor} />
       </td>
+      <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+        <MemoCell notes={first.notes} />
+      </td>
     </tr>
   );
 }
@@ -351,6 +375,9 @@ export function OpBatchHeader({
       </td>
       <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         <ActorCell name={actor} />
+      </td>
+      <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+        <MemoCell notes={first.notes} />
       </td>
     </tr>
   );
