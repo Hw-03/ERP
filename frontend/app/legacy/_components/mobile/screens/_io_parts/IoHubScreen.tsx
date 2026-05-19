@@ -132,12 +132,12 @@ function ComposeLanding({
   }
 
   return (
-    <div className="flex flex-col gap-3 px-4 py-4">
+    <div className="flex flex-col gap-3 px-3 py-3">
       <SectionHeader
         subtitle="Compose"
         title="작업 유형 선택"
       />
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         {WORK_TYPES.map((wt) => {
           const enabled = allowedWorkTypes.includes(wt.id);
           const caution = CAUTION_WORK_TYPES.includes(wt.id);
@@ -151,7 +151,7 @@ function ComposeLanding({
               type="button"
               onClick={() => enabled && onPick(wt.id)}
               disabled={!enabled}
-              className="flex items-center gap-3 rounded-[20px] border px-4 py-4 text-left transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
+              className="flex items-center gap-3 rounded-[20px] border px-3 py-3 text-left transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
               style={{
                 background: LEGACY_COLORS.s2,
                 borderColor: LEGACY_COLORS.border,
