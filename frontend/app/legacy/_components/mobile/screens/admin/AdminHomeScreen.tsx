@@ -55,7 +55,7 @@ export function AdminHomeScreen({
   onLock: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-3 px-4 pt-4 pb-8">
+    <div className="flex flex-col gap-3 px-3 pt-3 pb-8">
       <div className="flex items-center justify-between">
         <div>
           <div
@@ -71,7 +71,7 @@ export function AdminHomeScreen({
         <IconButton icon={Lock} label="잠금" size="md" onClick={onLock} color={LEGACY_COLORS.muted2} />
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         {SECTION_ORDER.map((id) => {
           const meta = ADMIN_SECTION_META[id];
           const Icon = meta.icon;

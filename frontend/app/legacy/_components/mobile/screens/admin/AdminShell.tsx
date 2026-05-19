@@ -19,7 +19,7 @@ export function AdminShell({ showToast }: { showToast: (toast: ToastState) => vo
 
   if (!unlocked) {
     return (
-      <div className="px-4 pt-4 pb-6">
+      <div className="px-3 pt-3 pb-6">
         <PinLock onUnlocked={() => setUnlocked(true)} />
       </div>
     );
