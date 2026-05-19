@@ -22,12 +22,11 @@ import {
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { transactionColor, transactionIconName } from "@/lib/mes-status";
-import { formatQty } from "@/lib/mes/format";
 import { useDeptColor } from "../DepartmentsContext";
 import { formatHistoryDate } from "./historyFormat";
 import { rowTint } from "./historyTheme";
-import { getHistoryDisplayLabel } from "./historyBatchInterpreter";
-import { MemoCell } from "./historyTableHelpers";
+import { getHistoryDisplayLabel, getSingleLogMovement } from "./historyBatchInterpreter";
+import { MemoCell, MovementSummaryCell } from "./historyTableHelpers";
 import { isReworkOperation } from "./transactionTaxonomy";
 
 const TX_ICON = {
@@ -130,12 +129,10 @@ function HistoryLogRowImpl({ log, selected, onSelect }: Props) {
         </div>
       </td>
       <td
-        className="whitespace-nowrap border-b px-4 py-3 text-center font-bold"
-        style={{ borderColor: LEGACY_COLORS.border, color: tcolor }}
+        className="whitespace-nowrap border-b px-4 py-3 text-center"
+        style={{ borderColor: LEGACY_COLORS.border }}
       >
-        {log.transfer_qty != null
-          ? `이동 ${formatQty(log.transfer_qty)}`
-          : `${Number(log.quantity_change) >= 0 ? "+" : ""}${formatQty(log.quantity_change)}`}
+        <MovementSummaryCell summary={{ parts: [getSingleLogMovement(log)] }} />
       </td>
       <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         {producer ? (

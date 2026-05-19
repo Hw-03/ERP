@@ -56,7 +56,7 @@ const TONE_COLOR: Record<MovementTone, string> = {
   muted: LEGACY_COLORS.muted2,
 };
 
-function MovementSummaryCell({ summary }: { summary: MovementSummary }) {
+export function MovementSummaryCell({ summary }: { summary: MovementSummary }) {
   return (
     <span className="inline-flex items-center gap-1 whitespace-nowrap">
       {summary.parts.map((p, i) => {

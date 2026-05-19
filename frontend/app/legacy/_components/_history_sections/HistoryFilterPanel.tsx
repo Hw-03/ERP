@@ -3,61 +3,56 @@
 import { Layers, Sparkles, TrendingUp } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common";
+import { OPERATION_OPTIONS } from "./historyQuery";
 
-// 자재목록(대시보드) InventoryFilters 와 같은 3카드 패턴을 입출고 내역에 이식 (#6).
-// 부서 = 단일선택(KPI 부서 박스와 동기, 백엔드 department 단일). 모델/공정 = 다중선택.
-const PROCESS_STEPS: { value: string; label: string }[] = [
-  { value: "R", label: "원자재" },
-  { value: "A", label: "중간공정" },
-  { value: "F", label: "공정완료" },
-];
-
+// 3차: 유일 필터 패널. 3카드 모두 다중 선택.
+// 부서 = 서버 departmentCounts 기반 동적("창고" 포함, 미상은 진짜 unknown만).
+// 거래 종류 = 전 16종 고정(공정 R/A/F 카드 폐기). KPI 박스는 표시 전용이라 동기 없음.
 type Props = {
   open: boolean;
   /** baseline summary 의 부서별 카운트 — 부서 칩 소스(동적). */
   departmentCounts: Record<string, number>;
-  activeDept: string | null;
-  onPickDept: (name: string) => void;
-  onClearDept: () => void;
+  selectedDepts: string[];
+  toggleDept: (v: string) => void;
+  clearDepts: () => void;
   models: string[];
   selectedModels: string[];
   toggleModel: (v: string) => void;
   clearModels: () => void;
-  selectedSteps: string[];
-  toggleStep: (v: string) => void;
-  clearSteps: () => void;
+  selectedOps: string[];
+  toggleOp: (v: string) => void;
+  clearOps: () => void;
 };
 
 export function HistoryFilterPanel({
   open,
   departmentCounts,
-  activeDept,
-  onPickDept,
-  onClearDept,
+  selectedDepts,
+  toggleDept,
+  clearDepts,
   models,
   selectedModels,
   toggleModel,
   clearModels,
-  selectedSteps,
-  toggleStep,
-  clearSteps,
+  selectedOps,
+  toggleOp,
+  clearOps,
 }: Props) {
   if (!open) return null;
-  const deptNames = Object.entries(departmentCounts)
+  const deptEntries = Object.entries(departmentCounts)
     .filter(([, c]) => c > 0)
-    .sort((a, b) => b[1] - a[1])
-    .map(([n]) => n);
+    .sort((a, b) => b[1] - a[1]);
 
   return (
     <div className="grid gap-2.5 xl:grid-cols-3">
       <Card icon={<Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />} title="부서 구분">
-        <FilterChip active={!activeDept} label="전체" onClick={onClearDept} tone={LEGACY_COLORS.green} className="w-full" />
-        {deptNames.map((name) => (
+        <FilterChip active={selectedDepts.length === 0} label="전체" onClick={clearDepts} tone={LEGACY_COLORS.green} className="w-full" />
+        {deptEntries.map(([name, count]) => (
           <FilterChip
             key={name}
-            active={activeDept === name}
-            label={name}
-            onClick={() => onPickDept(name)}
+            active={selectedDepts.includes(name)}
+            label={`${name} ${count.toLocaleString()}`}
+            onClick={() => toggleDept(name)}
             tone={LEGACY_COLORS.green}
             className="w-full"
           />
@@ -78,14 +73,14 @@ export function HistoryFilterPanel({
         ))}
       </Card>
 
-      <Card icon={<Layers className="h-4 w-4" style={{ color: LEGACY_COLORS.yellow }} />} title="공정 구분">
-        <FilterChip active={selectedSteps.length === 0} label="전체" onClick={clearSteps} tone={LEGACY_COLORS.yellow} className="w-full" />
-        {PROCESS_STEPS.map((s) => (
+      <Card icon={<Layers className="h-4 w-4" style={{ color: LEGACY_COLORS.yellow }} />} title="거래 종류">
+        <FilterChip active={selectedOps.length === 0} label="전체" onClick={clearOps} tone={LEGACY_COLORS.yellow} className="w-full" />
+        {OPERATION_OPTIONS.map((opt) => (
           <FilterChip
-            key={s.value}
-            active={selectedSteps.includes(s.value)}
-            label={s.label}
-            onClick={() => toggleStep(s.value)}
+            key={opt.value}
+            active={selectedOps.includes(opt.value)}
+            label={opt.label}
+            onClick={() => toggleOp(opt.value)}
             tone={LEGACY_COLORS.yellow}
             className="w-full"
           />
