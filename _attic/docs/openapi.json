@@ -9390,6 +9390,42 @@
             }
           },
           {
+            "description": "제품 모델명 필터 (쉼표 복수)",
+            "in": "query",
+            "name": "model",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "제품 모델명 필터 (쉼표 복수)",
+              "title": "Model"
+            }
+          },
+          {
+            "description": "공정 구분 필터 R/A/F (쉼표 복수)",
+            "in": "query",
+            "name": "process_step",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "공정 구분 필터 R/A/F (쉼표 복수)",
+              "title": "Process Step"
+            }
+          },
+          {
             "description": "포함 시작일 YYYY-MM-DD",
             "in": "query",
             "name": "date_from",
@@ -9752,6 +9788,42 @@
               ],
               "description": "부서 라벨 필터 (dept-bucket 거래 한정, '미상' 포함)",
               "title": "Department"
+            }
+          },
+          {
+            "description": "제품 모델명 필터 (쉼표 복수)",
+            "in": "query",
+            "name": "model",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "제품 모델명 필터 (쉼표 복수)",
+              "title": "Model"
+            }
+          },
+          {
+            "description": "공정 구분 필터 R/A/F (쉼표 복수)",
+            "in": "query",
+            "name": "process_step",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "공정 구분 필터 R/A/F (쉼표 복수)",
+              "title": "Process Step"
             }
           },
           {
