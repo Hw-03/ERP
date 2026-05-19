@@ -18,6 +18,8 @@ export interface Operator {
   warehouse_role: WarehouseRole;
   /** 부서 결재 역할 — 낱개(manual/adjust) IO 결재 권한. 누락 시 "none". */
   department_role: DepartmentRole;
+  /** 개인별 테마 설정 (light | dark | null). 누락 시 null. */
+  theme?: string | null;
   /** 조립 부서 직원의 담당 모델 slot 목록 (priority 순서). 누락 시 []. */
   assigned_model_slots: number[];
 }
@@ -53,6 +55,7 @@ function readOperator(): Operator | null {
       employee_code: parsed.employee_code as string,
       warehouse_role: (wh === "primary" || wh === "deputy" ? wh : "none") as WarehouseRole,
       department_role: (dept === "primary" || dept === "deputy" ? dept : "none") as DepartmentRole,
+      theme: parsed.theme ?? null,
       assigned_model_slots: slots,
     };
   } catch {

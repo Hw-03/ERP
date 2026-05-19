@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import BOM, Inventory, Item, TransactionLog, TransactionTypeEnum
+from app.models import BOM, Inventory, Item, ProcessType, TransactionLog, TransactionTypeEnum
 from app.schemas import (
     BackflushDetail,
     BomCheckResponse,
@@ -19,7 +19,7 @@ from app.schemas import (
 )
 from app.services import inventory as inventory_svc
 from app.services import stock_math
-from app.services.bom import BomCache, build_bom_cache, direct_children
+from app.services.bom import BomCache, build_bom_cache
 from app.services.bom import explode_bom as _explode_bom_svc
 from app.services.bom import merge_requirements
 from app.routers._errors import ErrorCode, http_error
@@ -294,15 +294,82 @@ def _explode_bom(
 def get_production_capacity(db: Session = Depends(get_db)):
     """BOM 최상위 완제품들에 대해 즉시/최대 생산 가능수량을 계산한다.
 
-    - **immediate**: BOM 직계 자식 1단계(AA/TF/HF/VF 등 중간재·반제품)의 가용 재고만으로
-      빠르게 만들 수 있는 수량. 원자재까지 재귀 전개하지 않는다.
-      각 직계 자식의 available(=warehouse+PRODUCTION-pending, 불량 제외) ÷ per-unit 수량의 최솟값.
-    - **maximum**: leaf 까지 전개한 전체 하위 자재의 available 기준 이론 최대.
-      불량(DEFECTIVE) 재고는 제외 — 시스템 표준 available 정의와 일치.
+    - **immediate**: 시작 재고를 stage_order ≥ 60(NF) 인 품목에서만 인정.
+      NF 미만(원자재 등)은 추가 생산 안 함 → 현실 도달 가능 수량.
+    - **maximum**: 맨 아래 원자재(TR, stage_order 10)까지 전부 재귀, 모든 재고 사용.
 
     응답 status 4단계:
       no_target / bom_not_registered / not_producible / producible.
     """
+
+    def _buildable(
+        item_id: uuid.UUID,
+        *,
+        bom_cache: BomCache,
+        fig_by_id: Dict[uuid.UUID, stock_math.StockFigures],
+        stage_by_item: Dict[uuid.UUID, int | None],
+        immediate_mode: bool,
+        memo: Dict[uuid.UUID, int],
+        visiting: frozenset,
+        depth: int = 0,
+    ) -> Tuple[int, uuid.UUID | None]:
+        """재귀 누적 가용 생산량(buildable).
+
+        Returns: (qty, bottleneck_item_id)
+        """
+        MAX_DEPTH = 10
+
+        if item_id in memo:
+            return memo[item_id], None
+
+        # 사이클 체크
+        if depth > MAX_DEPTH or item_id in visiting:
+            own = max(int(fig_by_id.get(item_id, stock_math.StockFigures()).available), 0)
+            return own, None
+
+        # 현재 아이템의 가용 재고
+        own = max(int(fig_by_id.get(item_id, stock_math.StockFigures()).available), 0)
+        stage = stage_by_item.get(item_id)
+
+        # immediate_mode에서 stage < 60이면 자식 전개 안 함 (원자재는 추가 생산 안 함)
+        if immediate_mode and stage is not None and stage < 60:
+            memo[item_id] = own
+            return own, None
+
+        children = bom_cache.get(item_id, [])
+        if not children:
+            memo[item_id] = own
+            return own, None
+
+        # 각 자식 재귀
+        new_visiting = visiting | frozenset([item_id])
+        extra_qty = float("inf")
+        bottleneck_id: uuid.UUID | None = None
+
+        for child_id, per_unit in children:
+            child_qty, _ = _buildable(
+                child_id,
+                bom_cache=bom_cache,
+                fig_by_id=fig_by_id,
+                stage_by_item=stage_by_item,
+                immediate_mode=immediate_mode,
+                memo=memo,
+                visiting=new_visiting,
+                depth=depth + 1,
+            )
+            if per_unit > 0:
+                can_make = int(child_qty / per_unit)
+                if can_make < extra_qty:
+                    extra_qty = can_make
+                    bottleneck_id = child_id
+
+        if extra_qty == float("inf"):
+            extra_qty = 0
+
+        total = own + int(extra_qty)
+        memo[item_id] = total
+        return total, bottleneck_id
+
     empty_response = {
         "immediate": 0,
         "maximum": 0,
@@ -319,14 +386,8 @@ def get_production_capacity(db: Session = Depends(get_db)):
     if not top_level_ids:
         return empty_response
 
-    # TODO: 데이터 기준 확인 후 필요 시 finished suffix(AF/PF 등) 필터 도입 검토.
-    # 현재는 BOM 의 최상위 parent 면 모두 포함 (process_type_code 필터 없음).
-    top_items_db = (
-        db.query(Item)
-        .filter(Item.item_id.in_(list(top_level_ids)))
-        .limit(15)
-        .all()
-    )
+    # 모든 top-level PF 조회 (limit 제거)
+    top_items_db = db.query(Item).filter(Item.item_id.in_(list(top_level_ids))).all()
 
     if not top_items_db:
         return empty_response
@@ -334,81 +395,71 @@ def get_production_capacity(db: Session = Depends(get_db)):
     # 1) BOM 전체를 한 번만 읽어 캐시
     bom_cache = build_bom_cache(db)
 
-    # 2) top_item 별로 (a) 직계 자식 → immediate, (b) leaf 전개 → maximum 준비
-    direct_by_top: Dict[uuid.UUID, List[Tuple[uuid.UUID, Decimal]]] = {}
-    leaf_by_top: Dict[uuid.UUID, Dict[uuid.UUID, Decimal]] = {}
-    all_comp_ids: set[uuid.UUID] = set()
+    # 2) top_item 및 BOM 구조의 모든 item에 대해 재고 조회
+    all_item_ids: set[uuid.UUID] = {item.item_id for item in top_items_db}
+
+    def _collect_all_items(iid: uuid.UUID, visited: set[uuid.UUID] | None = None) -> None:
+        if visited is None:
+            visited = set()
+        if iid in visited:
+            return
+        visited.add(iid)
+        all_item_ids.add(iid)
+        for child_id, _ in bom_cache.get(iid, []):
+            _collect_all_items(child_id, visited)
 
     for item in top_items_db:
-        direct = direct_children(db, item.item_id)
-        if direct:
-            direct_by_top[item.item_id] = direct
-            for cid, _ in direct:
-                all_comp_ids.add(cid)
+        _collect_all_items(item.item_id)
 
-        leaves = merge_requirements(_explode_bom(db, item.item_id, Decimal("1"), cache=bom_cache))
-        if leaves:
-            leaf_by_top[item.item_id] = leaves
-            all_comp_ids.update(leaves.keys())
+    # 3) bulk으로 재고 + 품목 정보 조회 (N+1 제거)
+    fig_by_id = stock_math.bulk_compute(db, all_item_ids)
+    items_map = {i.item_id: i for i in db.query(Item).filter(Item.item_id.in_(list(all_item_ids))).all()}
 
-    if not direct_by_top and not leaf_by_top:
-        # top item 은 있는데 BOM 전개가 전혀 안 됨
-        return {
-            "immediate": 0,
-            "maximum": 0,
-            "limiting_item": None,
-            "status": "bom_not_registered",
-            "top_items": [],
-        }
+    # 4) 각 item의 stage_order 맵
+    stage_by_item: Dict[uuid.UUID, int | None] = {}
+    for iid in all_item_ids:
+        item = items_map.get(iid)
+        if item and item.process_type_code:
+            pt = db.query(ProcessType).filter(ProcessType.code == item.process_type_code).first()
+            if pt:
+                stage_by_item[iid] = pt.stage_order
+        stage_by_item.setdefault(iid, None)
 
-    # 3) bulk 로 한 번에 재고 + 품목 정보 조회 (N+1 제거)
-    figures_map = stock_math.bulk_compute(db, all_comp_ids)
-    items_map = {
-        i.item_id: i
-        for i in db.query(Item).filter(Item.item_id.in_(list(all_comp_ids))).all()
-    }
-
-    def _component_name(cid: uuid.UUID) -> str | None:
-        comp = items_map.get(cid)
-        return comp.item_name if comp else None
-
-    def _min_by_components(
-        components: List[Tuple[uuid.UUID, Decimal]],
-    ) -> Tuple[int, str | None]:
-        """주어진 (component_id, req_qty) 목록에 대해 available/req 의 최솟값과 병목 부품명."""
-        min_can = float("inf")
-        limiting: str | None = None
-        for cid, req_qty in components:
-            req = float(req_qty)
-            if req <= 0:
-                continue
-            fig = figures_map.get(cid) or stock_math.StockFigures()
-            avail = float(fig.available)
-            can = avail / req
-            if can < min_can:
-                min_can = can
-                limiting = _component_name(cid)
-        if min_can == float("inf"):
-            return 0, None
-        return int(min_can), limiting
-
+    # 5) top 각각에 대해 immediate/maximum 계산
     top_results = []
     for item in top_items_db:
-        direct = direct_by_top.get(item.item_id, [])
-        leaves = leaf_by_top.get(item.item_id, {})
-        if not direct and not leaves:
-            continue
+        imm, imm_btl = _buildable(
+            item.item_id,
+            bom_cache=bom_cache,
+            fig_by_id=fig_by_id,
+            stage_by_item=stage_by_item,
+            immediate_mode=True,
+            memo={},
+            visiting=frozenset(),
+        )
+        mx, _ = _buildable(
+            item.item_id,
+            bom_cache=bom_cache,
+            fig_by_id=fig_by_id,
+            stage_by_item=stage_by_item,
+            immediate_mode=False,
+            memo={},
+            visiting=frozenset(),
+        )
 
-        immediate_val, immediate_bottleneck = _min_by_components(direct)
-        maximum_val, _ = _min_by_components(list(leaves.items()))
+        bottleneck_name: str | None = None
+        if imm_btl:
+            btl_item = items_map.get(imm_btl)
+            if btl_item:
+                bottleneck_name = btl_item.item_name
 
         top_results.append({
             "item_id": str(item.item_id),
             "item_name": item.item_name,
             "erp_code": item.erp_code,
-            "immediate": immediate_val,
-            "maximum": maximum_val,
-            "limiting_item": immediate_bottleneck,
+            "immediate": imm,
+            "maximum": mx,
+            "limiting_item": bottleneck_name,
         })
 
     if not top_results:
@@ -423,7 +474,7 @@ def get_production_capacity(db: Session = Depends(get_db)):
     total_immediate = sum(r["immediate"] for r in top_results)
     total_maximum = sum(r["maximum"] for r in top_results)
 
-    # 전체 병목: immediate 가 가장 작은 top_item 의 직계 자식 병목 부품
+    # 전체 병목: immediate 가 가장 작은 top_item 의 병목 부품
     min_item = min(top_results, key=lambda r: r["immediate"])
     bottleneck_name = min_item.get("limiting_item")
 

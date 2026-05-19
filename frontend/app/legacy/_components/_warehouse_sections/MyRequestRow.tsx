@@ -57,8 +57,6 @@ export function MyRequestRow({
   const flowLabel =
     fromDept && toDept ? `${fromDept} → ${toDept}` : fromDept ?? toDept ?? null;
 
-  const requestCode = req.request_code ?? req.request_id.slice(0, 8);
-
   return (
     <div
       className="rounded-[14px] border px-5 py-4"
@@ -126,13 +124,6 @@ export function MyRequestRow({
       )}
 
       <div className="mt-3 flex items-center justify-between gap-2">
-        <span
-          className="font-mono text-[11px]"
-          style={{ color: LEGACY_COLORS.muted2 }}
-          title={req.request_id}
-        >
-          요청번호 {requestCode}
-        </span>
         {cancelable && (
           <button
             type="button"

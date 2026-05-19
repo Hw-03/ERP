@@ -50,8 +50,19 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
         employee_code: emp.employee_code,
         warehouse_role: emp.warehouse_role ?? "none",
         department_role: emp.department_role ?? "none",
+        theme: emp.theme ?? null,
         assigned_model_slots: emp.assigned_model_slots ?? [],
       };
+
+      // 백엔드에서 받은 theme을 DOM과 localStorage에 적용
+      if (op.theme && typeof document !== "undefined") {
+        if (op.theme === "dark") {
+          document.documentElement.classList.add("dark");
+        } else if (op.theme === "light") {
+          document.documentElement.classList.remove("dark");
+        }
+      }
+
       try {
         const session = await api.getAppSession();
         setCurrentOperator(op, session.boot_id);

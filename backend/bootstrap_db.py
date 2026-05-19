@@ -131,6 +131,8 @@ _MIGRATION_DDL: list[str] = [
     "ALTER TABLE employees ADD COLUMN department_role VARCHAR(20) NOT NULL DEFAULT 'none'",
     # PIN 마지막 변경 일시 (NULL = 변경 이력 없음)
     "ALTER TABLE employees ADD COLUMN pin_last_changed DATETIME",
+    # 직원별 테마 설정 (light | dark | NULL=기본값)
+    "ALTER TABLE employees ADD COLUMN theme VARCHAR(10)",
     # 부서 대표 색깔 (HEX, NULL = 기본 purple)
     "ALTER TABLE departments ADD COLUMN color_hex VARCHAR(7)",
     # 입출고 2.0 작업 묶음

@@ -1365,7 +1365,6 @@
             "type": "array"
           },
           "created_at": {
-            "format": "date-time",
             "title": "Created At",
             "type": "string"
           },
@@ -1421,7 +1420,6 @@
           "pin_last_changed": {
             "anyOf": [
               {
-                "format": "date-time",
                 "type": "string"
               },
               {
@@ -1434,8 +1432,18 @@
             "title": "Role",
             "type": "string"
           },
+          "theme": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theme"
+          },
           "updated_at": {
-            "format": "date-time",
             "title": "Updated At",
             "type": "string"
           },
@@ -1459,6 +1467,24 @@
           "updated_at"
         ],
         "title": "EmployeeResponse",
+        "type": "object"
+      },
+      "EmployeeThemeUpdate": {
+        "properties": {
+          "theme": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theme"
+          }
+        },
+        "title": "EmployeeThemeUpdate",
         "type": "object"
       },
       "EmployeeUpdate": {
@@ -8878,6 +8904,60 @@
         ]
       }
     },
+    "/api/employees/{employee_id}/theme": {
+      "put": {
+        "description": "직원 테마 설정 저장 (light | dark | null).",
+        "operationId": "update_employee_theme_api_employees__employee_id__theme_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmployeeThemeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployeeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Employee Theme",
+        "tags": [
+          "Employees"
+        ]
+      }
+    },
     "/api/employees/{employee_id}/verify-pin": {
       "post": {
         "description": "작업자 식별용 PIN 검증 — 실제 보안 인증이 아님.\n\n무차별 대입 완화를 위해 (직원ID + 클라이언트 IP) 키로 실패 시도를 제한한다.\n실패만 카운트하며 성공 시 키를 리셋한다.",
@@ -11404,7 +11484,7 @@
     },
     "/api/production/capacity": {
       "get": {
-        "description": "BOM 최상위 완제품들에 대해 즉시/최대 생산 가능수량을 계산한다.\n\n- **immediate**: BOM 직계 자식 1단계(AA/TF/HF/VF 등 중간재·반제품)의 가용 재고만으로\n  빠르게 만들 수 있는 수량. 원자재까지 재귀 전개하지 않는다.\n  각 직계 자식의 available(=warehouse+PRODUCTION-pending, 불량 제외) ÷ per-unit 수량의 최솟값.\n- **maximum**: leaf 까지 전개한 전체 하위 자재의 available 기준 이론 최대.\n  불량(DEFECTIVE) 재고는 제외 — 시스템 표준 available 정의와 일치.\n\n응답 status 4단계:\n  no_target / bom_not_registered / not_producible / producible.",
+        "description": "BOM 최상위 완제품들에 대해 즉시/최대 생산 가능수량을 계산한다.\n\n- **immediate**: 시작 재고를 stage_order ≥ 60(NF) 인 품목에서만 인정.\n  NF 미만(원자재 등)은 추가 생산 안 함 → 현실 도달 가능 수량.\n- **maximum**: 맨 아래 원자재(TR, stage_order 10)까지 전부 재귀, 모든 재고 사용.\n\n응답 status 4단계:\n  no_target / bom_not_registered / not_producible / producible.",
         "operationId": "get_production_capacity_api_production_capacity_get",
         "responses": {
           "200": {
@@ -11426,7 +11506,7 @@
     },
     "/api/production/possible": {
       "get": {
-        "description": "BOM 최상위 완제품들에 대해 즉시/최대 생산 가능수량을 계산한다.\n\n- **immediate**: BOM 직계 자식 1단계(AA/TF/HF/VF 등 중간재·반제품)의 가용 재고만으로\n  빠르게 만들 수 있는 수량. 원자재까지 재귀 전개하지 않는다.\n  각 직계 자식의 available(=warehouse+PRODUCTION-pending, 불량 제외) ÷ per-unit 수량의 최솟값.\n- **maximum**: leaf 까지 전개한 전체 하위 자재의 available 기준 이론 최대.\n  불량(DEFECTIVE) 재고는 제외 — 시스템 표준 available 정의와 일치.\n\n응답 status 4단계:\n  no_target / bom_not_registered / not_producible / producible.",
+        "description": "BOM 최상위 완제품들에 대해 즉시/최대 생산 가능수량을 계산한다.\n\n- **immediate**: 시작 재고를 stage_order ≥ 60(NF) 인 품목에서만 인정.\n  NF 미만(원자재 등)은 추가 생산 안 함 → 현실 도달 가능 수량.\n- **maximum**: 맨 아래 원자재(TR, stage_order 10)까지 전부 재귀, 모든 재고 사용.\n\n응답 status 4단계:\n  no_target / bom_not_registered / not_producible / producible.",
         "operationId": "get_production_capacity_api_production_possible_get",
         "responses": {
           "200": {

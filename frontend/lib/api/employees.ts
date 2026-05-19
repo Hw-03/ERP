@@ -65,4 +65,8 @@ export const employeesApi = {
   // 본인 PIN 변경 — 현재 PIN 검증 필요
   changeMyPin: (employeeId: string, currentPin: string, newPin: string) =>
     postJson<void>(toApiUrl(`/api/employees/${employeeId}/change-pin`), { current_pin: currentPin, new_pin: newPin }),
+
+  // 직원 테마 설정 저장
+  setEmployeeTheme: (employeeId: string, theme: string | null) =>
+    putJson<Employee>(toApiUrl(`/api/employees/${employeeId}/theme`), { theme }),
 };

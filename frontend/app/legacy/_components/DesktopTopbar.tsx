@@ -9,6 +9,8 @@ import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { api } from "@/lib/api";
 import { clearCurrentOperator, useCurrentOperator } from "./login/useCurrentOperator";
 
+const DEFAULT_STATUS = "DEXCOWIN MES System";
+
 const WAREHOUSE_ROLE_LABEL: Record<string, string | null> = {
   primary: "창고 정",
   deputy: "창고 부",
@@ -85,7 +87,12 @@ export function DesktopTopbar({
 
         {status && (
           <span key={statusNonce} style={{ animation: "statusFlash 0.35s ease-out" }}>
-            <StatusPill tone={inferToneFromStatus(status)} label={status} title={status} className="py-1.5 text-sm" />
+            {(() => {
+              const isBrand = status === DEFAULT_STATUS;
+              const tone = isBrand ? "brand" : inferToneFromStatus(status);
+              const className = isBrand ? "py-1.5 text-sm font-black tracking-[0.04em]" : "py-1.5 text-sm";
+              return <StatusPill tone={tone} label={status} title={status} className={className} />;
+            })()}
           </span>
         )}
 

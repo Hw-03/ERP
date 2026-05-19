@@ -185,7 +185,6 @@ function QueueCard({
             {req.requester_name} · {req.requester_department}
           </div>
           <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
-            {req.request_code ?? req.request_id.slice(0, 8)} ·{" "}
             {formatDateTime(req.submitted_at ?? req.created_at)}
           </div>
         </div>

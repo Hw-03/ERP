@@ -327,6 +327,7 @@ class Employee(Base):
         onupdate=datetime.utcnow,
         server_default=func.now(),
     )
+    theme = Column(String(10), nullable=True)
 
     __table_args__ = (
         CheckConstraint(

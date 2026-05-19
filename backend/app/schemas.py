@@ -1,11 +1,11 @@
 """Pydantic schemas for the DEXCOWIN MES API."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
-from typing import List, Literal, Optional
+from typing import Annotated, List, Literal, Optional
 import uuid
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer
 
 from app.models import (
     AlertKindEnum,
@@ -19,6 +19,16 @@ from app.models import (
     StockRequestTypeEnum,
     TransactionTypeEnum,
 )
+
+
+def _serialize_datetime_with_utc(dt: datetime) -> str:
+    """Serialize naive datetime with +00:00 UTC offset."""
+    if dt.tzinfo is None:
+        return dt.isoformat() + "+00:00"
+    return dt.isoformat()
+
+
+UtcDatetime = Annotated[datetime, PlainSerializer(_serialize_datetime_with_utc, return_type=str)]
 
 
 class ItemCreate(BaseModel):
@@ -158,10 +168,11 @@ class EmployeeResponse(BaseModel):
     department_role: str = "none"
     display_order: int
     is_active: bool
-    created_at: datetime
-    updated_at: datetime
-    pin_last_changed: Optional[datetime] = None
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
+    pin_last_changed: Optional[UtcDatetime] = None
     pin_is_default: bool = True
+    theme: Optional[str] = None
     # 담당 모델 slot 목록 (priority 순서대로 정렬되어 반환됨)
     assigned_model_slots: List[int] = Field(default_factory=list)
 
@@ -173,6 +184,10 @@ class AdminPinVerifyRequest(BaseModel):
 class AdminPinUpdateRequest(BaseModel):
     current_pin: str = Field(..., min_length=4, max_length=32)
     new_pin: str = Field(..., min_length=4, max_length=32)
+
+
+class EmployeeThemeUpdate(BaseModel):
+    theme: Optional[str] = Field(None, max_length=10)
 
 
 class IntegrityCheckRequest(BaseModel):

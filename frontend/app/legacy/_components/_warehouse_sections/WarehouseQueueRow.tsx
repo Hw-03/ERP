@@ -60,9 +60,6 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
         >
           {req.status === "reserved" ? "승인 대기" : "제출됨"}
         </span>
-        <span className="font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-          {req.request_code ?? req.request_id.slice(0, 8)}
-        </span>
         <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
           {REQUEST_TYPE_LABEL[req.request_type] ?? req.request_type}
         </span>

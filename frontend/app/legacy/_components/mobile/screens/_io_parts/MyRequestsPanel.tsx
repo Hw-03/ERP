@@ -146,7 +146,7 @@ function RequestCard({ req }: { req: StockRequest }) {
             className={`${TYPO.body} mt-1 truncate font-black`}
             style={{ color: LEGACY_COLORS.text }}
           >
-            {req.request_code ?? req.request_id.slice(0, 8)}
+            {req.lines[0]?.item_name_snapshot ?? (TYPE_LABEL[req.request_type] ?? req.request_type)}
           </div>
           <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
             {formatDateTime(req.submitted_at ?? req.created_at)}

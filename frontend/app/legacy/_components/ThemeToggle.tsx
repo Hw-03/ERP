@@ -2,29 +2,50 @@
 
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
+import { api } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { useCurrentOperator, setCurrentOperator } from "./login/useCurrentOperator";
 
 export function ThemeToggle({ expanded = false }: { expanded?: boolean }) {
+  const operator = useCurrentOperator();
   const [isLight, setIsLight] = useState(true);
   const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("theme");
-    if (stored === "dark") {
-      document.documentElement.setAttribute("data-theme", "dark");
+    // operator.theme 또는 localStorage에서 테마 읽기 (operator 우선)
+    const theme = operator?.theme ?? localStorage.getItem("theme");
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
       setIsLight(false);
+    } else {
+      document.documentElement.classList.remove("dark");
+      setIsLight(true);
     }
-  }, []);
+  }, [operator?.theme]);
 
   function toggle() {
     const next = !isLight;
     setIsLight(next);
+    const newTheme = next ? "light" : "dark";
+
     if (next) {
-      document.documentElement.removeAttribute("data-theme");
-      localStorage.setItem("theme", "light");
+      document.documentElement.classList.remove("dark");
     } else {
-      document.documentElement.setAttribute("data-theme", "dark");
-      localStorage.setItem("theme", "dark");
+      document.documentElement.classList.add("dark");
+    }
+
+    // localStorage에 저장 (항상)
+    localStorage.setItem("theme", newTheme);
+
+    // 로그인된 operator가 있으면 백엔드에 저장 (fire-and-forget)
+    if (operator) {
+      api.setEmployeeTheme(operator.employee_id, newTheme).catch(() => {
+        // 실패해도 무시 (UI는 이미 업데이트됨)
+      });
+
+      // localStorage에 operator 정보 갱신
+      const updated = { ...operator, theme: newTheme };
+      setCurrentOperator(updated);
     }
   }
 

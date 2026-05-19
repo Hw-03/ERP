@@ -16,6 +16,7 @@ from app.schemas import (
     EmployeePinChangeRequest,
     EmployeePinResetRequest,
     EmployeeResponse,
+    EmployeeThemeUpdate,
     EmployeeUpdate,
     PinVerifyRequest,
 )
@@ -379,6 +380,26 @@ def reset_employee_pin(
     commit_only(db)
 
 
+@router.put("/{employee_id}/theme", response_model=EmployeeResponse, status_code=status.HTTP_200_OK)
+def update_employee_theme(
+    employee_id: uuid.UUID,
+    payload: EmployeeThemeUpdate,
+    db: Session = Depends(get_db),
+):
+    """직원 테마 설정 저장 (light | dark | null)."""
+    if payload.theme and payload.theme not in ("light", "dark"):
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "테마는 light, dark, 또는 null이어야 합니다.")
+
+    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    if not employee:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+
+    employee.theme = payload.theme
+    employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    commit_only(db)
+    return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
+
+
 def _to_response(
     employee: Employee, assigned_model_slots: Optional[List[int]] = None
 ) -> EmployeeResponse:
@@ -400,5 +421,6 @@ def _to_response(
         updated_at=employee.updated_at,
         pin_last_changed=getattr(employee, "pin_last_changed", None),
         pin_is_default=pin_is_default,
+        theme=getattr(employee, "theme", None),
         assigned_model_slots=assigned_model_slots or [],
     )
