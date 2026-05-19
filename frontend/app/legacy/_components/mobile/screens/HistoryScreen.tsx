@@ -96,7 +96,7 @@ export function HistoryScreen({
   };
 
   return (
-    <div className="flex flex-col gap-3 px-4 pb-6 pt-3">
+    <div className="flex flex-col gap-3 px-3 pb-6 pt-3">
       <div className="flex items-center gap-2">
         <IconButton icon={ArrowLeft} label="이전" size="md" onClick={onClose} color={LEGACY_COLORS.muted2} />
         <div className="flex-1">
@@ -121,7 +121,7 @@ export function HistoryScreen({
 
       {viewMode === "list" ? (
         <>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-1.5">
             <KpiCard label="조회 기준" value={summary.total} color={LEGACY_COLORS.blue} />
             <KpiCard label="입고합" value={formatQty(summary.inSum)} color={LEGACY_COLORS.green} />
             <KpiCard label="출고합" value={formatQty(summary.outSum)} color={LEGACY_COLORS.red} />
@@ -138,9 +138,9 @@ export function HistoryScreen({
               description="필터를 조정해 보세요."
             />
           ) : (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
               {groupedByDay.map(([day, dayLogs]) => (
-                <div key={day} className="flex flex-col gap-2">
+                <div key={day} className="flex flex-col gap-1.5">
                   <div
                     className={`${TYPO.caption} font-bold`}
                     style={{ color: LEGACY_COLORS.muted2 }}
