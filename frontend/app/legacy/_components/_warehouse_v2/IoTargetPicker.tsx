@@ -395,7 +395,7 @@ function ItemTable({
               품목명
             </th>
             <th
-              className="px-3 py-2 text-center"
+              className="hidden px-3 py-2 text-center sm:table-cell"
               style={{
                 background: "var(--c-popup-bg)",
                 borderBottom: `1px solid ${LEGACY_COLORS.border}`,
@@ -404,7 +404,7 @@ function ItemTable({
               품목 코드
             </th>
             <th
-              className="whitespace-nowrap px-3 py-2 text-center"
+              className="hidden whitespace-nowrap px-3 py-2 text-center sm:table-cell"
               style={{
                 background: "var(--c-popup-bg)",
                 borderBottom: `1px solid ${LEGACY_COLORS.border}`,
@@ -413,7 +413,7 @@ function ItemTable({
               창고
             </th>
             <th
-              className="whitespace-nowrap px-3 py-2 text-center"
+              className="hidden whitespace-nowrap px-3 py-2 text-center sm:table-cell"
               style={{
                 background: "var(--c-popup-bg)",
                 borderBottom: `1px solid ${LEGACY_COLORS.border}`,
@@ -452,7 +452,7 @@ function ItemTable({
                   </span>
                 </td>
                 <td
-                  className="px-3 py-2 text-center"
+                  className="hidden px-3 py-2 text-center sm:table-cell"
                   style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                 >
                   <span className="text-sm font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -460,7 +460,7 @@ function ItemTable({
                   </span>
                 </td>
                 <td
-                  className="px-3 py-2 text-center text-base font-black tabular-nums"
+                  className="hidden px-3 py-2 text-center text-base font-black tabular-nums sm:table-cell"
                   style={{
                     color: wQty > 0 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
                     borderBottom: `1px solid ${LEGACY_COLORS.border}`,
@@ -469,7 +469,7 @@ function ItemTable({
                   {formatQty(wQty)}
                 </td>
                 <td
-                  className="px-3 py-2 text-center"
+                  className="hidden px-3 py-2 text-center sm:table-cell"
                   style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                 >
                   {noDeptStock ? (
