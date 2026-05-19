@@ -13,11 +13,13 @@ import {
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { AlertsSheet } from "./AlertsSheet";
 import { IconButton } from "./primitives";
-import { DesktopInventoryView } from "../DesktopInventoryView";
-import { DesktopWarehouseView } from "../DesktopWarehouseView";
-import { DesktopHistoryView } from "../DesktopHistoryView";
-import { DesktopWeeklyReportView } from "../DesktopWeeklyReportView";
-import { DesktopAdminView } from "../DesktopAdminView";
+import {
+  MobileDashboardScreen,
+  MobileWarehouseScreen,
+  MobileHistoryScreen,
+  MobileWeeklyScreen,
+  MobileAdminScreen,
+} from "./screens";
 import { WeeklyWeekPicker, getWeekStartMonday } from "../_weekly_sections/WeeklyWeekPicker";
 import { api, type ProductionCapacity } from "@/lib/api";
 import type { Item } from "@/lib/api";
@@ -110,7 +112,7 @@ export function MobileShell() {
     const key = activeTab === "admin" ? "admin" : `${activeTab}-${refreshNonce}`;
     if (activeTab === "dashboard") {
       return (
-        <DesktopInventoryView
+        <MobileDashboardScreen
           key={key}
           globalSearch=""
           onStatusChange={handleStatusChange}
@@ -124,7 +126,7 @@ export function MobileShell() {
     }
     if (activeTab === "warehouse") {
       return (
-        <DesktopWarehouseView
+        <MobileWarehouseScreen
           key={key}
           globalSearch=""
           onStatusChange={handleStatusChange}
@@ -134,12 +136,12 @@ export function MobileShell() {
       );
     }
     if (activeTab === "history") {
-      return <DesktopHistoryView key={key} />;
+      return <MobileHistoryScreen key={key} />;
     }
     if (activeTab === "weekly") {
-      return <DesktopWeeklyReportView key={key} weekMon={weekMon} />;
+      return <MobileWeeklyScreen key={key} weekMon={weekMon} />;
     }
-    return <DesktopAdminView key={key} globalSearch="" onStatusChange={handleStatusChange} />;
+    return <MobileAdminScreen key={key} globalSearch="" onStatusChange={handleStatusChange} />;
   }, [
     activeTab,
     refreshNonce,
@@ -153,7 +155,7 @@ export function MobileShell() {
   ]);
 
   return (
-    <div className="h-screen overflow-hidden sm:bg-black">
+    <div className="h-screen overflow-hidden sm:bg-black" data-testid="mobile-shell">
       <div
         className="flex h-full flex-col overflow-hidden"
         style={{
@@ -178,7 +180,7 @@ export function MobileShell() {
         >
           <div className="min-w-0 flex-1">
             <div
-              className="text-xs font-bold uppercase tracking-wider"
+              className="truncate text-xs font-bold uppercase tracking-wider"
               style={{ color: LEGACY_COLORS.muted2 }}
             >
               {status}
@@ -194,7 +196,7 @@ export function MobileShell() {
           </div>
         </header>
 
-        <main className="relative flex-1 overflow-hidden flex">{content}</main>
+        <main className="relative flex-1 overflow-hidden flex" data-testid="screen-root">{content}</main>
 
         <nav
           className="shrink-0"
@@ -213,7 +215,7 @@ export function MobileShell() {
                 <button
                   key={tab}
                   onClick={() => handleTabChange(tab)}
-                  className="flex flex-1 flex-col items-center gap-1 py-1 transition-[transform] active:scale-[0.92]"
+                  className="flex min-h-[52px] flex-1 flex-col items-center justify-center gap-1 py-1 transition-[transform] active:scale-[0.92]"
                   aria-label={meta.label}
                   aria-current={active ? "page" : undefined}
                 >
