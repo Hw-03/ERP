@@ -205,7 +205,10 @@ export function MobileShell() {
           </div>
         </header>
 
-        <main className="relative flex-1 overflow-hidden flex" data-testid="screen-root">{content}</main>
+        <main className="relative flex-1 overflow-hidden flex" data-testid="screen-root">
+          <h1 className="sr-only">{TAB_META[activeTab].label} — DEXCOWIN MES</h1>
+          {content}
+        </main>
 
         <nav
           className="shrink-0"
@@ -237,13 +240,16 @@ export function MobileShell() {
                     <Icon
                       size={20}
                       strokeWidth={active ? 2.25 : 1.75}
-                      color={active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted}
+                      color={active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2}
                     />
                   </span>
                   <div
-                    className="text-[10px] font-semibold"
+                    className="text-[11px]"
                     style={{
-                      color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted,
+                      // WCAG AA: active blue(#2f74e7) 는 흰 배경서 4.14:1 로 미달 →
+                      // 활성은 진한 text 색 + bold, 비활성은 muted2(5.55:1) 로 대비 확보.
+                      color: active ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
+                      fontWeight: active ? 800 : 600,
                     }}
                   >
                     {meta.label}

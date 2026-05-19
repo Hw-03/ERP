@@ -426,7 +426,9 @@ export function MobileIoComposeWizard({
             onAddItem={(item, sourceKind, subTypeOverride) =>
               addItem(item, sourceKind ?? "direct_item", subTypeOverride)
             }
-            onAdvance={() => {}}
+            onAdvance={() => {
+              if (state.bundles.length > 0) state.goTo(4);
+            }}
             busy={previewing}
           />
         )}
@@ -489,26 +491,20 @@ export function MobileIoComposeWizard({
         )}
       </div>
 
-      {/* 썸존 하단 액션 — Step 2/3 (1=자동advance, 4=cart 내부버튼, 5=confirm 내부버튼) */}
-      {(step === 2 || step === 3) && (
+      {/* 썸존 하단 액션 — Step 2 만 (1=자동advance, 3=picker 내부 advance,
+          4=cart 내부버튼, 5=confirm 내부버튼). Step3 는 이중 하단바 방지로 제외. */}
+      {step === 2 && (
         <StickyFooter>
           <button
             type="button"
             onClick={() => {
-              if (step === 2 && state.canAdvance[2]) state.goNext();
-              if (step === 3 && state.bundles.length > 0) state.goTo(4);
+              if (state.canAdvance[2]) state.goNext();
             }}
-            disabled={step === 2 ? !state.canAdvance[2] : state.bundles.length === 0}
+            disabled={!state.canAdvance[2]}
             className="flex w-full items-center justify-center gap-2 rounded-[18px] px-7 py-4 text-base font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
             style={{ background: accent }}
           >
-            {step === 2
-              ? state.canAdvance[2]
-                ? "다음 단계로 →"
-                : "세부 작업과 부서를 선택하세요"
-              : state.bundles.length > 0
-              ? `다음 · 품목 확인 (${state.bundles.length})`
-              : "품목을 선택하세요"}
+            {state.canAdvance[2] ? "다음 단계로 →" : "세부 작업과 부서를 선택하세요"}
           </button>
         </StickyFooter>
       )}

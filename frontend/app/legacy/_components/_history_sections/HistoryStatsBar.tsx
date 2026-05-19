@@ -91,13 +91,16 @@ function StatBox({
       style={{ background: tint(color, 6), borderColor: tint(color, 22) }}
     >
       <div
-        className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-[0.12em]"
-        style={{ color }}
+        className="flex items-center gap-1.5 whitespace-nowrap text-xs font-bold"
+        style={{ color: `color-mix(in srgb, ${color} 45%, ${LEGACY_COLORS.text})` }}
       >
         {icon}
         {label}
       </div>
-      <div className="text-2xl font-black" style={{ color }}>
+      <div
+        className="text-2xl font-black tabular-nums"
+        style={{ color: `color-mix(in srgb, ${color} 55%, ${LEGACY_COLORS.text})` }}
+      >
         {value}건
       </div>
       <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>

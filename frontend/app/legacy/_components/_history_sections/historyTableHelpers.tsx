@@ -66,8 +66,10 @@ export function MovementSummaryCell({ summary }: { summary: MovementSummary }) {
             key={i}
             className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold"
             style={{
-              background: `color-mix(in srgb, ${color} 16%, transparent)`,
-              color,
+              // WCAG AA: 연한 틴트 위 brand 컬러 텍스트는 4.5:1 미달 →
+              // 같은 색조를 text 색과 섞어 어둡게(색 코딩 유지 + 대비 확보).
+              background: `color-mix(in srgb, ${color} 18%, transparent)`,
+              color: `color-mix(in srgb, ${color} 42%, ${LEGACY_COLORS.text})`,
             }}
           >
             {p.label}
@@ -78,8 +80,8 @@ export function MovementSummaryCell({ summary }: { summary: MovementSummary }) {
         <span
           className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold"
           style={{
-            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 18%, transparent)`,
-            color: LEGACY_COLORS.red,
+            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 20%, transparent)`,
+            color: `color-mix(in srgb, ${LEGACY_COLORS.red} 42%, ${LEGACY_COLORS.text})`,
           }}
         >
           {summary.warning}

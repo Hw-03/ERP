@@ -39,6 +39,8 @@ export function MobileWorkTypeStep({
         const Icon = row.icon;
         const active = workType === row.id;
         const accent = isExitWorkType(row.id) ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
+        // 활성 카드 텍스트: 연한 틴트 위 brand 색은 AA 미달 → text 색과 섞어 어둡게
+        const accentText = `color-mix(in srgb, ${accent} 42%, ${LEGACY_COLORS.text})`;
         return (
           <button
             key={row.id}
@@ -50,7 +52,7 @@ export function MobileWorkTypeStep({
               background: active ? tint(accent, 14) : LEGACY_COLORS.s2,
               borderColor: active ? accent : LEGACY_COLORS.border,
               borderWidth: active ? 2 : 1,
-              color: active ? accent : LEGACY_COLORS.text,
+              color: active ? accentText : LEGACY_COLORS.text,
             }}
           >
             <span
@@ -63,7 +65,7 @@ export function MobileWorkTypeStep({
               <span className="block text-lg font-black leading-tight">{row.label}</span>
               <span
                 className="block text-sm font-semibold"
-                style={{ color: active ? accent : LEGACY_COLORS.muted2 }}
+                style={{ color: active ? accentText : LEGACY_COLORS.muted2 }}
               >
                 {row.description}
               </span>

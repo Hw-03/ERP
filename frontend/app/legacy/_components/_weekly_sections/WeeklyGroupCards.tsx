@@ -6,7 +6,8 @@ import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import type { WeeklyGroupReport } from "@/lib/api/types/weekly";
 
-const ZERO_FADE = `color-mix(in srgb, ${LEGACY_COLORS.muted2} 30%, transparent)`;
+// 0/무변동 값 de-emphasis — 단 WCAG AA 충족 필요(투명 30% 는 미달) → 솔리드 muted2(5.55:1).
+const ZERO_FADE = LEGACY_COLORS.muted2;
 
 interface Props {
   groups: WeeklyGroupReport[];
@@ -74,7 +75,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
             <div className="flex items-center gap-2 py-1.5 pl-4 pr-3">
               <span
                 className="text-[16px] font-black tracking-[-0.01em] leading-none"
-                style={{ color: isQuiet ? LEGACY_COLORS.muted : LEGACY_COLORS.text }}
+                style={{ color: isQuiet ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text }}
               >
                 {g.dept_name}
               </span>
@@ -83,8 +84,10 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
                 style={{
                   background: isQuiet
                     ? tint(LEGACY_COLORS.muted2, 10, LEGACY_COLORS.s2)
-                    : tint(tone, 12, LEGACY_COLORS.s2),
-                  color: isQuiet ? LEGACY_COLORS.muted2 : tone,
+                    : tint(tone, 16, LEGACY_COLORS.s2),
+                  color: isQuiet
+                    ? LEGACY_COLORS.muted2
+                    : `color-mix(in srgb, ${tone} 42%, ${LEGACY_COLORS.text})`,
                 }}
               >
                 {g.process_code}
@@ -126,7 +129,10 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
               <span
                 className={g.in_qty > 0 ? "font-semibold" : "font-medium"}
                 style={{
-                  color: g.in_qty > 0 ? LEGACY_COLORS.green : ZERO_FADE,
+                  color:
+                    g.in_qty > 0
+                      ? `color-mix(in srgb, ${LEGACY_COLORS.green} 55%, ${LEGACY_COLORS.text})`
+                      : ZERO_FADE,
                 }}
               >
                 입고 {formatQty(g.in_qty)}
@@ -134,7 +140,10 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
               <span
                 className={g.out_qty > 0 ? "font-semibold" : "font-medium"}
                 style={{
-                  color: g.out_qty > 0 ? LEGACY_COLORS.red : ZERO_FADE,
+                  color:
+                    g.out_qty > 0
+                      ? `color-mix(in srgb, ${LEGACY_COLORS.red} 55%, ${LEGACY_COLORS.text})`
+                      : ZERO_FADE,
                 }}
               >
                 출고 {formatQty(g.out_qty)}
@@ -142,7 +151,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
               <span
                 className={g.current_qty > 0 ? "font-semibold" : "font-medium"}
                 style={{
-                  color: g.current_qty > 0 ? LEGACY_COLORS.muted : ZERO_FADE,
+                  color: g.current_qty > 0 ? LEGACY_COLORS.muted2 : ZERO_FADE,
                 }}
               >
                 현재 {formatQty(g.current_qty)}

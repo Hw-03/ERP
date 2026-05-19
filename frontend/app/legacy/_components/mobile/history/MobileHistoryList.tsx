@@ -78,12 +78,16 @@ export function MobileHistoryList({
             >
               <div className="flex items-center justify-between gap-2">
                 <span
-                  className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold"
+                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold"
                   style={{
-                    background: `color-mix(in srgb, ${tcolor} 14%, transparent)`,
-                    color: tcolor,
+                    background: `color-mix(in srgb, ${tcolor} 16%, transparent)`,
+                    color: LEGACY_COLORS.text,
                   }}
                 >
+                  <span
+                    className="h-1.5 w-1.5 shrink-0 rounded-full"
+                    style={{ background: tcolor }}
+                  />
                   {getHistoryDisplayLabel(log)}
                 </span>
                 <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -131,11 +135,11 @@ export function MobileHistoryList({
               <span
                 className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold"
                 style={{
-                  background: `color-mix(in srgb, ${tcolor} 14%, transparent)`,
-                  color: tcolor,
+                  background: `color-mix(in srgb, ${tcolor} 16%, transparent)`,
+                  color: LEGACY_COLORS.text,
                 }}
               >
-                <Layers className="h-3.5 w-3.5" />
+                <Layers className="h-3.5 w-3.5" style={{ color: tcolor }} />
                 {getHistoryDisplayLabel(first)}
               </span>
               <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
