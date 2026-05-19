@@ -9,8 +9,11 @@ import { chromium } from 'playwright';
 import { injectAxe, checkA11y, getViolations } from 'axe-playwright';
 import * as fs from 'fs';
 import * as path from 'path';
+import { seedOperator } from './_mobile-auth.mjs';
 
-const BASE_URL = 'http://localhost:3000/legacy';
+// page.path 가 이미 '/legacy?tab=...' 를 포함하므로 BASE_URL 에는 /legacy 를 붙이지 않는다.
+// MOBILE_BASE_URL 로 포트/호스트 오버라이드 가능(기본 localhost:3000).
+const BASE_URL = process.env.MOBILE_BASE_URL || 'http://localhost:3000';
 const SCREENSHOTS_DIR = path.resolve('./frontend/screenshots');
 const OUTPUT_FILE = path.join(SCREENSHOTS_DIR, 'a11y-report.json');
 
@@ -46,6 +49,9 @@ async function runA11yScan() {
       const context = await browser.newContext({
         viewport: { width: screen.width, height: screen.height },
       });
+
+      const op = await seedOperator(context, BASE_URL);
+      if (op) console.log(`  🔑 세션: ${op.name}(${op.department}) wh=${op.warehouse_role}`);
 
       for (const page of PAGES) {
         const browserPage = await context.newPage();

@@ -48,6 +48,15 @@ export function MobileShell() {
   const [alertsOpen, setAlertsOpen] = useState(false);
   const autoRevertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // URL ?tab= 으로 초기 탭 동기화 (딥링크/데스크탑 파리티/평가 스크립트).
+  // useSearchParams 의 Suspense 요구를 피하려 클라이언트 마운트 시 1회만 읽는다.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const t = new URLSearchParams(window.location.search).get("tab");
+    const valid: MobileTabId[] = ["dashboard", "warehouse", "history", "weekly", "admin"];
+    if (t && (valid as string[]).includes(t)) setActiveTab(t as MobileTabId);
+  }, []);
+
   const [weekMon, setWeekMon] = useState<Date>(() => getWeekStartMonday(new Date()));
   const [warehousePreselected, setWarehousePreselected] = useState<Item | null>(null);
   const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
