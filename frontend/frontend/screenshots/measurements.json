@@ -1,5 +1,5 @@
 {
-  "phone-home": {
+  "phone-dashboard": {
     "containerPaddingLeft": "0px",
     "containerPaddingRight": "0px",
     "containerPaddingTop": "0px",
@@ -7,7 +7,7 @@
     "mobileShellWidth": null,
     "backgroundColor": "rgba(0, 0, 0, 0)"
   },
-  "phone-inventory": {
+  "phone-warehouse": {
     "containerPaddingLeft": "0px",
     "containerPaddingRight": "0px",
     "containerPaddingTop": "0px",
@@ -31,14 +31,6 @@
     "mobileShellWidth": null,
     "backgroundColor": "rgba(0, 0, 0, 0)"
   },
-  "phone-warehouse": {
-    "containerPaddingLeft": "0px",
-    "containerPaddingRight": "0px",
-    "containerPaddingTop": "0px",
-    "itemRowHeights": [],
-    "mobileShellWidth": null,
-    "backgroundColor": "rgba(0, 0, 0, 0)"
-  },
   "phone-admin": {
     "containerPaddingLeft": "0px",
     "containerPaddingRight": "0px",
@@ -47,7 +39,7 @@
     "mobileShellWidth": null,
     "backgroundColor": "rgba(0, 0, 0, 0)"
   },
-  "phone-more": {
+  "tablet-dashboard": {
     "containerPaddingLeft": "0px",
     "containerPaddingRight": "0px",
     "containerPaddingTop": "0px",
@@ -55,15 +47,7 @@
     "mobileShellWidth": null,
     "backgroundColor": "rgba(0, 0, 0, 0)"
   },
-  "tablet-home": {
-    "containerPaddingLeft": "0px",
-    "containerPaddingRight": "0px",
-    "containerPaddingTop": "0px",
-    "itemRowHeights": [],
-    "mobileShellWidth": null,
-    "backgroundColor": "rgba(0, 0, 0, 0)"
-  },
-  "tablet-inventory": {
+  "tablet-warehouse": {
     "containerPaddingLeft": "0px",
     "containerPaddingRight": "0px",
     "containerPaddingTop": "0px",
@@ -87,23 +71,7 @@
     "mobileShellWidth": null,
     "backgroundColor": "rgba(0, 0, 0, 0)"
   },
-  "tablet-warehouse": {
-    "containerPaddingLeft": "0px",
-    "containerPaddingRight": "0px",
-    "containerPaddingTop": "0px",
-    "itemRowHeights": [],
-    "mobileShellWidth": null,
-    "backgroundColor": "rgba(0, 0, 0, 0)"
-  },
   "tablet-admin": {
-    "containerPaddingLeft": "0px",
-    "containerPaddingRight": "0px",
-    "containerPaddingTop": "0px",
-    "itemRowHeights": [],
-    "mobileShellWidth": null,
-    "backgroundColor": "rgba(0, 0, 0, 0)"
-  },
-  "tablet-more": {
     "containerPaddingLeft": "0px",
     "containerPaddingRight": "0px",
     "containerPaddingTop": "0px",

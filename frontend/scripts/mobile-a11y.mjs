@@ -20,13 +20,11 @@ const SCREENS = [
 ];
 
 const PAGES = [
-  { id: 'home', path: '/legacy?tab=home', label: 'Home' },
-  { id: 'inventory', path: '/legacy?tab=inventory', label: 'Inventory' },
-  { id: 'history', path: '/legacy?tab=history', label: 'History' },
+  { id: 'dashboard', path: '/legacy?tab=dashboard', label: 'Dashboard' },
   { id: 'warehouse', path: '/legacy?tab=warehouse', label: 'Warehouse' },
-  { id: 'dept', path: '/legacy?tab=dept', label: 'Dept' },
+  { id: 'history', path: '/legacy?tab=history', label: 'History' },
+  { id: 'weekly', path: '/legacy?tab=weekly', label: 'Weekly' },
   { id: 'admin', path: '/legacy?tab=admin', label: 'Admin' },
-  { id: 'more', path: '/legacy?tab=more', label: 'More' },
 ];
 
 async function ensureScreenshotsDir() {
