@@ -54,7 +54,7 @@ export function BottomSheet({
     >
       <div
         ref={sheetRef}
-        className="w-full max-w-[430px] overflow-y-auto rounded-t-[22px] border-t"
+        className="w-full max-w-full overflow-y-auto rounded-t-[22px] border-t"
         style={{
           background: LEGACY_COLORS.s1,
           borderColor: LEGACY_COLORS.border,
