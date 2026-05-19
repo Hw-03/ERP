@@ -91,11 +91,11 @@ function TabButton({
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="relative rounded-[12px] border px-4 py-2.5 transition-colors hover:brightness-110"
+      className="relative min-h-[44px] rounded-[12px] border px-2 py-2 transition-colors hover:brightness-110 lg:px-4 lg:py-2.5"
       style={{ background: bg, borderColor: border }}
     >
       <div
-        className="text-center text-[22px] font-black leading-tight tracking-[-0.02em]"
+        className="text-center text-xs font-black leading-tight tracking-[-0.02em] break-keep lg:text-[22px]"
         style={{ color: tone }}
       >
         {label}
