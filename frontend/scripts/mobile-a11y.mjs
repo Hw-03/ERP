@@ -20,13 +20,13 @@ const SCREENS = [
 ];
 
 const PAGES = [
-  { id: 'home', path: '/home', label: 'Home' },
-  { id: 'inventory', path: '/inventory', label: 'Inventory' },
-  { id: 'history', path: '/history', label: 'History' },
-  { id: 'weekly', path: '/weekly', label: 'WeeklyReport' },
-  { id: 'warehouse', path: '/warehouse', label: 'Warehouse' },
-  { id: 'admin', path: '/admin', label: 'Admin' },
-  { id: 'more', path: '/more', label: 'More' },
+  { id: 'home', path: '/legacy?tab=home', label: 'Home' },
+  { id: 'inventory', path: '/legacy?tab=inventory', label: 'Inventory' },
+  { id: 'history', path: '/legacy?tab=history', label: 'History' },
+  { id: 'warehouse', path: '/legacy?tab=warehouse', label: 'Warehouse' },
+  { id: 'dept', path: '/legacy?tab=dept', label: 'Dept' },
+  { id: 'admin', path: '/legacy?tab=admin', label: 'Admin' },
+  { id: 'more', path: '/legacy?tab=more', label: 'More' },
 ];
 
 async function ensureScreenshotsDir() {
@@ -45,7 +45,7 @@ async function runA11yScan() {
     for (const screen of SCREENS) {
       console.log(`\n♿ Scanning ${screen.name} (${screen.width}x${screen.height})...`);
 
-      const context = await browser.createContext({
+      const context = await browser.newContext({
         viewport: { width: screen.width, height: screen.height },
       });
 

@@ -4,7 +4,14 @@ import { useDeferredValue, useMemo } from "react";
 import type { Item } from "@/lib/api";
 import { getStockState } from "@/lib/mes/inventory";
 import { useItems } from "../mobile/hooks/useItems";
-import type { InventoryFilters } from "../mobile/screens/InventoryFilterSheet";
+
+export interface InventoryFilters {
+  department: string;
+  kpi: "OK" | "LOW" | "ZERO";
+  itemType: "RAW" | "SEMI" | "FIXED";
+  modelSlot: null | number;
+  grouped: boolean;
+}
 
 /**
  * mobile InventoryScreen 의 derivation chain.

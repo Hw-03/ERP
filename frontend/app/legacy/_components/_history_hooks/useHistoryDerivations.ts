@@ -2,7 +2,14 @@
 
 import { useMemo } from "react";
 import type { Item, ProductModel, TransactionLog, TransactionType } from "@/lib/api";
-import type { HistoryFilters } from "../mobile/screens/HistoryFilterSheet";
+
+export interface HistoryFilters {
+  date: string;
+  type: string;
+  employee: string;
+  model: string;
+  search: string;
+}
 
 /**
  * mobile HistoryScreen 의 거래 로그 derivation chain.

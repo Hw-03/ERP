@@ -1,185 +1,33 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { MobileShell, type TabId } from "./_components/mobile/MobileShell";
-import { InventoryScreen } from "./_components/mobile/screens/InventoryScreen";
-import { HistoryScreen } from "./_components/mobile/screens/HistoryScreen";
-import { HomeScreen } from "./_components/mobile/screens/HomeScreen";
-import { MoreScreen } from "./_components/mobile/screens/MoreScreen";
-import { Toast, type ToastState } from "@/lib/ui/Toast";
-import { AdminShell } from "./_components/mobile/screens/admin/AdminShell";
+import { Suspense } from "react";
+import { MobileShell } from "./_components/mobile/MobileShell";
 import { DesktopLegacyShell } from "./_components/DesktopLegacyShell";
-import {
-  WarehouseWizardProvider,
-  useWarehouseWizard,
-} from "./_components/mobile/io/warehouse/context";
-import { IoHubScreen } from "./_components/mobile/screens/_io_parts/IoHubScreen";
-import { DeptWizardProvider } from "./_components/mobile/io/dept/context";
-import { DeptWizardScreen } from "./_components/mobile/io/dept/DeptWizardScreen";
 import { ErpLoginGate } from "./_components/login/ErpLoginGate";
 import { DepartmentsProvider } from "./_components/DepartmentsContext";
-import { useCurrentOperator } from "./_components/login/useCurrentOperator";
-import { canEnterIO } from "./_components/_warehouse_steps";
-
-const TAB_TITLES: Record<TabId, { subtitle: string; title: string }> = {
-  home: { subtitle: "DEXCOWIN MES", title: "홈" },
-  inventory: { subtitle: "재고 현황", title: "재고" },
-  warehouse: { subtitle: "창고 입출고", title: "입출고" },
-  dept: { subtitle: "부서 입출고", title: "부서입출고" },
-  history: { subtitle: "입출고 이력", title: "내역" },
-  admin: { subtitle: "관리자", title: "관리자" },
-  more: { subtitle: "메뉴", title: "더보기" },
-};
 
 export default function LegacyPage() {
   return (
     <DepartmentsProvider>
       <ErpLoginGate>
-        <WarehouseWizardProvider>
-          <DeptWizardProvider>
-            <Suspense>
-              <LegacyBody />
-            </Suspense>
-          </DeptWizardProvider>
-        </WarehouseWizardProvider>
+        <Suspense>
+          <LegacyBody />
+        </Suspense>
       </ErpLoginGate>
     </DepartmentsProvider>
   );
 }
 
-const VALID_MOBILE_TABS = new Set<TabId>([
-  "home",
-  "inventory",
-  "warehouse",
-  "dept",
-  "history",
-  "admin",
-  "more",
-]);
-
-/** 데스크탑 ErpLoginGate 가 주는 dashboard 진입은 모바일에선 home 으로 매핑. */
-function normalizeTab(raw: string | null): TabId {
-  if (!raw || raw === "dashboard") return "home";
-  return VALID_MOBILE_TABS.has(raw as TabId) ? (raw as TabId) : "home";
-}
-
 function LegacyBody() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const initialTab = normalizeTab(searchParams.get("tab"));
-  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
-  const [refreshNonce, setRefreshNonce] = useState(0);
-  const [toast, setToast] = useState<ToastState | null>(null);
-  const { dispatch: warehouseDispatch } = useWarehouseWizard();
-  const operator = useCurrentOperator();
-
-  // 브라우저 뒤로/앞으로 → URL 변경 시 활성 탭 동기화.
-  // activeTab 을 deps 에 넣으면 setActiveTab 이 다시 트리거하는 무한 루프 위험 →
-  // searchParams 만 watch (URL 외부 변경에만 반응). 의도적 Cat-A.
-  useEffect(() => {
-    const next = normalizeTab(searchParams.get("tab"));
-    if (next !== activeTab) {
-      setActiveTab(next);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- searchParams sync only (Cat-A)
-  }, [searchParams]);
-
-  const changeTab = useCallback(
-    (tab: TabId) => {
-      if (tab === activeTab) {
-        // admin 은 내부 폼 입력 보호를 위해 리셋 제외 (데스크탑과 동일)
-        if (tab !== "admin") {
-          setRefreshNonce((n) => n + 1);
-        }
-        return;
-      }
-      setActiveTab(tab);
-      router.push(`/legacy?tab=${tab}`, { scroll: false });
-    },
-    [router, activeTab],
-  );
-
-  // 입출고 권한이 없는 부서 사용자가 직접 ?tab=warehouse|dept 로 진입하면 홈 탭으로 강제 이동
-  useEffect(() => {
-    if (!operator) return;
-    if ((activeTab === "warehouse" || activeTab === "dept") && !canEnterIO(operator)) {
-      changeTab("home");
-    }
-  }, [activeTab, operator, changeTab]);
-
-  const showToast = useCallback((next: ToastState) => setToast(next), []);
-  const clearToast = useCallback(() => setToast(null), []);
-
-  const handleLoggedOut = useCallback(() => {
-    // ErpLoginGate 는 mount 시 1회만 phase 를 결정하므로 reload 로 재진입.
-    if (typeof window !== "undefined") {
-      window.location.replace("/legacy");
-    }
-  }, []);
-
-  const title = useMemo(() => TAB_TITLES[activeTab], [activeTab]);
-
   return (
     <>
       <div className="lg:hidden">
-        <MobileShell
-          activeTab={activeTab}
-          onTabChange={changeTab}
-          subtitle={title.subtitle}
-          title={title.title}
-        >
-          {activeTab === "home" && (
-            <HomeScreen key={`home-${refreshNonce}`} showToast={showToast} onChangeTab={changeTab} />
-          )}
-          {activeTab === "inventory" && (
-            <InventoryScreen
-              key={`inventory-${refreshNonce}`}
-              showToast={showToast}
-              onOpenHistory={() => changeTab("history")}
-              onBulkIO={(items) => {
-                warehouseDispatch({
-                  type: "PREFILL_ITEMS",
-                  itemIds: items.map((i) => i.item_id),
-                  qty: 1,
-                });
-                warehouseDispatch({ type: "GO", step: 0 });
-                changeTab("warehouse");
-                showToast({
-                  type: "info",
-                  message: `${items.length}건이 창고 입출고에 추가되었습니다.`,
-                });
-              }}
-            />
-          )}
-          {activeTab === "warehouse" && (
-            <IoHubScreen key={`warehouse-${refreshNonce}`} showToast={showToast} onChangeTab={changeTab} />
-          )}
-          {activeTab === "dept" && <DeptWizardScreen key={`dept-${refreshNonce}`} showToast={showToast} />}
-          {activeTab === "history" && (
-            <HistoryScreen
-              key={`history-${refreshNonce}`}
-              onClose={() => changeTab("home")}
-              showToast={showToast}
-            />
-          )}
-          {activeTab === "admin" && <AdminShell key="admin" showToast={showToast} />}
-          {activeTab === "more" && (
-            <MoreScreen
-              key={`more-${refreshNonce}`}
-              showToast={showToast}
-              onChangeTab={changeTab}
-              onLoggedOut={handleLoggedOut}
-            />
-          )}
-        </MobileShell>
+        <MobileShell />
       </div>
 
       <Suspense>
         <DesktopLegacyShell />
       </Suspense>
-
-      <Toast toast={toast} onClose={clearToast} />
     </>
   );
 }

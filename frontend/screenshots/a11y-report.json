@@ -1,0 +1,534 @@
+{
+  "phone-home": {
+    "url": "http://localhost:3000/legacy/legacy?tab=home",
+    "violations": [
+      {
+        "id": "landmark-one-main",
+        "impact": "moderate",
+        "description": "Ensure the document has a main landmark",
+        "nodes": [
+          {
+            "html": "<html lang=\"ko\">",
+            "target": [
+              "html"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "region",
+        "impact": "moderate",
+        "description": "Ensure all page content is contained by landmarks",
+        "nodes": [
+          {
+            "html": "<h1 class=\"next-error-h1\" style=\"display:inline-block;margin:0 20px 0 0;padding:0 23px 0 0;font-size:24px;font-weight:500;vertical-align:top;line-height:49px\">404</h1>",
+            "target": [
+              "h1"
+            ]
+          },
+          {
+            "html": "<div style=\"display:inline-block\"><h2 style=\"font-size:14px;font-weight:400;line-height:49px;margin:0\">This page could not be found.</h2></div>",
+            "target": [
+              "div > div > div"
+            ]
+          }
+        ]
+      }
+    ],
+    "passes": false
+  },
+  "phone-inventory": {
+    "url": "http://localhost:3000/legacy/legacy?tab=inventory",
+    "violations": [
+      {
+        "id": "landmark-one-main",
+        "impact": "moderate",
+        "description": "Ensure the document has a main landmark",
+        "nodes": [
+          {
+            "html": "<html lang=\"ko\">",
+            "target": [
+              "html"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "region",
+        "impact": "moderate",
+        "description": "Ensure all page content is contained by landmarks",
+        "nodes": [
+          {
+            "html": "<h1 class=\"next-error-h1\" style=\"display:inline-block;margin:0 20px 0 0;padding:0 23px 0 0;font-size:24px;font-weight:500;vertical-align:top;line-height:49px\">404</h1>",
+            "target": [
+              "h1"
+            ]
+          },
+          {
+            "html": "<div style=\"display:inline-block\"><h2 style=\"font-size:14px;font-weight:400;line-height:49px;margin:0\">This page could not be found.</h2></div>",
+            "target": [
+              "div > div > div"
+            ]
+          }
+        ]
+      }
+    ],
+    "passes": false
+  },
+  "phone-history": {
+    "url": "http://localhost:3000/legacy/legacy?tab=history",
+    "violations": [
+      {
+        "id": "landmark-one-main",
+        "impact": "moderate",
+        "description": "Ensure the document has a main landmark",
+        "nodes": [
+          {
+            "html": "<html lang=\"ko\">",
+            "target": [
+              "html"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "region",
+        "impact": "moderate",
+        "description": "Ensure all page content is contained by landmarks",
+        "nodes": [
+          {
+            "html": "<h1 class=\"next-error-h1\" style=\"display:inline-block;margin:0 20px 0 0;padding:0 23px 0 0;font-size:24px;font-weight:500;vertical-align:top;line-height:49px\">404</h1>",
+            "target": [
+              "h1"
+            ]
+          },
+          {
+            "html": "<div style=\"display:inline-block\"><h2 style=\"font-size:14px;font-weight:400;line-height:49px;margin:0\">This page could not be found.</h2></div>",
+            "target": [
+              "div > div > div"
+            ]
+          }
+        ]
+      }
+    ],
+    "passes": false
+  },
+  "phone-warehouse": {
+    "url": "http://localhost:3000/legacy/legacy?tab=warehouse",
+    "violations": [
+      {
+        "id": "landmark-one-main",
+        "impact": "moderate",
+        "description": "Ensure the document has a main landmark",
+        "nodes": [
+          {
+            "html": "<html lang=\"ko\">",
+            "target": [
+              "html"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "region",
+        "impact": "moderate",
+        "description": "Ensure all page content is contained by landmarks",
+        "nodes": [
+          {
+            "html": "<h1 class=\"next-error-h1\" style=\"display:inline-block;margin:0 20px 0 0;padding:0 23px 0 0;font-size:24px;font-weight:500;vertical-align:top;line-height:49px\">404</h1>",
+            "target": [
+              "h1"
+            ]
+          },
+          {
+            "html": "<div style=\"display:inline-block\"><h2 style=\"font-size:14px;font-weight:400;line-height:49px;margin:0\">This page could not be found.</h2></div>",
+            "target": [
+              "div > div > div"
+            ]
+          }
+        ]
+      }
+    ],
+    "passes": false
+  },
+  "phone-dept": {
+    "url": "http://localhost:3000/legacy/legacy?tab=dept",
+    "violations": [
+      {
+        "id": "landmark-one-main",
+        "impact": "moderate",
+        "description": "Ensure the document has a main landmark",
+        "nodes": [
+          {
+            "html": "<html lang=\"ko\">",
+            "target": [
+              "html"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "region",
+        "impact": "moderate",
+        "description": "Ensure all page content is contained by landmarks",
+        "nodes": [
+          {
+            "html": "<h1 class=\"next-error-h1\" style=\"display:inline-block;margin:0 20px 0 0;padding:0 23px 0 0;font-size:24px;font-weight:500;vertical-align:top;line-height:49px\">404</h1>",
+            "target": [
+              "h1"
+            ]
+          },
+          {
+            "html": "<div style=\"display:inline-block\"><h2 style=\"font-size:14px;font-weight:400;line-height:49px;margin:0\">This page could not be found.</h2></div>",
+            "target": [
+              "div > div > div"
+            ]
+          }
+        ]
+      }
+    ],
+    "passes": false
+  },
+  "phone-admin": {
+    "url": "http://localhost:3000/legacy/legacy?tab=admin",
+    "violations": [
+      {
+        "id": "landmark-one-main",
+        "impact": "moderate",
+        "description": "Ensure the document has a main landmark",
+        "nodes": [
+          {
+            "html": "<html lang=\"ko\">",
+            "target": [
+              "html"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "region",
+        "impact": "moderate",
+        "description": "Ensure all page content is contained by landmarks",
+        "nodes": [
+          {
+            "html": "<h1 class=\"next-error-h1\" style=\"display:inline-block;margin:0 20px 0 0;padding:0 23px 0 0;font-size:24px;font-weight:500;vertical-align:top;line-height:49px\">404</h1>",
+            "target": [
+              "h1"
+            ]
+          },
+          {
+            "html": "<div style=\"display:inline-block\"><h2 style=\"font-size:14px;font-weight:400;line-height:49px;margin:0\">This page could not be found.</h2></div>",
+            "target": [
+              "div > div > div"
+            ]
+          }
+        ]
+      }
+    ],
+    "passes": false
+  },
+  "phone-more": {
+    "url": "http://localhost:3000/legacy/legacy?tab=more",
+    "violations": [
+      {
+        "id": "landmark-one-main",
+        "impact": "moderate",
+        "description": "Ensure the document has a main landmark",
+        "nodes": [
+          {
+            "html": "<html lang=\"ko\">",
+            "target": [
+              "html"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "region",
+        "impact": "moderate",
+        "description": "Ensure all page content is contained by landmarks",
+        "nodes": [
+          {
+            "html": "<h1 class=\"next-error-h1\" style=\"display:inline-block;margin:0 20px 0 0;padding:0 23px 0 0;font-size:24px;font-weight:500;vertical-align:top;line-height:49px\">404</h1>",
+            "target": [
+              "h1"
+            ]
+          },
+          {
+            "html": "<div style=\"display:inline-block\"><h2 style=\"font-size:14px;font-weight:400;line-height:49px;margin:0\">This page could not be found.</h2></div>",
+            "target": [
+              "div > div > div"
+            ]
+          }
+        ]
+      }
+    ],
+    "passes": false
+  },
+  "tablet-home": {
+    "url": "http://localhost:3000/legacy/legacy?tab=home",
+    "violations": [
+      {
+        "id": "landmark-one-main",
+        "impact": "moderate",
+        "description": "Ensure the document has a main landmark",
+        "nodes": [
+          {
+            "html": "<html lang=\"ko\">",
+            "target": [
+              "html"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "region",
+        "impact": "moderate",
+        "description": "Ensure all page content is contained by landmarks",
+        "nodes": [
+          {
+            "html": "<h1 class=\"next-error-h1\" style=\"display:inline-block;margin:0 20px 0 0;padding:0 23px 0 0;font-size:24px;font-weight:500;vertical-align:top;line-height:49px\">404</h1>",
+            "target": [
+              "h1"
+            ]
+          },
+          {
+            "html": "<div style=\"display:inline-block\"><h2 style=\"font-size:14px;font-weight:400;line-height:49px;margin:0\">This page could not be found.</h2></div>",
+            "target": [
+              "div > div > div"
+            ]
+          }
+        ]
+      }
+    ],
+    "passes": false
+  },
+  "tablet-inventory": {
+    "url": "http://localhost:3000/legacy/legacy?tab=inventory",
+    "violations": [
+      {
+        "id": "landmark-one-main",
+        "impact": "moderate",
+        "description": "Ensure the document has a main landmark",
+        "nodes": [
+          {
+            "html": "<html lang=\"ko\">",
+            "target": [
+              "html"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "region",
+        "impact": "moderate",
+        "description": "Ensure all page content is contained by landmarks",
+        "nodes": [
+          {
+            "html": "<h1 class=\"next-error-h1\" style=\"display:inline-block;margin:0 20px 0 0;padding:0 23px 0 0;font-size:24px;font-weight:500;vertical-align:top;line-height:49px\">404</h1>",
+            "target": [
+              "h1"
+            ]
+          },
+          {
+            "html": "<div style=\"display:inline-block\"><h2 style=\"font-size:14px;font-weight:400;line-height:49px;margin:0\">This page could not be found.</h2></div>",
+            "target": [
+              "div > div > div"
+            ]
+          }
+        ]
+      }
+    ],
+    "passes": false
+  },
+  "tablet-history": {
+    "url": "http://localhost:3000/legacy/legacy?tab=history",
+    "violations": [
+      {
+        "id": "landmark-one-main",
+        "impact": "moderate",
+        "description": "Ensure the document has a main landmark",
+        "nodes": [
+          {
+            "html": "<html lang=\"ko\">",
+            "target": [
+              "html"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "region",
+        "impact": "moderate",
+        "description": "Ensure all page content is contained by landmarks",
+        "nodes": [
+          {
+            "html": "<h1 class=\"next-error-h1\" style=\"display:inline-block;margin:0 20px 0 0;padding:0 23px 0 0;font-size:24px;font-weight:500;vertical-align:top;line-height:49px\">404</h1>",
+            "target": [
+              "h1"
+            ]
+          },
+          {
+            "html": "<div style=\"display:inline-block\"><h2 style=\"font-size:14px;font-weight:400;line-height:49px;margin:0\">This page could not be found.</h2></div>",
+            "target": [
+              "div > div > div"
+            ]
+          }
+        ]
+      }
+    ],
+    "passes": false
+  },
+  "tablet-warehouse": {
+    "url": "http://localhost:3000/legacy/legacy?tab=warehouse",
+    "violations": [
+      {
+        "id": "landmark-one-main",
+        "impact": "moderate",
+        "description": "Ensure the document has a main landmark",
+        "nodes": [
+          {
+            "html": "<html lang=\"ko\">",
+            "target": [
+              "html"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "region",
+        "impact": "moderate",
+        "description": "Ensure all page content is contained by landmarks",
+        "nodes": [
+          {
+            "html": "<h1 class=\"next-error-h1\" style=\"display:inline-block;margin:0 20px 0 0;padding:0 23px 0 0;font-size:24px;font-weight:500;vertical-align:top;line-height:49px\">404</h1>",
+            "target": [
+              "h1"
+            ]
+          },
+          {
+            "html": "<div style=\"display:inline-block\"><h2 style=\"font-size:14px;font-weight:400;line-height:49px;margin:0\">This page could not be found.</h2></div>",
+            "target": [
+              "div > div > div"
+            ]
+          }
+        ]
+      }
+    ],
+    "passes": false
+  },
+  "tablet-dept": {
+    "url": "http://localhost:3000/legacy/legacy?tab=dept",
+    "violations": [
+      {
+        "id": "landmark-one-main",
+        "impact": "moderate",
+        "description": "Ensure the document has a main landmark",
+        "nodes": [
+          {
+            "html": "<html lang=\"ko\">",
+            "target": [
+              "html"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "region",
+        "impact": "moderate",
+        "description": "Ensure all page content is contained by landmarks",
+        "nodes": [
+          {
+            "html": "<h1 class=\"next-error-h1\" style=\"display:inline-block;margin:0 20px 0 0;padding:0 23px 0 0;font-size:24px;font-weight:500;vertical-align:top;line-height:49px\">404</h1>",
+            "target": [
+              "h1"
+            ]
+          },
+          {
+            "html": "<div style=\"display:inline-block\"><h2 style=\"font-size:14px;font-weight:400;line-height:49px;margin:0\">This page could not be found.</h2></div>",
+            "target": [
+              "div > div > div"
+            ]
+          }
+        ]
+      }
+    ],
+    "passes": false
+  },
+  "tablet-admin": {
+    "url": "http://localhost:3000/legacy/legacy?tab=admin",
+    "violations": [
+      {
+        "id": "landmark-one-main",
+        "impact": "moderate",
+        "description": "Ensure the document has a main landmark",
+        "nodes": [
+          {
+            "html": "<html lang=\"ko\">",
+            "target": [
+              "html"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "region",
+        "impact": "moderate",
+        "description": "Ensure all page content is contained by landmarks",
+        "nodes": [
+          {
+            "html": "<h1 class=\"next-error-h1\" style=\"display:inline-block;margin:0 20px 0 0;padding:0 23px 0 0;font-size:24px;font-weight:500;vertical-align:top;line-height:49px\">404</h1>",
+            "target": [
+              "h1"
+            ]
+          },
+          {
+            "html": "<div style=\"display:inline-block\"><h2 style=\"font-size:14px;font-weight:400;line-height:49px;margin:0\">This page could not be found.</h2></div>",
+            "target": [
+              "div > div > div"
+            ]
+          }
+        ]
+      }
+    ],
+    "passes": false
+  },
+  "tablet-more": {
+    "url": "http://localhost:3000/legacy/legacy?tab=more",
+    "violations": [
+      {
+        "id": "landmark-one-main",
+        "impact": "moderate",
+        "description": "Ensure the document has a main landmark",
+        "nodes": [
+          {
+            "html": "<html lang=\"ko\">",
+            "target": [
+              "html"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "region",
+        "impact": "moderate",
+        "description": "Ensure all page content is contained by landmarks",
+        "nodes": [
+          {
+            "html": "<h1 class=\"next-error-h1\" style=\"display:inline-block;margin:0 20px 0 0;padding:0 23px 0 0;font-size:24px;font-weight:500;vertical-align:top;line-height:49px\">404</h1>",
+            "target": [
+              "h1"
+            ]
+          },
+          {
+            "html": "<div style=\"display:inline-block\"><h2 style=\"font-size:14px;font-weight:400;line-height:49px;margin:0\">This page could not be found.</h2></div>",
+            "target": [
+              "div > div > div"
+            ]
+          }
+        ]
+      }
+    ],
+    "passes": false
+  }
+}
