@@ -313,7 +313,33 @@
       font-size: 23px; font-weight: 700; text-align: center;
     }
 
-    /* ---------- Q&A (slide 11) ---------- */
+    /* ---------- QR 모바일 미리보기 (slide 11) ---------- */
+    .qr-preview { justify-content: center; align-items: center; }
+    .qr-preview-wrap {
+      display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 72px;
+      align-items: center; width: 100%; max-width: 1280px;
+    }
+    .qr-left .slide-eyebrow { color: var(--c-red); margin-bottom: 18px; }
+    .qr-left h2 { font-size: 56px; font-weight: 900; letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 26px; }
+    .qr-left h2 .hl { color: var(--c-red); }
+    .qr-left p.lead { font-size: 24px; color: var(--c-text); line-height: 1.55; margin-bottom: 28px; }
+    .qr-left ul { font-size: 19px; color: var(--c-gray); line-height: 1.8; list-style: none; }
+    .qr-left ul li { padding-left: 18px; position: relative; }
+    .qr-left ul li::before { content: "·"; position: absolute; left: 4px; top: -2px; color: var(--c-red); font-weight: 900; font-size: 24px; }
+    .qr-card {
+      background: #fff; border: 1px solid var(--c-line); border-radius: 24px;
+      padding: 28px 28px 22px; box-shadow: 0 12px 32px rgba(15,23,42,0.08);
+      display: flex; flex-direction: column; align-items: center; gap: 16px;
+    }
+    .qr-card img { width: 360px; height: 360px; image-rendering: pixelated; display: block; }
+    .qr-card .qr-url {
+      font-size: 15px; color: var(--c-gray); letter-spacing: 0.01em;
+      background: var(--c-light); border-radius: 8px; padding: 10px 14px;
+      word-break: break-all; text-align: center; max-width: 360px;
+    }
+    .qr-card .qr-note { font-size: 15px; color: var(--c-red); font-weight: 700; }
+
+    /* ---------- Q&A (마지막 슬라이드) ---------- */
     .qa { justify-content: center; align-items: center; }
     .qa-big { font-size: clamp(96px, 14vw, 168px); font-weight: 900; color: var(--c-text); letter-spacing: -0.05em; line-height: 1; }
     .qa-big .red { color: var(--c-red); }
@@ -791,8 +817,37 @@
     </div>
   </section>
 
-  <!-- ============ Slide 11 — 피드백 수집 ============ -->
-  <section class="slide" data-slide="11">
+  <!-- ============ Slide 11 — 모바일 미리보기 (QR) ============ -->
+  <section class="slide qr-preview" data-slide="11">
+    <div class="qr-preview-wrap">
+      <div class="qr-left">
+        <div class="slide-eyebrow">모바일 미리보기</div>
+        <h2>지금 <span class="hl">바로 스캔</span>해<br>모바일 화면을 열어 보세요.</h2>
+        <p class="lead">현장에서 자주 쓰실 모바일 화면(대시보드 · 입출고 · 내역 · 주간보고)을<br>휴대폰으로 그대로 확인하실 수 있습니다.</p>
+        <ul>
+          <li>사내 Wi-Fi에 연결된 상태여야 합니다.</li>
+          <li>접속 → PIN 4자리 → 시작 화면 진입.</li>
+          <li>외부망에서는 열리지 않습니다 (보안).</li>
+        </ul>
+      </div>
+      <div class="qr-card">
+        <img src="assets/qr-mobile.png" alt="모바일 접속 QR 코드">
+        <div class="qr-url">http://192.168.0.63:3000/legacy?tab=dashboard</div>
+        <div class="qr-note">사내 Wi-Fi 필수</div>
+      </div>
+    </div>
+    <div class="notes-panel">
+      <h4>말할 한 줄</h4>
+      <p class="lead">"휴대폰 꺼내셔서 QR 한번 찍어보세요. 같은 사내 Wi-Fi에 계시면 바로 모바일 화면 열립니다."</p>
+      <div class="audience-row">
+        <div><h4>현장 포인트</h4><ul><li>iOS·Android 모두 카메라 앱으로 OK</li><li>안 열리면 Wi-Fi SSID 재확인</li><li>완성도는 데스크탑 대비 낮음 — 후속 개선 예정</li></ul></div>
+        <div><h4>Q&A 대비</h4><ul><li>외부 접속 → 보안 검토 후 결정</li><li>오프라인 → 사내망만</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Slide 12 — 피드백 수집 ============ -->
+  <section class="slide" data-slide="12">
     <div class="slide-eyebrow">피드백 수집</div>
     <div class="slide-title">사용해 보시고 <span class="hl">의견을 주세요.</span></div>
     <div class="feedback-wrap">
@@ -839,8 +894,8 @@
     </div>
   </section>
 
-  <!-- ============ Slide 12 — 마무리 ============ -->
-  <section class="slide closing" data-slide="12">
+  <!-- ============ Slide 13 — 마무리 ============ -->
+  <section class="slide closing" data-slide="13">
     <div class="closing-wrap">
       <div class="closing-title">익숙한 방식이 편한 건 당연합니다.<br><span class="hl">그래도, 함께 써봐 주세요.</span></div>
       <div class="closing-lead">이건 그동안 반복되던 문제를 줄이기 위한 시도입니다. 개발 내내 담당자분들께는<br>최소한의 부탁만 드리려 했고,<br>화면과 흐름도 더 편하게·더 빠르게 쓰실 수 있도록 고민했습니다.</div>
@@ -862,8 +917,8 @@
     </div>
   </section>
 
-  <!-- ============ Slide 13 — Q&A ============ -->
-  <section class="slide qa" data-slide="13">
+  <!-- ============ Slide 14 — Q&A ============ -->
+  <section class="slide qa" data-slide="14">
     <div class="qa-big">Q<span class="red">&</span>A</div>
     <div class="qa-sub">궁금하신 점이 있으시면 편하게 질문해 주세요.</div>
     <div class="notes-panel">
@@ -872,7 +927,7 @@
         <div><ul>
           <li><strong>언제부터?</strong> → 5월 중 목표, 2주 병행 후 엑셀 폐기</li>
           <li><strong>교육은?</strong> → 오늘 발표가 교육, 필요 시 개별 안내</li>
-          <li><strong>모바일?</strong> → 추후 확장, 현재 데스크탑</li>
+          <li><strong>모바일?</strong> → 앞 슬라이드 QR로 미리보기 가능, 정식 출시는 추후</li>
         </ul></div>
         <div><ul>
           <li><strong>데이터 백업?</strong> → 서버 파일 백업, 별도 안내</li>
@@ -886,7 +941,7 @@
 </div><!-- /.deck -->
 
 <script>
-  const TOTAL = 13;
+  const TOTAL = 14;
   const STORAGE_KEY = 'dexcowin-mes-demo-v3';
   const DEMO_SLIDE = 10;
   const slides = Array.from(document.querySelectorAll('.slide'));
@@ -922,6 +977,7 @@
       case 't': case 'T': if (idx === DEMO_SLIDE) toggleNextDemoItem(); break;
       case '0': go(10); e.preventDefault(); break;
       case '-': go(11); e.preventDefault(); break;
+      case '=': go(12); e.preventDefault(); break;
       default:
         if (e.key >= '1' && e.key <= '9') { go(parseInt(e.key, 10)); e.preventDefault(); }
     }
