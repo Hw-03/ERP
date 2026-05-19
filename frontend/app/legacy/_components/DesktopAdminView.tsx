@@ -78,9 +78,9 @@ export function DesktopAdminView({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 gap-4 pl-0 pr-4">
+    <div className="flex min-h-0 flex-1 gap-4 pl-0 pr-4 overflow-y-auto lg:overflow-hidden">
       <div
-        className="grid min-h-0 flex-1 gap-4"
+        className="flex flex-col gap-4 lg:grid lg:min-h-0 lg:flex-1"
         style={{ gridTemplateColumns: "240px minmax(0,1fr)", transition: "grid-template-columns 0.2s ease" }}
       >
         <AdminSidebar
@@ -92,7 +92,7 @@ export function DesktopAdminView({
         />
 
         {/* 워크스페이스 */}
-        <section className="flex min-h-0 flex-col overflow-hidden">
+        <section className="flex flex-col overflow-auto lg:min-h-0 lg:overflow-hidden">
           {/* 토스트 영역 (섹션 헤더는 각 섹션이 직접 렌더링) */}
           {(saveMessage || message) && (
             <div role="alert" aria-live="polite" className="mb-3 flex shrink-0 flex-col gap-2">

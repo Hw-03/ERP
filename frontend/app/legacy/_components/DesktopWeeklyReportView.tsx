@@ -107,7 +107,7 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-hidden flex flex-col gap-3 py-1 pr-1">
+    <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 py-1 pr-1 lg:overflow-hidden">
       {error && (
         <div
           className="shrink-0 rounded-[10px] border px-3 py-1.5 text-[12px]"
@@ -215,10 +215,10 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
       })()}
 
       {/* ── 행2: 2-column (공정별 변화 | 품목 상세) ── 남은 높이 전부 사용 */}
-      <div className="flex flex-1 min-h-0 gap-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-1 lg:min-h-0">
         {/* 좌: 공정별 변화 */}
         <div
-          className="flex w-[330px] shrink-0 flex-col overflow-hidden rounded-[18px] border"
+          className="flex w-full shrink-0 flex-col overflow-hidden rounded-[18px] border min-h-[220px] lg:w-[330px] lg:min-h-0"
           style={cardBase}
         >
           <div
@@ -244,10 +244,9 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
         </div>
 
         {/* 우: 품목 상세 */}
-        <div className="relative flex-1">
+        <div className="flex flex-1 flex-col rounded-[18px] border min-h-[280px] lg:min-h-0" style={cardBase}>
           <div
-            className="absolute inset-0 flex flex-col rounded-[18px] border"
-            style={cardBase}
+            className="flex flex-1 flex-col"
           >
             <div
               className="shrink-0 border-b px-4 py-2.5"
