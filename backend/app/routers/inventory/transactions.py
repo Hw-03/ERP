@@ -21,6 +21,8 @@ from app.models import (
     IoBatch,
     Inventory,
     Item,
+    ItemModel,
+    ProductSymbol,
     TransactionEditLog,
     TransactionLog,
     TransactionTypeEnum,
@@ -100,6 +102,41 @@ def _department_label_expr():
             func.coalesce(IoBatch.to_department, IoBatch.from_department, "미상"),
         ),
         else_=None,
+    )
+
+
+def _process_step_filter(process_step: Optional[str]):
+    """process_type_code 마지막 글자(R 원자재 / A 중간공정 / F 공정완료) IN 필터.
+    쉼표 복수. 자재목록 대시보드와 같은 기준(코드 끝 1글자). 없으면 None.
+    """
+    if not process_step:
+        return None
+    steps = [s.strip().upper() for s in process_step.split(",") if s.strip()]
+    if not steps:
+        return None
+    last_char = func.substr(
+        Item.process_type_code, func.length(Item.process_type_code), 1
+    )
+    return last_char.in_(steps)
+
+
+def _model_filter(model: Optional[str]):
+    """item_models ↔ product_symbols.model_name IN 필터. 쉼표 복수.
+    품목-모델 다대다라 join 대신 EXISTS 로 거래 row 중복(카운트 왜곡) 회피. 없으면 None.
+    """
+    if not model:
+        return None
+    names = [m.strip() for m in model.split(",") if m.strip()]
+    if not names:
+        return None
+    return (
+        select(ItemModel.item_id)
+        .join(ProductSymbol, ProductSymbol.slot == ItemModel.slot)
+        .where(
+            ItemModel.item_id == TransactionLog.item_id,
+            ProductSymbol.model_name.in_(names),
+        )
+        .exists()
     )
 
 
@@ -206,6 +243,10 @@ def list_transactions(
     department: Optional[str] = Query(
         None, description="부서 라벨 필터 (dept-bucket 거래 한정, '미상' 포함)"
     ),
+    model: Optional[str] = Query(None, description="제품 모델명 필터 (쉼표 복수)"),
+    process_step: Optional[str] = Query(
+        None, description="공정 구분 필터 R/A/F (쉼표 복수)"
+    ),
     date_from: Optional[date] = Query(None, description="포함 시작일 YYYY-MM-DD"),
     date_to: Optional[date] = Query(None, description="포함 종료일 YYYY-MM-DD"),
     include_archived: bool = Query(False, description="archived_at 이 있는 레코드 포함 여부"),
@@ -252,6 +293,12 @@ def list_transactions(
         query = query.filter(TransactionLog.reference_no == reference_no)
     if department:
         query = query.filter(_department_label_expr() == department)
+    _ps = _process_step_filter(process_step)
+    if _ps is not None:
+        query = query.filter(_ps)
+    _md = _model_filter(model)
+    if _md is not None:
+        query = query.filter(_md)
     if date_from:
         query = query.filter(TransactionLog.created_at >= datetime.combine(date_from, time.min))
     if date_to:
@@ -295,6 +342,10 @@ def get_transactions_summary(
     search: Optional[str] = Query(None),
     department: Optional[str] = Query(
         None, description="부서 라벨 필터 (dept-bucket 거래 한정, '미상' 포함)"
+    ),
+    model: Optional[str] = Query(None, description="제품 모델명 필터 (쉼표 복수)"),
+    process_step: Optional[str] = Query(
+        None, description="공정 구분 필터 R/A/F (쉼표 복수)"
     ),
     date_from: Optional[date] = Query(None, description="포함 시작일 YYYY-MM-DD"),
     date_to: Optional[date] = Query(None, description="포함 종료일 YYYY-MM-DD"),
@@ -344,6 +395,12 @@ def get_transactions_summary(
         )
     if department:
         query = query.filter(_department_label_expr() == department)
+    _ps = _process_step_filter(process_step)
+    if _ps is not None:
+        query = query.filter(_ps)
+    _md = _model_filter(model)
+    if _md is not None:
+        query = query.filter(_md)
 
     # 한 번의 집계 쿼리로 4개 카운트.
     agg = query.with_entities(

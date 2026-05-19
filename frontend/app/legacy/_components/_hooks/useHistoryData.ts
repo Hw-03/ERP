@@ -20,6 +20,10 @@ export interface UseHistoryDataArgs {
   selectedDateKey: string | null;
   /** 상단 부서칩에서 선택한 부서. null = 전체. dept-bucket 거래를 그 부서로 좁힘. */
   department: string | null;
+  /** 필터 패널 — 제품 모델명 쉼표 결합. "" / 미지정 = 미적용. (C7 패널에서 주입) */
+  model?: string;
+  /** 필터 패널 — 공정 구분 R/A/F 쉼표 결합. "" / 미지정 = 미적용. (C7 패널에서 주입) */
+  processStep?: string;
 }
 
 export interface UseHistoryDataResult {
@@ -45,6 +49,8 @@ export function useHistoryData({
   debouncedSearch,
   selectedDateKey,
   department,
+  model = "",
+  processStep = "",
 }: UseHistoryDataArgs): UseHistoryDataResult {
   const [logs, setLogs] = useState<TransactionLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,9 +64,11 @@ export function useHistoryData({
   const dateTo = selectedDateKey ?? undefined;
   const search = debouncedSearch.trim() || undefined;
   const departmentParam = department ?? undefined;
+  const modelParam = model || undefined;
+  const processStepParam = processStep || undefined;
 
   // queryKey: 조건 변화를 한 문자열로. stale 응답 가드용.
-  const queryKey = `${transactionTypes ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${search ?? ""}|${departmentParam ?? ""}`;
+  const queryKey = `${transactionTypes ?? ""}|${dateFrom ?? ""}|${dateTo ?? ""}|${search ?? ""}|${departmentParam ?? ""}|${modelParam ?? ""}|${processStepParam ?? ""}`;
   const queryKeyRef = useRef(queryKey);
   // loadMore 가 사용하는 abort controller. 새 조건 effect 발동 시 abort.
   const loadMoreCtrlRef = useRef<AbortController | null>(null);
@@ -94,6 +102,8 @@ export function useHistoryData({
           dateTo,
           search,
           department: departmentParam,
+          model: modelParam,
+          processStep: processStepParam,
         },
         { signal: ctrl.signal },
       )
@@ -130,6 +140,8 @@ export function useHistoryData({
           dateTo,
           search,
           department: departmentParam,
+          model: modelParam,
+          processStep: processStepParam,
         },
         { signal: ctrl.signal },
       );
@@ -145,7 +157,7 @@ export function useHistoryData({
       if (queryKeyRef.current === myKey) setLoadingMore(false);
       if (loadMoreCtrlRef.current === ctrl) loadMoreCtrlRef.current = null;
     }
-  }, [transactionTypes, dateFrom, dateTo, search, departmentParam, queryKey]);
+  }, [transactionTypes, dateFrom, dateTo, search, departmentParam, modelParam, processStepParam, queryKey]);
 
   const canLoadMore = lastBatchSize === HISTORY_PAGE_SIZE;
 

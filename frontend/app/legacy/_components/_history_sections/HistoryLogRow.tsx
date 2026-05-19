@@ -27,6 +27,7 @@ import { useDeptColor } from "../DepartmentsContext";
 import { formatHistoryDate } from "./historyFormat";
 import { rowTint } from "./historyTheme";
 import { getHistoryDisplayLabel } from "./historyBatchInterpreter";
+import { MemoCell } from "./historyTableHelpers";
 import { isReworkOperation } from "./transactionTaxonomy";
 
 const TX_ICON = {
@@ -154,6 +155,9 @@ function HistoryLogRowImpl({ log, selected, onSelect }: Props) {
             -
           </span>
         )}
+      </td>
+      <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+        <MemoCell notes={log.notes} />
       </td>
     </tr>
   );

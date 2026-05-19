@@ -1,7 +1,9 @@
 "use client";
 
+import { ChevronLeft } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { SlidePanel } from "../common";
 import { DesktopRightPanel } from "../DesktopRightPanel";
 import { HistoryDetailPanel } from "./HistoryDetailPanel";
@@ -22,6 +24,9 @@ export interface DesktopHistoryRightPanelProps {
   setBatchCache: React.Dispatch<React.SetStateAction<Map<string, IoBatch>>>;
   itemRecentLogs: TransactionLog[];
   onSelectLog: (log: TransactionLog) => void;
+  /** 드릴(BOM 하위·최근거래) 스택이 있으면 "← 뒤로" 노출. */
+  canGoBack: boolean;
+  onBack: () => void;
   onLogUpdated: (updated: TransactionLog) => void;
   onLogCorrected: (result: { original: TransactionLog; correction: TransactionLog }) => void;
   /** 패널 닫기 (선택 해제). */
@@ -35,12 +40,25 @@ export function DesktopHistoryRightPanel({
   setBatchCache,
   itemRecentLogs,
   onSelectLog,
+  canGoBack,
+  onBack,
   onLogUpdated,
   onLogCorrected,
   onClose,
 }: DesktopHistoryRightPanelProps) {
   return (
     <SlidePanel open={!!selection} onClose={onClose}>
+      {canGoBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="mb-2 inline-flex items-center gap-1 rounded-[12px] border px-3 py-1.5 text-xs font-bold"
+          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+          뒤로
+        </button>
+      )}
       {displaySelection?.kind === "log" && (
         <DesktopRightPanel
           title={displaySelection.log.item_name}

@@ -3,10 +3,10 @@
 import { Search, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common";
-import { DATE_OPTIONS, TYPE_OPTIONS } from "./historyQuery";
+import { DATE_OPTIONS, TYPE_OPTIONS, typeChipsForBucket } from "./historyQuery";
 
 // scope(창고/부서/수량조정)는 상단 HistoryStatsBar 박스가 담당.
-// 여기 거래 유형 칩은 전체 옵션을 그대로 노출(불량 처리/공급사 반품 포함).
+// 거래 유형 칩은 activeBucket 에 종속 — 박스 미선택/수량조정이면 칩 줄 숨김 (#6/#8).
 type Props = {
   search: string;
   setSearch: (v: string) => void;
@@ -14,6 +14,8 @@ type Props = {
   setDateFilter: (v: string) => void;
   typeFilter: string;
   setTypeFilter: (v: string) => void;
+  /** 상단 KPI 박스 상태 — 'all'|'warehouse'|'dept'|'adjust'. */
+  activeBucket: string;
   totalCount: number;
 };
 
@@ -24,8 +26,10 @@ export function HistoryFilterBar({
   setDateFilter,
   typeFilter,
   setTypeFilter,
+  activeBucket,
   totalCount,
 }: Props) {
+  const typeChips = typeChipsForBucket(activeBucket);
   return (
     <section className="card" style={{ paddingTop: 14, paddingBottom: 14 }}>
       <div className="flex flex-col gap-2.5">
@@ -72,24 +76,27 @@ export function HistoryFilterBar({
 
         </div>
 
-        {/* 2줄: 거래 유형 칩 */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {TYPE_OPTIONS.map((opt) => (
-            <FilterChip
-              key={opt.value}
-              active={typeFilter === opt.value}
-              label={opt.label}
-              onClick={() => setTypeFilter(opt.value)}
-              size="sm"
-            />
-          ))}
-        </div>
+        {/* 2줄: 거래 유형 칩 — activeBucket 종속. 빈 목록이면 줄 자체 숨김. */}
+        {typeChips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {typeChips.map((opt) => (
+              <FilterChip
+                key={opt.value}
+                active={typeFilter === opt.value}
+                label={opt.label}
+                onClick={() => setTypeFilter(opt.value)}
+                size="sm"
+              />
+            ))}
+          </div>
+        )}
 
         {/* 3줄(조건부): 적용된 필터 요약 */}
         {(typeFilter !== "ALL" || dateFilter !== "ALL" || search.trim()) && (
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>적용됨</span>
-            {typeFilter !== "ALL" && (
+            {/* ADJUST 등 KPI 박스 구동 필터는 상단 박스/칩이 담당 → 여기선 표시 안 함 */}
+            {typeFilter !== "ALL" && TYPE_OPTIONS.some((opt) => opt.value === typeFilter) && (
               <span
                 className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold"
                 style={{
@@ -98,7 +105,7 @@ export function HistoryFilterBar({
                   color: LEGACY_COLORS.blue,
                 }}
               >
-                유형: {TYPE_OPTIONS.find((opt) => opt.value === typeFilter)?.label ?? typeFilter}
+                유형: {TYPE_OPTIONS.find((opt) => opt.value === typeFilter)?.label}
                 <button onClick={() => setTypeFilter("ALL")}><X className="h-3 w-3" /></button>
               </span>
             )}

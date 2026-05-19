@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, ArrowRight, History, Pencil, Workflow, Wrench } from "lucide-react";
+import { Activity, ArrowRight, History, Pencil, Workflow } from "lucide-react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch } from "@/lib/api/types/io";
@@ -12,15 +12,13 @@ import { PROCESS_TYPE_META } from "./historyTheme";
 import { formatHistoryDateTimeLong, parseUtc } from "./historyFormat";
 import {
   getBatchFlowEndpoints,
-  getHistoryActor,
   getHistoryDisplayLabel,
   getHistoryWorkTypeLabel,
 } from "./historyBatchInterpreter";
-import { TransactionEditModal } from "./TransactionEditModal";
 import {
   QUANTITY_CORRECTABLE_TYPES,
-  TransactionQuantityCorrectModal,
-} from "./TransactionQuantityCorrectModal";
+  TransactionEditUnifiedModal,
+} from "./TransactionEditUnifiedModal";
 import { HistoryDetailEditHistory } from "./HistoryDetailEditHistory";
 import { HistoryDetailRecentLogs } from "./HistoryDetailRecentLogs";
 
@@ -52,7 +50,6 @@ export function HistoryDetailPanel({
   onLogCorrected,
 }: Props) {
   const [editOpen, setEditOpen] = useState(false);
-  const [qtyOpen, setQtyOpen] = useState(false);
   const [edits, setEdits] = useState<TransactionEditLog[]>([]);
   const [editsLoaded, setEditsLoaded] = useState(false);
   const [flow, setFlow] = useState<FlowState>({ status: "idle" });
@@ -112,12 +109,6 @@ export function HistoryDetailPanel({
   const canMetaEdit = META_CORRECTABLE.has(selected.transaction_type);
   const canQtyCorrect = QUANTITY_CORRECTABLE_TYPES.has(selected.transaction_type);
   const editCount = selected.edit_count ?? edits.length;
-
-  // 표시자: requester / produced 가 다르면 둘 다.
-  const requester = selected.requester_name?.trim() ?? null;
-  const producedRaw = selected.produced_by ?? null;
-  const producedClean = producedRaw ? (producedRaw.split("(")[0]?.trim() || producedRaw) : null;
-  const showBoth = requester && producedClean && requester !== producedClean;
 
   return (
     <div className="space-y-4">
@@ -192,21 +183,27 @@ export function HistoryDetailPanel({
       {/* 흐름 카드 */}
       <FlowCard flow={flow} log={selected} />
 
-      {/* 상세 정보 */}
+      {/* 상세 정보 — 식별 헤더 1줄(품목·구분·일시, 목록 중복은 여기로 압축) + 목록에 없는 항목만 */}
       <div
         className="space-y-2.5 rounded-[24px] border p-4"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
+        <div
+          className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b pb-2.5 text-sm font-bold"
+          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+        >
+          <span className="truncate">{selected.item_name}</span>
+          <span style={{ color: LEGACY_COLORS.muted2 }}>·</span>
+          <span style={{ color: LEGACY_COLORS.muted2 }}>{getHistoryDisplayLabel(selected)}</span>
+          <span style={{ color: LEGACY_COLORS.muted2 }}>·</span>
+          <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+            {formatHistoryDateTimeLong(selected.created_at)}
+          </span>
+        </div>
         {(
           [
-            ["품목명", selected.item_name],
             ["품목 코드", selected.erp_code ?? "-"],
             ["분류", (PROCESS_TYPE_META[selected.item_process_type_code ?? ""] ?? { label: selected.item_process_type_code ?? "-" }).label],
-            ["담당자", showBoth
-              ? `요청자 ${requester} / 처리자 ${producedClean}`
-              : getHistoryActor(selected)],
-            ["메모", selected.notes ?? ""],
-            ["일시", formatHistoryDateTimeLong(selected.created_at)],
           ] as [string, string][]
         ).map(([label, value]) => (
           <div key={label} className="flex items-start justify-between gap-3">
@@ -220,46 +217,21 @@ export function HistoryDetailPanel({
         ))}
       </div>
 
-      {/* 정정 작업 — 항상 노출 */}
+      {/* 정정 — 정보·수량 한 화면(통합 모달) */}
       {(canMetaEdit || canQtyCorrect) && (
         <div className="rounded-[24px] border" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
           <div className="px-4 pt-3 pb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
             정정 작업
           </div>
-          <div className="grid grid-cols-2 gap-2 px-4 pb-4">
-            {canMetaEdit && (
-              <button
-                onClick={() => setEditOpen(true)}
-                className="flex items-center justify-center gap-1.5 rounded-[14px] border px-3 py-2.5 text-sm font-bold"
-                style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                정보 수정
-              </button>
-            )}
-            {canQtyCorrect && (
-              <button
-                onClick={() => {
-                  if (window.confirm("재고 수량이 변경됩니다. 계속하시겠습니까?")) setQtyOpen(true);
-                }}
-                className="flex items-center justify-center gap-1.5 rounded-[14px] border px-3 py-2.5 text-sm font-bold"
-                style={{
-                  borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 40%, transparent)`,
-                  color: LEGACY_COLORS.yellow,
-                }}
-              >
-                <Wrench className="h-3.5 w-3.5" />
-                수량 보정
-              </button>
-            )}
-            {!canQtyCorrect && canMetaEdit && (
-              <span
-                className="flex items-center justify-center text-xs"
-                style={{ color: LEGACY_COLORS.muted2 }}
-              >
-                이 거래 유형은 수량 보정을 지원하지 않습니다
-              </span>
-            )}
+          <div className="px-4 pb-4">
+            <button
+              onClick={() => setEditOpen(true)}
+              className="flex w-full items-center justify-center gap-1.5 rounded-[14px] border px-3 py-2.5 text-sm font-bold"
+              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              정보 · 수량 정정
+            </button>
           </div>
         </div>
       )}
@@ -268,21 +240,17 @@ export function HistoryDetailPanel({
 
       <HistoryDetailRecentLogs itemRecentLogs={itemRecentLogs} onSelectLog={onSelectLog} />
 
-      <TransactionEditModal
+      <TransactionEditUnifiedModal
         open={editOpen}
         log={selected}
+        canMetaEdit={canMetaEdit}
+        canQtyCorrect={canQtyCorrect}
         onClose={() => setEditOpen(false)}
-        onSuccess={(updated) => {
+        onMetaSuccess={(updated) => {
           onLogUpdated(updated);
           api.getTransactionEdits(updated.log_id).then(setEdits).catch(() => {});
         }}
-      />
-
-      <TransactionQuantityCorrectModal
-        open={qtyOpen}
-        log={selected}
-        onClose={() => setQtyOpen(false)}
-        onSuccess={(result) => {
+        onQtySuccess={(result) => {
           onLogCorrected(result);
           api.getTransactionEdits(result.original.log_id).then(setEdits).catch(() => {});
         }}

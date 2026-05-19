@@ -35,6 +35,7 @@ const COLUMNS: { label: string; width?: string; minWidth?: string; align?: "left
   { label: "품목명", minWidth: "180px" },
   { label: "변동요약", width: "150px", align: "center" },
   { label: "담당자", width: "130px", align: "center" },
+  { label: "메모", width: "70px", align: "center" },
 ];
 
 const VISIBLE_FETCH_CONCURRENCY = 4;
