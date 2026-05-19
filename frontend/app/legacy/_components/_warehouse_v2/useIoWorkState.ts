@@ -12,8 +12,8 @@ export const IO_STEP_LABELS: Record<IoStep, string> = {
   5: "제출 확인",
 };
 
-export function useIoWorkState(initialDepartment?: string | null) {
-  const [workType, setWorkTypeBase] = useState<IoWorkType>("receive");
+export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?: string | null) {
+  const [workType, setWorkTypeBase] = useState<IoWorkType>(initialWorkType ?? "receive");
   const [subType, setSubType] = useState<IoSubType>("receive_supplier");
   const [fromDepartment, setFromDepartment] = useState<string>(initialDepartment || "조립");
   const [toDepartment, setToDepartment] = useState<string>(initialDepartment || "조립");

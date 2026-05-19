@@ -28,6 +28,7 @@ export interface IoComposeViewProps {
   setItems: (items: Item[]) => void;
   preselectedItem?: Item | null;
   restoreDraft?: IoBatch | null;
+  defaultWorkType?: IoWorkType;
   onStatusChange: (status: string) => void;
   onSubmitSuccess?: () => void;
 }

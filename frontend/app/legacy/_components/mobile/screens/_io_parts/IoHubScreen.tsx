@@ -71,10 +71,8 @@ export function IoHubScreen({
         onChangeTab("dept");
         break;
       case "defective-register":
-        showToast({
-          type: "info",
-          message: "불량 격리는 위험 작업 — 데스크탑에서 처리해 주세요.",
-        });
+        wDispatch({ type: "SET_MODE", mode: "defect" });
+        wDispatch({ type: "NEXT" });
         break;
     }
   };

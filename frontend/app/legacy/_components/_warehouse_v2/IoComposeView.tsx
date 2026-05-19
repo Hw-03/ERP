@@ -94,6 +94,7 @@ export function IoComposeView({
   setItems,
   preselectedItem,
   restoreDraft: draftToRestore,
+  defaultWorkType,
   onStatusChange,
   onSubmitSuccess,
 }: IoComposeViewProps) {
@@ -108,7 +109,7 @@ export function IoComposeView({
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveBatchIdRef = useRef<string | null>(null);
 
-  const state = useIoWorkState(operator?.department);
+  const state = useIoWorkState(defaultWorkType, operator?.department);
   const { previewing, previewTarget } = useIoPreview();
   const { drafting, saveDraft } = useIoDraft();
   const { submitting, submit } = useIoSubmit();
