@@ -38,7 +38,7 @@ function FlowBadge({
   const Icon = type ? TX_ICON[transactionIconName(type)] : null;
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold"
+      className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-bold tracking-wide"
       style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}
     >
       {Icon && <Icon className="h-3.5 w-3.5" />}
@@ -57,6 +57,13 @@ const TONE_COLOR: Record<MovementTone, string> = {
 };
 
 export function MovementSummaryCell({ summary }: { summary: MovementSummary }) {
+  // 셀에 알약 1개(단건/묶음요약) → 큰 패딩·자간·큰 통일 폭으로 강조.
+  // 알약 2개(BOM 상위/하위 짝) → 좁은 패딩·작은 통일 폭(둘이 한 셀에 들어가야 함).
+  // 글자 크기는 모든 알약 동일(text-xs). 3자리 부호 포함 기준 폭, 4자리+ 자연 확장.
+  const isSingle = summary.parts.length === 1 && !summary.warning;
+  const pillClass = isSingle
+    ? "inline-flex min-w-[10.5rem] justify-center rounded-full px-3 py-1 text-xs font-bold tracking-wide"
+    : "inline-flex min-w-[5rem] justify-center rounded-full px-2 py-0.5 text-xs font-bold";
   return (
     <span className="inline-flex items-center gap-1 whitespace-nowrap">
       {summary.parts.map((p, i) => {
@@ -64,7 +71,7 @@ export function MovementSummaryCell({ summary }: { summary: MovementSummary }) {
         return (
           <span
             key={i}
-            className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold"
+            className={pillClass}
             style={{
               // WCAG AA: 연한 틴트 위 brand 컬러 텍스트는 4.5:1 미달 →
               // 같은 색조를 text 색과 섞어 어둡게(색 코딩 유지 + 대비 확보).
@@ -78,7 +85,7 @@ export function MovementSummaryCell({ summary }: { summary: MovementSummary }) {
       })}
       {summary.warning && (
         <span
-          className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold"
+          className="inline-flex rounded-full px-2 py-0.5 text-xs font-bold"
           style={{
             background: `color-mix(in srgb, ${LEGACY_COLORS.red} 20%, transparent)`,
             color: `color-mix(in srgb, ${LEGACY_COLORS.red} 42%, ${LEGACY_COLORS.text})`,
@@ -263,12 +270,12 @@ export function BatchHeader({
       }}
     >
       <td className="whitespace-nowrap border-b px-4 py-3 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-center gap-1.5">
           <ChevronToggleBtn expanded={expanded} onToggle={onToggle} />
           {formatHistoryDate(first.created_at)}
         </div>
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
         <FlowBadge type={primaryType} label={getHistoryDisplayLabel(first)} color={flowColor} />
       </td>
       <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
@@ -356,12 +363,12 @@ export function OpBatchHeader({
       }}
     >
       <td className="whitespace-nowrap border-b px-4 py-3 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-center gap-1.5">
           <ChevronToggleBtn expanded={expanded} onToggle={onToggle} />
           {formatHistoryDate(first.created_at)}
         </div>
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
         <FlowBadge type={primaryType} label={flow.primary} color={flowColor} />
       </td>
       <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>

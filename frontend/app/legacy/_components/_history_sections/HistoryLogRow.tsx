@@ -93,15 +93,15 @@ function HistoryLogRowImpl({ log, selected, onSelect }: Props) {
         className="whitespace-nowrap border-b px-4 py-3 text-xs"
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
       >
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-center gap-1.5">
           {/* 묶음 행 chevron 폭과 같은 spacer — 일시 정렬 축을 맞춤. */}
           <span aria-hidden className="inline-block h-5 w-5 shrink-0" />
           {formatHistoryDate(log.created_at)}
         </div>
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
         <span
-          className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold"
+          className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-bold tracking-wide"
           style={{ background: `color-mix(in srgb, ${tcolor} 14%, transparent)`, color: tcolor }}
         >
           <TxIcon className="h-3.5 w-3.5" aria-hidden="true" />

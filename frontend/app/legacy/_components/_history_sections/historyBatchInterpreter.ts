@@ -564,11 +564,11 @@ export function getHistoryMovementSummary(
     const childUnitLabel = childUnit && !childUnitMixed ? ` ${childUnit}` : "";
 
     if (topSum > 0) parts.push({
-      label: `상위 ${_formatNumber(topSum)}${topUnitLabel}`,
+      label: `상위 ${isRework ? "-" : "+"}${_formatNumber(topSum)}${topUnitLabel}`,
       tone: isRework ? "danger" : "primary",
     });
     if (childSum > 0) parts.push({
-      label: `하위 ${_formatNumber(childSum)}${childUnitLabel}`,
+      label: `하위 ${isRework ? "+" : "-"}${_formatNumber(childSum)}${childUnitLabel}`,
       tone: isRework ? "primary" : "danger",
     });
   } else if (sub === "warehouse_to_dept" || sub === "dept_to_warehouse" || sub === "dept_transfer"

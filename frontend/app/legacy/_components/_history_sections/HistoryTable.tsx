@@ -30,8 +30,8 @@ type Props = {
 };
 
 const COLUMNS: { label: string; width?: string; minWidth?: string; align?: "left" | "center"; hidden?: boolean }[] = [
-  { label: "일시", width: "140px" },
-  { label: "구분", width: "130px" },
+  { label: "일시", width: "140px", align: "center" },
+  { label: "구분", width: "130px", align: "center" },
   { label: "품목명", minWidth: "180px" },
   { label: "변동요약", width: "150px", align: "center" },
   { label: "담당자", width: "130px", align: "center", hidden: true },
