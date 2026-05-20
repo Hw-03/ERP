@@ -35,7 +35,6 @@ def _to_response(db: Session, log: ScrapLog) -> ScrapLogResponse:
         quantity=log.quantity,
         process_stage=log.process_stage,
         reason=log.reason,
-        batch_id=log.batch_id,
         operator=log.operator,
         created_at=log.created_at,
     )
@@ -93,7 +92,6 @@ def create_scrap(payload: ScrapLogCreateRequest, db: Session = Depends(get_db)):
 @router.get("", response_model=List[ScrapLogResponse], summary="Scrap 로그 조회")
 def list_scrap(
     item_id: Optional[uuid.UUID] = Query(None),
-    batch_id: Optional[uuid.UUID] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
@@ -101,7 +99,5 @@ def list_scrap(
     q = db.query(ScrapLog)
     if item_id:
         q = q.filter(ScrapLog.item_id == item_id)
-    if batch_id:
-        q = q.filter(ScrapLog.batch_id == batch_id)
     rows = q.order_by(ScrapLog.created_at.desc()).offset(skip).limit(limit).all()
     return [_to_response(db, r) for r in rows]

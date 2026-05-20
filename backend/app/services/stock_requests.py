@@ -3,7 +3,7 @@
 원칙:
 - 창고 재고가 움직이는 모든 작업(`from_bucket=='warehouse'` 또는 `to_bucket=='warehouse'`)은
   창고 담당자(`warehouse_role in ('primary','deputy')`)의 승인 후에만 실재고 반영.
-- 점유는 `Inventory.pending_quantity` 컬럼을 큐 배치(QueueBatch)와 공유하며, origin 구분은
+- 점유는 `Inventory.pending_quantity` 컬럼으로 관리하고, origin 구분은
   `StockRequestLine` 조회로 한다 (별도 컬럼 추가하지 않음).
 - 승인은 한 트랜잭션 내에서 release + 실재고 이동 + TransactionLog 기록을 모두 수행한다.
   성공하면 `completed`, 검증 실패하면 `failed_approval` 로 저장하고 pending 을 안전하게 원복.
