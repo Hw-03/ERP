@@ -152,15 +152,15 @@ function BundleRows({
         {/* 구분 */}
         <td className="whitespace-nowrap border-b px-4 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
           <span
-            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
+            className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-bold tracking-wide"
             style={{
               background: isBomParent
-                ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 16%, transparent)`
+                ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
                 : `color-mix(in srgb, ${LEGACY_COLORS.muted2} 14%, transparent)`,
               color: isBomParent ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
             }}
           >
-            {isBomParent ? <GitBranch className="h-3 w-3" /> : <Package className="h-3 w-3" />}
+            {isBomParent ? <GitBranch className="h-3.5 w-3.5" /> : <Package className="h-3.5 w-3.5" />}
             {isBomParent ? "BOM" : "단품"}
           </span>
         </td>
