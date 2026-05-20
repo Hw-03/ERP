@@ -8,8 +8,6 @@ import { SlidePanel } from "../common";
 import { DesktopRightPanel } from "../DesktopRightPanel";
 import { HistoryDetailPanel } from "./HistoryDetailPanel";
 import { HistoryBatchDetailPanel } from "./HistoryBatchDetailPanel";
-import { formatHistoryDate } from "./historyFormat";
-import { getHistoryActor, getHistoryDisplayLabel } from "./historyBatchInterpreter";
 import type { HistorySelection } from "./historyConstants";
 
 /**
@@ -60,10 +58,7 @@ export function DesktopHistoryRightPanel({
         </button>
       )}
       {displaySelection?.kind === "log" && (
-        <DesktopRightPanel
-          title={displaySelection.log.item_name}
-          subtitle={`${displaySelection.log.erp_code ?? "-"} · ${formatHistoryDate(displaySelection.log.created_at)}`}
-        >
+        <DesktopRightPanel title={displaySelection.log.item_name}>
           <HistoryDetailPanel
             selected={displaySelection.log}
             itemRecentLogs={itemRecentLogs}
@@ -82,9 +77,8 @@ export function DesktopHistoryRightPanel({
               ? `${batch.bundles[0].title} 외 ${batch.bundles.length - 1}건`
               : batch.bundles[0].title)
           : `${first.item_name} 외 ${displaySelection.logs.length - 1}건`;
-        const subtitleText = `${getHistoryDisplayLabel(first, batch)} · ${formatHistoryDate(first.created_at)} · ${getHistoryActor(first)}`;
         return (
-          <DesktopRightPanel title={titleText} subtitle={subtitleText}>
+          <DesktopRightPanel title={titleText}>
             <HistoryBatchDetailPanel
               batchId={displaySelection.batchId}
               logs={displaySelection.logs}

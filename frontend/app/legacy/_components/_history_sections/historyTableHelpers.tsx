@@ -26,7 +26,7 @@ const TX_ICON = {
   ShieldAlert, PackageX, Activity,
 } as const;
 
-function FlowBadge({
+export function FlowBadge({
   type,
   label,
   color,
@@ -47,7 +47,7 @@ function FlowBadge({
   );
 }
 
-const TONE_COLOR: Record<MovementTone, string> = {
+export const TONE_COLOR: Record<MovementTone, string> = {
   primary: LEGACY_COLORS.blue,
   success: LEGACY_COLORS.green,
   info: LEGACY_COLORS.cyan,

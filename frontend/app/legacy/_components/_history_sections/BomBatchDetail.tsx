@@ -96,10 +96,9 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached }: Props) {
 
 function StatusBadge({ included, shortage }: { included: boolean; shortage: number }) {
   const status = getHistoryLineStatusLabel({ included, shortage });
-  const color =
-    status.tone === "danger" ? LEGACY_COLORS.red
-    : status.tone === "ok" ? LEGACY_COLORS.green
-    : LEGACY_COLORS.muted2;
+  // 포함(ok) 은 기본값이라 chip 노출 안 함 — 부족/제외만 시각 신호.
+  if (status.tone === "ok") return null;
+  const color = status.tone === "danger" ? LEGACY_COLORS.red : LEGACY_COLORS.muted2;
   // shortage 표기는 formatQty 적용 — helper 의 정수 라벨을 덮어쓴다.
   const label = status.tone === "danger" ? `부족 ${formatQty(shortage)}` : status.label;
   return (
