@@ -11,7 +11,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Inventory, Item, TransactionLog, TransactionTypeEnum
+from app.models import Inventory, Item, ProductSymbol, TransactionLog, TransactionTypeEnum
 from app.schemas import (
     WeeklyGroupReport,
     WeeklyItemReport,
@@ -28,10 +28,6 @@ router = APIRouter()
 _F_CODES = ["TF", "HF", "VF", "NF", "AF", "PF"]
 
 _PROD_CODES = ["TF", "HF", "VF", "NF", "AF", "PF"]
-
-_FIXED_MODELS = ["DX3000", "ADX4000W", "ADX6000S", "ADX6000", "COCOON"]
-
-_SYMBOL_MAP = {"3": "DX3000", "4": "ADX4000W", "6": "ADX6000", "7": "COCOON"}
 
 _DEPT_NAMES: dict[str, str] = {
     "TF": "튜브",
@@ -58,21 +54,34 @@ _OUT_TYPES = {
 }
 
 
-def _resolve_model(item_name: str, model_symbol: str | None) -> str:
-    n = (item_name or "").upper()
-    if "ADX6000S" in n:
-        return "ADX6000S"
-    if "ADX6000FB" in n or "ADX6000" in n:
-        return "ADX6000"
-    if "ADX4000" in n:
-        return "ADX4000W"
-    if "DX3000" in n:
-        return "DX3000"
-    if "COCOON" in n:
-        return "COCOON"
-    if model_symbol and len(model_symbol) == 1:
-        return _SYMBOL_MAP.get(model_symbol, "기타/공용")
-    return "기타/공용"
+def _load_model_symbols(db: Session) -> tuple[dict[str, str], list[str]]:
+    """ProductSymbol 테이블에서 단일-글자 symbol → model_name 매핑과
+    slot 순 model_name 목록을 반환. 새 모델 추가는 이 테이블에 row 추가만.
+
+    Returns:
+        symbol_map: {"3": "DX3000", "8": "SOLO", ...}
+        ordered_models: ["DX3000", "ADX4000W", ...] (slot 순)
+    """
+    rows = (
+        db.query(ProductSymbol)
+        .filter(
+            ProductSymbol.symbol.isnot(None),
+            func.length(ProductSymbol.symbol) == 1,
+            ProductSymbol.model_name.isnot(None),
+        )
+        .order_by(ProductSymbol.slot)
+        .all()
+    )
+    symbol_map = {r.symbol: r.model_name for r in rows}
+    ordered_models = [r.model_name for r in rows]
+    return symbol_map, ordered_models
+
+
+def _resolve_model(model_symbol: str | None, symbol_map: dict[str, str]) -> str | None:
+    """단일-글자 model_symbol → 모델명. 다중 글자(공용 부품)/None → None(매트릭스 제외)."""
+    if not model_symbol or len(model_symbol) != 1:
+        return None
+    return symbol_map.get(model_symbol)
 
 
 def _current_week_bounds() -> tuple[date, date]:
@@ -224,9 +233,13 @@ def get_weekly_report(
         .all()
     )
 
+    symbol_map, ordered_models = _load_model_symbols(db)
+
     matrix: dict[str, dict[str, Decimal]] = {}
     for item, qty_sum in prod_items:
-        model_key = _resolve_model(item.item_name, item.model_symbol)
+        model_key = _resolve_model(item.model_symbol, symbol_map)
+        if model_key is None:
+            continue
         proc = item.process_type_code or ""
         if proc not in _PROD_CODES:
             continue
@@ -235,9 +248,7 @@ def get_weekly_report(
             matrix[model_key] = {}
         matrix[model_key][proc] = matrix[model_key].get(proc, Decimal("0")) + val
 
-    ordered_keys = list(_FIXED_MODELS)
-    if "기타/공용" in matrix:
-        ordered_keys.append("기타/공용")
+    ordered_keys = ordered_models
 
     production_matrix: list[WeeklyProductionModelRow] = []
     for key in ordered_keys:
