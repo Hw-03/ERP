@@ -9,7 +9,7 @@
 - Before editing frontend code, verify the real render/import path first.
 - If docs and live code disagree, trust the live code.
 - Do not edit `_archive/`, `_backup/`, or `frontend/_archive/` unless explicitly asked.
-- Do not casually edit `_attic/`; it contains active reference/baseline files.
+- Do not casually edit `_attic/`; it contains archived source material, backups, and old working notes.
 - Do not mix sample data with real data.
 - Do not perform large refactors, folder moves, or renames unless explicitly asked.
 - Do not rename legacy internal identifiers such as `xray-erp` unless explicitly asked.

@@ -44,10 +44,10 @@ Invoke-Check "Frontend tests + coverage" $FrontendRoot { npm run test:coverage }
 Invoke-Check "Frontend production build" $FrontendRoot { npm run build }
 # Round-16 #4 — bundle size gate (.next-prod/static/chunks 합산 ≤ 2.0 MB).
 Invoke-Check "Frontend bundle size" $FrontendRoot { npm run check:bundle-size }
-# OpenAPI drift check (Round-10A #5) — backend 라우터/스키마 변경 시 docs/openapi.json 갱신 강제.
+# OpenAPI drift check (Round-10A #5) — backend 라우터/스키마 변경 시 _dev/baselines/openapi.json 갱신 강제.
 Invoke-Check "OpenAPI drift" $BackendRoot {
     $TmpFile = Join-Path $env:TEMP "openapi-current.json"
-    $BaselineFile = Join-Path $RepoRoot "_attic/docs/openapi.json"
+    $BaselineFile = Join-Path $RepoRoot "_dev/baselines/openapi.json"
 
     $PyScript = @'
 import json
@@ -69,7 +69,7 @@ with open(out, "w", encoding="utf-8") as f:
     if ($current -ne $baseline) {
         Write-Host ""
         Write-Host "✗ OpenAPI drift detected. baseline 갱신 필요:"
-        Write-Host "  cd backend; python -c `"from app.main import app; import json; open('../_attic/docs/openapi.json','w',encoding='utf-8').write(json.dumps(app.openapi(),indent=2,sort_keys=True,ensure_ascii=False)+chr(10))`""
+        Write-Host "  cd backend; python -c `"from app.main import app; import json; open('../_dev/baselines/openapi.json','w',encoding='utf-8').write(json.dumps(app.openapi(),indent=2,sort_keys=True,ensure_ascii=False)+chr(10))`""
         throw "OpenAPI drift"
     }
     Write-Host "✓ OpenAPI spec matches baseline."

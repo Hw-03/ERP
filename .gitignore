@@ -66,6 +66,7 @@ backend/query_test.py
 
 # Obsidian vault (vault-sync 브랜치 전용, main에서 제외)
 vault/
+_attic/vault/
 
 # 품목 이미지 추출 원본 (scripts/dev/extract_excel_images.py 재실행으로 재생성 가능)
 data/이미지 추출을 위한 원본/
@@ -76,5 +77,9 @@ data/이미지 추출을 위한 원본/
 *.bak-*
 *.db.bak*
 backend/_backup/
+
+# Heavy source/extracted materials isolated out of the runtime tree.
+_attic/data/이미지 추출을 위한 원본/
+_attic/data/db_backups/
 # _attic/ 은 의도적으로 추적·커밋한다(정리 후 나중에 일괄 삭제 예정).
 # DB 백업만 위 규칙으로 자동 제외되고 나머지(스크립트·문서·데이터·카탈로그)는 커밋됨.

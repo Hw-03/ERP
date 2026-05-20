@@ -6,7 +6,6 @@ on:
   pull_request:
     branches: [main]
 
-# 같은 브랜치에서 새 push 가 들어오면 이전 실행은 취소
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -35,9 +34,6 @@ jobs:
         working-directory: backend
         run: pytest -q
 
-      # _attic/docs/openapi.json baseline 과 현재 FastAPI app.openapi() 결과 비교.
-      # (배포 정리로 docs/openapi.json → _attic/docs/openapi.json 이동됨.)
-      # 라우터/스키마 변경 시 baseline 미갱신이면 실패 — 갱신 절차는 README 참조.
       - name: OpenAPI drift check
         working-directory: backend
         run: |
@@ -49,11 +45,11 @@ jobs:
               json.dump(app.openapi(), f, indent=2, sort_keys=True, ensure_ascii=False)
               f.write('\n')
           "
-          diff -u ../_attic/docs/openapi.json /tmp/openapi-current.json \
-            && echo "✓ OpenAPI spec matches baseline." \
-            || (echo "" && echo "✗ OpenAPI drift detected." \
-                && echo "라우터 또는 스키마가 변경됐습니다. 다음 명령으로 baseline 갱신 후 commit:" \
-                && echo "  cd backend && python -c \"from app.main import app; import json; open('../_attic/docs/openapi.json','w',encoding='utf-8').write(json.dumps(app.openapi(),indent=2,sort_keys=True,ensure_ascii=False)+chr(10))\"" \
+          diff -u ../_dev/baselines/openapi.json /tmp/openapi-current.json \
+            && echo "[OK] OpenAPI spec matches baseline." \
+            || (echo "" && echo "[FAIL] OpenAPI drift detected." \
+                && echo "If this schema change is intentional, refresh the baseline and commit it:" \
+                && echo "  cd backend && python -c \"from app.main import app; import json; open('../_dev/baselines/openapi.json','w',encoding='utf-8').write(json.dumps(app.openapi(),indent=2,sort_keys=True,ensure_ascii=False)+chr(10))\"" \
                 && exit 1)
 
   frontend:
@@ -68,7 +64,6 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
-      # Next.js 빌드 캐시 재사용 — 변경 없는 파일은 재컴파일 스킵.
       - name: Cache .next/cache
         uses: actions/cache@v4
         with:
@@ -105,10 +100,8 @@ jobs:
         working-directory: frontend
         run: npm run build
         env:
-          # 빌드 단계는 정적 분석 목적 — 외부 백엔드 호출 없이 상대 경로(rewrites) 사용.
           NEXT_TELEMETRY_DISABLED: "1"
 
-      # Round-16 #4 — bundle size gate. 임계 2.0 MB 초과 시 build 실패.
       - name: Bundle size gate
         working-directory: frontend
         run: npm run check:bundle-size
