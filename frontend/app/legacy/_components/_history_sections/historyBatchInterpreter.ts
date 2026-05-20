@@ -64,6 +64,15 @@ export interface BatchFlowEndpoints {
 }
 
 export function getBatchFlowEndpoints(batch: IoBatch): BatchFlowEndpoints | null {
+  // 부서 내 작업(생산·재작업 등 batch.from_department == batch.to_department) 은
+  // 부모(out)/자식(in) 라인이 반대 방향이라 _bucketSlot mix 가 발생하지만,
+  // 사용자 인지상 "한 부서 안에서 끝나는 작업" — 그 부서로 단일 표기.
+  const batchFrom = _deptName(batch.from_department);
+  const batchTo = _deptName(batch.to_department);
+  if (batchFrom && batchTo && batchFrom === batchTo) {
+    return { from: batchFrom, to: batchTo, mixed: false };
+  }
+
   const fromSlots = new Map<string, BucketSlot>();
   const toSlots = new Map<string, BucketSlot>();
 
