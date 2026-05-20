@@ -72,7 +72,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
               }}
             />
             {/* 상단 행 한 줄: 부서명 · 공정코드 · 증감 */}
-            <div className="flex items-center gap-2 py-1 pl-3 pr-2">
+            <div className="flex items-center gap-2 py-1.5 pl-3 pr-2">
               <span
                 className="text-[15px] font-black tracking-[-0.01em] leading-none"
                 style={{ color: isQuiet ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text }}
@@ -123,7 +123,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
             </div>
             {/* 하단 행 한 줄: 입고 · 출고 · 현재 */}
             <div
-              className="flex items-center justify-between gap-2 border-t px-3 py-1 text-[12px] tabular-nums"
+              className="flex items-center justify-between gap-2 border-t px-3 py-1.5 text-[12px] tabular-nums"
               style={{ borderColor: tint(LEGACY_COLORS.border, 60, "transparent") }}
             >
               <span
