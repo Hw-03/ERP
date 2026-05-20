@@ -41,11 +41,17 @@ def make_erp_code(
 
 
 def next_serial_no(model_symbol: str, process_type: str, db: Session) -> int:
-    """동일 model_symbol + process_type 조합의 최대 serial_no + 1."""
+    """process_type 카테고리 전역의 최대 serial_no + 1.
+
+    운영 컨벤션: serial 은 process_type 안에서 모델 무관 전역 유일.
+    예: AR 카테고리에서 3-AR-0335, 4-AR-0336 처럼 모델이 달라도 시리얼은 겹치지 않게 메김.
+    `model_symbol` 인자는 컨텍스트 용도(향후 모델별 카운터 분리 가능성)로 시그니처는 유지하되,
+    현재는 카테고리 스코프로만 카운트한다.
+    """
     from app.models import Item
     max_s = (
         db.query(func.max(Item.serial_no))
-        .filter(Item.model_symbol == model_symbol, Item.process_type_code == process_type)
+        .filter(Item.process_type_code == process_type)
         .scalar()
     )
     return (max_s or 0) + 1

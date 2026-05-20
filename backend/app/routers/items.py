@@ -127,6 +127,9 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
 
     legacy_slot = model_slots[0] if len(model_slots) == 1 else None
 
+    # 신규 항목은 목록 맨 끝으로. sort_order 미설정 시 NULL 이 되어 SQLite 가 맨앞에 정렬해버림.
+    next_sort = (db.query(func.max(Item.sort_order)).scalar() or 0) + 1
+
     item = Item(
         item_name=payload.item_name,
         spec=payload.spec,
@@ -143,6 +146,7 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         serial_no=serial,
         option_code=opt,
         erp_code=erp_code,
+        sort_order=next_sort,
     )
     db.add(item)
     db.flush()
