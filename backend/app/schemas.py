@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Annotated, List, Literal, Optional
 import uuid
 
-from pydantic import BaseModel, ConfigDict, Field, PlainSerializer
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, WithJsonSchema
 
 from app.models import (
     AlertKindEnum,
@@ -28,7 +28,11 @@ def _serialize_datetime_with_utc(dt: datetime) -> str:
     return dt.isoformat()
 
 
-UtcDatetime = Annotated[datetime, PlainSerializer(_serialize_datetime_with_utc, return_type=str)]
+UtcDatetime = Annotated[
+    datetime,
+    PlainSerializer(_serialize_datetime_with_utc, return_type=str),
+    WithJsonSchema({"type": "string", "format": "date-time"}),
+]
 
 
 class ItemCreate(BaseModel):
@@ -84,9 +88,9 @@ class ItemResponse(BaseModel):
     process_type_code: Optional[str] = None
     option_code: Optional[str] = None
     serial_no: Optional[int] = None
-    bom_completed_at: Optional[datetime] = None
-    created_at: datetime
-    updated_at: datetime
+    bom_completed_at: Optional[UtcDatetime] = None
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
 
 
 class InventoryLocationResponse(BaseModel):
@@ -232,7 +236,7 @@ class InventoryResponse(BaseModel):
     available_quantity: Decimal = Decimal("0")     # warehouse + production - pending (defective 제외)
     last_reserver_name: Optional[str] = None
     location: Optional[str]
-    updated_at: datetime
+    updated_at: UtcDatetime
     locations: List[InventoryLocationResponse] = []
 
 
@@ -418,7 +422,7 @@ class TransactionEditLogResponse(BaseModel):
     before_payload: str
     after_payload: str
     correction_log_id: Optional[uuid.UUID] = None
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 class TransactionLogResponse(BaseModel):
@@ -440,7 +444,7 @@ class TransactionLogResponse(BaseModel):
     requester_name: Optional[str] = None
     notes: Optional[str]
     operation_batch_id: Optional[uuid.UUID] = None
-    created_at: datetime
+    created_at: UtcDatetime
     edit_count: int = 0  # 3차: 수정 이력 개수
 
 
@@ -645,7 +649,7 @@ class QueueLineResponse(BaseModel):
     reason: Optional[str] = None
     process_stage: Optional[str] = None
     included: bool
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 class QueueBatchResponse(BaseModel):
@@ -661,9 +665,9 @@ class QueueBatchResponse(BaseModel):
     parent_quantity: Optional[Decimal] = None
     reference_no: Optional[str] = None
     notes: Optional[str] = None
-    created_at: datetime
-    confirmed_at: Optional[datetime] = None
-    cancelled_at: Optional[datetime] = None
+    created_at: UtcDatetime
+    confirmed_at: Optional[UtcDatetime] = None
+    cancelled_at: Optional[UtcDatetime] = None
     lines: List[QueueLineResponse] = []
 
 
@@ -692,7 +696,7 @@ class ScrapLogResponse(BaseModel):
     reason: str
     batch_id: Optional[uuid.UUID] = None
     operator: Optional[str] = None
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 class LossLogCreateRequest(BaseModel):
@@ -713,7 +717,7 @@ class LossLogResponse(BaseModel):
     batch_id: Optional[uuid.UUID] = None
     reason: str
     operator: Optional[str] = None
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 class VarianceLogResponse(BaseModel):
@@ -728,7 +732,7 @@ class VarianceLogResponse(BaseModel):
     actual_used: Decimal
     diff: Decimal
     note: Optional[str] = None
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 # =============================================================================
@@ -747,8 +751,8 @@ class StockAlertResponse(BaseModel):
     threshold: Optional[Decimal] = None
     observed_value: Optional[Decimal] = None
     message: Optional[str] = None
-    triggered_at: datetime
-    acknowledged_at: Optional[datetime] = None
+    triggered_at: UtcDatetime
+    acknowledged_at: Optional[UtcDatetime] = None
     acknowledged_by: Optional[str] = None
 
 
@@ -775,7 +779,7 @@ class PhysicalCountResponse(BaseModel):
     diff: Decimal
     reason: Optional[str] = None
     operator: Optional[str] = None
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 # =============================================================================
@@ -933,7 +937,7 @@ class StockRequestLineResponse(BaseModel):
     to_department: Optional[str] = None
     status: StockRequestStatusEnum
     operation_line_id: Optional[uuid.UUID] = None
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 class StockRequestResponse(BaseModel):
@@ -947,26 +951,26 @@ class StockRequestResponse(BaseModel):
     request_type: StockRequestTypeEnum
     status: StockRequestStatusEnum
     requires_warehouse_approval: bool
-    reserved_at: Optional[datetime] = None
-    submitted_at: Optional[datetime] = None
+    reserved_at: Optional[UtcDatetime] = None
+    submitted_at: Optional[UtcDatetime] = None
     approved_by_employee_id: Optional[uuid.UUID] = None
     approved_by_name: Optional[str] = None
-    approved_at: Optional[datetime] = None
+    approved_at: Optional[UtcDatetime] = None
     rejected_by_employee_id: Optional[uuid.UUID] = None
     rejected_by_name: Optional[str] = None
-    rejected_at: Optional[datetime] = None
+    rejected_at: Optional[UtcDatetime] = None
     rejected_reason: Optional[str] = None
     requires_department_approval: bool = False
     department_approved_by_employee_id: Optional[uuid.UUID] = None
     department_approved_by_name: Optional[str] = None
-    department_approved_at: Optional[datetime] = None
-    cancelled_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    department_approved_at: Optional[UtcDatetime] = None
+    cancelled_at: Optional[UtcDatetime] = None
+    completed_at: Optional[UtcDatetime] = None
     reference_no: Optional[str] = None
     notes: Optional[str] = None
     operation_batch_id: Optional[uuid.UUID] = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
     lines: List[StockRequestLineResponse] = []
 
 
@@ -1055,10 +1059,10 @@ class IoBatchResponse(BaseModel):
     stock_request_id: Optional[uuid.UUID] = None
     reference_no: Optional[str] = None
     notes: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
-    submitted_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
+    submitted_at: Optional[UtcDatetime] = None
+    completed_at: Optional[UtcDatetime] = None
     bundles: List[IoBundlePayload] = Field(default_factory=list)
 
 
@@ -1083,7 +1087,7 @@ class ReservationLineResponse(BaseModel):
     from_bucket: RequestBucketEnum
     to_bucket: RequestBucketEnum
     to_department: Optional[str] = None
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 class DepartmentCreate(BaseModel):
