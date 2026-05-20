@@ -136,17 +136,9 @@ function HistoryLogRowImpl({ log, selected, onSelect }: Props) {
       </td>
       <td className="hidden sm:table-cell whitespace-nowrap border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
         {producer ? (
-          <div className="flex items-center justify-center gap-1.5">
-            <span
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black text-white"
-              style={{ background: producer.color }}
-            >
-              {producer.name[0] ?? "?"}
-            </span>
-            <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-              {producer.name}
-            </span>
-          </div>
+          <span className="block text-center text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
+            {producer.name}
+          </span>
         ) : (
           <span className="block text-center text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
             -

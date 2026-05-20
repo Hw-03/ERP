@@ -169,15 +169,7 @@ function ActorCell({ name }: { name: string }) {
     return <span className="block text-center text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>;
   }
   return (
-    <div className="flex items-center justify-center gap-1.5">
-      <span
-        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black text-white"
-        style={{ background: LEGACY_COLORS.muted2 }}
-      >
-        {name[0] ?? "?"}
-      </span>
-      <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{name}</span>
-    </div>
+    <span className="block text-center text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>{name}</span>
   );
 }
 

@@ -129,8 +129,14 @@ function BundleRows({
   const childLines = parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines;
   const includedChildLines = childLines.filter((l) => l.included);
 
-  // 헤더 우측 수량 — 부모 라인 있으면 sub_type 기반 부호+색, 없으면 bundle.quantity (단품).
-  const headerSigned = parentLine ? getHistoryLineSignedQuantity(parentLine, batch, bundle) : null;
+  // 헤더 우측 수량 — 부모 라인 있으면 sub_type 기반 부호+색.
+  // 단품(BOM 아님)은 bundle.quantity 가 라인 수(1)로 들어가는 경우가 있어 의미 없음 →
+  // bundle.lines 가 1개면 그 line 의 signed.label 사용(예: "+4 EA"). 그 외엔 bundle.quantity fallback.
+  const headerSigned = parentLine
+    ? getHistoryLineSignedQuantity(parentLine, batch, bundle)
+    : bundle.lines.length === 1
+      ? getHistoryLineSignedQuantity(bundle.lines[0], batch, bundle)
+      : null;
   const headerQtyText = headerSigned ? headerSigned.label : `${formatQty(bundle.quantity)}`;
   const headerQtyColor = headerSigned ? SIGN_TONE_HEX[headerSigned.tone] : LEGACY_COLORS.muted2;
 
@@ -182,12 +188,16 @@ function BundleRows({
           {headerQtyText}
         </td>
         {/* 담당자 */}
-        <td className="border-b px-4 py-2 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+        <td className="hidden sm:table-cell border-b px-4 py-2 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+          <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
+        </td>
+        {/* 메모 — 빈 셀(서식 유지) */}
+        <td className="hidden sm:table-cell border-b px-4 py-2 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
           <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
         </td>
       </tr>
 
-      {/* BOM 하위 라인 — 부모 자기 자신 제외, 5컬럼 정렬 */}
+      {/* BOM 하위 라인 — 부모 자기 자신 제외, 6컬럼 정렬 */}
       {isBomParent && expanded && childLines.map((line) => (
         <BomLineRow key={line.line_id} line={line} batch={batch} bundle={bundle} />
       ))}
@@ -229,7 +239,11 @@ function BomLineRow({ line, batch, bundle }: { line: IoLine; batch: IoBatch; bun
         {signed.label}
       </td>
       {/* 담당자 */}
-      <td className="border-b px-4 py-1.5 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className="hidden sm:table-cell border-b px-4 py-1.5 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+        <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
+      </td>
+      {/* 메모 — 빈 셀(서식 유지) */}
+      <td className="hidden sm:table-cell border-b px-4 py-1.5 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
         <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
       </td>
     </tr>

@@ -55,6 +55,30 @@ export function HistoryTable({
 }: Props) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
+  // 선택 변화에 따른 op_batch 자동 토글 — "선택해서 열린" 묶음만 자동 접힘.
+  // 단건/다른 묶음/none 으로 selection 이 바뀌면 이전 선택 묶음 접기 + 새 묶음이면 펼침.
+  // 수동 chevron 으로 펼친 다른 묶음은 그대로 유지(이전 selection 만 추적).
+  const prevSelectedBatchRef = useRef<string | null>(null);
+  useEffect(() => {
+    const currentBatchId = selection?.kind === "batch" ? selection.batchId : null;
+    const prevBatchId = prevSelectedBatchRef.current;
+    prevSelectedBatchRef.current = currentBatchId;
+    if (prevBatchId === currentBatchId) return;
+    setExpandedGroups((s) => {
+      let changed = false;
+      const next = new Set(s);
+      if (prevBatchId && next.has(prevBatchId)) {
+        next.delete(prevBatchId);
+        changed = true;
+      }
+      if (currentBatchId && !next.has(currentBatchId)) {
+        next.add(currentBatchId);
+        changed = true;
+      }
+      return changed ? next : s;
+    });
+  }, [selection]);
+
   const groups = useMemo(() => buildGroups(filteredLogs), [filteredLogs]);
 
   const batchKeys = useMemo(

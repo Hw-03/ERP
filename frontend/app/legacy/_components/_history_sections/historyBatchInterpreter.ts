@@ -583,15 +583,15 @@ export function getHistoryMovementSummary(
   } else if (sub === "defect_quarantine" || tx === "MARK_DEFECTIVE") {
     parts.push({ label: `불량 ${_distinctItemCount(included)}품목`, tone: "danger" });
   } else if (sub === "adjust_in" || sub === "adjust_out" || tx === "ADJUST") {
-    let increase = 0;
-    let decrease = 0;
+    const inc: typeof included = [];
+    const dec: typeof included = [];
     for (const l of included) {
       const q = _toNum(l.quantity);
-      if (q > 0) increase += q;
-      else if (q < 0) decrease += Math.abs(q);
+      if (q > 0) inc.push(l);
+      else if (q < 0) dec.push(l);
     }
-    if (increase > 0) parts.push({ label: `증가 ${_formatNumber(increase)}`, tone: "success" });
-    if (decrease > 0) parts.push({ label: `감소 ${_formatNumber(decrease)}`, tone: "danger" });
+    if (inc.length > 0) parts.push(_verbItemPart("증가", "success", inc));
+    if (dec.length > 0) parts.push(_verbItemPart("감소", "danger", dec));
     if (parts.length === 0) parts.push({ label: "수량 조정", tone: "warning" });
   }
 
