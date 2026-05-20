@@ -6,6 +6,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { erpCodeDept } from "@/lib/mes/process";
 import { InventoryKpiPanel, type KpiFilter } from "./_inventory_sections/InventoryKpiPanel";
 import { InventoryCapacityPanel } from "./_inventory_sections/InventoryCapacityPanel";
+import { InventoryFilterToggleButton } from "./_inventory_sections/InventoryFilterToggleButton";
 import {
   InventoryFilters,
   InventoryTableStickyHeader,
@@ -179,7 +180,14 @@ export function DesktopInventoryView({
                 else setKpi(key);
               }}
             />
-            <InventoryCapacityPanel capacityData={capacityData} onClick={onCapacityClick} />
+            <div className="mt-3 flex items-stretch gap-2">
+              <InventoryCapacityPanel capacityData={capacityData} onClick={onCapacityClick} />
+              <InventoryFilterToggleButton
+                filtersOpen={filtersOpen}
+                activeFilterCount={activeFilterCount}
+                onToggle={() => setFiltersOpen((prev) => !prev)}
+              />
+            </div>
             <InventoryFilters
               open={filtersOpen}
               selectedDepts={selectedDepts}
@@ -204,10 +212,7 @@ export function DesktopInventoryView({
               searchValue={localSearch}
               onSearchChange={setLocalSearch}
               count={filteredItems.length}
-              activeFilterCount={activeFilterCount}
-              filtersOpen={filtersOpen}
               isFiltered={isFiltered}
-              onToggleFilters={() => setFiltersOpen((prev) => !prev)}
             />
             <InventoryItemsTable
               error={error}

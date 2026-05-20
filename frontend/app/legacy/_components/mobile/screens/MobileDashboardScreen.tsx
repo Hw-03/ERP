@@ -176,7 +176,9 @@ export function MobileDashboardScreen({
                 else setKpi(key);
               }}
             />
-            <InventoryCapacityPanel capacityData={capacityData} onClick={onCapacityClick} />
+            <div className="mt-3">
+              <InventoryCapacityPanel capacityData={capacityData} onClick={onCapacityClick} />
+            </div>
           </section>
 
           <section
