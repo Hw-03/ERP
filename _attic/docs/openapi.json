@@ -1414,6 +1414,7 @@
             "type": "array"
           },
           "created_at": {
+            "format": "date-time",
             "title": "Created At",
             "type": "string"
           },
@@ -1469,6 +1470,7 @@
           "pin_last_changed": {
             "anyOf": [
               {
+                "format": "date-time",
                 "type": "string"
               },
               {
@@ -1493,6 +1495,7 @@
             "title": "Theme"
           },
           "updated_at": {
+            "format": "date-time",
             "title": "Updated At",
             "type": "string"
           },
