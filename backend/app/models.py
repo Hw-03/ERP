@@ -80,30 +80,6 @@ class LocationStatusEnum(str, enum.Enum):
     DEFECTIVE = "DEFECTIVE"
 
 
-class QueueBatchTypeEnum(str, enum.Enum):
-    PRODUCE = "PRODUCE"
-    DISASSEMBLE = "DISASSEMBLE"
-    RETURN = "RETURN"
-
-
-class QueueBatchStatusEnum(str, enum.Enum):
-    OPEN = "OPEN"
-    CONFIRMED = "CONFIRMED"
-    CANCELLED = "CANCELLED"
-
-
-class QueueLineDirectionEnum(str, enum.Enum):
-    IN = "IN"            # Into inventory (disassembly reuse, return intake)
-    OUT = "OUT"          # Consumed from inventory (production backflush)
-    SCRAP = "SCRAP"      # Discard / defective
-    LOSS = "LOSS"        # Missing on return
-
-
-class AlertKindEnum(str, enum.Enum):
-    SAFETY = "SAFETY"
-    COUNT_VARIANCE = "COUNT_VARIANCE"
-
-
 class DepartmentEnum(str, enum.Enum):
     ASSEMBLY = "조립"
     HIGH_VOLTAGE = "고압"
@@ -398,13 +374,6 @@ class TransactionLog(Base):
     reference_no = Column(String(100), nullable=True, index=True)
     produced_by = Column(String(100), nullable=True)
     notes = Column(Text, nullable=True)
-    # Optional link to the queue batch that generated this log
-    batch_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("queue_batches.batch_id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
     operation_batch_id = Column(
         UUID(as_uuid=True),
         ForeignKey("io_batches.batch_id", ondelete="SET NULL"),
@@ -421,7 +390,6 @@ class TransactionLog(Base):
     archived_at = Column(DateTime, nullable=True, index=True)
 
     item = relationship("Item", back_populates="transaction_logs")
-    batch = relationship("QueueBatch", back_populates="transaction_logs")
 
     __table_args__ = (
         # 5.5-A: "품목 X 의 최근 거래 N건" / "기간 export" 쿼리 가속.
@@ -525,85 +493,6 @@ class ProcessFlowRule(Base):
 
 
 # =============================================================================
-# Queue (예약/확정) workflow tables
-# =============================================================================
-
-
-class QueueBatch(Base):
-    __tablename__ = "queue_batches"
-
-    batch_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    batch_type = Column(
-        SAEnum(QueueBatchTypeEnum, name="queue_batch_type_enum", create_type=True),
-        nullable=False,
-    )
-    status = Column(
-        SAEnum(QueueBatchStatusEnum, name="queue_batch_status_enum", create_type=True),
-        nullable=False,
-        default=QueueBatchStatusEnum.OPEN,
-        index=True,
-    )
-    owner_employee_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("employees.employee_id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-    owner_name = Column(String(100), nullable=True)  # denormalized for display
-    parent_item_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("items.item_id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    parent_quantity = Column(Numeric(15, 4), nullable=True)
-    reference_no = Column(String(100), nullable=True, index=True)
-    notes = Column(Text, nullable=True)
-    created_at = Column(
-        DateTime,
-        nullable=False,
-        default=datetime.utcnow,
-        server_default=func.now(),
-        index=True,
-    )
-    confirmed_at = Column(DateTime, nullable=True)
-    cancelled_at = Column(DateTime, nullable=True)
-
-    lines = relationship("QueueLine", back_populates="batch", cascade="all, delete-orphan")
-    transaction_logs = relationship("TransactionLog", back_populates="batch")
-
-
-class QueueLine(Base):
-    __tablename__ = "queue_lines"
-
-    line_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    batch_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("queue_batches.batch_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    item_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("items.item_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    direction = Column(
-        SAEnum(QueueLineDirectionEnum, name="queue_line_direction_enum", create_type=True),
-        nullable=False,
-    )
-    quantity = Column(Numeric(15, 4), nullable=False)
-    bom_expected = Column(Numeric(15, 4), nullable=True)  # Original BOM expected qty (for variance)
-    reason = Column(Text, nullable=True)
-    process_stage = Column(String(2), ForeignKey("process_types.code"), nullable=True)
-    included = Column(Boolean, nullable=False, default=True)  # Selective inclusion toggle
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
-
-    batch = relationship("QueueBatch", back_populates="lines")
-    item = relationship("Item")
-
-
-# =============================================================================
 # Scrap / Loss / Variance history
 # =============================================================================
 
@@ -616,7 +505,6 @@ class ScrapLog(Base):
     quantity = Column(Numeric(15, 4), nullable=False)
     process_stage = Column(String(2), ForeignKey("process_types.code"), nullable=True)
     reason = Column(String(200), nullable=False)
-    batch_id = Column(UUID(as_uuid=True), ForeignKey("queue_batches.batch_id", ondelete="SET NULL"), nullable=True, index=True)
     operator = Column(String(100), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
 
@@ -627,7 +515,6 @@ class LossLog(Base):
     loss_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
     quantity = Column(Numeric(15, 4), nullable=False)
-    batch_id = Column(UUID(as_uuid=True), ForeignKey("queue_batches.batch_id", ondelete="SET NULL"), nullable=True, index=True)
     reason = Column(String(200), nullable=False)
     operator = Column(String(100), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
@@ -637,49 +524,12 @@ class VarianceLog(Base):
     __tablename__ = "variance_logs"
 
     var_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    batch_id = Column(UUID(as_uuid=True), ForeignKey("queue_batches.batch_id", ondelete="CASCADE"), nullable=False, index=True)
     item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
     bom_expected = Column(Numeric(15, 4), nullable=False)
     actual_used = Column(Numeric(15, 4), nullable=False)
     diff = Column(Numeric(15, 4), nullable=False)
     note = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
-
-
-# =============================================================================
-# Advanced inventory management: alerts, physical counts
-# =============================================================================
-
-
-class StockAlert(Base):
-    __tablename__ = "stock_alerts"
-
-    alert_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
-    kind = Column(
-        SAEnum(AlertKindEnum, name="alert_kind_enum", create_type=True),
-        nullable=False,
-        index=True,
-    )
-    threshold = Column(Numeric(15, 4), nullable=True)
-    observed_value = Column(Numeric(15, 4), nullable=True)
-    message = Column(Text, nullable=True)
-    triggered_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
-    acknowledged_at = Column(DateTime, nullable=True)
-    acknowledged_by = Column(String(100), nullable=True)
-
-
-class PhysicalCount(Base):
-    __tablename__ = "physical_counts"
-
-    count_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
-    counted_qty = Column(Numeric(15, 4), nullable=False)
-    system_qty = Column(Numeric(15, 4), nullable=False)
-    diff = Column(Numeric(15, 4), nullable=False)
-    reason = Column(String(200), nullable=True)
-    operator = Column(String(100), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
 
 
 # =============================================================================

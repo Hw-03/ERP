@@ -22,7 +22,6 @@ def test_health_and_detailed_health_are_ok(client, make_item):
     assert body["rows"]["items"] == 1
     assert body["rows"]["inventory"] == 1
     assert body["inventory_mismatch_count"] == 0
-    assert "open_queue_batches" in body
     assert "last_transaction_at" in body
 
 

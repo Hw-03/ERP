@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart2,
-  Bell,
   Boxes,
   History as HistoryIcon,
   Settings2,
@@ -11,8 +10,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { AlertsSheet } from "./AlertsSheet";
-import { IconButton } from "./primitives";
 import {
   MobileDashboardScreen,
   MobileWarehouseScreen,
@@ -45,7 +42,6 @@ export function MobileShell() {
   const [status, setStatus] = useState(DEFAULT_STATUS);
   const [statusNonce, setStatusNonce] = useState(0);
   const [refreshNonce, setRefreshNonce] = useState(0);
-  const [alertsOpen, setAlertsOpen] = useState(false);
   const autoRevertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // URL ?tab= 으로 초기 탭 동기화 (딥링크/데스크탑 파리티/평가 스크립트).
@@ -200,9 +196,6 @@ export function MobileShell() {
               <WeeklyWeekPicker weekMon={weekMon} onChange={setWeekMon} />
             </div>
           )}
-          <div className="flex shrink-0 items-center gap-1 ml-2">
-            <IconButton icon={Bell} label="알림" size="md" onClick={() => setAlertsOpen(true)} />
-          </div>
         </header>
 
         <main className="relative flex-1 overflow-hidden flex" data-testid="screen-root">
@@ -267,7 +260,6 @@ export function MobileShell() {
           onClose={() => setCapacityModal(false)}
         />
       )}
-      <AlertsSheet open={alertsOpen} onClose={() => setAlertsOpen(false)} />
     </div>
   );
 }

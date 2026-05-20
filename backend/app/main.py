@@ -25,8 +25,6 @@ from app.models import (
     Employee,
     Inventory,
     Item,
-    QueueBatch,
-    QueueBatchStatusEnum,
     TransactionLog,
 )
 from app.routers._errors import ErrorCode
@@ -35,10 +33,8 @@ from app.services import integrity as integrity_svc
 from app.routers import (
     admin_audit,
     admin_audit_csv,
-    alerts,
     bom,
     codes,
-    counts,
     departments,
     dept_adjustment,
     employees,
@@ -48,7 +44,6 @@ from app.routers import (
     loss,
     models as models_router,
     production,
-    queue,
     scrap,
     settings,
     stock_requests,
@@ -91,7 +86,6 @@ app = FastAPI(
         {"name": "Inventory", "description": "재고 조회·입출고·이동·불량·반품·거래이력."},
         {"name": "BOM", "description": "BOM CRUD + 트리 + Where-Used."},
         {"name": "Production", "description": "생산 입고 + BOM Backflush."},
-        {"name": "Queue", "description": "Queue 배치 워크플로 (생산/분해/반품 2단계)."},
         {"name": "Settings", "description": "관리자 PIN, 시스템 정합성 점검·복구."},
         {"name": "Ship Packages", "description": "출하 묶음 CRUD."},
         {"name": "Models", "description": "제품 모델 슬롯."},
@@ -99,8 +93,6 @@ app = FastAPI(
         {"name": "Scrap", "description": "폐기 이력."},
         {"name": "Loss", "description": "분실/누락 이력."},
         {"name": "Variance", "description": "차이 분석."},
-        {"name": "Alerts", "description": "안전재고/실사 알림."},
-        {"name": "Counts", "description": "실사 등록·강제 조정."},
         {"name": "Admin Audit", "description": "관리자 액션 감사로그 조회 (마스터/설정 변경)."},
     ],
 )
@@ -235,12 +227,9 @@ app.include_router(io.router, prefix="/api/io", tags=["Inventory IO"])
 app.include_router(bom.router, prefix="/api/bom", tags=["BOM"])
 app.include_router(production.router, prefix="/api/production", tags=["Production"])
 app.include_router(codes.router, prefix="/api/codes", tags=["Codes"])
-app.include_router(queue.router, prefix="/api/queue", tags=["Queue"])
 app.include_router(scrap.router, prefix="/api/scrap", tags=["Scrap"])
 app.include_router(loss.router, prefix="/api/loss", tags=["Loss"])
 app.include_router(variance.router, prefix="/api/variance", tags=["Variance"])
-app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
-app.include_router(counts.router, prefix="/api/counts", tags=["Counts"])
 app.include_router(models_router.router, prefix="/api/models", tags=["Models"])
 app.include_router(admin_audit.router, prefix="/api/admin", tags=["Admin Audit"])
 app.include_router(admin_audit_csv.router, prefix="/api/admin", tags=["Admin Audit"])
@@ -296,19 +285,13 @@ def health_detailed(db: Session = Depends(get_db)):
         "employees": db.query(Employee).count(),
         "inventory": db.query(Inventory).count(),
         "transaction_logs": db.query(TransactionLog).count(),
-        "queue_batches": db.query(QueueBatch).count(),
     }
 
     # 3) inventory mismatch — 가벼운 검사
     mismatches = integrity_svc.check_inventory_consistency(db)
     mismatch_count = len(mismatches)
 
-    # 4) open queue batches
-    open_batches = (
-        db.query(QueueBatch).filter(QueueBatch.status == QueueBatchStatusEnum.OPEN).count()
-    )
-
-    # 5) 최근 transaction log 시간
+    # 4) 최근 transaction log 시간
     last_tx = (
         db.query(func.max(TransactionLog.created_at)).scalar()
     )
@@ -318,7 +301,6 @@ def health_detailed(db: Session = Depends(get_db)):
         "db": {"ok": db_ok},
         "rows": rows,
         "inventory_mismatch_count": mismatch_count,
-        "open_queue_batches": open_batches,
         "last_transaction_at": last_tx.isoformat() if last_tx else None,
     }
 

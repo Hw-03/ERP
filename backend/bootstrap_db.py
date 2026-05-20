@@ -103,13 +103,8 @@ _MIGRATION_DDL: list[str] = [
     "ALTER TABLE inventory ADD COLUMN pending_quantity NUMERIC(15,4) NOT NULL DEFAULT 0",
     "ALTER TABLE inventory ADD COLUMN last_reserver_employee_id CHAR(36)",
     "ALTER TABLE inventory ADD COLUMN last_reserver_name VARCHAR(100)",
-    # M1: Batch link
-    "ALTER TABLE transaction_logs ADD COLUMN batch_id CHAR(36)",
     # M8: 재고 이원화 — warehouse_qty
     "ALTER TABLE inventory ADD COLUMN warehouse_qty NUMERIC(15,4) NOT NULL DEFAULT 0",
-    # Queue 조회 성능 개선 인덱스 (created_at desc 정렬, 담당자별 필터)
-    "CREATE INDEX IF NOT EXISTS ix_queue_batches_created_at ON queue_batches(created_at)",
-    "CREATE INDEX IF NOT EXISTS ix_queue_batches_owner_employee_id ON queue_batches(owner_employee_id)",
     # PIN 로그인 — 작업자 식별용 (실제 보안 인증 아님)
     "ALTER TABLE employees ADD COLUMN pin_hash TEXT",
     # 거래 수정 감사 이력 (3차 메타 수정 + 4차 수량 보정 공유)
@@ -212,6 +207,11 @@ _MIGRATION_DDL: list[str] = [
     "ALTER TABLE stock_requests ADD COLUMN department_approved_by_employee_id CHAR(36)",
     "ALTER TABLE stock_requests ADD COLUMN department_approved_by_name VARCHAR(100)",
     "ALTER TABLE stock_requests ADD COLUMN department_approved_at DATETIME",
+    # 2026-05-20: queue/alerts/counts dead feature 제거 — 테이블 삭제 (CASCADE 로 자식 FK 정리)
+    "DROP TABLE IF EXISTS queue_lines",
+    "DROP TABLE IF EXISTS queue_batches",
+    "DROP TABLE IF EXISTS stock_alerts",
+    "DROP TABLE IF EXISTS physical_counts",
 ]
 
 

@@ -19,10 +19,6 @@ import { inventoryApi } from "./api/inventory";
 import { employeesApi } from "./api/employees";
 // R6-D3: admin / settings 도메인 분리.
 import { adminApi } from "./api/admin";
-// R6-D4: queue 도메인 분리.
-import { queueApi } from "./api/queue";
-// R6-D5: operations (scrap/loss/variance + alerts + counts) 도메인 분리.
-import { operationsApi } from "./api/operations";
 // R6-D6: catalog (models + ship-packages + BOM) 도메인 분리.
 import { catalogApi } from "./api/catalog";
 // R6-D7: production / transactions / exports 도메인 분리.
@@ -65,17 +61,6 @@ import type {
   ProductModel,
   DepartmentMaster,
   Item,
-  QueueBatchType,
-  QueueBatchStatus,
-  QueueLineDirection,
-  QueueLine,
-  QueueBatch,
-  AlertKind,
-  StockAlert,
-  PhysicalCount,
-  ScrapLogRow,
-  LossLogRow,
-  VarianceLogRow,
   Employee,
   StockRequestStatus,
   StockRequestType,
@@ -134,17 +119,6 @@ export type {
   ProductModel,
   DepartmentMaster,
   Item,
-  QueueBatchType,
-  QueueBatchStatus,
-  QueueLineDirection,
-  QueueLine,
-  QueueBatch,
-  AlertKind,
-  StockAlert,
-  PhysicalCount,
-  ScrapLogRow,
-  LossLogRow,
-  VarianceLogRow,
   Employee,
   StockRequestStatus,
   StockRequestType,
@@ -198,10 +172,6 @@ export const api = {
   ...employeesApi,
   // R6-D3: admin / settings 도메인 분리 (3 메소드).
   ...adminApi,
-  // R6-D4: queue 도메인 분리 (9 메소드).
-  ...queueApi,
-  // R6-D5: operations 도메인 분리 (10 메소드 — scrap/loss/variance + alerts + counts).
-  ...operationsApi,
   // R6-D6: catalog 도메인 분리 (16 메소드 — models + ship-packages + BOM).
   ...catalogApi,
   // R6-D7: production / transactions / exports 도메인 분리 (9 메소드).

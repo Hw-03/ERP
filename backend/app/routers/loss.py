@@ -32,7 +32,6 @@ def _to_response(db: Session, log: LossLog) -> LossLogResponse:
         erp_code=item.erp_code if item else None,
         item_name=item.item_name if item else None,
         quantity=log.quantity,
-        batch_id=log.batch_id,
         reason=log.reason,
         operator=log.operator,
         created_at=log.created_at,
@@ -97,7 +96,6 @@ def create_loss(
 @router.get("", response_model=List[LossLogResponse], summary="Loss 로그 조회")
 def list_loss(
     item_id: Optional[uuid.UUID] = Query(None),
-    batch_id: Optional[uuid.UUID] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
@@ -105,7 +103,5 @@ def list_loss(
     q = db.query(LossLog)
     if item_id:
         q = q.filter(LossLog.item_id == item_id)
-    if batch_id:
-        q = q.filter(LossLog.batch_id == batch_id)
     rows = q.order_by(LossLog.created_at.desc()).offset(skip).limit(limit).all()
     return [_to_response(db, r) for r in rows]

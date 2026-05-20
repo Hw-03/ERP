@@ -11,8 +11,6 @@ export type * from "./shared";
 export type * from "./items";
 export type * from "./inventory";
 export type * from "./employees";
-export type * from "./queue";
-export type * from "./operations";
 export type * from "./catalog";
 export type * from "./production";
 export type * from "./stock-requests";
