@@ -278,6 +278,34 @@
         "title": "AlertKindEnum",
         "type": "string"
       },
+      "AuditCsvFile": {
+        "properties": {
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "file_name",
+          "size_bytes",
+          "row_count"
+        ],
+        "title": "AuditCsvFile",
+        "type": "object"
+      },
       "BOMCreate": {
         "properties": {
           "child_item_id": {
@@ -552,6 +580,27 @@
           }
         },
         "title": "BOMUpdate",
+        "type": "object"
+      },
+      "BackfillResult": {
+        "properties": {
+          "months": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Months",
+            "type": "array"
+          },
+          "total_rows": {
+            "title": "Total Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_rows",
+          "months"
+        ],
+        "title": "BackfillResult",
         "type": "object"
       },
       "BackflushDetail": {
@@ -7252,6 +7301,155 @@
         "summary": "Root",
         "tags": [
           "System"
+        ]
+      }
+    },
+    "/api/admin/audit-csv/backfill": {
+      "post": {
+        "description": "수동 백필 — DB 기준으로 월별 CSV 전체 재작성.",
+        "operationId": "trigger_backfill_api_admin_audit_csv_backfill_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "overwrite",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Overwrite",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackfillResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Trigger Backfill",
+        "tags": [
+          "Admin Audit"
+        ]
+      }
+    },
+    "/api/admin/audit-csv/files": {
+      "get": {
+        "operationId": "list_files_api_admin_audit_csv_files_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AuditCsvFile"
+                  },
+                  "title": "Response List Files Api Admin Audit Csv Files Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Files",
+        "tags": [
+          "Admin Audit"
+        ]
+      }
+    },
+    "/api/admin/audit-csv/{month}.csv": {
+      "get": {
+        "operationId": "download_csv_api_admin_audit_csv__month__csv_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "title": "Month",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Csv",
+        "tags": [
+          "Admin Audit"
+        ]
+      }
+    },
+    "/api/admin/audit-csv/{month}.xlsx": {
+      "get": {
+        "operationId": "download_xlsx_api_admin_audit_csv__month__xlsx_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "title": "Month",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Xlsx",
+        "tags": [
+          "Admin Audit"
         ]
       }
     },
