@@ -6,6 +6,7 @@ import type { BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
+import { TruncatedText } from "@/lib/ui/TruncatedText";
 import { BomBadge } from "./BomBadge";
 
 /**
@@ -79,12 +80,12 @@ export function BomReviewModal({ parent, rows, items, isCompleted, onClose, onCo
         >
           <BomBadge processTypeCode={parent.process_type_code} small />
           <div className="min-w-0">
-            <div className="truncate text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
+            <TruncatedText className="truncate text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
               {parent.item_name}
-            </div>
-            <div className="truncate text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+            </TruncatedText>
+            <TruncatedText className="truncate text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
               {parent.erp_code ?? "(코드 없음)"} · {rows.length}개 자식
-            </div>
+            </TruncatedText>
           </div>
         </div>
 
@@ -115,14 +116,14 @@ export function BomReviewModal({ parent, rows, items, isCompleted, onClose, onCo
                 >
                   <BomBadge processTypeCode={child?.process_type_code} small />
                   <div className="min-w-0">
-                    <span className="truncate font-semibold" style={{ color: LEGACY_COLORS.text }}>
+                    <TruncatedText className="truncate font-semibold" style={{ color: LEGACY_COLORS.text }}>
                       {child?.item_name ?? "(삭제된 품목)"}
-                    </span>
-                    {dup && (
-                      <span className="ml-1 font-bold" style={{ color: LEGACY_COLORS.red }}>
-                        · 중복
-                      </span>
-                    )}
+                      {dup && (
+                        <span className="ml-1 font-bold" style={{ color: LEGACY_COLORS.red }}>
+                          · 중복
+                        </span>
+                      )}
+                    </TruncatedText>
                   </div>
                   <span
                     className="font-semibold"

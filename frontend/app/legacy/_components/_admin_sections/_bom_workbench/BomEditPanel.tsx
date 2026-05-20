@@ -3,6 +3,7 @@
 import { ClipboardCheck } from "lucide-react";
 import type { BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { TruncatedText } from "@/lib/ui";
 import { EmptyState } from "../../common/EmptyState";
 import { BomBadge } from "./BomBadge";
 import { BomRow } from "./BomRow";
@@ -62,12 +63,12 @@ export function BomEditPanel({
       >
         <BomBadge processTypeCode={parent.process_type_code} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
+          <TruncatedText className="truncate text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
             {parent.item_name}
-          </div>
-          <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+          </TruncatedText>
+          <TruncatedText className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
             {parent.erp_code ?? "(코드 없음)"} · {bomRows.length}개 자식
-          </div>
+          </TruncatedText>
         </div>
         <span
           className="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[11px] font-bold"

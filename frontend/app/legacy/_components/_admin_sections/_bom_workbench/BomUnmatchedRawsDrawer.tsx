@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronUp, ChevronDown, AlertCircle, CheckCircle2 } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { TruncatedText } from "@/lib/ui";
 import { BomBadge } from "./BomBadge";
 
 /**
@@ -74,9 +75,9 @@ export function BomUnmatchedRawsDrawer({ rawItems, childIdSet }: Props) {
             >
               <BomBadge processTypeCode={i.process_type_code} small />
               <div className="min-w-0">
-                <div className="truncate text-sm" style={{ color: LEGACY_COLORS.text }}>
+                <TruncatedText className="truncate text-sm" style={{ color: LEGACY_COLORS.text }}>
                   {i.item_name}
-                </div>
+                </TruncatedText>
               </div>
               <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
                 {i.erp_code}

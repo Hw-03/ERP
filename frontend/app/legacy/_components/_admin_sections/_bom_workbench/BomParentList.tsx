@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { TruncatedText } from "@/lib/ui";
 import { BomBadge } from "./BomBadge";
 import { BomSearchInput } from "./BomSearchInput";
 import { BOM_STATUS_META, bomStatusOf, stageOf, type DeptLetter, type StageLetter } from "./bomDept";
@@ -145,13 +146,13 @@ export function BomParentList({
               >
                 <BomBadge processTypeCode={i.process_type_code} small />
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
+                  <TruncatedText className="truncate text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
                     {i.item_name}
-                  </div>
+                  </TruncatedText>
                   {i.erp_code && (
-                    <div className="truncate text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                    <TruncatedText className="truncate text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
                       {i.erp_code}
-                    </div>
+                    </TruncatedText>
                   )}
                 </div>
                 {mode === "edit" ? (

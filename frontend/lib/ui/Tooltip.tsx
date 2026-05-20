@@ -24,9 +24,22 @@ interface Props {
   disabled?: boolean;
   /** true 면 multi-line content 허용 (whitespace-normal + max-width). 기본 false (한 줄 nowrap). */
   multiline?: boolean;
+  /**
+   * trigger wrapper span 의 className 을 override.
+   * 기본 "relative inline-flex" — `min-w-0` 부모 안에서 truncate 자식을 감쌀 땐
+   * `"relative block min-w-0 w-full"` 같이 block 계열로 바꿔야 truncate 가 깨지지 않음.
+   */
+  triggerClassName?: string;
 }
 
-export function Tooltip({ content, children, side = "top", disabled = false, multiline = false }: Props) {
+export function Tooltip({
+  content,
+  children,
+  side = "top",
+  disabled = false,
+  multiline = false,
+  triggerClassName = "relative inline-flex",
+}: Props) {
   const triggerRef = useRef<HTMLSpanElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const show = !disabled && pos && content;
@@ -44,7 +57,7 @@ export function Tooltip({ content, children, side = "top", disabled = false, mul
     <>
       <span
         ref={triggerRef}
-        className="relative inline-flex"
+        className={triggerClassName}
         onMouseEnter={handleEnter}
         onMouseLeave={handleLeave}
       >
@@ -54,7 +67,7 @@ export function Tooltip({ content, children, side = "top", disabled = false, mul
         ? createPortal(
             <span
               role="tooltip"
-              className={`pointer-events-none fixed z-[100] -translate-x-1/2 rounded-[10px] border px-3 py-1.5 text-xs font-semibold shadow-lg ${
+              className={`pointer-events-none fixed z-[600] -translate-x-1/2 rounded-[10px] border px-3 py-1.5 text-xs font-semibold shadow-lg ${
                 multiline ? "whitespace-normal max-w-[220px] text-left" : "whitespace-nowrap"
               } ${side === "top" ? "-translate-y-full" : ""}`}
               style={{

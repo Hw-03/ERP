@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Check, X } from "lucide-react";
 import type { BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { TruncatedText } from "@/lib/ui";
 import { BomBadge } from "./BomBadge";
 import { BomSearchInput } from "./BomSearchInput";
 import { DEPT_LETTERS, DEPT_LETTER_TO_NAME, deptColor, deptOf, stageOf, type DeptLetter, type StageLetter } from "./bomDept";
@@ -204,13 +205,13 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
                 >
                   <BomBadge processTypeCode={c.process_type_code} small />
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
+                    <TruncatedText className="truncate text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
                       {c.item_name}
-                    </div>
+                    </TruncatedText>
                     {c.erp_code && (
-                      <div className="truncate text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                      <TruncatedText className="truncate text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
                         {c.erp_code}
-                      </div>
+                      </TruncatedText>
                     )}
                   </div>
                   {already ? (

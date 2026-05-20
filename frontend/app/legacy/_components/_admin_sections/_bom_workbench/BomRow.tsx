@@ -5,6 +5,7 @@ import { Trash2 } from "lucide-react";
 import type { BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
+import { TruncatedText } from "@/lib/ui";
 import { BomBadge } from "./BomBadge";
 
 /**
@@ -66,13 +67,13 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
     >
       <BomBadge processTypeCode={childItem?.process_type_code} />
       <div className="min-w-0">
-        <div className="truncate text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
+        <TruncatedText className="truncate text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
           {childName}
-        </div>
+        </TruncatedText>
         {erpCode && (
-          <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+          <TruncatedText className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
             {erpCode}
-          </div>
+          </TruncatedText>
         )}
       </div>
       <div className="flex justify-end">

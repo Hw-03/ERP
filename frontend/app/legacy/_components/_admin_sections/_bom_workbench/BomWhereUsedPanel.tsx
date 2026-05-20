@@ -3,6 +3,7 @@
 import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
+import { TruncatedText } from "@/lib/ui";
 import { EmptyState } from "../../common/EmptyState";
 import { BomBadge } from "./BomBadge";
 
@@ -45,12 +46,12 @@ export function BomWhereUsedPanel({ selected, rows, items, onSelectParent }: Pro
       >
         <BomBadge processTypeCode={selected.process_type_code} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
+          <TruncatedText className="truncate text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
             {selected.item_name}
-          </div>
-          <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+          </TruncatedText>
+          <TruncatedText className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
             {selected.erp_code ?? "(코드 없음)"} · {rows.length}개 부모에서 사용
-          </div>
+          </TruncatedText>
         </div>
       </div>
 
@@ -87,12 +88,12 @@ export function BomWhereUsedPanel({ selected, rows, items, onSelectParent }: Pro
                 >
                   <BomBadge processTypeCode={parent?.process_type_code} />
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
+                    <TruncatedText className="truncate text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
                       {r.parent_item_name}
-                    </div>
-                    <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                    </TruncatedText>
+                    <TruncatedText className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                       {r.parent_erp_code ?? "(코드 없음)"}
-                    </div>
+                    </TruncatedText>
                   </div>
                   <div className="text-right text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
                     ×{formatQty(r.quantity)} {r.unit || "EA"}
