@@ -5,29 +5,99 @@ import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import DepartmentEnum, Employee
+from app.models import Employee, EmployeeAssignedModel, ProductSymbol, StockRequest
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     EmployeeCreate,
+    EmployeePinChangeRequest,
     EmployeePinResetRequest,
     EmployeeResponse,
+    EmployeeThemeUpdate,
     EmployeeUpdate,
     PinVerifyRequest,
 )
 from app.routers.settings import require_admin
-from app.services.pin_auth import DEFAULT_PIN_HASH, verify_pin
+from app.services import rate_limit
+from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin, verify_pin
 from app.services import audit
 from app.services._tx import commit_and_refresh, commit_only
 
 router = APIRouter()
 
 
+def _assigned_slots_for(db: Session, employee_id: uuid.UUID) -> List[int]:
+    """단일 직원의 담당 모델 slot 목록 (priority asc)."""
+    rows = (
+        db.query(EmployeeAssignedModel.slot)
+        .filter(EmployeeAssignedModel.employee_id == employee_id)
+        .order_by(EmployeeAssignedModel.priority.asc(), EmployeeAssignedModel.slot.asc())
+        .all()
+    )
+    return [row.slot for row in rows]
+
+
+def _assigned_slots_bulk(db: Session, employee_ids: List[uuid.UUID]) -> dict:
+    """다수 직원의 담당 모델 slot을 dict[employee_id] = [slot, ...] 형태로 일괄 조회 (N+1 회피)."""
+    if not employee_ids:
+        return {}
+    rows = (
+        db.query(EmployeeAssignedModel)
+        .filter(EmployeeAssignedModel.employee_id.in_(employee_ids))
+        .order_by(EmployeeAssignedModel.employee_id, EmployeeAssignedModel.priority.asc())
+        .all()
+    )
+    grouped: dict = {}
+    for row in rows:
+        grouped.setdefault(row.employee_id, []).append(row.slot)
+    return grouped
+
+
+def _sync_assigned_models(
+    db: Session, employee_id: uuid.UUID, slots: List[int]
+) -> None:
+    """직원의 담당 모델을 payload 순서(=priority)로 통째 교체.
+
+    - 존재하지 않는 slot, 중복 slot 은 무시한다 (조용히 dedupe).
+    - 빈 리스트면 매핑 전부 제거.
+    """
+    db.query(EmployeeAssignedModel).filter(
+        EmployeeAssignedModel.employee_id == employee_id
+    ).delete(synchronize_session=False)
+
+    if not slots:
+        return
+
+    seen: set = set()
+    unique_ordered: list = []
+    for s in slots:
+        if s in seen:
+            continue
+        seen.add(s)
+        unique_ordered.append(s)
+
+    valid_slots = {
+        row.slot
+        for row in db.query(ProductSymbol.slot)
+        .filter(ProductSymbol.slot.in_(unique_ordered))
+        .all()
+    }
+    for idx, slot in enumerate(unique_ordered):
+        if slot not in valid_slots:
+            continue
+        db.add(
+            EmployeeAssignedModel(
+                employee_id=employee_id, slot=slot, priority=idx
+            )
+        )
+
+
 @router.get("", response_model=List[EmployeeResponse])
 def list_employees(
-    department: Optional[DepartmentEnum] = Query(None),
+    department: Optional[str] = Query(None),
     active_only: bool = Query(True),
     db: Session = Depends(get_db),
 ):
@@ -38,27 +108,61 @@ def list_employees(
         query = query.filter(Employee.is_active == "true")
 
     employees = query.order_by(Employee.display_order.asc(), Employee.name.asc()).all()
-    return [_to_response(employee) for employee in employees]
+    slot_map = _assigned_slots_bulk(db, [e.employee_id for e in employees])
+    return [
+        _to_response(employee, slot_map.get(employee.employee_id, []))
+        for employee in employees
+    ]
+
+
+def _auto_employee_code(db: Session) -> str:
+    """기존 E{숫자} 패턴에서 최대값 + 1 자동 부여."""
+    import re
+    codes = [e.employee_code for e in db.query(Employee.employee_code).all()]
+    nums = [int(m.group(1)) for c in codes if c and (m := re.fullmatch(r"E(\d+)", c))]
+    return f"E{max(nums, default=0) + 1}"
 
 
 @router.post("", response_model=EmployeeResponse, status_code=status.HTTP_201_CREATED)
 def create_employee(payload: EmployeeCreate, request: Request, db: Session = Depends(get_db)):
-    existing = db.query(Employee).filter(Employee.employee_code == payload.employee_code).first()
+    code = payload.employee_code.strip() if payload.employee_code else _auto_employee_code(db)
+    existing = db.query(Employee).filter(Employee.employee_code == code).first()
     if existing:
         raise http_error(409, ErrorCode.CONFLICT, "직원 코드가 이미 존재합니다.")
 
+    role_value = (payload.warehouse_role or "none").lower()
+    if role_value not in ("none", "primary", "deputy"):
+        raise http_error(
+            422,
+            ErrorCode.UNPROCESSABLE,
+            "warehouse_role 은 none/primary/deputy 중 하나여야 합니다.",
+        )
+
+    dept_role_value = (payload.department_role or "none").lower()
+    if dept_role_value not in ("none", "primary", "deputy"):
+        raise http_error(
+            422,
+            ErrorCode.UNPROCESSABLE,
+            "department_role 은 none/primary/deputy 중 하나여야 합니다.",
+        )
+
     employee = Employee(
-        employee_code=payload.employee_code,
+        employee_code=code,
         name=payload.name,
         role=payload.role,
         phone=payload.phone,
         department=payload.department,
         level=payload.level,
+        warehouse_role=role_value,
+        department_role=dept_role_value,
         display_order=payload.display_order,
         is_active="true" if payload.is_active else "false",
     )
     db.add(employee)
     db.flush()
+
+    if payload.assigned_model_slots is not None:
+        _sync_assigned_models(db, employee.employee_id, payload.assigned_model_slots)
 
     audit.record(
         db,
@@ -70,7 +174,7 @@ def create_employee(payload: EmployeeCreate, request: Request, db: Session = Dep
     )
 
     commit_and_refresh(db, employee)
-    return _to_response(employee)
+    return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
 
 
 @router.put("/{employee_id}", response_model=EmployeeResponse)
@@ -90,11 +194,41 @@ def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, request: Re
         employee.department = payload.department; changed.append("department")
     if payload.level is not None and employee.level != payload.level:
         employee.level = payload.level; changed.append("level")
+    if payload.warehouse_role is not None:
+        new_role = payload.warehouse_role.lower()
+        if new_role not in ("none", "primary", "deputy"):
+            raise http_error(
+                422,
+                ErrorCode.UNPROCESSABLE,
+                "warehouse_role 은 none/primary/deputy 중 하나여야 합니다.",
+            )
+        if (employee.warehouse_role or "none") != new_role:
+            employee.warehouse_role = new_role
+            changed.append("warehouse_role")
+    if payload.department_role is not None:
+        new_dept_role = payload.department_role.lower()
+        if new_dept_role not in ("none", "primary", "deputy"):
+            raise http_error(
+                422,
+                ErrorCode.UNPROCESSABLE,
+                "department_role 은 none/primary/deputy 중 하나여야 합니다.",
+            )
+        if (employee.department_role or "none") != new_dept_role:
+            employee.department_role = new_dept_role
+            changed.append("department_role")
     if payload.display_order is not None and employee.display_order != payload.display_order:
         employee.display_order = payload.display_order; changed.append("display_order")
     if payload.is_active is not None:
         if employee.is_active != payload.is_active:
             employee.is_active = payload.is_active; changed.append("is_active")
+
+    if payload.assigned_model_slots is not None:
+        current = _assigned_slots_for(db, employee.employee_id)
+        if current != payload.assigned_model_slots:
+            _sync_assigned_models(
+                db, employee.employee_id, payload.assigned_model_slots
+            )
+            changed.append("assigned_models")
 
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
@@ -109,38 +243,112 @@ def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, request: Re
         )
 
     commit_and_refresh(db, employee)
-    return _to_response(employee)
+    return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
 
 
-@router.delete("/{employee_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{employee_id}")
 def delete_employee(employee_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
 
-    audit.record(
-        db,
-        request=request,
-        action="employee.delete",
-        target_type="employee",
-        target_id=str(employee.employee_id),
-        payload_summary=f"{employee.name} ({employee.employee_code})",
-    )
-    db.delete(employee)
-    commit_only(db)
+    has_requests = db.query(StockRequest).filter(
+        StockRequest.requester_employee_id == employee_id
+    ).first() is not None
+
+    if has_requests:
+        employee.is_active = False
+        employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        audit.record(
+            db,
+            request=request,
+            action="employee.deactivate",
+            target_type="employee",
+            target_id=str(employee.employee_id),
+            payload_summary=f"{employee.name} ({employee.employee_code}) — 이력 있어 비활성화",
+        )
+        commit_only(db)
+        return JSONResponse(status_code=200, content={"result": "deactivated"})
+    else:
+        audit.record(
+            db,
+            request=request,
+            action="employee.delete",
+            target_type="employee",
+            target_id=str(employee.employee_id),
+            payload_summary=f"{employee.name} ({employee.employee_code}) — 영구 삭제",
+        )
+        db.delete(employee)
+        commit_only(db)
+        return JSONResponse(status_code=200, content={"result": "deleted"})
 
 
 @router.post("/{employee_id}/verify-pin", response_model=EmployeeResponse)
-def verify_employee_pin(employee_id: uuid.UUID, payload: PinVerifyRequest, db: Session = Depends(get_db)):
-    """작업자 식별용 PIN 검증 — 실제 보안 인증이 아님."""
+def verify_employee_pin(
+    employee_id: uuid.UUID,
+    payload: PinVerifyRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """작업자 식별용 PIN 검증 — 실제 보안 인증이 아님.
+
+    무차별 대입 완화를 위해 (직원ID + 클라이언트 IP) 키로 실패 시도를 제한한다.
+    실패만 카운트하며 성공 시 키를 리셋한다.
+    """
+    client_ip = getattr(getattr(request, "client", None), "host", None) or "unknown"
+    rl_key = f"verify_pin:{employee_id}:{client_ip}"
+
+    if rate_limit.is_blocked(rl_key):
+        raise http_error(
+            429,
+            ErrorCode.TOO_MANY_REQUESTS,
+            "PIN 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+        )
+
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
     if not bool(employee.is_active):
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원입니다.")
     if not verify_pin(employee.pin_hash, payload.pin):
+        rate_limit.record_failure(rl_key)
         raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
-    return _to_response(employee)
+
+    rate_limit.record_success(rl_key)
+    return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
+
+
+@router.post("/{employee_id}/change-pin", status_code=status.HTTP_204_NO_CONTENT)
+def change_employee_pin(
+    employee_id: uuid.UUID,
+    payload: EmployeePinChangeRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """본인 PIN 변경 — 현재 PIN 검증 필요."""
+    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    if not employee:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    if not employee.is_active:
+        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원입니다.")
+    if not verify_pin(employee.pin_hash, payload.current_pin):
+        raise http_error(403, ErrorCode.FORBIDDEN, "현재 PIN이 올바르지 않습니다.")
+    if payload.current_pin == payload.new_pin:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "새 PIN은 현재 PIN과 달라야 합니다.")
+
+    employee.pin_hash = hash_pin(payload.new_pin)
+    employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    employee.pin_last_changed = datetime.now(UTC).replace(tzinfo=None)
+
+    audit.record(
+        db,
+        request=request,
+        action="employee.change_pin",
+        target_type="employee",
+        target_id=str(employee.employee_id),
+        payload_summary=f"{employee.name} PIN 변경",
+    )
+    commit_only(db)
 
 
 @router.post("/{employee_id}/reset-pin", status_code=status.HTTP_204_NO_CONTENT)
@@ -159,6 +367,7 @@ def reset_employee_pin(
 
     employee.pin_hash = DEFAULT_PIN_HASH
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    employee.pin_last_changed = datetime.now(UTC).replace(tzinfo=None)
 
     audit.record(
         db,
@@ -171,7 +380,31 @@ def reset_employee_pin(
     commit_only(db)
 
 
-def _to_response(employee: Employee) -> EmployeeResponse:
+@router.put("/{employee_id}/theme", response_model=EmployeeResponse, status_code=status.HTTP_200_OK)
+def update_employee_theme(
+    employee_id: uuid.UUID,
+    payload: EmployeeThemeUpdate,
+    db: Session = Depends(get_db),
+):
+    """직원 테마 설정 저장 (light | dark | null)."""
+    if payload.theme and payload.theme not in ("light", "dark"):
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "테마는 light, dark, 또는 null이어야 합니다.")
+
+    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    if not employee:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+
+    employee.theme = payload.theme
+    employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    commit_only(db)
+    return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
+
+
+def _to_response(
+    employee: Employee, assigned_model_slots: Optional[List[int]] = None
+) -> EmployeeResponse:
+    pin_hash = getattr(employee, "pin_hash", None)
+    pin_is_default = pin_hash is None or pin_hash == DEFAULT_PIN_HASH
     return EmployeeResponse(
         employee_id=employee.employee_id,
         employee_code=employee.employee_code,
@@ -180,8 +413,14 @@ def _to_response(employee: Employee) -> EmployeeResponse:
         phone=employee.phone,
         department=employee.department,
         level=employee.level,
+        warehouse_role=(employee.warehouse_role or "none"),
+        department_role=(employee.department_role or "none"),
         display_order=int(employee.display_order),
         is_active=bool(employee.is_active),
         created_at=employee.created_at,
         updated_at=employee.updated_at,
+        pin_last_changed=getattr(employee, "pin_last_changed", None),
+        pin_is_default=pin_is_default,
+        theme=getattr(employee, "theme", None),
+        assigned_model_slots=assigned_model_slots or [],
     )

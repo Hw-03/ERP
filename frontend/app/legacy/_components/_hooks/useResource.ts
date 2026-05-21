@@ -63,7 +63,7 @@ export function useResource<T>(
   useEffect(() => {
     void reload();
     return () => activeCtrlRef.current?.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- generic deps array passed by caller (Cat-D)
   }, deps);
 
   return { data, loading, error, reload };

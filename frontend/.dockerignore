@@ -1,0 +1,30 @@
+# frontend Docker 이미지에 들어가면 안 되는 것 (build context = frontend/)
+# Dockerfile: package*.json → npm ci → COPY . . → npm run build.
+# 아래는 npm ci / npm run build 가 재생성하므로 로컬본을 이미지에 복사하면 안 됨.
+
+# 의존성·빌드 산출물 (npm ci / next build 가 재생성)
+node_modules/
+.next/
+.next-prod/
+out/
+
+# 테스트·커버리지 — 레포엔 남기지만 운영 이미지엔 불필요
+**/__tests__/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+vitest.config.mts
+vitest.setup.ts
+coverage/
+.vitest/
+
+# TS 증분 캐시
+tsconfig.tsbuildinfo
+
+# 로컬 환경/로그 (운영 env 는 compose 에서 주입)
+.env.local
+*.log
+
+# 격리소 (혹시 컨텍스트에 포함돼도 차단)
+_attic/

@@ -41,10 +41,10 @@ def get_all_bom(db: Session = Depends(get_db)):
             bom_id=entry.bom_id,
             parent_item_id=entry.parent_item_id,
             parent_item_name=parent.item_name,
-            parent_erp_code=parent.erp_code,
+            parent_item_code=parent.item_code,
             child_item_id=entry.child_item_id,
             child_item_name=child.item_name,
-            child_erp_code=child.erp_code,
+            child_item_code=child.item_code,
             quantity=entry.quantity,
             unit=entry.unit,
         ))
@@ -239,10 +239,10 @@ def get_where_used(item_id: uuid.UUID, db: Session = Depends(get_db)):
             bom_id=entry.bom_id,
             parent_item_id=entry.parent_item_id,
             parent_item_name=parent.item_name,
-            parent_erp_code=parent.erp_code,
+            parent_item_code=parent.item_code,
             child_item_id=entry.child_item_id,
             child_item_name=item.item_name,
-            child_erp_code=item.erp_code,
+            child_item_code=item.item_code,
             quantity=entry.quantity,
             unit=entry.unit,
         ))
@@ -283,9 +283,9 @@ def _build_tree_cached(
     if item.item_id in visited or depth > 10:
         return BOMTreeNode(
             item_id=item.item_id,
-            erp_code=item.erp_code,
+            item_code=item.item_code,
             item_name=item.item_name,
-            category=item.category,
+            process_type_code=item.process_type_code,
             unit=item.unit,
             required_quantity=required_quantity,
             current_stock=current_stock,
@@ -312,9 +312,9 @@ def _build_tree_cached(
 
     return BOMTreeNode(
         item_id=item.item_id,
-        erp_code=item.erp_code,
+        item_code=item.item_code,
         item_name=item.item_name,
-        category=item.category,
+        process_type_code=item.process_type_code,
         unit=item.unit,
         required_quantity=required_quantity,
         current_stock=current_stock,

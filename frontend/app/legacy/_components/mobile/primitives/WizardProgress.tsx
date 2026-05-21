@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "../tokens";
 
 export function WizardProgress({
@@ -38,7 +38,10 @@ export function WizardProgress({
         <div className={clsx(TYPO.caption, "font-semibold")} style={{ color: LEGACY_COLORS.muted2 }}>
           Step {current + 1} / {steps.length}
         </div>
-        <div className={clsx(TYPO.caption, "font-black")} style={{ color: LEGACY_COLORS.blue }}>
+        <div
+          className={clsx(TYPO.caption, "font-black")}
+          style={{ color: `color-mix(in srgb, ${LEGACY_COLORS.blue} 38%, ${LEGACY_COLORS.text})` }}
+        >
           {active?.label}
         </div>
       </div>

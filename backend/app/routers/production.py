@@ -1,5 +1,6 @@
 """Production router for production receipts and BOM-based backflush."""
 
+import logging
 import uuid
 from decimal import Decimal
 from typing import Dict, List, Tuple
@@ -8,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import BOM, CategoryEnum, Inventory, Item, TransactionLog, TransactionTypeEnum
+from app.models import BOM, Inventory, Item, ProcessType, TransactionLog, TransactionTypeEnum
 from app.schemas import (
     BackflushDetail,
     BomCheckResponse,
@@ -24,6 +25,8 @@ from app.services.bom import merge_requirements
 from app.routers._errors import ErrorCode, http_error
 
 router = APIRouter()
+
+logger = logging.getLogger("mes")
 
 
 @router.post(
@@ -64,7 +67,8 @@ def production_receipt(
     # 기존엔 component 마다 db.query 가 반복되어 N+1 였음.
     comp_ids = list(merged.keys())
     items_map = {i.item_id: i for i in db.query(Item).filter(Item.item_id.in_(comp_ids)).all()}
-    invs_map = {i.item_id: i for i in db.query(Inventory).filter(Inventory.item_id.in_(comp_ids)).all()}
+    # 다품목 동시 backflush TOCTOU 방지 — 한 번에 FOR UPDATE 잠금
+    invs_map = inventory_svc.lock_inventories(db, comp_ids)
 
     shortage_errors = []
     for comp_item_id, required_qty in merged.items():
@@ -77,7 +81,7 @@ def production_receipt(
         if current_avail < required_qty:
             comp_item = items_map.get(comp_item_id)
             shortage_errors.append(
-                f"[{comp_item.erp_code}] {comp_item.item_name}: 필요 {required_qty} {comp_item.unit}, "
+                f"[{comp_item.item_code}] {comp_item.item_name}: 필요 {required_qty} {comp_item.unit}, "
                 f"가용 {current_avail} {comp_item.unit}, 부족 {required_qty - current_avail}"
             )
 
@@ -123,17 +127,17 @@ def production_receipt(
             backflushed.append(
                 BackflushDetail(
                     item_id=comp_item_id,
-                    erp_code=comp_item.erp_code,
+                    item_code=comp_item.item_code,
                     item_name=comp_item.item_name,
-                    category=comp_item.category,
+                    process_type_code=comp_item.process_type_code,
                     required_quantity=required_qty,
                     stock_before=qty_before,
                     stock_after=inv.quantity,
                 )
             )
 
-        # 생산 결과: 카테고리 매핑 부서의 PRODUCTION으로 적재 (없으면 창고)
-        target_dept = inventory_svc.dept_for_category(produced_item.category)
+        # 생산 결과: process_type_code 기반 부서의 PRODUCTION으로 적재 (R 시리즈/없음 → 창고 폴백)
+        target_dept = inventory_svc.dept_for_process_type(produced_item.process_type_code)
         produced_inv = inventory_svc.get_or_create_inventory(db, payload.item_id)
         prod_qty_before = produced_inv.quantity or Decimal("0")
         if target_dept is not None:
@@ -159,7 +163,26 @@ def production_receipt(
         transaction_ids.append(produce_log.log_id)
 
         db.commit()
+    except HTTPException:
+        # WS9: 엔드포인트가 의도적으로 던진 404/4xx(예: 부품 미존재, 위 분기)를
+        # 아래 except Exception 이 500 으로 재포장하지 않도록 그대로 통과.
+        raise
+    except ValueError as exc:
+        # WS9: 동시 같은-부품 입고 경합에서 진 쪽 — consume_warehouse 의
+        # 원자적 가드(UPDATE ... WHERE qty>=n)가 늦게 ValueError 를 던진다.
+        # 사전 검사와 동일하게 깨끗한 422 STOCK_SHORTAGE 로 매핑(기존엔 아래
+        # except Exception 이 삼켜 500 으로 나갔음). db 는 롤백되어 loser 의
+        # 부분 배치/orphan TransactionLog 가 남지 않는다.
+        db.rollback()
+        raise http_error(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            code=ErrorCode.STOCK_SHORTAGE,
+            message="재고 부족으로 생산 입고를 진행할 수 없습니다.",
+            shortages=[str(exc)],
+        )
     except Exception as exc:
+        # WS8: 재던지기 전 풀스택 보존(기존엔 str(exc) 만 남고 트레이스 소실).
+        logger.exception("생산 처리 중 예기치 못한 오류")
         db.rollback()
         raise http_error(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -227,9 +250,9 @@ def check_production_feasibility(
             all_ok = False
         result.append(
             {
-                "erp_code": comp_item.erp_code,
+                "item_code": comp_item.item_code,
                 "item_name": comp_item.item_name,
-                "category": comp_item.category,
+                "process_type_code": comp_item.process_type_code,
                 "unit": comp_item.unit,
                 "required": float(required_qty),
                 "current_stock": float(current_total),
@@ -269,101 +292,199 @@ def _explode_bom(
 )
 @router.get("/possible", response_model=CapacityResponse, summary="Production capacity alias")
 def get_production_capacity(db: Session = Depends(get_db)):
-    """BOM이 등록된 AA 품목들에 대해 즉시/최대 생산 가능수량을 계산한다.
+    """BOM 최상위 완제품들에 대해 즉시/최대 생산 가능수량을 계산한다.
 
-    - **immediate**: warehouse_available (= warehouse_qty - pending) 기준 최소 생산 가능량.
-      production_receipt 의 실제 차감 검사식과 일치 (부서 생산재고/불량은 제외).
-      → "지금 당장 만들 수 있는 수량" 의 정확한 값.
-    - **maximum**: total (= warehouse + production + defective) 기준 이론적 최대.
-      **불량 재고도 포함**되므로 실제 가용량과 다를 수 있음. UI 에서는
-      immediate 와 maximum 의 차이를 운영자에게 분명히 설명해야 한다.
+    - **immediate**: 시작 재고를 stage_order ≥ 60(NF) 인 품목에서만 인정.
+      NF 미만(원자재 등)은 추가 생산 안 함 → 현실 도달 가능 수량.
+    - **maximum**: 맨 아래 원자재(TR, stage_order 10)까지 전부 재귀, 모든 재고 사용.
+
+    응답 status 4단계:
+      no_target / bom_not_registered / not_producible / producible.
     """
+
+    def _buildable(
+        item_id: uuid.UUID,
+        *,
+        bom_cache: BomCache,
+        fig_by_id: Dict[uuid.UUID, stock_math.StockFigures],
+        stage_by_item: Dict[uuid.UUID, int | None],
+        immediate_mode: bool,
+        memo: Dict[uuid.UUID, int],
+        visiting: frozenset,
+        depth: int = 0,
+    ) -> Tuple[int, uuid.UUID | None]:
+        """재귀 누적 가용 생산량(buildable).
+
+        Returns: (qty, bottleneck_item_id)
+        """
+        MAX_DEPTH = 10
+
+        if item_id in memo:
+            return memo[item_id], None
+
+        # 사이클 체크
+        if depth > MAX_DEPTH or item_id in visiting:
+            own = max(int(fig_by_id.get(item_id, stock_math.StockFigures()).available), 0)
+            return own, None
+
+        # 현재 아이템의 가용 재고
+        own = max(int(fig_by_id.get(item_id, stock_math.StockFigures()).available), 0)
+        stage = stage_by_item.get(item_id)
+
+        # immediate_mode에서 stage < 60이면 자식 전개 안 함 (원자재는 추가 생산 안 함)
+        if immediate_mode and stage is not None and stage < 60:
+            memo[item_id] = own
+            return own, None
+
+        children = bom_cache.get(item_id, [])
+        if not children:
+            memo[item_id] = own
+            return own, None
+
+        # 각 자식 재귀
+        new_visiting = visiting | frozenset([item_id])
+        extra_qty = float("inf")
+        bottleneck_id: uuid.UUID | None = None
+
+        for child_id, per_unit in children:
+            child_qty, _ = _buildable(
+                child_id,
+                bom_cache=bom_cache,
+                fig_by_id=fig_by_id,
+                stage_by_item=stage_by_item,
+                immediate_mode=immediate_mode,
+                memo=memo,
+                visiting=new_visiting,
+                depth=depth + 1,
+            )
+            if per_unit > 0:
+                can_make = int(child_qty / per_unit)
+                if can_make < extra_qty:
+                    extra_qty = can_make
+                    bottleneck_id = child_id
+
+        if extra_qty == float("inf"):
+            extra_qty = 0
+
+        total = own + int(extra_qty)
+        memo[item_id] = total
+        return total, bottleneck_id
+
+    empty_response = {
+        "immediate": 0,
+        "maximum": 0,
+        "limiting_item": None,
+        "status": "no_target",
+        "top_items": [],
+    }
+
     # BOM parent 중 다른 BOM의 child가 아닌 것 = 최상위 품목
     all_parent_ids = {row[0] for row in db.query(BOM.parent_item_id).distinct().all()}
     all_child_ids = {row[0] for row in db.query(BOM.child_item_id).distinct().all()}
     top_level_ids = all_parent_ids - all_child_ids
 
     if not top_level_ids:
-        return {"immediate": 0, "maximum": 0, "limiting_item": None, "top_items": []}
+        return empty_response
 
-    top_items_db = (
-        db.query(Item)
-        .filter(Item.item_id.in_(list(top_level_ids)))
-        .filter(Item.category == CategoryEnum.AA)
-        .limit(15)
-        .all()
-    )
+    # 모든 top-level PF 조회 (limit 제거)
+    top_items_db = db.query(Item).filter(Item.item_id.in_(list(top_level_ids))).all()
 
-    # 1) BOM 전체를 한 번만 읽어 캐시 만들고 모든 top item 을 펼친다 (N+1 제거)
+    if not top_items_db:
+        return empty_response
+
+    # 1) BOM 전체를 한 번만 읽어 캐시
     bom_cache = build_bom_cache(db)
-    explode_cache: Dict[uuid.UUID, Dict[uuid.UUID, Decimal]] = {}
-    all_comp_ids: set[uuid.UUID] = set()
+
+    # 2) top_item 및 BOM 구조의 모든 item에 대해 재고 조회
+    all_item_ids: set[uuid.UUID] = {item.item_id for item in top_items_db}
+
+    def _collect_all_items(iid: uuid.UUID, visited: set[uuid.UUID] | None = None) -> None:
+        if visited is None:
+            visited = set()
+        if iid in visited:
+            return
+        visited.add(iid)
+        all_item_ids.add(iid)
+        for child_id, _ in bom_cache.get(iid, []):
+            _collect_all_items(child_id, visited)
+
     for item in top_items_db:
-        merged = merge_requirements(_explode_bom(db, item.item_id, Decimal("1"), cache=bom_cache))
-        if not merged:
-            continue
-        explode_cache[item.item_id] = merged
-        all_comp_ids.update(merged.keys())
+        _collect_all_items(item.item_id)
 
-    if not explode_cache:
-        return {"immediate": 0, "maximum": 0, "limiting_item": None, "top_items": []}
+    # 3) bulk으로 재고 + 품목 정보 조회 (N+1 제거)
+    fig_by_id = stock_math.bulk_compute(db, all_item_ids)
+    items_map = {i.item_id: i for i in db.query(Item).filter(Item.item_id.in_(list(all_item_ids))).all()}
 
-    # 2) bulk 로 한 번에 재고 + 품목 정보 조회 (N+1 제거)
-    figures_map = stock_math.bulk_compute(db, all_comp_ids)
-    items_map = {
-        i.item_id: i
-        for i in db.query(Item).filter(Item.item_id.in_(list(all_comp_ids))).all()
-    }
+    # 4) 각 item의 stage_order 맵
+    stage_by_item: Dict[uuid.UUID, int | None] = {}
+    for iid in all_item_ids:
+        item = items_map.get(iid)
+        if item and item.process_type_code:
+            pt = db.query(ProcessType).filter(ProcessType.code == item.process_type_code).first()
+            if pt:
+                stage_by_item[iid] = pt.stage_order
+        stage_by_item.setdefault(iid, None)
 
+    # 5) top 각각에 대해 immediate/maximum 계산
     top_results = []
-    bottleneck_by_top: Dict[uuid.UUID, str | None] = {}
     for item in top_items_db:
-        merged = explode_cache.get(item.item_id)
-        if not merged:
-            continue
+        imm, imm_btl = _buildable(
+            item.item_id,
+            bom_cache=bom_cache,
+            fig_by_id=fig_by_id,
+            stage_by_item=stage_by_item,
+            immediate_mode=True,
+            memo={},
+            visiting=frozenset(),
+        )
+        mx, _ = _buildable(
+            item.item_id,
+            bom_cache=bom_cache,
+            fig_by_id=fig_by_id,
+            stage_by_item=stage_by_item,
+            immediate_mode=False,
+            memo={},
+            visiting=frozenset(),
+        )
 
-        min_immediate = float("inf")
-        min_maximum = float("inf")
-        limiting_item: str | None = None
+        bottleneck_name: str | None = None
+        if imm_btl:
+            btl_item = items_map.get(imm_btl)
+            if btl_item:
+                bottleneck_name = btl_item.item_name
 
-        for comp_id, req_qty in merged.items():
-            req = float(req_qty)
-            if req <= 0:
-                continue
-            fig = figures_map.get(comp_id) or stock_math.StockFigures()
-            wh_avail = float(fig.warehouse_available)
-            total = float(fig.total)
-            imm_can = wh_avail / req
-            max_can = total / req
-            if imm_can < min_immediate:
-                min_immediate = imm_can
-                comp_item = items_map.get(comp_id)
-                limiting_item = comp_item.item_name if comp_item else None
-            if max_can < min_maximum:
-                min_maximum = max_can
-
-        bottleneck_by_top[item.item_id] = limiting_item
         top_results.append({
             "item_id": str(item.item_id),
             "item_name": item.item_name,
-            "erp_code": item.erp_code,
-            "immediate": int(min_immediate) if min_immediate != float("inf") else 0,
-            "maximum": int(min_maximum) if min_maximum != float("inf") else 0,
+            "item_code": item.item_code,
+            "immediate": imm,
+            "maximum": mx,
+            "limiting_item": bottleneck_name,
         })
 
     if not top_results:
-        return {"immediate": 0, "maximum": 0, "limiting_item": None, "top_items": []}
+        return {
+            "immediate": 0,
+            "maximum": 0,
+            "limiting_item": None,
+            "status": "bom_not_registered",
+            "top_items": [],
+        }
 
     total_immediate = sum(r["immediate"] for r in top_results)
     total_maximum = sum(r["maximum"] for r in top_results)
 
-    # 가장 즉시 생산 가능량이 작은 top item 의 병목 부품 (이미 위에서 캐시됨)
+    # 전체 병목: immediate 가 가장 작은 top_item 의 병목 부품
     min_item = min(top_results, key=lambda r: r["immediate"])
-    bottleneck_name = bottleneck_by_top.get(uuid.UUID(min_item["item_id"]))
+    bottleneck_name = min_item.get("limiting_item")
+
+    is_producible = any(r["immediate"] > 0 or r["maximum"] > 0 for r in top_results)
+    status_value = "producible" if is_producible else "not_producible"
 
     return {
         "immediate": total_immediate,
         "maximum": total_maximum,
         "limiting_item": bottleneck_name,
+        "status": status_value,
         "top_items": sorted(top_results, key=lambda r: r["immediate"]),
     }

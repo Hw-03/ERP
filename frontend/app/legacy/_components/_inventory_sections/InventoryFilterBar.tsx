@@ -1,85 +1,70 @@
 "use client";
 
-import { ChevronDown, Filter, Search, Sparkles, TrendingUp } from "lucide-react";
+import { Layers, Search, Sparkles, TrendingUp } from "lucide-react";
 import type { ProductModel } from "@/lib/api";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { FilterChip } from "../common";
 
-const DEPT_OPTIONS = [
-  { label: "전체", value: "ALL" },
-  { label: "창고", value: "창고" },
-  { label: "튜브", value: "튜브" },
-  { label: "고압", value: "고압" },
-  { label: "진공", value: "진공" },
-  { label: "튜닝", value: "튜닝" },
-  { label: "조립", value: "조립" },
-  { label: "출하", value: "출하" },
-  { label: "AS", value: "AS" },
+const DEPT_CHIPS = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
+
+const PROCESS_STEP_CHIPS: { value: "R" | "A" | "F"; label: string }[] = [
+  { value: "R", label: "원자재" },
+  { value: "A", label: "중간공정" },
+  { value: "F", label: "공정완료" },
 ];
-
-function Chip({
-  active,
-  label,
-  onClick,
-  tone,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-  tone: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-full rounded-full border px-4 py-2 text-sm font-semibold transition-all hover:brightness-110"
-      style={{
-        background: active ? `color-mix(in srgb, ${tone} 14%, transparent)` : LEGACY_COLORS.s2,
-        borderColor: active ? tone : LEGACY_COLORS.border,
-        color: active ? tone : LEGACY_COLORS.muted2,
-      }}
-    >
-      {label}
-    </button>
-  );
-}
 
 type FiltersProps = {
   open: boolean;
   selectedDepts: string[];
   selectedModels: string[];
+  selectedProcessSteps: string[];
   productModels: ProductModel[];
   toggleDept: (v: string) => void;
   toggleModel: (v: string) => void;
+  toggleProcessStep: (v: string) => void;
   onClearDepts: () => void;
   onClearModels: () => void;
+  onClearProcessSteps: () => void;
 };
 
 export function InventoryFilters({
   open,
   selectedDepts,
   selectedModels,
+  selectedProcessSteps,
   productModels,
   toggleDept,
   toggleModel,
+  toggleProcessStep,
   onClearDepts,
   onClearModels,
+  onClearProcessSteps,
 }: FiltersProps) {
   if (!open) return null;
   return (
-    <div className="mt-2.5 grid gap-2.5 xl:grid-cols-2">
+    <div id="inventory-filter-panel" className="mt-2.5 grid gap-2.5 xl:grid-cols-3">
       <div className="rounded-[16px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
         <div className="mb-2 flex items-center gap-2 text-sm font-bold">
           <Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />
           부서 구분
         </div>
         <div className="grid grid-cols-3 gap-2">
-          <Chip active={selectedDepts.length === 0} label="전체" onClick={onClearDepts} tone={LEGACY_COLORS.green} />
-          {DEPT_OPTIONS.filter((o) => o.value !== "ALL").map((opt) => (
-            <Chip
-              key={opt.value}
-              active={selectedDepts.includes(opt.value)}
-              label={opt.label}
-              onClick={() => toggleDept(opt.value)}
+          <FilterChip active={selectedDepts.length === 0} label="전체" onClick={onClearDepts} tone={LEGACY_COLORS.green} className="w-full" />
+          <FilterChip
+            active={selectedDepts.includes("창고")}
+            label="창고"
+            onClick={() => toggleDept("창고")}
+            tone={LEGACY_COLORS.green}
+            className="w-full"
+          />
+          {DEPT_CHIPS.map((name) => (
+            <FilterChip
+              key={name}
+              active={selectedDepts.includes(name)}
+              label={name}
+              onClick={() => toggleDept(name)}
               tone={LEGACY_COLORS.green}
+              className="w-full"
             />
           ))}
         </div>
@@ -90,14 +75,47 @@ export function InventoryFilters({
           모델 구분
         </div>
         <div className="grid grid-cols-3 gap-2 overflow-x-auto">
-          <Chip active={selectedModels.length === 0} label="전체" onClick={onClearModels} tone={LEGACY_COLORS.cyan} />
+          <FilterChip active={selectedModels.length === 0} label="전체" onClick={onClearModels} tone={LEGACY_COLORS.cyan} className="w-full" />
           {productModels.map((m) => (
-            <Chip
+            <FilterChip
               key={m.model_name}
               active={selectedModels.includes(m.model_name ?? "")}
               label={m.model_name ?? ""}
               onClick={() => toggleModel(m.model_name ?? "")}
               tone={LEGACY_COLORS.cyan}
+              className="w-full"
+            />
+          ))}
+          <FilterChip
+            active={selectedModels.includes("미분류")}
+            label="미분류"
+            onClick={() => toggleModel("미분류")}
+            tone={LEGACY_COLORS.muted2}
+            className="w-full"
+          />
+        </div>
+      </div>
+      <div className="rounded-[16px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <div className="mb-2 flex items-center gap-2 text-sm font-bold">
+          <Layers className="h-4 w-4" style={{ color: LEGACY_COLORS.yellow }} />
+          공정 구분
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <FilterChip
+            active={selectedProcessSteps.length === 0}
+            label="전체"
+            onClick={onClearProcessSteps}
+            tone={LEGACY_COLORS.yellow}
+            className="w-full"
+          />
+          {PROCESS_STEP_CHIPS.map((step) => (
+            <FilterChip
+              key={step.value}
+              active={selectedProcessSteps.includes(step.value)}
+              label={step.label}
+              onClick={() => toggleProcessStep(step.value)}
+              tone={LEGACY_COLORS.yellow}
+              className="w-full"
             />
           ))}
         </div>
@@ -110,19 +128,13 @@ type StickyHeaderProps = {
   searchValue: string;
   onSearchChange: (v: string) => void;
   count: number;
-  activeFilterCount: number;
-  filtersOpen: boolean;
   isFiltered: boolean;
-  onToggleFilters: () => void;
 };
 
 export function InventoryTableStickyHeader({
   searchValue,
   onSearchChange,
-  activeFilterCount,
-  filtersOpen,
   isFiltered,
-  onToggleFilters,
 }: StickyHeaderProps) {
   return (
     <div
@@ -158,38 +170,12 @@ export function InventoryTableStickyHeader({
           <input
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="품명 · ERP코드 · 위치 · 공급처 검색"
+            placeholder="품명 · 품목 코드 · 위치 · 공급처 검색"
             className="flex-1 bg-transparent text-base outline-none"
             style={{ color: LEGACY_COLORS.text }}
+            aria-label="자재 검색"
           />
         </div>
-        <button
-          onClick={onToggleFilters}
-          className="flex shrink-0 items-center gap-1.5 rounded-[14px] border px-3 py-2 text-sm font-semibold transition-colors hover:brightness-110"
-          style={{
-            background: filtersOpen
-              ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
-              : LEGACY_COLORS.s2,
-            borderColor: filtersOpen ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-            color: filtersOpen ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
-          }}
-          aria-expanded={filtersOpen}
-        >
-          <Filter className="h-3.5 w-3.5" />
-          필터
-          {activeFilterCount > 0 && (
-            <span
-              className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full text-[11px] font-bold leading-none"
-              style={{ background: LEGACY_COLORS.blue, color: "#fff" }}
-            >
-              {activeFilterCount}
-            </span>
-          )}
-          <ChevronDown
-            className="h-3.5 w-3.5 transition-transform"
-            style={{ transform: filtersOpen ? "rotate(180deg)" : undefined }}
-          />
-        </button>
       </div>
     </div>
   );

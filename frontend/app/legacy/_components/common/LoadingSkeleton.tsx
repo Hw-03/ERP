@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 type Variant = "table" | "card" | "list";
 

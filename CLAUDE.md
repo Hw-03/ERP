@@ -1,142 +1,112 @@
 # CLAUDE.md
 
-## Goal
-ERP/MES prototype for material / inventory / production flow.
+## Project Rules
 
-## Paths
+- Official system name: **DEXCOWIN MES**. Do not call it ERP or X-Ray in user-facing text or documents.
 - backend: `backend/`
 - frontend: `frontend/`
 - backend entry: `backend/app/main.py`
-- before editing frontend, verify real render/import path first
+- Before editing frontend code, verify the real render/import path first.
+- If docs and live code disagree, trust the live code.
+- Do not edit `_archive/`, `_backup/`, or `frontend/_archive/` unless explicitly asked.
+- Do not casually edit `_attic/`; it contains archived source material, backups, and old working notes.
+- Do not mix sample data with real data.
+- Do not perform large refactors, folder moves, or renames unless explicitly asked.
+- Do not rename legacy internal identifiers such as `xray-erp` unless explicitly asked.
+- Respond in Korean, conclusion first, short and clear.
 
-## Root
-- `data/` source/output
-- `scripts/` utils
-- `docs/` docs
-- `.dev/` dev tools
-- `vault/` obsidian vault (only on `vault-sync`; not committed to `main`)
-- `_archive/`, `_backup/` do not edit
+## Commit / Push
 
-## Core Rules
-1. Self-drive when safe
-2. Small edit / search / run / verify = no mid-confirm
-3. Big change / destructive change = brief reason first
-4. If ambiguous, choose safest option
-5. Docs < actual live code path
+- Never auto-commit or auto-push.
+- Commit and push only when the user explicitly asks.
+- When explicitly asked to commit and push, run the required local checks first to avoid GitHub CI failures, and unless told otherwise, commit and push only the changes made in the current session.
 
-## Do Not Edit
-- `_archive/`
-- `_backup/`
-- `frontend/_archive/`
+## DB / Run / Verify
 
-Only if user explicitly asks.
+- Starting the server must not change the DB.
+- Before DB-changing work, briefly explain the impact first.
+- For setup, schema changes, migrations, or seed work:
 
-## Workflow
-1. find files
-2. verify active files
-3. edit
-4. run / verify
-5. report
+```bash
+cd backend
+python bootstrap_db.py --all
+```
 
-## Hard Warnings
-- do not edit from route file only
-- verify real component / import / API path first
-- if docs != code, trust code
-- do not mix sample data with real data
-- no large refactor / folder move / rename unless asked
+- Run backend:
 
-## Maintainability
-- prevent file bloat
-- if UI / state / API / helpers mix too much, prefer local helper/local component split
-- do not spam new files
-- do not fall back to giant single-file legacy
-- preserve maintainability after redesign
-
-## Branch Policy
-- daytime confirmed work -> `main`
-- night / experiment / overhaul / structural work -> feature branch
-- avoid mixing `mobile` / `desktop` / `backend` / `docs` in one branch
-- after work, report: merge-to-main? delete-branch?
-
-## Branch Names
-- `feat/...`
-- `fix/...`
-- `refactor/...`
-- `docs/...`
-
-Examples:
-- `feat/mobile-ux-overhaul`
-- `feat/backend-hardening`
-- `fix/inventory-sync-bug`
-
-## Commit Policy
-- no auto commit
-- no auto push
-- commit only when user asks
-- backup-point commit may be proposed before risky work
-- avoid noisy micro-commits
-- summarize change scope before commit
-
-## Commit Message
-Format:
-`YYYY-MM-DD area: summary`
-
-Areas:
-`mobile`, `desktop`, `backend`, `admin`, `docs`, `fix`, `refactor`
-
-Examples:
-- `2026-04-24 mobile: refine inventory selection mode`
-- `2026-04-24 backend: unify stock math`
-- `2026-04-24 admin: add mobile admin hub`
-
-Avoid vague messages:
-- `test`
-- `again`
-- `update`
-
-## Main Merge Policy
-- feature branch -> merge to `main` only after run/review
-- explain `merge` separately from `commit`
-- if useful, also list branches safe to delete after merge
-
-## Vault Branch Policy
-- `main` is the runtime/deploy source branch and must stay vault-free.
-- `vault-sync` keeps the same runtime progress as `main`, plus the `vault/` folder.
-- `main` and `vault-sync` should differ only by the presence of `vault/`.
-- When bringing `main` changes into `vault-sync`, do not apply any deletion/removal of `vault/`.
-- Do not merge `vault-sync` directly into `main`.
-- If runtime code from `vault-sync` must go to `main`, create a clean branch or cherry-pick excluding `vault/`.
-
-## Response Style
-- Korean
-- conclusion first
-- short, clear
-- non-dev friendly
-- prefer:
-  - now done
-  - not done
-  - next 1 thing
-
-## Report Format
-- done
-- changed files
-- verification
-- remaining issue
-- next 1 thing
-
-## Priority Files
-- `README.md`
-- `docs/AI_HANDOVER.md`
-- `docs/CODEX_PROGRESS.md`
-- `start.bat`
-- `docker-compose.yml`
-- `backend/app/main.py`
-- `frontend/package.json`
-
-## Run
-
-### backend
 ```bash
 cd backend
 python -m uvicorn app.main:app --reload
 ```
+
+- Before commit/push, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
+```
+
+---
+
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
+
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+
+## 1. Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+## 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+## 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+```text
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+---
+
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.

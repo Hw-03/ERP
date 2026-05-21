@@ -1,15 +1,14 @@
 "use client";
 
 import { memo } from "react";
+import Image from "next/image";
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import type { Item } from "@/lib/api";
-import {
-  LEGACY_COLORS,
-  employeeColor,
-  erpCodeDept,
-  formatNumber,
-  getStockState,
-} from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { itemCodeDept } from "@/lib/mes/process";
+import { getStockState } from "@/lib/mes/inventory";
+import { formatQty } from "@/lib/mes/format";
+import { useDeptColorLookup } from "../DepartmentsContext";
 
 function safeQty(item: Item) {
   const n = Number(item.quantity);
@@ -24,9 +23,11 @@ type Props = {
   item: Item;
   selected: boolean;
   onSelect: (item: Item | null) => void;
+  imageFilename?: string;
 };
 
-function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
+function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props) {
+  const getDeptColor = useDeptColorLookup();
   const minStock = getMinStock(item);
   const stock = getStockState(safeQty(item), minStock === 0 ? null : minStock);
   const qty = safeQty(item);
@@ -40,7 +41,7 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
   let used = 0;
   if (wh > 0) {
     const pct = Math.min(100, (wh / total) * 100);
-    segments.push({ pct, color: "#3ac4b0", label: `창고 ${formatNumber(wh)}` });
+    segments.push({ pct, color: "#3ac4b0", label: `창고 ${formatQty(wh)}` });
     used += pct;
   }
   for (const loc of depts) {
@@ -48,8 +49,8 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
     if (pct <= 0) break;
     segments.push({
       pct,
-      color: employeeColor(loc.department),
-      label: `${loc.department} ${formatNumber(loc.quantity)}`,
+      color: getDeptColor(loc.department),
+      label: `${loc.department} ${formatQty(loc.quantity)}`,
     });
     used += pct;
   }
@@ -58,10 +59,10 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
   const badges: { key: string; label: string; color: string; dim?: boolean }[] = [];
   if (Number(item.warehouse_qty) > 0) badges.push({ key: "창고", label: "창고", color: "#3dd4a0" });
   for (const l of item.locations.filter((l) => Number(l.quantity) > 0))
-    badges.push({ key: l.department, label: l.department, color: employeeColor(l.department) });
+    badges.push({ key: l.department, label: l.department, color: getDeptColor(l.department) });
   if (badges.length === 0) {
-    const dept = item.department ?? erpCodeDept(item.erp_code);
-    if (dept) badges.push({ key: dept, label: dept, color: employeeColor(dept), dim: true });
+    const dept = item.department ?? itemCodeDept(item.item_code);
+    if (dept) badges.push({ key: dept, label: dept, color: getDeptColor(dept), dim: true });
   }
   const visibleBadges = badges.slice(0, 2);
   const extraBadges = badges.length - 2;
@@ -90,7 +91,7 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
       }}
     >
       <td
-        className="border-b px-4 py-2.5 align-middle whitespace-nowrap"
+        className="border-b px-4 py-5 align-middle whitespace-nowrap"
         style={{ borderColor: LEGACY_COLORS.border }}
       >
         <span
@@ -101,20 +102,38 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
           {stock.label}
         </span>
       </td>
-      <td className="border-b px-4 py-2.5 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td
+        className="hidden sm:table-cell border-b px-1 py-5 text-center align-middle"
+        style={{ borderColor: LEGACY_COLORS.border, width: 60 }}
+      >
+        {imageFilename ? (
+          <Image
+            src={`/images/items/${imageFilename}`}
+            alt={item.item_name}
+            width={48}
+            height={48}
+            unoptimized
+            className="inline-block rounded border object-contain"
+            style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
+          />
+        ) : null}
+      </td>
+      <td className="border-b px-4 py-5 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="font-semibold">{item.item_name}</div>
-        <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-          {item.spec || "-"}
-        </div>
+        {item.spec && (
+          <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+            {item.spec}
+          </div>
+        )}
         {Number(item.quantity) === 0 ? (
           <div
-            className="mt-2 h-[5px] overflow-hidden rounded-full"
+            className="mt-[20px] h-[6px] overflow-hidden rounded-full"
             style={{ background: "#ef4444" }}
             title="품절"
           />
         ) : (
           <div
-            className="mt-2 flex h-[5px] overflow-hidden rounded-full"
+            className="mt-[20px] flex h-[6px] overflow-hidden rounded-full"
             style={{ background: LEGACY_COLORS.s3 }}
             title={segments.map((s) => s.label).join(" / ")}
             role="img"
@@ -131,16 +150,16 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
         )}
       </td>
       <td
-        className="border-b px-4 py-2.5 align-middle whitespace-nowrap text-sm"
+        className="hidden sm:table-cell border-b px-4 py-5 align-middle whitespace-nowrap text-sm"
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
       >
-        {item.erp_code ?? "-"}
+        {item.item_code ?? "-"}
       </td>
       <td
-        className="border-b px-4 py-2.5 align-middle whitespace-nowrap"
+        className="hidden sm:table-cell border-b px-4 py-5 align-middle whitespace-nowrap"
         style={{ borderColor: LEGACY_COLORS.border }}
       >
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-center gap-1.5">
           {visibleBadges.map((b) => (
             <span
               key={b.key}
@@ -158,19 +177,22 @@ function InventoryItemRowImpl({ item, selected, onSelect }: Props) {
         </div>
       </td>
       <td
-        className="border-b px-4 py-2.5 text-center align-middle whitespace-nowrap text-sm font-bold"
+        className="border-b px-4 py-5 text-center align-middle whitespace-nowrap text-sm font-bold"
         style={{
           borderColor: LEGACY_COLORS.border,
           color: isCritical ? stock.color : LEGACY_COLORS.text,
         }}
       >
-        {formatNumber(item.quantity)}
+        {formatQty(item.quantity)}{" "}
+        <span className="text-xs font-normal" style={{ color: LEGACY_COLORS.muted2 }}>
+          {item.unit ?? "개"}
+        </span>
       </td>
       <td
-        className="border-b px-4 py-2.5 text-center align-middle whitespace-nowrap text-sm font-bold"
+        className="hidden sm:table-cell border-b px-4 py-5 text-center align-middle whitespace-nowrap text-sm font-bold"
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
       >
-        {item.min_stock == null ? "-" : formatNumber(item.min_stock)}
+        {item.min_stock == null ? "-" : formatQty(item.min_stock)}
       </td>
     </tr>
   );

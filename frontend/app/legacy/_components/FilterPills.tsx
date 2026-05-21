@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LEGACY_COLORS } from "./legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 export function FilterPills({
   options,
@@ -33,7 +33,7 @@ export function FilterPills({
                 ? {
                     background: activeColor,
                     borderColor: activeColor,
-                    color: "#fff",
+                    color: LEGACY_COLORS.white,
                   }
                 : isHovered
                 ? {

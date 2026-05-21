@@ -1,6 +1,6 @@
-"""FastAPI application entry point for the X-Ray ERP backend.
+"""FastAPI application entry point for the DEXCOWIN MES backend.
 
-Startup 부작용 (create_all / run_migrations / seed / ERP 백필) 은 모두
+Startup 부작용 (create_all / run_migrations / seed / MES 백필) 은 모두
 `backend/bootstrap_db.py` 로 옮겼다. 서버 기동만으로는 DB 가 변하지 않는다.
 
 초기 설치 / 스키마 변경 / 시드 재적용은 명시적으로:
@@ -8,10 +8,11 @@ Startup 부작용 (create_all / run_migrations / seed / ERP 백필) 은 모두
     python bootstrap_db.py --all
 """
 
+import datetime as _dt
 import os
 import uuid
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, text
@@ -19,13 +20,11 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app._logging import get_logger, setup_logging
-from app.database import get_db
+from app.database import _is_sqlite, get_db
 from app.models import (
     Employee,
     Inventory,
     Item,
-    QueueBatch,
-    QueueBatchStatusEnum,
     TransactionLog,
 )
 from app.routers._errors import ErrorCode
@@ -33,43 +32,39 @@ from app.services import integrity as integrity_svc
 
 from app.routers import (
     admin_audit,
-    alerts,
+    admin_audit_csv,
     bom,
     codes,
-    counts,
+    departments,
+    dept_adjustment,
     employees,
     inventory,
+    io,
     items,
-    loss,
     models as models_router,
     production,
-    queue,
-    scrap,
     settings,
-    ship_packages,
+    stock_requests,
     variance,
 )
+from app.services import audit_csv as audit_csv_svc
+
+audit_csv_svc.register_session_listeners()
+
+
+_BOOT_ID: str = uuid.uuid4().hex
+_BOOT_STARTED_AT: str = _dt.datetime.utcnow().isoformat()
 
 
 app = FastAPI(
-    title="X-Ray ERP System",
+    title="DEXCOWIN MES",
     description="""
-    ## 정밀 X-Ray 장비 제조 ERP
+    ## DEXCOWIN 경량 MES
 
-    ### 11단계 공정 카테고리
-    | Code | 명칭 | 설명 |
-    |------|------|------|
-    | RM | Raw Material | 원자재 |
-    | TA | Tube Ass'y | 튜브 반제품 |
-    | TF | Tube Final | 튜브 완제품 |
-    | HA | High-voltage Ass'y | 고압 반제품 |
-    | HF | High-voltage Final | 고압 완제품 |
-    | VA | Vacuum Ass'y | 진공 반제품 |
-    | VF | Vacuum Final | 진공 완제품 |
-    | AA | Body Ass'y | 조립 반제품 |
-    | AF | Body Final | 조립 완제품 |
-    | FG | Finished Good | 완제품 |
-    | UK | Unknown | 미분류 또는 확인 필요 |
+    ### 공정 분류 코드 (18종)
+    `process_type_code` = 부서(T/H/V/N/A/P) × 단계(R=원자재 / A=중간공정 / F=공정완료)
+
+    TR/TA/TF (튜브) · HR/HA/HF (고압) · VR/VA/VF (진공) · NR/NA/NF (튜닝) · AR/AA/AF (조립) · PR/PA/PF (출하)
 
     ### 주요 기능
     - 품목 마스터 조회 및 수정
@@ -89,16 +84,11 @@ app = FastAPI(
         {"name": "Inventory", "description": "재고 조회·입출고·이동·불량·반품·거래이력."},
         {"name": "BOM", "description": "BOM CRUD + 트리 + Where-Used."},
         {"name": "Production", "description": "생산 입고 + BOM Backflush."},
-        {"name": "Queue", "description": "Queue 배치 워크플로 (생산/분해/반품 2단계)."},
         {"name": "Settings", "description": "관리자 PIN, 시스템 정합성 점검·복구."},
         {"name": "Ship Packages", "description": "출하 묶음 CRUD."},
         {"name": "Models", "description": "제품 모델 슬롯."},
         {"name": "Codes", "description": "코드 마스터 (제품기호/옵션/공정)."},
-        {"name": "Scrap", "description": "폐기 이력."},
-        {"name": "Loss", "description": "분실/누락 이력."},
         {"name": "Variance", "description": "차이 분석."},
-        {"name": "Alerts", "description": "안전재고/실사 알림."},
-        {"name": "Counts", "description": "실사 등록·강제 조정."},
         {"name": "Admin Audit", "description": "관리자 액션 감사로그 조회 (마스터/설정 변경)."},
     ],
 )
@@ -226,25 +216,44 @@ def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespon
 
 app.include_router(items.router, prefix="/api/items", tags=["Items"])
 app.include_router(employees.router, prefix="/api/employees", tags=["Employees"])
+app.include_router(departments.router, prefix="/api/departments", tags=["Departments"])
 app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
-app.include_router(ship_packages.router, prefix="/api/ship-packages", tags=["Ship Packages"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])
+app.include_router(io.router, prefix="/api/io", tags=["Inventory IO"])
 app.include_router(bom.router, prefix="/api/bom", tags=["BOM"])
 app.include_router(production.router, prefix="/api/production", tags=["Production"])
 app.include_router(codes.router, prefix="/api/codes", tags=["Codes"])
-app.include_router(queue.router, prefix="/api/queue", tags=["Queue"])
-app.include_router(scrap.router, prefix="/api/scrap", tags=["Scrap"])
-app.include_router(loss.router, prefix="/api/loss", tags=["Loss"])
 app.include_router(variance.router, prefix="/api/variance", tags=["Variance"])
-app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
-app.include_router(counts.router, prefix="/api/counts", tags=["Counts"])
 app.include_router(models_router.router, prefix="/api/models", tags=["Models"])
 app.include_router(admin_audit.router, prefix="/api/admin", tags=["Admin Audit"])
+app.include_router(admin_audit_csv.router, prefix="/api/admin", tags=["Admin Audit"])
+app.include_router(stock_requests.router, prefix="/api/stock-requests", tags=["Stock Requests"])
+app.include_router(dept_adjustment.router, prefix="/api/dept-adjustment", tags=["Dept Adjustment"])
 
 
 @app.get("/health", tags=["System"])
 def health_check():
-    return {"status": "ok", "service": "X-Ray ERP API"}
+    return {"status": "ok", "service": "DEXCOWIN MES API"}
+
+
+@app.get("/health/live", tags=["System"])
+def health_live(db: Session = Depends(get_db)):
+    """경량 liveness — 컨테이너/오케스트레이터 프로브 전용 (WS3).
+
+    정적 `/health` 와 달리 DB-down 을 구분: DB 미연결이면 503.
+    `/health/detailed` 와 달리 row count·무결성 스캔을 하지 않아 30s 주기
+    프로브에 적합(가벼움).
+    """
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as e:  # noqa: BLE001 — 프로브는 사유 무관 비가용이면 503
+        raise HTTPException(status_code=503, detail=f"DB unreachable: {e}")
+    return {"status": "live"}
+
+
+@app.get("/api/app-session", tags=["System"])
+def app_session():
+    return {"boot_id": _BOOT_ID, "started_at": _BOOT_STARTED_AT}
 
 
 @app.get("/health/detailed", tags=["System"])
@@ -270,19 +279,13 @@ def health_detailed(db: Session = Depends(get_db)):
         "employees": db.query(Employee).count(),
         "inventory": db.query(Inventory).count(),
         "transaction_logs": db.query(TransactionLog).count(),
-        "queue_batches": db.query(QueueBatch).count(),
     }
 
     # 3) inventory mismatch — 가벼운 검사
     mismatches = integrity_svc.check_inventory_consistency(db)
     mismatch_count = len(mismatches)
 
-    # 4) open queue batches
-    open_batches = (
-        db.query(QueueBatch).filter(QueueBatch.status == QueueBatchStatusEnum.OPEN).count()
-    )
-
-    # 5) 최근 transaction log 시간
+    # 4) 최근 transaction log 시간
     last_tx = (
         db.query(func.max(TransactionLog.created_at)).scalar()
     )
@@ -292,15 +295,61 @@ def health_detailed(db: Session = Depends(get_db)):
         "db": {"ok": db_ok},
         "rows": rows,
         "inventory_mismatch_count": mismatch_count,
-        "open_queue_batches": open_batches,
         "last_transaction_at": last_tx.isoformat() if last_tx else None,
     }
+
+
+@app.get("/api/health/db-info", tags=["System"])
+def health_db_info():
+    """서버가 실제 연결 중인 DB 정보 반환 — preflight 전용.
+    DATABASE_URL 전체 노출 금지. 엔진 종류 + 30명 안전 여부만 반환.
+    """
+    db_engine = "sqlite" if _is_sqlite else "postgresql"
+    return {
+        "db_engine": db_engine,
+        "is_sqlite": _is_sqlite,
+        "pool_enabled": not _is_sqlite,
+        "safe_for_30_users": not _is_sqlite,
+        "note": (
+            "SQLite는 개발/테스트 전용. 30명 운영은 PostgreSQL 필수."
+            if _is_sqlite else
+            "PostgreSQL 연결 정상. 30명 동시 운영 가능."
+        ),
+    }
+
+
+@app.post("/api/health/write-check", tags=["System"])
+def health_write_check(db: Session = Depends(get_db)):
+    """DB 쓰기 가능 여부 점검 — preflight 전용.
+    SAVEPOINT 안에서 실제 INSERT 실행 후 rollback. 데이터 변경 없음.
+    """
+    import time as _time
+    start = _time.perf_counter()
+    try:
+        sp = db.begin_nested()
+        # Actual write test: INSERT a temporary item row inside SAVEPOINT
+        db.add(Item(item_name="__health_write_test__", unit="EA"))
+        db.flush()
+        sp.rollback()
+        latency_ms = round((_time.perf_counter() - start) * 1000, 1)
+        return {
+            "status": "ok",
+            "db_engine": "sqlite" if _is_sqlite else "postgresql",
+            "writable": True,
+            "latency_ms": latency_ms,
+        }
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        raise HTTPException(status_code=503, detail=f"DB 쓰기 테스트 실패: {str(e)}")
 
 
 @app.get("/", tags=["System"])
 def root():
     return {
-        "message": "X-Ray ERP System API",
+        "message": "DEXCOWIN MES System API",
         "docs": "/docs",
         "version": app.version,
     }

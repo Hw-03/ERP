@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 
 // api 모킹 — useItems 가 부르는 api.getItems 만 가로챈다
 vi.mock("@/lib/api", () => ({
@@ -30,8 +30,8 @@ describe("useItems", () => {
     (api.getItems as any).mockRejectedValue(abortErr);
 
     const { result } = renderHook(() => useItems({}));
-    // AbortError 면 loading 은 가드되어 그대로 둘 수 있음 — error 는 절대 set 되지 않아야
-    await new Promise((r) => setTimeout(r, 30));
+    // AbortError 면 loading 은 가드되어 그대로 둘 수 있음. waitFor 로 hook update 를 act 안에서 비운다.
+    await waitFor(() => expect(api.getItems).toHaveBeenCalledTimes(1));
     expect(result.current.error).toBeNull();
   });
 

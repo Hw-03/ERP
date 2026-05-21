@@ -1,4 +1,4 @@
-"""4-part ERP code utilities: parse, format, validate, generate.
+"""4-part 품목 코드 utilities: parse, format, validate, generate.
 
 Code format: [제품기호]-[구분코드]-[일련번호]-[옵션코드]
 
@@ -14,7 +14,7 @@ Rules
       symbol (len == 1 and the symbol maps to a finished-good slot).
     - Process type is always exactly 2 characters from process_types.code.
     - Serial is a zero-padded integer (default width 4). Leading zeros are
-      stripped on display via format_erp_code(compact=True).
+      stripped on display via format_item_code(compact=True).
     - Option is exactly 2 characters from option_codes.code, or empty/None
       for items without options.
 """
@@ -41,7 +41,7 @@ CODE_TOKEN_RE = re.compile(r"^[0-9A-Za-z]+$")
 
 
 @dataclass
-class ErpCode:
+class ItemCode:
     symbol: str                  # e.g. "3" or "376"
     process_type: str            # e.g. "TR", "PA"
     serial: int                  # integer (no padding)
@@ -49,7 +49,7 @@ class ErpCode:
     symbol_slots: List[int] = field(default_factory=list)  # resolved slot ids
 
     def format(self, *, compact: bool = False) -> str:
-        return format_erp_code(self, compact=compact)
+        return format_item_code(self, compact=compact)
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ class ErpCode:
 # ---------------------------------------------------------------------------
 
 
-def parse_erp_code(raw: str) -> ErpCode:
+def parse_item_code(raw: str) -> ItemCode:
     """Parse a 4-part code. Accepts both compact ("3-PA-12-BG") and zero-padded
     ("3-PA-0012-BG") forms. Option segment is optional."""
     if not raw or not isinstance(raw, str):
@@ -87,7 +87,7 @@ def parse_erp_code(raw: str) -> ErpCode:
     if option is not None and len(option) != 2:
         raise ValueError(f"옵션코드는 2자여야 합니다: {option!r}")
 
-    return ErpCode(
+    return ItemCode(
         symbol=symbol,
         process_type=process_type,
         serial=serial,
@@ -96,7 +96,7 @@ def parse_erp_code(raw: str) -> ErpCode:
     )
 
 
-def format_erp_code(code: ErpCode, *, compact: bool = False) -> str:
+def format_item_code(code: ItemCode, *, compact: bool = False) -> str:
     """Render to canonical string. compact=True drops leading zeros on serial."""
     if compact:
         serial_part = str(code.serial)
@@ -121,7 +121,7 @@ def _split_symbol(symbol: str) -> List[int]:
 # ---------------------------------------------------------------------------
 
 
-def validate_code(db: Session, code: ErpCode) -> None:
+def validate_code(db: Session, code: ItemCode) -> None:
     """Raise ValueError if any part does not match master tables or rules."""
     # Symbol: every digit must map to an assigned (non-reserved) product_symbol
     for digit in code.symbol:
@@ -176,7 +176,7 @@ def next_serial(db: Session, symbol: str, process_type: str) -> int:
         .filter(
             Item.process_type_code == process_type,
             # Items sharing the same symbol prefix
-            Item.erp_code.like(f"{symbol}-{process_type}-%"),
+            Item.item_code.like(f"{symbol}-{process_type}-%"),
         )
         .scalar()
     )
@@ -189,14 +189,14 @@ def generate_code(
     symbol: str,
     process_type: str,
     option: Optional[str] = None,
-) -> ErpCode:
-    """Build a new ErpCode with an auto-assigned serial. Validates against
+) -> ItemCode:
+    """Build a new ItemCode with an auto-assigned serial. Validates against
     master tables before returning."""
     symbol = symbol.strip()
     process_type = process_type.strip().upper()
     option = option.strip().upper() if option else None
 
-    code = ErpCode(
+    code = ItemCode(
         symbol=symbol,
         process_type=process_type,
         serial=next_serial(db, symbol, process_type),

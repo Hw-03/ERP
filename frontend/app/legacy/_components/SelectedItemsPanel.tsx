@@ -1,8 +1,12 @@
 "use client";
 
-import { GripVertical, X } from "lucide-react";
+import { X } from "lucide-react";
 import { type Item } from "@/lib/api";
-import { LEGACY_COLORS, erpCodeDeptBadge, formatNumber, getStockState } from "./legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { itemCodeDeptBadge } from "@/lib/mes/process";
+import { getStockState } from "@/lib/mes/inventory";
+import { formatQty } from "@/lib/mes/format";
+import { useDeptColorLookup } from "./DepartmentsContext";
 
 export type SelectedEntry = { item: Item; quantity: number };
 
@@ -14,13 +18,14 @@ interface Props {
 }
 
 export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoing = false }: Props) {
+  const getDeptColor = useDeptColorLookup();
   if (entries.length === 0) return null;
 
   return (
     <div>
       {entries.map(({ item, quantity }) => {
         const stock = getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock));
-        const deptBadge = erpCodeDeptBadge(item.erp_code);
+        const deptBadge = itemCodeDeptBadge(item.item_code, getDeptColor);
         const expected = outgoing
           ? Number(item.quantity) - quantity
           : Number(item.quantity) + quantity;
@@ -31,7 +36,7 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
         return (
           <div
             key={item.item_id}
-            className="grid grid-cols-[16px_minmax(0,2fr)_minmax(70px,auto)_auto_minmax(72px,auto)_minmax(72px,auto)_32px] items-center gap-3 px-4 py-3"
+            className="grid grid-cols-[minmax(0,2fr)_minmax(70px,auto)_auto_minmax(72px,auto)_minmax(72px,auto)_32px] items-center gap-3 px-4 py-3"
             style={{
               borderBottom: `1px solid ${LEGACY_COLORS.border}`,
               background: isShortage
@@ -39,16 +44,13 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
                 : "transparent",
             }}
           >
-            {/* 그립 */}
-            <GripVertical className="h-4 w-4" style={{ color: LEGACY_COLORS.muted2 }} />
-
-            {/* 품목명 + ERP */}
+            {/* 품목명 + 품목 코드 */}
             <div className="min-w-0">
               <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
                 {item.item_name}
               </div>
               <div className="truncate text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                {item.erp_code ?? "-"}
+                {item.item_code ?? "-"}
               </div>
             </div>
 
@@ -91,7 +93,7 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
                 현재 재고
               </div>
               <div className="text-base font-black tabular-nums" style={{ color: stock.color }}>
-                {formatNumber(item.quantity)}
+                {formatQty(item.quantity)}
               </div>
             </div>
 
@@ -101,7 +103,7 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
                 실행 후
               </div>
               <div className="text-base font-black tabular-nums" style={{ color: expectedColor }}>
-                {formatNumber(expected)}
+                {formatQty(expected)}
               </div>
               {isShortage && (
                 <div className="text-[9px] font-bold uppercase tracking-[1px]" style={{ color: LEGACY_COLORS.red }}>

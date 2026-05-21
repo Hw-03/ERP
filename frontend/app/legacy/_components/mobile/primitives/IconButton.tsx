@@ -3,14 +3,14 @@
 import { forwardRef } from "react";
 import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 type Variant = "ghost" | "solid" | "outline";
 type Size = "sm" | "md" | "lg";
 
 const SIZE: Record<Size, { box: string; icon: number }> = {
-  sm: { box: "h-8 w-8", icon: 16 },
-  md: { box: "h-10 w-10", icon: 20 },
+  sm: { box: "h-9 w-9", icon: 16 },
+  md: { box: "h-11 w-11", icon: 20 },
   lg: { box: "h-12 w-12", icon: 22 },
 };
 
@@ -37,7 +37,7 @@ export const IconButton = forwardRef<
 
   const style =
     variant === "solid"
-      ? { background: color ?? LEGACY_COLORS.s3, color: "#fff" }
+      ? { background: color ?? LEGACY_COLORS.s3, color: LEGACY_COLORS.white }
       : variant === "outline"
       ? { background: "transparent", borderColor: LEGACY_COLORS.border, color: tone }
       : { background: "transparent", color: tone };
@@ -62,7 +62,7 @@ export const IconButton = forwardRef<
       {badge != null && badge > 0 ? (
         <span
           className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold"
-          style={{ background: LEGACY_COLORS.red, color: "#fff" }}
+          style={{ background: LEGACY_COLORS.red, color: LEGACY_COLORS.white }}
         >
           {badge > 99 ? "99+" : badge}
         </span>

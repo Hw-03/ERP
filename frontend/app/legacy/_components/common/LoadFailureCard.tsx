@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import { AlertTriangle } from "lucide-react";
-import { LEGACY_COLORS } from "../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 interface Props {
   message: string;
@@ -14,7 +14,7 @@ interface Props {
 function LoadFailureCardImpl({
   message,
   onRetry,
-  retryLabel = "새로고침",
+  retryLabel = "동기화",
   prefix = "데이터를 불러오지 못했습니다",
 }: Props) {
   const handleRetry = onRetry ?? (() => window.location.reload());

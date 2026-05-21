@@ -9,9 +9,9 @@ from app.database import get_db
 from app.models import OptionCode, ProcessFlowRule, ProcessType, ProductSymbol
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
-    ErpCodeGenerateRequest,
-    ErpCodeParseRequest,
-    ErpCodeResponse,
+    ItemCodeGenerateRequest,
+    ItemCodeParseRequest,
+    ItemCodeResponse,
     OptionCodeResponse,
     ProcessFlowRuleResponse,
     ProcessTypeResponse,
@@ -103,14 +103,14 @@ def list_process_flows(db: Session = Depends(get_db)):
 # ---- 4-part code operations ------------------------------------------------
 
 
-@router.post("/parse", response_model=ErpCodeResponse, summary="4-파트 ERP 코드 파싱")
-def parse_code(payload: ErpCodeParseRequest, db: Session = Depends(get_db)):
+@router.post("/parse", response_model=ItemCodeResponse, summary="4-파트 품목 코드 파싱")
+def parse_code(payload: ItemCodeParseRequest, db: Session = Depends(get_db)):
     try:
-        code = code_svc.parse_erp_code(payload.code)
+        code = code_svc.parse_item_code(payload.code)
         code_svc.validate_code(db, code)
     except ValueError as exc:
         raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, str(exc))
-    return ErpCodeResponse(
+    return ItemCodeResponse(
         symbol=code.symbol,
         process_type=code.process_type,
         serial=code.serial,
@@ -123,11 +123,11 @@ def parse_code(payload: ErpCodeParseRequest, db: Session = Depends(get_db)):
 
 @router.post(
     "/generate",
-    response_model=ErpCodeResponse,
+    response_model=ItemCodeResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="4-파트 ERP 코드 자동 생성",
+    summary="4-파트 품목 코드 자동 생성",
 )
-def generate_code(payload: ErpCodeGenerateRequest, db: Session = Depends(get_db)):
+def generate_code(payload: ItemCodeGenerateRequest, db: Session = Depends(get_db)):
     try:
         code = code_svc.generate_code(
             db,
@@ -137,7 +137,7 @@ def generate_code(payload: ErpCodeGenerateRequest, db: Session = Depends(get_db)
         )
     except ValueError as exc:
         raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, str(exc))
-    return ErpCodeResponse(
+    return ItemCodeResponse(
         symbol=code.symbol,
         process_type=code.process_type,
         serial=code.serial,

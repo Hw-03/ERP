@@ -6,14 +6,13 @@ on:
   pull_request:
     branches: [main]
 
-# 같은 브랜치에서 새 push 가 들어오면 이전 실행은 취소
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   backend:
-    name: Backend (pytest + compile)
+    name: Backend (pytest + compile + openapi-drift)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,8 +34,26 @@ jobs:
         working-directory: backend
         run: pytest -q
 
+      - name: OpenAPI drift check
+        working-directory: backend
+        run: |
+          python -c "
+          import sys, json
+          sys.path.insert(0, '.')
+          from app.main import app
+          with open('/tmp/openapi-current.json', 'w', encoding='utf-8') as f:
+              json.dump(app.openapi(), f, indent=2, sort_keys=True, ensure_ascii=False)
+              f.write('\n')
+          "
+          diff -u ../_dev/baselines/openapi.json /tmp/openapi-current.json \
+            && echo "[OK] OpenAPI spec matches baseline." \
+            || (echo "" && echo "[FAIL] OpenAPI drift detected." \
+                && echo "If this schema change is intentional, refresh the baseline and commit it:" \
+                && echo "  cd backend && python -c \"from app.main import app; import json; open('../_dev/baselines/openapi.json','w',encoding='utf-8').write(json.dumps(app.openapi(),indent=2,sort_keys=True,ensure_ascii=False)+chr(10))\"" \
+                && exit 1)
+
   frontend:
-    name: Frontend (lint + tsc + vitest)
+    name: Frontend (lint + tsc + vitest+coverage + build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,18 +64,44 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Cache .next/cache
+        uses: actions/cache@v4
+        with:
+          path: frontend/.next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}-${{ hashFiles('frontend/**/*.[jt]s', 'frontend/**/*.[jt]sx') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}-
+
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
 
       - name: Lint
         working-directory: frontend
-        run: npm run lint
+        run: npm run lint:strict
 
       - name: Type check
         working-directory: frontend
         run: npx tsc --noEmit
 
-      - name: Vitest
+      - name: Vitest (with coverage gate)
         working-directory: frontend
-        run: npm test
+        run: npm run test:coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
+          retention-days: 7
+
+      - name: Build (Next.js production)
+        working-directory: frontend
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: Bundle size gate
+        working-directory: frontend
+        run: npm run check:bundle-size

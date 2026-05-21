@@ -1,5 +1,5 @@
 """
-Sync legacy metadata and current stock from ERP Excel workbooks into backend/erp.db.
+Sync legacy metadata and current stock from Excel workbooks into backend/mes.db.
 
 Usage:
     python backend/sync_excel_stock.py
@@ -23,7 +23,7 @@ BACKEND_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BACKEND_DIR.parent
 DATA_DIR = PROJECT_ROOT / "data"
 CSV_PATH = DATA_DIR / "ERP_Master_DB.csv"
-SQLITE_PATH = BACKEND_DIR / "erp.db"
+SQLITE_PATH = BACKEND_DIR / "mes.db"
 
 sys.path.insert(0, str(BACKEND_DIR))
 os.environ["DATABASE_URL"] = f"sqlite:///{SQLITE_PATH.as_posix()}"
@@ -32,30 +32,26 @@ from app.database import SessionLocal
 from app.models import Inventory, Item
 
 
-CATEGORY_TO_FILE_TYPE: dict[str, str] = {
-    "RM": "원자재",
-    "TA": "조립자재",
-    "TF": "조립자재",
-    "HA": "발생부자재",
-    "HF": "발생부자재",
-    "VA": "발생부자재",
-    "VF": "발생부자재",
-    "AA": "조립자재",
-    "AF": "조립자재",
-    "FG": "완제품",
+PROCESS_TYPE_TO_FILE_TYPE: dict[str, str] = {
+    "TR": "원자재", "HR": "원자재", "VR": "원자재",
+    "NR": "원자재", "AR": "원자재", "PR": "원자재",
+    "TA": "조립자재", "TF": "조립자재",
+    "HA": "발생부자재", "HF": "발생부자재",
+    "VA": "발생부자재", "VF": "발생부자재",
+    "NA": "조립자재", "NF": "조립자재",
+    "AA": "조립자재", "AF": "조립자재",
+    "PA": "조립자재", "PF": "완제품",
 }
 
-CATEGORY_TO_PART: dict[str, str] = {
-    "RM": "자재창고",
-    "TA": "튜닝파트",
-    "TF": "튜닝파트",
-    "HA": "고압파트",
-    "HF": "고압파트",
-    "VA": "진공파트",
-    "VF": "진공파트",
-    "AA": "조립출하",
-    "AF": "조립출하",
-    "FG": "출하",
+PROCESS_TYPE_TO_PART: dict[str, str] = {
+    "TR": "자재창고", "HR": "자재창고", "VR": "자재창고",
+    "NR": "자재창고", "AR": "자재창고", "PR": "자재창고",
+    "TA": "튜브파트", "TF": "튜브파트",
+    "HA": "고압파트", "HF": "고압파트",
+    "VA": "진공파트", "VF": "진공파트",
+    "NA": "튜닝파트", "NF": "튜닝파트",
+    "AA": "조립출하", "AF": "조립출하",
+    "PA": "출하", "PF": "출하",
 }
 
 
@@ -105,10 +101,9 @@ def apply_metadata(db, rows: list[dict[str, str]]) -> int:
             .update(
                 {
                     Item.barcode: item_code,
-                    Item.legacy_file_type: CATEGORY_TO_FILE_TYPE.get(raw_category_code, "미분류"),
-                    Item.legacy_part: CATEGORY_TO_PART.get(raw_category_code, "자재창고"),
+                    Item.legacy_file_type: PROCESS_TYPE_TO_FILE_TYPE.get(raw_category_code, "미분류"),
+                    Item.legacy_part: PROCESS_TYPE_TO_PART.get(raw_category_code, "자재창고"),
                     Item.legacy_item_type: normalize_text(row.get("part_type")) or None,
-                    Item.legacy_model: normalize_text(row.get("model_ref")) or "공용",
                     Item.supplier: normalize_text(row.get("supplier")) or None,
                     Item.min_stock: to_decimal(row.get("safety_stock")),
                 },

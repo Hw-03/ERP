@@ -1,4 +1,8 @@
-"""일회성 스크립트: 미배정 품목에 ProductSymbol slot 연결."""
+"""[DEPRECATED] legacy_model 기반 모델 할당 스크립트 — legacy_model 컬럼 제거로 폐기.
+
+모델 연결은 품목 코드 파싱(parse_item_code → model_slots) 또는
+관리자 UI(AdminItemsSection)에서 직접 model_slots 수정으로 관리.
+"""
 import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))

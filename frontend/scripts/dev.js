@@ -44,7 +44,7 @@ function banner() {
   const out = process.stdout;
   const url = lanIp ? `http://${lanIp}:${port}` : `http://localhost:${port}`;
   out.write("\n");
-  out.write(`  ${C.magenta}${C.bold}DEXCOWIN ERP${C.reset}  ${C.gray}dev server${C.reset}\n`);
+  out.write(`  ${C.magenta}${C.bold}DEXCOWIN MES${C.reset}  ${C.gray}dev server${C.reset}\n`);
   out.write(`  ${C.gray}${"─".repeat(44)}${C.reset}\n`);
   out.write(`  ${C.dim}Network ${C.reset}  ${C.green}${url}${C.reset}\n`);
   out.write(`  ${C.gray}${"─".repeat(44)}${C.reset}\n\n`);

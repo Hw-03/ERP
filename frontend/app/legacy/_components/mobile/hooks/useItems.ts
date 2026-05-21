@@ -6,7 +6,6 @@ import { api, type Item } from "@/lib/api";
 export type ItemsFilters = {
   search?: string;
   department?: string; // "ALL" or dept code
-  legacyModel?: string; // "ALL" or model name
 };
 
 const PAGE_SIZE = 100;
@@ -14,7 +13,6 @@ const PAGE_SIZE = 100;
 function buildParams(filters: ItemsFilters, skip: number) {
   const params: Parameters<typeof api.getItems>[0] = { limit: PAGE_SIZE, skip };
   if (filters.department && filters.department !== "ALL") params.department = filters.department;
-  if (filters.legacyModel && filters.legacyModel !== "ALL") params.legacyModel = filters.legacyModel;
   const q = filters.search?.trim();
   if (q) params.search = q;
   return params;
@@ -54,7 +52,7 @@ export function useItems(filters: ItemsFilters) {
         if (!ctrl.signal.aborted) setLoading(false);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- filterKey = JSON.stringify(filters) is the derived deps (Cat-A)
     [filterKey],
   );
 

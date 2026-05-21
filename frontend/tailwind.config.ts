@@ -5,11 +5,14 @@ const config: Config = {
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    // lib/ui (BottomSheet/ConfirmModal/Toast/Tooltip 등) 의 클래스도 스캔해야
+    // z-[200]·rounded-t-[22px] 같은 arbitrary 유틸이 생성된다.
+    "./lib/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {
       colors: {
-        // X-ray ERP 산업용 테마 — Slate / Blue
+        // DEXCOWIN 산업용 테마 — Slate / Blue
         brand: {
           50:  "#eff6ff",
           100: "#dbeafe",

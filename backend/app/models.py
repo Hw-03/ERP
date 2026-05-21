@@ -1,4 +1,4 @@
-"""ERP data models for the X-Ray manufacturing workflow."""
+"""MES data models for the DEXCOWIN manufacturing workflow."""
 
 import enum
 import uuid
@@ -56,32 +56,13 @@ class BoolAsString(TypeDecorator):
         return str(value).lower() in ("true", "1", "yes", "t")
 
 
-class CategoryEnum(str, enum.Enum):
-    RM = "RM"
-    TA = "TA"
-    TF = "TF"
-    HA = "HA"
-    HF = "HF"
-    VA = "VA"
-    VF = "VF"
-    AA = "AA"
-    AF = "AF"
-    FG = "FG"
-    UK = "UK"
-
-
 class TransactionTypeEnum(str, enum.Enum):
     RECEIVE = "RECEIVE"
     PRODUCE = "PRODUCE"
     SHIP = "SHIP"
     ADJUST = "ADJUST"
     BACKFLUSH = "BACKFLUSH"
-    SCRAP = "SCRAP"
-    LOSS = "LOSS"
     DISASSEMBLE = "DISASSEMBLE"
-    RETURN = "RETURN"
-    RESERVE = "RESERVE"
-    RESERVE_RELEASE = "RESERVE_RELEASE"
     TRANSFER_TO_PROD = "TRANSFER_TO_PROD"
     TRANSFER_TO_WH = "TRANSFER_TO_WH"
     TRANSFER_DEPT = "TRANSFER_DEPT"
@@ -92,30 +73,6 @@ class TransactionTypeEnum(str, enum.Enum):
 class LocationStatusEnum(str, enum.Enum):
     PRODUCTION = "PRODUCTION"
     DEFECTIVE = "DEFECTIVE"
-
-
-class QueueBatchTypeEnum(str, enum.Enum):
-    PRODUCE = "PRODUCE"
-    DISASSEMBLE = "DISASSEMBLE"
-    RETURN = "RETURN"
-
-
-class QueueBatchStatusEnum(str, enum.Enum):
-    OPEN = "OPEN"
-    CONFIRMED = "CONFIRMED"
-    CANCELLED = "CANCELLED"
-
-
-class QueueLineDirectionEnum(str, enum.Enum):
-    IN = "IN"            # Into inventory (disassembly reuse, return intake)
-    OUT = "OUT"          # Consumed from inventory (production backflush)
-    SCRAP = "SCRAP"      # Discard / defective
-    LOSS = "LOSS"        # Missing on return
-
-
-class AlertKindEnum(str, enum.Enum):
-    SAFETY = "SAFETY"
-    COUNT_VARIANCE = "COUNT_VARIANCE"
 
 
 class DepartmentEnum(str, enum.Enum):
@@ -131,25 +88,35 @@ class DepartmentEnum(str, enum.Enum):
     ETC = "기타"
 
 
+class DeptAdjSubTypeEnum(str, enum.Enum):
+    PRODUCTION  = "production"    # 생산/조립
+    DISASSEMBLY = "disassembly"   # 분해/회수
+    CORRECTION  = "correction"    # 수량 보정
+
+
 class EmployeeLevelEnum(str, enum.Enum):
     ADMIN = "admin"
     MANAGER = "manager"
     STAFF = "staff"
 
 
+class Department(Base):
+    __tablename__ = "departments"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(50), unique=True, nullable=False)
+    display_order = Column(Integer, nullable=False, default=0)
+    is_active = Column(Boolean, nullable=False, default=True)
+    color_hex = Column(String(7), nullable=True)
+
+
 class Item(Base):
     __tablename__ = "items"
 
     item_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    item_code = Column(String(50), unique=True, nullable=True, index=True)  # 레거시 CSV 코드 — erp_code로 교체 후 DROP 예정
     item_name = Column(String(200), nullable=False)
+    sort_order = Column(Integer, nullable=True, index=True)  # 엑셀 정리본 행 순서
     spec = Column(Text, nullable=True)
-    category = Column(
-        SAEnum(CategoryEnum, name="category_enum", create_type=True),
-        nullable=False,
-        default=CategoryEnum.UK,
-        index=True,
-    )
     unit = Column(String(20), nullable=False, default="EA")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
     updated_at = Column(
@@ -161,21 +128,24 @@ class Item(Base):
     )
 
     # Legacy UI display fields (populated from ERP_Master_DB.csv or rule-based defaults)
+
     barcode = Column(String(100), nullable=True, index=True)
     legacy_file_type = Column(String(50), nullable=True, index=True)  # 원자재/조립자재/발생부자재/완제품/미분류
     legacy_part = Column(String(50), nullable=True, index=True)       # 자재창고/조립출하/고압파트/진공파트/튜닝파트/출하
     legacy_item_type = Column(String(50), nullable=True)              # part_type from CSV
-    legacy_model = Column(String(50), nullable=True, index=True)      # DX3000/ADX4000W/ADX6000/COCOON/SOLO/공용
     supplier = Column(String(200), nullable=True)
     min_stock = Column(Numeric(15, 4), nullable=True)
 
-    # 4-part ERP code ([모델기호조합]-[구분코드]-[일련번호]-[옵션코드])
-    erp_code = Column(String(40), nullable=True, unique=True, index=True)
+    # 4-part item code ([모델기호조합]-[구분코드]-[일련번호]-[옵션코드])
+    item_code = Column(String(40), nullable=True, unique=True, index=True)
     model_symbol = Column(String(20), nullable=True, index=True)  # 예: "346", "3", "34678"
     symbol_slot = Column(SmallInteger, ForeignKey("product_symbols.slot"), nullable=True, index=True)  # deprecated
     process_type_code = Column(String(2), ForeignKey("process_types.code"), nullable=True, index=True)
     option_code = Column(String(10), nullable=True)  # 자유 텍스트 (FK 제거)
     serial_no = Column(Integer, nullable=True)
+
+    # BOM 완료 워크플로우 — 사용자가 명시적으로 "완료로 표시"를 누를 때만 set/clear
+    bom_completed_at = Column(DateTime, nullable=True)
 
     inventory = relationship("Inventory", back_populates="item", uselist=False, cascade="all, delete-orphan")
     bom_as_parent = relationship(
@@ -190,7 +160,6 @@ class Item(Base):
         back_populates="item",
         cascade="all, delete-orphan",
     )
-    package_items = relationship("ShipPackageItem", back_populates="item")
 
 
 class Inventory(Base):
@@ -252,11 +221,7 @@ class InventoryLocation(Base):
         nullable=False,
         index=True,
     )
-    department = Column(
-        SAEnum(DepartmentEnum, name="department_enum", create_type=False),
-        nullable=False,
-        index=True,
-    )
+    department = Column(String(50), nullable=False, index=True)
     status = Column(
         SAEnum(LocationStatusEnum, name="location_status_enum", create_type=True),
         nullable=False,
@@ -308,21 +273,22 @@ class Employee(Base):
     name = Column(String(100), nullable=False, index=True)
     role = Column(String(100), nullable=False)
     phone = Column(String(30), nullable=True)
-    department = Column(
-        SAEnum(DepartmentEnum, name="department_enum", create_type=True),
-        nullable=False,
-        default=DepartmentEnum.ETC,
-        index=True,
-    )
+    department = Column(String(50), nullable=False, default="기타", index=True)
     level = Column(
         SAEnum(EmployeeLevelEnum, name="employee_level_enum", create_type=True),
         nullable=False,
         default=EmployeeLevelEnum.STAFF,
     )
+    # 창고 결재 역할: "none" | "primary" | "deputy". 시스템 권한(level)과 별개의 업무 역할.
+    # 소문자 문자열로 통일 (DB / API / 프론트 모두 동일).
+    warehouse_role = Column(String(20), nullable=False, default="none", server_default="none")
+    # 부서 결재 역할: 낱개(manual/adjust_in/adjust_out) IO 작업 승인 권한. warehouse_role 와 별개.
+    department_role = Column(String(20), nullable=False, default="none", server_default="none")
     display_order = Column(Integer, nullable=False, default=0)
     is_active = Column(BoolAsString, nullable=False, default=True)
     # 작업자 식별용 PIN 해시 — 실제 보안 인증이 아님. None이면 기본 PIN 0000 적용
     pin_hash = Column(Text, nullable=True)
+    pin_last_changed = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
     updated_at = Column(
         DateTime,
@@ -331,41 +297,44 @@ class Employee(Base):
         onupdate=datetime.utcnow,
         server_default=func.now(),
     )
-
-
-class ShipPackage(Base):
-    __tablename__ = "ship_packages"
-
-    package_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    package_code = Column(String(40), unique=True, nullable=False, index=True)
-    name = Column(String(200), nullable=False)
-    notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
-    updated_at = Column(
-        DateTime,
-        nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-        server_default=func.now(),
-    )
-
-    items = relationship("ShipPackageItem", back_populates="package", cascade="all, delete-orphan")
-
-
-class ShipPackageItem(Base):
-    __tablename__ = "ship_package_items"
-
-    package_item_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    package_id = Column(UUID(as_uuid=True), ForeignKey("ship_packages.package_id", ondelete="CASCADE"), nullable=False, index=True)
-    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
-    quantity = Column(Numeric(15, 4), nullable=False, default=Decimal("1"))
+    theme = Column(String(10), nullable=True)
 
     __table_args__ = (
-        UniqueConstraint("package_id", "item_id", name="uq_ship_package_item"),
+        CheckConstraint(
+            "warehouse_role IN ('none', 'primary', 'deputy')",
+            name="ck_employee_warehouse_role",
+        ),
+        CheckConstraint(
+            "department_role IN ('none', 'primary', 'deputy')",
+            name="ck_employee_department_role",
+        ),
     )
 
-    package = relationship("ShipPackage", back_populates="items")
-    item = relationship("Item", back_populates="package_items")
+
+class EmployeeAssignedModel(Base):
+    """직원-제품 다대다. 조립 부서 직원에게 담당 모델을 지정하면
+    입출고 목록에서 조립 그룹 내부 정렬 시 담당 모델 부품이 위로 올라간다.
+    priority 가 작을수록 더 위 — 0 이 1순위.
+    """
+
+    __tablename__ = "employee_assigned_models"
+
+    employee_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("employees.employee_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    slot = Column(
+        SmallInteger,
+        ForeignKey("product_symbols.slot", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    priority = Column(Integer, nullable=False, default=0, server_default="0")
+
+    __table_args__ = (
+        Index("ix_eam_employee", "employee_id"),
+        Index("ix_eam_employee_priority", "employee_id", "priority"),
+    )
 
 
 class SystemSetting(Base):
@@ -395,13 +364,13 @@ class TransactionLog(Base):
     quantity_change = Column(Numeric(15, 4), nullable=False)
     quantity_before = Column(Numeric(15, 4), nullable=True)
     quantity_after = Column(Numeric(15, 4), nullable=True)
+    transfer_qty = Column(Numeric(15, 4), nullable=True)
     reference_no = Column(String(100), nullable=True, index=True)
     produced_by = Column(String(100), nullable=True)
     notes = Column(Text, nullable=True)
-    # Optional link to the queue batch that generated this log
-    batch_id = Column(
+    operation_batch_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("queue_batches.batch_id", ondelete="SET NULL"),
+        ForeignKey("io_batches.batch_id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -412,14 +381,17 @@ class TransactionLog(Base):
         server_default=func.now(),
         index=True,
     )
+    archived_at = Column(DateTime, nullable=True, index=True)
 
     item = relationship("Item", back_populates="transaction_logs")
-    batch = relationship("QueueBatch", back_populates="transaction_logs")
 
     __table_args__ = (
         # 5.5-A: "품목 X 의 최근 거래 N건" / "기간 export" 쿼리 가속.
-        # 단일 item_id 인덱스 + created_at 인덱스 조합보다 복합이 효율적.
         Index("ix_tx_item_created", "item_id", "created_at"),
+        # 창고/부서 탭 필터 쿼리 가속 (transaction_type IN (...) + 날짜 정렬).
+        Index("ix_tx_type_created", "transaction_type", "created_at"),
+        # operation_batch_id 기반 배치 그룹 조회 가속.
+        Index("ix_tx_batch_created", "operation_batch_id", "created_at"),
     )
 
 
@@ -515,119 +487,14 @@ class ProcessFlowRule(Base):
 
 
 # =============================================================================
-# Queue (예약/확정) workflow tables
+# Variance history
 # =============================================================================
-
-
-class QueueBatch(Base):
-    __tablename__ = "queue_batches"
-
-    batch_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    batch_type = Column(
-        SAEnum(QueueBatchTypeEnum, name="queue_batch_type_enum", create_type=True),
-        nullable=False,
-    )
-    status = Column(
-        SAEnum(QueueBatchStatusEnum, name="queue_batch_status_enum", create_type=True),
-        nullable=False,
-        default=QueueBatchStatusEnum.OPEN,
-        index=True,
-    )
-    owner_employee_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("employees.employee_id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-    owner_name = Column(String(100), nullable=True)  # denormalized for display
-    parent_item_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("items.item_id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    parent_quantity = Column(Numeric(15, 4), nullable=True)
-    reference_no = Column(String(100), nullable=True, index=True)
-    notes = Column(Text, nullable=True)
-    created_at = Column(
-        DateTime,
-        nullable=False,
-        default=datetime.utcnow,
-        server_default=func.now(),
-        index=True,
-    )
-    confirmed_at = Column(DateTime, nullable=True)
-    cancelled_at = Column(DateTime, nullable=True)
-
-    lines = relationship("QueueLine", back_populates="batch", cascade="all, delete-orphan")
-    transaction_logs = relationship("TransactionLog", back_populates="batch")
-
-
-class QueueLine(Base):
-    __tablename__ = "queue_lines"
-
-    line_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    batch_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("queue_batches.batch_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    item_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("items.item_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    direction = Column(
-        SAEnum(QueueLineDirectionEnum, name="queue_line_direction_enum", create_type=True),
-        nullable=False,
-    )
-    quantity = Column(Numeric(15, 4), nullable=False)
-    bom_expected = Column(Numeric(15, 4), nullable=True)  # Original BOM expected qty (for variance)
-    reason = Column(Text, nullable=True)
-    process_stage = Column(String(2), ForeignKey("process_types.code"), nullable=True)
-    included = Column(Boolean, nullable=False, default=True)  # Selective inclusion toggle
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
-
-    batch = relationship("QueueBatch", back_populates="lines")
-    item = relationship("Item")
-
-
-# =============================================================================
-# Scrap / Loss / Variance history
-# =============================================================================
-
-
-class ScrapLog(Base):
-    __tablename__ = "scrap_logs"
-
-    scrap_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
-    quantity = Column(Numeric(15, 4), nullable=False)
-    process_stage = Column(String(2), ForeignKey("process_types.code"), nullable=True)
-    reason = Column(String(200), nullable=False)
-    batch_id = Column(UUID(as_uuid=True), ForeignKey("queue_batches.batch_id", ondelete="SET NULL"), nullable=True, index=True)
-    operator = Column(String(100), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
-
-
-class LossLog(Base):
-    __tablename__ = "loss_logs"
-
-    loss_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
-    quantity = Column(Numeric(15, 4), nullable=False)
-    batch_id = Column(UUID(as_uuid=True), ForeignKey("queue_batches.batch_id", ondelete="SET NULL"), nullable=True, index=True)
-    reason = Column(String(200), nullable=False)
-    operator = Column(String(100), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
 
 
 class VarianceLog(Base):
     __tablename__ = "variance_logs"
 
     var_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    batch_id = Column(UUID(as_uuid=True), ForeignKey("queue_batches.batch_id", ondelete="CASCADE"), nullable=False, index=True)
     item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
     bom_expected = Column(Numeric(15, 4), nullable=False)
     actual_used = Column(Numeric(15, 4), nullable=False)
@@ -637,39 +504,298 @@ class VarianceLog(Base):
 
 
 # =============================================================================
-# Advanced inventory management: alerts, physical counts
+# Stock request workflow (작업자 요청 → 창고 담당자 승인 → 재고 반영)
 # =============================================================================
 
 
-class StockAlert(Base):
-    __tablename__ = "stock_alerts"
+class StockRequestStatusEnum(str, enum.Enum):
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+    RESERVED = "reserved"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
+    COMPLETED = "completed"
+    FAILED_APPROVAL = "failed_approval"
 
-    alert_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
-    kind = Column(
-        SAEnum(AlertKindEnum, name="alert_kind_enum", create_type=True),
+
+class StockRequestTypeEnum(str, enum.Enum):
+    RAW_RECEIVE = "raw_receive"
+    RAW_SHIP = "raw_ship"
+    WAREHOUSE_TO_DEPT = "warehouse_to_dept"
+    DEPT_TO_WAREHOUSE = "dept_to_warehouse"
+    DEPT_INTERNAL = "dept_internal"
+    MARK_DEFECTIVE_WH = "mark_defective_wh"
+    MARK_DEFECTIVE_PROD = "mark_defective_prod"
+    SUPPLIER_RETURN = "supplier_return"
+    PACKAGE_OUT = "package_out"
+    # 낱개(manual/adjust_in/adjust_out) 라인 포함 IO — 부서 결재 정/부 승인만 필요.
+    # 실제 재고 변동은 io.py 의 _submit_immediate 가 dept 승인 후 실행한다.
+    MANUAL_ADJUSTMENT = "manual_adjustment"
+
+
+class RequestBucketEnum(str, enum.Enum):
+    WAREHOUSE = "warehouse"
+    PRODUCTION = "production"
+    DEFECTIVE = "defective"
+    NONE = "none"
+
+
+class StockRequest(Base):
+    """입출고 결재 요청. 창고 재고가 움직이는 작업은 승인 후에만 실재고 반영."""
+
+    __tablename__ = "stock_requests"
+
+    request_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_code = Column(String(40), unique=True, nullable=True, index=True)
+    client_request_id = Column(String(64), unique=True, nullable=True, index=True)
+    requester_employee_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("employees.employee_id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
     )
-    threshold = Column(Numeric(15, 4), nullable=True)
-    observed_value = Column(Numeric(15, 4), nullable=True)
-    message = Column(Text, nullable=True)
-    triggered_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
-    acknowledged_at = Column(DateTime, nullable=True)
-    acknowledged_by = Column(String(100), nullable=True)
-
-
-class PhysicalCount(Base):
-    __tablename__ = "physical_counts"
-
-    count_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
-    counted_qty = Column(Numeric(15, 4), nullable=False)
-    system_qty = Column(Numeric(15, 4), nullable=False)
-    diff = Column(Numeric(15, 4), nullable=False)
-    reason = Column(String(200), nullable=True)
-    operator = Column(String(100), nullable=True)
+    requester_name = Column(String(100), nullable=False)
+    requester_department = Column(String(50), nullable=False)
+    request_type = Column(
+        SAEnum(StockRequestTypeEnum, name="stock_request_type_enum", create_type=True),
+        nullable=False,
+        index=True,
+    )
+    status = Column(
+        SAEnum(StockRequestStatusEnum, name="stock_request_status_enum", create_type=True),
+        nullable=False,
+        default=StockRequestStatusEnum.SUBMITTED,
+        index=True,
+    )
+    requires_warehouse_approval = Column(Boolean, nullable=False, default=True)
+    reserved_at = Column(DateTime, nullable=True)
+    submitted_at = Column(DateTime, nullable=True)
+    approved_by_employee_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    approved_by_name = Column(String(100), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    rejected_by_employee_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    rejected_by_name = Column(String(100), nullable=True)
+    rejected_at = Column(DateTime, nullable=True)
+    rejected_reason = Column(Text, nullable=True)  # FAILED_APPROVAL 사유도 여기 저장
+    # 부서 결재 (낱개 manual/adjust 라인 포함 시 추가로 요구). warehouse_approval 와 독립적.
+    requires_department_approval = Column(Boolean, nullable=False, default=False, server_default="0")
+    department_approved_by_employee_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    department_approved_by_name = Column(String(100), nullable=True)
+    department_approved_at = Column(DateTime, nullable=True)
+    cancelled_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    reference_no = Column(String(100), nullable=True)
+    notes = Column(Text, nullable=True)
+    operation_batch_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("io_batches.batch_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        server_default=func.now(),
+    )
+
+    lines = relationship(
+        "StockRequestLine",
+        back_populates="request",
+        cascade="all, delete-orphan",
+        order_by="StockRequestLine.created_at",
+    )
+
+
+class StockRequestLine(Base):
+    __tablename__ = "stock_request_lines"
+
+    line_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("stock_requests.request_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    item_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("items.item_id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    item_name_snapshot = Column(String(200), nullable=False)
+    item_code_snapshot = Column(String(50), nullable=True)
+    quantity = Column(Numeric(15, 4), nullable=False)
+    from_bucket = Column(
+        SAEnum(RequestBucketEnum, name="request_bucket_enum", create_type=True),
+        nullable=False,
+    )
+    from_department = Column(String(50), nullable=True)
+    to_bucket = Column(
+        SAEnum(RequestBucketEnum, name="request_bucket_enum", create_type=False),
+        nullable=False,
+    )
+    to_department = Column(String(50), nullable=True)
+    status = Column(
+        SAEnum(StockRequestStatusEnum, name="stock_request_status_enum", create_type=False),
+        nullable=False,
+        default=StockRequestStatusEnum.SUBMITTED,
+    )
+    operation_line_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("io_lines.line_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
+
+    request = relationship("StockRequest", back_populates="lines")
+    item = relationship("Item")
+
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="ck_stock_request_line_qty_positive"),
+        Index("ix_stock_request_line_item_status", "item_id", "status"),
+    )
+
+
+class IoBatch(Base):
+    """입출고 2.0 작업 묶음. 사용자가 한 번에 제출한 작업의 감사 단위."""
+
+    __tablename__ = "io_batches"
+
+    batch_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    work_type = Column(String(32), nullable=False, index=True)
+    sub_type = Column(String(40), nullable=False, index=True)
+    status = Column(String(24), nullable=False, default="draft", index=True)
+    requester_employee_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("employees.employee_id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    requester_name = Column(String(100), nullable=False)
+    requester_department = Column(String(50), nullable=False)
+    from_department = Column(String(50), nullable=True)
+    to_department = Column(String(50), nullable=True)
+    requires_approval = Column(Boolean, nullable=False, default=False)
+    stock_request_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    reference_no = Column(String(100), nullable=True, index=True)
+    notes = Column(Text, nullable=True)
+    client_request_id = Column(String(64), nullable=True, unique=True, index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        server_default=func.now(),
+    )
+    submitted_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    bundles = relationship(
+        "IoBundle",
+        back_populates="batch",
+        cascade="all, delete-orphan",
+        order_by="IoBundle.created_at",
+    )
+
+    __table_args__ = (
+        Index("ix_io_batches_requester_status", "requester_employee_id", "status"),
+    )
+
+
+class IoBundle(Base):
+    """작업 기준 품목/패키지 하나에서 펼쳐진 실제 반영 라인 묶음."""
+
+    __tablename__ = "io_bundles"
+
+    bundle_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    batch_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("io_batches.batch_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_kind = Column(String(24), nullable=False)
+    source_item_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("items.item_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    title_snapshot = Column(String(220), nullable=False)
+    quantity = Column(Numeric(15, 4), nullable=False)
+    expanded_level = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
+
+    batch = relationship("IoBatch", back_populates="bundles")
+    lines = relationship(
+        "IoLine",
+        back_populates="bundle",
+        cascade="all, delete-orphan",
+        order_by="IoLine.created_at",
+    )
+    source_item = relationship("Item", foreign_keys=[source_item_id])
+
+
+class IoLine(Base):
+    """실제 재고 반영 후보 라인. excluded 라인도 감사 내역으로 남긴다."""
+
+    __tablename__ = "io_lines"
+
+    line_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    bundle_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("io_bundles.bundle_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    item_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("items.item_id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    item_name_snapshot = Column(String(200), nullable=False)
+    item_code_snapshot = Column(String(50), nullable=True)
+    unit = Column(String(20), nullable=False, default="EA")
+    direction = Column(String(20), nullable=False)
+    from_bucket = Column(String(20), nullable=False)
+    from_department = Column(String(50), nullable=True)
+    to_bucket = Column(String(20), nullable=False)
+    to_department = Column(String(50), nullable=True)
+    quantity = Column(Numeric(15, 4), nullable=False)
+    bom_expected = Column(Numeric(15, 4), nullable=True)
+    included = Column(Boolean, nullable=False, default=True)
+    origin = Column(String(24), nullable=False)
+    edited = Column(Boolean, nullable=False, default=False)
+    has_children_snapshot = Column(Boolean, nullable=False, default=False)
+    shortage = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
+    exclusion_note = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
+
+    bundle = relationship("IoBundle", back_populates="lines")
+    item = relationship("Item")
+
+    __table_args__ = (
+        CheckConstraint("quantity >= 0", name="ck_io_line_qty_nonneg"),
+        Index("ix_io_line_item_included", "item_id", "included"),
+    )
 
 
 class AdminAuditLog(Base):

@@ -1,0 +1,10 @@
+# Windows-only scripts: force CRLF line endings on checkout AND in GitHub ZIP archives.
+# Without this, GitHub "Download ZIP" serves these files with LF endings, which makes
+# cmd.exe misparse the batch syntax (commands split mid-line, fragments treated as
+# separate commands). Affects anyone who downloads via ZIP instead of git clone.
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# Shell scripts: force LF (in case anyone commits one from Windows in the future).
+*.sh    text eol=lf

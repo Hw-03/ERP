@@ -2,16 +2,15 @@
 
 import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "../tokens";
-import { formatNumber } from "../../legacyUi";
-
+import { formatQty } from "@/lib/mes/format";
 type Intent = "primary" | "success" | "danger" | "neutral";
 
 const INTENT_STYLE: Record<Intent, { bg: string; fg: string }> = {
-  primary: { bg: LEGACY_COLORS.blue, fg: "#fff" },
+  primary: { bg: LEGACY_COLORS.blue, fg: LEGACY_COLORS.white },
   success: { bg: LEGACY_COLORS.green, fg: "#041008" },
-  danger: { bg: LEGACY_COLORS.red, fg: "#fff" },
+  danger: { bg: LEGACY_COLORS.red, fg: LEGACY_COLORS.white },
   neutral: { bg: LEGACY_COLORS.s3, fg: LEGACY_COLORS.text },
 };
 
@@ -79,7 +78,7 @@ export function PrimaryActionButton({
           ) : null}
           {total != null ? (
             <span className={clsx(TYPO.caption, "font-black tabular-nums")}>
-              · {formatNumber(total)}
+              · {formatQty(total)}
               {totalUnit ? ` ${totalUnit}` : ""}
             </span>
           ) : null}

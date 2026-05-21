@@ -1,6 +1,6 @@
 @echo off
 rem ============================================================
-rem  ERP 재고 정합성 1차 진단 스크립트 (Phase 4)
+rem  MES 재고 정합성 1차 진단 스크립트 (Phase 4)
 rem  - /health/detailed 호출 → inventory_mismatch_count 확인
 rem  - 0 이면 정상 종료
 rem  - > 0 이면 backup_db.bat 호출 후 운영 담당자에게 보고하도록 안내
@@ -10,7 +10,7 @@ rem  이 스크립트는 "발견 + 백업 + 보고"만 자동화한다.
 rem ============================================================
 setlocal
 set "URL=http://127.0.0.1:8010/health/detailed"
-set "OUT=%TEMP%\erp_health_%RANDOM%.json"
+set "OUT=%TEMP%\mes_health_%RANDOM%.json"
 
 echo [RECONCILE] /health/detailed 호출 중...
 curl -s -m 8 "%URL%" -o "%OUT%"

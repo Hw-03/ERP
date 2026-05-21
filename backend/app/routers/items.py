@@ -14,16 +14,17 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import CategoryEnum, DepartmentEnum, Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
+from app.models import Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
+    BomCompletionUpdate,
     InventoryLocationResponse,
     ItemCreate,
     ItemResponse,
     ItemUpdate,
     ItemWithInventory,
 )
-from app.utils.erp_code import infer_process_type, infer_symbol_slot, make_erp_code, next_serial_no, slots_to_model_symbol
+from app.utils.item_code import make_item_code, next_serial_no, slots_to_model_symbol
 from app.models import ProductSymbol
 from app.services import audit
 from app.services import inventory as inventory_svc
@@ -82,22 +83,21 @@ def _to_item_with_inventory(
         item_id=item.item_id,
         item_name=item.item_name,
         spec=item.spec,
-        category=item.category,
         unit=item.unit,
         barcode=item.barcode,
         legacy_file_type=item.legacy_file_type,
         legacy_part=item.legacy_part,
         legacy_item_type=item.legacy_item_type,
-        legacy_model=item.legacy_model,
         supplier=item.supplier,
         min_stock=item.min_stock,
-        erp_code=item.erp_code,
+        item_code=item.item_code,
         model_symbol=item.model_symbol,
         model_slots=model_slots,
         symbol_slot=item.symbol_slot,
         process_type_code=item.process_type_code,
         option_code=item.option_code,
         serial_no=item.serial_no,
+        bom_completed_at=item.bom_completed_at,
         created_at=item.created_at,
         updated_at=item.updated_at,
         quantity=fig.total,
@@ -114,32 +114,30 @@ def _to_item_with_inventory(
 
 @router.post("", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
 def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get_db)):
-    category_val = payload.category.value if payload.category else "UK"
-
-    pt = infer_process_type(category_val, payload.legacy_part)
+    pt = payload.process_type_code or None
     model_slots = payload.model_slots or []
     model_sym = slots_to_model_symbol(model_slots) if model_slots else ""
     opt = payload.option_code or None
 
     serial = None
-    erp_code = None
+    item_code = None
     if pt and model_sym:
         serial = next_serial_no(model_sym, pt, db)
-        erp_code = make_erp_code(model_sym, pt, serial, opt)
+        item_code = make_item_code(model_sym, pt, serial, opt)
 
-    # legacy symbol_slot: 단일 모델 지정 시 이전 호환용으로 유지
-    legacy_slot = infer_symbol_slot(payload.legacy_model) if not model_slots else (model_slots[0] if len(model_slots) == 1 else None)
+    legacy_slot = model_slots[0] if len(model_slots) == 1 else None
+
+    # 신규 항목은 목록 맨 끝으로. sort_order 미설정 시 NULL 이 되어 SQLite 가 맨앞에 정렬해버림.
+    next_sort = (db.query(func.max(Item.sort_order)).scalar() or 0) + 1
 
     item = Item(
         item_name=payload.item_name,
         spec=payload.spec,
-        category=payload.category,
         unit=payload.unit,
         barcode=payload.barcode or None,
         legacy_file_type=payload.legacy_file_type,
         legacy_part=payload.legacy_part,
         legacy_item_type=payload.legacy_item_type,
-        legacy_model=payload.legacy_model,
         supplier=payload.supplier,
         min_stock=payload.min_stock,
         process_type_code=pt,
@@ -147,7 +145,8 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         symbol_slot=legacy_slot,
         serial_no=serial,
         option_code=opt,
-        erp_code=erp_code,
+        item_code=item_code,
+        sort_order=next_sort,
     )
     db.add(item)
     db.flush()
@@ -165,7 +164,7 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         action="item.create",
         target_type="item",
         target_id=str(item.item_id),
-        payload_summary=f"{item.item_name} ({item.erp_code or 'no-erp'}, init {init_qty})",
+        payload_summary=f"{item.item_name} ({item.item_code or 'no-code'}, init {init_qty})",
     )
 
     commit_and_refresh(db, item)
@@ -174,11 +173,10 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
 
 @router.get("", response_model=List[ItemWithInventory])
 def list_items(
-    category: Optional[CategoryEnum] = Query(None, description="카테고리 필터"),
+    process_type_code: Optional[str] = Query(None, description="process_type_code 필터 (TR/HR/.../PF 18개)"),
     search: Optional[str] = Query(None, description="품목명, 품목코드, 사양, 위치, 바코드 검색"),
     legacy_file_type: Optional[str] = Query(None, description="레거시 파일 구분 필터"),
     legacy_part: Optional[str] = Query(None, description="레거시 파트 필터"),
-    legacy_model: Optional[str] = Query(None, description="레거시 모델 필터"),
     department: Optional[str] = Query(None, description="부서 필터 (창고|조립|고압|진공|튜닝|튜브|출하|…)"),
     legacy_item_type: Optional[str] = Query(None, description="레거시 품목 유형 필터"),
     barcode: Optional[str] = Query(None, description="바코드 검색"),
@@ -188,8 +186,8 @@ def list_items(
 ):
     query = _build_item_query(db)
 
-    if category:
-        query = query.filter(Item.category == category)
+    if process_type_code:
+        query = query.filter(Item.process_type_code == process_type_code)
 
     if legacy_file_type:
         query = query.filter(Item.legacy_file_type == legacy_file_type)
@@ -197,27 +195,20 @@ def list_items(
     if legacy_part:
         query = query.filter(Item.legacy_part == legacy_part)
 
-    if legacy_model:
-        query = query.filter(Item.legacy_model.ilike(f"%{legacy_model}%"))
-
     if department:
         if department == "창고":
             # 창고 재고가 1 이상인 품목
             query = query.filter(Inventory.warehouse_qty > 0)
         else:
-            try:
-                dept_enum = DepartmentEnum(department)
-                dept_item_ids = (
-                    db.query(InventoryLocation.item_id)
-                    .filter(
-                        InventoryLocation.department == dept_enum,
-                        InventoryLocation.quantity > 0,
-                    )
-                    .subquery()
+            dept_item_ids = (
+                db.query(InventoryLocation.item_id)
+                .filter(
+                    InventoryLocation.department == department,
+                    InventoryLocation.quantity > 0,
                 )
-                query = query.filter(Item.item_id.in_(dept_item_ids))
-            except ValueError:
-                pass
+                .subquery()
+            )
+            query = query.filter(Item.item_id.in_(dept_item_ids))
 
     if legacy_item_type:
         query = query.filter(Item.legacy_item_type == legacy_item_type)
@@ -230,14 +221,14 @@ def list_items(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.erp_code.ilike(pattern),
+                Item.item_code.ilike(pattern),
                 Item.spec.ilike(pattern),
                 Item.barcode.ilike(pattern),
                 Inventory.location.ilike(pattern),
             )
         )
 
-    rows = query.order_by(Item.category, Item.erp_code).offset(skip).limit(limit).all()
+    rows = query.order_by(Item.sort_order, Item.item_code).offset(skip).limit(limit).all()
     if not rows:
         return []
 
@@ -282,18 +273,18 @@ def list_items(
 
 @router.get("/export.csv")
 def export_items_csv(db: Session = Depends(get_db)):
-    rows = _build_item_query(db).order_by(Item.erp_code).all()
+    rows = _build_item_query(db).order_by(Item.item_code).all()
 
     buffer = StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["erp_code", "item_name", "category", "spec", "unit", "quantity", "location", "updated_at"])
+    writer.writerow(["item_code", "item_name", "process_type_code", "spec", "unit", "quantity", "location", "updated_at"])
 
     for item, inventory in rows:
         writer.writerow(
             [
-                item.erp_code or "",
+                item.item_code or "",
                 item.item_name,
-                item.category.value,
+                item.process_type_code or "",
                 item.spec or "",
                 item.unit,
                 float(inventory.quantity) if inventory else 0,
@@ -305,20 +296,27 @@ def export_items_csv(db: Session = Depends(get_db)):
     return csv_streaming_response(buffer, "items-export.csv")
 
 
-_CATEGORY_ROW_COLOR = {
-    "RM": "D6E8FF",
-    "TA": "D6F5F5", "TF": "D6F5F5",
-    "HA": "FFF8D6", "HF": "FFF8D6",
-    "VA": "EAD6FF", "VF": "EAD6FF",
-    "AA": "FFE8D6", "AF": "FFE8D6",
-    "FG": "D6F5E0",
-    "UK": "EBEBEB",
+# process_type_code 의 prefix(부서 계열) 1글자 → 행 색상 (xlsx export 용).
+# README 기준 6개 부서: T(튜브)/H(고압)/V(진공)/N(튜닝)/A(조립)/P(출하).
+_PROCESS_PREFIX_ROW_COLOR = {
+    "T": "D6F5F5",  # 튜브
+    "H": "FFF8D6",  # 고압
+    "V": "EAD6FF",  # 진공
+    "N": "FFE8D6",  # 튜닝
+    "A": "D6E8FF",  # 조립
+    "P": "D6F5E0",  # 출하
 }
+
+
+def _row_color_for(process_type_code: Optional[str]) -> str:
+    if not process_type_code:
+        return "EBEBEB"
+    return _PROCESS_PREFIX_ROW_COLOR.get(process_type_code[0], "FFFFFF")
 
 
 @router.get("/export.xlsx")
 def export_items_xlsx(
-    category: Optional[CategoryEnum] = Query(None),
+    process_type_code: Optional[str] = Query(None, description="process_type_code 필터"),
     search: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
@@ -329,20 +327,20 @@ def export_items_xlsx(
     from app.utils.excel import apply_header, auto_width, make_xlsx_response
 
     query = _build_item_query(db)
-    if category:
-        query = query.filter(Item.category == category)
+    if process_type_code:
+        query = query.filter(Item.process_type_code == process_type_code)
     if search:
         pattern = f"%{search}%"
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.erp_code.ilike(pattern),
+                Item.item_code.ilike(pattern),
                 Item.spec.ilike(pattern),
                 Item.barcode.ilike(pattern),
                 Inventory.location.ilike(pattern),
             )
         )
-    rows = query.order_by(Item.category, Item.erp_code).all()
+    rows = query.order_by(Item.process_type_code, Item.item_code).all()
 
     # 가용수량 계산: stock_math 를 한 번 bulk 로 불러 경로별 재구현을 피한다.
     figures_map = stock_math.bulk_compute(db, [it.item_id for it, _ in rows])
@@ -352,7 +350,7 @@ def export_items_xlsx(
     ws.title = "품목 마스터"
 
     columns = [
-        "ERP코드", "품목명", "카테고리", "사양", "단위",
+        "품목 코드", "품목명", "공정코드", "사양", "단위",
         "재고수량", "가용수량", "예약수량", "위치", "공급업체", "안전재고", "바코드", "수정일",
     ]
     apply_header(ws, columns)
@@ -367,9 +365,9 @@ def export_items_xlsx(
         min_stock = float(item.min_stock) if item.min_stock else None
 
         row_data = [
-            item.erp_code or "",
+            item.item_code or "",
             item.item_name,
-            item.category.value,
+            item.process_type_code or "",
             item.spec or "",
             item.unit,
             qty,
@@ -384,7 +382,7 @@ def export_items_xlsx(
         ws.append(row_data)
 
         row_idx = ws.max_row
-        hex_color = _CATEGORY_ROW_COLOR.get(item.category.value, "FFFFFF")
+        hex_color = _row_color_for(item.process_type_code)
         row_fill = PatternFill("solid", fgColor=hex_color)
         for cell in ws[row_idx]:
             cell.fill = row_fill
@@ -420,14 +418,31 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
 
     changed: list[str] = []
     for field in (
-        "item_name", "spec", "category", "unit", "barcode",
-        "legacy_file_type", "legacy_part", "legacy_item_type", "legacy_model",
-        "supplier", "min_stock",
+        "item_name", "spec", "process_type_code", "unit", "barcode",
+        "legacy_file_type", "legacy_part", "legacy_item_type",
+        "supplier", "min_stock", "option_code",
     ):
         new_val = getattr(payload, field)
         if new_val is not None and getattr(item, field) != new_val:
             setattr(item, field, new_val)
             changed.append(field)
+
+    if payload.model_slots is not None:
+        db.query(ItemModel).filter(ItemModel.item_id == item.item_id).delete()
+        for slot in payload.model_slots:
+            db.add(ItemModel(item_id=item.item_id, slot=slot))
+        item.model_symbol = slots_to_model_symbol(payload.model_slots) or None
+        changed.append("model_slots")
+
+    if payload.item_code is not None and payload.item_code != item.item_code:
+        exists = db.query(Item).filter(
+            Item.item_code == payload.item_code,
+            Item.item_id != item.item_id,
+        ).first()
+        if exists:
+            raise http_error(409, ErrorCode.CONFLICT, f"'{payload.item_code}' 코드는 이미 사용 중입니다.")
+        item.item_code = payload.item_code
+        changed.append("item_code")
 
     item.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
@@ -440,6 +455,34 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
             target_id=str(item.item_id),
             payload_summary=f"{item.item_name}: {', '.join(changed)}",
         )
+
+    commit_and_refresh(db, item)
+    return item
+
+
+@router.patch("/{item_id}/bom-completion", response_model=ItemResponse)
+def update_bom_completion(
+    item_id: uuid.UUID,
+    payload: BomCompletionUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """BOM 완료 상태 토글 — 사용자가 명시적으로 누를 때만 set/clear."""
+    item = db.query(Item).filter(Item.item_id == item_id).first()
+    if not item:
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+
+    item.bom_completed_at = datetime.now(UTC).replace(tzinfo=None) if payload.completed else None
+    item.updated_at = datetime.now(UTC).replace(tzinfo=None)
+
+    audit.record(
+        db,
+        request=request,
+        action="item.bom_completion",
+        target_type="item",
+        target_id=str(item.item_id),
+        payload_summary=f"{item.item_name}: {'완료' if payload.completed else '완료 해제'}",
+    )
 
     commit_and_refresh(db, item)
     return item

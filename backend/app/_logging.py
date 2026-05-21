@@ -1,8 +1,8 @@
-"""ERP 백엔드 로깅 설정.
+"""MES 백엔드 로깅 설정.
 
 운영 표준:
 - 콘솔 로그: 기존대로 (uvicorn access + 우리 INFO)
-- 파일 로그: backend/logs/erp.log (RotatingFileHandler, 5MB x 5 backup)
+- 파일 로그: backend/logs/mes.log (RotatingFileHandler, 5MB x 5 backup)
 
 환경변수:
 - LOG_LEVEL (기본 INFO)
@@ -27,8 +27,8 @@ def setup_logging() -> logging.Logger:
     log_dir = Path(os.environ.get("LOG_DIR") or (_BACKEND_DIR / "logs"))
     log_dir.mkdir(parents=True, exist_ok=True)
 
-    logger = logging.getLogger("erp")
-    if getattr(logger, "_erp_configured", False):
+    logger = logging.getLogger("mes")
+    if getattr(logger, "_mes_configured", False):
         return logger
 
     logger.setLevel(level)
@@ -39,7 +39,7 @@ def setup_logging() -> logging.Logger:
     )
 
     file_handler = RotatingFileHandler(
-        log_dir / "erp.log",
+        log_dir / "mes.log",
         maxBytes=5 * 1024 * 1024,
         backupCount=5,
         encoding="utf-8",
@@ -54,9 +54,9 @@ def setup_logging() -> logging.Logger:
     logger.addHandler(console_handler)
 
     logger.propagate = False
-    logger._erp_configured = True  # type: ignore[attr-defined]
+    logger._mes_configured = True  # type: ignore[attr-defined]
     return logger
 
 
 def get_logger() -> logging.Logger:
-    return logging.getLogger("erp")
+    return logging.getLogger("mes")

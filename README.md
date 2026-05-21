@@ -1,11 +1,13 @@
-# DEXCOWIN ERP
+# DEXCOWIN MES
 
-정밀 X-ray 장비 제조사의 품목, 재고, BOM, 입출고를 관리하는 내부 ERP/MES 프로토타입.
+DEXCOWIN의 품목, 재고, BOM, 입출고를 관리하는 경량 MES 프로토타입.
+
+**현재 안정성 점수**: ~96/100 (Round-10A 완료, 2026-05-02). 세부 추적: [docs/CODEX_PROGRESS.md](docs/CODEX_PROGRESS.md)
 
 ## 현재 기준
 
-- 기준 품목 수: 971건
-- 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/erp.db`)
+- 기준 품목 수: 722건
+- 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/mes.db`)
 - 프론트엔드: Next.js 14 + Tailwind CSS
 - 주 사용 화면: `/legacy` (데스크톱 셸: 대시보드 / 입출고 / 입출고 내역 / 관리자)
 - 품목코드 기준 문서: `docs/ITEM_CODE_RULES.md`
@@ -50,7 +52,7 @@ http://localhost:3000
 
 | 스크립트 | 역할 |
 |---|---|
-| `scripts/ops/backup_db.bat` | `backend/erp.db` 를 `backend/_backup/erp_YYYYMMDD_HHMMSS.db` 로 복사 |
+| `scripts/ops/backup_db.bat` | `backend/mes.db` 를 `backend/_backup/mes_YYYYMMDD_HHMMSS.db` 로 복사 |
 | `scripts/ops/healthcheck.bat` | `GET /health/detailed` 호출 후 결과 출력 |
 | `scripts/ops/reconcile_inventory.bat` | 정합성 1차 진단 + 자동 백업 |
 
@@ -73,7 +75,7 @@ http://localhost:3000
 - `BF`는 구형 오염 코드이며 현재 기준에서 사용하지 않는다.
 - 부서 필터는 `category`가 아니라 `process_type_code` 또는 백엔드 `department` 응답 기준으로 동작해야 한다.
 
-ERP 코드 포맷:
+품목 코드 포맷:
 
 ```text
 {모델기호}-{process_type_code}-{일련번호:04d}[-{옵션코드}]
@@ -103,19 +105,27 @@ ERP 코드 포맷:
 ERP/
 ├── backend/              FastAPI · SQLAlchemy · SQLite
 │   ├── app/              routers / services / models
-│   ├── erp.db            기준 스냅샷 (971 품목)
+│   ├── mes.db            기준 스냅샷 (722 품목, 정리본 기준)
 │   └── requirements.txt
 ├── frontend/             Next.js 14 · Tailwind
-│   └── app/legacy/       현재 활성 셸 (대시보드/입출고/내역/관리자)
-├── data/                 입력 자료 (xlsx · csv)
+│   ├── app/legacy/       현재 활성 셸 (대시보드/입출고/내역/관리자)
+│   ├── features/mes/     MES feature 정본 (shared 부품 등) — 신규 import 대상
+│   └── lib/
+│       ├── api/          13 도메인 모듈 (admin/catalog/.../stock-requests)
+│       │   └── types/    도메인별 type 정본 (Round-10A #2)
+│       ├── api-core.ts   fetch 헬퍼 (postJson/putJson/deleteJson/parseError)
+│       └── mes/          MES 디자인시스템 (color/format/status/...)
+├── data/                 입력 자료 (xlsx · csv) + db_backups/ (DB 백업 단일 보관소)
 ├── docs/                 기준 · 운영 · 구조 · 인수인계
+│   ├── openapi.json      FastAPI baseline (CI drift 검사 기준)
 │   └── research/         외부 연구 보고서
 ├── scripts/              보조 스크립트
 │   ├── ops/              백업 · 헬스체크 · 재고 정합
 │   ├── migrations/       DB 스키마 / 코드 정제
-│   └── dev/              개발 보조 · 일회성 임포트
-├── docker/               컨테이너 정의 (선택)
-├── _archive/, _backup/   보관용 — 작업 대상 아님
+│   └── dev/              verify_local.ps1 등 개발 보조
+├── outputs/              도구 산출물 (bom_setup/, inventory_cleanup/)
+├── docker/               컨테이너 정의 (docker-compose.yml · docker-compose.nas.yml)
+├── _archive/             보관용 — 작업 대상 아님
 ├── start.bat             통합 실행 (Windows)
 ├── README.md             이 문서
 └── CLAUDE.md             AI/개발자 작업 규칙
@@ -131,7 +141,7 @@ ERP/
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | 운영자 | 365일 운영, 시작·재시작, 포트 충돌, 백업, 1차 장애 대응 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 개발자 | 폴더 구조·레이어·재고 3-bucket 모델·wizard 흐름 |
 | [docs/ERD.md](docs/ERD.md) | 개발자 | 엔티티 관계도(Mermaid) + 자재→재고→생산→출하 흐름 |
-| [docs/GLOSSARY.md](docs/GLOSSARY.md) | 모두 | 도메인 용어 단일 소스 (부서·카테고리·재고 모델·에러코드) |
+| [docs/GLOSSARY.md](docs/GLOSSARY.md) | 모두 | 도메인 용어 단일 소스 (부서·공정코드·재고 모델·에러코드) |
 | [docs/ITEM_CODE_RULES.md](docs/ITEM_CODE_RULES.md) | 모두 | 품목코드 최종 기준 |
 | [docs/AI_HANDOVER.md](docs/AI_HANDOVER.md) | AI 협업자 | 인수인계 (Phase 4·5 결과 포함) |
 | [docs/CODEX_PROGRESS.md](docs/CODEX_PROGRESS.md) | 모두 | 큰 기능 단위 진행 기록 |
@@ -141,14 +151,26 @@ ERP/
 
 ## 검증
 
+### 5게이트 일괄 검증 (commit 전 권장)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
+```
+
+backend pytest / frontend lint:strict / tsc / vitest+coverage / next build / OpenAPI drift 를 CI 와 동일 기준으로 검사. coverage threshold 50/50/50/50.
+
+### 개별 검증
+
 ```bash
 # 백엔드
 python -m compileall backend
+cd backend && pytest -q
 
 # 프론트
 cd frontend
-npm run lint
+npm run lint:strict
 npx tsc --noEmit
+npm run test:coverage
 npm run build
 ```
 
@@ -160,3 +182,16 @@ GET  /api/items
 GET  /api/inventory/summary
 GET  /api/production/capacity
 ```
+
+### API 변경 시 OpenAPI baseline 갱신
+
+backend 라우터/스키마 수정 시 `docs/openapi.json` 갱신 필수 (CI drift 검사):
+
+```bash
+cd backend
+python -c "from app.main import app; import json; \
+  open('../docs/openapi.json','w',encoding='utf-8').write(\
+  json.dumps(app.openapi(),indent=2,sort_keys=True,ensure_ascii=False)+chr(10))"
+```
+
+갱신본을 같은 commit 에 포함시켜야 CI 가 통과한다.

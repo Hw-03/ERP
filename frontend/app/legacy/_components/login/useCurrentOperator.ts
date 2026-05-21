@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from "react";
-import type { Department, EmployeeLevel } from "@/lib/api";
+import type { Department, DepartmentRole, EmployeeLevel, WarehouseRole } from "@/lib/api";
 
 export interface Operator {
   employee_id: string;
@@ -14,15 +14,50 @@ export interface Operator {
   department: Department;
   level: EmployeeLevel;
   employee_code: string;
+  /** 창고 결재 역할 — 기존 데이터 호환을 위해 누락 시 "none" 폴백. */
+  warehouse_role: WarehouseRole;
+  /** 부서 결재 역할 — 낱개(manual/adjust) IO 결재 권한. 누락 시 "none". */
+  department_role: DepartmentRole;
+  /** 개인별 테마 설정 (light | dark | null). 누락 시 null. */
+  theme?: string | null;
+  /** 조립 부서 직원의 담당 모델 slot 목록 (priority 순서). 누락 시 []. */
+  assigned_model_slots: number[];
 }
 
-const OPERATOR_KEY = "dexcowin_erp_operator";
+const OPERATOR_KEY = "dexcowin_mes_operator";
+const BOOT_KEY = "dexcowin_mes_boot_id";
+// 같은 탭에서 setCurrentOperator 가 호출되면 useCurrentOperator 구독자들을 깨우기 위한 이벤트.
+// localStorage `storage` 이벤트는 다른 탭에만 발화하므로 별도 CustomEvent 필요.
+const OPERATOR_CHANGE_EVENT = "dexcowin_operator_change";
 
 function readOperator(): Operator | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(OPERATOR_KEY);
-    return raw ? (JSON.parse(raw) as Operator) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<Operator> & {
+      warehouse_role?: string | null;
+      department_role?: string | null;
+      assigned_model_slots?: unknown;
+    };
+    if (!parsed.employee_id || !parsed.name) return null;
+    const wh = (parsed.warehouse_role ?? "none").toLowerCase();
+    const dept = (parsed.department_role ?? "none").toLowerCase();
+    const slotsRaw = parsed.assigned_model_slots;
+    const slots = Array.isArray(slotsRaw)
+      ? slotsRaw.filter((s): s is number => typeof s === "number" && Number.isInteger(s))
+      : [];
+    return {
+      employee_id: parsed.employee_id,
+      name: parsed.name,
+      department: parsed.department as Department,
+      level: parsed.level as EmployeeLevel,
+      employee_code: parsed.employee_code as string,
+      warehouse_role: (wh === "primary" || wh === "deputy" ? wh : "none") as WarehouseRole,
+      department_role: (dept === "primary" || dept === "deputy" ? dept : "none") as DepartmentRole,
+      theme: parsed.theme ?? null,
+      assigned_model_slots: slots,
+    };
   } catch {
     return null;
   }
@@ -33,14 +68,23 @@ export function readCurrentOperator(): Operator | null {
   return readOperator();
 }
 
-export function setCurrentOperator(op: Operator): void {
+export function getStoredBootId(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(BOOT_KEY);
+}
+
+export function setCurrentOperator(op: Operator, bootId?: string): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(OPERATOR_KEY, JSON.stringify(op));
+  if (bootId) window.localStorage.setItem(BOOT_KEY, bootId);
+  window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
 }
 
 export function clearCurrentOperator(): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(OPERATOR_KEY);
+  window.localStorage.removeItem(BOOT_KEY);
+  window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
 }
 
 export function useCurrentOperator(): Operator | null {
@@ -48,6 +92,13 @@ export function useCurrentOperator(): Operator | null {
 
   useEffect(() => {
     setOperator(readOperator());
+    const onChange = () => setOperator(readOperator());
+    window.addEventListener(OPERATOR_CHANGE_EVENT, onChange);
+    window.addEventListener("storage", onChange);
+    return () => {
+      window.removeEventListener(OPERATOR_CHANGE_EVENT, onChange);
+      window.removeEventListener("storage", onChange);
+    };
   }, []);
 
   return operator;

@@ -1,10 +1,17 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { Search, X } from "lucide-react";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "../tokens";
 
+/**
+ * 한글 IME 안정화: composition 중에는 외부 onChange 를 호출하지 않고
+ * compositionend 에서 한 번만 보내 입력 글자마다 부모 리렌더로 input 이 잘리는 문제 방지.
+ * 외부 value 변경은 composition 중일 때만 무시(외부 리셋이 입력을 덮어쓰는 것 방지),
+ * 평소에는 즉시 반영.
+ */
 export function InlineSearch({
   value,
   onChange,
@@ -18,6 +25,20 @@ export function InlineSearch({
   className?: string;
   autoFocus?: boolean;
 }) {
+  const composingRef = useRef(false);
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    if (composingRef.current) return;
+    if (draft !== value) setDraft(value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- draft 동기화는 외부 value 변경 시만
+  }, [value]);
+
+  const handleChange = (next: string) => {
+    setDraft(next);
+    if (!composingRef.current) onChange(next);
+  };
+
   return (
     <div
       className={clsx(
@@ -29,16 +50,29 @@ export function InlineSearch({
       <Search size={16} color={LEGACY_COLORS.muted} strokeWidth={2} />
       <input
         autoFocus={autoFocus}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={draft}
+        onChange={(e) => handleChange(e.target.value)}
+        onCompositionStart={() => {
+          composingRef.current = true;
+        }}
+        onCompositionEnd={(e) => {
+          composingRef.current = false;
+          const next = (e.target as HTMLInputElement).value;
+          setDraft(next);
+          onChange(next);
+        }}
         placeholder={placeholder}
-        className={clsx("h-10 min-w-0 flex-1 bg-transparent outline-none", TYPO.body)}
+        className={clsx("h-11 min-w-0 flex-1 bg-transparent outline-none", TYPO.body)}
         style={{ color: LEGACY_COLORS.text }}
       />
-      {value ? (
+      {draft ? (
         <button
           type="button"
-          onClick={() => onChange("")}
+          onClick={() => {
+            composingRef.current = false;
+            setDraft("");
+            onChange("");
+          }}
           aria-label="검색어 지우기"
           className="shrink-0 rounded-full p-1"
           style={{ color: LEGACY_COLORS.muted }}

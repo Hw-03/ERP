@@ -20,7 +20,10 @@ from decimal import Decimal
 sys.path.insert(0, os.path.dirname(__file__))
 
 from app.database import SessionLocal
-from app.models import BOM, CategoryEnum, Item
+from app.models import BOM, Item
+
+
+R_TYPE_CODES = ["TR", "HR", "VR", "NR", "AR", "PR"]  # 원자재 R 시리즈 6종
 
 
 def symbols_overlap(s1: str | None, s2: str | None) -> bool:
@@ -54,13 +57,13 @@ def add_bom(db, existing: set, parent: Item, child: Item, qty: int) -> bool:
 def main() -> None:
     db = SessionLocal()
     try:
-        ba_items = db.query(Item).filter(Item.category == CategoryEnum.AA).all()
-        ta_items = db.query(Item).filter(Item.category == CategoryEnum.TA).all()
-        ha_items = db.query(Item).filter(Item.category == CategoryEnum.HA).all()
-        va_items = db.query(Item).filter(Item.category == CategoryEnum.VA).all()
-        bf_items = db.query(Item).filter(Item.category == CategoryEnum.AF).all()
-        tf_items = db.query(Item).filter(Item.category == CategoryEnum.TF).all()
-        rm_items = db.query(Item).filter(Item.category == CategoryEnum.RM).all()
+        ba_items = db.query(Item).filter(Item.process_type_code == "AA").all()
+        ta_items = db.query(Item).filter(Item.process_type_code == "TA").all()
+        ha_items = db.query(Item).filter(Item.process_type_code == "HA").all()
+        va_items = db.query(Item).filter(Item.process_type_code == "VA").all()
+        bf_items = db.query(Item).filter(Item.process_type_code == "AF").all()
+        tf_items = db.query(Item).filter(Item.process_type_code == "TF").all()
+        rm_items = db.query(Item).filter(Item.process_type_code.in_(R_TYPE_CODES)).all()
 
         existing = load_existing(db)
         print(f"기존 BOM: {len(existing)}개")

@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.models import CategoryEnum, DepartmentEnum, LocationStatusEnum
+from app.models import DepartmentEnum, LocationStatusEnum
 from app.services.stock_math import (
     StockFigures,
     bulk_compute,

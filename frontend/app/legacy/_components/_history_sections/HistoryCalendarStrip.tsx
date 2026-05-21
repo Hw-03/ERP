@@ -2,9 +2,12 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber, transactionColor, transactionLabel } from "../legacyUi";
-import { EmptyState } from "../common/EmptyState";
-import { formatHistoryDate } from "./historyShared";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import {
+  isAdjustmentLike,
+  isDepartmentInternalType,
+  isWarehouseInvolvedType,
+} from "./transactionTaxonomy";
 
 type Props = {
   calendarYear: number;
@@ -17,9 +20,6 @@ type Props = {
   todayKey: string;
   selectedDay: string | null;
   setSelectedDay: (key: string | null) => void;
-  selectedDayLogs: TransactionLog[];
-  selectedLogId: string | undefined;
-  onSelectLog: (log: TransactionLog) => void;
 };
 
 export function HistoryCalendarStrip({
@@ -33,9 +33,6 @@ export function HistoryCalendarStrip({
   todayKey,
   selectedDay,
   setSelectedDay,
-  selectedDayLogs,
-  selectedLogId,
-  onSelectLog,
 }: Props) {
   return (
     <section className="card">
@@ -86,14 +83,22 @@ export function HistoryCalendarStrip({
               const dayLogs = calendarDayMap.get(key) ?? [];
               const isToday = key === todayKey;
               const isSelected = key === selectedDay;
-              const hasReceive = dayLogs.some((l) => l.transaction_type === "RECEIVE" || l.transaction_type === "PRODUCE");
-              const hasShip = dayLogs.some((l) => l.transaction_type === "SHIP" || l.transaction_type === "BACKFLUSH");
-              const hasAdjust = dayLogs.some((l) => l.transaction_type === "ADJUST");
+              // KPI 와 일치 — isWarehouseInvolvedType / isDepartmentInternalType / isAdjustmentLike.
+              let warehouseCount = 0;
+              let deptCount = 0;
+              let adjustCount = 0;
+              for (const l of dayLogs) {
+                if (isWarehouseInvolvedType(l.transaction_type)) warehouseCount++;
+                if (isDepartmentInternalType(l.transaction_type)) deptCount++;
+                if (isAdjustmentLike(l)) adjustCount++;
+              }
               return (
                 <button
                   key={key}
+                  aria-label={`${calendarYear}년 ${calendarMonth + 1}월 ${day}일${isSelected ? " (선택됨)" : ""}`}
+                  aria-pressed={isSelected}
                   onClick={() => setSelectedDay(selectedDay === key ? null : key)}
-                  className="flex flex-col items-center rounded-[14px] border p-2 transition-colors hover:brightness-110"
+                  className="flex flex-col items-center rounded-[14px] border p-1.5 transition-colors hover:brightness-110"
                   style={{
                     background: isSelected ? "rgba(101,169,255,.18)" : isToday ? "rgba(101,169,255,.08)" : LEGACY_COLORS.s2,
                     borderColor: isSelected
@@ -101,7 +106,7 @@ export function HistoryCalendarStrip({
                       : isToday
                       ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 27%, transparent)`
                       : LEGACY_COLORS.border,
-                    minHeight: "64px",
+                    minHeight: "132px",
                   }}
                 >
                   <span className="text-sm font-bold" style={{ color: isToday ? LEGACY_COLORS.blue : LEGACY_COLORS.text }}>
@@ -115,67 +120,28 @@ export function HistoryCalendarStrip({
                       {dayLogs.length}
                     </span>
                   )}
-                  <div className="mt-1 flex gap-0.5">
-                    {hasReceive && <span className="h-1.5 w-1.5 rounded-full" style={{ background: LEGACY_COLORS.green }} />}
-                    {hasShip && <span className="h-1.5 w-1.5 rounded-full" style={{ background: LEGACY_COLORS.red }} />}
-                    {hasAdjust && <span className="h-1.5 w-1.5 rounded-full" style={{ background: LEGACY_COLORS.yellow }} />}
+                  <div className="mt-1 flex w-full flex-col gap-0.5 px-1">
+                    {warehouseCount > 0 && (
+                      <span className="text-[11px] font-bold leading-tight" style={{ color: LEGACY_COLORS.green }}>
+                        창고 {warehouseCount}건
+                      </span>
+                    )}
+                    {deptCount > 0 && (
+                      <span className="text-[11px] font-bold leading-tight" style={{ color: LEGACY_COLORS.cyan }}>
+                        부서 {deptCount}건
+                      </span>
+                    )}
+                    {adjustCount > 0 && (
+                      <span className="text-[11px] font-bold leading-tight" style={{ color: LEGACY_COLORS.yellow }}>
+                        조정 {adjustCount}건
+                      </span>
+                    )}
                   </div>
                 </button>
               );
             })}
           </div>
 
-          {/* 선택일 거래 목록 */}
-          {selectedDay && (
-            <div
-              className="mt-4 rounded-[20px] border p-4"
-              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-            >
-              <div className="mb-3 text-sm font-bold">
-                {selectedDay} 거래 {selectedDayLogs.length}건
-              </div>
-              {selectedDayLogs.length === 0 ? (
-                <EmptyState
-                  variant="no-data"
-                  compact
-                  title="거래 없음"
-                  description="선택한 날짜에 처리된 거래가 없습니다."
-                />
-              ) : (
-                <div className="space-y-2">
-                  {selectedDayLogs.map((log) => {
-                    const tcolor = transactionColor(log.transaction_type);
-                    return (
-                      <button
-                        key={log.log_id}
-                        onClick={() => onSelectLog(log)}
-                        className="flex w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition-all hover:brightness-110"
-                        style={{
-                          background: selectedLogId === log.log_id ? "rgba(101,169,255,.10)" : LEGACY_COLORS.s1,
-                          borderColor: selectedLogId === log.log_id ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                        }}
-                      >
-                        <span
-                          className="inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-bold"
-                          style={{ background: `color-mix(in srgb, ${tcolor} 14%, transparent)`, color: tcolor }}
-                        >
-                          {transactionLabel(log.transaction_type)}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-sm">{log.item_name}</span>
-                        <span className="shrink-0 text-sm font-bold" style={{ color: tcolor }}>
-                          {Number(log.quantity_change) >= 0 ? "+" : ""}
-                          {formatNumber(log.quantity_change)}
-                        </span>
-                        <span className="shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                          {formatHistoryDate(log.created_at).split(" ")[1]}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
         </>
       )}
     </section>

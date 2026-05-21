@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes statusFlash {
+  from { opacity: 0.3; transform: translateY(-2px); }
+  to   { opacity: 1;   transform: translateY(0);    }
+}
+
 @layer base {
   :root {
     /* === Light Theme (Default) === */
@@ -25,6 +30,8 @@
     --c-muted2: #56657e;
     --c-panel-glow: radial-gradient(circle at top right, rgba(47, 116, 231, 0.08), transparent 36%);
     --c-card-shadow: 0 24px 64px rgba(45, 70, 106, 0.12);
+    --c-popup-bg: #ffffff;
+    --c-popup-shadow: 0 12px 28px rgba(45, 70, 106, 0.16);
     --c-radius-xl: 32px;
     --c-radius-lg: 24px;
     --c-radius-md: 18px;
@@ -70,6 +77,8 @@
     --c-muted2: #9badc7;
     --c-panel-glow: radial-gradient(circle at top right, rgba(101, 169, 255, 0.16), transparent 32%);
     --c-card-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+    --c-popup-bg: #101a2b;
+    --c-popup-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
     --pill-hover-mix: 55%;
     --pill-glow-strength: 75%;
     --pill-glow-blur: 24px;
@@ -89,7 +98,8 @@
   body {
     background: var(--c-bg);
     color: var(--c-text);
-    min-height: 100vh;
+    min-height: 100vh; /* fallback */
+    min-height: 100dvh; /* iOS Safari: 하단 툴바 포함 동적 뷰포트 — 하단 탭바 가림 방지 */
   }
 
   /* 스크롤바 스타일 */
@@ -154,15 +164,31 @@
   animation: flow 2s ease-in-out infinite;
 }
 
-/* === ERP Login Intro === */
-@keyframes erp-letter-in {
-  from { opacity: 0; transform: translateY(-6px); }
+/* === MES Login Intro === */
+@keyframes mes-logo-fade-in {
+  from { opacity: 0; transform: scale(0.88); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes mes-card-rise {
+  from { opacity: 0; transform: translateY(20px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes erp-card-rise {
-  from { opacity: 0; transform: translateY(20px); }
+@keyframes mes-field-rise {
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* === Admin PIN Lock (DesktopPinLock) === */
+@keyframes admin-pin-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+.animate-admin-pin-shake {
+  animation: admin-pin-shake 0.4s ease-in-out;
 }
 
 /* 사용자가 동작 감소를 선호하는 경우 모든 자체 애니메이션 무력화 (WCAG 2.3.3). */

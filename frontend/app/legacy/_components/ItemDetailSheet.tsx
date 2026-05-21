@@ -1,18 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type Item, type TransactionLog } from "@/lib/api";
-import { BottomSheet } from "./BottomSheet";
-import {
-  LEGACY_COLORS,
-  erpCodeDeptBadge,
-  formatNumber,
-  getStockState,
-  transactionColor,
-  transactionLabel,
-} from "./legacyUi";
+import { api, type InventoryLocationRow, type Item, type TransactionLog } from "@/lib/api";
+import { BottomSheet } from "@/lib/ui/BottomSheet";
+import { ItemDetailHistoryList } from "./ItemDetailHistoryList";
+import { ItemDetailActionForm, type ItemDetailActionMode } from "./ItemDetailActionForm";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { itemCodeDeptBadge } from "@/lib/mes/process";
+import { getStockState } from "@/lib/mes/inventory";
+import { formatQty } from "@/lib/mes/format";
+import { useDeptColor, useDeptColorLookup } from "./DepartmentsContext";
+import { SegmentedControl } from "./mobile/primitives";
 
-type ActionMode = "ADJUST" | "RECEIVE" | "SHIP";
+type ActionMode = ItemDetailActionMode;
+type DetailTab = "summary" | "locations" | "history";
 
 export function ItemDetailSheet({
   item,
@@ -23,20 +24,34 @@ export function ItemDetailSheet({
   onClose: () => void;
   onSaved: (updated: Item) => void;
 }) {
+  const [tab, setTab] = useState<DetailTab>("summary");
   const [mode, setMode] = useState<ActionMode>("ADJUST");
   const [qty, setQty] = useState("0");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<TransactionLog[]>([]);
+  const [locations, setLocations] = useState<InventoryLocationRow[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(false);
+  const getDeptColor = useDeptColorLookup();
 
   useEffect(() => {
     if (!item) return;
+    setTab("summary");
     setMode("ADJUST");
     setQty(String(Number(item.quantity)));
     setNotes("");
     setError(null);
-    void api.getTransactions({ itemId: item.item_id, limit: 10 }).then(setLogs).catch(() => setLogs([]));
+    void api
+      .getTransactions({ itemId: item.item_id, limit: 10 })
+      .then(setLogs)
+      .catch(() => setLogs([]));
+    setLocationsLoading(true);
+    void api
+      .getItemLocations(item.item_id)
+      .then((rows) => setLocations(rows ?? []))
+      .catch(() => setLocations([]))
+      .finally(() => setLocationsLoading(false));
   }, [item]);
 
   if (!item) return null;
@@ -45,7 +60,7 @@ export function ItemDetailSheet({
     item.available_quantity ?? Number(item.quantity) - Number(item.pending_quantity ?? 0),
   );
   const stockState = getStockState(availableQty, item.min_stock == null ? null : Number(item.min_stock));
-  const deptBadge = erpCodeDeptBadge(item.erp_code);
+  const deptBadge = itemCodeDeptBadge(item.item_code, getDeptColor);
 
   const bump = (delta: number) => {
     const minimum = mode === "ADJUST" ? 0 : 1;
@@ -82,10 +97,8 @@ export function ItemDetailSheet({
           quantity: numericQty,
           reason: notes || "레거시 UI 조정",
         });
-      } else if (mode === "RECEIVE") {
-        response = await api.receiveInventory(payload);
       } else {
-        response = await api.shipInventory(payload);
+        response = await api.receiveInventory(payload);
       }
 
       onSaved({
@@ -102,225 +115,232 @@ export function ItemDetailSheet({
     }
   }
 
+  const tabs: { id: DetailTab; label: string; badge?: number | null }[] = [
+    { id: "summary", label: "요약" },
+    { id: "locations", label: "위치", badge: locations.length || null },
+    { id: "history", label: "거래", badge: logs.length || null },
+  ];
+
   return (
     <BottomSheet open={!!item} onClose={onClose} title={item.item_name}>
       <div className="px-5 pb-6">
-        <div className="mb-[14px]">
-          <div className="mb-[6px] flex flex-wrap gap-[6px]">
+        <div className="mb-[10px] flex flex-wrap gap-[6px]">
+          <span
+            className="rounded-full px-[7px] py-[2px] text-[9px] font-bold"
+            style={{
+              background:
+                stockState.label === "정상"
+                  ? "rgba(31,209,122,.15)"
+                  : stockState.label === "부족"
+                    ? "rgba(244,185,66,.15)"
+                    : "rgba(242,95,92,.15)",
+              color: stockState.color,
+            }}
+          >
+            {stockState.label}
+          </span>
+          {deptBadge && (
             <span
               className="rounded-full px-[7px] py-[2px] text-[9px] font-bold"
-              style={{
-                background:
-                  stockState.label === "정상"
-                    ? "rgba(31,209,122,.15)"
-                    : stockState.label === "부족"
-                      ? "rgba(244,185,66,.15)"
-                      : "rgba(242,95,92,.15)",
-                color: stockState.color,
-              }}
+              style={{ background: deptBadge.bg, color: deptBadge.color }}
             >
-              {stockState.label}
+              {deptBadge.label}
             </span>
-            {deptBadge && (
-              <span
-                className="rounded-full px-[7px] py-[2px] text-[9px] font-bold"
-                style={{ background: deptBadge.bg, color: deptBadge.color }}
-              >
-                {deptBadge.label}
-              </span>
-            )}
-          </div>
-
-          <div className="overflow-hidden rounded-[14px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-            {[
-              ["ERP 코드", item.erp_code ?? "-"],
-              ["사양", item.spec || "-"],
-              ["총재고", `${formatNumber(item.quantity)} ${item.unit}`],
-              [
-                "가용 / 예약",
-                `${formatNumber(item.available_quantity ?? item.quantity)} / ${formatNumber(item.pending_quantity ?? 0)} ${item.unit}`,
-              ],
-              ...(item.last_reserver_name && Number(item.pending_quantity ?? 0) > 0
-                ? [["점유자", `🔒 ${item.last_reserver_name}`] as [string, string]]
-                : []),
-              ["위치", item.location || "-"],
-              ["파트", item.legacy_part || "-"],
-              ["모델", item.legacy_model || "공용"],
-              ["공급처", item.supplier || "-"],
-              ["바코드", item.barcode || "-"],
-              ["안전재고", item.min_stock != null ? formatNumber(item.min_stock) : "-"],
-            ].map(([label, value], index, array) => (
-              <div
-                key={label}
-                className="flex items-center justify-between gap-3 px-[14px] py-[10px]"
-                style={{
-                  borderBottom: index === array.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
-                }}
-              >
-                <div className="text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {label}
-                </div>
-                <div className="text-right">
-                  {value}
-                </div>
-              </div>
-            ))}
-          </div>
+          )}
         </div>
 
-        <div className="mb-[14px] overflow-hidden rounded-[14px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          <div className="flex gap-2 px-[14px] py-3">
-            {[
-              { id: "ADJUST", label: "조정" },
-              { id: "RECEIVE", label: "입고" },
-              { id: "SHIP", label: "출고" },
-            ].map((action) => (
-              <button
-                key={action.id}
-                onClick={() => {
-                  setMode(action.id as ActionMode);
-                  setQty(action.id === "ADJUST" ? String(Number(item.quantity)) : "1");
-                }}
-                className="flex-1 rounded-xl py-2 text-xs font-bold"
-                style={{
-                  background: mode === action.id ? LEGACY_COLORS.blue : LEGACY_COLORS.s3,
-                  color: mode === action.id ? "#fff" : LEGACY_COLORS.muted2,
-                }}
-              >
-                {action.label}
-              </button>
-            ))}
-          </div>
+        {/* 탭 */}
+        <div className="mb-[14px]">
+          <SegmentedControl
+            tabs={tabs}
+            active={tab}
+            onChange={(next) => setTab(next as DetailTab)}
+          />
+        </div>
 
-          <div className="px-[14px] pb-[14px]">
-            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={{ color: LEGACY_COLORS.muted2 }}>
-              {mode === "ADJUST" ? "최종 수량" : "처리 수량"}
-            </div>
-            <input
-              value={qty}
-              onChange={(event) => setQty(event.target.value)}
-              inputMode="numeric"
-              className="mb-[7px] w-full rounded-[11px] border px-[13px] py-[11px] text-center text-[22px] font-bold outline-none"
-              style={{
-                background: LEGACY_COLORS.s1,
-                borderColor: LEGACY_COLORS.border,
-                color: LEGACY_COLORS.text,
-              }}
-            />
-            <div className="mb-3 grid grid-cols-4 gap-[7px]">
-              {[-10, -1, 1, 10].map((delta) => (
-                <button
-                  key={delta}
-                  onClick={() => bump(delta)}
-                  className="rounded-[10px] py-[11px] text-sm font-bold"
+        {tab === "summary" ? (
+          <>
+            <div
+              className="mb-[14px] overflow-hidden rounded-[14px] border"
+              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+            >
+              {[
+                ["품목 코드", item.item_code ?? "-"],
+                ["사양", item.spec || "-"],
+                ["총재고", `${formatQty(item.quantity)} ${item.unit}`],
+                [
+                  "가용 / 예약",
+                  `${formatQty(item.available_quantity ?? item.quantity)} / ${formatQty(item.pending_quantity ?? 0)} ${item.unit}`,
+                ],
+                ...(item.last_reserver_name && Number(item.pending_quantity ?? 0) > 0
+                  ? [["점유자", `🔒 ${item.last_reserver_name}`] as [string, string]]
+                  : []),
+                ["위치", item.location || "-"],
+                ["파트", item.legacy_part || "-"],
+                ["공급처", item.supplier || "-"],
+                ["바코드", item.barcode || "-"],
+                ["안전재고", item.min_stock != null ? formatQty(item.min_stock) : "-"],
+              ].map(([label, value], index, array) => (
+                <div
+                  key={label}
+                  className="flex items-center justify-between gap-3 px-[14px] py-[10px]"
                   style={{
-                    background: delta < 0 ? "rgba(242,95,92,.15)" : "rgba(31,209,122,.12)",
-                    color: delta < 0 ? LEGACY_COLORS.red : LEGACY_COLORS.green,
+                    borderBottom:
+                      index === array.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
                   }}
                 >
-                  {delta > 0 ? `+${delta}` : delta}
-                </button>
+                  <div
+                    className="text-[11px] font-semibold"
+                    style={{ color: LEGACY_COLORS.muted2 }}
+                  >
+                    {label}
+                  </div>
+                  <div className="text-right">{value}</div>
+                </div>
               ))}
             </div>
 
-            <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1px]" style={{ color: LEGACY_COLORS.muted2 }}>
-              비고
-            </div>
-            <input
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              placeholder="메모 (선택)"
-              className="w-full rounded-[11px] border px-[13px] py-[11px] text-sm outline-none"
-              style={{
-                background: LEGACY_COLORS.s1,
-                borderColor: LEGACY_COLORS.border,
-                color: LEGACY_COLORS.text,
-              }}
+            <ItemDetailActionForm
+              mode={mode}
+              qty={qty}
+              notes={notes}
+              error={error}
+              saving={saving}
+              initialQuantity={Number(item.quantity)}
+              setMode={setMode}
+              setQty={setQty}
+              setNotes={setNotes}
+              bump={bump}
+              onSubmit={() => void submit()}
             />
+          </>
+        ) : null}
 
-            {error ? (
-              <div
-                className="mt-3 rounded-xl border px-3 py-2 text-xs"
-                style={{
-                  background: "rgba(242,95,92,.12)",
-                  borderColor: "rgba(242,95,92,.25)",
-                  color: LEGACY_COLORS.red,
-                }}
-              >
-                {error}
-              </div>
-            ) : null}
+        {tab === "locations" ? (
+          <ItemLocationsPanel
+            loading={locationsLoading}
+            locations={locations}
+            unit={item.unit}
+          />
+        ) : null}
 
-            <button
-              onClick={() => void submit()}
-              disabled={saving}
-              className="mt-3 w-full rounded-xl py-[13px] text-[15px] font-bold disabled:opacity-50"
-              style={{ background: LEGACY_COLORS.blue, color: "#fff" }}
-            >
-              {saving ? "처리 중..." : mode === "ADJUST" ? "수정" : mode === "RECEIVE" ? "입고" : "출고"}
-            </button>
-          </div>
-        </div>
-
-        <div className="mb-[6px] text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted }}>
-          📋 최근 입출고
-        </div>
-        <div className="overflow-hidden rounded-[14px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-          {logs.length === 0 ? (
-            <div className="px-[14px] py-4 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-              최근 이력이 없습니다.
-            </div>
-          ) : (
-            logs.map((log, index) => (
-              <div
-                key={log.log_id}
-                className="flex items-start gap-2 px-[14px] py-[10px]"
-                style={{
-                  borderBottom: index === logs.length - 1 ? "none" : `1px solid ${LEGACY_COLORS.border}`,
-                }}
-              >
-                <span
-                  className="rounded px-[6px] py-[2px] text-[10px] font-bold"
-                  style={{
-                    background:
-                      log.transaction_type === "RECEIVE" ? "rgba(31,209,122,.15)" : "rgba(242,95,92,.15)",
-                    color: transactionColor(log.transaction_type),
-                  }}
-                >
-                  {transactionLabel(log.transaction_type)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {new Date(log.created_at).toLocaleString("ko-KR")}
-                  </div>
-                  {log.produced_by ? (
-                    <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
-                      👤 {log.produced_by}
-                    </div>
-                  ) : null}
-                  {log.notes ? (
-                    <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
-                      {log.notes}
-                    </div>
-                  ) : null}
-                </div>
-                <div className="shrink-0 text-right">
-                  <div
-                    className="text-sm font-bold"
-                    style={{ color: transactionColor(log.transaction_type) }}
-                  >
-                    {log.quantity_change >= 0 ? "+" : ""}
-                    {formatNumber(log.quantity_change)}
-                  </div>
-                  <div className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                    → {formatNumber(log.quantity_after)}
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        {tab === "history" ? <ItemDetailHistoryList logs={logs} /> : null}
       </div>
     </BottomSheet>
+  );
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  WAREHOUSE: "창고",
+  PRODUCTION: "생산",
+  DEFECTIVE: "불량",
+  PENDING: "예약",
+};
+
+function ItemLocationsPanel({
+  loading,
+  locations,
+  unit,
+}: {
+  loading: boolean;
+  locations: InventoryLocationRow[];
+  unit: string;
+}) {
+  if (loading) {
+    return (
+      <div
+        className="rounded-[14px] border px-4 py-6 text-center text-sm"
+        style={{
+          background: LEGACY_COLORS.s2,
+          borderColor: LEGACY_COLORS.border,
+          color: LEGACY_COLORS.muted2,
+        }}
+      >
+        위치 정보를 불러오는 중…
+      </div>
+    );
+  }
+  if (locations.length === 0) {
+    return (
+      <div
+        className="rounded-[14px] border px-4 py-6 text-center text-sm"
+        style={{
+          background: LEGACY_COLORS.s2,
+          borderColor: LEGACY_COLORS.border,
+          color: LEGACY_COLORS.muted2,
+        }}
+      >
+        등록된 위치 분포가 없습니다.
+      </div>
+    );
+  }
+
+  const total = locations.reduce((s, r) => s + Number(r.quantity || 0), 0);
+  return (
+    <div
+      className="overflow-hidden rounded-[14px] border"
+      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+    >
+      {locations.map((row, index) => (
+        <LocationRow
+          key={`${row.department}-${row.status}-${index}`}
+          row={row}
+          unit={unit}
+          total={total}
+          isLast={index === locations.length - 1}
+        />
+      ))}
+    </div>
+  );
+}
+
+function LocationRow({
+  row,
+  unit,
+  total,
+  isLast,
+}: {
+  row: InventoryLocationRow;
+  unit: string;
+  total: number;
+  isLast: boolean;
+}) {
+  const deptColor = useDeptColor(row.department);
+  const statusLabel = STATUS_LABEL[row.status] ?? row.status;
+  const pct = total > 0 ? (Number(row.quantity || 0) / total) * 100 : 0;
+  return (
+    <div
+      className="px-[14px] py-[10px]"
+      style={{ borderBottom: isLast ? "none" : `1px solid ${LEGACY_COLORS.border}` }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span
+            className="rounded-full px-2 py-[2px] text-[10px] font-bold"
+            style={{ background: `${deptColor}26`, color: deptColor }}
+          >
+            {row.department}
+          </span>
+          <span
+            className="text-[10px] font-semibold uppercase tracking-[1px]"
+            style={{ color: LEGACY_COLORS.muted2 }}
+          >
+            {statusLabel}
+          </span>
+        </div>
+        <div className="text-right text-sm font-bold tabular-nums" style={{ color: LEGACY_COLORS.text }}>
+          {formatQty(row.quantity)} {unit}
+        </div>
+      </div>
+      <div
+        className="mt-1 h-[3px] w-full overflow-hidden rounded-full"
+        style={{ background: LEGACY_COLORS.s3 }}
+      >
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${Math.min(100, pct)}%`, background: deptColor }}
+        />
+      </div>
+    </div>
   );
 }

@@ -3,13 +3,11 @@
 import clsx from "clsx";
 import { Check } from "lucide-react";
 import type { Item } from "@/lib/api";
-import {
-  erpCodeDeptBadge,
-  formatErpCode,
-  formatNumber,
-  getStockState,
-  LEGACY_COLORS,
-} from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { itemCodeDeptBadge } from "@/lib/mes/process";
+import { getStockState } from "@/lib/mes/inventory";
+import { formatItemCode, formatQty } from "@/lib/mes/format";
+import { useDeptColorLookup } from "../../DepartmentsContext";
 import { TYPO } from "../tokens";
 import { StatusBadge } from "./StatusBadge";
 
@@ -30,9 +28,10 @@ export function ItemRow({
   dense?: boolean;
   className?: string;
 }) {
+  const getDeptColor = useDeptColorLookup();
   const state = getStockState(Number(item.quantity), item.min_stock);
-  const deptBadge = erpCodeDeptBadge(item.erp_code);
-  const erpCompact = formatErpCode(item.erp_code);
+  const deptBadge = itemCodeDeptBadge(item.item_code, getDeptColor);
+  const itemCompact = formatItemCode(item.item_code);
 
   return (
     <button
@@ -61,7 +60,7 @@ export function ItemRow({
               borderColor: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
             }}
           >
-            {selected ? <Check size={13} strokeWidth={3} color="#fff" /> : null}
+            {selected ? <Check size={13} strokeWidth={3} color={LEGACY_COLORS.white} /> : null}
           </span>
         </span>
       ) : null}
@@ -78,7 +77,7 @@ export function ItemRow({
             className={clsx(TYPO.title, "shrink-0 font-black tabular-nums")}
             style={{ color: state.color }}
           >
-            {formatNumber(item.quantity)}
+            {formatQty(item.quantity)}
           </div>
         </div>
         <div className="mt-[3px] flex items-center gap-[6px]">
@@ -86,7 +85,7 @@ export function ItemRow({
             className={clsx(TYPO.caption, "truncate")}
             style={{ color: LEGACY_COLORS.muted }}
           >
-            {erpCompact ?? "-"}
+            {itemCompact ?? "-"}
           </div>
           {deptBadge ? (
             <StatusBadge label={deptBadge.label} color={deptBadge.color} className="shrink-0" />
