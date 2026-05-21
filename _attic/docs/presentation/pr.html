@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DEXCOWIN MES 구축 — 비용·가치 보고 (1:1 PR)</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --c-bg:   #FFFFFF;
+      --c-text: #0F172A;
+      --c-red:  #DC2626;
+      --c-blue: #2563EB;
+      --c-gray: #64748B;
+      --c-light:#F1F5F9;
+      --c-line: #E2E8F0;
+      --c-green:#059669;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Pretendard', 'Noto Sans KR', system-ui, -apple-system, sans-serif;
+      background: var(--c-bg);
+      color: var(--c-text);
+      overflow: hidden;
+      height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      word-break: keep-all;
+      overflow-wrap: break-word;
+    }
+
+    /* ---------- deck ---------- */
+    .deck { position: relative; width: 100vw; height: 100vh; }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      padding: 72px 88px 60px;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 60ms;
+    }
+    .slide.active { opacity: 1; pointer-events: auto; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .slide.active > *:not(.notes-panel) { animation: fadeIn 220ms ease-out both; }
+    .slide.active > *:nth-child(2):not(.notes-panel) { animation-delay: 55ms; }
+    .slide.active > *:nth-child(3):not(.notes-panel) { animation-delay: 110ms; }
+
+    /* ---------- header / footer ---------- */
+    .deck-header {
+      position: fixed; top: 0; right: 0; height: 52px;
+      display: flex; align-items: center; padding: 0 40px;
+      z-index: 50; pointer-events: none;
+    }
+    .slide-counter { font-size: 16px; font-weight: 700; color: var(--c-gray); letter-spacing: 0.06em; }
+    .slide-counter b { color: var(--c-red); }
+
+    .deck-footer {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 34px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 40px; z-index: 50; pointer-events: none;
+      font-size: 14px; color: var(--c-gray); letter-spacing: 0.03em;
+    }
+    .progress-bar { display: flex; gap: 4px; }
+    .progress-bar span {
+      display: block; width: 26px; height: 4px;
+      background: var(--c-line); border-radius: 2px; transition: background 200ms;
+    }
+    .progress-bar span.done    { background: var(--c-red); opacity: 0.4; }
+    .progress-bar span.current { background: var(--c-red); opacity: 1; }
+
+    /* ---------- common ---------- */
+    .slide-eyebrow {
+      font-size: 17px; font-weight: 800; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--c-red); margin-bottom: 10px;
+    }
+    .slide-title {
+      font-size: 48px; font-weight: 900; letter-spacing: -0.03em;
+      color: var(--c-text); line-height: 1.18;
+    }
+    .slide-title .hl { color: var(--c-blue); }
+    .slide-title .red { color: var(--c-red); }
+    .body-area { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+
+    /* ---------- cover (slide 1) ---------- */
+    .cover { padding: 96px 110px; justify-content: space-between; }
+    .cover-logo { max-width: 540px; width: 46vw; height: auto; }
+    .cover-sub { font-size: 30px; font-weight: 700; color: var(--c-blue); margin-top: 28px; letter-spacing: -0.01em; }
+    .cover-sub small { display:block; font-size: 22px; font-weight: 500; color: var(--c-gray); letter-spacing: 0.12em; text-transform: uppercase; margin-top: 8px; }
+    .cover-tagline { font-size: 33px; color: var(--c-text); font-weight: 600; max-width: 820px; line-height: 1.55; }
+    .cover-meta { font-size: 20px; color: var(--c-gray); letter-spacing: 0.06em; font-weight: 600; }
+
+    /* ---------- 한 줄 결과 (slide 2) ---------- */
+    .result-wrap {
+      flex: 1; display: flex; flex-direction: column; justify-content: center;
+      gap: 40px; align-items: center; text-align: center;
+    }
+    .result-vs {
+      display: grid; grid-template-columns: 1fr auto 1fr; gap: 36px;
+      align-items: center; width: 100%; max-width: 1280px;
+    }
+    .result-side { display: flex; flex-direction: column; gap: 16px; align-items: center; }
+    .result-label {
+      font-size: 22px; font-weight: 800; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--c-gray);
+    }
+    .result-side.ours .result-label { color: var(--c-blue); }
+    .result-side.theirs .result-label { color: var(--c-red); }
+    .result-num {
+      font-size: clamp(72px, 9vw, 132px); font-weight: 900;
+      letter-spacing: -0.04em; line-height: 1;
+    }
+    .result-side.ours .result-num { color: var(--c-blue); }
+    .result-side.theirs .result-num { color: var(--c-red); }
+    .result-sub { font-size: 22px; color: var(--c-gray); font-weight: 600; line-height: 1.5; }
+    .result-vsmark {
+      font-size: 44px; font-weight: 900; color: var(--c-gray);
+      padding: 0 8px; letter-spacing: -0.02em;
+    }
+    .result-foot {
+      font-size: 26px; color: var(--c-text); font-weight: 700;
+      max-width: 980px; line-height: 1.55; margin-top: 14px;
+    }
+    .result-foot b { color: var(--c-red); }
+
+    /* ---------- 무엇을 만들었나 (slide 3) ---------- */
+    .scope-grid {
+      flex: 1; display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 22px; margin-top: 28px; align-items: stretch;
+    }
+    .scope-card {
+      border: 2px solid var(--c-line); border-radius: 16px;
+      padding: 28px 26px; display: flex; flex-direction: column; gap: 14px;
+    }
+    .scope-icon {
+      width: 48px; height: 48px; border-radius: 12px;
+      background: #DBEAFE; color: var(--c-blue);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; font-weight: 900; flex-shrink: 0;
+    }
+    .scope-h { font-size: 22px; font-weight: 900; color: var(--c-text); letter-spacing: -0.02em; }
+    .scope-body { font-size: 19px; color: var(--c-gray); line-height: 1.6; }
+    .scope-tag {
+      display: inline-block; padding: 4px 12px; background: var(--c-light);
+      border-radius: 999px; font-size: 15px; font-weight: 700; color: var(--c-text);
+      margin-right: 6px; margin-bottom: 4px;
+    }
+
+    /* ---------- 비교 표 (slide 4) ---------- */
+    .comp-wrap { flex: 1; display: flex; flex-direction: column; justify-content: center; margin-top: 22px; }
+    .comp-table { width: 100%; border-collapse: collapse; }
+    .comp-table th, .comp-table td {
+      border: 1px solid var(--c-line);
+      padding: 13px 14px; text-align: left;
+      font-size: 17px;
+    }
+    .comp-table thead th {
+      background: var(--c-blue); color: #fff;
+      font-size: 17px; font-weight: 800;
+      text-align: center; letter-spacing: -0.01em;
+    }
+    .comp-table tbody tr td:first-child {
+      font-weight: 800; color: var(--c-text); white-space: nowrap;
+    }
+    .comp-table tbody td:nth-child(2),
+    .comp-table tbody td:nth-child(3),
+    .comp-table tbody td:nth-child(4) { text-align: right; font-variant-numeric: tabular-nums; }
+    .comp-table tbody td:nth-child(5) { text-align: center; font-size: 16px; }
+    .comp-row-ours { background: #DBEAFE; }
+    .comp-row-ours td { color: var(--c-blue); font-weight: 800; }
+    .comp-row-ours td:first-child { color: var(--c-blue); }
+    .comp-row-eco { background: #FEE2E2; }
+    .comp-row-eco td { color: var(--c-red); }
+    .comp-row-eco td:nth-child(5) { font-weight: 900; }
+    .comp-foot { margin-top: 14px; font-size: 15px; color: var(--c-gray); line-height: 1.55; }
+    .comp-table .est, .comp-table td.est { font-style: italic; color: var(--c-gray); font-weight: 500; }
+    .est { font-style: italic; opacity: 0.75; }
+    .comp-sources { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--c-text); }
+    .comp-sources b { color: var(--c-blue); font-weight: 800; margin-right: 6px; }
+    .comp-sources a { color: var(--c-gray); text-decoration: underline; text-decoration-color: var(--c-line); }
+    .comp-disclaimer { margin-top: 10px; font-size: 13px; color: var(--c-gray); font-style: italic; }
+
+    /* ---------- 격차 시각화 (slide 5) ---------- */
+    .gap-wrap { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 30px; margin-top: 14px; }
+    .gap-bars { display: flex; flex-direction: column; gap: 16px; }
+    .gap-row { display: grid; grid-template-columns: 220px 1fr 200px; gap: 18px; align-items: center; }
+    .gap-name { font-size: 22px; font-weight: 800; color: var(--c-text); text-align: right; line-height: 1.3; }
+    .gap-bar {
+      height: 38px; background: var(--c-light); border-radius: 8px;
+      position: relative; overflow: hidden;
+    }
+    .gap-bar-fill {
+      position: absolute; left: 0; top: 0; bottom: 0;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: flex-end;
+      padding-right: 14px; color: #fff; font-size: 16px; font-weight: 800;
+    }
+    .gap-bar-fill.theirs { background: var(--c-red); }
+    .gap-bar-fill.ours { background: var(--c-blue); }
+    .gap-bar-fill.mid   { background: var(--c-gray); }
+    .gap-num { font-size: 26px; font-weight: 900; color: var(--c-text); text-align: right; font-variant-numeric: tabular-nums; }
+    .gap-conclusion {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+      margin-top: 12px;
+    }
+    .gap-callout {
+      padding: 26px 30px; border-radius: 18px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .gap-callout.bg-blue { background: #DBEAFE; }
+    .gap-callout.bg-red { background: #FEE2E2; }
+    .gap-callout-label { font-size: 16px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+    .gap-callout.bg-blue .gap-callout-label { color: var(--c-blue); }
+    .gap-callout.bg-red .gap-callout-label { color: var(--c-red); }
+    .gap-callout-ratio {
+      font-size: clamp(48px, 6vw, 76px); font-weight: 900;
+      letter-spacing: -0.04em; line-height: 1;
+    }
+    .gap-callout.bg-blue .gap-callout-ratio { color: var(--c-blue); }
+    .gap-callout.bg-red .gap-callout-ratio { color: var(--c-red); }
+    .gap-callout-sub { font-size: 19px; color: var(--c-text); font-weight: 600; }
+
+    /* ---------- 강점 3 (slide 6) ---------- */
+    .strength-grid {
+      flex: 1; display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 26px; margin-top: 28px; align-items: stretch;
+    }
+    .strength-card {
+      border: 2px solid var(--c-line); border-radius: 18px;
+      padding: 38px 32px; display: flex; flex-direction: column; gap: 18px;
+    }
+    .strength-num {
+      width: 60px; height: 60px; border-radius: 50%;
+      background: var(--c-blue); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; font-weight: 900;
+    }
+    .strength-h { font-size: 28px; font-weight: 900; color: var(--c-text); letter-spacing: -0.02em; }
+    .strength-body { font-size: 21px; color: var(--c-gray); line-height: 1.6; }
+    .strength-highlight {
+      padding: 14px 18px; background: #DBEAFE; border-radius: 12px;
+      border-left: 5px solid var(--c-blue);
+      font-size: 19px; font-weight: 800; color: var(--c-blue); line-height: 1.5;
+      margin-top: auto;
+    }
+
+    /* ---------- fit 비교 (slide 7) ---------- */
+    .fit-wrap { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 28px; margin-top: 20px; }
+    .fit-meters { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
+    .fit-side { display: flex; flex-direction: column; gap: 14px; }
+    .fit-label { font-size: 22px; font-weight: 800; letter-spacing: 0.04em; color: var(--c-gray); }
+    .fit-side.theirs .fit-label { color: var(--c-red); }
+    .fit-side.ours .fit-label { color: var(--c-blue); }
+    .fit-pct { font-size: clamp(72px, 9vw, 110px); font-weight: 900; line-height: 1; letter-spacing: -0.04em; }
+    .fit-side.theirs .fit-pct { color: var(--c-red); }
+    .fit-side.ours .fit-pct { color: var(--c-blue); }
+    .fit-sub { font-size: 19px; color: var(--c-gray); font-weight: 600; line-height: 1.5; }
+    .fit-examples { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .fit-ex {
+      border: 2px solid var(--c-line); border-radius: 14px;
+      padding: 22px 22px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .fit-ex-h { font-size: 19px; font-weight: 900; color: var(--c-blue); letter-spacing: -0.01em; }
+    .fit-ex-body { font-size: 17px; color: var(--c-gray); line-height: 1.55; }
+    .fit-ex-body b { color: var(--c-text); }
+
+    /* ---------- 다목적 도구 (slide 8) ---------- */
+    .tool-wrap { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 28px; margin-top: 20px; }
+    .tool-lead { font-size: 25px; color: var(--c-text); line-height: 1.6; font-weight: 600; max-width: 1050px; }
+    .tool-lead b { color: var(--c-blue); font-weight: 900; }
+    .tool-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    .tool-item {
+      padding: 22px 20px; border-radius: 14px; background: var(--c-light);
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .tool-item-icon { font-size: 26px; }
+    .tool-item-h { font-size: 18px; font-weight: 800; color: var(--c-text); letter-spacing: -0.01em; }
+    .tool-item-body { font-size: 15px; color: var(--c-gray); line-height: 1.5; }
+    .tool-foot {
+      padding: 20px 26px; background: #DBEAFE;
+      border-radius: 14px; border-left: 5px solid var(--c-blue);
+      font-size: 21px; font-weight: 800; color: var(--c-blue); line-height: 1.55;
+    }
+
+    /* ---------- 약점·보강 (slide 9) ---------- */
+    .gap-need-wrap { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 22px; margin-top: 20px; }
+    .gap-need-intro { font-size: 23px; color: var(--c-text); font-weight: 600; line-height: 1.5; }
+    .need-table { width: 100%; border-collapse: collapse; }
+    .need-table th, .need-table td {
+      border: 1px solid var(--c-line); padding: 16px 20px; text-align: left;
+      font-size: 18px;
+    }
+    .need-table thead th {
+      background: var(--c-text); color: #fff;
+      font-size: 17px; font-weight: 800; letter-spacing: 0.04em;
+    }
+    .need-table tbody td:first-child {
+      font-weight: 800; color: var(--c-text); width: 220px; white-space: nowrap;
+    }
+    .need-table tbody td:nth-child(2) { color: var(--c-red); width: 280px; }
+    .need-table tbody td:nth-child(3) { color: var(--c-text); }
+
+    /* ---------- 다음 단계 (slide 10) ---------- */
+    .next-wrap { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 24px; margin-top: 22px; }
+    .next-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
+    .next-card {
+      border: 2px solid var(--c-line); border-radius: 18px;
+      padding: 28px 28px; display: flex; flex-direction: column; gap: 16px;
+    }
+    .next-card.now { border-color: var(--c-red); background: #FEF2F2; }
+    .next-card.mid { border-color: var(--c-blue); background: #EFF6FF; }
+    .next-when {
+      font-size: 17px; font-weight: 800; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--c-gray);
+    }
+    .next-card.now .next-when { color: var(--c-red); }
+    .next-card.mid .next-when { color: var(--c-blue); }
+    .next-h { font-size: 23px; font-weight: 900; color: var(--c-text); letter-spacing: -0.02em; }
+    .next-list { font-size: 19px; color: var(--c-text); line-height: 1.6; list-style: none; padding: 0; margin: 0; }
+    .next-list li { padding-left: 22px; position: relative; margin-bottom: 8px; }
+    .next-list li::before {
+      content: ""; position: absolute; left: 6px; top: 11px;
+      width: 8px; height: 8px; border-radius: 50%; background: var(--c-blue);
+    }
+    .next-card.now .next-list li::before { background: var(--c-red); }
+    .next-pledge {
+      padding: 20px 26px; background: var(--c-text); color: #fff;
+      border-radius: 14px; font-size: 22px; font-weight: 700; line-height: 1.55;
+    }
+    .next-pledge b { color: #FCD34D; }
+
+    /* ---------- 마무리 (slide 11) ---------- */
+    .closing-pr { justify-content: center; align-items: center; text-align: center; }
+    .closing-pr-wrap { max-width: 1100px; display: flex; flex-direction: column; gap: 36px; align-items: center; }
+    .closing-pr-title {
+      font-size: clamp(40px, 5.5vw, 64px); font-weight: 900;
+      letter-spacing: -0.03em; line-height: 1.25; color: var(--c-text);
+    }
+    .closing-pr-title .hl { color: var(--c-blue); }
+    .closing-pr-title .red { color: var(--c-red); }
+    .closing-pr-lead { font-size: 25px; color: var(--c-gray); font-weight: 600; line-height: 1.6; max-width: 920px; }
+    .closing-pr-thanks { font-size: 30px; font-weight: 900; color: var(--c-red); letter-spacing: -0.02em; margin-top: 8px; }
+
+    /* ---------- notes panel ---------- */
+    .notes-panel {
+      display: none;
+      border-top: 1px solid var(--c-line);
+      background: #FAFBFC; padding: 24px 88px 28px;
+      font-size: 15px; line-height: 1.6; color: var(--c-text);
+    }
+    .notes-panel h4 {
+      color: var(--c-red); font-size: 11px; letter-spacing: 0.14em;
+      text-transform: uppercase; margin: 0 0 5px; font-weight: 800;
+    }
+    .notes-panel .lead { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+    .audience-row { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-top: 8px; }
+    .notes-panel ul { padding-left: 17px; margin: 4px 0; }
+    .notes-panel li { font-size: 14px; color: var(--c-gray); margin-bottom: 3px; }
+    .notes-panel li strong { color: var(--c-red); }
+
+    body.notes-mode { overflow: auto; height: auto; }
+    body.notes-mode .deck { width: 100%; height: auto; }
+    body.notes-mode .slide {
+      position: relative; inset: auto; opacity: 1 !important;
+      pointer-events: auto; min-height: 100vh;
+    }
+    body.notes-mode .notes-panel { display: block; }
+    body.notes-mode .deck-header { position: relative; height: 46px; }
+    body.notes-mode .deck-footer { display: none; }
+
+    @media print {
+      @page { size: A4 landscape; margin: 0; }
+      body { overflow: visible; height: auto; }
+      .deck-header, .deck-footer { display: none; }
+      .deck { width: 100%; height: auto; }
+      .slide {
+        position: relative; inset: auto; opacity: 1 !important;
+        pointer-events: auto; page-break-after: always;
+        page-break-inside: avoid; min-height: 100vh;
+      }
+      .slide > * { animation: none !important; }
+      .notes-panel { display: block; page-break-after: always; page-break-inside: avoid; padding: 28px 48px; }
+    }
+  </style>
+</head>
+<body>
+<div class="deck">
+
+  <div class="deck-header">
+    <div class="slide-counter"><b><span id="cur">01</span></b> / 11</div>
+  </div>
+
+  <div class="deck-footer">
+    <div>DEXCOWIN MES 구축 — 비용·가치 보고 (1:1 PR)</div>
+    <div class="progress-bar" id="progress"></div>
+  </div>
+
+  <!-- ============ Slide 1 — 표지 ============ -->
+  <section class="slide cover" data-slide="1">
+    <div>
+      <img class="cover-logo" src="assets/dexcowin-logo.png" alt="DEXCOWIN">
+      <div class="cover-sub">
+        MES 자체 구축 — 비용·가치 보고
+        <small>Internal Review · for 1:1</small>
+      </div>
+    </div>
+    <div>
+      <div class="cover-tagline">
+        외주 1억대 작업을 <b style="color:var(--c-blue)">14만원·1개월</b>에 자체 구축.<br>
+        회사 흐름 그대로 맞춘 결과물.
+      </div>
+    </div>
+    <div class="cover-meta">2026.05 · 보고자 김현우</div>
+    <div class="notes-panel">
+      <h4>오프닝</h4>
+      <p class="lead">"사장님, 시간 잠깐 내주셔서 감사합니다. 사내 발표는 시연 위주로 갔는데, 자랑처럼 들릴 부분이 있어서 따로 짚고 싶었습니다."</p>
+      <div class="audience-row">
+        <div><h4>톤</h4><ul><li>자랑 X / 숫자 + 정직</li><li>5~7분 안에, 질문 받으며 자연스럽게</li></ul></div>
+        <div><h4>포지셔닝</h4><ul><li>"AI가 다 했다" X / "도구를 활용했다" O</li><li>다음 단계까지 책임감 있게</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Slide 2 — 한 줄 결과 ============ -->
+  <section class="slide" data-slide="2">
+    <div class="slide-eyebrow">한 줄 결과</div>
+    <div class="slide-title">투입은 <span class="hl">14만원</span>, 대안은 <span class="red">5천만~1억</span>.</div>
+    <div class="result-wrap">
+      <div class="result-vs">
+        <div class="result-side ours">
+          <div class="result-label">자체 구축 (본 건)</div>
+          <div class="result-num">14만</div>
+          <div class="result-sub">클로드 코드 1달 구독료 + 본인 시간 1개월</div>
+        </div>
+        <div class="result-vsmark">vs</div>
+        <div class="result-side theirs">
+          <div class="result-label">외주 SI 견적 (대안)</div>
+          <div class="result-num">5천만<span style="font-size:0.5em">~</span>1억</div>
+          <div class="result-sub">도입비만. 유지보수·호스팅 별도</div>
+        </div>
+      </div>
+      <div class="result-foot">
+        같은 결과물을 외부 의뢰했으면 <b>1년 TCO로 약 30배</b> 비용에 (외주 SI 최소 견적 기준), <b>6~12개월 일정</b>이 필요했습니다.
+      </div>
+    </div>
+    <div class="notes-panel">
+      <h4>말할 한 줄</h4>
+      <p class="lead">"외부에 나간 돈은 클로드 코드 한 달 구독료 100달러, 그게 전부입니다. 시간은 정규 업무 외에 한 달 들였고요. 회사 회계상 들어간 돈은 14만원입니다."</p>
+      <div class="audience-row">
+        <div><h4>여기서 멈추기</h4><ul><li>숫자 말하고 사장님 반응 살피기</li><li>"어떻게?" 질문 유도</li></ul></div>
+        <div><h4>다음 슬라이드 연결</h4><ul><li>스코프(3) → 비교표(4) 순서로 풀어가기</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Slide 3 — 무엇을 만들었나 ============ -->
+  <section class="slide" data-slide="3">
+    <div class="slide-eyebrow">무엇을 만들었나</div>
+    <div class="slide-title">DEXCOWIN <span class="hl">자체 MES</span> — 회사 운영 그대로.</div>
+    <div class="scope-grid">
+      <div class="scope-card">
+        <div class="scope-icon">①</div>
+        <div class="scope-h">품목·코드 체계</div>
+        <div class="scope-body">모델 5종 × 부서 6 × 공정 3 = <b>18 코드체계</b>, 약 <b>971 부품</b> 마스터.</div>
+      </div>
+      <div class="scope-card">
+        <div class="scope-icon">②</div>
+        <div class="scope-h">BOM 자동 전개</div>
+        <div class="scope-body">상위 품목 출고 시 하위 자재 자동 차감. 다층 BOM 지원.</div>
+      </div>
+      <div class="scope-card">
+        <div class="scope-icon">③</div>
+        <div class="scope-h">입출고 4유형</div>
+        <div class="scope-body">원자재 입고 / 창고 입출고 / 부서 입출고 / 불량 — 모든 흐름 추적.</div>
+      </div>
+      <div class="scope-card">
+        <div class="scope-icon">④</div>
+        <div class="scope-h">결재 워크플로</div>
+        <div class="scope-body">창고 정·부 결재, 부서 내 결재 — 권동환·이필욱 권한 모델 그대로 반영.</div>
+      </div>
+      <div class="scope-card">
+        <div class="scope-icon">⑤</div>
+        <div class="scope-h">실시간 재고</div>
+        <div class="scope-body">부서·모델·공정별 실시간 잔량. 안전재고·실사·배치큐까지.</div>
+      </div>
+      <div class="scope-card">
+        <div class="scope-icon">⑥</div>
+        <div class="scope-h">주간보고·감사</div>
+        <div class="scope-body">모델×부서 생산 매트릭스. 모든 변경 감사 로그·정정이력 보존.</div>
+      </div>
+    </div>
+    <div class="notes-panel">
+      <h4>말할 한 줄</h4>
+      <p class="lead">"기존 엑셀로 흩어져 있던 재고·BOM·입출고·결재를 한 화면 안에서 굴리게 만들었습니다."</p>
+      <div class="audience-row">
+        <div><h4>강조</h4><ul><li>"회사 운영 그대로" — 표준 패키지가 못 하는 부분</li><li>모바일 일부도 있다고 슬쩍</li></ul></div>
+        <div><h4>안 말할 것</h4><ul><li>회계·HR·영업·구매 (필요 없는 영역이라 굳이 언급 X)</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Slide 4 — 시판 옵션 비교 ============ -->
+  <section class="slide" data-slide="4">
+    <div class="slide-eyebrow">시판 옵션 비교</div>
+    <div class="slide-title">같은 결과물을 외부로 갔다면 <span class="red">얼마였을까?</span></div>
+    <div class="comp-wrap">
+      <table class="comp-table">
+        <thead>
+          <tr>
+            <th style="width:24%">솔루션</th>
+            <th style="width:17%">도입비</th>
+            <th style="width:19%">한달 사용비</th>
+            <th style="width:20%">1년 TCO</th>
+            <th style="width:20%">우리 요구 충족</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="comp-row-eco">
+            <td>이카운트 ERP</td>
+            <td>20만 (가입비)</td>
+            <td>4만</td>
+            <td>약 68만</td>
+            <td>✗ MES 기능 부족</td>
+          </tr>
+          <tr>
+            <td>더존 iCUBE</td>
+            <td class="est">약 3,000만～1억</td>
+            <td class="est">약 50～150만</td>
+            <td class="est">약 4,000만～1.2억</td>
+            <td>✓</td>
+          </tr>
+          <tr>
+            <td>영림원 K-System Ace (구축형)</td>
+            <td class="est">약 3.5～6.5억</td>
+            <td class="est">약 450～800만</td>
+            <td class="est">약 4～7억</td>
+            <td>✓</td>
+          </tr>
+          <tr>
+            <td>시스템에버 (영림원 SaaS)</td>
+            <td>약 400～1,600만</td>
+            <td>30～120만</td>
+            <td>약 760～3,040만</td>
+            <td>✓</td>
+          </tr>
+          <tr>
+            <td>Odoo Enterprise (Custom)</td>
+            <td class="est">약 1,000～5,000만</td>
+            <td>약 96～120만 (25명)</td>
+            <td class="est">약 2,200～6,400만</td>
+            <td>✓</td>
+          </tr>
+          <tr>
+            <td>외주 SI 자체개발</td>
+            <td>5,000만～<span class="est">1억</span></td>
+            <td>50～<span class="est">150만</span></td>
+            <td>5,600만～<span class="est">1.18억</span></td>
+            <td>✓</td>
+          </tr>
+          <tr class="comp-row-ours">
+            <td>자체 개발 (본 건)</td>
+            <td>15만</td>
+            <td>15만</td>
+            <td>약 195만</td>
+            <td>✓</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="comp-sources">
+        <div><b>이카운트 ERP</b>월 4만원 + 가입비 최초 1회 20만원 — <a href="https://www.ecount.com/kr/ecount/join/pricing" target="_blank">ecount.com 한국 공식 가격</a></div>
+        <div><b>더존 iCUBE</b>"수천만원대 초중반~수억, 연 유지보수료 라이선스의 15~20%" — <a href="https://korea-erp.com/douzone-program/" target="_blank">한국ERP 더존 제품 비교</a></div>
+        <div><b>영림원 K-System Ace</b>구축형 "ERP 라이선스 통상 2~3억, 컨설팅 1인/월 1,900만+" — <a href="https://www.systemever.kr/html/service_cost.html" target="_blank">시스템에버 도입비 비교</a></div>
+        <div><b>시스템에버 (영림원 SaaS)</b>월 30~120만 + 컨설팅 1회 80만(통상 5~20회) — <a href="https://www.systemever.kr/html/service_cost.html" target="_blank">시스템에버 도입비 비교</a></div>
+        <div><b>Odoo Enterprise</b>Custom $25.50~31.90/user/월 (Standard $16.90~21.10) — <a href="https://www.odoo.com/pricing" target="_blank">odoo.com 공식 가격</a></div>
+        <div><b>외주 SI</b>"개발비 5천만원 기준, 유지 월 50만(SW개발비 1%)", "단일 라인 수천만원대~다라인 수억원대" — <a href="https://www.sfow.co.kr/as_rule/?bmode=view&idx=167462974" target="_blank">스마트공장(sfow) MES SI 안내</a>, <a href="https://capa.ai/knowledge/post/mes-system-implementation-guide" target="_blank">capa.ai MES 도입 가이드</a></div>
+      </div>
+      <div class="comp-disclaimer">
+        ※ <span class="est">기울임</span> = 출처 비공개로 인한 보수적 추정. 산출 근거 ─
+        <b>영림원</b>: MES만 따로 도입 불가 → 전체 K-System Ace 기준 (시스템에버 단가 합산).
+        <b>더존 iCUBE</b>: 한국ERP "수천만~수억" 보수 범위화 + 연 유지 15~20% 표준 비율.
+        <b>Odoo 도입비</b>: 한국 SI 견적 비공개라 외주 SI(5천만) 절반으로 추정.
+        <b>외주 SI 상한</b>: sfow 기준값(5천만·월 50만) + capa.ai "수억" 보수 cap.
+        <b>이카운트</b>는 가격은 매력적이나 BOM·결재·공정 추적 부재로 우리 요구를 못 풂.
+      </div>
+    </div>
+    <div class="notes-panel">
+      <h4>말할 한 줄</h4>
+      <p class="lead">"우리 요구를 충족하는 시판 옵션 중 가장 싼 게 더존 Smart MES로 1년 TCO 1,150만 이상, 외주 가면 5,600만~1억 이상입니다."</p>
+      <div class="audience-row">
+        <div><h4>예상 질문</h4><ul><li><strong>이카운트 안 되나?</strong> → "회계랑 단순 재고만 강합니다. BOM·결재·공정 없어서 결국 엑셀 관행으로 회귀합니다."</li><li><strong>영림원 왜 이렇게 비싼가?</strong> → "영림원은 MES만 따로 도입 불가, 전체 ERP 통합으로 가야 합니다. 우리 규모엔 오버스펙."</li><li><strong>Odoo 도입비 근거?</strong> → "odoo.com엔 한국 SI 비용 공개 없어 외주 SI 절반으로 추정. 직접 견적 필요."</li><li><strong>이탤릭이 뭐냐?</strong> → "출처 비공개 항목의 보수적 추정치입니다. 표 아래에 산출 근거 명시해뒀습니다."</li></ul></div>
+        <div><h4>강조</h4><ul><li>"우리 요구 충족" 열이 핵심 — 가격만 봐선 안 됨</li><li>추정 가장 약한 셀: <strong>Odoo 도입비</strong> (직접 출처 없음). 질문 들어오면 솔직히 인정</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Slide 5 — 격차 시각화 ============ -->
+  <section class="slide" data-slide="5">
+    <div class="slide-eyebrow">1년 TCO 비교</div>
+    <div class="slide-title"><span class="hl">시판 최저의 약 1/4</span>, <span class="red">외주의 1/30</span>.</div>
+    <div class="gap-wrap">
+      <div class="gap-bars">
+        <div class="gap-row">
+          <div class="gap-name">자체 개발</div>
+          <div class="gap-bar"><div class="gap-bar-fill ours" style="width:2%;">　</div></div>
+          <div class="gap-num" style="color:var(--c-blue)">약 195만</div>
+        </div>
+        <div class="gap-row">
+          <div class="gap-name">시스템에버<br><span style="font-size:14px;font-weight:600;color:var(--c-gray)">검증된 시판 최저</span></div>
+          <div class="gap-bar"><div class="gap-bar-fill mid" style="width:14%;">약 760만</div></div>
+          <div class="gap-num">약 760～3,040만</div>
+        </div>
+        <div class="gap-row">
+          <div class="gap-name">외주 SI<br><span style="font-size:14px;font-weight:600;color:var(--c-gray)">현실적 대안</span></div>
+          <div class="gap-bar"><div class="gap-bar-fill theirs" style="width:100%;">5,600만</div></div>
+          <div class="gap-num" style="color:var(--c-red)">5,600만～<span class="est">1.18억</span></div>
+        </div>
+      </div>
+      <div class="gap-conclusion">
+        <div class="gap-callout bg-blue">
+          <div class="gap-callout-label">vs 시판 최저</div>
+          <div class="gap-callout-ratio">약 1 / 4</div>
+          <div class="gap-callout-sub">시스템에버(영림원 SaaS) 최소 견적 대비</div>
+        </div>
+        <div class="gap-callout bg-red">
+          <div class="gap-callout-label">vs 외주 SI</div>
+          <div class="gap-callout-ratio">1 / 30</div>
+          <div class="gap-callout-sub">실제 가장 가능성 높은 대안 대비</div>
+        </div>
+      </div>
+    </div>
+    <div class="notes-panel">
+      <h4>말할 한 줄</h4>
+      <p class="lead">"1년만 봐도 우리는 약 200만, 외주는 못해도 5,600만에서 1억 1천 8백만입니다. 30배에서 60배 차이입니다."</p>
+      <div class="audience-row">
+        <div><h4>호흡</h4><ul><li>1/6, 1/30 비율 강조 후 멈춤</li></ul></div>
+        <div><h4>주의</h4><ul><li>"엄청 싸다"만 강조하면 의심받음 — 다음 슬라이드(강점)에서 fit·속도로 보강</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Slide 6 — 자체 개발 강점 3 ============ -->
+  <section class="slide" data-slide="6">
+    <div class="slide-eyebrow">자체 개발의 강점</div>
+    <div class="slide-title">싸기만 한 게 아닙니다 — <span class="hl">3가지 우위</span>.</div>
+    <div class="strength-grid">
+      <div class="strength-card">
+        <div class="strength-num">1</div>
+        <div class="strength-h">비용</div>
+        <div class="strength-body">
+          시판 최저(시스템에버 SaaS)의 약 1/4, 외주의 1/30 수준. 1년 TCO 약 195만에 운영 가능.
+        </div>
+        <div class="strength-highlight">외주 1억대 작업을 14만원에</div>
+      </div>
+      <div class="strength-card">
+        <div class="strength-num">2</div>
+        <div class="strength-h">도메인 fit</div>
+        <div class="strength-body">
+          회사 흐름 그대로 반영. 권한·결재 라우팅·코드체계·낱개 보정 차단까지 회사 운영 그대로.
+        </div>
+        <div class="strength-highlight">외주는 60~70% fit이 한계</div>
+      </div>
+      <div class="strength-card">
+        <div class="strength-num">3</div>
+        <div class="strength-h">변경 대응 속도</div>
+        <div class="strength-body">
+          의견 받고 당일~며칠 내 반영. 시판·외주는 수주~월 단위 견적·일정 필요.
+        </div>
+        <div class="strength-highlight">즉시 개선이 가능한 구조</div>
+      </div>
+    </div>
+    <div class="notes-panel">
+      <h4>말할 한 줄</h4>
+      <p class="lead">"비용·fit·속도 — 외주가 못 따라오는 세 가지 우위입니다. 그중 가장 중요한 건 fit이라고 봅니다."</p>
+      <div class="audience-row">
+        <div><h4>다음 슬라이드 연결</h4><ul><li>fit 슬라이드(7)에서 구체 예시</li></ul></div>
+        <div><h4>주의</h4><ul><li>"속도"는 양날의 검 — "변덕 부려도 다 받아준다"로 들리면 안 됨</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Slide 7 — fit이 왜 중요한가 ============ -->
+  <section class="slide" data-slide="7">
+    <div class="slide-eyebrow">도메인 fit이 왜 중요한가</div>
+    <div class="slide-title">외주는 결국 <span class="red">"회사가 솔루션에"</span> 맞춰야 합니다.</div>
+    <div class="fit-wrap">
+      <div class="fit-meters">
+        <div class="fit-side theirs">
+          <div class="fit-label">시판·외주 평균</div>
+          <div class="fit-pct">60～70%</div>
+          <div class="fit-sub">표준 패키지에 회사를 맞춰가야 함. 나머지 30~40%는 운영자가 엑셀·수작업으로 보완.</div>
+        </div>
+        <div class="fit-side ours">
+          <div class="fit-label">자체 개발 (본 건)</div>
+          <div class="fit-pct">그대로</div>
+          <div class="fit-sub">회사 사정 아는 사람이 만들었기 때문. 패키지엔 없는 회사 고유 정책까지 반영.</div>
+        </div>
+      </div>
+      <div class="fit-examples">
+        <div class="fit-ex">
+          <div class="fit-ex-h">권한·결재 라우팅</div>
+          <div class="fit-ex-body">권동환 사원(창고 정), 이필욱 부장(창고 부) <b>실제 운영 그대로</b>. 패키지엔 표준 결재만.</div>
+        </div>
+        <div class="fit-ex">
+          <div class="fit-ex-h">18 코드체계</div>
+          <div class="fit-ex-body">모델 × 부서 × 공정 = <b>회사 실제 흐름 그대로</b>. 외주는 SI 표준 코드로 시작하려 함.</div>
+        </div>
+        <div class="fit-ex">
+          <div class="fit-ex-h">낱개 보정 차단</div>
+          <div class="fit-ex-body">"엑셀로 끼워맞추기" 관행 <b>명시 차단</b>. 외주는 보통 자유롭게 보정 허용.</div>
+        </div>
+      </div>
+    </div>
+    <div class="notes-panel">
+      <h4>말할 한 줄</h4>
+      <p class="lead">"패키지로 가면 60~70%만 맞고 나머지는 결국 엑셀로 돌아갑니다. 우리가 벗어나려던 그 관행으로요."</p>
+      <div class="audience-row">
+        <div><h4>강조 포인트</h4><ul><li>낱개 보정 차단 — 이게 자체 개발 아니면 못 함</li></ul></div>
+        <div><h4>예상 반응</h4><ul><li>"맞춤 개발이라 비싼 거 아닌가?" → "패키지보다 싸게 만들었습니다. 시간은 한 달."</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Slide 8 — 다목적 도구 가치 ============ -->
+  <section class="slide" data-slide="8">
+    <div class="slide-eyebrow">추가 가치 — 도구 자체의 확장성</div>
+    <div class="slide-title">월 $100는 <span class="hl">MES만 굴리는 비용이 아닙니다</span>.</div>
+    <div class="tool-wrap">
+      <div class="tool-lead">
+        같은 클로드 코드 구독으로 MES 외에도 <b>회사 업무 자동화 전반</b>을 처리할 수 있습니다.
+        즉 운영비 <b>월 15만</b>의 상당 부분은 <b>회사 차원 생산성 인프라</b> 비용으로 보는 게 정확합니다.
+      </div>
+      <div class="tool-grid">
+        <div class="tool-item">
+          <div class="tool-item-icon">🔧</div>
+          <div class="tool-item-h">사내 도구·스크립트</div>
+          <div class="tool-item-body">일회성 정리·자동화 코드 즉시 개발.</div>
+        </div>
+        <div class="tool-item">
+          <div class="tool-item-icon">📊</div>
+          <div class="tool-item-h">데이터 분석</div>
+          <div class="tool-item-body">엑셀·CSV 가공, 집계, 시각화 즉시.</div>
+        </div>
+        <div class="tool-item">
+          <div class="tool-item-icon">📝</div>
+          <div class="tool-item-h">보고서·메일 초안</div>
+          <div class="tool-item-body">정형 보고·공지·메일 빠르게.</div>
+        </div>
+        <div class="tool-item">
+          <div class="tool-item-icon">🎤</div>
+          <div class="tool-item-h">발표자료</div>
+          <div class="tool-item-body">이번 사내 발표자료도 동일 도구로 작성.</div>
+        </div>
+        <div class="tool-item">
+          <div class="tool-item-icon">🔍</div>
+          <div class="tool-item-h">코드 리뷰·디버깅</div>
+          <div class="tool-item-body">MES 외 다른 코드도 검수·수정 가능.</div>
+        </div>
+        <div class="tool-item">
+          <div class="tool-item-icon">📚</div>
+          <div class="tool-item-h">문서·매뉴얼</div>
+          <div class="tool-item-body">기술 문서, 운영 가이드, 인수인계서.</div>
+        </div>
+        <div class="tool-item">
+          <div class="tool-item-icon">🗂</div>
+          <div class="tool-item-h">엑셀 자동화</div>
+          <div class="tool-item-body">반복 작업·정리·취합을 스크립트화.</div>
+        </div>
+        <div class="tool-item">
+          <div class="tool-item-icon">⚙</div>
+          <div class="tool-item-h">일반 사무 자동화</div>
+          <div class="tool-item-body">반복 업무 발견 시 즉시 자동화.</div>
+        </div>
+      </div>
+      <div class="tool-foot">
+        회사 차원에서 팀 단위 구독으로 확장하면, 다른 부서 자동화에도 같은 도구를 활용할 수 있습니다.
+      </div>
+    </div>
+    <div class="notes-panel">
+      <h4>말할 한 줄</h4>
+      <p class="lead">"그 180만은 MES 전용이 아니라 사무 자동화 도구비입니다. MES 운영비만 따지면 일부일 뿐이고, 회사 차원 생산성 도구로 보시는 게 정확합니다."</p>
+      <div class="audience-row">
+        <div><h4>확장 제안</h4><ul><li>팀 단위 구독 — 다른 부서 자동화에도 응용</li></ul></div>
+        <div><h4>주의</h4><ul><li>강요 X — "필요해지면 검토" 톤으로</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Slide 9 — 약점·보강 필요 ============ -->
+  <section class="slide" data-slide="9">
+    <div class="slide-eyebrow">정직한 한계</div>
+    <div class="slide-title">자체 개발이 시판보다 <span class="red">보강이 필요한 영역</span>.</div>
+    <div class="gap-need-wrap">
+      <div class="gap-need-intro">
+        비용·fit·속도는 우위지만, 시판이 더 잘 갖춰진 부분도 있습니다. 다음 항목들은 운영하면서 단계적으로 보강이 필요합니다.
+      </div>
+      <table class="need-table">
+        <thead>
+          <tr>
+            <th>보강 항목</th>
+            <th>시판은 어떻게</th>
+            <th>보강 방향</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>회계 통합</td>
+            <td>표준 포함 (전표·세금계산서)</td>
+            <td>현재 회사 회계 솔루션과 연동, 또는 회계는 별도 유지</td>
+          </tr>
+          <tr>
+            <td>보안·재해복구 인증</td>
+            <td>SaaS 표준 (이중화·백업·암호화)</td>
+            <td>백업 정책 명문화 + 정기 복구 테스트 + HTTPS·접근권한 점검</td>
+          </tr>
+          <tr>
+            <td>모바일 완성도</td>
+            <td>대부분 ✓ (반응형/전용 앱)</td>
+            <td>현장 자주 쓰는 입출고·재고조회부터 우선 보강</td>
+          </tr>
+          <tr>
+            <td>사용자 매뉴얼</td>
+            <td>공식 매뉴얼·교육 자료</td>
+            <td>부서별 운영 가이드, 신규 입사자용 매뉴얼 작성</td>
+          </tr>
+          <tr>
+            <td>외부 감사 대응</td>
+            <td>인증서·감사로그 표준</td>
+            <td>거래처 보안 검토 받게 되면 접근로그·암호화 입증</td>
+          </tr>
+          <tr>
+            <td>DB 확장성</td>
+            <td>대용량 표준 (Oracle/MSSQL)</td>
+            <td>인원·데이터 증가 시 PostgreSQL 마이그레이션 검토</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="notes-panel">
+      <h4>말할 한 줄</h4>
+      <p class="lead">"비용·fit·속도는 우위지만, 시판이 더 잘 갖춰진 부분도 있습니다. 정직하게 짚고 가겠습니다."</p>
+      <div class="audience-row">
+        <div><h4>강조</h4><ul><li>정직한 한계 인정이 신뢰감의 핵심</li><li>"단계적 보강"이라 강조 — 한 번에 다 해결 X</li></ul></div>
+        <div><h4>다음 슬라이드 연결</h4><ul><li>"우선순위는 이렇습니다" → 다음 단계(10)</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Slide 10 — 다음 단계 ============ -->
+  <section class="slide" data-slide="10">
+    <div class="slide-eyebrow">다음 단계</div>
+    <div class="slide-title">우선순위 <span class="hl">3개월·6개월·장기</span>로 단계적 보강.</div>
+    <div class="next-wrap">
+      <div class="next-grid">
+        <div class="next-card now">
+          <div class="next-when">지금 (3개월 안)</div>
+          <div class="next-h">운영 안전망</div>
+          <ul class="next-list">
+            <li>매일 자동 백업 점검 + 복구 시나리오 1회 테스트</li>
+            <li>부서별 사용자 매뉴얼 정리 (신규 입사자 인계 가능 수준)</li>
+          </ul>
+        </div>
+        <div class="next-card mid">
+          <div class="next-when">중기 (6개월~1년)</div>
+          <div class="next-h">현장·통합 강화</div>
+          <ul class="next-list">
+            <li>모바일 완성도 — 현장 사용 빈도 보고 우선순위</li>
+            <li>회계 연동 또는 별도 회계 솔루션 정착</li>
+          </ul>
+        </div>
+        <div class="next-card">
+          <div class="next-when">장기 (1년+)</div>
+          <div class="next-h">필요해질 때만</div>
+          <ul class="next-list">
+            <li>외부 감사 대응 — 거래처 보안 검토 요청 시</li>
+            <li>DB 확장성 — 데이터 누적 1~2년 후 성능 보고 결정</li>
+          </ul>
+        </div>
+      </div>
+      <div class="next-pledge">
+        지금 당장 필요한 건 <b>백업·복구</b>와 <b>사용자 매뉴얼</b> 두 개뿐입니다. 그 부분은 제가 책임지고 챙기겠습니다.
+      </div>
+    </div>
+    <div class="notes-panel">
+      <h4>말할 한 줄</h4>
+      <p class="lead">"지금 당장 필요한 건 백업·복구랑 사용자 매뉴얼 두 개뿐입니다. 회계·모바일·외부 감사는 필요해지는 시점에 추가하면 됩니다."</p>
+      <div class="audience-row">
+        <div><h4>톤</h4><ul><li>"투자가 필요합니다" X → "제가 책임지고 챙기겠습니다" O</li></ul></div>
+        <div><h4>예상 질문</h4><ul><li><strong>인수인계는?</strong> → "팀에 1명만 익히면 충분. 문서는 제가 정리하겠습니다."</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Slide 11 — 마무리 ============ -->
+  <section class="slide closing-pr" data-slide="11">
+    <div class="closing-pr-wrap">
+      <div class="closing-pr-title">
+        <span class="red">14만원·1개월</span>으로 <span class="hl">1억대 작업</span>을,<br>
+        회사 흐름 <b>그대로</b> 맞춰 만들었습니다.
+      </div>
+      <div class="closing-pr-lead">
+        남은 건 운영 안전망 정리뿐입니다. 백업·복구와 사용자 매뉴얼,<br>
+        그 두 가지는 제가 책임지고 챙기겠습니다.
+      </div>
+      <div class="closing-pr-thanks">감사합니다.</div>
+    </div>
+    <div class="notes-panel">
+      <h4>마무리 (호흡)</h4>
+      <p class="lead">"발표에선 시연 위주로만 다뤘는데, 이 부분은 사장님께 따로 말씀드리고 싶어서 자리 부탁드렸습니다. 들어주셔서 감사합니다."</p>
+      <div class="audience-row">
+        <div><h4>주의</h4><ul><li>사장님이 "잘했다" 하시면 거기서 닫기 (덧붙이지 말기)</li></ul></div>
+        <div><h4>질문 받으면</h4><ul><li>Q&A 슬라이드 없음 — 자연스럽게 대화로 전환</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /.deck -->
+
+<script>
+  const TOTAL = 11;
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const cur = document.getElementById('cur');
+  const progress = document.getElementById('progress');
+  let idx = 1;
+
+  for (let i = 0; i < TOTAL; i++) progress.appendChild(document.createElement('span'));
+
+  function render() {
+    slides.forEach((s, i) => s.classList.toggle('active', i + 1 === idx));
+    cur.textContent = String(idx).padStart(2, '0');
+    progress.querySelectorAll('span').forEach((s, i) => {
+      s.className = i + 1 < idx ? 'done' : i + 1 === idx ? 'current' : '';
+    });
+    history.replaceState(null, '', location.search + '#' + idx);
+  }
+
+  function go(n) { idx = Math.max(1, Math.min(TOTAL, n)); render(); }
+  function next() { go(idx + 1); }
+  function prev() { go(idx - 1); }
+
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    switch (e.key) {
+      case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': next(); e.preventDefault(); break;
+      case 'ArrowLeft': case 'ArrowUp': case 'PageUp': prev(); e.preventDefault(); break;
+      case 'Home': go(1); e.preventDefault(); break;
+      case 'End':  go(TOTAL); e.preventDefault(); break;
+      case 'f': case 'F': toggleFullscreen(); break;
+      case 'n': case 'N': toggleNotes(); break;
+      case '0': go(10); e.preventDefault(); break;
+      case '-': go(11); e.preventDefault(); break;
+      default:
+        if (e.key >= '1' && e.key <= '9') { go(parseInt(e.key, 10)); e.preventDefault(); }
+    }
+  });
+
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+    else document.exitFullscreen();
+  }
+
+  function toggleNotes() {
+    const on = document.body.classList.toggle('notes-mode');
+    const u = new URL(location.href);
+    if (on) u.searchParams.set('notes', '1'); else u.searchParams.delete('notes');
+    history.replaceState(null, '', u.pathname + (u.search || '') + '#' + idx);
+  }
+
+  const m = location.hash.match(/^#(\d+)/);
+  if (m) idx = Math.max(1, Math.min(TOTAL, parseInt(m[1], 10)));
+  if (new URLSearchParams(location.search).get('notes') === '1') document.body.classList.add('notes-mode');
+  render();
+</script>
+</body>
+</html>
