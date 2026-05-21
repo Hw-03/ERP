@@ -2,17 +2,22 @@
 
 2026.05 발표용 HTML 슬라이드 데크. 단일 파일이라 USB·메일로 그대로 전달 가능.
 
+데크 두 종류:
+- `교육.html` — 사내 발표용 (14장, 시연·전환 안내)
+- `비교.html` — 1:1 PR용 (11장, 비용·가치 보고)
+
 ## 실행
 
 방법 1 — 더블클릭
 ```
-docs\presentation\index.html
+docs\presentation\교육.html
+docs\presentation\비교.html
 ```
 크롬·엣지·파이어폭스 모두 OK.
 
 방법 2 — 풀스크린으로 바로
 ```powershell
-start chrome --start-fullscreen "file:///c:/ERP/docs/presentation/index.html"
+start chrome --start-fullscreen "file:///c:/ERP/_attic/docs/presentation/교육.html"
 ```
 
 ## 키보드 단축키
@@ -78,4 +83,4 @@ start chrome --start-fullscreen "file:///c:/ERP/docs/presentation/index.html"
 
 ## 콘텐츠 업데이트
 
-전부 `index.html` 한 파일에 인라인. 슬라이드별 `<!-- ============ Slide N ============ -->` 주석으로 구분.
+전부 `교육.html`(또는 `비교.html`) 한 파일에 인라인. 슬라이드별 `<!-- ============ Slide N ============ -->` 주석으로 구분.
