@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/_inventory_sections/InventoryCapacityPanel.tsx
+source_path: erp/frontend/app/legacy/_components/_inventory_sections/InventoryCapacityPanel.tsx
 status: active
 updated: 2026-04-27
 source_sha: 8a121c362e50
@@ -73,37 +73,8 @@ export function InventoryCapacityPanel({
           </span>
           <span className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>/</span>
           <span className="text-sm font-black" style={{ color: LEGACY_COLORS.blue }}>
-            최대 {formatNumber(capacityData.maximum)}
-          </span>
-        </>
-      )}
-      {capacityData.limiting_item && (
-        <span
-          className="ml-auto inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold"
-          style={{
-            background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 16%, transparent)`,
-            color: LEGACY_COLORS.yellow,
-          }}
-        >
-          <AlertTriangle className="h-3 w-3" />
-          병목 부품: {capacityData.limiting_item}
-        </span>
-      )}
-    </>
-  );
-  if (interactive) {
-    return (
-      <button type="button" className={className} style={baseStyle} onClick={onClick} title="생산 가능수량 상세">
-        {inner}
-      </button>
-    );
-  }
-  return (
-    <div className={className} style={baseStyle}>
-      {inner}
-    </div>
-  );
-}
+# ... (이하 31줄 생략. 원본 참조)
+
 ````
 
 ---

@@ -1,6 +1,11 @@
 ---
 layer: backend
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # test_admin_audit_csv.py — 감사 CSV 내보내기
 

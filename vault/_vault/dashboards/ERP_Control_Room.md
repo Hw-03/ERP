@@ -282,23 +282,8 @@ flowchart LR
     items --> io
     departments --> sr
     departments --> inv_tr
-    departments --> dept_adj
-    employees --> sr
-    bom --> production
-    bom --> inv_df
-    io --> inv_tx
-    sr --> io
-    sr --> inv_df
-    production --> inv_tx
-    inv_rc --> inv_tx
-    inv_tr --> inv_tx
-    inv_sp --> inv_df
-    inv_df --> inv_tx
-    inv_tx --> inv_q
-    inv_tx --> variance
-    inv_tx --> inv_wk
-    inv_tx --> audit
-    audit --> audit_csv
+# ... (이하 17줄 생략. 원본 참조)
+
 ```
 
 > [!tip] 위 다이어그램의 정확성은 코드가 진실. 의심되면 `erp/backend/app/routers/` 글로브로 다시 확인할 것.

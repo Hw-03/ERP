@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/mobile/hooks/useModels.ts
+source_path: erp/frontend/app/legacy/_components/mobile/hooks/useModels.ts
 status: active
 updated: 2026-04-27
 source_sha: 4af0fca61f81
@@ -73,12 +73,8 @@ export function useModels() {
   }, []);
 
   useEffect(() => {
-    const cleanup = refetch();
-    return cleanup;
-  }, [refetch]);
+# ... (이하 6줄 생략. 원본 참조)
 
-  return { models, loading, error, refetch };
-}
 ````
 
 ---

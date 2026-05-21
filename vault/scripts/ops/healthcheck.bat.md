@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: scripts
-source_path: scripts/ops/healthcheck.bat
+source_path: erp/scripts/ops/healthcheck.bat
 status: active
 updated: 2026-04-27
 source_sha: ba6e03435330

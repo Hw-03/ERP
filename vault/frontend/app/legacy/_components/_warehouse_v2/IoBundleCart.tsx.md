@@ -120,23 +120,8 @@ export function IoBundleCart({ bundles, subType, itemMap, getAvailable,
                   ? (qty) => onBundleQuantityChange(bundle.bundle_id, qty)
                   : undefined}
               onRemoveLine={(lineId) => onRemoveLine(bundle.bundle_id, lineId)}
-              onRemoveBundle={() => onRemoveBundle(bundle.bundle_id)} />
-          ))}
-        </div>
-      )}
+# ... (이하 17줄 생략. 원본 참조)
 
-      {/* 다음 단계 버튼 */}
-      {bundles.length > 0 && (
-        <button type="button" onClick={onAdvance} disabled={!canAdvance}
-          className="flex w-full items-center justify-center gap-1.5 rounded-[14px] ..."
-          style={{ background: LEGACY_COLORS.blue }}>
-          <ClipboardCheck className="h-4 w-4" />
-          제출확인 →
-        </button>
-      )}
-    </div>
-  );
-}
 ```
 
 ---

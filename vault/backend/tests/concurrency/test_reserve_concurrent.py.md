@@ -1,6 +1,11 @@
 ---
 layer: backend
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # test_reserve_concurrent.py — 예약 동시 경합
 

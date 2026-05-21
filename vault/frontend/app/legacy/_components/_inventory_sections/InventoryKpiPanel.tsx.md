@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/_inventory_sections/InventoryKpiPanel.tsx
+source_path: erp/frontend/app/legacy/_components/_inventory_sections/InventoryKpiPanel.tsx
 status: active
 updated: 2026-04-27
 source_sha: fdca8721ab50
@@ -73,27 +73,8 @@ export function InventoryKpiPanel({ cards, activeKey, onChange }: Props) {
                 ? `color-mix(in srgb, ${card.tone} 16%, transparent)`
                 : `color-mix(in srgb, ${card.tone} 8%, transparent)`,
               borderColor: isActive || isHover
-                ? card.tone
-                : `color-mix(in srgb, ${card.tone} 35%, transparent)`,
-            }}
-          >
-            <div className="flex items-baseline justify-between gap-2">
-              <div className="text-[20px] font-black tracking-[-0.02em]" style={{ color: card.tone }}>
-                {card.label}
-              </div>
-              <div className="text-[22px] font-black leading-none" style={{ color: card.tone }}>
-                {formatNumber(card.value)}
-              </div>
-            </div>
-            <div className="mt-1.5 text-[11px] font-semibold" style={{ color: card.tone, opacity: 0.7 }}>
-              {card.hint}
-            </div>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+# ... (이하 21줄 생략. 원본 참조)
+
 ````
 
 ---

@@ -9,6 +9,11 @@ aliases:
   - stock_math
   - 재고 계산 공식
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # 📐 stock_math.py — 재고 계산 공식 단일 소스
 

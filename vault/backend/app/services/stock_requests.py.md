@@ -9,6 +9,11 @@ aliases:
   - stock_requests service
   - 결재 상태머신
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # 📋 stock_requests.py — 배치 상태머신 & 결재 흐름
 

@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/mobile/primitives/SectionHeader.tsx
+source_path: erp/frontend/app/legacy/_components/mobile/primitives/SectionHeader.tsx
 status: active
 updated: 2026-04-27
 source_sha: 54a02796ad3c

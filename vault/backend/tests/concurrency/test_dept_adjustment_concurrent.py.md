@@ -1,6 +1,11 @@
 ---
 layer: backend
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # test_dept_adjustment_concurrent.py — 교차 아이템 교착 방지
 

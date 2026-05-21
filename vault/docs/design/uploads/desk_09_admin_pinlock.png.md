@@ -2,7 +2,7 @@
 type: asset-note
 project: ERP
 layer: docs
-source_path: docs/design/uploads/desk_09_admin_pinlock.png
+source_path: erp/docs/design/uploads/desk_09_admin_pinlock.png
 status: active
 updated: 2026-04-27
 source_sha: 8ba0c1152f6d

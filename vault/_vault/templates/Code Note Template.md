@@ -3,11 +3,14 @@ type: code-note
 project: ERP
 layer: 
 source_path: 
-status: draft
+erp/status: draft
 tags:
   - erp
 aliases:
   - 
+---
+status: active
+updated: 2026-05-21
 ---
 
 # {{title}}

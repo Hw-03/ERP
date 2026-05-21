@@ -1,6 +1,11 @@
 ---
 layer: backend
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # test_get_db_rollback.py — 세션 롤백 검증
 

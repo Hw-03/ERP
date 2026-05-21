@@ -10,6 +10,11 @@ aliases:
   - 4파트 코드 파싱
   - ItemCode
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # 🏷️ codes.py — 4-파트 품목 코드 파싱·검증·생성
 

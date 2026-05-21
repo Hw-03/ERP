@@ -2,7 +2,7 @@
 type: asset-note
 project: ERP
 layer: docs
-source_path: docs/design/uploads/mob_10_admin_bom-513b3125.png
+source_path: erp/docs/design/uploads/mob_10_admin_bom-513b3125.png
 status: active
 updated: 2026-04-27
 source_sha: de81c1619c91

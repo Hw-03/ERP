@@ -2,7 +2,7 @@
 type: asset-note
 project: ERP
 layer: docs
-source_path: docs/design/uploads/desk_10_admin_pin_typing-5065723f.png
+source_path: erp/docs/design/uploads/desk_10_admin_pin_typing-5065723f.png
 status: active
 updated: 2026-04-27
 source_sha: 25bfc926efdc

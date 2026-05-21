@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/mobile/primitives/FilterChip.tsx
+source_path: erp/frontend/app/legacy/_components/mobile/primitives/FilterChip.tsx
 status: active
 updated: 2026-04-27
 source_sha: 5ce1f9f9f7e6
@@ -73,22 +73,8 @@ export function FilterChip({
           : { background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }
       }
     >
-      {label}
-    </button>
-  );
-}
+# ... (이하 16줄 생략. 원본 참조)
 
-export function FilterChipRow({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={clsx("flex gap-2 overflow-x-auto scrollbar-hide pb-[2px]", className)}>{children}</div>
-  );
-}
 ````
 
 ---

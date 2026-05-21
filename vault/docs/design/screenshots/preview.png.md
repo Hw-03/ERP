@@ -2,7 +2,7 @@
 type: asset-note
 project: ERP
 layer: docs
-source_path: docs/design/screenshots/preview.png
+source_path: erp/docs/design/screenshots/preview.png
 status: active
 updated: 2026-04-27
 source_sha: 58102f2c3867

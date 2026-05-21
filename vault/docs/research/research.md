@@ -2,7 +2,7 @@
 type: index
 project: ERP
 layer: docs
-source_path: docs/research/
+source_path: erp/docs/research/
 status: active
 updated: 2026-04-27
 tags:

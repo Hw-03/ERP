@@ -120,20 +120,8 @@ export function DesktopSidebar({
               onTabChange={onTabChange} onHover={setHoveredTab} />
           ))}
         </nav>
+# ... (이하 14줄 생략. 원본 참조)
 
-        {/* 하단: 관리 탭 + 테마 토글 */}
-        <div className="mt-auto space-y-1.5 pt-1.5">
-          {BOTTOM_TABS.map((tab) => (
-            <TabButton key={tab.id} tab={tab} active={tab.id === activeTab}
-              expanded={expanded} hovered={hoveredTab === tab.id}
-              onTabChange={onTabChange} onHover={setHoveredTab} />
-          ))}
-          <ThemeToggle expanded={expanded} />
-        </div>
-      </aside>
-    </div>
-  );
-}
 ```
 
 ---

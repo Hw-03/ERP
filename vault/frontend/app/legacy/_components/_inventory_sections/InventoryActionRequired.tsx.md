@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/_inventory_sections/InventoryActionRequired.tsx
+source_path: erp/frontend/app/legacy/_components/_inventory_sections/InventoryActionRequired.tsx
 status: active
 updated: 2026-04-27
 source_sha: 14f9cf29bc87
@@ -73,13 +73,8 @@ export function InventoryActionRequired({ lowCount, zeroCount, onGoToWarehouseTa
           onClick={onGoToWarehouseTab}
           className="ml-auto inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
           style={{ background: tone }}
-        >
-          입출고 화면 열기 <ArrowRight className="h-3 w-3" />
-        </button>
-      )}
-    </div>
-  );
-}
+# ... (이하 7줄 생략. 원본 참조)
+
 ````
 
 ---

@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/FilterPills.tsx
+source_path: erp/frontend/app/legacy/_components/FilterPills.tsx
 status: active
 updated: 2026-04-27
 source_sha: e7f754824600
@@ -73,30 +73,8 @@ export function FilterPills({
                 ? {
                     background: activeColor,
                     borderColor: activeColor,
-                    color: "#fff",
-                  }
-                : isHovered
-                ? {
-                    background: `color-mix(in srgb, ${activeColor} var(--pill-hover-mix, 14%), transparent)`,
-                    borderColor: activeColor,
-                    color: `color-mix(in srgb, ${activeColor}, #ffffff calc(var(--pill-inset-ring, 0) * 60%))`,
-                    boxShadow: `inset 0 0 0 calc(var(--pill-inset-ring, 0) * 1px) ${activeColor}, 0 0 var(--pill-glow-blur, 0px) color-mix(in srgb, ${activeColor} var(--pill-glow-strength, 0%), transparent)`,
-                    transform: "translateY(-1px)",
-                  }
-                : {
-                    background: LEGACY_COLORS.s2,
-                    borderColor: LEGACY_COLORS.border,
-                    color: LEGACY_COLORS.muted2,
-                  }
-            }
-          >
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+# ... (이하 24줄 생략. 원본 참조)
+
 ````
 
 ---

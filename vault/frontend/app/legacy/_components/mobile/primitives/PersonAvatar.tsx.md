@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/mobile/primitives/PersonAvatar.tsx
+source_path: erp/frontend/app/legacy/_components/mobile/primitives/PersonAvatar.tsx
 status: active
 updated: 2026-04-27
 source_sha: dc2f495577e4
@@ -73,33 +73,8 @@ export function PersonAvatar({
 
   return (
     <button
-      type="button"
-      onClick={onClick}
-      className={clsx("flex shrink-0 flex-col items-center gap-1 active:scale-95", className)}
-    >
-      <div
-        className={clsx(
-          "flex items-center justify-center rounded-full font-black uppercase",
-          box,
-          text,
-        )}
-        style={{
-          background: selected ? color : `${color}22`,
-          color: selected ? "#fff" : color,
-          border: `2px solid ${selected ? color : "transparent"}`,
-          transition: "background-color .15s, border-color .15s",
-        }}
-      >
-        {firstEmployeeLetter(name)}
-      </div>
-      {showLabel ? (
-        <div className={clsx(TYPO.caption, "font-semibold")} style={{ color: selected ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}>
-          {name}
-        </div>
-      ) : null}
-    </button>
-  );
-}
+# ... (이하 27줄 생략. 원본 참조)
+
 ````
 
 ---

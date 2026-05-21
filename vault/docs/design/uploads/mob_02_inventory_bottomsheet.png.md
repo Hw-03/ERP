@@ -2,7 +2,7 @@
 type: asset-note
 project: ERP
 layer: docs
-source_path: docs/design/uploads/mob_02_inventory_bottomsheet.png
+source_path: erp/docs/design/uploads/mob_02_inventory_bottomsheet.png
 status: active
 updated: 2026-04-27
 source_sha: 1f8a56492878

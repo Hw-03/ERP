@@ -9,6 +9,11 @@ aliases:
   - audit_csv service
   - CSV 내보내기
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # 📊 audit_csv.py — CSV/XLSX 외부 감사 미러
 

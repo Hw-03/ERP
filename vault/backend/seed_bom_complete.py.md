@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: backend
-source_path: backend/seed_bom_complete.py
+source_path: erp/backend/seed_bom_complete.py
 status: active
 updated: 2026-04-27
 source_sha: e5f9a61c661a
@@ -73,132 +73,8 @@ def load_existing(db) -> set:
     rows = db.query(BOM.parent_item_id, BOM.child_item_id).all()
     return {(str(p), str(c)) for p, c in rows}
 
+# ... (이하 126줄 생략. 원본 참조)
 
-def add_bom(db, existing: set, parent: Item, child: Item, qty: int) -> bool:
-    if parent.item_id == child.item_id:
-        return False
-    key = (str(parent.item_id), str(child.item_id))
-    if key in existing:
-        return False
-    db.add(BOM(
-        bom_id=uuid.uuid4(),
-        parent_item_id=parent.item_id,
-        child_item_id=child.item_id,
-        quantity=Decimal(str(qty)),
-        unit="EA",
-    ))
-    existing.add(key)
-    return True
-
-
-def main() -> None:
-    db = SessionLocal()
-    try:
-        ba_items = db.query(Item).filter(Item.category == CategoryEnum.AA).all()
-        ta_items = db.query(Item).filter(Item.category == CategoryEnum.TA).all()
-        ha_items = db.query(Item).filter(Item.category == CategoryEnum.HA).all()
-        va_items = db.query(Item).filter(Item.category == CategoryEnum.VA).all()
-        bf_items = db.query(Item).filter(Item.category == CategoryEnum.AF).all()
-        tf_items = db.query(Item).filter(Item.category == CategoryEnum.TF).all()
-        rm_items = db.query(Item).filter(Item.category == CategoryEnum.RM).all()
-
-        existing = load_existing(db)
-        print(f"기존 BOM: {len(existing)}개")
-
-        created_bf = 0
-        created_tf = 0
-        created_sub = 0
-
-        # AA → AF 연결 (model_symbol 겹치는 것끼리)
-        bf_linked: set[str] = set()
-        for ba in ba_items:
-            for bf in bf_items:
-                if symbols_overlap(ba.model_symbol, bf.model_symbol):
-                    if add_bom(db, existing, ba, bf, 1):
-                        created_bf += 1
-                        bf_linked.add(str(bf.item_id))
-
-        # model_symbol이 없는 AF는 model_symbol 없는 AA에 연결
-        bf_unlinked = [b for b in bf_items if str(b.item_id) not in bf_linked]
-        ba_no_sym = [b for b in ba_items if not b.model_symbol]
-        if bf_unlinked and ba_no_sym:
-            for bf in bf_unlinked[:20]:  # 최대 20개
-                for ba in ba_no_sym[:5]:
-                    if add_bom(db, existing, ba, bf, 1):
-                        created_bf += 1
-
-        # TA → TF 연결 (model_symbol 겹치는 것끼리)
-        tf_linked: set[str] = set()
-        for ta in ta_items:
-            for tf in tf_items:
-                if symbols_overlap(ta.model_symbol, tf.model_symbol):
-                    if add_bom(db, existing, ta, tf, 1):
-                        created_tf += 1
-                        tf_linked.add(str(tf.item_id))
-
-        # model_symbol 없는 TF는 아무 TA에나 연결
-        tf_unlinked = [t for t in tf_items if str(t.item_id) not in tf_linked]
-        if tf_unlinked and ta_items:
-            for tf in tf_unlinked:
-                if add_bom(db, existing, ta_items[0], tf, 1):
-                    created_tf += 1
-
-        # AA에 아직 HA/VA/TA 서브어셈블리 없는 경우 보완
-        # (기존 seed는 10개 AA에만 적용됨 — 나머지 AA도 서브어셈블리 연결)
-        for ba in ba_items:
-            sym = ba.model_symbol or ""
-            # 같은 모델의 HA 연결
-            for ha in ha_items:
-                if symbols_overlap(sym, ha.model_symbol or ""):
-                    if add_bom(db, existing, ba, ha, 1):
-                        created_sub += 1
-                    break  # AA당 HA 1개만
-            # 같은 모델의 VA 연결
-            for va in va_items:
-                if symbols_overlap(sym, va.model_symbol or ""):
-                    if add_bom(db, existing, ba, va, 1):
-                        created_sub += 1
-                    break
-            # 같은 모델의 TA 연결
-            for ta in ta_items:
-                if symbols_overlap(sym, ta.model_symbol or ""):
-                    if add_bom(db, existing, ba, ta, 1):
-                        created_sub += 1
-                    break
-
-        # HA/VA에 RM 연결 (아직 없는 HA/VA에 한해 소수)
-        for ha in ha_items:
-            sym = ha.model_symbol or ""
-            rm_cands = [r for r in rm_items if symbols_overlap(sym, r.model_symbol or "")]
-            if not rm_cands:
-                rm_cands = rm_items[:3]
-            for rm in rm_cands[:3]:
-                if add_bom(db, existing, ha, rm, 2):
-                    created_sub += 1
-
-        for va in va_items:
-            sym = va.model_symbol or ""
-            rm_cands = [r for r in rm_items if symbols_overlap(sym, r.model_symbol or "")]
-            if not rm_cands:
-                rm_cands = rm_items[:3]
-            for rm in rm_cands[:3]:
-                if add_bom(db, existing, va, rm, 2):
-                    created_sub += 1
-
-        db.commit()
-        print(f"추가된 BOM:")
-        print(f"  AA → AF: {created_bf}개")
-        print(f"  TA → TF: {created_tf}개")
-        print(f"  서브어셈블리 보완: {created_sub}개")
-        print(f"  합계: {created_bf + created_tf + created_sub}개")
-        print(f"전체 BOM: {len(existing)}개")
-
-    finally:
-        db.close()
-
-
-if __name__ == "__main__":
-    main()
 ````
 
 ---

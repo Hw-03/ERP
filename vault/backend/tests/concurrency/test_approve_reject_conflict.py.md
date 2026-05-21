@@ -1,6 +1,11 @@
 ---
 layer: backend
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # test_approve_reject_conflict.py — 승인/반려 경쟁
 

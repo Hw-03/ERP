@@ -10,6 +10,11 @@ aliases:
   - SQLAlchemy 엔진
   - PG/SQLite 가드
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # 🔌 database.py — SQLAlchemy 엔진 & PG/SQLite 가드
 

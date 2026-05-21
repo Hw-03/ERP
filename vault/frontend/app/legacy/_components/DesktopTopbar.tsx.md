@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/DesktopTopbar.tsx
+source_path: erp/frontend/app/legacy/_components/DesktopTopbar.tsx
 status: active
 updated: 2026-04-27
 source_sha: 399a427862f5
@@ -73,26 +73,8 @@ export function DesktopTopbar({
               </div>
             )}
             <div className="text-[24px] font-black tracking-[-0.02em]">{title}</div>
-          </div>
-        </div>
+# ... (이하 20줄 생략. 원본 참조)
 
-        {status && <StatusPill tone={inferToneFromStatus(status)} label={status} title={status} />}
-
-        {actionSlot}
-        <ThemeToggle />
-
-        <button
-          onClick={onRefresh}
-          className="flex items-center gap-2 rounded-[20px] px-4 py-2.5 text-base font-semibold text-white transition-opacity hover:opacity-90"
-          style={{ background: LEGACY_COLORS.blue }}
-        >
-          <RefreshCw className="h-4 w-4" />
-          새로고침
-        </button>
-      </div>
-    </header>
-  );
-}
 ````
 
 ---

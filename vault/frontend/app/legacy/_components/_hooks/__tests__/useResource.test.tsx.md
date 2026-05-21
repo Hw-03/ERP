@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/_hooks/__tests__/useResource.test.tsx
+source_path: erp/frontend/app/legacy/_components/_hooks/__tests__/useResource.test.tsx
 status: active
 updated: 2026-04-27
 source_sha: 3548fa88f5d7
@@ -73,14 +73,8 @@ describe("useResource", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(fetcher).toHaveBeenCalledTimes(1);
 
-    fetcher.mockResolvedValueOnce({ v: 2 });
-    await act(async () => {
-      await result.current.reload();
-    });
-    expect(fetcher).toHaveBeenCalledTimes(2);
-    expect(result.current.data).toEqual({ v: 2 });
-  });
-});
+# ... (이하 8줄 생략. 원본 참조)
+
 ````
 
 ---

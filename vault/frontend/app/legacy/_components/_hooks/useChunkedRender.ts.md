@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/_hooks/useChunkedRender.ts
+source_path: erp/frontend/app/legacy/_components/_hooks/useChunkedRender.ts
 status: active
 updated: 2026-04-27
 source_sha: 049af23d1410
@@ -73,19 +73,8 @@ export function useChunkedRender<T>(items: T[], chunkSize = 50) {
           if (e.isIntersecting) {
             setCount((c) => Math.min(c + chunkSize, items.length));
           }
-        }
-      },
-      { rootMargin: "200px" },
-    );
-    io.observe(node);
-    return () => io.disconnect();
-  }, [count, items.length, chunkSize]);
+# ... (이하 13줄 생략. 원본 참조)
 
-  const visible = useMemo(() => items.slice(0, count), [items, count]);
-  const hasMore = count < items.length;
-
-  return { visible, sentinelRef, hasMore, total: items.length, shown: visible.length } as const;
-}
 ````
 
 ---

@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: backend
-source_path: backend/app/services/__init__.py
+source_path: erp/backend/app/services/__init__.py
 status: active
 updated: 2026-04-27
 source_sha: 156251c3f537

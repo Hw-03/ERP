@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/common/__tests__/ConfirmModal.test.tsx
+source_path: erp/frontend/app/legacy/_components/common/__tests__/ConfirmModal.test.tsx
 status: active
 updated: 2026-04-27
 source_sha: ad5fbe2b7cf0
@@ -73,38 +73,8 @@ describe("ConfirmModal", () => {
   });
 
   it("busy=true 면 backdrop 클릭 무시 + Escape 무시", () => {
-    const onClose = vi.fn();
-    const { container } = render(
-      <ConfirmModal
-        open
-        busy
-        title="처리 중"
-        onClose={onClose}
-        onConfirm={() => {}}
-      />
-    );
-    // backdrop 클릭
-    const backdrop = container.querySelector('[role="dialog"]') as HTMLElement;
-    fireEvent.click(backdrop);
-    expect(onClose).not.toHaveBeenCalled();
+# ... (이하 32줄 생략. 원본 참조)
 
-    // Escape
-    fireEvent.keyDown(window, { key: "Escape" });
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  it("open=false 면 아무것도 렌더 안 함", () => {
-    const { container } = render(
-      <ConfirmModal
-        open={false}
-        title="hidden"
-        onClose={() => {}}
-        onConfirm={() => {}}
-      />
-    );
-    expect(container.firstChild).toBeNull();
-  });
-});
 ````
 
 ---

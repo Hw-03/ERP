@@ -2,7 +2,7 @@
 type: asset-note
 project: ERP
 layer: docs
-source_path: docs/design/uploads/desk_01_dashboard.png
+source_path: erp/docs/design/uploads/desk_01_dashboard.png
 status: active
 updated: 2026-04-27
 source_sha: 5b569ad6d37c

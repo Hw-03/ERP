@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/mobile/primitives/SectionCard.tsx
+source_path: erp/frontend/app/legacy/_components/mobile/primitives/SectionCard.tsx
 status: active
 updated: 2026-04-27
 source_sha: 5c9361b6f0bc
@@ -73,54 +73,8 @@ export function SectionCard({
           <div className="min-w-0">
             {title ? (
               <div
-                className={clsx(TYPO.overline, "font-bold uppercase tracking-[2px]")}
-                style={{ color: LEGACY_COLORS.muted2 }}
-              >
-                {title}
-              </div>
-            ) : null}
-            {subtitle ? (
-              <div
-                className={clsx(TYPO.body, "font-semibold")}
-                style={{ color: LEGACY_COLORS.text }}
-              >
-                {subtitle}
-              </div>
-            ) : null}
-          </div>
-          {action ? <div className="shrink-0">{action}</div> : null}
-        </div>
-      ) : null}
-      <div className={pad}>{children}</div>
-    </div>
-  );
-}
+# ... (이하 48줄 생략. 원본 참조)
 
-export function SectionCardRow({
-  label,
-  value,
-  valueColor,
-  className,
-}: {
-  label: string;
-  value: React.ReactNode;
-  valueColor?: string;
-  className?: string;
-}) {
-  return (
-    <div className={clsx("flex items-center justify-between py-[6px]", className)}>
-      <span className={clsx(TYPO.caption, "font-semibold")} style={{ color: LEGACY_COLORS.muted2 }}>
-        {label}
-      </span>
-      <span
-        className={clsx(TYPO.body, "font-black text-right")}
-        style={{ color: valueColor ?? LEGACY_COLORS.text }}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
 ````
 
 ---

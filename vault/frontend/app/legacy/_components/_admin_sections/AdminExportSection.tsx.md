@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/_admin_sections/AdminExportSection.tsx
+source_path: erp/frontend/app/legacy/_components/_admin_sections/AdminExportSection.tsx
 status: active
 updated: 2026-04-27
 source_sha: c61f4129f28c
@@ -73,27 +73,8 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
         </div>
         <div
           className="rounded-[28px] border p-5"
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-        >
-          <div className="mb-4 flex items-center gap-2 text-base font-bold">
-            <FileDown className="h-4 w-4" /> 거래 엑셀
-          </div>
-          <p className="mb-4 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-            최근 30일 입출고 거래 내역을 엑셀 파일로 내보냅니다.
-          </p>
-          <a
-            href={transactionsExportUrl}
-            download
-            className="block w-full rounded-[18px] px-4 py-3 text-center text-sm font-semibold text-white"
-            style={{ background: LEGACY_COLORS.green }}
-          >
-            최근 30일 거래 내역 다운로드
-          </a>
-        </div>
-      </div>
-    </div>
-  );
-}
+# ... (이하 21줄 생략. 원본 참조)
+
 ````
 
 ---

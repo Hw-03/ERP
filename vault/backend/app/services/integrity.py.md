@@ -9,6 +9,11 @@ aliases:
   - integrity service
   - 불변식 점검
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # 🔍 integrity.py — 재고 불변식 점검·복구
 

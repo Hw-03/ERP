@@ -2,7 +2,7 @@
 type: index
 project: ERP
 layer: docs
-source_path: docs/design/
+source_path: erp/docs/design/
 status: active
 updated: 2026-04-27
 tags:

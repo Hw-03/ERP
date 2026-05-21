@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/mobile/primitives/StatusBadge.tsx
+source_path: erp/frontend/app/legacy/_components/mobile/primitives/StatusBadge.tsx
 status: active
 updated: 2026-04-27
 source_sha: 8289f85e27b8
@@ -73,15 +73,8 @@ export function StatusBadge({
       className={clsx(
         "inline-flex items-center gap-1 rounded-[8px] px-2 py-[2px] font-semibold",
         TYPO.caption,
-        className,
-      )}
-      style={{ background: `${c}22`, color: c }}
-    >
-      {dot ? <span className="h-[6px] w-[6px] rounded-full" style={{ background: c }} /> : null}
-      {label}
-    </span>
-  );
-}
+# ... (이하 9줄 생략. 원본 참조)
+
 ````
 
 ---

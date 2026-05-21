@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/mobile/tokens.ts
+source_path: erp/frontend/app/legacy/_components/mobile/tokens.ts
 status: active
 updated: 2026-04-27
 source_sha: d4f14ebbb5ef

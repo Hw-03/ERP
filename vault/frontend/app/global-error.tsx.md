@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/global-error.tsx
+source_path: erp/frontend/app/global-error.tsx
 status: active
 updated: 2026-04-27
 source_sha: fde7f1a4af8d
@@ -73,16 +73,8 @@ export default function GlobalError({
             border: "1px solid #888",
             borderRadius: 12,
             fontWeight: 700,
-            cursor: "pointer",
-            background: "transparent",
-          }}
-        >
-          다시 시도
-        </button>
-      </body>
-    </html>
-  );
-}
+# ... (이하 10줄 생략. 원본 참조)
+
 ````
 
 ---

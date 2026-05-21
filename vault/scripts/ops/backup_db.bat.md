@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: scripts
-source_path: scripts/ops/backup_db.bat
+source_path: erp/scripts/ops/backup_db.bat
 status: active
 updated: 2026-04-27
 source_sha: 54ace48ba0f0
@@ -73,44 +73,8 @@ if not errorlevel 1 (
     if not errorlevel 1 (
         echo [BACKUP] OK ^(sqlite3 .backup^)
         echo   from : %DB%
-        echo   to   : %DEST%
-        endlocal & exit /b 0
-    )
-    echo [BACKUP] sqlite3 .backup failed - trying python fallback
-)
+# ... (이하 38줄 생략. 원본 참조)
 
-rem ----- 2: Python sqlite3 backup API --------------------------------------
-where python >nul 2>&1
-if not errorlevel 1 (
-    python -c "import sqlite3,sys; src=sqlite3.connect(r'%DB%'); dst=sqlite3.connect(r'%DEST%'); src.backup(dst); dst.close(); src.close()"
-    if not errorlevel 1 (
-        echo [BACKUP] OK ^(python sqlite3.backup^)
-        echo   from : %DB%
-        echo   to   : %DEST%
-        endlocal & exit /b 0
-    )
-    echo [BACKUP] python backup failed - trying file copy fallback
-)
-
-rem ----- 3: WAL checkpoint + copy 3 files ----------------------------------
-where python >nul 2>&1
-if not errorlevel 1 (
-    python -c "import sqlite3; c=sqlite3.connect(r'%DB%'); c.execute('PRAGMA wal_checkpoint(TRUNCATE)'); c.close()"
-)
-copy /Y "%DB%" "%DEST%" >nul
-if errorlevel 1 (
-    echo [BACKUP] copy failed: %DB% -^> %DEST%
-    endlocal & exit /b 1
-)
-if exist "%DB%-wal" copy /Y "%DB%-wal" "%DEST%-wal" >nul
-if exist "%DB%-shm" copy /Y "%DB%-shm" "%DEST%-shm" >nul
-
-echo [BACKUP] OK ^(file copy fallback^)
-echo   from : %DB%
-echo   to   : %DEST%
-
-endlocal
-exit /b 0
 ````
 
 ---

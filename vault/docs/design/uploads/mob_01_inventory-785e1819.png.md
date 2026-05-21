@@ -2,7 +2,7 @@
 type: asset-note
 project: ERP
 layer: docs
-source_path: docs/design/uploads/mob_01_inventory-785e1819.png
+source_path: erp/docs/design/uploads/mob_01_inventory-785e1819.png
 status: active
 updated: 2026-04-27
 source_sha: e500d7119c4b

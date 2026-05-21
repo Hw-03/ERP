@@ -144,17 +144,8 @@ return (
           adminPin={adminPin}
           ...
         />
-      </section>
-    </div>
+# ... (이하 11줄 생략. 원본 참조)
 
-    {/* 우측 요약 패널 (showRightPanel 시 400px) */}
-    <div style={{ width: showRightPanel ? 420 : 0, transition: "width 160ms ..." }}>
-      <DesktopRightPanel title="관리 요약" ...>
-        <AdminRightPanelContent section={section} ... />
-      </DesktopRightPanel>
-    </div>
-  </div>
-);
 ```
 
 ---

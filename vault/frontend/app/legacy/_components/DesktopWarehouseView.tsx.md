@@ -145,30 +145,8 @@ export function DesktopWarehouseView({ globalSearch, onStatusChange, preselected
           sectionTab={sectionTab}
           onContinueIoDraft={(draft) => {
             setRestoreIoDraft(draft);
-            setSectionTab("compose");  // compose 탭으로 이동
-          }}
-          ...
-        />
+# ... (이하 24줄 생략. 원본 참조)
 
-        {/* io 2.0 요청 작성 (compose 탭 시에만) */}
-        {sectionTab === "compose" && (
-          <IoComposeView
-            restoreDraft={restoreIoDraft}
-            onStatusChange={(status) => {
-              onStatusChange(status);
-              setPanelRefreshNonce((n) => n + 1);  // 배지 재집계 트리거
-            }}
-            onSubmitSuccess={() => {
-              setPanelRefreshNonce((n) => n + 1);
-              onSubmitSuccess?.();
-            }}
-            ...
-          />
-        )}
-      </div>
-    </div>
-  );
-}
 ```
 
 ---

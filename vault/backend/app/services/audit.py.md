@@ -9,6 +9,11 @@ aliases:
   - audit service
   - 마스터 변경 감사
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # 🔐 audit.py — 마스터 변경 감사 로그
 

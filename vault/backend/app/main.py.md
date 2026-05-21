@@ -9,6 +9,11 @@ aliases:
   - FastAPI 진입점
   - 라우터 등록
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # 🚀 main.py — FastAPI 앱 진입점 & 라우터 등록
 

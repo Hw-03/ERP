@@ -2,7 +2,7 @@
 type: asset-note
 project: ERP
 layer: docs
-source_path: docs/design/uploads/mob_06_admin_pin_typing-a8b064f6.png
+source_path: erp/docs/design/uploads/mob_06_admin_pin_typing-a8b064f6.png
 status: active
 updated: 2026-04-27
 source_sha: 9dea6478cb3d

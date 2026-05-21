@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/page.tsx
+source_path: erp/frontend/app/page.tsx
 status: active
 updated: 2026-04-27
 source_sha: d82745effcd3

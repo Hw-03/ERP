@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: backend
-source_path: backend/seed_employees.py
+source_path: erp/backend/seed_employees.py
 status: active
 updated: 2026-04-27
 source_sha: 012f68838802
@@ -73,58 +73,8 @@ REFERENCE_EMPLOYEES = [
     ("E23", "양승규",  "영업/부장",    "영업"),
     ("E24", "김예진",  "영업/대리",    "영업"),
     ("E25", "심이리나", "영업/과장",   "영업"),
-    ("E26", "드미트리", "영업/사원",   "영업"),
-]
+# ... (이하 52줄 생략. 원본 참조)
 
-CATEGORY_TO_DEPT = {
-    "조립":  DepartmentEnum.ASSEMBLY,
-    "진공":  DepartmentEnum.VACUUM,
-    "고압":  DepartmentEnum.HIGH_VOLTAGE,
-    "튜닝":  DepartmentEnum.TUNING,
-    "튜브":  DepartmentEnum.TUBE,
-    "AS":    DepartmentEnum.AS,
-    "연구소": DepartmentEnum.RESEARCH,
-    "기타":  DepartmentEnum.ETC,
-    "영업":  DepartmentEnum.SALES,
-}
-
-
-def role_to_level(role: str) -> EmployeeLevelEnum:
-    suffix = role.split("/")[-1] if "/" in role else role
-    if suffix in ("대표",):
-        return EmployeeLevelEnum.ADMIN
-    if suffix in ("부장", "과장", "책임"):
-        return EmployeeLevelEnum.MANAGER
-    return EmployeeLevelEnum.STAFF
-
-
-def main() -> None:
-    db = SessionLocal()
-    try:
-        existing = db.query(Employee).count()
-        print(f"기존 직원 {existing}명 삭제 후 26명으로 교체합니다.")
-        db.query(Employee).delete()
-        db.flush()
-
-        for order, (code, name, role, category) in enumerate(REFERENCE_EMPLOYEES, start=1):
-            db.add(Employee(
-                employee_code=code,
-                name=name,
-                role=role,
-                department=CATEGORY_TO_DEPT[category],
-                level=role_to_level(role),
-                display_order=order,
-                is_active="true",
-            ))
-
-        db.commit()
-        print(f"직원 {len(REFERENCE_EMPLOYEES)}명 삽입 완료.")
-    finally:
-        db.close()
-
-
-if __name__ == "__main__":
-    main()
 ````
 
 ---

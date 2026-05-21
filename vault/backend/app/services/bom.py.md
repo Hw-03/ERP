@@ -9,6 +9,11 @@ aliases:
   - bom service
   - BOM 전개
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # 🌳 bom.py — BOM 전개 유틸리티
 

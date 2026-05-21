@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/mobile/primitives/KpiCard.tsx
+source_path: erp/frontend/app/legacy/_components/mobile/primitives/KpiCard.tsx
 status: active
 updated: 2026-04-27
 source_sha: f7925d8d85e1
@@ -73,15 +73,8 @@ export function KpiCard({
       }}
     >
       <div className={clsx(TYPO.caption, "font-semibold uppercase tracking-[1px]")} style={{ color: LEGACY_COLORS.muted2 }}>
-        {label}
-      </div>
-      <div className={clsx(TYPO.display, "font-black tabular-nums")} style={{ color }}>
-        {value}
-      </div>
-      <div className="h-[2px] w-full rounded-full" style={{ background: active ? color : `${color}40` }} />
-    </button>
-  );
-}
+# ... (이하 9줄 생략. 원본 참조)
+
 ````
 
 ---

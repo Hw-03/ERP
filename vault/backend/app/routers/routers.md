@@ -2,7 +2,7 @@
 type: index
 project: ERP
 layer: backend
-source_path: backend/app/routers/
+source_path: erp/backend/app/routers/
 status: active
 updated: 2026-04-27
 tags:
@@ -30,19 +30,18 @@ tags:
 - [[backend/app/routers/__init__.py|__init__.py]]
 - [[backend/app/routers/_errors.py|_errors.py]]
 - [[backend/app/routers/admin_audit.py|admin_audit.py]]
-- [[backend/app/routers/alerts.py|alerts.py]]
+- [[backend/app/routers/admin_audit_csv.py|admin_audit_csv.py]]
 - [[backend/app/routers/bom.py|bom.py]]
 - [[backend/app/routers/codes.py|codes.py]]
-- [[backend/app/routers/counts.py|counts.py]]
+- [[backend/app/routers/departments.py|departments.py]]
+- [[backend/app/routers/dept_adjustment.py|dept_adjustment.py]]
 - [[backend/app/routers/employees.py|employees.py]]
+- [[backend/app/routers/io.py|io.py]]
 - [[backend/app/routers/items.py|items.py]]
-- [[backend/app/routers/loss.py|loss.py]]
 - [[backend/app/routers/models.py|models.py]]
 - [[backend/app/routers/production.py|production.py]]
-- [[backend/app/routers/queue.py|queue.py]]
-- [[backend/app/routers/scrap.py|scrap.py]]
 - [[backend/app/routers/settings.py|settings.py]]
-- [[backend/app/routers/ship_packages.py|ship_packages.py]]
+- [[backend/app/routers/stock_requests.py|stock_requests.py]]
 - [[backend/app/routers/variance.py|variance.py]]
 
 ## 읽는 팁

@@ -2,7 +2,7 @@
 type: index
 project: ERP
 layer: docs
-source_path: docs/design/scraps/
+source_path: erp/docs/design/scraps/
 status: active
 updated: 2026-04-27
 tags:

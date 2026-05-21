@@ -2,7 +2,7 @@
 type: index
 project: ERP
 layer: frontend
-source_path: frontend/app/operations/
+source_path: erp/frontend/app/operations/
 status: active
 updated: 2026-04-27
 tags:

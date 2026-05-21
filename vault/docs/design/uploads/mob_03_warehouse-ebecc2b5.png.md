@@ -2,7 +2,7 @@
 type: asset-note
 project: ERP
 layer: docs
-source_path: docs/design/uploads/mob_03_warehouse-ebecc2b5.png
+source_path: erp/docs/design/uploads/mob_03_warehouse-ebecc2b5.png
 status: active
 updated: 2026-04-27
 source_sha: 7f45a505d300

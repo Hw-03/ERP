@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/mobile/primitives/PrimaryActionButton.tsx
+source_path: erp/frontend/app/legacy/_components/mobile/primitives/PrimaryActionButton.tsx
 status: active
 updated: 2026-04-27
 source_sha: 5031184b3f22
@@ -73,61 +73,8 @@ export function PrimaryActionButton({
   count?: number;
   total?: number;
   totalUnit?: string;
-  intent?: Intent;
-  icon?: LucideIcon;
-  onClick: () => void;
-  disabled?: boolean;
-  loadingText?: string;
-  className?: string;
-}) {
-  const { bg, fg } = INTENT_STYLE[intent];
-  const showMeta = count != null || total != null;
+# ... (이하 55줄 생략. 원본 참조)
 
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={clsx(
-        "flex w-full items-center justify-center gap-3 rounded-[16px] px-4 py-[14px] font-black transition-[transform,opacity] active:scale-[0.98] disabled:opacity-40",
-        className,
-      )}
-      style={{ background: bg, color: fg }}
-    >
-      {Icon ? <Icon size={18} strokeWidth={2.25} /> : null}
-      <div className="flex min-w-0 flex-col items-center">
-        <div className={clsx(TYPO.body, "font-black")}>
-          {loadingText && disabled ? loadingText : label}
-        </div>
-        {sublabel ? (
-          <div
-            className={clsx(TYPO.overline, "font-semibold opacity-80 tracking-[1px]")}
-          >
-            {sublabel}
-          </div>
-        ) : null}
-      </div>
-      {showMeta && !disabled ? (
-        <div className="flex shrink-0 items-center gap-2 opacity-90">
-          {count != null ? (
-            <span
-              className={clsx(TYPO.caption, "rounded-full px-2 py-[2px] font-black tabular-nums")}
-              style={{ background: "rgba(0,0,0,.18)" }}
-            >
-              {count}건
-            </span>
-          ) : null}
-          {total != null ? (
-            <span className={clsx(TYPO.caption, "font-black tabular-nums")}>
-              · {formatNumber(total)}
-              {totalUnit ? ` ${totalUnit}` : ""}
-            </span>
-          ) : null}
-        </div>
-      ) : null}
-    </button>
-  );
-}
 ````
 
 ---

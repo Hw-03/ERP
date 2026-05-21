@@ -2,7 +2,7 @@
 type: asset-note
 project: ERP
 layer: docs
-source_path: docs/design/uploads/desk_03_dashboard_model_filter.png
+source_path: erp/docs/design/uploads/desk_03_dashboard_model_filter.png
 status: active
 updated: 2026-04-27
 source_sha: ceff0db0482f

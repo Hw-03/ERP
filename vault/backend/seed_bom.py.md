@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: backend
-source_path: backend/seed_bom.py
+source_path: erp/backend/seed_bom.py
 status: active
 updated: 2026-04-27
 source_sha: 5e07b2436d54
@@ -73,49 +73,8 @@ def add_bom(db, existing: set, parent: Item, child: Item, qty: int) -> bool:
 
 
 def main() -> None:
-    db = SessionLocal()
-    try:
-        ba_items = db.query(Item).filter(Item.category == CategoryEnum.AA).all()
-        ta_items = db.query(Item).filter(Item.category == CategoryEnum.TA).all()
-        ha_items = db.query(Item).filter(Item.category == CategoryEnum.HA).all()
-        va_items = db.query(Item).filter(Item.category == CategoryEnum.VA).all()
-        rm_items = db.query(Item).filter(Item.category == CategoryEnum.RM).all()
+# ... (이하 43줄 생략. 원본 참조)
 
-        if not ba_items:
-            print("AA 카테고리 품목이 없습니다.")
-            return
-
-        existing: set = set()
-        created = 0
-
-        # Level 1: AA 상위 10개를 부모로, TA/HA/VA/RM 섞어서 각 10개씩
-        l1_parents = ba_items[:10]
-        child_pool = ta_items + ha_items + va_items + rm_items
-
-        for parent in l1_parents:
-            candidates = [c for c in child_pool if c.item_id != parent.item_id]
-            targets = random.sample(candidates, min(10, len(candidates)))
-            for child in targets:
-                if add_bom(db, existing, parent, child, random.randint(1, 8)):
-                    created += 1
-
-        # Level 2: TA/HA/VA 각 2개씩(총 6개)를 부모로, RM 자식 5개씩
-        l2_pool = ta_items[:2] + ha_items[:2] + va_items[:2]
-        for parent in l2_pool:
-            targets = random.sample(rm_items, min(5, len(rm_items)))
-            for child in targets:
-                if add_bom(db, existing, parent, child, random.randint(1, 5)):
-                    created += 1
-
-        db.commit()
-        print(f"BOM {created}개 생성 완료.")
-        print(f"  Level1 부모 (AA): {[p.item_name for p in l1_parents]}")
-    finally:
-        db.close()
-
-
-if __name__ == "__main__":
-    main()
 ````
 
 ---

@@ -9,6 +9,11 @@ aliases:
   - Pydantic 스키마
   - UtcDatetime
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # 📝 schemas.py — Pydantic 요청/응답 스키마
 

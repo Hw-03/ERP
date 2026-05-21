@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/error.tsx
+source_path: erp/frontend/app/error.tsx
 status: active
 updated: 2026-04-27
 source_sha: e58b9207b503
@@ -73,22 +73,8 @@ export default function ErrorBoundary({
           type="button"
           onClick={() => reset()}
           className="rounded-[12px] border px-5 py-2.5 text-sm font-bold"
-        >
-          다시 시도
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (typeof window !== "undefined") window.location.href = "/legacy";
-          }}
-          className="rounded-[12px] border px-5 py-2.5 text-sm font-bold"
-        >
-          대시보드로 이동
-        </button>
-      </div>
-    </div>
-  );
-}
+# ... (이하 16줄 생략. 원본 참조)
+
 ````
 
 ---

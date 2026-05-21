@@ -12,6 +12,11 @@ aliases:
   - 부서 조정
   - 불량 처리
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # 🔧 dept_adjustment.py — 부서 재고 조정 & 불량 처리
 

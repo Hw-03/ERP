@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/Dockerfile
+source_path: erp/frontend/Dockerfile
 status: active
 updated: 2026-04-27
 source_sha: a1006a15eb8b

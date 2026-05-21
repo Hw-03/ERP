@@ -2,7 +2,7 @@
 type: asset-note
 project: ERP
 layer: docs
-source_path: docs/design/uploads/desk_06_warehouse_search-ae4e527e.png
+source_path: erp/docs/design/uploads/desk_06_warehouse_search-ae4e527e.png
 status: active
 updated: 2026-04-27
 source_sha: 5a8e24acf120

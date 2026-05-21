@@ -2,7 +2,7 @@
 type: index
 project: ERP
 layer: docs
-source_path: docs/design/screens/
+source_path: erp/docs/design/screens/
 status: active
 updated: 2026-04-27
 tags:

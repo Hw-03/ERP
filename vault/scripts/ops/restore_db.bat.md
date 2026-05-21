@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: scripts
-source_path: scripts/ops/restore_db.bat
+source_path: erp/scripts/ops/restore_db.bat
 status: active
 updated: 2026-04-27
 source_sha: c6ea982a239e
@@ -73,28 +73,8 @@ if exist "%DB%" (
     echo [RESTORE] snapshot: erp_PRE-RESTORE_%TS%.db
 )
 
-rem 2) integrity check
-python -c "import sqlite3,sys; c=sqlite3.connect(r'%SRC%'); r=c.execute('PRAGMA integrity_check').fetchone()[0]; sys.exit(0 if r=='ok' else 3)"
-if errorlevel 3 (
-    echo [RESTORE] integrity check failed on %SRC%
-    exit /b 3
-)
+# ... (이하 22줄 생략. 원본 참조)
 
-rem 3) replace + remove stale wal/shm
-copy /Y "%SRC%" "%DB%" >nul
-if errorlevel 1 (
-    echo [RESTORE] copy failed
-    exit /b 1
-)
-del "%DB%-wal" "%DB%-shm" 2>nul
-
-echo [RESTORE] OK
-echo   restored: %SRC%
-echo   to     : %DB%
-echo Now start the backend manually (start.bat or uvicorn).
-
-endlocal
-exit /b 0
 ````
 
 ---

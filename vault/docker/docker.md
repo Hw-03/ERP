@@ -2,7 +2,7 @@
 type: index
 project: ERP
 layer: docker
-source_path: docker/
+source_path: erp/docker/
 status: active
 updated: 2026-04-27
 tags:

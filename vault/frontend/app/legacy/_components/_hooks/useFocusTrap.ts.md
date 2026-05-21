@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/_hooks/useFocusTrap.ts
+source_path: erp/frontend/app/legacy/_components/_hooks/useFocusTrap.ts
 status: active
 updated: 2026-04-27
 source_sha: 9b684005d7c0
@@ -73,32 +73,8 @@ export function useFocusTrap<T extends HTMLElement>(
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return;
-      const list = focusables();
-      if (list.length === 0) return;
-      const first = list[0];
-      const last = list[list.length - 1];
-      const current = document.activeElement;
-      if (e.shiftKey && current === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && current === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
+# ... (이하 26줄 생략. 원본 참조)
 
-    container.addEventListener("keydown", handleKey);
-    return () => {
-      container.removeEventListener("keydown", handleKey);
-      // 이전 포커스 복원 — DOM 에 없으면 no-op (옵셔널 체이닝)
-      if (previouslyFocused && document.contains(previouslyFocused)) {
-        previouslyFocused.focus?.();
-      }
-    };
-  }, [active, initialFocusRef]);
-
-  return ref;
-}
 ````
 
 ---

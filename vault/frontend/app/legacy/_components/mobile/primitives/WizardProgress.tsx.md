@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/mobile/primitives/WizardProgress.tsx
+source_path: erp/frontend/app/legacy/_components/mobile/primitives/WizardProgress.tsx
 status: active
 updated: 2026-04-27
 source_sha: 20f6239a4d23
@@ -73,18 +73,8 @@ export function WizardProgress({
             />
           );
         })}
-      </div>
-      <div className="flex items-center justify-between">
-        <div className={clsx(TYPO.caption, "font-semibold")} style={{ color: LEGACY_COLORS.muted2 }}>
-          Step {current + 1} / {steps.length}
-        </div>
-        <div className={clsx(TYPO.caption, "font-black")} style={{ color: LEGACY_COLORS.blue }}>
-          {active?.label}
-        </div>
-      </div>
-    </div>
-  );
-}
+# ... (이하 12줄 생략. 원본 참조)
+
 ````
 
 ---

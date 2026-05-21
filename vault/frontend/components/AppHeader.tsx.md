@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/components/AppHeader.tsx
+source_path: erp/frontend/components/AppHeader.tsx
 status: active
 updated: 2026-04-27
 source_sha: 74f2dc4ba734
@@ -73,27 +73,8 @@ export default function AppHeader() {
 
         <nav className="flex flex-wrap gap-2">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href;
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition ${
-                  active
-                    ? "border-blue-500 bg-blue-500 text-white"
-                    : "border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700 hover:text-white"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
-    </header>
-  );
-}
+# ... (이하 21줄 생략. 원본 참조)
+
 ````
 
 ---

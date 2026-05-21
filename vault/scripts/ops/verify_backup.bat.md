@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: scripts
-source_path: scripts/ops/verify_backup.bat
+source_path: erp/scripts/ops/verify_backup.bat
 status: active
 updated: 2026-04-27
 source_sha: df9fb91ebaa6

@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/_warehouse_hooks/useWarehouseScroll.ts
+source_path: erp/frontend/app/legacy/_components/_warehouse_hooks/useWarehouseScroll.ts
 status: active
 updated: 2026-04-27
 source_sha: b2aff4efcf25
@@ -73,32 +73,8 @@ export function useWarehouseScroll({ step1Done, step2Done, forcedStep, lastResul
     prevStep1DoneRef.current = step1Done;
   }, [step1Done]);
 
-  useEffect(() => {
-    if (step2Done && !prevStep2DoneRef.current) scrollToRef(step3Ref);
-    prevStep2DoneRef.current = step2Done;
-  }, [step2Done]);
+# ... (이하 26줄 생략. 원본 참조)
 
-  useEffect(() => {
-    if (lastResult && lastResult !== prevLastResultRef.current) {
-      scrollToRef(step2Ref, 200);
-    }
-    prevLastResultRef.current = lastResult;
-  }, [lastResult]);
-
-  useEffect(() => {
-    if (forcedStep === 1 && prevForcedStepRef.current !== 1) scrollToRef(step1Ref);
-    if (forcedStep === 2 && prevForcedStepRef.current !== 2) scrollToRef(step2Ref);
-    prevForcedStepRef.current = forcedStep;
-  }, [forcedStep]);
-
-  return {
-    scrollRootRef,
-    step1Ref,
-    step2Ref,
-    step3Ref,
-    step4Ref,
-  };
-}
 ````
 
 ---

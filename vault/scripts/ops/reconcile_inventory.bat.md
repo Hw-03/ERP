@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: scripts
-source_path: scripts/ops/reconcile_inventory.bat
+source_path: erp/scripts/ops/reconcile_inventory.bat
 status: active
 updated: 2026-04-27
 source_sha: e470a3a9606a
@@ -73,28 +73,8 @@ if "%MISMATCH%"=="0" (
 
 echo.
 echo [RECONCILE] 정합성 위반 발견. DB 백업을 먼저 수행합니다...
-echo.
+# ... (이하 22줄 생략. 원본 참조)
 
-call "%~dp0backup_db.bat"
-if not "%ERRORLEVEL%"=="0" (
-    echo [RECONCILE] 백업 실패 — 운영 담당자에게 즉시 보고하세요.
-    del "%OUT%"
-    exit /b 2
-)
-
-echo.
-echo ============================================================
-echo  [RECONCILE] 다음 단계
-echo  1. 위 백업 파일을 안전한 위치에 보관
-echo  2. /health/detailed 응답 전체를 운영 담당자에게 전달:
-type "%OUT%"
-echo.
-echo  3. 수정 작업은 별도 절차(개발자 수동) — 자동 수정 안 함.
-echo ============================================================
-
-del "%OUT%"
-endlocal
-exit /b 0
 ````
 
 ---

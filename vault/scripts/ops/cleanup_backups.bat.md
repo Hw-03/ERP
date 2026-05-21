@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: scripts
-source_path: scripts/ops/cleanup_backups.bat
+source_path: erp/scripts/ops/cleanup_backups.bat
 status: active
 updated: 2026-04-27
 source_sha: dd82a3cafc52

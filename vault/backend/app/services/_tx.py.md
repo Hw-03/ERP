@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: backend
-source_path: backend/app/services/_tx.py
+source_path: erp/backend/app/services/_tx.py
 status: active
 updated: 2026-04-27
 source_sha: 848c2472e6a9

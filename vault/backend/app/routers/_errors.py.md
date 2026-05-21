@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: backend
-source_path: backend/app/routers/_errors.py
+source_path: erp/backend/app/routers/_errors.py
 status: active
 updated: 2026-04-27
 source_sha: 6c6031cc8fe5
@@ -73,24 +73,8 @@ class ErrorCode:
     BUSINESS_RULE = "BUSINESS_RULE"              # 422 — 도메인 규칙 위반
 
 
-def http_error(
-    status_code: int,
-    code: str,
-    message: str,
-    **extra: Any,
-) -> HTTPException:
-    """표준화된 HTTPException 생성.
+# ... (이하 18줄 생략. 원본 참조)
 
-    Args:
-        status_code: HTTP 상태 코드
-        code: ErrorCode 의 상수 값 (클라이언트가 분기에 사용)
-        message: 한국어 사용자 표시 메시지
-        **extra: 부분 실패 등 부가 정보 (shortages 등). 비어있으면 키 자체 생략.
-    """
-    detail: dict[str, Any] = {"code": code, "message": message}
-    if extra:
-        detail["extra"] = extra
-    return HTTPException(status_code=status_code, detail=detail)
 ````
 
 ---

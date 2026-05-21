@@ -2,7 +2,7 @@
 type: index
 project: ERP
 layer: backend
-source_path: backend/tests/routers/
+source_path: erp/backend/tests/routers/
 status: active
 updated: 2026-04-27
 tags:

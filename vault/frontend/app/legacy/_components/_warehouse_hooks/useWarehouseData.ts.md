@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/_warehouse_hooks/useWarehouseData.ts
+source_path: erp/frontend/app/legacy/_components/_warehouse_hooks/useWarehouseData.ts
 status: active
 updated: 2026-04-27
 source_sha: 8ffd50e39766
@@ -73,33 +73,8 @@ export function useWarehouseData({ globalSearch, onStatusChange }: Args) {
     void Promise.all([
       api.getEmployees({ activeOnly: true }),
       api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
-      api.getShipPackages(),
-    ])
-      .then(([nextEmployees, nextItems, nextPackages]) => {
-        setEmployees(nextEmployees);
-        setItems(nextItems);
-        setPackages(nextPackages);
-        setLoadFailure(null);
-        onStatusChange(`입출고 준비 완료: 직원 ${nextEmployees.length}명, 품목 ${nextItems.length}건`);
-      })
-      .catch((nextError) => {
-        const msg = nextError instanceof Error ? nextError.message : "입출고 데이터를 불러오지 못했습니다.";
-        setLoadFailure(msg);
-        onStatusChange(msg);
-      })
-      .finally(() => setLoading(false));
-  }, [globalSearch, onStatusChange]);
+# ... (이하 27줄 생략. 원본 참조)
 
-  return {
-    employees,
-    items,
-    packages,
-    productModels,
-    loadFailure,
-    loading,
-    setItems,
-  };
-}
 ````
 
 ---

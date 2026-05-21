@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/mobile/hooks/useItems.ts
+source_path: erp/frontend/app/legacy/_components/mobile/hooks/useItems.ts
 status: active
 updated: 2026-04-27
 source_sha: e5bc618c83b5
@@ -73,56 +73,8 @@ export function useItems(filters: ItemsFilters) {
 
   const filterKey = JSON.stringify(filters);
 
-  const fetchPage = useCallback(
-    async (skip: number, append: boolean, ctrl: AbortController) => {
-      // 직전 요청 abort — append 가 아닌 새 검색일 때만
-      if (!append) {
-        activeCtrlRef.current?.abort();
-        activeCtrlRef.current = ctrl;
-      }
-      try {
-        setLoading(true);
-        const data = await api.getItems(buildParams(filters, skip), { signal: ctrl.signal });
-        if (ctrl.signal.aborted) return;
-        setItems((prev) => (append ? [...prev, ...data] : data));
-        setHasMore(data.length === PAGE_SIZE);
-        setError(null);
-      } catch (err) {
-        if ((err as Error)?.name === "AbortError" || ctrl.signal.aborted) return;
-        setError(err instanceof Error ? err.message : "품목을 불러오지 못했습니다.");
-      } finally {
-        if (!ctrl.signal.aborted) setLoading(false);
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filterKey],
-  );
+# ... (이하 50줄 생략. 원본 참조)
 
-  useEffect(() => {
-    const ctrl = new AbortController();
-    setPage(1);
-    void fetchPage(0, false, ctrl);
-    return () => {
-      ctrl.abort();
-    };
-  }, [fetchPage]);
-
-  const loadMore = useCallback(() => {
-    if (!hasMore || loading) return;
-    const nextPage = page + 1;
-    setPage(nextPage);
-    const ctrl = new AbortController();
-    void fetchPage((nextPage - 1) * PAGE_SIZE, true, ctrl);
-  }, [hasMore, loading, page, fetchPage]);
-
-  const refetch = useCallback(() => {
-    const ctrl = new AbortController();
-    setPage(1);
-    void fetchPage(0, false, ctrl);
-  }, [fetchPage]);
-
-  return { items, loading, error, hasMore, loadMore, refetch };
-}
 ````
 
 ---

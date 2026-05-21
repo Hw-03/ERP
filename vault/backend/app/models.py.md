@@ -9,6 +9,11 @@ aliases:
   - ORM 모델
   - 데이터베이스 스키마
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # 🗄️ models.py — 31개 ORM 엔터티 전체 정의
 

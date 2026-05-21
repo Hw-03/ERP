@@ -2,7 +2,7 @@
 type: asset-note
 project: ERP
 layer: docs
-source_path: docs/design/screenshots/02-light-dark.png
+source_path: erp/docs/design/screenshots/02-light-dark.png
 status: active
 updated: 2026-04-27
 source_sha: 1805e7fff73e

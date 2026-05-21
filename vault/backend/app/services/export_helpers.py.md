@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: backend
-source_path: backend/app/services/export_helpers.py
+source_path: erp/backend/app/services/export_helpers.py
 status: active
 updated: 2026-04-27
 source_sha: 2839fbc4213c

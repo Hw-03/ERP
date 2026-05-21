@@ -2,7 +2,7 @@
 type: asset-note
 project: ERP
 layer: docs
-source_path: docs/design/uploads/desk_02_dashboard_kpi_shortage.png
+source_path: erp/docs/design/uploads/desk_02_dashboard_kpi_shortage.png
 status: active
 updated: 2026-04-27
 source_sha: 441b5b26e035

@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/_admin_sections/adminShared.ts
+source_path: erp/frontend/app/legacy/_components/_admin_sections/adminShared.ts
 status: active
 updated: 2026-04-27
 source_sha: ed27716a608f
@@ -73,28 +73,8 @@ export const EMPTY_ADD_FORM = {
   category: "RM" as Item["category"],
   spec: "",
   unit: "EA",
-  model_slots: [] as number[],
-  option_code: "",
-  legacy_item_type: "",
-  supplier: "",
-  min_stock: "",
-  initial_quantity: "",
-};
+# ... (이하 22줄 생략. 원본 참조)
 
-export type AddForm = typeof EMPTY_ADD_FORM;
-
-export const EMPTY_EMPLOYEE_FORM = {
-  employee_code: "",
-  name: "",
-  role: "",
-  phone: "",
-  department: "조립",
-};
-
-export type EmployeeAddForm = typeof EMPTY_EMPLOYEE_FORM;
-
-export const BOM_PARENT_CATS = ["ALL", "AA", "HA", "VA", "TA", "AF", "TF", "FG"];
-export const BOM_CHILD_CATS = ["ALL", "RM", "?A", "?F"];
 ````
 
 ---

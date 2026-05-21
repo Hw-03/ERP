@@ -7,6 +7,11 @@ aliases:
   - MobileWarehouseScreen
 created: 2026-05-21
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # MobileWarehouseScreen.tsx
 

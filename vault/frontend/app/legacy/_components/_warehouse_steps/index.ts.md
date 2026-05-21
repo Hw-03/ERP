@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/_warehouse_steps/index.ts
+source_path: erp/frontend/app/legacy/_components/_warehouse_steps/index.ts
 status: active
 updated: 2026-04-27
 source_sha: 580c36e2d952

@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: backend
-source_path: backend/app/utils/excel.py
+source_path: erp/backend/app/utils/excel.py
 status: active
 updated: 2026-04-27
 source_sha: 73d2450545b0

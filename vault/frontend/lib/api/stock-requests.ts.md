@@ -112,17 +112,8 @@ export const stockRequestsApi = {
     ),
 
   deleteStockRequestDraft: (requestId: string, requesterEmployeeId: string) =>
-    deleteJson<void>(
-      toApiUrl(
-        `/api/stock-requests/draft/${requestId}?requester_employee_id=${encodeURIComponent(requesterEmployeeId)}`,
-      ),
-    ),
+# ... (이하 11줄 생략. 원본 참조)
 
-  submitStockRequestDraft: (requestId: string, requesterEmployeeId: string) =>
-    postJson<StockRequest>(toApiUrl(`/api/stock-requests/${requestId}/submit`), {
-      requester_employee_id: requesterEmployeeId,
-    }),
-};
 ```
 
 ---

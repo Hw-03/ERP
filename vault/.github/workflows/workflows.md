@@ -2,7 +2,7 @@
 type: index
 project: ERP
 layer: github
-source_path: .github/workflows/
+source_path: erp/.github/workflows/
 status: active
 updated: 2026-04-27
 tags:

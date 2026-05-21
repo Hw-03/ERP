@@ -2,7 +2,7 @@
 type: index
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/
+source_path: erp/frontend/app/legacy/
 status: active
 updated: 2026-04-27
 tags:

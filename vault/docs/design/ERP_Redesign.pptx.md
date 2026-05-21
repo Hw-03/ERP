@@ -2,7 +2,7 @@
 type: asset-note
 project: ERP
 layer: docs
-source_path: docs/design/ERP_Redesign.pptx
+source_path: erp/docs/design/ERP_Redesign.pptx
 status: active
 updated: 2026-04-27
 source_sha: 61ed46f4d10d

@@ -99,16 +99,8 @@ export const inventoryApi = {
     item_id: string;
     quantity: number;
     source: "warehouse" | "production";
-    source_department?: Department;
-    target_department: Department;
-    reason?: string;
-    operator?: string;
-  }) =>
-    postJson<InventoryMutationResponse>(toApiUrl("/api/inventory/mark-defective"), payload),
+# ... (이하 10줄 생략. 원본 참조)
 
-  getItemLocations: (itemId: string) =>
-    fetcher<InventoryLocationRow[]>(toApiUrl(`/api/inventory/locations/${itemId}`)),
-};
 ```
 
 ---

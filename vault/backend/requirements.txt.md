@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: backend
-source_path: backend/requirements.txt
+source_path: erp/backend/requirements.txt
 status: active
 updated: 2026-04-27
 source_sha: 2ae926058177

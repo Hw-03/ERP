@@ -173,17 +173,8 @@ export function applyLineQuantityChange(
     // 단품/수동 라인 단순 갱신
     return {
       ...bundle,
-      lines: bundle.lines.map((line) =>
-        line.line_id === lineId
-          ? { ...line, quantity, shortage,
-              edited: line.bom_expected !== null
-                ? Math.abs(quantity - line.bom_expected) > 0.0001
-                : line.origin === "manual" || line.edited }
-          : line,
-      ),
-    };
-  });
-}
+# ... (이하 11줄 생략. 원본 참조)
+
 ```
 
 ---

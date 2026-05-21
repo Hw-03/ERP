@@ -2,7 +2,7 @@
 type: index
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/_hooks/__tests__/
+source_path: erp/frontend/app/legacy/_components/_hooks/__tests__/
 status: active
 updated: 2026-04-27
 tags:

@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/page.tsx
+source_path: erp/frontend/app/legacy/page.tsx
 status: active
 updated: 2026-04-27
 source_sha: c29180b02e30
@@ -73,68 +73,8 @@ export default function LegacyPage() {
 }
 
 function LegacyBody() {
-  const [activeTab, setActiveTab] = useState<TabId>("inventory");
-  const [showHistory, setShowHistory] = useState(false);
-  const [toast, setToast] = useState<ToastState | null>(null);
-  const { dispatch: warehouseDispatch } = useWarehouseWizard();
+# ... (이하 62줄 생략. 원본 참조)
 
-  const showToast = useCallback((next: ToastState) => setToast(next), []);
-  const clearToast = useCallback(() => setToast(null), []);
-
-  const title = useMemo(() => {
-    if (showHistory) return { subtitle: "입출고 이력", title: "입출고 이력" };
-    return TAB_TITLES[activeTab];
-  }, [activeTab, showHistory]);
-
-  return (
-    <>
-      <div className="lg:hidden">
-        <MobileShell
-          activeTab={activeTab}
-          onTabChange={(tab) => {
-            setActiveTab(tab);
-            setShowHistory(false);
-          }}
-          subtitle={title.subtitle}
-          title={title.title}
-        >
-          {showHistory ? (
-            <HistoryScreen onClose={() => setShowHistory(false)} />
-          ) : (
-            <>
-              {activeTab === "inventory" && (
-                <InventoryScreen
-                  showToast={showToast}
-                  onOpenHistory={() => setShowHistory(true)}
-                  onBulkIO={(items) => {
-                    warehouseDispatch({
-                      type: "PREFILL_ITEMS",
-                      itemIds: items.map((i) => i.item_id),
-                      qty: 1,
-                    });
-                    warehouseDispatch({ type: "GO", step: 0 });
-                    setActiveTab("warehouse");
-                    showToast({
-                      type: "info",
-                      message: `${items.length}건이 창고입출고에 추가되었습니다.`,
-                    });
-                  }}
-                />
-              )}
-              {activeTab === "warehouse" && <WarehouseWizardScreen showToast={showToast} />}
-              {activeTab === "dept" && <DeptWizardScreen showToast={showToast} />}
-              {activeTab === "admin" && <AdminShell showToast={showToast} />}
-            </>
-          )}
-        </MobileShell>
-      </div>
-
-      <DesktopLegacyShell />
-
-      <Toast toast={toast} onClose={clearToast} />
-    </>
-  );
-}
 ````
 
 ---

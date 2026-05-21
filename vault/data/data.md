@@ -2,7 +2,7 @@
 type: index
 project: ERP
 layer: data
-source_path: data/
+source_path: erp/data/
 status: active
 updated: 2026-04-27
 tags:

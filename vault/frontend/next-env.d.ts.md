@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/next-env.d.ts
+source_path: erp/frontend/next-env.d.ts
 status: active
 updated: 2026-04-27
 source_sha: 06e5b053de5e

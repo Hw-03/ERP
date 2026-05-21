@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/mobile/primitives/EmptyState.tsx
+source_path: erp/frontend/app/legacy/_components/mobile/primitives/EmptyState.tsx
 status: active
 updated: 2026-04-27
 source_sha: 55ef9a0037de

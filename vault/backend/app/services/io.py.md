@@ -9,6 +9,11 @@ aliases:
   - io service
   - 입출고 서비스
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # 📦 io.py — 입출고 탭 2.0 오케스트레이션 서비스
 

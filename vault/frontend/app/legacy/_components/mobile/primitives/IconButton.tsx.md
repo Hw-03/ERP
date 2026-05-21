@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/mobile/primitives/IconButton.tsx
+source_path: erp/frontend/app/legacy/_components/mobile/primitives/IconButton.tsx
 status: active
 updated: 2026-04-27
 source_sha: 84dab1fec739
@@ -73,43 +73,8 @@ export const IconButton = forwardRef<
   ref,
 ) {
   const { box, icon } = SIZE[size];
-  const tone = color ?? LEGACY_COLORS.text;
+# ... (이하 37줄 생략. 원본 참조)
 
-  const style =
-    variant === "solid"
-      ? { background: color ?? LEGACY_COLORS.s3, color: "#fff" }
-      : variant === "outline"
-      ? { background: "transparent", borderColor: LEGACY_COLORS.border, color: tone }
-      : { background: "transparent", color: tone };
-
-  return (
-    <button
-      ref={ref}
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      title={label}
-      className={clsx(
-        "relative inline-flex shrink-0 items-center justify-center rounded-[14px] transition-[transform,opacity] active:scale-95 disabled:opacity-40",
-        variant === "outline" && "border",
-        box,
-        className,
-      )}
-      style={style}
-    >
-      <Icon size={icon} strokeWidth={1.75} />
-      {badge != null && badge > 0 ? (
-        <span
-          className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold"
-          style={{ background: LEGACY_COLORS.red, color: "#fff" }}
-        >
-          {badge > 99 ? "99+" : badge}
-        </span>
-      ) : null}
-    </button>
-  );
-});
 ````
 
 ---

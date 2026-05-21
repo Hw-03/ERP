@@ -2,7 +2,7 @@
 type: index
 project: ERP
 layer: scripts
-source_path: scripts/ops/
+source_path: erp/scripts/ops/
 status: active
 updated: 2026-04-27
 tags:

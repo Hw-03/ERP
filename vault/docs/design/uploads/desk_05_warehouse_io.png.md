@@ -2,7 +2,7 @@
 type: asset-note
 project: ERP
 layer: docs
-source_path: docs/design/uploads/desk_05_warehouse_io.png
+source_path: erp/docs/design/uploads/desk_05_warehouse_io.png
 status: active
 updated: 2026-04-27
 source_sha: 7b473dd88acd

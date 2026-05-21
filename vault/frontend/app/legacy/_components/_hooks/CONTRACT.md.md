@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/_hooks/CONTRACT.md
+source_path: erp/frontend/app/legacy/_components/_hooks/CONTRACT.md
 status: active
 updated: 2026-04-27
 source_sha: 9a7776a8263a

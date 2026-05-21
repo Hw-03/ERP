@@ -2,7 +2,7 @@
 type: asset-note
 project: ERP
 layer: docs
-source_path: docs/design/uploads/desk_07_history.png
+source_path: erp/docs/design/uploads/desk_07_history.png
 status: active
 updated: 2026-04-27
 source_sha: c4e9b3bde9be

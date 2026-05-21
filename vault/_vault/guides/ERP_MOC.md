@@ -97,23 +97,8 @@ flowchart TB
     ApiTs -->|fetch| Routers
     Routers --> InvPkg
     Routers --> Io
-    Routers --> DeptAdj
-    InvPkg --> Services
-    Io --> Services
-    DeptAdj --> Services
-    Services --> Models
-    Models --> DB
-    Services -. "모든 재고 변동은 기록" .-> Audit
-    Io -. "요청 ID 생성<br/>SR-yyyymmdd-hhmmss" .-> Reqs
-    DeptAdj -. "결재 결과 audit" .-> Audit
-    Hooks -. "FlowBadge<br/>(±부호·구분 표시)" .-> Pages
+# ... (이하 17줄 생략. 원본 참조)
 
-    classDef be fill:#d4f4dd,stroke:#2a8c4f,color:#000
-    classDef fe fill:#d8e6ff,stroke:#3157a8,color:#000
-    classDef db fill:#fdecc8,stroke:#b88a1f,color:#000
-    class Routers,InvPkg,Io,DeptAdj,Services,Models be
-    class Pages,Hooks,ApiTs fe
-    class Items,Inv,Tx,Audit,Reqs db
 ```
 
 > [!tip] 다이어그램 읽는 법 (핵심 4가지)

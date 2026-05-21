@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/ThemeToggle.tsx
+source_path: erp/frontend/app/legacy/_components/ThemeToggle.tsx
 status: active
 updated: 2026-04-27
 source_sha: fed1e6830fbf
@@ -73,15 +73,8 @@ export function ThemeToggle() {
       className="flex items-center justify-center rounded-2xl px-3 py-3 transition-all hover:brightness-110"
       style={{
         background: LEGACY_COLORS.s2,
-        color: isLight ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2,
-        border: `1px solid ${LEGACY_COLORS.border}`,
-      }}
-      title={isLight ? "다크 모드로 전환" : "라이트 모드로 전환"}
-    >
-      {isLight ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-    </button>
-  );
-}
+# ... (이하 9줄 생략. 원본 참조)
+
 ````
 
 ---

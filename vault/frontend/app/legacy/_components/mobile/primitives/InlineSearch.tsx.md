@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/mobile/primitives/InlineSearch.tsx
+source_path: erp/frontend/app/legacy/_components/mobile/primitives/InlineSearch.tsx
 status: active
 updated: 2026-04-27
 source_sha: 905f4d392163
@@ -73,22 +73,8 @@ export function InlineSearch({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className={clsx("h-10 min-w-0 flex-1 bg-transparent outline-none", TYPO.body)}
-        style={{ color: LEGACY_COLORS.text }}
-      />
-      {value ? (
-        <button
-          type="button"
-          onClick={() => onChange("")}
-          aria-label="검색어 지우기"
-          className="shrink-0 rounded-full p-1"
-          style={{ color: LEGACY_COLORS.muted }}
-        >
-          <X size={14} />
-        </button>
-      ) : null}
-    </div>
-  );
-}
+# ... (이하 16줄 생략. 원본 참조)
+
 ````
 
 ---

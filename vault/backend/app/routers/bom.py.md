@@ -137,14 +137,8 @@ BOM(Bill of Materials, 자재명세서)은 "완제품 A를 만들려면 부품 B
 >         child_item = items_map.get(child_id)
 >         if not child_item:
 >             continue
->         children.append(
->             _build_tree_cached(
->                 child_item, child_per_unit * required_quantity,
->                 items_map, invs_map, cache, depth + 1, visited,
->             )
->         )
->     return BOMTreeNode(..., children=children)
-> ```
+# ... (이하 8줄 생략. 원본 참조)
+```
 
 `_is_circular`는 DFS 스택 반복, `_build_tree_cached`는 `visited | {id}` 복사 패턴으로
 형제 노드가 올바르게 방문되도록 보장한다.

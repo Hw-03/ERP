@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/mobile/primitives/SheetHeader.tsx
+source_path: erp/frontend/app/legacy/_components/mobile/primitives/SheetHeader.tsx
 status: active
 updated: 2026-04-27
 source_sha: 72a05e2e9201

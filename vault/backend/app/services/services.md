@@ -2,7 +2,7 @@
 type: index
 project: ERP
 layer: backend
-source_path: backend/app/services/
+source_path: erp/backend/app/services/
 status: active
 updated: 2026-04-27
 tags:

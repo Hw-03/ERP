@@ -11,6 +11,11 @@ aliases:
   - inventory service
   - 재고 서비스
 ---
+type: code-note
+status: active
+updated: 2026-05-21
+project: DEXCOWIN MES
+---
 
 # 🏭 inventory.py — 3-Bucket 재고 핵심 서비스
 

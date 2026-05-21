@@ -2,7 +2,7 @@
 type: index
 project: ERP
 layer: docs
-source_path: docs/regression-2026-04-26/
+source_path: erp/docs/regression-2026-04-26/
 status: active
 updated: 2026-04-27
 tags:

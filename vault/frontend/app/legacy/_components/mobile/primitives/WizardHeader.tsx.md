@@ -2,7 +2,7 @@
 type: code-note
 project: ERP
 layer: frontend
-source_path: frontend/app/legacy/_components/mobile/primitives/WizardHeader.tsx
+source_path: erp/frontend/app/legacy/_components/mobile/primitives/WizardHeader.tsx
 status: active
 updated: 2026-04-27
 source_sha: f032c318eb4a
@@ -73,30 +73,8 @@ export function WizardHeader({
               key={step.key}
               className="h-[4px] flex-1 rounded-full transition-colors"
               style={{ background: bg }}
-            />
-          );
-        })}
-      </div>
-      <div className="flex items-center justify-between gap-2">
-        <div
-          className={clsx(TYPO.overline, "shrink-0 font-bold uppercase tracking-[2px]")}
-          style={{ color: LEGACY_COLORS.muted2 }}
-        >
-          Step {current + 1} / {steps.length}
-        </div>
-        <div
-          className={clsx(TYPO.caption, "truncate font-black")}
-          style={{ color: LEGACY_COLORS.blue }}
-        >
-          {active?.label}
-        </div>
-      </div>
-      {chips && chips.length > 0 ? (
-        <SummaryChipBar chips={chips} className="pt-1" />
-      ) : null}
-    </div>
-  );
-}
+# ... (이하 24줄 생략. 원본 참조)
+
 ````
 
 ---
