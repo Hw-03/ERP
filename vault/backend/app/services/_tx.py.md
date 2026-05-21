@@ -66,11 +66,3 @@ def commit_only(db: Session) -> None:
     """`db.commit()`만 수행 (refresh 불필요한 경우)."""
     db.commit()
 ````
-
----
-
-## 정책
-
-- `main` 브랜치는 코드만 유지한다.
-- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
-- 코드와 노트가 다르면 실제 코드가 우선이다.
