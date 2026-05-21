@@ -29,6 +29,7 @@ tags: [vault, index]
 
 - [[_vault/guides/ERP_MOC]] — Map of Content (도메인별 진입점)
 - [[_vault/guides/용어사전]] — 56개 도메인 용어
+- [[_vault/guides/폴더_지도]] — 루트 폴더 전체 한 줄 안내 (.claude / _attic / _dev 포함)
 
 ## 🎭 시나리오
 
