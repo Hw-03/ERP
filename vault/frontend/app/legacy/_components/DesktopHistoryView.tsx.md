@@ -1,271 +1,225 @@
 ---
 type: code-note
-project: ERP
+project: DEXCOWIN MES
 layer: frontend
-source_path: frontend/app/legacy/_components/DesktopHistoryView.tsx
 status: active
-updated: 2026-04-27
-source_sha: d49d4da9cfc9
-tags:
-  - erp
-  - frontend
-  - frontend-component
-  - tsx
+created: 2026-05-21
+updated: 2026-05-21
+source_path: erp/frontend/app/legacy/_components/DesktopHistoryView.tsx
+tags: [vault, code-note, frontend, component]
+aliases: [DesktopHistoryView, 입출고 내역, 거래 이력]
 ---
 
-# DesktopHistoryView.tsx
+# DesktopHistoryView.tsx — 입출고 내역 탭
 
-> [!summary] 역할
-> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
+#layer/frontend #topic/component #topic/legacy
 
-## 원본 위치
-
-- Source: `frontend/app/legacy/_components/DesktopHistoryView.tsx`
-- Layer: `frontend`
-- Kind: `frontend-component`
-- Size: `13230` bytes
-
-## 연결
-
-- Parent hub: [[frontend/app/legacy/_components/_components|frontend/app/legacy/_components]]
-- Related: [[frontend/frontend]]
-
-## 읽는 포인트
-
-- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
-- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
-
-## 원본 발췌
-
-> 전체 336줄 중 앞부분만 발췌했다. 실제 수정은 원본 파일을 기준으로 한다.
-
-````tsx
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, TrendingDown, TrendingUp } from "lucide-react";
-import { api, type TransactionLog, type TransactionType } from "@/lib/api";
-import { DesktopRightPanel } from "./DesktopRightPanel";
-import { LEGACY_COLORS, formatNumber } from "./legacyUi";
-import { HistoryFilterBar } from "./_history_sections/HistoryFilterBar";
-import { HistoryCalendarStrip } from "./_history_sections/HistoryCalendarStrip";
-import { HistoryTable } from "./_history_sections/HistoryTable";
-import { HistoryDetailPanel } from "./_history_sections/HistoryDetailPanel";
-import {
-  EXCEPTION_TYPES,
-  HISTORY_PAGE_SIZE,
-  formatHistoryDate,
-  getPeriodStart,
-  parseUtc,
-  toDateKey,
-} from "./_history_sections/historyShared";
-
-export function DesktopHistoryView() {
-  const [logs, setLogs] = useState<TransactionLog[]>([]);
-  const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
-  const [selected, setSelected] = useState<TransactionLog | null>(null);
-  const [typeFilter, setTypeFilter] = useState("ALL");
-  const [dateFilter, setDateFilter] = useState("ALL");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [calendarLoading, setCalendarLoading] = useState(false);
-  const [editingNotes, setEditingNotes] = useState("");
-  const [savingNotes, setSavingNotes] = useState(false);
-  const [copiedRef, setCopiedRef] = useState<string | null>(null);
-  const [itemRecentLogs, setItemRecentLogs] = useState<TransactionLog[]>([]);
-
-  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
-  const now = new Date();
-  const [calendarYear, setCalendarYear] = useState(now.getFullYear());
-  const [calendarMonth, setCalendarMonth] = useState(now.getMonth());
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
-
-  useEffect(() => {
-    setLoading(true);
-    void api
-      .getTransactions({ limit: HISTORY_PAGE_SIZE, skip: 0 })
-      .then((data) => {
-        setLogs(data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (!selected) {
-      setItemRecentLogs([]);
-      return;
-    }
-    setEditingNotes(selected.notes ?? "");
-    void api
-      .getTransactions({ itemId: selected.item_id, limit: 6 })
-      .then((data) => {
-        setItemRecentLogs(data.filter((l) => l.log_id !== selected.log_id).slice(0, 5));
-      })
-      .catch(() => setItemRecentLogs([]));
-  }, [selected]);
-
-  useEffect(() => {
-    if (viewMode !== "calendar") return;
-    setCalendarLoading(true);
-    setSelectedDay(null);
-    void api
-      .getTransactions({ limit: 2000, skip: 0 })
-      .then((data) => {
-        setCalendarLogs(data);
-        setCalendarLoading(false);
-      })
-      .catch(() => setCalendarLoading(false));
-  }, [viewMode]);
-
-  function prevMonth() {
-    if (calendarMonth === 0) {
-      setCalendarYear((y) => y - 1);
-      setCalendarMonth(11);
-    } else setCalendarMonth((m) => m - 1);
-  }
-  function nextMonth() {
-    if (calendarMonth === 11) {
-      setCalendarYear((y) => y + 1);
-      setCalendarMonth(0);
-    } else setCalendarMonth((m) => m + 1);
-  }
-
-  const calendarDayMap = useMemo(() => {
-    const map = new Map<string, TransactionLog[]>();
-    for (const log of calendarLogs) {
-      const key = toDateKey(log.created_at);
-      const d = parseUtc(log.created_at);
-      if (d.getFullYear() !== calendarYear || d.getMonth() !== calendarMonth) continue;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(log);
-    }
-    return map;
-  }, [calendarLogs, calendarYear, calendarMonth]);
-
-  const calendarDays = useMemo(() => {
-    const firstDay = new Date(calendarYear, calendarMonth, 1).getDay();
-    const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
-    const cells: (number | null)[] = [];
-    for (let i = 0; i < firstDay; i++) cells.push(null);
-    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-    while (cells.length % 7 !== 0) cells.push(null);
-    return cells;
-  }, [calendarYear, calendarMonth]);
-
-  const selectedDayLogs = useMemo(
-    () => (selectedDay ? calendarDayMap.get(selectedDay) ?? [] : []),
-    [selectedDay, calendarDayMap],
-  );
-
-  const todayKey = toDateKey(new Date().toISOString());
-
-  const filteredLogs = useMemo(() => {
-    const start = getPeriodStart(dateFilter);
-    return logs.filter((log) => {
-      if (typeFilter === "EXCEPTION") {
-        if (!EXCEPTION_TYPES.has(log.transaction_type)) return false;
-      } else if (typeFilter !== "ALL" && log.transaction_type !== (typeFilter as TransactionType)) return false;
-      if (start && parseUtc(log.created_at) < start) return false;
-      if (search.trim()) {
-        const kw = search.trim().toLowerCase();
-        const hay = `${log.item_name} ${log.erp_code} ${log.reference_no ?? ""} ${log.notes ?? ""} ${log.produced_by ?? ""}`.toLowerCase();
-        if (!hay.includes(kw)) return false;
-      }
-      return true;
-    });
-  }, [logs, typeFilter, dateFilter, search]);
-
-  const stats = useMemo(() => {
-    let receiveSum = 0;
-    let shipSum = 0;
-    let exceptionCount = 0;
-    for (const log of filteredLogs) {
-      if (log.transaction_type === "RECEIVE" || log.transaction_type === "PRODUCE") {
-        receiveSum += Number(log.quantity_change);
-      }
-      if (log.transaction_type === "SHIP" || log.transaction_type === "BACKFLUSH") {
-        shipSum += Math.abs(Number(log.quantity_change));
-      }
-      if (EXCEPTION_TYPES.has(log.transaction_type) || log.transaction_type === "BACKFLUSH") {
-        exceptionCount++;
-      }
-    }
-    return { total: filteredLogs.length, receiveSum, shipSum, exceptionCount };
-  }, [filteredLogs]);
-
-  const canLoadMore = logs.length >= page * HISTORY_PAGE_SIZE;
-
-  async function loadMore() {
-    const nextPage = page + 1;
-    setLoadingMore(true);
-    try {
-      const more = await api.getTransactions({
-        limit: HISTORY_PAGE_SIZE,
-        skip: (nextPage - 1) * HISTORY_PAGE_SIZE,
-      });
-      setLogs((prev) => [...prev, ...more]);
-      setPage(nextPage);
-    } finally {
-      setLoadingMore(false);
-    }
-  }
-
-  async function saveNotes() {
-    if (!selected) return;
-    setSavingNotes(true);
-    try {
-      const updated = await api.updateTransactionNotes(selected.log_id, editingNotes || null);
-      setLogs((prev) => prev.map((l) => (l.log_id === updated.log_id ? updated : l)));
-      setSelected(updated);
-    } finally {
-      setSavingNotes(false);
-    }
-  }
-
-  function copyRef(ref: string, e: React.MouseEvent) {
-    e.stopPropagation();
-    void navigator.clipboard.writeText(ref).then(() => {
-      setCopiedRef(ref);
-      setTimeout(() => setCopiedRef(null), 1500);
-    });
-  }
-
-  function handleSelectLog(log: TransactionLog) {
-    setSelected((c) => (c?.log_id === log.log_id ? null : log));
-  }
-
-  return (
-    <div className="flex min-h-0 flex-1 gap-4 pl-0 pr-4">
-      {/* ── 좌측: 스크롤 영역 ── */}
-      <div
-        className="scrollbar-hide min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px] border"
-        style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.bg }}
-      >
-        <div className="flex flex-col gap-3 pb-6">
-          {/* ── 요약 통계 카드 ── */}
-          <section className="card">
-            <div className="grid grid-cols-4 gap-3">
-              <div
-                className="flex flex-col gap-1 rounded-[20px] border p-4"
-                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-              >
-                <div className="text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  조회 건수
-                </div>
-                <div className="text-2xl font-black">{formatNumber(stats.total)}</div>
-                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>현재 로드 기준</div>
-                {canLoadMore && (
-                  <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>(+더 불러올 수 있음)</div>
-                )}
-````
+> [!summary] 한 줄 요약
+> 입출고 내역 탭의 최상위 컴포넌트. 거래 목록(무한스크롤) + KPI 박스 + 달력 패널 + 필터 패널 + 우측 상세 패널로 구성된다. `productionApi.getTransactionsSummary` 로 KPI 를 별도 집계한다.
 
 ---
 
-## 정책
+## 1. 위치 & 관계
 
-- `main` 브랜치는 코드만 유지한다.
-- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
-- 코드와 노트가 다르면 실제 코드가 우선이다.
+| 항목 | 내용 |
+|------|------|
+| 원본 | `erp/frontend/app/legacy/_components/DesktopHistoryView.tsx` |
+| 레이어 | frontend / component |
+| `"use client"` | O |
+| 소비자 | [[erp/frontend/app/legacy/_components/DesktopLegacyShell.tsx]] |
+
+```mermaid
+graph TD
+  HV["DesktopHistoryView"] --> HSB["HistoryStatsBar<br/>(KPI 카드 4개)"]
+  HV --> HFB["HistoryFilterBar<br/>(검색 + 기간 칩)"]
+  HV --> HFP["HistoryFilterPanel<br/>(부서/모델/거래종류 필터)"]
+  HV --> HCP["HistoryCalendarPanel<br/>(월 달력)"]
+  HV --> HT["HistoryTable<br/>(거래 목록 + 무한스크롤)"]
+  HV --> HRP["DesktopHistoryRightPanel<br/>(우측 상세/수정 패널)"]
+
+  style HV fill:#1e3a5f,color:#e0f0ff
+```
+
+---
+
+## 2. 핵심 상태
+
+| 상태 | 타입 | 설명 |
+|------|------|------|
+| `logs` | `TransactionLog[]` | 거래 목록 (무한스크롤) |
+| `selection` | `HistorySelection \| null` | 선택된 단건(`log`) 또는 배치(`batch`) |
+| `selectionStack` | `HistorySelection[]` | 우측 패널 내 드릴 뒤로가기 스택 |
+| `summary` | `TransactionSummary` | 현재 필터 기준 KPI (X분자) |
+| `baselineSummary` | `TransactionSummary` | 기간만 적용한 전체 KPI (Y분모) |
+| `batchCache` | `Map<string, IoBatch>` | 배치 상세 캐시 (HistoryTable 공유) |
+| `filterPanelOpen` | `boolean` | 필터 패널 열림 상태 |
+| `calendarOpen` | `boolean` | 달력 패널 열림 상태 |
+| `calendarLogs` | `TransactionLog[]` | 달력용 해당 월 전체 거래 |
+
+---
+
+## 3. 이중 summary 패턴
+
+```mermaid
+graph LR
+  FILTER["필터 조건<br/>(거래종류/검색/부서/모델)"] -->|getTransactionsSummary| S["summary<br/>(X분자)"]
+  PERIOD["기간 조건만"] -->|getTransactionsSummary| B["baselineSummary<br/>(Y분모)"]
+  S -->|"{기간} Y건 중 X건"| DISPLAY["HistoryStatsBar"]
+  B --> DISPLAY
+```
+
+- `summary`: 모든 필터 적용 → "현재 조건에 맞는 거래 수"
+- `baselineSummary`: 기간 필터만 적용 → "이 기간 전체 거래 수" (베이스라인)
+
+두 summary 모두 `AbortController` 로 취소 가능하며, 필터 변경 시 이전 요청을 취소한다.
+
+---
+
+## 4. 코드 발췌
+
+```tsx
+// KPI summary — 현재 필터 적용
+useEffect(() => {
+  const transactionTypes = opParam || undefined;
+  const dateFrom = selectedDay ?? dateFilterToFrom(dateFilter);
+  // ... 파라미터 빌딩
+
+  const ctrl = new AbortController();
+  void productionApi
+    .getTransactionsSummary(params, { signal: ctrl.signal })
+    .then((s) => {
+      if (summaryKeyRef.current !== myKey) return; // stale 응답 무시
+      setSummary(s);
+    })
+    .catch((err) => {
+      if ((err as Error)?.name === "AbortError") return;
+    });
+  return () => ctrl.abort(); // 클린업
+}, [dateFilter, selectedDay, debouncedSearch, deptParam, modelParam, opParam]);
+```
+
+---
+
+## 5. 우측 패널 드릴 네비게이션
+
+```mermaid
+stateDiagram-v2
+  [*] --> LOG_SELECTED: 표 행 클릭
+  LOG_SELECTED --> DRILL: navigateToLog() 호출
+  DRILL --> PREV: goBack() 호출
+  PREV --> DRILL: navigateToLog() 재호출
+  LOG_SELECTED --> [*]: 패널 닫기
+```
+
+```typescript
+// 드릴 — 현재 선택을 스택에 쌓고 새 항목으로 이동
+function navigateToLog(log: TransactionLog) {
+  setSelection((cur) => {
+    if (cur && !(cur.kind === "log" && cur.log.log_id === log.log_id)) {
+      setSelectionStack((s) => [...s, cur]);
+      window.history.pushState({ historyDrill: true }, "");
+    }
+    return { kind: "log", log };
+  });
+}
+
+// 뒤로가기 — 스택 pop
+function goBack() {
+  setSelectionStack((s) => {
+    if (s.length === 0) return s;
+    const prev = s[s.length - 1];
+    setSelection(prev);
+    return s.slice(0, -1);
+  });
+}
+```
+
+브라우저 뒤로가기 버튼도 `popstate` 이벤트로 같은 `goBack()` 을 호출한다.
+
+---
+
+## 6. 달력 패널
+
+- 기본 접힘. 버튼 클릭 시 펼침.
+- 펼쳐진 동안만 해당 달의 전체 거래를 fetch.
+- 다른 필터(거래종류/부서/모델)와 무관하게 그 달 전체 표시.
+- 날짜 셀 클릭 → `selectedDay` 설정 → 목록 필터에 반영.
+
+```typescript
+useEffect(() => {
+  if (!calendarOpen) return;
+  const ctrl = new AbortController();
+  void api.getTransactions(
+    { limit: 2000, skip: 0, dateFrom: ymd(firstDay), dateTo: ymd(lastDay) },
+    { signal: ctrl.signal },
+  ).then(setCalendarLogs);
+  return () => ctrl.abort();
+}, [calendarOpen, calendarYear, calendarMonth]);
+```
+
+---
+
+## 7. 거래 수정/보정
+
+우측 패널(`DesktopHistoryRightPanel`)에서 수정 후 콜백으로 목록을 갱신:
+
+```typescript
+// 메타데이터 수정 (notes/ref/담당자)
+function handleLogUpdated(updated: TransactionLog) {
+  setLogs((prev) => prev.map((l) => (l.log_id === updated.log_id ? updated : l)));
+  setSelection({ kind: "log", log: updated });
+}
+
+// 수량 보정 (원본 archived + 보정 거래 신규 생성)
+function handleLogCorrected(result: { original: TransactionLog; correction: TransactionLog }) {
+  setLogs((prev) => {
+    const without = prev.filter((l) => l.log_id !== result.original.log_id);
+    return [result.correction, result.original, ...without];  // 보정 먼저
+  });
+}
+```
+
+---
+
+## 8. 필터 검색 디바운스
+
+```typescript
+const SEARCH_DEBOUNCE_MS = 350;
+
+useEffect(() => {
+  const t = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
+  return () => clearTimeout(t);
+}, [search]);
+```
+
+`debouncedSearch` 가 `useHistoryData` 훅과 `getTransactionsSummary` 에 동시 전달된다.
+
+---
+
+## 9. 관련 파일
+
+- [[erp/frontend/app/legacy/_components/DesktopLegacyShell.tsx]] — 부모 컴포넌트
+- [[erp/frontend/lib/api/production.ts]] — getTransactions, getTransactionsSummary
+- [[erp/frontend/lib/api.ts]] — api.getTransactions, api.getModels
+- `erp/frontend/app/legacy/_components/_history_sections/HistoryTable.tsx`
+- `erp/frontend/app/legacy/_components/_history_sections/DesktopHistoryRightPanel.tsx`
+- [[erp/backend/app/routers/inventory.py]] — transactions 엔드포인트
+
+---
+
+## 10. 주의 사항
+
+> [!warning] stale 응답 방지
+> `summaryKeyRef.current !== myKey` 체크로 이전 fetch 응답이 늦게 도착해도 무시한다.
+> `AbortController` 만으로는 이미 응답된 요청을 막지 못하므로 ref 키 비교가 필요.
+
+> [!info] `batchCache` 공유
+> `HistoryTable` 의 lazy batch fetch 와 우측 패널의 배치 상세 표시가 같은 `Map` 을 공유하여 중복 fetch 를 방지한다.
+
+---
+
+## 11. 정책
+
+- `main` 브랜치: 코드만 유지
+- `vault-sync` 브랜치: 코드 + `vault/` 노트
+- 코드와 노트가 다르면 실제 코드 우선

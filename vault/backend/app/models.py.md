@@ -1,271 +1,196 @@
 ---
-type: code-note
-project: ERP
 layer: backend
-source_path: backend/app/models.py
-status: active
-updated: 2026-04-27
-source_sha: 177f2fd034b9
+topic: model
+file: erp/backend/app/models.py
 tags:
-  - erp
-  - backend
-  - db-model
-  - py
+  - "#layer/backend"
+  - "#topic/model"
+aliases:
+  - ORM 모델
+  - 데이터베이스 스키마
 ---
 
-# models.py
+# 🗄️ models.py — 31개 ORM 엔터티 전체 정의
 
-> [!summary] 역할
-> SQLAlchemy ORM 모델과 테이블 관계를 정의하는 DB 설계 기준 파일이다.
+> [!summary]
+> SQLAlchemy ORM 으로 정의된 31개 엔터티와 6개 Enum 이 담긴 DB 설계 기준 파일. 재고 3-bucket 불변식과 결재 상태머신의 구조적 기반이다. 모든 UUID PK, Decimal(15,4) 수량, UTC datetime.
 
-## 원본 위치
+---
 
-- Source: `backend/app/models.py`
-- Layer: `backend`
-- Kind: `db-model`
-- Size: `25615` bytes
+## 1. 한 문장 목적
 
-## 연결
+DEXCOWIN MES 전체 데이터 구조를 정의하며, 서비스 레이어와 라우터가 모두 이 파일의 클래스를 임포트한다.
 
-- Parent hub: [[backend/app/app|backend/app]]
-- Related: [[backend/backend]]
+---
 
-## 읽는 포인트
+## 2. 파일 위치 & 임포트 경로
 
-- 실제 수정은 원본 파일에서 한다.
-- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+```
+erp/backend/app/models.py
+from app.models import Inventory, Item, Employee, BOM, TransactionLog, ...
+```
 
-## 원본 발췌
+---
 
-> 전체 665줄 중 앞부분만 발췌했다. 실제 수정은 원본 파일을 기준으로 한다.
+## 3. Enum 목록 (6개)
 
-````python
-"""ERP data models for the X-Ray manufacturing workflow."""
+| Enum | 값 | 설명 |
+|------|----|------|
+| `TransactionTypeEnum` | 11종 | 재고 변동 거래 유형 |
+| `LocationStatusEnum` | PRODUCTION, DEFECTIVE | 부서 재고 버킷 |
+| `DepartmentEnum` | 10개 부서 | 조립/고압/진공/튜닝/튜브/AS/연구/영업/출하/기타 |
+| `DeptAdjSubTypeEnum` | production/disassembly/correction | 부서 조정 세부 유형 |
+| `EmployeeLevelEnum` | admin/manager/staff | 직원 권한 레벨 |
+| `StockRequestStatusEnum` | 7종 | 결재 요청 상태 |
+| `StockRequestTypeEnum` | 10종 | 결재 요청 유형 |
+| `RequestBucketEnum` | warehouse/production/defective/none | 재고 버킷 |
 
-import enum
-import uuid
-from datetime import datetime
-from decimal import Decimal
+---
 
-from sqlalchemy import (
-    Boolean,
-    CheckConstraint,
-    Column,
-    DateTime,
-    Enum as SAEnum,
-    ForeignKey,
-    Index,
-    Integer,
-    Numeric,
-    SmallInteger,
-    String,
-    Text,
-    UniqueConstraint,
-    func,
-)
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
-from sqlalchemy.types import TypeDecorator
+## 4. TransactionTypeEnum 11종
 
-from app.database import Base
-
-
-class BoolAsString(TypeDecorator):
-    """DB 에는 'true'/'false' 문자열로, 애플리케이션에서는 bool 로 다룬다.
-
-    기존 Employee.is_active 가 VARCHAR(5) 로 저장되는 관성을 유지하면서 ORM 레이어에서만
-    bool 로 정규화. 스키마 변경 필요 없음.
-    """
-
-    impl = String(5)
-    cache_ok = True
-
-    def process_bind_param(self, value, dialect):
-        if value is None:
-            return None
-        if isinstance(value, bool):
-            return "true" if value else "false"
-        # 기존 문자열/정수 입력 호환
-        if isinstance(value, str):
-            return "true" if value.lower() in ("true", "1", "yes", "t") else "false"
-        return "true" if bool(value) else "false"
-
-    def process_result_value(self, value, dialect):
-        if value is None:
-            return None
-        if isinstance(value, bool):
-            return value
-        return str(value).lower() in ("true", "1", "yes", "t")
-
-
-class CategoryEnum(str, enum.Enum):
-    RM = "RM"
-    TA = "TA"
-    TF = "TF"
-    HA = "HA"
-    HF = "HF"
-    VA = "VA"
-    VF = "VF"
-    AA = "AA"
-    AF = "AF"
-    FG = "FG"
-    UK = "UK"
-
-
+```python
 class TransactionTypeEnum(str, enum.Enum):
-    RECEIVE = "RECEIVE"
-    PRODUCE = "PRODUCE"
-    SHIP = "SHIP"
-    ADJUST = "ADJUST"
-    BACKFLUSH = "BACKFLUSH"
-    SCRAP = "SCRAP"
-    LOSS = "LOSS"
-    DISASSEMBLE = "DISASSEMBLE"
-    RETURN = "RETURN"
-    RESERVE = "RESERVE"
-    RESERVE_RELEASE = "RESERVE_RELEASE"
-    TRANSFER_TO_PROD = "TRANSFER_TO_PROD"
-    TRANSFER_TO_WH = "TRANSFER_TO_WH"
-    TRANSFER_DEPT = "TRANSFER_DEPT"
-    MARK_DEFECTIVE = "MARK_DEFECTIVE"
-    SUPPLIER_RETURN = "SUPPLIER_RETURN"
-
-
-class LocationStatusEnum(str, enum.Enum):
-    PRODUCTION = "PRODUCTION"
-    DEFECTIVE = "DEFECTIVE"
-
-
-class QueueBatchTypeEnum(str, enum.Enum):
-    PRODUCE = "PRODUCE"
-    DISASSEMBLE = "DISASSEMBLE"
-    RETURN = "RETURN"
-
-
-class QueueBatchStatusEnum(str, enum.Enum):
-    OPEN = "OPEN"
-    CONFIRMED = "CONFIRMED"
-    CANCELLED = "CANCELLED"
-
-
-class QueueLineDirectionEnum(str, enum.Enum):
-    IN = "IN"            # Into inventory (disassembly reuse, return intake)
-    OUT = "OUT"          # Consumed from inventory (production backflush)
-    SCRAP = "SCRAP"      # Discard / defective
-    LOSS = "LOSS"        # Missing on return
-
-
-class AlertKindEnum(str, enum.Enum):
-    SAFETY = "SAFETY"
-    COUNT_VARIANCE = "COUNT_VARIANCE"
-
-
-class DepartmentEnum(str, enum.Enum):
-    ASSEMBLY = "조립"
-    HIGH_VOLTAGE = "고압"
-    VACUUM = "진공"
-    TUNING = "튜닝"
-    TUBE = "튜브"
-    AS = "AS"
-    RESEARCH = "연구"
-    SALES = "영업"
-    SHIPPING = "출하"
-    ETC = "기타"
-
-
-class EmployeeLevelEnum(str, enum.Enum):
-    ADMIN = "admin"
-    MANAGER = "manager"
-    STAFF = "staff"
-
-
-class Item(Base):
-    __tablename__ = "items"
-
-    item_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    item_code = Column(String(50), unique=True, nullable=True, index=True)  # 레거시 CSV 코드 — erp_code로 교체 후 DROP 예정
-    item_name = Column(String(200), nullable=False)
-    spec = Column(Text, nullable=True)
-    category = Column(
-        SAEnum(CategoryEnum, name="category_enum", create_type=True),
-        nullable=False,
-        default=CategoryEnum.UK,
-        index=True,
-    )
-    unit = Column(String(20), nullable=False, default="EA")
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
-    updated_at = Column(
-        DateTime,
-        nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-        server_default=func.now(),
-    )
-
-    # Legacy UI display fields (populated from ERP_Master_DB.csv or rule-based defaults)
-    barcode = Column(String(100), nullable=True, index=True)
-    legacy_file_type = Column(String(50), nullable=True, index=True)  # 원자재/조립자재/발생부자재/완제품/미분류
-    legacy_part = Column(String(50), nullable=True, index=True)       # 자재창고/조립출하/고압파트/진공파트/튜닝파트/출하
-    legacy_item_type = Column(String(50), nullable=True)              # part_type from CSV
-    legacy_model = Column(String(50), nullable=True, index=True)      # DX3000/ADX4000W/ADX6000/COCOON/SOLO/공용
-    supplier = Column(String(200), nullable=True)
-    min_stock = Column(Numeric(15, 4), nullable=True)
-
-    # 4-part ERP code ([모델기호조합]-[구분코드]-[일련번호]-[옵션코드])
-    erp_code = Column(String(40), nullable=True, unique=True, index=True)
-    model_symbol = Column(String(20), nullable=True, index=True)  # 예: "346", "3", "34678"
-    symbol_slot = Column(SmallInteger, ForeignKey("product_symbols.slot"), nullable=True, index=True)  # deprecated
-    process_type_code = Column(String(2), ForeignKey("process_types.code"), nullable=True, index=True)
-    option_code = Column(String(10), nullable=True)  # 자유 텍스트 (FK 제거)
-    serial_no = Column(Integer, nullable=True)
-
-    inventory = relationship("Inventory", back_populates="item", uselist=False, cascade="all, delete-orphan")
-    bom_as_parent = relationship(
-        "BOM",
-        foreign_keys="BOM.parent_item_id",
-        back_populates="parent_item",
-        cascade="all, delete-orphan",
-    )
-    bom_as_child = relationship("BOM", foreign_keys="BOM.child_item_id", back_populates="child_item")
-    transaction_logs = relationship(
-        "TransactionLog",
-        back_populates="item",
-        cascade="all, delete-orphan",
-    )
-    package_items = relationship("ShipPackageItem", back_populates="item")
-
-
-class Inventory(Base):
-    __tablename__ = "inventory"
-
-    inventory_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    item_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("items.item_id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True,
-        index=True,
-    )
-    # quantity = warehouse_qty + Σ(InventoryLocation.quantity). 서비스 레이어가 동기화 보장.
-    quantity = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
-    # 창고 보관량. 가용 재고 계산에 포함.
-    warehouse_qty = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
-    # 큐 배치 예약분 (warehouse_qty 대비). Available = warehouse + production_total − pending.
-    pending_quantity = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
-    last_reserver_employee_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("employees.employee_id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    last_reserver_name = Column(String(100), nullable=True)
-    location = Column(String(100), nullable=True)
-    updated_at = Column(
-````
+    RECEIVE          = "RECEIVE"          # 입고
+    PRODUCE          = "PRODUCE"          # 생산 결과품 적재
+    SHIP             = "SHIP"             # 출고
+    ADJUST           = "ADJUST"           # 수량 조정
+    BACKFLUSH        = "BACKFLUSH"        # 생산 소비 (구성품 차감)
+    DISASSEMBLE      = "DISASSEMBLE"      # 분해
+    TRANSFER_TO_PROD = "TRANSFER_TO_PROD" # 창고→생산 이동
+    TRANSFER_TO_WH   = "TRANSFER_TO_WH"  # 생산→창고 복귀
+    TRANSFER_DEPT    = "TRANSFER_DEPT"    # 부서간 이동
+    MARK_DEFECTIVE   = "MARK_DEFECTIVE"  # 불량 등록
+    SUPPLIER_RETURN  = "SUPPLIER_RETURN" # 공급사 반품
+```
 
 ---
 
-## 정책
+## 5. 엔터티 관계도
 
-- `main` 브랜치는 코드만 유지한다.
-- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
-- 코드와 노트가 다르면 실제 코드가 우선이다.
+```mermaid
+erDiagram
+    Item ||--o| Inventory : "1:1"
+    Item ||--o{ InventoryLocation : "1:N"
+    Item ||--o{ BOM : "parent"
+    Item ||--o{ BOM : "child"
+    Item ||--o{ TransactionLog : "1:N"
+    Inventory ||--o{ StockRequestLine : "item_id"
+    StockRequest ||--o{ StockRequestLine : "1:N"
+    IoBatch ||--o{ IoBundle : "1:N"
+    IoBundle ||--o{ IoLine : "1:N"
+    IoBatch ||--o| StockRequest : "optional"
+    Employee ||--o{ StockRequest : "requester"
+    TransactionLog }o--o| IoBatch : "operation_batch_id"
+```
+
+---
+
+## 6. 핵심 엔터티 목록 (31개)
+
+### 품목 & 재고 (5개)
+
+| 클래스 | 테이블 | 설명 |
+|--------|--------|------|
+| `Item` | `items` | 품목 마스터. item_code(4-part), process_type_code, sort_order |
+| `Inventory` | `inventory` | 품목당 1행. quantity = warehouse_qty + Σ location. CHECK 4개 |
+| `InventoryLocation` | `inventory_locations` | 부서×상태 단위 재고. (item_id, dept, status) UNIQUE |
+| `BOM` | `bom` | parent-child 관계. quantity, (parent, child) UNIQUE |
+| `VarianceLog` | `variance_logs` | BOM 기대값 vs 실사용 차이 |
+
+### 직원 (3개)
+
+| 클래스 | 테이블 | 설명 |
+|--------|--------|------|
+| `Employee` | `employees` | warehouse_role / department_role / pin_hash / level |
+| `EmployeeAssignedModel` | `employee_assigned_models` | 직원-제품 다대다 |
+| `Department` | `departments` | 부서 마스터 (display_order, color_hex) |
+
+### 거래 로그 (2개)
+
+| 클래스 | 테이블 | 설명 |
+|--------|--------|------|
+| `TransactionLog` | `transaction_logs` | 재고 변동 감사 로그. 3중 복합 인덱스 |
+| `TransactionEditLog` | `transaction_edit_logs` | 거래 메타 수정 이력 |
+
+### 결재 흐름 (3개)
+
+| 클래스 | 테이블 | 설명 |
+|--------|--------|------|
+| `StockRequest` | `stock_requests` | 결재 요청 헤더. requires_warehouse/dept_approval |
+| `StockRequestLine` | `stock_request_lines` | 요청 라인. from/to bucket, dept |
+| `AdminAuditLog` | `admin_audit_logs` | 마스터 변경 감사 |
+
+### IO 배치 (3개)
+
+| 클래스 | 테이블 | 설명 |
+|--------|--------|------|
+| `IoBatch` | `io_batches` | 입출고 작업 묶음 |
+| `IoBundle` | `io_bundles` | 품목/패키지 단위 번들 |
+| `IoLine` | `io_lines` | 개별 재고 반영 후보 라인 |
+
+### 코드 마스터 (6개)
+
+| 클래스 | 테이블 | 설명 |
+|--------|--------|------|
+| `ProductSymbol` | `product_symbols` | 100-slot 제품 기호 (is_finished_good) |
+| `ItemModel` | `item_models` | 품목-제품 다대다 |
+| `OptionCode` | `option_codes` | 2자 옵션 코드 |
+| `ProcessType` | `process_types` | 2자 공정 코드 (prefix/suffix/stage_order) |
+| `ProcessFlowRule` | `process_flow_rules` | 공정 전이 규칙 |
+| `SystemSetting` | `system_settings` | key-value 시스템 설정 |
+
+---
+
+## 7. Inventory CHECK 제약
+
+```python
+class Inventory(Base):
+    __table_args__ = (
+        CheckConstraint("quantity >= 0",         name="ck_inventory_quantity_nonneg"),
+        CheckConstraint("warehouse_qty >= 0",    name="ck_inventory_warehouse_nonneg"),
+        CheckConstraint("pending_quantity >= 0", name="ck_inventory_pending_nonneg"),
+        CheckConstraint("warehouse_qty >= pending_quantity",
+                        name="ck_inventory_pending_le_warehouse"),
+    )
+```
+
+---
+
+## 8. Employee 권한 컬럼
+
+```python
+class Employee(Base):
+    level          = Column(SAEnum(EmployeeLevelEnum), ...)  # admin/manager/staff
+    warehouse_role = Column(String(20), default="none")      # none/primary/deputy
+    department_role = Column(String(20), default="none")     # none/primary/deputy
+    pin_hash       = Column(Text, nullable=True)             # None = 기본 PIN 0000
+```
+
+---
+
+## 9. BoolAsString 커스텀 타입
+
+```python
+class BoolAsString(TypeDecorator):
+    """Employee.is_active: DB에는 'true'/'false' VARCHAR(5),
+    ORM에서는 bool 로 변환. 스키마 변경 없이 레거시 호환."""
+    impl = String(5)
+```
+
+---
+
+## 10. 주의 사항
+
+> [!warning]
+> 1. `InventoryLocation` 은 `Inventory` 와 직접 relationship 매핑이 없다. `item_id` 로 직접 쿼리한다.
+> 2. `StockRequestLine.from_bucket` / `to_bucket` 은 같은 Enum 타입(`request_bucket_enum`)을 `create_type=False` 로 재사용한다.
+> 3. `TransactionLog.archived_at` — 아직 아카이브 기능 미구현, NULL 유지.
+
+---
+
+## 11. 관련 노트 링크
+
+- [[inventory.py]] — Inventory, InventoryLocation 조작
+- [[schemas.py]] — Pydantic 응답 스키마
+- [[database.py]] — Base, SessionLocal 정의

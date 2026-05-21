@@ -1,271 +1,217 @@
 ---
 type: code-note
-project: ERP
+project: DEXCOWIN MES
 layer: frontend
-source_path: frontend/app/legacy/_components/DesktopInventoryView.tsx
 status: active
-updated: 2026-04-27
-source_sha: 494daabcc823
-tags:
-  - erp
-  - frontend
-  - frontend-component
-  - tsx
+created: 2026-05-21
+updated: 2026-05-21
+source_path: erp/frontend/app/legacy/_components/DesktopInventoryView.tsx
+tags: [vault, code-note, frontend, component]
+aliases: [DesktopInventoryView, 재고 대시보드, 대시보드 탭]
 ---
 
-# DesktopInventoryView.tsx
+# DesktopInventoryView.tsx — 재고 대시보드 탭
 
-> [!summary] 역할
-> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
+#layer/frontend #topic/component #topic/legacy
 
-## 원본 위치
+> [!summary] 한 줄 요약
+> 대시보드 탭의 최상위 컴포넌트. 재고 KPI 카드 + 생산 가능 수량 + 필터(부서/모델/공정) + 품목 테이블 + 우측 상세 패널로 구성된다. 안전재고 경고 수를 부모(`DesktopLegacyShell`)에 전달해 탭 배지를 갱신한다.
 
-- Source: `frontend/app/legacy/_components/DesktopInventoryView.tsx`
-- Layer: `frontend`
-- Kind: `frontend-component`
-- Size: `12137` bytes
+---
 
-## 연결
+## 1. 위치 & 관계
 
-- Parent hub: [[frontend/app/legacy/_components/_components|frontend/app/legacy/_components]]
-- Related: [[frontend/frontend]]
+| 항목 | 내용 |
+|------|------|
+| 원본 | `erp/frontend/app/legacy/_components/DesktopInventoryView.tsx` |
+| 레이어 | frontend / component |
+| `"use client"` | O |
+| 소비자 | [[erp/frontend/app/legacy/_components/DesktopLegacyShell.tsx]] |
 
-## 읽는 포인트
+```mermaid
+graph TD
+  IV["DesktopInventoryView"] --> KPI["InventoryKpiPanel<br/>(전체/정상/부족/품절 카드)"]
+  IV --> CAP["InventoryCapacityPanel<br/>(생산 가능 수량)"]
+  IV --> FTG["InventoryFilterToggleButton"]
+  IV --> FILT["InventoryFilters<br/>(부서/모델/공정 필터)"]
+  IV --> TBL["InventoryItemsTable<br/>(품목 목록 100개씩)"]
+  IV --> RP["DesktopInventoryRightPanel<br/>(우측 상세)"]
 
-- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
-- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+  style IV fill:#1e3a5f,color:#e0f0ff
+```
 
-## 원본 발췌
+---
 
-> 전체 310줄 중 앞부분만 발췌했다. 실제 수정은 원본 파일을 기준으로 한다.
+## 2. props
 
-````tsx
-"use client";
-
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { PackageSearch } from "lucide-react";
-import { api, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
-import { DesktopRightPanel } from "./DesktopRightPanel";
-import { LEGACY_COLORS, erpCodeDept, getStockState } from "./legacyUi";
-import { InventoryKpiPanel, type KpiCard, type KpiFilter } from "./_inventory_sections/InventoryKpiPanel";
-import { InventoryActionRequired } from "./_inventory_sections/InventoryActionRequired";
-import { InventoryCapacityPanel } from "./_inventory_sections/InventoryCapacityPanel";
-import {
-  InventoryFilters,
-  InventoryTableStickyHeader,
-} from "./_inventory_sections/InventoryFilterBar";
-import { InventoryItemsTable } from "./_inventory_sections/InventoryItemsTable";
-import { InventoryDetailPanel } from "./_inventory_sections/InventoryDetailPanel";
-
-const DESKTOP_PAGE_SIZE = 100;
-
-function getMinStock(item: Item) {
-  return item.min_stock == null ? 0 : Number(item.min_stock);
-}
-
-function matchesSearch(item: Item, keyword: string) {
-  if (!keyword) return true;
-  const haystack = [
-    item.erp_code,
-    item.item_name,
-    item.spec ?? "",
-    item.location ?? "",
-    item.supplier ?? "",
-    item.legacy_model ?? "",
-    item.barcode ?? "",
-  ]
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(keyword);
-}
-
-function safeQty(item: Item) {
-  const n = Number(item.quantity);
-  return isNaN(n) ? 0 : n;
-}
-
-function matchesKpi(item: Item, kpi: KpiFilter) {
-  const qty = safeQty(item);
-  const min = getMinStock(item);
-  if (kpi === "NORMAL") return qty > 0 && qty >= min;
-  if (kpi === "LOW") return qty > 0 && qty < min;
-  if (kpi === "ZERO") return qty <= 0;
-  return true;
-}
-
-export function DesktopInventoryView({
-  globalSearch,
-  onStatusChange,
-  onGoToWarehouse,
-  onGoToWarehouseTab,
-  onSummaryChange,
-  capacityData,
-  onCapacityClick,
-}: {
-  globalSearch: string;
-  onStatusChange: (status: string) => void;
-  onGoToWarehouse: (item: Item) => void;
-  onGoToWarehouseTab?: () => void;
-  onSummaryChange?: (s: { low: number; zero: number }) => void;
+```typescript
+{
+  globalSearch: string;            // 탑바 전역 검색 (현재 "" 고정)
+  onStatusChange: (msg) => void;   // 탑바 상태 메시지 갱신
+  onGoToWarehouse: (item) => void; // 입출고 탭으로 품목 전달
+  onGoToWarehouseTab?: () => void; // 입출고 탭으로 이동만 (품목 없음)
+  onSummaryChange?: (s) => void;   // 탭 배지 경고 수 전달
   capacityData?: ProductionCapacity | null;
-  onCapacityClick?: () => void;
-}) {
-  const [items, setItems] = useState<Item[]>([]);
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [itemLogs, setItemLogs] = useState<TransactionLog[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
-  const [productModels, setProductModels] = useState<ProductModel[]>([]);
-  const [kpi, setKpi] = useState<KpiFilter>("ALL");
-  const [localSearch, setLocalSearch] = useState("");
-  const [displayLimit, setDisplayLimit] = useState(DESKTOP_PAGE_SIZE);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const deferredLocalSearch = useDeferredValue(localSearch.trim().toLowerCase());
-
-  async function loadItems() {
-    try {
-      setLoading(true);
-      setError(null);
-      const nextItems = await api.getItems({
-        limit: 2000,
-        search: globalSearch.trim() || undefined,
-      });
-      setItems(nextItems);
-      onStatusChange(`재고 ${nextItems.length}건을 불러왔습니다.`);
-      setSelectedItem((current) => (current ? nextItems.find((item) => item.item_id === current.item_id) ?? null : null));
-    } catch (nextError) {
-      const message = nextError instanceof Error ? nextError.message : "재고 데이터를 불러오지 못했습니다.";
-      setError(message);
-      onStatusChange(message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function toggleDept(v: string) {
-    setSelectedDepts((prev) => (prev.includes(v) ? prev.filter((d) => d !== v) : [...prev, v]));
-    setDisplayLimit(DESKTOP_PAGE_SIZE);
-  }
-  function toggleModel(v: string) {
-    setSelectedModels((prev) => (prev.includes(v) ? prev.filter((m) => m !== v) : [...prev, v]));
-    setDisplayLimit(DESKTOP_PAGE_SIZE);
-  }
-
-  useEffect(() => {
-    void api.getModels().then(setProductModels).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    void loadItems();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [globalSearch]);
-
-  useEffect(() => {
-    if (!selectedItem) {
-      setItemLogs([]);
-      return;
-    }
-    void api
-      .getTransactions({ itemId: selectedItem.item_id, limit: 10 })
-      .then(setItemLogs)
-      .catch(() => setItemLogs([]));
-  }, [selectedItem]);
-
-  const selectedSlots = useMemo(
-    () => new Set(productModels.filter((m) => selectedModels.includes(m.model_name ?? "")).map((m) => m.slot)),
-    [productModels, selectedModels],
-  );
-
-  const scopedItems = useMemo(
-    () =>
-      items.filter((item) => {
-        if (!matchesSearch(item, deferredLocalSearch)) return false;
-        if (selectedDepts.length > 0) {
-          const inDept = selectedDepts.some((d) =>
-            d === "창고"
-              ? (item.warehouse_qty ?? 0) > 0
-              : item.department === d ||
-                erpCodeDept(item.erp_code) === d ||
-                item.locations.some((loc) => loc.department === d),
-          );
-          if (!inDept) return false;
-        }
-        if (selectedSlots.size > 0 && !item.model_slots.some((s) => selectedSlots.has(s))) return false;
-        return true;
-      }),
-    [items, deferredLocalSearch, selectedDepts, selectedSlots],
-  );
-  const filteredItems = useMemo(() => scopedItems.filter((item) => matchesKpi(item, kpi)), [scopedItems, kpi]);
-
-  useEffect(() => {
-    setDisplayLimit(DESKTOP_PAGE_SIZE);
-  }, [filteredItems]);
-
-  const summary = useMemo(() => {
-    const totalQuantity = scopedItems.reduce((acc, item) => acc + safeQty(item), 0);
-    const normalCount = scopedItems.filter((item) => safeQty(item) > 0 && safeQty(item) >= getMinStock(item)).length;
-    const lowCount = scopedItems.filter((item) => safeQty(item) > 0 && safeQty(item) < getMinStock(item)).length;
-    const zeroCount = scopedItems.filter((item) => safeQty(item) <= 0).length;
-    return { totalCount: scopedItems.length, totalQuantity, normalCount, lowCount, zeroCount };
-  }, [scopedItems]);
-
-  useEffect(() => {
-    onSummaryChange?.({ low: summary.lowCount, zero: summary.zeroCount });
-  }, [summary.lowCount, summary.zeroCount, onSummaryChange]);
-
-  const isFiltered = selectedDepts.length > 0 || selectedModels.length > 0 || deferredLocalSearch.length > 0;
-  const activeFilterCount =
-    selectedDepts.length + selectedModels.length + (deferredLocalSearch.length > 0 ? 1 : 0);
-
-  const kpiCards: KpiCard[] = [
-    {
-      label: "전체",
-      value: filteredItems.length,
-      hint: isFiltered
-        ? `필터 적용 중 · 전체 ${items.length}건 중 ${filteredItems.length}건 조회`
-        : "조회 기준 전체 품목",
-      tone: LEGACY_COLORS.blue,
-      key: "ALL",
-    },
-    { label: "정상", value: summary.normalCount, hint: "운영 가능", tone: LEGACY_COLORS.green, key: "NORMAL" },
-    { label: "부족", value: summary.lowCount, hint: "안전재고 이하", tone: LEGACY_COLORS.yellow, key: "LOW" },
-    { label: "품절", value: summary.zeroCount, hint: "즉시 조치 필요", tone: LEGACY_COLORS.red, key: "ZERO" },
-  ];
-
-  const headerBadge = selectedItem
-    ? (() => {
-        const stock = getStockState(
-          Number(selectedItem.quantity),
-          selectedItem.min_stock == null ? null : Number(selectedItem.min_stock),
-        );
-        return (
-          <span
-            className="inline-flex rounded-full px-3 py-1 text-sm font-bold"
-            style={{ color: stock.color, background: `color-mix(in srgb, ${stock.color} 12%, transparent)` }}
-          >
-            {stock.label}
-          </span>
-        );
-      })()
-    : null;
-
-  function resetAllFilters() {
-    setSelectedDepts([]);
-    setSelectedModels([]);
-    setLocalSearch("");
-    setKpi("ALL");
-  }
-
-````
+  onCapacityClick?: () => void;    // 생산 가능 모달 열기
+}
+```
 
 ---
 
-## 정책
+## 3. 핵심 상태
 
-- `main` 브랜치는 코드만 유지한다.
-- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
-- 코드와 노트가 다르면 실제 코드가 우선이다.
+| 상태 | 타입 | 설명 |
+|------|------|------|
+| `items` | `Item[]` | 전체 품목 목록 (2000개 한 번에 로드) |
+| `selectedItem` | `Item \| null` | 우측 패널에 표시할 품목 |
+| `itemLogs` | `TransactionLog[]` | 선택 품목 최근 거래 5건 |
+| `selectedDepts` | `string[]` | 부서 필터 선택값 |
+| `selectedModels` | `string[]` | 제품 모델 필터 선택값 |
+| `selectedProcessSteps` | `string[]` | 공정 단계 필터 (R/A/F) |
+| `kpi` | `KpiFilter` | KPI 카드 클릭 필터 (ALL/NORMAL/LOW/ZERO) |
+| `localSearch` | `string` | 품목 검색어 (useDeferredValue) |
+| `displayLimit` | `number` | 테이블 렌더 수 (100개씩 증가) |
+
+---
+
+## 4. 필터링 파이프라인
+
+```mermaid
+graph LR
+  ITEMS["items[]<br/>(2000개)"] -->|matchesSearch| A
+  A -->|부서 필터| B
+  B -->|모델 슬롯 필터| C
+  C -->|공정 단계 필터| SCOPED["scopedItems[]"]
+  SCOPED -->|matchesKpi| FILTERED["filteredItems[]"]
+  FILTERED -->|displayLimit| TABLE["InventoryItemsTable<br/>(100개씩 렌더)"]
+```
+
+```typescript
+const scopedItems = useMemo(
+  () => items.filter((item) => {
+    if (!matchesSearch(item, deferredLocalSearch)) return false;
+    if (selectedDepts.length > 0) {
+      const inDept = selectedDepts.some((d) =>
+        d === "창고"
+          ? (item.warehouse_qty ?? 0) > 0
+          : item.department === d ||
+            itemCodeDept(item.item_code) === d ||
+            item.locations.some((loc) => loc.department === d),
+      );
+      if (!inDept) return false;
+    }
+    // 모델 슬롯 필터, 공정 단계 필터...
+    return true;
+  }),
+  [items, deferredLocalSearch, selectedDepts, selectedSlots, showUnclassified, selectedProcessSteps],
+);
+const filteredItems = useMemo(() =>
+  scopedItems.filter((item) => matchesKpi(item, kpi)),
+  [scopedItems, kpi]
+);
+```
+
+---
+
+## 5. 코드 발췌 — KPI 카드 + 탭 배지 갱신
+
+```tsx
+// 훅에서 kpiCards, headerBadge, isFiltered, activeFilterCount 파생
+const { isFiltered, activeFilterCount, kpiCards, headerBadge } = useDesktopInventoryDerivations({
+  items, scopedItems, filteredItems, selectedDepts, selectedModels, selectedProcessSteps,
+  deferredLocalSearch, displayItem, onSummaryChange,
+});
+
+// KPI 카드: 전체/정상/부족/품절
+// KPI 클릭 시 해당 상태로 필터 적용 (ALL 클릭 시 모든 필터 초기화)
+<InventoryKpiPanel
+  cards={kpiCards}
+  activeKey={kpi}
+  onChange={(key) => {
+    if (key === "ALL") resetAllFilters();
+    else setKpi(key);
+  }}
+/>
+```
+
+`onSummaryChange?.({ low, zero })` 는 `useDesktopInventoryDerivations` 훅 내부에서 호출되며, 부모 `DesktopLegacyShell` 에 탭 배지 숫자를 전달한다.
+
+---
+
+## 6. 대시보드 → 입출고 탭 연결
+
+```tsx
+// 우측 패널의 "입출고" 버튼 클릭 시
+<DesktopInventoryRightPanel
+  onGoToWarehouse={onGoToWarehouse}  // 품목과 함께 입출고 탭으로
+  ...
+/>
+// → DesktopLegacyShell.handleGoToWarehouse(item) 호출
+// → setWarehousePreselected(item) + setActiveTab("warehouse")
+```
+
+---
+
+## 7. useDeferredValue 적용
+
+```typescript
+const deferredLocalSearch = useDeferredValue(localSearch.trim().toLowerCase());
+```
+
+로컬 검색어를 `useDeferredValue` 로 지연시켜, 타이핑 중 테이블 재렌더가 UI 를 블록하지 않도록 한다. 2000개 품목 필터링이 있어 성능에 민감.
+
+---
+
+## 8. 품목 로드 훅
+
+```typescript
+// R7-HOOK2: useInventoryData 훅으로 분리
+const { items, setItems, loading, error, loadItems } = useInventoryData({
+  globalSearch, onStatusChange, onSelectedSync,
+});
+
+// onSelectedSync: items 갱신 시 selectedItem 을 최신값으로 동기화
+const onSelectedSync = useCallback(
+  (next: Item[]) =>
+    setSelectedItem((current) =>
+      current ? next.find((item) => item.item_id === current.item_id) ?? null : null,
+    ),
+  [],
+);
+```
+
+---
+
+## 9. 레이아웃 구조
+
+```
+DesktopInventoryView
+├── 좌측 스크롤 컨테이너
+│   ├── section.card (KPI + 생산가능 + 필터)
+│   │   ├── InventoryKpiPanel
+│   │   ├── InventoryCapacityPanel + InventoryFilterToggleButton
+│   │   └── InventoryFilters (접이식)
+│   └── section.card (품목 테이블)
+│       ├── InventoryTableStickyHeader (검색 + 카운트)
+│       └── InventoryItemsTable
+└── DesktopInventoryRightPanel (우측 고정 패널)
+```
+
+---
+
+## 10. 관련 파일
+
+- [[erp/frontend/app/legacy/_components/DesktopLegacyShell.tsx]] — 부모 컴포넌트
+- [[erp/frontend/lib/api.ts]] — api.getItems, api.getModels, api.getTransactions
+- `erp/frontend/app/legacy/_components/_hooks/useInventoryData.ts`
+- `erp/frontend/app/legacy/_components/_hooks/useDesktopInventoryDerivations.ts`
+- `erp/frontend/app/legacy/_components/_inventory_sections/InventoryKpiPanel.tsx`
+- [[erp/backend/app/routers/inventory.py]] — 품목/재고 엔드포인트
+
+---
+
+## 11. 정책
+
+- `main` 브랜치: 코드만 유지
+- `vault-sync` 브랜치: 코드 + `vault/` 노트
+- 코드와 노트가 다르면 실제 코드 우선

@@ -1,55 +1,17 @@
----
-type: code-note
-project: ERP
-layer: frontend
-source_path: frontend/postcss.config.js
-status: active
-updated: 2026-04-27
-source_sha: 81781ed39dc8
-tags:
-  - erp
-  - frontend
-  - source-file
-  - js
+﻿---
+layer: config
 ---
 
-# postcss.config.js
+# postcss.config.js — PostCSS 설정
 
-> [!summary] 역할
-> 원본 프로젝트의 `postcss.config.js` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
+> [!summary] tailwindcss + autoprefixer 플러그인
 
-## 원본 위치
+## 1. 역할
+Tailwind CSS 처리 + 브라우저 prefix 자동 추가(flex → -webkit-flex 등).
 
-- Source: `frontend/postcss.config.js`
-- Layer: `frontend`
-- Kind: `source-file`
-- Size: `83` bytes
+## 2. 실제 원본 위치
+erp/frontend/postcss.config.js
 
-## 연결
-
-- Parent hub: [[frontend/frontend|frontend]]
-- Related: [[frontend/frontend]]
-
-## 읽는 포인트
-
-- 실제 수정은 원본 파일에서 한다.
-- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
-
-## 원본 발췌
-
-````js
-module.exports = {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-};
-````
-
----
-
-## 정책
-
-- `main` 브랜치는 코드만 유지한다.
-- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
-- 코드와 노트가 다르면 실제 코드가 우선이다.
+## 3. 관련 형제 파일
+- [[tailwind.config.ts.md|Tailwind 설정]]
+- [[package.json.md|패키지 매니페스트]]

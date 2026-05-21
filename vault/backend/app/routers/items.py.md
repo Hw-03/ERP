@@ -1,271 +1,172 @@
 ---
 type: code-note
-project: ERP
+project: DEXCOWIN MES
 layer: backend
-source_path: backend/app/routers/items.py
 status: active
-updated: 2026-04-27
-source_sha: 4e4521f2a6a8
-tags:
-  - erp
-  - backend
-  - router
-  - py
+created: 2026-05-21
+updated: 2026-05-21
+source_path: erp/backend/app/routers/items.py
+tags: [vault, code-note, backend, router, layer/backend, topic/router, topic/품목마스터]
+aliases:
+  - 품목마스터 라우터
 ---
 
-# items.py
+# 📦 items.py — 품목 마스터 CRUD + 재고 통합 조회
 
 > [!summary] 역할
-> FastAPI 라우터 계층의 `items` 영역 API 엔드포인트를 담당한다.
+> 품목(Item)의 생성·조회·수정, CSV/XLSX 내보내기, BOM 완료 상태 관리를 담당하는 라우터.
+> 조회 시 재고 수치(창고·예약·가용)를 함께 반환해 프론트가 별도 재고 API를 호출할 필요가 없다.
 
-## 원본 위치
+## 1. 이 파일의 역할
 
-- Source: `backend/app/routers/items.py`
-- Layer: `backend`
-- Kind: `router`
-- Size: `15908` bytes
+품목 마스터(Item 테이블)에 대한 CRUD + 검색 기능 전체를 제공합니다.
+단순 품목 정보뿐 아니라 재고 현황(`ItemWithInventory`)을 한 번에 반환하는 게 핵심 특징입니다.
+N+1 문제를 막기 위해 `stock_math.bulk_compute`로 재고 수치를 한 번에 계산합니다.
 
-## 연결
+## 2. 실제 원본 위치
 
-- Parent hub: [[backend/app/routers/routers|backend/app/routers]]
-- Related: [[backend/backend]]
+- **원본**: `erp/backend/app/routers/items.py` ([[erp/backend/app/routers/items.py]])
+- vault 노트는 분석 지도일 뿐, 수정은 원본에서만.
 
-## 읽는 포인트
+## 3. import 로 가져오는 것
 
-- 라우터는 API 표면이다. 요청/응답 계약은 `schemas.py`와 함께 확인한다.
-- DB 변경은 서비스/모델/테스트까지 같이 본다.
+| 모듈 | 역할 |
+|---|---|
+| `app.models` | `Item`, `Inventory`, `InventoryLocation`, `ItemModel`, `ProductSymbol`, `LocationStatusEnum` |
+| `app.schemas` | `ItemCreate`, `ItemUpdate`, `ItemWithInventory`, `ItemResponse`, `BomCompletionUpdate` 등 |
+| `app.utils.item_code` | `make_item_code`, `next_serial_no`, `slots_to_model_symbol` — 4파트 코드 생성 |
+| `app.services.audit` | 변경 이력 기록 |
+| `app.services.stock_math` | `bulk_compute`, `compute_for`, `StockFigures` — 재고 수치 계산 |
+| `app.services.inventory` | `inventory_svc` — 재고 직접 조작 (이 파일에서는 참조만) |
+| `app.services._tx` | `commit_and_refresh` — 트랜잭션 커밋 헬퍼 |
+| `app.services.export_helpers` | `csv_streaming_response` — CSV 스트리밍 응답 |
+| `openpyxl` | XLSX 내보내기 (lazy import, `/export.xlsx` 에서만) |
 
-## 원본 발췌
+## 4. export / 외부에 제공하는 것
 
-> 전체 445줄 중 앞부분만 발췌했다. 실제 수정은 원본 파일을 기준으로 한다.
+- **prefix**: `/api/items`
 
-````python
-"""Items router for item master CRUD operations."""
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| `POST` | `/api/items` | 품목 신규 생성 (item_code 자동 생성 포함) |
+| `GET` | `/api/items` | 품목 목록 조회 (다중 필터 + 페이징) |
+| `GET` | `/api/items/export.csv` | 전체 품목 CSV 내보내기 |
+| `GET` | `/api/items/export.xlsx` | 전체 품목 XLSX 내보내기 (부서별 색상) |
+| `GET` | `/api/items/{item_id}` | 품목 단건 상세 조회 |
+| `PUT` | `/api/items/{item_id}` | 품목 수정 |
+| `PATCH` | `/api/items/{item_id}/bom-completion` | BOM 완료 상태 토글 |
 
-from datetime import UTC, datetime
-import csv
-from io import StringIO
-import uuid
-from typing import List, Optional
+## 5. 이 파일을 참조하는 곳
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import StreamingResponse
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
+- `erp/backend/app/main.py` — `app.include_router(items.router, prefix="/api/items", tags=["Items"])`
+- 프론트엔드 `frontend/lib/api/items.ts` (또는 유사 경로)가 모든 엔드포인트 호출
+- BOM 완료 버튼 클릭 시 `PATCH /bom-completion` 호출
 
-from sqlalchemy import func
+## 6. 실제 업무 흐름에서 언제 쓰이는지
 
-from app.database import get_db
-from app.models import CategoryEnum, DepartmentEnum, Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
-from app.routers._errors import ErrorCode, http_error
-from app.schemas import (
-    InventoryLocationResponse,
-    ItemCreate,
-    ItemResponse,
-    ItemUpdate,
-    ItemWithInventory,
-)
-from app.utils.erp_code import infer_process_type, infer_symbol_slot, make_erp_code, next_serial_no, slots_to_model_symbol
-from app.models import ProductSymbol
-from app.services import audit
-from app.services import inventory as inventory_svc
-from app.services import stock_math
-from app.services._tx import commit_and_refresh
-from app.services.export_helpers import csv_streaming_response
+- [[시나리오_품목등록]]: 새 부품·완제품 등록 → `POST /api/items`
+- [[시나리오_재고입출고]]: 입출고 전 품목 목록 조회로 품목 선택
+- [[시나리오_생산배치]]: 생산 대상 품목 검색, BOM 완료 여부 확인
+- XLSX 내보내기는 재고 현황 보고서로 활용
 
-router = APIRouter()
+## 7. 핵심 함수 / 상수 / 매핑
 
+| 함수/상수 | 설명 |
+|---|---|
+| `_build_item_query(db)` | Item + Inventory outerjoin 기본 쿼리 반환 |
+| `_to_item_with_inventory(...)` | Item + Inventory → `ItemWithInventory` DTO 조립. bulk prefetch 지원 |
+| `create_item(payload, request, db)` | item_code 자동 계산 + Inventory 초기 행 생성 |
+| `list_items(...)` | 필터 7종 + bulk prefetch(N+1 제거) |
+| `export_items_xlsx(...)` | openpyxl로 부서별 행 색상 + 안전재고 미만 빨간 글씨 |
+| `update_bom_completion(...)` | `bom_completed_at` 타임스탬프 set/clear |
+| `_PROCESS_PREFIX_ROW_COLOR` | 공정 prefix → XLSX 행 색상 매핑 dict |
 
-def _build_item_query(db: Session):
-    return db.query(Item, Inventory).outerjoin(Inventory, Item.item_id == Inventory.item_id)
+## 8. ⚠️ 위험 포인트
 
+> [!warning] 수정 시 깨지기 쉬운 지점
+> - `_to_item_with_inventory`의 figures/locations/model_slots 파라미터: `None` 이면 단건 쿼리, 값이 있으면 bulk prefetch. 둘을 혼동하면 N+1 또는 데이터 불일치.
+> - `export.xlsx`/`export.csv` 경로가 `/{item_id}` 보다 먼저 선언되어야 라우트 매칭이 올바름. 경로 순서 바꾸면 "xlsx"를 item_id로 파싱해 404.
+> - `next_serial_no` + `make_item_code` 는 DB에 중복 없음을 가정. 동시 요청 시 race condition 가능성 있음.
+> - `sort_order` 를 누락하면 SQLite가 NULL을 맨 앞 정렬해 순서가 뒤집힘.
 
-def _to_item_with_inventory(
-    db: Session,
-    item: Item,
-    inventory: Optional[Inventory],
-    *,
-    figures: Optional[stock_math.StockFigures] = None,
-    locations: Optional[list[InventoryLocationResponse]] = None,
-    model_slots: Optional[list[int]] = None,
-) -> ItemWithInventory:
-    """ItemWithInventory DTO 조립.
+[[위험지대_지도]] — 품목 코드 자동 생성, N+1 재고 쿼리 영역
 
-    성능 모드 (Phase C bulk prefetch 용): 호출측이 figures / locations / model_slots 를
-    미리 채워 넣으면 DB 쿼리를 추가로 발생시키지 않는다. 인자를 생략하면 기존처럼
-    단건 쿼리를 수행한다 (단건 상세 조회용).
-    """
-    from decimal import Decimal as _D
+## 9. 죽은 코드 의심 / 삭제하면 안 되는 이유
 
-    fig = figures if figures is not None else stock_math.compute_for(db, item.item_id)
+- `_row_color_for` 함수: XLSX export 에서만 사용. CSV 경로에서 쓰지 않아 보이지만 xlsx 유지에 필수.
+- `legacy_file_type`, `legacy_part`, `legacy_item_type` 필드: 구 시스템 마이그레이션 데이터. 현재 UI에서 쓰는지 불분명하지만 삭제 시 기존 데이터 조회 불가 — 유지 필요.
+- `ProductSymbol` import: `items.py` 에서 직접 쿼리하지 않지만 `item_code` 생성 유틸(`utils/item_code.py`)이 내부에서 참조함.
 
-    if locations is None:
-        loc_rows = (
-            db.query(InventoryLocation)
-            .filter(InventoryLocation.item_id == item.item_id, InventoryLocation.quantity > 0)
-            .all()
-        )
-        locations = [
-            InventoryLocationResponse(
-                department=row.department,
-                status=row.status,
-                quantity=row.quantity or _D("0"),
-            )
-            for row in loc_rows
-        ]
+## 10. 수정 전 체크리스트
 
-    if model_slots is None:
-        model_slots = [
-            row.slot
-            for row in db.query(ItemModel).filter(ItemModel.item_id == item.item_id).all()
-        ]
+- [ ] `verify_local.ps1` 통과 확인
+- [ ] `tests/` 의 items 관련 테스트(`test_items.py`) 확인
+- [ ] 프론트엔드 `lib/api/items.ts` 호출처 확인 (응답 shape 변경 시 필수)
+- [ ] `_to_item_with_inventory` 수정 시 bulk prefetch 경로와 단건 경로 양쪽 검증
+- [ ] XLSX export 수정 시 `openpyxl` lazy import 유지 (서버 시작 속도 보호)
 
-    return ItemWithInventory(
-        item_id=item.item_id,
-        item_name=item.item_name,
-        spec=item.spec,
-        category=item.category,
-        unit=item.unit,
-        barcode=item.barcode,
-        legacy_file_type=item.legacy_file_type,
-        legacy_part=item.legacy_part,
-        legacy_item_type=item.legacy_item_type,
-        legacy_model=item.legacy_model,
-        supplier=item.supplier,
-        min_stock=item.min_stock,
-        erp_code=item.erp_code,
-        model_symbol=item.model_symbol,
-        model_slots=model_slots,
-        symbol_slot=item.symbol_slot,
-        process_type_code=item.process_type_code,
-        option_code=item.option_code,
-        serial_no=item.serial_no,
-        created_at=item.created_at,
-        updated_at=item.updated_at,
-        quantity=fig.total,
-        warehouse_qty=fig.warehouse_qty,
-        production_total=fig.production_total,
-        defective_total=fig.defective_total,
-        pending_quantity=fig.pending,
-        available_quantity=fig.available,
-        last_reserver_name=inventory.last_reserver_name if inventory else None,
-        location=inventory.location if inventory else None,
-        locations=locations,
-    )
+## 11. 핵심 코드 발췌
 
+> [!example] bulk prefetch로 N+1 제거하는 list_items 핵심 (약 30줄)
+> ```python
+> rows = query.order_by(Item.sort_order, Item.item_code).offset(skip).limit(limit).all()
+> if not rows:
+>     return []
+>
+> # bulk prefetch — N+1 제거. 기존에는 item 1건당 4 쿼리씩 나갔음.
+> item_ids = [it.item_id for it, _ in rows]
+> figures_map = stock_math.bulk_compute(db, item_ids)
+>
+> loc_rows = (
+>     db.query(InventoryLocation)
+>     .filter(InventoryLocation.item_id.in_(item_ids), InventoryLocation.quantity > 0)
+>     .all()
+> )
+> locations_by_item: dict = {}
+> for row in loc_rows:
+>     locations_by_item.setdefault(row.item_id, []).append(
+>         InventoryLocationResponse(
+>             department=row.department,
+>             status=row.status,
+>             quantity=row.quantity or _D("0"),
+>         )
+>     )
+>
+> model_rows = db.query(ItemModel).filter(ItemModel.item_id.in_(item_ids)).all()
+> slots_by_item: dict = {}
+> for row in model_rows:
+>     slots_by_item.setdefault(row.item_id, []).append(row.slot)
+>
+> return [
+>     _to_item_with_inventory(
+>         db, item, inv,
+>         figures=figures_map.get(item.item_id),
+>         locations=locations_by_item.get(item.item_id, []),
+>         model_slots=slots_by_item.get(item.item_id, []),
+>     )
+>     for item, inv in rows
+> ]
+> ```
 
-@router.post("", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
-def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get_db)):
-    category_val = payload.category.value if payload.category else "UK"
+`stock_math.bulk_compute` 한 번 + InventoryLocation IN 1번 + ItemModel IN 1번으로 목록 전체 처리.
+`item_ids` 범위 안에서만 쿼리하므로 100건 조회도 DB 왕복 3회로 끝난다.
 
-    pt = infer_process_type(category_val, payload.legacy_part)
-    model_slots = payload.model_slots or []
-    model_sym = slots_to_model_symbol(model_slots) if model_slots else ""
-    opt = payload.option_code or None
+```mermaid
+flowchart LR
+    FE["Frontend\n품목 목록 화면"] -->|GET /api/items| Router["items.py\nlist_items"]
+    Router -->|outerjoin| DB_Item[("Item\n테이블")]
+    Router -->|bulk_compute| stock_math["services/\nstock_math.py"]
+    Router -->|IN query| DB_Loc[("InventoryLocation\n테이블")]
+    Router -->|IN query| DB_Model[("ItemModel\n테이블")]
+    Router -->|assemble| DTO["ItemWithInventory\nDTO 반환"]
+```
 
-    serial = None
-    erp_code = None
-    if pt and model_sym:
-        serial = next_serial_no(model_sym, pt, db)
-        erp_code = make_erp_code(model_sym, pt, serial, opt)
+## 관련 노트
 
-    # legacy symbol_slot: 단일 모델 지정 시 이전 호환용으로 유지
-    legacy_slot = infer_symbol_slot(payload.legacy_model) if not model_slots else (model_slots[0] if len(model_slots) == 1 else None)
+- [[처음_읽는_사람]], [[ERP_MOC]], [[용어사전]]
+- [[erp/backend/app/services/stock_math.py]]
+- [[erp/backend/app/services/audit.py]]
+- [[erp/backend/app/models.py]]
+- [[erp/backend/app/utils/item_code.py]]
 
-    item = Item(
-        item_name=payload.item_name,
-        spec=payload.spec,
-        category=payload.category,
-        unit=payload.unit,
-        barcode=payload.barcode or None,
-        legacy_file_type=payload.legacy_file_type,
-        legacy_part=payload.legacy_part,
-        legacy_item_type=payload.legacy_item_type,
-        legacy_model=payload.legacy_model,
-        supplier=payload.supplier,
-        min_stock=payload.min_stock,
-        process_type_code=pt,
-        model_symbol=model_sym or None,
-        symbol_slot=legacy_slot,
-        serial_no=serial,
-        option_code=opt,
-        erp_code=erp_code,
-    )
-    db.add(item)
-    db.flush()
-
-    for slot in model_slots:
-        db.add(ItemModel(item_id=item.item_id, slot=slot))
-
-    init_qty = payload.initial_quantity if payload.initial_quantity is not None else 0
-    inventory = Inventory(item_id=item.item_id, quantity=init_qty, warehouse_qty=init_qty)
-    db.add(inventory)
-
-    audit.record(
-        db,
-        request=request,
-        action="item.create",
-        target_type="item",
-        target_id=str(item.item_id),
-        payload_summary=f"{item.item_name} ({item.erp_code or 'no-erp'}, init {init_qty})",
-    )
-
-    commit_and_refresh(db, item)
-    return item
-
-
-@router.get("", response_model=List[ItemWithInventory])
-def list_items(
-    category: Optional[CategoryEnum] = Query(None, description="카테고리 필터"),
-    search: Optional[str] = Query(None, description="품목명, 품목코드, 사양, 위치, 바코드 검색"),
-    legacy_file_type: Optional[str] = Query(None, description="레거시 파일 구분 필터"),
-    legacy_part: Optional[str] = Query(None, description="레거시 파트 필터"),
-    legacy_model: Optional[str] = Query(None, description="레거시 모델 필터"),
-    department: Optional[str] = Query(None, description="부서 필터 (창고|조립|고압|진공|튜닝|튜브|출하|…)"),
-    legacy_item_type: Optional[str] = Query(None, description="레거시 품목 유형 필터"),
-    barcode: Optional[str] = Query(None, description="바코드 검색"),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=2000),
-    db: Session = Depends(get_db),
-):
-    query = _build_item_query(db)
-
-    if category:
-        query = query.filter(Item.category == category)
-
-    if legacy_file_type:
-        query = query.filter(Item.legacy_file_type == legacy_file_type)
-
-    if legacy_part:
-        query = query.filter(Item.legacy_part == legacy_part)
-
-    if legacy_model:
-        query = query.filter(Item.legacy_model.ilike(f"%{legacy_model}%"))
-
-    if department:
-        if department == "창고":
-            # 창고 재고가 1 이상인 품목
-            query = query.filter(Inventory.warehouse_qty > 0)
-        else:
-            try:
-                dept_enum = DepartmentEnum(department)
-                dept_item_ids = (
-                    db.query(InventoryLocation.item_id)
-                    .filter(
-                        InventoryLocation.department == dept_enum,
-                        InventoryLocation.quantity > 0,
-                    )
-                    .subquery()
-                )
-                query = query.filter(Item.item_id.in_(dept_item_ids))
-            except ValueError:
-                pass
-````
-
----
-
-## 정책
-
-- `main` 브랜치는 코드만 유지한다.
-- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
-- 코드와 노트가 다르면 실제 코드가 우선이다.
+Up: [[_routers]]

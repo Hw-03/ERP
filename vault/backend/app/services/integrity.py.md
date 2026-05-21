@@ -1,219 +1,155 @@
 ---
-type: code-note
-project: ERP
 layer: backend
-source_path: backend/app/services/integrity.py
-status: active
-updated: 2026-04-27
-source_sha: 84115743a65e
+topic: service
+file: erp/backend/app/services/integrity.py
 tags:
-  - erp
-  - backend
-  - service
-  - py
+  - "#layer/backend"
+  - "#topic/service"
+aliases:
+  - integrity service
+  - 불변식 점검
 ---
 
-# integrity.py
+# 🔍 integrity.py — 재고 불변식 점검·복구
 
-> [!summary] 역할
-> 라우터에서 직접 처리하기 무거운 `integrity` 비즈니스 로직과 계산 책임을 분리해 담는다.
+> [!summary]
+> `Inventory.quantity == warehouse_qty + Σ InventoryLocation.quantity` 불변식이 깨진 행을 탐지하고 선택적으로 복구하는 도구. 정상 운영 중에는 `inventory._sync_total` 이 불변식을 유지하지만, 과거 버그나 외부 스크립트로 어긋난 데이터를 복구할 때 사용한다.
 
-## 원본 위치
+---
 
-- Source: `backend/app/services/integrity.py`
-- Layer: `backend`
-- Kind: `service`
-- Size: `5623` bytes
+## 1. 한 문장 목적
 
-## 연결
+전체 Inventory 행을 스캔해 불변식 위반을 찾고, `dry_run=False` 옵션으로 실제 수정까지 수행한다.
 
-- Parent hub: [[backend/app/services/services|backend/app/services]]
-- Related: [[backend/backend]]
+---
 
-## 읽는 포인트
+## 2. 파일 위치 & 임포트 경로
 
-- 서비스는 라우터보다 안쪽의 업무 규칙을 담는다.
-- 재고 수량이나 BOM 계산은 화면 표시와 실제 거래가 일치해야 한다.
+```
+erp/backend/app/services/integrity.py
+from app.services import integrity as integrity_svc
+```
 
-## 원본 발췌
+---
 
-````python
-"""재고 불변식 점검 / 복구.
+## 3. 핵심 함수
 
-불변식: Inventory.quantity == Inventory.warehouse_qty + Σ InventoryLocation.quantity
+| 함수 | 설명 | DB 쓰기 |
+|------|------|---------|
+| `check_inventory_consistency(db)` | 불일치 행 목록 반환 | 없음 |
+| `repair_inventory_totals(db, dry_run=True)` | 불일치 행 재계산·수정 | dry_run=False 일 때만 |
 
-이 불변식은 services/inventory 의 `_sync_total` 이 모든 재고 변경 경로에서
-유지한다. 외부 스크립트나 과거 버그로 어긋난 데이터를 점검·복구하기 위한 도구.
-"""
+---
 
-from __future__ import annotations
+## 4. 탐지 로직
 
-from dataclasses import dataclass
-from decimal import Decimal
-from typing import Optional
-import uuid
+```python
+def check_inventory_consistency(db) -> list[InventoryMismatch]:
+    loc_sums = _location_sum_map(db)   # 한 번에 GROUP BY
 
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+    rows = db.query(Inventory, Item).outerjoin(Item, ...).all()
+    for inv, item in rows:
+        computed = inv.warehouse_qty + loc_sums.get(inv.item_id, 0)
+        if inv.quantity != computed:
+            mismatches.append(InventoryMismatch(
+                recorded_total=inv.quantity,
+                computed_total=computed,
+                delta=inv.quantity - computed,   # 양수=과다, 음수=과소
+                ...
+            ))
+```
 
-from app.models import Inventory, InventoryLocation, Item
+```mermaid
+flowchart LR
+    A["check_inventory_consistency"] --> B["_location_sum_map\nGROUP BY item_id"]
+    A --> C["Inventory JOIN Item\n전체 스캔"]
+    B --> D{"recorded != computed?"}
+    C --> D
+    D -- "예" --> E["InventoryMismatch 추가"]
+    D -- "아니오" --> F["통과"]
+    E --> G["mismatches 반환"]
+```
 
+---
 
-_D0 = Decimal("0")
+## 5. 복구 로직
 
+```python
+def repair_inventory_totals(db, *, dry_run=True) -> RepairReport:
+    for inv in db.query(Inventory).all():
+        computed = inv.warehouse_qty + loc_sums.get(inv.item_id, 0)
+        if inv.quantity != computed:
+            mismatched += 1
+            if not dry_run:
+                inv.quantity = computed   # 덮어쓰기
+                repaired += 1
+    if not dry_run and repaired:
+        db.commit()   # 이 함수 내부에서만 commit
+    return RepairReport(checked, mismatched, repaired, dry_run, samples)
+```
 
+> [!warning]
+> `repair_inventory_totals` 는 내부에서 직접 `db.commit()` 을 호출하는 유일한 서비스 함수다. 라우터의 트랜잭션 밖에서 독립적으로 실행된다.
+
+---
+
+## 6. 반환 데이터 구조
+
+```python
 @dataclass
 class InventoryMismatch:
     item_id: uuid.UUID
     item_code: Optional[str]
     item_name: Optional[str]
-    erp_code: Optional[str]
-    recorded_total: Decimal      # Inventory.quantity
-    computed_total: Decimal      # warehouse + loc_sum (실제 합)
+    recorded_total: Decimal   # DB의 Inventory.quantity
+    computed_total: Decimal   # warehouse + loc_sum
     warehouse_qty: Decimal
     location_sum: Decimal
     pending_quantity: Decimal
 
     @property
     def delta(self) -> Decimal:
-        """recorded - computed. 양수면 quantity 가 과다, 음수면 과소."""
         return self.recorded_total - self.computed_total
-
-    def to_dict(self) -> dict:
-        return {
-            "item_id": str(self.item_id),
-            "item_code": self.item_code,
-            "item_name": self.item_name,
-            "erp_code": self.erp_code,
-            "recorded_total": float(self.recorded_total),
-            "computed_total": float(self.computed_total),
-            "warehouse_qty": float(self.warehouse_qty),
-            "location_sum": float(self.location_sum),
-            "pending_quantity": float(self.pending_quantity),
-            "delta": float(self.delta),
-        }
-
+        # 양수 = quantity 가 과다 / 음수 = quantity 가 과소
 
 @dataclass
 class RepairReport:
-    checked: int
-    mismatched: int
-    repaired: int
+    checked: int      # 전체 Inventory 행 수
+    mismatched: int   # 불일치 행 수
+    repaired: int     # 실제 수정된 행 수 (dry_run=True 면 항상 0)
     dry_run: bool
-    samples: list[dict]  # 최대 20개 샘플
-
-    def to_dict(self) -> dict:
-        return {
-            "checked": self.checked,
-            "mismatched": self.mismatched,
-            "repaired": self.repaired,
-            "dry_run": self.dry_run,
-            "samples": self.samples,
-        }
-
-
-def _location_sum_map(db: Session) -> dict[uuid.UUID, Decimal]:
-    """{item_id: Σ InventoryLocation.quantity}. 재고 location 미존재 품목은 키 없음."""
-    rows = (
-        db.query(
-            InventoryLocation.item_id,
-            func.coalesce(func.sum(InventoryLocation.quantity), 0),
-        )
-        .group_by(InventoryLocation.item_id)
-        .all()
-    )
-    return {iid: Decimal(str(summed or 0)) for iid, summed in rows}
-
-
-def check_inventory_consistency(db: Session) -> list[InventoryMismatch]:
-    """전 Inventory 행의 quantity 불변식을 검사. 깨진 것만 반환."""
-    loc_sums = _location_sum_map(db)
-
-    # Inventory 와 Item 을 한 번에 조인 (설명용 메타 포함)
-    rows = (
-        db.query(Inventory, Item)
-        .outerjoin(Item, Item.item_id == Inventory.item_id)
-        .all()
-    )
-
-    mismatches: list[InventoryMismatch] = []
-    for inv, item in rows:
-        wh = inv.warehouse_qty or _D0
-        recorded = inv.quantity or _D0
-        loc_sum = loc_sums.get(inv.item_id, _D0)
-        computed = wh + loc_sum
-        if recorded != computed:
-            mismatches.append(
-                InventoryMismatch(
-                    item_id=inv.item_id,
-                    item_code=item.item_code if item else None,
-                    item_name=item.item_name if item else None,
-                    erp_code=item.erp_code if item else None,
-                    recorded_total=recorded,
-                    computed_total=computed,
-                    warehouse_qty=wh,
-                    location_sum=loc_sum,
-                    pending_quantity=inv.pending_quantity or _D0,
-                )
-            )
-    return mismatches
-
-
-def repair_inventory_totals(db: Session, *, dry_run: bool = True) -> RepairReport:
-    """quantity 를 warehouse + loc_sum 으로 재계산해 덮어쓴다.
-
-    dry_run=True (기본) 이면 DB 에 쓰지 않고 리포트만.
-    """
-    loc_sums = _location_sum_map(db)
-    inventories = db.query(Inventory).all()
-
-    mismatched = 0
-    repaired = 0
-    samples: list[dict] = []
-
-    for inv in inventories:
-        wh = inv.warehouse_qty or _D0
-        recorded = inv.quantity or _D0
-        loc_sum = loc_sums.get(inv.item_id, _D0)
-        computed = wh + loc_sum
-        if recorded == computed:
-            continue
-        mismatched += 1
-        if len(samples) < 20:
-            item = db.query(Item).filter(Item.item_id == inv.item_id).first()
-            samples.append(
-                InventoryMismatch(
-                    item_id=inv.item_id,
-                    item_code=item.item_code if item else None,
-                    item_name=item.item_name if item else None,
-                    erp_code=item.erp_code if item else None,
-                    recorded_total=recorded,
-                    computed_total=computed,
-                    warehouse_qty=wh,
-                    location_sum=loc_sum,
-                    pending_quantity=inv.pending_quantity or _D0,
-                ).to_dict()
-            )
-        if not dry_run:
-            inv.quantity = computed
-            repaired += 1
-
-    if not dry_run and repaired:
-        db.commit()
-
-    return RepairReport(
-        checked=len(inventories),
-        mismatched=mismatched,
-        repaired=repaired,
-        dry_run=dry_run,
-        samples=samples,
-    )
-````
+    samples: list[dict]   # 불일치 샘플 최대 20개
+```
 
 ---
 
-## 정책
+## 7. 운영 사용 흐름
 
-- `main` 브랜치는 코드만 유지한다.
-- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
-- 코드와 노트가 다르면 실제 코드가 우선이다.
+1. `GET /api/settings/inventory/check` → `check_inventory_consistency` 호출 → 불일치 목록 확인
+2. `/health/detailed` 에서도 `check_inventory_consistency` 를 호출해 `inventory_mismatch_count` 를 노출한다
+3. 불일치 발견 시 `POST /api/settings/inventory/repair?dry_run=true` 로 사전 확인 후 `dry_run=false` 로 실제 복구
+
+---
+
+## 8. 의존 관계
+
+```
+integrity.py
+  ← models (Inventory, InventoryLocation, Item)
+  호출자: main.py (/health/detailed), settings 라우터 (/inventory/check, /repair)
+```
+
+---
+
+## 9. 주의 사항
+
+> [!note]
+> `_location_sum_map` 은 GROUP BY 로 전체 item 의 location 합을 한 번에 읽는다. 이 함수 호출 후 즉시 Inventory 목록을 스캔하므로, 중간에 다른 트랜잭션이 재고를 바꾸면 결과가 inconsistent 할 수 있다. 복구는 점검 직후 시스템 유휴 시간에 실행하는 것이 안전하다.
+
+---
+
+## 10. 관련 노트 링크
+
+- [[inventory.py]] — `_sync_total` 불변식 유지자
+- [[main.py]] — `/health/detailed` 에서 호출
+- [[models.py]] — Inventory, InventoryLocation ORM 정의

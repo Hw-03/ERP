@@ -1,249 +1,199 @@
 ---
 type: code-note
-project: ERP
+project: DEXCOWIN MES
 layer: frontend
-source_path: frontend/app/legacy/_components/_history_sections/HistoryDetailPanel.tsx
+source_path: erp/frontend/app/legacy/_components/_history_sections/HistoryDetailPanel.tsx
 status: active
-updated: 2026-04-27
-source_sha: 7db1583e5fba
+updated: 2026-05-21
 tags:
-  - erp
-  - frontend
-  - frontend-component
-  - tsx
+  - layer/frontend
+  - topic/history
+  - audience/junior
 ---
 
 # HistoryDetailPanel.tsx
 
 > [!summary] 역할
-> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
-
-## 원본 위치
-
-- Source: `frontend/app/legacy/_components/_history_sections/HistoryDetailPanel.tsx`
-- Layer: `frontend`
-- Kind: `frontend-component`
-- Size: `8643` bytes
-
-## 연결
-
-- Parent hub: [[frontend/app/legacy/_components/_history_sections/_history_sections|frontend/app/legacy/_components/_history_sections]]
-- Related: [[frontend/frontend]]
-
-## 읽는 포인트
-
-- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
-- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
-
-## 원본 발췌
-
-````tsx
-"use client";
-
-import { Activity } from "lucide-react";
-import type { TransactionLog } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber, transactionColor, transactionLabel } from "../legacyUi";
-import { CATEGORY_META, formatHistoryDate, parseUtc } from "./historyShared";
-
-type Props = {
-  selected: TransactionLog | null;
-  editingNotes: string;
-  setEditingNotes: (v: string) => void;
-  savingNotes: boolean;
-  onSaveNotes: () => void;
-  itemRecentLogs: TransactionLog[];
-  onSelectLog: (log: TransactionLog) => void;
-};
-
-export function HistoryDetailPanel({
-  selected,
-  editingNotes,
-  setEditingNotes,
-  savingNotes,
-  onSaveNotes,
-  itemRecentLogs,
-  onSelectLog,
-}: Props) {
-  if (!selected) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center" style={{ color: LEGACY_COLORS.muted2 }}>
-          <Activity className="mx-auto mb-3 h-10 w-10 opacity-30" />
-          <div className="text-base">테이블에서 항목을 클릭하면<br />상세 내용이 표시됩니다</div>
-        </div>
-      </div>
-    );
-  }
-
-  const tcolor = transactionColor(selected.transaction_type);
-
-  return (
-    <div className="space-y-4">
-      {/* 거래 유형 + 수량 강조 */}
-      <div
-        className="rounded-[24px] border p-5 text-center"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-      >
-        <span
-          className="inline-flex rounded-full px-4 py-1.5 text-sm font-bold"
-          style={{ background: `color-mix(in srgb, ${tcolor} 14%, transparent)`, color: tcolor }}
-        >
-          {transactionLabel(selected.transaction_type)}
-        </span>
-        <div className="mt-3 text-4xl font-black" style={{ color: tcolor }}>
-          {Number(selected.quantity_change) >= 0 ? "+" : ""}
-          {formatNumber(selected.quantity_change)}
-          <span className="ml-2 text-base font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-            {selected.item_unit}
-          </span>
-        </div>
-        {(selected.quantity_before != null || selected.quantity_after != null) && (
-          <div className="mt-3 flex items-center gap-2">
-            <div
-              className="flex-1 rounded-[14px] border px-3 py-2 text-center"
-              style={{
-                background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 8%, transparent)`,
-                borderColor: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 25%, transparent)`,
-              }}
-            >
-              <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: LEGACY_COLORS.muted2 }}>
-                처리 전
-              </div>
-              <div className="mt-1 text-lg font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-                {selected.quantity_before != null ? formatNumber(selected.quantity_before) : "-"}
-              </div>
-            </div>
-            <span className="text-lg" style={{ color: LEGACY_COLORS.muted2 }}>→</span>
-            <div
-              className="flex-1 rounded-[14px] border px-3 py-2 text-center"
-              style={{
-                background: `color-mix(in srgb, ${tcolor} 8%, transparent)`,
-                borderColor: `color-mix(in srgb, ${tcolor} 30%, transparent)`,
-              }}
-            >
-              <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: tcolor }}>
-                처리 후
-              </div>
-              <div className="mt-1 text-lg font-black" style={{ color: tcolor }}>
-                {selected.quantity_after != null ? formatNumber(selected.quantity_after) : "-"}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 상세 정보 */}
-      <div
-        className="space-y-2.5 rounded-[24px] border p-4"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-      >
-        {(
-          [
-            ["품목명", selected.item_name],
-            ["ERP코드", selected.erp_code ?? "-"],
-            ["분류", (CATEGORY_META[selected.item_category] ?? { label: selected.item_category }).label],
-            ["단위", selected.item_unit],
-            ["담당자", selected.produced_by ?? "-"],
-            ["참조번호", selected.reference_no ?? "-"],
-            ["일시", parseUtc(selected.created_at).toLocaleString("ko-KR")],
-          ] as [string, string][]
-        ).map(([label, value]) => (
-          <div key={label} className="flex items-start justify-between gap-3">
-            <span className="shrink-0 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              {label}
-            </span>
-            <span className="text-right text-base font-semibold break-all" style={{ color: LEGACY_COLORS.text }}>
-              {value}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {/* 메모 편집 */}
-      <div
-        className="rounded-[24px] border p-4"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-      >
-        <div className="mb-2 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
-          메모
-        </div>
-        <textarea
-          value={editingNotes}
-          onChange={(e) => setEditingNotes(e.target.value)}
-          placeholder="메모를 입력하세요..."
-          className="min-h-[80px] w-full rounded-[14px] border px-3 py-2.5 text-base outline-none"
-          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-        />
-        <button
-          onClick={onSaveNotes}
-          disabled={savingNotes || editingNotes === (selected.notes ?? "")}
-          className="mt-2 w-full rounded-[14px] py-2.5 text-base font-bold text-white disabled:opacity-40"
-          style={{ background: LEGACY_COLORS.blue }}
-        >
-          {savingNotes ? "저장 중..." : "메모 저장"}
-        </button>
-      </div>
-
-      {/* 이 품목의 최근 거래 */}
-      <div
-        className="rounded-[24px] border p-4"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-      >
-        <div className="mb-3 text-sm font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
-          이 품목의 최근 거래
-        </div>
-        {itemRecentLogs.length === 0 ? (
-          <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>최근 거래 없음</div>
-        ) : (
-          <div className="space-y-2">
-            {itemRecentLogs.map((log) => (
-              <button
-                key={log.log_id}
-                onClick={() => onSelectLog(log)}
-                className="flex w-full items-center justify-between rounded-[14px] border p-3 text-left transition-all hover:brightness-110"
-                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-              >
-                <div className="flex-1 min-w-0">
-                  <span
-                    className="inline-flex rounded px-2 py-0.5 text-xs font-bold"
-                    style={{
-                      background: `color-mix(in srgb, ${transactionColor(log.transaction_type)} 14%, transparent)`,
-                      color: transactionColor(log.transaction_type),
-                    }}
-                  >
-                    {transactionLabel(log.transaction_type)}
-                  </span>
-                  <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {formatHistoryDate(log.created_at)}
-                  </div>
-                  {(log.quantity_before != null || log.quantity_after != null) && (
-                    <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                      {log.quantity_before != null ? formatNumber(log.quantity_before) : "-"} →{" "}
-                      {log.quantity_after != null ? formatNumber(log.quantity_after) : "-"}
-                    </div>
-                  )}
-                </div>
-                <div
-                  className="shrink-0 ml-2 text-base font-bold text-right"
-                  style={{ color: transactionColor(log.transaction_type) }}
-                >
-                  {Number(log.quantity_change) >= 0 ? "+" : ""}
-                  {formatNumber(log.quantity_change)}
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-````
+> **거래 상세 우측 패널.** 선택된 `TransactionLog` 한 건의 상세 정보(영웅 헤더·메타 스트립·수정 이력·최근 거래)를 표시하고, 메타 정보 정정 및 수량 정정 모달을 제공한다.
 
 ---
 
-## 정책
+## 1. 위치
 
-- `main` 브랜치는 코드만 유지한다.
-- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
-- 코드와 노트가 다르면 실제 코드가 우선이다.
+```
+erp/frontend/app/legacy/_components/_history_sections/HistoryDetailPanel.tsx
+```
+
+**부모**: `DesktopHistoryView.tsx` (우측 패널 영역)
+
+---
+
+## 2. 역할 한 줄 요약
+
+테이블에서 선택한 거래 로그의 상세를 3개 섹션으로 표시: 영웅 헤더(타입·변동·흐름·재고 델타), 메타 스트립(코드·담당자·메모·일시·정정 버튼), 수정 이력 + 이 품목 최근 거래.
+
+---
+
+## 3. Props
+
+| prop | 타입 | 설명 |
+|---|---|---|
+| `selected` | `TransactionLog \| null` | 현재 선택된 거래 로그 |
+| `itemRecentLogs` | `TransactionLog[]` | 같은 품목의 최근 거래 목록 |
+| `onSelectLog` | `(log) => void` | 최근 거래에서 다른 항목 선택 |
+| `onLogUpdated` | `(updated) => void` | 메타 정정 성공 후 콜백 |
+| `onLogCorrected` | `({original, correction}) => void` | 수량 정정 성공 후 콜백 |
+
+---
+
+## 4. 구성 섹션
+
+```mermaid
+flowchart TD
+    Panel[HistoryDetailPanel] --> Hero["HistoryDetailHero\n타입배지·변동요약·흐름·재고델타"]
+    Panel --> Meta["HistoryDetailMetaStrip\n품목코드·담당자·메모·일시·정정버튼"]
+    Panel --> Edits["Collapsible: 수정 이력\n(edits.length > 0 시만)"]
+    Panel --> Recent["Collapsible: 이 품목의 최근 거래"]
+    Panel --> Modal["TransactionEditUnifiedModal\n메타/수량 정정 모달"]
+```
+
+---
+
+## 5. 상태 관리
+
+| 상태 | 용도 |
+|---|---|
+| `editOpen` | 정정 모달 열림 여부 |
+| `edits` | 수정 이력 목록 (`TransactionEditLog[]`) |
+| `editsLoaded` | 수정 이력 로딩 완료 여부 |
+| `flow` | IoBatch 흐름 로딩 상태 (`idle/loading/available/unavailable`) |
+
+---
+
+## 6. FlowState — 작업 흐름 표시
+
+```typescript
+type FlowState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "available"; batch: IoBatch }
+  | { status: "unavailable" };
+```
+
+`selected.operation_batch_id`가 있으면 `ioApi.getBatch()`를 호출해서 "출발 → 도착" 흐름을 표시한다. 없거나 실패하면 흐름 줄 자체를 숨긴다.
+
+---
+
+## 7. 코드 발췌 — 영웅 헤더
+
+```tsx
+function HistoryDetailHero({ log, flow, editCount }) {
+  const tcolor = transactionColor(log.transaction_type);
+  const movement = getSingleLogMovement(log);
+  const eps = flow.status === "available" ? getBatchFlowEndpoints(flow.batch) : null;
+
+  return (
+    <div className="rounded-[20px] border p-4 space-y-3" style={heroStyle}>
+      {/* 타입 배지 + 변동요약 + 수정됨 배지 */}
+      <div className="flex flex-wrap items-center gap-2">
+        <FlowBadge type={log.transaction_type} label={getHistoryDisplayLabel(log)} color={tcolor} />
+        <MovementSummaryCell summary={{ parts: [movement] }} />
+        {editCount > 0 && (
+          <span style={{ color: LEGACY_COLORS.yellow }}>
+            <History className="h-3 w-3" /> 수정됨 {editCount}
+          </span>
+        )}
+      </div>
+
+      {/* 흐름: 출발 → 도착 */}
+      {flow.status === "available" && eps && (
+        <div className="flex items-center gap-2 text-xs">
+          <span>{eps.from}</span>
+          <ArrowRight className="h-3.5 w-3.5" />
+          <span>{eps.to}</span>
+          {workType && <span>({workType})</span>}
+        </div>
+      )}
+
+      {/* 재고 영향: 처리 전 → 처리 후 */}
+      {hasStockDelta && (
+        <div className="flex items-center gap-2 text-xs">
+          <span>처리 전 {qBefore}</span>
+          <ArrowRight />
+          <span style={{ color: tcolor }}>처리 후 {qAfter}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## 8. 정정 가능 거래 유형
+
+```typescript
+const META_CORRECTABLE = new Set([
+  "RECEIVE", "SHIP", "ADJUST",
+  "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "TRANSFER_DEPT",
+  "MARK_DEFECTIVE", "SUPPLIER_RETURN",
+]);
+```
+
+`META_CORRECTABLE`에 속하는 거래 유형이면 정정 버튼이 표시된다. `QUANTITY_CORRECTABLE_TYPES`(수량 정정 가능 목록)는 `TransactionEditUnifiedModal`에서 관리.
+
+---
+
+## 9. UtcDatetime 표시
+
+```tsx
+// HistoryDetailMetaStrip 내부
+<span style={{ color: LEGACY_COLORS.muted2 }}>
+  {formatHistoryDateTimeLong(log.created_at)}
+</span>
+```
+
+`formatHistoryDateTimeLong`은 UTC ISO 문자열을 KST 기준 "YYYY-MM-DD HH:mm:ss" 형식으로 변환한다. 단순 포맷 함수이며 `historyFormat.ts`에 정의됨.
+
+---
+
+## 10. Collapsible 섹션
+
+```tsx
+function Collapsible({ icon, title, count, defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="rounded-[20px] border" ...>
+      <button onClick={() => setOpen((v) => !v)}>
+        {title} ({count})
+        <ChevronDown className={open ? "rotate-180" : ""} />
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
+    </div>
+  );
+}
+```
+
+수정 이력과 최근 거래 목록은 모두 접을 수 있는 섹션으로 표시. 기본값은 닫힘(`defaultOpen=false`).
+
+---
+
+## 11. 연결 관계
+
+- **부모**: `erp/frontend/app/legacy/_components/DesktopHistoryView.tsx`
+- **자식**: `HistoryDetailEditHistory`, `HistoryDetailRecentLogs`, `TransactionEditUnifiedModal`
+- **해석 함수**: `erp/frontend/app/legacy/_components/_history_sections/historyBatchInterpreter.ts` (`getBatchFlowEndpoints`, `getHistoryDisplayLabel` 등)
+- **API**: `api.getTransactionEdits`, `ioApi.getBatch`
+
+---
+
+## 12. 신입을 위한 맥락
+
+> [!note] 처음 보는 신입에게
+> 거래 내역 테이블에서 항목을 클릭하면 오른쪽에 이 패널이 열린다.
+>
+> **"처리 전 → 처리 후"**: 이 거래로 재고가 얼마에서 얼마로 바뀌었는지 보여준다.
+>
+> **"흐름 (출발 → 도착)"**: 어느 위치(창고/부서)에서 어디로 이동했는지 보여준다. 입출고 2.0으로 처리된 경우에만 표시된다.
+>
+> **정정 버튼**: 잘못된 정보를 사후에 수정할 수 있다. 수량 정정은 별도의 정정 거래를 생성해서 원본 로그는 보존한다 (이력 보전 원칙).

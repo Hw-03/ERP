@@ -1,188 +1,209 @@
 ---
 type: code-note
-project: ERP
+project: DEXCOWIN MES
 layer: backend
-source_path: backend/app/routers/employees.py
 status: active
-updated: 2026-04-27
-source_sha: 4b1dfe9bd401
-tags:
-  - erp
-  - backend
-  - router
-  - py
+created: 2026-05-21
+updated: 2026-05-21
+source_path: erp/backend/app/routers/employees.py
+tags: [vault, code-note, backend, router]
+aliases: [직원 마스터 API]
 ---
 
-# employees.py
+# 📦 employees.py — 직원 마스터 CRUD + PIN 관리
 
 > [!summary] 역할
-> FastAPI 라우터 계층의 `employees` 영역 API 엔드포인트를 담당한다.
+> 직원 정보 관리의 모든 엔드포인트.  
+> CRUD(목록/생성/수정/삭제) 외에 PIN 검증·변경·초기화, 담당 모델 배정, 테마 설정까지 담당한다.  
+> 삭제는 이력이 있으면 소프트 삭제(비활성화), 없으면 영구 삭제로 분기된다.
 
-## 원본 위치
+#layer/backend #topic/router #topic/employees
 
-- Source: `backend/app/routers/employees.py`
-- Layer: `backend`
-- Kind: `router`
-- Size: `5404` bytes
+---
 
-## 연결
+## 1. 역할
 
-- Parent hub: [[backend/app/routers/routers|backend/app/routers]]
-- Related: [[backend/backend]]
+- 직원 목록 조회 / 생성 / 수정 / 삭제
+- PIN 검증 (`verify-pin`), 본인 PIN 변경 (`change-pin`), 관리자 PIN 으로 초기화 (`reset-pin`)
+- 담당 모델 슬롯 배정 (`assigned_model_slots`): `EmployeeAssignedModel` 테이블 통째 교체
+- 테마 설정 저장 (light/dark/null)
+- 모든 생성/수정/삭제에 `audit.record` 감사 기록
 
-## 읽는 포인트
+## 2. 원본 위치
 
-- 라우터는 API 표면이다. 요청/응답 계약은 `schemas.py`와 함께 확인한다.
-- DB 변경은 서비스/모델/테스트까지 같이 본다.
+```
+erp/backend/app/routers/employees.py
+```
 
-## 원본 발췌
+## 3. import
 
-````python
-"""Employee master router."""
+| 모듈 | 용도 |
+|------|------|
+| `app.models.Employee, EmployeeAssignedModel, ProductSymbol, StockRequest` | ORM |
+| `app.services.pin_auth` | hash_pin, verify_pin, DEFAULT_PIN_HASH |
+| `app.services.rate_limit` | PIN 브루트포스 완화 |
+| `app.services.audit` | 감사 기록 |
+| `app.routers.settings.require_admin` | 관리자 PIN 검증 (reset-pin 용) |
+| `app.services._tx.commit_and_refresh, commit_only` | 원자적 DB 커밋 |
 
-from datetime import UTC, datetime
-import uuid
-from typing import List, Optional
+## 4. export (endpoint 목록)
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy.orm import Session
+| Method | Path | 설명 |
+|--------|------|------|
+| GET | `/employees` | 직원 목록 (department/active_only 필터) |
+| POST | `/employees` | 직원 생성 (employee_code 자동 부여 가능) |
+| PUT | `/employees/{employee_id}` | 직원 정보 수정 |
+| DELETE | `/employees/{employee_id}` | 삭제 or 비활성화 |
+| POST | `/employees/{employee_id}/verify-pin` | PIN 검증 (rate-limit 있음) |
+| POST | `/employees/{employee_id}/change-pin` | 본인 PIN 변경 |
+| POST | `/employees/{employee_id}/reset-pin` | PIN 초기화 (관리자 PIN 필요) |
+| PUT | `/employees/{employee_id}/theme` | 테마 설정 |
 
-from app.database import get_db
-from app.models import DepartmentEnum, Employee
-from app.routers._errors import ErrorCode, http_error
-from app.schemas import EmployeeCreate, EmployeeResponse, EmployeeUpdate
-from app.services import audit
-from app.services._tx import commit_and_refresh, commit_only
+## 5. 참조처
 
-router = APIRouter()
+- 프론트엔드 직원 관리 화면
+- `transactions.py::_verify_editor` → Employee PIN 검증 시 동일 로직
+- `departments.py::require_admin` — settings.py 의 `require_admin` 을 공유 사용
 
+## 6. 업무 흐름
 
-@router.get("", response_model=List[EmployeeResponse])
-def list_employees(
-    department: Optional[DepartmentEnum] = Query(None),
-    active_only: bool = Query(True),
-    db: Session = Depends(get_db),
-):
-    query = db.query(Employee)
-    if department:
-        query = query.filter(Employee.department == department)
-    if active_only:
-        query = query.filter(Employee.is_active == "true")
+```mermaid
+flowchart TD
+    subgraph CRUD
+        A[GET /employees] --> B[_assigned_slots_bulk N+1 없음]
+        C[POST /employees] --> D[_auto_employee_code\n빈 경우 E숫자 자동]
+        D --> E[_sync_assigned_models]
+        E --> F[audit.record employee.create]
+    end
 
-    employees = query.order_by(Employee.display_order.asc(), Employee.name.asc()).all()
-    return [_to_response(employee) for employee in employees]
+    subgraph PIN
+        G[POST /verify-pin] --> H[rate_limit 체크]
+        H --> I[verify_pin]
+        I -->|실패| J[rate_limit.record_failure]
+        I -->|성공| K[rate_limit.record_success]
 
+        L[POST /reset-pin] --> M[require_admin 관리자PIN]
+        M --> N[pin_hash = DEFAULT_PIN_HASH]
+    end
 
-@router.post("", response_model=EmployeeResponse, status_code=status.HTTP_201_CREATED)
-def create_employee(payload: EmployeeCreate, request: Request, db: Session = Depends(get_db)):
-    existing = db.query(Employee).filter(Employee.employee_code == payload.employee_code).first()
-    if existing:
-        raise http_error(409, ErrorCode.CONFLICT, "직원 코드가 이미 존재합니다.")
+    subgraph 삭제 분기
+        O[DELETE /{employee_id}] --> P{StockRequest 이력?}
+        P -->|있음| Q[is_active=False\n audit deactivate]
+        P -->|없음| R[db.delete\n audit delete]
+    end
+```
 
-    employee = Employee(
-        employee_code=payload.employee_code,
-        name=payload.name,
-        role=payload.role,
-        phone=payload.phone,
-        department=payload.department,
-        level=payload.level,
-        display_order=payload.display_order,
-        is_active="true" if payload.is_active else "false",
-    )
-    db.add(employee)
-    db.flush()
+## 7. 핵심 함수
 
-    audit.record(
-        db,
-        request=request,
-        action="employee.create",
-        target_type="employee",
-        target_id=str(employee.employee_id),
-        payload_summary=f"{employee.name} ({employee.employee_code})",
-    )
+### `_sync_assigned_models` — 담당 모델 통째 교체
 
-    commit_and_refresh(db, employee)
-    return _to_response(employee)
+```python
+def _sync_assigned_models(db: Session, employee_id: uuid.UUID, slots: List[int]) -> None:
+    """직원의 담당 모델을 payload 순서(=priority)로 통째 교체.
+    존재하지 않는 slot, 중복 slot 은 무시한다 (조용히 dedupe).
+    빈 리스트면 매핑 전부 제거.
+    """
+    db.query(EmployeeAssignedModel).filter(
+        EmployeeAssignedModel.employee_id == employee_id
+    ).delete(synchronize_session=False)
+    # 유효한 slot 만 INSERT (ProductSymbol 존재 확인)
+    valid_slots = {row.slot for row in db.query(ProductSymbol.slot)
+                   .filter(ProductSymbol.slot.in_(unique_ordered)).all()}
+    for idx, slot in enumerate(unique_ordered):
+        if slot not in valid_slots:
+            continue
+        db.add(EmployeeAssignedModel(employee_id=employee_id, slot=slot, priority=idx))
+```
 
+### `_auto_employee_code` — E{숫자} 자동 부여
 
-@router.put("/{employee_id}", response_model=EmployeeResponse)
-def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, request: Request, db: Session = Depends(get_db)):
-    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
-    if not employee:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+```python
+def _auto_employee_code(db: Session) -> str:
+    import re
+    codes = [e.employee_code for e in db.query(Employee.employee_code).all()]
+    nums = [int(m.group(1)) for c in codes if c and (m := re.fullmatch(r"E(\d+)", c))]
+    return f"E{max(nums, default=0) + 1}"
+```
 
-    changed: list[str] = []
-    if payload.name is not None and employee.name != payload.name:
-        employee.name = payload.name; changed.append("name")
-    if payload.role is not None and employee.role != payload.role:
-        employee.role = payload.role; changed.append("role")
-    if payload.phone is not None and employee.phone != payload.phone:
-        employee.phone = payload.phone; changed.append("phone")
-    if payload.department is not None and employee.department != payload.department:
-        employee.department = payload.department; changed.append("department")
-    if payload.level is not None and employee.level != payload.level:
-        employee.level = payload.level; changed.append("level")
-    if payload.display_order is not None and employee.display_order != payload.display_order:
-        employee.display_order = payload.display_order; changed.append("display_order")
-    if payload.is_active is not None:
-        new_flag = "true" if payload.is_active else "false"
-        if employee.is_active != new_flag:
-            employee.is_active = new_flag; changed.append("is_active")
+### `verify_employee_pin` — rate-limit 포함
 
-    employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
+```python
+@router.post("/{employee_id}/verify-pin", response_model=EmployeeResponse)
+def verify_employee_pin(employee_id, payload, request, db):
+    client_ip = getattr(getattr(request, "client", None), "host", None) or "unknown"
+    rl_key = f"verify_pin:{employee_id}:{client_ip}"
 
-    if changed:
-        audit.record(
-            db,
-            request=request,
-            action="employee.update",
-            target_type="employee",
-            target_id=str(employee.employee_id),
-            payload_summary=f"{employee.name}: {', '.join(changed)}",
-        )
+    if rate_limit.is_blocked(rl_key):
+        raise http_error(429, ErrorCode.TOO_MANY_REQUESTS, "PIN 시도가 너무 많습니다.")
 
-    commit_and_refresh(db, employee)
-    return _to_response(employee)
+    ...
+    if not verify_pin(employee.pin_hash, payload.pin):
+        rate_limit.record_failure(rl_key)
+        raise http_error(403, ...)
 
+    rate_limit.record_success(rl_key)
+    return _to_response(employee, ...)
+```
 
-@router.delete("/{employee_id}", status_code=status.HTTP_204_NO_CONTENT)
+## 8. 위험 포인트
+
+> [!danger] 삭제 분기: 비활성화 vs 영구 삭제
+> `StockRequest` 이력이 있으면 비활성화, 없으면 영구 삭제.  
+> 이력 테이블이 추가되면 이 조건을 확장해야 한다.  
+> 현재는 `StockRequest` 만 체크한다.
+
+> [!warning] is_active 의 타입 혼용
+> DB 에서 `is_active` 는 문자열 `"true"/"false"` 로 저장되지만 (레거시),  
+> `_to_response` 에서 `bool(employee.is_active)` 로 변환한다.  
+> 코드 내 조건문에서 `if employee.is_active` (truthy) 와 `== "true"` 가 혼용됨.
+
+> [!warning] PIN 검증은 실제 인증이 아님
+> docstring 에 명시: "작업자 식별용 PIN 검증 — 실제 보안 인증이 아님."
+
+## 9. 죽은 코드 의심
+
+- `_assigned_slots_for` 는 `create_employee`, `update_employee`, `reset-pin` 응답 조립에 사용.  
+  `_assigned_slots_bulk` 와 역할이 겹치지만 단건이라 유지.
+
+## 10. 수정 전 체크
+
+- [ ] `warehouse_role` / `department_role` 허용 값: `none/primary/deputy` — 스키마 레벨 Enum 없음, 라우터에서 직접 검증
+- [ ] `_sync_assigned_models` 는 delete + insert 방식 — flush 시점 주의 (commit 전 id 필요)
+- [ ] `change-pin`: 현재 PIN 과 새 PIN 이 같으면 422 — 프론트에서도 동일 검증 권장
+
+## 11. 코드 발췌
+
+```python
+@router.delete("/{employee_id}")
 def delete_employee(employee_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
 
-    audit.record(
-        db,
-        request=request,
-        action="employee.delete",
-        target_type="employee",
-        target_id=str(employee.employee_id),
-        payload_summary=f"{employee.name} ({employee.employee_code})",
-    )
-    db.delete(employee)
-    commit_only(db)
+    has_requests = db.query(StockRequest).filter(
+        StockRequest.requester_employee_id == employee_id
+    ).first() is not None
 
-
-def _to_response(employee: Employee) -> EmployeeResponse:
-    return EmployeeResponse(
-        employee_id=employee.employee_id,
-        employee_code=employee.employee_code,
-        name=employee.name,
-        role=employee.role,
-        phone=employee.phone,
-        department=employee.department,
-        level=employee.level,
-        display_order=int(employee.display_order),
-        is_active=employee.is_active == "true",
-        created_at=employee.created_at,
-        updated_at=employee.updated_at,
-    )
-````
+    if has_requests:
+        employee.is_active = False
+        employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        audit.record(db, request=request, action="employee.deactivate", ...)
+        commit_only(db)
+        return JSONResponse(status_code=200, content={"result": "deactivated"})
+    else:
+        audit.record(db, request=request, action="employee.delete", ...)
+        db.delete(employee)
+        commit_only(db)
+        return JSONResponse(status_code=200, content={"result": "deleted"})
+```
 
 ---
 
-## 정책
+## 관련 노트
 
-- `main` 브랜치는 코드만 유지한다.
-- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
-- 코드와 노트가 다르면 실제 코드가 우선이다.
+- [[_routers]] — 라우터 허브
+- [[erp/backend/app/routers/settings.py]] — require_admin (reset-pin 사용)
+- [[erp/backend/app/services/pin_auth.py]] — hash_pin / verify_pin
+- [[erp/backend/app/services/rate_limit.py]] — PIN rate-limit
+
+Up: [[_routers]]

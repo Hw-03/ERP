@@ -1,271 +1,140 @@
 ---
-type: code-note
-project: ERP
 layer: backend
-source_path: backend/app/schemas.py
-status: active
-updated: 2026-04-27
-source_sha: 2a84913dd52b
+topic: schema
+file: erp/backend/app/schemas.py
 tags:
-  - erp
-  - backend
-  - schema
-  - py
+  - "#layer/backend"
+  - "#topic/schema"
+aliases:
+  - Pydantic 스키마
+  - UtcDatetime
 ---
 
-# schemas.py
+# 📝 schemas.py — Pydantic 요청/응답 스키마
 
-> [!summary] 역할
-> FastAPI 요청/응답에 쓰는 Pydantic 스키마와 타입 계약을 정의한다.
+> [!summary]
+> FastAPI 요청/응답에 쓰는 Pydantic v2 스키마와 타입 계약을 정의한다. 핵심은 `UtcDatetime` alias(line 27–31) — naive datetime 에 자동으로 `+00:00` UTC offset 을 붙여 클라이언트에 ISO 8601 형식으로 직렬화한다.
 
-## 원본 위치
+---
 
-- Source: `backend/app/schemas.py`
-- Layer: `backend`
-- Kind: `schema`
-- Size: `24273` bytes
+## 1. 한 문장 목적
 
-## 연결
+API 입력 검증과 응답 직렬화를 위한 Pydantic 스키마 컨테이너. DB 모델과 외부 API 계약 사이의 변환 계층.
 
-- Parent hub: [[backend/app/app|backend/app]]
-- Related: [[backend/backend]]
+---
 
-## 읽는 포인트
+## 2. 파일 위치 & 임포트 경로
 
-- 실제 수정은 원본 파일에서 한다.
-- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+```
+erp/backend/app/schemas.py
+from app.schemas import ItemCreate, ItemResponse, UtcDatetime, ...
+```
 
-## 원본 발췌
+---
 
-> 전체 753줄 중 앞부분만 발췌했다. 실제 수정은 원본 파일을 기준으로 한다.
+## 3. UtcDatetime (commit 4db421a / F4b)
 
-````python
-"""Pydantic schemas for the X-Ray ERP API."""
-
-from datetime import datetime
-from decimal import Decimal
-from typing import List, Optional
-import uuid
-
-from pydantic import BaseModel, ConfigDict, Field
-
-from app.models import (
-    AlertKindEnum,
-    CategoryEnum,
-    DepartmentEnum,
-    EmployeeLevelEnum,
-    LocationStatusEnum,
-    QueueBatchStatusEnum,
-    QueueBatchTypeEnum,
-    QueueLineDirectionEnum,
-    TransactionTypeEnum,
-)
+```python
+# line 20-31
+def _serialize_datetime_with_utc(dt: datetime) -> str:
+    """Serialize naive datetime with +00:00 UTC offset."""
+    if dt.tzinfo is None:
+        return dt.isoformat() + "+00:00"
+    return dt.isoformat()
 
 
-class ItemCreate(BaseModel):
-    item_name: str = Field(..., max_length=200, description="품목명")
-    spec: Optional[str] = Field(None, description="사양")
-    category: CategoryEnum = Field(CategoryEnum.UK, description="11단계 공정 카테고리")
-    unit: str = Field("EA", max_length=20, description="단위")
-    barcode: Optional[str] = Field(None, max_length=100)
-    legacy_file_type: Optional[str] = Field(None, max_length=50)
-    legacy_part: Optional[str] = Field(None, max_length=50)
-    legacy_item_type: Optional[str] = Field(None, max_length=50)
-    legacy_model: Optional[str] = Field(None, max_length=50)
-    supplier: Optional[str] = Field(None, max_length=200)
-    min_stock: Optional[Decimal] = None
-    initial_quantity: Optional[Decimal] = Field(None, description="초기 재고 수량 (기본 0)")
-    model_slots: List[int] = Field(default=[], description="사용 제품 슬롯 목록 (1=DX3000, 2=COCOON, 3=SOLO, 4=ADX4000W, 5=ADX6000)")
-    option_code: Optional[str] = Field(None, max_length=10, description="옵션/스펙 코드 (예: BG)")
+UtcDatetime = Annotated[
+    datetime,
+    PlainSerializer(_serialize_datetime_with_utc, return_type=str),
+    WithJsonSchema({"type": "string", "format": "date-time"}),
+]
+```
 
+> [!info] UtcDatetime 사용 이유
+> SQLAlchemy 가 DB 에서 읽은 `datetime` 은 timezone-naive (tzinfo=None) 이다.
+> 클라이언트가 이를 받으면 로컬 시간으로 해석할 수 있다. `UtcDatetime` 은
+> naive datetime 에 자동으로 `+00:00` 을 붙여 항상 UTC 임을 명시한다.
 
-class ItemUpdate(BaseModel):
-    item_name: Optional[str] = Field(None, max_length=200)
-    spec: Optional[str] = None
-    category: Optional[CategoryEnum] = None
-    unit: Optional[str] = Field(None, max_length=20)
-    barcode: Optional[str] = Field(None, max_length=100)
-    legacy_file_type: Optional[str] = Field(None, max_length=50)
-    legacy_part: Optional[str] = Field(None, max_length=50)
-    legacy_item_type: Optional[str] = Field(None, max_length=50)
-    legacy_model: Optional[str] = Field(None, max_length=50)
-    supplier: Optional[str] = Field(None, max_length=200)
-    min_stock: Optional[Decimal] = None
+---
 
+## 4. 주요 스키마 목록
 
+### 품목
+
+| 스키마 | 용도 |
+|--------|------|
+| `ItemCreate` | POST /items 요청 |
+| `ItemUpdate` | PATCH /items/{id} 요청 |
+| `ItemResponse` | 품목 응답 (model_slots 포함) |
+
+### 재고
+
+| 스키마 | 용도 |
+|--------|------|
+| `InventoryResponse` | 재고 요약 응답 |
+| `TransactionLogResponse` | 거래 이력 응답 |
+
+### 직원
+
+| 스키마 | 용도 |
+|--------|------|
+| `EmployeeCreate` | 직원 생성 |
+| `EmployeeResponse` | 직원 응답 |
+
+### 결재 요청
+
+| 스키마 | 용도 |
+|--------|------|
+| `StockRequestCreate` | 결재 요청 생성 |
+| `StockRequestResponse` | 결재 요청 응답 |
+
+---
+
+## 5. 모델 설정
+
+```python
 class ItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
-    item_id: uuid.UUID
-    item_name: str
-    spec: Optional[str]
-    category: CategoryEnum
-    unit: str
-    barcode: Optional[str] = None
-    legacy_file_type: Optional[str] = None
-    legacy_part: Optional[str] = None
-    legacy_item_type: Optional[str] = None
-    legacy_model: Optional[str] = None
-    supplier: Optional[str] = None
-    min_stock: Optional[Decimal] = None
-    # ERP code fields
-    erp_code: Optional[str] = None
-    model_symbol: Optional[str] = None
-    model_slots: List[int] = []
-    symbol_slot: Optional[int] = None
-    process_type_code: Optional[str] = None
-    option_code: Optional[str] = None
-    serial_no: Optional[int] = None
-    created_at: datetime
-    updated_at: datetime
-
-
-class InventoryLocationResponse(BaseModel):
-    """부서×상태(생산/불량) 단위 재고 분포."""
-    department: DepartmentEnum
-    status: LocationStatusEnum
-    quantity: Decimal
-
-
-class ItemWithInventory(ItemResponse):
-    quantity: Optional[Decimal] = Decimal("0")
-    warehouse_qty: Decimal = Decimal("0")
-    production_total: Decimal = Decimal("0")
-    defective_total: Decimal = Decimal("0")
-    pending_quantity: Decimal = Decimal("0")
-    available_quantity: Decimal = Decimal("0")
-    last_reserver_name: Optional[str] = None
-    location: Optional[str] = None
-    locations: List[InventoryLocationResponse] = []
-    department: Optional[str] = None
-
-
-class EmployeeCreate(BaseModel):
-    employee_code: str = Field(..., max_length=30)
-    name: str = Field(..., max_length=100)
-    role: str = Field(..., max_length=100)
-    phone: Optional[str] = Field(None, max_length=30)
-    department: DepartmentEnum
-    level: EmployeeLevelEnum = EmployeeLevelEnum.STAFF
-    display_order: int = 0
-    is_active: bool = True
-
-
-class EmployeeUpdate(BaseModel):
-    name: Optional[str] = Field(None, max_length=100)
-    role: Optional[str] = Field(None, max_length=100)
-    phone: Optional[str] = Field(None, max_length=30)
-    department: Optional[DepartmentEnum] = None
-    level: Optional[EmployeeLevelEnum] = None
-    display_order: Optional[int] = None
-    is_active: Optional[bool] = None
-
-
-class EmployeeResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    employee_id: uuid.UUID
-    employee_code: str
-    name: str
-    role: str
-    phone: Optional[str]
-    department: DepartmentEnum
-    level: EmployeeLevelEnum
-    display_order: int
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
-
-
-class ShipPackageItemCreate(BaseModel):
-    item_id: uuid.UUID
-    quantity: Decimal = Field(..., gt=0)
-
-
-class ShipPackageCreate(BaseModel):
-    package_code: str = Field(..., max_length=40)
-    name: str = Field(..., max_length=200)
-    notes: Optional[str] = None
-
-
-class ShipPackageUpdate(BaseModel):
-    name: Optional[str] = Field(None, max_length=200)
-    notes: Optional[str] = None
-
-
-class ShipPackageItemResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    package_item_id: uuid.UUID
-    package_id: uuid.UUID
-    item_id: uuid.UUID
-    quantity: Decimal
-
-
-class ShipPackageResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    package_id: uuid.UUID
-    package_code: str
-    name: str
-    notes: Optional[str]
-    created_at: datetime
-    updated_at: datetime
-
-
-class ShipPackageItemDetail(BaseModel):
-    package_item_id: uuid.UUID
-    item_id: uuid.UUID
-    erp_code: Optional[str] = None
-    item_name: str
-    item_category: CategoryEnum
-    item_unit: str
-    quantity: Decimal
-
-
-class ShipPackageDetailResponse(ShipPackageResponse):
-    items: List[ShipPackageItemDetail]
-
-
-class AdminPinVerifyRequest(BaseModel):
-    pin: str = Field(..., min_length=4, max_length=32)
-
-
-class AdminPinUpdateRequest(BaseModel):
-    current_pin: str = Field(..., min_length=4, max_length=32)
-    new_pin: str = Field(..., min_length=4, max_length=32)
-
-
-class InventoryReceive(BaseModel):
-    item_id: uuid.UUID = Field(..., description="입고 대상 품목 ID")
-    quantity: Decimal = Field(..., gt=0, description="입고 수량")
-    location: Optional[str] = Field(None, max_length=100, description="보관 위치")
-    reference_no: Optional[str] = Field(None, max_length=100, description="참조 번호")
-    produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
-    notes: Optional[str] = Field(None, description="비고")
-
-
-class InventoryShip(BaseModel):
-    item_id: uuid.UUID = Field(..., description="출고 대상 품목 ID")
-    quantity: Decimal = Field(..., gt=0, description="출고 수량")
-    location: Optional[str] = Field(None, max_length=100, description="출고 위치")
-    reference_no: Optional[str] = Field(None, max_length=100, description="참조 번호")
-    produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
-    notes: Optional[str] = Field(None, description="비고")
-
-
-class InventoryAdjust(BaseModel):
-    item_id: uuid.UUID = Field(..., description="재고 조정 대상 품목 ID")
-    quantity: Decimal = Field(..., ge=0, description="조정 후 최종 수량")
-    reason: str = Field(..., min_length=1, description="조정 사유")
-    location: Optional[str] = Field(None, max_length=100, description="보관 위치")
-    reference_no: Optional[str] = Field(None, max_length=100, description="참조 번호")
-````
+    # from_attributes=True → SQLAlchemy ORM 객체를 직접 직렬화 가능
+```
 
 ---
 
-## 정책
+## 6. ItemCreate 핵심 필드
 
-- `main` 브랜치는 코드만 유지한다.
-- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
-- 코드와 노트가 다르면 실제 코드가 우선이다.
+```python
+class ItemCreate(BaseModel):
+    item_name: str = Field(..., max_length=200)
+    spec: Optional[str]
+    process_type_code: Optional[str] = Field(None, max_length=2)
+    unit: str = Field("EA", max_length=20)
+    initial_quantity: Optional[Decimal]
+    model_slots: List[int] = Field(default=[])
+    # model_slots: 사용 제품 슬롯 목록 (1=DX3000, 2=COCOON, ...)
+    option_code: Optional[str] = Field(None, max_length=10)
+```
+
+---
+
+## 7. 의존 관계
+
+```
+schemas.py
+  ← models (EmployeeLevelEnum, LocationStatusEnum, RequestBucketEnum, ...)
+  ← pydantic (BaseModel, ConfigDict, Field, PlainSerializer, AnnotatedTypes)
+  호출자: 모든 라우터 (요청 파라미터 & 응답 모델)
+```
+
+---
+
+## 8. 주의 사항
+
+> [!warning]
+> `UtcDatetime` 을 응답 스키마에 쓰지 않으면 naive datetime 이 그대로 직렬화되어 `"2026-05-21T14:30:00"` (offset 없음) 로 나간다. 프론트가 로컬 시간으로 해석해 1시간 오차가 생길 수 있다. 신규 응답 스키마에는 항상 `UtcDatetime` 을 사용한다.
+
+---
+
+## 9. 관련 노트 링크
+
+- [[models.py]] — ORM 엔터티 (스키마가 참조하는 Enum 위치)
+- [[main.py]] — FastAPI 앱 (라우터에서 스키마 사용)

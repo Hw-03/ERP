@@ -1,271 +1,175 @@
 ---
-type: code-note
-project: ERP
 layer: backend
-source_path: backend/app/main.py
-status: active
-updated: 2026-04-27
-source_sha: 22eaf0fb64d9
+topic: app-entry
+file: erp/backend/app/main.py
 tags:
-  - erp
-  - backend
-  - app-entry
-  - py
+  - "#layer/backend"
+  - "#topic/app-entry"
+aliases:
+  - FastAPI 진입점
+  - 라우터 등록
 ---
 
-# main.py
+# 🚀 main.py — FastAPI 앱 진입점 & 라우터 등록
 
-> [!summary] 역할
-> FastAPI 앱 생성, 라우터 등록, 미들웨어, 전역 예외 처리를 묶는 서버 진입점이다.
+> [!summary]
+> FastAPI 앱 생성, 14개 라우터 등록, CORS 미들웨어, X-Request-Id 미들웨어, 전역 예외 핸들러(ValueError/IntegrityError/OperationalError/Exception), 헬스 엔드포인트 5개를 담는 서버 진입점. **서버 기동만으로 DB 가 변하지 않는다** (bootstrap_db.py 분리).
 
-## 원본 위치
+---
 
-- Source: `backend/app/main.py`
-- Layer: `backend`
-- Kind: `app-entry`
-- Size: `11333` bytes
+## 1. 한 문장 목적
 
-## 연결
+DEXCOWIN MES 백엔드 서버의 진입점으로, 앱을 생성하고 모든 라우터와 미들웨어를 등록한다.
 
-- Parent hub: [[backend/app/app|backend/app]]
-- Related: [[backend/backend]]
+---
 
-## 읽는 포인트
+## 2. 파일 위치 & 실행 명령
 
-- 실제 수정은 원본 파일에서 한다.
-- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+```
+erp/backend/app/main.py
+cd backend
+python -m uvicorn app.main:app --reload
+```
 
-## 원본 발췌
+---
 
-> 전체 306줄 중 앞부분만 발췌했다. 실제 수정은 원본 파일을 기준으로 한다.
+## 3. 라우터 등록 (14개)
 
-````python
-"""FastAPI application entry point for the X-Ray ERP backend.
+```python
+app.include_router(items.router,          prefix="/api/items",            tags=["Items"])
+app.include_router(employees.router,      prefix="/api/employees",        tags=["Employees"])
+app.include_router(departments.router,    prefix="/api/departments",      tags=["Departments"])
+app.include_router(settings.router,       prefix="/api/settings",         tags=["Settings"])
+app.include_router(inventory.router,      prefix="/api/inventory",        tags=["Inventory"])
+app.include_router(io.router,             prefix="/api/io",               tags=["Inventory IO"])
+app.include_router(bom.router,            prefix="/api/bom",              tags=["BOM"])
+app.include_router(production.router,     prefix="/api/production",       tags=["Production"])
+app.include_router(codes.router,          prefix="/api/codes",            tags=["Codes"])
+app.include_router(variance.router,       prefix="/api/variance",         tags=["Variance"])
+app.include_router(models_router.router,  prefix="/api/models",           tags=["Models"])
+app.include_router(admin_audit.router,    prefix="/api/admin",            tags=["Admin Audit"])
+app.include_router(admin_audit_csv.router,prefix="/api/admin",            tags=["Admin Audit"])
+app.include_router(stock_requests.router, prefix="/api/stock-requests",   tags=["Stock Requests"])
+app.include_router(dept_adjustment.router,prefix="/api/dept-adjustment",  tags=["Dept Adjustment"])
+```
 
-Startup 부작용 (create_all / run_migrations / seed / ERP 백필) 은 모두
-`backend/bootstrap_db.py` 로 옮겼다. 서버 기동만으로는 DB 가 변하지 않는다.
+---
 
-초기 설치 / 스키마 변경 / 시드 재적용은 명시적으로:
-    cd backend
-    python bootstrap_db.py --all
-"""
+## 4. 헬스 엔드포인트 (5개)
 
-import os
-import uuid
+```mermaid
+flowchart LR
+    H1["GET /health\n정적 상태 확인"] --> R1["{'status':'ok'}"]
+    H2["GET /health/live\nDB ping (liveness)"] --> R2["503 if DB down"]
+    H3["GET /health/detailed\n불변식+카운트"] --> R3["mismatch_count 포함"]
+    H4["GET /api/health/db-info\nSQLite vs PG"] --> R4["safe_for_30_users"]
+    H5["POST /api/health/write-check\nSAVEPOINT 쓰기 테스트"] --> R5["latency_ms"]
+```
 
-from fastapi import Depends, FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from sqlalchemy import func, text
-from sqlalchemy.exc import IntegrityError, OperationalError
-from sqlalchemy.orm import Session
+| 엔드포인트 | 주기 | 용도 |
+|-----------|------|------|
+| `/health` | 항상 | 로드밸런서 프로브 |
+| `/health/live` | 30초 | 컨테이너 liveness |
+| `/health/detailed` | 수동 | 운영 점검 (무거움) |
+| `/api/health/db-info` | 초기화 | preflight 엔진 확인 |
+| `/api/health/write-check` | 초기화 | DB 쓰기 가능 확인 |
 
-from app._logging import get_logger, setup_logging
-from app.database import get_db
-from app.models import (
-    Employee,
-    Inventory,
-    Item,
-    QueueBatch,
-    QueueBatchStatusEnum,
-    TransactionLog,
-)
-from app.routers._errors import ErrorCode
-from app.services import integrity as integrity_svc
+---
 
-from app.routers import (
-    admin_audit,
-    alerts,
-    bom,
-    codes,
-    counts,
-    employees,
-    inventory,
-    items,
-    loss,
-    models as models_router,
-    production,
-    queue,
-    scrap,
-    settings,
-    ship_packages,
-    variance,
-)
+## 5. 전역 예외 핸들러
 
+```python
+@app.exception_handler(ValueError)
+def _value_error_handler(...):   # 422 VALIDATION_ERROR
 
-app = FastAPI(
-    title="X-Ray ERP System",
-    description="""
-    ## 정밀 X-Ray 장비 제조 ERP
+@app.exception_handler(IntegrityError)
+def _integrity_error_handler(...):  # 409 DB_INTEGRITY
 
-    ### 11단계 공정 카테고리
-    | Code | 명칭 | 설명 |
-    |------|------|------|
-    | RM | Raw Material | 원자재 |
-    | TA | Tube Ass'y | 튜브 반제품 |
-    | TF | Tube Final | 튜브 완제품 |
-    | HA | High-voltage Ass'y | 고압 반제품 |
-    | HF | High-voltage Final | 고압 완제품 |
-    | VA | Vacuum Ass'y | 진공 반제품 |
-    | VF | Vacuum Final | 진공 완제품 |
-    | AA | Body Ass'y | 조립 반제품 |
-    | AF | Body Final | 조립 완제품 |
-    | FG | Finished Good | 완제품 |
-    | UK | Unknown | 미분류 또는 확인 필요 |
+@app.exception_handler(OperationalError)
+def _operational_error_handler(...):  # 503 DB_UNAVAILABLE
 
-    ### 주요 기능
-    - 품목 마스터 조회 및 수정
-    - 재고 요약, 입고, 출고, 조정, 거래 이력
-    - 직원 마스터 및 출하 패키지 관리
-    - BOM 관리와 트리 조회
-    - 생산 입고와 BOM 기반 Backflush
-    """,
-    version="1.3.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    redirect_slashes=False,
-    openapi_tags=[
-        {"name": "System", "description": "헬스체크, 메타 — 운영 점검용."},
-        {"name": "Items", "description": "품목 마스터 CRUD + 검색."},
-        {"name": "Employees", "description": "직원 마스터."},
-        {"name": "Inventory", "description": "재고 조회·입출고·이동·불량·반품·거래이력."},
-        {"name": "BOM", "description": "BOM CRUD + 트리 + Where-Used."},
-        {"name": "Production", "description": "생산 입고 + BOM Backflush."},
-        {"name": "Queue", "description": "Queue 배치 워크플로 (생산/분해/반품 2단계)."},
-        {"name": "Settings", "description": "관리자 PIN, 시스템 정합성 점검·복구."},
-        {"name": "Ship Packages", "description": "출하 묶음 CRUD."},
-        {"name": "Models", "description": "제품 모델 슬롯."},
-        {"name": "Codes", "description": "코드 마스터 (제품기호/옵션/공정)."},
-        {"name": "Scrap", "description": "폐기 이력."},
-        {"name": "Loss", "description": "분실/누락 이력."},
-        {"name": "Variance", "description": "차이 분석."},
-        {"name": "Alerts", "description": "안전재고/실사 알림."},
-        {"name": "Counts", "description": "실사 등록·강제 조정."},
-        {"name": "Admin Audit", "description": "관리자 액션 감사로그 조회 (마스터/설정 변경)."},
-    ],
-)
+@app.exception_handler(Exception)
+def _unhandled_exception_handler(...):  # 500 INTERNAL
+```
 
-_DEFAULT_CORS_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
-# Phase 5: CORS_EXTRA_ORIGINS 환경 변수가 있으면 콤마로 split 해서 추가.
-# 변수 미설정/빈 값이면 기본 origin 만 사용 (기존 동작 동일).
-_extra_origins_raw = os.environ.get("CORS_EXTRA_ORIGINS", "").strip()
-_extra_origins = [o.strip() for o in _extra_origins_raw.split(",") if o.strip()] if _extra_origins_raw else []
+모든 에러 응답 형식:
+```json
+{"detail": {"code": "VALIDATION_ERROR", "message": "...", "extra": {"request_id": "..."}}}
+```
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_DEFAULT_CORS_ORIGINS + _extra_origins,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+---
 
+## 6. X-Request-Id 미들웨어
 
+```python
 @app.middleware("http")
-async def _request_id_middleware(request: Request, call_next):
-    """X-Request-Id 헤더가 있으면 통과, 없으면 발급. 응답 헤더에 부착."""
+async def _request_id_middleware(request, call_next):
     rid = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:12]
-    # request.state 에 저장 (필요 시 라우터에서 접근 가능)
     request.state.request_id = rid
     response = await call_next(request)
     response.headers["X-Request-Id"] = rid
     return response
+```
 
-
-setup_logging()
-_log = get_logger()
-
-
-def _error_payload(code: str, message: str, extra: dict | None = None) -> dict:
-    body: dict = {"code": code, "message": message}
-    if extra:
-        body["extra"] = extra
-    return {"detail": body}
-
-
-def _rid(request: Request) -> str:
-    """미들웨어가 request.state에 박은 request_id를 우선 사용. 없으면 헤더, 그래도 없으면 새로 발급."""
-    return (
-        getattr(request.state, "request_id", None)
-        or request.headers.get("X-Request-Id")
-        or uuid.uuid4().hex[:12]
-    )
-
-
-@app.exception_handler(ValueError)
-def _value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
-    # Pydantic ValidationError 도 ValueError 하위 — 응답 모델 검증 실패는 서버 결함이므로
-    # 500 으로 떨어뜨려 INTERNAL 핸들러가 처리하게 한다.
-    from pydantic import ValidationError
-    if isinstance(exc, ValidationError):
-        rid = _rid(request)
-        _log.error("ResponseValidation rid=%s path=%s msg=%s", rid, request.url.path, exc)
-        return JSONResponse(
-            status_code=500,
-            content=_error_payload(
-                ErrorCode.INTERNAL,
-                "응답 데이터 검증 실패(서버 측 오류).",
-                extra={"request_id": rid},
-            ),
-        )
-    rid = _rid(request)
-    _log.warning("ValueError rid=%s path=%s msg=%s", rid, request.url.path, exc)
-    return JSONResponse(
-        status_code=422,
-        content=_error_payload(
-            ErrorCode.VALIDATION_ERROR,
-            str(exc) or "유효성 검사 실패",
-            extra={"request_id": rid},
-        ),
-    )
-
-
-@app.exception_handler(IntegrityError)
-def _integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
-    rid = _rid(request)
-    _log.error("IntegrityError rid=%s path=%s msg=%s", rid, request.url.path, exc)
-    return JSONResponse(
-        status_code=409,
-        content=_error_payload(
-            ErrorCode.DB_INTEGRITY,
-            "DB 제약 조건 위반",
-            extra={"request_id": rid},
-        ),
-    )
-
-
-@app.exception_handler(OperationalError)
-def _operational_error_handler(request: Request, exc: OperationalError) -> JSONResponse:
-    rid = _rid(request)
-    _log.error("OperationalError rid=%s path=%s msg=%s", rid, request.url.path, exc)
-    return JSONResponse(
-        status_code=503,
-        content=_error_payload(
-            ErrorCode.DB_UNAVAILABLE,
-            "DB 연결 일시 오류",
-            extra={"request_id": rid},
-        ),
-    )
-
-
-@app.exception_handler(Exception)
-def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    # FastAPI 가 HTTPException 은 자체 처리하므로 여기에는 진짜 unhandled 만 옴.
-    rid = _rid(request)
-    _log.exception("Unhandled rid=%s path=%s", rid, request.url.path)
-    return JSONResponse(
-        status_code=500,
-        content=_error_payload(
-            ErrorCode.INTERNAL,
-````
+모든 응답 헤더에 `X-Request-Id` 가 포함된다. 예외 핸들러와 감사 로그에서 이 값을 사용해 요청을 추적한다.
 
 ---
 
-## 정책
+## 7. CORS 설정
 
-- `main` 브랜치는 코드만 유지한다.
-- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
-- 코드와 노트가 다르면 실제 코드가 우선이다.
+```python
+allow_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+] + _extra_origins  # CORS_EXTRA_ORIGINS 환경 변수로 추가
+
+allow_origin_regex = r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|...)..."
+```
+
+`CORS_EXTRA_ORIGINS` 환경 변수로 추가 origin 을 콤마 구분자로 지정할 수 있다.
+
+---
+
+## 8. 기동 시 부작용 없음
+
+> [!important]
+> `create_all` / 마이그레이션 / 시드 등 DB 변경 작업은 모두 `bootstrap_db.py` 로 분리됨.
+> 서버 기동(`uvicorn app.main:app`) 만으로는 DB 가 변하지 않는다.
+>
+> DB 초기화가 필요할 때:
+> ```bash
+> cd backend
+> python bootstrap_db.py --all
+> ```
+
+---
+
+## 9. 앱 메타
+
+```python
+app = FastAPI(
+    title="DEXCOWIN MES",
+    version="1.3.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    redirect_slashes=False,
+)
+```
+
+---
+
+## 10. 기동 시 1회 초기화
+
+```python
+# audit_csv 세션 이벤트 후크 등록 (파일 상단, 라우터 등록 전)
+audit_csv_svc.register_session_listeners()
+```
+
+---
+
+## 11. 관련 노트 링크
+
+- [[database.py]] — `get_db`, `_is_sqlite`
+- [[audit_csv.py]] — `register_session_listeners`
+- [[integrity.py]] — `/health/detailed` 에서 호출
+- [[models.py]] — Item, Employee, Inventory, TransactionLog 조회

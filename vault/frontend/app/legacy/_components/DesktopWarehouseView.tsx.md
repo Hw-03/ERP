@@ -1,271 +1,244 @@
 ---
 type: code-note
-project: ERP
+project: DEXCOWIN MES
 layer: frontend
-source_path: frontend/app/legacy/_components/DesktopWarehouseView.tsx
 status: active
-updated: 2026-04-27
-source_sha: c4278dd0dfb8
-tags:
-  - erp
-  - frontend
-  - frontend-component
-  - tsx
+created: 2026-05-21
+updated: 2026-05-21
+source_path: erp/frontend/app/legacy/_components/DesktopWarehouseView.tsx
+tags: [vault, code-note, frontend, component]
+aliases: [DesktopWarehouseView, 입출고 화면, 창고 뷰]
 ---
 
-# DesktopWarehouseView.tsx
+# DesktopWarehouseView.tsx — 입출고 탭 화면
 
-> [!summary] 역할
-> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
+#layer/frontend #topic/component #topic/legacy
 
-## 원본 위치
+> [!summary] 한 줄 요약
+> 입출고 탭의 최상위 컴포넌트. 요청 작성(IoComposeView) + 4개 draft/queue 패널(WarehouseDraftPanelTabs)을 조합하고, 탭 배지 숫자(장바구니/창고큐/부서큐)를 집계한다.
 
-- Source: `frontend/app/legacy/_components/DesktopWarehouseView.tsx`
-- Layer: `frontend`
-- Kind: `frontend-component`
-- Size: `19772` bytes
+---
 
-## 연결
+## 1. 위치 & 관계
 
-- Parent hub: [[frontend/app/legacy/_components/_components|frontend/app/legacy/_components]]
-- Related: [[frontend/frontend]]
+| 항목 | 내용 |
+|------|------|
+| 원본 | `erp/frontend/app/legacy/_components/DesktopWarehouseView.tsx` |
+| 레이어 | frontend / component |
+| `"use client"` | O |
+| 소비자 | [[erp/frontend/app/legacy/_components/DesktopLegacyShell.tsx]] |
 
-## 읽는 포인트
+```mermaid
+graph TD
+  WV["DesktopWarehouseView"] --> WH["WarehouseHeader<br/>(헤더 + 에러 배너)"]
+  WV --> WT["WarehouseSectionTabs<br/>(섹션 탭 바)"]
+  WV --> WDP["WarehouseDraftPanelTabs<br/>(장바구니 / 내 요청 / 창고큐 / 부서큐)"]
+  WV --> ICW["IoComposeView<br/>(새 입출고 작성, 입출고 2.0)"]
 
-- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
-- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+  style WV fill:#1e3a5f,color:#e0f0ff
+  style ICW fill:#1e5f2a,color:#e0ffe8
+```
 
-## 원본 발췌
+---
 
-> 전체 491줄 중 앞부분만 발췌했다. 실제 수정은 원본 파일을 기준으로 한다.
+## 2. 5개 섹션 탭
 
-````tsx
-"use client";
+| 섹션 ID | 이름 | 설명 |
+|---------|------|------|
+| `compose` | 요청 작성 | 새 입출고 작성 (IoComposeView, 입출고 2.0) |
+| `cart` | 장바구니 | 저장된 draft 목록 (구형 + io 2.0 합산) |
+| `my-requests` | 내 요청 | 본인이 제출한 요청 이력 |
+| `warehouse-queue` | 창고 승인 | 창고 담당자 승인 대기 목록 |
+| `dept-queue` | 부서 승인 | 부서장 승인 대기 목록 |
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type Item, type ShipPackage } from "@/lib/api";
-import { LEGACY_COLORS, formatNumber, normalizeDepartment } from "./legacyUi";
-import { ConfirmModal, ResultModal } from "./common";
-import { CAUTION_WORK_TYPES, type WorkType } from "./_warehouse_steps";
-import { useWarehouseFilters } from "./_warehouse_hooks/useWarehouseFilters";
-import { useWarehouseWizardState } from "./_warehouse_hooks/useWarehouseWizardState";
-import { useWarehouseCompletionFeedback } from "./_warehouse_hooks/useWarehouseCompletionFeedback";
-import { useWarehouseData } from "./_warehouse_hooks/useWarehouseData";
-import { useWarehouseScroll } from "./_warehouse_hooks/useWarehouseScroll";
-import { WarehouseHeader } from "./_warehouse_sections/WarehouseHeader";
-import { WarehouseStickySummary } from "./_warehouse_sections/WarehouseStickySummary";
-import { WarehouseCompletionOverlay } from "./_warehouse_sections/WarehouseCompletionOverlay";
-import { WarehouseStepLayout } from "./_warehouse_sections/WarehouseStepLayout";
-import { WarehouseConfirmContent } from "./_warehouse_modals/WarehouseConfirmContent";
+> [!note] 접근 권한
+> - `warehouse-queue`: `warehouse_role === "primary" | "deputy"` 인 경우만 탭 표시
+> - `dept-queue`: `isDepartmentApprover(operator)` 인 경우만 탭 표시
 
-export function DesktopWarehouseView({
-  globalSearch,
-  onStatusChange,
-  preselectedItem,
-  onSubmitSuccess,
-}: {
-  globalSearch: string;
-  onStatusChange: (status: string) => void;
-  preselectedItem?: Item | null;
-  onSubmitSuccess?: () => void;
-}) {
-  // ─── 데이터 (hook) ───
-  const { employees, items, packages, productModels, loadFailure, setItems } = useWarehouseData({
-    globalSearch,
-    onStatusChange,
+---
+
+## 3. 탭 배지 카운트 집계
+
+```typescript
+// 장바구니 배지 — 구형 draft + io 2.0 draft 합산
+useEffect(() => {
+  if (!operatorEmployeeId) return;
+  Promise.all([
+    api.listStockRequestDrafts(operatorEmployeeId),  // 구형
+    api.listDrafts(operatorEmployeeId),              // io 2.0
+  ]).then(([legacyRows, ioRows]) => {
+    const n = legacyRows.length + ioRows.length;
+    setCartCount(n);
+    cartCountCache.set(operatorEmployeeId, n);  // 세션 내 캐시
   });
+}, [operatorEmployeeId, panelRefreshNonce]);
 
-  // ─── 선택 ───
-  const [employeeId, setEmployeeId] = useState("");
-  const [selectedItems, setSelectedItems] = useState<Map<string, number>>(new Map());
-  const [selectedPackage, setSelectedPackage] = useState<ShipPackage | null>(null);
+// 창고 큐 배지
+useEffect(() => {
+  if (!canSeeQueue) return;
+  api.countWarehouseQueue().then(({ count }) => {
+    setWarehouseQueueCount(count);
+  });
+}, [canSeeQueue, panelRefreshNonce]);
 
-  // ─── 메모 ───
-  const [referenceNo, setReferenceNo] = useState("");
-  const [notes, setNotes] = useState("");
+// 부서 큐 배지
+useEffect(() => {
+  if (!canSeeDeptQueue || !operatorEmployeeId) return;
+  api.countDepartmentQueue(operatorEmployeeId).then(({ count }) => {
+    setDeptQueueCount(count);
+  });
+}, [canSeeDeptQueue, operatorEmployeeId, panelRefreshNonce]);
+```
 
-  // ─── 실행/UI ───
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [lastResult, setLastResult] = useState<{ count: number; label: string } | null>(null);
-  const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
-  const [employeeExpanded, setEmployeeExpanded] = useState(false);
+---
 
-  // ─── 모달 ───
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [resultModal, setResultModal] = useState<
-    | {
-        kind: "fail" | "partial";
-        successCount: number;
-        failures: { name: string; reason: string }[];
-      }
-    | null
-  >(null);
+## 4. 세션 메모리 캐시
 
-  // ─── preselectedItem 처리 ───
-  useEffect(() => {
-    if (preselectedItem) {
-      setSelectedItems(new Map([[preselectedItem.item_id, 1]]));
-      setPendingScrollId(preselectedItem.item_id);
-    }
-  }, [preselectedItem]);
+탭 전환 시 remount 되어도 배지 숫자가 깜박이지 않도록 모듈 레벨 캐시를 사용한다:
 
-  // ─── selection-derived ───
-  const selectedEntries = useMemo(
-    () =>
-      Array.from(selectedItems.entries())
-        .map(([id, qty]) => ({ item: items.find((i) => i.item_id === id)!, quantity: qty }))
-        .filter((e) => e.item != null),
-    [selectedItems, items],
+```typescript
+// 탭 전환 remount 사이 직전 카운트 보존
+const cartCountCache = new Map<string, number>();
+const warehouseQueueCountCache = { value: 0 };
+const deptQueueCountCache = new Map<string, number>();
+```
+
+새로고침 시 휘발. 첫 진입은 항상 fresh fetch.
+
+---
+
+## 5. 코드 발췌 — 핵심 구조
+
+```tsx
+export function DesktopWarehouseView({ globalSearch, onStatusChange, preselectedItem, onSubmitSuccess }) {
+  const { employees, items, productModels, loadFailure, setItems } = useWarehouseData(...);
+  const operator = readCurrentOperator();
+
+  const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>("compose");
+  const [cartCount, setCartCount] = useState(...);
+  const [warehouseQueueCount, setWarehouseQueueCount] = useState(...);
+  const [deptQueueCount, setDeptQueueCount] = useState(...);
+  const [restoreIoDraft, setRestoreIoDraft] = useState<IoBatch | null>(null);
+
+  // 접근 권한 체크
+  const canSeeQueue = operator?.warehouse_role === "primary" || === "deputy";
+  const canSeeDeptQueue = isDepartmentApprover(operator);
+
+  // 접근 불가 시 안내 화면
+  if (operator && !canEnterIO(operator)) {
+    return <WarehouseAccessDenied department={operator.department ?? ""} />;
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-1 min-w-0 overflow-y-auto lg:pr-4">
+      <div className="flex min-h-full w-full flex-col gap-3 ...">
+        <WarehouseHeader loadFailure={loadFailure} />
+        <WarehouseSectionTabs
+          active={sectionTab} onChange={setSectionTab}
+          showQueue={canSeeQueue} showDeptQueue={canSeeDeptQueue}
+          cartCount={cartCount} queueCount={warehouseQueueCount}
+          deptQueueCount={deptQueueCount}
+        />
+
+        {/* 장바구니 / 내 요청 / 큐 패널 */}
+        <WarehouseDraftPanelTabs
+          sectionTab={sectionTab}
+          onContinueIoDraft={(draft) => {
+            setRestoreIoDraft(draft);
+            setSectionTab("compose");  // compose 탭으로 이동
+          }}
+          ...
+        />
+
+        {/* io 2.0 요청 작성 (compose 탭 시에만) */}
+        {sectionTab === "compose" && (
+          <IoComposeView
+            restoreDraft={restoreIoDraft}
+            onStatusChange={(status) => {
+              onStatusChange(status);
+              setPanelRefreshNonce((n) => n + 1);  // 배지 재집계 트리거
+            }}
+            onSubmitSuccess={() => {
+              setPanelRefreshNonce((n) => n + 1);
+              onSubmitSuccess?.();
+            }}
+            ...
+          />
+        )}
+      </div>
+    </div>
   );
-
-  const selectedEmployee = employees.find((e) => e.employee_id === employeeId) ?? null;
-  const step1Done = !!selectedEmployee;
-  const hasSelectedPackage = !!selectedPackage;
-  const hasSelectedItems = selectedEntries.length > 0;
-
-  // ─── wizard state (hook) ───
-  const wizard = useWarehouseWizardState({ step1Done, hasSelectedPackage, hasSelectedItems });
-  const {
-    workType, rawDirection, warehouseDirection, deptDirection, selectedDept, defectiveSource,
-    forcedStep, setWorkType, setForcedStep, setStep2Confirmed, step2Done, step2State,
-    showStep3, showStep4, showStep5, resetWizardConfig,
-  } = wizard;
-
-  // ─── scroll (hook) ───
-  const refs = useWarehouseScroll({ step1Done, step2Done, forcedStep, lastResult });
-
-  // ─── workType-derived ───
-  const isOutbound =
-    workType === "raw-io"
-      ? rawDirection === "out"
-      : workType === "warehouse-io"
-        ? warehouseDirection === "wh-to-dept"
-        : workType === "dept-io"
-          ? deptDirection === "out"
-          : true;
-
-  const effectiveLabel =
-    workType === "raw-io"
-      ? `원자재 ${rawDirection === "in" ? "입고" : "출고"}`
-      : workType === "warehouse-io"
-        ? warehouseDirection === "wh-to-dept"
-          ? `창고→${selectedDept} 이동`
-          : `${selectedDept}→창고 복귀`
-        : workType === "dept-io"
-          ? `${selectedDept} ${deptDirection === "in" ? "입고" : "출고"}`
-          : workType === "defective-register"
-            ? `불량 등록 (${defectiveSource === "warehouse" ? "창고" : selectedDept} → ${selectedDept} 격리)`
-            : workType === "supplier-return"
-              ? `공급업체 반품 (${selectedDept} 불량)`
-              : "패키지 출고";
-
-  const shortLabel = effectiveLabel.replace(/\s*\(.*\)\s*$/, "");
-  const totalQty = Array.from(selectedItems.values()).reduce((sum, q) => sum + q, 0);
-  const quantityInvalid =
-    workType !== "package-out" && selectedEntries.some((e) => e.quantity <= 0);
-  const canExecute =
-    !!selectedEmployee
-    && (workType === "package-out" ? !!selectedPackage : selectedEntries.length > 0)
-    && !quantityInvalid;
-  const accent = isOutbound ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
-  const isCaution = CAUTION_WORK_TYPES.includes(workType);
-
-  // ─── filters (hook) ───
-  const filter = useWarehouseFilters({
-    items, packages, selectedItems, globalSearch, isPackageMode: workType === "package-out",
-  });
-
-  // ─── completion feedback (hook) ───
-  const { completionFlyout, completionPhase } = useWarehouseCompletionFeedback({
-    lastResult,
-    workType,
-    rawDirection,
-    warehouseDirection,
-    deptDirection,
-  });
-
-  // ─── parent-owned wrapped setters (cross-cutting) ───
-  function changeWorkType(wt: WorkType) {
-    if (wt === workType) return;
-    setWorkType(wt);
-    setSelectedItems(new Map());
-    setSelectedPackage(null);
-    setStep2Confirmed(false);
-    setError(null);
-  }
-
-  function selectEmployee(id: string) {
-    setEmployeeId(id);
-    setForcedStep(null);
-  }
-
-  // ─── api calls (preserved) ───
-  async function dispatchSingleItem(item: Item, qty: number, producedBy: string) {
-    const baseRef = referenceNo || undefined;
-    const baseNotes = notes || undefined;
-    if (workType === "raw-io") {
-      const payload = { item_id: item.item_id, quantity: qty, reference_no: baseRef, produced_by: producedBy, notes: baseNotes };
-      if (rawDirection === "out") await api.shipInventory(payload);
-      else await api.receiveInventory(payload);
-    } else if (workType === "warehouse-io") {
-      const payload = { item_id: item.item_id, quantity: qty, department: selectedDept, reference_no: baseRef, produced_by: producedBy, notes: baseNotes };
-      if (warehouseDirection === "wh-to-dept") await api.transferToProduction(payload);
-      else await api.transferToWarehouse(payload);
-    } else if (workType === "dept-io") {
-      const payload = { item_id: item.item_id, quantity: qty, department: selectedDept, reference_no: baseRef, produced_by: producedBy, notes: baseNotes };
-      if (deptDirection === "in") await api.transferToProduction(payload);
-      else await api.transferToWarehouse(payload);
-    } else if (workType === "defective-register") {
-      await api.markDefective({
-        item_id: item.item_id,
-        quantity: qty,
-        source: defectiveSource,
-        source_department: defectiveSource === "production" ? selectedDept : undefined,
-        target_department: selectedDept,
-        reason: baseNotes,
-        operator: producedBy,
-      });
-    } else if (workType === "supplier-return") {
-      await api.returnToSupplier({ item_id: item.item_id, quantity: qty, from_department: selectedDept, reference_no: baseRef, notes: baseNotes, operator: producedBy });
-    }
-  }
-
-  async function submit() {
-    if (!selectedEmployee) return setError("담당 직원을 먼저 선택해 주세요.");
-    if (workType === "package-out" && !selectedPackage) return setError("출고할 패키지를 선택해 주세요.");
-    if (workType !== "package-out" && selectedEntries.length === 0) return setError("품목을 먼저 선택해 주세요.");
-    if (workType !== "package-out" && selectedEntries.some((e) => e.quantity <= 0)) return setError("모든 선택 품목의 수량은 1 이상이어야 합니다.");
-
-    try {
-      setSubmitting(true);
-      setError(null);
-      const producedBy = `${selectedEmployee.name} (${normalizeDepartment(selectedEmployee.department)})`;
-
-      if (workType === "package-out" && selectedPackage) {
-        try {
-          await api.shipPackage({
-            package_id: selectedPackage.package_id,
-            quantity: 1,
-            reference_no: referenceNo || undefined,
-            produced_by: producedBy,
-            notes: notes || undefined,
-          });
-        } catch (err) {
-          const reason = err instanceof Error ? err.message : "패키지 출고에 실패했습니다.";
-          // 데이터 정합성을 위해 items는 새로고침해 둠
-          try {
-            const refreshed = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
-            setItems(refreshed);
-          } catch { /* 무시 */ }
-          setResultModal({ kind: "fail", successCount: 0, failures: [{ name: selectedPackage.name ?? "패키지", reason }] });
-          return;
-````
+}
+```
 
 ---
 
-## 정책
+## 6. draft 복원 흐름
 
-- `main` 브랜치는 코드만 유지한다.
-- `vault-sync` 브랜치는 같은 코드에 `vault/` 인수인계 문서를 더한다.
-- 코드와 노트가 다르면 실제 코드가 우선이다.
+```mermaid
+sequenceDiagram
+  participant U as 작업자
+  participant DP as WarehouseDraftPanelTabs
+  participant WV as DesktopWarehouseView
+  participant IC as IoComposeView
+
+  U->>DP: 장바구니에서 "이어하기" 클릭
+  DP->>WV: onContinueIoDraft(draft)
+  WV->>WV: setRestoreIoDraft(draft)
+  WV->>WV: setSectionTab("compose")
+  WV->>IC: restoreDraft={draft} 전달
+  IC->>IC: draft 라인을 폼에 복원
+```
+
+---
+
+## 7. `panelRefreshNonce` 패턴
+
+`panelRefreshNonce` 를 1씩 증가시키면 여러 `useEffect` 의 의존성 배열이 동시에 트리거된다:
+- 장바구니 카운트 재집계
+- 창고 큐 카운트 재집계
+- 부서 큐 카운트 재집계
+
+`IoComposeView` 가 성공/상태 변경 시 `setPanelRefreshNonce((n) => n + 1)` 을 호출한다.
+
+---
+
+## 8. 권한 체크 함수
+
+```typescript
+// _warehouse_steps 에서 import
+import { canEnterIO, isDepartmentApprover } from "./_warehouse_steps";
+
+// canEnterIO: 입출고 화면 진입 가능 여부
+// isDepartmentApprover: 부서 큐 탭 표시 여부
+```
+
+---
+
+## 9. 관련 파일
+
+- [[erp/frontend/app/legacy/_components/DesktopLegacyShell.tsx]] — 부모 컴포넌트
+- [[erp/frontend/lib/api/io.ts]] — listDrafts, submit, getDraft
+- [[erp/frontend/lib/api/stock-requests.ts]] — listStockRequestDrafts, countWarehouseQueue
+- `erp/frontend/app/legacy/_components/_warehouse_v2/IoComposeView.tsx` — 입출고 2.0 작성 UI
+- `erp/frontend/app/legacy/_components/_warehouse_sections/WarehouseDraftPanelTabs.tsx` — 패널 탭들
+- [[erp/backend/app/routers/io.py]] — 입출고 2.0 백엔드
+
+---
+
+## 10. 주의 사항
+
+> [!warning] `restoreIoDraft` 상태
+> 장바구니에서 이어하기 후 `IoComposeView` 가 draft 를 복원하면 `restoreIoDraft` 를 `null` 로 리셋해야 한다. 그렇지 않으면 다음 compose 탭 진입 시에도 draft 가 복원된다.
+
+> [!info] 구형 draft 호환
+> `handleLegacyDraftContinue` 는 구형 `StockRequest` draft 를 복원하지 않는다.
+> "새 입출고 화면에서 직접 복원되지 않습니다" 안내만 표시한다.
+
+---
+
+## 11. 정책
+
+- `main` 브랜치: 코드만 유지
+- `vault-sync` 브랜치: 코드 + `vault/` 노트
+- 코드와 노트가 다르면 실제 코드 우선
