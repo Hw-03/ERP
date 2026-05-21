@@ -4,11 +4,14 @@ project: ERP
 layer: backend
 source_path: erp/backend/
 status: active
-updated: 2026-04-27
+updated: 2026-05-21
 tags:
   - erp
   - backend
   - index
+aliases:
+  - "backend"
+  - "backend.md"
 ---
 
 # backend

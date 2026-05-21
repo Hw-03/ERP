@@ -1,31 +1,33 @@
 ---
 type: index
 project: ERP
-layer: scripts
-source_path: erp/scripts/
+layer: docker
+source_path: erp/docker/
 status: active
-updated: 2026-04-27
+updated: 2026-05-21
 tags:
   - erp
-  - scripts
+  - docker
   - index
+aliases:
+  - "docker"
+  - "docker.md"
 ---
 
-# scripts
+# docker
 
 > [!summary] 역할
-> `scripts/` 아래 원본 파일들을 Obsidian에서 탐색하기 위한 폴더 허브다.
+> Docker 실행/배포 설정을 담는 폴더다.
 
 ## 원본 위치
 
-- Source: `scripts/`
-- File count: `32`
+- Source: `docker/`
+- File count: `2`
 
-## 하위 허브
+## 파일 노트
 
-- [[scripts/dev/dev|dev]]
-- [[scripts/migrations/migrations|migrations]]
-- [[scripts/ops/ops|ops]]
+- [[docker/docker-compose.nas.yml|docker-compose.nas.yml]]
+- [[docker/docker-compose.yml|docker-compose.yml]]
 
 ## 읽는 팁
 

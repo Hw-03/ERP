@@ -4,11 +4,14 @@ project: ERP
 layer: data
 source_path: erp/data/
 status: active
-updated: 2026-04-27
+updated: 2026-05-21
 tags:
   - erp
   - data
   - index
+aliases:
+  - "data"
+  - "data.md"
 ---
 
 # data

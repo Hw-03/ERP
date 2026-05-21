@@ -6,6 +6,9 @@ status: active
 created: 2026-05-21
 updated: 2026-05-21
 tags: [vault, index]
+aliases:
+  - "_vault"
+  - "_vault.md"
 ---
 
 # 📁 _vault

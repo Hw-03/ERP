@@ -4,11 +4,14 @@ project: ERP
 layer: docs
 source_path: erp/docs/
 status: active
-updated: 2026-04-27
+updated: 2026-05-21
 tags:
   - erp
   - docs
   - index
+aliases:
+  - "docs"
+  - "docs.md"
 ---
 
 # docs

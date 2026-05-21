@@ -4,11 +4,14 @@ project: ERP
 layer: github
 source_path: erp/.github/
 status: active
-updated: 2026-04-27
+updated: 2026-05-21
 tags:
   - erp
   - github
   - index
+aliases:
+  - ".github"
+  - ".github.md"
 ---
 
 # .github
