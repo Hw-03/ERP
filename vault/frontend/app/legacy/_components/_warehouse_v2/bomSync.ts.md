@@ -8,7 +8,6 @@ updated: 2026-05-21
 tags:
   - layer/frontend
   - topic/warehouse-v2
-  - audience/junior
 ---
 
 # bomSync.ts
@@ -218,9 +217,9 @@ type GetAvailable = (line: IoLine) => number | null;
 
 ---
 
-## 11. 신입을 위한 맥락
+## 11. 참고 맥락
 
-> [!note] 처음 보는 신입에게
+> [!note] 참고
 > 이 파일은 "BOM 수량 자동 계산기"다. 가장 중요한 개념:
 >
 > 생산 작업에서 완제품 수량을 5개로 바꾸면 → 필요한 부품들이 자동으로 `5 × bom_expected` 로 계산된다. 이 계산이 여기에 있다.

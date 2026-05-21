@@ -22,7 +22,7 @@ source_path: erp/CLAUDE.md
 # CLAUDE.md (코드 미러)
 
 > [!summary] 역할
-> 이 노트는 `erp/CLAUDE.md` 의 핵심 규칙을 신입 입장에서 **왜 지켜야 하는지** 까지 풀어 쓴 분석 지도다.
+> 이 노트는 `erp/CLAUDE.md` 의 핵심 규칙을 **왜 지켜야 하는지** 까지 풀어 쓴 분석 지도다.
 
 > [!warning] 원본 위치
 > 실제 규칙 수정은 원본에서만 한다.
@@ -31,7 +31,7 @@ source_path: erp/CLAUDE.md
 
 ---
 
-## 1. 이름 규칙 (가장 자주 틀린다)
+## 1. 이름 규칙
 
 > [!warning] DEXCOWIN MES
 > 사용자 노출 텍스트·문서에서 시스템 이름은 **DEXCOWIN MES** 다.
@@ -40,11 +40,11 @@ source_path: erp/CLAUDE.md
 > [!info] 단, legacy 식별자는 손대지 마라
 > - 폴더명 `erp/` → 그대로
 > - DB 컬럼 `erp_code`, 내부 식별자 `xray-erp` → 그대로
-> - 신입이 "이름 통일하겠다"고 마음대로 바꾸면 마이그레이션·CI 가 와장창 깨진다.
+> - 임의로 rename 하면 마이그레이션·CI 가 깨진다.
 
 ---
 
-## 2. 경로 (입사 첫 시간에 외울 것)
+## 2. 경로
 
 - backend: `erp/backend/`
 - frontend: `erp/frontend/`
@@ -114,7 +114,7 @@ python -m uvicorn app.main:app --reload
 
 ## 7. AI 작업 4대 행동 원칙 (원본 후반)
 
-> [!info] 신입이 가장 자주 어기는 부분
+> [!info] LLM 행동 가이드
 > 원본 `erp/CLAUDE.md` 후반의 LLM 행동 가이드. AI 와 페어로 작업할 때 그대로 적용된다.
 
 1. **Think Before Coding** — 가정을 명시. 모호하면 묻는다.
@@ -127,15 +127,15 @@ python -m uvicorn app.main:app --reload
 
 ---
 
-## 8. 신입에게 — 왜 이 규칙을 따라야 하는지
+## 8. 왜 이 규칙을 따라야 하는지
 
-> [!summary] 1년 2개월차에게
+> [!summary] 배경
 > 이 규칙들은 "AI 한 명이 코드를 망친 흔적" 위에 세워졌다. 각 조항마다 실제 사고가 있었다.
 
-- 자동 커밋 금지 → 한 번 잘못 머지된 vault 가 main PR 을 진흙탕으로 만든 적이 있다.
-- DB 자동 변경 금지 → 서버 재기동만으로 스키마가 흔들려 데이터 정합성이 무너진 적이 있다.
-- 코드가 정답 → 옛 문서를 믿고 라우터를 바꿨다가 죽은 엔드포인트를 살린 적이 있다.
-- legacy 식별자 보존 → 마음대로 rename 하다 CI 가 한나절 빨간불이었다.
+- 자동 커밋 금지 → 한 번 잘못 머지된 vault 가 main PR 을 진흙탕으로 만든 전례가 있다.
+- DB 자동 변경 금지 → 서버 재기동만으로 스키마가 흔들려 데이터 정합성이 무너진 전례가 있다.
+- 코드가 정답 → 옛 문서를 믿고 라우터를 바꿨다가 죽은 엔드포인트를 살린 전례가 있다.
+- legacy 식별자 보존 → 임의 rename 으로 CI 가 한나절 빨간불이었던 전례가 있다.
 
 > [!tip] 의심되면
 > 원본 `erp/CLAUDE.md` 를 다시 본다. 그래도 모호하면 [[erp/_vault/guides/위험지대_지도]] 와 [[erp/_vault/guides/AI_생성_코드_읽는_법]] 을 본다.

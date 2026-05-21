@@ -21,7 +21,7 @@ source_path: erp/README.md
 # README.md (코드 미러)
 
 > [!summary] 역할
-> 이 노트는 `erp/README.md` 를 신입이 빠르게 훑을 수 있게 정리한 **분석 지도**다. 코드 사본이 아니다.
+> 이 노트는 `erp/README.md` 를 빠르게 참고할 수 있게 정리한 **분석 지도**다. 코드 사본이 아니다.
 
 > [!warning] 원본 위치
 > 실제 수정은 원본에서만 한다.
@@ -74,8 +74,8 @@ backend pytest / frontend lint:strict / tsc / vitest+coverage / next build / Ope
 | 모두 (품목코드) | `erp/docs/ITEM_CODE_RULES.md` |
 | AI 협업자 | `erp/docs/AI_HANDOVER.md` |
 
-> [!tip] vault 안에서 같은 자료를 더 쉽게 보려면
-> - 신입 첫날 안내: [[erp/_vault/guides/처음_읽는_사람]]
+> [!tip] vault 안에서 같은 자료를 참고하려면
+> - 진입 안내: [[erp/_vault/guides/처음_읽는_사람]]
 > - 용어 모음: [[erp/_vault/guides/용어사전]]
 > - MOC: [[erp/_vault/guides/ERP_MOC]]
 
@@ -84,7 +84,7 @@ backend pytest / frontend lint:strict / tsc / vitest+coverage / next build / Ope
 ## 미러의 본질
 
 > [!warning] 이건 코드 사본이 아니다
-> 원본 `erp/README.md` 의 일부 표·코드 블록은 의도적으로 옮기지 않는다. 이 노트는 **원본을 어디서 어떻게 읽을지** 가르치는 지도일 뿐이다. 사실 검증은 항상 원본을 본다.
+> 원본 `erp/README.md` 의 일부 표·코드 블록은 의도적으로 옮기지 않는다. 이 노트는 **원본을 어디서 어떻게 읽을지** 안내하는 지도다. 사실 검증은 항상 원본을 본다.
 
 > [!quote] 코드가 정답
 > 미러와 원본이 다르면 원본을 따른다. 원본과 실제 코드가 다르면 **코드를 따른다**.

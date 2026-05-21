@@ -2,7 +2,6 @@
 tags:
   - layer/frontend
   - topic/admin
-  - audience/junior
 aliases:
   - AdminEmployeesSection
 created: 2026-05-21

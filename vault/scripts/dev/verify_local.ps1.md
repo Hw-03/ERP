@@ -2,7 +2,6 @@
 tags:
   - layer/scripts
   - topic/ops
-  - audience/junior
 aliases:
   - verify_local
 created: 2026-05-21

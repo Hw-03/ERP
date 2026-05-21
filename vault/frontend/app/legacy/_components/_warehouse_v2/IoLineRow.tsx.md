@@ -8,7 +8,6 @@ updated: 2026-05-21
 tags:
   - layer/frontend
   - topic/warehouse-v2
-  - audience/junior
 ---
 
 # IoLineRow.tsx
@@ -175,9 +174,9 @@ export function expectedAfter(line: IoLine, available: number | null) {
 
 ---
 
-## 11. 신입을 위한 맥락
+## 11. 참고 맥락
 
-> [!note] 처음 보는 신입에게
+> [!note] 참고
 > 이 컴포넌트는 카트(Step 4)에서 품목 한 줄이다. 가장 중요한 개념 두 가지:
 >
 > 1. **BOM Locked**: `produce`/`disassemble` 작업에서 BOM이 자동으로 전개된 하위 자재는 수량을 직접 편집할 수 없다. 상위 품목 수량을 바꾸면 자동으로 비례 계산된다.

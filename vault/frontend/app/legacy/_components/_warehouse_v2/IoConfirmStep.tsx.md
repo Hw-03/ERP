@@ -8,7 +8,6 @@ updated: 2026-05-21
 tags:
   - layer/frontend
   - topic/warehouse-v2
-  - audience/junior
 ---
 
 # IoConfirmStep.tsx
@@ -174,9 +173,9 @@ if (bundle.source_kind !== "bom_parent" && bundle.lines.length === 1) {
 
 ---
 
-## 11. 신입을 위한 맥락
+## 11. 참고 맥락
 
-> [!note] 처음 보는 신입에게
+> [!note] 참고
 > Step 5는 "마지막 점검 화면"이다. 여기서 중요한 점 두 가지:
 >
 > 1. **결재 vs 즉시 반영**: 창고→부서 반출이나 불량 격리는 창고 담당자 승인이 필요하다. 이 화면에서 버튼 문구가 "즉시 반영"이 아닌 "창고 결재 요청"으로 바뀌어 표시된다.

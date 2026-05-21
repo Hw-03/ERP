@@ -2,7 +2,6 @@
 tags:
   - layer/frontend
   - topic/mobile
-  - audience/junior
 aliases:
   - MobileWarehouseScreen
 created: 2026-05-21

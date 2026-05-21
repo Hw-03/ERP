@@ -8,7 +8,6 @@ updated: 2026-05-21
 tags:
   - layer/frontend
   - topic/warehouse-v2
-  - audience/junior
 ---
 
 # IoBundleCart.tsx
@@ -153,9 +152,9 @@ export function IoBundleCart({ bundles, subType, itemMap, getAvailable,
 
 ---
 
-## 10. 신입을 위한 맥락
+## 10. 참고 맥락
 
-> [!note] 처음 보는 신입에게
+> [!note] 참고
 > `IoBundleCart`는 장바구니 화면이다. 각 `IoBundle`은 "하나의 작업 묶음"인데, BOM 묶음이면 상위 품목 1개 + 하위 자재 여러 개가 한 묶음이다.
 >
 > 이 컴포넌트 자체는 매우 간단하다. 실제 복잡한 로직(수량 변경 시 BOM 비례 재계산)은 `bomSync.ts`에 있고, 부모(`IoComposeView`)가 `setBundles`에서 호출한다. 이 컴포넌트는 그 결과를 받아서 보여줄 뿐이다.

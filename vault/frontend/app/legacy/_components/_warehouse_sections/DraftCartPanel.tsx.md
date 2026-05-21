@@ -8,7 +8,6 @@ updated: 2026-05-21
 tags:
   - layer/frontend
   - topic/warehouse
-  - audience/junior
 ---
 
 # DraftCartPanel.tsx
@@ -135,9 +134,9 @@ const reload = useCallback(async () => {
 
 ---
 
-## 10. 신입을 위한 맥락
+## 10. 참고 맥락
 
-> [!note] 처음 보는 신입에게
+> [!note] 참고
 > 입출고 마법사에서 작업 중에 자동 저장된 초안들이 여기 모인다. 탭 배지의 숫자가 이 패널의 초안 개수다.
 >
 > 레거시(`StockRequest`)와 2.0(`IoBatch`) 두 종류가 공존하는 이유는 시스템 전환 과정에서 이전 방식의 초안이 아직 남아있을 수 있기 때문이다. 두 종류를 병렬로 불러와 한 화면에 보여준다.

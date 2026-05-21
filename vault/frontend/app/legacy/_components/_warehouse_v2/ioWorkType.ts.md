@@ -8,7 +8,6 @@ updated: 2026-05-21
 tags:
   - layer/frontend
   - topic/warehouse-v2
-  - audience/junior
 ---
 
 # ioWorkType.ts
@@ -197,9 +196,9 @@ export function deptVisibility(subType: IoSubType): { from: boolean; to: boolean
 
 ---
 
-## 11. 신입을 위한 맥락
+## 11. 참고 맥락
 
-> [!note] 처음 보는 신입에게
+> [!note] 참고
 > 이 파일은 warehouse_v2의 "규칙 책"이다. "어떤 작업은 결재가 필요한가?", "BOM은 언제 잠기나?", "각 라인은 어떤 태그를 달아야 하나?" 같은 비즈니스 규칙이 모두 여기 모여 있다.
 >
 > 새로운 작업 유형이나 결재 정책을 추가할 때 이 파일을 먼저 수정해야 한다. 컴포넌트들은 여기서 import해서 사용하므로, 이 파일을 바꾸면 전체 마법사 UI에 반영된다.

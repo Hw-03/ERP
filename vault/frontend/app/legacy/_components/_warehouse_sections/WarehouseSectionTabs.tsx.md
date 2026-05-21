@@ -8,7 +8,6 @@ updated: 2026-05-21
 tags:
   - layer/frontend
   - topic/warehouse
-  - audience/junior
 ---
 
 # WarehouseSectionTabs.tsx
@@ -145,9 +144,9 @@ const badgeFor = (id: WarehouseSectionTab): number | null => {
 
 ---
 
-## 9. 신입을 위한 맥락
+## 9. 참고 맥락
 
-> [!note] 처음 보는 신입에게
+> [!note] 참고
 > 창고 화면 최상단에 있는 탭 바다. 권한에 따라 탭 수가 달라진다:
 > - 일반 작업자: 3탭 (요청작성·작업중·내요청)
 > - 창고 정/부: + 창고 승인함 (4탭)

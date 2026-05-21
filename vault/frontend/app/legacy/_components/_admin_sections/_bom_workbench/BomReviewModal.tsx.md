@@ -2,7 +2,6 @@
 tags:
   - layer/frontend
   - topic/bom
-  - audience/junior
 aliases:
   - BomReviewModal
 created: 2026-05-21

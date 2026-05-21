@@ -8,7 +8,6 @@ updated: 2026-05-21
 tags:
   - layer/frontend
   - topic/warehouse-v2
-  - audience/junior
 ---
 
 # IoWorkTypeStep.tsx
@@ -167,9 +166,9 @@ function DeptGrid({ label, value, onChange, fill }) {
 
 ---
 
-## 9. 신입을 위한 맥락
+## 9. 참고 맥락
 
-> [!note] 처음 보는 신입에게
+> [!note] 참고
 > Step 1은 "어떤 작업을 할지" 고르는 큰 카드 4개 화면이다. Step 2는 "그 안에서 더 구체적으로" 선택하는 화면이다.
 >
 > - `process` 유형은 특이하게 Step 2에서 방향(입/출)을 먼저 고른다. 왜냐하면 "생산 입고(BOM)"와 "수량보정 출고(낱개)"처럼 같은 부서 작업이라도 성격이 달라서 방향이 subType을 결정하기 때문이다.

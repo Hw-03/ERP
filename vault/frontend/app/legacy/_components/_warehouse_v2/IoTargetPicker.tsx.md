@@ -8,7 +8,6 @@ updated: 2026-05-21
 tags:
   - layer/frontend
   - topic/warehouse-v2
-  - audience/junior
 ---
 
 # IoTargetPicker.tsx
@@ -182,9 +181,9 @@ useEffect(() => {
 
 ---
 
-## 11. 신입을 위한 맥락
+## 11. 참고 맥락
 
-> [!note] 처음 보는 신입에게
+> [!note] 참고
 > 이 컴포넌트는 "창고에서 어떤 물건을 입출고할지 고르는 검색 화면"이다.
 >
 > **BOM 버튼 vs 낱개 버튼 차이:**

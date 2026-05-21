@@ -2,7 +2,6 @@
 tags:
   - layer/frontend
   - topic/mobile
-  - audience/junior
 aliases:
   - MobileIoComposeWizard
 created: 2026-05-21

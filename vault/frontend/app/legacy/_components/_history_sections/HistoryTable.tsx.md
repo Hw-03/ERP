@@ -8,7 +8,6 @@ updated: 2026-05-21
 tags:
   - layer/frontend
   - topic/history
-  - audience/junior
 ---
 
 # HistoryTable.tsx
@@ -193,9 +192,9 @@ function toggleAll() {
 
 ---
 
-## 11. 신입을 위한 맥락
+## 11. 참고 맥락
 
-> [!note] 처음 보는 신입에게
+> [!note] 참고
 > 이 컴포넌트는 입출고 기록 조회 화면의 테이블이다. 이해해야 할 핵심 개념:
 >
 > 1. **그룹핑**: 여러 품목을 한 번에 입출고하면 여러 로그가 한 묶음(`op_batch`)으로 묶인다. 테이블에서는 접어서 한 행으로 표시하고, 클릭해서 펼치면 내부 품목들을 볼 수 있다.

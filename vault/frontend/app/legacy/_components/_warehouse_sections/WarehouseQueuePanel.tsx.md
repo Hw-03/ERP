@@ -8,7 +8,6 @@ updated: 2026-05-21
 tags:
   - layer/frontend
   - topic/warehouse
-  - audience/junior
 ---
 
 # WarehouseQueuePanel.tsx
@@ -146,9 +145,9 @@ const submitReject = async (requestId: string) => {
 
 ---
 
-## 11. 신입을 위한 맥락
+## 11. 참고 맥락
 
-> [!note] 처음 보는 신입에게
+> [!note] 참고
 > 창고 담당자만 볼 수 있는 승인함이다. 부서에서 자재를 요청하면 여기로 들어온다.
 >
 > 승인·반려 모두 PIN이 필요한 이유: 누군가 창고 담당자 PC에 앉아 있어도 본인인지 확인하기 위한 이중 인증이다.

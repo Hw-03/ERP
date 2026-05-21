@@ -2,7 +2,6 @@
 tags:
   - layer/scripts
   - topic/ops
-  - audience/junior
 aliases:
   - backup_db
 created: 2026-05-21

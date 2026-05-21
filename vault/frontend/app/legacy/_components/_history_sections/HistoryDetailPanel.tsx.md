@@ -8,7 +8,6 @@ updated: 2026-05-21
 tags:
   - layer/frontend
   - topic/history
-  - audience/junior
 ---
 
 # HistoryDetailPanel.tsx
@@ -187,9 +186,9 @@ function Collapsible({ icon, title, count, defaultOpen = false, children }) {
 
 ---
 
-## 12. 신입을 위한 맥락
+## 12. 참고 맥락
 
-> [!note] 처음 보는 신입에게
+> [!note] 참고
 > 거래 내역 테이블에서 항목을 클릭하면 오른쪽에 이 패널이 열린다.
 >
 > **"처리 전 → 처리 후"**: 이 거래로 재고가 얼마에서 얼마로 바뀌었는지 보여준다.

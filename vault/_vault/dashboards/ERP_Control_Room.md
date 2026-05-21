@@ -18,8 +18,8 @@ aliases:
 > [!summary] 한 줄 요약
 > **시스템 전체를 한 화면에서 조망한다.** 라우터 20개, 데스크탑 화면 5섹션, 가이드/시나리오 9건이 어디 있고 어떻게 묶여 있는지 — 여기서 다 시작한다.
 
-> [!quote] 이 시스템의 정체
-> 사용자가 Claude Code / Codex 로 바이브 코딩한 **DEXCOWIN MES**. 1년 2개월 차 IT 신입(비전공)이 인수받아 운영·확장한다. 공식명은 **DEXCOWIN MES** — 본문에서 절대 "ERP" / "X-Ray" 로 부르지 말 것 (단, `xray-erp`, `erp_code` 같은 내부 식별자는 의도적으로 보존).
+> [!note] 이 시스템의 정체
+> 사용자가 Claude Code / Codex 로 바이브 코딩한 **DEXCOWIN MES**. 공식명은 **DEXCOWIN MES** — 본문에서 절대 "ERP" / "X-Ray" 로 부르지 말 것 (단, `xray-erp`, `erp_code` 같은 내부 식별자는 의도적으로 보존).
 
 ---
 
@@ -31,7 +31,7 @@ aliases:
 > | 라우터 (`erp/backend/app/routers/`) | **20개** | [[backend/app/routers/routers\|라우터 목록]] |
 > | 데스크탑 섹션 (`erp/frontend/app/legacy/_components/`) | **5섹션** (inventory · history · admin · warehouse · weekly-report) | [[frontend/app/legacy/legacy\|legacy 셸]] |
 > | 운영 시나리오 | **4건** | [[_vault/guides/_guides\|guides/]] |
-> | 신입 온보딩 가이드 | **5건** (신규) | 아래 "빠른 진입점" |
+> | 인수인계 가이드 | **5건** (신규) | 아래 "빠른 진입점" |
 > | DB 엔진 | SQLite (단일 파일) | `erp/backend/data/` |
 > | 백엔드 진입점 | `erp/backend/app/main.py` | uvicorn |
 > | 프론트엔드 라이브 경로 | `erp/frontend/app/legacy` | (모바일은 별도 셸) |
@@ -41,10 +41,10 @@ aliases:
 
 ---
 
-## 🚀 빠른 진입점 (신입 → 베테랑 순)
+## 🚀 빠른 진입점 (기본 → 심화 순)
 
-> [!info]+ 🆕 신입 첫 1주 — 비전공자용 (NEW)
-> 바이브 코딩된 시스템을 처음 만지는 사람을 위해 새로 만든 5종 세트.
+> [!info]+ 🆕 첫 1주 안내 (NEW)
+> 바이브 코딩된 시스템을 처음 만지는 인수인계 담당자를 위한 5종 세트.
 >
 > | 순서 | 가이드 | 무엇 |
 > |---|---|---|
@@ -378,7 +378,7 @@ pie title 라우터 분포 (총 20개)
 - Up: [[_vault/dashboards/_dashboards]]
 - 같은 레이어: [[_vault/dashboards/ERP_System_Map.canvas|시스템 캔버스]]
 - 시작점: [[_vault/guides/처음_읽는_사람]]
-- 신입 1주: [[_vault/guides/첫주_체크리스트]]
+- 첫 주 체크리스트: [[_vault/guides/첫주_체크리스트]]
 - MOC: [[_vault/guides/ERP_MOC|MES MOC]]
 - 용어: [[_vault/guides/용어사전]]
 - FAQ: [[_vault/guides/FAQ_전체]]

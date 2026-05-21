@@ -8,7 +8,6 @@ updated: 2026-05-21
 tags:
   - layer/frontend
   - topic/warehouse-v2
-  - audience/junior
 ---
 
 # IoComposeView.tsx
@@ -176,9 +175,9 @@ async function handleSubmit() {
 
 ---
 
-## 11. 신입을 위한 맥락
+## 11. 참고 맥락
 
-> [!note] 처음 보는 신입에게
+> [!note] 참고
 > 이 파일은 "입출고 2.0 마법사의 사령탑"이다. 실제 UI는 각 Step 컴포넌트에 있고, 이 파일은 그들 사이의 흐름·상태·API 호출을 조율한다. 코드가 길어 보이지만 크게 세 덩어리다:
 > 1. URL ↔ step 동기화 (useEffect 2개)
 > 2. 품목 추가 / BOM 정규화 (addItem 함수)

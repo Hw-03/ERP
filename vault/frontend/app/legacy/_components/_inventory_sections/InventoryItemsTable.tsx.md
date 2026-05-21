@@ -8,7 +8,6 @@ updated: 2026-05-21
 tags:
   - layer/frontend
   - topic/inventory
-  - audience/junior
 ---
 
 # InventoryItemsTable.tsx
@@ -165,9 +164,9 @@ flowchart TD
 
 ---
 
-## 11. 신입을 위한 맥락
+## 11. 참고 맥락
 
-> [!note] 처음 보는 신입에게
+> [!note] 참고
 > 재고 탭에서 모든 품목을 보여주는 테이블이다. 구조는 단순하다:
 >
 > 1. 부모(`DesktopInventoryView`)가 전체 품목을 fetch하고 필터링해서 `filteredItems`로 전달
