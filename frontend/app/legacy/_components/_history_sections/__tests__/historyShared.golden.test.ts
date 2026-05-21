@@ -170,7 +170,7 @@ describe("getHistoryDisplaySubLabel", () => {
   });
 
   it("batch 없음, tx 매핑 없으면 undefined", () => {
-    expect(getHistoryDisplaySubLabel({ transaction_type: "RESERVE" })).toBeUndefined();
+    expect(getHistoryDisplaySubLabel({ transaction_type: "UNKNOWN" })).toBeUndefined();
   });
 });
 
@@ -205,11 +205,6 @@ describe("getHistoryOperationLabel", () => {
       ["ADJUST", "수량 조정"],
       ["MARK_DEFECTIVE", "불량 처리"],
       ["SUPPLIER_RETURN", "공급사 반품"],
-      ["SCRAP", "폐기"],
-      ["LOSS", "손실"],
-      ["RETURN", "반품"],
-      ["RESERVE", "예약"],
-      ["RESERVE_RELEASE", "예약 해제"],
     ];
     for (const [tx, expected] of cases) {
       expect(getHistoryOperationLabel({ transaction_type: tx })).toBe(expected);
@@ -231,14 +226,9 @@ describe("getHistoryFlowLabel", () => {
       ["BACKFLUSH", "자동차감"],
       ["PRODUCE", "생산 입고"],
       ["DISASSEMBLE", "재작업"],
-      ["SCRAP", "폐기"],
-      ["LOSS", "분실"],
       ["MARK_DEFECTIVE", "불량 처리"],
       ["ADJUST", "수량 조정"],
       ["SUPPLIER_RETURN", "공급사 반품"],
-      ["RETURN", "반품"],
-      ["RESERVE", "예약"],
-      ["RESERVE_RELEASE", "예약 해제"],
     ];
     for (const [tx, expected] of cases) {
       expect(getHistoryFlowLabel({ transaction_type: tx })).toBe(expected);
@@ -749,8 +739,8 @@ describe("isExceptionLike", () => {
     expect(isExceptionLike({ transaction_type: "PRODUCE", edit_count: null })).toBe(false);
   });
 
-  it("SCRAP → true", () => {
-    expect(isExceptionLike({ transaction_type: "SCRAP" })).toBe(true);
+  it("SUPPLIER_RETURN → true", () => {
+    expect(isExceptionLike({ transaction_type: "SUPPLIER_RETURN" })).toBe(true);
   });
 });
 
@@ -766,8 +756,8 @@ describe("isAdjustmentLike", () => {
     expect(isAdjustmentLike({ transaction_type: "MARK_DEFECTIVE" })).toBe(false);
   });
 
-  it("SCRAP → false", () => {
-    expect(isAdjustmentLike({ transaction_type: "SCRAP" })).toBe(false);
+  it("SUPPLIER_RETURN → false", () => {
+    expect(isAdjustmentLike({ transaction_type: "SUPPLIER_RETURN" })).toBe(false);
   });
 });
 
@@ -804,24 +794,12 @@ describe("rowTint", () => {
     expect(rowTint("PRODUCE")).toBe("rgba(67,211,157,.05)");
   });
 
-  it("RETURN → 초록 tint", () => {
-    expect(rowTint("RETURN")).toBe("rgba(67,211,157,.05)");
-  });
-
   it("SHIP → 빨강 tint", () => {
     expect(rowTint("SHIP")).toBe("rgba(255,123,123,.05)");
   });
 
   it("BACKFLUSH → 빨강 tint", () => {
     expect(rowTint("BACKFLUSH")).toBe("rgba(255,123,123,.05)");
-  });
-
-  it("SCRAP → 빨강 tint", () => {
-    expect(rowTint("SCRAP")).toBe("rgba(255,123,123,.05)");
-  });
-
-  it("LOSS → 빨강 tint", () => {
-    expect(rowTint("LOSS")).toBe("rgba(255,123,123,.05)");
   });
 
   it("ADJUST → 파랑 tint", () => {

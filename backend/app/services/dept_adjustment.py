@@ -21,14 +21,13 @@ from app.models import (
     Inventory,
     Item,
     LocationStatusEnum,
-    ScrapLog,
     TransactionLog,
     TransactionTypeEnum,
 )
 from app.database import _is_sqlite
 from app.services import inventory as inventory_svc
 
-AdjDirection = Literal["in", "out", "defective", "scrap"]
+AdjDirection = Literal["in", "out", "defective"]
 
 
 @dataclass
@@ -203,9 +202,6 @@ _TRANSACTION_TYPE_MAP: dict[tuple[AdjDirection, str], TransactionTypeEnum] = {
     ("defective", "production"):  TransactionTypeEnum.MARK_DEFECTIVE,
     ("defective", "disassembly"): TransactionTypeEnum.MARK_DEFECTIVE,
     ("defective", "correction"):  TransactionTypeEnum.MARK_DEFECTIVE,
-    ("scrap", "production"):  TransactionTypeEnum.SCRAP,
-    ("scrap", "disassembly"): TransactionTypeEnum.SCRAP,
-    ("scrap", "correction"):  TransactionTypeEnum.SCRAP,
 }
 
 
@@ -220,7 +216,7 @@ def submit_adjustment(
 ) -> list[uuid.UUID]:
     """부서 재고 조정 원자 처리. 생성된 TransactionLog ID 목록 반환.
 
-    처리 순서: out → scrap/defective → in  (소비 먼저, 입고 마지막).
+    처리 순서: out → defective → in  (소비 먼저, 입고 마지막).
     db.flush()만 사용 — commit은 라우터에서.
     """
     if not lines:
@@ -234,7 +230,7 @@ def submit_adjustment(
     sub_str = sub_type.value
     ordered = (
         [ln for ln in lines if ln.direction == "out"]
-        + [ln for ln in lines if ln.direction in ("scrap", "defective")]
+        + [ln for ln in lines if ln.direction == "defective"]
         + [ln for ln in lines if ln.direction == "in"]
     )
 
@@ -268,17 +264,6 @@ def submit_adjustment(
                 target_dept=dept_enum,
             )
             qty_before = inv.quantity or Decimal("0")
-
-        elif ln.direction == "scrap":
-            inv = inventory_svc.consume_from_department(db, ln.item_id, qty, dept_enum)
-            qty_before = (inv.quantity or Decimal("0")) + qty
-            scrap_reason = ln.reason or f"부서 재고 조정 폐기 ({sub_str})"
-            db.add(ScrapLog(
-                item_id=ln.item_id,
-                quantity=qty,
-                reason=scrap_reason[:200],
-                operator=operator_name,
-            ))
 
         log = TransactionLog(
             item_id=ln.item_id,

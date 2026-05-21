@@ -151,11 +151,6 @@ const _TX_OPERATION: Record<string, string> = {
   ADJUST: "수량 조정",
   MARK_DEFECTIVE: "불량 처리",
   SUPPLIER_RETURN: "공급사 반품",
-  SCRAP: "폐기",
-  LOSS: "손실",
-  RETURN: "반품",
-  RESERVE: "예약",
-  RESERVE_RELEASE: "예약 해제",
 };
 
 const _DISPLAY_SUB_LABEL: Record<string, string> = {
@@ -252,14 +247,9 @@ export function getHistoryFlowLabel(
     case "BACKFLUSH": return "자동차감";
     case "PRODUCE": return "생산 입고";
     case "DISASSEMBLE": return "재작업";
-    case "SCRAP": return "폐기";
-    case "LOSS": return "분실";
     case "MARK_DEFECTIVE": return "불량 처리";
     case "ADJUST": return "수량 조정";
     case "SUPPLIER_RETURN": return "공급사 반품";
-    case "RETURN": return "반품";
-    case "RESERVE": return "예약";
-    case "RESERVE_RELEASE": return "예약 해제";
     default: return log.transaction_type;
   }
 }
@@ -632,11 +622,6 @@ const _SINGLE_OP: Record<string, { verb: string; tone: MovementTone; signed?: bo
   BACKFLUSH: { verb: "자동 차감", tone: "danger" },
   PRODUCE: { verb: "생산", tone: "success" },
   DISASSEMBLE: { verb: "재작업", tone: "danger" },
-  SCRAP: { verb: "폐기", tone: "danger" },
-  LOSS: { verb: "손실", tone: "danger" },
-  RETURN: { verb: "반품", tone: "muted" },
-  RESERVE: { verb: "예약", tone: "muted" },
-  RESERVE_RELEASE: { verb: "예약 해제", tone: "muted" },
 };
 
 export function getSingleLogMovement(log: {

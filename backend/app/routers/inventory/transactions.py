@@ -75,9 +75,6 @@ _SUMMARY_WAREHOUSE_TYPES = [
     TransactionTypeEnum.SHIP,
     TransactionTypeEnum.TRANSFER_TO_PROD,
     TransactionTypeEnum.TRANSFER_TO_WH,
-    TransactionTypeEnum.RESERVE,
-    TransactionTypeEnum.RESERVE_RELEASE,
-    TransactionTypeEnum.RETURN,
 ]
 _SUMMARY_DEPT_TYPES = [
     TransactionTypeEnum.TRANSFER_DEPT,
@@ -94,7 +91,7 @@ def _department_label_expr():
     1) _SUMMARY_DEPT_TYPES(부서계열): IoBatch.to/from_department 가 있으면 그 부서,
        배치/부서 없으면 '미상'.
     2) _SUMMARY_WAREHOUSE_TYPES(창고계열): 부서 개념이 없으므로 고정 '창고'.
-    3) 그 외(ADJUST/MARK_DEFECTIVE/SUPPLIER_RETURN/SCRAP … 무-맥락): '미상'.
+    3) 그 외(ADJUST/MARK_DEFECTIVE/SUPPLIER_RETURN … 무-맥락): '미상'.
 
     summary 의 부서별 카운트와 summary/list 의 department 필터가 같은 식을 공유.
     """
@@ -183,11 +180,6 @@ _TX_OP: dict[str, str] = {
     "ADJUST": "수량 조정",
     "MARK_DEFECTIVE": "불량 처리",
     "SUPPLIER_RETURN": "공급사 반품",
-    "SCRAP": "폐기",
-    "LOSS": "손실",
-    "RETURN": "반품",
-    "RESERVE": "예약",
-    "RESERVE_RELEASE": "예약 해제",
 }
 
 # sub_type 이 있으면 라벨을 결정하는 키 집합 (tx 기반 라벨을 덮어쓴다)

@@ -47,12 +47,10 @@ def _mk_log(item_id, *, tx: TransactionTypeEnum, qty, when: datetime) -> Transac
     return log
 
 
-def test_audit_tx_types_excludes_production_and_reserve():
-    """생산/백플러시/예약 은 명시적으로 제외."""
+def test_audit_tx_types_excludes_production():
+    """생산/백플러시는 명시적으로 제외."""
     assert TransactionTypeEnum.PRODUCE not in audit_csv.AUDIT_TX_TYPES
     assert TransactionTypeEnum.BACKFLUSH not in audit_csv.AUDIT_TX_TYPES
-    assert TransactionTypeEnum.RESERVE not in audit_csv.AUDIT_TX_TYPES
-    assert TransactionTypeEnum.RESERVE_RELEASE not in audit_csv.AUDIT_TX_TYPES
 
 
 def test_audit_tx_types_includes_material_movement():
@@ -63,10 +61,7 @@ def test_audit_tx_types_includes_material_movement():
         TransactionTypeEnum.TRANSFER_TO_PROD,
         TransactionTypeEnum.TRANSFER_TO_WH,
         TransactionTypeEnum.TRANSFER_DEPT,
-        TransactionTypeEnum.SCRAP,
-        TransactionTypeEnum.LOSS,
         TransactionTypeEnum.ADJUST,
-        TransactionTypeEnum.RETURN,
         TransactionTypeEnum.SUPPLIER_RETURN,
         TransactionTypeEnum.MARK_DEFECTIVE,
         TransactionTypeEnum.DISASSEMBLE,
@@ -107,7 +102,7 @@ def test_backfill_writes_monthly_files(csv_dir, make_item, db_session):
     # 같은 월 2건 + 다른 월 1건
     db_session.add(_mk_log(item.item_id, tx=TransactionTypeEnum.RECEIVE, qty=D("5"), when=datetime(2026, 5, 1, 10, 0)))
     db_session.add(_mk_log(item.item_id, tx=TransactionTypeEnum.SHIP, qty=D("-2"), when=datetime(2026, 5, 20, 11, 0)))
-    db_session.add(_mk_log(item.item_id, tx=TransactionTypeEnum.SCRAP, qty=D("-1"), when=datetime(2026, 4, 30, 23, 59)))
+    db_session.add(_mk_log(item.item_id, tx=TransactionTypeEnum.SUPPLIER_RETURN, qty=D("-1"), when=datetime(2026, 4, 30, 23, 59)))
     db_session.commit()
 
     result = audit_csv.backfill_all(db_session)
@@ -213,7 +208,7 @@ def test_listener_skips_rollback(csv_dir, make_item, db_session):
         db_session.commit()  # item 자체는 커밋 (별도 transaction)
 
         db_session.add(
-            _mk_log(item.item_id, tx=TransactionTypeEnum.SCRAP, qty=D("-1"), when=datetime(2026, 7, 1, 8, 0))
+            _mk_log(item.item_id, tx=TransactionTypeEnum.SUPPLIER_RETURN, qty=D("-1"), when=datetime(2026, 7, 1, 8, 0))
         )
         db_session.flush()
         db_session.rollback()

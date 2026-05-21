@@ -147,11 +147,10 @@ def test_production_matrix_excludes_out_of_week(client, db_session):
 
 @pytest.mark.parametrize("tx_type", [
     TransactionTypeEnum.RECEIVE,
-    TransactionTypeEnum.RETURN,
     TransactionTypeEnum.ADJUST,
 ])
 def test_production_matrix_excludes_non_produce(client, db_session, tx_type):
-    """RECEIVE·RETURN·ADJUST는 production_matrix에 집계되지 않는다."""
+    """RECEIVE·ADJUST는 production_matrix에 집계되지 않는다."""
     item = _make_prod_item(db_session, name="COCOON AF 부품", process_code="AF",
                            model_symbol="7", qty=_dec(7))
     _add_log(db_session, item.item_id, tx_type=tx_type, qty=_dec(7), at=_WEEK_MID)

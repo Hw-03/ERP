@@ -1,9 +1,8 @@
 """외부 심사 대응용 입출고 CSV 미러.
 
 DB 의 `TransactionLog` 가 source-of-truth 이고, 이 모듈은 그 미러를 디스크에 떨군다.
-- 자재 이동 거래(RECEIVE/SHIP/TRANSFER_*/SCRAP/LOSS/ADJUST/RETURN/SUPPLIER_RETURN/
-  MARK_DEFECTIVE/DISASSEMBLE) 만 기록한다. 생산 내부 소비(PRODUCE/BACKFLUSH)와
-  예약(RESERVE/RESERVE_RELEASE) 은 제외.
+- 자재 이동 거래(RECEIVE/SHIP/TRANSFER_*/ADJUST/SUPPLIER_RETURN/
+  MARK_DEFECTIVE/DISASSEMBLE) 만 기록한다. 생산 내부 소비(PRODUCE/BACKFLUSH)는 제외.
 - 월별 CSV (`inout_YYYY-MM.csv`) 에 거래 1건 = 1줄로 append.
 - `created_at` 기준으로 파일이 결정되므로 월말 자정 경계도 자연스럽게 분기된다.
 - 트랜잭션이 commit 된 직후에만 append (롤백된 거래는 남지 않는다). 파일 IO 실패는
@@ -37,10 +36,7 @@ AUDIT_TX_TYPES: frozenset[TransactionTypeEnum] = frozenset({
     TransactionTypeEnum.TRANSFER_TO_PROD,
     TransactionTypeEnum.TRANSFER_TO_WH,
     TransactionTypeEnum.TRANSFER_DEPT,
-    TransactionTypeEnum.SCRAP,
-    TransactionTypeEnum.LOSS,
     TransactionTypeEnum.ADJUST,
-    TransactionTypeEnum.RETURN,
     TransactionTypeEnum.SUPPLIER_RETURN,
     TransactionTypeEnum.MARK_DEFECTIVE,
     TransactionTypeEnum.DISASSEMBLE,
@@ -55,10 +51,7 @@ TX_TYPE_LABEL_KO: dict[str, str] = {
     "TRANSFER_TO_PROD": "창고→생산 이동",
     "TRANSFER_TO_WH": "생산→창고 이동",
     "TRANSFER_DEPT": "부서간 이동",
-    "SCRAP": "폐기",
-    "LOSS": "손실",
     "ADJUST": "수량 조정",
-    "RETURN": "반품",
     "SUPPLIER_RETURN": "공급사 반품",
     "MARK_DEFECTIVE": "불량 처리",
     "DISASSEMBLE": "분해",

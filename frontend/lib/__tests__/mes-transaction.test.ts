@@ -6,11 +6,10 @@ import {
 } from "../mes/transaction";
 
 describe("mes/transaction barrel", () => {
-  it("re-exports TRANSACTION_META with 16 keys", () => {
+  it("re-exports TRANSACTION_META with 11 keys", () => {
     const required = [
       "RECEIVE", "PRODUCE", "SHIP", "ADJUST", "BACKFLUSH",
-      "SCRAP", "LOSS", "DISASSEMBLE", "RETURN",
-      "RESERVE", "RESERVE_RELEASE",
+      "DISASSEMBLE",
       "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "TRANSFER_DEPT",
       "MARK_DEFECTIVE", "SUPPLIER_RETURN",
     ];
@@ -19,7 +18,7 @@ describe("mes/transaction barrel", () => {
 
   it("getTransactionLabel returns Korean label for known type", () => {
     expect(getTransactionLabel("RECEIVE")).toBe("원자재 입고");
-    expect(getTransactionLabel("SCRAP")).toBe("폐기");
+    expect(getTransactionLabel("MARK_DEFECTIVE")).toBe("불량");
     expect(getTransactionLabel("TRANSFER_DEPT")).toBe("부서이동");
   });
 
@@ -29,7 +28,7 @@ describe("mes/transaction barrel", () => {
 
   it("getTransactionTone matches MesTone for each meta entry", () => {
     expect(getTransactionTone("RECEIVE")).toBe("success");
-    expect(getTransactionTone("SCRAP")).toBe("danger");
+    expect(getTransactionTone("MARK_DEFECTIVE")).toBe("danger");
     expect(getTransactionTone("UNKNOWN")).toBe("info");
   });
 });

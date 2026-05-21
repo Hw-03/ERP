@@ -64,11 +64,10 @@ describe("inferTone", () => {
 });
 
 describe("TRANSACTION_META", () => {
-  it("api.ts TransactionType 16키 모두 정의 (TX-DRIFT-001 적용 후)", () => {
+  it("api.ts TransactionType 11키 모두 정의", () => {
     const required = [
       "RECEIVE", "PRODUCE", "SHIP", "ADJUST", "BACKFLUSH",
-      "SCRAP", "LOSS", "DISASSEMBLE", "RETURN",
-      "RESERVE", "RESERVE_RELEASE",
+      "DISASSEMBLE",
       "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "TRANSFER_DEPT",
       "MARK_DEFECTIVE", "SUPPLIER_RETURN",
     ];
@@ -92,8 +91,8 @@ describe("getTransactionLabel / getTransactionTone", () => {
   it("정의된 타입 — 매핑 반환", () => {
     expect(getTransactionLabel("RECEIVE")).toBe("원자재 입고");
     expect(getTransactionTone("RECEIVE")).toBe("success");
-    expect(getTransactionLabel("SCRAP")).toBe("폐기");
-    expect(getTransactionTone("SCRAP")).toBe("danger");
+    expect(getTransactionLabel("MARK_DEFECTIVE")).toBe("불량");
+    expect(getTransactionTone("MARK_DEFECTIVE")).toBe("danger");
   });
 
   it("미지 타입 — 라벨은 입력 그대로, 톤은 info", () => {
@@ -113,8 +112,6 @@ describe("transactionColor", () => {
 
   it("위험 거래 → red", () => {
     expect(transactionColor("SHIP")).toBe(LEGACY_COLORS.red);
-    expect(transactionColor("SCRAP")).toBe(LEGACY_COLORS.red);
-    expect(transactionColor("LOSS")).toBe(LEGACY_COLORS.red);
     expect(transactionColor("MARK_DEFECTIVE")).toBe(LEGACY_COLORS.red);
     // history-rework-color-2026-05-15: DISASSEMBLE("재작업") 은 되돌림 성격이라 red 로 격상.
     expect(transactionColor("DISASSEMBLE")).toBe(LEGACY_COLORS.red);
@@ -122,7 +119,6 @@ describe("transactionColor", () => {
 
   it("주의 거래 → yellow", () => {
     expect(transactionColor("ADJUST")).toBe(LEGACY_COLORS.yellow);
-    expect(transactionColor("RESERVE")).toBe(LEGACY_COLORS.yellow);
   });
 
   it("BACKFLUSH 은 고유 색 #fb923c", () => {
@@ -130,8 +126,6 @@ describe("transactionColor", () => {
   });
 
   it("muted 거래 → muted/muted2", () => {
-    expect(transactionColor("RESERVE_RELEASE")).toBe(LEGACY_COLORS.muted2);
-    expect(transactionColor("RETURN")).toBe(LEGACY_COLORS.muted);
     expect(transactionColor("SUPPLIER_RETURN")).toBe(LEGACY_COLORS.muted);
   });
 

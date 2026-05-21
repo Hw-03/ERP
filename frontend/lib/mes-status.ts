@@ -71,12 +71,7 @@ export const TRANSACTION_META: Record<TransactionType, TransactionMeta> = {
   SHIP: { label: "출고", tone: "info" },
   ADJUST: { label: "조정", tone: "warning" },
   BACKFLUSH: { label: "자동차감", tone: "info" },
-  SCRAP: { label: "폐기", tone: "danger" },
-  LOSS: { label: "분실", tone: "danger" },
   DISASSEMBLE: { label: "재작업", tone: "danger" },
-  RETURN: { label: "반품", tone: "neutral" },
-  RESERVE: { label: "예약", tone: "warning" },
-  RESERVE_RELEASE: { label: "예약해제", tone: "muted" },
   TRANSFER_TO_PROD: { label: "창고 반출", tone: "info" },
   TRANSFER_TO_WH: { label: "창고이동", tone: "info" },
   TRANSFER_DEPT: { label: "부서이동", tone: "info" },
@@ -110,12 +105,7 @@ export type TransactionIconName =
   | "Sliders"           // ADJUST
   | "Hammer"            // PRODUCE
   | "Recycle"           // BACKFLUSH
-  | "Trash2"            // SCRAP
-  | "AlertCircle"       // LOSS
   | "Wrench"            // DISASSEMBLE
-  | "Undo2"             // RETURN
-  | "BookmarkPlus"      // RESERVE
-  | "BookmarkMinus"     // RESERVE_RELEASE
   | "ArrowRightLeft"    // TRANSFER_TO_PROD / TRANSFER_TO_WH / TRANSFER_DEPT
   | "ShieldAlert"       // MARK_DEFECTIVE
   | "PackageX"          // SUPPLIER_RETURN
@@ -142,21 +132,14 @@ export function transactionColor(type: TransactionType | string): string {
       return LEGACY_COLORS.cyan;
     case "BACKFLUSH":
       return "#fb923c";
-    case "SCRAP":
-    case "LOSS":
     case "MARK_DEFECTIVE":
       return LEGACY_COLORS.red;
-    case "RESERVE":
-      return LEGACY_COLORS.yellow;
-    case "RESERVE_RELEASE":
-      return LEGACY_COLORS.muted2;
     case "TRANSFER_TO_PROD":
     case "TRANSFER_TO_WH":
     case "TRANSFER_DEPT":
       return LEGACY_COLORS.blue;
     case "DISASSEMBLE":
       return LEGACY_COLORS.red;
-    case "RETURN":
     case "SUPPLIER_RETURN":
       return LEGACY_COLORS.muted;
     default:
@@ -176,18 +159,8 @@ export function transactionIconName(type: TransactionType | string): Transaction
       return "Hammer";
     case "BACKFLUSH":
       return "Recycle";
-    case "SCRAP":
-      return "Trash2";
-    case "LOSS":
-      return "AlertCircle";
     case "DISASSEMBLE":
       return "Wrench";
-    case "RETURN":
-      return "Undo2";
-    case "RESERVE":
-      return "BookmarkPlus";
-    case "RESERVE_RELEASE":
-      return "BookmarkMinus";
     case "TRANSFER_TO_PROD":
     case "TRANSFER_TO_WH":
     case "TRANSFER_DEPT":

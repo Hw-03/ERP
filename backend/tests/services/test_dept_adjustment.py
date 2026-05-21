@@ -172,13 +172,10 @@ def test_submit_production_manual_edit(make_item, make_location, db_session):
 
 
 def test_submit_disassembly_mixed(make_item, make_location, db_session):
-    """분해: out + in + defective + scrap 혼합."""
-    from app.models import ScrapLog
-
+    """분해: out + in + defective 혼합."""
     target = make_item(name="AF")
     b = make_item(name="AR1")
     c = make_item(name="AR2")
-    d = make_item(name="AR3")
 
     make_location(target.item_id, department=ASSEMBLY, quantity=D("5"))
     make_location(b.item_id, department=ASSEMBLY, quantity=D("0"))
@@ -188,34 +185,22 @@ def test_submit_disassembly_mixed(make_item, make_location, db_session):
         svc.AdjLine(item_id=target.item_id, direction="out",      quantity=D("1"), department=ASSEMBLY),
         svc.AdjLine(item_id=b.item_id,      direction="in",       quantity=D("2"), department=ASSEMBLY),
         svc.AdjLine(item_id=c.item_id,      direction="defective", quantity=D("1"), department=ASSEMBLY),
-        svc.AdjLine(item_id=d.item_id,      direction="scrap",    quantity=D("1"), department=ASSEMBLY,
-                    reason="파손"),
     ]
-
-    # d는 production stock 0 → scrap은 consume_from_department 사용, 재고 없으면 error
-    # d에 재고 추가
-    make_location(d.item_id, department=ASSEMBLY, quantity=D("3"))
 
     log_ids = svc.submit_adjustment(
         db_session, DeptAdjSubTypeEnum.DISASSEMBLY, lines, operator_name="작업자"
     )
     db_session.commit()
 
-    assert len(log_ids) == 4
+    assert len(log_ids) == 3
     assert _prod_qty(db_session, target.item_id) == D("4")   # 5 - 1
     assert _prod_qty(db_session, b.item_id)      == D("2")   # 0 + 2
     assert _defective_qty(db_session, c.item_id) == D("1")
-    assert _prod_qty(db_session, d.item_id)      == D("2")   # 3 - 1 (scrap)
-
-    scrap_rows = db_session.query(ScrapLog).all()
-    assert len(scrap_rows) == 1
-    assert scrap_rows[0].reason == "파손"
 
     types = _tx_types(db_session)
     assert "DISASSEMBLE" in types
     assert "RECEIVE" in types
     assert "MARK_DEFECTIVE" in types
-    assert "SCRAP" in types
 
 
 def test_submit_correction_in_out(make_item, make_location, db_session):

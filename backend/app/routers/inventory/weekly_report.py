@@ -42,15 +42,12 @@ _DEPT_NAMES: dict[str, str] = {
 _IN_TYPES = {
     TransactionTypeEnum.RECEIVE,
     TransactionTypeEnum.PRODUCE,
-    TransactionTypeEnum.RETURN,
 }
 
 # 출고/소비 집계 타입
 _OUT_TYPES = {
     TransactionTypeEnum.SHIP,
     TransactionTypeEnum.BACKFLUSH,
-    TransactionTypeEnum.SCRAP,
-    TransactionTypeEnum.LOSS,
 }
 
 

@@ -36,7 +36,6 @@ export function getDefaultHistoryScopeForOperator(
 
 export const WAREHOUSE_INVOLVED_TYPES: readonly TransactionType[] = [
   "RECEIVE", "SHIP", "TRANSFER_TO_PROD", "TRANSFER_TO_WH",
-  "RESERVE", "RESERVE_RELEASE", "RETURN",
 ] as const;
 
 export const DEPT_INTERNAL_TYPES: readonly TransactionType[] = [
@@ -45,12 +44,12 @@ export const DEPT_INTERNAL_TYPES: readonly TransactionType[] = [
 
 // 타입만으로 scope 확정 불가 — IoBatch.lines.from_bucket/to_bucket 참고 필요.
 export const AMBIGUOUS_TYPES: readonly TransactionType[] = [
-  "ADJUST", "MARK_DEFECTIVE", "SUPPLIER_RETURN", "SCRAP", "LOSS",
+  "ADJUST", "MARK_DEFECTIVE", "SUPPLIER_RETURN",
 ] as const;
 
 // "예외/정정" 칩/카드 기준 (UX). KPI 카운트에는 edit_count>0 도 포함됨.
 export const EXCEPTION_LIKE_TYPES: readonly TransactionType[] = [
-  "ADJUST", "MARK_DEFECTIVE", "SUPPLIER_RETURN", "SCRAP", "LOSS",
+  "ADJUST", "MARK_DEFECTIVE", "SUPPLIER_RETURN",
 ] as const;
 
 const _wh = new Set<string>(WAREHOUSE_INVOLVED_TYPES);
@@ -59,7 +58,7 @@ const _amb = new Set<string>(AMBIGUOUS_TYPES);
 const _exc = new Set<string>(EXCEPTION_LIKE_TYPES);
 
 const _HIDDEN_TYPES = new Set<string>([
-  "SCRAP", "LOSS", "DISASSEMBLE", "RETURN", "RESERVE", "RESERVE_RELEASE", "TRANSFER_DEPT",
+  "DISASSEMBLE", "TRANSFER_DEPT",
 ]);
 
 // ──────────────────────────────────────────────────────────────────

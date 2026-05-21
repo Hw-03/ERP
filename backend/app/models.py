@@ -62,12 +62,7 @@ class TransactionTypeEnum(str, enum.Enum):
     SHIP = "SHIP"
     ADJUST = "ADJUST"
     BACKFLUSH = "BACKFLUSH"
-    SCRAP = "SCRAP"
-    LOSS = "LOSS"
     DISASSEMBLE = "DISASSEMBLE"
-    RETURN = "RETURN"
-    RESERVE = "RESERVE"
-    RESERVE_RELEASE = "RESERVE_RELEASE"
     TRANSFER_TO_PROD = "TRANSFER_TO_PROD"
     TRANSFER_TO_WH = "TRANSFER_TO_WH"
     TRANSFER_DEPT = "TRANSFER_DEPT"
@@ -493,31 +488,8 @@ class ProcessFlowRule(Base):
 
 
 # =============================================================================
-# Scrap / Loss / Variance history
+# Variance history
 # =============================================================================
-
-
-class ScrapLog(Base):
-    __tablename__ = "scrap_logs"
-
-    scrap_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
-    quantity = Column(Numeric(15, 4), nullable=False)
-    process_stage = Column(String(2), ForeignKey("process_types.code"), nullable=True)
-    reason = Column(String(200), nullable=False)
-    operator = Column(String(100), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
-
-
-class LossLog(Base):
-    __tablename__ = "loss_logs"
-
-    loss_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
-    quantity = Column(Numeric(15, 4), nullable=False)
-    reason = Column(String(200), nullable=False)
-    operator = Column(String(100), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
 
 
 class VarianceLog(Base):

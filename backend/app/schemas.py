@@ -599,50 +599,8 @@ class ErpCodeResponse(BaseModel):
 
 
 # =============================================================================
-# Scrap / Loss / Variance logs
+# Variance logs
 # =============================================================================
-
-
-class ScrapLogCreateRequest(BaseModel):
-    item_id: uuid.UUID
-    quantity: Decimal = Field(..., gt=0)
-    reason: str = Field(..., max_length=200)
-    process_stage: Optional[str] = Field(None, max_length=2)
-    operator: Optional[str] = Field(None, max_length=100)
-
-
-class ScrapLogResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    scrap_id: uuid.UUID
-    item_id: uuid.UUID
-    erp_code: Optional[str] = None
-    item_name: Optional[str] = None
-    quantity: Decimal
-    process_stage: Optional[str] = None
-    reason: str
-    operator: Optional[str] = None
-    created_at: UtcDatetime
-
-
-class LossLogCreateRequest(BaseModel):
-    item_id: uuid.UUID
-    quantity: Decimal = Field(..., gt=0)
-    reason: str = Field(..., max_length=200)
-    operator: Optional[str] = Field(None, max_length=100)
-
-
-class LossLogResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    loss_id: uuid.UUID
-    item_id: uuid.UUID
-    erp_code: Optional[str] = None
-    item_name: Optional[str] = None
-    quantity: Decimal
-    reason: str
-    operator: Optional[str] = None
-    created_at: UtcDatetime
 
 
 class VarianceLogResponse(BaseModel):

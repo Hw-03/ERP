@@ -41,10 +41,8 @@ from app.routers import (
     inventory,
     io,
     items,
-    loss,
     models as models_router,
     production,
-    scrap,
     settings,
     stock_requests,
     variance,
@@ -90,8 +88,6 @@ app = FastAPI(
         {"name": "Ship Packages", "description": "출하 묶음 CRUD."},
         {"name": "Models", "description": "제품 모델 슬롯."},
         {"name": "Codes", "description": "코드 마스터 (제품기호/옵션/공정)."},
-        {"name": "Scrap", "description": "폐기 이력."},
-        {"name": "Loss", "description": "분실/누락 이력."},
         {"name": "Variance", "description": "차이 분석."},
         {"name": "Admin Audit", "description": "관리자 액션 감사로그 조회 (마스터/설정 변경)."},
     ],
@@ -227,8 +223,6 @@ app.include_router(io.router, prefix="/api/io", tags=["Inventory IO"])
 app.include_router(bom.router, prefix="/api/bom", tags=["BOM"])
 app.include_router(production.router, prefix="/api/production", tags=["Production"])
 app.include_router(codes.router, prefix="/api/codes", tags=["Codes"])
-app.include_router(scrap.router, prefix="/api/scrap", tags=["Scrap"])
-app.include_router(loss.router, prefix="/api/loss", tags=["Loss"])
 app.include_router(variance.router, prefix="/api/variance", tags=["Variance"])
 app.include_router(models_router.router, prefix="/api/models", tags=["Models"])
 app.include_router(admin_audit.router, prefix="/api/admin", tags=["Admin Audit"])

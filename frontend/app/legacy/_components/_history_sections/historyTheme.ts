@@ -9,12 +9,9 @@ export function rowTint(type: string): string {
   switch (type) {
     case "RECEIVE":
     case "PRODUCE":
-    case "RETURN":
       return "rgba(67,211,157,.05)";
     case "SHIP":
     case "BACKFLUSH":
-    case "SCRAP":
-    case "LOSS":
       return "rgba(255,123,123,.05)";
     case "ADJUST":
       return "rgba(101,169,255,.05)";
