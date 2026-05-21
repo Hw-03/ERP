@@ -1,5 +1,5 @@
 """
-bootstrap_db.py — DB 스키마 / 마이그레이션 / 참조 데이터 / ERP 코드 백필 통합 CLI.
+bootstrap_db.py — DB 스키마 / 마이그레이션 / 참조 데이터 / 품목코드 백필 통합 CLI.
 
 FastAPI 앱 시작 시 자동 실행되던 부작용들을 여기로 옮겼다.
 `uvicorn app.main:app` 만으로는 DB 가 변하지 않는다. 초기 설치 / 스키마 변경 /
@@ -7,7 +7,7 @@ FastAPI 앱 시작 시 자동 실행되던 부작용들을 여기로 옮겼다.
 
 Usage:
     cd backend
-    python bootstrap_db.py --all                # 스키마 + 마이그레이션 + 시드 + ERP 백필
+    python bootstrap_db.py --all                # 스키마 + 마이그레이션 + 시드 + 품목코드 백필
     python bootstrap_db.py --schema --migrate   # DDL 관련만
     python bootstrap_db.py --seed               # 참조 데이터 (Employee/ProductSymbol/…)
     python bootstrap_db.py --erp-backfill       # erp_code NULL 품목에 코드 부여
@@ -48,9 +48,9 @@ from app.services.pin_auth import DEFAULT_PIN_HASH
 from app.utils.erp_code import make_erp_code
 
 # bootstrap_db 는 uvicorn 밖에서 단독 실행되므로 setup_logging() 호출 없이도
-# 동작해야 한다. 백엔드 표준 로거("erp") 네임스페이스를 그대로 쓰되,
+# 동작해야 한다. 백엔드 표준 로거("mes") 네임스페이스를 그대로 쓰되,
 # 핸들러 미설정 환경(=단독 CLI)에서도 메시지가 죽지 않도록 NullHandler 보강.
-logger = logging.getLogger("erp")
+logger = logging.getLogger("mes")
 if not logger.handlers:
     logger.addHandler(logging.NullHandler())
 
@@ -212,7 +212,44 @@ _MIGRATION_DDL: list[str] = [
     "DROP TABLE IF EXISTS queue_batches",
     "DROP TABLE IF EXISTS stock_alerts",
     "DROP TABLE IF EXISTS physical_counts",
+    # 2026-05-21: 죽은 거래 타입 5종(SCRAP/LOSS/RETURN/RESERVE/RESERVE_RELEASE) 제거
+    # — 사용자 입출고 경로에서 발생하지 않음. 0행 보장 후 테이블 DROP.
+    "DROP TABLE IF EXISTS scrap_logs",
+    "DROP TABLE IF EXISTS loss_logs",
 ]
+
+
+def _drop_dead_transaction_type_enum_values() -> None:
+    """PG only: transaction_type_enum 에서 죽은 5종 값(SCRAP/LOSS/RETURN/
+    RESERVE/RESERVE_RELEASE)을 제거.
+
+    PG 는 enum 값 DROP 을 직접 지원 안 함 → 새 enum 생성 → 컬럼 cast →
+    구 enum DROP → rename. SQLite 에서는 no-op (네이티브 enum 타입 없음).
+    멱등 — 이미 정리된 상태면 즉시 return.
+    """
+    if engine.dialect.name != "postgresql":
+        return
+    dead = ("SCRAP", "LOSS", "RETURN", "RESERVE", "RESERVE_RELEASE")
+    with engine.begin() as conn:
+        rows = conn.execute(text(
+            "SELECT enumlabel FROM pg_enum "
+            "WHERE enumtypid = 'transaction_type_enum'::regtype"
+        )).scalars().all()
+        if not any(v in rows for v in dead):
+            return
+        conn.execute(text("""
+            CREATE TYPE transaction_type_enum_new AS ENUM (
+                'RECEIVE','PRODUCE','SHIP','ADJUST','BACKFLUSH','DISASSEMBLE',
+                'TRANSFER_TO_PROD','TRANSFER_TO_WH','TRANSFER_DEPT',
+                'MARK_DEFECTIVE','SUPPLIER_RETURN'
+            );
+            ALTER TABLE transaction_logs
+                ALTER COLUMN transaction_type
+                TYPE transaction_type_enum_new
+                USING transaction_type::text::transaction_type_enum_new;
+            DROP TYPE transaction_type_enum;
+            ALTER TYPE transaction_type_enum_new RENAME TO transaction_type_enum;
+        """))
 
 
 def run_migrations() -> dict[str, object]:
@@ -271,6 +308,14 @@ def run_migrations() -> dict[str, object]:
         "WHERE warehouse_role IS NULL OR warehouse_role = ''",
         label="post-update:warehouse_role",
     )
+
+    # 죽은 거래 타입 5종 — PG enum 정리 (SQLite 는 no-op). 멱등.
+    try:
+        _drop_dead_transaction_type_enum_values()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] PG enum cleanup failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
 
     if errors:
         logger.error(
@@ -502,7 +547,7 @@ def backfill_erp_codes() -> int:
 # 5. 통합
 # ---------------------------------------------------------------------------
 def bootstrap_all() -> dict:
-    """전체 부트스트랩: create_all → migrate → seed → ERP 백필."""
+    """전체 부트스트랩: create_all → migrate → seed → 품목코드 백필."""
     run_schema_create_all()
     migrations = run_migrations()
     seeded = seed_reference_data()
@@ -549,8 +594,8 @@ def reset_flow_rules() -> int:
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="ERP backend DB bootstrap tool")
-    parser.add_argument("--all", action="store_true", help="schema + migrate + seed + erp-backfill")
+    parser = argparse.ArgumentParser(description="MES backend DB bootstrap tool")
+    parser.add_argument("--all", action="store_true", help="schema + migrate + seed + 품목코드 백필")
     parser.add_argument("--schema", action="store_true", help="run create_all")
     parser.add_argument("--migrate", action="store_true", help="run ALTER TABLE migrations")
     parser.add_argument("--seed", action="store_true", help="seed reference data")

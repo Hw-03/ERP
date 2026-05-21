@@ -26,7 +26,7 @@ python scripts/ops/backup_db.py
 python scripts/ops/check_inventory_integrity.py
 
 # 4. 음수 품목 조회 (SQLite)
-sqlite3 backend/erp.db "SELECT i.item_id, it.erp_code, i.warehouse_qty, i.quantity FROM inventory i JOIN item it ON it.item_id = i.item_id WHERE i.warehouse_qty < 0 OR i.quantity < 0;"
+sqlite3 backend/mes.db "SELECT i.item_id, it.erp_code, i.warehouse_qty, i.quantity FROM inventory i JOIN item it ON it.item_id = i.item_id WHERE i.warehouse_qty < 0 OR i.quantity < 0;"
 ```
 
 ### 복구
@@ -66,16 +66,16 @@ UPDATE inventory SET quantity = warehouse_qty + (
 docker compose -f docker/docker-compose.yml up -d postgres
 
 # 3. .env 수정
-echo "DATABASE_URL=postgresql://erp_user:erp_pass@localhost:5432/erp_db" >> backend/.env
+echo "DATABASE_URL=postgresql://mes_user:mes_pass@localhost:5432/mes_db" >> backend/.env
 
 # 4. 마이그레이션
 cd backend && python bootstrap_db.py
 
 # 5. 서버 재시작
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8010 --workers 2
 
 # 6. preflight
-python scripts/ops/preflight_30_users.py --url http://localhost:8000
+python scripts/ops/preflight_30_users.py --url http://localhost:8010
 ```
 
 ---
@@ -102,11 +102,11 @@ docker compose -f docker/docker-compose.yml restart postgres
 
 # 4. 서버 재시작
 cd backend
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8010 --workers 2
 
 # 5. 확인
-curl http://localhost:8000/health
-python scripts/ops/preflight_30_users.py --url http://localhost:8000
+curl http://localhost:8010/health
+python scripts/ops/preflight_30_users.py --url http://localhost:8010
 ```
 
 ---
@@ -117,12 +117,12 @@ python scripts/ops/preflight_30_users.py --url http://localhost:8000
 
 ```bash
 # 최신 백업 확인
-ls -lt outputs/backups/erp_*.db | head -5
+ls -lt outputs/backups/mes_*.db | head -5
 
 # 복구 (현재 DB를 .pre-restore로 자동 백업 후 복구)
 python scripts/ops/restore_db.py \
-    --sqlite outputs/backups/erp_YYYYMMDD_HHMMSS.db \
-    --target backend/erp.db \
+    --sqlite outputs/backups/mes_YYYYMMDD_HHMMSS.db \
+    --target backend/mes.db \
     --check
 
 # 무결성 자동 확인됨 (--check 플래그)
@@ -132,19 +132,19 @@ python scripts/ops/restore_db.py \
 
 ```bash
 # 최신 백업 확인
-ls -lt outputs/backups/erp_*.sql | head -5
+ls -lt outputs/backups/mes_*.sql | head -5
 
 # Docker 컨테이너 기준 복구
 CONTAINER=$(docker ps --filter "name=postgres" --format "{{.Names}}" | head -1)
 python scripts/ops/restore_db.py \
-    --postgres outputs/backups/erp_YYYYMMDD_HHMMSS.sql \
+    --postgres outputs/backups/mes_YYYYMMDD_HHMMSS.sql \
     --container $CONTAINER \
     --check
 
 # 직접 호스트 기준
 python scripts/ops/restore_db.py \
-    --postgres outputs/backups/erp_YYYYMMDD_HHMMSS.sql \
-    --host localhost --port 5432 --user erp_user --dbname erp_db \
+    --postgres outputs/backups/mes_YYYYMMDD_HHMMSS.sql \
+    --host localhost --port 5432 --user mes_user --dbname mes_db \
     --check
 ```
 
@@ -155,7 +155,7 @@ python scripts/ops/restore_db.py \
 python scripts/ops/check_inventory_integrity.py
 
 # preflight 전체 통과 확인
-python scripts/ops/preflight_30_users.py --url http://localhost:8000
+python scripts/ops/preflight_30_users.py --url http://localhost:8010
 ```
 
 ### 복구 리허설 (매주 금요일 권장)
@@ -166,16 +166,16 @@ python scripts/ops/backup_db.py
 
 # 2. 임시 경로에 복구 테스트 (운영 DB 미변경)
 python scripts/ops/restore_db.py \
-    --sqlite outputs/backups/erp_LATEST.db \
-    --target /tmp/erp_rehearsal_test.db \
+    --sqlite outputs/backups/mes_LATEST.db \
+    --target /tmp/mes_rehearsal_test.db \
     --check
 
 # 3. 임시 DB 무결성 직접 확인
-DATABASE_URL=sqlite:////tmp/erp_rehearsal_test.db \
+DATABASE_URL=sqlite:////tmp/mes_rehearsal_test.db \
     python scripts/ops/check_inventory_integrity.py
 
 # 4. 정상 확인 후 임시 파일 삭제
-rm /tmp/erp_rehearsal_test.db
+rm /tmp/mes_rehearsal_test.db
 echo "복구 리허설 완료"
 ```
 
@@ -209,7 +209,7 @@ grep "409" <서버 로그> | tail -20
 
 ```bash
 # 서버 API 활용 (정합성 복구 엔드포인트)
-curl -X POST http://localhost:8000/api/settings/sync-totals -H "Content-Type: application/json" -d '{"pin": "<관리자PIN>"}'
+curl -X POST http://localhost:8010/api/settings/sync-totals -H "Content-Type: application/json" -d '{"pin": "<관리자PIN>"}'
 ```
 
 ---
@@ -218,7 +218,7 @@ curl -X POST http://localhost:8000/api/settings/sync-totals -H "Content-Type: ap
 
 매일 출근 후:
 ```bash
-python scripts/ops/preflight_30_users.py --url http://localhost:8000
+python scripts/ops/preflight_30_users.py --url http://localhost:8010
 ```
 
 주 1회:

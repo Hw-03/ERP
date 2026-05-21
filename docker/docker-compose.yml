@@ -3,28 +3,28 @@ version: "3.9"
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: erp_postgres
+    container_name: mes_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: erp_user
-      POSTGRES_PASSWORD: erp_pass
-      POSTGRES_DB: erp_db
+      POSTGRES_USER: mes_user
+      POSTGRES_PASSWORD: mes_pass
+      POSTGRES_DB: mes_db
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U erp_user -d erp_db"]
+      test: ["CMD-SHELL", "pg_isready -U mes_user -d mes_db"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: erp_pgadmin
+    container_name: mes_pgadmin
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@erp.local
+      PGADMIN_DEFAULT_EMAIL: admin@mes.local
       PGADMIN_DEFAULT_PASSWORD: admin
     ports:
       - "5050:80"
@@ -33,10 +33,10 @@ services:
 
   backend:
     build: ../backend
-    container_name: erp_backend
+    container_name: mes_backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://erp_user:erp_pass@postgres:5432/erp_db
+      DATABASE_URL: postgresql://mes_user:mes_pass@postgres:5432/mes_db
       # WS2 가드: 운영 표식. SQLite/DATABASE_URL 미설정 시 backend 기동 거부(fail-fast).
       APP_ENV: production
     ports:
@@ -53,7 +53,7 @@ services:
       retries: 3
       start_period: 20s
     volumes:
-      # 로그 영속화 — 재시작 시 backend/logs/erp.log 유지(컨테이너 ephemeral 방지).
+      # 로그 영속화 — 재시작 시 backend/logs/mes.log 유지(컨테이너 ephemeral 방지).
       - ../backend/logs:/app/logs
     logging:
       driver: json-file
@@ -67,7 +67,7 @@ services:
 
   frontend:
     build: ../frontend
-    container_name: erp_frontend
+    container_name: mes_frontend
     restart: unless-stopped
     environment:
       # next.config.js rewrites(/api/:path*) 의 프록시 타깃.

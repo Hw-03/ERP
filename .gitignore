@@ -72,7 +72,7 @@ _attic/vault/
 data/이미지 추출을 위한 원본/
 
 # ── 배포 전 정리 (predeploy-cleanup) ──────────────────────────────
-# 백업 스냅샷 — *.db.backup-* 만 있던 구멍 보강 (erp.db.bak-YYYYMMDD-... 등).
+# 백업 스냅샷 — *.db.backup-* 만 있던 구멍 보강 (mes.db.bak-YYYYMMDD-... 등).
 # DB 류는 처음부터 커밋 안 하는 관례 유지 (*.db / *.db.backup-* 와 동일 취지).
 *.bak-*
 *.db.bak*

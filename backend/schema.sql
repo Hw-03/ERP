@@ -1,5 +1,5 @@
 -- =============================================================================
--- DEXCOWIN ERP reference schema
+-- DEXCOWIN MES reference schema
 -- =============================================================================
 --
 -- This file is a PostgreSQL reference schema for documentation/import planning.

@@ -3,19 +3,19 @@ version: "3.9"
 services:
   backend:
     build: ../backend
-    container_name: erp_backend
+    container_name: mes_backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: sqlite:////app/erp.db
+      DATABASE_URL: sqlite:////app/mes.db
     ports:
       - "8010:8010"
     volumes:
-      - ../backend/erp.db:/app/erp.db
+      - ../backend/mes.db:/app/mes.db
     # backend.command 제거 — backend/Dockerfile CMD 와 동일 (8010, no --reload).
 
   frontend:
     build: ../frontend
-    container_name: erp_frontend
+    container_name: mes_frontend
     restart: unless-stopped
     environment:
       BACKEND_INTERNAL_URL: http://backend:8010

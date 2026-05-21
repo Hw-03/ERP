@@ -1,5 +1,5 @@
 """
-Sync legacy metadata and current stock from ERP Excel workbooks into backend/erp.db.
+Sync legacy metadata and current stock from Excel workbooks into backend/mes.db.
 
 Usage:
     python backend/sync_excel_stock.py
@@ -23,7 +23,7 @@ BACKEND_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BACKEND_DIR.parent
 DATA_DIR = PROJECT_ROOT / "data"
 CSV_PATH = DATA_DIR / "ERP_Master_DB.csv"
-SQLITE_PATH = BACKEND_DIR / "erp.db"
+SQLITE_PATH = BACKEND_DIR / "mes.db"
 
 sys.path.insert(0, str(BACKEND_DIR))
 os.environ["DATABASE_URL"] = f"sqlite:///{SQLITE_PATH.as_posix()}"

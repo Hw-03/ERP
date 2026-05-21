@@ -3,10 +3,10 @@
 
 사용법:
     # SQLite 파일 복구
-    python scripts/ops/restore_db.py --sqlite outputs/backups/erp_20260508_120000.db --target backend/erp.db
+    python scripts/ops/restore_db.py --sqlite outputs/backups/mes_20260508_120000.db --target backend/mes.db
 
     # PostgreSQL 덤프 복구 (Docker 컨테이너 기준)
-    python scripts/ops/restore_db.py --postgres outputs/backups/erp_20260508_120000.sql --container <container>
+    python scripts/ops/restore_db.py --postgres outputs/backups/mes_20260508_120000.sql --container <container>
 
     # 복구 후 무결성 자동 점검 (--check 플래그)
     python scripts/ops/restore_db.py --sqlite ... --check
@@ -125,7 +125,7 @@ def _run_integrity_check(db_url: str) -> None:
 def parse_args():
     parser = argparse.ArgumentParser(description="DB 복구 유틸리티")
     parser.add_argument("--sqlite", metavar="BACKUP_PATH", help="SQLite 백업 파일 경로")
-    parser.add_argument("--target", default="backend/erp.db", help="복구 대상 경로 (기본: backend/erp.db)")
+    parser.add_argument("--target", default="backend/mes.db", help="복구 대상 경로 (기본: backend/mes.db)")
     parser.add_argument("--postgres", metavar="BACKUP_SQL", help="PostgreSQL 덤프 파일 경로")
     parser.add_argument("--container", help="Docker 컨테이너 이름")
     parser.add_argument("--host", default="localhost")

@@ -1,7 +1,7 @@
 @echo off
 rem ============================================================
-rem  ERP DB backup script (WAL safe)
-rem  - copies backend\erp.db to backend\_backup\erp_YYYYMMDD_HHMMSS.db
+rem  MES DB backup script (WAL safe)
+rem  - copies backend\mes.db to backend\_backup\mes_YYYYMMDD_HHMMSS.db
 rem  - safe to run while the backend is up (transaction-consistent)
 rem
 rem  fallback order:
@@ -12,11 +12,11 @@ rem ============================================================
 setlocal enabledelayedexpansion
 
 set "ROOT=%~dp0..\.."
-set "DB=%ROOT%\backend\erp.db"
+set "DB=%ROOT%\backend\mes.db"
 set "DEST_DIR=%ROOT%\backend\_backup"
 
 if not exist "%DB%" (
-    echo [BACKUP] erp.db not found: %DB%
+    echo [BACKUP] mes.db not found: %DB%
     exit /b 1
 )
 
@@ -24,7 +24,7 @@ if not exist "%DEST_DIR%" mkdir "%DEST_DIR%"
 
 rem timestamp via PowerShell so the format is locale-independent
 for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss"`) do set "TS=%%i"
-set "DEST=%DEST_DIR%\erp_%TS%.db"
+set "DEST=%DEST_DIR%\mes_%TS%.db"
 
 rem ----- 1: sqlite3 CLI -----------------------------------------------------
 where sqlite3 >nul 2>&1

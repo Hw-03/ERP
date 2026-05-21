@@ -41,7 +41,7 @@ _args, _ = _parser.parse_known_args()
 DATABASE_URL = (
     _args.db_url
     or os.getenv("DATABASE_URL")
-    or f"sqlite:///{(BACKEND_DIR / 'erp.db').as_posix()}"
+    or f"sqlite:///{(BACKEND_DIR / 'mes.db').as_posix()}"
 )
 
 engine = create_engine(

@@ -26,7 +26,7 @@ from app.routers._errors import ErrorCode, http_error
 
 router = APIRouter()
 
-logger = logging.getLogger("erp")
+logger = logging.getLogger("mes")
 
 
 @router.post(

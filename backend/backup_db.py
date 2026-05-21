@@ -1,12 +1,12 @@
 """
 SQLite DB 백업 스크립트.
 
-기존 erp_backup_YYYYMMDD_HHMMSS.db 패턴을 유지한다.
+기존 mes_backup_YYYYMMDD_HHMMSS.db 패턴을 유지한다.
 30일 이상 된 백업 파일을 자동 정리하는 옵션을 제공한다.
 
 사용법:
     python backup_db.py                    # 기본 백업
-    python backup_db.py --label nightly    # erp_backup_nightly_20260514_020000.db
+    python backup_db.py --label nightly    # mes_backup_nightly_20260514_020000.db
     python backup_db.py --keep-days 60     # 60일 이상 된 백업 정리 (기본 30)
     python backup_db.py --no-cleanup       # 오래된 백업 정리 안 함
 
@@ -20,7 +20,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-DB_SRC = Path(__file__).parent / "erp.db"
+DB_SRC = Path(__file__).parent / "mes.db"
 BACKUP_DIR = Path(__file__).parent
 
 
@@ -31,7 +31,7 @@ def backup(label: str, keep_days: int, no_cleanup: bool) -> None:
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     suffix = f"_{label}" if label else ""
-    dest = BACKUP_DIR / f"erp_backup{suffix}_{ts}.db"
+    dest = BACKUP_DIR / f"mes_backup{suffix}_{ts}.db"
 
     shutil.copy2(DB_SRC, dest)
     size_kb = dest.stat().st_size // 1024
@@ -42,7 +42,7 @@ def backup(label: str, keep_days: int, no_cleanup: bool) -> None:
 
     cutoff_ts = datetime.now().timestamp() - keep_days * 86400
     removed = 0
-    for old in BACKUP_DIR.glob("erp_backup*.db"):
+    for old in BACKUP_DIR.glob("mes_backup*.db"):
         if old == dest:
             continue
         if old.stat().st_mtime < cutoff_ts:

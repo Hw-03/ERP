@@ -24,7 +24,7 @@ from app.services import dept_adjustment as svc
 
 router = APIRouter()
 
-logger = logging.getLogger("erp")
+logger = logging.getLogger("mes")
 
 
 # ──────────────────────────── Schemas ────────────────────────────

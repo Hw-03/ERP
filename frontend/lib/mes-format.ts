@@ -67,7 +67,7 @@ export function formatDate(value: string | null | undefined): string {
 }
 
 /**
- * ERP 코드 표시 포맷 — "DX3000-AA-007" → "DX3000-AA-7" (compact).
+ * 품목코드 표시 포맷 — "DX3000-AA-007" → "DX3000-AA-7" (compact).
  *   - compact=true (기본): 3번째 segment 의 leading zero 제거 ("0" 자체는 유지).
  *   - compact=false: 입력 그대로.
  *   - 빈 입력: null 반환 (formatQty/formatDate 와 달리 placeholder "-" 반환 안 함 — 호출측 분기).

@@ -31,7 +31,7 @@ from app.services import integrity as integrity_svc
 from app.services._tx import commit_and_refresh, commit_only
 from app.services.pin_auth import hash_pin
 
-logger = logging.getLogger("erp")
+logger = logging.getLogger("mes")
 
 
 class ResetRequest(BaseModel):

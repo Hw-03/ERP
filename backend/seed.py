@@ -1,5 +1,5 @@
 """
-Seed SQLite ERP data from ERP_Master_DB.csv.
+Seed SQLite MES data from ERP_Master_DB.csv.
 
 [레거시 부트스트랩 전용] — settings./reset 에서는 사용하지 않음.
 운영 초기화는 app/services/seed_cleanup.py (722 정리본 기준) 를 사용.
@@ -26,7 +26,7 @@ from pathlib import Path
 BACKEND_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BACKEND_DIR.parent
 CSV_PATH = PROJECT_ROOT / "data" / "ERP_Master_DB.csv"
-SQLITE_PATH = BACKEND_DIR / "erp.db"
+SQLITE_PATH = BACKEND_DIR / "mes.db"
 LEGACY_HTML_PATH = PROJECT_ROOT / "_legacy_import" / "inventory_v2.html"
 
 sys.path.insert(0, str(BACKEND_DIR))

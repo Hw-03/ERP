@@ -38,7 +38,7 @@ DEPT_MAP: dict[str, str] = {
 def _parse_erp_code(raw: str) -> tuple[str, str, int, str | None]:
     parts = str(raw).strip().split("-")
     if len(parts) < 3:
-        raise ValueError(f"ERP 코드 형식 오류: {raw!r}")
+        raise ValueError(f"품목 코드 형식 오류: {raw!r}")
     model_symbol = parts[0]
     process_type_code = parts[1]
     try:
@@ -118,7 +118,7 @@ def run_cleanup_import(
     for i, row in enumerate(rows):
         erp = row["erp_code"]
         if erp in erp_seen:
-            raise ValueError(f"ERP 코드 중복: {erp}")
+            raise ValueError(f"품목 코드 중복: {erp}")
         erp_seen.add(erp)
 
         model_symbol, pt_code, serial_no, option_code = _parse_erp_code(erp)

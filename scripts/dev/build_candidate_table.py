@@ -10,7 +10,7 @@ ROOT = Path('_attic/data/0520 권동환 사원님 재고')
 CUR = ROOT / '확정품명, 코드 추가.xlsx'
 MASTER = Path('_attic/data/생산부_재고_매칭작업_최종.bak_memo13_20260518_101641.xlsx')
 A_FILE = ROOT / '원본' / 'F704-03__R00__자재_재고_현황_매칭품명추가.xlsx'
-DB = Path('backend/erp.db')
+DB = Path('backend/mes.db')
 OUT = ROOT / '판단필요_후보표_20260521.xlsx'
 
 

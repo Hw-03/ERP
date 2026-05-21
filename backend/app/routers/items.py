@@ -164,7 +164,7 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         action="item.create",
         target_type="item",
         target_id=str(item.item_id),
-        payload_summary=f"{item.item_name} ({item.erp_code or 'no-erp'}, init {init_qty})",
+        payload_summary=f"{item.item_name} ({item.erp_code or 'no-code'}, init {init_qty})",
     )
 
     commit_and_refresh(db, item)

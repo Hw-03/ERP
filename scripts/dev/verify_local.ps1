@@ -77,7 +77,7 @@ with open(out, "w", encoding="utf-8") as f:
 
 if ($DbReadOnlyCheck) {
     Invoke-Check "DB read-only consistency" $RepoRoot {
-        $DbPath = Join-Path $BackendRoot "erp.db"
+        $DbPath = Join-Path $BackendRoot "mes.db"
         if (-not (Test-Path $DbPath)) {
             throw "DB file not found: $DbPath"
         }

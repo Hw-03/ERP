@@ -99,7 +99,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
         {/* 직원 선택 — 드롭다운이 형제 필드들 위에 오도록 stacking 보장 */}
         <div
           style={{
-            animation: "erp-field-rise 0.5s 0.05s ease both",
+            animation: "mes-field-rise 0.5s 0.05s ease both",
             position: "relative",
             zIndex: 30,
           }}
@@ -122,10 +122,10 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
         {/* PIN 입력 */}
         <div
           className="mt-5"
-          style={{ animation: "erp-field-rise 0.5s 0.15s ease both" }}
+          style={{ animation: "mes-field-rise 0.5s 0.15s ease both" }}
         >
           <label
-            htmlFor="erp-login-pin"
+            htmlFor="mes-login-pin"
             className="mb-2 block text-sm font-semibold"
             style={{ color: "var(--c-text)" }}
           >
@@ -141,7 +141,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
           >
             <Lock size={16} style={{ color: "var(--c-muted)", flexShrink: 0 }} />
             <input
-              id="erp-login-pin"
+              id="mes-login-pin"
               ref={pinInputRef}
               type="password"
               inputMode="numeric"
@@ -170,7 +170,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
         {/* 로그인 버튼 — wrapper 가 애니메이션, 버튼 inline opacity 보존 */}
         <div
           className="mt-6"
-          style={{ animation: "erp-field-rise 0.5s 0.25s ease both" }}
+          style={{ animation: "mes-field-rise 0.5s 0.25s ease both" }}
         >
           <button
             type="button"
@@ -200,7 +200,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
         {/* PIN 초기화 요청 — 항상 보이는 보조 안내 */}
         <div
           className="mt-5"
-          style={{ animation: "erp-field-rise 0.5s 0.30s ease both" }}
+          style={{ animation: "mes-field-rise 0.5s 0.30s ease both" }}
         >
           <div className="flex flex-col items-center gap-1">
             <span
@@ -229,7 +229,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
           className="mt-7 border-t pt-5"
           style={{
             borderColor: "var(--c-border)",
-            animation: "erp-field-rise 0.5s 0.35s ease both",
+            animation: "mes-field-rise 0.5s 0.35s ease both",
           }}
         >
           <div

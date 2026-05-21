@@ -12,7 +12,7 @@
 import type { Item } from "@/lib/api";
 
 /**
- * Item 검색 박스 표시용 라벨 — "ERP코드 / 품목명".
+ * Item 검색 박스 표시용 라벨 — "품목코드 / 품목명".
  */
 export function buildItemSearchLabel(item: Item): string {
   return `${item.erp_code} / ${item.item_name}`;

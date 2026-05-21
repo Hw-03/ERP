@@ -1,6 +1,6 @@
 @echo off
 rem ============================================================
-rem  ERP 재고 정합성 1차 진단 스크립트 (Phase 4)
+rem  MES 재고 정합성 1차 진단 스크립트 (Phase 4)
 rem  - /health/detailed 호출 → inventory_mismatch_count 확인
 rem  - 0 이면 정상 종료
 rem  - > 0 이면 backup_db.bat 호출 후 운영 담당자에게 보고하도록 안내

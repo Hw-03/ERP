@@ -10,7 +10,7 @@ from sqlalchemy.pool import NullPool
 load_dotenv()
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_SQLITE_PATH = BACKEND_DIR / "erp.db"
+DEFAULT_SQLITE_PATH = BACKEND_DIR / "mes.db"
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",

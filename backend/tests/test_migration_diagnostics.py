@@ -98,18 +98,18 @@ def test_real_failure_is_collected_and_logged(shared_engine, monkeypatch, caplog
         bootstrap_db, "_MIGRATION_DDL", bootstrap_db._MIGRATION_DDL + [bogus]
     )
 
-    # 전체 스위트에서 app.main 이 setup_logging() 으로 erp 로거의
+    # 전체 스위트에서 app.main 이 setup_logging() 으로 mes 로거의
     # propagate=False 를 설정하면 caplog(root 전파 기반)가 못 본다.
-    # caplog 핸들러를 erp 로거에 직접 붙여 전파 설정과 무관하게 캡처한다.
-    erp_logger = logging.getLogger("erp")
-    prev_level = erp_logger.level
-    erp_logger.setLevel(logging.WARNING)
-    erp_logger.addHandler(caplog.handler)
+    # caplog 핸들러를 mes 로거에 직접 붙여 전파 설정과 무관하게 캡처한다.
+    mes_logger = logging.getLogger("mes")
+    prev_level = mes_logger.level
+    mes_logger.setLevel(logging.WARNING)
+    mes_logger.addHandler(caplog.handler)
     try:
         result = bootstrap_db.run_migrations()
     finally:
-        erp_logger.removeHandler(caplog.handler)
-        erp_logger.setLevel(prev_level)
+        mes_logger.removeHandler(caplog.handler)
+        mes_logger.setLevel(prev_level)
 
     # 진짜 실패가 errors 에 정확히 1건 수집됐는지.
     assert result["failed"] == 1

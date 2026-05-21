@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 A_SRC = ROOT / '_attic' / 'data' / '0520 권동환 사원님 재고' / 'F704-03__R00__자재_재고_현황_매칭품명추가.xlsx'
 A_BAK = A_SRC.with_name(A_SRC.stem + '_원본백업_20260520.xlsx')
 MATCH = ROOT / '_attic' / 'data' / '생산부_재고_매칭작업_최종.bak_memo13_20260518_101641.xlsx'
-DB = ROOT / 'backend' / 'erp.db'
+DB = ROOT / 'backend' / 'mes.db'
 
 FILL_UNMATCH = PatternFill(start_color='D9D9D9', end_color='D9D9D9', fill_type='solid')
 FILL_DB_MISS = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')  # 연빨강 = DB와 불일치

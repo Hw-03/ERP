@@ -3,15 +3,15 @@
 
 사용법:
     # SQLite 직접 파일 백업
-    python scripts/ops/backup_db.py --sqlite backend/erp.db
+    python scripts/ops/backup_db.py --sqlite backend/mes.db
 
     # PostgreSQL (Docker 컨테이너 기준)
     python scripts/ops/backup_db.py --postgres --container <container_name>
     python scripts/ops/backup_db.py --postgres --host localhost --port 5432 --user erp_user --dbname erp_db
 
 결과:
-    outputs/backups/erp_YYYYMMDD_HHMMSS.db   (SQLite)
-    outputs/backups/erp_YYYYMMDD_HHMMSS.sql  (PostgreSQL)
+    outputs/backups/mes_YYYYMMDD_HHMMSS.db   (SQLite)
+    outputs/backups/mes_YYYYMMDD_HHMMSS.sql  (PostgreSQL)
 """
 
 import argparse
@@ -33,7 +33,7 @@ def backup_sqlite(db_path: str) -> None:
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    dst = OUTPUT_DIR / f"erp_{ts}.db"
+    dst = OUTPUT_DIR / f"mes_{ts}.db"
     shutil.copy2(src, dst)
     size_kb = dst.stat().st_size // 1024
     print(f"✅ SQLite 백업 완료: {dst} ({size_kb} KB)")
@@ -42,7 +42,7 @@ def backup_sqlite(db_path: str) -> None:
 def backup_postgres(container: str | None, host: str, port: int, user: str, dbname: str) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    dst = OUTPUT_DIR / f"erp_{ts}.sql"
+    dst = OUTPUT_DIR / f"mes_{ts}.sql"
 
     if container:
         cmd = [
@@ -94,8 +94,8 @@ def main():
     elif args.postgres:
         backup_postgres(args.container, args.host, args.port, args.user, args.dbname)
     else:
-        # 기본: backend/erp.db 존재하면 SQLite 백업
-        default_path = Path(__file__).resolve().parents[2] / "backend" / "erp.db"
+        # 기본: backend/mes.db 존재하면 SQLite 백업
+        default_path = Path(__file__).resolve().parents[2] / "backend" / "mes.db"
         if default_path.exists():
             backup_sqlite(str(default_path))
         else:

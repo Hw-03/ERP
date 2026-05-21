@@ -19,11 +19,11 @@ type LogoState = "center" | "above-card";
 const SHRINK_TRANSFORM = "scale(0.333) translateY(calc(-75vh - 420px))";
 const CENTER_TRANSFORM = "scale(1) translateY(0)";
 
-interface ErpLoginGateProps {
+interface MesLoginGateProps {
   children: React.ReactNode;
 }
 
-export function ErpLoginGate({ children }: ErpLoginGateProps) {
+export function MesLoginGate({ children }: MesLoginGateProps) {
   const [phase, setPhase] = useState<GatePhase>("loading");
   const [logoState, setLogoState] = useState<LogoState>("center");
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -116,7 +116,7 @@ export function ErpLoginGate({ children }: ErpLoginGateProps) {
   // SSR/hydration 깜빡임 방지
   if (phase === "loading") return null;
 
-  // 로그인 완료 → 기존 ERP 화면
+  // 로그인 완료 → 메인 화면
   if (phase === "authed") return <>{children}</>;
 
   return (
@@ -136,7 +136,7 @@ export function ErpLoginGate({ children }: ErpLoginGateProps) {
       >
         <div
           style={{
-            animation: phase === "intro" ? "erp-logo-fade-in 0.5s ease both" : undefined,
+            animation: phase === "intro" ? "mes-logo-fade-in 0.5s ease both" : undefined,
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -165,9 +165,9 @@ export function ErpLoginGate({ children }: ErpLoginGateProps) {
       {/* 카드 — form 단계에만 등장 (rise 애니메이션) */}
       {phase === "form" && (
         <div
-          className="erp-card-anim w-full"
+          className="mes-card-anim w-full"
           style={{
-            animation: "erp-card-rise 0.6s ease both",
+            animation: "mes-card-rise 0.6s ease both",
             // 카드만 top 정렬 + 고정 marginTop → 카드 height 가 변해도 카드 상단 위치 일정 (로고 겹침 방지)
             alignSelf: "flex-start",
             marginTop: "calc(50vh - 280px)",
