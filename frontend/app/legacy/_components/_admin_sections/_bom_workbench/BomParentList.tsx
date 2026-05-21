@@ -82,7 +82,7 @@ export function BomParentList({
       })
       .filter((i) => {
         if (!kw) return true;
-        return `${i.item_name} ${i.erp_code ?? ""}`.toLowerCase().includes(kw);
+        return `${i.item_name} ${i.item_code ?? ""}`.toLowerCase().includes(kw);
       });
   }, [items, dept, search, stageFilter, mode, statusFilter, completedSet, childCountMap]);
 
@@ -149,9 +149,9 @@ export function BomParentList({
                   <TruncatedText className="truncate text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
                     {i.item_name}
                   </TruncatedText>
-                  {i.erp_code && (
+                  {i.item_code && (
                     <TruncatedText className="truncate text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                      {i.erp_code}
+                      {i.item_code}
                     </TruncatedText>
                   )}
                 </div>

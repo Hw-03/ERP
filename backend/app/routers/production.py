@@ -81,7 +81,7 @@ def production_receipt(
         if current_avail < required_qty:
             comp_item = items_map.get(comp_item_id)
             shortage_errors.append(
-                f"[{comp_item.erp_code}] {comp_item.item_name}: 필요 {required_qty} {comp_item.unit}, "
+                f"[{comp_item.item_code}] {comp_item.item_name}: 필요 {required_qty} {comp_item.unit}, "
                 f"가용 {current_avail} {comp_item.unit}, 부족 {required_qty - current_avail}"
             )
 
@@ -127,7 +127,7 @@ def production_receipt(
             backflushed.append(
                 BackflushDetail(
                     item_id=comp_item_id,
-                    erp_code=comp_item.erp_code,
+                    item_code=comp_item.item_code,
                     item_name=comp_item.item_name,
                     process_type_code=comp_item.process_type_code,
                     required_quantity=required_qty,
@@ -250,7 +250,7 @@ def check_production_feasibility(
             all_ok = False
         result.append(
             {
-                "erp_code": comp_item.erp_code,
+                "item_code": comp_item.item_code,
                 "item_name": comp_item.item_name,
                 "process_type_code": comp_item.process_type_code,
                 "unit": comp_item.unit,
@@ -456,7 +456,7 @@ def get_production_capacity(db: Session = Depends(get_db)):
         top_results.append({
             "item_id": str(item.item_id),
             "item_name": item.item_name,
-            "erp_code": item.erp_code,
+            "item_code": item.item_code,
             "immediate": imm,
             "maximum": mx,
             "limiting_item": bottleneck_name,

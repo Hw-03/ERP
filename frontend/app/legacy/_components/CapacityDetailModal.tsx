@@ -102,7 +102,7 @@ export function CapacityDetailModal({
                 >
                   <div className="min-w-0">
                     <div className="truncate text-sm" style={{ color: LEGACY_COLORS.text }}>{item.item_name}</div>
-                    <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
+                    <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{item.item_code}</div>
                     {item.limiting_item && (
                       <div className="truncate text-xs" style={{ color: LEGACY_COLORS.yellow }}>
                         병목: {item.limiting_item}

@@ -73,7 +73,7 @@ export function WarehouseIOTab({
     });
     if (!keyword) return byCat;
     return byCat.filter((item) => {
-      const haystack = `${item.item_name} ${item.erp_code} ${item.barcode ?? ""}`.toLowerCase();
+      const haystack = `${item.item_name} ${item.item_code} ${item.barcode ?? ""}`.toLowerCase();
       return haystack.includes(keyword);
     });
   }, [itemSearch, categoryFilter, items]);
@@ -375,7 +375,7 @@ export function WarehouseIOTab({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold truncate">{item.item_name}</div>
-                  <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{item.erp_code}</div>
+                  <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{item.item_code}</div>
                 </div>
                 <div className="font-mono text-xs shrink-0" style={{ color: LEGACY_COLORS.cyan }}>
                   {formatNumber(item.quantity)} {item.unit}
@@ -493,7 +493,7 @@ export function WarehouseIOTab({
               >
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-semibold truncate">{entry.item.item_name}</div>
-                  <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{entry.item.erp_code}</div>
+                  <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>{entry.item.item_code}</div>
                 </div>
                 <div className="ml-3 font-mono text-sm font-bold shrink-0" style={{ color: LEGACY_COLORS.blue }}>
                   {formatNumber(entry.quantity)} {entry.item.unit}

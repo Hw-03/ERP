@@ -34,7 +34,7 @@ export function DesktopInventoryRightPanel({
       {displayItem && (
         <DesktopRightPanel
           title={displayItem.item_name}
-          subtitle={displayItem.legacy_part ? `${displayItem.erp_code} · ${displayItem.legacy_part}` : (displayItem.erp_code ?? undefined)}
+          subtitle={displayItem.legacy_part ? `${displayItem.item_code} · ${displayItem.legacy_part}` : (displayItem.item_code ?? undefined)}
           headerBadge={headerBadge}
         >
           <InventoryDetailPanel item={displayItem} logs={itemLogs} onGoToWarehouse={onGoToWarehouse} />

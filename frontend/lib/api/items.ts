@@ -68,7 +68,7 @@ export const itemsApi = {
       legacy_item_type?: string;
       supplier?: string;
       min_stock?: number;
-      erp_code?: string;
+      item_code?: string;
       option_code?: string;
       model_slots?: number[];
     },

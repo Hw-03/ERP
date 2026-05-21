@@ -3,8 +3,8 @@ import {
   PROCESS_LABEL,
   PROCESS_TO_DEPT,
   processStageLabel,
-  erpCodeDept,
-  erpCodeDeptBadge,
+  itemCodeDept,
+  itemCodeDeptBadge,
   displayPart,
 } from "../mes/process";
 
@@ -32,22 +32,22 @@ describe("PROCESS_LABEL", () => {
   });
 });
 
-describe("erpCodeDept", () => {
+describe("itemCodeDept", () => {
   it("maps stage code 첫 글자 → 부서", () => {
-    expect(erpCodeDept("ITM-TR-00001")).toBe("튜브");
-    expect(erpCodeDept("ITM-HA-00010")).toBe("고압");
-    expect(erpCodeDept("ITM-VF-00099")).toBe("진공");
-    expect(erpCodeDept("ITM-NR-00001")).toBe("튜닝");
-    expect(erpCodeDept("ITM-AA-00001")).toBe("조립");
-    expect(erpCodeDept("ITM-PF-00001")).toBe("출하");
+    expect(itemCodeDept("ITM-TR-00001")).toBe("튜브");
+    expect(itemCodeDept("ITM-HA-00010")).toBe("고압");
+    expect(itemCodeDept("ITM-VF-00099")).toBe("진공");
+    expect(itemCodeDept("ITM-NR-00001")).toBe("튜닝");
+    expect(itemCodeDept("ITM-AA-00001")).toBe("조립");
+    expect(itemCodeDept("ITM-PF-00001")).toBe("출하");
   });
 
   it("returns null for missing/short/unknown code", () => {
-    expect(erpCodeDept(undefined)).toBeNull();
-    expect(erpCodeDept(null)).toBeNull();
-    expect(erpCodeDept("")).toBeNull();
-    expect(erpCodeDept("ONLYONE")).toBeNull();
-    expect(erpCodeDept("ITM-XX-00001")).toBeNull();
+    expect(itemCodeDept(undefined)).toBeNull();
+    expect(itemCodeDept(null)).toBeNull();
+    expect(itemCodeDept("")).toBeNull();
+    expect(itemCodeDept("ONLYONE")).toBeNull();
+    expect(itemCodeDept("ITM-XX-00001")).toBeNull();
   });
 });
 
@@ -76,11 +76,11 @@ describe("displayPart", () => {
   });
 });
 
-describe("erpCodeDeptBadge", () => {
+describe("itemCodeDeptBadge", () => {
   const stub = (name?: string | null) => `#${name ?? "x"}`;
 
   it("returns label / color / bg for valid code", () => {
-    const badge = erpCodeDeptBadge("ITM-AA-00001", stub);
+    const badge = itemCodeDeptBadge("ITM-AA-00001", stub);
     expect(badge).not.toBeNull();
     expect(badge!.label).toBe("조립");
     expect(badge!.color).toBe("#조립");
@@ -89,8 +89,8 @@ describe("erpCodeDeptBadge", () => {
   });
 
   it("returns null when erp code does not map", () => {
-    expect(erpCodeDeptBadge(undefined, stub)).toBeNull();
-    expect(erpCodeDeptBadge("BAD", stub)).toBeNull();
-    expect(erpCodeDeptBadge("ITM-XX-00001", stub)).toBeNull();
+    expect(itemCodeDeptBadge(undefined, stub)).toBeNull();
+    expect(itemCodeDeptBadge("BAD", stub)).toBeNull();
+    expect(itemCodeDeptBadge("ITM-XX-00001", stub)).toBeNull();
   });
 });

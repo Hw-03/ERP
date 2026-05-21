@@ -5,7 +5,7 @@ import Image from "next/image";
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { erpCodeDept } from "@/lib/mes/process";
+import { itemCodeDept } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "../DepartmentsContext";
@@ -61,7 +61,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
   for (const l of item.locations.filter((l) => Number(l.quantity) > 0))
     badges.push({ key: l.department, label: l.department, color: getDeptColor(l.department) });
   if (badges.length === 0) {
-    const dept = item.department ?? erpCodeDept(item.erp_code);
+    const dept = item.department ?? itemCodeDept(item.item_code);
     if (dept) badges.push({ key: dept, label: dept, color: getDeptColor(dept), dim: true });
   }
   const visibleBadges = badges.slice(0, 2);
@@ -153,7 +153,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
         className="hidden sm:table-cell border-b px-4 py-5 align-middle whitespace-nowrap text-sm"
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
       >
-        {item.erp_code ?? "-"}
+        {item.item_code ?? "-"}
       </td>
       <td
         className="hidden sm:table-cell border-b px-4 py-5 align-middle whitespace-nowrap"

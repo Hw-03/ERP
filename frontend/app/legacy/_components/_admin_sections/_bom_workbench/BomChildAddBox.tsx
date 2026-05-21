@@ -70,7 +70,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
       })
       .filter((i) => {
         if (!kw) return true;
-        return `${i.item_name} ${i.erp_code ?? ""}`.toLowerCase().includes(kw);
+        return `${i.item_name} ${i.item_code ?? ""}`.toLowerCase().includes(kw);
       });
   }, [items, parent.item_id, search, deptFilter, stageFilter]);
 
@@ -208,9 +208,9 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
                     <TruncatedText className="truncate text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
                       {c.item_name}
                     </TruncatedText>
-                    {c.erp_code && (
+                    {c.item_code && (
                       <TruncatedText className="truncate text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                        {c.erp_code}
+                        {c.item_code}
                       </TruncatedText>
                     )}
                   </div>

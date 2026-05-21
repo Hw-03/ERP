@@ -301,7 +301,7 @@ function HistoryDetailMetaStrip({
           </span>
         )}
         <span style={{ color: LEGACY_COLORS.muted2 }}>
-          {log.erp_code ?? "-"}
+          {log.item_code ?? "-"}
         </span>
         <span style={{ color: LEGACY_COLORS.muted2 }}>·</span>
         <span style={{ color: LEGACY_COLORS.muted2 }}>담당자</span>

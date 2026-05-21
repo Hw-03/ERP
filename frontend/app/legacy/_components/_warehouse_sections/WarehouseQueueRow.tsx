@@ -71,7 +71,7 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
       <div className="mt-2 flex flex-col gap-1 text-sm" style={{ color: LEGACY_COLORS.text }}>
         {req.lines.map((line) => (
           <div key={line.line_id} className="flex flex-wrap items-center gap-2">
-            <span style={{ color: LEGACY_COLORS.muted2 }}>{line.erp_code_snapshot ?? "-"}</span>
+            <span style={{ color: LEGACY_COLORS.muted2 }}>{line.item_code_snapshot ?? "-"}</span>
             <span>{line.item_name_snapshot}</span>
             <span className="ml-auto font-bold">{formatQty(line.quantity)} 개</span>
             <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>

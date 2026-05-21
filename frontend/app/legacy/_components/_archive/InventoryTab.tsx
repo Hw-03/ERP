@@ -7,7 +7,7 @@ import { ItemDetailSheet } from "./ItemDetailSheet";
 import type { ToastState } from "./Toast";
 import {
   LEGACY_COLORS,
-  erpCodeDeptBadge,
+  itemCodeDeptBadge,
   formatNumber,
   getStockState,
   normalizeModel,
@@ -310,7 +310,7 @@ export function InventoryTab({
               row.available,
               item.min_stock == null ? null : Number(item.min_stock),
             );
-            const deptBadge = erpCodeDeptBadge(item.erp_code);
+            const deptBadge = itemCodeDeptBadge(item.item_code);
 
             return (
               <button
@@ -356,14 +356,14 @@ export function InventoryTab({
                   </div>
                   <div className="flex items-center gap-1.5">
                     <div className="truncate text-sm font-semibold">{item.item_name}</div>
-                    {item.erp_code && (
+                    {item.item_code && (
                       <span className="shrink-0 font-mono text-[10px] font-black" style={{ color: LEGACY_COLORS.blue }}>
-                        {item.erp_code}
+                        {item.item_code}
                       </span>
                     )}
                   </div>
                   <div className="mt-0.5 truncate text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {item.erp_code}
+                    {item.item_code}
                     {item.legacy_part ? ` / ${item.legacy_part}` : ""}
                     {normalizeModel(item.legacy_model) !== "공용" ? ` / ${normalizeModel(item.legacy_model)}` : ""}
                     {item.location ? ` · 📍${item.location}` : ""}

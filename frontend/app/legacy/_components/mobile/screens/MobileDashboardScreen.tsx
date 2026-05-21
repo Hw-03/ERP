@@ -3,7 +3,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { erpCodeDept } from "@/lib/mes/process";
+import { itemCodeDept } from "@/lib/mes/process";
 import { SlidersHorizontal } from "lucide-react";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { InlineSearch } from "../primitives";
@@ -113,7 +113,7 @@ export function MobileDashboardScreen({
             d === "창고"
               ? (item.warehouse_qty ?? 0) > 0
               : item.department === d ||
-                erpCodeDept(item.erp_code) === d ||
+                itemCodeDept(item.item_code) === d ||
                 item.locations.some((loc) => loc.department === d),
           );
           if (!inDept) return false;
@@ -284,8 +284,8 @@ export function MobileDashboardScreen({
                 </div>
                 <div className="mt-0.5 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
                   {displayItem.legacy_part
-                    ? `${displayItem.erp_code} · ${displayItem.legacy_part}`
-                    : displayItem.erp_code ?? "-"}
+                    ? `${displayItem.item_code} · ${displayItem.legacy_part}`
+                    : displayItem.item_code ?? "-"}
                 </div>
               </div>
               {headerBadge}

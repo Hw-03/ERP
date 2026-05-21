@@ -18,7 +18,7 @@ export function safeQty(item: Item): number {
 export function matchesSearch(item: Item, keyword: string): boolean {
   if (!keyword) return true;
   const haystack = [
-    item.erp_code,
+    item.item_code,
     item.item_name,
     item.spec ?? "",
     item.location ?? "",

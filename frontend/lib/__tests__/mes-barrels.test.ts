@@ -20,7 +20,7 @@ describe("lib/mes barrel re-exports", () => {
   it("@/lib/mes/format exposes mes-format API", async () => {
     const mod = await import("../mes/format");
     expect(typeof mod.formatQty).toBe("function");
-    expect(typeof mod.formatErpCode).toBe("function");
+    expect(typeof mod.formatItemCode).toBe("function");
     expect(typeof mod.formatDateTime).toBe("function");
     expect(typeof mod.formatPercent).toBe("function");
   });

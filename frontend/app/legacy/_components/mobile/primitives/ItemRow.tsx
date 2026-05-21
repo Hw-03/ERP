@@ -4,9 +4,9 @@ import clsx from "clsx";
 import { Check } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { erpCodeDeptBadge } from "@/lib/mes/process";
+import { itemCodeDeptBadge } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
-import { formatErpCode, formatQty } from "@/lib/mes/format";
+import { formatItemCode, formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "../../DepartmentsContext";
 import { TYPO } from "../tokens";
 import { StatusBadge } from "./StatusBadge";
@@ -30,8 +30,8 @@ export function ItemRow({
 }) {
   const getDeptColor = useDeptColorLookup();
   const state = getStockState(Number(item.quantity), item.min_stock);
-  const deptBadge = erpCodeDeptBadge(item.erp_code, getDeptColor);
-  const erpCompact = formatErpCode(item.erp_code);
+  const deptBadge = itemCodeDeptBadge(item.item_code, getDeptColor);
+  const erpCompact = formatItemCode(item.item_code);
 
   return (
     <button

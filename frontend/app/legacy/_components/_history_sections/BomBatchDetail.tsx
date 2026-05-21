@@ -221,15 +221,15 @@ function BomLineRow({ line, batch, bundle }: { line: IoLine; batch: IoBatch; bun
       <td className="whitespace-nowrap border-b px-4 py-1.5" style={{ borderColor: LEGACY_COLORS.border }}>
         <StatusBadge included={line.included} shortage={line.shortage} />
       </td>
-      {/* 품목명 (들여쓰기 + 가이드 + 이름 + erp_code) */}
+      {/* 품목명 (들여쓰기 + 가이드 + 이름 + item_code) */}
       <td className="border-b py-1.5 pr-4" style={{ borderColor: LEGACY_COLORS.border, paddingLeft: "3rem" }}>
         <div className="flex items-center gap-2">
           <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>└</span>
           <span className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
             {line.item_name}
           </span>
-          {line.erp_code && (
-            <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{line.erp_code}</span>
+          {line.item_code && (
+            <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{line.item_code}</span>
           )}
         </div>
       </td>

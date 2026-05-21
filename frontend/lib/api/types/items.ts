@@ -27,7 +27,7 @@ export interface Item {
   legacy_item_type: string | null;
   supplier: string | null;
   min_stock: number | null;
-  erp_code: string | null;
+  item_code: string | null;
   model_symbol: string | null;
   model_slots: number[];
   symbol_slot: number | null;

@@ -237,10 +237,10 @@ export function BomWorkbench({
         const p = items.find((i) => i.item_id === r.parent_item_id);
         const c = items.find((i) => i.item_id === r.child_item_id);
         return {
-          parent_erp_code: p?.erp_code ?? "",
+          parent_item_code: p?.item_code ?? "",
           parent_item_name: r.parent_item_name,
           parent_process_type: p?.process_type_code ?? "",
-          child_erp_code: c?.erp_code ?? "",
+          child_item_code: c?.item_code ?? "",
           child_item_name: r.child_item_name,
           child_process_type: c?.process_type_code ?? "",
           quantity: r.quantity,
@@ -262,7 +262,7 @@ export function BomWorkbench({
     URL.revokeObjectURL(jsonA.href);
     // CSV (standalone build.py 와 동일 스키마, UTF-8 BOM)
     const header =
-      "parent_erp_code,parent_item_name,parent_process_type,child_erp_code,child_item_name,child_process_type,quantity,unit";
+      "parent_item_code,parent_item_name,parent_process_type,child_item_code,child_item_name,child_process_type,quantity,unit";
     const csv =
       "﻿" +
       header +
@@ -270,10 +270,10 @@ export function BomWorkbench({
       rows
         .map((r) =>
           [
-            r.parent_erp_code,
+            r.parent_item_code,
             r.parent_item_name,
             r.parent_process_type,
-            r.child_erp_code,
+            r.child_item_code,
             r.child_item_name,
             r.child_process_type,
             r.quantity,

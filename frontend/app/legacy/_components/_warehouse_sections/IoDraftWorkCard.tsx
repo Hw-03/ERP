@@ -331,7 +331,7 @@ function DraftLineRow({ line, subType }: { line: IoLine; subType: IoSubType }) {
         className="shrink-0 font-mono text-[11px] font-bold"
         style={{ color: LEGACY_COLORS.muted2 }}
       >
-        {line.erp_code ?? "—"}
+        {line.item_code ?? "—"}
       </span>
       <span
         className="min-w-0 flex-1 truncate font-bold"

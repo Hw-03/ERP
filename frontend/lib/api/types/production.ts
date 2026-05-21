@@ -8,7 +8,7 @@ import type { TransactionType } from "./shared";
 export interface TransactionLog {
   log_id: string;
   item_id: string;
-  erp_code: string | null;
+  item_code: string | null;
   item_name: string;
   item_process_type_code: string | null;
   item_unit: string;
@@ -41,7 +41,7 @@ export interface TransactionEditLog {
 }
 
 export interface ProductionCheckComponent {
-  erp_code: string | null;
+  item_code: string | null;
   item_name: string;
   process_type_code: string | null;
   unit: string;
@@ -68,7 +68,7 @@ export type ProductionCapacityStatus =
 export interface ProductionCapacityItem {
   item_id: string;
   item_name: string;
-  erp_code: string | null;
+  item_code: string | null;
   immediate: number;
   maximum: number;
   /** 이 완제품의 immediate 를 결정한 직계 자식 병목 부품명. */
@@ -86,7 +86,7 @@ export interface ProductionCapacity {
 
 export interface BackflushDetail {
   item_id: string;
-  erp_code: string | null;
+  item_code: string | null;
   item_name: string;
   process_type_code: string | null;
   required_quantity: number;

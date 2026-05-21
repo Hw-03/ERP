@@ -83,7 +83,7 @@ export const PROCESS_TYPE_LABEL: Record<string, string> = {
 export function matchesSearch(item: Item, keyword: string) {
   if (!keyword) return true;
   const haystack = [
-    item.erp_code,
+    item.item_code,
     item.item_name,
     item.barcode ?? "",
     item.spec ?? "",

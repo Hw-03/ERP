@@ -4,7 +4,7 @@ import { Check, MinusCircle, Trash2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { getStockState } from "@/lib/mes/inventory";
-import { erpCodeDeptBadge } from "@/lib/mes/process";
+import { itemCodeDeptBadge } from "@/lib/mes/process";
 import { useDeptColorLookup } from "../DepartmentsContext";
 import type { IoLine, IoSubType, Item } from "./types";
 import { isBomForced, lineTagLabel, type LineTagTone } from "./ioWorkType";
@@ -81,7 +81,7 @@ export function IoLineRow({
   const titleColor = disabled ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text;
   const rowBackground = shortage ? tint(LEGACY_COLORS.red, 8) : "transparent";
   const stock = item ? getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock)) : null;
-  const deptBadge = item ? erpCodeDeptBadge(item.erp_code, getDeptColor) : null;
+  const deptBadge = item ? itemCodeDeptBadge(item.item_code, getDeptColor) : null;
   const expected = expectedAfter(line, available);
   const tag = lineTagLabel(line, subType);
   const tagColor = toneToColor(tag.tone);
@@ -160,7 +160,7 @@ export function IoLineRow({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-          <span className="truncate">{line.erp_code ?? "-"}</span>
+          <span className="truncate">{line.item_code ?? "-"}</span>
           <span
             className="rounded-full px-2 py-0.5 text-[10px] font-bold"
             style={{ background: tint(tagColor, 14), color: tagColor }}

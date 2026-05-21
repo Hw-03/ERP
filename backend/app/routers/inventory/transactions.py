@@ -294,7 +294,7 @@ def _to_log_response(
     return TransactionLogResponse(
         log_id=log.log_id,
         item_id=log.item_id,
-        erp_code=item.erp_code,
+        item_code=item.item_code,
         item_name=item.item_name,
         item_process_type_code=item.process_type_code,
         item_unit=item.unit,
@@ -410,7 +410,7 @@ def list_transactions(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.erp_code.ilike(pattern),
+                Item.item_code.ilike(pattern),
                 TransactionLog.reference_no.ilike(pattern),
                 TransactionLog.notes.ilike(pattern),
                 TransactionLog.produced_by.ilike(pattern),
@@ -480,7 +480,7 @@ def get_transactions_summary(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.erp_code.ilike(pattern),
+                Item.item_code.ilike(pattern),
                 TransactionLog.reference_no.ilike(pattern),
                 TransactionLog.notes.ilike(pattern),
                 TransactionLog.produced_by.ilike(pattern),
@@ -556,7 +556,7 @@ def export_transactions_csv(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.erp_code.ilike(pattern),
+                Item.item_code.ilike(pattern),
                 TransactionLog.reference_no.ilike(pattern),
                 TransactionLog.notes.ilike(pattern),
                 TransactionLog.produced_by.ilike(pattern),
@@ -572,7 +572,7 @@ def export_transactions_csv(
         [
             "created_at",
             "transaction_type",
-            "erp_code",
+            "item_code",
             "item_name",
             "process_type_code",
             "quantity_change",
@@ -588,7 +588,7 @@ def export_transactions_csv(
             [
                 log.created_at.isoformat(),
                 log.transaction_type.value,
-                item.erp_code or "",
+                item.item_code or "",
                 item.item_name,
                 item.process_type_code or "",
                 float(log.quantity_change),
@@ -629,7 +629,7 @@ def export_transactions_xlsx(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.erp_code.ilike(pattern),
+                Item.item_code.ilike(pattern),
                 TransactionLog.reference_no.ilike(pattern),
                 TransactionLog.notes.ilike(pattern),
                 TransactionLog.produced_by.ilike(pattern),
@@ -665,7 +665,7 @@ def export_transactions_xlsx(
         row_data = [
             log.created_at.strftime("%Y-%m-%d %H:%M") if log.created_at else "",
             tx_label.get(tx_val, tx_val),
-            item.erp_code or "",
+            item.item_code or "",
             item.item_name,
             item.process_type_code or "",
             float(log.quantity_change),

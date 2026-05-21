@@ -114,7 +114,6 @@ class Item(Base):
     __tablename__ = "items"
 
     item_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    item_code = Column(String(50), unique=True, nullable=True, index=True)  # 레거시 CSV 코드 — erp_code로 교체 후 DROP 예정
     item_name = Column(String(200), nullable=False)
     sort_order = Column(Integer, nullable=True, index=True)  # 엑셀 정리본 행 순서
     spec = Column(Text, nullable=True)
@@ -137,8 +136,8 @@ class Item(Base):
     supplier = Column(String(200), nullable=True)
     min_stock = Column(Numeric(15, 4), nullable=True)
 
-    # 4-part ERP code ([모델기호조합]-[구분코드]-[일련번호]-[옵션코드])
-    erp_code = Column(String(40), nullable=True, unique=True, index=True)
+    # 4-part item code ([모델기호조합]-[구분코드]-[일련번호]-[옵션코드])
+    item_code = Column(String(40), nullable=True, unique=True, index=True)
     model_symbol = Column(String(20), nullable=True, index=True)  # 예: "346", "3", "34678"
     symbol_slot = Column(SmallInteger, ForeignKey("product_symbols.slot"), nullable=True, index=True)  # deprecated
     process_type_code = Column(String(2), ForeignKey("process_types.code"), nullable=True, index=True)
@@ -639,7 +638,7 @@ class StockRequestLine(Base):
         index=True,
     )
     item_name_snapshot = Column(String(200), nullable=False)
-    erp_code_snapshot = Column(String(50), nullable=True)
+    item_code_snapshot = Column(String(50), nullable=True)
     quantity = Column(Numeric(15, 4), nullable=False)
     from_bucket = Column(
         SAEnum(RequestBucketEnum, name="request_bucket_enum", create_type=True),
@@ -773,7 +772,7 @@ class IoLine(Base):
         index=True,
     )
     item_name_snapshot = Column(String(200), nullable=False)
-    erp_code_snapshot = Column(String(50), nullable=True)
+    item_code_snapshot = Column(String(50), nullable=True)
     unit = Column(String(20), nullable=False, default="EA")
     direction = Column(String(20), nullable=False)
     from_bucket = Column(String(20), nullable=False)

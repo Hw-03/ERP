@@ -93,7 +93,11 @@
             "title": "Direction",
             "type": "string"
           },
-          "erp_code": {
+          "has_children": {
+            "title": "Has Children",
+            "type": "boolean"
+          },
+          "item_code": {
             "anyOf": [
               {
                 "type": "string"
@@ -102,11 +106,7 @@
                 "type": "null"
               }
             ],
-            "title": "Erp Code"
-          },
-          "has_children": {
-            "title": "Has Children",
-            "type": "boolean"
+            "title": "Item Code"
           },
           "item_id": {
             "format": "uuid",
@@ -152,7 +152,7 @@
         "required": [
           "item_id",
           "item_name",
-          "erp_code",
+          "item_code",
           "process_type_code",
           "unit",
           "direction",
@@ -361,7 +361,7 @@
             "title": "Bom Id",
             "type": "string"
           },
-          "child_erp_code": {
+          "child_item_code": {
             "anyOf": [
               {
                 "type": "string"
@@ -370,7 +370,7 @@
                 "type": "null"
               }
             ],
-            "title": "Child Erp Code"
+            "title": "Child Item Code"
           },
           "child_item_id": {
             "format": "uuid",
@@ -381,7 +381,7 @@
             "title": "Child Item Name",
             "type": "string"
           },
-          "parent_erp_code": {
+          "parent_item_code": {
             "anyOf": [
               {
                 "type": "string"
@@ -390,7 +390,7 @@
                 "type": "null"
               }
             ],
-            "title": "Parent Erp Code"
+            "title": "Parent Item Code"
           },
           "parent_item_id": {
             "format": "uuid",
@@ -415,10 +415,10 @@
           "bom_id",
           "parent_item_id",
           "parent_item_name",
-          "parent_erp_code",
+          "parent_item_code",
           "child_item_id",
           "child_item_name",
-          "child_erp_code",
+          "child_item_code",
           "quantity",
           "unit"
         ],
@@ -490,7 +490,7 @@
             "title": "Current Stock",
             "type": "string"
           },
-          "erp_code": {
+          "item_code": {
             "anyOf": [
               {
                 "type": "string"
@@ -499,7 +499,7 @@
                 "type": "null"
               }
             ],
-            "title": "Erp Code"
+            "title": "Item Code"
           },
           "item_id": {
             "format": "uuid",
@@ -597,7 +597,7 @@
       },
       "BackflushDetail": {
         "properties": {
-          "erp_code": {
+          "item_code": {
             "anyOf": [
               {
                 "type": "string"
@@ -606,7 +606,7 @@
                 "type": "null"
               }
             ],
-            "title": "Erp Code"
+            "title": "Item Code"
           },
           "item_id": {
             "format": "uuid",
@@ -664,7 +664,7 @@
             "title": "Current Stock",
             "type": "number"
           },
-          "erp_code": {
+          "item_code": {
             "anyOf": [
               {
                 "type": "string"
@@ -673,7 +673,7 @@
                 "type": "null"
               }
             ],
-            "title": "Erp Code"
+            "title": "Item Code"
           },
           "item_name": {
             "title": "Item Name",
@@ -849,7 +849,12 @@
       },
       "CapacityTopItem": {
         "properties": {
-          "erp_code": {
+          "immediate": {
+            "description": "BOM 직계 자식(중간재·반제품)의 available 기준 즉시 생산 가능량.",
+            "title": "Immediate",
+            "type": "integer"
+          },
+          "item_code": {
             "anyOf": [
               {
                 "type": "string"
@@ -858,12 +863,7 @@
                 "type": "null"
               }
             ],
-            "title": "Erp Code"
-          },
-          "immediate": {
-            "description": "BOM 직계 자식(중간재·반제품)의 available 기준 즉시 생산 가능량.",
-            "title": "Immediate",
-            "type": "integer"
+            "title": "Item Code"
           },
           "item_id": {
             "title": "Item Id",
@@ -1652,107 +1652,6 @@
           }
         },
         "title": "EmployeeUpdate",
-        "type": "object"
-      },
-      "ErpCodeGenerateRequest": {
-        "properties": {
-          "option": {
-            "anyOf": [
-              {
-                "maxLength": 2,
-                "minLength": 2,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Option"
-          },
-          "process_type": {
-            "maxLength": 2,
-            "minLength": 2,
-            "title": "Process Type",
-            "type": "string"
-          },
-          "symbol": {
-            "maxLength": 5,
-            "minLength": 1,
-            "title": "Symbol",
-            "type": "string"
-          }
-        },
-        "required": [
-          "symbol",
-          "process_type"
-        ],
-        "title": "ErpCodeGenerateRequest",
-        "type": "object"
-      },
-      "ErpCodeParseRequest": {
-        "properties": {
-          "code": {
-            "description": "4-part 품목 코드 문자열",
-            "title": "Code",
-            "type": "string"
-          }
-        },
-        "required": [
-          "code"
-        ],
-        "title": "ErpCodeParseRequest",
-        "type": "object"
-      },
-      "ErpCodeResponse": {
-        "properties": {
-          "formatted_compact": {
-            "title": "Formatted Compact",
-            "type": "string"
-          },
-          "formatted_full": {
-            "title": "Formatted Full",
-            "type": "string"
-          },
-          "option": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Option"
-          },
-          "process_type": {
-            "title": "Process Type",
-            "type": "string"
-          },
-          "serial": {
-            "title": "Serial",
-            "type": "integer"
-          },
-          "symbol": {
-            "title": "Symbol",
-            "type": "string"
-          },
-          "symbol_slots": {
-            "items": {
-              "type": "integer"
-            },
-            "title": "Symbol Slots",
-            "type": "array"
-          }
-        },
-        "required": [
-          "symbol",
-          "process_type",
-          "serial",
-          "symbol_slots",
-          "formatted_full",
-          "formatted_compact"
-        ],
-        "title": "ErpCodeResponse",
         "type": "object"
       },
       "ExpandComponentRequest": {
@@ -2641,17 +2540,6 @@
             "title": "Edited",
             "type": "boolean"
           },
-          "erp_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Erp Code"
-          },
           "exclusion_note": {
             "anyOf": [
               {
@@ -2687,6 +2575,17 @@
             "default": true,
             "title": "Included",
             "type": "boolean"
+          },
+          "item_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Code"
           },
           "item_id": {
             "format": "uuid",
@@ -2788,17 +2687,6 @@
             "title": "Edited",
             "type": "boolean"
           },
-          "erp_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Erp Code"
-          },
           "exclusion_note": {
             "anyOf": [
               {
@@ -2834,6 +2722,17 @@
             "default": true,
             "title": "Included",
             "type": "boolean"
+          },
+          "item_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Code"
           },
           "item_id": {
             "format": "uuid",
@@ -3167,6 +3066,107 @@
         "title": "IoSubmitResponse",
         "type": "object"
       },
+      "ItemCodeGenerateRequest": {
+        "properties": {
+          "option": {
+            "anyOf": [
+              {
+                "maxLength": 2,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Option"
+          },
+          "process_type": {
+            "maxLength": 2,
+            "minLength": 2,
+            "title": "Process Type",
+            "type": "string"
+          },
+          "symbol": {
+            "maxLength": 5,
+            "minLength": 1,
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "process_type"
+        ],
+        "title": "ItemCodeGenerateRequest",
+        "type": "object"
+      },
+      "ItemCodeParseRequest": {
+        "properties": {
+          "code": {
+            "description": "4-part 품목 코드 문자열",
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "ItemCodeParseRequest",
+        "type": "object"
+      },
+      "ItemCodeResponse": {
+        "properties": {
+          "formatted_compact": {
+            "title": "Formatted Compact",
+            "type": "string"
+          },
+          "formatted_full": {
+            "title": "Formatted Full",
+            "type": "string"
+          },
+          "option": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Option"
+          },
+          "process_type": {
+            "title": "Process Type",
+            "type": "string"
+          },
+          "serial": {
+            "title": "Serial",
+            "type": "integer"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "symbol_slots": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Symbol Slots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "symbol",
+          "process_type",
+          "serial",
+          "symbol_slots",
+          "formatted_full",
+          "formatted_compact"
+        ],
+        "title": "ItemCodeResponse",
+        "type": "object"
+      },
       "ItemCreate": {
         "properties": {
           "barcode": {
@@ -3357,7 +3357,7 @@
             "title": "Created At",
             "type": "string"
           },
-          "erp_code": {
+          "item_code": {
             "anyOf": [
               {
                 "type": "string"
@@ -3366,7 +3366,7 @@
                 "type": "null"
               }
             ],
-            "title": "Erp Code"
+            "title": "Item Code"
           },
           "item_id": {
             "format": "uuid",
@@ -3542,7 +3542,7 @@
             ],
             "title": "Barcode"
           },
-          "erp_code": {
+          "item_code": {
             "anyOf": [
               {
                 "maxLength": 40,
@@ -3552,7 +3552,7 @@
                 "type": "null"
               }
             ],
-            "title": "Erp Code"
+            "title": "Item Code"
           },
           "item_name": {
             "anyOf": [
@@ -3748,7 +3748,7 @@
             ],
             "title": "Department"
           },
-          "erp_code": {
+          "item_code": {
             "anyOf": [
               {
                 "type": "string"
@@ -3757,7 +3757,7 @@
                 "type": "null"
               }
             ],
-            "title": "Erp Code"
+            "title": "Item Code"
           },
           "item_id": {
             "format": "uuid",
@@ -4885,17 +4885,6 @@
             "title": "Created At",
             "type": "string"
           },
-          "erp_code_snapshot": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Erp Code Snapshot"
-          },
           "from_bucket": {
             "$ref": "#/components/schemas/RequestBucketEnum"
           },
@@ -4909,6 +4898,17 @@
               }
             ],
             "title": "From Department"
+          },
+          "item_code_snapshot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Code Snapshot"
           },
           "item_id": {
             "format": "uuid",
@@ -5444,7 +5444,7 @@
             "title": "Edit Count",
             "type": "integer"
           },
-          "erp_code": {
+          "item_code": {
             "anyOf": [
               {
                 "type": "string"
@@ -5453,7 +5453,7 @@
                 "type": "null"
               }
             ],
-            "title": "Erp Code"
+            "title": "Item Code"
           },
           "item_id": {
             "format": "uuid",
@@ -5902,7 +5902,7 @@
             "title": "Diff",
             "type": "string"
           },
-          "erp_code": {
+          "item_code": {
             "anyOf": [
               {
                 "type": "string"
@@ -5911,7 +5911,7 @@
                 "type": "null"
               }
             ],
-            "title": "Erp Code"
+            "title": "Item Code"
           },
           "item_id": {
             "format": "uuid",
@@ -6035,7 +6035,12 @@
             "title": "Delta",
             "type": "string"
           },
-          "erp_code": {
+          "in_qty": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "In Qty",
+            "type": "string"
+          },
+          "item_code": {
             "anyOf": [
               {
                 "type": "string"
@@ -6044,12 +6049,7 @@
                 "type": "null"
               }
             ],
-            "title": "Erp Code"
-          },
-          "in_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "In Qty",
-            "type": "string"
+            "title": "Item Code"
           },
           "item_id": {
             "title": "Item Id",
@@ -6072,7 +6072,7 @@
         },
         "required": [
           "item_id",
-          "erp_code",
+          "item_code",
           "item_name",
           "prev_qty",
           "in_qty",
@@ -6854,7 +6854,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ErpCodeGenerateRequest"
+                "$ref": "#/components/schemas/ItemCodeGenerateRequest"
               }
             }
           },
@@ -6865,7 +6865,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErpCodeResponse"
+                  "$ref": "#/components/schemas/ItemCodeResponse"
                 }
               }
             },
@@ -6920,7 +6920,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ErpCodeParseRequest"
+                "$ref": "#/components/schemas/ItemCodeParseRequest"
               }
             }
           },
@@ -6931,7 +6931,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErpCodeResponse"
+                  "$ref": "#/components/schemas/ItemCodeResponse"
                 }
               }
             },

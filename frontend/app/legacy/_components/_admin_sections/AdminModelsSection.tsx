@@ -401,7 +401,7 @@ function ModelDetailView({ model, linkedItems, linkedBomCount }: ModelDetailView
                   {it.item_name}
                 </div>
                 <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {it.erp_code ?? "—"}
+                  {it.item_code ?? "—"}
                 </span>
               </div>
             ))}

@@ -58,7 +58,7 @@ class ItemUpdate(BaseModel):
     legacy_item_type: Optional[str] = Field(None, max_length=50)
     supplier: Optional[str] = Field(None, max_length=200)
     min_stock: Optional[Decimal] = None
-    erp_code: Optional[str] = Field(None, max_length=40)
+    item_code: Optional[str] = Field(None, max_length=40)
     option_code: Optional[str] = Field(None, max_length=10)
     model_slots: Optional[List[int]] = None
 
@@ -76,8 +76,8 @@ class ItemResponse(BaseModel):
     legacy_item_type: Optional[str] = None
     supplier: Optional[str] = None
     min_stock: Optional[Decimal] = None
-    # ERP code fields
-    erp_code: Optional[str] = None
+    # item code fields
+    item_code: Optional[str] = None
     model_symbol: Optional[str] = None
     model_slots: List[int] = []
     symbol_slot: Optional[int] = None
@@ -331,17 +331,17 @@ class BOMDetailResponse(BaseModel):
     bom_id: uuid.UUID
     parent_item_id: uuid.UUID
     parent_item_name: str
-    parent_erp_code: Optional[str]
+    parent_item_code: Optional[str]
     child_item_id: uuid.UUID
     child_item_name: str
-    child_erp_code: Optional[str]
+    child_item_code: Optional[str]
     quantity: Decimal
     unit: str
 
 
 class BOMTreeNode(BaseModel):
     item_id: uuid.UUID
-    erp_code: Optional[str] = None
+    item_code: Optional[str] = None
     item_name: str
     process_type_code: Optional[str] = None
     unit: str
@@ -363,7 +363,7 @@ class ProductionReceiptRequest(BaseModel):
 
 class BackflushDetail(BaseModel):
     item_id: uuid.UUID
-    erp_code: Optional[str] = None
+    item_code: Optional[str] = None
     item_name: str
     process_type_code: Optional[str] = None
     required_quantity: Decimal
@@ -426,7 +426,7 @@ class TransactionLogResponse(BaseModel):
 
     log_id: uuid.UUID
     item_id: uuid.UUID
-    erp_code: Optional[str] = None
+    item_code: Optional[str] = None
     item_name: str
     item_process_type_code: Optional[str] = None
     item_unit: str
@@ -492,7 +492,7 @@ class ProductSymbolUpdate(BaseModel):
 
 class WeeklyItemReport(BaseModel):
     item_id: str
-    erp_code: Optional[str]
+    item_code: Optional[str]
     item_name: str
     prev_qty: Decimal
     in_qty: Decimal
@@ -578,17 +578,17 @@ class ProcessFlowRuleResponse(BaseModel):
     consumes_codes: Optional[str]
 
 
-class ErpCodeParseRequest(BaseModel):
+class ItemCodeParseRequest(BaseModel):
     code: str = Field(..., description="4-part 품목 코드 문자열")
 
 
-class ErpCodeGenerateRequest(BaseModel):
+class ItemCodeGenerateRequest(BaseModel):
     symbol: str = Field(..., min_length=1, max_length=5)
     process_type: str = Field(..., min_length=2, max_length=2)
     option: Optional[str] = Field(None, min_length=2, max_length=2)
 
 
-class ErpCodeResponse(BaseModel):
+class ItemCodeResponse(BaseModel):
     symbol: str
     process_type: str
     serial: int
@@ -608,7 +608,7 @@ class VarianceLogResponse(BaseModel):
 
     var_id: uuid.UUID
     item_id: uuid.UUID
-    erp_code: Optional[str] = None
+    item_code: Optional[str] = None
     item_name: Optional[str] = None
     bom_expected: Decimal
     actual_used: Decimal
@@ -621,7 +621,7 @@ class VarianceLogResponse(BaseModel):
 # Phase 5.3-A — 운영 도구 응답 schema (BOM 가능 여부 / 생산 capacity / 정합성)
 # =============================================================================
 class BomCheckComponent(BaseModel):
-    erp_code: Optional[str] = None
+    item_code: Optional[str] = None
     item_name: str
     process_type_code: Optional[str] = None
     unit: str
@@ -647,7 +647,7 @@ CapacityStatus = Literal["no_target", "bom_not_registered", "not_producible", "p
 class CapacityTopItem(BaseModel):
     item_id: str
     item_name: str
-    erp_code: Optional[str] = None
+    item_code: Optional[str] = None
     immediate: int = Field(
         ...,
         description="BOM 직계 자식(중간재·반제품)의 available 기준 즉시 생산 가능량.",
@@ -764,7 +764,7 @@ class StockRequestLineResponse(BaseModel):
     request_id: uuid.UUID
     item_id: uuid.UUID
     item_name_snapshot: str
-    erp_code_snapshot: Optional[str] = None
+    item_code_snapshot: Optional[str] = None
     quantity: Decimal
     from_bucket: RequestBucketEnum
     from_department: Optional[str] = None
@@ -820,7 +820,7 @@ class IoLinePayload(BaseModel):
     line_id: uuid.UUID
     item_id: uuid.UUID
     item_name: str
-    erp_code: Optional[str] = None
+    item_code: Optional[str] = None
     unit: str = "EA"
     direction: str
     from_bucket: str

@@ -177,7 +177,7 @@ export function InventoryItemsTable({
                 item={item}
                 selected={selectedItem?.item_id === item.item_id}
                 onSelect={onSelectItem}
-                imageFilename={item.erp_code ? imageManifest?.[item.erp_code] : undefined}
+                imageFilename={item.item_code ? imageManifest?.[item.item_code] : undefined}
               />
             ))}
           </tbody>

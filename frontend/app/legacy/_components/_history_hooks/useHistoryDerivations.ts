@@ -115,7 +115,7 @@ export function useHistoryDerivations(
       if (start && parseUtc(log.created_at) < start) return false;
       if (filters.search.trim()) {
         const k = filters.search.trim().toLowerCase();
-        const hay = `${log.item_name} ${log.erp_code} ${log.reference_no ?? ""} ${log.notes ?? ""}`.toLowerCase();
+        const hay = `${log.item_name} ${log.item_code} ${log.reference_no ?? ""} ${log.notes ?? ""}`.toLowerCase();
         if (!hay.includes(k)) return false;
       }
       return true;

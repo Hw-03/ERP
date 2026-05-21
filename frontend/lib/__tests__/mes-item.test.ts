@@ -26,7 +26,7 @@ const stubItem = (overrides: Partial<Item> = {}): Item => ({
   legacy_item_type: null,
   supplier: null,
   min_stock: null,
-  erp_code: "ITM-AA-00001",
+  item_code: "ITM-AA-00001",
   model_symbol: null,
   model_slots: [],
   symbol_slot: null,

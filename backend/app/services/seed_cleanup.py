@@ -149,7 +149,6 @@ def run_cleanup_import(
     items_to_add = [
         Item(
             item_code=p["erp"],
-            erp_code=p["erp"],
             barcode=p["erp"],
             item_name=p["item_name"],
             unit="EA",

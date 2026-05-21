@@ -45,7 +45,7 @@ from app.models import (
     ProductSymbol,
 )
 from app.services.pin_auth import DEFAULT_PIN_HASH
-from app.utils.erp_code import make_erp_code
+from app.utils.item_code import make_item_code
 
 # bootstrap_db 는 uvicorn 밖에서 단독 실행되므로 setup_logging() 호출 없이도
 # 동작해야 한다. 백엔드 표준 로거("mes") 네임스페이스를 그대로 쓰되,
@@ -91,7 +91,7 @@ _MIGRATION_DDL: list[str] = [
     "ALTER TABLE items ADD COLUMN legacy_item_type VARCHAR(50)",
     "ALTER TABLE items ADD COLUMN supplier VARCHAR(200)",
     "ALTER TABLE items ADD COLUMN min_stock NUMERIC(15,4)",
-    # M1: 4-part ERP code
+    # M1: 4-part item code
     "ALTER TABLE items ADD COLUMN erp_code VARCHAR(40)",
     "ALTER TABLE items ADD COLUMN symbol_slot SMALLINT",
     "ALTER TABLE items ADD COLUMN process_type_code VARCHAR(2)",
@@ -216,7 +216,46 @@ _MIGRATION_DDL: list[str] = [
     # — 사용자 입출고 경로에서 발생하지 않음. 0행 보장 후 테이블 DROP.
     "DROP TABLE IF EXISTS scrap_logs",
     "DROP TABLE IF EXISTS loss_logs",
+    # items.item_code (레거시 CSV) DROP + erp_code → item_code rename 은
+    # _consolidate_item_code_columns() 헬퍼에서 처리. 멱등 (PRAGMA 로 현재 상태 검사 후
+    # 필요한 단계만 수행) — fresh DB / 운영 DB 모두 안전.
 ]
+
+
+def _consolidate_item_code_columns() -> None:
+    """items 의 erp_code → item_code rename + 레거시 item_code DROP.
+    snapshot 컬럼(stock_request_lines, io_lines)의 erp_code_snapshot → item_code_snapshot 도 함께.
+
+    멱등 — 현재 컬럼 상태를 PRAGMA 로 보고 필요한 단계만 실행한다.
+    SQLite ALTER TABLE 의 멱등 패턴이 약해서 별도 함수로 분리.
+    """
+    def _cols(conn, table: str) -> set[str]:
+        return {r[1] for r in conn.execute(text(f"PRAGMA table_info({table})"))}
+
+    with engine.connect() as conn:
+        items_cols = _cols(conn, "items")
+        # items: 두 컬럼이 공존하는 경우(운영 DB) 만 정리.
+        # fresh DB 는 ORM create_all 로 이미 item_code 만 있음 → skip.
+        # 단 _MIGRATION_DDL 의 historical ADD COLUMN erp_code 가 fresh DB 에 erp_code 를
+        # 다시 추가할 수 있어 그 경우도 정리한다 (데이터는 NULL, fresh DB 라 무해).
+        if "erp_code" in items_cols:
+            # 인덱스 의존성 먼저 정리 (SQLite 가 DROP COLUMN 시 자동 정리 못함)
+            conn.execute(text("DROP INDEX IF EXISTS ix_items_item_code"))
+            conn.execute(text("DROP INDEX IF EXISTS ix_items_erp_code"))
+            if "item_code" in items_cols:
+                conn.execute(text("ALTER TABLE items DROP COLUMN item_code"))
+            conn.execute(text("ALTER TABLE items RENAME COLUMN erp_code TO item_code"))
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_items_item_code ON items(item_code)"
+            ))
+        # snapshot 컬럼 — 동일 패턴
+        for table in ("stock_request_lines", "io_lines"):
+            cols = _cols(conn, table)
+            if "erp_code_snapshot" in cols and "item_code_snapshot" not in cols:
+                conn.execute(text(
+                    f"ALTER TABLE {table} RENAME COLUMN erp_code_snapshot TO item_code_snapshot"
+                ))
+        conn.commit()
 
 
 def _drop_dead_transaction_type_enum_values() -> None:
@@ -288,6 +327,14 @@ def run_migrations() -> dict[str, object]:
 
     for sql in _MIGRATION_DDL:
         _run(sql, label="ddl")
+
+    # items.item_code 통합 (erp_code → item_code rename + 레거시 item_code DROP)
+    try:
+        _consolidate_item_code_columns()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] item_code consolidation failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
 
     # pending_quantity NULL 기본값 채우기
     _run(
@@ -504,7 +551,7 @@ def backfill_erp_codes() -> int:
     """erp_code 미할당 품목에 자동 부여. 기존 serial_no 와 충돌하지 않도록 그룹별 최대값+1."""
     db = SessionLocal()
     try:
-        targets = db.query(Item).filter(Item.erp_code.is_(None)).all()
+        targets = db.query(Item).filter(Item.item_code.is_(None)).all()
         if not targets:
             return 0
 
@@ -534,7 +581,7 @@ def backfill_erp_codes() -> int:
             item.symbol_slot = slot
             item.serial_no = serial
             item.option_code = opt
-            item.erp_code = make_erp_code(symbol, pt, serial, opt)
+            item.item_code = make_item_code(symbol, pt, serial, opt)
             count += 1
 
         db.commit()
@@ -569,7 +616,7 @@ def check_db() -> dict:
             "product_symbols": db.query(ProductSymbol).count(),
             "option_codes": db.query(OptionCode).count(),
             "items": db.query(Item).count(),
-            "items_missing_erp_code": db.query(Item).filter(Item.erp_code.is_(None)).count(),
+            "items_missing_item_code": db.query(Item).filter(Item.item_code.is_(None)).count(),
         }
     finally:
         db.close()

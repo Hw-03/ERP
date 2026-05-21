@@ -6,7 +6,7 @@ export type AdjDirection = "in" | "out" | "defective" | "scrap";
 export interface AdjLineTemplate {
   item_id: string;
   item_name: string;
-  erp_code: string | null;
+  item_code: string | null;
   process_type_code: string | null;
   unit: string;
   direction: AdjDirection;

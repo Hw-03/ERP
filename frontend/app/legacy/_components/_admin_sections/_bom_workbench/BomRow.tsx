@@ -54,7 +54,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
   }
 
   const childName = childItem?.item_name ?? "(삭제된 품목)";
-  const erpCode = childItem?.erp_code ?? "";
+  const erpCode = childItem?.item_code ?? "";
   const unit = row.unit || childItem?.unit || "EA";
 
   return (

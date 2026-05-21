@@ -40,7 +40,7 @@ class AdjLine:
     bom_expected: Optional[Decimal] = None
     has_children: bool = False
     item_name: str = ""
-    erp_code: Optional[str] = None
+    item_code: Optional[str] = None
     process_type_code: Optional[str] = None
     unit: str = "EA"
 
@@ -68,7 +68,7 @@ def _enrich(db: Session, lines: list[AdjLine]) -> list[AdjLine]:
         item = items_map.get(ln.item_id)
         if item:
             ln.item_name = item.item_name
-            ln.erp_code = item.erp_code
+            ln.item_code = item.item_code
             ln.process_type_code = item.process_type_code
             ln.unit = item.unit
             ln.has_children = _has_bom_children(db, ln.item_id)

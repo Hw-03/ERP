@@ -6,7 +6,7 @@ import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { ItemDetailHistoryList } from "./ItemDetailHistoryList";
 import { ItemDetailActionForm, type ItemDetailActionMode } from "./ItemDetailActionForm";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { erpCodeDeptBadge } from "@/lib/mes/process";
+import { itemCodeDeptBadge } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColor, useDeptColorLookup } from "./DepartmentsContext";
@@ -60,7 +60,7 @@ export function ItemDetailSheet({
     item.available_quantity ?? Number(item.quantity) - Number(item.pending_quantity ?? 0),
   );
   const stockState = getStockState(availableQty, item.min_stock == null ? null : Number(item.min_stock));
-  const deptBadge = erpCodeDeptBadge(item.erp_code, getDeptColor);
+  const deptBadge = itemCodeDeptBadge(item.item_code, getDeptColor);
 
   const bump = (delta: number) => {
     const minimum = mode === "ADJUST" ? 0 : 1;
@@ -165,7 +165,7 @@ export function ItemDetailSheet({
               style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
             >
               {[
-                ["품목 코드", item.erp_code ?? "-"],
+                ["품목 코드", item.item_code ?? "-"],
                 ["사양", item.spec || "-"],
                 ["총재고", `${formatQty(item.quantity)} ${item.unit}`],
                 [

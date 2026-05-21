@@ -28,7 +28,7 @@ type UpdateItemPayload = {
   unit?: string;
   model_slots?: number[];
   option_code?: string;
-  erp_code?: string;
+  item_code?: string;
 };
 
 export type AdminMasterItemsState = {
@@ -43,7 +43,7 @@ export type AdminMasterItemsState = {
   visibleItems: Item[];
   addItem: () => void;
   saveItemField: (
-    field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "erp_code" | "process_type_code",
+    field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "item_code" | "process_type_code",
     value: string,
   ) => void;
   updateItemFull: (payload: UpdateItemPayload) => void;
@@ -65,7 +65,7 @@ export function useAdminMasterItems({
   const visibleItems = useMemo(() => {
     const keyword = `${globalSearch} ${itemSearch}`.trim().toLowerCase();
     if (!keyword) return items;
-    return items.filter((item) => `${item.item_name} ${item.erp_code}`.toLowerCase().includes(keyword));
+    return items.filter((item) => `${item.item_name} ${item.item_code}`.toLowerCase().includes(keyword));
   }, [globalSearch, itemSearch, items]);
 
   async function _addItem() {
@@ -90,7 +90,7 @@ export function useAdminMasterItems({
       setSelectedItem(created);
       setAddMode(false);
       setAddForm(() => EMPTY_ADD_FORM);
-      onStatusChange(`'${created.item_name}' 품목이 추가됐습니다. (${created.erp_code})`);
+      onStatusChange(`'${created.item_name}' 품목이 추가됐습니다. (${created.item_code})`);
       onShowSave?.(`'${created.item_name}' 품목이 추가됐습니다.`);
     } catch (error) {
       onError(error instanceof Error ? error.message : "품목 추가에 실패했습니다.");
@@ -98,7 +98,7 @@ export function useAdminMasterItems({
   }
 
   async function _saveItemField(
-    field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "erp_code" | "process_type_code",
+    field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "item_code" | "process_type_code",
     value: string,
   ) {
     if (!selectedItem) return;

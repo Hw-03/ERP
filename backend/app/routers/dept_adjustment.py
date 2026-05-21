@@ -32,7 +32,7 @@ logger = logging.getLogger("mes")
 class AdjLineResponse(BaseModel):
     item_id: uuid.UUID
     item_name: str
-    erp_code: Optional[str]
+    item_code: Optional[str]
     process_type_code: Optional[str]
     unit: str
     direction: str
@@ -94,7 +94,7 @@ def _line_to_response(ln: svc.AdjLine) -> AdjLineResponse:
     return AdjLineResponse(
         item_id=ln.item_id,
         item_name=ln.item_name,
-        erp_code=ln.erp_code,
+        item_code=ln.item_code,
         process_type_code=ln.process_type_code,
         unit=ln.unit,
         direction=ln.direction,

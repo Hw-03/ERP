@@ -23,7 +23,7 @@ export interface IoLine {
   line_id: string;
   item_id: string;
   item_name: string;
-  erp_code: string | null;
+  item_code: string | null;
   unit: string;
   direction: IoLineDirection;
   from_bucket: IoBucket;

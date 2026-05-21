@@ -73,7 +73,7 @@ export function formatDate(value: string | null | undefined): string {
  *   - 빈 입력: null 반환 (formatQty/formatDate 와 달리 placeholder "-" 반환 안 함 — 호출측 분기).
  *   - segment 가 3개 미만: 입력 그대로.
  */
-export function formatErpCode(code?: string | null, compact = true): string | null {
+export function formatItemCode(code?: string | null, compact = true): string | null {
   if (!code) return null;
   if (!compact) return code;
   const parts = code.split("-");

@@ -7,7 +7,7 @@ import { useAdminMasterItemsContext } from "../AdminMasterItemsContext";
 import { ItemFormFields } from "./ItemFormFields";
 import type { ItemFormData } from "./ItemFormFields";
 
-function itemToForm(item: Item): ItemFormData & { erp_code: string } {
+function itemToForm(item: Item): ItemFormData & { item_code: string } {
   return {
     item_name: item.item_name,
     spec: item.spec ?? "",
@@ -18,7 +18,7 @@ function itemToForm(item: Item): ItemFormData & { erp_code: string } {
     unit: item.unit ?? "EA",
     model_slots: item.model_slots ?? [],
     option_code: item.option_code ?? "",
-    erp_code: item.erp_code ?? "",
+    item_code: item.item_code ?? "",
   };
 }
 
@@ -37,7 +37,7 @@ export function EditItemForm({ selectedItem }: { selectedItem: Item }) {
       unit: form.unit || undefined,
       model_slots: form.model_slots,
       option_code: form.option_code || undefined,
-      erp_code: form.erp_code || undefined,
+      item_code: form.item_code || undefined,
     });
   }
 
@@ -48,7 +48,7 @@ export function EditItemForm({ selectedItem }: { selectedItem: Item }) {
       <ItemFormFields
         form={form}
         setForm={setForm as (u: (f: ItemFormData) => ItemFormData) => void}
-        showErpCode
+        showItemCode
       />
 
       <button

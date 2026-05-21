@@ -17,17 +17,17 @@ export interface BOMDetailEntry {
   bom_id: string;
   parent_item_id: string;
   parent_item_name: string;
-  parent_erp_code: string | null;
+  parent_item_code: string | null;
   child_item_id: string;
   child_item_name: string;
-  child_erp_code: string | null;
+  child_item_code: string | null;
   quantity: number;
   unit: string;
 }
 
 export interface BOMTreeNode {
   item_id: string;
-  erp_code: string;
+  item_code: string;
   item_name: string;
   process_type_code: string | null;
   unit: string;

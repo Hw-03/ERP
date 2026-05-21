@@ -319,9 +319,9 @@ function BundleBlock({
               <span className="flex-1 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
                 {line.item_name}
               </span>
-              {line.erp_code && (
+              {line.item_code && (
                 <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {line.erp_code}
+                  {line.item_code}
                 </span>
               )}
               <span className="whitespace-nowrap text-[11px] font-bold" style={{ color: qtyColor }}>

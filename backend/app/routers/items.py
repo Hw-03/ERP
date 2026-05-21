@@ -24,7 +24,7 @@ from app.schemas import (
     ItemUpdate,
     ItemWithInventory,
 )
-from app.utils.erp_code import make_erp_code, next_serial_no, slots_to_model_symbol
+from app.utils.item_code import make_item_code, next_serial_no, slots_to_model_symbol
 from app.models import ProductSymbol
 from app.services import audit
 from app.services import inventory as inventory_svc
@@ -90,7 +90,7 @@ def _to_item_with_inventory(
         legacy_item_type=item.legacy_item_type,
         supplier=item.supplier,
         min_stock=item.min_stock,
-        erp_code=item.erp_code,
+        item_code=item.item_code,
         model_symbol=item.model_symbol,
         model_slots=model_slots,
         symbol_slot=item.symbol_slot,
@@ -120,10 +120,10 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
     opt = payload.option_code or None
 
     serial = None
-    erp_code = None
+    item_code = None
     if pt and model_sym:
         serial = next_serial_no(model_sym, pt, db)
-        erp_code = make_erp_code(model_sym, pt, serial, opt)
+        item_code = make_item_code(model_sym, pt, serial, opt)
 
     legacy_slot = model_slots[0] if len(model_slots) == 1 else None
 
@@ -145,7 +145,7 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         symbol_slot=legacy_slot,
         serial_no=serial,
         option_code=opt,
-        erp_code=erp_code,
+        item_code=item_code,
         sort_order=next_sort,
     )
     db.add(item)
@@ -164,7 +164,7 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         action="item.create",
         target_type="item",
         target_id=str(item.item_id),
-        payload_summary=f"{item.item_name} ({item.erp_code or 'no-code'}, init {init_qty})",
+        payload_summary=f"{item.item_name} ({item.item_code or 'no-code'}, init {init_qty})",
     )
 
     commit_and_refresh(db, item)
@@ -221,14 +221,14 @@ def list_items(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.erp_code.ilike(pattern),
+                Item.item_code.ilike(pattern),
                 Item.spec.ilike(pattern),
                 Item.barcode.ilike(pattern),
                 Inventory.location.ilike(pattern),
             )
         )
 
-    rows = query.order_by(Item.sort_order, Item.erp_code).offset(skip).limit(limit).all()
+    rows = query.order_by(Item.sort_order, Item.item_code).offset(skip).limit(limit).all()
     if not rows:
         return []
 
@@ -273,16 +273,16 @@ def list_items(
 
 @router.get("/export.csv")
 def export_items_csv(db: Session = Depends(get_db)):
-    rows = _build_item_query(db).order_by(Item.erp_code).all()
+    rows = _build_item_query(db).order_by(Item.item_code).all()
 
     buffer = StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["erp_code", "item_name", "process_type_code", "spec", "unit", "quantity", "location", "updated_at"])
+    writer.writerow(["item_code", "item_name", "process_type_code", "spec", "unit", "quantity", "location", "updated_at"])
 
     for item, inventory in rows:
         writer.writerow(
             [
-                item.erp_code or "",
+                item.item_code or "",
                 item.item_name,
                 item.process_type_code or "",
                 item.spec or "",
@@ -334,13 +334,13 @@ def export_items_xlsx(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.erp_code.ilike(pattern),
+                Item.item_code.ilike(pattern),
                 Item.spec.ilike(pattern),
                 Item.barcode.ilike(pattern),
                 Inventory.location.ilike(pattern),
             )
         )
-    rows = query.order_by(Item.process_type_code, Item.erp_code).all()
+    rows = query.order_by(Item.process_type_code, Item.item_code).all()
 
     # 가용수량 계산: stock_math 를 한 번 bulk 로 불러 경로별 재구현을 피한다.
     figures_map = stock_math.bulk_compute(db, [it.item_id for it, _ in rows])
@@ -365,7 +365,7 @@ def export_items_xlsx(
         min_stock = float(item.min_stock) if item.min_stock else None
 
         row_data = [
-            item.erp_code or "",
+            item.item_code or "",
             item.item_name,
             item.process_type_code or "",
             item.spec or "",
@@ -434,15 +434,15 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
         item.model_symbol = slots_to_model_symbol(payload.model_slots) or None
         changed.append("model_slots")
 
-    if payload.erp_code is not None and payload.erp_code != item.erp_code:
+    if payload.item_code is not None and payload.item_code != item.item_code:
         exists = db.query(Item).filter(
-            Item.erp_code == payload.erp_code,
+            Item.item_code == payload.item_code,
             Item.item_id != item.item_id,
         ).first()
         if exists:
-            raise http_error(409, ErrorCode.CONFLICT, f"'{payload.erp_code}' 코드는 이미 사용 중입니다.")
-        item.erp_code = payload.erp_code
-        changed.append("erp_code")
+            raise http_error(409, ErrorCode.CONFLICT, f"'{payload.item_code}' 코드는 이미 사용 중입니다.")
+        item.item_code = payload.item_code
+        changed.append("item_code")
 
     item.updated_at = datetime.now(UTC).replace(tzinfo=None)
 

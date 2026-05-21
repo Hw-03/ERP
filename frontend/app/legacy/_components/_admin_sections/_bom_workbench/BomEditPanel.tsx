@@ -67,7 +67,7 @@ export function BomEditPanel({
             {parent.item_name}
           </TruncatedText>
           <TruncatedText className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            {parent.erp_code ?? "(코드 없음)"} · {bomRows.length}개 자식
+            {parent.item_code ?? "(코드 없음)"} · {bomRows.length}개 자식
           </TruncatedText>
         </div>
         <span

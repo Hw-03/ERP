@@ -322,7 +322,7 @@ function ConfirmBundleCard({
             className="flex flex-wrap items-center gap-2 text-xs font-semibold"
             style={{ color: LEGACY_COLORS.muted2 }}
           >
-            <span>{onlyLine.erp_code ?? "-"}</span>
+            <span>{onlyLine.item_code ?? "-"}</span>
             {onlyLine.direction === "move" && (onlyLine.from_department || onlyLine.to_department) && (
               <span>
                 · {onlyLine.from_department ?? "창고"} → {onlyLine.to_department ?? "창고"}
@@ -413,7 +413,7 @@ function ConfirmBundleCard({
           className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold"
           style={{ color: LEGACY_COLORS.muted2 }}
         >
-          <span>{headerLine.erp_code ?? "-"}</span>
+          <span>{headerLine.item_code ?? "-"}</span>
           {(headerLine.from_department || headerLine.to_department) && (
             <span>
               · {headerLine.from_department ?? "-"}
@@ -471,7 +471,7 @@ function ConfirmLineRow({ line, isChild }: { line: IoLine; isChild: boolean }) {
           className="flex flex-wrap items-center gap-2 text-xs font-semibold"
           style={{ color: LEGACY_COLORS.muted2 }}
         >
-          <span>{line.erp_code ?? "-"}</span>
+          <span>{line.item_code ?? "-"}</span>
           {(line.from_department || line.to_department) && (
             <span>
               · {line.from_department ?? "-"}

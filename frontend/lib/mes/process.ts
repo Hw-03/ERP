@@ -2,7 +2,7 @@
  * MES 공정 (Process Stage) 모듈 — `@/lib/mes/process`.
  *
  * Round-10D (#5) 신설. 품목코드 2번째 segment (TR/TA/TF/HR/...) → 라벨 매핑.
- * Round-10E (#1) 추가: `PROCESS_TO_DEPT` + `erpCodeDept` + `erpCodeDeptBadge`
+ * Round-10E (#1) 추가: `PROCESS_TO_DEPT` + `itemCodeDept` + `itemCodeDeptBadge`
  * — 부서명 매핑은 품목코드 static 매핑이라 부서 정규화 충돌과 무관.
  */
 
@@ -54,24 +54,24 @@ export const PROCESS_TO_DEPT: Record<string, string> = {
 };
 
 /**
- * ERP 코드 (예: "ITM-TR-00123") → 부서명. 형식 어긋나거나 stage 미매핑이면 null.
+ * 품목 코드 (예: "ITM-TR-00123") → 부서명. 형식 어긋나거나 stage 미매핑이면 null.
  */
-export function erpCodeDept(erp_code?: string | null): string | null {
-  if (!erp_code) return null;
-  const parts = erp_code.split("-");
+export function itemCodeDept(item_code?: string | null): string | null {
+  if (!item_code) return null;
+  const parts = item_code.split("-");
   if (parts.length < 2) return null;
   return PROCESS_TO_DEPT[parts[1]] ?? null;
 }
 
 /**
- * ERP 코드 + 색상 lookup 함수 → 부서 배지 메타 (label/color/bg).
+ * 품목 코드 + 색상 lookup 함수 → 부서 배지 메타 (label/color/bg).
  * `getColor` 는 require parameter — 호출처가 항상 `useDeptColorLookup()` 결과를 전달.
  */
-export function erpCodeDeptBadge(
-  erp_code: string | null | undefined,
+export function itemCodeDeptBadge(
+  item_code: string | null | undefined,
   getColor: (name?: string | null) => string,
 ): { label: string; color: string; bg: string } | null {
-  const dept = erpCodeDept(erp_code);
+  const dept = itemCodeDept(item_code);
   if (!dept) return null;
   const color = getColor(dept);
   return { label: dept, color, bg: `color-mix(in srgb, ${color} 12%, transparent)` };

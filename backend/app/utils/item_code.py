@@ -1,4 +1,4 @@
-"""ERP 4-part code generation utility.
+"""4-part item code generation utility.
 
 Format: {model_symbol}-{process_type}-{serial:04d}[-{option}]
 Example: 346-AR-0001, 3-PA-0001-BG, 34-TR-0023
@@ -29,13 +29,13 @@ def slots_to_model_symbol(slots: list[int]) -> str:
     return "".join(symbols)
 
 
-def make_erp_code(
+def make_item_code(
     model_symbol: str,
     process_type: str,
     serial_no: int,
     option_code: str | None = None,
 ) -> str:
-    """ERP 코드 문자열 생성."""
+    """품목 코드 문자열 생성."""
     base = f"{model_symbol}-{process_type}-{serial_no:04d}"
     return f"{base}-{option_code}" if option_code else base
 

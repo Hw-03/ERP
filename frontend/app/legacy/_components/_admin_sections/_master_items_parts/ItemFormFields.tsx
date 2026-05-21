@@ -15,14 +15,14 @@ export type ItemFormData = {
   model_slots: number[];
   option_code: string;
   initial_quantity?: string;
-  erp_code?: string;
+  item_code?: string;
 };
 
 interface Props {
   form: ItemFormData;
   setForm: (updater: (f: ItemFormData) => ItemFormData) => void;
   showInitialQuantity?: boolean;
-  showErpCode?: boolean;
+  showItemCode?: boolean;
 }
 
 function FieldLabel({ label, badge }: { label: string; badge?: "필수" | "선택" }) {
@@ -55,7 +55,7 @@ const inputStyle = {
   color: LEGACY_COLORS.text,
 };
 
-export function ItemFormFields({ form, setForm, showInitialQuantity, showErpCode }: Props) {
+export function ItemFormFields({ form, setForm, showInitialQuantity, showItemCode }: Props) {
   return (
     <>
       {/* 텍스트/숫자 필드 */}
@@ -110,13 +110,13 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showErpCode
         </div>
       ))}
 
-      {showErpCode && (
+      {showItemCode && (
         <div>
           <FieldLabel label="품목 코드" badge="선택" />
           <input
             type="text"
-            value={form.erp_code ?? ""}
-            onChange={(e) => setForm((f) => ({ ...f, erp_code: e.target.value }))}
+            value={form.item_code ?? ""}
+            onChange={(e) => setForm((f) => ({ ...f, item_code: e.target.value }))}
             placeholder="예: 346-AR-0001"
             className="w-full rounded-[18px] border px-4 py-3 text-base outline-none"
             style={inputStyle}

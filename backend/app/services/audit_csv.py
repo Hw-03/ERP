@@ -107,7 +107,7 @@ def row_from_log(log: TransactionLog, item: Item | None) -> list[str]:
     item_code = ""
     item_name = ""
     if item:
-        item_code = item.erp_code or item.item_code or ""
+        item_code = item.item_code or ""
         item_name = item.item_name or ""
     return [
         log.created_at.strftime("%Y-%m-%d %H:%M:%S") if log.created_at else "",
