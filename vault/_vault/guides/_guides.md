@@ -1,28 +1,42 @@
 ---
 type: index
-project: ERP
+project: DEXCOWIN MES
+layer: meta
 status: active
-updated: 2026-04-27
-tags:
-  - erp
-  - guide
-  - index
-aliases:
-  - 가이드 허브
+created: 2026-05-21
+updated: 2026-05-21
+tags: [vault, index]
 ---
 
-# guides
+# 📖 가이드
 
+> [!summary]
+> 신규 사용자부터 개발자까지 필요한 시작, 안전, 길찾기, 시나리오, 기타 문서들.
 
-## 가이드 목록
+## 🚪 시작하기
 
-- [[_vault/guides/처음_읽는_사람]]
-- [[_vault/guides/ERP_MOC]]
-- [[_vault/guides/FAQ_전체]]
-- [[_vault/guides/용어사전]]
-- [[_vault/guides/시나리오_품목등록]]
-- [[_vault/guides/시나리오_재고입출고]]
-- [[_vault/guides/시나리오_생산배치]]
-- [[_vault/guides/시나리오_분해반품]]
+- [[_vault/guides/왜_이_시스템인가]] — MES 비전 / ERP 아님 명시
+- [[_vault/guides/처음_읽는_사람]] — vault 첫날 안내서
+- [[_vault/guides/AI_생성_코드_읽는_법]] — 3대 추적 동선
+- [[_vault/guides/바이브_코딩_컨텍스트]] — 솔직한 메타
+- [[_vault/guides/첫주_체크리스트]] — Day 0→5 체크리스트
 
-Up: [[_vault/_vault]]
+## ⚠️ 안전하게 손대기
+
+- [[_vault/guides/위험지대_지도]] — 7개 위험 영역
+
+## 🗺 길찾기
+
+- [[_vault/guides/ERP_MOC]] — Map of Content (도메인별 진입점)
+- [[_vault/guides/용어사전]] — 56개 도메인 용어
+
+## 🎭 시나리오
+
+- [[_vault/guides/시나리오_재고입출고]] — 재고 인출고 업무 흐름
+- [[_vault/guides/시나리오_분해반품]] — 분해 반품 처리 프로세스
+- [[_vault/guides/시나리오_생산배치]] — 생산 배치 관리
+- [[_vault/guides/시나리오_품목등록]] — 품목 등록 및 코드 체계
+
+## ❓ 기타
+
+- [[_vault/guides/FAQ_전체]] — 자주 묻는 질문
