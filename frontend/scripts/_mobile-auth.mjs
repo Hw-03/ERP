@@ -1,14 +1,14 @@
 /**
  * 모바일 평가 스크립트 공용 — 작업자 세션 시딩.
  *
- * 앱은 localStorage 의 작업자 정보(`dexcowin_erp_operator`)가 없으면 로그인
+ * 앱은 localStorage 의 작업자 정보(`dexcowin_mes_operator`)가 없으면 로그인
  * 게이트만 렌더한다. 평가(스크린샷/a11y)는 실제 화면을 봐야 하므로,
  * 페이지 로드 전에 백엔드의 실제 직원/boot_id 를 가져와 localStorage 에
- * 주입한다(ErpLoginGate 의 boot_id 검증 통과용).
+ * 주입한다(MesLoginGate 의 boot_id 검증 통과용).
  */
 
-const OPERATOR_KEY = "dexcowin_erp_operator";
-const BOOT_KEY = "dexcowin_erp_boot_id";
+const OPERATOR_KEY = "dexcowin_mes_operator";
+const BOOT_KEY = "dexcowin_mes_boot_id";
 
 /** 모든 탭 도달을 위해 창고 권한(primary>deputy) 우선, 그 다음 admin 레벨 */
 function pickOperator(employees) {

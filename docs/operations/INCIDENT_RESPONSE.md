@@ -26,7 +26,7 @@ python scripts/ops/backup_db.py
 python scripts/ops/check_inventory_integrity.py
 
 # 4. 음수 품목 조회 (SQLite)
-sqlite3 backend/mes.db "SELECT i.item_id, it.erp_code, i.warehouse_qty, i.quantity FROM inventory i JOIN item it ON it.item_id = i.item_id WHERE i.warehouse_qty < 0 OR i.quantity < 0;"
+sqlite3 backend/mes.db "SELECT i.item_id, it.item_code, i.warehouse_qty, i.quantity FROM inventory i JOIN item it ON it.item_id = i.item_id WHERE i.warehouse_qty < 0 OR i.quantity < 0;"
 ```
 
 ### 복구

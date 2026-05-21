@@ -41,7 +41,7 @@ export function processStageLabel(code?: string | null): string {
 }
 
 /**
- * ERP 코드 process stage 코드 → 부서명 매핑.
+ * 품목 코드 process stage 코드 → 부서명 매핑.
  * 첫 글자 (T/H/V/N/A/P) 가 부서를 결정.
  */
 export const PROCESS_TO_DEPT: Record<string, string> = {

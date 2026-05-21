@@ -10,7 +10,7 @@ rem  이 스크립트는 "발견 + 백업 + 보고"만 자동화한다.
 rem ============================================================
 setlocal
 set "URL=http://127.0.0.1:8010/health/detailed"
-set "OUT=%TEMP%\erp_health_%RANDOM%.json"
+set "OUT=%TEMP%\mes_health_%RANDOM%.json"
 
 echo [RECONCILE] /health/detailed 호출 중...
 curl -s -m 8 "%URL%" -o "%OUT%"

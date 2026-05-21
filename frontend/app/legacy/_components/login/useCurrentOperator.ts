@@ -24,8 +24,8 @@ export interface Operator {
   assigned_model_slots: number[];
 }
 
-const OPERATOR_KEY = "dexcowin_erp_operator";
-const BOOT_KEY = "dexcowin_erp_boot_id";
+const OPERATOR_KEY = "dexcowin_mes_operator";
+const BOOT_KEY = "dexcowin_mes_boot_id";
 // 같은 탭에서 setCurrentOperator 가 호출되면 useCurrentOperator 구독자들을 깨우기 위한 이벤트.
 // localStorage `storage` 이벤트는 다른 탭에만 발화하므로 별도 CustomEvent 필요.
 const OPERATOR_CHANGE_EVENT = "dexcowin_operator_change";

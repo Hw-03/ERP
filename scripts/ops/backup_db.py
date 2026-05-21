@@ -7,7 +7,7 @@
 
     # PostgreSQL (Docker 컨테이너 기준)
     python scripts/ops/backup_db.py --postgres --container <container_name>
-    python scripts/ops/backup_db.py --postgres --host localhost --port 5432 --user erp_user --dbname erp_db
+    python scripts/ops/backup_db.py --postgres --host localhost --port 5432 --user mes_user --dbname mes_db
 
 결과:
     outputs/backups/mes_YYYYMMDD_HHMMSS.db   (SQLite)
@@ -77,8 +77,8 @@ def parse_args():
     parser.add_argument("--container", help="Docker 컨테이너 이름 (PostgreSQL)")
     parser.add_argument("--host", default="localhost")
     parser.add_argument("--port", type=int, default=5432)
-    parser.add_argument("--user", default="erp_user")
-    parser.add_argument("--dbname", default="erp_db")
+    parser.add_argument("--user", default="mes_user")
+    parser.add_argument("--dbname", default="mes_db")
     return parser.parse_args()
 
 

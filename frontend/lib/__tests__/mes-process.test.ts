@@ -88,7 +88,7 @@ describe("itemCodeDeptBadge", () => {
     expect(badge!.bg).toContain("#조립");
   });
 
-  it("returns null when erp code does not map", () => {
+  it("returns null when item code does not map", () => {
     expect(itemCodeDeptBadge(undefined, stub)).toBeNull();
     expect(itemCodeDeptBadge("BAD", stub)).toBeNull();
     expect(itemCodeDeptBadge("ITM-XX-00001", stub)).toBeNull();

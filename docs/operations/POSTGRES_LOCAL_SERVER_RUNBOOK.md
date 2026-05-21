@@ -116,7 +116,7 @@ scripts\ops\backup_db.bat
 
 ### 수동 백업 (PostgreSQL)
 ```bash
-docker exec <postgres-container> pg_dump -U erp_user erp_db > backup_$(date +%Y%m%d).sql
+docker exec <postgres-container> pg_dump -U mes_user mes_db > backup_$(date +%Y%m%d).sql
 ```
 
 ### 수동 백업 확인

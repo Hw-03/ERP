@@ -40,7 +40,7 @@ const stubItem = (overrides: Partial<Item> = {}): Item => ({
 });
 
 describe("buildItemSearchLabel", () => {
-  it("formats as 'erp / name'", () => {
+  it("formats as 'item_code / name'", () => {
     expect(buildItemSearchLabel(stubItem())).toBe("ITM-AA-00001 / Widget A");
   });
 });

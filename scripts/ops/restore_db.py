@@ -130,8 +130,8 @@ def parse_args():
     parser.add_argument("--container", help="Docker 컨테이너 이름")
     parser.add_argument("--host", default="localhost")
     parser.add_argument("--port", type=int, default=5432)
-    parser.add_argument("--user", default="erp_user")
-    parser.add_argument("--dbname", default="erp_db")
+    parser.add_argument("--user", default="mes_user")
+    parser.add_argument("--dbname", default="mes_db")
     parser.add_argument("--check", action="store_true", help="복구 후 무결성 자동 점검")
     return parser.parse_args()
 

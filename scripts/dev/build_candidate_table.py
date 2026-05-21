@@ -109,7 +109,7 @@ def main():
 
     conn = sqlite3.connect(DB)
     cur = conn.cursor()
-    cur.execute('SELECT erp_code, item_name, spec, model_symbol FROM items')
+    cur.execute('SELECT item_code, item_name, spec, model_symbol FROM items')
     db_rows = []
     for c, n, s, m in cur.fetchall():
         if c:

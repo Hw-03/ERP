@@ -153,7 +153,7 @@ def _new_line(
         bundle_id=bundle.bundle_id,
         item_id=item.item_id,
         item_name_snapshot=item.item_name,
-        erp_code_snapshot=item.erp_code,
+        item_code_snapshot=item.item_code,
         unit=item.unit or "EA",
         direction=direction,
         from_bucket=from_bucket,

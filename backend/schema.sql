@@ -31,7 +31,7 @@ DROP TABLE IF EXISTS items CASCADE;
 CREATE TABLE items (
     item_pk BIGSERIAL PRIMARY KEY,
     item_id VARCHAR(36) NOT NULL UNIQUE,
-    erp_code VARCHAR(50) UNIQUE,
+    item_code VARCHAR(50) UNIQUE,
     category_code category_code_enum NOT NULL,
     process_type_code VARCHAR(2),
     symbol_slot INTEGER,
@@ -57,7 +57,7 @@ CREATE TABLE items (
 );
 
 CREATE INDEX idx_items_category ON items(category_code);
-CREATE INDEX idx_items_erp_code ON items(erp_code);
+CREATE INDEX idx_items_item_code ON items(item_code);
 CREATE INDEX idx_items_process_type ON items(process_type_code);
 CREATE INDEX idx_items_department ON items(department);
 CREATE INDEX idx_items_std_name ON items(std_name);

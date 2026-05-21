@@ -31,7 +31,7 @@ export function ItemRow({
   const getDeptColor = useDeptColorLookup();
   const state = getStockState(Number(item.quantity), item.min_stock);
   const deptBadge = itemCodeDeptBadge(item.item_code, getDeptColor);
-  const erpCompact = formatItemCode(item.item_code);
+  const itemCompact = formatItemCode(item.item_code);
 
   return (
     <button
@@ -85,7 +85,7 @@ export function ItemRow({
             className={clsx(TYPO.caption, "truncate")}
             style={{ color: LEGACY_COLORS.muted }}
           >
-            {erpCompact ?? "-"}
+            {itemCompact ?? "-"}
           </div>
           {deptBadge ? (
             <StatusBadge label={deptBadge.label} color={deptBadge.color} className="shrink-0" />

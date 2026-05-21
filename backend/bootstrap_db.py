@@ -10,7 +10,7 @@ Usage:
     python bootstrap_db.py --all                # 스키마 + 마이그레이션 + 시드 + 품목코드 백필
     python bootstrap_db.py --schema --migrate   # DDL 관련만
     python bootstrap_db.py --seed               # 참조 데이터 (Employee/ProductSymbol/…)
-    python bootstrap_db.py --erp-backfill       # erp_code NULL 품목에 코드 부여
+    python bootstrap_db.py --item-code-backfill # item_code NULL 품목에 코드 부여
     python bootstrap_db.py --check              # 실행하지 않고 DB 상태만 점검
 
 모듈로도 import 가능:
@@ -545,10 +545,10 @@ def seed_reference_data() -> dict[str, int]:
 
 
 # ---------------------------------------------------------------------------
-# 4. ERP 코드 백필 (erp_code NULL 인 품목에 4-part 코드 자동 부여)
+# 4. 품목 코드 백필 (item_code NULL 인 품목에 4-part 코드 자동 부여)
 # ---------------------------------------------------------------------------
-def backfill_erp_codes() -> int:
-    """erp_code 미할당 품목에 자동 부여. 기존 serial_no 와 충돌하지 않도록 그룹별 최대값+1."""
+def backfill_item_codes() -> int:
+    """item_code 미할당 품목에 자동 부여. 기존 serial_no 와 충돌하지 않도록 그룹별 최대값+1."""
     db = SessionLocal()
     try:
         targets = db.query(Item).filter(Item.item_code.is_(None)).all()
@@ -598,11 +598,11 @@ def bootstrap_all() -> dict:
     run_schema_create_all()
     migrations = run_migrations()
     seeded = seed_reference_data()
-    backfilled = backfill_erp_codes()
+    backfilled = backfill_item_codes()
     return {
         "migrations": migrations,
         "seeded": seeded,
-        "erp_backfilled": backfilled,
+        "item_code_backfilled": backfilled,
     }
 
 
@@ -646,7 +646,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--schema", action="store_true", help="run create_all")
     parser.add_argument("--migrate", action="store_true", help="run ALTER TABLE migrations")
     parser.add_argument("--seed", action="store_true", help="seed reference data")
-    parser.add_argument("--erp-backfill", action="store_true", help="backfill ERP codes")
+    parser.add_argument("--item-code-backfill", action="store_true", help="backfill item codes")
     parser.add_argument("--reset-flow-rules", action="store_true", help="process_flow_rules 초기화 및 재시드")
     parser.add_argument("--check", action="store_true", help="report DB state without writing")
     return parser.parse_args(argv)
@@ -691,9 +691,9 @@ def main(argv: list[str] | None = None) -> int:
         seeded = seed_reference_data()
         print(f"[seed] {seeded}")
         did_something = True
-    if args.all or args.erp_backfill:
-        count = backfill_erp_codes()
-        print(f"[erp-backfill] {count} items updated")
+    if args.all or args.item_code_backfill:
+        count = backfill_item_codes()
+        print(f"[item-code-backfill] {count} items updated")
         did_something = True
     if getattr(args, "reset_flow_rules", False):
         count = reset_flow_rules()
