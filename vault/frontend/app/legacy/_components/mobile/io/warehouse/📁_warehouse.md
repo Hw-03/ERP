@@ -12,12 +12,26 @@ aliases:
   - "warehouse.md"
 ---
 
-# 📁 warehouse
+# warehouse
 
-> [!info] 코드 미러 영역
-> 이 폴더는 `erp/frontend/app/legacy/_components/mobile/io/warehouse/` 의 vault 미러. 자식 파일들의 분석 노트가 모여 있다.
+> [!summary] 역할
+> `frontend/app/legacy/_components/mobile/io/warehouse/` 아래 원본 파일들을 Obsidian에서 탐색하기 위한 폴더 허브다.
 
-## 통계
+## 원본 위치
 
-- 자식 파일: **1개** (.md 제외)
-- 자식 폴더: **0개**
+- Source: `frontend/app/legacy/_components/mobile/io/warehouse/`
+- File count: `4`
+
+## 파일 노트
+
+- [[frontend/app/legacy/_components/mobile/io/warehouse/WarehouseWizardScreen.tsx|WarehouseWizardScreen.tsx]]
+- [[frontend/app/legacy/_components/mobile/io/warehouse/WarehouseWizardSteps.tsx|WarehouseWizardSteps.tsx]]
+- [[frontend/app/legacy/_components/mobile/io/warehouse/context.tsx|context.tsx]]
+- [[frontend/app/legacy/_components/mobile/io/warehouse/warehouseWizardConfig.ts|warehouseWizardConfig.ts]]
+
+## 읽는 팁
+
+- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
+- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
+
+Up: [[frontend/app/legacy/_components/mobile/io/io|frontend/app/legacy/_components/mobile/io]]

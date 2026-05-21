@@ -12,16 +12,30 @@ aliases:
   - "screens.md"
 ---
 
-# 📁 screens
+# screens
 
-> [!info] 코드 미러 영역
-> 이 폴더는 `erp/frontend/app/legacy/_components/mobile/screens/` 의 vault 미러. 자식 파일들의 분석 노트가 모여 있다.
+> [!summary] 역할
+> `frontend/app/legacy/_components/mobile/screens/` 아래 원본 파일들을 Obsidian에서 탐색하기 위한 폴더 허브다.
 
-## 통계
+## 원본 위치
 
-- 자식 파일: **7개** (.md 제외)
-- 자식 폴더: **1개**
+- Source: `frontend/app/legacy/_components/mobile/screens/`
+- File count: `12`
 
-## 자식 폴더
+## 하위 허브
 
-- [[erp/frontend/app/legacy/_components/mobile/screens/admin/📁_admin|admin/]]
+- [[frontend/app/legacy/_components/mobile/screens/admin/admin|admin]]
+
+## 파일 노트
+
+- [[frontend/app/legacy/_components/mobile/screens/HistoryFilterSheet.tsx|HistoryFilterSheet.tsx]]
+- [[frontend/app/legacy/_components/mobile/screens/HistoryScreen.tsx|HistoryScreen.tsx]]
+- [[frontend/app/legacy/_components/mobile/screens/InventoryFilterSheet.tsx|InventoryFilterSheet.tsx]]
+- [[frontend/app/legacy/_components/mobile/screens/InventoryScreen.tsx|InventoryScreen.tsx]]
+
+## 읽는 팁
+
+- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
+- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
+
+Up: [[frontend/app/legacy/_components/mobile/mobile|frontend/app/legacy/_components/mobile]]

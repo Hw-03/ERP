@@ -12,12 +12,32 @@ aliases:
   - "split_logos.md"
 ---
 
-# 📁 split_logos
+# split_logos
 
-> [!info] 코드 미러 영역
-> 이 폴더는 `erp/scripts/dev/split_logos/` 의 vault 미러. 자식 파일들의 분석 노트가 모여 있다.
+> [!summary] 역할
+> `scripts/dev/split_logos/` 아래 원본 파일들을 Obsidian에서 탐색하기 위한 폴더 허브다.
 
-## 통계
+## 원본 위치
 
-- 자식 파일: **11개** (.md 제외)
-- 자식 폴더: **0개**
+- Source: `scripts/dev/split_logos/`
+- File count: `10`
+
+## 파일 노트
+
+- [[scripts/dev/split_logos/ChatGPT Image 2026년 4월 24일 오전 10_21_16 (1).png|ChatGPT Image 2026년 4월 24일 오전 10_21_16 (1).png]]
+- [[scripts/dev/split_logos/ChatGPT Image 2026년 4월 24일 오전 10_21_16 (2).png|ChatGPT Image 2026년 4월 24일 오전 10_21_16 (2).png]]
+- [[scripts/dev/split_logos/ChatGPT Image 2026년 4월 24일 오전 10_21_16 (3).png|ChatGPT Image 2026년 4월 24일 오전 10_21_16 (3).png]]
+- [[scripts/dev/split_logos/ChatGPT Image 2026년 4월 24일 오전 10_21_16 (4).png|ChatGPT Image 2026년 4월 24일 오전 10_21_16 (4).png]]
+- [[scripts/dev/split_logos/ChatGPT Image 2026년 4월 24일 오전 10_21_17 (10).png|ChatGPT Image 2026년 4월 24일 오전 10_21_17 (10).png]]
+- [[scripts/dev/split_logos/ChatGPT Image 2026년 4월 24일 오전 10_21_17 (5).png|ChatGPT Image 2026년 4월 24일 오전 10_21_17 (5).png]]
+- [[scripts/dev/split_logos/ChatGPT Image 2026년 4월 24일 오전 10_21_17 (6).png|ChatGPT Image 2026년 4월 24일 오전 10_21_17 (6).png]]
+- [[scripts/dev/split_logos/ChatGPT Image 2026년 4월 24일 오전 10_21_17 (7).png|ChatGPT Image 2026년 4월 24일 오전 10_21_17 (7).png]]
+- [[scripts/dev/split_logos/ChatGPT Image 2026년 4월 24일 오전 10_21_17 (8).png|ChatGPT Image 2026년 4월 24일 오전 10_21_17 (8).png]]
+- [[scripts/dev/split_logos/ChatGPT Image 2026년 4월 24일 오전 10_21_17 (9).png|ChatGPT Image 2026년 4월 24일 오전 10_21_17 (9).png]]
+
+## 읽는 팁
+
+- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
+- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
+
+Up: [[scripts/dev/dev|scripts/dev]]

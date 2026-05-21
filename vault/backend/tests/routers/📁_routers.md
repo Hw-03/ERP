@@ -12,12 +12,24 @@ aliases:
   - "routers.md"
 ---
 
-# 📁 routers
+# routers
 
-> [!info] 코드 미러 영역
-> 이 폴더는 `erp/backend/tests/routers/` 의 vault 미러. 자식 파일들의 분석 노트가 모여 있다.
+> [!summary] 역할
+> `backend/tests/routers/` 아래 원본 파일들을 Obsidian에서 탐색하기 위한 폴더 허브다.
 
-## 통계
+## 원본 위치
 
-- 자식 파일: **16개** (.md 제외)
-- 자식 폴더: **0개**
+- Source: `backend/tests/routers/`
+- File count: `2`
+
+## 파일 노트
+
+- [[backend/tests/routers/__init__.py|__init__.py]]
+- [[backend/tests/routers/test_admin_audit.py|test_admin_audit.py]]
+
+## 읽는 팁
+
+- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
+- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
+
+Up: [[backend/tests/tests|backend/tests]]
