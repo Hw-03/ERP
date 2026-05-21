@@ -19,7 +19,7 @@ tags: [vault, index]
 - [[_vault/guides/처음_읽는_사람]] — vault 첫날 안내서
 - [[_vault/guides/AI_생성_코드_읽는_법]] — 3대 추적 동선
 - [[_vault/guides/바이브_코딩_컨텍스트]] — 솔직한 메타
-- [[_vault/guides/첫주_체크리스트]] — Day 0→5 체크리스트
+- [[_vault/guides/체크리스트]] — Day 0→5 체크리스트
 
 ## ⚠️ 안전하게 손대기
 

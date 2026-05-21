@@ -15,7 +15,7 @@
 		{"id":"guide-ai-code","type":"file","file":"_vault/guides/AI_생성_코드_읽는_법.md","x":220,"y":440,"width":260,"height":120},
 		{"id":"guide-danger-map","type":"file","file":"_vault/guides/위험지대_지도.md","x":520,"y":440,"width":260,"height":120},
 		{"id":"guide-vibe","type":"file","file":"_vault/guides/바이브_코딩_컨텍스트.md","x":-80,"y":600,"width":260,"height":120},
-		{"id":"guide-firstweek","type":"file","file":"_vault/guides/첫주_체크리스트.md","x":220,"y":600,"width":260,"height":120},
+		{"id":"guide-firstweek","type":"file","file":"_vault/guides/체크리스트.md","x":220,"y":600,"width":260,"height":120},
 		{"id":"routers-section","type":"text","text":"## 백엔드 라우터 지도 (2026-05)\n\n주요 라우터 + inventory 패키지","x":-520,"y":780,"width":420,"height":120},
 		{"id":"router-items","type":"file","file":"backend/app/routers/items.py.md","x":-80,"y":780,"width":260,"height":100},
 		{"id":"router-bom","type":"file","file":"backend/app/routers/bom.py.md","x":220,"y":780,"width":260,"height":100},

@@ -56,7 +56,7 @@ aliases:
 - [[erp/_vault/guides/바이브_코딩_컨텍스트]] — 이 시스템이 어떻게 태어났는지 (필독)
 - [[erp/_vault/guides/AI_생성_코드_읽는_법]] — AI 가 쓴 코드 특유의 함정
 - [[erp/_vault/guides/위험지대_지도]] — 함부로 손대면 안 되는 영역
-- [[erp/_vault/guides/첫주_체크리스트]] — 1주차 일별 체크리스트
+- [[erp/_vault/guides/체크리스트]] — 1주차 일별 체크리스트
 
 ---
 

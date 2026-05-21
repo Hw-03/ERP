@@ -52,7 +52,7 @@ aliases:
 > | 2 | [[_vault/guides/바이브_코딩_컨텍스트\|바이브 코딩 컨텍스트]] | Claude/Codex 로 만든 코드의 특징과 함정 |
 > | 3 | [[_vault/guides/AI_생성_코드_읽는_법\|AI 생성 코드 읽는 법]] | 패턴/주석/네이밍 어떻게 해석할지 |
 > | 4 | [[_vault/guides/위험지대_지도\|위험지대 지도]] | 건드리면 터지는 곳, 안 터지는 곳 |
-> | 5 | [[_vault/guides/첫주_체크리스트\|첫주 체크리스트]] | 환경/계정/리뷰 체크리스트 |
+> | 5 | [[_vault/guides/체크리스트\|체크리스트]] | 환경/계정/리뷰 체크리스트 |
 
 > [!info]+ 🗺 시스템 전체 지도
 > | 목적 | 바로가기 |
@@ -378,7 +378,7 @@ pie title 라우터 분포 (총 20개)
 - Up: [[_vault/dashboards/_dashboards]]
 - 같은 레이어: [[_vault/dashboards/ERP_System_Map.canvas|시스템 캔버스]]
 - 시작점: [[_vault/guides/처음_읽는_사람]]
-- 첫 주 체크리스트: [[_vault/guides/첫주_체크리스트]]
+- 첫 주 체크리스트: [[_vault/guides/체크리스트]]
 - MOC: [[_vault/guides/ERP_MOC|MES MOC]]
 - 용어: [[_vault/guides/용어사전]]
 - FAQ: [[_vault/guides/FAQ_전체]]
