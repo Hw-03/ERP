@@ -1,6 +1,71 @@
 @echo off
 setlocal
 
+rem ====== Prerequisites: Python + Node.js ======
+set "MISSING_PY=0"
+set "MISSING_NODE=0"
+where py >nul 2>&1
+if errorlevel 1 set "MISSING_PY=1"
+where node >nul 2>&1
+if errorlevel 1 set "MISSING_NODE=1"
+if "%MISSING_PY%%MISSING_NODE%"=="00" goto :prereq_ok
+
+echo.
+echo ================================================================
+echo  [MES] 필수 프로그램이 설치되어 있지 않습니다
+echo ================================================================
+if "%MISSING_PY%"=="1"   echo   [ ] Python 3.13+    ^(미설치^)
+if "%MISSING_PY%"=="0"   echo   [O] Python          ^(설치됨^)
+if "%MISSING_NODE%"=="1" echo   [ ] Node.js LTS     ^(미설치^)
+if "%MISSING_NODE%"=="0" echo   [O] Node.js         ^(설치됨^)
+echo.
+echo ----------------------------------------------------------------
+echo  [수동 설치 - 권장]
+echo    Python : https://www.python.org/downloads/
+echo             ^(설치 화면에서 "Add python.exe to PATH" 반드시 체크^)
+echo    Node.js: https://nodejs.org/  ^(LTS 버전 다운로드^)
+echo.
+echo  [자동 설치] Windows 10/11 + winget + 관리자 권한 필요
+echo ----------------------------------------------------------------
+echo.
+set "USE_WINGET=N"
+set /p USE_WINGET="자동 설치를 시도할까요? (Y/N, 기본 N): "
+if /i not "%USE_WINGET%"=="Y" goto :prereq_exit
+
+where winget >nul 2>&1
+if errorlevel 1 (
+    echo.
+    echo [MES] winget 을 찾을 수 없습니다. 위 링크로 수동 설치 후 다시 실행하세요.
+    goto :prereq_exit
+)
+
+if "%MISSING_PY%"=="1" (
+    echo.
+    echo [MES] Python 3.13 설치 중... ^(UAC 창이 뜨면 "예" 클릭^)
+    winget install -e --id Python.Python.3.13 --accept-source-agreements --accept-package-agreements --override "/quiet PrependPath=1"
+)
+if "%MISSING_NODE%"=="1" (
+    echo.
+    echo [MES] Node.js LTS 설치 중... ^(UAC 창이 뜨면 "예" 클릭^)
+    winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
+)
+
+echo.
+echo ================================================================
+echo  설치 완료. 변경된 PATH 를 반영하려면
+echo  이 cmd 창을 닫고 새 cmd 창에서 start.bat 를 다시 실행하세요.
+echo ================================================================
+pause
+exit /b 0
+
+:prereq_exit
+echo.
+echo 설치 완료 후 새 cmd 창에서 start.bat 를 다시 실행해 주세요.
+pause
+exit /b 1
+
+:prereq_ok
+
 rem ====== Install dependencies on first run / after pulls ======
 pushd "%~dp0frontend"
 set "NEED_NPM_INSTALL=0"
