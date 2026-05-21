@@ -1,60 +1,88 @@
 ---
-type: index
-project: ERP
-layer: root
+type: meta
+project: DEXCOWIN MES
+layer: meta
 status: active
-updated: 2026-04-27
+created: 2026-04-27
+updated: 2026-05-21
 tags:
-  - erp
+  - vault
+  - meta
   - root
-  - hub
+  - layer/meta
+  - topic/root
 aliases:
-  - ERP
-  - ERP Root
-  - ERP 프로젝트
+  - DEXCOWIN MES Vault
+  - Vault 루트
+  - 인수인계 허브
 ---
 
-# ERP
+# DEXCOWIN MES Vault
 
-> [!summary] 역할
-> `vault-sync` 브랜치에서만 존재하는 Obsidian 인수인계 루트 허브다. 현재 코드는 `main`과 같고, 차이는 `vault/` 문서뿐이다.
+> [!summary] 한 줄
+> 이 vault 는 **DEXCOWIN MES** 코드(`erp/`)를 신입이 읽을 수 있게 만든 **분석 지도**다. 코드 사본이 아니다.
 
-## 브랜치 정책
+> [!info] 파일명과 공식명
+> 진입 노트 파일명은 호환을 위해 `ERP.md` 로 유지하지만, 시스템 공식명은 **DEXCOWIN MES** 다. 사용자 노출 텍스트에서 "ERP" / "X-Ray" 는 쓰지 않는다.
 
-- `main`: 코드만 유지한다. `vault/`를 커밋하지 않는다.
-- `vault-sync`: `main`과 같은 코드 + Obsidian `vault/` 문서를 보존한다.
-- 최신 코드 구조를 보려면 이 노트에서 각 폴더 허브로 이동한다.
+---
 
-## 최상위 허브
+## 현재 브랜치: `vault-sync`
 
-- [[.github/.github|.github]]
-- [[backend/backend|backend]]
-- [[data/data|data]]
-- [[docker/docker|docker]]
-- [[docs/docs|docs]]
-- [[frontend/frontend|frontend]]
-- [[scripts/scripts|scripts]]
-- [[_vault/dashboards/ERP_Control_Room|ERP Control Room]]
-- [[_vault/guides/ERP_MOC|ERP MOC]]
-- [[_vault/guides/처음_읽는_사람|처음 읽는 사람]]
+> [!warning] 브랜치 정책
+> - `main` — 코드만 (vault 없음)
+> - `vault-sync` — 같은 코드 + `erp/vault/` 인수인계 문서
+> 합치지 마라. `main` 에 vault 가 올라가면 코드 PR 리뷰가 진흙탕이 된다.
 
-## 루트 파일
+---
 
-- [[.gitignore|.gitignore]]
-- [[CLAUDE.md|CLAUDE.md]]
-- [[README.md|README.md]]
-- [[start.bat|start.bat]]
+## 빠른 진입점
 
-## 현재 구조에서 특히 볼 곳
+> [!tip] 처음이라면 여기부터
+> [[erp/_vault/guides/처음_읽는_사람]] 한 문서면 1시간 내에 큰 그림이 잡힌다.
 
-- [[backend/app/routers/inventory/inventory|inventory 라우터 패키지]]
-- [[frontend/app/legacy/_components/_inventory_sections/_inventory_sections|재고 화면 섹션]]
-- [[frontend/app/legacy/_components/_warehouse_steps/_warehouse_steps|입출고 wizard 단계]]
-- [[frontend/app/legacy/_components/_admin_sections/_admin_sections|관리자 섹션]]
-- [[scripts/ops/ops|운영 스크립트]]
-- [[.github/workflows/workflows|CI workflow]]
+### 대시보드 / MOC
+
+- [[erp/_vault/dashboards/ERP_Control_Room]] — 한눈에 보는 상태판
+- [[erp/_vault/guides/ERP_MOC]] — Vault 목차(Map Of Content)
+- [[erp/_vault/guides/_guides]] — 가이드 인덱스
+
+### 신규 가이드 5종 (Phase 2 로드맵)
+
+> [!info] 신입을 위한 핵심 5종
+> 옛 코드와 새 코드의 간극, AI 생성 흔적, 위험 영역을 다룬다. 첫 주에 차례로 읽어라.
+
+- [[erp/_vault/guides/왜_이_시스템인가]] — 왜 자체 MES 를 만들었는가
+- [[erp/_vault/guides/바이브_코딩_컨텍스트]] — 이 시스템이 어떻게 태어났는지 (필독)
+- [[erp/_vault/guides/AI_생성_코드_읽는_법]] — AI 가 쓴 코드 특유의 함정
+- [[erp/_vault/guides/위험지대_지도]] — 함부로 손대면 안 되는 영역
+- [[erp/_vault/guides/첫주_체크리스트]] — 1주차 일별 체크리스트
+
+---
+
+## 코드 트리 허브
+
+- [[backend/backend]]
+- [[frontend/frontend]]
+- [[scripts/scripts]]
+- [[docs/docs]]
+- [[data/data]]
+- [[docker/docker]]
+- [[.github/.github]]
+
+## 루트 파일 미러
+
+- [[README.md]] — 원본: `erp/README.md`
+- [[CLAUDE.md]] — 원본: `erp/CLAUDE.md`
+- [[.gitignore]]
+- [[start.bat]]
+
+---
 
 ## 원칙
 
-> [!warning]
-> 설명과 실제 코드가 다르면 실제 코드가 우선이다. Vault는 인수인계와 탐색을 돕는 레이어다.
+> [!warning] 코드가 정답
+> 문서와 실제 코드가 다르면 **코드가 정답이다**. Vault 는 인수인계와 탐색을 돕는 레이어일 뿐, 실행에는 영향이 없다.
+
+> [!quote] 신입에게
+> "코드를 외울 필요 없다. 어디를 봐야 할지를 외워라."
