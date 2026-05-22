@@ -33,11 +33,8 @@ UtcDatetime = Annotated[
 
 class ItemCreate(BaseModel):
     item_name: str = Field(..., max_length=200, description="품목명")
-    spec: Optional[str] = Field(None, description="사양")
     process_type_code: Optional[str] = Field(None, max_length=2, description="공정 코드 (TR/HR/.../PF 18개)")
     unit: str = Field("EA", max_length=20, description="단위")
-    barcode: Optional[str] = Field(None, max_length=100)
-    legacy_file_type: Optional[str] = Field(None, max_length=50)
     legacy_part: Optional[str] = Field(None, max_length=50)
     legacy_item_type: Optional[str] = Field(None, max_length=50)
     supplier: Optional[str] = Field(None, max_length=200)
@@ -49,11 +46,8 @@ class ItemCreate(BaseModel):
 
 class ItemUpdate(BaseModel):
     item_name: Optional[str] = Field(None, max_length=200)
-    spec: Optional[str] = None
     process_type_code: Optional[str] = Field(None, max_length=2, description="공정 코드 (TR/HR/.../PF 18개)")
     unit: Optional[str] = Field(None, max_length=20)
-    barcode: Optional[str] = Field(None, max_length=100)
-    legacy_file_type: Optional[str] = Field(None, max_length=50)
     legacy_part: Optional[str] = Field(None, max_length=50)
     legacy_item_type: Optional[str] = Field(None, max_length=50)
     supplier: Optional[str] = Field(None, max_length=200)
@@ -68,10 +62,7 @@ class ItemResponse(BaseModel):
 
     item_id: uuid.UUID
     item_name: str
-    spec: Optional[str]
     unit: str
-    barcode: Optional[str] = None
-    legacy_file_type: Optional[str] = None
     legacy_part: Optional[str] = None
     legacy_item_type: Optional[str] = None
     supplier: Optional[str] = None
@@ -80,7 +71,6 @@ class ItemResponse(BaseModel):
     item_code: Optional[str] = None
     model_symbol: Optional[str] = None
     model_slots: List[int] = []
-    symbol_slot: Optional[int] = None
     process_type_code: Optional[str] = None
     option_code: Optional[str] = None
     serial_no: Optional[int] = None
@@ -812,7 +802,6 @@ class StockRequestResponse(BaseModel):
 class IoPreviewTarget(BaseModel):
     source_kind: str = Field("direct_item", max_length=24)
     item_id: Optional[uuid.UUID] = None
-    package_id: Optional[uuid.UUID] = None
     quantity: Decimal = Field(Decimal("1"), gt=0)
 
 
@@ -842,7 +831,6 @@ class IoBundlePayload(BaseModel):
     source_kind: str
     title: str
     source_item_id: Optional[uuid.UUID] = None
-    package_id: Optional[uuid.UUID] = None
     quantity: Decimal
     expanded_level: int = 1
     lines: List[IoLinePayload] = Field(default_factory=list)

@@ -140,11 +140,6 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
       </td>
       <td className="border-b px-4 py-5 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="font-semibold">{item.item_name}</div>
-        {item.spec && (
-          <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            {item.spec}
-          </div>
-        )}
         {Number(item.quantity) === 0 ? (
           <div
             className="mt-[20px] h-[6px] overflow-hidden rounded-full"

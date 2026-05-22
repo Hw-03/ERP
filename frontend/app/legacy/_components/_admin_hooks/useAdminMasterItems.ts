@@ -77,7 +77,6 @@ export function useAdminMasterItems({
       const created = await api.createItem({
         item_name: addForm.item_name.trim(),
         process_type_code: addForm.process_type_code || undefined,
-        spec: addForm.spec || undefined,
         unit: addForm.unit || "EA",
         model_slots: addForm.model_slots.length > 0 ? addForm.model_slots : undefined,
         option_code: addForm.option_code || undefined,

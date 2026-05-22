@@ -166,7 +166,6 @@ export function ItemDetailSheet({
             >
               {[
                 ["품목 코드", item.item_code ?? "-"],
-                ["사양", item.spec || "-"],
                 ["총재고", `${formatQty(item.quantity)} ${item.unit}`],
                 [
                   "가용 / 예약",
@@ -178,7 +177,6 @@ export function ItemDetailSheet({
                 ["위치", item.location || "-"],
                 ["파트", item.legacy_part || "-"],
                 ["공급처", item.supplier || "-"],
-                ["바코드", item.barcode || "-"],
                 ["안전재고", item.min_stock != null ? formatQty(item.min_stock) : "-"],
               ].map(([label, value], index, array) => (
                 <div

@@ -82,10 +82,7 @@ def _to_item_with_inventory(
     return ItemWithInventory(
         item_id=item.item_id,
         item_name=item.item_name,
-        spec=item.spec,
         unit=item.unit,
-        barcode=item.barcode,
-        legacy_file_type=item.legacy_file_type,
         legacy_part=item.legacy_part,
         legacy_item_type=item.legacy_item_type,
         supplier=item.supplier,
@@ -93,7 +90,6 @@ def _to_item_with_inventory(
         item_code=item.item_code,
         model_symbol=item.model_symbol,
         model_slots=model_slots,
-        symbol_slot=item.symbol_slot,
         process_type_code=item.process_type_code,
         option_code=item.option_code,
         serial_no=item.serial_no,
@@ -125,24 +121,18 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         serial = next_serial_no(model_sym, pt, db)
         item_code = make_item_code(model_sym, pt, serial, opt)
 
-    legacy_slot = model_slots[0] if len(model_slots) == 1 else None
-
     # 신규 항목은 목록 맨 끝으로. sort_order 미설정 시 NULL 이 되어 SQLite 가 맨앞에 정렬해버림.
     next_sort = (db.query(func.max(Item.sort_order)).scalar() or 0) + 1
 
     item = Item(
         item_name=payload.item_name,
-        spec=payload.spec,
         unit=payload.unit,
-        barcode=payload.barcode or None,
-        legacy_file_type=payload.legacy_file_type,
         legacy_part=payload.legacy_part,
         legacy_item_type=payload.legacy_item_type,
         supplier=payload.supplier,
         min_stock=payload.min_stock,
         process_type_code=pt,
         model_symbol=model_sym or None,
-        symbol_slot=legacy_slot,
         serial_no=serial,
         option_code=opt,
         item_code=item_code,
@@ -174,12 +164,10 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
 @router.get("", response_model=List[ItemWithInventory])
 def list_items(
     process_type_code: Optional[str] = Query(None, description="process_type_code 필터 (TR/HR/.../PF 18개)"),
-    search: Optional[str] = Query(None, description="품목명, 품목코드, 사양, 위치, 바코드 검색"),
-    legacy_file_type: Optional[str] = Query(None, description="레거시 파일 구분 필터"),
+    search: Optional[str] = Query(None, description="품목명, 품목코드, 위치 검색"),
     legacy_part: Optional[str] = Query(None, description="레거시 파트 필터"),
     department: Optional[str] = Query(None, description="부서 필터 (창고|조립|고압|진공|튜닝|튜브|출하|…)"),
     legacy_item_type: Optional[str] = Query(None, description="레거시 품목 유형 필터"),
-    barcode: Optional[str] = Query(None, description="바코드 검색"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=2000),
     db: Session = Depends(get_db),
@@ -188,9 +176,6 @@ def list_items(
 
     if process_type_code:
         query = query.filter(Item.process_type_code == process_type_code)
-
-    if legacy_file_type:
-        query = query.filter(Item.legacy_file_type == legacy_file_type)
 
     if legacy_part:
         query = query.filter(Item.legacy_part == legacy_part)
@@ -213,17 +198,12 @@ def list_items(
     if legacy_item_type:
         query = query.filter(Item.legacy_item_type == legacy_item_type)
 
-    if barcode:
-        query = query.filter(Item.barcode == barcode)
-
     if search:
         pattern = f"%{search}%"
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
                 Item.item_code.ilike(pattern),
-                Item.spec.ilike(pattern),
-                Item.barcode.ilike(pattern),
                 Inventory.location.ilike(pattern),
             )
         )
@@ -277,7 +257,7 @@ def export_items_csv(db: Session = Depends(get_db)):
 
     buffer = StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["item_code", "item_name", "process_type_code", "spec", "unit", "quantity", "location", "updated_at"])
+    writer.writerow(["item_code", "item_name", "process_type_code", "unit", "quantity", "location", "updated_at"])
 
     for item, inventory in rows:
         writer.writerow(
@@ -285,7 +265,6 @@ def export_items_csv(db: Session = Depends(get_db)):
                 item.item_code or "",
                 item.item_name,
                 item.process_type_code or "",
-                item.spec or "",
                 item.unit,
                 float(inventory.quantity) if inventory else 0,
                 inventory.location if inventory else "",
@@ -335,8 +314,6 @@ def export_items_xlsx(
             or_(
                 Item.item_name.ilike(pattern),
                 Item.item_code.ilike(pattern),
-                Item.spec.ilike(pattern),
-                Item.barcode.ilike(pattern),
                 Inventory.location.ilike(pattern),
             )
         )
@@ -350,8 +327,8 @@ def export_items_xlsx(
     ws.title = "품목 마스터"
 
     columns = [
-        "품목 코드", "품목명", "공정코드", "사양", "단위",
-        "재고수량", "가용수량", "예약수량", "위치", "공급업체", "안전재고", "바코드", "수정일",
+        "품목 코드", "품목명", "공정코드", "단위",
+        "재고수량", "가용수량", "예약수량", "위치", "공급업체", "안전재고", "수정일",
     ]
     apply_header(ws, columns)
 
@@ -368,7 +345,6 @@ def export_items_xlsx(
             item.item_code or "",
             item.item_name,
             item.process_type_code or "",
-            item.spec or "",
             item.unit,
             qty,
             available,
@@ -376,7 +352,6 @@ def export_items_xlsx(
             inventory.location if inventory else "",
             item.supplier or "",
             min_stock or "",
-            item.barcode or "",
             item.updated_at.strftime("%Y-%m-%d %H:%M") if item.updated_at else "",
         ]
         ws.append(row_data)
@@ -418,8 +393,8 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
 
     changed: list[str] = []
     for field in (
-        "item_name", "spec", "process_type_code", "unit", "barcode",
-        "legacy_file_type", "legacy_part", "legacy_item_type",
+        "item_name", "process_type_code", "unit",
+        "legacy_part", "legacy_item_type",
         "supplier", "min_stock", "option_code",
     ):
         new_val = getattr(payload, field)

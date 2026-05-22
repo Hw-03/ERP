@@ -85,15 +85,12 @@ def run_schema_create_all() -> None:
 # 2. Raw ALTER TABLE 마이그레이션 (SQLite 호환 단순 ADD COLUMN)
 # ---------------------------------------------------------------------------
 _MIGRATION_DDL: list[str] = [
-    "ALTER TABLE items ADD COLUMN barcode VARCHAR(100)",
-    "ALTER TABLE items ADD COLUMN legacy_file_type VARCHAR(50)",
     "ALTER TABLE items ADD COLUMN legacy_part VARCHAR(50)",
     "ALTER TABLE items ADD COLUMN legacy_item_type VARCHAR(50)",
     "ALTER TABLE items ADD COLUMN supplier VARCHAR(200)",
     "ALTER TABLE items ADD COLUMN min_stock NUMERIC(15,4)",
     # M1: 4-part item code
     "ALTER TABLE items ADD COLUMN erp_code VARCHAR(40)",
-    "ALTER TABLE items ADD COLUMN symbol_slot SMALLINT",
     "ALTER TABLE items ADD COLUMN process_type_code VARCHAR(2)",
     "ALTER TABLE items ADD COLUMN option_code VARCHAR(2)",
     "ALTER TABLE items ADD COLUMN serial_no INTEGER",
@@ -216,6 +213,9 @@ _MIGRATION_DDL: list[str] = [
     # — 사용자 입출고 경로에서 발생하지 않음. 0행 보장 후 테이블 DROP.
     "DROP TABLE IF EXISTS scrap_logs",
     "DROP TABLE IF EXISTS loss_logs",
+    # 2026-05-22: 출하패키지 미사용 확정 — 관련 테이블 완전 제거 (데이터 0행, API 이미 삭제됨)
+    "DROP TABLE IF EXISTS ship_package_items",
+    "DROP TABLE IF EXISTS ship_packages",
     # items.item_code (레거시 CSV) DROP + erp_code → item_code rename 은
     # _consolidate_item_code_columns() 헬퍼에서 처리. 멱등 (PRAGMA 로 현재 상태 검사 후
     # 필요한 단계만 수행) — fresh DB / 운영 DB 모두 안전.
@@ -259,8 +259,19 @@ def _consolidate_item_code_columns() -> None:
             conn.execute(text("DROP INDEX IF EXISTS ix_items_item_code"))
             conn.execute(text("DROP INDEX IF EXISTS ix_items_erp_code"))
             if "item_code" in items_cols:
-                conn.execute(text("ALTER TABLE items DROP COLUMN item_code"))
-            conn.execute(text("ALTER TABLE items RENAME COLUMN erp_code TO item_code"))
+                # 두 컬럼 공존: _MIGRATION_DDL 의 historical "ADD COLUMN erp_code" 가 rename 후
+                # 재실행될 때 빈 유령 erp_code 를 다시 만드는 케이스.
+                # erp_code 가 모두 NULL 이면 유령 컬럼 → erp_code 만 DROP, item_code 데이터 보존.
+                erp_non_null = conn.execute(
+                    text("SELECT COUNT(*) FROM items WHERE erp_code IS NOT NULL")
+                ).scalar()
+                if erp_non_null == 0:
+                    conn.execute(text("ALTER TABLE items DROP COLUMN erp_code"))
+                else:
+                    conn.execute(text("ALTER TABLE items DROP COLUMN item_code"))
+                    conn.execute(text("ALTER TABLE items RENAME COLUMN erp_code TO item_code"))
+            else:
+                conn.execute(text("ALTER TABLE items RENAME COLUMN erp_code TO item_code"))
             conn.execute(text(
                 "CREATE UNIQUE INDEX IF NOT EXISTS ix_items_item_code ON items(item_code)"
             ))
@@ -271,6 +282,22 @@ def _consolidate_item_code_columns() -> None:
                 conn.execute(text(
                     f"ALTER TABLE {table} RENAME COLUMN erp_code_snapshot TO item_code_snapshot"
                 ))
+        conn.commit()
+
+
+def _drop_unused_item_columns() -> None:
+    """spec / barcode / legacy_file_type — 미사용 컬럼 제거. 멱등.
+
+    symbol_slot 은 FK(→ product_symbols.slot)가 있어 SQLite DROP COLUMN 불가.
+    ORM 모델에서 제거됐으므로 API 노출은 없음 — DB에 그대로 남겨둔다.
+    """
+    to_drop = {"spec", "barcode", "legacy_file_type"}
+    with engine.connect() as conn:
+        cols = {r[1] for r in conn.execute(text("PRAGMA table_info(items)"))}
+        for col in to_drop:
+            if col in cols:
+                conn.execute(text(f"DROP INDEX IF EXISTS ix_items_{col}"))
+                conn.execute(text(f"ALTER TABLE items DROP COLUMN {col}"))
         conn.commit()
 
 
@@ -432,6 +459,14 @@ def run_migrations() -> dict[str, object]:
         _add_new_transaction_type_values()
     except Exception as exc:  # noqa: BLE001
         msg = f"[migrate] PG enum add (defect handling) failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
+
+    # spec/barcode/legacy_file_type/symbol_slot — 미사용 컬럼 제거. 멱등.
+    try:
+        _drop_unused_item_columns()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] unused item columns drop failed: {exc}"
         errors.append(msg)
         logger.warning(msg, exc_info=False)
 

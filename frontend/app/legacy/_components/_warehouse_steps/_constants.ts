@@ -85,8 +85,6 @@ export function matchesSearch(item: Item, keyword: string) {
   const haystack = [
     item.item_code,
     item.item_name,
-    item.barcode ?? "",
-    item.spec ?? "",
     item.legacy_part ?? "",
     item.location ?? "",
   ]

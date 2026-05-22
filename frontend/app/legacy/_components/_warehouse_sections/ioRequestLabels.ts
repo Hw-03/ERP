@@ -8,7 +8,6 @@ export const REQUEST_TYPE_LABEL: Record<string, string> = {
   mark_defective_wh: "창고 불량 등록",
   mark_defective_prod: "생산 불량 등록",
   supplier_return: "공급업체 반품",
-  package_out: "패키지 출고",
   manual_adjustment: "수동 조정",
   // 불량 처리 흐름 (Phase 2/5)
   defect_scrap: "불량 폐기",

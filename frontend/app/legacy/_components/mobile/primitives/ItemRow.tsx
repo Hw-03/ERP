@@ -97,14 +97,6 @@ export function ItemRow({
             className="shrink-0 ml-auto"
           />
         </div>
-        {item.spec ? (
-          <div
-            className={clsx(TYPO.caption, "mt-[2px] truncate")}
-            style={{ color: LEGACY_COLORS.muted2 }}
-          >
-            {item.spec}
-          </div>
-        ) : null}
       </div>
       {right ? <div className="shrink-0">{right}</div> : null}
     </button>
