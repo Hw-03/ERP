@@ -12,7 +12,7 @@ import { IoTargetPicker } from "./IoTargetPicker";
 import { IoBundleCart } from "./IoBundleCart";
 import { IoConfirmStep } from "./IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "./IoSubmitModals";
-import { IO_WORK_TYPES, approvalKind, directionWord, isExitWorkType, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
+import { IO_WORK_TYPES, approvalKind, directionWord, isDefectInventorySubType, isExitWorkType, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
 import { applyBundleQuantityChange, applyLineQuantityChange, applyToggleLine } from "./bomSync";
 import { useIoDraftRestore } from "./useIoDraftRestore";
 import { useIoDraft } from "./useIoDraft";
@@ -20,7 +20,8 @@ import { useIoPreview } from "./useIoPreview";
 import { useIoSubmit } from "./useIoSubmit";
 import { useIoWorkState, type IoStep } from "./useIoWorkState";
 import type { IoComposeViewProps } from "./types";
-import { DefectHubPanel } from "../_defect_hub/DefectHubPanel";
+import { DefectInventoryPicker } from "./DefectInventoryPicker";
+import { DefectActionStep } from "./DefectActionStep";
 
 function locationQuantity(item: Item, department: string | null | undefined, status: "PRODUCTION" | "DEFECTIVE") {
   if (!department) return 0;
@@ -633,33 +634,7 @@ export function IoComposeView({
           ref={(el) => { stepRefs.current[2] = el; }}
           className={stepWrapperClass(2)}
         >
-          {state.workType === "defect" ? (
-            <WizardStepCard
-              n={2}
-              title="불량 처리"
-              state={stepState(2)}
-              summary="격리 · 폐기 · 반품 · 분해"
-              onChange={() => state.goTo(2)}
-              accent={LEGACY_COLORS.red}
-              fill
-            >
-              {currentEmployee ? (
-                <DefectHubPanel
-                  defectDeptFilter={defectDeptFilter}
-                  currentEmployee={{
-                    employee_id: currentEmployee.employee_id,
-                    name: currentEmployee.name,
-                    department: currentEmployee.department,
-                  }}
-                />
-              ) : (
-                <div className="p-6 text-center" style={{ color: LEGACY_COLORS.muted2 }}>
-                  로그인 정보가 필요합니다.
-                </div>
-              )}
-            </WizardStepCard>
-          ) : (
-            <WizardStepCard
+          <WizardStepCard
               n={2}
               title="세부 작업과 부서 선택"
               state={stepState(2)}
@@ -699,7 +674,6 @@ export function IoComposeView({
                 </div>
               </div>
             </WizardStepCard>
-          )}
         </div>
       )}
 
@@ -710,39 +684,51 @@ export function IoComposeView({
         >
           <WizardStepCard
             n={3}
-            title={`${pickerDirectionLabel(state.subType)} 품목 선택`}
+            title={
+              state.workType === "defect" && isDefectInventorySubType(state.subType)
+                ? "처리 대상 선택"
+                : `${pickerDirectionLabel(state.subType)} 품목 선택`
+            }
             state={stepState(3)}
             summary={`${state.bundles.length}개 묶음 · 라인 ${lineCount}개`}
             onChange={() => state.goTo(3)}
             accent={accent}
             fill={step === 3}
           >
-            <IoTargetPicker
-              workType={state.workType}
-              subType={state.subType}
-              deptIoDirection={state.deptIoDirection}
-              bundleSubType={state.bundles.length > 0 ? state.subType : null}
-              bomParents={bomParents}
-              targetDepartment={targetDepartmentOf(state.subType, state.fromDepartment, state.toDepartment)}
-              items={items}
-              productModels={productModels}
-              bundles={state.bundles}
-              search={search}
-              onSearchChange={setSearch}
-              onAddItem={(item, sourceKind, subTypeOverride) =>
-                addItem(item, sourceKind ?? "direct_item", subTypeOverride)}
-              onAdvance={() => {
-                const step4El = stepRefs.current[4];
-                if (!step4El) return;
-                const scrollContainer = findScrollContainer(step4El);
-                if (!scrollContainer) return;
-                // useLayoutEffect 가 set 한 height 가 paint 된 다음 프레임에 측정
-                requestAnimationFrame(() => {
-                  scrollToElement(scrollContainer, step4El, STEP4_SCROLL_OFFSET);
-                });
-              }}
-              busy={previewing}
-            />
+            {state.workType === "defect" && isDefectInventorySubType(state.subType) ? (
+              <DefectInventoryPicker
+                department={state.fromDepartment}
+                selected={state.defectSelectedLocation}
+                onSelect={state.setDefectSelectedLocation}
+                onAdvance={state.goNext}
+              />
+            ) : (
+              <IoTargetPicker
+                workType={state.workType}
+                subType={state.subType}
+                deptIoDirection={state.deptIoDirection}
+                bundleSubType={state.bundles.length > 0 ? state.subType : null}
+                bomParents={bomParents}
+                targetDepartment={targetDepartmentOf(state.subType, state.fromDepartment, state.toDepartment)}
+                items={items}
+                productModels={productModels}
+                bundles={state.bundles}
+                search={search}
+                onSearchChange={setSearch}
+                onAddItem={(item, sourceKind, subTypeOverride) =>
+                  addItem(item, sourceKind ?? "direct_item", subTypeOverride)}
+                onAdvance={() => {
+                  const step4El = stepRefs.current[4];
+                  if (!step4El) return;
+                  const scrollContainer = findScrollContainer(step4El);
+                  if (!scrollContainer) return;
+                  requestAnimationFrame(() => {
+                    scrollToElement(scrollContainer, step4El, STEP4_SCROLL_OFFSET);
+                  });
+                }}
+                busy={previewing}
+              />
+            )}
           </WizardStepCard>
         </div>
       )}
@@ -761,6 +747,24 @@ export function IoComposeView({
             accent={accent}
             fill={step === 4 || (step === 3 && state.bundles.length > 0)}
           >
+            {state.workType === "defect" && isDefectInventorySubType(state.subType) && state.defectSelectedLocation ? (
+              <DefectActionStep
+                subType={state.subType}
+                selectedLocation={state.defectSelectedLocation}
+                action={state.defectAction}
+                reasonCategory={state.defectReasonCategory}
+                reasonMemo={state.defectReasonMemo}
+                bomDecisions={state.defectBomDecisions}
+                onActionChange={state.setDefectAction}
+                onReasonChange={(cat, memo) => {
+                  state.setDefectReasonCategory(cat);
+                  state.setDefectReasonMemo(memo);
+                }}
+                onBomDecisionsChange={state.setDefectBomDecisions}
+                canAdvance={state.canAdvance[4]}
+                onAdvance={state.goNext}
+              />
+            ) : (
             <IoBundleCart
               bundles={state.bundles}
               subType={state.subType}
@@ -800,6 +804,7 @@ export function IoComposeView({
               }}
               canAdvance={state.canAdvance[4]}
             />
+            )}
           </WizardStepCard>
         </div>
       )}

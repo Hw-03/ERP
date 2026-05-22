@@ -62,6 +62,8 @@ function directionAccent(subType: IoSubType): string {
   if (
     subType === "defect_quarantine" ||
     subType === "supplier_return" ||
+    subType === "defect_restore" ||
+    subType === "defect_process" ||
     subType === "warehouse_to_dept" ||
     subType === "disassemble" ||
     subType === "adjust_out"
@@ -80,6 +82,12 @@ function confirmCopy(
   const confirmLabel = needsApproval ? "결재 요청" : "즉시 반영";
   if (subType === "defect_quarantine") {
     return { title: `불량 격리를 ${verb}`, tone: "danger", confirmLabel };
+  }
+  if (subType === "defect_restore") {
+    return { title: `격리 해제(정상 복귀)를 ${verb}`, tone: "danger", confirmLabel };
+  }
+  if (subType === "defect_process") {
+    return { title: `격리 처리를 ${verb}`, tone: "danger", confirmLabel };
   }
   if (subType === "supplier_return") {
     return { title: `공급처 반품을 ${verb}`, tone: "danger", confirmLabel };
