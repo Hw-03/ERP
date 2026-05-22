@@ -315,6 +315,8 @@ def upsert_stock_request_draft(
             lines_input=lines_input,
             reference_no=payload.reference_no,
             notes=payload.notes,
+            reason_category=payload.reason_category,
+            reason_memo=payload.reason_memo,
         )
     except ValueError as exc:
         db.rollback()

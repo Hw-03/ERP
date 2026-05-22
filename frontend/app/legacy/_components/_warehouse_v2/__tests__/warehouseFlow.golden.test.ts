@@ -120,7 +120,7 @@ describe("ioWorkType 상수", () => {
       receive: ["receive_supplier"],
       warehouse_io: ["warehouse_to_dept", "dept_to_warehouse"],
       process: ["produce", "disassemble", "adjust_in", "adjust_out"],
-      defect: ["defect_quarantine", "supplier_return"],
+      defect: ["defect_quarantine", "defect_restore", "defect_process", "supplier_return"],
     });
   });
 
@@ -136,8 +136,10 @@ describe("ioWorkType 상수", () => {
       ["disassemble", "분해", "상위 품목 출고 + 회수 품목 입고"],
       ["adjust_in", "수량보정 입고", "선택 품목 수량 증가"],
       ["adjust_out", "수량보정 출고", "선택 품목 수량 감소"],
-      ["defect_quarantine", "불량 격리", "창고 승인 요청으로 격리"],
-      ["supplier_return", "공급처 반품", "불량 재고를 반품 처리"],
+      ["defect_quarantine", "새 격리", "정상 재고를 격리 처리 (창고 승인)"],
+      ["defect_restore", "격리 해제", "격리 재고를 정상 복귀 (즉시)"],
+      ["defect_process", "격리 처리", "격리 재고 폐기·분해 (창고 승인)"],
+      ["supplier_return", "공급처 반품", "격리 재고를 공급처에 반품 (창고 승인)"],
     ]);
   });
 
@@ -191,7 +193,7 @@ describe("subTypeLabel", () => {
       dept_transfer: "dept_transfer", // IO_SUB_TYPES 에 없음 → 그대로 반환
       adjust_in: "수량보정 입고",
       adjust_out: "수량보정 출고",
-      defect_quarantine: "불량 격리",
+      defect_quarantine: "새 격리",
       supplier_return: "공급처 반품",
     });
   });
@@ -234,7 +236,7 @@ describe("requiresApproval", () => {
       adjust_in: false,
       adjust_out: false,
       defect_quarantine: true,
-      supplier_return: false,
+      supplier_return: true,
     });
   });
 });
@@ -282,6 +284,7 @@ describe("approvalKind", () => {
     expect(approvalKind("warehouse_to_dept", [])).toBe("warehouse");
     expect(approvalKind("dept_to_warehouse", withManual)).toBe("warehouse");
     expect(approvalKind("defect_quarantine", withManual)).toBe("warehouse");
+    expect(approvalKind("supplier_return", [])).toBe("warehouse");
   });
 
   it("비결재 subType + manual line → department", () => {
@@ -294,7 +297,6 @@ describe("approvalKind", () => {
     const direct = [makeBundle({ lines: [makeLine({ origin: "direct" })] })];
     expect(approvalKind("produce", direct)).toBe("none");
     expect(approvalKind("receive_supplier", [])).toBe("none");
-    expect(approvalKind("supplier_return", direct)).toBe("none");
   });
 });
 

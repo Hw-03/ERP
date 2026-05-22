@@ -32,12 +32,19 @@ cd backend
 python bootstrap_db.py --all
 ```
 
-- Run backend:
+- Run backend (canonical — 좀비 워커 자동 정리 + /health/live 확인):
 
-```bash
-cd backend
-python -m uvicorn app.main:app --reload
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\start-backend.ps1
 ```
+
+- Stop backend (포트 8010 잡은 모든 PID 강제 종료):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\stop-backend.ps1
+```
+
+- 백엔드에 로그가 0줄이면 좀비 의심 — stop 실행 후 start 로 재기동.
 
 - Before commit/push, run:
 

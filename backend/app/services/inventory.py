@@ -683,7 +683,8 @@ def scrap_defective(
     db.flush()
     if result.rowcount == 0:
         cur = defective_loc.quantity if defective_loc else Decimal("0")
-        raise ValueError(f"{dept.value} 불량 재고 부족 (현재 {cur}, 요청 {qty}).")
+        dept_label = getattr(dept, "value", str(dept))
+        raise ValueError(f"{dept_label} 불량 재고 부족 (현재 {cur}, 요청 {qty}).")
 
     db.expire_all()
     inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()

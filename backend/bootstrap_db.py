@@ -63,6 +63,7 @@ _BENIGN_MIGRATION_PATTERNS: tuple[str, ...] = (
     "duplicate column name",
     "duplicate column",
     "already exists",
+    "no such column",  # DROP COLUMN 멱등: 컬럼이 이미 제거된 경우
 )
 
 
@@ -386,6 +387,122 @@ def _add_new_transaction_type_values() -> None:
             ))
 
 
+def _fix_io_bundles_package_id() -> None:
+    """io_bundles.package_id (→ ship_packages FK) 제거.
+
+    ship_packages 가 DROP 된 뒤에도 io_bundles 의 FK 정의가 남아 있으면
+    PRAGMA foreign_keys=ON 환경에서 모든 INSERT 가 "no such table: ship_packages" 로 실패.
+    SQLite DROP COLUMN 은 FK 포함 컬럼을 허용하지 않으므로 테이블 재생성으로 처리. 멱등.
+    """
+    with engine.connect() as conn:
+        cols = {r[1] for r in conn.execute(text("PRAGMA table_info(io_bundles)"))}
+        if "package_id" not in cols:
+            return
+        conn.execute(text("PRAGMA foreign_keys=OFF"))
+        conn.execute(text("""
+            CREATE TABLE io_bundles_new (
+                bundle_id UUID NOT NULL,
+                batch_id UUID NOT NULL,
+                source_kind VARCHAR(24) NOT NULL,
+                source_item_id UUID,
+                title_snapshot VARCHAR(220) NOT NULL,
+                quantity NUMERIC(15, 4) NOT NULL,
+                expanded_level INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                PRIMARY KEY (bundle_id),
+                FOREIGN KEY(batch_id) REFERENCES io_batches (batch_id) ON DELETE CASCADE,
+                FOREIGN KEY(source_item_id) REFERENCES items (item_id) ON DELETE SET NULL
+            )
+        """))
+        conn.execute(text("""
+            INSERT INTO io_bundles_new
+                (bundle_id, batch_id, source_kind, source_item_id, title_snapshot,
+                 quantity, expanded_level, created_at)
+            SELECT bundle_id, batch_id, source_kind, source_item_id, title_snapshot,
+                   quantity, expanded_level, created_at
+            FROM io_bundles
+        """))
+        conn.execute(text("DROP TABLE io_bundles"))
+        conn.execute(text("ALTER TABLE io_bundles_new RENAME TO io_bundles"))
+        conn.execute(text("PRAGMA foreign_keys=ON"))
+        conn.commit()
+
+
+def _fix_queue_batches_fk() -> None:
+    """transaction_logs / variance_logs 에서 queue_batches FK 및 관련 컬럼 제거.
+
+    queue_batches 가 DROP 된 뒤 FK 가 남아 PRAGMA foreign_keys=ON 환경에서
+    INSERT 마다 "no such table: queue_batches" 실패. 테이블 재생성으로 처리. 멱등.
+    """
+    with engine.connect() as conn:
+        cols = {r[1] for r in conn.execute(text("PRAGMA table_info(transaction_logs)"))}
+        if "batch_id" in cols:
+            conn.execute(text("PRAGMA foreign_keys=OFF"))
+            conn.execute(text("""
+                CREATE TABLE transaction_logs_new (
+                    log_id UUID NOT NULL,
+                    item_id UUID NOT NULL,
+                    transaction_type VARCHAR(16) NOT NULL,
+                    quantity_change NUMERIC(15, 4) NOT NULL,
+                    quantity_before NUMERIC(15, 4),
+                    quantity_after NUMERIC(15, 4),
+                    reference_no VARCHAR(100),
+                    produced_by VARCHAR(100),
+                    notes TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    transfer_qty REAL,
+                    operation_batch_id CHAR(36),
+                    archived_at DATETIME,
+                    reason_category VARCHAR(32),
+                    reason_memo TEXT,
+                    PRIMARY KEY (log_id),
+                    FOREIGN KEY(item_id) REFERENCES items (item_id) ON DELETE CASCADE,
+                    FOREIGN KEY(operation_batch_id) REFERENCES io_batches (batch_id) ON DELETE SET NULL
+                )
+            """))
+            conn.execute(text("""
+                INSERT INTO transaction_logs_new
+                    (log_id, item_id, transaction_type, quantity_change, quantity_before,
+                     quantity_after, reference_no, produced_by, notes, created_at,
+                     transfer_qty, operation_batch_id, archived_at, reason_category, reason_memo)
+                SELECT log_id, item_id, transaction_type, quantity_change, quantity_before,
+                       quantity_after, reference_no, produced_by, notes, created_at,
+                       transfer_qty, operation_batch_id, archived_at, reason_category, reason_memo
+                FROM transaction_logs
+            """))
+            conn.execute(text("DROP TABLE transaction_logs"))
+            conn.execute(text("ALTER TABLE transaction_logs_new RENAME TO transaction_logs"))
+            conn.execute(text("PRAGMA foreign_keys=ON"))
+
+        vcols = {r[1] for r in conn.execute(text("PRAGMA table_info(variance_logs)"))}
+        if "batch_id" in vcols:
+            conn.execute(text("PRAGMA foreign_keys=OFF"))
+            conn.execute(text("""
+                CREATE TABLE variance_logs_new (
+                    var_id UUID NOT NULL,
+                    item_id UUID NOT NULL,
+                    bom_expected NUMERIC(15, 4) NOT NULL,
+                    actual_used NUMERIC(15, 4) NOT NULL,
+                    diff NUMERIC(15, 4) NOT NULL,
+                    note TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    PRIMARY KEY (var_id),
+                    FOREIGN KEY(item_id) REFERENCES items (item_id) ON DELETE CASCADE
+                )
+            """))
+            conn.execute(text("""
+                INSERT INTO variance_logs_new
+                    (var_id, item_id, bom_expected, actual_used, diff, note, created_at)
+                SELECT var_id, item_id, bom_expected, actual_used, diff, note, created_at
+                FROM variance_logs
+            """))
+            conn.execute(text("DROP TABLE variance_logs"))
+            conn.execute(text("ALTER TABLE variance_logs_new RENAME TO variance_logs"))
+            conn.execute(text("PRAGMA foreign_keys=ON"))
+
+        conn.commit()
+
+
 def run_migrations() -> dict[str, object]:
     """누락된 컬럼/인덱스/테이블을 반영. 각 문장을 3분류한다.
 
@@ -422,6 +539,22 @@ def run_migrations() -> dict[str, object]:
 
     for sql in _MIGRATION_DDL:
         _run(sql, label="ddl")
+
+    # io_bundles.package_id → ship_packages FK 제거 (ship_packages DROP 후 FK 깨짐)
+    try:
+        _fix_io_bundles_package_id()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] io_bundles package_id fix failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
+
+    # transaction_logs / variance_logs 의 batch_id → queue_batches FK 제거
+    try:
+        _fix_queue_batches_fk()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] queue_batches FK fix failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
 
     # items.item_code 통합 (erp_code → item_code rename + 레거시 item_code DROP)
     try:

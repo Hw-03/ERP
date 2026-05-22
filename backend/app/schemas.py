@@ -735,6 +735,8 @@ class StockRequestDraftUpsert(BaseModel):
     reference_no: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
     lines: List[StockRequestLineCreate] = Field(default_factory=list)
+    reason_category: Optional[str] = Field(None, max_length=50)
+    reason_memo: Optional[str] = None
 
 
 class StockRequestSubmitPayload(BaseModel):

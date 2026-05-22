@@ -328,6 +328,47 @@ def _preflight_inventory_check(
             )
 
 
+def _preflight_defective_check(
+    db: Session,
+    lines_input: Sequence[LineInput],
+) -> None:
+    """from_bucket==DEFECTIVE 라인의 격리 재고 사전 검증.
+
+    부서 격리(InventoryLocation status=DEFECTIVE) 의 수량이 요청 수량 이상인지
+    확인. 부족 시 ValueError → 라우터에서 422 매핑.
+
+    DEFECT_SCRAP / DEFECT_RETURN / DEFECT_DISASSEMBLE 처럼 from_bucket=DEFECTIVE
+    인 라인이 격리되지 않은 항목을 폐기/반품/분해 하려는 케이스 차단.
+    """
+    needed: dict[tuple, Decimal] = {}
+    for li in lines_input:
+        if li.from_bucket == RequestBucketEnum.DEFECTIVE and li.from_department is not None:
+            key = (li.item_id, li.from_department)
+            needed[key] = needed.get(key, Decimal("0")) + li.quantity
+
+    if not needed:
+        return
+
+    for (item_id, dept), qty in needed.items():
+        loc = (
+            db.query(InventoryLocation)
+            .filter(
+                InventoryLocation.item_id == item_id,
+                InventoryLocation.department == dept,
+                InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
+            )
+            .first()
+        )
+        avail = loc.quantity if loc else Decimal("0")
+        if avail < qty:
+            item = db.query(Item).filter(Item.item_id == item_id).first()
+            item_name = item.item_name if item else str(item_id)
+            dept_label = getattr(dept, "value", str(dept))
+            raise ValueError(
+                f"격리 재고 부족: {item_name} / {dept_label} 불량 {avail}개, 요청 {qty}개."
+            )
+
+
 def _build_request_and_lines(
     db: Session,
     *,
@@ -504,6 +545,7 @@ def create_request(
 
     _validate_lines(request_type, lines_input)
     _preflight_inventory_check(db, request_type, lines_input)
+    _preflight_defective_check(db, lines_input)
     now = datetime.utcnow()
     code = _generate_request_code(now)
     request = _build_request_and_lines(
@@ -591,6 +633,8 @@ def upsert_draft_request(
     lines_input: Sequence[LineInput],
     reference_no: Optional[str],
     notes: Optional[str],
+    reason_category: Optional[str] = None,
+    reason_memo: Optional[str] = None,
 ) -> StockRequest:
     """직원 + request_type 기준 active draft 를 upsert.
 
@@ -620,6 +664,8 @@ def upsert_draft_request(
 
         existing.reference_no = reference_no
         existing.notes = notes
+        existing.reason_category = reason_category
+        existing.reason_memo = reason_memo
         existing.requires_warehouse_approval = any(
             line_requires_approval(li.from_bucket, li.to_bucket) for li in lines_input
         )
@@ -657,6 +703,8 @@ def upsert_draft_request(
         status=StockRequestStatusEnum.DRAFT,
         request_code=None,
         submitted_at=None,
+        reason_category=reason_category,
+        reason_memo=reason_memo,
     )
 
 
@@ -768,6 +816,7 @@ def submit_draft_request(
     ]
     _validate_lines(request.request_type, line_inputs)
     _preflight_inventory_check(db, request.request_type, line_inputs)
+    _preflight_defective_check(db, line_inputs)
 
     now = datetime.utcnow()
     if not request.request_code:

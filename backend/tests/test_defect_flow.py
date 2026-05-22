@@ -493,3 +493,116 @@ def test_locations_returns_defective_list(db_session, client, make_item):
     assert res2.status_code == 200
     for loc in res2.json():
         assert loc["department"] == DepartmentEnum.ASSEMBLY.value
+
+
+# ---------------------------------------------------------------------------
+# 가드: 격리되지 않은 항목 폐기 요청 차단
+# ---------------------------------------------------------------------------
+
+
+def test_defect_scrap_without_quarantine_rejected(db_session, client, make_item):
+    """from_bucket=DEFECTIVE 인데 해당 부서 격리 재고가 0 → 422.
+
+    이전엔 SUBMITTED 까지 들어가서 결재 시점에 500 폭발했음.
+    """
+    item = make_item(name="GUARD-A", process_type_code="TR", warehouse_qty=Decimal("10"))
+    requester = _make_employee(db_session, code="EG1", name="가드테스터1")
+    db_session.commit()
+
+    res = client.post("/api/stock-requests", json={
+        "requester_employee_id": str(requester.employee_id),
+        "request_type": "defect_scrap",
+        "lines": [{
+            "item_id": str(item.item_id),
+            "quantity": "5",
+            "from_bucket": "defective",
+            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "to_bucket": "none",
+        }],
+        "notes": "격리 안 한 채 폐기 시도",
+    })
+    assert res.status_code == 422, res.json()
+    detail = res.json().get("detail", {})
+    msg = detail.get("message", "") if isinstance(detail, dict) else str(detail)
+    assert "격리 재고 부족" in msg
+
+
+def test_defect_scrap_with_insufficient_quarantine_rejected(db_session, client, make_item):
+    """격리 3개 상태에서 5개 폐기 요청 → 422."""
+    item = make_item(name="GUARD-B", process_type_code="TR", warehouse_qty=Decimal("10"))
+    requester = _make_employee(db_session, code="EG2", name="가드테스터2")
+    db_session.commit()
+
+    client.post("/api/defects/quarantine", json={
+        "item_id": str(item.item_id),
+        "qty": "3",
+        "source": "warehouse",
+        "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "reason_category": "외관불량",
+        "reason_memo": "",
+        "actor_employee_id": str(requester.employee_id),
+    })
+
+    res = client.post("/api/stock-requests", json={
+        "requester_employee_id": str(requester.employee_id),
+        "request_type": "defect_scrap",
+        "lines": [{
+            "item_id": str(item.item_id),
+            "quantity": "5",
+            "from_bucket": "defective",
+            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "to_bucket": "none",
+        }],
+        "notes": "초과 폐기 시도",
+    })
+    assert res.status_code == 422, res.json()
+
+
+# ---------------------------------------------------------------------------
+# DRAFT 경로 — reason_category / reason_memo 보존
+# ---------------------------------------------------------------------------
+
+
+def test_draft_upsert_preserves_reason_category(db_session, client, make_item):
+    """DRAFT upsert 페이로드의 reason_category / reason_memo 가 DB 에 저장된다.
+
+    이전엔 스키마/라우터/서비스 모두 두 필드를 무시 → NULL 저장 → 결재 단계에서 사유 손실.
+    """
+    item = make_item(name="DRAFTREASON", process_type_code="TR", warehouse_qty=Decimal("5"))
+    requester = _make_employee(db_session, code="EDR", name="드래프트테스터")
+    # 격리 먼저 (가드를 통과시키기 위함)
+    client.post("/api/defects/quarantine", json={
+        "item_id": str(item.item_id),
+        "qty": "2",
+        "source": "warehouse",
+        "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "reason_category": "외관불량",
+        "reason_memo": "",
+        "actor_employee_id": str(requester.employee_id),
+    })
+    db_session.commit()
+
+    res = client.put("/api/stock-requests/draft", json={
+        "requester_employee_id": str(requester.employee_id),
+        "request_type": "defect_scrap",
+        "reason_category": "기타",
+        "reason_memo": "장바구니 단계 사유",
+        "lines": [{
+            "item_id": str(item.item_id),
+            "quantity": "2",
+            "from_bucket": "defective",
+            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "to_bucket": "none",
+        }],
+    })
+    assert res.status_code == 200, res.json()
+
+    db_session.expire_all()
+    draft = db_session.query(StockRequest).filter(
+        StockRequest.requester_employee_id == requester.employee_id,
+        StockRequest.request_type == StockRequestTypeEnum.DEFECT_SCRAP,
+        StockRequest.status == StockRequestStatusEnum.DRAFT,
+    ).first()
+    assert draft is not None
+    assert draft.reason_category == "기타"
+    assert draft.reason_memo == "장바구니 단계 사유"
