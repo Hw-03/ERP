@@ -20,6 +20,7 @@ import { useIoPreview } from "./useIoPreview";
 import { useIoSubmit } from "./useIoSubmit";
 import { useIoWorkState, type IoStep } from "./useIoWorkState";
 import type { IoComposeViewProps } from "./types";
+import { DefectHubPanel } from "../_defect_hub/DefectHubPanel";
 
 function locationQuantity(item: Item, department: string | null | undefined, status: "PRODUCTION" | "DEFECTIVE") {
   if (!department) return 0;
@@ -97,6 +98,8 @@ export function IoComposeView({
   defaultWorkType,
   onStatusChange,
   onSubmitSuccess,
+  defectDeptFilter,
+  currentEmployee,
 }: IoComposeViewProps) {
   const [employeeId, setEmployeeId] = useState(operator?.employee_id ?? "");
   const [search, setSearch] = useState(globalSearch);
@@ -329,6 +332,21 @@ export function IoComposeView({
     setError(null);
     state.goTo(2);
   }
+
+  // 대시보드 빨간 [불량 N] 클릭으로 진입한 경우 (?defect_dept=X) 마운트 시 자동으로
+  // 워크타입 "defect" 선택 + Step 2 로 진입. 1회만 실행.
+  const defectAutoAppliedRef = useRef(false);
+  useEffect(() => {
+    if (
+      defectDeptFilter
+      && !defectAutoAppliedRef.current
+      && state.workType !== "defect"
+    ) {
+      defectAutoAppliedRef.current = true;
+      handleWorkTypeChange("defect");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defectDeptFilter]);
 
   async function handleSubmit() {
     if (!employeeId) {
@@ -615,46 +633,73 @@ export function IoComposeView({
           ref={(el) => { stepRefs.current[2] = el; }}
           className={stepWrapperClass(2)}
         >
-          <WizardStepCard
-            n={2}
-            title="세부 작업과 부서 선택"
-            state={stepState(2)}
-            summary={stepTwoSummary}
-            onChange={() => state.goTo(2)}
-            accent={accent}
-            fill={step === 2}
-          >
-            <div className="flex h-full min-h-0 flex-col">
-              <div className="min-h-0 flex-1">
-                <IoSubTypeStep
-                  workType={state.workType}
-                  subType={state.subType}
-                  fromDepartment={state.fromDepartment}
-                  toDepartment={state.toDepartment}
-                  deptIoDirection={state.deptIoDirection}
-                  onSubTypeChange={handleSubTypeChange}
-                  onFromDepartmentChange={changeFromDepartment}
-                  onToDepartmentChange={changeToDepartment}
-                  onDeptIoDirectionChange={(dir) => {
-                    const had = state.bundles.length > 0;
-                    state.setDeptIoDirection(dir);
-                    if (had) onStatusChange("방향 변경으로 작업 묶음을 초기화했습니다.");
+          {state.workType === "defect" ? (
+            <WizardStepCard
+              n={2}
+              title="불량 처리"
+              state={stepState(2)}
+              summary="격리 · 폐기 · 반품 · 분해"
+              onChange={() => state.goTo(2)}
+              accent={LEGACY_COLORS.red}
+              fill
+            >
+              {currentEmployee ? (
+                <DefectHubPanel
+                  defectDeptFilter={defectDeptFilter}
+                  currentEmployee={{
+                    employee_id: currentEmployee.employee_id,
+                    name: currentEmployee.name,
+                    department: currentEmployee.department,
                   }}
                 />
+              ) : (
+                <div className="p-6 text-center" style={{ color: LEGACY_COLORS.muted2 }}>
+                  로그인 정보가 필요합니다.
+                </div>
+              )}
+            </WizardStepCard>
+          ) : (
+            <WizardStepCard
+              n={2}
+              title="세부 작업과 부서 선택"
+              state={stepState(2)}
+              summary={stepTwoSummary}
+              onChange={() => state.goTo(2)}
+              accent={accent}
+              fill={step === 2}
+            >
+              <div className="flex h-full min-h-0 flex-col">
+                <div className="min-h-0 flex-1">
+                  <IoSubTypeStep
+                    workType={state.workType}
+                    subType={state.subType}
+                    fromDepartment={state.fromDepartment}
+                    toDepartment={state.toDepartment}
+                    deptIoDirection={state.deptIoDirection}
+                    onSubTypeChange={handleSubTypeChange}
+                    onFromDepartmentChange={changeFromDepartment}
+                    onToDepartmentChange={changeToDepartment}
+                    onDeptIoDirectionChange={(dir) => {
+                      const had = state.bundles.length > 0;
+                      state.setDeptIoDirection(dir);
+                      if (had) onStatusChange("방향 변경으로 작업 묶음을 초기화했습니다.");
+                    }}
+                  />
+                </div>
+                <div className="mt-auto pt-5">
+                  <button
+                    type="button"
+                    onClick={state.goNext}
+                    disabled={!state.canAdvance[2]}
+                    className="flex w-full items-center justify-center gap-2 rounded-[18px] px-7 py-5 text-lg font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
+                    style={{ background: accent }}
+                  >
+                    {state.canAdvance[2] ? "다음 단계로 →" : "세부 작업과 부서를 선택하세요"}
+                  </button>
+                </div>
               </div>
-              <div className="mt-auto pt-5">
-                <button
-                  type="button"
-                  onClick={state.goNext}
-                  disabled={!state.canAdvance[2]}
-                  className="flex w-full items-center justify-center gap-2 rounded-[18px] px-7 py-5 text-lg font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
-                  style={{ background: accent }}
-                >
-                  {state.canAdvance[2] ? "다음 단계로 →" : "세부 작업과 부서를 선택하세요"}
-                </button>
-              </div>
-            </div>
-          </WizardStepCard>
+            </WizardStepCard>
+          )}
         </div>
       )}
 

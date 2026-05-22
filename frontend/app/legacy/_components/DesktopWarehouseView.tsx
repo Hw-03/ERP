@@ -164,6 +164,8 @@ export function DesktopWarehouseView({
               setPanelRefreshNonce((n) => n + 1);
               onSubmitSuccess?.();
             }}
+            defectDeptFilter={defectDeptFilter}
+            currentEmployee={operator ?? undefined}
           />
         )}
       </div>
