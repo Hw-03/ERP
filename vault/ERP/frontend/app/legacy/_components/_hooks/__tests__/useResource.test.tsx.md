@@ -1,43 +1,43 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "frontend/app/legacy/_components/_hooks/__tests__/useResource.test.tsx"
+importance: important
 layer: frontend
-source_path: erp/frontend/app/legacy/_components/_hooks/__tests__/useResource.test.tsx
-status: active
-updated: 2026-04-27
-source_sha: 3548fa88f5d7
-tags:
-  - erp
-  - frontend
-  - test
-  - tsx
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# useResource.test.tsx
+# useResource.test.tsx — useResource.test.tsx 설명
 
-> [!summary] 역할
-> 현재 ERP 동작을 회귀 없이 유지하기 위한 자동 테스트 파일이다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`useResource.test.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
 
-- Source: `frontend/app/legacy/_components/_hooks/__tests__/useResource.test.tsx`
-- Layer: `frontend`
-- Kind: `test`
-- Size: `1832` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-- Parent hub: [[frontend/app/legacy/_components/_hooks/__tests__/__tests__|frontend/app/legacy/_components/_hooks/__tests__]]
-- Related: [[frontend/frontend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 기능 변경 후 같은 영역 테스트를 먼저 확인한다.
-- 테스트가 문서보다 최신 동작을 더 정확히 말해줄 때가 많다.
+## 중요한 내용
 
-## 원본 발췌
+자동으로 뽑을 수 있는 함수/클래스 목록은 적지만, 파일 위치와 확장자로 볼 때 위 역할을 맡습니다.
 
-````tsx
+## 연결되는 파일
+
+- [[ERP/frontend/app/legacy/_components/_hooks/__tests__/📁___tests__]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
+
+## 핵심 발췌
+
+```tsx
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useResource } from "../useResource";
@@ -73,6 +73,12 @@ describe("useResource", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(fetcher).toHaveBeenCalledTimes(1);
 
-# ... (이하 8줄 생략. 원본 참조)
-
-````
+    fetcher.mockResolvedValueOnce({ v: 2 });
+    await act(async () => {
+      await result.current.reload();
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(result.current.data).toEqual({ v: 2 });
+  });
+});
+```

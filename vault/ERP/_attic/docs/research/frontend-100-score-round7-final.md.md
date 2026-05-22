@@ -1,23 +1,54 @@
 ---
-type: code-note
+type: file-explanation
+source_path: "_attic/docs/research/frontend-100-score-round7-final.md"
+importance: reference
+layer: archive
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
-layer: attic
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/_attic/docs/research/frontend-100-score-round7-final.md
-tags: [vault, code-note, auto-generated, stub, mirror-fill]
 ---
 
-# frontend-100-score-round7-final.md
+# frontend-100-score-round7-final.md — frontend-100-score-round7-final.md 설명
 
-> [!info] 1:1 미러 stub
-> 탐색기에 보이는 폴더 구조를 vault 에 그대로 반영하기 위한 stub.
-> 원본: [[erp/_attic/docs/research/frontend-100-score-round7-final.md]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄 (또는 메타)
+`frontend-100-score-round7-final.md`는 현재 운영 코드가 아니라 과거 자료나 실험 결과를 보관한 참고 파일입니다.
 
-```
+## 업무 흐름에서의 의미
+
+과거 맥락을 이해하는 데 도움은 되지만, 현재 운영 기준으로 바로 사용하면 안 됩니다.
+
+## 언제 보면 좋나
+
+- 과거 자료의 의미를 확인할 때
+- 현재 코드와 비교할 참고 근거가 필요할 때
+
+## 중요한 내용
+
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
+
+- `프론트엔드 100점 — Round-7 최종 점수표 (90점대 진입) — 2025-04-30`
+- `1. 점수 변화 (90점대 진입)`
+- `80점대 항목 4개 → 모두 90점대 ✅`
+- `거대 컴포넌트 (유일하게 60점대)`
+- `2. Round-7 산출물 (8건)`
+- `3. 가장 큰 개선`
+- `Feature boundary 82 → 90 (+8)`
+- `Type layer 85 → 92 (+7)`
+- `custom hook 82 → 90 (+8)`
+- `테스트성 84 → 92 (+8)`
+
+## 연결되는 파일
+
+- [[ERP/_attic/docs/research/📁_research]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+보관 자료입니다. 현재 코드처럼 믿고 수정하거나 실행하지 않습니다.
+
+## 핵심 발췌
+
+```md
 # 프론트엔드 100점 — Round-7 최종 점수표 (90점대 진입) — 2025-04-30
 
 > **작업 ID:** R7-12
@@ -43,4 +74,34 @@ tags: [vault, code-note, auto-generated, stub, mirror-fill]
 | AI 인계 | 98 | 98 | 0 | — |
 | **합산** | **957** | **995** | **+38** | |
 | **% (1100)** | **87** | **90** | **+3** | |
+
+### 80점대 항목 4개 → 모두 90점대 ✅
+
+| 항목 | 이전 | 현재 |
+|---|---|---|
+| Feature boundary | 82 | **90** ✅ |
+| Type layer | 85 | **92** ✅ |
+| custom hook | 82 | **90** ✅ |
+| 테스트성 | 84 | **92** ✅ |
+
+### 거대 컴포넌트 (유일하게 60점대)
+
+55 → 62 (+7). hook 추출로 일부 상승. Round-8 에서 본격 분해.
+
+---
+
+## 2. Round-7 산출물 (8건)
+
+| ID | 작업 | 결과 | 커밋 |
+|---|---|---|---|
+| R7-T | API types 도메인별 분리 (10 파일) | ✅ | `c345de9` |
+| R7-TEST1 | items/employees/inventory API 단위 테스트 (20 케이스) | ✅ | `2ff81ba` |
+| R7-TEST2 | mes/transaction + mes/color 단위 테스트 (9 케이스) | ✅ | `56293f7` |
+| R7-FEATURE1 | ConfirmModal 본문 → features/mes/shared | ✅ | `a513e46` |
+| R7-FEATURE2 | BottomSheet 본문 → features/mes/shared | ✅ | `beeda11` |
+| R7-HOOK1 | useHistoryData hook 추출 (HistoryView) | ✅ | `a3eb7ea` |
+| R7-HOOK2 | useInventoryData hook 추출 (InventoryView) | ✅ | `1ae935c` |
+| R7-12 | 점수표 (본 문서) | ✅ |
+
+---
 ```

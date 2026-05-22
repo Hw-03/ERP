@@ -1,132 +1,91 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "backend/app/routers/inventory/__init__.py"
+importance: important
 layer: backend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/backend/app/routers/inventory/__init__.py
-tags: [vault, code-note, backend, router]
-aliases: [inventory 패키지 진입점]
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# 📦 __init__.py — inventory 라우터 패키지 진입점
+# __init__.py — __init__.py 설명
 
-> [!summary] 역할
-> `inventory` 패키지를 FastAPI 라우터로 노출하는 진입점.  
-> Phase 4 에서 807줄짜리 단일 파일을 책임 단위로 분할한 결과물이다.  
-> **핵심**: `GET ""` (전체 목록) 엔드포인트가 이 파일에 직접 정의된 이유는 FastAPI 가 빈 prefix + 빈 path 조합으로 `include_router` 를 거부하기 때문이다.
+## 이 파일은 무엇을 책임지나
 
-#layer/backend #topic/router #topic/inventory
+`__init__.py`는 재고 업무 API 중 한 영역을 맡는 Python 코드입니다. 화면에서 들어온 요청을 검증하고 실제 재고 서비스로 넘기는 관문입니다.
 
----
+## 업무 흐름에서의 의미
 
-## 1. 역할
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
 
-- 서브 라우터 7개를 올바른 순서로 include
-- `GET /inventory` (빈 path) 목록 조회를 직접 소유
-- `from app.routers import inventory` + `app.include_router(inventory.router, prefix="/inventory")` 호환 인터페이스 제공
+## 언제 보면 좋나
 
-## 2. 원본 위치
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-```
-erp/backend/app/routers/inventory/__init__.py
-```
+## 중요한 내용
 
-- Layer: backend / router
-- Phase 4 분할 전 원본: `erp/backend/app/routers/inventory.py` (807줄)
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-## 3. import
+- `list_inventory`
+- `API GET ""`
 
-| 모듈 | 용도 |
-|------|------|
-| `fastapi.APIRouter, Depends, Query` | 라우터·의존성 |
-| `sqlalchemy.orm.Session` | DB 세션 |
-| `app.database.get_db` | DB 세션 DI |
-| `app.models.Inventory, Item` | ORM 모델 |
-| `app.schemas.InventoryResponse` | 응답 스키마 |
-| `._shared.to_response_bulk` | N+1 제거 bulk 응답 조립 |
-| 서브 모듈 7개 | defective, query, receive, supplier, transactions, transfer, weekly_report |
+## 연결되는 파일
 
-## 4. export (endpoint 목록)
+### 먼저 같이 볼 파일
+- [[ERP/backend/app/services/inventory.py]] — 입고, 출고, 부서 이동, 불량 처리처럼 실제 재고 숫자를 바꾸는 업무 규칙을 담은 핵심 파일입니다.
+- [[ERP/backend/app/services/stock_math.py]] — 여러 재고 숫자를 일관된 방식으로 계산하고 검증하기 위한 보조 함수입니다.
+- [[ERP/backend/app/models.py]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 파일입니다.
+- [[ERP/frontend/lib/api/inventory.ts]] — `inventory.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
 
-| Method | Path | 설명 |
-|--------|------|------|
-| GET | `/inventory` | 전체 재고 목록 (process_type_code 필터, skip/limit) |
+## 조심할 점
 
-> [!note] 나머지 endpoint 는 서브 모듈이 소유. include 순서가 중요하다.
+API 응답 형식이나 상태 코드를 바꾸면 프론트 화면과 자동 테스트가 같이 영향을 받습니다.
 
-## 5. 참조처
-
-- `erp/backend/app/main.py` → `app.include_router(inventory.router, prefix="/inventory")`
-- 프론트엔드: `frontend/src/api/inventory.ts` (GET /inventory)
-
-## 6. 업무 흐름
-
-```mermaid
-flowchart LR
-    main[main.py] -->|include_router prefix=/inventory| PKG[inventory.__init__]
-    PKG -->|include_router| TXN[transactions.router]
-    PKG -->|include_router| QRY[query.router]
-    PKG -->|include_router| WKR[weekly_report.router]
-    PKG -->|include_router| RCV[receive.router]
-    PKG -->|include_router| TRF[transfer.router]
-    PKG -->|include_router| DEF[defective.router]
-    PKG -->|include_router| SUP[supplier.router]
-    PKG -->|GET ""| LIST[목록 응답]
-```
-
-> [!warning] 등록 순서 주의
-> `/transactions/*`, `/summary`, `/locations/...` 같은 **정적 경로**를 동적 catch-all(`""`) 보다 먼저 등록해야 한다.  
-> `transactions.router` → `query.router` 가 먼저, `GET ""` 는 마지막.
-
-## 7. 핵심 함수
-
-### `list_inventory`
+## 핵심 발췌
 
 ```python
-@router.get("", response_model=List[InventoryResponse])
-def list_inventory(
-    process_type_code: Optional[str] = Query(None, max_length=2),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=2000),
-    db: Session = Depends(get_db),
-):
-    q = db.query(Inventory).join(Item, Inventory.item_id == Item.item_id)
-    if process_type_code:
-        q = q.filter(Item.process_type_code == process_type_code)
+"""inventory 라우터 패키지.
 
-    rows = q.order_by(Item.item_code).offset(skip).limit(limit).all()
-    return to_response_bulk(db, rows)
-```
+Phase 4 에서 단일 파일(routers/inventory.py 807줄)을 책임 단위로 분할.
+`from app.routers import inventory` + `app.include_router(inventory.router, ...)` 호환.
 
-- `to_response_bulk` 호출로 N+1 없이 bulk 응답 조립
-- 정렬: `item_code` asc
-- 최대 2000건
+서브 모듈:
+- query        — /summary, /locations/{item_id}
+- receive      — /receive, /adjust
+- transfer     — /transfer-to-production, /transfer-to-warehouse, /transfer-between-depts
+- defective    — /mark-defective
+- supplier     — /return-to-supplier
+- transactions — /transactions, /transactions/export.csv|.xlsx, PUT /transactions/{log_id}
 
-## 8. 위험 포인트
+GET "" (목록) 은 FastAPI include_router 가 빈 prefix + 빈 path 를 거부하므로
+이 파일에 직접 정의한다.
+"""
 
-> [!danger] 라우터 등록 순서 오류
-> `GET ""` 를 `include_router(transactions.router)` 보다 **먼저** 두면 `/transactions` 경로가 item_id UUID 로 해석되어 404 발생.  
-> 현재 코드는 올바른 순서이지만, 서브 모듈 추가 시 순서를 반드시 확인하라.
+from typing import List, Optional
 
-> [!warning] `weekly_report` 미문서화
-> 서브 모듈 import 목록에 `weekly_report` 가 있으나 docstring 에는 누락되어 있다. 실수로 제거하지 말 것.
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 
-## 9. 죽은 코드 의심
+from app.database import get_db
+from app.models import Inventory, Item
+from app.schemas import InventoryResponse
 
-- 없음 (진입점 파일이라 최소한의 코드만 있음)
+from . import (
+    defective,
+    query,
+    receive,
+    supplier,
+    transactions,
+    transfer,
+    weekly_report,
+)
+from ._shared import to_response_bulk
 
-## 10. 수정 전 체크
 
-- [ ] 새 서브 모듈 추가 시: `include_router` 순서 확인 (정적 경로 먼저)
-- [ ] `GET ""` 경로 변경 불가 — `main.py` prefix 와 맞물림
-- [ ] `__all__ = ["router"]` 유지 — 외부 import 규약
+router = APIRouter()
 
-## 11. 코드 발췌
-
-```python
-# 정적 경로를 동적 catch-all("") 보다 먼저 등록
+# 정적 경로(/transactions/*, /summary, /locations/...)를 동적 catch-all("") 보다 먼저 등록.
 router.include_router(transactions.router)
 router.include_router(query.router)
 router.include_router(weekly_report.router)
@@ -135,27 +94,10 @@ router.include_router(transfer.router)
 router.include_router(defective.router)
 router.include_router(supplier.router)
 
+
 @router.get("", response_model=List[InventoryResponse])
 def list_inventory(
     process_type_code: Optional[str] = Query(None, max_length=2),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=2000),
-    db: Session = Depends(get_db),
-):
-    q = db.query(Inventory).join(Item, Inventory.item_id == Item.item_id)
-    if process_type_code:
-        q = q.filter(Item.process_type_code == process_type_code)
-    rows = q.order_by(Item.item_code).offset(skip).limit(limit).all()
-    return to_response_bulk(db, rows)
 ```
-
----
-
-## 관련 노트
-
-- [[_inventory]] — inventory 패키지 허브
-- [[_shared.py]] — to_response_bulk 구현
-- [[transactions.py]] — 가장 큰 서브 모듈 (7 endpoints)
-- [[query.py]] — /summary, /locations
-
-Up: [[_inventory]]

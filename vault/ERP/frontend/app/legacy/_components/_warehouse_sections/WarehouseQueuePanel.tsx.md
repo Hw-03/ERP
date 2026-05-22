@@ -1,155 +1,104 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "frontend/app/legacy/_components/_warehouse_sections/WarehouseQueuePanel.tsx"
+importance: important
 layer: frontend
-source_path: erp/frontend/app/legacy/_components/_warehouse_sections/WarehouseQueuePanel.tsx
-status: active
-updated: 2026-05-21
-tags:
-  - layer/frontend
-  - topic/warehouse
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# WarehouseQueuePanel.tsx
+# WarehouseQueuePanel.tsx — WarehouseQueuePanel.tsx 설명
 
-> [!summary] 역할
-> **창고 승인함 패널.** 창고 담당자(정/부)가 보는 결재 대기 목록. 각 요청에 대해 PIN 입력 후 승인 또는 반려 사유 + PIN 입력 후 반려를 처리한다.
+## 이 파일은 무엇을 책임지나
 
----
+`WarehouseQueuePanel.tsx`는 입출고 요청 작성, 작업중 목록, 내 요청, 창고 승인함 같은 창고 업무 화면의 일부입니다.
 
-## 1. 위치
+## 업무 흐름에서의 의미
 
-```
-erp/frontend/app/legacy/_components/_warehouse_sections/WarehouseQueuePanel.tsx
-```
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-**부모**: `DesktopWarehouseView.tsx` (queue 탭 활성 시, `showQueue === true`인 경우만)
+## 언제 보면 좋나
 
----
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-## 2. 역할 한 줄 요약
+## 중요한 내용
 
-`api.listWarehouseQueue()`로 결재 대기 `StockRequest` 목록을 가져와 `WarehouseQueueRow`로 렌더링. 승인/반려는 PIN 기반 인증 처리.
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
----
+- `WarehouseQueuePanel`
+- `StockRequest`
+- `Props`
 
-## 3. Props
+## 연결되는 파일
 
-| prop | 타입 | 설명 |
-|---|---|---|
-| `approverEmployeeId` | `string` | 결재자(창고 담당자)의 employee_id |
-| `refreshNonce` | `number` | 외부 증가 시 목록 재조회 |
-| `onChanged` | `() => void` | 승인/반려 완료 후 부모 알림 |
+### 먼저 같이 볼 파일
+- [[ERP/frontend/app/legacy/_components/DesktopWarehouseView.tsx]] — `DesktopWarehouseView.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+- [[ERP/frontend/lib/api/stock-requests.ts]] — `stock-requests.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
+- [[ERP/backend/app/routers/stock_requests.py]] — 프론트의 입출고 요청 작성, 내 요청, 창고 승인함이 호출하는 API 입구입니다.
+- [[ERP/backend/app/services/stock_requests.py]] — 현장 담당자가 요청을 제출하고 창고가 승인/반려/취소하는 흐름을 처리하는 서비스입니다.
 
----
+## 조심할 점
 
-## 4. 상태 관리
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
 
-| 상태 | 용도 |
-|---|---|
-| `items` | 결재 대기 StockRequest 목록 |
-| `loading` / `error` | 로딩·에러 표시 |
-| `busyId` | 처리 중인 request_id (버튼 중복 방지) |
-| `approvePinFor` | PIN 입력 인라인 UI를 열 대상 request_id |
-| `approvePin` / `approveError` | 승인 PIN 입력값·에러 |
-| `showRejectFor` | 반려 UI를 열 대상 request_id |
-| `rejectReason` / `rejectPin` / `rejectError` | 반려 사유·PIN·에러 |
-
----
-
-## 5. 흐름
-
-```mermaid
-sequenceDiagram
-    participant U as 창고 담당자
-    participant P as WarehouseQueuePanel
-    participant A as API
-
-    A-->>P: listWarehouseQueue() → items[]
-    U->>P: 승인 버튼 클릭
-    P->>U: PIN 입력 UI 열기 (approvePinFor 설정)
-    U->>P: PIN 입력 후 확인
-    P->>A: approveStockRequest(requestId, {actor_employee_id, pin})
-    A-->>P: 성공 응답
-    P->>P: reload() + onChanged()
-```
-
----
-
-## 6. 코드 발췌 — 승인/반려 API 호출
+## 핵심 발췌
 
 ```tsx
-const submitApprove = async (requestId: string) => {
-  if (!approvePin) return;
-  setBusyId(requestId);
-  try {
-    await api.approveStockRequest(requestId, {
-      actor_employee_id: approverEmployeeId,
-      pin: approvePin,
-    });
-    closeApprove();
-    await reload();
-    onChanged();
-  } catch (err) {
-    if (err instanceof ApiError && err.isConflict) {
-      setApproveError("이미 처리된 요청입니다.");
-    } else if (err instanceof ApiError && err.isUnavailable) {
-      setApproveError("서버 과부하 — 잠시 후 다시 시도하세요.");
-    } else {
-      setApproveError(err instanceof Error ? err.message : "승인에 실패했습니다.");
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { api, type StockRequest } from "@/lib/api";
+import { ApiError } from "@/lib/api-core";
+import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
+import { WarehouseQueueRow } from "./WarehouseQueueRow";
+
+interface Props {
+  approverEmployeeId: string;
+  refreshNonce: number;
+  onChanged: () => void;
+}
+
+export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChanged }: Props) {
+  const [items, setItems] = useState<StockRequest[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [showRejectFor, setShowRejectFor] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectPin, setRejectPin] = useState("");
+  const [rejectError, setRejectError] = useState<string | null>(null);
+  const [approvePinFor, setApprovePinFor] = useState<string | null>(null);
+  const [approvePin, setApprovePin] = useState("");
+  const [approveError, setApproveError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const rows = await api.listWarehouseQueue();
+      setItems(rows);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "승인함을 불러오지 못했습니다.");
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    setBusyId(null);
-  }
-};
+  }, []);
 
-const submitReject = async (requestId: string) => {
-  if (!rejectPin || !rejectReason.trim()) {
-    setRejectError("PIN과 반려 사유를 모두 입력해 주세요.");
-    return;
-  }
-  // ... api.rejectStockRequest 호출
-};
+  useEffect(() => {
+    void reload();
+  }, [reload, refreshNonce]);
+
+  const closeApprove = () => {
+    setApprovePinFor(null);
+    setApprovePin("");
+    setApproveError(null);
+  };
+  const closeReject = () => {
+    setShowRejectFor(null);
+    setRejectReason("");
+    setRejectPin("");
+    setRejectError(null);
+  };
 ```
-
----
-
-## 7. 에러 처리
-
-| HTTP 상태 | 처리 |
-|---|---|
-| 409 Conflict | "이미 처리된 요청입니다." (동시 결재 방지) |
-| 503 Unavailable | "서버 과부하 — 잠시 후 다시 시도하세요." |
-| 그 외 | 에러 메시지 직접 표시 |
-
----
-
-## 8. 빈 상태
-
-결재 대기 목록이 없으면: "승인 대기 중인 요청이 없습니다." EmptyState 표시.
-
----
-
-## 9. `WarehouseQueueRow`에 전달하는 상태
-
-이 패널은 상태를 들고, 실제 UI 렌더링은 `WarehouseQueueRow`에 위임한다. PIN 입력 인라인 UI·에러 메시지·버튼 상태가 모두 row 단위로 관리된다.
-
----
-
-## 10. 연결 관계
-
-- **부모**: `erp/frontend/app/legacy/_components/DesktopWarehouseView.tsx`
-- **자식**: `erp/frontend/app/legacy/_components/_warehouse_sections/WarehouseQueueRow.tsx`
-- **API**: `api.listWarehouseQueue`, `api.approveStockRequest`, `api.rejectStockRequest`
-- **에러 타입**: `@/lib/api-core` (`ApiError`)
-
----
-
-## 11. 참고 맥락
-
-> [!note] 참고
-> 창고 담당자만 볼 수 있는 승인함이다. 부서에서 자재를 요청하면 여기로 들어온다.
->
-> 승인·반려 모두 PIN이 필요한 이유: 누군가 창고 담당자 PC에 앉아 있어도 본인인지 확인하기 위한 이중 인증이다.
->
-> 반려 시 "사유"도 필수인 이유: 요청자가 왜 거절됐는지 알아야 재요청을 올바르게 할 수 있기 때문이다.

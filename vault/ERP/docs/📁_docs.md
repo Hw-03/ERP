@@ -1,55 +1,42 @@
 ---
-type: index
-project: ERP
+type: folder-note
+source_path: "docs"
+importance: important
 layer: docs
-source_path: erp/docs/
-status: active
-updated: 2026-05-21
-tags:
-  - erp
-  - docs
-  - index
-aliases:
-  - "docs"
-  - "docs.md"
+graph: hub
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# docs
+# 📁 docs
 
-> [!summary] 역할
-> 현재 개발과 운영 판단에 필요한 기준 문서가 모인 폴더다.
+## 이 폴더는 무엇을 위한 곳인가
 
-## 원본 위치
+사용법, 운영법, 구조 설명, 설계 기준을 담은 원본 문서 폴더입니다.
 
-- Source: `docs/`
-- File count: `92`
+## 현장 업무와의 관계
 
-## 하위 허브
+현장 사용자 안내, 운영 체크리스트, 개발 구조 설명의 근거가 됩니다.
 
-- [[docs/design/design|design]]
-- [[docs/regression-2026-04-26/regression-2026-04-26|regression-2026-04-26]]
-- [[docs/research/research|research]]
+## 언제 보면 좋나
 
-## 파일 노트
+- 기능 사용법이나 운영 절차를 확인할 때
+- 새 작업 전 기존 기준을 찾아볼 때
 
-- [[docs/AI_HANDOVER.md|AI_HANDOVER.md]]
-- [[docs/API_CHANGELOG.md|API_CHANGELOG.md]]
-- [[docs/ARCHITECTURE.md|ARCHITECTURE.md]]
-- [[docs/BACKEND_REFACTOR_PLAN.md|BACKEND_REFACTOR_PLAN.md]]
-- [[docs/CODEX_PROGRESS.md|CODEX_PROGRESS.md]]
-- [[docs/ERD.md|ERD.md]]
-- [[docs/FRONTEND_HOOKS_PLAN.md|FRONTEND_HOOKS_PLAN.md]]
-- [[docs/GLOSSARY.md|GLOSSARY.md]]
-- [[docs/ITEM_CODE_RULES.md|ITEM_CODE_RULES.md]]
-- [[docs/MOBILE_SCAN_TESTING.md|MOBILE_SCAN_TESTING.md]]
-- [[docs/ONBOARDING.md|ONBOARDING.md]]
-- [[docs/OPERATIONS.md|OPERATIONS.md]]
-- [[docs/README.md|README.md]]
-- [[docs/USER_GUIDE.md|USER_GUIDE.md]]
+## 주요 하위 폴더
 
-## 읽는 팁
+- [[ERP/docs/operations/📁_operations]] — `docs/operations` 폴더의 역할을 설명하는 안내판입니다.
 
-- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
-- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
+## 먼저 볼 파일 5개
 
-Up: [[ERP]]
+- [[ERP/docs/OPERATIONS.md]] — `OPERATIONS.md`는 프로젝트 기준이나 운영 방법을 설명하는 원본 문서입니다.
+- [[ERP/docs/defect-handling-for-operators.txt]] — `defect-handling-for-operators.txt`는 프로젝트 기준이나 운영 방법을 설명하는 원본 문서입니다.
+- [[ERP/docs/defect-handling-redesign.md]] — `defect-handling-redesign.md`는 프로젝트 기준이나 운영 방법을 설명하는 원본 문서입니다.
+
+## 조심할 점
+
+문서가 코드보다 늦게 갱신될 수 있습니다. 최종 판단은 실제 코드와 테스트 결과를 우선합니다.
+
+## 다음에 볼 위치
+
+- 상위 폴더: [[ERP/📁_ERP]]

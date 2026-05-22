@@ -1,94 +1,107 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "README.md"
+importance: important
 layer: meta
-status: active
-created: 2026-04-27
-updated: 2026-05-21
-tags:
-  - vault
-  - meta
-  - root
-  - mirror
-  - layer/meta
-  - topic/root
-aliases:
-  - README 미러
-  - 루트 README 인수인계
-source_path: erp/README.md
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# README.md (코드 미러)
+# README.md — 프로젝트 공식 소개와 실행 안내
 
-> [!summary] 역할
-> 이 노트는 `erp/README.md` 를 빠르게 참고할 수 있게 정리한 **분석 지도**다. 코드 사본이 아니다.
+## 이 파일은 무엇을 책임지나
 
-> [!warning] 원본 위치
-> 실제 수정은 원본에서만 한다.
-> - 원본: `erp/README.md`
-> - 이 미러: `erp/vault/README.md.md`
+이 문서는 DEXCOWIN MES가 무엇인지, 어떻게 실행하는지, 어떤 폴더를 먼저 봐야 하는지 알려주는 공식 입구입니다.
 
----
+## 업무 흐름에서의 의미
 
-## 원본 핵심 요약
+새 담당자나 운영자가 프로젝트 전체 방향을 가장 빠르게 확인할 때 읽는 문서입니다.
 
-> [!info] DEXCOWIN MES 한 줄
-> DEXCOWIN 의 품목, 재고, BOM, 입출고를 관리하는 경량 MES 프로토타입.
+## 언제 보면 좋나
 
-### 현재 기준 (원본 발췌)
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 기준 품목 수: **722건**
-- 백엔드: FastAPI + SQLAlchemy + SQLite (`erp/backend/mes.db`)
+## 중요한 내용
+
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
+
+- `DEXCOWIN MES`
+- `현재 기준`
+- `빠른 시작 (Windows · 권장)`
+- `수동 실행`
+- `운영 보조 스크립트`
+- `품목코드 핵심 규칙`
+- `한눈에 보는 폴더 구조`
+- `문서 허브`
+- `검증`
+- `5게이트 일괄 검증 (commit 전 권장)`
+
+## 연결되는 파일
+
+- [[ERP/📁_ERP]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+README가 오래되면 새 사람이 잘못된 실행법을 따라갈 수 있습니다. 큰 구조가 바뀌면 같이 갱신해야 합니다.
+
+## 핵심 발췌
+
+```md
+# DEXCOWIN MES
+
+DEXCOWIN의 품목, 재고, BOM, 입출고를 관리하는 경량 MES 프로토타입.
+
+**현재 안정성 점수**: ~96/100 (Round-10A 완료, 2026-05-02). 세부 추적: [docs/CODEX_PROGRESS.md](docs/CODEX_PROGRESS.md)
+
+## 현재 기준
+
+- 기준 품목 수: 722건
+- 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/mes.db`)
 - 프론트엔드: Next.js 14 + Tailwind CSS
-- 주 사용 화면: `/legacy` (대시보드 / 입출고 / 입출고 내역 / 관리자)
-- 안정성 점수: ~96/100 (Round-10A, 2026-05-02)
+- 주 사용 화면: `/legacy` (데스크톱 셸: 대시보드 / 입출고 / 입출고 내역 / 관리자)
+- 품목코드 기준 문서: `docs/ITEM_CODE_RULES.md`
 
-### 빠른 시작 (Windows)
+## 빠른 시작 (Windows · 권장)
 
-> [!tip] 한 번에 띄우기
-> 루트의 `erp/start.bat` 실행만으로 백엔드·프론트가 함께 뜨고 LAN IP 브라우저가 자동 실행된다.
-> - 백엔드: `http://127.0.0.1:8010`
-> - 프론트: `http://<LAN IP>:3000`
+루트의 `start.bat` 한 번 실행으로 백엔드·프론트가 함께 뜨고 LAN IP 기준 브라우저가 자동 실행된다.
 
-수동 실행은 `erp/README.md` 의 "수동 실행" 절 참고.
-
-### 5게이트 검증 (커밋 전 필수)
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
+```bat
+start.bat
 ```
 
-backend pytest / frontend lint:strict / tsc / vitest+coverage / next build / OpenAPI drift 6개 게이트를 CI 와 동일 기준으로 검사.
+- 백엔드: `http://0.0.0.0:8010` (로컬 호출은 `http://127.0.0.1:8010`)
+- 프론트엔드: `http://<LAN IP>:3000` 또는 `http://localhost:3000`
+- 같은 사설망 안의 다른 PC에서도 `http://<LAN IP>:3000` 으로 접속 가능
 
----
+처음 실행 시 `npm install` 과 `pip install -r backend/requirements.txt` 가 자동 수행된다.
 
-## 문서 허브 (원본에서 링크되는 위치)
+## 수동 실행
 
-| 대상 | 문서 |
+백엔드:
+
+```bash
+cd backend
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload
+```
+
+프론트엔드:
+
+```bash
+cd frontend
+npm run dev
+```
+
+대표 접속:
+
+```text
+http://localhost:3000
+```
+
+## 운영 보조 스크립트
+
+| 스크립트 | 역할 |
 |---|---|
-| 현장 사용자 | `erp/docs/USER_GUIDE.md` |
-| 운영자 | `erp/docs/OPERATIONS.md` |
-| 개발자 (구조) | `erp/docs/ARCHITECTURE.md` |
-| 개발자 (ERD) | `erp/docs/ERD.md` |
-| 모두 (용어) | `erp/docs/GLOSSARY.md` |
-| 모두 (품목코드) | `erp/docs/ITEM_CODE_RULES.md` |
-| AI 협업자 | `erp/docs/AI_HANDOVER.md` |
-
-> [!tip] vault 안에서 같은 자료를 참고하려면
-> - 진입 안내: [[erp/_vault/guides/처음_읽는_사람]]
-> - 용어 모음: [[erp/_vault/guides/용어사전]]
-> - MOC: [[erp/_vault/guides/ERP_MOC]]
-
----
-
-## 미러의 본질
-
-> [!warning] 이건 코드 사본이 아니다
-> 원본 `erp/README.md` 의 일부 표·코드 블록은 의도적으로 옮기지 않는다. 이 노트는 **원본을 어디서 어떻게 읽을지** 안내하는 지도다. 사실 검증은 항상 원본을 본다.
-
-> [!quote] 코드가 정답
-> 미러와 원본이 다르면 원본을 따른다. 원본과 실제 코드가 다르면 **코드를 따른다**.
-
----
-
-Up: [[ERP]]
+| `scripts/ops/backup_db.bat` | `backend/mes.db` 를 `backend/_backup/mes_YYYYMMDD_HHMMSS.db` 로 복사 |
+```

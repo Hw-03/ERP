@@ -1,142 +1,106 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "frontend/app/legacy/_components/_warehouse_sections/DraftCartPanel.tsx"
+importance: important
 layer: frontend
-source_path: erp/frontend/app/legacy/_components/_warehouse_sections/DraftCartPanel.tsx
-status: active
-updated: 2026-05-21
-tags:
-  - layer/frontend
-  - topic/warehouse
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# DraftCartPanel.tsx
+# DraftCartPanel.tsx — DraftCartPanel.tsx 설명
 
-> [!summary] 역할
-> **창고 화면 "작업 중" 탭 패널.** 현재 작업자의 저장된 초안(draft) 목록을 불러와 목록으로 표시하고, 이어하기·삭제 기능을 제공한다. 레거시 `StockRequest` 초안과 입출고 2.0 `IoBatch` 초안 두 종류를 모두 처리한다.
+## 이 파일은 무엇을 책임지나
 
----
+`DraftCartPanel.tsx`는 입출고 요청 작성, 작업중 목록, 내 요청, 창고 승인함 같은 창고 업무 화면의 일부입니다.
 
-## 1. 위치
+## 업무 흐름에서의 의미
 
-```
-erp/frontend/app/legacy/_components/_warehouse_sections/DraftCartPanel.tsx
-```
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-**부모**: `DesktopWarehouseView.tsx` (cart 탭 활성 시 표시)
+## 언제 보면 좋나
 
----
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-## 2. 역할 한 줄 요약
+## 중요한 내용
 
-"저장했다가 나중에 이어하기" 기능의 목록 패널. 두 종류의 초안(레거시/2.0)을 병렬로 fetch해서 카드 목록으로 표시한다.
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
----
+- `DraftCartPanel`
+- `IoBatch`
+- `StockRequest`
+- `DeleteTarget`
+- `Props`
 
-## 3. Props
+## 연결되는 파일
 
-| prop | 타입 | 설명 |
-|---|---|---|
-| `employeeId` | `string \| null` | 현재 작업자 ID |
-| `refreshNonce` | `number` | 외부에서 증가시키면 목록 재조회 |
-| `onContinue` | `(draft: StockRequest) => void` | 레거시 초안 이어하기 |
-| `onContinueIo` | `(draft: IoBatch) => void` | 2.0 초안 이어하기 |
-| `onChanged` | `() => void` | 삭제 완료 후 부모에 알림 (배지 수 갱신) |
-| `onCountChange` | `(n: number) => void` | 초안 총 개수 → 부모 배지 업데이트 |
+### 먼저 같이 볼 파일
+- [[ERP/frontend/app/legacy/_components/DesktopWarehouseView.tsx]] — `DesktopWarehouseView.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+- [[ERP/frontend/lib/api/stock-requests.ts]] — `stock-requests.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
+- [[ERP/backend/app/routers/stock_requests.py]] — 프론트의 입출고 요청 작성, 내 요청, 창고 승인함이 호출하는 API 입구입니다.
+- [[ERP/backend/app/services/stock_requests.py]] — 현장 담당자가 요청을 제출하고 창고가 승인/반려/취소하는 흐름을 처리하는 서비스입니다.
 
----
+## 조심할 점
 
-## 4. 데이터 흐름
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
 
-```mermaid
-flowchart TD
-    A[reload 호출\n(employeeId or refreshNonce 변경)] --> B["Promise.all\n[listStockRequestDrafts, listDrafts]"]
-    B --> C[drafts: StockRequest[]\nioDrafts: IoBatch[]]
-    C --> D["onCountChange(legacyRows.length + ioRows.length)"]
-    C --> E[렌더링]
-    E --> F["IoDraftWorkCard x N\n(2.0 초안)"]
-    E --> G["DraftCartItemRow x M\n(레거시 초안)"]
-```
+## 핵심 발췌
 
----
+```tsx
+"use client";
 
-## 5. 삭제 플로우
+import { useCallback, useEffect, useState } from "react";
+import { api, type IoBatch, type StockRequest } from "@/lib/api";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
+import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
+import { DraftCartItemRow } from "./DraftCartItemRow";
+import { IoDraftWorkCard } from "./IoDraftWorkCard";
 
-```typescript
+interface Props {
+  employeeId: string | null;
+  refreshNonce: number;
+  onContinue: (draft: StockRequest) => void;
+  onContinueIo?: (draft: IoBatch) => void;
+  onChanged: () => void;
+  onCountChange?: (n: number) => void;
+}
+
 type DeleteTarget =
   | { kind: "stock"; draft: StockRequest }
   | { kind: "io"; draft: IoBatch }
   | null;
+
+export function DraftCartPanel({
+  employeeId,
+  refreshNonce,
+  onContinue,
+  onContinueIo,
+  onChanged,
+  onCountChange,
+}: Props) {
+  const [drafts, setDrafts] = useState<StockRequest[]>([]);
+  const [ioDrafts, setIoDrafts] = useState<IoBatch[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
+  const [opError, setOpError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    if (!employeeId) {
+      setDrafts([]);
+      setIoDrafts([]);
+      onCountChange?.(0);
+      return;
+    }
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [legacyRows, ioRows] = await Promise.all([
+        api.listStockRequestDrafts(employeeId),
+        api.listDrafts(employeeId),
+      ]);
 ```
-
-1. 삭제 버튼 클릭 → `setDeleteTarget(...)` → ConfirmModal 표시
-2. 확인 클릭 → `handleDeleteConfirm()` 호출
-3. 종류에 따라 `api.deleteStockRequestDraft` 또는 `api.deleteDraft` 호출
-4. 완료 후 `reload()` + `onChanged()`
-
----
-
-## 6. 코드 발췌 — 병렬 fetch
-
-```tsx
-const reload = useCallback(async () => {
-  if (!employeeId) {
-    setDrafts([]);
-    setIoDrafts([]);
-    onCountChange?.(0);
-    return;
-  }
-  setLoading(true);
-  try {
-    const [legacyRows, ioRows] = await Promise.all([
-      api.listStockRequestDrafts(employeeId),
-      api.listDrafts(employeeId),
-    ]);
-    setDrafts(legacyRows);
-    setIoDrafts(ioRows);
-    onCountChange?.(legacyRows.length + ioRows.length);
-  } catch (err) {
-    setLoadError(err instanceof Error ? err.message : "작업 중 목록을 불러오지 못했습니다.");
-  } finally {
-    setLoading(false);
-  }
-}, [employeeId, onCountChange]);
-```
-
----
-
-## 7. 렌더링 조건
-
-| 상태 | 표시 내용 |
-|---|---|
-| `employeeId === null` | "작업자를 선택하세요" EmptyState |
-| `loading` | LoadingSkeleton (list, 2행) |
-| `loadError` | LoadFailureCard + 재시도 버튼 |
-| `empty` | "작업 중인 요청이 없습니다." EmptyState |
-| 정상 | IoDraftWorkCard + DraftCartItemRow 목록 |
-
----
-
-## 8. 두 종류의 초안 카드
-
-| 컴포넌트 | 초안 종류 | 표시 내용 |
-|---|---|---|
-| `IoDraftWorkCard` | `IoBatch` (입출고 2.0) | 작업 유형·부서·묶음 수·저장 시각 |
-| `DraftCartItemRow` | `StockRequest` (레거시) | 요청 품목·수량·저장 시각 |
-
----
-
-## 9. 연결 관계
-
-- **부모**: `erp/frontend/app/legacy/_components/DesktopWarehouseView.tsx`
-- **자식**: `IoDraftWorkCard`, `DraftCartItemRow`
-- **API**: `api.listDrafts`, `api.deleteDraft`, `api.listStockRequestDrafts`, `api.deleteStockRequestDraft`
-
----
-
-## 10. 참고 맥락
-
-> [!note] 참고
-> 입출고 마법사에서 작업 중에 자동 저장된 초안들이 여기 모인다. 탭 배지의 숫자가 이 패널의 초안 개수다.
->
-> 레거시(`StockRequest`)와 2.0(`IoBatch`) 두 종류가 공존하는 이유는 시스템 전환 과정에서 이전 방식의 초안이 아직 남아있을 수 있기 때문이다. 두 종류를 병렬로 불러와 한 화면에 보여준다.

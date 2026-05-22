@@ -1,96 +1,103 @@
-# DefectHubPanel.tsx
+---
+type: file-explanation
+source_path: "frontend/app/legacy/_components/_defect_hub/DefectHubPanel.tsx"
+importance: important
+layer: frontend
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
+---
 
-## 이 파일은 뭐예요?
+# DefectHubPanel.tsx — DefectHubPanel.tsx 설명
 
-불량 처리 허브의 최상위 컨테이너 컴포넌트. KPI 카드, 퀵 액션, 필터 바, 부서별 격리 목록을
-하나의 패널에 통합하고, [처리] 버튼 클릭 시 품목 종류에 따라 `PaPfDefectWizard` 또는
-`RDefectActionModal`로 분기한다. 격리 추가(`AddQuarantineModal`)도 여기서 관리한다.
+## 이 파일은 무엇을 책임지나
 
-## 언제 보나요?
+`DefectHubPanel.tsx`는 불량 격리, 폐기, 반품, 분해 같은 불량 처리 화면의 일부입니다.
 
-- 불량 처리 허브 전체 레이아웃/동작을 파악할 때
-- KPI 카드 클릭 필터가 목록에 반영 안 될 때
-- 모달 분기 로직(PA/PF vs R)을 수정할 때
-- 데이터 로드 시점이나 새로고침(`reloadNonce`) 타이밍을 바꿀 때
+## 업무 흐름에서의 의미
+
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
+
+## 언제 보면 좋나
+
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
 ## 중요한 내용
 
-### Props
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-```ts
-interface Props {
-  defectDeptFilter?: string | null; // 특정 부서만 강제 필터 (창고뷰 등에서 주입)
-  currentEmployee: DefectHubEmployee; // { employee_id, name, department }
-}
-```
-
-### 주요 상태
-
-| 상태 | 타입 | 설명 |
-|---|---|---|
-| `kpi` | `DefectKpi` | KPI 4개 카운트 |
-| `locations` | `DefectLocation[]` | 전체 격리 목록 (서버에서 받은 원본) |
-| `scope` | `DefectScope` | `"my"` / `"production"` / `"all"` |
-| `sort` | `DefectSort` | `"oldest"` / `"newest"` |
-| `kpiFilter` | `DefectKpiKind \| null` | KPI 카드 클릭 시 활성화, 재클릭 시 해제 |
-| `processingLocation` | `DefectLocation \| null` | [처리] 버튼 클릭된 항목 |
-| `reloadNonce` | `number` | 증가 시 KPI + 목록 재로드 트리거 |
-
-### 핵심 로직
-
-**초기 scope 결정:**
-- `defectDeptFilter` 있으면 → `"my"`
-- 생산 라인 소속이면 → `"my"`, 그 외 → `"all"`
-
-**목록 필터링 (`useMemo`):**
-1. scope에 따라 부서 필터 (`my` → 내 부서, `production` → 6개 라인 전체)
-2. KPI 필터 — `over_one_year`만 목록 레벨에서 적용 가능 (나머지 3개는 카운트만 표시)
-3. `oldest`/`newest` 정렬
-
-**PA/PF 판별:**
-```ts
-function isPaPfItem(itemCode: string | null | undefined): boolean {
-  const parts = itemCode.split("-");
-  return parts[1] === "PA" || parts[1] === "PF";
-}
-```
-
-**데이터 로드:** `reloadNonce` 변경마다 KPI + 목록을 `Promise.all`로 동시 호출.
-처리/격리 완료 후 `reloadNonce`를 +1 하여 자동 갱신.
+- `DefectHubPanel`
+- `DefectKpiKind`
+- `DefectScope`
+- `DefectSort`
+- `DefectHubEmployee`
+- `Props`
 
 ## 연결되는 파일
 
-### 먼저 볼 파일
-- [[ERP/frontend/lib/api/defects.ts]] — `defectsApi.getDefectKpi()`, `defectsApi.listDefects()` 호출
-- [[ERP/frontend/app/legacy/_components/_defect_hub/PaPfDefectWizard.tsx]] — PA/PF 처리 위자드
-- [[ERP/frontend/app/legacy/_components/_defect_hub/RDefectActionModal.tsx]] — R 타입 처리 모달
-- [[ERP/frontend/app/legacy/_components/_defect_hub/AddQuarantineModal.tsx]] — 새 격리 추가 모달
+- [[ERP/frontend/app/legacy/_components/_defect_hub/📁__defect_hub]] — 이 파일이 속한 폴더의 안내판입니다.
 
-> [!info]- 더 연결된 파일
-> - [[ERP/frontend/app/legacy/_components/_defect_hub/DefectKpiCards.tsx]] — KPI 카드 UI
-> - [[ERP/frontend/app/legacy/_components/_defect_hub/DefectQuickActions.tsx]] — 퀵 액션 버튼
-> - [[ERP/frontend/app/legacy/_components/_defect_hub/DefectFilterBar.tsx]] — 범위/정렬 필터
-> - [[ERP/frontend/app/legacy/_components/_defect_hub/DefectDepartmentList.tsx]] — 격리 목록
+## 조심할 점
+
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
 
 ## 핵심 발췌
 
 ```tsx
-// 처리 모달 — 품목 종류(R / PA·PF)에 따라 분기
-{processingLocation && isPaPfItem(processingLocation.item_code) ? (
-  <PaPfDefectWizard
-    open
-    onClose={() => setProcessingLocation(null)}
-    location={processingLocation}
-    currentEmployee={currentEmployee}
-    onSubmitted={handleModalSubmitted}
-  />
-) : processingLocation ? (
-  <RDefectActionModal
-    open
-    onClose={() => setProcessingLocation(null)}
-    location={processingLocation}
-    currentEmployee={currentEmployee}
-    onSubmitted={handleModalSubmitted}
-  />
-) : null}
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { defectsApi } from "@/lib/api/defects";
+import type { DefectKpi, DefectLocation } from "@/lib/api/types/defects";
+/** DefectHubPanel 이 필요한 최소 직원 필드 */
+export interface DefectHubEmployee {
+  employee_id: string;
+  name: string;
+  department: string;
+}
+import { DefectKpiCards, type DefectKpiKind } from "./DefectKpiCards";
+import { DefectQuickActions } from "./DefectQuickActions";
+import { DefectFilterBar, type DefectScope, type DefectSort } from "./DefectFilterBar";
+import { DefectDepartmentList } from "./DefectDepartmentList";
+import { RDefectActionModal } from "./RDefectActionModal";
+import { PaPfDefectWizard } from "./PaPfDefectWizard";
+import { AddQuarantineModal } from "./AddQuarantineModal";
+
+/** item_code 2번째 segment 가 process_type. PA/PF 면 BOM 분해 가능. */
+function isPaPfItem(itemCode: string | null | undefined): boolean {
+  if (!itemCode) return false;
+  const parts = itemCode.split("-");
+  if (parts.length < 2) return false;
+  return parts[1] === "PA" || parts[1] === "PF";
+}
+
+const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+const PRODUCTION_LINES = new Set(["튜브", "고압", "진공", "튜닝", "조립", "출하"]);
+
+interface Props {
+  defectDeptFilter?: string | null;
+  currentEmployee: DefectHubEmployee;
+}
+
+const DEFAULT_KPI: DefectKpi = {
+  quarantined: 0,
+  over_one_year: 0,
+  pending_approval: 0,
+  processed_today: 0,
+};
+
+export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
+  const [kpi, setKpi] = useState<DefectKpi>(DEFAULT_KPI);
+  const [locations, setLocations] = useState<DefectLocation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // defectDeptFilter prop 이 있으면 내 부서 필터로 초기 설정,
+  // 없으면 생산 라인이면 "my", 아니면 "all"
+  const initialScope = (): DefectScope => {
+    if (defectDeptFilter) return "my";
+    return PRODUCTION_LINES.has(currentEmployee.department) ? "my" : "all";
+  };
 ```

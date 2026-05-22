@@ -1,64 +1,103 @@
-# seed_cleanup.py
+---
+type: file-explanation
+source_path: "backend/app/services/seed_cleanup.py"
+importance: important
+layer: backend
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
+---
 
-## 이 파일은 뭐예요?
+# seed_cleanup.py — seed_cleanup.py 설명
 
-722행짜리 정리본 엑셀(`생산부_재고_매칭작업_정리본.xlsx`)을 DB에 적재하는 서비스. `scripts/dev/import_inventory_cleanup.py`의 핵심 로직을 추출한 것이며, `settings./reset` 엔드포인트가 이 함수를 호출한다.
+## 이 파일은 무엇을 책임지나
 
-## 언제 보나요?
+`seed_cleanup.py`는 `seed_cleanup` 업무 규칙을 실제로 실행하는 Python 코드입니다. 라우터보다 안쪽에서 DB 조회와 변경을 담당합니다.
 
-- DB 초기화 후 기준 재고를 다시 적재해야 할 때
-- 엑셀 파싱 실패 오류 메시지를 추적할 때
-- `bootstrap_db.py --all`이 내부적으로 무슨 일을 하는지 볼 때
+## 업무 흐름에서의 의미
 
-## 핵심 상수
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
 
-| 상수 | 값 | 의미 |
-|------|----|------|
-| `EXPECTED_ROWS` | 722 | 엑셀 유효 행수. 다르면 오류 |
-| `EXPECTED_TOTAL_QTY` | 108,924 | 전체 재고 합계. 다르면 경고 |
-| `DEFAULT_MIN_STOCK` | 200 | 적재 시 min_stock 기본값 |
-| `DEFAULT_EXCEL_PATH` | `outputs/inventory_cleanup/생산부_재고_매칭작업_정리본.xlsx` | 기본 엑셀 경로 |
+## 언제 보면 좋나
 
-## 부서 코드 매핑
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-```python
-DEPT_MAP = {"T": "튜브", "H": "고압", "V": "진공", "N": "튜닝", "A": "조립", "P": "출하"}
-```
+## 중요한 내용
 
-품목 코드(`6-PA-0001` 형식)의 `process_type_code` 첫 글자로 부서를 결정한다.
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-## 주요 함수
-
-### `run_cleanup_import(db, excel_path, *, dry_run=False)`
-
-엑셀을 파싱해 `Item` + `Inventory` + `InventoryLocation`을 일괄 적재한다.
-
-**호출 전 전제조건:** `items / inventory / inventory_locations` 테이블이 비어 있어야 한다.
-
-**`dry_run=True`** 이면 파싱·검증만 하고 DB는 변경하지 않는다.
-
-반환값:
-```python
-{"rows": int, "total_qty": Decimal, "ok": bool, "errors": list[str]}
-```
-
-## 흐름 요약
-
-1. 엑셀 로드 (`_load_excel`) → 헤더 자동 감지 (ERP코드 / 품명 / 분류 / 현재고)
-2. 행수·합계 검증
-3. 각 행마다 품목 코드 파싱 (`_parse_erp_code`) → 부서 결정
-4. `process_types` 테이블에서 유효 코드 확인
-5. `Item` → `Inventory` → `InventoryLocation` 순서로 bulk insert
-
-## 주의사항
-
-> [!warning]
-> - 적재 전 테이블이 비어 있지 않으면 중복 오류 발생
-> - `openpyxl` 미설치 시 `RuntimeError` 발생 (`pip install openpyxl`)
-> - 행수나 합계가 불일치해도 오류는 `errors` 리스트에 담길 뿐, dry_run이 아닌 경우 적재는 계속됨
+- `_parse_erp_code`
+- `_load_excel`
+- `run_cleanup_import`
 
 ## 연결되는 파일
 
-- [[ERP/backend/app/models.py]] — Item, Inventory, InventoryLocation, LocationStatusEnum
-- [[ERP/backend/bootstrap_db.py]] — `--all` 플래그 시 이 서비스 호출
-- `scripts/dev/import_inventory_cleanup.py` — 이 서비스의 원본 스크립트
+### 먼저 같이 볼 파일
+- [[ERP/backend/app/models.py]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 파일입니다.
+- [[ERP/backend/app/schemas.py]] — 백엔드와 프론트엔드가 주고받는 데이터 모양을 정하는 파일입니다.
+- [[ERP/backend/app/database.py]] — `database.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/database.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
+
+## 조심할 점
+
+서비스는 DB 변경을 포함할 수 있습니다. 같은 도메인의 라우터, 모델, 테스트를 함께 확인해야 합니다.
+
+## 핵심 발췌
+
+```python
+"""seed_cleanup.py — 722 정리본 엑셀을 DB에 적재하는 호출 가능 서비스.
+
+scripts/dev/import_inventory_cleanup.py 의 핵심 로직 추출.
+settings./reset 엔드포인트가 이 함수를 호출한다.
+"""
+
+from __future__ import annotations
+
+from decimal import Decimal
+from pathlib import Path
+
+from sqlalchemy.orm import Session
+
+from app.models import Inventory, InventoryLocation, Item, LocationStatusEnum
+
+try:
+    import openpyxl
+except ImportError:
+    openpyxl = None  # type: ignore[assignment]
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_EXCEL_PATH = REPO_ROOT / "outputs" / "inventory_cleanup" / "생산부_재고_매칭작업_정리본.xlsx"
+
+EXPECTED_ROWS = 722
+EXPECTED_TOTAL_QTY = Decimal("108924")
+DEFAULT_MIN_STOCK = Decimal("200")
+
+DEPT_MAP: dict[str, str] = {
+    "T": "튜브",
+    "H": "고압",
+    "V": "진공",
+    "N": "튜닝",
+    "A": "조립",
+    "P": "출하",
+}
+
+
+def _parse_erp_code(raw: str) -> tuple[str, str, int, str | None]:
+    parts = str(raw).strip().split("-")
+    if len(parts) < 3:
+        raise ValueError(f"품목 코드 형식 오류: {raw!r}")
+    model_symbol = parts[0]
+    process_type_code = parts[1]
+    try:
+        serial_no = int(parts[2])
+    except ValueError:
+        raise ValueError(f"시리얼 번호 파싱 오류: {raw!r}")
+    option_code = parts[3] if len(parts) >= 4 else None
+    return model_symbol, process_type_code, serial_no, option_code
+
+
+def _load_excel(excel_path: Path) -> list[dict]:
+    if openpyxl is None:
+        raise RuntimeError("openpyxl 미설치: pip install openpyxl")
+    wb = openpyxl.load_workbook(excel_path)
+```

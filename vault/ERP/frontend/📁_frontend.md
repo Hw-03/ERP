@@ -1,55 +1,58 @@
 ---
-type: index
-project: ERP
+type: folder-note
+source_path: "frontend"
+importance: important
 layer: frontend
-source_path: erp/frontend/
-status: active
-updated: 2026-05-21
-tags:
-  - erp
-  - frontend
-  - index
-aliases:
-  - "frontend"
-  - "frontend.md"
+graph: hub
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# frontend
+# 📁 frontend
 
-> [!summary] 역할
-> Next.js 14 기반 사용자 화면과 API 클라이언트를 담는 프론트엔드 루트다.
+## 이 폴더는 무엇을 위한 곳인가
 
-## 원본 위치
+Next.js 프론트엔드입니다. 현장 직원과 관리자가 실제로 보는 화면이 들어 있습니다.
 
-- Source: `frontend/`
-- File count: `172`
+## 현장 업무와의 관계
 
-## 하위 허브
+대시보드, 입출고, 입출고 내역, 관리자 화면, 모바일 화면이 여기서 구성됩니다.
 
-- [[frontend/app/app|app]]
-- [[frontend/components/components|components]]
-- [[frontend/lib/lib|lib]]
-- [[frontend/public/public|public]]
-- [[frontend/scripts/scripts|scripts]]
+## 언제 보면 좋나
 
-## 파일 노트
+- 화면 문구나 버튼 위치를 바꿀 때
+- 현장 사용 흐름을 개선할 때
+- API 호출이 어디서 일어나는지 찾을 때
 
-- [[frontend/.eslintrc.json|.eslintrc.json]]
-- [[frontend/.gitignore|.gitignore]]
-- [[frontend/Dockerfile|Dockerfile]]
-- [[frontend/next-env.d.ts|next-env.d.ts]]
-- [[frontend/next.config.js|next.config.js]]
-- [[frontend/package-lock.json|package-lock.json]]
-- [[frontend/package.json|package.json]]
-- [[frontend/postcss.config.js|postcss.config.js]]
-- [[frontend/tailwind.config.ts|tailwind.config.ts]]
-- [[frontend/tsconfig.json|tsconfig.json]]
-- [[frontend/vitest.config.ts|vitest.config.ts]]
-- [[frontend/vitest.setup.ts|vitest.setup.ts]]
+## 주요 하위 폴더
 
-## 읽는 팁
+- [[ERP/frontend/app/📁_app]] — Next.js App Router의 진입 폴더입니다. 실제 활성 화면은 대부분 legacy 하위에서 실행됩니다.
+- [[ERP/frontend/components/📁_components]] — `frontend/components`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
+- [[ERP/frontend/features/📁_features]] — `frontend/features`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
+- [[ERP/frontend/lib/📁_lib]] — 프론트 화면이 공통으로 쓰는 API 호출, 포맷, 상태/색상 규칙, UI 보조 로직입니다.
+- [[ERP/frontend/public/📁_public]] — `frontend/public`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
+- [[ERP/frontend/scripts/📁_scripts]] — `frontend/scripts`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
 
-- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
-- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
+## 먼저 볼 파일 5개
 
-Up: [[ERP]]
+- [[ERP/frontend/.dockerignore]] — `.dockerignore`는 Git/도구 설정입니다. 프로젝트 구조 안에서 `frontend/.dockerignore` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
+- [[ERP/frontend/.eslintrc.json]] — `.eslintrc.json`는 JSON 설정/데이터입니다. 프로젝트 구조 안에서 `frontend/.eslintrc.json` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
+- [[ERP/frontend/.gitignore]] — `.gitignore`는 Git/도구 설정입니다. 프로젝트 구조 안에서 `frontend/.gitignore` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
+- [[ERP/frontend/next-env.d.ts]] — `next-env.d.ts`는 TypeScript/React 코드입니다. 프로젝트 구조 안에서 `frontend/next-env.d.ts` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
+- [[ERP/frontend/next.config.js]] — `next.config.js`는 JavaScript 설정/코드입니다. 프로젝트 구조 안에서 `frontend/next.config.js` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
+
+> [!info]- 추가 파일
+> - [[ERP/frontend/package-lock.json]] — package-lock.json
+> - [[ERP/frontend/package.json]] — package.json
+> - [[ERP/frontend/postcss.config.js]] — postcss.config.js
+> - [[ERP/frontend/tailwind.config.ts]] — tailwind.config.ts
+> - [[ERP/frontend/tsconfig.json]] — tsconfig.json
+> - [[ERP/frontend/vitest.setup.ts]] — vitest.setup.ts
+
+## 조심할 점
+
+현재 실제 데스크톱 화면은 app/legacy 쪽이 중심입니다. 이름만 보고 legacy라 버리면 안 됩니다.
+
+## 다음에 볼 위치
+
+- 상위 폴더: [[ERP/📁_ERP]]

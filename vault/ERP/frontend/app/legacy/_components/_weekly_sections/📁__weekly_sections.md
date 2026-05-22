@@ -1,23 +1,39 @@
 ---
-type: index
-project: DEXCOWIN MES
+type: folder-note
+source_path: "frontend/app/legacy/_components/_weekly_sections"
+importance: normal
 layer: frontend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/app/legacy/_components/_weekly_sections/
-tags: [vault, index, folder-marker]
-aliases:
-  - "_weekly_sections"
-  - "_weekly_sections.md"
+graph: hub
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
 # 📁 _weekly_sections
 
-> [!info] 코드 미러 영역
-> 이 폴더는 `erp/frontend/app/legacy/_components/_weekly_sections/` 의 vault 미러. 자식 파일들의 분석 노트가 모여 있다.
+## 이 폴더는 무엇을 위한 곳인가
 
-## 통계
+`frontend/app/legacy/_components/_weekly_sections`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
 
-- 자식 파일: **4개** (.md 제외)
-- 자식 폴더: **0개**
+## 현장 업무와의 관계
+
+사용자가 보는 화면이나 화면이 서버와 통신하는 방식에 연결됩니다.
+
+## 언제 보면 좋나
+
+- 이 폴더 안의 파일이 어떤 역할인지 빠르게 파악할 때
+- 수정 전에 먼저 읽을 파일을 고를 때
+
+## 먼저 볼 파일 5개
+
+- [[ERP/frontend/app/legacy/_components/_weekly_sections/WeeklyDetailTable.tsx]] — `WeeklyDetailTable.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+- [[ERP/frontend/app/legacy/_components/_weekly_sections/WeeklyGroupCards.tsx]] — `WeeklyGroupCards.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+- [[ERP/frontend/app/legacy/_components/_weekly_sections/WeeklyProductionMatrix.tsx]] — `WeeklyProductionMatrix.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+- [[ERP/frontend/app/legacy/_components/_weekly_sections/WeeklyWeekPicker.tsx]] — `WeeklyWeekPicker.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+
+## 조심할 점
+
+폴더 성격을 먼저 확인하고 현재 운영 코드인지, 보관 자료인지, 자동 생성물인지 구분해야 합니다.
+
+## 다음에 볼 위치
+
+- 상위 폴더: [[ERP/frontend/app/legacy/_components/📁__components]]

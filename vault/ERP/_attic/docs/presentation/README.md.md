@@ -1,23 +1,53 @@
 ---
-type: code-note
+type: file-explanation
+source_path: "_attic/docs/presentation/README.md"
+importance: reference
+layer: archive
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
-layer: attic
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/_attic/docs/presentation/README.md
-tags: [vault, code-note, auto-generated, stub, mirror-fill]
 ---
 
-# README.md
+# README.md — README.md 설명
 
-> [!info] 1:1 미러 stub
-> 탐색기에 보이는 폴더 구조를 vault 에 그대로 반영하기 위한 stub.
-> 원본: [[erp/_attic/docs/presentation/README.md]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄 (또는 메타)
+`README.md`는 현재 운영 코드가 아니라 과거 자료나 실험 결과를 보관한 참고 파일입니다.
 
-```
+## 업무 흐름에서의 의미
+
+과거 맥락을 이해하는 데 도움은 되지만, 현재 운영 기준으로 바로 사용하면 안 됩니다.
+
+## 언제 보면 좋나
+
+- 과거 자료의 의미를 확인할 때
+- 현재 코드와 비교할 참고 근거가 필요할 때
+
+## 중요한 내용
+
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
+
+- `DEXCOWIN MES — 사내 발표 슬라이드`
+- `실행`
+- `키보드 단축키`
+- `발표자 노트`
+- `시연 체크리스트 (슬라이드 9)`
+- `발표 전 점검`
+- `슬라이드 구성 (총 11장)`
+- `로고`
+- `콘텐츠 업데이트`
+
+## 연결되는 파일
+
+- [[ERP/_attic/docs/presentation/📁_presentation]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+보관 자료입니다. 현재 코드처럼 믿고 수정하거나 실행하지 않습니다.
+
+## 핵심 발췌
+
+```md
 # DEXCOWIN MES — 사내 발표 슬라이드
 
 2026.05 발표용 HTML 슬라이드 데크. 단일 파일이라 USB·메일로 그대로 전달 가능.
@@ -43,4 +73,34 @@ start chrome --start-fullscreen "file:///c:/ERP/_attic/docs/presentation/교육.
 ## 키보드 단축키
 
 | 키 | 동작 |
+|---|---|
+| `→` `↓` `Space` `PgDn` | 다음 슬라이드 |
+| `←` `↑` `PgUp` | 이전 슬라이드 |
+| `1` ~ `9` | 슬라이드 번호로 직접 점프 |
+| `0` | 슬라이드 10 (라이브 시연) |
+| `-` | 슬라이드 11 (모바일 QR) |
+| `=` | 슬라이드 12 (피드백 수집) |
+| `Home` / `End` | 첫 / 마지막(14 Q&A) 슬라이드 |
+| `F` | 풀스크린 토글 |
+| `ESC` | 풀스크린 해제 |
+| `N` | 발표자 노트 패널 토글 |
+| `T` | 슬라이드 10 시연 체크리스트 다음 항목 체크 |
+
+## 발표자 노트
+
+- 노트 보기: URL 끝에 `?notes=1` 추가하거나 발표 중 `N`키
+- 각 슬라이드: 말할 한 줄 / 청중 반응 / Q&A 대비
+- 인쇄: `Ctrl+P` → 가로 A4. 슬라이드 한 페이지 + 노트 한 페이지
+
+## 시연 체크리스트 (슬라이드 9)
+
+발표 도중 alt+tab으로 MES로 이동 → 시연 → 슬라이드 복귀 시 진행 표시.
+
+- 항목 클릭 또는 `T`키로 체크 / 해제
+- localStorage 저장 — 새로고침해도 유지
+- 전부 체크 후 `T` 한 번 더 = 초기화 (다음 발표 대비)
+
+시연 6항목: PIN 로그인 / 창고 입출고 요청 / 창고 정·부 승인 / 부서 재고 확인 / BOM 입고 자동출고 / 불량 등록
+
+## 발표 전 점검
 ```

@@ -1,22 +1,48 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "frontend/lib/mes/item.ts"
+importance: important
 layer: frontend
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/lib/mes/item.ts
-tags: [vault, code-note, auto-generated, stub]
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# item.ts
+# item.ts — item.ts 설명
 
-> [!info] 자동 생성된 stub 노트
-> 이 노트는 자동 보정으로 생성됐다. 원본 위치: [[erp/frontend/lib/mes/item.ts]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄
+`item.ts`는 MES 화면에서 반복해서 쓰는 표시 규칙, 색상, 포맷, 상태값을 정리한 공용 파일입니다.
 
-```
+## 업무 흐름에서의 의미
+
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
+
+## 언제 보면 좋나
+
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
+
+## 중요한 내용
+
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
+
+- `buildItemSearchLabel`
+- `itemMatchesKpi`
+- `groupedItems`
+- `GroupedItem`
+
+## 연결되는 파일
+
+- [[ERP/frontend/lib/mes/📁_mes]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+공용 파일이라 여러 화면에 영향이 퍼질 수 있습니다. 변경 후 대시보드, 입출고, 내역, 관리자 화면을 같이 확인해야 합니다.
+
+## 핵심 발췌
+
+```ts
 /**
  * MES Item 도메인 유틸 — `@/lib/mes/item`.
  *
@@ -47,4 +73,29 @@ export function buildItemSearchLabel(item: Item): string {
 export function itemMatchesKpi(item: Item, kpi: string): boolean {
   const qty = Number(item.quantity);
   const min = item.min_stock == null ? null : Number(item.min_stock);
+  if (kpi === "정상") return qty > 0 && !(min != null && qty < min);
+  if (kpi === "부족") return qty > 0 && min != null && qty < min;
+  if (kpi === "품절") return qty <= 0;
+  return true;
+}
+
+export interface GroupedItem {
+  key: string;
+  representative: Item;
+  quantity: number;
+  count: number;
+}
+
+/**
+ * Item[] 을 품목명 (대소문자 무시 + trim) 기준으로 그룹화.
+ * 각 그룹은 첫 등장 Item 을 representative 로, 수량/개수 합산.
+ */
+export function groupedItems(items: Item[]): GroupedItem[] {
+  const map = new Map<string, GroupedItem>();
+  for (const item of items) {
+    const key = item.item_name.trim().toLowerCase();
+    const current = map.get(key);
+    if (current) {
+      current.quantity += Number(item.quantity);
+      current.count += 1;
 ```

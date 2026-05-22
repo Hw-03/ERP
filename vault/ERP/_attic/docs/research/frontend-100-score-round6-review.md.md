@@ -1,23 +1,54 @@
 ---
-type: code-note
+type: file-explanation
+source_path: "_attic/docs/research/frontend-100-score-round6-review.md"
+importance: reference
+layer: archive
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
-layer: attic
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/_attic/docs/research/frontend-100-score-round6-review.md
-tags: [vault, code-note, auto-generated, stub, mirror-fill]
 ---
 
-# frontend-100-score-round6-review.md
+# frontend-100-score-round6-review.md — frontend-100-score-round6-review.md 설명
 
-> [!info] 1:1 미러 stub
-> 탐색기에 보이는 폴더 구조를 vault 에 그대로 반영하기 위한 stub.
-> 원본: [[erp/_attic/docs/research/frontend-100-score-round6-review.md]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄 (또는 메타)
+`frontend-100-score-round6-review.md`는 현재 운영 코드가 아니라 과거 자료나 실험 결과를 보관한 참고 파일입니다.
 
-```
+## 업무 흐름에서의 의미
+
+과거 맥락을 이해하는 데 도움은 되지만, 현재 운영 기준으로 바로 사용하면 안 됩니다.
+
+## 언제 보면 좋나
+
+- 과거 자료의 의미를 확인할 때
+- 현재 코드와 비교할 참고 근거가 필요할 때
+
+## 중요한 내용
+
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
+
+- `프론트엔드 100점 — Round-6 종료 점수표 — 2025-04-30`
+- `1. 점수 변화`
+- `2. Round-6 산출물`
+- `3. API 분리 누적 효과`
+- `4. 90점 도달 미달 — 추가 작업 필요`
+- `가장 빠른 길 (위험 B 이하)`
+- `권장: R6 추가 진행 (5건)`
+- `5. main 머지 가능 여부`
+- `🟢 Round-6 까지 — 가능`
+- `6. 다음 1순위`
+
+## 연결되는 파일
+
+- [[ERP/_attic/docs/research/📁_research]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+보관 자료입니다. 현재 코드처럼 믿고 수정하거나 실행하지 않습니다.
+
+## 핵심 발췌
+
+```md
 # 프론트엔드 100점 — Round-6 종료 점수표 — 2025-04-30
 
 > **작업 ID:** R6-12
@@ -43,4 +74,34 @@ tags: [vault, code-note, auto-generated, stub, mirror-fill]
 | AI 인계 | 96 | **97** | +1 |
 | **합산** | **915** | **932** | **+17** |
 | **% (1100)** | **83** | **85** | **+2** |
+
+---
+
+## 2. Round-6 산출물
+
+| ID | 작업 | 결과 | 커밋 |
+|---|---|---|---|
+| R6-D1 | API inventory 도메인 분리 (11 메소드) | ✅ | `b64c050` |
+| R6-D2 | API employees 도메인 분리 (6 메소드) | ✅ | `cc6c846` |
+| R6-D3 | API admin / settings 도메인 분리 (3 메소드) | ✅ | `3549484` |
+| R6-D4 | API queue 도메인 분리 (9 메소드) | ✅ | `5a92786` |
+| R6-W1/W2 | 거대 컴포넌트 분해 | ⏭ Round-7 (위험 C, useState 11+) |
+| R6-P1 | parseError 16곳 통합 | ⏭ Round-7 (도메인 추가 분리 우선) |
+| R6-12 | 점수표 (본 문서) | ✅ |
+
+---
+
+## 3. API 분리 누적 효과
+
+```
+api.ts 변화:
+  Round-3 시작:  1431줄 (단일 거대 파일)
+  R3-2 (barrel): 1431 (변화 없음, barrel 만 추가)
+  R4-2 (types):  1039 (-392, 27% 감소)
+  R5-5 (items):   983 (-56)
+  R6-D1 (inv):    824 (-159, 16% 감소)
+  R6-D2 (emp):    760 (-64)
+  R6-D3 (admin):  734 (-26)
+  R6-D4 (queue):  646 (-88)
+  -----------
 ```

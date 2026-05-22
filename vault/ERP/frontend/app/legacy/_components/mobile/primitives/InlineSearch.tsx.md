@@ -1,50 +1,59 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "frontend/app/legacy/_components/mobile/primitives/InlineSearch.tsx"
+importance: important
 layer: frontend
-source_path: erp/frontend/app/legacy/_components/mobile/primitives/InlineSearch.tsx
-status: active
-updated: 2026-04-27
-source_sha: 905f4d392163
-tags:
-  - erp
-  - frontend
-  - frontend-component
-  - tsx
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# InlineSearch.tsx
+# InlineSearch.tsx — InlineSearch.tsx 설명
 
-> [!summary] 역할
-> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`InlineSearch.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
 
-- Source: `frontend/app/legacy/_components/mobile/primitives/InlineSearch.tsx`
-- Layer: `frontend`
-- Kind: `frontend-component`
-- Size: `1368` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-- Parent hub: [[frontend/app/legacy/_components/mobile/primitives/primitives|frontend/app/legacy/_components/mobile/primitives]]
-- Related: [[frontend/frontend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
-- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+## 중요한 내용
 
-## 원본 발췌
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-````tsx
+- `InlineSearch`
+
+## 연결되는 파일
+
+- [[ERP/frontend/app/legacy/_components/mobile/primitives/📁_primitives]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
+
+## 핵심 발췌
+
+```tsx
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { Search, X } from "lucide-react";
-import { LEGACY_COLORS } from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "../tokens";
 
+/**
+ * 한글 IME 안정화: composition 중에는 외부 onChange 를 호출하지 않고
+ * compositionend 에서 한 번만 보내 입력 글자마다 부모 리렌더로 input 이 잘리는 문제 방지.
+ * 외부 value 변경은 composition 중일 때만 무시(외부 리셋이 입력을 덮어쓰는 것 방지),
+ * 평소에는 즉시 반영.
+ */
 export function InlineSearch({
   value,
   onChange,
@@ -58,6 +67,20 @@ export function InlineSearch({
   className?: string;
   autoFocus?: boolean;
 }) {
+  const composingRef = useRef(false);
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    if (composingRef.current) return;
+    if (draft !== value) setDraft(value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- draft 동기화는 외부 value 변경 시만
+  }, [value]);
+
+  const handleChange = (next: string) => {
+    setDraft(next);
+    if (!composingRef.current) onChange(next);
+  };
+
   return (
     <div
       className={clsx(
@@ -69,10 +92,7 @@ export function InlineSearch({
       <Search size={16} color={LEGACY_COLORS.muted} strokeWidth={2} />
       <input
         autoFocus={autoFocus}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className={clsx("h-10 min-w-0 flex-1 bg-transparent outline-none", TYPO.body)}
-# ... (이하 16줄 생략. 원본 참조)
-
-````
+        value={draft}
+        onChange={(e) => handleChange(e.target.value)}
+        onCompositionStart={() => {
+```

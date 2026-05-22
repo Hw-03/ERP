@@ -1,55 +1,55 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "frontend/app/legacy/_components/mobile/primitives/ItemRow.tsx"
+importance: important
 layer: frontend
-source_path: erp/frontend/app/legacy/_components/mobile/primitives/ItemRow.tsx
-status: active
-updated: 2026-04-27
-source_sha: fa9158562b2f
-tags:
-  - erp
-  - frontend
-  - frontend-component
-  - tsx
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# ItemRow.tsx
+# ItemRow.tsx — ItemRow.tsx 설명
 
-> [!summary] 역할
-> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`ItemRow.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
 
-- Source: `frontend/app/legacy/_components/mobile/primitives/ItemRow.tsx`
-- Layer: `frontend`
-- Kind: `frontend-component`
-- Size: `3437` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-- Parent hub: [[frontend/app/legacy/_components/mobile/primitives/primitives|frontend/app/legacy/_components/mobile/primitives]]
-- Related: [[frontend/frontend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
-- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+## 중요한 내용
 
-## 원본 발췌
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-````tsx
+- `ItemRow`
+
+## 연결되는 파일
+
+- [[ERP/frontend/app/legacy/_components/mobile/primitives/📁_primitives]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
+
+## 핵심 발췌
+
+```tsx
 "use client";
 
 import clsx from "clsx";
 import { Check } from "lucide-react";
 import type { Item } from "@/lib/api";
-import {
-  erpCodeDeptBadge,
-  formatErpCode,
-  formatNumber,
-  getStockState,
-  LEGACY_COLORS,
-} from "../../legacyUi";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { itemCodeDeptBadge } from "@/lib/mes/process";
+import { getStockState } from "@/lib/mes/inventory";
+import { formatItemCode, formatQty } from "@/lib/mes/format";
+import { useDeptColorLookup } from "../../DepartmentsContext";
 import { TYPO } from "../tokens";
 import { StatusBadge } from "./StatusBadge";
 
@@ -70,9 +70,29 @@ export function ItemRow({
   dense?: boolean;
   className?: string;
 }) {
+  const getDeptColor = useDeptColorLookup();
   const state = getStockState(Number(item.quantity), item.min_stock);
-  const deptBadge = erpCodeDeptBadge(item.erp_code);
-  const erpCompact = formatErpCode(item.erp_code);
-# ... (이하 78줄 생략. 원본 참조)
+  const deptBadge = itemCodeDeptBadge(item.item_code, getDeptColor);
+  const itemCompact = formatItemCode(item.item_code);
 
-````
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        "flex w-full items-center gap-3 rounded-[20px] border px-3 text-left active:scale-[0.99]",
+        dense ? "py-[10px]" : "py-3",
+        className,
+      )}
+      style={{
+        background: selected ? `${LEGACY_COLORS.blue as string}14` : LEGACY_COLORS.s2,
+        borderColor: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+      }}
+    >
+      {showCheckbox ? (
+        // 시각 22×22 유지 + 외곽 44×44 hit-area (WCAG 2.5.5)
+        <span
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center"
+          aria-hidden
+        >
+```

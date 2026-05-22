@@ -1,75 +1,47 @@
 ---
-type: index
-project: DEXCOWIN MES
+type: folder-note
+source_path: "frontend/lib"
+importance: important
 layer: frontend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/lib/
-tags: [vault, index, folder-marker]
-aliases:
-  - "lib"
-  - "lib.md"
+graph: hub
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
 # 📁 lib
 
-> [!summary] 역할
-> 전체 프론트엔드의 API hub, MES 도메인 유틸, 공용 UI 컴포넌트를 집약한 shared 레이어.
+## 이 폴더는 무엇을 위한 곳인가
 
-> [!info] 코드 미러 영역
-> 이 폴더는 `erp/frontend/lib/` 의 vault 미러.
+프론트 화면이 공통으로 쓰는 API 호출, 포맷, 상태/색상 규칙, UI 보조 로직입니다.
 
-## 어떤 파일들이 있나
+## 현장 업무와의 관계
 
-**API 진입점 (루트)**
-- [[erp/frontend/lib/api.ts.md|api.ts]] — API hub barrel. `api-core.ts` + 11개 도메인 모듈을 묶어 `@/lib/api` 단일 경로로 re-export. 앱 전체가 여기서 임포트.
-- [[erp/frontend/lib/api-core.ts.md|api-core.ts]] — `fetch` 래퍼(`fetcher`, `postJson`, `putJson`, `patchJson`), URL 빌더(`toApiUrl`), 에러 파서. 모든 API 호출의 실제 진입점.
+여기 규칙이 바뀌면 여러 화면의 표시와 서버 호출 방식이 동시에 바뀝니다.
 
-**MES 도메인 유틸 (루트 레거시 — barrel로 `@/lib/mes` 에 통합됨)**
-- `mes-department.ts`, `mes-format.ts`, `mes-status.ts` — Round-3 이전 경로. 신규 코드는 `mes/` 하위 사용.
+## 언제 보면 좋나
 
-**api/ — 도메인별 API 모듈 (11개)**
-- `items.ts`, `inventory.ts`, `employees.ts`, `admin.ts`, `catalog.ts`, `production.ts`
-- `io.ts`, `stock-requests.ts`, `departments.ts`, `weekly.ts`, `core.ts`
-- `types/` — `shared.ts`, `catalog.ts`, `departments.ts`, `dept-adjustment.ts`, `employees.ts`, `inventory.ts`, `io.ts`, `items.ts`, `production.ts`, `stock-requests.ts`, `weekly.ts`
+- API 호출 실패 처리나 공통 표시 규칙을 볼 때
+- 여러 화면이 같이 쓰는 타입/포맷을 확인할 때
 
-**mes/ — MES 도메인 순수 유틸 (10개, barrel: `@/lib/mes`)**
-- `color.ts` / `colorUtils.ts` — `LEGACY_COLORS`, 색상 헬퍼
-- `department.ts` — `normalizeDepartment`
-- `employee.ts` — `firstEmployeeLetter`
-- `format.ts` — 날짜·수량 포맷터
-- `inventory.ts` — 재고 도메인 유틸
-- `item.ts` — 품목 도메인 유틸
-- `process.ts` — 공정 유형 유틸
-- `status.ts` — 상태 레이블·색상
-- `transaction.ts` — 거래 도메인 유틸
+## 주요 하위 폴더
 
-**ui/ — cross-feature 공용 UI (barrel: `@/lib/ui`)**
-- `Toast.tsx`, `ConfirmModal.tsx`, `BottomSheet.tsx`, `Tooltip.tsx`, `TruncatedText.tsx`
-- `useFocusTrap.ts`
+- [[ERP/frontend/lib/__tests__/📁___tests__]] — `frontend/lib/__tests__`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
+- [[ERP/frontend/lib/api/📁_api]] — 프론트엔드가 백엔드 API를 부르는 도메인별 통로입니다.
+- [[ERP/frontend/lib/mes/📁_mes]] — `frontend/lib/mes`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
+- [[ERP/frontend/lib/ui/📁_ui]] — `frontend/lib/ui`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
 
-## 도메인 컨텍스트
+## 먼저 볼 파일 5개
 
-`api.ts` → `api-core.ts` → `api/<domain>.ts` 3단계 구조.  
-앱 어디서든 `import { api, type Item } from "@/lib/api"` 한 줄로 해결된다.  
-`mes/` 유틸은 React 없는 순수 TS — 서버/클라이언트 어디서도 사용 가능.  
-`ui/` 는 Round-14 에서 `features/mes/shared` 에서 이동한 cross-feature modal/sheet/toast.
+- [[ERP/frontend/lib/api-core.ts]] — 프론트 화면이 백엔드에 요청을 보낼 때 공통으로 쓰는 fetch 보조 파일입니다.
+- [[ERP/frontend/lib/mes-department.ts]] — `mes-department.ts`는 MES 화면에서 반복해서 쓰는 표시 규칙, 색상, 포맷, 상태값을 정리한 공용 파일입니다.
+- [[ERP/frontend/lib/mes-format.ts]] — `mes-format.ts`는 MES 화면에서 반복해서 쓰는 표시 규칙, 색상, 포맷, 상태값을 정리한 공용 파일입니다.
+- [[ERP/frontend/lib/mes-status.ts]] — `mes-status.ts`는 MES 화면에서 반복해서 쓰는 표시 규칙, 색상, 포맷, 상태값을 정리한 공용 파일입니다.
+- [[ERP/frontend/lib/api.ts]] — `api.ts`는 TypeScript/React 코드입니다. 프로젝트 구조 안에서 `frontend/lib/api.ts` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-## ⚠️ 위험 포인트
+## 조심할 점
 
-- `api-core.ts` 의 `fetcher` / `postJson` 수정은 전체 API 호출에 영향. 에러 핸들링 / 인증 헤더 변경 시 반드시 검토.
-- 루트의 `mes-*.ts` 파일들은 레거시 경로 — 삭제하지 말 것. `@/lib/mes` barrel 이 내부적으로 재-export.
-- `api/types/shared.ts` 의 `TransactionType` 은 frontend 전체에서 참조 — 신규 타입 추가 시 백엔드 스키마와 동기화 필요.
+공용 라이브러리라 한 줄 수정이 여러 화면에 번집니다.
 
-## 관련 가이드
+## 다음에 볼 위치
 
-- [[erp/_vault/guides/api-layer]]
-- [[erp/_vault/guides/mes-utils]]
-
-## 자식 폴더
-
-- [[erp/frontend/lib/__tests__/📁___tests__|__tests__/]]
-- [[erp/frontend/lib/api/📁_api|api/]]
-- [[erp/frontend/lib/mes/📁_mes|mes/]]
-- [[erp/frontend/lib/ui/📁_ui|ui/]]
+- 상위 폴더: [[ERP/frontend/📁_frontend]]

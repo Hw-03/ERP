@@ -1,22 +1,95 @@
 ---
+type: file-explanation
+source_path: "backend/tests/concurrency/test_request_code_unique.py"
+importance: normal
 layer: backend
----
-type: code-note
-status: active
-updated: 2026-05-21
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
 ---
 
-# test_request_code_unique.py — request_code 중복 방지
+# test_request_code_unique.py — test_request_code_unique.py 설명
 
-> [!summary] 1000건 동시 생성해도 request_code (SR-YYYYMMDD-HHMMSS-XXXXXXXX) unique
+## 이 파일은 무엇을 책임지나
 
-## 1. 역할
-32비트 엔트로피 + IntegrityError retry로 중복 없는 요청 코드 생성. 동시 다중 요청에서 유일성 검증.
+`test_request_code_unique.py`는 백엔드 동작이 깨지지 않았는지 자동으로 확인하는 테스트 파일입니다.
 
-## 2. 실제 원본 위치
-`erp/backend/tests/concurrency/test_request_code_unique.py`
+## 업무 흐름에서의 의미
 
-## 3. 관련 형제 파일
-- [[test_submit_concurrent.py.md|동시 제출]]
-- [[test_approve_concurrent.py.md|동시 승인]]
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
+
+## 언제 보면 좋나
+
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
+
+## 중요한 내용
+
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
+
+- `_setup`
+- `test_concurrent_request_code_no_duplicate`
+
+## 연결되는 파일
+
+- [[ERP/backend/tests/concurrency/📁_concurrency]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 핵심 발췌
+
+```python
+"""동시성 테스트: request_code 중복 없음.
+
+1000건 동시 생성해도 request_code 가 unique해야 한다.
+(SR-YYYYMMDD-HHMMSS-XXXXXXXX 형식, 32비트 엔트로피 + IntegrityError retry)
+"""
+
+from __future__ import annotations
+
+import sys
+import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from decimal import Decimal
+from pathlib import Path
+
+import pytest
+
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
+from app.models import (
+    DepartmentEnum,
+    Employee,
+    EmployeeLevelEnum,
+    Inventory,
+    Item,
+    RequestBucketEnum,
+    StockRequest,
+    StockRequestStatusEnum,
+    StockRequestTypeEnum,
+)
+from app.services import stock_requests as svc
+
+
+def _setup(make_session):
+    """테스트용 직원 + 품목 + 재고 생성."""
+    session = make_session()
+
+    emp = Employee(
+        employee_code="CTEST01",
+        name="테스트직원",
+        role="조립/사원",
+        department=DepartmentEnum.ASSEMBLY.value,
+        level=EmployeeLevelEnum.STAFF,
+        is_active=True,
+        display_order=0,
+    )
+    session.add(emp)
+    session.flush()
+
+    item = Item(item_name="코드테스트품목", process_type_code="TR", unit="EA")
+    session.add(item)
+    session.flush()
+
+    inv = Inventory(
+```

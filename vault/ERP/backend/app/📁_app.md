@@ -1,53 +1,50 @@
 ---
-type: index
-project: DEXCOWIN MES
+type: folder-note
+source_path: "backend/app"
+importance: important
 layer: backend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/backend/app/
-tags: [vault, index, folder-marker]
-aliases:
-  - "app"
-  - "app.md"
+graph: hub
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
 # 📁 app
 
-> [!summary] 역할
-> DEXCOWIN MES 백엔드의 Python 패키지 루트. FastAPI 앱 생성, ORM 모델 정의, Pydantic 스키마, DB 연결, 라우터·서비스·유틸리티 서브 패키지가 모두 여기서 출발한다.
+## 이 폴더는 무엇을 위한 곳인가
 
-> [!info] 코드 미러 영역
-> 이 폴더는 `erp/backend/app/` 의 vault 미러. 자식 파일들의 분석 노트가 모여 있다.
+백엔드 애플리케이션의 본체입니다. 서버 시작점, DB 연결, 모델, 스키마, 라우터, 서비스가 모여 있습니다.
 
-## 어떤 파일들이 있나
+## 현장 업무와의 관계
 
-핵심 파일:
-- `[[erp/backend/app/main.py|main.py]]` — FastAPI 앱 인스턴스 생성, 미들웨어 등록, 라우터 include. 서버 기동 자체로 DB 가 변하지 않도록 설계됨.
-- `[[erp/backend/app/models.py|models.py]]` — SQLAlchemy ORM 모델 전체 (Item, Inventory, InventoryLocation, TransactionLog, StockRequest, Employee, Department …). 스키마 변경 시 마이그레이션 영향.
-- `[[erp/backend/app/schemas.py|schemas.py]]` — Pydantic 응답·요청 모델. 프런트엔드 API 계약과 직결.
-- `[[erp/backend/app/database.py|database.py]]` — SQLAlchemy 엔진·세션·`get_db` 의존성. `_is_sqlite()` 플래그 포함.
-- `[[erp/backend/app/_logging.py|_logging.py]]` — 구조화 로거 설정. `setup_logging()` / `get_logger()` 제공.
+현장 화면의 거의 모든 저장/조회 동작이 이 폴더를 거칩니다.
 
-부수 파일: `__init__.py` (패키지 마커), `__pycache__/` (무시).
+## 언제 보면 좋나
 
-## 도메인 컨텍스트
+- 백엔드 오류의 원인을 따라갈 때
+- 어떤 API가 어떤 업무 규칙을 쓰는지 확인할 때
+- DB와 화면 사이의 데이터 약속을 볼 때
 
-시스템 전체의 기술 진입점. `main.py` 에서 15개 라우터를 `include_router` 로 마운트하고, `audit_csv_svc.register_session_listeners()` 로 감사 이벤트를 연결한다. DB 초기화·시드는 `backend/bootstrap_db.py --all` 로만 수행한다.
+## 주요 하위 폴더
 
-## ⚠️ 위험 포인트
+- [[ERP/backend/app/routers/📁_routers]] — 프론트엔드가 호출하는 API 문입니다. URL별로 요청을 받아 서비스 로직으로 넘깁니다.
+- [[ERP/backend/app/services/📁_services]] — API 라우터 안에서 바로 처리하기 어려운 실제 업무 규칙을 모아 둔 곳입니다.
+- [[ERP/backend/app/utils/📁_utils]] — `backend/app/utils`는 백엔드 안의 세부 폴더입니다.
 
-- `models.py` ORM 변경 → `bootstrap_db.py` 재실행 또는 마이그레이션 스크립트 작성 필요. 스키마 드리프트 발생 가능.
-- `schemas.py` Pydantic 모델 변경 → 프런트엔드 API 타입 불일치 즉시 발생.
-- `main.py` 미들웨어 순서 변경 → CORS 오류 또는 인증 우회 위험.
+## 먼저 볼 파일 5개
 
-## 관련 가이드
+- [[ERP/backend/app/database.py]] — `database.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/database.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
+- [[ERP/backend/app/models.py]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 파일입니다.
+- [[ERP/backend/app/schemas.py]] — 백엔드와 프론트엔드가 주고받는 데이터 모양을 정하는 파일입니다.
+- [[ERP/backend/app/__init__.py]] — `__init__.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/__init__.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
+- [[ERP/backend/app/_logging.py]] — `_logging.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/_logging.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-- [[erp/_vault/guides/bootstrap-db|bootstrap-db]]
-- [[erp/_vault/guides/run-backend|run-backend]]
+> [!info]- 추가 파일
+> - [[ERP/backend/app/main.py]] — main.py
 
-## 자식 폴더
+## 조심할 점
 
-- [[erp/backend/app/routers/📁_routers|routers/]] — 15개 라우터 + inventory 서브 패키지
-- [[erp/backend/app/services/📁_services|services/]] — 14개 비즈니스 로직 서비스
-- [[erp/backend/app/utils/📁_utils|utils/]] — excel, item_code 등 유틸리티
+이 폴더는 운영 핵심입니다. 특히 models.py, schemas.py, services, routers는 서로 맞물려 있으므로 한 파일만 보고 고치면 위험합니다.
+
+## 다음에 볼 위치
+
+- 상위 폴더: [[ERP/backend/📁_backend]]

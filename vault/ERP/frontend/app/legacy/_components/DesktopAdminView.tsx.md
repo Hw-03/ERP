@@ -1,215 +1,99 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "frontend/app/legacy/_components/DesktopAdminView.tsx"
+importance: critical
 layer: frontend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/app/legacy/_components/DesktopAdminView.tsx
-tags: [vault, code-note, frontend, component]
-aliases: [DesktopAdminView, 관리자 화면, 관리 탭]
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# DesktopAdminView.tsx — 관리자 탭
+# DesktopAdminView.tsx — DesktopAdminView.tsx 설명
 
-#layer/frontend #topic/component #topic/legacy
+## 이 파일은 무엇을 책임지나
 
-> [!summary] 한 줄 요약
-> 관리자 탭의 최상위 컴포넌트. PIN 잠금 게이트 → 좌측 섹션 사이드바 + 중앙 워크스페이스 + 우측 요약 패널 3단 레이아웃. 본 파일은 레이아웃과 토스트 영역만 담당하고, 실제 섹션 콘텐츠는 하위 컴포넌트에 위임한다.
+`DesktopAdminView.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
 
----
+## 업무 흐름에서의 의미
 
-## 1. 위치 & 관계
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-| 항목 | 내용 |
-|------|------|
-| 원본 | `erp/frontend/app/legacy/_components/DesktopAdminView.tsx` |
-| 레이어 | frontend / component |
-| `"use client"` | O |
-| 소비자 | [[erp/frontend/app/legacy/_components/DesktopLegacyShell.tsx]] |
+## 언제 보면 좋나
 
-```mermaid
-graph TD
-  AV["DesktopAdminView"] -->|PIN 미잠금| PL["DesktopPinLock<br/>(PIN 입력 화면)"]
-  AV -->|PIN 잠금 해제 후| LAYOUT["3단 레이아웃"]
-  LAYOUT --> SB["AdminSidebar<br/>(섹션 목록)"]
-  LAYOUT --> SC["AdminSectionContent<br/>(섹션별 콘텐츠)"]
-  LAYOUT --> RP["DesktopRightPanel<br/>(요약 패널)"]
-  RP --> ARP["AdminRightPanelContent"]
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
+- 운영 데이터가 달라질 수 있는 변경을 준비할 때
 
-  style AV fill:#1e3a5f,color:#e0f0ff
-  style PL fill:#5f1e1e,color:#ffe0e0
-```
+## 중요한 내용
 
----
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-## 2. 관리자 섹션 목록
+- `DesktopAdminView`
 
-| 섹션 ID | 라벨 | 설명 |
-|---------|------|------|
-| `models` | 모델 | 제품 모델 추가/삭제 (기본 섹션) |
-| `items` | 품목 | 품목 기본 정보 수정 |
-| `employees` | 직원 | 직원 활성 상태 관리 |
-| `bom` | BOM | 부모-자식 자재 구성 |
-| `packages` | 출하묶음 | 패키지 구성 관리 |
-| `export` | 내보내기 | 엑셀 데이터 내보내기 |
-| `departments` | 부서 | 부서 마스터 관리 |
-| `settings` | 설정 | PIN 변경, 감사 CSV, DB 초기화 |
+## 연결되는 파일
 
----
+- [[ERP/frontend/app/legacy/_components/📁__components]] — 이 파일이 속한 폴더의 안내판입니다.
 
-## 3. 3개 주요 훅
+## 조심할 점
 
-```typescript
-// PIN/섹션/우측패널 UI 상태
-const {
-  unlocked, adminPin, section, showRightPanel, selectedDept,
-  unlock, lock, selectSection, togglePanel, ...
-} = useAdminViewState("models");
+이 파일은 운영 데이터, 재고 수량, 승인 상태, DB 구조, 백업/복구 중 하나와 직접 연결됩니다. 수정 전에는 관련 테스트, 백업 여부, 연결 화면/API를 반드시 확인해야 합니다.
 
-// 마스터 데이터 로드 (품목/직원/모델/부서/BOM)
-const {
-  items, employees, productModels, departments, allBomRows,
-  refreshAllBom, refreshItems, loadData,
-} = useAdminBootstrap({ unlocked, globalSearch, onError: setMessage });
-
-// PIN 변경, DB 초기화
-const {
-  pinForm, setPinForm, changePin, resetDatabase, ...
-} = useAdminSettings({ onStatusChange, onError: setMessage, onAfterReset: loadData });
-```
-
----
-
-## 4. PIN 잠금 흐름
-
-```mermaid
-sequenceDiagram
-  participant U as 관리자
-  participant AV as DesktopAdminView
-  participant PL as DesktopPinLock
-  participant API as adminApi
-
-  AV->>PL: unlocked === false → PinLock 렌더
-  U->>PL: PIN 입력
-  PL->>API: verifyAdminPin(pin)
-  alt 성공
-    API-->>PL: {message: "ok"}
-    PL->>AV: onUnlocked()
-    AV->>AV: unlock() → unlocked = true
-    AV-->>U: 3단 레이아웃 렌더
-  else 실패
-    API-->>PL: ApiError(403)
-    PL-->>U: "PIN이 올바르지 않습니다"
-  end
-```
-
----
-
-## 5. 코드 발췌 — 레이아웃 + 토스트
+## 핵심 발췌
 
 ```tsx
-// PIN 미잠금: 잠금 화면
-if (!unlocked) {
-  return (
-    <DesktopPinLock
-      onUnlocked={unlock}
-      onCancel={() => router.push("/legacy?tab=dashboard", { scroll: false })}
-    />
-  );
-}
+"use client";
 
-// 잠금 해제 후: 3단 레이아웃
-return (
-  <div className="flex min-h-0 flex-1 gap-4 pl-0 pr-4 overflow-y-auto lg:overflow-hidden">
-    {/* 좌측 섹션 사이드바 (240px) + 중앙 워크스페이스 (1fr) */}
-    <div style={{ gridTemplateColumns: "240px minmax(0,1fr)" }}>
-      <AdminSidebar section={section} onSelect={selectSection} onLock={lock} ... />
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { PanelRight } from "lucide-react";
+import { DesktopRightPanel } from "./DesktopRightPanel";
+import { DesktopPinLock } from "./DesktopPinLock";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { AdminSidebar } from "./_admin_sections/AdminSidebar";
+import { AdminSectionContent } from "./_admin_sections/AdminSectionContent";
+import { AdminRightPanelContent } from "./_admin_sections/AdminRightPanelContent";
+import { useAdminBootstrap } from "./_admin_hooks/useAdminBootstrap";
+import { useAdminSettings } from "./_admin_hooks/useAdminSettings";
+import { useAdminViewState } from "./_admin_hooks/useAdminViewState";
 
-      <section className="flex flex-col overflow-auto">
-        {/* 토스트 영역 */}
-        {(saveMessage || message) && (
-          <div role="alert" aria-live="polite">
-            {saveMessage && <div style={{ color: LEGACY_COLORS.green }}>...</div>}
-            {message   && <div style={{ color: LEGACY_COLORS.red }}>...</div>}
-          </div>
-        )}
+/**
+ * 섹션 헤더와 KPI는 각 섹션이 직접 그린다 (AdminPageHeader / AdminKpiBar 사용).
+ * 본 파일은 PIN gate, 좌/우 레이아웃 wrapper, 토스트 영역만 담당.
+ */
+export function DesktopAdminView({
+  globalSearch,
+  onStatusChange,
+}: {
+  globalSearch: string;
+  onStatusChange: (status: string) => void;
+}) {
+  const router = useRouter();
+  const {
+    unlocked,
+    adminPin,
+    section,
+    showRightPanel,
+    selectedDept,
+    setSelectedDept,
+    unlock,
+    lock,
+    selectSection,
+    togglePanel,
+  } = useAdminViewState("models");
 
-        {/* 섹션별 콘텐츠 위임 */}
-        <AdminSectionContent
-          section={section}
-          items={items} employees={employees} productModels={productModels}
-          departments={departments} allBomRows={allBomRows}
-          changePin={changePin} resetDatabase={resetDatabase}
-          adminPin={adminPin}
-          ...
-        />
-# ... (이하 11줄 생략. 원본 참조)
+  const [message, setMessage] = useState("");
 
+  const {
+    items, setItems,
+    employees, setEmployees,
+    productModels, setProductModels,
+    departments, setDepartments,
+    allBomRows,
+    refreshAllBom,
+    refreshItems,
+    loadData,
+  } = useAdminBootstrap({
+    unlocked,
+    globalSearch,
+    onError: setMessage,
 ```
-
----
-
-## 6. 우측 패널 토글
-
-```typescript
-// AdminSidebar 에서 버튼 클릭 → togglePanel() 호출
-// showRightPanel true/false 토글
-// 너비 0 ↔ 420px CSS 전환
-```
-
-`<PanelRight>` lucide 아이콘 버튼으로 토글한다.
-
----
-
-## 7. 토스트 색상 규칙
-
-| 종류 | 변수 | 색상 |
-|------|------|------|
-| `saveMessage` | 성공 메시지 | `LEGACY_COLORS.green` |
-| `message` | 에러 메시지 | `LEGACY_COLORS.red` |
-
-`role="alert" aria-live="polite"` 로 접근성 지원.
-
----
-
-## 8. `useAdminViewState` 초기 섹션
-
-```typescript
-useAdminViewState("models")
-//                 ↑
-// 관리자 탭 진입 시 기본으로 "모델" 섹션을 표시
-```
-
-`DesktopLegacyShell` 에서 admin 탭은 key 가 `"admin"` 으로 고정되어 remount 되지 않는다. 따라서 탭을 이동했다 돌아와도 입력 중이던 폼이 유지된다.
-
----
-
-## 9. 관련 파일
-
-- [[erp/frontend/app/legacy/_components/DesktopLegacyShell.tsx]] — 부모 컴포넌트
-- [[erp/frontend/lib/api/admin.ts]] — verifyAdminPin, updateAdminPin, resetDatabase
-- `erp/frontend/app/legacy/_components/_admin_hooks/useAdminViewState.ts`
-- `erp/frontend/app/legacy/_components/_admin_hooks/useAdminBootstrap.ts`
-- `erp/frontend/app/legacy/_components/_admin_hooks/useAdminSettings.ts`
-- `erp/frontend/app/legacy/_components/_admin_sections/AdminSectionContent.tsx`
-- [[erp/backend/app/routers/settings.py]] — PIN/DB 리셋 백엔드
-
----
-
-## 10. 주의 사항
-
-> [!warning] `resetDatabase` — PIN 재확인 포함
-> DB 초기화는 `useAdminSettings.resetDatabase` 에서 처리된다. PIN 이 다시 한번 서버로 전달되어 검증 후 초기화된다. 취소 불가능한 작업이므로 UI 에서 반드시 이중 확인을 받아야 한다.
-
-> [!info] admin 탭 remount 방지
-> `DesktopLegacyShell` 의 `content = useMemo(...)` 에서 admin 탭은 `key="admin"` 고정.
-> 탭 재클릭 시 `refreshNonce` 가 변하지 않아 자식이 unmount/remount 되지 않는다.
-
----
-
-## 11. 정책
-
-- `main` 브랜치: 코드만 유지
-- `vault-sync` 브랜치: 코드 + `vault/` 노트
-- 코드와 노트가 다르면 실제 코드 우선

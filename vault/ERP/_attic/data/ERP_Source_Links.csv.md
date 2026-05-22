@@ -1,24 +1,44 @@
 ---
-type: code-note
+type: file-explanation
+source_path: "_attic/data/ERP_Source_Links.csv"
+importance: reference
+layer: archive
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
-layer: attic
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/_attic/data/ERP_Source_Links.csv
-tags: [vault, code-note, auto-generated, stub, mirror-fill]
 ---
 
-# ERP_Source_Links.csv
+# ERP_Source_Links.csv — ERP_Source_Links.csv 설명
 
-> [!info] 1:1 미러 stub
-> 탐색기에 보이는 폴더 구조를 vault 에 그대로 반영하기 위한 stub.
-> 원본: [[erp/_attic/data/ERP_Source_Links.csv]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄 (또는 메타)
+`ERP_Source_Links.csv`는 현재 운영 코드가 아니라 과거 자료나 실험 결과를 보관한 참고 파일입니다.
 
-```
-﻿item_id,source_file,source_sheet,source_row,original_name
+## 업무 흐름에서의 의미
+
+과거 맥락을 이해하는 데 도움은 되지만, 현재 운영 기준으로 바로 사용하면 안 됩니다.
+
+## 언제 보면 좋나
+
+- 과거 자료의 의미를 확인할 때
+- 현재 코드와 비교할 참고 근거가 필요할 때
+
+## 중요한 내용
+
+자동으로 뽑을 수 있는 함수/클래스 목록은 적지만, 파일 위치와 확장자로 볼 때 위 역할을 맡습니다.
+
+## 연결되는 파일
+
+- [[ERP/_attic/data/📁_data]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+보관 자료입니다. 현재 코드처럼 믿고 수정하거나 실행하지 않습니다.
+
+## 핵심 발췌
+
+```csv
+item_id,source_file,source_sheet,source_row,original_name
 RM-000001,A,26.03월,4,전극(70kV)
 RM-000002,A,26.03월,5,텅스텐 필라멘트
 RM-000003,A,26.03월,6,텅스텐 필라멘트
@@ -43,4 +63,34 @@ RM-000020,C,고압,3,캐논튜브 [ D-081B ] _ 60KV
 RM-000021,A,26.03월,24,TUBE
 RM-000021,C,고압,4,캐논튜브 [ D-041 ] _ 70KV 
 RM-000022,A,26.03월,25,TUBE
+RM-000022,C,고압,6,세라믹튜브 [DXDR-070] _ 70KV
+RM-000023,A,26.03월,26,TUBE
+RM-000023,C,고압,5,캐논튜브 [ D-0813 ] _ 80KV 
+RM-000024,A,26.03월,27,TUBE
+RM-000024,C,고압,8,CEI튜브 [OX-70] _ 90KV
+RM-000025,A,26.03월,28,TUBE
+RM-000025,C,고압,7,세라믹튜브 [DXDR-100] _ 100KV
+RM-000026,A,26.03월,29,튜브 하우징 파이프
+RM-000026,C,고압,101,베이클라이트 하우징 파이프
+RM-000027,A,26.03월,30,튜브 하우징 파이프
+RM-000027,C,고압,102,70KV 튜브 하우징용 파이프
+RM-000028,A,26.03월,31,튜브 하우징 파이프
+RM-000028,C,고압,102,70KV 튜브 하우징용 파이프
+RM-000029,A,26.03월,32,네온램프
+RM-000029,C,고압,10,네온램프(NEON-5T)
+RM-000030,A,26.03월,33,고압 다이오드
+RM-000030,C,고압,9,"고압다이오드 2CL77 [20KV, 5mA]"
+RM-000031,A,26.03월,34,고압 다이오드
+RM-000031,C,고압,18,DL1500(다이오드)
+RM-000032,A,26.03월,35,고압 다이오드
+RM-000032,C,고압,24,DD1800 (신규 다이오드)
+RM-000033,A,26.03월,36,15㏀ 고압용 저항
+RM-000033,C,고압,13,"고압용 (15㏀±1％, DIP) - 1/4W"
+RM-000034,A,26.03월,37,30㏀ 고압용 저항
+RM-000034,C,고압,12,고압용 (30㏀)
+RM-000035,A,26.03월,38,500Ω 고압용 저항
+RM-000035,C,고압,14,"고압용 (500Ω±1％, DIP) - 1/4W"
+RM-000036,A,26.03월,39,"1.7W,10kV 시멘트저항 짧은 것"
+RM-000036,C,고압,20,RK92-18XD 307J 시멘트저항 긴 것
+RM-000037,A,26.03월,40,"2.7W,15kV 시멘트저항 긴 것"
 ```

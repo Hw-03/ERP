@@ -1,38 +1,46 @@
 ---
-type: index
-project: DEXCOWIN MES
+type: folder-note
+source_path: "frontend/app/legacy/_components/_admin_hooks"
+importance: normal
 layer: frontend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/app/legacy/_components/_admin_hooks/
-tags: [vault, index, folder-marker]
-aliases:
-  - "_admin_hooks"
-  - "_admin_hooks.md"
+graph: hub
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# _admin_hooks
+# 📁 _admin_hooks
 
-> [!summary] 역할
-> `frontend/app/legacy/_components/_admin_hooks/` 아래 원본 파일들을 Obsidian에서 탐색하기 위한 폴더 허브다.
+## 이 폴더는 무엇을 위한 곳인가
 
-## 원본 위치
+`frontend/app/legacy/_components/_admin_hooks`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
 
-- Source: `frontend/app/legacy/_components/_admin_hooks/`
-- File count: `5`
+## 현장 업무와의 관계
 
-## 파일 노트
+사용자가 보는 화면이나 화면이 서버와 통신하는 방식에 연결됩니다.
 
-- [[frontend/app/legacy/_components/_admin_hooks/useAdminBom.ts|useAdminBom.ts]]
-- [[frontend/app/legacy/_components/_admin_hooks/useAdminEmployees.ts|useAdminEmployees.ts]]
-- [[frontend/app/legacy/_components/_admin_hooks/useAdminMasterItems.ts|useAdminMasterItems.ts]]
-- [[frontend/app/legacy/_components/_admin_hooks/useAdminModels.ts|useAdminModels.ts]]
-- [[frontend/app/legacy/_components/_admin_hooks/useAdminPackages.ts|useAdminPackages.ts]]
+## 언제 보면 좋나
 
-## 읽는 팁
+- 이 폴더 안의 파일이 어떤 역할인지 빠르게 파악할 때
+- 수정 전에 먼저 읽을 파일을 고를 때
 
-- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
-- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
+## 먼저 볼 파일 5개
 
-Up: [[frontend/app/legacy/_components/_components|frontend/app/legacy/_components]]
+- [[ERP/frontend/app/legacy/_components/_admin_hooks/useAdminBootstrap.ts]] — `useAdminBootstrap.ts`는 관리자 화면의 한 부분을 담당하는 TypeScript/React 코드입니다. 직원, 품목, BOM, 설정 같은 관리 작업과 연결됩니다.
+- [[ERP/frontend/app/legacy/_components/_admin_hooks/useAdminDepartments.ts]] — `useAdminDepartments.ts`는 관리자 화면의 한 부분을 담당하는 TypeScript/React 코드입니다. 직원, 품목, BOM, 설정 같은 관리 작업과 연결됩니다.
+- [[ERP/frontend/app/legacy/_components/_admin_hooks/useAdminEmployees.ts]] — `useAdminEmployees.ts`는 관리자 화면의 한 부분을 담당하는 TypeScript/React 코드입니다. 직원, 품목, BOM, 설정 같은 관리 작업과 연결됩니다.
+- [[ERP/frontend/app/legacy/_components/_admin_hooks/useAdminEmployeesConfirm.ts]] — `useAdminEmployeesConfirm.ts`는 관리자 화면의 한 부분을 담당하는 TypeScript/React 코드입니다. 직원, 품목, BOM, 설정 같은 관리 작업과 연결됩니다.
+- [[ERP/frontend/app/legacy/_components/_admin_hooks/useAdminEmployeesForm.ts]] — `useAdminEmployeesForm.ts`는 관리자 화면의 한 부분을 담당하는 TypeScript/React 코드입니다. 직원, 품목, BOM, 설정 같은 관리 작업과 연결됩니다.
+
+> [!info]- 추가 파일
+> - [[ERP/frontend/app/legacy/_components/_admin_hooks/useAdminMasterItems.ts]] — useAdminMasterItems.ts
+> - [[ERP/frontend/app/legacy/_components/_admin_hooks/useAdminModels.ts]] — useAdminModels.ts
+> - [[ERP/frontend/app/legacy/_components/_admin_hooks/useAdminSettings.ts]] — useAdminSettings.ts
+> - [[ERP/frontend/app/legacy/_components/_admin_hooks/useAdminViewState.ts]] — useAdminViewState.ts
+
+## 조심할 점
+
+폴더 성격을 먼저 확인하고 현재 운영 코드인지, 보관 자료인지, 자동 생성물인지 구분해야 합니다.
+
+## 다음에 볼 위치
+
+- 상위 폴더: [[ERP/frontend/app/legacy/_components/📁__components]]

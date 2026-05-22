@@ -1,22 +1,95 @@
 ---
+type: file-explanation
+source_path: "backend/tests/concurrency/test_approve_reject_conflict.py"
+importance: normal
 layer: backend
----
-type: code-note
-status: active
-updated: 2026-05-21
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
 ---
 
-# test_approve_reject_conflict.py — 승인/반려 경쟁
+# test_approve_reject_conflict.py — test_approve_reject_conflict.py 설명
 
-> [!summary] 같은 요청에 승인+반려 동시 실행 → 터미널 상태 1개만 유지
+## 이 파일은 무엇을 책임지나
 
-## 1. 역할
-10쌍(승인+반려) 스레드 동시 실행. RESERVED → COMPLETED 또는 REJECTED만 허용. TransactionLog 최대 1건, 음수 재고 방지 검증.
+`test_approve_reject_conflict.py`는 백엔드 동작이 깨지지 않았는지 자동으로 확인하는 테스트 파일입니다.
 
-## 2. 실제 원본 위치
-`erp/backend/tests/concurrency/test_approve_reject_conflict.py`
+## 업무 흐름에서의 의미
 
-## 3. 관련 형제 파일
-- [[test_approve_concurrent.py.md|순수 동시 승인]]
-- [[test_inventory_invariant.py.md|재고 불변식]]
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
+
+## 언제 보면 좋나
+
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
+
+## 중요한 내용
+
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
+
+- `_setup`
+- `test_approve_reject_conflict`
+
+## 연결되는 파일
+
+- [[ERP/backend/tests/concurrency/📁_concurrency]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 핵심 발췌
+
+```python
+"""동시성 테스트: approve + reject 같은 요청에 동시 실행 → 둘 중 하나만 성공.
+
+RESERVED 요청을 10 쌍(승인 1 + 반려 1)이 동시에 처리할 때:
+- 최종 상태가 COMPLETED 또는 REJECTED 중 하나여야 한다.
+- TransactionLog 는 최대 1건 (COMPLETED 경우만 생성).
+- Inventory 재고는 음수 없음.
+"""
+
+from __future__ import annotations
+
+import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from decimal import Decimal
+from pathlib import Path
+
+import pytest
+
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
+from app.models import (
+    DepartmentEnum,
+    Employee,
+    EmployeeLevelEnum,
+    Inventory,
+    Item,
+    RequestBucketEnum,
+    StockRequest,
+    StockRequestLine,
+    StockRequestStatusEnum,
+    StockRequestTypeEnum,
+    TransactionLog,
+)
+from app.services import stock_requests as svc
+from app.services.pin_auth import DEFAULT_PIN_HASH
+
+
+def _setup(make_session):
+    session = make_session()
+
+    requester = Employee(
+        employee_code="AREQ01",
+        name="요청자_AR",
+        role="조립/사원",
+        department=DepartmentEnum.ASSEMBLY.value,
+        level=EmployeeLevelEnum.STAFF,
+        is_active=True,
+        display_order=0,
+    )
+    approver = Employee(
+        employee_code="AWHA01",
+        name="창고담당자_AR",
+        role="조립/사원",
+        department=DepartmentEnum.ASSEMBLY.value,
+```

@@ -1,201 +1,102 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "frontend/app/legacy/_components/_history_sections/HistoryTable.tsx"
+importance: important
 layer: frontend
-source_path: erp/frontend/app/legacy/_components/_history_sections/HistoryTable.tsx
-status: active
-updated: 2026-05-21
-tags:
-  - layer/frontend
-  - topic/history
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# HistoryTable.tsx
+# HistoryTable.tsx — HistoryTable.tsx 설명
 
-> [!summary] 역할
-> **입출고 내역 테이블 컴포넌트.** 거래 로그를 solo(단건)·batch(레거시 묶음)·op_batch(2.0 IoBatch 묶음) 세 종류로 그룹핑해서 접기/펼치기 테이블로 렌더링한다. op_batch는 Intersection Observer 기반 lazy fetch로 IoBatch 상세를 로드한다.
+## 이 파일은 무엇을 책임지나
 
----
+`HistoryTable.tsx`는 입출고 내역 화면에서 날짜, 목록, 상세, 묶음 작업을 보여주는 화면 부품입니다.
 
-## 1. 위치
+## 업무 흐름에서의 의미
 
-```
-erp/frontend/app/legacy/_components/_history_sections/HistoryTable.tsx
-```
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-**부모**: `DesktopHistoryView.tsx`
+## 언제 보면 좋나
 
----
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-## 2. 역할 한 줄 요약
+## 중요한 내용
 
-`TransactionLog[]`를 받아 날짜·참조번호·배치ID 기준으로 그룹핑하고, 각 그룹을 접기/펼치기 가능한 테이블 행으로 렌더링한다. 선택 행은 우측 패널(HistoryDetailPanel)과 연동된다.
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
----
+- `HistoryTable`
+- `Props`
 
-## 3. Props
+## 연결되는 파일
 
-| prop | 타입 | 설명 |
-|---|---|---|
-| `loading` | `boolean` | 최초 로딩 상태 |
-| `filteredLogs` | `TransactionLog[]` | 필터링된 거래 로그 |
-| `totalCount` | `number \| undefined` | 서버 전체 건수 (헤더 진행률 표시) |
-| `selection` | `HistorySelection \| null` | 현재 선택된 항목 (log 또는 batch) |
-| `onSelectLog` | `(log) => void` | 단건 선택 콜백 |
-| `onSelectBatch` | `(batchId, logs) => void` | 배치 선택 콜백 |
-| `batchCache` | `Map<string, IoBatch>` | 부모와 공유하는 IoBatch 캐시 |
-| `setBatchCache` | `Dispatch` | 캐시 업데이트 |
-| `canLoadMore` | `boolean` | "100건 더보기" 버튼 표시 여부 |
-| `loadingMore` | `boolean` | 추가 로딩 중 |
-| `onLoadMore` | `() => void` | 추가 로드 콜백 |
+### 먼저 같이 볼 파일
+- [[ERP/frontend/app/legacy/_components/DesktopHistoryView.tsx]] — `DesktopHistoryView.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+- [[ERP/frontend/lib/api/inventory.ts]] — `inventory.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
+- [[ERP/backend/app/routers/inventory/transactions.py]] — `transactions.py`는 재고 업무 API 중 한 영역을 맡는 Python 코드입니다. 화면에서 들어온 요청을 검증하고 실제 재고 서비스로 넘기는 관문입니다.
 
----
+## 조심할 점
 
-## 4. 그룹 타입 3종
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
 
-```typescript
-// historyTableHelpers.ts의 buildGroups 결과
-type GroupRow =
-  | { type: "solo";     log: TransactionLog }
-  | { type: "batch";    refNo: string; logs: TransactionLog[] }
-  | { type: "op_batch"; batchId: string; logs: TransactionLog[] }
-```
-
-| 그룹 타입 | 설명 | 클릭 동작 |
-|---|---|---|
-| `solo` | reference_no 없는 단건 | `onSelectLog(log)` |
-| `batch` | 레거시 reference_no 기준 묶음 | 첫 로그 선택 + 펼침 |
-| `op_batch` | 입출고 2.0 IoBatch 묶음 | `onSelectBatch(batchId, logs)` + 펼침/접기 |
-
----
-
-## 5. op_batch Lazy Fetch 메커니즘
-
-```mermaid
-flowchart TD
-    A["Intersection Observer\n생성 (마운트 1회)"] --> B["opBatchRowRef 콜백\n→ observe(el)"]
-    B --> C{뷰포트 120px 이내?}
-    C -->|진입| D["enqueueBatchFetch(batchId)"]
-    D --> E{캐시 or 대기 중?}
-    E -->|없음| F["fetchQueueRef에 추가\ntryDrainQueue()"]
-    F --> G["ioApi.getBatch(batchId)\n동시성 max 4"]
-    G --> H["setBatchCache 갱신"]
-```
-
-```typescript
-const VISIBLE_FETCH_CONCURRENCY = 4;  // 동시 최대 4개 fetch
-
-const enqueueBatchFetch = useCallback((batchId: string) => {
-  if (batchCacheRef.current.has(batchId)) return;  // 캐시 히트
-  if (pendingFetchesRef.current.has(batchId)) return;  // 이미 대기 중
-  pendingFetchesRef.current.add(batchId);
-  fetchQueueRef.current.push(batchId);
-  tryDrainQueue();
-}, [tryDrainQueue]);
-```
-
-> [!info] Eager Prefetch도 함께
-> op_batch 그룹은 visible 여부와 무관하게 마운트 시 큐에 추가된다(`groups` useMemo 이후). 이는 접힌 묶음도 sub_type 기준 구분 라벨이 즉시 정확하게 표시되도록 하기 위함이다.
-
----
-
-## 6. 선택 상태와 자동 토글
-
-```typescript
-const prevSelectedBatchRef = useRef<string | null>(null);
-useEffect(() => {
-  const currentBatchId = selection?.kind === "batch" ? selection.batchId : null;
-  const prevBatchId = prevSelectedBatchRef.current;
-  // 이전 선택 묶음 접기, 새 묶음 펼치기
-  setExpandedGroups((s) => {
-    const next = new Set(s);
-    if (prevBatchId && next.has(prevBatchId)) next.delete(prevBatchId);
-    if (currentBatchId && !next.has(currentBatchId)) next.add(currentBatchId);
-    return next;
-  });
-}, [selection]);
-```
-
-수동 chevron으로 펼친 다른 묶음은 그대로 유지하고, 선택이 변경된 묶음만 자동 토글한다.
-
----
-
-## 7. 코드 발췌 — 테이블 렌더링 분기
+## 핵심 발췌
 
 ```tsx
-{groups.map((group) => {
-  if (group.type === "solo") {
-    return <HistoryLogRow key={group.log.log_id} log={group.log}
-      selected={selectedLogId === group.log.log_id} onSelect={onSelectLog} />;
-  }
+"use client";
 
-  if (group.type === "op_batch") {
-    const expanded = expandedGroups.has(group.batchId);
-    const batch = batchCache.get(group.batchId) ?? null;
-    return (
-      <Fragment key={`op-${group.batchId}`}>
-        <OpBatchHeader group={group} expanded={expanded} batch={batch}
-          onToggle={() => toggleGroup(group.batchId)}
-          onSelect={() => { onSelectBatch(group.batchId, group.logs); ... }}
-          rowRef={opBatchRowRef} />
-        {expanded && <BomBatchDetail batchId={group.batchId} ... />}
-      </Fragment>
-    );
-  }
+import { ChevronDown } from "lucide-react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { TransactionLog } from "@/lib/api";
+import { ioApi } from "@/lib/api/io";
+import type { IoBatch } from "@/lib/api/types/io";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { EmptyState, LoadingSkeleton } from "../common";
+import { formatHistoryDate } from "./historyFormat";
+import type { HistorySelection } from "./historyConstants";
+import { HistoryLogRow } from "./HistoryLogRow";
+import { BatchHeader, OpBatchHeader, buildGroups } from "./historyTableHelpers";
+import { BomBatchDetail } from "./BomBatchDetail";
 
-  // type === "batch" (레거시)
-  const expanded = expandedGroups.has(group.refNo);
-  return (
-    <Fragment key={`ref-${group.refNo}`}>
-      <BatchHeader group={group} expanded={expanded}
-        onToggle={() => toggleGroup(group.refNo)}
-        onSelect={() => { onSelectLog(group.logs[0]); expandGroup(group.refNo); }} />
-      {expanded && group.logs.map((log) => <HistoryLogRow key={log.log_id} ... />)}
-    </Fragment>
-  );
-})}
+type Props = {
+  loading: boolean;
+  filteredLogs: TransactionLog[];
+  /** 조건 전체 카운트(서버 summary). 헤더 진행률(`100/342건`) 표시용. */
+  totalCount?: number;
+  selection: HistorySelection | null;
+  onSelectLog: (log: TransactionLog) => void;
+  onSelectBatch: (batchId: string, logs: TransactionLog[]) => void;
+  /** 부모(DesktopHistoryView)가 들고 있는 batchCache — 우측 패널과 공유. */
+  batchCache: Map<string, IoBatch>;
+  setBatchCache: React.Dispatch<React.SetStateAction<Map<string, IoBatch>>>;
+  canLoadMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
+};
+
+const COLUMNS: { label: string; width?: string; minWidth?: string; align?: "left" | "center"; hidden?: boolean }[] = [
+  { label: "일시", width: "140px", align: "center" },
+  { label: "구분", width: "130px", align: "center" },
+  { label: "품목명", minWidth: "180px" },
+  { label: "변동요약", width: "150px", align: "center" },
+  { label: "담당자", width: "130px", align: "center", hidden: true },
+  { label: "메모", width: "70px", align: "center", hidden: true },
+];
+
+const VISIBLE_FETCH_CONCURRENCY = 4;
+
+export function HistoryTable({
+  loading,
+  filteredLogs,
+  totalCount,
+  selection,
+  onSelectLog,
+  onSelectBatch,
+  batchCache,
+  setBatchCache,
+  canLoadMore,
+  loadingMore,
+  onLoadMore,
+}: Props) {
 ```
-
----
-
-## 8. 테이블 컬럼
-
-| 컬럼 | 너비 | 비고 |
-|---|---|---|
-| 일시 | 140px | UTC → KST 변환 표시 |
-| 구분 | 130px | FlowBadge (거래 유형 배지) |
-| 품목명 | minWidth 180px | - |
-| 변동요약 | 150px | `MovementSummaryCell` (+N / -N) |
-| 담당자 | 130px | sm 이상만 표시 |
-| 메모 | 70px | sm 이상만 표시 |
-
----
-
-## 9. 전체 펼치기/접기
-
-```typescript
-const allExpanded = batchKeys.length > 0 && batchKeys.every((k) => expandedGroups.has(k));
-function toggleAll() {
-  if (allExpanded) setExpandedGroups(new Set());
-  else setExpandedGroups(new Set(batchKeys));
-}
-```
-
----
-
-## 10. 연결 관계
-
-- **부모**: `erp/frontend/app/legacy/_components/DesktopHistoryView.tsx`
-- **자식**: `HistoryLogRow`, `OpBatchHeader`, `BatchHeader`, `BomBatchDetail`
-- **헬퍼**: `erp/frontend/app/legacy/_components/_history_sections/historyTableHelpers.tsx` (`buildGroups`)
-- **API**: `erp/frontend/app/legacy/lib/api/io` (`ioApi.getBatch`)
-
----
-
-## 11. 참고 맥락
-
-> [!note] 참고
-> 이 컴포넌트는 입출고 기록 조회 화면의 테이블이다. 이해해야 할 핵심 개념:
->
-> 1. **그룹핑**: 여러 품목을 한 번에 입출고하면 여러 로그가 한 묶음(`op_batch`)으로 묶인다. 테이블에서는 접어서 한 행으로 표시하고, 클릭해서 펼치면 내부 품목들을 볼 수 있다.
-> 2. **Lazy Fetch**: 테이블에 수십 개의 op_batch가 있어도 뷰포트에 보이는 것만 API 호출로 상세를 가져온다. 스크롤하면서 점진적으로 로드된다.

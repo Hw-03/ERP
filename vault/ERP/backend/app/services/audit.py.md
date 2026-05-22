@@ -1,134 +1,101 @@
 ---
+type: file-explanation
+source_path: "backend/app/services/audit.py"
+importance: important
 layer: backend
-topic: service
-file: erp/backend/app/services/audit.py
-tags:
-  - "#layer/backend"
-  - "#topic/service"
-aliases:
-  - audit service
-  - 마스터 변경 감사
----
-type: code-note
-status: active
-updated: 2026-05-21
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
 ---
 
-# 🔐 audit.py — 마스터 변경 감사 로그
+# audit.py — audit.py 설명
 
-> [!summary]
-> 품목·직원·BOM·설정·코드 등 **마스터/설정 변경**만 `AdminAuditLog` 에 기록하는 헬퍼. 재고 변동은 `TransactionLog` 가 별도로 담당하므로 이 모듈에서 다루지 않는다. `db.add` 만 수행하고 commit 은 호출자(라우터) 가 책임진다.
+## 이 파일은 무엇을 책임지나
 
----
+`audit.py`는 `audit` 업무 규칙을 실제로 실행하는 Python 코드입니다. 라우터보다 안쪽에서 DB 조회와 변경을 담당합니다.
 
-## 1. 한 문장 목적
+## 업무 흐름에서의 의미
 
-관리자가 마스터 데이터를 변경할 때 누가, 언제, 무엇을 바꿨는지 원자적으로 기록한다.
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
 
----
+## 언제 보면 좋나
 
-## 2. 파일 위치 & 임포트 경로
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-```
-erp/backend/app/services/audit.py
-from app.services import audit
-```
+## 중요한 내용
 
----
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-## 3. API 전체
+- `record`
+
+## 연결되는 파일
+
+### 먼저 같이 볼 파일
+- [[ERP/backend/app/models.py]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 파일입니다.
+- [[ERP/backend/app/schemas.py]] — 백엔드와 프론트엔드가 주고받는 데이터 모양을 정하는 파일입니다.
+- [[ERP/backend/app/database.py]] — `database.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/database.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
+
+## 조심할 점
+
+서비스는 DB 변경을 포함할 수 있습니다. 같은 도메인의 라우터, 모델, 테스트를 함께 확인해야 합니다.
+
+## 핵심 발췌
 
 ```python
+"""관리자 액션 감사로그 헬퍼.
+
+재고 변동은 `TransactionLog` 가 도메인 audit 으로 작동하므로 여기서 다루지 않는다.
+이 헬퍼는 마스터/설정 변경 (item·employee·bom·settings·codes) 만 기록한다.
+
+사용 패턴 (라우터 안):
+    from fastapi import Request
+    from app.services import audit
+
+    audit.record(
+        db,
+        request=request,
+        action="bom.update",
+        target_type="bom",
+        target_id=str(bom_id),
+        payload_summary=f"qty {old} → {new}",
+    )
+
+기록은 `db.add` 만 하고 commit 은 호출자가 책임진다. 라우터의 commit 시점에 함께 묶여야
+원자적이다 (실패 시 audit 도 같이 롤백되어 잘못된 기록을 남기지 않음).
+"""
+
+from __future__ import annotations
+
+from typing import Optional
+
+from fastapi import Request
+from sqlalchemy.orm import Session
+
+from app.models import AdminAuditLog
+
+
 def record(
     db: Session,
     *,
-    action: str,            # "bom.update", "item.delete" 등 도메인.동작 형식
-    target_type: str,       # "bom", "item", "employee", "settings", "codes"
-    target_id: Optional[str] = None,        # 대상 오브젝트 ID (문자열)
-    payload_summary: Optional[str] = None,  # "qty 3 → 5" 같은 변경 요약
-    request: Optional[Request] = None,      # FastAPI Request (X-Request-Id 추출)
-    actor_pin_role: str = "admin",          # 작업자 역할 구분
+    action: str,
+    target_type: str,
+    target_id: Optional[str] = None,
+    payload_summary: Optional[str] = None,
+    request: Optional[Request] = None,
+    actor_pin_role: str = "admin",
 ) -> AdminAuditLog:
-    """AdminAuditLog row 를 db.add. commit 은 호출자 책임."""
+    rid = None
+    if request is not None:
+        rid = getattr(request.state, "request_id", None)
+    log = AdminAuditLog(
+        action=action,
+        target_type=target_type,
+        target_id=target_id,
+        payload_summary=payload_summary,
+        request_id=rid,
+        actor_pin_role=actor_pin_role,
+    )
+    db.add(log)
+    return log
 ```
-
----
-
-## 4. 사용 패턴
-
-```python
-# 라우터 안에서 사용 예시
-from app.services import audit
-
-audit.record(
-    db,
-    request=request,
-    action="bom.update",
-    target_type="bom",
-    target_id=str(bom_id),
-    payload_summary=f"qty {old} → {new}",
-)
-db.commit()  # audit + 실제 변경이 한 트랜잭션으로 묶임
-```
-
----
-
-## 5. 원자성 보장
-
-```mermaid
-flowchart LR
-    A["라우터: BOM 수정"] --> B["bom.update 실행"]
-    A --> C["audit.record(db, action='bom.update')"]
-    B --> D["db.commit()"]
-    C --> D
-    D --> E["성공: 변경 + 감사 동시 커밋"]
-    D --> F["실패: 둘 다 rollback"]
-```
-
-> [!note]
-> `audit.record` 는 `db.add` 만 하고 즉시 반환한다. 라우터의 `db.commit()` 과 한 트랜잭션이므로 실패 시 감사 기록도 같이 롤백되어 잘못된 기록을 남기지 않는다.
-
----
-
-## 6. AdminAuditLog 컬럼
-
-| 컬럼 | 설명 |
-|------|------|
-| `audit_id` | UUID PK |
-| `actor_pin_role` | 작업자 역할 (기본 "admin") |
-| `action` | `"bom.update"`, `"item.create"` 등 |
-| `target_type` | `"bom"`, `"item"`, `"employee"` 등 |
-| `target_id` | 대상 오브젝트 ID (문자열) |
-| `payload_summary` | 변경 내용 요약 |
-| `request_id` | X-Request-Id (미들웨어가 발급) |
-| `created_at` | 기록 시각 |
-
----
-
-## 7. 재고 감사와의 분리
-
-| 감사 종류 | 테이블 | 담당 모듈 |
-|-----------|--------|----------|
-| 마스터/설정 변경 | `admin_audit_logs` | `services/audit.py` |
-| 재고 변동 | `transaction_logs` | `services/inventory.py` 경유 |
-| CSV 미러 | `data/audit_csv/` | `services/audit_csv.py` |
-
----
-
-## 8. 의존 관계
-
-```
-audit.py
-  ← models (AdminAuditLog)
-  ← fastapi (Request — X-Request-Id 추출)
-  호출자: 모든 마스터 변경 라우터 (bom, items, employees, codes, settings)
-```
-
----
-
-## 9. 관련 노트 링크
-
-- [[audit_csv.py]] — TransactionLog 의 CSV 미러
-- [[models.py]] — AdminAuditLog ORM 정의
-- [[main.py]] — X-Request-Id 미들웨어

@@ -1,222 +1,103 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "frontend/app/legacy/_components/DesktopWarehouseView.tsx"
+importance: critical
 layer: frontend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/app/legacy/_components/DesktopWarehouseView.tsx
-tags: [vault, code-note, frontend, component]
-aliases: [DesktopWarehouseView, 입출고 화면, 창고 뷰]
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# DesktopWarehouseView.tsx — 입출고 탭 화면
+# DesktopWarehouseView.tsx — DesktopWarehouseView.tsx 설명
 
-#layer/frontend #topic/component #topic/legacy
+## 이 파일은 무엇을 책임지나
 
-> [!summary] 한 줄 요약
-> 입출고 탭의 최상위 컴포넌트. 요청 작성(IoComposeView) + 4개 draft/queue 패널(WarehouseDraftPanelTabs)을 조합하고, 탭 배지 숫자(장바구니/창고큐/부서큐)를 집계한다.
+`DesktopWarehouseView.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
 
----
+## 업무 흐름에서의 의미
 
-## 1. 위치 & 관계
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-| 항목 | 내용 |
-|------|------|
-| 원본 | `erp/frontend/app/legacy/_components/DesktopWarehouseView.tsx` |
-| 레이어 | frontend / component |
-| `"use client"` | O |
-| 소비자 | [[erp/frontend/app/legacy/_components/DesktopLegacyShell.tsx]] |
+## 언제 보면 좋나
 
-```mermaid
-graph TD
-  WV["DesktopWarehouseView"] --> WH["WarehouseHeader<br/>(헤더 + 에러 배너)"]
-  WV --> WT["WarehouseSectionTabs<br/>(섹션 탭 바)"]
-  WV --> WDP["WarehouseDraftPanelTabs<br/>(장바구니 / 내 요청 / 창고큐 / 부서큐)"]
-  WV --> ICW["IoComposeView<br/>(새 입출고 작성, 입출고 2.0)"]
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
+- 운영 데이터가 달라질 수 있는 변경을 준비할 때
 
-  style WV fill:#1e3a5f,color:#e0f0ff
-  style ICW fill:#1e5f2a,color:#e0ffe8
-```
+## 중요한 내용
 
----
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-## 2. 5개 섹션 탭
+- `DesktopWarehouseView`
+- `IoBatch`
+- `Item`
+- `StockRequest`
+- `WarehouseSectionTab`
 
-| 섹션 ID | 이름 | 설명 |
-|---------|------|------|
-| `compose` | 요청 작성 | 새 입출고 작성 (IoComposeView, 입출고 2.0) |
-| `cart` | 장바구니 | 저장된 draft 목록 (구형 + io 2.0 합산) |
-| `my-requests` | 내 요청 | 본인이 제출한 요청 이력 |
-| `warehouse-queue` | 창고 승인 | 창고 담당자 승인 대기 목록 |
-| `dept-queue` | 부서 승인 | 부서장 승인 대기 목록 |
+## 연결되는 파일
 
-> [!note] 접근 권한
-> - `warehouse-queue`: `warehouse_role === "primary" | "deputy"` 인 경우만 탭 표시
-> - `dept-queue`: `isDepartmentApprover(operator)` 인 경우만 탭 표시
+- [[ERP/frontend/app/legacy/_components/📁__components]] — 이 파일이 속한 폴더의 안내판입니다.
 
----
+## 조심할 점
 
-## 3. 탭 배지 카운트 집계
+이 파일은 운영 데이터, 재고 수량, 승인 상태, DB 구조, 백업/복구 중 하나와 직접 연결됩니다. 수정 전에는 관련 테스트, 백업 여부, 연결 화면/API를 반드시 확인해야 합니다.
 
-```typescript
-// 장바구니 배지 — 구형 draft + io 2.0 draft 합산
-useEffect(() => {
-  if (!operatorEmployeeId) return;
-  Promise.all([
-    api.listStockRequestDrafts(operatorEmployeeId),  // 구형
-    api.listDrafts(operatorEmployeeId),              // io 2.0
-  ]).then(([legacyRows, ioRows]) => {
-    const n = legacyRows.length + ioRows.length;
-    setCartCount(n);
-    cartCountCache.set(operatorEmployeeId, n);  // 세션 내 캐시
-  });
-}, [operatorEmployeeId, panelRefreshNonce]);
+## 핵심 발췌
 
-// 창고 큐 배지
-useEffect(() => {
-  if (!canSeeQueue) return;
-  api.countWarehouseQueue().then(({ count }) => {
-    setWarehouseQueueCount(count);
-  });
-}, [canSeeQueue, panelRefreshNonce]);
+```tsx
+"use client";
 
-// 부서 큐 배지
-useEffect(() => {
-  if (!canSeeDeptQueue || !operatorEmployeeId) return;
-  api.countDepartmentQueue(operatorEmployeeId).then(({ count }) => {
-    setDeptQueueCount(count);
-  });
-}, [canSeeDeptQueue, operatorEmployeeId, panelRefreshNonce]);
-```
+import { useEffect, useState } from "react";
+import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
+import { canEnterIO, isDepartmentApprover } from "./_warehouse_steps";
+import { useWarehouseData } from "./_warehouse_hooks/useWarehouseData";
+import { WarehouseHeader } from "./_warehouse_sections/WarehouseHeader";
+import { WarehouseSectionTabs, type WarehouseSectionTab } from "./_warehouse_sections/WarehouseSectionTabs";
+import { WarehouseAccessDenied } from "./_warehouse_sections/WarehouseAccessDenied";
+import { WarehouseDraftPanelTabs } from "./_warehouse_sections/WarehouseDraftPanelTabs";
+import { IoComposeView } from "./_warehouse_v2/IoComposeView";
+import { readCurrentOperator } from "./login/useCurrentOperator";
 
----
-
-## 4. 세션 메모리 캐시
-
-탭 전환 시 remount 되어도 배지 숫자가 깜박이지 않도록 모듈 레벨 캐시를 사용한다:
-
-```typescript
-// 탭 전환 remount 사이 직전 카운트 보존
+// 탭 전환 remount 사이 직전 카운트 보존 (세션 내 메모리 캐시).
+// 새로고침 시 휘발 — 첫 진입은 항상 fresh fetch.
 const cartCountCache = new Map<string, number>();
 const warehouseQueueCountCache = { value: 0 };
 const deptQueueCountCache = new Map<string, number>();
-```
 
-새로고침 시 휘발. 첫 진입은 항상 fresh fetch.
+export function DesktopWarehouseView({
+  globalSearch,
+  onStatusChange,
+  preselectedItem,
+  onSubmitSuccess,
+  defectDeptFilter,
+}: {
+  globalSearch: string;
+  onStatusChange: (status: string) => void;
+  preselectedItem?: Item | null;
+  onSubmitSuccess?: () => void;
+  /** Phase 3: 대시보드 빨간 불량 클릭 → URL ?defect_dept=X 로 전달된 부서명.
+   *  Phase 4 허브 컴포넌트가 이 값을 읽어 자동 필터 적용. */
+  defectDeptFilter?: string | null;
+}) {
+  const { employees, items, productModels, loadFailure, setItems } = useWarehouseData({
+    globalSearch,
+    onStatusChange,
+  });
 
----
-
-## 5. 코드 발췌 — 핵심 구조
-
-```tsx
-export function DesktopWarehouseView({ globalSearch, onStatusChange, preselectedItem, onSubmitSuccess }) {
-  const { employees, items, productModels, loadFailure, setItems } = useWarehouseData(...);
-  const operator = readCurrentOperator();
-
+  const operator = typeof window !== "undefined" ? readCurrentOperator() : null;
+  const [employeeId, setEmployeeId] = useState<string>(operator?.employee_id ?? "");
   const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>("compose");
-  const [cartCount, setCartCount] = useState(...);
-  const [warehouseQueueCount, setWarehouseQueueCount] = useState(...);
-  const [deptQueueCount, setDeptQueueCount] = useState(...);
+  const [panelRefreshNonce, setPanelRefreshNonce] = useState(0);
+  const [cartCount, setCartCount] = useState(() => {
+    const eid = operator?.employee_id ?? "";
+    return eid ? cartCountCache.get(eid) ?? 0 : 0;
+  });
+  const [warehouseQueueCount, setWarehouseQueueCount] = useState(
+    () => warehouseQueueCountCache.value,
+  );
+  const [deptQueueCount, setDeptQueueCount] = useState(() => {
+    const eid = operator?.employee_id ?? "";
+    return eid ? deptQueueCountCache.get(eid) ?? 0 : 0;
+  });
   const [restoreIoDraft, setRestoreIoDraft] = useState<IoBatch | null>(null);
-
-  // 접근 권한 체크
-  const canSeeQueue = operator?.warehouse_role === "primary" || === "deputy";
-  const canSeeDeptQueue = isDepartmentApprover(operator);
-
-  // 접근 불가 시 안내 화면
-  if (operator && !canEnterIO(operator)) {
-    return <WarehouseAccessDenied department={operator.department ?? ""} />;
-  }
-
-  return (
-    <div className="flex h-full min-h-0 flex-1 min-w-0 overflow-y-auto lg:pr-4">
-      <div className="flex min-h-full w-full flex-col gap-3 ...">
-        <WarehouseHeader loadFailure={loadFailure} />
-        <WarehouseSectionTabs
-          active={sectionTab} onChange={setSectionTab}
-          showQueue={canSeeQueue} showDeptQueue={canSeeDeptQueue}
-          cartCount={cartCount} queueCount={warehouseQueueCount}
-          deptQueueCount={deptQueueCount}
-        />
-
-        {/* 장바구니 / 내 요청 / 큐 패널 */}
-        <WarehouseDraftPanelTabs
-          sectionTab={sectionTab}
-          onContinueIoDraft={(draft) => {
-            setRestoreIoDraft(draft);
-# ... (이하 24줄 생략. 원본 참조)
-
 ```
-
----
-
-## 6. draft 복원 흐름
-
-```mermaid
-sequenceDiagram
-  participant U as 작업자
-  participant DP as WarehouseDraftPanelTabs
-  participant WV as DesktopWarehouseView
-  participant IC as IoComposeView
-
-  U->>DP: 장바구니에서 "이어하기" 클릭
-  DP->>WV: onContinueIoDraft(draft)
-  WV->>WV: setRestoreIoDraft(draft)
-  WV->>WV: setSectionTab("compose")
-  WV->>IC: restoreDraft={draft} 전달
-  IC->>IC: draft 라인을 폼에 복원
-```
-
----
-
-## 7. `panelRefreshNonce` 패턴
-
-`panelRefreshNonce` 를 1씩 증가시키면 여러 `useEffect` 의 의존성 배열이 동시에 트리거된다:
-- 장바구니 카운트 재집계
-- 창고 큐 카운트 재집계
-- 부서 큐 카운트 재집계
-
-`IoComposeView` 가 성공/상태 변경 시 `setPanelRefreshNonce((n) => n + 1)` 을 호출한다.
-
----
-
-## 8. 권한 체크 함수
-
-```typescript
-// _warehouse_steps 에서 import
-import { canEnterIO, isDepartmentApprover } from "./_warehouse_steps";
-
-// canEnterIO: 입출고 화면 진입 가능 여부
-// isDepartmentApprover: 부서 큐 탭 표시 여부
-```
-
----
-
-## 9. 관련 파일
-
-- [[erp/frontend/app/legacy/_components/DesktopLegacyShell.tsx]] — 부모 컴포넌트
-- [[erp/frontend/lib/api/io.ts]] — listDrafts, submit, getDraft
-- [[erp/frontend/lib/api/stock-requests.ts]] — listStockRequestDrafts, countWarehouseQueue
-- `erp/frontend/app/legacy/_components/_warehouse_v2/IoComposeView.tsx` — 입출고 2.0 작성 UI
-- `erp/frontend/app/legacy/_components/_warehouse_sections/WarehouseDraftPanelTabs.tsx` — 패널 탭들
-- [[erp/backend/app/routers/io.py]] — 입출고 2.0 백엔드
-
----
-
-## 10. 주의 사항
-
-> [!warning] `restoreIoDraft` 상태
-> 장바구니에서 이어하기 후 `IoComposeView` 가 draft 를 복원하면 `restoreIoDraft` 를 `null` 로 리셋해야 한다. 그렇지 않으면 다음 compose 탭 진입 시에도 draft 가 복원된다.
-
-> [!info] 구형 draft 호환
-> `handleLegacyDraftContinue` 는 구형 `StockRequest` draft 를 복원하지 않는다.
-> "새 입출고 화면에서 직접 복원되지 않습니다" 안내만 표시한다.
-
----
-
-## 11. 정책
-
-- `main` 브랜치: 코드만 유지
-- `vault-sync` 브랜치: 코드 + `vault/` 노트
-- 코드와 노트가 다르면 실제 코드 우선

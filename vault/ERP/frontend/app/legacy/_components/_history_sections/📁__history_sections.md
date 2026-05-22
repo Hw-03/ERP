@@ -1,60 +1,62 @@
 ---
-type: index
-project: DEXCOWIN MES
+type: folder-note
+source_path: "frontend/app/legacy/_components/_history_sections"
+importance: normal
 layer: frontend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/app/legacy/_components/_history_sections/
-tags: [vault, index, folder-marker]
-aliases:
-  - "_history_sections"
-  - "_history_sections.md"
+graph: hub
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
 # 📁 _history_sections
 
-> [!summary] 역할
-> 거래 이력 조회 화면을 구성하는 UI 컴포넌트와 도메인 유틸 모음.
+## 이 폴더는 무엇을 위한 곳인가
 
-> [!info] 코드 미러 영역
-> 이 폴더는 `erp/frontend/app/legacy/_components/_history_sections/` 의 vault 미러.
+`frontend/app/legacy/_components/_history_sections`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
 
-## 어떤 파일들이 있나
+## 현장 업무와의 관계
 
-**UI 컴포넌트**
-- [[erp/frontend/app/legacy/_components/_history_sections/HistoryCalendarStrip.tsx.md|HistoryCalendarStrip.tsx]] — 날짜 선택 달력 스트립
-- [[erp/frontend/app/legacy/_components/_history_sections/HistoryFilterBar.tsx.md|HistoryFilterBar.tsx]] — 상단 필터 바
-- [[erp/frontend/app/legacy/_components/_history_sections/HistoryFilterPanel.tsx.md|HistoryFilterPanel.tsx]] — 슬라이드 필터 패널
-- [[erp/frontend/app/legacy/_components/_history_sections/HistoryLogRow.tsx.md|HistoryLogRow.tsx]] — 이력 목록 개별 행
-- [[erp/frontend/app/legacy/_components/_history_sections/HistoryDetailEditHistory.tsx.md|HistoryDetailEditHistory.tsx]] — 상세 패널 수정 이력 탭
-- [[erp/frontend/app/legacy/_components/_history_sections/HistoryDetailRecentLogs.tsx.md|HistoryDetailRecentLogs.tsx]] — 상세 패널 최근 거래 탭
-- [[erp/frontend/app/legacy/_components/_history_sections/BomBatchDetail.tsx.md|BomBatchDetail.tsx]] — BOM 배치 상세 (배치 해석 포함)
-- [[erp/frontend/app/legacy/_components/_history_sections/TransactionEditUnifiedModal.tsx.md|TransactionEditUnifiedModal.tsx]] — 거래 수정 통합 모달
-- `HistoryTable.tsx`, `HistoryStatsBar.tsx`, `HistoryDetailPanel.tsx`, `HistoryBatchDetailPanel.tsx`, `DesktopHistoryRightPanel.tsx`
+사용자가 보는 화면이나 화면이 서버와 통신하는 방식에 연결됩니다.
 
-**도메인 유틸 (non-React)**
-- [[erp/frontend/app/legacy/_components/_history_sections/historyFormat.ts.md|historyFormat.ts]] — 날짜·수량·단위 포맷터
-- [[erp/frontend/app/legacy/_components/_history_sections/historyQuery.ts.md|historyQuery.ts]] — 필터 버킷 정의 (OPERATION_OPTIONS, DATE_OPTIONS, 3단계 scope)
-- [[erp/frontend/app/legacy/_components/_history_sections/historyTheme.ts.md|historyTheme.ts]] — 거래 유형별 tint 색상 함수
-- [[erp/frontend/app/legacy/_components/_history_sections/transactionTaxonomy.ts.md|transactionTaxonomy.ts]] — `TransactionType` scope 분류 (HistoryScope, isWarehouseInvolvedType 등)
-- `historyConstants.ts`, `historyBatchInterpreter.ts`, `historyTableHelpers.tsx`
+## 언제 보면 좋나
 
-## 도메인 컨텍스트
+- 이 폴더 안의 파일이 어떤 역할인지 빠르게 파악할 때
+- 수정 전에 먼저 읽을 파일을 고를 때
 
-이력 조회 화면(`DesktopHistoryView`) 전용 섹션.  
-`historyQuery.ts` 에서 정의한 11개 `OPERATION_OPTIONS`와 3단계 scope (`ALL` / `WAREHOUSE_INVOLVED` / `DEPT_INTERNAL`) 가 필터링의 기준이다.  
-`transactionTaxonomy.ts` 는 `historyShared.ts` 에서 분리된 파일 — 동일 폴더 내에서 상호 참조하므로 import 경로 주의.
+## 주요 하위 폴더
 
-## ⚠️ 위험 포인트
+- [[ERP/frontend/app/legacy/_components/_history_sections/__tests__/📁___tests__]] — `frontend/app/legacy/_components/_history_sections/__tests__`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
 
-- `historyBatchInterpreter.ts` 의 `_TX_OPERATION` 과 `historyQuery.ts` 의 `OPERATION_OPTIONS` 는 같은 `transaction_type` 값을 각자 독립적으로 보유. 두 파일 모두 수정해야 일관성 유지.
-- `transactionTaxonomy.ts` 와 `historyTheme.ts` 를 변경하면 이력 행 색상·scope 분류 전체에 영향.
+## 먼저 볼 파일 5개
 
-## 관련 가이드
+- [[ERP/frontend/app/legacy/_components/_history_sections/BomBatchDetail.tsx]] — `BomBatchDetail.tsx`는 입출고 내역 화면에서 날짜, 목록, 상세, 묶음 작업을 보여주는 화면 부품입니다.
+- [[ERP/frontend/app/legacy/_components/_history_sections/DesktopHistoryRightPanel.tsx]] — `DesktopHistoryRightPanel.tsx`는 입출고 내역 화면에서 날짜, 목록, 상세, 묶음 작업을 보여주는 화면 부품입니다.
+- [[ERP/frontend/app/legacy/_components/_history_sections/HistoryBatchDetailPanel.tsx]] — `HistoryBatchDetailPanel.tsx`는 입출고 내역 화면에서 날짜, 목록, 상세, 묶음 작업을 보여주는 화면 부품입니다.
+- [[ERP/frontend/app/legacy/_components/_history_sections/HistoryCalendarPanel.tsx]] — `HistoryCalendarPanel.tsx`는 입출고 내역 화면에서 날짜, 목록, 상세, 묶음 작업을 보여주는 화면 부품입니다.
+- [[ERP/frontend/app/legacy/_components/_history_sections/HistoryCalendarStrip.tsx]] — `HistoryCalendarStrip.tsx`는 입출고 내역 화면에서 날짜, 목록, 상세, 묶음 작업을 보여주는 화면 부품입니다.
 
-- [[erp/_vault/guides/history-flow]]
+> [!info]- 추가 파일
+> - [[ERP/frontend/app/legacy/_components/_history_sections/HistoryDetailEditHistory.tsx]] — HistoryDetailEditHistory.tsx
+> - [[ERP/frontend/app/legacy/_components/_history_sections/HistoryDetailPanel.tsx]] — HistoryDetailPanel.tsx
+> - [[ERP/frontend/app/legacy/_components/_history_sections/HistoryDetailRecentLogs.tsx]] — HistoryDetailRecentLogs.tsx
+> - [[ERP/frontend/app/legacy/_components/_history_sections/HistoryFilterBar.tsx]] — HistoryFilterBar.tsx
+> - [[ERP/frontend/app/legacy/_components/_history_sections/HistoryFilterPanel.tsx]] — HistoryFilterPanel.tsx
+> - [[ERP/frontend/app/legacy/_components/_history_sections/HistoryLogRow.tsx]] — HistoryLogRow.tsx
+> - [[ERP/frontend/app/legacy/_components/_history_sections/HistoryStatsBar.tsx]] — HistoryStatsBar.tsx
+> - [[ERP/frontend/app/legacy/_components/_history_sections/HistoryTable.tsx]] — HistoryTable.tsx
+> - [[ERP/frontend/app/legacy/_components/_history_sections/TransactionEditUnifiedModal.tsx]] — TransactionEditUnifiedModal.tsx
+> - [[ERP/frontend/app/legacy/_components/_history_sections/historyBatchInterpreter.ts]] — historyBatchInterpreter.ts
+> - [[ERP/frontend/app/legacy/_components/_history_sections/historyConstants.ts]] — historyConstants.ts
+> - [[ERP/frontend/app/legacy/_components/_history_sections/historyFormat.ts]] — historyFormat.ts
+> - [[ERP/frontend/app/legacy/_components/_history_sections/historyQuery.ts]] — historyQuery.ts
+> - [[ERP/frontend/app/legacy/_components/_history_sections/historyTableHelpers.tsx]] — historyTableHelpers.tsx
+> - [[ERP/frontend/app/legacy/_components/_history_sections/historyTheme.ts]] — historyTheme.ts
+> - [[ERP/frontend/app/legacy/_components/_history_sections/transactionTaxonomy.ts]] — transactionTaxonomy.ts
 
-## 자식 폴더
+## 조심할 점
 
-- [[erp/frontend/app/legacy/_components/_history_sections/__tests__/📁___tests__|__tests__/]]
+폴더 성격을 먼저 확인하고 현재 운영 코드인지, 보관 자료인지, 자동 생성물인지 구분해야 합니다.
+
+## 다음에 볼 위치
+
+- 상위 폴더: [[ERP/frontend/app/legacy/_components/📁__components]]

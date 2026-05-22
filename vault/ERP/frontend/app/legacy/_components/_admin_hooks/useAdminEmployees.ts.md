@@ -1,61 +1,76 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "frontend/app/legacy/_components/_admin_hooks/useAdminEmployees.ts"
+importance: important
 layer: frontend
-source_path: erp/frontend/app/legacy/_components/_admin_hooks/useAdminEmployees.ts
-status: active
-updated: 2026-04-27
-source_sha: 8890952c8c9f
-tags:
-  - erp
-  - frontend
-  - frontend-hook
-  - ts
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# useAdminEmployees.ts
+# useAdminEmployees.ts — useAdminEmployees.ts 설명
 
-> [!summary] 역할
-> 프론트엔드 화면에서 상태, 데이터 로딩, 상호작용 흐름을 재사용하기 위한 React hook이다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`useAdminEmployees.ts`는 관리자 화면의 한 부분을 담당하는 TypeScript/React 코드입니다. 직원, 품목, BOM, 설정 같은 관리 작업과 연결됩니다.
 
-- Source: `frontend/app/legacy/_components/_admin_hooks/useAdminEmployees.ts`
-- Layer: `frontend`
-- Kind: `frontend-hook`
-- Size: `3235` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-- Parent hub: [[frontend/app/legacy/_components/_admin_hooks/_admin_hooks|frontend/app/legacy/_components/_admin_hooks]]
-- Related: [[frontend/frontend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
-- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+## 중요한 내용
 
-## 원본 발췌
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-````ts
+- `useAdminEmployees`
+- `EmployeeEditForm`
+- `UseAdminEmployeesArgs`
+- `AdminEmployeesState`
+
+## 연결되는 파일
+
+### 먼저 같이 볼 파일
+- [[ERP/frontend/app/legacy/_components/DesktopAdminView.tsx]] — `DesktopAdminView.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+- [[ERP/frontend/lib/api/admin.ts]] — `admin.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
+- [[ERP/backend/app/routers/settings.py]] — `settings.py`는 `settings` 업무를 외부 API로 열어 주는 Python 코드입니다. 프론트 화면이 백엔드 기능을 호출할 때 이 파일의 URL을 거칩니다.
+- [[ERP/backend/app/routers/employees.py]] — `employees.py`는 `employees` 업무를 외부 API로 열어 주는 Python 코드입니다. 프론트 화면이 백엔드 기능을 호출할 때 이 파일의 URL을 거칩니다.
+
+## 조심할 점
+
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
+
+## 핵심 발췌
+
+```ts
 "use client";
 
 // AdminEmployeesSection 전용 hook.
+// Round-15 (#2): form/confirm sub-hook 으로 분리, 본 hook 은 4 async operation 조율.
 
-import { useState } from "react";
-import type { Employee } from "@/lib/api";
+import type { DepartmentMaster, Employee } from "@/lib/api";
 import { api } from "@/lib/api";
-import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../_admin_sections/adminShared";
+import { useAdminEmployeesForm, type EmployeeEditForm } from "./useAdminEmployeesForm";
+import { useAdminEmployeesConfirm } from "./useAdminEmployeesConfirm";
+import type { EmployeeAddForm } from "../_admin_sections/adminShared";
+
+export type { EmployeeEditForm } from "./useAdminEmployeesForm";
 
 export type UseAdminEmployeesArgs = {
   employees: Employee[];
   setEmployees: (updater: (prev: Employee[]) => Employee[]) => void;
+  departments: DepartmentMaster[];
   onStatusChange: (msg: string) => void;
   onError: (msg: string) => void;
 };
 
 export type AdminEmployeesState = {
   employees: Employee[];
+  departments: DepartmentMaster[];
   selectedEmployee: Employee | null;
   setSelectedEmployee: (e: Employee | null) => void;
   empAddMode: boolean;
@@ -64,15 +79,27 @@ export type AdminEmployeesState = {
   setEmpAddForm: (updater: (f: EmployeeAddForm) => EmployeeAddForm) => void;
   addEmployee: () => void;
   toggleEmployee: (employee: Employee) => void;
+  confirmTarget: Employee | null;
+  confirmToggle: () => void;
+  cancelConfirm: () => void;
+  /* 2차: 정보 수정 / PIN 초기화 */
+  editForm: EmployeeEditForm;
+  setEditForm: (updater: (f: EmployeeEditForm) => EmployeeEditForm) => void;
+  saveEmployee: () => void;
+  pinResetTarget: Employee | null;
+  pinResetAdminPin: string;
+  setPinResetAdminPin: (v: string) => void;
+  pinResetError: string;
+  requestPinReset: (employee: Employee) => void;
+  confirmPinReset: () => void;
+  cancelPinReset: () => void;
+  /* 삭제 */
+  deleteTarget: Employee | null;
+  requestDelete: (employee: Employee) => void;
+  confirmDelete: () => void;
+  cancelDelete: () => void;
 };
 
 export function useAdminEmployees({
   employees,
-  setEmployees,
-  onStatusChange,
-  onError,
-}: UseAdminEmployeesArgs): AdminEmployeesState {
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-# ... (이하 55줄 생략. 원본 참조)
-
-````
+```

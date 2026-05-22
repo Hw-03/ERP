@@ -1,52 +1,62 @@
 ---
-type: index
-project: DEXCOWIN MES
+type: folder-note
+source_path: "frontend/app/legacy/_components/mobile/primitives"
+importance: normal
 layer: frontend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/app/legacy/_components/mobile/primitives/
-tags: [vault, index, folder-marker]
-aliases:
-  - "primitives"
-  - "primitives.md"
+graph: hub
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# primitives
+# 📁 primitives
 
-> [!summary] 역할
-> `frontend/app/legacy/_components/mobile/primitives/` 아래 원본 파일들을 Obsidian에서 탐색하기 위한 폴더 허브다.
+## 이 폴더는 무엇을 위한 곳인가
 
-## 원본 위치
+`frontend/app/legacy/_components/mobile/primitives`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
 
-- Source: `frontend/app/legacy/_components/mobile/primitives/`
-- File count: `19`
+## 현장 업무와의 관계
 
-## 파일 노트
+사용자가 보는 화면이나 화면이 서버와 통신하는 방식에 연결됩니다.
 
-- [[frontend/app/legacy/_components/mobile/primitives/AsyncState.tsx|AsyncState.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/EmptyState.tsx|EmptyState.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/FilterChip.tsx|FilterChip.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/IconButton.tsx|IconButton.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/InlineSearch.tsx|InlineSearch.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/ItemRow.tsx|ItemRow.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/KpiCard.tsx|KpiCard.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/PersonAvatar.tsx|PersonAvatar.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/PrimaryActionButton.tsx|PrimaryActionButton.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/SectionCard.tsx|SectionCard.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/SectionHeader.tsx|SectionHeader.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/SheetHeader.tsx|SheetHeader.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/StatusBadge.tsx|StatusBadge.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/Stepper.tsx|Stepper.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/StickyFooter.tsx|StickyFooter.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/SummaryChipBar.tsx|SummaryChipBar.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/WizardHeader.tsx|WizardHeader.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/WizardProgress.tsx|WizardProgress.tsx]]
-- [[frontend/app/legacy/_components/mobile/primitives/index.ts|index.ts]]
+## 언제 보면 좋나
 
-## 읽는 팁
+- 이 폴더 안의 파일이 어떤 역할인지 빠르게 파악할 때
+- 수정 전에 먼저 읽을 파일을 고를 때
 
-- 먼저 이 허브에서 파일 위치를 잡고, 세부 내용은 각 파일 노트나 실제 원본 파일을 본다.
-- 노트와 실제 코드가 다르면 실제 코드가 우선이다.
+## 먼저 볼 파일 5개
 
-Up: [[frontend/app/legacy/_components/mobile/mobile|frontend/app/legacy/_components/mobile]]
+- [[ERP/frontend/app/legacy/_components/mobile/primitives/AsyncState.tsx]] — `AsyncState.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+- [[ERP/frontend/app/legacy/_components/mobile/primitives/EmptyState.tsx]] — `EmptyState.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+- [[ERP/frontend/app/legacy/_components/mobile/primitives/ErrorAlert.tsx]] — `ErrorAlert.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+- [[ERP/frontend/app/legacy/_components/mobile/primitives/FilterChip.tsx]] — `FilterChip.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+- [[ERP/frontend/app/legacy/_components/mobile/primitives/IconButton.tsx]] — `IconButton.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+
+> [!info]- 추가 파일
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/InlineSearch.tsx]] — InlineSearch.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/ItemRow.tsx]] — ItemRow.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/KpiCard.tsx]] — KpiCard.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/MoreMenuRow.tsx]] — MoreMenuRow.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/PersonAvatar.tsx]] — PersonAvatar.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/PinInput.tsx]] — PinInput.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/PrimaryActionButton.tsx]] — PrimaryActionButton.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/QuickActionGrid.tsx]] — QuickActionGrid.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/SectionCard.tsx]] — SectionCard.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/SectionHeader.tsx]] — SectionHeader.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/SegmentedControl.tsx]] — SegmentedControl.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/SheetHeader.tsx]] — SheetHeader.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/StatusBadge.tsx]] — StatusBadge.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/Stepper.tsx]] — Stepper.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/StickyFooter.tsx]] — StickyFooter.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/SubScreenHeader.tsx]] — SubScreenHeader.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/SummaryChipBar.tsx]] — SummaryChipBar.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/WizardHeader.tsx]] — WizardHeader.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/WizardProgress.tsx]] — WizardProgress.tsx
+> - [[ERP/frontend/app/legacy/_components/mobile/primitives/index.ts]] — index.ts
+
+## 조심할 점
+
+폴더 성격을 먼저 확인하고 현재 운영 코드인지, 보관 자료인지, 자동 생성물인지 구분해야 합니다.
+
+## 다음에 볼 위치
+
+- 상위 폴더: [[ERP/frontend/app/legacy/_components/mobile/📁_mobile]]

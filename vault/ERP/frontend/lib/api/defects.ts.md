@@ -1,66 +1,83 @@
-# defects.ts
+---
+type: file-explanation
+source_path: "frontend/lib/api/defects.ts"
+importance: important
+layer: frontend
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
+---
 
-## 이 파일은 뭐예요?
+# defects.ts — defects.ts 설명
 
-불량 처리 허브 API 클라이언트 모듈. 백엔드 `/api/defects/*` 엔드포인트와 1:1 대응하는
-함수 4개를 `defectsApi` 객체로 묶어 제공한다. Phase 4 신규 추가.
+## 이 파일은 무엇을 책임지나
 
-## 언제 보나요?
+`defects.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
 
-- 불량 API 호출 함수를 추가하거나 수정할 때
-- API URL이나 쿼리 파라미터를 바꿀 때
-- 새 엔드포인트를 연결할 때
+## 업무 흐름에서의 의미
+
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
+
+## 언제 보면 좋나
+
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
 ## 중요한 내용
 
-### API 함수 목록
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-| 함수 | HTTP | 엔드포인트 | 설명 |
-|---|---|---|---|
-| `listDefects(department?)` | GET | `/api/defects/locations` | 부서별 격리 항목 목록. `department` 없으면 전체 |
-| `getDefectKpi()` | GET | `/api/defects/kpi` | KPI 4개 카운트 반환 |
-| `quarantine(payload)` | POST | `/api/defects/quarantine` | 즉시 격리 (결재 없음) |
-| `unquarantine(payload)` | POST | `/api/defects/unquarantine` | 즉시 정상 복귀 (결재 없음) |
-
-### 사용하는 유틸리티
-
-- `fetcher<T>` — GET 요청 래퍼 (`@/lib/api/api-core`)
-- `postJson<T>` — POST JSON 래퍼 (`@/lib/api/api-core`)
-- `toApiUrl` — 상대 경로를 절대 URL로 변환
-
-### 결재 필요 작업은 여기 없다
-
-scrap / disassemble 등 결재가 필요한 불량 처리는 `stock-requests.ts`의
-`stockRequestsApi.createStockRequest()`를 통해 요청한다.
-즉시 처리(격리/복귀)만 이 모듈에 있다.
+- `defectsApi`
 
 ## 연결되는 파일
 
-### 먼저 볼 파일
-- [[ERP/frontend/lib/api/types/defects.ts]] — 이 모듈이 사용하는 모든 타입 정의
-- [[ERP/backend/app/routers/defects.py]] — 대응하는 백엔드 라우터
+### 먼저 같이 볼 파일
+- [[ERP/frontend/lib/api-core.ts]] — 프론트 화면이 백엔드에 요청을 보낼 때 공통으로 쓰는 fetch 보조 파일입니다.
+- [[ERP/backend/app/routers/defects.py]] — `defects.py`는 `defects` 업무를 외부 API로 열어 주는 Python 코드입니다. 프론트 화면이 백엔드 기능을 호출할 때 이 파일의 URL을 거칩니다.
+- [[ERP/frontend/lib/api/types/defects.ts]] — `defects.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
 
-> [!info]- 더 연결된 파일
-> - [[ERP/frontend/app/legacy/_components/_defect_hub/DefectHubPanel.tsx]] — `listDefects`, `getDefectKpi` 호출
-> - [[ERP/frontend/app/legacy/_components/_defect_hub/AddQuarantineModal.tsx]] — `quarantine` 호출
-> - [[ERP/frontend/app/legacy/_components/_defect_hub/PaPfDefectWizard.tsx]] — `unquarantine` 호출
-> - [[ERP/frontend/app/legacy/_components/_defect_hub/RDefectActionModal.tsx]] — `unquarantine` 호출
+## 조심할 점
+
+공용 파일이라 여러 화면에 영향이 퍼질 수 있습니다. 변경 후 대시보드, 입출고, 내역, 관리자 화면을 같이 확인해야 합니다.
 
 ## 핵심 발췌
 
 ```ts
+/**
+ * 불량 처리 허브 API — `@/lib/api/defects`.
+ * Phase 4 신규. Phase 2 백엔드 API 와 대응.
+ */
+
+import { fetcher, postJson, toApiUrl } from "../api-core";
+import type { DefectKpi, DefectLocation, QuarantinePayload, UnquarantinePayload } from "./types/defects";
+
 export const defectsApi = {
+  /**
+   * 부서·아이템별 DEFECTIVE 목록.
+   * @param department 부서 필터 (없으면 전체)
+   */
   listDefects: (department?: string): Promise<DefectLocation[]> =>
     fetcher<DefectLocation[]>(
-      toApiUrl(`/api/defects/locations${department ? `?department=${encodeURIComponent(department)}` : ""}`),
+      toApiUrl(
+        `/api/defects/locations${department ? `?department=${encodeURIComponent(department)}` : ""}`,
+      ),
     ),
 
+  /**
+   * KPI 카드 4개 카운트.
+   */
   getDefectKpi: (): Promise<DefectKpi> =>
     fetcher<DefectKpi>(toApiUrl("/api/defects/kpi")),
 
+  /**
+   * 즉시 격리 (결재 없음).
+   */
   quarantine: (payload: QuarantinePayload): Promise<void> =>
     postJson<void>(toApiUrl("/api/defects/quarantine"), payload),
 
+  /**
+   * 즉시 정상 복귀 (결재 없음).
+   */
   unquarantine: (payload: UnquarantinePayload): Promise<void> =>
     postJson<void>(toApiUrl("/api/defects/unquarantine"), payload),
 };

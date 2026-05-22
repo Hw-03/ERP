@@ -1,23 +1,54 @@
 ---
-type: code-note
+type: file-explanation
+source_path: "_attic/docs/research/LEGACY_MES_COMPARISON.md"
+importance: reference
+layer: archive
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
-layer: attic
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/_attic/docs/research/LEGACY_MES_COMPARISON.md
-tags: [vault, code-note, auto-generated, stub, mirror-fill]
 ---
 
-# LEGACY_MES_COMPARISON.md
+# LEGACY_MES_COMPARISON.md — LEGACY_MES_COMPARISON.md 설명
 
-> [!info] 1:1 미러 stub
-> 탐색기에 보이는 폴더 구조를 vault 에 그대로 반영하기 위한 stub.
-> 원본: [[erp/_attic/docs/research/LEGACY_MES_COMPARISON.md]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄 (또는 메타)
+`LEGACY_MES_COMPARISON.md`는 현재 운영 코드가 아니라 과거 자료나 실험 결과를 보관한 참고 파일입니다.
 
-```
+## 업무 흐름에서의 의미
+
+과거 맥락을 이해하는 데 도움은 되지만, 현재 운영 기준으로 바로 사용하면 안 됩니다.
+
+## 언제 보면 좋나
+
+- 과거 자료의 의미를 확인할 때
+- 현재 코드와 비교할 참고 근거가 필요할 때
+
+## 중요한 내용
+
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
+
+- `기존 MES vs 현재 MES 비교 분석 보고서`
+- `0. Executive Summary (한 페이지 요약)`
+- `0.1 종합 점수`
+- `0.2 한 줄 요약`
+- `0.3 영역별 승패`
+- `1. 분석 배경`
+- `1.1 기존 MES 시스템 개요`
+- `1.2 기존 MES의 핵심 문제 (현장 담당자 피드백)`
+- `1.3 현재 MES가 맡은 미션`
+- `2. 분석 방법론`
+
+## 연결되는 파일
+
+- [[ERP/_attic/docs/research/📁_research]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+보관 자료입니다. 현재 코드처럼 믿고 수정하거나 실행하지 않습니다.
+
+## 핵심 발췌
+
+```md
 # 기존 MES vs 현재 MES 비교 분석 보고서
 
 > **작성일**: 2026-04-27
@@ -43,4 +74,34 @@ tags: [vault, code-note, auto-generated, stub, mirror-fill]
 ### 0.2 한 줄 요약
 
 > **"MES는 넓고 낡았고, 현재 MES는 좁고 새것."**
+
+- MES는 품질·설비·POP·PDA까지 다 있지만 2021년식 C/S 구조에 8클릭 UX
+- 현재 MES는 자재·재고 코어가 강하고 모바일 친화적이지만, 품질·설비 도메인은 통째로 비어있음
+
+### 0.3 영역별 승패
+
+| 영역 | MES | 우리 | 결론 |
+|---|---|---|---|
+| 아키텍처 / 접근성 | 33% | **97%** | 🟢 압승 |
+| UX / 사용성 | 37% | **73%** | 🟢 우세 |
+| 마스터 데이터 | **80%** | 31% | 🔴 열세 |
+| 생산 관리 | **80%** | 36% | 🔴 열세 |
+| 품질 관리 | **80%** | 3% | ⛔ 거의 0 |
+| 자재 관리 | 77% | 77% | ⚖ 호각 |
+| 재고 / 창고 | 70% | 63% | ⚖ 호각 |
+| 설비 관리 | **80%** | 0% | ⛔ 통째로 0 |
+| 운영 / 보안 | 68% | 48% | 🟡 약세 |
+| 출력 / 보고 | 75% | 30% | 🔴 열세 |
+| 추적성 | 75% | 70% | ⚖ 호각 |
+
+---
+
+## 1. 분석 배경
+
+### 1.1 기존 MES 시스템 개요
+
+덱스코윈에서 2021~2022년 도입한 MES (Manufacturing Execution System). 3개 프로그램으로 구성:
+
+- **MES** — 관리 프로그램 (PC, 사무직)
+- **POP** — 작업자 프로그램 (현장 PC, 생산 작업자)
 ```

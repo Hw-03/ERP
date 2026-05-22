@@ -1,233 +1,102 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "frontend/lib/api/production.ts"
+importance: important
 layer: frontend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/lib/api/production.ts
-tags: [vault, code-note, frontend, api]
-aliases: [productionApi, 생산 API, 거래 내역 API]
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# lib/api/production.ts — 생산/거래 내역/엑셀 API (11 메소드)
+# production.ts — production.ts 설명
 
-#layer/frontend #topic/api
+## 이 파일은 무엇을 책임지나
 
-> [!summary] 한 줄 요약
-> 생산 입고·생산 가능 수량 확인, 거래 내역 조회·수정·보정, 엑셀 내보내기 URL 생성을 담당한다. `DesktopHistoryView` 의 핵심 데이터 소스다.
+`production.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
 
----
+## 업무 흐름에서의 의미
 
-## 1. 위치 & 관계
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-| 항목 | 내용 |
-|------|------|
-| 원본 | `erp/frontend/lib/api/production.ts` |
-| 분리 시점 | Round-6 (R6-D7) |
-| 역할 | 생산 입고 + 거래 내역 조회/수정 + 엑셀 내보내기 |
-| 백엔드 라우터 | [[erp/backend/app/routers/production.py]], [[erp/backend/app/routers/inventory.py]] |
+## 언제 보면 좋나
 
-```mermaid
-graph LR
-  productionApi --> productionReceipt
-  productionApi --> checkProduction
-  productionApi --> getProductionCapacity
-  productionApi --> getTransactions
-  productionApi --> getTransactionsSummary
-  productionApi --> metaEditTransaction
-  productionApi --> getTransactionEdits
-  productionApi --> quantityCorrectTransaction
-  productionApi --> getItemsExportUrl
-  productionApi --> getTransactionsExportUrl
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-  style productionApi fill:#1e3a5f,color:#e0f0ff
-```
+## 중요한 내용
 
----
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-## 2. 메소드 목록 (11개)
+- `productionApi`
+- `TransactionSummary`
 
-| 메소드 | HTTP | 엔드포인트 | 설명 |
-|--------|------|-----------|------|
-| `productionReceipt` | POST | `/api/production/receipt` | 생산 완료 입고 |
-| `checkProduction` | GET | `/api/production/bom-check/{itemId}?quantity=` | BOM 기반 생산 가능 여부 확인 |
-| `getProductionCapacity` | GET | `/api/production/capacity` | 전체 생산 가능 수량 |
-| `getTransactions` | GET | `/api/inventory/transactions?...` | 거래 내역 목록 (다중 필터) |
-| `getTransactionsSummary` | GET | `/api/inventory/transactions/summary?...` | 거래 KPI 집계 (카운트) |
-| `metaEditTransaction` | POST | `/api/inventory/transactions/{id}/meta-edit` | 메타(notes/ref/담당자) 수정 |
-| `getTransactionEdits` | GET | `/api/inventory/transactions/{id}/edits` | 수정 이력 조회 |
-| `quantityCorrectTransaction` | POST | `/api/inventory/transactions/{id}/quantity-correction` | 수량 보정 |
-| `getItemsExportUrl` | (URL 생성) | `/api/items/export.xlsx` | 품목 엑셀 다운로드 URL |
-| `getTransactionsExportUrl` | (URL 생성) | `/api/inventory/transactions/export.xlsx` | 거래 내역 엑셀 다운로드 URL |
+## 연결되는 파일
 
----
+### 먼저 같이 볼 파일
+- [[ERP/frontend/lib/api-core.ts]] — 프론트 화면이 백엔드에 요청을 보낼 때 공통으로 쓰는 fetch 보조 파일입니다.
+- [[ERP/backend/app/routers/production.py]] — `production.py`는 `production` 업무를 외부 API로 열어 주는 Python 코드입니다. 프론트 화면이 백엔드 기능을 호출할 때 이 파일의 URL을 거칩니다.
+- [[ERP/frontend/lib/api/types/production.ts]] — `production.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
 
-## 3. 코드 발췌 — `getTransactions`
+## 조심할 점
 
-```typescript
-getTransactions: (
-  params?: {
-    itemId?: string;
-    transactionType?: TransactionType;
-    transactionTypes?: string; // 쉼표 구분. 예: "RECEIVE,SHIP"
-    referenceNo?: string;
-    search?: string;
-    department?: string;
-    model?: string;        // 제품 모델명 (쉼표 복수)
-    processStep?: string;  // 공정 구분 R/A/F (쉼표 복수)
-    dateFrom?: string;     // YYYY-MM-DD
-    dateTo?: string;       // YYYY-MM-DD
-    includeArchived?: boolean;
-    limit?: number;
-    skip?: number;
-  },
-  opts?: { signal?: AbortSignal },
-) => {
-  const query = new URLSearchParams();
-  if (params?.itemId) query.set("item_id", params.itemId);
-  if (params?.transactionType) query.set("transaction_type", params.transactionType);
-  if (params?.transactionTypes) query.set("transaction_types", params.transactionTypes);
-  // ... 나머지 파라미터 빌딩
-  return fetcher<TransactionLog[]>(
-    toApiUrl(`/api/inventory/transactions?${query}`),
-    opts?.signal,
-  );
-},
-```
+공용 파일이라 여러 화면에 영향이 퍼질 수 있습니다. 변경 후 대시보드, 입출고, 내역, 관리자 화면을 같이 확인해야 합니다.
 
----
+## 핵심 발췌
 
-## 4. `TransactionSummary` 타입 (이 파일 내 정의)
+```ts
+/**
+ * Production / History (transactions) / Exports — `@/lib/api/production`.
+ *
+ * Round-6 (R6-D7) 분리. 9 메소드:
+ *   Production: productionReceipt / checkProduction / getProductionCapacity
+ *   Transactions: getTransactions / metaEditTransaction / getTransactionEdits / quantityCorrectTransaction
+ *   Exports: getItemsExportUrl / getTransactionsExportUrl
+ */
 
-```typescript
+import { fetcher, postJson, toApiUrl } from "../api-core";
+import type {
+  ProductionCapacity,
+  ProductionCheckResponse,
+  ProductionReceiptResponse,
+  TransactionEditLog,
+  TransactionLog,
+  TransactionType,
+} from "./types";
+
+/** 입출고 내역 KPI 응답 — 카운트 4개. */
 export interface TransactionSummary {
   total: number;
   warehouseCount: number;
   deptCount: number;
   adjustCount: number;
-  /** dept-bucket 거래의 부서별 카운트 {부서명: 건수}. */
+  /** dept-bucket 거래의 부서별 카운트 {부서명: 건수}. 배치/부서 없으면 '미상'. */
   departmentCounts: Record<string, number>;
 }
+
+export const productionApi = {
+  productionReceipt: (payload: {
+    item_id: string;
+    quantity: number;
+    reference_no?: string;
+    produced_by?: string;
+    notes?: string;
+  }) => postJson<ProductionReceiptResponse>(toApiUrl("/api/production/receipt"), payload),
+
+  checkProduction: (itemId: string, quantity: number) =>
+    fetcher<ProductionCheckResponse>(
+      toApiUrl(`/api/production/bom-check/${itemId}?quantity=${quantity}`),
+    ),
+
+  getProductionCapacity: () =>
+    fetcher<ProductionCapacity>(toApiUrl("/api/production/capacity")),
+
+  getTransactions: (
+    params?: {
+      itemId?: string;
+      transactionType?: TransactionType;
+      transactionTypes?: string; // 쉼표 구분 복수값. 예: "RECEIVE,SHIP"
+      referenceNo?: string;
+      search?: string;
+      department?: string;
+      model?: string;        // 제품 모델명 (쉼표 복수)
 ```
-
-> [!info] 백엔드 → 프론트엔드 필드명 변환
-> 백엔드는 스네이크 케이스(`warehouse_count`)를 반환하고,
-> `getTransactionsSummary` 메소드 내부에서 `.then()` 으로 카멜 케이스로 변환한다.
-
----
-
-## 5. 엑셀 내보내기 URL 생성
-
-```typescript
-getTransactionsExportUrl: (params?: {
-  transaction_type?: string;
-  search?: string;
-  start_date?: string; // YYYY-MM-DD
-  end_date?: string;   // YYYY-MM-DD
-}) => {
-  // 미지정 시 최근 30일(D-29 ~ 오늘)을 자동 부여
-  const today = new Date();
-  const from = new Date(today);
-  from.setDate(today.getDate() - 29);
-  const ymd = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  qs.set("start_date", params?.start_date ?? ymd(from));
-  qs.set("end_date", params?.end_date ?? ymd(today));
-  return toApiUrl(`/api/inventory/transactions/export.xlsx?${qs}`);
-},
-```
-
-> [!note] URL 생성 함수
-> `getItemsExportUrl` 과 `getTransactionsExportUrl` 은 fetch 를 하지 않는다.
-> URL 문자열만 반환하므로 `<a href={url} download>` 로 직접 연결하면 된다.
-
----
-
-## 6. 거래 수정 API 상세
-
-### `metaEditTransaction` — 메타데이터만 수정
-```typescript
-metaEditTransaction(logId, {
-  notes?: string | null;
-  reference_no?: string | null;
-  produced_by?: string | null;
-  reason: string;              // 수정 이유 (필수)
-  edited_by_employee_id: string;
-  edited_by_pin: string;       // PIN 인증
-})
-```
-
-### `quantityCorrectTransaction` — 수량 보정
-```typescript
-quantityCorrectTransaction(logId, {
-  quantity_change: number;     // SHIP은 음수여야 함
-  reason: string;
-  edited_by_employee_id: string;
-  edited_by_pin: string;
-})
-// 반환: { original: TransactionLog; correction: TransactionLog }
-// 원본 거래는 archived 처리, 보정 거래가 새로 생성됨
-```
-
----
-
-## 7. DesktopHistoryView 와의 연결
-
-```mermaid
-graph LR
-  HV["DesktopHistoryView"] -->|getTransactions| T["거래 목록"]
-  HV -->|getTransactionsSummary| S["KPI 집계"]
-  HV -->|getTransactionsSummary baseline| B["기간 베이스라인"]
-  HV -->|metaEditTransaction| EDIT["메타 수정"]
-  HV -->|quantityCorrectTransaction| CORR["수량 보정"]
-```
-
-`DesktopHistoryView` 에서 직접 `productionApi` 를 import 해서 사용한다 (api 허브 우회):
-```typescript
-import { productionApi, type TransactionSummary } from "@/lib/api/production";
-```
-
----
-
-## 8. AbortController 패턴
-
-```typescript
-const ctrl = new AbortController();
-void productionApi
-  .getTransactionsSummary(params, { signal: ctrl.signal })
-  .then(setSummary)
-  .catch((err) => {
-    if ((err as Error)?.name === "AbortError") return; // 정상 취소
-  });
-return () => ctrl.abort(); // 컴포넌트 effect 클린업
-```
-
----
-
-## 9. 관련 파일
-
-- [[erp/frontend/lib/api.ts]] — 이 파일을 spread merge 하는 허브
-- [[erp/frontend/app/legacy/_components/DesktopHistoryView.tsx]] — 주요 소비자
-- [[erp/backend/app/routers/production.py]] — 생산 입고 라우터
-- [[erp/backend/app/routers/inventory.py]] — 거래 내역 라우터 (transactions 엔드포인트)
-
----
-
-## 10. 주의 사항
-
-> [!warning] `getTransactions` 필터 파라미터 누락 시
-> 파라미터 없이 호출하면 전체 거래를 반환한다. 대용량일 수 있으므로
-> `limit`, `skip` 으로 페이지네이션을 반드시 적용할 것.
-
-> [!warning] `quantityCorrectTransaction` — SHIP 수량
-> 입고(RECEIVE)는 `quantity_change` 를 양수로, 출고(SHIP)는 음수로 넣어야 한다.
-> 양수를 잘못 넣으면 백엔드에서 에러 반환.
-
----
-
-## 11. 정책
-
-- `main` 브랜치: 코드만 유지
-- `vault-sync` 브랜치: 코드 + `vault/` 노트
-- 코드와 노트가 다르면 실제 코드 우선

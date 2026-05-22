@@ -1,92 +1,100 @@
-# AddQuarantineModal.tsx
+---
+type: file-explanation
+source_path: "frontend/app/legacy/_components/_defect_hub/AddQuarantineModal.tsx"
+importance: important
+layer: frontend
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
+---
 
-## 이 파일은 뭐예요?
+# AddQuarantineModal.tsx — AddQuarantineModal.tsx 설명
 
-정상 재고에서 불량 항목을 즉시 격리하는 모달. 결재 없이 즉시 처리된다.
-품목 검색 → 출처(창고/부서) 선택 → 수량 입력 → 사유 입력 → `defectsApi.quarantine()` 호출
-순서로 진행된다.
+## 이 파일은 무엇을 책임지나
 
-## 언제 보나요?
+`AddQuarantineModal.tsx`는 불량 격리, 폐기, 반품, 분해 같은 불량 처리 화면의 일부입니다.
 
-- 퀵 액션의 [새 격리 추가] 버튼 동작을 수정할 때
-- 격리 출처 로직(창고 vs 부서 재고)을 바꿀 때
-- 품목 검색 debounce/결과 표시를 조정할 때
-- 격리 제출 실패 에러 메시지를 수정할 때
+## 업무 흐름에서의 의미
+
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
+
+## 언제 보면 좋나
+
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
 ## 중요한 내용
 
-### Props
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-```ts
+- `AddQuarantineModal`
+- `SourceKind`
+- `AddQuarantineModalProps`
+
+## 연결되는 파일
+
+- [[ERP/frontend/app/legacy/_components/_defect_hub/📁__defect_hub]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
+
+## 핵심 발췌
+
+```tsx
+"use client";
+
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { AlertTriangle, Search } from "lucide-react";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { useFocusTrap } from "@/lib/mes/useFocusTrap";
+import { defectsApi } from "@/lib/api/defects";
+import { itemsApi } from "@/lib/api/items";
+import type { Item } from "@/lib/api/types";
+import { ReasonFormFields } from "./ReasonFormFields";
+
+const PRODUCTION_LINES = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
+
+type SourceKind = "warehouse" | "production";
+
 export interface AddQuarantineModalProps {
   open: boolean;
   onClose: () => void;
   currentEmployee: { employee_id: string; name: string; department: string };
   onSubmitted: () => void;
 }
-```
 
-### 주요 상태
+/**
+ * 새 격리 추가 모달.
+ *
+ * 입력:
+ *   - 품목 검색 (item_code / item_name)
+ *   - 출처: 창고 재고 OR 부서 재고 (라디오)
+ *     · 창고 재고 → target_dept select (어느 부서로 격리할지)
+ *     · 부서 재고 → source_dept select (= target_dept 자동, 같은 부서 안에서 격리)
+ *   - 수량 + 사유 카테고리/메모
+ *
+ * 제출: defectsApi.quarantine (즉시, 결재 불필요).
+ */
+export function AddQuarantineModal({
+  open,
+  onClose,
+  currentEmployee,
+  onSubmitted,
+}: AddQuarantineModalProps): JSX.Element | null {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<Item[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [selected, setSelected] = useState<Item | null>(null);
 
-| 상태 | 설명 |
-|---|---|
-| `query` / `results` / `searching` | 품목 검색 입력값 / 결과 목록 / 로딩 |
-| `selected` | 선택된 품목 (`Item`) |
-| `source` | `"warehouse"` (창고) 또는 `"production"` (부서) |
-| `dept` | 격리 대상 부서 (생산 6라인 중 선택) |
-| `qty` / `category` / `memo` | 수량, 사유 카테고리, 사유 메모 |
-| `busy` / `error` | 제출 중 플래그 / 에러 메시지 |
+  const [source, setSource] = useState<SourceKind>("warehouse");
+  // warehouse 모드: target_dept 만 선택. production 모드: source_dept = target_dept.
+  const [dept, setDept] = useState<string>(
+    PRODUCTION_LINES.includes(currentEmployee.department as (typeof PRODUCTION_LINES)[number])
+      ? currentEmployee.department
+      : PRODUCTION_LINES[0],
+  );
 
-### 동작 흐름
-
-1. **품목 검색** — `query` 입력 200ms debounce 후 `itemsApi.getItems()` 호출, AbortController로 이전 요청 취소
-2. **출처 선택** — 라디오 버튼
-   - `warehouse`: 창고에서 차감 → 선택 부서 [불량]으로 격리
-   - `production`: 선택 부서의 정상 재고에서 같은 부서 [불량]으로 이동
-3. **제출 조건** (`canSubmit`): `selected` 있음 + `category` 있음 + `qty > 0`
-4. **제출** — `defectsApi.quarantine(payload)` 호출
-   - `source_dept`: `production` 모드일 때만 포함
-   - 성공 → `onSubmitted()` + `onClose()` 호출
-5. **모달 열릴 때** 폼 전체 초기화, **ESC** 키로 닫기
-
-### 초기 dept 값
-
-현재 로그인 직원의 부서가 생산 6라인이면 그 부서, 아니면 첫 번째 라인("튜브")으로 초기화.
-
-## 연결되는 파일
-
-### 먼저 볼 파일
-- [[ERP/frontend/lib/api/defects.ts]] — `defectsApi.quarantine()` 호출
-- [[ERP/frontend/lib/api/types/defects.ts]] — `QuarantinePayload` 타입
-- [[ERP/frontend/lib/api/items.ts]] — `itemsApi.getItems()` — 품목 검색
-
-> [!info]- 더 연결된 파일
-> - [[ERP/frontend/app/legacy/_components/_defect_hub/ReasonFormFields.tsx]] — 사유 카테고리/메모 공통 폼
-> - [[ERP/frontend/app/legacy/_components/_defect_hub/DefectHubPanel.tsx]] — 이 모달을 열고 닫는 부모
-
-## 핵심 발췌
-
-```tsx
-async function handleSubmit() {
-  if (!canSubmit || !selected) return;
-  setBusy(true);
-  try {
-    await defectsApi.quarantine({
-      item_id: selected.item_id,
-      qty: qtyNum,
-      source,
-      source_dept: source === "production" ? dept : undefined,
-      target_dept: dept,
-      reason_category: category,
-      reason_memo: memo,
-      actor_employee_id: currentEmployee.employee_id,
-    });
-    onSubmitted();
-    onClose();
-  } catch (err) {
-    setError(err instanceof Error ? err.message : "격리 처리 중 오류가 발생했습니다.");
-  } finally {
-    setBusy(false);
-  }
-}
+  const [qty, setQty] = useState<string>("");
 ```

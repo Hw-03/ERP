@@ -1,43 +1,39 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "frontend/scripts/dev.js"
+importance: normal
 layer: frontend
-source_path: erp/frontend/scripts/dev.js
-status: active
-updated: 2026-04-27
-source_sha: feaea164f3fd
-tags:
-  - erp
-  - frontend
-  - source-file
-  - js
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# dev.js
+# dev.js — dev.js 설명
 
-> [!summary] 역할
-> 원본 프로젝트의 `dev.js` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`dev.js`는 JavaScript 설정/코드입니다. 프로젝트 구조 안에서 `frontend/scripts/dev.js` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-- Source: `frontend/scripts/dev.js`
-- Layer: `frontend`
-- Kind: `source-file`
-- Size: `3131` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-- Parent hub: [[frontend/scripts/scripts|frontend/scripts]]
-- Related: [[frontend/frontend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 실제 수정은 원본 파일에서 한다.
-- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+## 중요한 내용
 
-## 원본 발췌
+자동으로 뽑을 수 있는 함수/클래스 목록은 적지만, 파일 위치와 확장자로 볼 때 위 역할을 맡습니다.
 
-````js
+## 연결되는 파일
+
+- [[ERP/frontend/scripts/📁_scripts]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 핵심 발췌
+
+```js
 // Custom dev server wrapper for Next.js
 // - Prints a tidy banner with the real LAN IP
 // - Suppresses Next's default "▲ Next.js / Local / Network / Environments" banner
@@ -73,6 +69,24 @@ function detectLanIp() {
     ip.startsWith("192.168.") ||
     ip.startsWith("10.") ||
     /^172\.(1[6-9]|2\d|3[0-1])\./.test(ip);
-# ... (이하 68줄 생략. 원본 참조)
+  return candidates.find(isPrivate) || candidates[0] || null;
+}
 
-````
+const port = process.env.PORT || "3000";
+const hostname = process.env.HOSTNAME || "0.0.0.0";
+const lanIp = detectLanIp();
+
+function banner() {
+  const out = process.stdout;
+  const url = lanIp ? `http://${lanIp}:${port}` : `http://localhost:${port}`;
+  out.write("\n");
+  out.write(`  ${C.magenta}${C.bold}DEXCOWIN MES${C.reset}  ${C.gray}dev server${C.reset}\n`);
+  out.write(`  ${C.gray}${"─".repeat(44)}${C.reset}\n`);
+  out.write(`  ${C.dim}Network ${C.reset}  ${C.green}${url}${C.reset}\n`);
+  out.write(`  ${C.gray}${"─".repeat(44)}${C.reset}\n\n`);
+}
+
+const SUPPRESS_PATTERNS = [
+  /^\s*▲\s*Next\.js\s/,
+  /^\s*-\s*Local:\s/,
+```

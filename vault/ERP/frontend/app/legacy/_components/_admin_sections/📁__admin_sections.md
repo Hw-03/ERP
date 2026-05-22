@@ -1,66 +1,62 @@
 ---
-type: index
-project: DEXCOWIN MES
+type: folder-note
+source_path: "frontend/app/legacy/_components/_admin_sections"
+importance: normal
 layer: frontend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/app/legacy/_components/_admin_sections/
-tags: [vault, index, folder-marker]
-aliases:
-  - "_admin_sections"
-  - "_admin_sections.md"
+graph: hub
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
 # 📁 _admin_sections
 
-> [!summary] 역할
-> 관리자 화면(`DesktopAdminView`)을 구성하는 섹션 컴포넌트, 컨텍스트, 공유 상수 모음.
+## 이 폴더는 무엇을 위한 곳인가
 
-> [!info] 코드 미러 영역
-> 이 폴더는 `erp/frontend/app/legacy/_components/_admin_sections/` 의 vault 미러.
+`frontend/app/legacy/_components/_admin_sections`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
 
-## 어떤 파일들이 있나
+## 현장 업무와의 관계
 
-**상단 레벨 컴포넌트**
-- [[erp/frontend/app/legacy/_components/_admin_sections/AdminSidebar.tsx.md|AdminSidebar.tsx]] — 관리자 탭 사이드바
-- [[erp/frontend/app/legacy/_components/_admin_sections/AdminAuditLogSection.tsx.md|AdminAuditLogSection.tsx]] — 감사 로그 섹션
-- [[erp/frontend/app/legacy/_components/_admin_sections/AdminDangerZone.tsx.md|AdminDangerZone.tsx]] — PIN 변경 / DB 리셋 위험 영역
-- [[erp/frontend/app/legacy/_components/_admin_sections/AdminEmployeesSection.tsx.md|AdminEmployeesSection.tsx]] — 직원 관리 섹션
-- [[erp/frontend/app/legacy/_components/_admin_sections/AdminMasterItemsSection.tsx.md|AdminMasterItemsSection.tsx]] — 마스터 품목 섹션
-- [[erp/frontend/app/legacy/_components/_admin_sections/AdminModelsSection.tsx.md|AdminModelsSection.tsx]] — 제품 모델 섹션
-- [[erp/frontend/app/legacy/_components/_admin_sections/AdminExportSection.tsx.md|AdminExportSection.tsx]] — 데이터 내보내기 섹션
-- `AdminDepartmentsSection.tsx`, `AdminRightPanelContent.tsx`, `AdminSectionContent.tsx`
-- `AssignedModelsEditor.tsx`, `DeptManagementPanel.tsx`, `SidebarButton.tsx`
+사용자가 보는 화면이나 화면이 서버와 통신하는 방식에 연결됩니다.
 
-**컨텍스트**
-- [[erp/frontend/app/legacy/_components/_admin_sections/AdminEmployeesContext.tsx.md|AdminEmployeesContext.tsx]]
-- [[erp/frontend/app/legacy/_components/_admin_sections/AdminMasterItemsContext.tsx.md|AdminMasterItemsContext.tsx]]
-- [[erp/frontend/app/legacy/_components/_admin_sections/AdminModelsContext.tsx.md|AdminModelsContext.tsx]]
-- `AdminDepartmentsContext.tsx`
+## 언제 보면 좋나
 
-**공유 상수**
-- [[erp/frontend/app/legacy/_components/_admin_sections/adminShared.ts.md|adminShared.ts]] — `PROCESS_TYPE_OPTIONS`, `MODEL_SLOTS`, `UNIT_OPTIONS`, `EMPTY_ADD_FORM` 등
+- 이 폴더 안의 파일이 어떤 역할인지 빠르게 파악할 때
+- 수정 전에 먼저 읽을 파일을 고를 때
 
-## 도메인 컨텍스트
+## 주요 하위 폴더
 
-관리자 화면은 사이드바 탭(`AdminSidebar`) 선택에 따라 우측에 섹션 컴포넌트를 교체하는 구조.  
-`adminShared.ts` 에 공정 유형 코드(TR/TA/TF … PR/PA/PF — 6종 × 3단계 = 18종)와 제품 모델 슬롯(DX3000/COCOON/SOLO/ADX4000W/ADX6000) 이 정의되어 있다.  
-각 Context는 해당 섹션의 API 호출·낙관적 업데이트 상태를 캡슐화한다.
+- [[ERP/frontend/app/legacy/_components/_admin_sections/_admin_primitives/📁__admin_primitives]] — `frontend/app/legacy/_components/_admin_sections/_admin_primitives`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
+- [[ERP/frontend/app/legacy/_components/_admin_sections/_bom_workbench/📁__bom_workbench]] — `frontend/app/legacy/_components/_admin_sections/_bom_workbench`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
+- [[ERP/frontend/app/legacy/_components/_admin_sections/_employees_parts/📁__employees_parts]] — `frontend/app/legacy/_components/_admin_sections/_employees_parts`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
+- [[ERP/frontend/app/legacy/_components/_admin_sections/_master_items_parts/📁__master_items_parts]] — `frontend/app/legacy/_components/_admin_sections/_master_items_parts`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
 
-## ⚠️ 위험 포인트
+## 먼저 볼 파일 5개
 
-- `AdminDangerZone.tsx` 는 PIN 리셋과 DB 리셋을 직접 호출 — 운영 환경에서 accidental trigger 방지 로직 확인 필요.
-- `adminShared.ts` 의 `PROCESS_TYPE_OPTIONS` 를 변경하면 품목 등록 폼과 필터 전체에 영향.
+- [[ERP/frontend/app/legacy/_components/_admin_sections/AdminAuditLogSection.tsx]] — `AdminAuditLogSection.tsx`는 관리자 화면의 한 부분을 담당하는 TypeScript/React 코드입니다. 직원, 품목, BOM, 설정 같은 관리 작업과 연결됩니다.
+- [[ERP/frontend/app/legacy/_components/_admin_sections/AdminDangerZone.tsx]] — `AdminDangerZone.tsx`는 관리자 화면의 한 부분을 담당하는 TypeScript/React 코드입니다. 직원, 품목, BOM, 설정 같은 관리 작업과 연결됩니다.
+- [[ERP/frontend/app/legacy/_components/_admin_sections/AdminDepartmentsContext.tsx]] — `AdminDepartmentsContext.tsx`는 관리자 화면의 한 부분을 담당하는 TypeScript/React 코드입니다. 직원, 품목, BOM, 설정 같은 관리 작업과 연결됩니다.
+- [[ERP/frontend/app/legacy/_components/_admin_sections/AdminDepartmentsSection.tsx]] — `AdminDepartmentsSection.tsx`는 관리자 화면의 한 부분을 담당하는 TypeScript/React 코드입니다. 직원, 품목, BOM, 설정 같은 관리 작업과 연결됩니다.
+- [[ERP/frontend/app/legacy/_components/_admin_sections/AdminEmployeesContext.tsx]] — `AdminEmployeesContext.tsx`는 관리자 화면의 한 부분을 담당하는 TypeScript/React 코드입니다. 직원, 품목, BOM, 설정 같은 관리 작업과 연결됩니다.
 
-## 관련 가이드
+> [!info]- 추가 파일
+> - [[ERP/frontend/app/legacy/_components/_admin_sections/AdminEmployeesSection.tsx]] — AdminEmployeesSection.tsx
+> - [[ERP/frontend/app/legacy/_components/_admin_sections/AdminExportSection.tsx]] — AdminExportSection.tsx
+> - [[ERP/frontend/app/legacy/_components/_admin_sections/AdminMasterItemsContext.tsx]] — AdminMasterItemsContext.tsx
+> - [[ERP/frontend/app/legacy/_components/_admin_sections/AdminMasterItemsSection.tsx]] — AdminMasterItemsSection.tsx
+> - [[ERP/frontend/app/legacy/_components/_admin_sections/AdminModelsContext.tsx]] — AdminModelsContext.tsx
+> - [[ERP/frontend/app/legacy/_components/_admin_sections/AdminModelsSection.tsx]] — AdminModelsSection.tsx
+> - [[ERP/frontend/app/legacy/_components/_admin_sections/AdminRightPanelContent.tsx]] — AdminRightPanelContent.tsx
+> - [[ERP/frontend/app/legacy/_components/_admin_sections/AdminSectionContent.tsx]] — AdminSectionContent.tsx
+> - [[ERP/frontend/app/legacy/_components/_admin_sections/AdminSidebar.tsx]] — AdminSidebar.tsx
+> - [[ERP/frontend/app/legacy/_components/_admin_sections/AssignedModelsEditor.tsx]] — AssignedModelsEditor.tsx
+> - [[ERP/frontend/app/legacy/_components/_admin_sections/DeptManagementPanel.tsx]] — DeptManagementPanel.tsx
+> - [[ERP/frontend/app/legacy/_components/_admin_sections/SidebarButton.tsx]] — SidebarButton.tsx
+> - [[ERP/frontend/app/legacy/_components/_admin_sections/adminShared.ts]] — adminShared.ts
 
-- [[erp/_vault/guides/admin-flow]]
+## 조심할 점
 
-## 자식 폴더
+폴더 성격을 먼저 확인하고 현재 운영 코드인지, 보관 자료인지, 자동 생성물인지 구분해야 합니다.
 
-- [[erp/frontend/app/legacy/_components/_admin_sections/_admin_primitives/📁__admin_primitives|_admin_primitives/]]
-- [[erp/frontend/app/legacy/_components/_admin_sections/_bom_parts/📁__bom_parts|_bom_parts/]]
-- [[erp/frontend/app/legacy/_components/_admin_sections/_bom_workbench/📁__bom_workbench|_bom_workbench/]]
-- [[erp/frontend/app/legacy/_components/_admin_sections/_employees_parts/📁__employees_parts|_employees_parts/]]
-- [[erp/frontend/app/legacy/_components/_admin_sections/_master_items_parts/📁__master_items_parts|_master_items_parts/]]
+## 다음에 볼 위치
+
+- 상위 폴더: [[ERP/frontend/app/legacy/_components/📁__components]]

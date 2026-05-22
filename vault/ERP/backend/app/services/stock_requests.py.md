@@ -1,181 +1,113 @@
 ---
+type: file-explanation
+source_path: "backend/app/services/stock_requests.py"
+importance: critical
 layer: backend
-topic: service
-file: erp/backend/app/services/stock_requests.py
-tags:
-  - "#layer/backend"
-  - "#topic/service"
-aliases:
-  - stock_requests service
-  - 결재 상태머신
----
-type: code-note
-status: active
-updated: 2026-05-21
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
 ---
 
-# 📋 stock_requests.py — 배치 상태머신 & 결재 흐름
+# stock_requests.py — 입출고 요청과 승인 흐름
 
-> [!summary]
-> 작업자가 재고 이동을 **요청**하고 창고/부서 담당자가 **승인**하면 실재고가 반영되는 2단계 결재 흐름의 핵심. DRAFT → SUBMITTED → RESERVED → COMPLETED 상태 전이를 관리하며, 창고가 관여하는 모든 작업은 PIN 검증된 승인자 없이 재고를 건드리지 않는다.
+## 이 파일은 무엇을 책임지나
 
----
+현장 담당자가 요청을 제출하고 창고가 승인/반려/취소하는 흐름을 처리하는 서비스입니다.
 
-## 1. 한 문장 목적
+## 업무 흐름에서의 의미
 
-창고 재고가 움직이는 작업은 창고 담당자(또는 부서 정/부), PIN 검증 후에만 실재고 반영하는 결재 상태머신을 구현한다.
+아직 처리되지 않은 요청과 실제 재고 처리 완료를 구분하는 업무 규칙이 들어 있습니다.
 
----
+## 언제 보면 좋나
 
-## 2. 파일 위치 & 임포트 경로
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
+- 운영 데이터가 달라질 수 있는 변경을 준비할 때
 
-```
-erp/backend/app/services/stock_requests.py
-from app.services import stock_requests as stock_request_svc
-```
+## 중요한 내용
 
----
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-## 3. 상태 전이도
+- `LineInput`
+- `FailedApprovalError`
+- `RequestNotFoundError`
+- `line_requires_approval`
+- `line_requires_pending`
+- `request_requires_approval`
+- `_generate_request_code`
+- `validate_line_shape_for_request_type`
+- `_validate_lines`
+- `_preflight_inventory_check`
+- 그 외 8개 항목
 
-```mermaid
-stateDiagram-v2
-    [*] --> DRAFT: upsert_draft_request
-    DRAFT --> SUBMITTED: submit_draft_request
-    [*] --> SUBMITTED: create_request (즉시)
-    SUBMITTED --> RESERVED: reserve() 성공 (창고→부서 라인)
-    SUBMITTED --> COMPLETED: 승인 불필요 or 자가승인
-    RESERVED --> COMPLETED: approve_request (창고 담당자 PIN)
-    RESERVED --> FAILED_APPROVAL: 시스템 검증 실패
-    SUBMITTED --> REJECTED: reject_request (창고 담당자 PIN)
-    RESERVED --> REJECTED: reject_request
-    SUBMITTED --> CANCELLED: cancel_request (본인 or admin)
-    RESERVED --> CANCELLED: cancel_request → pending 원복
-```
+## 연결되는 파일
 
----
+### 먼저 같이 볼 파일
+- [[ERP/backend/app/routers/stock_requests.py]] — 프론트의 입출고 요청 작성, 내 요청, 창고 승인함이 호출하는 API 입구입니다.
+- [[ERP/backend/app/models.py]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 파일입니다.
+- [[ERP/backend/app/schemas.py]] — 백엔드와 프론트엔드가 주고받는 데이터 모양을 정하는 파일입니다.
+- [[ERP/backend/app/database.py]] — `database.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/database.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-## 4. 요청 유형 & 허용 bucket 조합
+## 조심할 점
 
-| request_type | from_bucket | to_bucket | 부서 필수 |
-|---|---|---|---|
-| RAW_RECEIVE | NONE | WAREHOUSE | — |
-| RAW_SHIP | WAREHOUSE | NONE | — |
-| WAREHOUSE_TO_DEPT | WAREHOUSE | PRODUCTION | to_dept |
-| DEPT_TO_WAREHOUSE | PRODUCTION | WAREHOUSE | from_dept |
-| DEPT_INTERNAL | PRODUCTION | PRODUCTION | 양쪽 |
-| MARK_DEFECTIVE_WH | WAREHOUSE | DEFECTIVE | to_dept |
-| MARK_DEFECTIVE_PROD | PRODUCTION | DEFECTIVE | 양쪽 |
-| SUPPLIER_RETURN | DEFECTIVE | NONE | from_dept |
-| PACKAGE_OUT | WAREHOUSE | NONE | — |
-| MANUAL_ADJUSTMENT | 자유 | 자유 | 부서 결재만 |
+상태 전이가 꼬이면 승인 대기 수량, 요청 목록, 실제 재고 처리가 어긋납니다.
 
----
-
-## 5. 핵심 코드 발췌
+## 핵심 발췌
 
 ```python
-def _finalize_submission(db, *, request, requester, now):
-    """제출 시점 분기:
-    - 승인 불필요 or 자가승인 → _execute_all_lines + COMPLETED
-    - WAREHOUSE from 라인 있음 → reserve() + RESERVED
-    - 나머지 → SUBMITTED
-    """
-    warehouse_ok = (not request.requires_warehouse_approval) or is_admin or \
-                   requester_role in ("primary", "deputy")
-    dept_ok = (not request.requires_department_approval) or is_admin or \
-              requester_dept_role in ("primary", "deputy")
-    if warehouse_ok and dept_ok:
-        _execute_all_lines(db, request, lines, ...)
-        request.status = StockRequestStatusEnum.COMPLETED
-        return request
-    # pending 예약이 필요한 라인 처리
-    if pending_lines:
-        for item_id, qty in agg.items():
-            inventory_svc.reserve(db, item_id, qty, employee=requester)
-        request.status = StockRequestStatusEnum.RESERVED
-    else:
-        request.status = StockRequestStatusEnum.SUBMITTED
+"""StockRequest 서비스 — 작업자 결재 요청 흐름.
+
+원칙:
+- 창고 재고가 움직이는 모든 작업(`from_bucket=='warehouse'` 또는 `to_bucket=='warehouse'`)은
+  창고 담당자(`warehouse_role in ('primary','deputy')`)의 승인 후에만 실재고 반영.
+- 점유는 `Inventory.pending_quantity` 컬럼으로 관리하고, origin 구분은
+  `StockRequestLine` 조회로 한다 (별도 컬럼 추가하지 않음).
+- 승인은 한 트랜잭션 내에서 release + 실재고 이동 + TransactionLog 기록을 모두 수행한다.
+  성공하면 `completed`, 검증 실패하면 `failed_approval` 로 저장하고 pending 을 안전하게 원복.
+- 승인 불필요 작업(`production ↔ production`)은 즉시 실행되고 `completed` 상태로 기록.
+"""
+
+from __future__ import annotations
+
+import secrets
+import uuid
+from datetime import datetime
+from decimal import Decimal
+from typing import Iterable, List, Optional, Sequence
+
+from sqlalchemy.orm import Session
+
+from app.models import (
+    DepartmentEnum,
+    Employee,
+    InventoryLocation,
+    Item,
+    LocationStatusEnum,
+    RequestBucketEnum,
+    StockRequest,
+    StockRequestLine,
+    StockRequestStatusEnum,
+    StockRequestTypeEnum,
+    TransactionLog,
+    TransactionTypeEnum,
+)
+from app.database import _is_sqlite
+from app.services import inventory as inventory_svc
+from app.services.dept_hierarchy import can_approve_department
+from app.services.pin_auth import verify_pin
+
+
+# ---------------------------------------------------------------------------
+# 정책 상수
+# ---------------------------------------------------------------------------
+
+# request_type → 승인 시 호출할 거래 유형 (TransactionLog.transaction_type)
+_TX_TYPE_BY_REQUEST: dict[StockRequestTypeEnum, TransactionTypeEnum] = {
+    StockRequestTypeEnum.RAW_RECEIVE: TransactionTypeEnum.RECEIVE,
+    StockRequestTypeEnum.RAW_SHIP: TransactionTypeEnum.SHIP,
+    StockRequestTypeEnum.WAREHOUSE_TO_DEPT: TransactionTypeEnum.TRANSFER_TO_PROD,
+    StockRequestTypeEnum.DEPT_TO_WAREHOUSE: TransactionTypeEnum.TRANSFER_TO_WH,
+    StockRequestTypeEnum.DEPT_INTERNAL: TransactionTypeEnum.TRANSFER_DEPT,
+    StockRequestTypeEnum.MARK_DEFECTIVE_WH: TransactionTypeEnum.MARK_DEFECTIVE,
+    StockRequestTypeEnum.MARK_DEFECTIVE_PROD: TransactionTypeEnum.MARK_DEFECTIVE,
 ```
-
-```python
-def approve_request(db, request, *, approver, pin):
-    """창고 담당자 승인. PIN 검증 + 재고 이동 + TransactionLog 한 트랜잭션."""
-    role = (approver.warehouse_role or "none").lower()
-    if role not in ("primary", "deputy"):
-        raise PermissionError("창고 담당자만 승인할 수 있습니다.")
-    if not verify_pin(approver.pin_hash, pin):
-        raise PermissionError("PIN이 일치하지 않습니다.")
-    try:
-        _execute_all_lines(db, request, list(request.lines), ..., is_approval=True)
-    except ValueError as exc:
-        raise FailedApprovalError(str(exc))
-    request.status = StockRequestStatusEnum.COMPLETED
-```
-
----
-
-## 6. 승인 정책
-
-> [!info] 승인이 필요한 조건
-> `from_bucket == WAREHOUSE` 또는 `to_bucket == WAREHOUSE` 인 라인이 하나라도 있으면 → 창고 담당자 승인 필요
->
-> `PRODUCTION ↔ PRODUCTION` (DEFECTIVE 포함) 라인만 있으면 → 즉시 실행
-
-> [!info] 부서 결재 (MANUAL_ADJUSTMENT)
-> `manual / adjust_in / adjust_out` origin 라인이 포함된 IO batch → `requires_department_approval=True`
-> 부서 정/부(department_role) 또는 admin 이 PIN 승인 후 실재고 반영
-
----
-
-## 7. request_code 형식
-
-```
-SR-YYYYMMDD-HHMMSS-XXXXXXXX
-예: SR-20260521-143022-A3F8B2C1
-```
-
-8자리 랜덤 hex (32비트 엔트로피). unique constraint 충돌 시 라우터가 1회 retry.
-
----
-
-## 8. 사용자 정의 예외
-
-```python
-class FailedApprovalError(Exception):
-    """승인 시점 시스템 검증 실패. 라우터가 catch → 별도 트랜잭션으로 status 기록."""
-
-class RequestNotFoundError(LookupError):
-    """request_id 가 존재하지 않을 때."""
-```
-
----
-
-## 9. 의존 관계
-
-```
-stock_requests.py
-  ← models (StockRequest, StockRequestLine, StockRequestStatusEnum, ...)
-  ← services/inventory (reserve, release, execute_line)
-  ← services/pin_auth (verify_pin)
-  ← services/io (sync_batch_from_stock_request — 역방향 호출)
-  호출자: io.py (_submit_approval), stock_requests 라우터
-```
-
----
-
-## 10. 주의 사항
-
-> [!warning]
-> 1. DRAFT 저장 중에는 `inventory_svc.*` 호출 절대 금지. DRAFT는 재고에 영향을 주지 않는다.
-> 2. `FailedApprovalError` 발생 시 라우터가 rollback 후 별도 트랜잭션에서 `mark_failed_approval` 을 호출해 status 기록. pending 은 그 안에서 원복된다.
-> 3. 부서간 이동(`DEPT_INTERNAL`) 잠금 순서: `from_dept` 와 `to_dept` 를 이름 정렬 후 선락 → 데드락 방지.
-
----
-
-## 11. 관련 노트 링크
-
-- [[inventory.py]] — reserve / release / execute 실행자
-- [[io.py]] — IoBatch ↔ StockRequest 연결
-- [[models.py]] — StockRequest, StockRequestLine ORM

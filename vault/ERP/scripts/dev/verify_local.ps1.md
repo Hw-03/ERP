@@ -1,80 +1,67 @@
 ---
-tags:
-  - layer/scripts
-  - topic/ops
-aliases:
-  - verify_local
-created: 2026-05-21
----
-type: code-note
-status: active
-updated: 2026-05-21
+type: file-explanation
+source_path: "scripts/dev/verify_local.ps1"
+importance: important
+layer: scripts
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
 ---
 
-# verify_local.ps1
+# verify_local.ps1 — verify_local.ps1 설명
 
-> [!info] 한 줄 요약
-> push 전 필수 로컬 검증 스크립트. Frontend lint·typecheck·테스트·빌드·번들 크기, Backend pytest, OpenAPI drift 를 순서대로 실행하여 GitHub CI 실패를 사전 차단한다.
+## 이 파일은 무엇을 책임지나
 
-## 1. 파일 위치
+`verify_local.ps1`는 개발/검증/데이터 정리에 쓰는 보조 스크립트입니다.
 
-```
-erp/scripts/dev/verify_local.ps1
-```
+## 업무 흐름에서의 의미
 
-## 2. 실행 방법
+개발자가 변경 전후 품질을 확인하거나 데이터 작업을 준비할 때 사용합니다.
 
-```powershell
-# CLAUDE.md 기준 — push 전 항상 실행
-powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
+## 언제 보면 좋나
 
-# 옵션: DB 정합성 검사 포함
-powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -DbReadOnlyCheck
-```
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-## 3. 검사 항목 (순서대로)
+## 중요한 내용
 
-| 순서 | 이름 | 명령 | 비고 |
-|---|---|---|---|
-| 1 | Backend pytest | `python -m pytest -q` | backend/ 에서 실행 |
-| 2 | Frontend strict lint | `npm run lint:strict` | frontend/ 에서 실행 |
-| 3 | Frontend type check | `npx tsc --noEmit` | TS 컴파일 오류 검출 |
-| 4 | Frontend tests + coverage | `npm run test:coverage` | 50/50/50/50 threshold |
-| 5 | Frontend production build | `npm run build` | 빌드 실패 사전 차단 |
-| 6 | Frontend bundle size | `npm run check:bundle-size` | .next-prod chunks ≤ 2.0 MB |
-| 7 | OpenAPI drift | Python 인라인 스크립트 | baseline 비교 |
-| 8 | (옵션) DB read-only | Python 인라인 스크립트 | `-DbReadOnlyCheck` 플래그 시 |
-| 9 | Git working tree | `git status --short` | 미커밋 파일 확인 |
+자동으로 뽑을 수 있는 함수/클래스 목록은 적지만, 파일 위치와 확장자로 볼 때 위 역할을 맡습니다.
 
-## 4. OpenAPI drift 검사 상세
+## 연결되는 파일
 
-```mermaid
-flowchart LR
-    Script["PS 스크립트"] --> Capture["app.openapi() → /tmp/openapi-current.json"]
-    Capture --> Compare{현재 == baseline?}
-    Compare -->|일치| Pass["통과"]
-    Compare -->|불일치| Fail["drift 에러 + 갱신 명령 출력"]
-```
+- [[ERP/scripts/dev/📁_dev]] — 이 파일이 속한 폴더의 안내판입니다.
 
-baseline 파일: `erp/_dev/baselines/openapi.json`
+## 조심할 점
 
-갱신 명령:
-```bash
-cd backend
-python -c "from app.main import app; import json; open('../_dev/baselines/openapi.json','w',encoding='utf-8').write(json.dumps(app.openapi(),indent=2,sort_keys=True,ensure_ascii=False)+chr(10))"
-```
+큰 위험은 낮지만, 연결된 파일과 실행 위치를 확인한 뒤 수정하는 편이 안전합니다.
 
-## 5. 코드 발췌 (검사 실행 함수)
+## 핵심 발췌
 
 ```powershell
-# erp/scripts/dev/verify_local.ps1 (13-37)
+param(
+    [switch] $DbReadOnlyCheck
+)
+
+$ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
+
+# RepoRoot 을 git으로 정확히 계산 (스크립트 위치와 무관)
+$RepoRoot = git rev-parse --show-toplevel
+$FrontendRoot = Join-Path $RepoRoot "frontend"
+$BackendRoot = Join-Path $RepoRoot "backend"
+
 function Invoke-Check {
     param(
-        [Parameter(Mandatory = $true)] [string] $Name,
-        [Parameter(Mandatory = $true)] [string] $WorkingDirectory,
-        [Parameter(Mandatory = $true)] [scriptblock] $Command
+        [Parameter(Mandatory = $true)]
+        [string] $Name,
+
+        [Parameter(Mandatory = $true)]
+        [string] $WorkingDirectory,
+
+        [Parameter(Mandatory = $true)]
+        [scriptblock] $Command
     )
+
     Write-Host ""
     Write-Host "==> $Name"
     Push-Location $WorkingDirectory
@@ -88,52 +75,22 @@ function Invoke-Check {
         Pop-Location
     }
 }
+
+Invoke-Check "Backend pytest" $BackendRoot { python -m pytest -q }
+Invoke-Check "Frontend strict lint" $FrontendRoot { npm run lint:strict }
+Invoke-Check "Frontend type check" $FrontendRoot { npx tsc --noEmit }
+# coverage gate (Round-10A #5) — CI 와 동일한 threshold 50/50/50/50.
+Invoke-Check "Frontend tests + coverage" $FrontendRoot { npm run test:coverage }
+Invoke-Check "Frontend production build" $FrontendRoot { npm run build }
+# Round-16 #4 — bundle size gate (.next-prod/static/chunks 합산 ≤ 2.0 MB).
+Invoke-Check "Frontend bundle size" $FrontendRoot { npm run check:bundle-size }
+# OpenAPI drift check (Round-10A #5) — backend 라우터/스키마 변경 시 _dev/baselines/openapi.json 갱신 강제.
+Invoke-Check "OpenAPI drift" $BackendRoot {
+    $TmpFile = Join-Path $env:TEMP "openapi-current.json"
+    $BaselineFile = Join-Path $RepoRoot "_dev/baselines/openapi.json"
+
+    $PyScript = @'
+import json
+import sys
+sys.path.insert(0, ".")
 ```
-
-## 6. DB 정합성 검사 (옵션)
-
-`-DbReadOnlyCheck` 플래그 시 SQLite read-only 모드로 검사:
-
-- 주요 테이블 행 수 출력
-- `inventory_mismatch_count` = 0 검증
-  (`quantity != warehouse_qty + location_sum` 인 항목 수)
-- `open_queue_batches` 수 출력
-- 마지막 거래 시각 출력
-
-```
-mismatch_count != 0 이면 exit 1 → 스크립트 전체 실패
-```
-
-## 7. RepoRoot 계산
-
-```powershell
-# erp/scripts/dev/verify_local.ps1 (9-11)
-$RepoRoot = git rev-parse --show-toplevel
-$FrontendRoot = Join-Path $RepoRoot "frontend"
-$BackendRoot  = Join-Path $RepoRoot "backend"
-```
-
-스크립트 위치와 무관하게 git 루트 기준으로 경로 계산.
-
-## 8. 에러 정책
-
-```powershell
-$ErrorActionPreference = "Stop"
-Set-StrictMode -Version Latest
-```
-
-어느 한 검사라도 실패 시 즉시 중단. 이후 검사는 실행되지 않음.
-
-## 9. 자주 하는 실수 / 주의
-
-> [!warning] OpenAPI drift 발생 시
-> 백엔드 라우터 또는 스키마를 수정했는데 baseline 을 갱신하지 않으면 이 스크립트가 실패한다. 에러 메시지에 출력된 갱신 명령 한 줄을 실행 후 `_dev/baselines/openapi.json` 을 커밋에 포함하면 된다.
-
-> [!note] CI 와 동일 threshold
-> coverage 50/50/50/50 은 GitHub CI 와 동일. 로컬 통과 = CI 통과.
-
-## 10. 관련 파일
-
-- `[[erp/CLAUDE.md]]` — "Before commit/push, run verify_local.ps1" 기준 명시
-- `erp/_dev/baselines/openapi.json` — OpenAPI drift baseline
-- `[[erp/frontend/package.json]]` — lint:strict, test:coverage, check:bundle-size 스크립트 정의

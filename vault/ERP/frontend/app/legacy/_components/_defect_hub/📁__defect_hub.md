@@ -1,50 +1,52 @@
+---
+type: folder-note
+source_path: "frontend/app/legacy/_components/_defect_hub"
+importance: normal
+layer: frontend
+graph: hub
+updated: 2026-05-22
+project: DEXCOWIN MES
+---
+
 # 📁 _defect_hub
 
-## 이 폴더는 뭐예요?
+## 이 폴더는 무엇을 위한 곳인가
 
-불량 재고 처리 UI 컴포넌트 모음. 창고 또는 생산부에서 불량 재고를 격리(quarantine)하거나
-처리(scrap/disassemble/return)하는 워크플로의 화면 요소들이 여기에 있다.
+`frontend/app/legacy/_components/_defect_hub`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
 
-## 언제 여기를 보나요?
+## 현장 업무와의 관계
 
-- 불량 처리 화면에서 버튼/모달이 이상하게 동작할 때
-- 불량 KPI 카드 수치가 틀렸을 때
-- 새 불량 처리 워크타입을 추가할 때
-- PA/PF 품목 BOM 분해 로직을 수정할 때
+사용자가 보는 화면이나 화면이 서버와 통신하는 방식에 연결됩니다.
 
-## 주요 파일
+## 언제 보면 좋나
 
-| 파일 | 역할 |
-|---|---|
-| `DefectHubPanel.tsx` | 불량 처리 허브 진입점. KPI 카드 + 퀵 액션 + 필터 + 목록 + 모달 분기 |
-| `DefectKpiCards.tsx` | KPI 카드 4개 UI (격리 건수, 1년 이상, 결재 대기, 오늘 처리) |
-| `DefectQuickActions.tsx` | 퀵 액션 버튼 (새 격리, R 반품, R 폐기) |
-| `DefectFilterBar.tsx` | 범위(my/production/all) + 정렬(oldest/newest) 필터 바 |
-| `DefectDepartmentList.tsx` | 부서별 격리 항목 목록 렌더링 |
-| `AddQuarantineModal.tsx` | 새 격리 추가 모달 (품목 검색 → 출처/부서 → 수량 → 사유) |
-| `RDefectActionModal.tsx` | R 타입 품목 처리 모달 (정상 복귀 / 폐기 / 반품) |
-| `PaPfDefectWizard.tsx` | PA/PF 품목 처리 위자드 (정상 복귀 / 전부 폐기 / BOM 분해) |
-| `DisassembleTree.tsx` | BOM 분해 트리 — 자식 품목별 처리 방식 결정 UI |
-| `ReasonFormFields.tsx` | 사유 카테고리 + 메모 입력 공통 폼 필드 |
+- 이 폴더 안의 파일이 어떤 역할인지 빠르게 파악할 때
+- 수정 전에 먼저 읽을 파일을 고를 때
 
-## 품목 종류별 모달 분기
+## 주요 하위 폴더
 
-`DefectHubPanel`이 [처리] 버튼 클릭 시 `item_code` 두 번째 segment로 분기한다:
+- [[ERP/frontend/app/legacy/_components/_defect_hub/__tests__/📁___tests__]] — `frontend/app/legacy/_components/_defect_hub/__tests__`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
 
-```
-item_code 예: 6-PA-0001, 6-PF-0002
-                ↑↑
-           parts[1] === "PA" 또는 "PF"  →  PaPfDefectWizard
-           그 외 (R 등)                 →  RDefectActionModal
-```
+## 먼저 볼 파일 5개
 
-## 관련 파일
+- [[ERP/frontend/app/legacy/_components/_defect_hub/AddQuarantineModal.tsx]] — `AddQuarantineModal.tsx`는 불량 격리, 폐기, 반품, 분해 같은 불량 처리 화면의 일부입니다.
+- [[ERP/frontend/app/legacy/_components/_defect_hub/DefectDepartmentList.tsx]] — `DefectDepartmentList.tsx`는 불량 격리, 폐기, 반품, 분해 같은 불량 처리 화면의 일부입니다.
+- [[ERP/frontend/app/legacy/_components/_defect_hub/DefectFilterBar.tsx]] — `DefectFilterBar.tsx`는 불량 격리, 폐기, 반품, 분해 같은 불량 처리 화면의 일부입니다.
+- [[ERP/frontend/app/legacy/_components/_defect_hub/DefectHubPanel.tsx]] — `DefectHubPanel.tsx`는 불량 격리, 폐기, 반품, 분해 같은 불량 처리 화면의 일부입니다.
+- [[ERP/frontend/app/legacy/_components/_defect_hub/DefectKpiCards.tsx]] — `DefectKpiCards.tsx`는 불량 격리, 폐기, 반품, 분해 같은 불량 처리 화면의 일부입니다.
 
-### 먼저 볼 파일
-- [[ERP/backend/app/routers/defects.py]] — 백엔드 격리/복귀 API 엔드포인트
-- [[ERP/frontend/lib/api/defects.ts]] — API 클라이언트 (quarantine, unquarantine, listDefects, getDefectKpi)
-- [[ERP/frontend/lib/api/types/defects.ts]] — DefectLocation, DefectKpi, QuarantinePayload, UnquarantinePayload 타입
+> [!info]- 추가 파일
+> - [[ERP/frontend/app/legacy/_components/_defect_hub/DefectQuickActions.tsx]] — DefectQuickActions.tsx
+> - [[ERP/frontend/app/legacy/_components/_defect_hub/DisassembleTree.tsx]] — DisassembleTree.tsx
+> - [[ERP/frontend/app/legacy/_components/_defect_hub/PaPfDefectWizard.tsx]] — PaPfDefectWizard.tsx
+> - [[ERP/frontend/app/legacy/_components/_defect_hub/RDefectActionModal.tsx]] — RDefectActionModal.tsx
+> - [[ERP/frontend/app/legacy/_components/_defect_hub/ReasonFormFields.tsx]] — ReasonFormFields.tsx
+> - [[ERP/frontend/app/legacy/_components/_defect_hub/reasonCategories.ts]] — reasonCategories.ts
 
-> [!info]- 더 연결된 파일
-> - [[ERP/frontend/lib/api/stock-requests.ts]] — PaPfDefectWizard에서 scrap/disassemble 결재 요청 생성
-> - [[ERP/frontend/app/legacy/_components/_defect_hub/__tests__/]] — 단위 테스트 4종
+## 조심할 점
+
+폴더 성격을 먼저 확인하고 현재 운영 코드인지, 보관 자료인지, 자동 생성물인지 구분해야 합니다.
+
+## 다음에 볼 위치
+
+- 상위 폴더: [[ERP/frontend/app/legacy/_components/📁__components]]

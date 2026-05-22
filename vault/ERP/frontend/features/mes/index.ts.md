@@ -1,28 +1,48 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "frontend/features/mes/index.ts"
+importance: important
 layer: frontend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/features/mes/index.ts
-tags: [vault, code-note, c-tier]
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# features/mes — MES feature barrel (루트)
+# index.ts — index.ts 설명
 
-> [!summary] Round-14 정리: 공용 UI (Toast/ConfirmModal/BottomSheet) → @/lib/ui 이동. features/mes = 도메인 feature 슬롯만 유지
+## 이 파일은 무엇을 책임지나
 
-## 1. 역할
+`index.ts`는 TypeScript/React 코드입니다. 프로젝트 구조 안에서 `frontend/features/mes/index.ts` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-features/mes 루트 barrel. 비어있음. 하위 feature 슬롯(admin·app-shell·history·inventory·mobile·warehouse) placeholder로 유지.
+## 업무 흐름에서의 의미
 
-## 2. 실제 원본 위치
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-`erp/frontend/features/mes/index.ts` ([[erp/frontend/features/mes/index.ts|원본]])
+## 언제 보면 좋나
 
-## 3. 관련 형제 파일
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- [[erp/frontend/features/mes/admin/index.ts|admin]]
-- [[erp/frontend/features/mes/warehouse/index.ts|warehouse]]
-- [[erp/frontend/features/mes/history/index.ts|history]]
+## 중요한 내용
+
+자동으로 뽑을 수 있는 함수/클래스 목록은 적지만, 파일 위치와 확장자로 볼 때 위 역할을 맡습니다.
+
+## 연결되는 파일
+
+- [[ERP/frontend/features/mes/📁_mes]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+큰 위험은 낮지만, 연결된 파일과 실행 위치를 확인한 뒤 수정하는 편이 안전합니다.
+
+## 핵심 발췌
+
+```ts
+/**
+ * MES features barrel — `@/features/mes`.
+ *
+ * Round-14 (#1) 정리: 공용 UI (Toast/ConfirmModal/BottomSheet) 는
+ * `@/lib/ui` 로 이동. features/mes 는 도메인 feature 슬롯만 유지.
+ */
+export {};
+```

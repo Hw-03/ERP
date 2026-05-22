@@ -1,160 +1,104 @@
 ---
+type: file-explanation
+source_path: "backend/app/services/integrity.py"
+importance: critical
 layer: backend
-topic: service
-file: erp/backend/app/services/integrity.py
-tags:
-  - "#layer/backend"
-  - "#topic/service"
-aliases:
-  - integrity service
-  - 불변식 점검
----
-type: code-note
-status: active
-updated: 2026-05-21
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
 ---
 
-# 🔍 integrity.py — 재고 불변식 점검·복구
+# integrity.py — integrity.py 설명
 
-> [!summary]
-> `Inventory.quantity == warehouse_qty + Σ InventoryLocation.quantity` 불변식이 깨진 행을 탐지하고 선택적으로 복구하는 도구. 정상 운영 중에는 `inventory._sync_total` 이 불변식을 유지하지만, 과거 버그나 외부 스크립트로 어긋난 데이터를 복구할 때 사용한다.
+## 이 파일은 무엇을 책임지나
 
----
+`integrity.py`는 `integrity` 업무 규칙을 실제로 실행하는 Python 코드입니다. 라우터보다 안쪽에서 DB 조회와 변경을 담당합니다.
 
-## 1. 한 문장 목적
+## 업무 흐름에서의 의미
 
-전체 Inventory 행을 스캔해 불변식 위반을 찾고, `dry_run=False` 옵션으로 실제 수정까지 수행한다.
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
 
----
+## 언제 보면 좋나
 
-## 2. 파일 위치 & 임포트 경로
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
+- 운영 데이터가 달라질 수 있는 변경을 준비할 때
 
-```
-erp/backend/app/services/integrity.py
-from app.services import integrity as integrity_svc
-```
+## 중요한 내용
 
----
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-## 3. 핵심 함수
+- `InventoryMismatch`
+- `RepairReport`
+- `_location_sum_map`
+- `check_inventory_consistency`
+- `repair_inventory_totals`
 
-| 함수 | 설명 | DB 쓰기 |
-|------|------|---------|
-| `check_inventory_consistency(db)` | 불일치 행 목록 반환 | 없음 |
-| `repair_inventory_totals(db, dry_run=True)` | 불일치 행 재계산·수정 | dry_run=False 일 때만 |
+## 연결되는 파일
 
----
+### 먼저 같이 볼 파일
+- [[ERP/backend/app/models.py]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 파일입니다.
+- [[ERP/backend/app/schemas.py]] — 백엔드와 프론트엔드가 주고받는 데이터 모양을 정하는 파일입니다.
+- [[ERP/backend/app/database.py]] — `database.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/database.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-## 4. 탐지 로직
+## 조심할 점
 
-```python
-def check_inventory_consistency(db) -> list[InventoryMismatch]:
-    loc_sums = _location_sum_map(db)   # 한 번에 GROUP BY
+이 파일은 운영 데이터, 재고 수량, 승인 상태, DB 구조, 백업/복구 중 하나와 직접 연결됩니다. 수정 전에는 관련 테스트, 백업 여부, 연결 화면/API를 반드시 확인해야 합니다.
 
-    rows = db.query(Inventory, Item).outerjoin(Item, ...).all()
-    for inv, item in rows:
-        computed = inv.warehouse_qty + loc_sums.get(inv.item_id, 0)
-        if inv.quantity != computed:
-            mismatches.append(InventoryMismatch(
-                recorded_total=inv.quantity,
-                computed_total=computed,
-                delta=inv.quantity - computed,   # 양수=과다, 음수=과소
-                ...
-            ))
-```
-
-```mermaid
-flowchart LR
-    A["check_inventory_consistency"] --> B["_location_sum_map\nGROUP BY item_id"]
-    A --> C["Inventory JOIN Item\n전체 스캔"]
-    B --> D{"recorded != computed?"}
-    C --> D
-    D -- "예" --> E["InventoryMismatch 추가"]
-    D -- "아니오" --> F["통과"]
-    E --> G["mismatches 반환"]
-```
-
----
-
-## 5. 복구 로직
+## 핵심 발췌
 
 ```python
-def repair_inventory_totals(db, *, dry_run=True) -> RepairReport:
-    for inv in db.query(Inventory).all():
-        computed = inv.warehouse_qty + loc_sums.get(inv.item_id, 0)
-        if inv.quantity != computed:
-            mismatched += 1
-            if not dry_run:
-                inv.quantity = computed   # 덮어쓰기
-                repaired += 1
-    if not dry_run and repaired:
-        db.commit()   # 이 함수 내부에서만 commit
-    return RepairReport(checked, mismatched, repaired, dry_run, samples)
-```
+"""재고 불변식 점검 / 복구.
 
-> [!warning]
-> `repair_inventory_totals` 는 내부에서 직접 `db.commit()` 을 호출하는 유일한 서비스 함수다. 라우터의 트랜잭션 밖에서 독립적으로 실행된다.
+불변식: Inventory.quantity == Inventory.warehouse_qty + Σ InventoryLocation.quantity
 
----
+이 불변식은 services/inventory 의 `_sync_total` 이 모든 재고 변경 경로에서
+유지한다. 외부 스크립트나 과거 버그로 어긋난 데이터를 점검·복구하기 위한 도구.
+"""
 
-## 6. 반환 데이터 구조
+from __future__ import annotations
 
-```python
+from dataclasses import dataclass
+from decimal import Decimal
+from typing import Optional
+import uuid
+
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.models import Inventory, InventoryLocation, Item
+
+
+_D0 = Decimal("0")
+
+
 @dataclass
 class InventoryMismatch:
     item_id: uuid.UUID
     item_code: Optional[str]
     item_name: Optional[str]
-    recorded_total: Decimal   # DB의 Inventory.quantity
-    computed_total: Decimal   # warehouse + loc_sum
+    recorded_total: Decimal      # Inventory.quantity
+    computed_total: Decimal      # warehouse + loc_sum (실제 합)
     warehouse_qty: Decimal
     location_sum: Decimal
     pending_quantity: Decimal
 
     @property
     def delta(self) -> Decimal:
+        """recorded - computed. 양수면 quantity 가 과다, 음수면 과소."""
         return self.recorded_total - self.computed_total
-        # 양수 = quantity 가 과다 / 음수 = quantity 가 과소
 
-@dataclass
-class RepairReport:
-    checked: int      # 전체 Inventory 행 수
-    mismatched: int   # 불일치 행 수
-    repaired: int     # 실제 수정된 행 수 (dry_run=True 면 항상 0)
-    dry_run: bool
-    samples: list[dict]   # 불일치 샘플 최대 20개
+    def to_dict(self) -> dict:
+        return {
+            "item_id": str(self.item_id),
+            "item_code": self.item_code,
+            "item_name": self.item_name,
+            "item_code": self.item_code,
+            "recorded_total": float(self.recorded_total),
+            "computed_total": float(self.computed_total),
+            "warehouse_qty": float(self.warehouse_qty),
+            "location_sum": float(self.location_sum),
+            "pending_quantity": float(self.pending_quantity),
+            "delta": float(self.delta),
+        }
 ```
-
----
-
-## 7. 운영 사용 흐름
-
-1. `GET /api/settings/inventory/check` → `check_inventory_consistency` 호출 → 불일치 목록 확인
-2. `/health/detailed` 에서도 `check_inventory_consistency` 를 호출해 `inventory_mismatch_count` 를 노출한다
-3. 불일치 발견 시 `POST /api/settings/inventory/repair?dry_run=true` 로 사전 확인 후 `dry_run=false` 로 실제 복구
-
----
-
-## 8. 의존 관계
-
-```
-integrity.py
-  ← models (Inventory, InventoryLocation, Item)
-  호출자: main.py (/health/detailed), settings 라우터 (/inventory/check, /repair)
-```
-
----
-
-## 9. 주의 사항
-
-> [!note]
-> `_location_sum_map` 은 GROUP BY 로 전체 item 의 location 합을 한 번에 읽는다. 이 함수 호출 후 즉시 Inventory 목록을 스캔하므로, 중간에 다른 트랜잭션이 재고를 바꾸면 결과가 inconsistent 할 수 있다. 복구는 점검 직후 시스템 유휴 시간에 실행하는 것이 안전하다.
-
----
-
-## 10. 관련 노트 링크
-
-- [[inventory.py]] — `_sync_total` 불변식 유지자
-- [[main.py]] — `/health/detailed` 에서 호출
-- [[models.py]] — Inventory, InventoryLocation ORM 정의

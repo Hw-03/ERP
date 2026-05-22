@@ -1,131 +1,103 @@
 ---
-tags:
-  - layer/frontend
-  - topic/bom
-aliases:
-  - BomWhereUsedPanel
-created: 2026-05-21
----
-type: code-note
-status: active
-updated: 2026-05-21
+type: file-explanation
+source_path: "frontend/app/legacy/_components/_admin_sections/_bom_workbench/BomWhereUsedPanel.tsx"
+importance: important
+layer: frontend
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
 ---
 
-# BomWhereUsedPanel.tsx
+# BomWhereUsedPanel.tsx — BomWhereUsedPanel.tsx 설명
 
-> [!info] 한 줄 요약
-> BOM 역참조(Where Used) 패널. 선택된 품목이 어느 부모의 자식으로 등장하는지 1단계 조회 결과를 표시한다.
+## 이 파일은 무엇을 책임지나
 
-## 1. 파일 위치
+`BomWhereUsedPanel.tsx`는 관리자 화면의 한 부분을 담당하는 TypeScript/React 코드입니다. 직원, 품목, BOM, 설정 같은 관리 작업과 연결됩니다.
 
-```
-erp/frontend/app/legacy/_components/_admin_sections/_bom_workbench/BomWhereUsedPanel.tsx
-```
+## 업무 흐름에서의 의미
 
-## 2. 책임 (단일 목적)
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-- 선택된 품목 헤더 (배지 + 이름 + 사용처 수)
-- 역참조 결과 목록 (부모 품목 코드·이름·사용 수량)
-- 항목 클릭 시 편집 모드로 전환 + 해당 부모 선택 (`onSelectParent`)
+## 언제 보면 좋나
 
-## 3. Props 구조
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-```ts
-// erp/frontend/app/legacy/_components/_admin_sections/_bom_workbench/BomWhereUsedPanel.tsx (15-19)
-interface Props {
-  selected: Item | null;
-  rows: BOMDetailEntry[];        // 페이지가 부모 변경 시 미리 fetch (where-used)
-  items: Item[];                 // 부모 Item 정보 조회용 (itemMap)
-  onSelectParent: (parentId: string) => void;
-}
-```
+## 중요한 내용
 
-`rows` 는 `BomWorkbench` 에서 `api.getBOMWhereUsed(parentId)` 로 미리 가져와 전달.
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-## 4. 역참조 흐름
+- `BomWhereUsedPanel`
+- `Props`
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant BW as BomWorkbench
-    participant Panel as BomWhereUsedPanel
+## 연결되는 파일
 
-    User->>BW: 사용처 모드 버튼 클릭
-    BW->>BW: setMode("whereused")
-    User->>BW: 품목 선택 (BomParentList)
-    BW->>API: api.getBOMWhereUsed(parentId)
-    API-->>BW: BOMDetailEntry[]
-    BW->>Panel: rows 전달 (whereUsedRows)
-    User->>Panel: 부모 행 클릭
-    Panel->>BW: onSelectParent(parentId)
-    BW->>BW: setMode("edit") + setParentId(parentId)
-```
+### 먼저 같이 볼 파일
+- [[ERP/frontend/app/legacy/_components/DesktopAdminView.tsx]] — `DesktopAdminView.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+- [[ERP/frontend/lib/api/admin.ts]] — `admin.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
+- [[ERP/backend/app/routers/settings.py]] — `settings.py`는 `settings` 업무를 외부 API로 열어 주는 Python 코드입니다. 프론트 화면이 백엔드 기능을 호출할 때 이 파일의 URL을 거칩니다.
+- [[ERP/backend/app/routers/employees.py]] — `employees.py`는 `employees` 업무를 외부 API로 열어 주는 Python 코드입니다. 프론트 화면이 백엔드 기능을 호출할 때 이 파일의 URL을 거칩니다.
 
-## 5. 코드 발췌 (역참조 행 렌더)
+## 조심할 점
+
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
+
+## 핵심 발췌
 
 ```tsx
-// erp/frontend/app/legacy/_components/_admin_sections/_bom_workbench/BomWhereUsedPanel.tsx (75-101)
-rows.map((r) => {
-  const parent = itemMap.get(r.parent_item_id);
+"use client";
+
+import type { BOMDetailEntry, Item } from "@/lib/api";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { formatQty } from "@/lib/mes/format";
+import { TruncatedText } from "@/lib/ui";
+import { EmptyState } from "../../common/EmptyState";
+import { BomBadge } from "./BomBadge";
+
+/**
+ * 역참조 모드 — 선택된 품목이 어느 부모의 자식으로 등장하는지 1단계 조회.
+ *
+ * 데이터 소스: 페이지가 부모 변경 시 미리 fetch (where-used).
+ */
+interface Props {
+  selected: Item | null;
+  rows: BOMDetailEntry[];
+  items: Item[];
+  onSelectParent: (parentId: string) => void;
+}
+
+export function BomWhereUsedPanel({ selected, rows, items, onSelectParent }: Props) {
+  if (!selected) {
+    return (
+      <div
+        className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border"
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      >
+        <EmptyState
+          variant="no-data"
+          title="좌측에서 품목을 선택하세요"
+          description="이 품목이 자식으로 들어가는 BOM을 표시합니다."
+        />
+      </div>
+    );
+  }
+
+  const itemMap = new Map(items.map((i) => [i.item_id, i]));
+
   return (
-    <button
-      key={r.bom_id}
-      type="button"
-      onClick={() => onSelectParent(r.parent_item_id)}
-      className="grid w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:brightness-105"
-      style={{
-        gridTemplateColumns: "auto 1fr 120px",
-        borderBottom: `1px solid ${LEGACY_COLORS.border}`,
-      }}
-      title="이 부모로 이동 (편집 모드)"
-    >
-      <BomBadge processTypeCode={parent?.process_type_code} />
-      <div className="min-w-0">
-        <TruncatedText className="truncate text-sm font-semibold">
-          {r.parent_item_name}
-        </TruncatedText>
-        <TruncatedText className="truncate text-xs">
-          {r.parent_item_code ?? "(코드 없음)"}
-        </TruncatedText>
-      </div>
-      <div className="text-right text-sm font-semibold">
-        ×{formatQty(r.quantity)} {r.unit || "EA"}
-      </div>
-    </button>
-  );
-})
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      {/* 선택된 품목 헤더 */}
+      <div
+        className="flex items-center gap-3 rounded-2xl border px-4 py-3"
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      >
+        <BomBadge processTypeCode={selected.process_type_code} />
+        <div className="min-w-0 flex-1">
+          <TruncatedText className="truncate text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
+            {selected.item_name}
+          </TruncatedText>
+          <TruncatedText className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+            {selected.item_code ?? "(코드 없음)"} · {rows.length}개 부모에서 사용
+          </TruncatedText>
+        </div>
 ```
-
-## 6. 빈 상태 처리
-
-| 상황 | 표시 내용 |
-|---|---|
-| `selected === null` | EmptyState: "좌측에서 품목을 선택하세요" |
-| `rows.length === 0` | 텍스트: "이 품목을 자식으로 사용하는 BOM이 없습니다." |
-
-## 7. 그리드 컬럼 구성
-
-```
-gridTemplateColumns: "auto 1fr 120px"
-// BomBadge | 부모 이름·코드 | 사용 수량
-```
-
-## 8. 의존 관계
-
-| 방향 | 대상 |
-|---|---|
-| 가져옴 | `BomBadge` (process_type_code 배지) |
-| 가져옴 | `TruncatedText` (`erp/lib/ui`) |
-| 가져옴 | `formatQty` (`erp/lib/mes/format`) |
-| 사용됨 | `BomWorkbench` — `whereused` 모드에서 렌더 |
-
-## 9. 주의 / 특이사항
-
-> [!note] 1단계 역참조만 제공
-> 이 패널은 선택된 품목의 직계 부모만 보여준다. 부모의 부모(2단계 이상) 추적은 해당 부모 클릭 후 재조회해야 한다.
-
-## 10. 관련 파일
-
-- `[[erp/frontend/app/legacy/_components/_admin_sections/_bom_workbench/BomWorkbench.tsx]]`
-- `[[erp/backend/app/routers/bom.py]]` — `GET /bom/where-used/{item_id}` 엔드포인트

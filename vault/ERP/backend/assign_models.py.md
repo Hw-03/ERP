@@ -1,44 +1,48 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "backend/assign_models.py"
+importance: important
 layer: backend
-source_path: erp/backend/assign_models.py
-status: active
-updated: 2026-04-27
-source_sha: dc5309f9199c
-tags:
-  - erp
-  - backend
-  - source-file
-  - py
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# assign_models.py
+# assign_models.py — assign_models.py 설명
 
-> [!summary] 역할
-> 원본 프로젝트의 `assign_models.py` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`assign_models.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/assign_models.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-- Source: `backend/assign_models.py`
-- Layer: `backend`
-- Kind: `source-file`
-- Size: `1570` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
 
-- Parent hub: [[backend/backend|backend]]
-- Related: [[backend/backend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 실제 수정은 원본 파일에서 한다.
-- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+## 중요한 내용
 
-## 원본 발췌
+자동으로 뽑을 수 있는 함수/클래스 목록은 적지만, 파일 위치와 확장자로 볼 때 위 역할을 맡습니다.
 
-````python
-"""일회성 스크립트: 미배정 품목에 ProductSymbol slot 연결."""
+## 연결되는 파일
+
+- [[ERP/backend/📁_backend]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+큰 위험은 낮지만, 연결된 파일과 실행 위치를 확인한 뒤 수정하는 편이 안전합니다.
+
+## 핵심 발췌
+
+```python
+"""[DEPRECATED] legacy_model 기반 모델 할당 스크립트 — legacy_model 컬럼 제거로 폐기.
+
+모델 연결은 품목 코드 파싱(parse_item_code → model_slots) 또는
+관리자 UI(AdminItemsSection)에서 직접 model_slots 수정으로 관리.
+"""
 import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
@@ -73,6 +77,19 @@ for item in items:
     for slot, keywords in SLOT_KEYWORDS:
         if any(kw in lm for kw in keywords):
             matched_slots.append(slot)
-# ... (이하 29줄 생략. 원본 참조)
 
-````
+    # 매칭 없거나 "공용" 포함 → 전체 슬롯
+    if not matched_slots or "공용" in lm:
+        matched_slots = ALL_SLOTS
+
+    for slot in matched_slots:
+        key = (str(item.item_id), slot)
+        if key in existing:
+            skipped += 1
+            continue
+        db.add(ItemModel(item_id=item.item_id, slot=slot))
+        existing.add(key)
+        added += 1
+
+db.commit()
+```

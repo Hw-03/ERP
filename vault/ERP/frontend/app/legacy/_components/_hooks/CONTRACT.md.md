@@ -1,43 +1,52 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "frontend/app/legacy/_components/_hooks/CONTRACT.md"
+importance: important
 layer: frontend
-source_path: erp/frontend/app/legacy/_components/_hooks/CONTRACT.md
-status: active
-updated: 2026-04-27
-source_sha: 9a7776a8263a
-tags:
-  - erp
-  - frontend
-  - source-file
-  - md
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# CONTRACT.md
+# CONTRACT.md — CONTRACT.md 설명
 
-> [!summary] 역할
-> 원본 프로젝트의 `CONTRACT.md` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`CONTRACT.md`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
 
-- Source: `frontend/app/legacy/_components/_hooks/CONTRACT.md`
-- Layer: `frontend`
-- Kind: `source-file`
-- Size: `3698` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-- Parent hub: [[frontend/app/legacy/_components/_hooks/_hooks|frontend/app/legacy/_components/_hooks]]
-- Related: [[frontend/frontend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 실제 수정은 원본 파일에서 한다.
-- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+## 중요한 내용
 
-## 원본 발췌
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-````markdown
+- `Hook Contract — frontend/app/legacy/\_components/\_hooks`
+- `1. Read hook (단일 fetcher)`
+- `2. List hook (페이지 / 검색 / 필터)`
+- `3. Mutation hook`
+- `4. POST/PUT/PATCH 응답 헬퍼`
+- `5. Race / 정합성 패턴 정리`
+- `6. Form 상태`
+- `7. 향후 hook 추가 시 체크리스트`
+
+## 연결되는 파일
+
+- [[ERP/frontend/app/legacy/_components/_hooks/📁__hooks]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
+
+## 핵심 발췌
+
+```md
 # Hook Contract — frontend/app/legacy/\_components/\_hooks
 
 이 폴더와 `_admin_hooks/`, `mobile/hooks/` 의 hook 들은 외부 라이브러리(SWR / React Query) 미도입 정책 하에서 일관된 모양을 갖도록 약속한다.
@@ -93,27 +102,4 @@ tags:
 - 에러 처리는 `parseError(res)` 로 단일 진입점.
 
 ## 5. Race / 정합성 패턴 정리
-
-| 상황 | 패턴 |
-|---|---|
-| 검색창 빠른 타이핑 | AbortController (`useItems`, `useTransactions`) |
-| 단일 fetcher + deps 변경 | `useResource(fetcher, deps)` — fetcher 가 `signal` 받으면 자동 abort 처리 (5.5-F) |
-| 변하지 않는 reference 데이터 | `useResource(fn, [])` |
-| 외부 트리거(저장 후 갱신) | 부모가 `refetch()` 호출 / Context 의 `refresh*` 콜백 |
-| 단일 mutation | `await api.x()` → `setState` (pessimistic) |
-| 즉시 UI 반응이 중요 | optimistic + 롤백 (현재는 거의 없음) |
-
-## 6. Form 상태
-
-- form 라이브러리(react-hook-form / formik) 미도입.
-- 단순 form 은 `useState` 다중 호출로 충분.
-- 5개 이상 필드 + 단계 진행이 있는 wizard 는 Context dispatcher 패턴 사용 (예: `_warehouse_steps/`, `_dept_steps/`).
-
-## 7. 향후 hook 추가 시 체크리스트
-
-- [ ] 위 1~3 형태 중 하나에 정렬되는가?
-- [ ] race 가능성이 있으면 AbortController 적용했는가?
-- [ ] mutation 은 pessimistic 인지 optimistic 인지 의도가 명확한가?
-- [ ] 에러 메시지는 한국어 사용자 메시지인가?
-- [ ] `data, loading, error` 키가 일관되는가?
-````
+```

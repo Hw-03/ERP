@@ -1,23 +1,53 @@
 ---
-type: index
-project: DEXCOWIN MES
+type: folder-note
+source_path: "backend/tests/concurrency"
+importance: normal
 layer: backend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/backend/tests/concurrency/
-tags: [vault, index, folder-marker]
-aliases:
-  - "concurrency"
-  - "concurrency.md"
+graph: hub
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
 # 📁 concurrency
 
-> [!info] 코드 미러 영역
-> 이 폴더는 `erp/backend/tests/concurrency/` 의 vault 미러. 자식 파일들의 분석 노트가 모여 있다.
+## 이 폴더는 무엇을 위한 곳인가
 
-## 통계
+`backend/tests/concurrency`는 백엔드 안의 세부 폴더입니다.
 
-- 자식 파일: **16개** (.md 제외)
-- 자식 폴더: **0개**
+## 현장 업무와의 관계
+
+API, DB, 서비스 규칙 중 한 영역과 연결됩니다.
+
+## 언제 보면 좋나
+
+- 이 폴더 안의 파일이 어떤 역할인지 빠르게 파악할 때
+- 수정 전에 먼저 읽을 파일을 고를 때
+
+## 먼저 볼 파일 5개
+
+- [[ERP/backend/tests/concurrency/__init__.py]] — `__init__.py`는 백엔드 동작이 깨지지 않았는지 자동으로 확인하는 테스트 파일입니다.
+- [[ERP/backend/tests/concurrency/conftest.py]] — `conftest.py`는 백엔드 동작이 깨지지 않았는지 자동으로 확인하는 테스트 파일입니다.
+- [[ERP/backend/tests/concurrency/test_approve_concurrent.py]] — `test_approve_concurrent.py`는 백엔드 동작이 깨지지 않았는지 자동으로 확인하는 테스트 파일입니다.
+- [[ERP/backend/tests/concurrency/test_approve_reject_conflict.py]] — `test_approve_reject_conflict.py`는 백엔드 동작이 깨지지 않았는지 자동으로 확인하는 테스트 파일입니다.
+- [[ERP/backend/tests/concurrency/test_cancel_approve_conflict.py]] — `test_cancel_approve_conflict.py`는 백엔드 동작이 깨지지 않았는지 자동으로 확인하는 테스트 파일입니다.
+
+> [!info]- 추가 파일
+> - [[ERP/backend/tests/concurrency/test_consume_warehouse_concurrent.py]] — test_consume_warehouse_concurrent.py
+> - [[ERP/backend/tests/concurrency/test_defective_concurrent.py]] — test_defective_concurrent.py
+> - [[ERP/backend/tests/concurrency/test_dept_adjustment_concurrent.py]] — test_dept_adjustment_concurrent.py
+> - [[ERP/backend/tests/concurrency/test_inventory_invariant.py]] — test_inventory_invariant.py
+> - [[ERP/backend/tests/concurrency/test_production_receipt_concurrent_same_item.py]] — test_production_receipt_concurrent_same_item.py
+> - [[ERP/backend/tests/concurrency/test_request_code_unique.py]] — test_request_code_unique.py
+> - [[ERP/backend/tests/concurrency/test_reserve_concurrent.py]] — test_reserve_concurrent.py
+> - [[ERP/backend/tests/concurrency/test_return_to_supplier_concurrent.py]] — test_return_to_supplier_concurrent.py
+> - [[ERP/backend/tests/concurrency/test_submit_concurrent.py]] — test_submit_concurrent.py
+> - [[ERP/backend/tests/concurrency/test_transfer_concurrent.py]] — test_transfer_concurrent.py
+> - [[ERP/backend/tests/concurrency/test_transfer_concurrent_atomic.py]] — test_transfer_concurrent_atomic.py
+
+## 조심할 점
+
+폴더 성격을 먼저 확인하고 현재 운영 코드인지, 보관 자료인지, 자동 생성물인지 구분해야 합니다.
+
+## 다음에 볼 위치
+
+- 상위 폴더: [[ERP/backend/tests/📁_tests]]

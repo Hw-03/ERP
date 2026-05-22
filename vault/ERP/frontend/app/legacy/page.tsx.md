@@ -1,78 +1,77 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "frontend/app/legacy/page.tsx"
+importance: important
 layer: frontend
-source_path: erp/frontend/app/legacy/page.tsx
-status: active
-updated: 2026-04-27
-source_sha: c29180b02e30
-tags:
-  - erp
-  - frontend
-  - frontend-component
-  - tsx
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# page.tsx
+# page.tsx — page.tsx 설명
 
-> [!summary] 역할
-> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`page.tsx`는 TypeScript/React 코드입니다. 프로젝트 구조 안에서 `frontend/app/legacy/page.tsx` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-- Source: `frontend/app/legacy/page.tsx`
-- Layer: `frontend`
-- Kind: `frontend-component`
-- Size: `3719` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-- Parent hub: [[frontend/app/legacy/legacy|frontend/app/legacy]]
-- Related: [[frontend/frontend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
-- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+## 중요한 내용
 
-## 원본 발췌
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-````tsx
+- `LegacyPage`
+- `LegacyBody`
+
+## 연결되는 파일
+
+- [[ERP/frontend/app/legacy/📁_legacy]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
+
+## 핵심 발췌
+
+```tsx
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { MobileShell, type TabId } from "./_components/mobile/MobileShell";
-import { InventoryScreen } from "./_components/mobile/screens/InventoryScreen";
-import { HistoryScreen } from "./_components/mobile/screens/HistoryScreen";
-import { Toast, type ToastState } from "./_components/Toast";
-import { AdminShell } from "./_components/mobile/screens/admin/AdminShell";
+import { Suspense } from "react";
+import { MobileShell } from "./_components/mobile/MobileShell";
 import { DesktopLegacyShell } from "./_components/DesktopLegacyShell";
-import {
-  WarehouseWizardProvider,
-  useWarehouseWizard,
-} from "./_components/mobile/io/warehouse/context";
-import { WarehouseWizardScreen } from "./_components/mobile/io/warehouse/WarehouseWizardScreen";
-import { DeptWizardProvider } from "./_components/mobile/io/dept/context";
-import { DeptWizardScreen } from "./_components/mobile/io/dept/DeptWizardScreen";
-
-const TAB_TITLES: Record<TabId, { subtitle: string; title: string }> = {
-  inventory: { subtitle: "재고 현황", title: "재고" },
-  warehouse: { subtitle: "창고 입출고", title: "창고입출고" },
-  dept: { subtitle: "부서 입출고", title: "부서입출고" },
-  admin: { subtitle: "관리자", title: "관리자" },
-};
+import { MesLoginGate } from "./_components/login/MesLoginGate";
+import { DepartmentsProvider } from "./_components/DepartmentsContext";
 
 export default function LegacyPage() {
   return (
-    <WarehouseWizardProvider>
-      <DeptWizardProvider>
-        <LegacyBody />
-      </DeptWizardProvider>
-    </WarehouseWizardProvider>
+    <DepartmentsProvider>
+      <MesLoginGate>
+        <Suspense>
+          <LegacyBody />
+        </Suspense>
+      </MesLoginGate>
+    </DepartmentsProvider>
   );
 }
 
 function LegacyBody() {
-# ... (이하 62줄 생략. 원본 참조)
+  return (
+    <>
+      <div className="lg:hidden">
+        <MobileShell />
+      </div>
 
-````
+      <Suspense>
+        <DesktopLegacyShell />
+      </Suspense>
+    </>
+  );
+}
+```

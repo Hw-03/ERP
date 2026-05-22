@@ -1,51 +1,47 @@
 ---
-type: index
-project: DEXCOWIN MES
+type: folder-note
+source_path: "backend/app/routers/inventory"
+importance: important
 layer: backend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/backend/app/routers/inventory/
-tags: [vault, index, folder-marker]
-aliases:
-  - "inventory"
-  - "inventory.md"
+graph: hub
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
 # 📁 inventory
 
-> [!summary] 역할
-> 재고 조회·입고·이동·불량·반품·이력 기능을 책임 단위로 분리한 라우터 패키지. Phase 4 에서 단일 파일(807줄)을 이 구조로 분할했다.
+## 이 폴더는 무엇을 위한 곳인가
 
-> [!info] 코드 미러 영역
-> 이 폴더는 `erp/backend/app/routers/inventory/` 의 vault 미러. 자식 파일들의 분석 노트가 모여 있다.
+재고 조회, 입고, 이동, 불량 격리, 반품, 거래 내역처럼 재고 자체를 다루는 API 묶음입니다.
 
-## 어떤 파일들이 있나
+## 현장 업무와의 관계
 
-핵심 서브모듈:
-- `[[erp/backend/app/routers/inventory/__init__.py|__init__.py]]` — `router` 조립 파일. 서브 라우터를 `include_router` 순서대로 등록하고, `GET ""` (목록) 엔드포인트를 직접 정의. 정적 경로를 catch-all 보다 먼저 등록하는 순서 규칙이 있음.
-- `[[erp/backend/app/routers/inventory/transactions.py|transactions.py]]` — 이력 조회, CSV/xlsx 익스포트, 트랜잭션 수정(PUT)
-- `[[erp/backend/app/routers/inventory/query.py|query.py]]` — `/summary`, `/locations/{item_id}` 집계 쿼리
-- `[[erp/backend/app/routers/inventory/receive.py|receive.py]]` — `/receive` (입고), `/adjust` (수량 조정)
-- `[[erp/backend/app/routers/inventory/transfer.py|transfer.py]]` — `/transfer-to-production`, `/transfer-to-warehouse`, `/transfer-between-depts`
+회사의 가장 중요한 수량 정보가 들어오고 나가는 입구입니다. 창고 수량, 부서 수량, 불량 수량이 여기서 움직입니다.
 
-부수 서브모듈:
-- `defective.py` — `/mark-defective` 불량 처리
-- `supplier.py` — `/return-to-supplier` 공급사 반품
-- `weekly_report.py` — 주간 보고 집계 (Phase 4 추가)
-- `_shared.py` — `to_response_bulk()` 등 패키지 내 공통 헬퍼
+## 언제 보면 좋나
 
-## 도메인 컨텍스트
+- 수량이 맞지 않을 때
+- 입고/출고/이동 API를 찾을 때
+- 불량 처리나 공급처 반품 흐름을 확인할 때
 
-3-버킷 재고 모델(`warehouse_qty`, `PRODUCTION` 위치, `DEFECTIVE` 위치)을 HTTP 레이어로 노출한다. `Inventory.quantity = warehouse_qty + Σ InventoryLocation.quantity` 불변식이 이 패키지의 모든 쓰기 엔드포인트를 통해 유지된다. 비즈니스 로직은 `services/inventory.py`, `services/stock_math.py` 에 위임.
+## 먼저 볼 파일 5개
 
-## ⚠️ 위험 포인트
+- [[ERP/backend/app/routers/inventory/defective.py]] — `defective.py`는 재고 업무 API 중 한 영역을 맡는 Python 코드입니다. 화면에서 들어온 요청을 검증하고 실제 재고 서비스로 넘기는 관문입니다.
+- [[ERP/backend/app/routers/inventory/receive.py]] — `receive.py`는 재고 업무 API 중 한 영역을 맡는 Python 코드입니다. 화면에서 들어온 요청을 검증하고 실제 재고 서비스로 넘기는 관문입니다.
+- [[ERP/backend/app/routers/inventory/supplier.py]] — `supplier.py`는 재고 업무 API 중 한 영역을 맡는 Python 코드입니다. 화면에서 들어온 요청을 검증하고 실제 재고 서비스로 넘기는 관문입니다.
+- [[ERP/backend/app/routers/inventory/transactions.py]] — `transactions.py`는 재고 업무 API 중 한 영역을 맡는 Python 코드입니다. 화면에서 들어온 요청을 검증하고 실제 재고 서비스로 넘기는 관문입니다.
+- [[ERP/backend/app/routers/inventory/transfer.py]] — `transfer.py`는 재고 업무 API 중 한 영역을 맡는 Python 코드입니다. 화면에서 들어온 요청을 검증하고 실제 재고 서비스로 넘기는 관문입니다.
 
-- `__init__.py` 의 라우터 등록 순서 변경 시 정적 경로가 동적 catch-all에 묻혀 404 또는 잘못된 핸들러 호출 발생 가능.
-- `transactions.py` 의 PUT 엔드포인트는 감사 로그에 기록되므로, 수정 범위를 변경할 때 `audit_csv.py` 리스너도 함께 확인.
-- 동시성 테스트 (`tests/concurrency/`) 가 이 패키지 엔드포인트를 직접 타격함 — 낙관적 락 코드 변경 시 해당 테스트 먼저 실행.
+> [!info]- 추가 파일
+> - [[ERP/backend/app/routers/inventory/__init__.py]] — __init__.py
+> - [[ERP/backend/app/routers/inventory/_shared.py]] — _shared.py
+> - [[ERP/backend/app/routers/inventory/query.py]] — query.py
+> - [[ERP/backend/app/routers/inventory/weekly_report.py]] — weekly_report.py
 
-## 관련 가이드
+## 조심할 점
 
-- [[erp/_vault/guides/inventory-3bucket|inventory-3bucket]]
-- [[erp/_vault/guides/router-conventions|router-conventions]]
+재고 API는 실수하면 숫자가 틀어집니다. 서비스와 stock_math, 거래 로그까지 같이 확인해야 합니다.
+
+## 다음에 볼 위치
+
+- 상위 폴더: [[ERP/backend/app/routers/📁_routers]]

@@ -1,70 +1,84 @@
-# defects.ts (types)
+---
+type: file-explanation
+source_path: "frontend/lib/api/types/defects.ts"
+importance: important
+layer: frontend
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
+---
 
-## 이 파일은 뭐예요?
+# defects.ts — defects.ts 설명
 
-불량 처리 허브 도메인 타입 정의. 백엔드 Phase 2 API 응답 / 요청 바디와 1:1 대응한다.
-`defectsApi` 함수들이 이 타입을 직접 사용한다.
+## 이 파일은 무엇을 책임지나
 
-## 언제 보나요?
+`defects.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
 
-- 불량 관련 타입 오류가 날 때
-- 백엔드 스키마가 바뀌어서 프론트 타입을 동기화해야 할 때
-- 새 필드를 추가할 때
+## 업무 흐름에서의 의미
+
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
+
+## 언제 보면 좋나
+
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
 ## 중요한 내용
 
-### DefectLocation
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-격리된 재고 항목 1건. `listDefects()` 응답 원소.
+- `DefectLocation`
+- `DefectKpi`
+- `QuarantinePayload`
+- `UnquarantinePayload`
+
+## 연결되는 파일
+
+### 먼저 같이 볼 파일
+- [[ERP/frontend/lib/api-core.ts]] — 프론트 화면이 백엔드에 요청을 보낼 때 공통으로 쓰는 fetch 보조 파일입니다.
+- [[ERP/backend/app/routers/defects.py]] — `defects.py`는 `defects` 업무를 외부 API로 열어 주는 Python 코드입니다. 프론트 화면이 백엔드 기능을 호출할 때 이 파일의 URL을 거칩니다.
+
+## 조심할 점
+
+공용 파일이라 여러 화면에 영향이 퍼질 수 있습니다. 변경 후 대시보드, 입출고, 내역, 관리자 화면을 같이 확인해야 합니다.
+
+## 핵심 발췌
 
 ```ts
+/**
+ * 불량 처리 허브 도메인 타입 — `@/lib/api/types/defects`.
+ * Phase 2 백엔드 API 와 1:1 대응.
+ */
+
 export interface DefectLocation {
   item_id: string;
   item_name: string;
   item_code: string;
   department: string;
   quantity: number;
-  defective_at: string;      // ISO 8601 datetime string
+  defective_at: string; // ISO 8601 datetime string
   reason_category?: string | null;
   reason_memo?: string | null;
 }
-```
 
-### DefectKpi
-
-KPI 카드 4개에 표시되는 집계 숫자. `getDefectKpi()` 응답.
-
-```ts
 export interface DefectKpi {
-  quarantined: number;       // 현재 격리 총 건수
-  over_one_year: number;     // 1년 이상 격리된 건수
-  pending_approval: number;  // 결재 대기 중인 건수
-  processed_today: number;   // 오늘 처리 완료 건수
+  quarantined: number;
+  over_one_year: number;
+  pending_approval: number;
+  processed_today: number;
 }
-```
 
-### QuarantinePayload
-
-`defectsApi.quarantine()` 요청 바디.
-
-```ts
 export interface QuarantinePayload {
   item_id: string;
   qty: number;
-  source: "warehouse" | "production";  // 재고 차감 출처
-  source_dept?: string;                // production 모드일 때만 필요
-  target_dept: string;                 // 격리 대상 부서
+  source: "warehouse" | "production";
+  source_dept?: string;
+  target_dept: string;
   reason_category: string;
   reason_memo: string;
   actor_employee_id: string;
 }
-```
 
-### UnquarantinePayload
-
-`defectsApi.unquarantine()` 요청 바디 (즉시 정상 복귀).
-
-```ts
 export interface UnquarantinePayload {
   item_id: string;
   qty: number;
@@ -74,23 +88,3 @@ export interface UnquarantinePayload {
   actor_employee_id: string;
 }
 ```
-
-### 타입 관계 요약
-
-```
-listDefects()   → DefectLocation[]
-getDefectKpi()  → DefectKpi
-quarantine()    ← QuarantinePayload
-unquarantine()  ← UnquarantinePayload
-```
-
-## 연결되는 파일
-
-### 먼저 볼 파일
-- [[ERP/frontend/lib/api/defects.ts]] — 이 타입을 import해서 사용하는 API 클라이언트
-- [[ERP/backend/app/schemas.py]] — 대응하는 백엔드 Pydantic 스키마
-
-> [!info]- 더 연결된 파일
-> - [[ERP/frontend/app/legacy/_components/_defect_hub/DefectHubPanel.tsx]] — `DefectKpi`, `DefectLocation` 사용
-> - [[ERP/frontend/app/legacy/_components/_defect_hub/AddQuarantineModal.tsx]] — `QuarantinePayload` 사용
-> - [[ERP/frontend/app/legacy/_components/_defect_hub/PaPfDefectWizard.tsx]] — `DefectLocation`, `UnquarantinePayload` 사용

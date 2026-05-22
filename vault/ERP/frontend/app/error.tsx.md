@@ -1,43 +1,41 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "frontend/app/error.tsx"
+importance: normal
 layer: frontend
-source_path: erp/frontend/app/error.tsx
-status: active
-updated: 2026-04-27
-source_sha: e58b9207b503
-tags:
-  - erp
-  - frontend
-  - frontend-component
-  - tsx
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# error.tsx
+# error.tsx — error.tsx 설명
 
-> [!summary] 역할
-> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`error.tsx`는 TypeScript/React 코드입니다. 프로젝트 구조 안에서 `frontend/app/error.tsx` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-- Source: `frontend/app/error.tsx`
-- Layer: `frontend`
-- Kind: `frontend-component`
-- Size: `1631` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-- Parent hub: [[frontend/app/app|frontend/app]]
-- Related: [[frontend/frontend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
-- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+## 중요한 내용
 
-## 원본 발췌
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-````tsx
+- `ErrorBoundary`
+
+## 연결되는 파일
+
+- [[ERP/frontend/app/📁_app]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 핵심 발췌
+
+```tsx
 "use client";
 
 // Next.js App Router 의 라우트 단위 ErrorBoundary.
@@ -73,6 +71,20 @@ export default function ErrorBoundary({
           type="button"
           onClick={() => reset()}
           className="rounded-[12px] border px-5 py-2.5 text-sm font-bold"
-# ... (이하 16줄 생략. 원본 참조)
-
-````
+        >
+          다시 시도
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window !== "undefined") window.location.href = "/legacy";
+          }}
+          className="rounded-[12px] border px-5 py-2.5 text-sm font-bold"
+        >
+          대시보드로 이동
+        </button>
+      </div>
+    </div>
+  );
+}
+```

@@ -1,60 +1,55 @@
 ---
-type: index
-project: DEXCOWIN MES
+type: folder-note
+source_path: "backend/app/services"
+importance: important
 layer: backend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/backend/app/services/
-tags: [vault, index, folder-marker]
-aliases:
-  - "services"
-  - "services.md"
+graph: hub
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
 # 📁 services
 
-> [!summary] 역할
-> 라우터가 위임하는 비즈니스 로직과 트랜잭션 경계 모음. DB 상태 변이는 원칙적으로 이 계층에서만 일어난다.
+## 이 폴더는 무엇을 위한 곳인가
 
-> [!info] 코드 미러 영역
-> 이 폴더는 `erp/backend/app/services/` 의 vault 미러. 자식 파일들의 분석 노트가 모여 있다.
+API 라우터 안에서 바로 처리하기 어려운 실제 업무 규칙을 모아 둔 곳입니다.
 
-## 어떤 파일들이 있나
+## 현장 업무와의 관계
 
-재고·수량 핵심:
-- `[[erp/backend/app/services/inventory.py|inventory.py]]` — 3-버킷 재고 모델 구현. 입고·이동·불량·반품 실행 함수. `warehouse_qty` ↔ `InventoryLocation` 불변식 유지.
-- `[[erp/backend/app/services/stock_math.py|stock_math.py]]` — 재고 수량 계산 유틸. 가용 재고(`available`), pending 차감 등 순수 연산.
-- `[[erp/backend/app/services/stock_requests.py|stock_requests.py]]` — 불출 요청 상태 전이 (PENDING → APPROVED / REJECTED / CANCELLED). 낙관적 락 포함.
-- `[[erp/backend/app/services/dept_adjustment.py|dept_adjustment.py]]` — 부서 재고 수동 조정. 조정 이력 기록.
-- `[[erp/backend/app/services/io.py|io.py]]` — 입출고 v2 고수준 로직.
+재고 계산, 요청 승인, BOM, 감사 로그, PIN 인증 같은 회사 규칙이 이곳에서 실행됩니다.
 
-감사·코드·관리:
-- `[[erp/backend/app/services/audit.py|audit.py]]` — 감사 로그 쓰기·조회.
-- `[[erp/backend/app/services/audit_csv.py|audit_csv.py]]` — SQLAlchemy 세션 이벤트 리스너 기반 자동 감사 CSV 기록. `register_session_listeners()` 로 앱 시작 시 등록.
-- `[[erp/backend/app/services/integrity.py|integrity.py]]` — 재고 불변식 검증 (`check_inventory_integrity()`). 진단 및 자가 수복 도구.
-- `[[erp/backend/app/services/codes.py|codes.py]]` — 공통 코드 CRUD.
-- `[[erp/backend/app/services/bom.py|bom.py]]` — BOM 조회·수정·검증.
+## 언제 보면 좋나
 
-인프라·보조:
-- `pin_auth.py` — 직원 PIN 인증 로직.
-- `rate_limit.py` — 간단한 인메모리 레이트 리밋.
-- `export_helpers.py` — xlsx / CSV 생성 공통 함수.
-- `seed_cleanup.py` — 테스트/개발용 시드 데이터 정리.
-- `_tx.py` — 트랜잭션 컨텍스트 헬퍼 (내부 전용).
+- API는 맞는데 결과가 이상할 때
+- 재고 계산이나 승인 상태 흐름을 검증할 때
+- 운영 규칙을 바꿔야 할 때
 
-## 도메인 컨텍스트
+## 먼저 볼 파일 5개
 
-MES 의 실질적인 업무 규칙이 이 폴더에 집중된다. 라우터는 HTTP 파싱만 담당하고, 상태 변이·검증·집계는 서비스로 위임하는 구조다. 동시성 안전성(낙관적 락, FOR UPDATE)도 이 계층에서 처리한다.
+- [[ERP/backend/app/services/integrity.py]] — `integrity.py`는 `integrity` 업무 규칙을 실제로 실행하는 Python 코드입니다. 라우터보다 안쪽에서 DB 조회와 변경을 담당합니다.
+- [[ERP/backend/app/services/inventory.py]] — 입고, 출고, 부서 이동, 불량 처리처럼 실제 재고 숫자를 바꾸는 업무 규칙을 담은 핵심 파일입니다.
+- [[ERP/backend/app/services/stock_math.py]] — 여러 재고 숫자를 일관된 방식으로 계산하고 검증하기 위한 보조 함수입니다.
+- [[ERP/backend/app/services/stock_requests.py]] — 현장 담당자가 요청을 제출하고 창고가 승인/반려/취소하는 흐름을 처리하는 서비스입니다.
+- [[ERP/backend/app/services/__init__.py]] — `__init__.py`는 `__init__` 업무 규칙을 실제로 실행하는 Python 코드입니다. 라우터보다 안쪽에서 DB 조회와 변경을 담당합니다.
 
-## ⚠️ 위험 포인트
+> [!info]- 추가 파일
+> - [[ERP/backend/app/services/_tx.py]] — _tx.py
+> - [[ERP/backend/app/services/audit.py]] — audit.py
+> - [[ERP/backend/app/services/audit_csv.py]] — audit_csv.py
+> - [[ERP/backend/app/services/bom.py]] — bom.py
+> - [[ERP/backend/app/services/codes.py]] — codes.py
+> - [[ERP/backend/app/services/dept_adjustment.py]] — dept_adjustment.py
+> - [[ERP/backend/app/services/dept_hierarchy.py]] — dept_hierarchy.py
+> - [[ERP/backend/app/services/export_helpers.py]] — export_helpers.py
+> - [[ERP/backend/app/services/io.py]] — io.py
+> - [[ERP/backend/app/services/pin_auth.py]] — pin_auth.py
+> - [[ERP/backend/app/services/rate_limit.py]] — rate_limit.py
+> - [[ERP/backend/app/services/seed_cleanup.py]] — seed_cleanup.py
 
-- `audit_csv.py` 는 SQLAlchemy 이벤트에 훅이 걸려 있어 서비스 함수 외부에서 직접 세션을 커밋하면 감사 기록이 누락될 수 있음.
-- `integrity.py` 의 수복 함수는 재고를 직접 수정함 — 운영 중 실행 전 반드시 영향 범위 확인.
-- `stock_requests.py` 상태 전이는 동시성 테스트 커버리지가 있으므로 변경 시 `tests/concurrency/` 통과 필수.
+## 조심할 점
 
-## 관련 가이드
+서비스는 DB를 직접 바꾸는 경우가 많습니다. 특히 inventory, stock_requests, stock_math는 테스트 없이 건드리면 안 됩니다.
 
-- [[erp/_vault/guides/inventory-3bucket|inventory-3bucket]]
-- [[erp/_vault/guides/audit-csv|audit-csv]]
-- [[erp/_vault/guides/bootstrap-db|bootstrap-db]]
+## 다음에 볼 위치
+
+- 상위 폴더: [[ERP/backend/app/📁_app]]

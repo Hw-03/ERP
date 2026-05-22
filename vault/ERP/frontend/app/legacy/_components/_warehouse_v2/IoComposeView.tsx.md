@@ -1,103 +1,93 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "frontend/app/legacy/_components/_warehouse_v2/IoComposeView.tsx"
+importance: important
 layer: frontend
-source_path: erp/frontend/app/legacy/_components/_warehouse_v2/IoComposeView.tsx
-status: active
-updated: 2026-05-21
-tags:
-  - layer/frontend
-  - topic/warehouse-v2
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# IoComposeView.tsx
+# IoComposeView.tsx — IoComposeView.tsx 설명
 
-> [!summary] 역할
-> **입출고 2.0 마법사의 최상위 진입점 컴포넌트.** Step 1~5의 전체 흐름을 조율하고, URL 히스토리 동기화·자동저장·BOM 정규화·제출 처리를 담당한다. `DesktopWarehouseView`에서 직접 렌더링된다.
+## 이 파일은 무엇을 책임지나
 
----
+`IoComposeView.tsx`는 입출고 요청 작성, 작업중 목록, 내 요청, 창고 승인함 같은 창고 업무 화면의 일부입니다.
 
-## 1. 위치 및 파일 구조
+## 업무 흐름에서의 의미
 
-```
-erp/frontend/app/legacy/_components/_warehouse_v2/
-└── IoComposeView.tsx          ← 이 파일 (마법사 루트)
-    ├── IoWorkTypeStep.tsx      (Step 1 · Step 2)
-    ├── IoTargetPicker.tsx      (Step 3)
-    ├── IoBundleCart.tsx        (Step 4)
-    ├── IoConfirmStep.tsx       (Step 5)
-    ├── ioWorkType.ts           (유형 정의·헬퍼)
-    ├── bomSync.ts              (BOM 비례 계산)
-    └── useIoWorkState.ts       (마법사 상태 훅)
-```
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
----
+## 언제 보면 좋나
 
-## 2. 역할 한 줄 요약
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-"작업 유형 선택(Step 1) → 세부 작업·부서(Step 2) → 품목 선택(Step 3) → 수량 확인(Step 4) → 최종 제출(Step 5)" 흐름을 단일 컴포넌트에서 관리하는 **5단계 Wizard 오케스트레이터**.
+## 중요한 내용
 
----
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-## 3. 주요 Props
+- `IoComposeView`
+- `BOMDetailEntry`
+- `IoBundle`
+- `IoLine`
+- `IoSourceKind`
+- `IoSubType`
+- `IoWorkType`
+- `Item`
+- `IoSubmitResultState`
+- `IoStep`
 
-| prop | 타입 | 설명 |
-|---|---|---|
-| `operator` | `OperatorLike \| null` | 현재 로그인한 작업자. `employee_id`·`department`·`warehouse_role` 포함 |
-| `items` | `Item[]` | 전체 품목 목록 (Step 3 피커에 전달) |
-| `preselectedItem` | `Item \| undefined` | 외부(재고 탭)에서 미리 선택된 품목. Step 3 자동 추가 |
-| `restoreDraft` | `IoBatch \| undefined` | 작업 중 탭에서 이어하기 시 복원할 초안 |
-| `defaultWorkType` | `IoWorkType` | 초기 작업 유형 기본값 |
-| `onSubmitSuccess` | `() => void` | 제출 성공 후 부모에 알림 콜백 |
-| `onStatusChange` | `(msg: string) => void` | 헤더 상태 바 메시지 업데이트 |
+## 연결되는 파일
 
----
+### 먼저 같이 볼 파일
+- [[ERP/frontend/app/legacy/_components/DesktopWarehouseView.tsx]] — `DesktopWarehouseView.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+- [[ERP/frontend/lib/api/stock-requests.ts]] — `stock-requests.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
+- [[ERP/backend/app/routers/stock_requests.py]] — 프론트의 입출고 요청 작성, 내 요청, 창고 승인함이 호출하는 API 입구입니다.
+- [[ERP/backend/app/services/stock_requests.py]] — 현장 담당자가 요청을 제출하고 창고가 승인/반려/취소하는 흐름을 처리하는 서비스입니다.
 
-## 4. 핵심 흐름
+## 조심할 점
 
-```mermaid
-flowchart TD
-    A[Step 1: 작업 유형 선택] --> B[Step 2: 세부작업·부서 선택]
-    B --> C[Step 3: 품목 선택\nIoTargetPicker]
-    C -->|품목 추가| D[previewTarget API 호출]
-    D -->|bundles 반환| E[Step 4: 수량 확인\nIoBundleCart]
-    E --> F[Step 5: 최종 확인\nIoConfirmStep]
-    F -->|handleSubmit| G{결재 필요?}
-    G -->|창고/부서 결재| H[승인 대기 큐]
-    G -->|즉시 반영| I[재고 즉시 업데이트]
-```
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
 
----
-
-## 5. 주요 상태 관리
-
-| 상태/훅 | 소속 | 역할 |
-|---|---|---|
-| `useIoWorkState` | 내부 훅 | step·workType·subType·부서·bundles·canAdvance 관리 |
-| `useIoPreview` | 내부 훅 | `previewTarget` API 비동기 호출 (bundles 생성) |
-| `useIoDraft` | 내부 훅 | 초안 저장 API |
-| `useIoSubmit` | 내부 훅 | 최종 제출 API (멱등 client_request_id 포함) |
-| `useIoDraftRestore` | 내부 훅 | 복원 시 state 재구성 |
-| `bomParents` | `Set<string>` | BOM 부모 item_id 집합. 마운트 시 1회 fetch |
-| `autosaveTimerRef` | ref | 700ms 디바운스 자동저장 |
-
----
-
-## 6. URL 히스토리 동기화
-
-> [!info] 왜 URL에 step을 넣나?
-> 브라우저 뒤로/앞으로 버튼이 마법사 단계 이동으로 작동하도록 `?step=N` 쿼리를 히스토리에 쌓는다.
-
-- `state.step` 변경 → `router.push(...?step=N)`
-- URL step 변경(뒤로/앞으로) → `state.goTo(target)` (도달 불가 step은 clamp)
-- `pendingFinalStepRef`: Step 3→5 점프 시 중간 step=4를 먼저 URL에 쌓고, 완료 후 step=5로 자동 이동
-
----
-
-## 7. 코드 발췌 — BOM 정규화 및 자동저장
+## 핵심 발췌
 
 ```tsx
-// Pydantic Decimal은 JSON에서 문자열로 직렬화 → number로 정규화
+"use client";
+
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
+import { api, type BOMDetailEntry, type IoBundle, type IoLine, type IoSourceKind, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
+import { ApiError } from "@/lib/api-core";
+import { WizardStepCard } from "./_atoms";
+import { IoWorkTypeStep, IoSubTypeStep } from "./IoWorkTypeStep";
+import { IoTargetPicker } from "./IoTargetPicker";
+import { IoBundleCart } from "./IoBundleCart";
+import { IoConfirmStep } from "./IoConfirmStep";
+import { IoSubmitModals, type IoSubmitResultState } from "./IoSubmitModals";
+import { IO_WORK_TYPES, approvalKind, directionWord, isDefectInventorySubType, isExitWorkType, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from...
+import { applyBundleQuantityChange, applyLineQuantityChange, applyToggleLine } from "./bomSync";
+import { useIoDraftRestore } from "./useIoDraftRestore";
+import { useIoDraft } from "./useIoDraft";
+import { useIoPreview } from "./useIoPreview";
+import { useIoSubmit } from "./useIoSubmit";
+import { useIoWorkState, type IoStep } from "./useIoWorkState";
+import type { IoComposeViewProps } from "./types";
+import { DefectInventoryPicker } from "./DefectInventoryPicker";
+import { DefectActionStep } from "./DefectActionStep";
+import { defectsApi } from "@/lib/api/defects";
+import { stockRequestsApi } from "@/lib/api/stock-requests";
+import type { Department } from "@/lib/api/types/shared";
+
+function locationQuantity(item: Item, department: string | null | undefined, status: "PRODUCTION" | "DEFECTIVE") {
+  if (!department) return 0;
+  return item.locations.find((loc) => loc.department === department && loc.status === status)?.quantity ?? 0;
+}
+
+// Pydantic Decimal은 JSON에서 문자열("1.0000")로 직렬화된다 — 프론트는 number 로 타이핑되어 있으나 실값은 string.
+// stepper 산술/합계가 string concat 으로 깨지므로 bundle 수신 즉시 number 로 정규화한다.
 function normalizeBundles(bundles: IoBundle[]): IoBundle[] {
   return bundles.map((bundle) => ({
     ...bundle,
@@ -111,76 +101,10 @@ function normalizeBundles(bundles: IoBundle[]): IoBundle[] {
   }));
 }
 
-// 자동저장: bundles 변경 700ms 후 백그라운드 저장
-useEffect(() => {
-  if (!employeeId) return;
-  if (state.bundles.length === 0) return;
-  if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
-  autosaveTimerRef.current = setTimeout(async () => {
-    try {
-      const result = await saveDraft({ employeeId, workType: state.workType, ... });
-      autosaveBatchIdRef.current = result.batch_id;
-      onStatusChange(`자동 저장됨 · ${hh}:${mm}`);
-    } catch {
-      onStatusChange("자동 저장 실패 — 잠시 후 재시도");
-    }
-  }, 700);
-}, [state.bundles, state.notes, ...]);
-```
-
----
-
-## 8. Step별 렌더링 조건
-
-| Step | 렌더 조건 | 컴포넌트 |
-|---|---|---|
-| 1 | 항상 | `IoWorkTypeStep` |
-| 2 | `step >= 2` | `IoSubTypeStep` |
-| 3 | `step >= 3` | `IoTargetPicker` |
-| 4 | `step >= 4` 또는 `step === 3 && bundles.length > 0` | `IoBundleCart` |
-| 5 | `step >= 5` | `IoConfirmStep` |
-
-> [!tip] Step 4가 Step 3 중에 나타나는 이유
-> 품목을 선택하는 순간 카트(Step 4)가 함께 표시된다. 사용자가 연속 선택하면서 선택한 품목을 바로 확인할 수 있도록 한다.
-
----
-
-## 9. 제출 시 Draft 충돌 방지
-
-```tsx
-async function handleSubmit() {
-  // 자동저장 draft가 동일 line_id를 점유한 채로 submit하면 PK 충돌(IntegrityError)
-  // → submit 전에 대기 중 autosave 취소 + 기존 draft 삭제
-  if (autosaveTimerRef.current) {
-    clearTimeout(autosaveTimerRef.current);
-    autosaveTimerRef.current = null;
-  }
-  if (autosaveBatchIdRef.current) {
-    await api.deleteDraft(staleId, employeeId);  // 실패해도 submit 진행
-  }
-  const response = await submit({ ... });
-  ...
+function workTypeLabel(workType: IoWorkType) {
+  return IO_WORK_TYPES.find((row) => row.id === workType)?.label ?? workType;
 }
+
+const AUTO_SCROLL_OFFSET = -2;
+const STEP4_SCROLL_OFFSET = 0;
 ```
-
----
-
-## 10. 연결 관계
-
-- **부모**: `erp/frontend/app/legacy/_components/DesktopWarehouseView.tsx`
-- **자식**: `IoWorkTypeStep`, `IoTargetPicker`, `IoBundleCart`, `IoConfirmStep`, `IoSubmitModals`
-- **훅**: `useIoWorkState`, `useIoDraft`, `useIoPreview`, `useIoSubmit`, `useIoDraftRestore`
-- **유틸**: `erp/frontend/app/legacy/_components/_warehouse_v2/bomSync.ts`
-- **백엔드 API**: `POST /io/preview`, `POST /io/submit`, `POST /io/draft`, `DELETE /io/draft/{id}`
-
----
-
-## 11. 참고 맥락
-
-> [!note] 참고
-> 이 파일은 "입출고 2.0 마법사의 사령탑"이다. 실제 UI는 각 Step 컴포넌트에 있고, 이 파일은 그들 사이의 흐름·상태·API 호출을 조율한다. 코드가 길어 보이지만 크게 세 덩어리다:
-> 1. URL ↔ step 동기화 (useEffect 2개)
-> 2. 품목 추가 / BOM 정규화 (addItem 함수)
-> 3. 자동저장 / 제출 (handleSubmit)
->
-> `useIoWorkState`가 핵심 상태를 들고 있으므로 그 훅을 먼저 읽으면 전체 구조가 보인다.

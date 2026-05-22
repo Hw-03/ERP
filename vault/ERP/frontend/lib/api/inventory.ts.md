@@ -1,78 +1,71 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "frontend/lib/api/inventory.ts"
+importance: important
 layer: frontend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/lib/api/inventory.ts
-tags: [vault, code-note, frontend, api]
-aliases: [inventoryApi, 재고 API]
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# lib/api/inventory.ts — 재고 도메인 API (9 메소드)
+# inventory.ts — inventory.ts 설명
 
-#layer/frontend #topic/api
+## 이 파일은 무엇을 책임지나
 
-> [!summary] 한 줄 요약
-> 창고 재고의 입고, 조정, 이동, 불량 처리, 반품, 위치 조회 9개 메소드를 담는다. 모든 쓰기 작업은 `InventoryMutationResponse` 를 반환한다.
+`inventory.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
 
----
+## 업무 흐름에서의 의미
 
-## 1. 위치 & 관계
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-| 항목 | 내용 |
-|------|------|
-| 원본 | `erp/frontend/lib/api/inventory.ts` |
-| 분리 시점 | Round-6 (R6-D1) |
-| 역할 | 재고 현황 조회 + 재고 변동 작업 |
-| 백엔드 라우터 | [[erp/backend/app/routers/inventory.py]] |
+## 언제 보면 좋나
 
-```mermaid
-graph LR
-  inventoryApi --> getInventorySummary
-  inventoryApi --> receiveInventory
-  inventoryApi --> adjustInventory
-  inventoryApi --> transferToProduction
-  inventoryApi --> transferToWarehouse
-  inventoryApi --> transferBetweenDepts
-  inventoryApi --> markDefective
-  inventoryApi --> returnToSupplier
-  inventoryApi --> getItemLocations
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-  style inventoryApi fill:#1e3a5f,color:#e0f0ff
-```
+## 중요한 내용
 
----
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-## 2. 메소드 목록 (9개)
+- `inventoryApi`
 
-| 메소드 | HTTP | 엔드포인트 | 설명 |
-|--------|------|-----------|------|
-| `getInventorySummary` | GET | `/api/inventory/summary` | 카테고리별 재고 요약 |
-| `receiveInventory` | POST | `/api/inventory/receive` | 외부 입고 (창고) |
-| `adjustInventory` | POST | `/api/inventory/adjust` | 재고 수량 조정 (reason 필수) |
-| `transferToProduction` | POST | `/api/inventory/transfer-to-production` | 창고 → 부서 불출 |
-| `transferToWarehouse` | POST | `/api/inventory/transfer-to-warehouse` | 부서 → 창고 반납 |
-| `transferBetweenDepts` | POST | `/api/inventory/transfer-between-depts` | 부서 ↔ 부서 이동 |
-| `markDefective` | POST | `/api/inventory/mark-defective` | 불량 처리 |
-| `returnToSupplier` | POST | `/api/inventory/return-to-supplier` | 공급사 반품 |
-| `getItemLocations` | GET | `/api/inventory/locations/{itemId}` | 품목별 부서 위치 목록 |
+## 연결되는 파일
 
----
+### 먼저 같이 볼 파일
+- [[ERP/frontend/lib/api-core.ts]] — 프론트 화면이 백엔드에 요청을 보낼 때 공통으로 쓰는 fetch 보조 파일입니다.
+- [[ERP/frontend/lib/api/types/inventory.ts]] — `inventory.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
 
-## 3. 코드 발췌
+## 조심할 점
 
-```typescript
+공용 파일이라 여러 화면에 영향이 퍼질 수 있습니다. 변경 후 대시보드, 입출고, 내역, 관리자 화면을 같이 확인해야 합니다.
+
+## 핵심 발췌
+
+```ts
+/**
+ * Inventory 도메인 API — `@/lib/api/inventory`.
+ *
+ * Round-6 (R6-D1) 분리. 9개 메소드:
+ *   - getInventorySummary
+ *   - receiveInventory
+ *   - adjustInventory
+ *   - transferToProduction / transferToWarehouse / transferBetweenDepts
+ *   - markDefective / returnToSupplier
+ *   - getItemLocations
+ *
+ * 외부 호환을 위해 `frontend/lib/api.ts` 가 spread merge 한다.
+ */
+
 import { fetcher, postJson, toApiUrl } from "../api-core";
 import type {
-  Department, InventoryLocationRow,
-  InventoryMutationResponse, InventorySummary,
+  Department,
+  InventoryLocationRow,
+  InventoryMutationResponse,
+  InventorySummary,
 } from "./types";
 
 export const inventoryApi = {
-  getInventorySummary: () =>
-    fetcher<InventorySummary>(toApiUrl("/api/inventory/summary")),
+  getInventorySummary: () => fetcher<InventorySummary>(toApiUrl("/api/inventory/summary")),
 
   receiveInventory: (payload: {
     item_id: string;
@@ -83,6 +76,15 @@ export const inventoryApi = {
     notes?: string;
   }) => postJson<InventoryMutationResponse>(toApiUrl("/api/inventory/receive"), payload),
 
+  adjustInventory: (payload: {
+    item_id: string;
+    quantity: number;
+    reason: string;
+    location?: string;
+    reference_no?: string;
+    produced_by?: string;
+  }) => postJson<InventoryMutationResponse>(toApiUrl("/api/inventory/adjust"), payload),
+
   transferToProduction: (payload: {
     item_id: string;
     quantity: number;
@@ -92,124 +94,7 @@ export const inventoryApi = {
     produced_by?: string;
   }) =>
     postJson<InventoryMutationResponse>(
-      toApiUrl("/api/inventory/transfer-to-production"), payload,
+      toApiUrl("/api/inventory/transfer-to-production"),
+      payload,
     ),
-
-  markDefective: (payload: {
-    item_id: string;
-    quantity: number;
-    source: "warehouse" | "production";
-# ... (이하 10줄 생략. 원본 참조)
-
 ```
-
----
-
-## 4. 주요 타입 설명
-
-| 타입 | 구조 | 설명 |
-|------|------|------|
-| `InventorySummary` | `{categories[], total_items, total_quantity, uk_item_count}` | 카테고리별 재고 집계 |
-| `InventoryMutationResponse` | 서버 응답 (상태 메시지 등) | 모든 쓰기 작업 공통 반환 |
-| `InventoryLocationRow` | `{department, status, quantity}` | 품목의 부서별 위치 한 줄 |
-| `Department` | `"조립" \| "고압" \| "진공" \| ...` | 유효 부서명 유니온 타입 |
-
----
-
-## 5. 이동 흐름 다이어그램
-
-```mermaid
-graph LR
-  W["창고<br/>(warehouse)"]
-  D1["부서A"]
-  D2["부서B"]
-  OUT["공급사/폐기"]
-
-  receiveInventory --> W
-  W -->|transferToProduction| D1
-  D1 -->|transferToWarehouse| W
-  D1 -->|transferBetweenDepts| D2
-  D1 -->|markDefective| D1
-  W -->|markDefective| W
-  D1 -->|returnToSupplier| OUT
-  adjustInventory -.->|수량 보정| W
-```
-
----
-
-## 6. payload 필드 설명
-
-### `receiveInventory`
-
-| 필드 | 필수 | 설명 |
-|------|------|------|
-| `item_id` | O | 품목 UUID |
-| `quantity` | O | 입고 수량 (양수) |
-| `location` | - | 창고 내 위치 메모 |
-| `reference_no` | - | 발주서 번호 등 참조 번호 |
-| `produced_by` | - | 입고 담당자 |
-| `notes` | - | 메모 |
-
-### `markDefective`
-
-| 필드 | 필수 | 설명 |
-|------|------|------|
-| `source` | O | `"warehouse"` 또는 `"production"` |
-| `source_department` | - | production 출처 부서 |
-| `target_department` | O | 불량품 보관 부서 |
-
----
-
-## 7. 사용 예시
-
-```typescript
-// 재고 현황 조회
-const summary = await api.getInventorySummary();
-
-// 창고에서 조립부서로 불출
-await api.transferToProduction({
-  item_id: "abc-123",
-  quantity: 10,
-  department: "조립",
-  reference_no: "WO-2026-001",
-});
-
-// 품목 위치 조회 (우측 패널)
-const locations = await api.getItemLocations(item.item_id);
-```
-
----
-
-## 8. 관련 파일
-
-- [[erp/frontend/lib/api.ts]] — 이 파일을 spread merge 하는 허브
-- [[erp/frontend/app/legacy/_components/DesktopInventoryView.tsx]] — 재고 대시보드
-- [[erp/frontend/app/legacy/_components/DesktopWarehouseView.tsx]] — 입출고 화면
-- [[erp/backend/app/routers/inventory.py]] — 백엔드 엔드포인트
-
----
-
-## 9. 주의 사항
-
-> [!warning] `adjustInventory` 는 reason 필수
-> 재고 조정은 audit trail 을 위해 `reason` 필드가 반드시 필요하다.
-
-> [!warning] `transferBetweenDepts` — from/to 부서 구분
-> `from_department` 와 `to_department` 둘 다 `Department` 타입이어야 한다.
-> 같은 부서를 넣으면 백엔드에서 에러 반환.
-
----
-
-## 10. 히스토리 메모
-
-| 리비전 | 변경 내용 |
-|--------|-----------|
-| R6-D1 | inventory 도메인 최초 분리 (9메소드) |
-
----
-
-## 11. 정책
-
-- `main` 브랜치: 코드만 유지
-- `vault-sync` 브랜치: 코드 + `vault/` 노트
-- 코드와 노트가 다르면 실제 코드 우선

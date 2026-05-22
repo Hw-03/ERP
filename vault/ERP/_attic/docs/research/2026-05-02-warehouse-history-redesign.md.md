@@ -1,23 +1,54 @@
 ---
-type: code-note
+type: file-explanation
+source_path: "_attic/docs/research/2026-05-02-warehouse-history-redesign.md"
+importance: reference
+layer: archive
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
-layer: attic
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/_attic/docs/research/2026-05-02-warehouse-history-redesign.md
-tags: [vault, code-note, auto-generated, stub, mirror-fill]
 ---
 
-# 2026-05-02-warehouse-history-redesign.md
+# 2026-05-02-warehouse-history-redesign.md — 2026-05-02-warehouse-history-redesign.md 설명
 
-> [!info] 1:1 미러 stub
-> 탐색기에 보이는 폴더 구조를 vault 에 그대로 반영하기 위한 stub.
-> 원본: [[erp/_attic/docs/research/2026-05-02-warehouse-history-redesign.md]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄 (또는 메타)
+`2026-05-02-warehouse-history-redesign.md`는 현재 운영 코드가 아니라 과거 자료나 실험 결과를 보관한 참고 파일입니다.
 
-```
+## 업무 흐름에서의 의미
+
+과거 맥락을 이해하는 데 도움은 되지만, 현재 운영 기준으로 바로 사용하면 안 됩니다.
+
+## 언제 보면 좋나
+
+- 과거 자료의 의미를 확인할 때
+- 현재 코드와 비교할 참고 근거가 필요할 때
+
+## 중요한 내용
+
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
+
+- `입출고·내역 화면 재설계 — 2026-05-02`
+- `MES-WAREHOUSE-001 — 입출고 화면 동선 개선안`
+- `현재 WorkType → 50~60대 용어 매핑`
+- `개선된 위저드 흐름 (5단계 → 4단계)`
+- `화면 상단 고정 영역 (개선 핵심)`
+- `수량 입력 실수 방지`
+- `재고 부족 경고 규칙`
+- `작업 후 피드백`
+- `데스크톱 Tab→Enter 흐름`
+- `모바일 UX`
+
+## 연결되는 파일
+
+- [[ERP/_attic/docs/research/📁_research]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+보관 자료입니다. 현재 코드처럼 믿고 수정하거나 실행하지 않습니다.
+
+## 핵심 발췌
+
+```md
 # 입출고·내역 화면 재설계 — 2026-05-02
 
 > **작업 ID:** MES-WAREHOUSE-001~002, MES-HISTORY-001~002  
@@ -43,4 +74,34 @@ tags: [vault, code-note, auto-generated, stub, mirror-fill]
 
 ```
 현재:  [직원선택] → [작업유형] → [품목+수량] → [확인] → [완료]
+개선:  [직원선택] → [작업유형]  →  [품목+수량]  → [최종확인+완료]
+                                   ↑
+                            재고 현황 상단 고정 노출
+```
+
+### 화면 상단 고정 영역 (개선 핵심)
+
+```
+┌─────────────────────────────────────────────────────┐
+│  [품목명]  현재 창고 수량: 150개                      │
+│  가용 수량: 120개 (예약 30개)   ← pending_quantity    │
+│  안전재고: 50개  ⚠ 가용 < 요청 시 빨간 배너           │
+└─────────────────────────────────────────────────────┘
+```
+
+### 수량 입력 실수 방지
+
+| 기능 | 현재 | 개선 |
+|---|---|---|
+| 음수 차단 | 서버 검증만 | UI 레벨 `min={0}` + 빨간 테두리 |
+| 최대 수량 안내 | 없음 | 가용 수량 표시 + 초과 시 경고 |
+| 스텝퍼 | 없음 | `+1/-1` 버튼 + 직접 입력 병행 |
+| 모바일 키패드 | inputMode 미설정 | `inputMode="decimal"` |
+
+### 재고 부족 경고 규칙
+
+```
+가용 수량 = warehouse_qty - pending_quantity
+
+요청 수량 > 가용 수량 → 빨간 배너 "재고 부족 (가용: N개)"
 ```

@@ -1,46 +1,79 @@
 ---
+type: file-explanation
+source_path: "backend/app/schemas.py"
+importance: critical
 layer: backend
-topic: schema
-file: erp/backend/app/schemas.py
-tags:
-  - "#layer/backend"
-  - "#topic/schema"
-aliases:
-  - Pydantic 스키마
-  - UtcDatetime
----
-type: code-note
-status: active
-updated: 2026-05-21
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
 ---
 
-# 📝 schemas.py — Pydantic 요청/응답 스키마
+# schemas.py — API 데이터 약속
 
-> [!summary]
-> FastAPI 요청/응답에 쓰는 Pydantic v2 스키마와 타입 계약을 정의한다. 핵심은 `UtcDatetime` alias(line 27–31) — naive datetime 에 자동으로 `+00:00` UTC offset 을 붙여 클라이언트에 ISO 8601 형식으로 직렬화한다.
+## 이 파일은 무엇을 책임지나
 
----
+백엔드와 프론트엔드가 주고받는 데이터 모양을 정하는 파일입니다.
 
-## 1. 한 문장 목적
+## 업무 흐름에서의 의미
 
-API 입력 검증과 응답 직렬화를 위한 Pydantic 스키마 컨테이너. DB 모델과 외부 API 계약 사이의 변환 계층.
+화면이 기대하는 필드명과 백엔드가 보내는 응답이 맞는지 확인하는 계약서 역할을 합니다.
 
----
+## 언제 보면 좋나
 
-## 2. 파일 위치 & 임포트 경로
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
+- 운영 데이터가 달라질 수 있는 변경을 준비할 때
 
-```
-erp/backend/app/schemas.py
-from app.schemas import ItemCreate, ItemResponse, UtcDatetime, ...
-```
+## 중요한 내용
 
----
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-## 3. UtcDatetime (commit 4db421a / F4b)
+- `ItemCreate`
+- `ItemUpdate`
+- `ItemResponse`
+- `InventoryLocationResponse`
+- `ItemWithInventory`
+- `PinVerifyRequest`
+- `EmployeePinResetRequest`
+- `EmployeePinChangeRequest`
+- `EmployeeCreate`
+- `EmployeeUpdate`
+- 그 외 8개 항목
+
+## 연결되는 파일
+
+### 먼저 같이 볼 파일
+- [[ERP/backend/app/models.py]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 파일입니다.
+- [[ERP/backend/app/main.py]] — FastAPI 서버를 만들고, CORS와 에러 처리, 라우터 연결, 헬스체크를 등록하는 백엔드의 현관문입니다.
+- [[ERP/backend/app/routers/stock_requests.py]] — 프론트의 입출고 요청 작성, 내 요청, 창고 승인함이 호출하는 API 입구입니다.
+- [[ERP/frontend/lib/api/types/inventory.ts]] — `inventory.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
+
+## 조심할 점
+
+필드명이나 필수 여부를 바꾸면 화면, 테스트, OpenAPI 문서가 함께 바뀌어야 합니다.
+
+## 핵심 발췌
 
 ```python
-# line 20-31
+"""Pydantic schemas for the DEXCOWIN MES API."""
+
+from datetime import datetime, timezone
+from decimal import Decimal
+from typing import Annotated, List, Literal, Optional
+import uuid
+
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, WithJsonSchema
+
+from app.models import (
+    EmployeeLevelEnum,
+    LocationStatusEnum,
+    RequestBucketEnum,
+    StockRequestStatusEnum,
+    StockRequestTypeEnum,
+    TransactionTypeEnum,
+)
+
+
 def _serialize_datetime_with_utc(dt: datetime) -> str:
     """Serialize naive datetime with +00:00 UTC offset."""
     if dt.tzinfo is None:
@@ -53,93 +86,28 @@ UtcDatetime = Annotated[
     PlainSerializer(_serialize_datetime_with_utc, return_type=str),
     WithJsonSchema({"type": "string", "format": "date-time"}),
 ]
-```
 
-> [!info] UtcDatetime 사용 이유
-> SQLAlchemy 가 DB 에서 읽은 `datetime` 은 timezone-naive (tzinfo=None) 이다.
-> 클라이언트가 이를 받으면 로컬 시간으로 해석할 수 있다. `UtcDatetime` 은
-> naive datetime 에 자동으로 `+00:00` 을 붙여 항상 UTC 임을 명시한다.
 
----
-
-## 4. 주요 스키마 목록
-
-### 품목
-
-| 스키마 | 용도 |
-|--------|------|
-| `ItemCreate` | POST /items 요청 |
-| `ItemUpdate` | PATCH /items/{id} 요청 |
-| `ItemResponse` | 품목 응답 (model_slots 포함) |
-
-### 재고
-
-| 스키마 | 용도 |
-|--------|------|
-| `InventoryResponse` | 재고 요약 응답 |
-| `TransactionLogResponse` | 거래 이력 응답 |
-
-### 직원
-
-| 스키마 | 용도 |
-|--------|------|
-| `EmployeeCreate` | 직원 생성 |
-| `EmployeeResponse` | 직원 응답 |
-
-### 결재 요청
-
-| 스키마 | 용도 |
-|--------|------|
-| `StockRequestCreate` | 결재 요청 생성 |
-| `StockRequestResponse` | 결재 요청 응답 |
-
----
-
-## 5. 모델 설정
-
-```python
-class ItemResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    # from_attributes=True → SQLAlchemy ORM 객체를 직접 직렬화 가능
-```
-
----
-
-## 6. ItemCreate 핵심 필드
-
-```python
 class ItemCreate(BaseModel):
-    item_name: str = Field(..., max_length=200)
-    spec: Optional[str]
-    process_type_code: Optional[str] = Field(None, max_length=2)
-    unit: str = Field("EA", max_length=20)
-    initial_quantity: Optional[Decimal]
-    model_slots: List[int] = Field(default=[])
-    # model_slots: 사용 제품 슬롯 목록 (1=DX3000, 2=COCOON, ...)
-    option_code: Optional[str] = Field(None, max_length=10)
+    item_name: str = Field(..., max_length=200, description="품목명")
+    process_type_code: Optional[str] = Field(None, max_length=2, description="공정 코드 (TR/HR/.../PF 18개)")
+    unit: str = Field("EA", max_length=20, description="단위")
+    legacy_part: Optional[str] = Field(None, max_length=50)
+    legacy_item_type: Optional[str] = Field(None, max_length=50)
+    supplier: Optional[str] = Field(None, max_length=200)
+    min_stock: Optional[Decimal] = None
+    initial_quantity: Optional[Decimal] = Field(None, description="초기 재고 수량 (기본 0)")
+    model_slots: List[int] = Field(default=[], description="사용 제품 슬롯 목록 (1=DX3000, 2=COCOON, 3=SOLO, 4=ADX4000W, 5=ADX6000)")
+    option_code: Optional[str] = Field(None, max_length=10, description="옵션/스펙 코드 (예: BG)")
+
+
+class ItemUpdate(BaseModel):
+    item_name: Optional[str] = Field(None, max_length=200)
+    process_type_code: Optional[str] = Field(None, max_length=2, description="공정 코드 (TR/HR/.../PF 18개)")
+    unit: Optional[str] = Field(None, max_length=20)
+    legacy_part: Optional[str] = Field(None, max_length=50)
+    legacy_item_type: Optional[str] = Field(None, max_length=50)
+    supplier: Optional[str] = Field(None, max_length=200)
+    min_stock: Optional[Decimal] = None
+    item_code: Optional[str] = Field(None, max_length=40)
 ```
-
----
-
-## 7. 의존 관계
-
-```
-schemas.py
-  ← models (EmployeeLevelEnum, LocationStatusEnum, RequestBucketEnum, ...)
-  ← pydantic (BaseModel, ConfigDict, Field, PlainSerializer, AnnotatedTypes)
-  호출자: 모든 라우터 (요청 파라미터 & 응답 모델)
-```
-
----
-
-## 8. 주의 사항
-
-> [!warning]
-> `UtcDatetime` 을 응답 스키마에 쓰지 않으면 naive datetime 이 그대로 직렬화되어 `"2026-05-21T14:30:00"` (offset 없음) 로 나간다. 프론트가 로컬 시간으로 해석해 1시간 오차가 생길 수 있다. 신규 응답 스키마에는 항상 `UtcDatetime` 을 사용한다.
-
----
-
-## 9. 관련 노트 링크
-
-- [[models.py]] — ORM 엔터티 (스키마가 참조하는 Enum 위치)
-- [[main.py]] — FastAPI 앱 (라우터에서 스키마 사용)

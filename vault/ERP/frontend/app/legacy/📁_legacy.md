@@ -1,49 +1,41 @@
 ---
-type: index
-project: DEXCOWIN MES
+type: folder-note
+source_path: "frontend/app/legacy"
+importance: important
 layer: frontend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/app/legacy/
-tags: [vault, index, folder-marker]
-aliases:
-  - "legacy"
-  - "legacy.md"
+graph: hub
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
 # 📁 legacy
 
-> [!summary] 역할
-> DEXCOWIN MES 의 실제 활성 UI 루트. 이름은 "legacy" 지만 현재 유일하게 동작하는 화면 진입점이다.
+## 이 폴더는 무엇을 위한 곳인가
 
-> [!info] 코드 미러 영역
-> 이 폴더는 `erp/frontend/app/legacy/` 의 vault 미러.
+현재 운영 중인 실제 MES 화면입니다. 이름은 legacy지만 지금 사용자가 보는 핵심 UI입니다.
 
-## 어떤 파일들이 있나
+## 현장 업무와의 관계
 
-핵심 파일:
-- `page.tsx` — `DepartmentsProvider` → `MesLoginGate` → `LegacyBody` 조합. 모바일(`MobileShell`)과 데스크톱(`DesktopLegacyShell`)을 분기 렌더
+대시보드, 입출고, 내역, 관리자, 로그인 게이트가 이 흐름 안에서 움직입니다.
 
-부수 폴더:
-- `_components/` — 184개 .tsx 컴포넌트 모음 (도메인별 서브폴더로 분리)
+## 언제 보면 좋나
 
-## 도메인 컨텍스트
+- 현장 UX를 바꿀 때
+- 로그인 담당자 흐름을 볼 때
+- 데스크톱/모바일 화면 분기를 확인할 때
 
-`page.tsx` 는 브레이크포인트(`lg:hidden`)로 모바일/데스크톱 셸을 분기한다.
-로그인은 `MesLoginGate` 가 담당하고, 부서 목록은 `DepartmentsProvider` 로 전역 공급된다.
-실제 도메인 화면(재고, 입출고, 이력, 관리)은 모두 `_components/` 하위에 위치한다.
+## 주요 하위 폴더
 
-## ⚠️ 위험 포인트
+- [[ERP/frontend/app/legacy/_components/📁__components]] — 실제 화면을 이루는 React 컴포넌트 모음입니다.
 
-- 폴더 이름이 "legacy" 이므로 deprecated/불필요 코드로 오해하기 쉽다. 절대 삭제 금지.
-- CLAUDE.md 에도 동일 주의사항이 명시되어 있다.
-- `app/page.tsx` 가 이 폴더의 `page.tsx` 를 re-export 하는 구조이므로, 루트 라우트(`/`)와 직결된다.
+## 먼저 볼 파일 5개
 
-## 관련 가이드
+- [[ERP/frontend/app/legacy/page.tsx]] — `page.tsx`는 TypeScript/React 코드입니다. 프로젝트 구조 안에서 `frontend/app/legacy/page.tsx` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-- [[erp/_vault/guides/frontend-routing]]
+## 조심할 점
 
-## 자식 폴더
+이 폴더를 과거 코드로 착각하면 안 됩니다. 지금 화면의 중심입니다.
 
-- [[erp/frontend/app/legacy/_components/📁__components|_components/]] — 184개 컴포넌트 모음
+## 다음에 볼 위치
+
+- 상위 폴더: [[ERP/frontend/app/📁_app]]

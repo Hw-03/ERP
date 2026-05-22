@@ -1,43 +1,42 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "backend/seed_employees.py"
+importance: normal
 layer: backend
-source_path: erp/backend/seed_employees.py
-status: active
-updated: 2026-04-27
-source_sha: 012f68838802
-tags:
-  - erp
-  - backend
-  - source-file
-  - py
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# seed_employees.py
+# seed_employees.py — seed_employees.py 설명
 
-> [!summary] 역할
-> 원본 프로젝트의 `seed_employees.py` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`seed_employees.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/seed_employees.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-- Source: `backend/seed_employees.py`
-- Layer: `backend`
-- Kind: `source-file`
-- Size: `3256` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
 
-- Parent hub: [[backend/backend|backend]]
-- Related: [[backend/backend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 실제 수정은 원본 파일에서 한다.
-- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+## 중요한 내용
 
-## 원본 발췌
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-````python
+- `role_to_level`
+- `main`
+
+## 연결되는 파일
+
+- [[ERP/backend/📁_backend]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 핵심 발췌
+
+```python
 """참조 파일(_archive/reference/files/init_db_v4.js) 기준 직원 26명으로 동기화."""
 import sys
 import os
@@ -73,6 +72,24 @@ REFERENCE_EMPLOYEES = [
     ("E23", "양승규",  "영업/부장",    "영업"),
     ("E24", "김예진",  "영업/대리",    "영업"),
     ("E25", "심이리나", "영업/과장",   "영업"),
-# ... (이하 52줄 생략. 원본 참조)
+    ("E26", "드미트리", "영업/사원",   "영업"),
+]
 
-````
+CATEGORY_TO_DEPT = {
+    "조립":  DepartmentEnum.ASSEMBLY,
+    "진공":  DepartmentEnum.VACUUM,
+    "고압":  DepartmentEnum.HIGH_VOLTAGE,
+    "튜닝":  DepartmentEnum.TUNING,
+    "튜브":  DepartmentEnum.TUBE,
+    "AS":    DepartmentEnum.AS,
+    "연구소": DepartmentEnum.RESEARCH,
+    "기타":  DepartmentEnum.ETC,
+    "영업":  DepartmentEnum.SALES,
+}
+
+
+def role_to_level(role: str) -> EmployeeLevelEnum:
+    suffix = role.split("/")[-1] if "/" in role else role
+    if suffix in ("대표",):
+        return EmployeeLevelEnum.ADMIN
+```

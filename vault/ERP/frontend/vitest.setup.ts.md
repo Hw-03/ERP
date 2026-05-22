@@ -1,42 +1,38 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "frontend/vitest.setup.ts"
+importance: normal
 layer: frontend
-source_path: erp/frontend/vitest.setup.ts
-status: active
-updated: 2026-04-27
-source_sha: cd71be4bbf93
-tags:
-  - erp
-  - frontend
-  - source-file
-  - ts
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# vitest.setup.ts
+# vitest.setup.ts — vitest.setup.ts 설명
 
-> [!summary] 역할
-> 원본 프로젝트의 `vitest.setup.ts` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`vitest.setup.ts`는 TypeScript/React 코드입니다. 프로젝트 구조 안에서 `frontend/vitest.setup.ts` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-- Source: `frontend/vitest.setup.ts`
-- Layer: `frontend`
-- Kind: `source-file`
-- Size: `44` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-- Parent hub: [[frontend/frontend|frontend]]
-- Related: [[frontend/frontend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 실제 수정은 원본 파일에서 한다.
-- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+## 중요한 내용
 
-## 원본 발췌
+자동으로 뽑을 수 있는 함수/클래스 목록은 적지만, 파일 위치와 확장자로 볼 때 위 역할을 맡습니다.
 
-````ts
+## 연결되는 파일
+
+- [[ERP/frontend/📁_frontend]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 핵심 발췌
+
+```ts
 import "@testing-library/jest-dom/vitest";
-````
+```

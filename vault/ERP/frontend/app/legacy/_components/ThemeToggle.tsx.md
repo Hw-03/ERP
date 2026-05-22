@@ -1,78 +1,98 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "frontend/app/legacy/_components/ThemeToggle.tsx"
+importance: important
 layer: frontend
-source_path: erp/frontend/app/legacy/_components/ThemeToggle.tsx
-status: active
-updated: 2026-04-27
-source_sha: fed1e6830fbf
-tags:
-  - erp
-  - frontend
-  - frontend-component
-  - tsx
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# ThemeToggle.tsx
+# ThemeToggle.tsx — ThemeToggle.tsx 설명
 
-> [!summary] 역할
-> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`ThemeToggle.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
 
-- Source: `frontend/app/legacy/_components/ThemeToggle.tsx`
-- Layer: `frontend`
-- Kind: `frontend-component`
-- Size: `1295` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-- Parent hub: [[frontend/app/legacy/_components/_components|frontend/app/legacy/_components]]
-- Related: [[frontend/frontend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
-- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+## 중요한 내용
 
-## 원본 발췌
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-````tsx
+- `ThemeToggle`
+
+## 연결되는 파일
+
+- [[ERP/frontend/app/legacy/_components/📁__components]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
+
+## 핵심 발췌
+
+```tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
-import { LEGACY_COLORS } from "./legacyUi";
+import { api } from "@/lib/api";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { useCurrentOperator, setCurrentOperator } from "./login/useCurrentOperator";
 
-export function ThemeToggle() {
-  const [isLight, setIsLight] = useState(false);
+export function ThemeToggle({ expanded = false }: { expanded?: boolean }) {
+  const operator = useCurrentOperator();
+  const [isLight, setIsLight] = useState(true);
+  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("theme");
-    if (stored === "light") {
-      document.documentElement.setAttribute("data-theme", "light");
+    // operator.theme 또는 localStorage에서 테마 읽기 (operator 우선)
+    const theme = operator?.theme ?? localStorage.getItem("theme");
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+      setIsLight(false);
+    } else {
+      document.documentElement.classList.remove("dark");
       setIsLight(true);
     }
-  }, []);
+  }, [operator?.theme]);
 
   function toggle() {
     const next = !isLight;
     setIsLight(next);
+    const newTheme = next ? "light" : "dark";
+
     if (next) {
-      document.documentElement.setAttribute("data-theme", "light");
-      localStorage.setItem("theme", "light");
+      document.documentElement.classList.remove("dark");
     } else {
-      document.documentElement.removeAttribute("data-theme");
-      localStorage.setItem("theme", "dark");
+      document.documentElement.classList.add("dark");
+    }
+
+    // localStorage에 저장 (항상)
+    localStorage.setItem("theme", newTheme);
+
+    // 로그인된 operator가 있으면 백엔드에 저장 (fire-and-forget)
+    if (operator) {
+      api.setEmployeeTheme(operator.employee_id, newTheme).catch(() => {
+        // 실패해도 무시 (UI는 이미 업데이트됨)
+      });
+
+      // localStorage에 operator 정보 갱신
+      const updated = { ...operator, theme: newTheme };
+      setCurrentOperator(updated);
     }
   }
 
   return (
     <button
       onClick={toggle}
-      className="flex items-center justify-center rounded-2xl px-3 py-3 transition-all hover:brightness-110"
-      style={{
-        background: LEGACY_COLORS.s2,
-# ... (이하 9줄 생략. 원본 참조)
-
-````
+      onMouseEnter={() => setHovered(true)}
+```

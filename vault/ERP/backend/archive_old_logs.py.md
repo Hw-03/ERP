@@ -1,22 +1,41 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "backend/archive_old_logs.py"
+importance: normal
 layer: backend
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/backend/archive_old_logs.py
-tags: [vault, code-note, auto-generated, stub]
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# archive_old_logs.py
+# archive_old_logs.py — archive_old_logs.py 설명
 
-> [!info] 자동 생성된 stub 노트
-> 이 노트는 자동 보정으로 생성됐다. 원본 위치: [[erp/backend/archive_old_logs.py]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄
+`archive_old_logs.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/archive_old_logs.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-```
+## 업무 흐름에서의 의미
+
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
+
+## 언제 보면 좋나
+
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
+
+## 중요한 내용
+
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
+
+- `archive`
+
+## 연결되는 파일
+
+- [[ERP/backend/📁_backend]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 핵심 발췌
+
+```python
 """
 거래 이력 아카이빙 스크립트.
 
@@ -47,4 +66,26 @@ def archive(months: int, dry_run: bool) -> None:
     db = SessionLocal()
     try:
         q = db.query(TransactionLog).filter(
+            TransactionLog.created_at < cutoff,
+            TransactionLog.archived_at.is_(None),
+        )
+        count = q.count()
+        print(f"대상: {count:,}건 (기준일 이전: {cutoff.date()})")
+        if dry_run:
+            print("[dry-run] 실제 반영 없음. --dry-run 없이 재실행하면 마킹됩니다.")
+            return
+        now = datetime.utcnow()
+        q.update({"archived_at": now}, synchronize_session=False)
+        db.commit()
+        print(f"완료: {count:,}건 archived_at={now.isoformat()[:19]} 마킹")
+    finally:
+        db.close()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="거래 이력 아카이빙")
+    parser.add_argument("--months", type=int, default=6, help="기준 개월 수 (기본 6)")
+    parser.add_argument("--dry-run", action="store_true", help="대상 건수 확인만 (반영 안 함)")
+    args = parser.parse_args()
+    archive(args.months, args.dry_run)
 ```

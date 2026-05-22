@@ -1,28 +1,35 @@
 ---
-type: index
+type: folder-note
+source_path: "_dev"
+importance: important
+layer: archive
+graph: hub
+updated: 2026-05-22
 project: DEXCOWIN MES
-layer: meta
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/_dev/
-tags: [vault, index, folder-marker]
-aliases:
-  - "_dev"
-  - "_dev.md"
 ---
 
 # 📁 _dev
 
-> [!danger] 격리 보관소 — 손대지 마라
-> CLAUDE.md 정책. 코드 영역 원본은 절대 만지지 않는다.
-> 보관 / baseline / 옛 자료 모음. 정리하지 말 것.
+## 이 폴더는 무엇을 위한 곳인가
 
-## 통계
+개발 중 참고한 임시 자료와 도구 흔적입니다.
 
-- 자식 파일: **0개** (.md 제외)
-- 자식 폴더: **1개**
+## 현장 업무와의 관계
 
-## 자식 폴더
+현장 운영보다는 개발 과정 추적용입니다.
 
-- [[erp/_dev/baselines/📁_baselines|baselines/]]
+## 언제 보면 좋나
+
+- 최근 실험이나 임시 산출물을 확인할 때
+
+## 주요 하위 폴더
+
+- [[ERP/_dev/baselines/📁_baselines]] — `_dev/baselines`는 현재 운영 코드가 아니라 보관/참고 자료입니다.
+
+## 조심할 점
+
+운영 기준 문서가 아닙니다. 참고만 하고 실제 기준은 코드와 docs에서 확인합니다.
+
+## 다음에 볼 위치
+
+- 상위 폴더: [[ERP/📁_ERP]]

@@ -1,159 +1,108 @@
 ---
+type: file-explanation
+source_path: "backend/app/services/codes.py"
+importance: important
 layer: backend
-topic: service
-file: erp/backend/app/services/codes.py
-tags:
-  - "#layer/backend"
-  - "#topic/service"
-aliases:
-  - codes service
-  - 4파트 코드 파싱
-  - ItemCode
----
-type: code-note
-status: active
-updated: 2026-05-21
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
 ---
 
-# 🏷️ codes.py — 4-파트 품목 코드 파싱·검증·생성
+# codes.py — codes.py 설명
 
-> [!summary]
-> `[제품기호]-[구분코드]-[일련번호]-[옵션코드]` 형식의 4-파트 품목 코드를 파싱·포맷·마스터 테이블 검증·자동 채번하는 유틸리티. 이전 `ErpCode` 클래스는 `ItemCode` 로 rename 되었다 (commit `f1ff96c`).
+## 이 파일은 무엇을 책임지나
 
----
+`codes.py`는 `codes` 업무 규칙을 실제로 실행하는 Python 코드입니다. 라우터보다 안쪽에서 DB 조회와 변경을 담당합니다.
 
-## 1. 한 문장 목적
+## 업무 흐름에서의 의미
 
-품목 코드 `376-TR-0012-BG` 같은 문자열을 파싱하고 마스터 테이블 대조 검증 후 자동 시리얼 번호를 발급한다.
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
 
----
+## 언제 보면 좋나
 
-## 2. 파일 위치 & 임포트 경로
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-```
-erp/backend/app/services/codes.py
-from app.services import codes as codes_svc
-from app.services.codes import ItemCode, parse_item_code, generate_code
-```
+## 중요한 내용
 
----
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-## 3. 코드 포맷 규칙
+- `ItemCode`
+- `parse_item_code`
+- `format_item_code`
+- `_split_symbol`
+- `validate_code`
+- `next_serial`
+- `generate_code`
 
-```
-[제품기호] - [구분코드] - [일련번호] - [옵션코드]
-   376          TR          0012           BG
-```
+## 연결되는 파일
 
-| 파트 | 규칙 |
-|------|------|
-| 제품기호 | 숫자만, 1자 이상. 복수 자리 = 슬롯 조합 (예: "376" = 슬롯3+7+6) |
-| 구분코드 | 정확히 2자, process_types.code 에 존재해야 함 |
-| 일련번호 | 0 이상 정수, 표시 시 4자리 zero-pad (compact=True 로 생략 가능) |
-| 옵션코드 | 정확히 2자 or None, option_codes.code 에 존재해야 함 |
+### 먼저 같이 볼 파일
+- [[ERP/backend/app/routers/codes.py]] — `codes.py`는 `codes` 업무를 외부 API로 열어 주는 Python 코드입니다. 프론트 화면이 백엔드 기능을 호출할 때 이 파일의 URL을 거칩니다.
+- [[ERP/backend/app/models.py]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 파일입니다.
+- [[ERP/backend/app/schemas.py]] — 백엔드와 프론트엔드가 주고받는 데이터 모양을 정하는 파일입니다.
+- [[ERP/backend/app/database.py]] — `database.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/database.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-> [!info] PA/AA 제한
-> 완제품(PA) 과 최종조립체(AA) 는 반드시 **단일 슬롯 기호** + `is_finished_good=True` 슬롯만 허용
+## 조심할 점
 
----
+서비스는 DB 변경을 포함할 수 있습니다. 같은 도메인의 라우터, 모델, 테스트를 함께 확인해야 합니다.
 
-## 4. ItemCode 데이터 클래스
+## 핵심 발췌
 
 ```python
+"""4-part 품목 코드 utilities: parse, format, validate, generate.
+
+Code format: [제품기호]-[구분코드]-[일련번호]-[옵션코드]
+
+Examples
+    376-TR-0012-BG   (raw material shared across DX3000, COCOON, ADX6000FB)
+    3-PA-0012-WM     (DX3000 finished good, white matte)
+
+Rules
+    - Symbol is a non-empty string composed of single-slot digits (e.g. "3",
+      "7", "376"). Multi-digit symbol is a concatenation of slot symbols and
+      is allowed only for raw/assembly items shared across products.
+    - For PA (최종 완제품) and AA (최종 조립체), symbol MUST be a single slot
+      symbol (len == 1 and the symbol maps to a finished-good slot).
+    - Process type is always exactly 2 characters from process_types.code.
+    - Serial is a zero-padded integer (default width 4). Leading zeros are
+      stripped on display via format_item_code(compact=True).
+    - Option is exactly 2 characters from option_codes.code, or empty/None
+      for items without options.
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from typing import List, Optional
+
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.models import Item, OptionCode, ProcessType, ProductSymbol
+
+
+SERIAL_PAD_WIDTH = 4
+CODE_TOKEN_RE = re.compile(r"^[0-9A-Za-z]+$")
+
+
+# ---------------------------------------------------------------------------
+# Data transfer object
+# ---------------------------------------------------------------------------
+
+
 @dataclass
 class ItemCode:
-    symbol: str          # "3" 또는 "376"
-    process_type: str    # "TR", "PA"
-    serial: int          # 정수 (패딩 없음)
-    option: Optional[str] = None  # "BG" 또는 None
-    symbol_slots: List[int] = field(default_factory=list)  # [3, 7, 6]
+    symbol: str                  # e.g. "3" or "376"
+    process_type: str            # e.g. "TR", "PA"
+    serial: int                  # integer (no padding)
+    option: Optional[str] = None # e.g. "BG" or None
+    symbol_slots: List[int] = field(default_factory=list)  # resolved slot ids
 
     def format(self, *, compact: bool = False) -> str:
-        # compact=False → "376-TR-0012-BG"
-        # compact=True  → "376-TR-12-BG"
+        return format_item_code(self, compact=compact)
+
+
+# ---------------------------------------------------------------------------
 ```
-
----
-
-## 5. 함수 목록
-
-| 함수 | 설명 |
-|------|------|
-| `parse_item_code(raw)` | 문자열 → ItemCode (포맷만 검증) |
-| `format_item_code(code, compact)` | ItemCode → 문자열 |
-| `validate_code(db, code)` | 마스터 테이블 대조 검증 |
-| `next_serial(db, symbol, process_type)` | 다음 시리얼 번호 조회 |
-| `generate_code(db, *, symbol, process_type, option)` | 자동 채번 + 검증 후 ItemCode 반환 |
-
----
-
-## 6. 핵심 코드 발췌
-
-```python
-def parse_item_code(raw: str) -> ItemCode:
-    """3 또는 4개 토큰 허용 (옵션 생략 가능)."""
-    tokens = raw.strip().upper().split("-")
-    if len(tokens) not in (3, 4):
-        raise ValueError(...)
-    symbol, process_type, serial_str = tokens[0], tokens[1], tokens[2]
-    option = tokens[3] if len(tokens) == 4 else None
-    return ItemCode(symbol=symbol, process_type=process_type,
-                    serial=int(serial_str), option=option,
-                    symbol_slots=_split_symbol(symbol))
-
-
-def validate_code(db, code):
-    """마스터 3종 검사: ProductSymbol + ProcessType + OptionCode."""
-    for digit in code.symbol:
-        slot = db.query(ProductSymbol).filter(ProductSymbol.symbol == digit).one_or_none()
-        if slot is None or slot.is_reserved:
-            raise ValueError(f"제품기호 '{digit}' 미배정")
-
-    ptype = db.query(ProcessType).filter(ProcessType.code == code.process_type).one_or_none()
-    if ptype is None:
-        raise ValueError(f"구분코드 '{code.process_type}' 미정의")
-
-    if code.process_type in ("PA", "AA"):
-        # 단일 슬롯 + is_finished_good 검사
-        ...
-```
-
----
-
-## 7. 시리얼 채번 로직
-
-```mermaid
-flowchart LR
-    A["generate_code(symbol, process_type)"] --> B["next_serial(db, symbol, process_type)"]
-    B --> C["SELECT MAX(serial_no)\nWHERE item_code LIKE '{symbol}-{process_type}-%'"]
-    C --> D["max + 1"]
-    D --> E["validate_code 통과"]
-    E --> F["ItemCode 반환"]
-```
-
----
-
-## 8. rename 이력
-
-> [!note] commit f1ff96c
-> `ErpCode` 클래스 → `ItemCode` 로 rename.
-> `parse_erp_code` → `parse_item_code`, `format_erp_code` → `format_item_code`.
-> 기존 vault 노트에 `ErpCode` 가 남아 있으면 구버전이다.
-
----
-
-## 9. 의존 관계
-
-```
-codes.py
-  ← models (Item, OptionCode, ProcessType, ProductSymbol)
-  호출자: codes 라우터 (코드 파싱/생성), items 라우터 (item_code 검증)
-```
-
----
-
-## 10. 관련 노트 링크
-
-- [[models.py]] — ProductSymbol, ProcessType, OptionCode ORM
-- [[main.py]] — `/api/codes` 라우터 등록

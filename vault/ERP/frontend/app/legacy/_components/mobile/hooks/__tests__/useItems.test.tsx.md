@@ -1,45 +1,45 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "frontend/app/legacy/_components/mobile/hooks/__tests__/useItems.test.tsx"
+importance: important
 layer: frontend
-source_path: erp/frontend/app/legacy/_components/mobile/hooks/__tests__/useItems.test.tsx
-status: active
-updated: 2026-04-27
-source_sha: 0059ae52d0b9
-tags:
-  - erp
-  - frontend
-  - test
-  - tsx
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# useItems.test.tsx
+# useItems.test.tsx — useItems.test.tsx 설명
 
-> [!summary] 역할
-> 현재 ERP 동작을 회귀 없이 유지하기 위한 자동 테스트 파일이다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`useItems.test.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
 
-- Source: `frontend/app/legacy/_components/mobile/hooks/__tests__/useItems.test.tsx`
-- Layer: `frontend`
-- Kind: `test`
-- Size: `2881` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-- Parent hub: [[frontend/app/legacy/_components/mobile/hooks/__tests__/__tests__|frontend/app/legacy/_components/mobile/hooks/__tests__]]
-- Related: [[frontend/frontend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 기능 변경 후 같은 영역 테스트를 먼저 확인한다.
-- 테스트가 문서보다 최신 동작을 더 정확히 말해줄 때가 많다.
+## 중요한 내용
 
-## 원본 발췌
+자동으로 뽑을 수 있는 함수/클래스 목록은 적지만, 파일 위치와 확장자로 볼 때 위 역할을 맡습니다.
 
-````tsx
+## 연결되는 파일
+
+- [[ERP/frontend/app/legacy/_components/mobile/hooks/__tests__/📁___tests__]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
+
+## 핵심 발췌
+
+```tsx
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 
 // api 모킹 — useItems 가 부르는 api.getItems 만 가로챈다
 vi.mock("@/lib/api", () => ({
@@ -70,9 +70,27 @@ describe("useItems", () => {
     (api.getItems as any).mockRejectedValue(abortErr);
 
     const { result } = renderHook(() => useItems({}));
-    // AbortError 면 loading 은 가드되어 그대로 둘 수 있음 — error 는 절대 set 되지 않아야
-    await new Promise((r) => setTimeout(r, 30));
+    // AbortError 면 loading 은 가드되어 그대로 둘 수 있음. waitFor 로 hook update 를 act 안에서 비운다.
+    await waitFor(() => expect(api.getItems).toHaveBeenCalledTimes(1));
     expect(result.current.error).toBeNull();
-# ... (이하 43줄 생략. 원본 참조)
+  });
 
-````
+  it("일반 에러는 error state 로 노출", async () => {
+    (api.getItems as any).mockRejectedValue(new Error("network down"));
+    const { result } = renderHook(() => useItems({}));
+    await waitFor(() => expect(result.current.error).toBe("network down"));
+  });
+
+  it("빠른 필터 변경 시 마지막 결과만 반영", async () => {
+    let resolveFirst: (v: any) => void = () => {};
+    const firstPromise = new Promise((res) => {
+      resolveFirst = res;
+    });
+    (api.getItems as any)
+      .mockImplementationOnce((_p: any, opts: any) => {
+        // 첫 호출: signal.aborted 가 true 가 되도록 설계됨
+        return new Promise((_, rej) => {
+          opts?.signal?.addEventListener?.("abort", () => {
+            const err = new Error("aborted");
+            (err as any).name = "AbortError";
+```

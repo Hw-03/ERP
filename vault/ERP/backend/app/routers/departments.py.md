@@ -1,110 +1,105 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "backend/app/routers/departments.py"
+importance: important
 layer: backend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/backend/app/routers/departments.py
-tags: [vault, code-note, backend, router]
-aliases: [부서 마스터 API]
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# 📦 departments.py — 부서 마스터 CRUD + 순서 재배치
+# departments.py — departments.py 설명
 
-> [!summary] 역할
-> 부서 정보의 CRUD 와 표시 순서 재배치를 담당하는 라우터.  
-> 모든 쓰기 작업(생성/수정/삭제/순서변경)은 **관리자 PIN** 이 필요하다.  
-> `require_admin` 함수를 `settings.py` 에서 임포트해 공유한다.
+## 이 파일은 무엇을 책임지나
 
-#layer/backend #topic/router #topic/employees
+`departments.py`는 `departments` 업무를 외부 API로 열어 주는 Python 코드입니다. 프론트 화면이 백엔드 기능을 호출할 때 이 파일의 URL을 거칩니다.
 
----
+## 업무 흐름에서의 의미
 
-## 1. 역할
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
 
-- 부서 목록 조회 (is_active 필터)
-- 생성 / 수정 / 삭제 — 모두 관리자 PIN 검증
-- `PATCH /reorder`: 여러 부서의 display_order 를 한 번에 변경
-- 삭제는 DB CASCADE 로 영구 삭제 (소프트 삭제 없음)
+## 언제 보면 좋나
 
-## 2. 원본 위치
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-```
-erp/backend/app/routers/departments.py
-```
+## 중요한 내용
 
-## 3. import
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-| 모듈 | 용도 |
-|------|------|
-| `app.models.Department` | ORM 모델 |
-| `app.routers.settings.require_admin` | 관리자 PIN 검증 |
-| `app.schemas.DepartmentCreate, DepartmentUpdate, DepartmentDeleteRequest, DepartmentReorderPayload, DepartmentResponse` | 스키마 |
+- `list_departments`
+- `create_department`
+- `reorder_departments`
+- `update_department`
+- `delete_department`
+- `API GET ""`
+- `API POST ""`
+- `API PATCH "/reorder"`
+- `API PUT "/{dept_id}"`
+- `API DELETE "/{dept_id}"`
 
-## 4. export (endpoint 목록)
+## 연결되는 파일
 
-| Method | Path | PIN 필요 | 설명 |
-|--------|------|----------|------|
-| GET | `/departments` | 없음 | 부서 목록 (is_active 필터) |
-| POST | `/departments` | 필요 | 부서 생성 |
-| PATCH | `/departments/reorder` | 필요 | 표시 순서 일괄 변경 |
-| PUT | `/departments/{dept_id}` | 필요 | 부서 정보 수정 |
-| DELETE | `/departments/{dept_id}` | 필요 | 부서 삭제 |
+### 먼저 같이 볼 파일
+- [[ERP/backend/app/schemas.py]] — 백엔드와 프론트엔드가 주고받는 데이터 모양을 정하는 파일입니다.
+- [[ERP/backend/app/models.py]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 파일입니다.
+- [[ERP/frontend/lib/api/departments.ts]] — `departments.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
 
-## 5. 참조처
+## 조심할 점
 
-- 프론트엔드 부서 관리 설정 화면
-- `inventory/transfer.py` — `DepartmentEnum` 이 부서 라우팅 기준
-- `employees.py` — `Employee.department` FK 관계
+API 응답 형식이나 상태 코드를 바꾸면 프론트 화면과 자동 테스트가 같이 영향을 받습니다.
 
-## 6. 업무 흐름
-
-```mermaid
-flowchart LR
-    A[관리자 화면] -->|POST /departments + PIN| B[require_admin 검증]
-    B -->|실패| ERR[403]
-    B -->|통과| C[중복명 확인]
-    C -->|중복| DUP[409]
-    C -->|없음| D[Department INSERT]
-    D --> E[DB commit/refresh]
-    E --> F[DepartmentResponse]
-
-    G[PATCH /reorder + PIN] --> B
-    B --> H[for item in payload.items\n dept.display_order = item.display_order]
-    H --> I[commit]
-```
-
-## 7. 핵심 함수
-
-### `delete_department` — PIN 이중 수신 (body 우선)
+## 핵심 발췌
 
 ```python
-@router.delete("/{dept_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_department(
-    dept_id: int,
-    pin: Optional[str] = Query(None, description="deprecated — body 사용 권장"),
-    body: Optional[DepartmentDeleteRequest] = Body(None),
+"""Department master router."""
+
+from typing import List, Optional
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models import Department
+from app.routers._errors import ErrorCode, http_error
+from app.routers.settings import require_admin
+from app.schemas import (
+    DepartmentCreate,
+    DepartmentDeleteRequest,
+    DepartmentReorderPayload,
+    DepartmentResponse,
+    DepartmentUpdate,
+)
+
+router = APIRouter()
+
+
+@router.get("", response_model=List[DepartmentResponse])
+def list_departments(
+    is_active: Optional[bool] = Query(None),
     db: Session = Depends(get_db),
 ):
-    """PIN 은 request body 로 전달하면 access log 에 남지 않는다.
-    body 없으면 query string pin 으로 폴백."""
-    effective_pin = (body.pin if body and body.pin else None) or pin
-    if not effective_pin:
-        raise http_error(400, ErrorCode.BAD_REQUEST, "관리자 PIN 이 필요합니다.")
-    require_admin(db, effective_pin)
-    ...
-    db.delete(dept)
+    query = db.query(Department)
+    if is_active is not None:
+        query = query.filter(Department.is_active == is_active)
+    return query.order_by(Department.display_order.asc(), Department.name.asc()).all()
+
+
+@router.post("", response_model=DepartmentResponse, status_code=status.HTTP_201_CREATED)
+def create_department(
+    payload: DepartmentCreate,
+    db: Session = Depends(get_db),
+):
+    require_admin(db, payload.pin)
+    if db.query(Department).filter(Department.name == payload.name).first():
+        raise HTTPException(status_code=409, detail="이미 존재하는 부서명입니다.")
+    dept = Department(name=payload.name, display_order=payload.display_order, is_active=True, color_hex=payload.color_hex)
+    db.add(dept)
     db.commit()
-```
+    db.refresh(dept)
+    return dept
 
-> [!tip] body 우선 이유
-> Query string 에 PIN 을 넣으면 웹 서버 access log 에 PIN 이 그대로 기록된다.  
-> Body 로 전달 시 access log 에 남지 않는다.
 
-### `reorder_departments`
-
-```python
 @router.patch("/reorder")
 def reorder_departments(payload: DepartmentReorderPayload, db: Session = Depends(get_db)):
     require_admin(db, payload.pin)
@@ -112,74 +107,4 @@ def reorder_departments(payload: DepartmentReorderPayload, db: Session = Depends
         dept = db.query(Department).filter(Department.id == item.id).first()
         if dept:
             dept.display_order = item.display_order
-    db.commit()
-    return {"ok": True}
 ```
-
-## 8. 위험 포인트
-
-> [!danger] 부서 삭제 시 CASCADE
-> `db.delete(dept)` 로 직접 삭제한다.  
-> `Department` 에 연결된 `Employee.department` 등이 CASCADE 설정에 따라 함께 삭제될 수 있다.  
-> 삭제 전에 해당 부서 직원이 있는지 확인 로직이 없다.
-
-> [!warning] `require_admin` 은 settings.py 에서 임포트
-> `from app.routers.settings import require_admin`  
-> settings.py 가 변경되면 departments.py 에도 영향 있음.
-
-## 9. 죽은 코드 의심
-
-- `from fastapi import HTTPException` 임포트 사용 중 (일부 곳은 HTTPException 직접 사용, 일부는 http_error 사용). 불일치.
-
-## 10. 수정 전 체크
-
-- [ ] 부서 삭제 시 해당 부서 직원/재고 이동 이력 여부 확인 로직 필요한지 검토
-- [ ] `PATCH /reorder` 는 없는 dept_id 를 조용히 무시함 — 클라이언트가 유효한 id 만 전달해야 함
-- [ ] `color_hex` 필드가 있음 — 프론트 부서 카드 색상용, null 허용
-
-## 11. 코드 발췌
-
-```python
-@router.post("", response_model=DepartmentResponse, status_code=status.HTTP_201_CREATED)
-def create_department(payload: DepartmentCreate, db: Session = Depends(get_db)):
-    require_admin(db, payload.pin)
-    if db.query(Department).filter(Department.name == payload.name).first():
-        raise HTTPException(status_code=409, detail="이미 존재하는 부서명입니다.")
-    dept = Department(
-        name=payload.name,
-        display_order=payload.display_order,
-        is_active=True,
-        color_hex=payload.color_hex
-    )
-    db.add(dept)
-    db.commit()
-    db.refresh(dept)
-    return dept
-
-@router.put("/{dept_id}", response_model=DepartmentResponse)
-def update_department(dept_id: int, payload: DepartmentUpdate, db: Session = Depends(get_db)):
-    require_admin(db, payload.pin)
-    dept = db.query(Department).filter(Department.id == dept_id).first()
-    if not dept:
-        raise HTTPException(status_code=404, detail="부서를 찾을 수 없습니다.")
-    if payload.name is not None:
-        if db.query(Department).filter(
-            Department.name == payload.name, Department.id != dept_id
-        ).first():
-            raise HTTPException(status_code=409, detail="이미 존재하는 부서명입니다.")
-        dept.name = payload.name
-    ...
-    db.commit()
-    db.refresh(dept)
-    return dept
-```
-
----
-
-## 관련 노트
-
-- [[_routers]] — 라우터 허브
-- [[erp/backend/app/routers/settings.py]] — require_admin 정의
-- [[erp/backend/app/routers/employees.py]] — 직원 부서 배정
-
-Up: [[_routers]]

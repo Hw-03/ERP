@@ -1,61 +1,44 @@
 ---
-type: index
-project: DEXCOWIN MES
+type: folder-note
+source_path: "frontend/app"
+importance: important
 layer: frontend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/app/
-tags: [vault, index, folder-marker]
-aliases:
-  - "app"
-  - "app.md"
+graph: hub
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
 # 📁 app
 
-> [!summary] 역할
-> Next.js 14 App Router 진입점. 실제 UI 로직은 `app/legacy/` 하위에 있고, 이 폴더는 라우팅 뼈대만 담는다.
+## 이 폴더는 무엇을 위한 곳인가
 
-> [!info] 코드 미러 영역
-> 이 폴더는 `erp/frontend/app/` 의 vault 미러.
+Next.js App Router의 진입 폴더입니다. 실제 활성 화면은 대부분 legacy 하위에서 실행됩니다.
 
-## 어떤 파일들이 있나
+## 현장 업무와의 관계
 
-핵심 파일:
-- `layout.tsx` — HTML 루트, metadata(`DEXCOWIN 재고 관리 시스템`), globals.css 임포트
-- `page.tsx` — `export { default } from "./legacy/page"` 단 한 줄. 루트 `/` 를 legacy 에 위임
-- `error.tsx` — App Router 에러 바운더리
-- `global-error.tsx` — 최상위 에러 바운더리
-- `globals.css` — 전역 Tailwind 기준 스타일
+브라우저 첫 접속이 어디 화면으로 들어가는지 결정합니다.
 
-부수 폴더 — 라우트 stub (page.tsx 없이 폴더만 존재):
-- `admin/`, `alerts/`, `bom/`, `counts/`, `history/`, `inventory/`, `operations/`, `queue/`
-  이 라우트들은 현재 실제 페이지가 없다. 직접 접근 시 404 또는 legacy 로 대체.
+## 언제 보면 좋나
 
-## 도메인 컨텍스트
+- 처음 접속 화면, 에러 화면, 라우팅 구조를 확인할 때
+- 모바일/데스크톱 진입을 볼 때
 
-App Router 는 파일 기반 라우팅 추상화 역할만 수행한다. 모든 화면 렌더링은 `legacy/page.tsx`
-→ `DepartmentsProvider` + `MesLoginGate` + `DesktopLegacyShell` / `MobileShell` 체인에서 이루어진다.
+## 주요 하위 폴더
 
-## ⚠️ 위험 포인트
+- [[ERP/frontend/app/legacy/📁_legacy]] — 현재 운영 중인 실제 MES 화면입니다. 이름은 legacy지만 지금 사용자가 보는 핵심 UI입니다.
 
-- `app/page.tsx` 는 stub 이다 — 내용이 한 줄이라도 건드리면 라우팅 전체에 영향.
-- stub 라우트(`admin/` 등)에 page.tsx 를 추가하면 legacy 와 중복 진입점이 생긴다.
-- 실제 UI 는 `legacy/` 에 있다. 이름에 속지 말 것.
+## 먼저 볼 파일 5개
 
-## 관련 가이드
+- [[ERP/frontend/app/error.tsx]] — `error.tsx`는 TypeScript/React 코드입니다. 프로젝트 구조 안에서 `frontend/app/error.tsx` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
+- [[ERP/frontend/app/global-error.tsx]] — `global-error.tsx`는 TypeScript/React 코드입니다. 프로젝트 구조 안에서 `frontend/app/global-error.tsx` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
+- [[ERP/frontend/app/globals.css]] — `globals.css`는 스타일시트입니다. 프로젝트 구조 안에서 `frontend/app/globals.css` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
+- [[ERP/frontend/app/layout.tsx]] — `layout.tsx`는 TypeScript/React 코드입니다. 프로젝트 구조 안에서 `frontend/app/layout.tsx` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
+- [[ERP/frontend/app/page.tsx]] — `page.tsx`는 TypeScript/React 코드입니다. 프로젝트 구조 안에서 `frontend/app/page.tsx` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-- [[erp/_vault/guides/frontend-routing]]
+## 조심할 점
 
-## 자식 폴더
+page.tsx와 layout.tsx를 잘못 바꾸면 전체 접속 경로가 흔들립니다.
 
-- [[erp/frontend/app/legacy/📁_legacy|legacy/]] — **실제 활성 UI** 진입점
-- [[erp/frontend/app/admin/admin|admin/]] — stub
-- [[erp/frontend/app/alerts/alerts|alerts/]] — stub
-- [[erp/frontend/app/bom/bom|bom/]] — stub
-- [[erp/frontend/app/counts/counts|counts/]] — stub
-- [[erp/frontend/app/history/history|history/]] — stub
-- [[erp/frontend/app/inventory/inventory|inventory/]] — stub
-- [[erp/frontend/app/operations/operations|operations/]] — stub
-- [[erp/frontend/app/queue/queue|queue/]] — stub
+## 다음에 볼 위치
+
+- 상위 폴더: [[ERP/frontend/📁_frontend]]

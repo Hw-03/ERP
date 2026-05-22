@@ -1,22 +1,50 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "frontend/app/legacy/_components/_warehouse_sections/WarehouseQueueRow.tsx"
+importance: important
 layer: frontend
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/app/legacy/_components/_warehouse_sections/WarehouseQueueRow.tsx
-tags: [vault, code-note, auto-generated, stub]
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# WarehouseQueueRow.tsx
+# WarehouseQueueRow.tsx — WarehouseQueueRow.tsx 설명
 
-> [!info] 자동 생성된 stub 노트
-> 이 노트는 자동 보정으로 생성됐다. 원본 위치: [[erp/frontend/app/legacy/_components/_warehouse_sections/WarehouseQueueRow.tsx]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄
+`WarehouseQueueRow.tsx`는 입출고 요청 작성, 작업중 목록, 내 요청, 창고 승인함 같은 창고 업무 화면의 일부입니다.
 
-```
+## 업무 흐름에서의 의미
+
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
+
+## 언제 보면 좋나
+
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
+
+## 중요한 내용
+
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
+
+- `WarehouseQueueRow`
+- `WarehouseQueueRowProps`
+
+## 연결되는 파일
+
+### 먼저 같이 볼 파일
+- [[ERP/frontend/app/legacy/_components/DesktopWarehouseView.tsx]] — `DesktopWarehouseView.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+- [[ERP/frontend/lib/api/stock-requests.ts]] — `stock-requests.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
+- [[ERP/backend/app/routers/stock_requests.py]] — 프론트의 입출고 요청 작성, 내 요청, 창고 승인함이 호출하는 API 입구입니다.
+- [[ERP/backend/app/services/stock_requests.py]] — 현장 담당자가 요청을 제출하고 창고가 승인/반려/취소하는 흐름을 처리하는 서비스입니다.
+
+## 조심할 점
+
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
+
+## 핵심 발췌
+
+```tsx
 "use client";
 
 import type { StockRequest } from "@/lib/api";
@@ -47,4 +75,29 @@ export interface WarehouseQueueRowProps {
   setShowRejectFor: (id: string | null) => void;
   closeApprove: () => void;
   closeReject: () => void;
+  submitApprove: (id: string) => void;
+  submitReject: (id: string) => void;
+}
+
+export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
+  const {
+    req,
+    busyId,
+    approvePinFor, approvePin, approveError,
+    setApprovePin, setApprovePinFor,
+    showRejectFor, rejectReason, rejectPin, rejectError,
+    setRejectReason, setRejectPin, setShowRejectFor,
+    closeApprove, closeReject,
+    submitApprove, submitReject,
+  } = props;
+
+  return (
+    <div
+      key={req.request_id}
+      className="rounded-[14px] border px-5 py-4"
+      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+    >
+      <div className="flex flex-wrap items-center gap-2 text-sm" style={{ color: LEGACY_COLORS.text }}>
+        <span
+          className="rounded-full px-2 py-0.5 text-[11px] font-bold"
 ```

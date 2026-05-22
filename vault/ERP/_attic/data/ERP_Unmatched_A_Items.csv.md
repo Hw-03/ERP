@@ -1,24 +1,44 @@
 ---
-type: code-note
+type: file-explanation
+source_path: "_attic/data/ERP_Unmatched_A_Items.csv"
+importance: reference
+layer: archive
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
-layer: attic
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/_attic/data/ERP_Unmatched_A_Items.csv
-tags: [vault, code-note, auto-generated, stub, mirror-fill]
 ---
 
-# ERP_Unmatched_A_Items.csv
+# ERP_Unmatched_A_Items.csv — ERP_Unmatched_A_Items.csv 설명
 
-> [!info] 1:1 미러 stub
-> 탐색기에 보이는 폴더 구조를 vault 에 그대로 반영하기 위한 stub.
-> 원본: [[erp/_attic/data/ERP_Unmatched_A_Items.csv]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄 (또는 메타)
+`ERP_Unmatched_A_Items.csv`는 현재 운영 코드가 아니라 과거 자료나 실험 결과를 보관한 참고 파일입니다.
 
-```
-﻿item_id,category_code,std_name,std_spec,std_unit,part_type,maker,maker_pn,supplier,department,model_ref,stock_prev,stock_current,safety_stock,moq,lead_time,source_file,source_sheet,source_row,original_name_a,original_name_bc,mapping_status,notes,created_at
+## 업무 흐름에서의 의미
+
+과거 맥락을 이해하는 데 도움은 되지만, 현재 운영 기준으로 바로 사용하면 안 됩니다.
+
+## 언제 보면 좋나
+
+- 과거 자료의 의미를 확인할 때
+- 현재 코드와 비교할 참고 근거가 필요할 때
+
+## 중요한 내용
+
+자동으로 뽑을 수 있는 함수/클래스 목록은 적지만, 파일 위치와 확장자로 볼 때 위 역할을 맡습니다.
+
+## 연결되는 파일
+
+- [[ERP/_attic/data/📁_data]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+보관 자료입니다. 현재 코드처럼 믿고 수정하거나 실행하지 않습니다.
+
+## 핵심 발췌
+
+```csv
+item_id,category_code,std_name,std_spec,std_unit,part_type,maker,maker_pn,supplier,department,model_ref,stock_prev,stock_current,safety_stock,moq,lead_time,source_file,source_sh...
 RM-000001,RM,전극(70kV) 순철 도금,순철 도금,,전극,,,,,,0,,,,,A,26.03월,4,전극(70kV),,raw_only,A단독: 파일 B/C에서 매칭 실패,2026-04-11T02:18:35
 RM-000002,RM,텅스텐 필라멘트,,,필라멘트,,,,,,0,,,,,A,26.03월,5,텅스텐 필라멘트,,raw_only,A단독: 파일 B/C에서 매칭 실패,2026-04-11T02:18:35
 RM-000003,RM,텅스텐 필라멘트,,,필라멘트,,,,,,0,,,,,A,26.03월,6,텅스텐 필라멘트,,raw_only,A단독: 파일 B/C에서 매칭 실패,2026-04-11T02:18:35
@@ -43,4 +63,6 @@ RM-000079,RM,방사구,,,황동,,,해진정밀,,,0,,,,,A,26.03월,82,방사구,,
 RM-000080,RM,방사구 외경 탭 추가,외경 탭 추가,,황동,,,해진정밀,,,100,,,,,A,26.03월,83,방사구,,raw_only,A단독: 파일 B/C에서 매칭 실패,2026-04-11T02:18:35
 RM-000086,RM,3 PIN 커넥터,,,BOARD,,,,,,0,,,,,A,26.03월,89,3 PIN 커넥터,,raw_only,A단독: 파일 B/C에서 매칭 실패,2026-04-11T02:18:35
 RM-000087,RM,4 PIN 커넥터,,,BOARD,,,,,,0,,,,,A,26.03월,90,4 PIN 커넥터,,raw_only,A단독: 파일 B/C에서 매칭 실패,2026-04-11T02:18:35
+RM-000089,RM,9핀 B/D - TFT,
+...
 ```

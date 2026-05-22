@@ -1,50 +1,71 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "frontend/app/legacy/_components/DesktopTopbar.tsx"
+importance: important
 layer: frontend
-source_path: erp/frontend/app/legacy/_components/DesktopTopbar.tsx
-status: active
-updated: 2026-04-27
-source_sha: 399a427862f5
-tags:
-  - erp
-  - frontend
-  - frontend-component
-  - tsx
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# DesktopTopbar.tsx
+# DesktopTopbar.tsx — DesktopTopbar.tsx 설명
 
-> [!summary] 역할
-> Next.js/React 화면 또는 UI 컴포넌트로, 실제 사용자 경험의 일부를 렌더링한다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`DesktopTopbar.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
 
-- Source: `frontend/app/legacy/_components/DesktopTopbar.tsx`
-- Layer: `frontend`
-- Kind: `frontend-component`
-- Size: `1757` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-- Parent hub: [[frontend/app/legacy/_components/_components|frontend/app/legacy/_components]]
-- Related: [[frontend/frontend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
-- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+## 중요한 내용
 
-## 원본 발췌
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-````tsx
+- `DesktopTopbar`
+- `ElementType`
+- `ReactNode`
+
+## 연결되는 파일
+
+- [[ERP/frontend/app/legacy/_components/📁__components]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
+
+## 핵심 발췌
+
+```tsx
 "use client";
 
-import type { ElementType, ReactNode } from "react";
-import { RefreshCw } from "lucide-react";
-import { LEGACY_COLORS } from "./legacyUi";
-import { ThemeToggle } from "./ThemeToggle";
+import { useEffect, useRef, useState, type ElementType, type ReactNode } from "react";
+import { ChevronDown, KeyRound, LogOut, RefreshCw } from "lucide-react";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { normalizeDepartment } from "@/lib/mes/department";
 import { StatusPill, inferToneFromStatus } from "./common";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
+import { api } from "@/lib/api";
+import { clearCurrentOperator, useCurrentOperator } from "./login/useCurrentOperator";
+
+const DEFAULT_STATUS = "DEXCOWIN MES System";
+
+const WAREHOUSE_ROLE_LABEL: Record<string, string | null> = {
+  primary: "창고 정",
+  deputy: "창고 부",
+  none: null,
+};
+
+const DEPARTMENT_ROLE_LABEL: Record<string, string | null> = {
+  primary: "부서 정",
+  deputy: "부서 부",
+  none: null,
+};
 
 export function DesktopTopbar({
   title,
@@ -52,27 +73,27 @@ export function DesktopTopbar({
   onRefresh,
   actionSlot,
   status,
+  statusNonce,
+  titleAddon,
 }: {
   title: string;
   icon?: ElementType;
   onRefresh: () => void;
   actionSlot?: ReactNode;
   status?: string;
+  statusNonce?: number;
+  titleAddon?: ReactNode;
 }) {
-  return (
-    <header className="pl-0 pr-4 pt-0">
-      <div
-        className="flex items-center gap-3 rounded-[28px] border px-5 py-4"
-        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-      >
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-3">
-            {Icon && (
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px]" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.blue }}>
-                <Icon className="h-5 w-5" />
-              </div>
-            )}
-            <div className="text-[24px] font-black tracking-[-0.02em]">{title}</div>
-# ... (이하 20줄 생략. 원본 참조)
-
-````
+  const operator = useCurrentOperator();
+  const roleLabel = operator ? WAREHOUSE_ROLE_LABEL[operator.warehouse_role] ?? null : null;
+  const deptRoleLabel = operator ? DEPARTMENT_ROLE_LABEL[operator.department_role] ?? null : null;
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinCurrent, setPinCurrent] = useState("");
+  const [pinNew, setPinNew] = useState("");
+  const [pinConfirm, setPinConfirm] = useState("");
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [pinBusy, setPinBusy] = useState(false);
+```

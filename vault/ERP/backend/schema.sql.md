@@ -1,45 +1,41 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "backend/schema.sql"
+importance: normal
 layer: backend
-source_path: erp/backend/schema.sql
-status: active
-updated: 2026-04-27
-source_sha: c43e9d19d7c7
-tags:
-  - erp
-  - backend
-  - source-file
-  - sql
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# schema.sql
+# schema.sql — schema.sql 설명
 
-> [!summary] 역할
-> 원본 프로젝트의 `schema.sql` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`schema.sql`는 SQL 스키마/쿼리입니다. 프로젝트 구조 안에서 `backend/schema.sql` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-- Source: `backend/schema.sql`
-- Layer: `backend`
-- Kind: `source-file`
-- Size: `5342` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
 
-- Parent hub: [[backend/backend|backend]]
-- Related: [[backend/backend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 실제 수정은 원본 파일에서 한다.
-- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+## 중요한 내용
 
-## 원본 발췌
+자동으로 뽑을 수 있는 함수/클래스 목록은 적지만, 파일 위치와 확장자로 볼 때 위 역할을 맡습니다.
 
-````sql
+## 연결되는 파일
+
+- [[ERP/backend/📁_backend]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 핵심 발췌
+
+```sql
 -- =============================================================================
--- DEXCOWIN ERP reference schema
+-- DEXCOWIN MES reference schema
 -- =============================================================================
 --
 -- This file is a PostgreSQL reference schema for documentation/import planning.
@@ -71,8 +67,26 @@ DROP TABLE IF EXISTS items CASCADE;
 CREATE TABLE items (
     item_pk BIGSERIAL PRIMARY KEY,
     item_id VARCHAR(36) NOT NULL UNIQUE,
-    erp_code VARCHAR(50) UNIQUE,
+    item_code VARCHAR(50) UNIQUE,
     category_code category_code_enum NOT NULL,
-# ... (이하 116줄 생략. 원본 참조)
-
-````
+    process_type_code VARCHAR(2),
+    symbol_slot INTEGER,
+    option_code VARCHAR(2),
+    serial_no INTEGER,
+    std_name VARCHAR(200) NOT NULL,
+    std_spec VARCHAR(200),
+    std_unit VARCHAR(20) DEFAULT 'EA',
+    part_type VARCHAR(50),
+    maker VARCHAR(100),
+    maker_pn VARCHAR(100),
+    supplier VARCHAR(100),
+    department VARCHAR(20),
+    model_ref VARCHAR(200),
+    min_stock INTEGER,
+    mapping_status mapping_status_enum NOT NULL DEFAULT 'raw_only',
+    original_name_a VARCHAR(200),
+    original_name_bc VARCHAR(200),
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+```

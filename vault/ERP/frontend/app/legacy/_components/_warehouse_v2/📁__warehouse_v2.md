@@ -1,65 +1,60 @@
 ---
-type: index
-project: DEXCOWIN MES
+type: folder-note
+source_path: "frontend/app/legacy/_components/_warehouse_v2"
+importance: normal
 layer: frontend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/app/legacy/_components/_warehouse_v2/
-tags: [vault, index, folder-marker]
-aliases:
-  - "_warehouse_v2"
-  - "_warehouse_v2.md"
+graph: hub
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
 # 📁 _warehouse_v2
 
-> [!summary] 역할
-> 입출고 작업 화면 v2 재설계 결과물. UI 진입점·상태 관리·제출 흐름이 모두 이 폴더에 집중되어 있다.
+## 이 폴더는 무엇을 위한 곳인가
 
-> [!info] 코드 미러 영역
-> 이 폴더는 `erp/frontend/app/legacy/_components/_warehouse_v2/` 의 vault 미러.
+`frontend/app/legacy/_components/_warehouse_v2`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
 
-## 어떤 파일들이 있나
+## 현장 업무와의 관계
 
-핵심 컴포넌트:
-- `IoSubmitModals.tsx` — 제출 성공/실패 결과 모달. `ConfirmModal` 래퍼. `IoSubmitResultState` 타입 export
-- `IoBundleCard.tsx` — 입출고 묶음(bundle) 카드 UI. BOM 자동 전개 / 단품 분기 렌더. 기준 수량 stepper 포함
-- `IoComposeView.tsx` — 5단계 작업 구성 뷰 최상위 컴포넌트 (1:유형 → 2:세부 → 3:대상 → 4:반영 → 5:확인)
-- `IoConfirmStep.tsx` — Step 5 확인 화면
-- `IoTargetPicker.tsx` — Step 3 대상 품목 선택
-- `IoBundleCart.tsx` — 묶음 장바구니 목록
-- `IoWorkTypeStep.tsx` — Step 1/2 작업 유형 선택
+사용자가 보는 화면이나 화면이 서버와 통신하는 방식에 연결됩니다.
 
-핵심 훅:
-- `useIoWorkState.ts` — 5단계 전체 상태(workType, subType, bundles, step 등) 관리. `IoStep` 타입 및 `IO_STEP_LABELS` 정의
-- `useIoDraft.ts` — `api.saveDraft` / `api.getDraft` 래퍼. 임시저장 비동기 상태
-- `useIoDraftRestore.ts` — draft 복원 전용 effect 추출. `restoredDraftRef` / `autosaveBatchIdRef` 주입 패턴
-- `useIoPreview.ts` — 제출 전 재고 예측 미리보기
-- `useIoSubmit.ts` — 최종 제출 처리
+## 언제 보면 좋나
 
-유틸:
-- `types.ts` — `IoBundle`, `IoLine`, `IoSubType`, `IoWorkType`, `IoComposeViewProps` 등 로컬 타입 (대부분 `@/lib/api` re-export)
-- `ioWorkType.ts` — `IO_WORK_TYPES`, `DEFAULT_SUB_TYPE`, `DeptIoDirection`, 레이블 함수들
-- `bomSync.ts` — BOM 자동 전개 동기화 로직
-- `_atoms.tsx` — Jotai 또는 Context 기반 원자 상태
+- 이 폴더 안의 파일이 어떤 역할인지 빠르게 파악할 때
+- 수정 전에 먼저 읽을 파일을 고를 때
 
-## 도메인 컨텍스트
+## 주요 하위 폴더
 
-입출고 작업은 **receive(입고) / ship(출고) / transfer(이동) / process(공정)** 4가지 `IoWorkType` 을 가진다.
-`process` 유형은 방향(`DeptIoDirection`: in/out)을 추가로 선택해야 한다.
-BOM 부모 품목을 선택하면 자재가 자동 전개되어 `IoBundle.lines` 에 `origin: "bom_auto"` 라인으로 포함된다.
+- [[ERP/frontend/app/legacy/_components/_warehouse_v2/__tests__/📁___tests__]] — `frontend/app/legacy/_components/_warehouse_v2/__tests__`는 프론트엔드 화면이나 공용 로직의 세부 폴더입니다.
 
-## ⚠️ 위험 포인트
+## 먼저 볼 파일 5개
 
-- `useIoWorkState` 는 service layer(`api.saveDraft`, `api.submitBatch`)와 강결합되어 있다. 상태 변경 시 backend service 영향 확인 필수.
-- BOM cascade 수량 변경은 `onQuantityChange` 경로로만 처리한다. 직접 `bundles` 상태를 조작하면 자식 라인 수량이 비동기 불일치 발생 가능.
-- `useIoDraftRestore` 는 `restoredDraftRef` 중복 복원 방지 guard 를 갖는다. 이 ref 를 외부에서 reset 하면 복원이 무한 반복될 수 있다.
+- [[ERP/frontend/app/legacy/_components/_warehouse_v2/DefectActionStep.tsx]] — `DefectActionStep.tsx`는 입출고 요청 작성, 작업중 목록, 내 요청, 창고 승인함 같은 창고 업무 화면의 일부입니다.
+- [[ERP/frontend/app/legacy/_components/_warehouse_v2/DefectInventoryPicker.tsx]] — `DefectInventoryPicker.tsx`는 입출고 요청 작성, 작업중 목록, 내 요청, 창고 승인함 같은 창고 업무 화면의 일부입니다.
+- [[ERP/frontend/app/legacy/_components/_warehouse_v2/IoBundleCard.tsx]] — `IoBundleCard.tsx`는 입출고 요청 작성, 작업중 목록, 내 요청, 창고 승인함 같은 창고 업무 화면의 일부입니다.
+- [[ERP/frontend/app/legacy/_components/_warehouse_v2/IoBundleCart.tsx]] — `IoBundleCart.tsx`는 입출고 요청 작성, 작업중 목록, 내 요청, 창고 승인함 같은 창고 업무 화면의 일부입니다.
+- [[ERP/frontend/app/legacy/_components/_warehouse_v2/IoComposeView.tsx]] — `IoComposeView.tsx`는 입출고 요청 작성, 작업중 목록, 내 요청, 창고 승인함 같은 창고 업무 화면의 일부입니다.
 
-## 관련 가이드
+> [!info]- 추가 파일
+> - [[ERP/frontend/app/legacy/_components/_warehouse_v2/IoConfirmStep.tsx]] — IoConfirmStep.tsx
+> - [[ERP/frontend/app/legacy/_components/_warehouse_v2/IoLineRow.tsx]] — IoLineRow.tsx
+> - [[ERP/frontend/app/legacy/_components/_warehouse_v2/IoSubmitModals.tsx]] — IoSubmitModals.tsx
+> - [[ERP/frontend/app/legacy/_components/_warehouse_v2/IoTargetPicker.tsx]] — IoTargetPicker.tsx
+> - [[ERP/frontend/app/legacy/_components/_warehouse_v2/IoWorkTypeStep.tsx]] — IoWorkTypeStep.tsx
+> - [[ERP/frontend/app/legacy/_components/_warehouse_v2/_atoms.tsx]] — _atoms.tsx
+> - [[ERP/frontend/app/legacy/_components/_warehouse_v2/bomSync.ts]] — bomSync.ts
+> - [[ERP/frontend/app/legacy/_components/_warehouse_v2/ioWorkType.ts]] — ioWorkType.ts
+> - [[ERP/frontend/app/legacy/_components/_warehouse_v2/types.ts]] — types.ts
+> - [[ERP/frontend/app/legacy/_components/_warehouse_v2/useIoDraft.ts]] — useIoDraft.ts
+> - [[ERP/frontend/app/legacy/_components/_warehouse_v2/useIoDraftRestore.ts]] — useIoDraftRestore.ts
+> - [[ERP/frontend/app/legacy/_components/_warehouse_v2/useIoPreview.ts]] — useIoPreview.ts
+> - [[ERP/frontend/app/legacy/_components/_warehouse_v2/useIoSubmit.ts]] — useIoSubmit.ts
+> - [[ERP/frontend/app/legacy/_components/_warehouse_v2/useIoWorkState.ts]] — useIoWorkState.ts
 
-- [[erp/_vault/guides/warehouse-io-flow]]
+## 조심할 점
 
-## 자식 폴더
+폴더 성격을 먼저 확인하고 현재 운영 코드인지, 보관 자료인지, 자동 생성물인지 구분해야 합니다.
 
-없음 (플랫 구조)
+## 다음에 볼 위치
+
+- 상위 폴더: [[ERP/frontend/app/legacy/_components/📁__components]]

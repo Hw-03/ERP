@@ -1,47 +1,57 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "frontend/app/legacy/_components/_warehouse_hooks/useWarehouseData.ts"
+importance: important
 layer: frontend
-source_path: erp/frontend/app/legacy/_components/_warehouse_hooks/useWarehouseData.ts
-status: active
-updated: 2026-04-27
-source_sha: 8ffd50e39766
-tags:
-  - erp
-  - frontend
-  - frontend-hook
-  - ts
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# useWarehouseData.ts
+# useWarehouseData.ts — useWarehouseData.ts 설명
 
-> [!summary] 역할
-> 프론트엔드 화면에서 상태, 데이터 로딩, 상호작용 흐름을 재사용하기 위한 React hook이다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`useWarehouseData.ts`는 입출고 요청 작성, 작업중 목록, 내 요청, 창고 승인함 같은 창고 업무 화면의 일부입니다.
 
-- Source: `frontend/app/legacy/_components/_warehouse_hooks/useWarehouseData.ts`
-- Layer: `frontend`
-- Kind: `frontend-hook`
-- Size: `2200` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-- Parent hub: [[frontend/app/legacy/_components/_warehouse_hooks/_warehouse_hooks|frontend/app/legacy/_components/_warehouse_hooks]]
-- Related: [[frontend/frontend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
-- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+## 중요한 내용
 
-## 원본 발췌
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-````ts
+- `useWarehouseData`
+- `Employee`
+- `Item`
+- `ProductModel`
+- `Args`
+
+## 연결되는 파일
+
+### 먼저 같이 볼 파일
+- [[ERP/frontend/app/legacy/_components/DesktopWarehouseView.tsx]] — `DesktopWarehouseView.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+- [[ERP/frontend/lib/api/stock-requests.ts]] — `stock-requests.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
+- [[ERP/backend/app/routers/stock_requests.py]] — 프론트의 입출고 요청 작성, 내 요청, 창고 승인함이 호출하는 API 입구입니다.
+- [[ERP/backend/app/services/stock_requests.py]] — 현장 담당자가 요청을 제출하고 창고가 승인/반려/취소하는 흐름을 처리하는 서비스입니다.
+
+## 조심할 점
+
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
+
+## 핵심 발췌
+
+```ts
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type Employee, type Item, type ProductModel, type ShipPackage } from "@/lib/api";
+import { api, type Employee, type Item, type ProductModel } from "@/lib/api";
 
 type Args = {
   globalSearch: string;
@@ -51,10 +61,9 @@ type Args = {
 export function useWarehouseData({ globalSearch, onStatusChange }: Args) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [items, setItems] = useState<Item[]>([]);
-  const [packages, setPackages] = useState<ShipPackage[]>([]);
   const [productModels, setProductModels] = useState<ProductModel[]>([]);
   const [loadFailure, setLoadFailure] = useState<string | null>(null);
-  // Phase 4: 로딩 플래그 — 메인 데이터(items/employees/packages) 첫 로딩 동안 true.
+  // Phase 4: 로딩 플래그 — 메인 데이터(items/employees) 첫 로딩 동안 true.
   // productModels 는 부수 데이터이므로 플래그에 포함하지 않는다.
   const [loading, setLoading] = useState(true);
 
@@ -73,6 +82,25 @@ export function useWarehouseData({ globalSearch, onStatusChange }: Args) {
     void Promise.all([
       api.getEmployees({ activeOnly: true }),
       api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
-# ... (이하 27줄 생략. 원본 참조)
+    ])
+      .then(([nextEmployees, nextItems]) => {
+        setEmployees(nextEmployees);
+        setItems(nextItems);
+        setLoadFailure(null);
+      })
+      .catch((nextError) => {
+        const msg = nextError instanceof Error ? nextError.message : "입출고 데이터를 불러오지 못했습니다.";
+        setLoadFailure(msg);
+        onStatusChange(msg);
+      })
+      .finally(() => setLoading(false));
+  }, [globalSearch, onStatusChange]);
 
-````
+  return {
+    employees,
+    items,
+    productModels,
+    loadFailure,
+    loading,
+    setItems,
+```

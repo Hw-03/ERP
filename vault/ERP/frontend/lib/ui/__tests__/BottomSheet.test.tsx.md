@@ -1,22 +1,39 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "frontend/lib/ui/__tests__/BottomSheet.test.tsx"
+importance: normal
 layer: frontend
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/lib/ui/__tests__/BottomSheet.test.tsx
-tags: [vault, code-note, auto-generated, stub]
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# BottomSheet.test.tsx
+# BottomSheet.test.tsx — BottomSheet.test.tsx 설명
 
-> [!info] 자동 생성된 stub 노트
-> 이 노트는 자동 보정으로 생성됐다. 원본 위치: [[erp/frontend/lib/ui/__tests__/BottomSheet.test.tsx]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄
+`BottomSheet.test.tsx`는 TypeScript/React 코드입니다. 프로젝트 구조 안에서 `frontend/lib/ui/__tests__/BottomSheet.test.tsx` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-```
+## 업무 흐름에서의 의미
+
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
+
+## 언제 보면 좋나
+
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
+
+## 중요한 내용
+
+자동으로 뽑을 수 있는 함수/클래스 목록은 적지만, 파일 위치와 확장자로 볼 때 위 역할을 맡습니다.
+
+## 연결되는 파일
+
+- [[ERP/frontend/lib/ui/__tests__/📁___tests__]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 핵심 발췌
+
+```tsx
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
@@ -47,4 +64,29 @@ describe("BottomSheet", () => {
       </BottomSheet>,
     );
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("Escape / 배경 탭 / 핸들 클릭 → onClose", () => {
+    const onClose = vi.fn();
+    render(
+      <BottomSheet open onClose={onClose} title="t">
+        <p>본문</p>
+      </BottomSheet>,
+    );
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(screen.getByRole("dialog"));
+    fireEvent.click(screen.getByLabelText("시트 닫기 핸들"));
+    expect(onClose).toHaveBeenCalledTimes(3);
+  });
+
+  it("핸들에서 임계 이상 끌어내리면 onClose", () => {
+    const onClose = vi.fn();
+    render(
+      <BottomSheet open onClose={onClose} title="t" dismissThresholdPx={96}>
+        <p>본문</p>
+      </BottomSheet>,
+    );
+    const sheet = getSheet();
+    fireEvent.touchStart(sheet, { touches: [{ clientY: 100 }] });
+    fireEvent.touchMove(sheet, { touches: [{ clientY: 320 }] }); // dy=220 > 96
 ```

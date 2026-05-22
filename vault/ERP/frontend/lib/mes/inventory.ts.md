@@ -1,22 +1,48 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "frontend/lib/mes/inventory.ts"
+importance: important
 layer: frontend
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/frontend/lib/mes/inventory.ts
-tags: [vault, code-note, auto-generated, stub]
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# inventory.ts
+# inventory.ts — inventory.ts 설명
 
-> [!info] 자동 생성된 stub 노트
-> 이 노트는 자동 보정으로 생성됐다. 원본 위치: [[erp/frontend/lib/mes/inventory.ts]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄
+`inventory.ts`는 MES 화면에서 반복해서 쓰는 표시 규칙, 색상, 포맷, 상태값을 정리한 공용 파일입니다.
 
-```
+## 업무 흐름에서의 의미
+
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
+
+## 언제 보면 좋나
+
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
+
+## 중요한 내용
+
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
+
+- `getStockState`
+- `LEGACY_FILE_TYPES`
+- `LEGACY_PARTS`
+- `StockState`
+
+## 연결되는 파일
+
+- [[ERP/frontend/lib/mes/📁_mes]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+공용 파일이라 여러 화면에 영향이 퍼질 수 있습니다. 변경 후 대시보드, 입출고, 내역, 관리자 화면을 같이 확인해야 합니다.
+
+## 핵심 발췌
+
+```ts
 /**
  * MES 재고 (Inventory) 유틸 — `@/lib/mes/inventory`.
  *
@@ -47,4 +73,14 @@ export function getStockState(quantity: number, minStock?: number | null): Stock
   }
   return { label: "정상", color: LEGACY_COLORS.green };
 }
+
+/**
+ * legacy 재고 필터 옵션 상수.
+ *   - LEGACY_FILE_TYPES — 자료 종류 필터 (현재 "전체" 단일)
+ *   - LEGACY_PARTS — 파트 (자재창고/조립출하/부서별 파트)
+ *
+ * UI 의 select / chip 옵션 메타. "전체" 는 필터 미적용 의미 (DB 값 아님).
+ */
+export const LEGACY_FILE_TYPES = ["전체"] as const;
+export const LEGACY_PARTS = ["전체", "자재창고", "조립출하", "고압파트", "진공파트", "튜닝파트"] as const;
 ```

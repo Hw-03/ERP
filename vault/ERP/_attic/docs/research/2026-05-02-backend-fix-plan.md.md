@@ -1,23 +1,54 @@
 ---
-type: code-note
+type: file-explanation
+source_path: "_attic/docs/research/2026-05-02-backend-fix-plan.md"
+importance: reference
+layer: archive
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
-layer: attic
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/_attic/docs/research/2026-05-02-backend-fix-plan.md
-tags: [vault, code-note, auto-generated, stub, mirror-fill]
 ---
 
-# 2026-05-02-backend-fix-plan.md
+# 2026-05-02-backend-fix-plan.md — 2026-05-02-backend-fix-plan.md 설명
 
-> [!info] 1:1 미러 stub
-> 탐색기에 보이는 폴더 구조를 vault 에 그대로 반영하기 위한 stub.
-> 원본: [[erp/_attic/docs/research/2026-05-02-backend-fix-plan.md]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄 (또는 메타)
+`2026-05-02-backend-fix-plan.md`는 현재 운영 코드가 아니라 과거 자료나 실험 결과를 보관한 참고 파일입니다.
 
-```
+## 업무 흐름에서의 의미
+
+과거 맥락을 이해하는 데 도움은 되지만, 현재 운영 기준으로 바로 사용하면 안 됩니다.
+
+## 언제 보면 좋나
+
+- 과거 자료의 의미를 확인할 때
+- 현재 코드와 비교할 참고 근거가 필요할 때
+
+## 중요한 내용
+
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
+
+- `백엔드 수정안 — 2026-05-02`
+- `MES-BE-001 — `update_item` + `process_type_code` 누락 버그`
+- `현상`
+- `원인`
+- `수정안`
+- `schemas.py — ItemUpdate에 추가`
+- `items.py — update_item 루프에 추가`
+- `검증 절차 (회사 PC)`
+- `실제 라우트: backend/app/routers/items.py 의 @router.put("/{item_id}")`
+- `→ 메서드는 PUT (PATCH 아님)`
+
+## 연결되는 파일
+
+- [[ERP/_attic/docs/research/📁_research]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+보관 자료입니다. 현재 코드처럼 믿고 수정하거나 실행하지 않습니다.
+
+## 핵심 발췌
+
+```md
 # 백엔드 수정안 — 2026-05-02
 
 > **작업 ID:** MES-BE-001~006
@@ -43,4 +74,34 @@ tags: [vault, code-note, auto-generated, stub, mirror-fill]
 ### 수정안
 
 ```python
+# schemas.py — ItemUpdate에 추가
+class ItemUpdate(BaseModel):
+    item_name: Optional[str] = None
+    spec: Optional[str] = None
+    unit: Optional[str] = None
+    barcode: Optional[str] = None
+    min_stock: Optional[int] = None
+    process_type_code: Optional[str] = None   # ← 추가
+    # ... 기존 필드 유지
+```
+
+```python
+# items.py — update_item 루프에 추가
+for field in (
+    "item_name", "spec", "unit", "barcode", "min_stock",
+    "process_type_code",   # ← 추가
+    # ... 기존 필드
+):
+    value = getattr(payload, field, None)
+    if value is not None:
+        setattr(item, field, value)
+```
+
+### 검증 절차 (회사 PC)
+
+```bash
+# 실제 라우트: backend/app/routers/items.py 의 @router.put("/{item_id}")
+# → 메서드는 PUT (PATCH 아님)
+
+# 1) 변경 전 baseline
 ```

@@ -1,43 +1,44 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "backend/seed_bom_complete.py"
+importance: normal
 layer: backend
-source_path: erp/backend/seed_bom_complete.py
-status: active
-updated: 2026-04-27
-source_sha: e5f9a61c661a
-tags:
-  - erp
-  - backend
-  - source-file
-  - py
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# seed_bom_complete.py
+# seed_bom_complete.py — seed_bom_complete.py 설명
 
-> [!summary] 역할
-> 원본 프로젝트의 `seed_bom_complete.py` 파일을 Obsidian에서 추적하기 위한 미러 노트다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`seed_bom_complete.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/seed_bom_complete.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-- Source: `backend/seed_bom_complete.py`
-- Layer: `backend`
-- Kind: `source-file`
-- Size: `6169` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
 
-- Parent hub: [[backend/backend|backend]]
-- Related: [[backend/backend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 실제 수정은 원본 파일에서 한다.
-- Vault 노트는 구조 파악과 인수인계를 돕는 설명 레이어다.
+## 중요한 내용
 
-## 원본 발췌
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-````python
+- `symbols_overlap`
+- `load_existing`
+- `add_bom`
+- `main`
+
+## 연결되는 파일
+
+- [[ERP/backend/📁_backend]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 핵심 발췌
+
+```python
 """BOM 완성 스크립트.
 
 기존 BOM(130개)은 유지하고, ?F 타입(AF, TF) 품목을 대응하는
@@ -60,7 +61,10 @@ from decimal import Decimal
 sys.path.insert(0, os.path.dirname(__file__))
 
 from app.database import SessionLocal
-from app.models import BOM, CategoryEnum, Item
+from app.models import BOM, Item
+
+
+R_TYPE_CODES = ["TR", "HR", "VR", "NR", "AR", "PR"]  # 원자재 R 시리즈 6종
 
 
 def symbols_overlap(s1: str | None, s2: str | None) -> bool:
@@ -73,6 +77,20 @@ def load_existing(db) -> set:
     rows = db.query(BOM.parent_item_id, BOM.child_item_id).all()
     return {(str(p), str(c)) for p, c in rows}
 
-# ... (이하 126줄 생략. 원본 참조)
 
-````
+def add_bom(db, existing: set, parent: Item, child: Item, qty: int) -> bool:
+    if parent.item_id == child.item_id:
+        return False
+    key = (str(parent.item_id), str(child.item_id))
+    if key in existing:
+        return False
+    db.add(BOM(
+        bom_id=uuid.uuid4(),
+        parent_item_id=parent.item_id,
+        child_item_id=child.item_id,
+        quantity=Decimal(str(qty)),
+        unit="EA",
+    ))
+    existing.add(key)
+    return True
+```

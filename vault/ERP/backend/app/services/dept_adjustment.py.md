@@ -1,175 +1,110 @@
 ---
+type: file-explanation
+source_path: "backend/app/services/dept_adjustment.py"
+importance: important
 layer: backend
-topic: service
-file: erp/backend/app/services/dept_adjustment.py
-risk: high
-tags:
-  - "#layer/backend"
-  - "#topic/service"
-  - "#risk/high"
-aliases:
-  - dept_adjustment service
-  - 부서 조정
-  - 불량 처리
----
-type: code-note
-status: active
-updated: 2026-05-21
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
 ---
 
-# 🔧 dept_adjustment.py — 부서 재고 조정 & 불량 처리
+# dept_adjustment.py — dept_adjustment.py 설명
 
-> [!summary]
-> 부서 PRODUCTION 재고끼리만 움직이는 생산·조립·분해·수량 보정 서비스. 창고 승인 불필요, 부서 정/부 결재 후 즉시 처리. 처리 순서는 **out → defective → in** (소비 먼저, 입고 마지막) 으로 고정된다.
+## 이 파일은 무엇을 책임지나
 
----
+`dept_adjustment.py`는 `dept_adjustment` 업무 규칙을 실제로 실행하는 Python 코드입니다. 라우터보다 안쪽에서 DB 조회와 변경을 담당합니다.
 
-## 1. 한 문장 목적
+## 업무 흐름에서의 의미
 
-생산(PRODUCE), 분해(DISASSEMBLE), 수량 보정(CORRECTION) 등 부서 내부 재고 조정을 원자적으로 처리하며 TransactionLog 를 남긴다.
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
 
----
+## 언제 보면 좋나
 
-## 2. 파일 위치 & 임포트 경로
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-```
-erp/backend/app/services/dept_adjustment.py
-from app.services import dept_adjustment as dept_adj_svc
-```
+## 중요한 내용
 
----
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-## 3. sub_type 분류
+- `AdjLine`
+- `_dept_for_item`
+- `_has_bom_children`
+- `_enrich`
+- `build_production_template`
+- `build_disassembly_template`
+- `expand_component`
+- `submit_adjustment`
+- `submit_defective_disassemble`
 
-| DeptAdjSubTypeEnum | 설명 | out 라인 | in 라인 |
-|---|---|---|---|
-| `production` | 생산/조립 | 구성품 차감 | 결과품 적재 |
-| `disassembly` | 분해/회수 | 완성품 차감 | 구성품 적재 |
-| `correction` | 수량 보정 | 과잉 분 차감 | 부족 분 적재 |
+## 연결되는 파일
 
----
+### 먼저 같이 볼 파일
+- [[ERP/backend/app/routers/dept_adjustment.py]] — `dept_adjustment.py`는 `dept_adjustment` 업무를 외부 API로 열어 주는 Python 코드입니다. 프론트 화면이 백엔드 기능을 호출할 때 이 파일의 URL을 거칩니다.
+- [[ERP/backend/app/models.py]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 파일입니다.
+- [[ERP/backend/app/schemas.py]] — 백엔드와 프론트엔드가 주고받는 데이터 모양을 정하는 파일입니다.
+- [[ERP/backend/app/database.py]] — `database.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/database.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-## 4. 결재 라우팅 (⚠️ 위험지대 3번)
+## 조심할 점
 
-> [!danger] 위험지대 3번 — 부서 결재 라우팅
-> `dept_adjustment` 는 **창고 승인 없음** 원칙이지만, `io.py` 의 `_submit_dept_only_approval` 경로를 통해 부서 정/부 결재가 붙는 경우가 있다.
-> - manual / adjust_in / adjust_out origin 라인 → `MANUAL_ADJUSTMENT` StockRequest → 부서 결재
-> - 결재자가 부서 정/부 또는 admin 이면 자가승인 → 즉시 실행
+서비스는 DB 변경을 포함할 수 있습니다. 같은 도메인의 라우터, 모델, 테스트를 함께 확인해야 합니다.
 
----
-
-## 5. 처리 순서
-
-```mermaid
-flowchart LR
-    A["submit_adjustment(lines)"] --> B["선락: item_id 정렬\n데드락 방지"]
-    B --> C["out 라인 처리\nconsume_from_department"]
-    C --> D["defective 라인 처리\nmark_defective"]
-    D --> E["in 라인 처리\nreceive_confirmed"]
-    E --> F["TransactionLog 생성\ndb.flush()"]
-    F --> G["log_ids 반환"]
-```
-
----
-
-## 6. TransactionType 매핑
+## 핵심 발췌
 
 ```python
-_TRANSACTION_TYPE_MAP = {
-    ("out", "production"):  TransactionTypeEnum.BACKFLUSH,
-    ("out", "disassembly"): TransactionTypeEnum.DISASSEMBLE,
-    ("out", "correction"):  TransactionTypeEnum.ADJUST,
-    ("in",  "production"):  TransactionTypeEnum.PRODUCE,
-    ("in",  "disassembly"): TransactionTypeEnum.RECEIVE,
-    ("in",  "correction"):  TransactionTypeEnum.ADJUST,
-    ("defective", "*"):     TransactionTypeEnum.MARK_DEFECTIVE,
-}
-```
+"""부서 재고 조정 서비스 — 생산/조립·분해/회수·수량 보정.
 
----
+처리 정책:
+- 부서 PRODUCTION 재고끼리만 움직임 (즉시 처리, 창고 승인 불필요).
+- 원자성: db.flush()만 사용, commit은 라우터에서. ValueError 발생 시 라우터가 rollback.
+"""
 
-## 7. 핵심 코드 발췌
+from __future__ import annotations
 
-```python
-def submit_adjustment(db, sub_type, lines, *, operator_name=None, ...):
-    """out → defective → in 순서 보장 (소비 먼저)."""
-    if not _is_sqlite:
-        inventory_svc.lock_inventories(db, sorted({ln.item_id for ln in lines}))
+import uuid
+from dataclasses import dataclass, field
+from decimal import Decimal
+from typing import Literal, Optional
 
-    ordered = (
-        [ln for ln in lines if ln.direction == "out"]
-        + [ln for ln in lines if ln.direction == "defective"]
-        + [ln for ln in lines if ln.direction == "in"]
-    )
-    for ln in ordered:
-        if ln.direction == "out":
-            inv = inventory_svc.consume_from_department(db, ln.item_id, qty, dept)
-        elif ln.direction == "in":
-            inv = inventory_svc.receive_confirmed(db, ln.item_id, qty,
-                                                   bucket="production", dept=dept)
-        elif ln.direction == "defective":
-            inv = inventory_svc.mark_defective(db, ln.item_id, qty,
-                                                source="production",
-                                                source_dept=dept, target_dept=dept)
-        # TransactionLog 생성
-        db.add(TransactionLog(...))
-        db.flush()
-```
+from sqlalchemy.orm import Session
 
----
+from app.models import (
+    BOM,
+    DepartmentEnum,
+    DeptAdjSubTypeEnum,
+    Inventory,
+    Item,
+    LocationStatusEnum,
+    TransactionLog,
+    TransactionTypeEnum,
+)
+from app.database import _is_sqlite
+from app.services import inventory as inventory_svc
 
-## 8. BOM 템플릿 빌더
+AdjDirection = Literal["in", "out", "defective"]
 
-| 함수 | 목적 |
-|------|------|
-| `build_production_template(db, item_id, qty)` | 생산: BOM 구성품 out + 결과품 in 라인 |
-| `build_disassembly_template(db, item_id, qty)` | 분해: 완성품 out + BOM 구성품 in 라인 |
-| `expand_component(db, item_id, qty, dept, dir)` | 중간공정품 1단계 선택 전개 |
 
-```python
-def build_production_template(db, item_id, qty, *, base_dept=None):
-    """생산 초기 라인 세트:
-    BOM 직계 구성품 → direction="out"
-    결과품 → direction="in" (마지막 라인)
-    """
-```
-
----
-
-## 9. AdjLine 데이터 구조
-
-```python
 @dataclass
 class AdjLine:
     item_id: uuid.UUID
-    direction: Literal["in", "out", "defective"]
+    direction: AdjDirection
     quantity: Decimal
     department: DepartmentEnum
-    reason: Optional[str]
-    bom_expected: Optional[Decimal]   # BOM 기대값 (차이 분석용)
-    has_children: bool
-    item_name: str
-    item_code: Optional[str]
-    process_type_code: Optional[str]
-    unit: str
+    reason: Optional[str] = None
+    bom_expected: Optional[Decimal] = None
+    has_children: bool = False
+    item_name: str = ""
+    item_code: Optional[str] = None
+    process_type_code: Optional[str] = None
+    unit: str = "EA"
+
+
+def _dept_for_item(item: Item) -> DepartmentEnum:
+    """품목의 process_type_code로 기본 부서 결정. None이면 조립 폴백."""
+    dept = inventory_svc.dept_for_process_type(item.process_type_code)
+    return dept if dept is not None else DepartmentEnum.ASSEMBLY
+
+
+def _has_bom_children(db: Session, item_id: uuid.UUID) -> bool:
+    return db.query(BOM).filter(BOM.parent_item_id == item_id).limit(1).first() is not None
 ```
-
----
-
-## 10. 의존 관계
-
-```
-dept_adjustment.py
-  ← models (BOM, TransactionLog, DeptAdjSubTypeEnum, ...)
-  ← services/inventory (consume_from_department, receive_confirmed, mark_defective, lock_inventories)
-  호출자: dept_adjustment 라우터
-```
-
----
-
-## 11. 관련 노트 링크
-
-- [[inventory.py]] — 실제 재고 변경 함수
-- [[bom.py]] — BOM 전개 (direct_children 사용)
-- [[models.py]] — DeptAdjSubTypeEnum, TransactionTypeEnum

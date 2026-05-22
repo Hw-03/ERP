@@ -1,174 +1,111 @@
 ---
+type: file-explanation
+source_path: "backend/app/services/audit_csv.py"
+importance: important
 layer: backend
-topic: service
-file: erp/backend/app/services/audit_csv.py
-tags:
-  - "#layer/backend"
-  - "#topic/service"
-aliases:
-  - audit_csv service
-  - CSV 내보내기
----
-type: code-note
-status: active
-updated: 2026-05-21
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
 ---
 
-# 📊 audit_csv.py — CSV/XLSX 외부 감사 미러
+# audit_csv.py — audit_csv.py 설명
 
-> [!summary]
-> `TransactionLog` DB 레코드를 월별 CSV 파일로 자동 미러링하는 서비스. SQLAlchemy 세션 이벤트(after_flush / after_commit / after_rollback)에 후크를 걸어 commit 완료된 거래만 파일에 append 한다. 파일 IO 실패는 거래 자체를 막지 않는다.
+## 이 파일은 무엇을 책임지나
 
----
+`audit_csv.py`는 `audit_csv` 업무 규칙을 실제로 실행하는 Python 코드입니다. 라우터보다 안쪽에서 DB 조회와 변경을 담당합니다.
 
-## 1. 한 문장 목적
+## 업무 흐름에서의 의미
 
-외부 심사 대응을 위해 자재 이동 거래를 월별 CSV 파일로 자동 저장하고, 누락분을 backfill 하는 도구를 제공한다.
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
 
----
+## 언제 보면 좋나
 
-## 2. 파일 위치 & 임포트 경로
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-```
-erp/backend/app/services/audit_csv.py
-from app.services import audit_csv as audit_csv_svc
-```
+## 중요한 내용
 
----
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-## 3. 포함 거래 유형 (AUDIT_TX_TYPES)
+- `get_csv_dir`
+- `path_for_month`
+- `_fmt_num`
+- `row_from_log`
+- `_append_rows`
+- `_append_logs`
+- `list_available_months`
+- `backfill_all`
+- `_collect_after_flush`
+- `_emit_after_commit`
+- 그 외 2개 항목
+
+## 연결되는 파일
+
+### 먼저 같이 볼 파일
+- [[ERP/backend/app/models.py]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 파일입니다.
+- [[ERP/backend/app/schemas.py]] — 백엔드와 프론트엔드가 주고받는 데이터 모양을 정하는 파일입니다.
+- [[ERP/backend/app/database.py]] — `database.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/database.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
+
+## 조심할 점
+
+서비스는 DB 변경을 포함할 수 있습니다. 같은 도메인의 라우터, 모델, 테스트를 함께 확인해야 합니다.
+
+## 핵심 발췌
 
 ```python
-AUDIT_TX_TYPES = frozenset({
-    TransactionTypeEnum.RECEIVE,         # 입고
-    TransactionTypeEnum.SHIP,            # 출고
-    TransactionTypeEnum.TRANSFER_TO_PROD,# 창고→생산 이동
-    TransactionTypeEnum.TRANSFER_TO_WH,  # 생산→창고 이동
-    TransactionTypeEnum.TRANSFER_DEPT,   # 부서간 이동
-    TransactionTypeEnum.ADJUST,          # 수량 조정
-    TransactionTypeEnum.SUPPLIER_RETURN, # 공급사 반품
-    TransactionTypeEnum.MARK_DEFECTIVE,  # 불량 처리
-    TransactionTypeEnum.DISASSEMBLE,     # 분해
+"""외부 심사 대응용 입출고 CSV 미러.
+
+DB 의 `TransactionLog` 가 source-of-truth 이고, 이 모듈은 그 미러를 디스크에 떨군다.
+- 자재 이동 거래(RECEIVE/SHIP/TRANSFER_*/ADJUST/SUPPLIER_RETURN/
+  MARK_DEFECTIVE/DISASSEMBLE) 만 기록한다. 생산 내부 소비(PRODUCE/BACKFLUSH)는 제외.
+- 월별 CSV (`inout_YYYY-MM.csv`) 에 거래 1건 = 1줄로 append.
+- `created_at` 기준으로 파일이 결정되므로 월말 자정 경계도 자연스럽게 분기된다.
+- 트랜잭션이 commit 된 직후에만 append (롤백된 거래는 남지 않는다). 파일 IO 실패는
+  거래 자체를 막지 않으며, 누락분은 `scripts/dev/backfill_audit_csv.py` 가 메운다.
+"""
+
+from __future__ import annotations
+
+import csv
+import logging
+import os
+import threading
+from collections import defaultdict
+from datetime import datetime
+from pathlib import Path
+from typing import Iterable
+
+from sqlalchemy import event
+from sqlalchemy.orm import Session
+
+from app.database import BACKEND_DIR, SessionLocal
+from app.models import Item, TransactionLog, TransactionTypeEnum
+
+_log = logging.getLogger(__name__)
+
+
+# 외부 로그에 포함할 거래 유형 — 자재 이동만.
+AUDIT_TX_TYPES: frozenset[TransactionTypeEnum] = frozenset({
+    TransactionTypeEnum.RECEIVE,
+    TransactionTypeEnum.SHIP,
+    TransactionTypeEnum.TRANSFER_TO_PROD,
+    TransactionTypeEnum.TRANSFER_TO_WH,
+    TransactionTypeEnum.TRANSFER_DEPT,
+    TransactionTypeEnum.ADJUST,
+    TransactionTypeEnum.SUPPLIER_RETURN,
+    TransactionTypeEnum.MARK_DEFECTIVE,
+    TransactionTypeEnum.DISASSEMBLE,
 })
-# PRODUCE, BACKFLUSH 는 생산 내부 소비 → 제외
+
+
+# 한글 라벨 — 본 모듈이 외부 제출용 단일 진실. 라우터의 `_TX_OP` 와 표현이 달라질
+# 수 있으므로 의존하지 않고 자체 정의한다.
+TX_TYPE_LABEL_KO: dict[str, str] = {
+    "RECEIVE": "입고",
+    "SHIP": "출고",
+    "TRANSFER_TO_PROD": "창고→생산 이동",
+    "TRANSFER_TO_WH": "생산→창고 이동",
+    "TRANSFER_DEPT": "부서간 이동",
+    "ADJUST": "수량 조정",
+    "SUPPLIER_RETURN": "공급사 반품",
 ```
-
----
-
-## 4. 이벤트 후크 흐름
-
-```mermaid
-sequenceDiagram
-    라우터->>DB: flush (TransactionLog 추가)
-    DB-->>_collect_after_flush: 후크 발동
-    _collect_after_flush->>_pending_log_ids: log_id 저장
-    라우터->>DB: commit
-    DB-->>_emit_after_commit: 후크 발동
-    _emit_after_commit->>새세션: log_id IN 조회
-    새세션->>CSV파일: append (월별 파일)
-    Note over DB: rollback 시
-    DB-->>_discard_on_rollback: 후크 발동
-    _discard_on_rollback->>_pending_log_ids: 후보 제거
-```
-
----
-
-## 5. 파일 경로 규칙
-
-```
-backend/data/audit_csv/inout_YYYY-MM.csv
-예: inout_2026-05.csv
-```
-
-`AUDIT_CSV_DIR` 환경 변수로 경로 override 가능. `created_at` 기준으로 월별 파일이 결정된다.
-
----
-
-## 6. CSV 컬럼 (11개)
-
-| 번호 | 컬럼명 | 내용 |
-|------|--------|------|
-| 1 | 일시 | YYYY-MM-DD HH:MM:SS |
-| 2 | 거래유형 | 한글 라벨 (예: 입고, 출고) |
-| 3 | 품목코드 | Item.item_code |
-| 4 | 품목명 | Item.item_name |
-| 5 | 수량 | quantity_change |
-| 6 | 변경전 재고 | quantity_before |
-| 7 | 변경후 재고 | quantity_after |
-| 8 | 참조번호 | reference_no |
-| 9 | 처리자 | produced_by |
-| 10 | 비고 | notes (개행 → 공백) |
-| 11 | 거래ID | log_id |
-
----
-
-## 7. 핵심 코드 발췌
-
-```python
-def register_session_listeners(sessionmaker=None) -> None:
-    """app 시작 시 1회 호출. after_flush / after_commit / after_rollback 후크 등록."""
-    target = sessionmaker if sessionmaker is not None else SessionLocal
-    if id(target) in _listeners_registered:
-        return
-    event.listen(target, "after_flush", _collect_after_flush)
-    event.listen(target, "after_commit", _emit_after_commit)
-    event.listen(target, "after_rollback", _discard_on_rollback)
-
-
-def _emit_after_commit(session: Session) -> None:
-    """commit 성공 후 별도 세션으로 log_id 재조회 → CSV append."""
-    log_ids = _pending_log_ids.pop(id(session), None)
-    if not log_ids:
-        return
-    db = _Session(bind=session.get_bind())
-    try:
-        logs = db.query(TransactionLog).filter(TransactionLog.log_id.in_(log_ids)).all()
-        _append_logs(logs, items_by_id)
-    except Exception:
-        _log.exception("audit_csv after_commit 처리 실패 log_ids=%s", log_ids)
-    finally:
-        db.close()
-```
-
----
-
-## 8. Backfill (누락 복구)
-
-```python
-def backfill_all(db, *, overwrite=True) -> dict:
-    """DB 의 모든 자재 이동 거래를 월별 CSV 로 재작성한다 (idempotent).
-    overwrite=True 면 기존 파일 삭제 후 재생성.
-    """
-```
-
-`scripts/dev/backfill_audit_csv.py` 에서도 동일 함수를 호출한다.
-
----
-
-## 9. 운영 주의사항
-
-> [!warning]
-> 1. 파일 IO 실패는 거래를 막지 않는다. 누락된 기록은 `backfill_all` 로 복구한다.
-> 2. `_file_lock` (threading.Lock) 으로 동시 append 를 직렬화한다. 고빈도 트랜잭션 환경에서 병목이 될 수 있다.
-> 3. `register_session_listeners()` 는 `main.py` 에서 앱 기동 시 1회 호출한다. 중복 등록 방지 로직이 있다.
-
----
-
-## 10. 의존 관계
-
-```
-audit_csv.py
-  ← models (TransactionLog, TransactionTypeEnum, Item)
-  ← database (SessionLocal, BACKEND_DIR)
-  ← sqlalchemy.event (after_flush, after_commit, after_rollback)
-  호출자: main.py (register_session_listeners), admin_audit_csv 라우터 (backfill, list_months)
-```
-
----
-
-## 11. 관련 노트 링크
-
-- [[audit.py]] — 마스터 변경 감사 (다른 종류)
-- [[main.py]] — `register_session_listeners()` 호출 지점
-- [[models.py]] — TransactionLog ORM

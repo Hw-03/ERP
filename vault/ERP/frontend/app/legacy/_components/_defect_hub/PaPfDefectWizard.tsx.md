@@ -1,96 +1,101 @@
-# PaPfDefectWizard.tsx
+---
+type: file-explanation
+source_path: "frontend/app/legacy/_components/_defect_hub/PaPfDefectWizard.tsx"
+importance: important
+layer: frontend
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
+---
 
-## 이 파일은 뭐예요?
+# PaPfDefectWizard.tsx — PaPfDefectWizard.tsx 설명
 
-PA(완제품) / PF(반제품) 타입 격리 품목 처리 위자드. BOM 분해가 가능한 품목이므로
-단순 폐기/반품 외에 자식 부품별로 처리 방식을 결정하는 "분해" 옵션이 추가된다.
-`DefectHubPanel`이 `item_code` 두 번째 segment가 `PA` 또는 `PF`일 때 이 컴포넌트를 열어준다.
+## 이 파일은 무엇을 책임지나
 
-## 언제 보나요?
+`PaPfDefectWizard.tsx`는 불량 격리, 폐기, 반품, 분해 같은 불량 처리 화면의 일부입니다.
 
-- PA/PF 품목 [처리] 모달의 UI나 로직을 수정할 때
-- BOM 분해 트리(`DisassembleTree`)와 연동 방식을 파악할 때
-- `defect_disassemble` / `defect_scrap` 결재 요청 생성 방식을 바꿀 때
-- 정상 복귀(`unquarantine`) 흐름을 수정할 때
+## 업무 흐름에서의 의미
+
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
+
+## 언제 보면 좋나
+
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
 ## 중요한 내용
 
-### Props
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-```ts
-interface PaPfDefectWizardProps {
-  open: boolean;
-  onClose: () => void;
-  location: DefectLocation;         // 처리할 격리 항목
-  currentEmployee: { employee_id: string; name: string; department: string };
-  onSubmitted: () => void;
-}
-```
-
-### 처리 방식 3가지
-
-| `action` | 레이블 | API |
-|---|---|---|
-| `unquarantine` | 정상 복귀 (잘못 격리) | `defectsApi.unquarantine()` — 즉시, 결재 불필요 |
-| `scrap` | 전부 폐기 (BOM 통째) | `stockRequestsApi.createStockRequest({ request_type: "defect_scrap" })` — 결재 필요 |
-| `disassemble` | 분해 + 자식 처리 | `stockRequestsApi.createStockRequest({ request_type: "defect_disassemble" })` — 결재 필요 |
-
-### 단계별 흐름
-
-1. 처리 방식 라디오 버튼 선택 (`unquarantine` / `scrap` / `disassemble`)
-2. `disassemble` 선택 시 → `DisassembleTree` 표시 — 자식 품목별 처리(`ChildDecision[]`) 결정
-3. 본인 사유 입력 (`ReasonFormFields`)
-4. 제출 — `action`에 따라 API 분기
-
-### 주요 상태
-
-| 상태 | 설명 |
-|---|---|
-| `action` | 선택된 처리 방식 (기본값: `"disassemble"`) |
-| `decisions` | BOM 자식 트리 결정 목록 (`ChildDecision[]`) |
-| `category` / `memo` | 사유 카테고리 / 메모 |
-| `busy` / `errorMsg` | 제출 중 / 에러 |
-
-**제출 조건 (`canSubmit`):** `category` 비어있지 않음 + `busy` 아님.
-
-**disassemble 제출 시** `decisions`를 JSON으로 직렬화하여 `notes` 필드에 포함:
-```ts
-notes: JSON.stringify({ child_decisions: childDecisions })
-```
+- `PaPfDefectWizard`
+- `ChildDecision`
+- `DisposalAction`
+- `PaPfDefectWizardProps`
 
 ## 연결되는 파일
 
-### 먼저 볼 파일
-- [[ERP/frontend/lib/api/defects.ts]] — `defectsApi.unquarantine()` (정상 복귀)
-- [[ERP/frontend/lib/api/stock-requests.ts]] — `stockRequestsApi.createStockRequest()` (scrap/disassemble 결재)
-- [[ERP/frontend/app/legacy/_components/_defect_hub/DisassembleTree.tsx]] — BOM 자식 처리 결정 트리 UI
+- [[ERP/frontend/app/legacy/_components/_defect_hub/📁__defect_hub]] — 이 파일이 속한 폴더의 안내판입니다.
 
-> [!info]- 더 연결된 파일
-> - [[ERP/frontend/lib/api/types/defects.ts]] — `DefectLocation`, `UnquarantinePayload`
-> - [[ERP/frontend/app/legacy/_components/_defect_hub/ReasonFormFields.tsx]] — 사유 공통 폼
-> - [[ERP/frontend/app/legacy/_components/_defect_hub/DefectHubPanel.tsx]] — 이 위자드를 여는 부모
+## 조심할 점
+
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
 
 ## 핵심 발췌
 
 ```tsx
-// action별 API 분기
-if (action === "unquarantine") {
-  await defectsApi.unquarantine({ item_id, qty, dept, reason_category, reason_memo, actor_employee_id });
-} else if (action === "scrap") {
-  await stockRequestsApi.createStockRequest({
-    requester_employee_id: currentEmployee.employee_id,
-    request_type: "defect_scrap",
-    notes: memo || null,
-    lines: [{ item_id: location.item_id, quantity: location.quantity,
-               from_bucket: "defective", from_department: location.department, to_bucket: "none" }],
-  });
-} else {
-  // disassemble
-  await stockRequestsApi.createStockRequest({
-    request_type: "defect_disassemble",
-    notes: JSON.stringify({ child_decisions: childDecisions }),
-    lines: [{ item_id: location.item_id, quantity: location.quantity,
-               from_bucket: "defective", from_department: location.department, to_bucket: "none" }],
-  });
+"use client";
+
+import { useEffect, useId, useState } from "react";
+import { createPortal } from "react-dom";
+import { AlertTriangle } from "lucide-react";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { defectsApi } from "@/lib/api/defects";
+import { stockRequestsApi } from "@/lib/api/stock-requests";
+import type { DefectLocation } from "@/lib/api/types/defects";
+import type { Department } from "@/lib/api/types/shared";
+import { DisassembleTree, type ChildDecision } from "./DisassembleTree";
+import { ReasonFormFields } from "./ReasonFormFields";
+
+type DisposalAction = "unquarantine" | "scrap" | "disassemble";
+
+interface PaPfDefectWizardProps {
+  open: boolean;
+  onClose: () => void;
+  location: DefectLocation;
+  currentEmployee: { employee_id: string; name: string; department: string };
+  onSubmitted: () => void;
 }
+
+export function PaPfDefectWizard({
+  open,
+  onClose,
+  location,
+  currentEmployee,
+  onSubmitted,
+}: PaPfDefectWizardProps) {
+  const titleId = useId();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const [action, setAction] = useState<DisposalAction>("disassemble");
+  const [decisions, setDecisions] = useState<ChildDecision[]>([]);
+  const [category, setCategory] = useState("");
+  const [memo, setMemo] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // ESC 닫기
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (!busy && e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, busy, onClose]);
+
+  // action 변경 시 decisions 초기화
+  useEffect(() => {
 ```

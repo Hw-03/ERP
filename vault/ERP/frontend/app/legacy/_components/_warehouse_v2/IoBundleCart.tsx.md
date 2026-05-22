@@ -1,92 +1,92 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "frontend/app/legacy/_components/_warehouse_v2/IoBundleCart.tsx"
+importance: important
 layer: frontend
-source_path: erp/frontend/app/legacy/_components/_warehouse_v2/IoBundleCart.tsx
-status: active
-updated: 2026-05-21
-tags:
-  - layer/frontend
-  - topic/warehouse-v2
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# IoBundleCart.tsx
+# IoBundleCart.tsx — IoBundleCart.tsx 설명
 
-> [!summary] 역할
-> **입출고 마법사 Step 4 — 선택한 품목 카트 컨테이너.** 복수의 `IoBundleCard`를 렬거하고 전체 요약(반영 라인 수·총 수량)과 "제출확인 →" 버튼을 제공한다.
+## 이 파일은 무엇을 책임지나
 
----
+`IoBundleCart.tsx`는 입출고 요청 작성, 작업중 목록, 내 요청, 창고 승인함 같은 창고 업무 화면의 일부입니다.
 
-## 1. 위치
+## 업무 흐름에서의 의미
 
-```
-erp/frontend/app/legacy/_components/_warehouse_v2/IoBundleCart.tsx
-```
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-**부모**: `IoComposeView.tsx` (Step 4 WizardStepCard 내부)  
-**자식**: `IoBundleCard.tsx` (묶음 카드 한 개)
+## 언제 보면 좋나
 
----
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-## 2. 역할 한 줄 요약
+## 중요한 내용
 
-여러 개의 `IoBundle`을 카드 목록으로 렌더링하는 얇은 컨테이너. 실제 각 라인의 수량 편집 UI는 `IoBundleCard` → `IoLineRow`에 위임한다.
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
----
+- `IoBundleCart`
+- `Props`
 
-## 3. Props
+## 연결되는 파일
 
-| prop | 타입 | 설명 |
-|---|---|---|
-| `bundles` | `IoBundle[]` | 현재 선택된 묶음 목록 |
-| `subType` | `IoSubType` | 세부 작업 유형 |
-| `itemMap` | `Map<string, Item>` | `item_id → Item` 매핑 (재고 조회용) |
-| `getAvailable` | `(line) => number \| null` | 라인별 가용 재고 계산 함수 |
-| `onToggleLine` | `(bundleId, lineId) => void` | 라인 체크 토글 |
-| `onQuantityChange` | `(bundleId, lineId, qty, shortage) => void` | 라인 수량 변경 |
-| `onBundleQuantityChange` | `(bundleId, qty) => void \| undefined` | 묶음 기준 수량 변경 |
-| `onRemoveLine` | `(bundleId, lineId) => void` | 라인 삭제 |
-| `onRemoveBundle` | `(bundleId) => void` | 묶음 전체 삭제 |
-| `onAdvance` | `() => void` | "제출확인 →" 버튼 |
-| `canAdvance` | `boolean` | 다음 단계 가능 여부 |
+### 먼저 같이 볼 파일
+- [[ERP/frontend/app/legacy/_components/DesktopWarehouseView.tsx]] — `DesktopWarehouseView.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+- [[ERP/frontend/lib/api/stock-requests.ts]] — `stock-requests.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
+- [[ERP/backend/app/routers/stock_requests.py]] — 프론트의 입출고 요청 작성, 내 요청, 창고 승인함이 호출하는 API 입구입니다.
+- [[ERP/backend/app/services/stock_requests.py]] — 현장 담당자가 요청을 제출하고 창고가 승인/반려/취소하는 흐름을 처리하는 서비스입니다.
 
----
+## 조심할 점
 
-## 4. 구조
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
 
-```mermaid
-flowchart TD
-    Cart[IoBundleCart] --> Summary["요약 바\n반영 라인 N개 · 총 수량 X"]
-    Cart --> BundleCards["bundles.map()\nIoBundleCard x N"]
-    Cart --> AdvBtn["제출확인 → 버튼\n(canAdvance가 false면 비활성)"]
-    BundleCards --> LineRows["IoLineRow x M\n(각 묶음 내 라인)"]
-```
-
----
-
-## 5. 요약 계산
+## 핵심 발췌
 
 ```tsx
-const includedCount = bundles
-  .flatMap((bundle) => bundle.lines)
-  .filter((line) => line.included).length;
+"use client";
 
-const totalQty = bundles
-  .flatMap((bundle) => bundle.lines)
-  .filter((line) => line.included)
-  .reduce((acc, line) => acc + (Number.isFinite(line.quantity) ? line.quantity : 0), 0);
-```
+import { ClipboardCheck } from "lucide-react";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
+import { EmptyState } from "../common";
+import type { IoBundle, IoLine, IoSubType, Item } from "./types";
+import { IoBundleCard } from "./IoBundleCard";
+import { formatQty } from "@/lib/mes/format";
 
-요약 바에 "반영 라인 N개 · 총 수량 X"를 표시. 체크 해제된 라인은 합산에서 제외.
+interface Props {
+  bundles: IoBundle[];
+  subType: IoSubType;
+  itemMap: Map<string, Item>;
+  getAvailable: (line: IoLine) => number | null;
+  onToggleLine: (bundleId: string, lineId: string) => void;
+  onQuantityChange: (bundleId: string, lineId: string, quantity: number, shortage: number) => void;
+  onBundleQuantityChange?: (bundleId: string, quantity: number) => void;
+  onRemoveLine: (bundleId: string, lineId: string) => void;
+  onRemoveBundle: (bundleId: string) => void;
+  onAdvance: () => void;
+  canAdvance: boolean;
+}
 
----
-
-## 6. 코드 발췌 — 전체 구조
-
-```tsx
-export function IoBundleCart({ bundles, subType, itemMap, getAvailable,
-  onToggleLine, onQuantityChange, onBundleQuantityChange,
-  onRemoveLine, onRemoveBundle, onAdvance, canAdvance }: Props) {
+export function IoBundleCart({
+  bundles,
+  subType,
+  itemMap,
+  getAvailable,
+  onToggleLine,
+  onQuantityChange,
+  onBundleQuantityChange,
+  onRemoveLine,
+  onRemoveBundle,
+  onAdvance,
+  canAdvance,
+}: Props) {
+  const includedCount = bundles.flatMap((bundle) => bundle.lines).filter((line) => line.included).length;
+  const totalQty = bundles
+    .flatMap((bundle) => bundle.lines)
+    .filter((line) => line.included)
+    .reduce((acc, line) => acc + (Number.isFinite(line.quantity) ? line.quantity : 0), 0);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
@@ -94,67 +94,10 @@ export function IoBundleCart({ bundles, subType, itemMap, getAvailable,
         체크된 품목만 재고에 반영됩니다. 체크를 해제하면 이번 작업에서 제외됩니다.
       </p>
 
-      {/* 요약 바 */}
       {bundles.length > 0 && (
-        <div className="flex items-center justify-between rounded-[14px] border px-4 py-2.5"
-          style={{ background: tint(LEGACY_COLORS.blue, 6), borderColor: tint(LEGACY_COLORS.blue, 24) }}>
-          <span>반영 라인 {includedCount}개 · 총 수량</span>
-          <span className="text-2xl font-black tabular-nums">{formatQty(totalQty)}</span>
-        </div>
-      )}
-
-      {/* 묶음 카드 목록 */}
-      {bundles.length === 0 ? (
-        <EmptyState title="아직 선택된 품목이 없습니다." ... />
-      ) : (
-        <div className="space-y-3">
-          {bundles.map((bundle) => (
-            <IoBundleCard key={bundle.bundle_id} bundle={bundle} subType={subType}
-              itemMap={itemMap} getAvailable={getAvailable}
-              onToggleLine={(lineId) => onToggleLine(bundle.bundle_id, lineId)}
-              onQuantityChange={(lineId, qty, shortage) =>
-                onQuantityChange(bundle.bundle_id, lineId, qty, shortage)}
-              onBundleQuantityChange={
-                onBundleQuantityChange
-                  ? (qty) => onBundleQuantityChange(bundle.bundle_id, qty)
-                  : undefined}
-              onRemoveLine={(lineId) => onRemoveLine(bundle.bundle_id, lineId)}
-# ... (이하 17줄 생략. 원본 참조)
-
+        <div
+          className="flex items-center justify-between rounded-[14px] border px-4 py-2.5"
+          style={{
+            background: tint(LEGACY_COLORS.blue, 6),
+            borderColor: tint(LEGACY_COLORS.blue, 24),
 ```
-
----
-
-## 7. `canAdvance` 조건 (부모에서 계산)
-
-`useIoWorkState`의 `canAdvance[4]`가 `false`이면 버튼 비활성. 조건:
-- `bundles.length > 0`
-- 포함된 라인이 1개 이상
-- `hasShortage === false` (재고 부족 없음)
-- `hasInvalidQuantity === false` (0 이하 수량 없음)
-
----
-
-## 8. 빈 상태
-
-카트에 아무것도 없으면 `EmptyState` 컴포넌트 표시:
-- 제목: "아직 선택된 품목이 없습니다."
-- 설명: "이전 단계에서 대상을 다시 선택하세요."
-
----
-
-## 9. 연결 관계
-
-- **부모**: `erp/frontend/app/legacy/_components/_warehouse_v2/IoComposeView.tsx`
-- **자식**: `erp/frontend/app/legacy/_components/_warehouse_v2/IoBundleCard.tsx`
-- **BOM 동기화**: `erp/frontend/app/legacy/_components/_warehouse_v2/bomSync.ts` (부모에서 호출되어 bundles 갱신 후 전달)
-- **타입**: `erp/frontend/app/legacy/_components/_warehouse_v2/types.ts` (`IoBundle`, `IoLine`)
-
----
-
-## 10. 참고 맥락
-
-> [!note] 참고
-> `IoBundleCart`는 장바구니 화면이다. 각 `IoBundle`은 "하나의 작업 묶음"인데, BOM 묶음이면 상위 품목 1개 + 하위 자재 여러 개가 한 묶음이다.
->
-> 이 컴포넌트 자체는 매우 간단하다. 실제 복잡한 로직(수량 변경 시 BOM 비례 재계산)은 `bomSync.ts`에 있고, 부모(`IoComposeView`)가 `setBundles`에서 호출한다. 이 컴포넌트는 그 결과를 받아서 보여줄 뿐이다.

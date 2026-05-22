@@ -1,149 +1,106 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "backend/app/routers/models.py"
+importance: important
 layer: backend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/backend/app/routers/models.py
-tags: [vault, code-note, backend, router, layer/backend, topic/router, topic/제품모델]
-aliases:
-  - 제품모델 라우터
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# 📦 models.py — 제품 모델 슬롯 CRUD
+# models.py — models.py 설명
 
-> [!summary] 역할
-> `ProductSymbol` 테이블 기반 제품 모델(슬롯)의 목록 조회·신규 등록·삭제를 담당하는 라우터.
-> `codes.py`의 슬롯 수정과 달리, 모델 단위로 CRUD를 제공하며 슬롯 자동 배정과 기호(symbol) 자동 생성을 지원한다.
+## 이 파일은 무엇을 책임지나
 
-## 1. 이 파일의 역할
+`models.py`는 `models` 업무를 외부 API로 열어 주는 Python 코드입니다. 프론트 화면이 백엔드 기능을 호출할 때 이 파일의 URL을 거칩니다.
 
-제품 모델(`ProductSymbol` 중 `is_reserved=False` 인 실제 모델)을 관리합니다.
-`codes.py`가 슬롯의 세부 속성을 변경하는 관리자 도구라면, `models.py`는 "새 모델 추가/삭제"라는
-더 단순한 UI 동선을 위한 라우터입니다.
-슬롯 번호는 1~100 중 비어 있는 가장 작은 값을 자동으로 배정합니다.
+## 업무 흐름에서의 의미
 
-## 2. 실제 원본 위치
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
 
-- **원본**: `erp/backend/app/routers/models.py` ([[erp/backend/app/routers/models.py]])
-- vault 노트는 분석 지도일 뿐, 수정은 원본에서만.
+## 언제 보면 좋나
 
-## 3. import 로 가져오는 것
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-| 모듈 | 역할 |
-|---|---|
-| `app.models` | `ProductSymbol`, `ItemModel` |
-| `app.routers._errors` | `ErrorCode`, `http_error` |
-| `app.services._tx` | `commit_and_refresh`, `commit_only` |
-| `pydantic.BaseModel` | 로컬 스키마 `ProductModelResponse`, `ProductModelCreate` 정의 |
+## 중요한 내용
 
-> [!info] 로컬 스키마
-> 이 파일은 `app.schemas` 를 import하지 않고 파일 내부에 `ProductModelResponse`, `ProductModelCreate`를 직접 정의한다. 규모가 작아 별도 분리 없이 인라인으로 처리한 패턴.
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-## 4. export / 외부에 제공하는 것
+- `ProductModelResponse`
+- `ProductModelCreate`
+- `list_models`
+- `create_model`
+- `delete_model`
+- `API GET ""`
+- `API POST ""`
+- `API DELETE "/{slot}"`
 
-- **prefix**: `/api/models`
+## 연결되는 파일
 
-| 메서드 | 경로 | 설명 |
-|---|---|---|
-| `GET` | `/api/models` | 제품 모델 목록 (is_reserved=False 만) |
-| `POST` | `/api/models` | 새 모델 등록 (슬롯·기호 자동 배정) |
-| `DELETE` | `/api/models/{slot}` | 모델 삭제 (품목 연결 있으면 409 거부) |
+### 먼저 같이 볼 파일
+- [[ERP/backend/app/schemas.py]] — 백엔드와 프론트엔드가 주고받는 데이터 모양을 정하는 파일입니다.
+- [[ERP/backend/app/models.py]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 파일입니다.
 
-## 5. 이 파일을 참조하는 곳
+## 조심할 점
 
-- `erp/backend/app/main.py` — `app.include_router(models_router.router, prefix="/api/models", tags=["Models"])`
-- 프론트엔드 제품 모델 관리 화면 (모델 드롭다운 데이터 소스)
-- `erp/backend/app/routers/items.py` — 품목 등록 시 `model_slots` 필드로 연결
+API 응답 형식이나 상태 코드를 바꾸면 프론트 화면과 자동 테스트가 같이 영향을 받습니다.
 
-## 6. 실제 업무 흐름에서 언제 쓰이는지
+## 핵심 발췌
 
-- [[시나리오_품목등록]]: 새 제품 라인 추가 → `POST /api/models` → 이후 해당 모델로 품목 등록
-- 단종 모델 정리: 연결 품목 없음 확인 후 `DELETE /api/models/{slot}`
+```python
+"""Product model (ProductSymbol) CRUD router."""
 
-## 7. 핵심 함수 / 상수 / 매핑
+from typing import List, Optional
 
-| 함수 | 설명 |
-|---|---|
-| `list_models(db)` | `is_reserved=False` + `model_name IS NOT NULL` 필터 |
-| `create_model(payload, db)` | 이름 중복 확인 → 빈 슬롯 탐색(1~100) → 기호 자동 생성(A-Z,a-z,0-9 순) |
-| `delete_model(slot, db)` | `ItemModel.slot` 사용 건수 확인 → 0이면 삭제, 아니면 409 |
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
-## 8. ⚠️ 위험 포인트
+from app.database import get_db
+from app.models import ItemModel, ProductSymbol
+from app.routers._errors import ErrorCode, http_error
+from app.services._tx import commit_and_refresh, commit_only
 
-> [!warning] 수정 시 깨지기 쉬운 지점
-> - 슬롯 자동 배정(`range(1, 101)`): 100슬롯 모두 채워지면 400 에러. 실제로 채워질 가능성은 낮지만 에러 메시지가 명확하지 않을 수 있음.
-> - 기호 자동 생성 순서(`A-Z a-z 0-9`): 62개 후보 모두 사용 중이면 `symbol=None`으로 저장됨 — 후속 코드 생성 시 오류.
-> - `delete_model`이 `ItemModel` 테이블만 확인. `Item.symbol_slot` 컬럼을 직접 참조하는 품목이 있다면 고아 데이터 발생 가능.
-> - 이 파일에는 `audit.record` 호출이 없다. 모델 추가·삭제가 감사 로그에 기록되지 않음.
+router = APIRouter()
 
-[[위험지대_지도]] — 슬롯 고아 데이터, 감사 로그 누락
 
-## 9. 죽은 코드 의심 / 삭제하면 안 되는 이유
+class ProductModelResponse(BaseModel):
+    model_config = {"protected_namespaces": (), "from_attributes": True}
+    slot: int
+    symbol: Optional[str]
+    model_name: Optional[str]
+    is_reserved: bool
 
-- `ProductModelResponse.is_reserved` 필드: 항상 `False` 값으로 반환되지만(필터 결과), 프론트가 이 필드를 읽어 UI 잠금 처리할 수 있으므로 유지.
-- `codes.py`의 `update_symbol`과 기능이 일부 겹침. 두 엔드포인트는 UI 컨텍스트(관리자 슬롯 편집 vs 모델 간단 등록)가 다르므로 둘 다 유지.
 
-## 10. 수정 전 체크리스트
+class ProductModelCreate(BaseModel):
+    model_config = {"protected_namespaces": ()}
+    model_name: str = Field(..., min_length=1, max_length=50)
+    symbol: Optional[str] = Field(None, max_length=5)
 
-- [ ] `verify_local.ps1` 통과 확인
-- [ ] 모델 삭제 시 `Item.symbol_slot` 참조 품목 확인 (현재 코드에서 누락)
-- [ ] `codes.py`의 `update_symbol`과 충돌 없는지 확인
-- [ ] 슬롯 62개 초과 시나리오 고려 (symbol 자동 생성 실패)
 
-## 11. 핵심 코드 발췌
+@router.get("", response_model=List[ProductModelResponse], summary="제품 모델 목록 (예약 제외)")
+def list_models(db: Session = Depends(get_db)):
+    """등록된 제품 모델 목록 반환 (is_reserved=False인 실제 모델만)."""
+    return (
+        db.query(ProductSymbol)
+        .filter(ProductSymbol.model_name.isnot(None))
+        .filter(ProductSymbol.is_reserved == False)  # noqa: E712
+        .order_by(ProductSymbol.slot)
+        .all()
+    )
 
-> [!example] 슬롯·기호 자동 배정 로직 (약 25줄)
-> ```python
-> def create_model(payload: ProductModelCreate, db: Session = Depends(get_db)):
->     existing_name = db.query(ProductSymbol).filter(
->         ProductSymbol.model_name == payload.model_name
->     ).first()
->     if existing_name:
->         raise http_error(409, ErrorCode.CONFLICT, "같은 이름의 모델이 이미 존재합니다.")
->
->     # 다음 빈 slot 찾기 (1~100)
->     used_slots = {ps.slot for ps in db.query(ProductSymbol).all()}
->     next_slot = next((s for s in range(1, 101) if s not in used_slots), None)
->     if next_slot is None:
->         raise http_error(400, ErrorCode.BAD_REQUEST, "슬롯이 모두 사용 중입니다.")
->
->     # symbol 처리: 제공 안 하면 자동 생성
->     symbol = payload.symbol
->     if not symbol:
->         for candidate in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789":
->             if not db.query(ProductSymbol).filter(ProductSymbol.symbol == candidate).first():
->                 symbol = candidate
->                 break
->     else:
->         dup = db.query(ProductSymbol).filter(ProductSymbol.symbol == symbol).first()
->         if dup:
->             raise http_error(409, ErrorCode.CONFLICT, "같은 기호(symbol)의 모델이 이미 존재합니다.")
->
->     ps = ProductSymbol(slot=next_slot, symbol=symbol, model_name=payload.model_name, is_reserved=False)
->     db.add(ps)
->     commit_and_refresh(db, ps)
->     return ps
-> ```
 
-빈 슬롯 자동 탐색 + 기호 자동 할당 패턴. 전체 슬롯을 매번 조회해 사용 중인 집합을 만든다.
-
-```mermaid
-flowchart LR
-    FE["제품 모델 관리 화면"] -->|GET /api/models| R["models.py\nlist_models"]
-    FE -->|POST /api/models| C["create_model"]
-    C -->|used_slots 계산| DB[("ProductSymbol\n테이블")]
-    C -->|중복 확인| DB
-    C -->|INSERT| DB
-    FE -->|DELETE /api/models/{slot}| D["delete_model"]
-    D -->|ItemModel 연결 확인| DB2[("ItemModel\n테이블")]
+@router.post(
+    "",
+    response_model=ProductModelResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="제품 모델 신규 등록 (slot 자동 배정)",
+)
+def create_model(payload: ProductModelCreate, db: Session = Depends(get_db)):
+    """새 제품 모델 추가."""
+    # 이름 중복 확인
+    existing_name = db.query(ProductSymbol).filter(ProductSymbol.model_name == payload.model_name).first()
+    if existing_name:
+        raise http_error(409, ErrorCode.CONFLICT, "같은 이름의 모델이 이미 존재합니다.")
 ```
-
-## 관련 노트
-
-- [[처음_읽는_사람]], [[ERP_MOC]], [[용어사전]]
-- [[erp/backend/app/routers/codes.py]]
-- [[erp/backend/app/models.py]]
-
-Up: [[_routers]]

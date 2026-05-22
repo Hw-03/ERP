@@ -1,23 +1,54 @@
 ---
-type: code-note
+type: file-explanation
+source_path: "_attic/docs/research/2026-05-08-30-user-readiness-score.md"
+importance: reference
+layer: archive
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
-layer: attic
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/_attic/docs/research/2026-05-08-30-user-readiness-score.md
-tags: [vault, code-note, auto-generated, stub, mirror-fill]
 ---
 
-# 2026-05-08-30-user-readiness-score.md
+# 2026-05-08-30-user-readiness-score.md — 2026-05-08-30-user-readiness-score.md 설명
 
-> [!info] 1:1 미러 stub
-> 탐색기에 보이는 폴더 구조를 vault 에 그대로 반영하기 위한 stub.
-> 원본: [[erp/_attic/docs/research/2026-05-08-30-user-readiness-score.md]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄 (또는 메타)
+`2026-05-08-30-user-readiness-score.md`는 현재 운영 코드가 아니라 과거 자료나 실험 결과를 보관한 참고 파일입니다.
 
-```
+## 업무 흐름에서의 의미
+
+과거 맥락을 이해하는 데 도움은 되지만, 현재 운영 기준으로 바로 사용하면 안 됩니다.
+
+## 언제 보면 좋나
+
+- 과거 자료의 의미를 확인할 때
+- 현재 코드와 비교할 참고 근거가 필요할 때
+
+## 중요한 내용
+
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
+
+- `30명 실사용 준비도 점수표`
+- `개선 전 점수 (174387e, 1차 보강 완료 시점)`
+- `2차 보강 내용`
+- `Phase A — Lock 순서 정렬 (deadlock 방지)`
+- `Phase B — 원자적 consume (TOCTOU 제거)`
+- `Phase C — 동시성 테스트 5종 추가`
+- `Phase D — Frontend client_request_id`
+- `Phase E — 운영 도구 및 문서`
+- `개선 후 점수`
+- `잔존 위험`
+
+## 연결되는 파일
+
+- [[ERP/_attic/docs/research/📁_research]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+보관 자료입니다. 현재 코드처럼 믿고 수정하거나 실행하지 않습니다.
+
+## 핵심 발췌
+
+```md
 # 30명 실사용 준비도 점수표
 **작성일**: 2026-05-08 | **커밋 기준**: 174387e (1차) → 2차 보강 후
 
@@ -43,4 +74,34 @@ tags: [vault, code-note, auto-generated, stub, mirror-fill]
 
 ---
 
+## 2차 보강 내용
+
+### Phase A — Lock 순서 정렬 (deadlock 방지)
+
+| 수정 | 내용 |
+|------|------|
+| `lock_inventories()` | `.order_by(Inventory.item_id)` 추가 — 모든 호출자 동일 순서 락 |
+| `_execute_all_lines()` | 라인 처리 전 item_id 정렬 후 일괄 선락 |
+| `submit_adjustment()` | 라인 처리 전 item_id 정렬 후 일괄 선락 |
+
+### Phase B — 원자적 consume (TOCTOU 제거)
+
+| 수정 | 내용 |
+|------|------|
+| `consume_warehouse()` | lock+check+write → 원자적 조건부 UPDATE (WHERE warehouse_qty >= qty) |
+| `consume_from_department()` | lock+check+write → 원자적 조건부 UPDATE (WHERE quantity >= qty) |
+
+SQLite에서도 안전 (DB 엔진 수준 원자성 보장).
+
+### Phase C — 동시성 테스트 5종 추가
+
+| 테스트 | 결과 |
+|--------|------|
+| `test_consume_warehouse_concurrent` | ✅ 30스레드, 음수 없음, 정확한 차감 |
+| `test_transfer_concurrent` | ✅ 20스레드, 총량 불변, 음수 없음 |
+| `test_defective_concurrent` | ✅ 20스레드, 총량 불변, 부서 음수 없음 |
+| `test_dept_adjustment_concurrent` | ✅ 교차 순서 20스레드, deadlock 없음 |
+| `test_package_ship_concurrent` | ✅ 10스레드, 양쪽 구성품 음수 없음 |
+
+### Phase D — Frontend client_request_id
 ```

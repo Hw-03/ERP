@@ -1,62 +1,89 @@
 ---
+type: file-explanation
+source_path: "backend/app/services/stock_math.py"
+importance: critical
 layer: backend
-topic: service
-file: erp/backend/app/services/stock_math.py
-tags:
-  - "#layer/backend"
-  - "#topic/service"
-aliases:
-  - stock_math
-  - 재고 계산 공식
----
-type: code-note
-status: active
-updated: 2026-05-21
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
 ---
 
-# 📐 stock_math.py — 재고 계산 공식 단일 소스
+# stock_math.py — 재고 계산 보조 규칙
 
-> [!summary]
-> 여러 라우터가 각자 `wh + prod - pending` 식을 직접 계산하던 것을 여기로 통합했다. `StockFigures` dataclass 와 `compute_for` / `bulk_compute` 함수가 UI에 노출되는 모든 재고 수치의 단일 진실(source of truth)이다.
+## 이 파일은 무엇을 책임지나
 
----
+여러 재고 숫자를 일관된 방식으로 계산하고 검증하기 위한 보조 함수입니다.
 
-## 1. 한 문장 목적
+## 업무 흐름에서의 의미
 
-재고 수치 계산 로직을 한 곳에 모아 수식 불일치를 방지한다.
+사용 가능 재고, 승인 대기 수량, 부서별 수량을 해석할 때 기준이 됩니다.
 
----
+## 언제 보면 좋나
 
-## 2. 파일 위치 & 임포트 경로
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
+- 운영 데이터가 달라질 수 있는 변경을 준비할 때
 
-```
-erp/backend/app/services/stock_math.py
-from app.services import stock_math as stock_math_svc
-from app.services.stock_math import StockFigures, compute_for, bulk_compute
-```
+## 중요한 내용
 
----
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-## 3. 용어 정의
+- `StockFigures`
+- `compute_for`
+- `bulk_compute`
+- `figures_from_inventory`
 
-| 용어 | 정의 |
-|------|------|
-| `warehouse_qty` | 창고 재고 (Inventory.warehouse_qty) |
-| `production_total` | 모든 부서 PRODUCTION 버킷 합계 |
-| `defective_total` | 모든 부서 DEFECTIVE 버킷 합계 |
-| `pending` | 배치 OUT 예약 중 (warehouse 대비) |
-| `total` | warehouse + production + defective — Inventory.quantity 와 일치해야 함 |
-| `available` | warehouse + production − pending — UI 노출 가용 재고 |
-| `warehouse_available` | warehouse − pending — BOM feasibility / 창고 출고 검사용 |
+## 연결되는 파일
 
----
+### 먼저 같이 볼 파일
+- [[ERP/backend/app/models.py]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 파일입니다.
+- [[ERP/backend/app/schemas.py]] — 백엔드와 프론트엔드가 주고받는 데이터 모양을 정하는 파일입니다.
+- [[ERP/backend/app/database.py]] — `database.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/database.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 
-## 4. StockFigures 공식
+## 조심할 점
+
+여기 계산이 바뀌면 여러 화면의 수량 표시가 동시에 달라질 수 있습니다.
+
+## 핵심 발췌
 
 ```python
+"""재고 수식 단일 소스.
+
+기존에 여러 라우터가 각자 `wh + prod - pending` 같은 식을 직접 계산하던 것을
+여기로 모은다. 신규 코드는 이 모듈만 사용한다.
+
+## 용어 정의
+
+- `warehouse_qty`: 창고 재고 (Inventory.warehouse_qty)
+- `production_total`: 부서별 PRODUCTION 버킷 합계 (InventoryLocation)
+- `defective_total`: 부서별 DEFECTIVE 버킷 합계
+- `pending`: 배치 OUT 예약 중 (Inventory.pending_quantity) — warehouse 대비
+- `total`: warehouse + production + defective (Inventory.quantity 와 같아야 함)
+- `available`: warehouse + production - pending — "재고 가용" (UI 에 노출되는 값)
+- `warehouse_available`: warehouse - pending — 생산 backflush / 창고 출고에서
+  실제 소비 가능한 분량. BOM feasibility 검사는 이 값을 써야 한다.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from decimal import Decimal
+import uuid
+from typing import Iterable
+
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.models import Inventory, InventoryLocation, LocationStatusEnum
+
+
+_D0 = Decimal("0")
+
+
 @dataclass(frozen=True)
 class StockFigures:
+    """한 품목의 재고 수치 모음. 모든 값 Decimal."""
+
     warehouse_qty: Decimal = _D0
     production_total: Decimal = _D0
     defective_total: Decimal = _D0
@@ -75,68 +102,4 @@ class StockFigures:
     @property
     def warehouse_available(self) -> Decimal:
         """창고 소비 가능분: warehouse - pending. BOM backflush / 창고 출고 검사용."""
-        return self.warehouse_qty - self.pending
 ```
-
----
-
-## 5. 주요 함수
-
-```mermaid
-flowchart TD
-    A["compute_for(db, item_id)\n쿼리 2회"] --> SF["StockFigures"]
-    B["bulk_compute(db, item_ids)\n쿼리 2회 (IN절)"] --> SF
-    C["figures_from_inventory(inv, prod, defect)\n쿼리 없음"] --> SF
-    SF --> D[".total\n.available\n.warehouse_available"]
-```
-
-| 함수 | 쿼리 수 | 용도 |
-|------|---------|------|
-| `compute_for` | 2 | 단건 품목 재고 계산 |
-| `bulk_compute` | 2 (IN절) | 목록 페이지 N개 품목 일괄 계산 |
-| `figures_from_inventory` | 0 | 이미 조회된 Inventory 로 포장만 |
-
----
-
-## 6. bulk_compute 내부 흐름
-
-```python
-def bulk_compute(db, item_ids):
-    # 1) Inventory IN 쿼리 → {item_id: Inventory}
-    invs = {inv.item_id: inv for inv in db.query(Inventory)
-            .filter(Inventory.item_id.in_(ids)).all()}
-
-    # 2) InventoryLocation GROUP BY item_id, status
-    agg_rows = db.query(InventoryLocation.item_id, InventoryLocation.status,
-                        func.coalesce(func.sum(...), 0))
-               .group_by(item_id, status).all()
-
-    # prod_by_id / defect_by_id 에 분류 후 StockFigures 조립
-```
-
-N개 품목을 처리하더라도 쿼리는 항상 2회만 나간다.
-
----
-
-## 7. 의존 관계
-
-```
-stock_math.py
-  ← models (Inventory, InventoryLocation, LocationStatusEnum)
-  호출자: 라우터(items, inventory 목록), capacity 검사
-```
-
----
-
-## 8. 주의 사항
-
-> [!warning]
-> `available` 은 불량을 제외한다. 불량까지 포함한 총량을 원하면 `.total` 을 사용한다.
-> BOM feasibility 검사(생산/창고 출고 가능 여부)는 반드시 `warehouse_available` 을 사용해야 한다.
-
----
-
-## 9. 관련 노트 링크
-
-- [[inventory.py]] — 실제 재고 변경 함수
-- [[models.py]] — Inventory, InventoryLocation ORM 정의

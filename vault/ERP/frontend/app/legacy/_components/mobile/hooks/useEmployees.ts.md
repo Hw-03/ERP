@@ -1,43 +1,47 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "frontend/app/legacy/_components/mobile/hooks/useEmployees.ts"
+importance: important
 layer: frontend
-source_path: erp/frontend/app/legacy/_components/mobile/hooks/useEmployees.ts
-status: active
-updated: 2026-04-27
-source_sha: 7e2b0b933b03
-tags:
-  - erp
-  - frontend
-  - frontend-hook
-  - ts
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# useEmployees.ts
+# useEmployees.ts — useEmployees.ts 설명
 
-> [!summary] 역할
-> 프론트엔드 화면에서 상태, 데이터 로딩, 상호작용 흐름을 재사용하기 위한 React hook이다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`useEmployees.ts`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
 
-- Source: `frontend/app/legacy/_components/mobile/hooks/useEmployees.ts`
-- Layer: `frontend`
-- Kind: `frontend-hook`
-- Size: `1194` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-- Parent hub: [[frontend/app/legacy/_components/mobile/hooks/hooks|frontend/app/legacy/_components/mobile/hooks]]
-- Related: [[frontend/frontend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
-- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+## 중요한 내용
 
-## 원본 발췌
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-````ts
+- `useEmployees`
+- `Department`
+- `Employee`
+
+## 연결되는 파일
+
+- [[ERP/frontend/app/legacy/_components/mobile/hooks/📁_hooks]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
+
+## 핵심 발췌
+
+```ts
 "use client";
 
 import { useEffect, useState } from "react";
@@ -70,9 +74,9 @@ export function useEmployees(params?: { department?: Department; activeOnly?: bo
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- key = derived filter signature (Cat-A)
   }, [key]);
 
   return { employees, loading, error };
 }
-````
+```

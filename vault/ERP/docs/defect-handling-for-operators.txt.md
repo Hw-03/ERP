@@ -1,22 +1,46 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "docs/defect-handling-for-operators.txt"
+importance: important
 layer: docs
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/docs/defect-handling-for-operators.txt
-tags: [vault, code-note, auto-generated, stub]
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# defect-handling-for-operators.txt
+# defect-handling-for-operators.txt — defect-handling-for-operators.txt 설명
 
-> [!info] 자동 생성된 stub 노트
-> 이 노트는 자동 보정으로 생성됐다. 원본 위치: [[erp/docs/defect-handling-for-operators.txt]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄
+`defect-handling-for-operators.txt`는 프로젝트 기준이나 운영 방법을 설명하는 원본 문서입니다.
 
-```
+## 업무 흐름에서의 의미
+
+사람이 합의한 기준을 담지만, 코드가 바뀌었을 수 있으므로 현재 코드와 함께 읽어야 합니다.
+
+## 언제 보면 좋나
+
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
+
+## 중요한 내용
+
+자동으로 뽑을 수 있는 함수/클래스 목록은 적지만, 파일 위치와 확장자로 볼 때 위 역할을 맡습니다.
+
+## 연결되는 파일
+
+### 먼저 같이 볼 파일
+- [[ERP/README.md]] — 이 문서는 DEXCOWIN MES가 무엇인지, 어떻게 실행하는지, 어떤 폴더를 먼저 봐야 하는지 알려주는 공식 입구입니다.
+- [[ERP/docs/OPERATIONS.md]] — `OPERATIONS.md`는 프로젝트 기준이나 운영 방법을 설명하는 원본 문서입니다.
+- [[ERP/docs/operations/DAILY_OPERATION_CHECKLIST.md]] — `DAILY_OPERATION_CHECKLIST.md`는 프로젝트 기준이나 운영 방법을 설명하는 원본 문서입니다.
+
+## 조심할 점
+
+큰 위험은 낮지만, 연결된 파일과 실행 위치를 확인한 뒤 수정하는 편이 안전합니다.
+
+## 핵심 발췌
+
+```text
 ============================================================
 불량 처리 시스템 새로 만들어요 — 현장 설명서
 ============================================================
@@ -47,4 +71,29 @@ tags: [vault, code-note, auto-generated, stub]
 
 ■ 평소 일하던 흐름은 그대로
 ─────────────────────────────────────────────
+입고하고, 생산하고, 출고하고 — 이건 똑같아요.
+바뀌는 건 "불량이 나왔을 때" 한 가지 단추를 더 누른다 정도.
+
+
+
+■ 불량 발견하면 어떻게?
+─────────────────────────────────────────────
+어디서든 (입고 검수 / 생산 중 / 자체 검사 / 출고 직전)
+불량이 보이면 똑같이 한 가지로 처리해요.
+
+  → [불량 격리] 단추를 누른다
+  → 부서, 품목, 수량, 사유를 적는다
+  → 끝. 결재 안 받아도 됨, 바로 빠짐
+
+그러면 그 부품은 "정상 재고"에서 빠지고
+"불량 격리"라는 빨간 칸으로 옮겨갑니다.
+
+대시보드에서도 빨간 글씨로 "조립부 불량 5개" 이런 식으로 떠요.
+일하면서 흘리지 마시고, 발견하면 그 자리에서 격리만 해주세요.
+
+
+
+■ 격리는 부담 없이, 일단 빼두세요
+─────────────────────────────────────────────
+"확실치 않은데 격리해도 되나?" 걱정 마세요.
 ```

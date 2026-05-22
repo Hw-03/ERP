@@ -1,52 +1,50 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "frontend/app/legacy/_components/_warehouse_steps/index.ts"
+importance: important
 layer: frontend
-source_path: erp/frontend/app/legacy/_components/_warehouse_steps/index.ts
-status: active
-updated: 2026-04-27
-source_sha: 580c36e2d952
-tags:
-  - erp
-  - frontend
-  - frontend-module
-  - ts
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# index.ts
+# index.ts — index.ts 설명
 
-> [!summary] 역할
-> 프론트엔드 화면을 구성하는 타입, 상수, 유틸리티, 보조 모듈이다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`index.ts`는 입출고 요청 작성, 작업중 목록, 내 요청, 창고 승인함 같은 창고 업무 화면의 일부입니다.
 
-- Source: `frontend/app/legacy/_components/_warehouse_steps/index.ts`
-- Layer: `frontend`
-- Kind: `frontend-module`
-- Size: `525` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+사용자가 화면에서 보고 누르는 경험과 직접 연결됩니다. 문구, 버튼, 표, 상세 패널 개선은 이 계층에서 확인합니다.
 
-- Parent hub: [[frontend/app/legacy/_components/_warehouse_steps/_warehouse_steps|frontend/app/legacy/_components/_warehouse_steps]]
-- Related: [[frontend/frontend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 현재 실제 UI는 `frontend/app/legacy` 흐름이다.
-- 컴포넌트 변경 시 `frontend/lib/api.ts` 타입과 백엔드 응답을 함께 확인한다.
+## 중요한 내용
 
-## 원본 발췌
+자동으로 뽑을 수 있는 함수/클래스 목록은 적지만, 파일 위치와 확장자로 볼 때 위 역할을 맡습니다.
 
-````ts
+## 연결되는 파일
+
+### 먼저 같이 볼 파일
+- [[ERP/frontend/app/legacy/_components/DesktopWarehouseView.tsx]] — `DesktopWarehouseView.tsx`는 현재 운영 중인 MES 화면을 구성하는 React 컴포넌트입니다.
+- [[ERP/frontend/lib/api/stock-requests.ts]] — `stock-requests.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.
+- [[ERP/backend/app/routers/stock_requests.py]] — 프론트의 입출고 요청 작성, 내 요청, 창고 승인함이 호출하는 API 입구입니다.
+- [[ERP/backend/app/services/stock_requests.py]] — 현장 담당자가 요청을 제출하고 창고가 승인/반려/취소하는 흐름을 처리하는 서비스입니다.
+
+## 조심할 점
+
+현재 실제 운영 화면입니다. 작은 문구나 상태 변경도 현장 사용 흐름에 영향을 줄 수 있습니다.
+
+## 핵심 발췌
+
+```ts
 // 입출고 wizard step 컴포넌트 패키지.
 // 기존 _warehouse_steps.tsx (1,135줄)을 책임 단위로 분할 — Phase 4.
 // 외부 import 경로(`./_warehouse_steps`)는 동일하게 유지된다.
 
 export * from "./_constants";
-export { WizardStepCard } from "./_atoms";
-export { EmployeeStep } from "./EmployeeStep";
-export { WorkTypeStep } from "./WorkTypeStep";
-export { ItemPickStep } from "./ItemPickStep";
-export { QuantityStep } from "./QuantityStep";
-export { ExecuteStep } from "./ExecuteStep";
-````
+```

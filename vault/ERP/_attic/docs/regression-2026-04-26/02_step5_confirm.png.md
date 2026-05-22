@@ -1,22 +1,40 @@
 ---
-type: code-note
+type: metadata-note
+source_path: "_attic/docs/regression-2026-04-26/02_step5_confirm.png"
+importance: reference
+layer: archive
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
-layer: attic
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/_attic/docs/regression-2026-04-26/02_step5_confirm.png
-tags: [vault, code-note, auto-generated, stub, mirror-fill]
 ---
 
-# 02_step5_confirm.png
+# 02_step5_confirm.png — 02_step5_confirm.png 설명
 
-> [!info] 1:1 미러 stub
-> 탐색기에 보이는 폴더 구조를 vault 에 그대로 반영하기 위한 stub.
-> 원본: [[erp/_attic/docs/regression-2026-04-26/02_step5_confirm.png]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄 (또는 메타)
+`02_step5_confirm.png`는 현재 운영 코드가 아니라 과거 자료나 실험 결과를 보관한 참고 파일입니다.
 
-```
-(binary file, 45 KB)
-```
+## 업무 흐름에서의 의미
+
+과거 맥락을 이해하는 데 도움은 되지만, 현재 운영 기준으로 바로 사용하면 안 됩니다.
+
+## 언제 보면 좋나
+
+- 과거 자료의 의미를 확인할 때
+- 현재 코드와 비교할 참고 근거가 필요할 때
+
+## 중요한 내용
+
+자동으로 뽑을 수 있는 함수/클래스 목록은 적지만, 파일 위치와 확장자로 볼 때 위 역할을 맡습니다.
+
+## 연결되는 파일
+
+- [[ERP/_attic/docs/regression-2026-04-26/📁_regression-2026-04-26]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+보관 자료입니다. 현재 코드처럼 믿고 수정하거나 실행하지 않습니다.
+
+## 파일 내용 처리
+
+이 파일은 바이너리이거나 사람이 직접 읽는 코드 파일이 아닙니다. 파일명, 위치, 용도 중심의 메타 설명만 남깁니다.

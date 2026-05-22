@@ -1,55 +1,58 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "scripts/ops/verify_backup.bat"
+importance: important
 layer: scripts
-source_path: erp/scripts/ops/verify_backup.bat
-status: active
-updated: 2026-04-27
-source_sha: df9fb91ebaa6
-tags:
-  - erp
-  - scripts
-  - ops-script
-  - bat
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# verify_backup.bat
+# verify_backup.bat — verify_backup.bat 설명
 
-> [!summary] 역할
-> 운영자가 백업, 복구, 점검, 정합성 확인을 할 때 실행하는 보조 스크립트다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`verify_backup.bat`는 운영자가 백업, 복구, 헬스체크, 정합성 확인에 쓰는 운영 스크립트입니다.
 
-- Source: `scripts/ops/verify_backup.bat`
-- Layer: `scripts`
-- Kind: `ops-script`
-- Size: `901` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+운영 중 장애 대응, 백업, 복구, 정합성 점검처럼 실제 데이터 안전과 연결됩니다.
 
-- Parent hub: [[scripts/ops/ops|scripts/ops]]
-- Related: [[scripts/scripts]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 운영 점검, 백업, 복구, 정합성 확인이 필요할 때
+- 장애 대응 절차를 검토할 때
 
-- 실행 전 대상 DB/파일 경로를 확인한다.
-- 운영 스크립트는 백업 여부와 되돌림 절차를 먼저 본다.
+## 중요한 내용
 
-## 원본 발췌
+자동으로 뽑을 수 있는 함수/클래스 목록은 적지만, 파일 위치와 확장자로 볼 때 위 역할을 맡습니다.
 
-````bat
+## 연결되는 파일
+
+### 먼저 같이 볼 파일
+- [[ERP/docs/operations/DAILY_OPERATION_CHECKLIST.md]] — `DAILY_OPERATION_CHECKLIST.md`는 프로젝트 기준이나 운영 방법을 설명하는 원본 문서입니다.
+- [[ERP/docs/operations/INCIDENT_RESPONSE.md]] — `INCIDENT_RESPONSE.md`는 프로젝트 기준이나 운영 방법을 설명하는 원본 문서입니다.
+- [[ERP/backend/app/services/integrity.py]] — `integrity.py`는 `integrity` 업무 규칙을 실제로 실행하는 Python 코드입니다. 라우터보다 안쪽에서 DB 조회와 변경을 담당합니다.
+
+## 조심할 점
+
+운영 스크립트는 실제 DB 파일이나 백업 파일을 건드릴 수 있습니다. 실행 전 대상 경로를 확인해야 합니다.
+
+## 핵심 발췌
+
+```bat
 @echo off
 rem ============================================================
 rem  Verify the most recent backup file:
 rem    - PRAGMA integrity_check
 rem    - row counts (items / inventory / transaction_logs / bom / admin_audit_logs)
-rem  Excludes erp_PRE-RESTORE_* files from "most recent" lookup.
+rem  Excludes mes_PRE-RESTORE_* files from "most recent" lookup.
 rem ============================================================
 setlocal
 
 set "ROOT=%~dp0..\.."
 
-for /f "usebackq delims=" %%f in (`powershell -NoProfile -Command "(Get-ChildItem '%ROOT%\backend\_backup\erp_*.db' | Where-Object { $_.Name -notlike '*PRE-RESTORE*' } | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName"`) do set "LATEST=%%f"
+for /f "usebackq delims=" %%f in (`powershell -NoProfile -Command "(Get-ChildItem '%ROOT%\backend\_backup\mes_*.db' | Where-Object { $_.Name -notlike '*PRE-RESTORE*' } | Sort-Ob...
 
 if not defined LATEST (
     echo [VERIFY] no backup found in %ROOT%\backend\_backup\
@@ -62,4 +65,4 @@ python "%~dp0_verify_backup.py" "%LATEST%"
 
 endlocal
 exit /b %ERRORLEVEL%
-````
+```

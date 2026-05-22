@@ -1,47 +1,50 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "scripts/ops/backup_db.bat"
+importance: important
 layer: scripts
-source_path: erp/scripts/ops/backup_db.bat
-status: active
-updated: 2026-04-27
-source_sha: 54ace48ba0f0
-tags:
-  - erp
-  - scripts
-  - ops-script
-  - bat
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# backup_db.bat
+# backup_db.bat — backup_db.bat 설명
 
-> [!summary] 역할
-> 운영자가 백업, 복구, 점검, 정합성 확인을 할 때 실행하는 보조 스크립트다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`backup_db.bat`는 운영자가 백업, 복구, 헬스체크, 정합성 확인에 쓰는 운영 스크립트입니다.
 
-- Source: `scripts/ops/backup_db.bat`
-- Layer: `scripts`
-- Kind: `ops-script`
-- Size: `2558` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+운영 중 장애 대응, 백업, 복구, 정합성 점검처럼 실제 데이터 안전과 연결됩니다.
 
-- Parent hub: [[scripts/ops/ops|scripts/ops]]
-- Related: [[scripts/scripts]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 운영 점검, 백업, 복구, 정합성 확인이 필요할 때
+- 장애 대응 절차를 검토할 때
 
-- 실행 전 대상 DB/파일 경로를 확인한다.
-- 운영 스크립트는 백업 여부와 되돌림 절차를 먼저 본다.
+## 중요한 내용
 
-## 원본 발췌
+자동으로 뽑을 수 있는 함수/클래스 목록은 적지만, 파일 위치와 확장자로 볼 때 위 역할을 맡습니다.
 
-````bat
+## 연결되는 파일
+
+### 먼저 같이 볼 파일
+- [[ERP/docs/operations/DAILY_OPERATION_CHECKLIST.md]] — `DAILY_OPERATION_CHECKLIST.md`는 프로젝트 기준이나 운영 방법을 설명하는 원본 문서입니다.
+- [[ERP/docs/operations/INCIDENT_RESPONSE.md]] — `INCIDENT_RESPONSE.md`는 프로젝트 기준이나 운영 방법을 설명하는 원본 문서입니다.
+- [[ERP/backend/app/services/integrity.py]] — `integrity.py`는 `integrity` 업무 규칙을 실제로 실행하는 Python 코드입니다. 라우터보다 안쪽에서 DB 조회와 변경을 담당합니다.
+
+## 조심할 점
+
+운영 스크립트는 실제 DB 파일이나 백업 파일을 건드릴 수 있습니다. 실행 전 대상 경로를 확인해야 합니다.
+
+## 핵심 발췌
+
+```bat
 @echo off
 rem ============================================================
-rem  ERP DB backup script (WAL safe)
-rem  - copies backend\erp.db to backend\_backup\erp_YYYYMMDD_HHMMSS.db
+rem  MES DB backup script (WAL safe)
+rem  - copies backend\mes.db to backend\_backup\mes_YYYYMMDD_HHMMSS.db
 rem  - safe to run while the backend is up (transaction-consistent)
 rem
 rem  fallback order:
@@ -52,11 +55,11 @@ rem ============================================================
 setlocal enabledelayedexpansion
 
 set "ROOT=%~dp0..\.."
-set "DB=%ROOT%\backend\erp.db"
+set "DB=%ROOT%\backend\mes.db"
 set "DEST_DIR=%ROOT%\backend\_backup"
 
 if not exist "%DB%" (
-    echo [BACKUP] erp.db not found: %DB%
+    echo [BACKUP] mes.db not found: %DB%
     exit /b 1
 )
 
@@ -64,7 +67,7 @@ if not exist "%DEST_DIR%" mkdir "%DEST_DIR%"
 
 rem timestamp via PowerShell so the format is locale-independent
 for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss"`) do set "TS=%%i"
-set "DEST=%DEST_DIR%\erp_%TS%.db"
+set "DEST=%DEST_DIR%\mes_%TS%.db"
 
 rem ----- 1: sqlite3 CLI -----------------------------------------------------
 where sqlite3 >nul 2>&1
@@ -73,6 +76,24 @@ if not errorlevel 1 (
     if not errorlevel 1 (
         echo [BACKUP] OK ^(sqlite3 .backup^)
         echo   from : %DB%
-# ... (이하 38줄 생략. 원본 참조)
+        echo   to   : %DEST%
+        endlocal & exit /b 0
+    )
+    echo [BACKUP] sqlite3 .backup failed - trying python fallback
+)
 
-````
+rem ----- 2: Python sqlite3 backup API --------------------------------------
+where python >nul 2>&1
+if not errorlevel 1 (
+    python -c "import sqlite3,sys; src=sqlite3.connect(r'%DB%'); dst=sqlite3.connect(r'%DEST%'); src.backup(dst); dst.close(); src.close()"
+    if not errorlevel 1 (
+        echo [BACKUP] OK ^(python sqlite3.backup^)
+        echo   from : %DB%
+        echo   to   : %DEST%
+        endlocal & exit /b 0
+    )
+    echo [BACKUP] python backup failed - trying file copy fallback
+)
+
+rem ----- 3: WAL checkpoint + copy 3 files ----------------------------------
+```

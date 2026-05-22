@@ -1,217 +1,110 @@
 ---
-type: code-note
-project: DEXCOWIN MES
+type: file-explanation
+source_path: "backend/app/routers/settings.py"
+importance: critical
 layer: backend
-status: active
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/backend/app/routers/settings.py
-tags: [vault, code-note, backend, router]
-aliases: [시스템 설정 API, 관리자 PIN, 무결성 점검]
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# 📦 settings.py — 시스템 설정·관리자 PIN·무결성 점검·DB 초기화
+# settings.py — settings.py 설명
 
-> [!summary] 역할
-> 시스템 운영 전반을 관리하는 위험 지대 라우터.  
-> - 관리자 PIN 검증 및 변경  
-> - `require_admin` 함수: 다른 라우터(departments, employees)에서 임포트해 공유  
-> - 재고 불변식 점검(check) 및 복구(repair)  
-> - DB 안전 초기화(reset) — 품목·재고 데이터 삭제 후 시드 재적재
+## 이 파일은 무엇을 책임지나
 
-#layer/backend #topic/router #topic/settings
+`settings.py`는 `settings` 업무를 외부 API로 열어 주는 Python 코드입니다. 프론트 화면이 백엔드 기능을 호출할 때 이 파일의 URL을 거칩니다.
 
----
+## 업무 흐름에서의 의미
 
-## 1. 역할
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
 
-- 관리자 PIN: 검증 / 변경 (SystemSetting 테이블 저장, bcrypt-like 해시)
-- `require_admin(db, pin)`: 전역 공유 함수 — 다른 라우터에서 호출
-- 재고 불변식 점검: `GET|POST /settings/integrity/inventory`
-- 재고 복구: `POST /settings/integrity/repair` (dry_run 기본 true)
-- DB 초기화: `POST /settings/reset` — **운영 주의**
+## 언제 보면 좋나
 
-## 2. 원본 위치
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
+- 운영 데이터가 달라질 수 있는 변경을 준비할 때
 
-```
-erp/backend/app/routers/settings.py
-```
+## 중요한 내용
 
-## 3. import
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
-| 모듈 | 용도 |
-|------|------|
-| `app.models.SystemSetting` | 관리자 PIN 저장 테이블 |
-| `app.services.integrity` | check_inventory_consistency, repair_inventory_totals |
-| `app.services.audit` | 감사 기록 (PIN 변경, repair, reset) |
-| `app.services.pin_auth.hash_pin` | PIN 해싱 |
-| `app.services._tx.commit_and_refresh, commit_only` | DB 커밋 |
-| `app.services.seed_cleanup.run_cleanup_import` | reset 시 시드 재적재 |
+- `ResetRequest`
+- `IntegrityRepairRequest`
+- `ensure_admin_pin`
+- `_is_hashed`
+- `_matches_admin_pin`
+- `verify_admin_pin`
+- `update_admin_pin`
+- `require_admin`
+- `_inventory_integrity_payload`
+- `check_inventory_integrity`
+- 그 외 8개 항목
 
-## 4. export (endpoint 목록)
+## 연결되는 파일
 
-| Method | Path | PIN 필요 | 설명 |
-|--------|------|----------|------|
-| POST | `/settings/verify-pin` | 자신 PIN | 관리자 PIN 검증 |
-| PUT | `/settings/admin-pin` | 현재+새 PIN | 관리자 PIN 변경 |
-| GET | `/settings/integrity/inventory` | 관리자 PIN | 재고 불변식 점검 (deprecated, body 우선) |
-| POST | `/settings/integrity/inventory` | 관리자 PIN | 재고 불변식 점검 (신규 기준) |
-| POST | `/settings/integrity/repair` | 관리자 PIN | 재고 복구 (dry_run=true 기본) |
-| POST | `/settings/reset` | 관리자 PIN | DB 초기화 + 시드 재적재 |
+### 먼저 같이 볼 파일
+- [[ERP/backend/app/schemas.py]] — 백엔드와 프론트엔드가 주고받는 데이터 모양을 정하는 파일입니다.
+- [[ERP/backend/app/models.py]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 파일입니다.
 
-**공개 함수 (다른 라우터 임포트용)**
+## 조심할 점
 
-| 함수 | 설명 |
-|------|------|
-| `require_admin(db, pin)` | 관리자 PIN 불일치 시 403 |
+이 파일은 운영 데이터, 재고 수량, 승인 상태, DB 구조, 백업/복구 중 하나와 직접 연결됩니다. 수정 전에는 관련 테스트, 백업 여부, 연결 화면/API를 반드시 확인해야 합니다.
 
-## 5. 참조처
-
-- `departments.py` → `from app.routers.settings import require_admin`
-- `employees.py` → `from app.routers.settings import require_admin`
-- 프론트엔드 설정 화면 (PIN 관리, 무결성 점검)
-
-## 6. 업무 흐름
-
-```mermaid
-flowchart TD
-    subgraph PIN 관리
-        A[POST /verify-pin] --> B[ensure_admin_pin\nDB에 없으면 0000 생성]
-        B --> C[_matches_admin_pin]
-        C -->|평문 발견| D[lazy migration: 즉시 해시화]
-        C -->|해시 일치| OK[200 OK]
-        C -->|불일치| ERR[403]
-    end
-
-    subgraph 무결성
-        E[POST /integrity/inventory] --> F[require_admin]
-        F --> G[integrity_svc.check_inventory_consistency]
-        G --> H[미스매치 목록 반환]
-
-        I[POST /integrity/repair dry_run=true] --> F
-        F --> J[repair_inventory_totals]
-        J -->|dry_run=false| K[audit.record + commit]
-    end
-
-    subgraph 초기화
-        L[POST /reset] --> M[require_admin]
-        M --> N[audit.record BEFORE commit\n초기화 후 audit도 지워질 수 있으므로]
-        N --> O[Item/Inventory/InventoryLocation 전체 삭제]
-        O --> P[run_cleanup_import 시드]
-    end
-```
-
-## 7. 핵심 함수
-
-### `require_admin` — 전역 공유
+## 핵심 발췌
 
 ```python
-def require_admin(db: Session, pin: str) -> None:
-    """관리자 PIN 검증. 일치하지 않으면 403."""
-    setting = ensure_admin_pin(db)
-    if not _matches_admin_pin(db, setting, pin):
-        raise http_error(403, ErrorCode.BAD_REQUEST, "관리자 비밀번호가 올바르지 않습니다.")
-```
+"""System settings router.
 
-### `_matches_admin_pin` — lazy migration
+관리자 PIN 인증 엔드포인트와 DB 재시드(안전 초기화), 재고 불변식 점검/복구 엔드포인트.
+무결성 점검 · 복구는 운영자가 명시적으로 호출하는 관리자 도구이며 프론트엔드는 사용하지 않는다.
+"""
 
-```python
-def _matches_admin_pin(db: Session, setting: SystemSetting, input_pin: str) -> bool:
-    """PIN 비교. 평문 발견 시 자동 해시화(lazy migration)."""
-    stored = setting.setting_value
-    if _is_hashed(stored):         # 64자 hex → 해시 비교
-        return stored == hash_pin(input_pin)
-    # 평문 → 비교 후 일치하면 즉시 해시화 (레거시 DB 마이그레이션)
-    if stored == input_pin:
-        setting.setting_value = hash_pin(input_pin)
-        setting.updated_at = datetime.now(UTC).replace(tzinfo=None)
-        commit_only(db)
-        return True
-    return False
-```
+import logging
+from datetime import UTC, datetime
 
-> [!important] lazy migration 설명
-> DB 에 평문 PIN 이 저장되어 있으면(구버전 DB), 첫 번째 올바른 로그인 시 자동으로 해시화한다.  
-> 개발자가 DB 를 직접 마이그레이션하지 않아도 된다.
+from typing import Optional
 
-### `reset_database` — 위험 작업
+from fastapi import APIRouter, Body, Depends, Query, Request
+from sqlalchemy.orm import Session
 
-```python
-@router.post("/reset", response_model=MessageResponse)
-def reset_database(payload: ResetRequest, request: Request, db: Session = Depends(get_db)):
-    # reset 직전에 audit 1건 기록 (reset 자체는 시드 재적재로 audit_logs 도 비울 수 있어 사후 기록 무의미)
-    audit.record(db, ..., action="settings.reset_db", ...)
-    commit_only(db)
-    # 품목·재고 데이터 초기화 (Employee/ProcessType 등은 유지)
-    db.query(_Loc).delete(synchronize_session=False)
-    db.query(_Inv).delete(synchronize_session=False)
-    db.query(_Item).delete(synchronize_session=False)
-    db.commit()
-    result = run_cleanup_import(db)
-    return MessageResponse(message=f"...rows={result['rows']}...")
-```
+from pydantic import BaseModel, Field
 
-## 8. 위험 포인트
+from app.database import get_db
+from app.models import Inventory, SystemSetting
+from app.routers._errors import ErrorCode, http_error
+from app.schemas import (
+    AdminPinUpdateRequest,
+    AdminPinVerifyRequest,
+    IntegrityCheckBody,
+    IntegrityCheckRequest,
+    IntegrityCheckResponse,
+    IntegrityRepairResponse,
+    MessageResponse,
+)
+from app.services import audit
+from app.services import integrity as integrity_svc
+from app.services._tx import commit_and_refresh, commit_only
+from app.services.pin_auth import hash_pin
 
-> [!danger] POST /settings/reset — 되돌릴 수 없음
-> Item / Inventory / InventoryLocation 전체를 삭제한다.  
-> Employee, ProcessType, Department 등 참조 데이터는 유지된다.  
-> audit 기록도 reset 으로 지워질 수 있으므로 **reset 전 audit 기록** 이 먼저 commit 된다.
+logger = logging.getLogger("mes")
 
-> [!danger] dry_run 기본값
-> `POST /integrity/repair` 의 `dry_run` 기본값은 **True**.  
-> 실제 복구를 하려면 `"dry_run": false` 를 명시해야 한다.  
-> 기본값을 모르고 호출하면 아무것도 변경되지 않는다.
 
-> [!warning] `require_admin` 은 공유 함수
-> departments.py, employees.py 가 이 함수를 임포트한다.  
-> 함수 시그니처나 예외 타입 변경 시 세 파일 모두 영향 받음.
+class ResetRequest(BaseModel):
+    pin: str = Field(..., min_length=4, max_length=32, description="현재 관리자 PIN")
 
-## 9. 죽은 코드 의심
 
-- `GET /settings/integrity/inventory` 는 `Deprecated compatibility endpoint` 주석이 달려 있음.  
-  신규 코드는 `POST` 엔드포인트를 사용해야 한다.
-- `_require_admin = require_admin` 내부 alias — 코드 내 일부가 여전히 `_require_admin` 을 호출.
+class IntegrityRepairRequest(BaseModel):
+    pin: str = Field(..., min_length=4, max_length=32)
+    dry_run: bool = True
 
-## 10. 수정 전 체크
+router = APIRouter()
 
-- [ ] `require_admin` 변경 시 departments.py, employees.py 테스트
-- [ ] `repair` 호출 전 반드시 `dry_run=true` 로 먼저 점검 후 false 로 적용
-- [ ] `reset` 은 절대 자동화/스크립트에서 호출 금지
-- [ ] `ADMIN_PIN_KEY = "admin_pin"` 상수 변경 시 DB 의 `SystemSetting.setting_key` 도 마이그레이션 필요
-
-## 11. 코드 발췌
-
-```python
 ADMIN_PIN_KEY = "admin_pin"
 DEFAULT_ADMIN_PIN = "0000"
 
+
 def ensure_admin_pin(db: Session) -> SystemSetting:
-    setting = db.query(SystemSetting).filter(
-        SystemSetting.setting_key == ADMIN_PIN_KEY
-    ).first()
+    setting = db.query(SystemSetting).filter(SystemSetting.setting_key == ADMIN_PIN_KEY).first()
     if setting:
         return setting
-    # DB 에 없으면 기본 PIN(0000) 으로 자동 생성
-    setting = SystemSetting(
-        setting_key=ADMIN_PIN_KEY,
-        setting_value=hash_pin(DEFAULT_ADMIN_PIN)
-    )
-    db.add(setting)
-    commit_and_refresh(db, setting)
-    return setting
-
-def _is_hashed(value: str) -> bool:
-    return len(value) == 64 and all(c in "0123456789abcdef" for c in value)
 ```
-
----
-
-## 관련 노트
-
-- [[_routers]] — 라우터 허브
-- [[erp/backend/app/routers/departments.py]] — require_admin 사용
-- [[erp/backend/app/routers/employees.py]] — require_admin 사용
-- [[erp/backend/app/services/integrity.py]] — 무결성 점검 로직
-
-Up: [[_routers]]

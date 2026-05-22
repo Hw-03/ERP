@@ -1,23 +1,47 @@
 ---
-type: code-note
+type: file-explanation
+source_path: "_attic/scripts/dev/randomize_inventory.py"
+importance: reference
+layer: archive
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
-layer: attic
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/_attic/scripts/dev/randomize_inventory.py
-tags: [vault, code-note, auto-generated, stub, mirror-fill]
 ---
 
-# randomize_inventory.py
+# randomize_inventory.py — randomize_inventory.py 설명
 
-> [!info] 1:1 미러 stub
-> 탐색기에 보이는 폴더 구조를 vault 에 그대로 반영하기 위한 stub.
-> 원본: [[erp/_attic/scripts/dev/randomize_inventory.py]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄 (또는 메타)
+`randomize_inventory.py`는 현재 운영 코드가 아니라 과거 자료나 실험 결과를 보관한 참고 파일입니다.
 
-```
+## 업무 흐름에서의 의미
+
+과거 맥락을 이해하는 데 도움은 되지만, 현재 운영 기준으로 바로 사용하면 안 됩니다.
+
+## 언제 보면 좋나
+
+- 과거 자료의 의미를 확인할 때
+- 현재 코드와 비교할 참고 근거가 필요할 때
+
+## 중요한 내용
+
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
+
+- `weighted_sample`
+- `split_quantity`
+- `randomize`
+
+## 연결되는 파일
+
+- [[ERP/_attic/scripts/dev/📁_dev]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+보관 자료입니다. 현재 코드처럼 믿고 수정하거나 실행하지 않습니다.
+
+## 핵심 발췌
+
+```python
 """
 창고/부서 랜덤 재고 분배 + 안전재고 설정 스크립트.
 
@@ -43,4 +67,34 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent.parent / "backend"
 sys.path.insert(0, str(BACKEND_DIR))
 os.environ["DATABASE_URL"] = f"sqlite:///{(BACKEND_DIR / 'erp.db').as_posix()}"
 
+from app.database import SessionLocal
+from app.models import (
+    DepartmentEnum,
+    Inventory,
+    InventoryLocation,
+    Item,
+    LocationStatusEnum,
+)
+
+random.seed(42)
+
+# process_type_code 별 가중 부서 목록 (앞쪽이 더 높은 확률)
+# 키는 18종 공정 코드. 사용 0건인 코드(NA, TA)도 정의해 둔다.
+PROCESS_TYPE_DEPT_WEIGHTS: dict[str, list[tuple[DepartmentEnum, int]]] = {
+    # 튜브 (T)
+    "TR": [(DepartmentEnum.TUBE, 4), (DepartmentEnum.ASSEMBLY, 2), (DepartmentEnum.TUNING, 1)],
+    "TA": [(DepartmentEnum.TUBE, 5), (DepartmentEnum.ASSEMBLY, 2), (DepartmentEnum.TUNING, 1)],
+    "TF": [(DepartmentEnum.TUBE, 5), (DepartmentEnum.ASSEMBLY, 2)],
+    # 고압 (H)
+    "HR": [(DepartmentEnum.HIGH_VOLTAGE, 4), (DepartmentEnum.ASSEMBLY, 2)],
+    "HA": [(DepartmentEnum.HIGH_VOLTAGE, 5), (DepartmentEnum.ASSEMBLY, 2), (DepartmentEnum.RESEARCH, 1)],
+    "HF": [(DepartmentEnum.HIGH_VOLTAGE, 5), (DepartmentEnum.ASSEMBLY, 2)],
+    # 진공 (V)
+    "VR": [(DepartmentEnum.VACUUM, 4), (DepartmentEnum.ASSEMBLY, 2), (DepartmentEnum.TUNING, 1)],
+    "VA": [(DepartmentEnum.VACUUM, 5), (DepartmentEnum.ASSEMBLY, 2), (DepartmentEnum.TUNING, 1)],
+    "VF": [(DepartmentEnum.VACUUM, 5), (DepartmentEnum.ASSEMBLY, 2)],
+    # 튜닝 (N)
+    "NR": [(DepartmentEnum.TUNING, 4), (DepartmentEnum.VACUUM, 2), (DepartmentEnum.ASSEMBLY, 1)],
+    "NA": [(DepartmentEnum.TUNING, 5), (DepartmentEnum.VACUUM, 2)],
+    "NF": [(DepartmentEnum.TUNING, 5), (DepartmentEnum.ASSEMBLY, 2)],
 ```

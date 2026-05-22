@@ -1,42 +1,36 @@
 ---
-type: code-note
-project: ERP
+type: file-explanation
+source_path: "backend/tests/__init__.py"
+importance: normal
 layer: backend
-source_path: erp/backend/tests/__init__.py
-status: active
-updated: 2026-04-27
-source_sha: da39a3ee5e6b
-tags:
-  - erp
-  - backend
-  - test
-  - py
+graph: file
+updated: 2026-05-22
+project: DEXCOWIN MES
 ---
 
-# __init__.py
+# __init__.py — __init__.py 설명
 
-> [!summary] 역할
-> 현재 ERP 동작을 회귀 없이 유지하기 위한 자동 테스트 파일이다.
+## 이 파일은 무엇을 책임지나
 
-## 원본 위치
+`__init__.py`는 백엔드 동작이 깨지지 않았는지 자동으로 확인하는 테스트 파일입니다.
 
-- Source: `backend/tests/__init__.py`
-- Layer: `backend`
-- Kind: `test`
-- Size: `0` bytes
+## 업무 흐름에서의 의미
 
-## 연결
+현장 화면에서 발생한 요청이 실제 데이터 조회나 변경으로 이어질 때 이 백엔드 영역이 관여합니다.
 
-- Parent hub: [[backend/tests/tests|backend/tests]]
-- Related: [[backend/backend]]
+## 언제 보면 좋나
 
-## 읽는 포인트
+- 이 파일이 맡은 화면/API/데이터 흐름을 확인해야 할 때
+- 수정 전에 영향 범위를 빠르게 파악해야 할 때
 
-- 기능 변경 후 같은 영역 테스트를 먼저 확인한다.
-- 테스트가 문서보다 최신 동작을 더 정확히 말해줄 때가 많다.
+## 중요한 내용
 
-## 원본 발췌
+자동으로 뽑을 수 있는 함수/클래스 목록은 적지만, 파일 위치와 확장자로 볼 때 위 역할을 맡습니다.
 
-````python
+## 연결되는 파일
 
-````
+- [[ERP/backend/tests/📁_tests]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 파일 내용 처리
+
+이 파일은 바이너리이거나 사람이 직접 읽는 코드 파일이 아닙니다. 파일명, 위치, 용도 중심의 메타 설명만 남깁니다.

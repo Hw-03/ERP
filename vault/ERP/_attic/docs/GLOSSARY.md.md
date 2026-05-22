@@ -1,23 +1,52 @@
 ---
-type: code-note
+type: file-explanation
+source_path: "_attic/docs/GLOSSARY.md"
+importance: reference
+layer: archive
+graph: file
+updated: 2026-05-22
 project: DEXCOWIN MES
-layer: attic
-status: stub
-created: 2026-05-21
-updated: 2026-05-21
-source_path: erp/_attic/docs/GLOSSARY.md
-tags: [vault, code-note, auto-generated, stub, mirror-fill]
 ---
 
-# GLOSSARY.md
+# GLOSSARY.md — GLOSSARY.md 설명
 
-> [!info] 1:1 미러 stub
-> 탐색기에 보이는 폴더 구조를 vault 에 그대로 반영하기 위한 stub.
-> 원본: [[erp/_attic/docs/GLOSSARY.md]]
+## 이 파일은 무엇을 책임지나
 
-## 원본 첫 줄 (또는 메타)
+`GLOSSARY.md`는 현재 운영 코드가 아니라 과거 자료나 실험 결과를 보관한 참고 파일입니다.
 
-```
+## 업무 흐름에서의 의미
+
+과거 맥락을 이해하는 데 도움은 되지만, 현재 운영 기준으로 바로 사용하면 안 됩니다.
+
+## 언제 보면 좋나
+
+- 과거 자료의 의미를 확인할 때
+- 현재 코드와 비교할 참고 근거가 필요할 때
+
+## 중요한 내용
+
+이 파일에서 눈에 띄는 구조는 다음과 같습니다.
+
+- `용어 사전 (GLOSSARY)`
+- `부서 / 분류`
+- `공정코드 (`process_type_code`)`
+- `재고 3-bucket 모델`
+- `BOM`
+- `트랜잭션`
+- `에러 코드 (Phase 4 표준화)`
+- `그 외 용어`
+
+## 연결되는 파일
+
+- [[ERP/_attic/docs/📁_docs]] — 이 파일이 속한 폴더의 안내판입니다.
+
+## 조심할 점
+
+보관 자료입니다. 현재 코드처럼 믿고 수정하거나 실행하지 않습니다.
+
+## 핵심 발췌
+
+```md
 # 용어 사전 (GLOSSARY)
 
 이 문서는 MES 프로토타입에서 코드·UI·문서가 같은 의미로 쓰는 도메인 용어를 한 곳에 정리한다. 새로운 작업자/문서/기능은 여기 있는 단어를 그대로 사용한다.
@@ -43,4 +72,33 @@ tags: [vault, code-note, auto-generated, stub, mirror-fill]
 | 튜브 | `TR` | `TA` | `TF` |
 | 고압 | `HR` | `HA` | `HF` |
 | 진공 | `VR` | `VA` | `VF` |
+| 튜닝 | `NR` | `NA` | `NF` |
+| 조립 | `AR` | `AA` | `AF` |
+| 출하 | `PR` | `PA` | `PF` |
+
+- `CategoryEnum` (`RM`/`TA`/`TF`/`HA`/`HF`/`VA`/`VF`/`AA`/`AF`/`FG`/`UK`) 은 2026-04-29 완전 제거. 코드·DB·UI 어디에도 존재하지 않는다.
+- suffix 의미: `R` = 원자재, `A` = 조립/가공, `F` = 완성/출하형.
+
+## 재고 3-bucket 모델
+
+`stock_math.StockFigures` 가 정의하는 단일 소스. 다른 어디에도 직접 계산 금지.
+
+| 용어 | 코드 | 의미 |
+|---|---|---|
+| 창고 재고 | `warehouse_qty` | `Inventory.warehouse_qty`. 창고 부서가 보유한 분량. |
+| 생산 합계 | `production_total` | 부서별 `InventoryLocation` 의 `PRODUCTION` 상태 합계. |
+| 불량 합계 | `defective_total` | 부서별 `InventoryLocation` 의 `DEFECTIVE` 상태 합계. |
+| 보류 | `pending` | `Inventory.pending_quantity`. OUT 큐에서 예약 중. |
+| 총재고 | `total` | `warehouse + production + defective` (= `Inventory.quantity` 와 같아야 함). |
+| 가용 | `available` | `warehouse + production - pending`. UI 가 보여주는 사용 가능량. |
+| 창고 가용 | `warehouse_available` | `warehouse - pending`. **BOM backflush·창고 출고 검사용**. |
+
+## BOM
+
+| 용어 | 코드 | 설명 |
+|---|---|---|
+| 부모 / 자식 | `parent_item_id` / `child_item_id` | BOM 한 줄. parent 1개당 child 여러 개. |
+| 트리 | `BOMTreeNode` | 다단계 전개 결과 (재귀). `_explode_bom`. |
+| Backflush | `TransactionTypeEnum.BACKFLUSH` | 생산 입고 시 BOM 자식들을 자동 차감하는 동작. |
+| Where-Used | `/api/bom/where-used/{item_id}` | 역방향 추적. 이 자식이 어떤 parent 들에 들어가는지. (Phase 4 추가) |
 ```
