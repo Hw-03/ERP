@@ -2,7 +2,7 @@
   "name": "erp-graph-size-patcher",
   "version": "0.1.0",
   "private": true,
-  "description": "Runtime node size patcher for Obsidian's built-in Graph View.",
+  "description": "Runtime node size and collision radius patcher for Obsidian's built-in Graph View.",
   "main": "main.js",
   "scripts": {
     "build": "esbuild main.ts --bundle --external:obsidian --format=cjs --platform=browser --target=es2018 --outfile=main.js",

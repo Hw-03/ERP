@@ -110,7 +110,7 @@ export function DefectActionStep({
           className="flex w-full items-center justify-center gap-2 rounded-[18px] px-7 py-5 text-lg font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
           style={{ background: LEGACY_COLORS.red }}
         >
-          {canAdvance ? "다음 단계로 →" : "사유 카테고리를 선택하세요"}
+          {canAdvance ? "제출하기 →" : "사유 카테고리를 선택하세요"}
         </button>
       </div>
     );
@@ -147,7 +147,7 @@ export function DefectActionStep({
           className="flex w-full items-center justify-center gap-2 rounded-[18px] px-7 py-5 text-lg font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
           style={{ background: LEGACY_COLORS.red }}
         >
-          {canAdvance ? "다음 단계로 →" : "사유 카테고리를 선택하세요"}
+          {canAdvance ? "제출하기 →" : "사유 카테고리를 선택하세요"}
         </button>
       </div>
     );
@@ -218,7 +218,7 @@ export function DefectActionStep({
         className="flex w-full items-center justify-center gap-2 rounded-[18px] px-7 py-5 text-lg font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
         style={{ background: LEGACY_COLORS.red }}
       >
-        {canAdvance ? "다음 단계로 →" : "처리 방법과 사유를 선택하세요"}
+        {canAdvance ? "제출하기 →" : "처리 방법과 사유를 선택하세요"}
       </button>
     </div>
   );

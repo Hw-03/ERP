@@ -3,7 +3,7 @@
   "name": "ERP Graph Size Patcher",
   "version": "0.1.0",
   "minAppVersion": "1.5.0",
-  "description": "Adjusts built-in Graph View node sizes from vault hierarchy while keeping the native graph physics and interactions.",
+  "description": "Adjusts built-in Graph View node sizes and runtime collision radii from the vault hierarchy while keeping native interactions.",
   "author": "ERP Vault",
   "authorUrl": "",
   "isDesktopOnly": true

@@ -22,6 +22,9 @@ import { useIoWorkState, type IoStep } from "./useIoWorkState";
 import type { IoComposeViewProps } from "./types";
 import { DefectInventoryPicker } from "./DefectInventoryPicker";
 import { DefectActionStep } from "./DefectActionStep";
+import { defectsApi } from "@/lib/api/defects";
+import { stockRequestsApi } from "@/lib/api/stock-requests";
+import type { Department } from "@/lib/api/types/shared";
 
 function locationQuantity(item: Item, department: string | null | undefined, status: "PRODUCTION" | "DEFECTIVE") {
   if (!department) return 0;
@@ -117,6 +120,7 @@ export function IoComposeView({
   const { previewing, previewTarget } = useIoPreview();
   const { drafting, saveDraft } = useIoDraft();
   const { submitting, submit } = useIoSubmit();
+  const [defectSubmitting, setDefectSubmitting] = useState(false);
 
   // 브라우저 뒤로/앞으로 ↔ step 동기화. URL ?step=N 으로 history 엔트리를 쌓아 입출고 위저드 내부에서도
   // 뒤/앞 버튼이 작동하게 함.
@@ -348,6 +352,75 @@ export function IoComposeView({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defectDeptFilter]);
+
+  async function handleDefectInventorySubmit() {
+    const loc = state.defectSelectedLocation;
+    if (!employeeId || !loc) return;
+    setDefectSubmitting(true);
+    try {
+      const subType = state.subType;
+      const action = state.defectAction;
+      const lines = [{
+        item_id: loc.item_id,
+        quantity: loc.quantity,
+        from_bucket: "defective" as const,
+        from_department: loc.department as Department,
+        to_bucket: "none" as const,
+      }];
+      if (subType === "defect_restore" || action === "restore") {
+        await defectsApi.unquarantine({
+          item_id: loc.item_id,
+          qty: loc.quantity,
+          dept: loc.department,
+          reason_category: state.defectReasonCategory,
+          reason_memo: state.defectReasonMemo,
+          actor_employee_id: employeeId,
+        });
+        setResult({ kind: "success", title: "정상 복귀 완료", message: "격리 재고가 정상 복귀되었습니다." });
+      } else if (subType === "supplier_return") {
+        await stockRequestsApi.createStockRequest({
+          requester_employee_id: employeeId,
+          request_type: "defect_return",
+          reason_category: state.defectReasonCategory,
+          reason_memo: state.defectReasonMemo || null,
+          notes: state.defectReasonMemo || null,
+          lines,
+        });
+        setResult({ kind: "success", title: "결재 요청 완료", message: "창고 결재 요청이 제출되었습니다." });
+      } else if (action === "scrap") {
+        await stockRequestsApi.createStockRequest({
+          requester_employee_id: employeeId,
+          request_type: "defect_scrap",
+          reason_category: state.defectReasonCategory,
+          reason_memo: state.defectReasonMemo || null,
+          notes: state.defectReasonMemo || null,
+          lines,
+        });
+        setResult({ kind: "success", title: "결재 요청 완료", message: "창고 결재 요청이 제출되었습니다." });
+      } else if (action === "disassemble") {
+        const childDecisions = state.defectBomDecisions.map((d) => ({
+          item_id: d.item_id,
+          action: d.action,
+          qty: d.qty,
+        }));
+        await stockRequestsApi.createStockRequest({
+          requester_employee_id: employeeId,
+          request_type: "defect_disassemble",
+          reason_category: state.defectReasonCategory,
+          reason_memo: state.defectReasonMemo || null,
+          notes: JSON.stringify({ child_decisions: childDecisions }),
+          lines,
+        });
+        setResult({ kind: "success", title: "결재 요청 완료", message: "창고 결재 요청이 제출되었습니다." });
+      }
+      state.reset();
+      onStatusChange("불량 처리 완료");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "처리 중 오류가 발생했습니다.");
+    } finally {
+      setDefectSubmitting(false);
+    }
+  }
 
   async function handleSubmit() {
     if (!employeeId) {
@@ -762,7 +835,7 @@ export function IoComposeView({
                 }}
                 onBomDecisionsChange={state.setDefectBomDecisions}
                 canAdvance={state.canAdvance[4]}
-                onAdvance={state.goNext}
+                onAdvance={handleDefectInventorySubmit}
               />
             ) : (
             <IoBundleCart
@@ -809,7 +882,7 @@ export function IoComposeView({
         </div>
       )}
 
-      {step >= 5 && (
+      {step >= 5 && !(state.workType === "defect" && isDefectInventorySubType(state.subType)) && (
         <div
           ref={(el) => { stepRefs.current[5] = el; }}
           className={stepWrapperClass(5)}

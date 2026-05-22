@@ -24,13 +24,17 @@ __export(main_exports, {
 module.exports = __toCommonJS(main_exports);
 var import_obsidian = require("obsidian");
 var DEFAULT_SETTINGS = {
-  enabled: false,
+  enabled: true,
   minRadius: 8,
-  maxRadius: 48,
+  maxRadius: 120,
   scaleFactor: 4,
   includeExtensions: ".md,.canvas",
   patchIntervalMs: 0
 };
+var COLLISION_PADDING = 2;
+var COLLISION_RADIUS_PROPS = ["collisionRadius", "collideRadius", "radius", "r", "size", "nodeSize"];
+var LINK_LENGTH_PROPS = ["distance", "length", "restLength", "targetLength", "desiredLength", "springLength", "linkDistance"];
+var RUNTIME_RESTORE_PROPS = [...COLLISION_RADIUS_PROPS, "value", "weight", "mass", "x", "y", ...LINK_LENGTH_PROPS];
 var ERP_COLOR_GROUPS = [
   { query: "path:ERP.md", color: { a: 1, rgb: 9133302 } },
   { query: "path:_vault", color: { a: 1, rgb: 16098851 } },
@@ -235,21 +239,20 @@ var ErpGraphSizePatcherPlugin = class extends import_obsidian.Plugin {
   }
   patchGraphView(view, sizeIndex) {
     const renderers = this.findRendererCandidates(view);
-    const collections = this.findNodeCollections(view, sizeIndex);
+    const nodeItems = this.collectGraphNodeItems(view, renderers, sizeIndex);
+    if (nodeItems.length === 0) return 0;
+    const collisionPatched = this.patchGraphCollision(renderers, nodeItems);
     const patched = /* @__PURE__ */ new Set();
-    for (const renderer of renderers) {
-      this.patchGraphRenderer(renderer, sizeIndex, patched);
-    }
-    for (const collection of collections) {
-      for (const item of collection) {
-        const radius = this.lookupRadius(item.node, item.key, sizeIndex);
-        if (radius === null) continue;
-        try {
-          if (this.patchGraphNode(item.node, radius)) patched.add(item.node);
-        } catch (error) {
-          console.debug("[ERP Graph Size Patcher] Skipped a read-only graph node.", error);
-        }
+    for (const item of nodeItems) {
+      try {
+        if (this.patchGraphNode(item.node, item.radius)) patched.add(item.node);
+      } catch (error) {
+        console.debug("[ERP Graph Size Patcher] Skipped a read-only graph node.", error);
       }
+    }
+    if (!collisionPatched) {
+      console.warn("[ERP Graph Size Patcher] Collision hook not found; size patch applied without collision fallback.");
+      this.throttledNotice("ERP Graph Size Patcher: size patch applied; collision hook not found.");
     }
     this.requestGraphRefresh(view);
     for (const renderer of renderers) this.requestGraphRefresh(renderer);
@@ -293,23 +296,34 @@ var ErpGraphSizePatcherPlugin = class extends import_obsidian.Plugin {
     const canRender = ["changed", "queueRender", "setData", "render"].some((key) => typeof value[key] === "function");
     return hasNodes && canRender;
   }
-  patchGraphRenderer(renderer, sizeIndex, patched) {
+  collectGraphNodeItems(view, renderers, sizeIndex) {
+    const nodeRadii = /* @__PURE__ */ new Map();
+    const add = (item) => {
+      const radius = this.lookupRadius(item.node, item.key, sizeIndex) ?? this.settings.minRadius;
+      const current = nodeRadii.get(item.node);
+      if (current === void 0 || radius > current) nodeRadii.set(item.node, radius);
+    };
+    for (const renderer of renderers) {
+      for (const source of this.rendererNodeSources(renderer)) {
+        if (!source) continue;
+        for (const item of this.asNodeCollection(source)) add(item);
+      }
+    }
+    for (const collection of this.findNodeCollections(view)) {
+      for (const item of collection) add(item);
+    }
+    return Array.from(nodeRadii.entries()).map(([node, radius]) => ({ node, radius }));
+  }
+  rendererNodeSources(renderer) {
     var _a, _b;
-    const sources = [
+    const nodeSources = [
       renderer.nodeLookup,
       renderer.nodes,
       renderer.nodeList,
       (_a = renderer.graph) == null ? void 0 : _a.nodeLookup,
       (_b = renderer.graph) == null ? void 0 : _b.nodes
     ];
-    for (const source of sources) {
-      if (!source) continue;
-      for (const item of this.asNodeCollection(source, sizeIndex)) {
-        const radius = this.lookupRadius(item.node, item.key, sizeIndex);
-        if (radius === null) continue;
-        if (this.patchGraphNode(item.node, radius)) patched.add(item.node);
-      }
-    }
+    return nodeSources;
   }
   patchGraphNode(node, radius) {
     if (typeof node.getSize !== "function" && !this.originalGetSizes.has(node)) return false;
@@ -362,6 +376,218 @@ var ErpGraphSizePatcherPlugin = class extends import_obsidian.Plugin {
     }
     return previous !== radius;
   }
+  patchGraphCollision(renderers, nodeItems) {
+    const accessorCount = this.patchCollisionAccessors(renderers);
+    let patched = accessorCount > 0;
+    for (const item of nodeItems) {
+      const collisionRadius = item.radius + COLLISION_PADDING;
+      if (!this.setNodeCollisionRadius(item.node, collisionRadius)) return false;
+      if (accessorCount === 0 && this.patchNumericCollisionRadiusProps(item.node, collisionRadius)) {
+        patched = true;
+      }
+    }
+    if (this.separateOverlappingNodes(nodeItems)) patched = true;
+    return patched;
+  }
+  patchCollisionAccessors(renderers) {
+    let patched = 0;
+    for (const target of this.findPhysicsCandidates(renderers)) {
+      for (const key of this.safePropertyNames(target)) {
+        if (!this.isCollisionRadiusAccessorName(key)) continue;
+        if (this.patchCollisionAccessor(target, key)) patched += 1;
+      }
+    }
+    return patched;
+  }
+  findPhysicsCandidates(renderers) {
+    const found = /* @__PURE__ */ new Set();
+    const visited = /* @__PURE__ */ new WeakSet();
+    const stack = [];
+    for (const renderer of renderers) {
+      stack.push({ value: renderer, depth: 0 });
+      for (const key of ["graph", "engine", "simulation", "force", "forces", "collision", "collide", "physics"]) {
+        try {
+          if (this.isTraversable(renderer[key])) stack.push({ value: renderer[key], depth: 0 });
+        } catch (e) {
+        }
+      }
+    }
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current) break;
+      const value = current.value;
+      if (!this.isPlainObjectLike(value) || visited.has(value)) continue;
+      visited.add(value);
+      found.add(value);
+      if (current.depth >= 3) continue;
+      for (const key of this.safePropertyNames(value)) {
+        if (this.shouldSkipPhysicsProperty(key)) continue;
+        try {
+          const next = value[key];
+          if (this.isPlainObjectLike(next)) stack.push({ value: next, depth: current.depth + 1 });
+        } catch (e) {
+        }
+      }
+    }
+    return Array.from(found);
+  }
+  isCollisionRadiusAccessorName(key) {
+    const normalized = key.toLowerCase();
+    if (normalized.includes("radius")) return true;
+    if (normalized.includes("nodesize")) return true;
+    if (normalized === "getsize" || normalized === "size") return true;
+    if (normalized.includes("collisionsize")) return true;
+    return false;
+  }
+  patchCollisionAccessor(target, key) {
+    const current = target[key];
+    if (typeof current !== "function") return false;
+    if (current.__erpGraphCollisionAccessor === true) return false;
+    this.rememberOriginals(target, [key]);
+    const original = this.originals.get(target)?.[key] || current;
+    const plugin = this;
+    const wrapped = function erpCollisionRadiusAccessor(...args) {
+      const collisionRadius = plugin.findCollisionRadiusForCall(this, args);
+      if (collisionRadius !== null) return collisionRadius;
+      return original.apply(this, args);
+    };
+    try {
+      Object.defineProperty(wrapped, "__erpGraphCollisionAccessor", {
+        value: true,
+        configurable: true
+      });
+      target[key] = wrapped;
+      this.patchedObjects.add(target);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  findCollisionRadiusForCall(context, args) {
+    for (const value of args) {
+      const radius = this.readCollisionRadius(value);
+      if (radius !== null) return radius;
+    }
+    return this.readCollisionRadius(context);
+  }
+  readCollisionRadius(value) {
+    if (!value || typeof value !== "object") return null;
+    const radius = value.__erpCollisionRadius;
+    return typeof radius === "number" && Number.isFinite(radius) ? radius : null;
+  }
+  setNodeCollisionRadius(node, collisionRadius) {
+    try {
+      Object.defineProperty(node, "__erpCollisionRadius", {
+        value: collisionRadius,
+        writable: true,
+        configurable: true
+      });
+      this.patchedObjects.add(node);
+      return true;
+    } catch (e) {
+      try {
+        node.__erpCollisionRadius = collisionRadius;
+        this.patchedObjects.add(node);
+        return true;
+      } catch (e2) {
+        return false;
+      }
+    }
+  }
+  patchNumericCollisionRadiusProps(node, collisionRadius) {
+    let patched = false;
+    for (const prop of COLLISION_RADIUS_PROPS) {
+      const current = node[prop];
+      if (typeof current !== "number" || !Number.isFinite(current)) continue;
+      this.rememberOriginals(node, [prop]);
+      node[prop] = collisionRadius;
+      patched = true;
+    }
+    return patched;
+  }
+  separateOverlappingNodes(nodeItems) {
+    const positioned = nodeItems.map((item, index) => {
+      const position = this.readNodePosition(item.node);
+      if (!position) return null;
+      return {
+        node: item.node,
+        index,
+        x: position.x,
+        y: position.y,
+        radius: item.radius + COLLISION_PADDING
+      };
+    }).filter((item) => item !== null);
+    if (positioned.length < 2) return false;
+    let moved = false;
+    for (let iteration = 0; iteration < 6; iteration += 1) {
+      let movedThisIteration = false;
+      for (let i = 0; i < positioned.length; i += 1) {
+        for (let j = i + 1; j < positioned.length; j += 1) {
+          const a = positioned[i];
+          const b = positioned[j];
+          const minDistance = a.radius + b.radius + COLLISION_PADDING;
+          let dx = b.x - a.x;
+          let dy = b.y - a.y;
+          let distanceSq = dx * dx + dy * dy;
+          if (distanceSq >= minDistance * minDistance) continue;
+          if (distanceSq === 0) {
+            const angle = ((a.index + 1) * 97 + (b.index + 1) * 53) % 360;
+            const radians = angle * Math.PI / 180;
+            dx = Math.cos(radians);
+            dy = Math.sin(radians);
+            distanceSq = 1;
+          }
+          const distance = Math.sqrt(distanceSq);
+          const push = (minDistance - distance) / 2;
+          const nx = dx / distance;
+          const ny = dy / distance;
+          a.x -= nx * push;
+          a.y -= ny * push;
+          b.x += nx * push;
+          b.y += ny * push;
+          moved = true;
+          movedThisIteration = true;
+        }
+      }
+      if (!movedThisIteration) break;
+    }
+    if (!moved) return false;
+    for (const item of positioned) {
+      this.writeNodePosition(item.node, item.x, item.y);
+    }
+    return true;
+  }
+  readNodePosition(node) {
+    if (typeof node.x === "number" && Number.isFinite(node.x) && typeof node.y === "number" && Number.isFinite(node.y)) {
+      return { x: node.x, y: node.y };
+    }
+    for (const key of ["position", "pos"]) {
+      const value = node[key];
+      if (value && typeof value === "object" && typeof value.x === "number" && Number.isFinite(value.x) && typeof value.y === "number" && Number.isFinite(value.y)) {
+        return { x: value.x, y: value.y };
+      }
+    }
+    return null;
+  }
+  writeNodePosition(node, x, y) {
+    if (typeof node.x === "number" && Number.isFinite(node.x) && typeof node.y === "number" && Number.isFinite(node.y)) {
+      this.rememberOriginals(node, ["x", "y"]);
+      node.x = x;
+      node.y = y;
+      this.patchedObjects.add(node);
+      return;
+    }
+    for (const key of ["position", "pos"]) {
+      const value = node[key];
+      if (value && typeof value === "object" && typeof value.x === "number" && Number.isFinite(value.x) && typeof value.y === "number" && Number.isFinite(value.y)) {
+        this.rememberOriginals(value, ["x", "y"]);
+        value.x = x;
+        value.y = y;
+        this.patchedObjects.add(value);
+        return;
+      }
+    }
+  }
   buildSizeIndex() {
     const includedExtensions = this.getIncludedExtensions();
     const includedFiles = this.app.vault.getFiles().filter((file) => !file.path.startsWith(".obsidian/")).filter((file) => includedExtensions.has(`.${file.extension.toLowerCase()}`));
@@ -374,11 +600,17 @@ var ErpGraphSizePatcherPlugin = class extends import_obsidian.Plugin {
         folderCounts.set(folder, (folderCounts.get(folder) || 0) + 1);
       }
     }
+    const representedFolders = /* @__PURE__ */ new Set();
+    for (const file of includedFiles) {
+      const folder = this.getRepresentedFolder(file);
+      if (folder !== null) representedFolders.add(folder);
+    }
+    const maxDescendantCount = Math.max(1, ...Array.from(representedFolders).map((folder) => folderCounts.get(folder) || 0));
     const sizeIndex = /* @__PURE__ */ new Map();
     for (const file of includedFiles) {
       const folder = this.getRepresentedFolder(file);
       const descendantCount = folder !== null ? folderCounts.get(folder) || 0 : 0;
-      const radius = descendantCount > 0 ? this.radiusForCount(descendantCount) : this.settings.minRadius;
+      const radius = descendantCount > 0 ? this.radiusForCount(descendantCount, maxDescendantCount) : this.settings.minRadius;
       for (const alias of this.aliasesForFile(file, folder)) {
         this.setMaxSize(sizeIndex, alias, radius);
       }
@@ -390,16 +622,19 @@ var ErpGraphSizePatcherPlugin = class extends import_obsidian.Plugin {
     const values = raw.split(",").map((value) => value.trim().toLowerCase()).filter(Boolean).map((value) => value.startsWith(".") ? value : `.${value}`);
     return new Set(values.length ? values : [".md", ".canvas"]);
   }
-  radiusForCount(count) {
-    const raw = this.settings.minRadius + Math.sqrt(Math.max(0, count)) * this.settings.scaleFactor;
+  radiusForCount(count, maxCount) {
+    const safeCount = Math.max(0, count);
+    const safeMax = Math.max(1, maxCount);
+    const normalized = Math.sqrt(safeCount) / Math.sqrt(safeMax);
+    const raw = this.settings.minRadius + normalized * (this.settings.maxRadius - this.settings.minRadius);
     return Math.max(this.settings.minRadius, Math.min(this.settings.maxRadius, raw));
   }
   getRepresentedFolder(file) {
     var _a;
     const parent = ((_a = file.parent) == null ? void 0 : _a.path) || "";
-    const basename = file.basename;
+    const basename = this.normalizeHubBasename(file.basename);
     if (!parent || parent === "/") {
-      if (["ERP", "_ERP", "ERP-Vault", "_ERP-Vault"].includes(basename)) return "";
+      if (["ERP", "_ERP", "ERP-Vault", "_ERP-Vault", "vault", "_vault"].includes(basename)) return "";
       return null;
     }
     const folderName = parent.split("/").pop() || "";
@@ -422,6 +657,7 @@ var ErpGraphSizePatcherPlugin = class extends import_obsidian.Plugin {
       if (representedFolder) aliases.add(representedFolder);
       aliases.add(folderName);
       aliases.add(`_${folderName}`);
+      aliases.add(`📁_${folderName}`);
       if (!representedFolder) {
         aliases.add("/");
         aliases.add("root");
@@ -436,7 +672,10 @@ var ErpGraphSizePatcherPlugin = class extends import_obsidian.Plugin {
   normalizeKey(value) {
     return String(value).replace(/\\/g, "/").replace(/^\/+/, "").trim().toLowerCase();
   }
-  findNodeCollections(view, sizeIndex) {
+  normalizeHubBasename(value) {
+    return value.replace(/^📁_/, "");
+  }
+  findNodeCollections(view) {
     const collections = [];
     const visited = /* @__PURE__ */ new WeakSet();
     const stack = [{ value: view, depth: 0 }];
@@ -448,7 +687,7 @@ var ErpGraphSizePatcherPlugin = class extends import_obsidian.Plugin {
       if (!this.isTraversable(value) || visited.has(value)) continue;
       visited.add(value);
       inspected += 1;
-      const collection = this.asNodeCollection(value, sizeIndex);
+      const collection = this.asNodeCollection(value);
       if (collection.length > 0) collections.push(collection);
       if (current.depth >= 6) continue;
       for (const key of this.safePropertyNames(value)) {
@@ -462,38 +701,30 @@ var ErpGraphSizePatcherPlugin = class extends import_obsidian.Plugin {
     }
     return collections;
   }
-  asNodeCollection(value, sizeIndex) {
+  asNodeCollection(value) {
     const result = [];
     if (value instanceof Map) {
       for (const [key, node] of value.entries()) {
-        if (this.isPatchableNodeCandidate(node) && this.lookupRadius(node, String(key), sizeIndex) !== null) {
-          result.push({ node, key: String(key) });
-        }
+        if (this.isPatchableNodeCandidate(node)) result.push({ node, key: String(key) });
       }
       return result.length > 0 ? result : [];
     }
     if (value instanceof Set) {
       for (const node of value.values()) {
-        if (this.isPatchableNodeCandidate(node) && this.lookupRadius(node, void 0, sizeIndex) !== null) {
-          result.push({ node });
-        }
+        if (this.isPatchableNodeCandidate(node)) result.push({ node });
       }
       return result.length > 0 ? result : [];
     }
     if (Array.isArray(value)) {
       for (const node of value) {
-        if (this.isPatchableNodeCandidate(node) && this.lookupRadius(node, void 0, sizeIndex) !== null) {
-          result.push({ node });
-        }
+        if (this.isPatchableNodeCandidate(node)) result.push({ node });
       }
       return result.length > 0 ? result : [];
     }
     if (this.isPlainObjectLike(value)) {
       for (const key of Object.keys(value)) {
         const node = value[key];
-        if (this.isPatchableNodeCandidate(node) && this.lookupRadius(node, key, sizeIndex) !== null) {
-          result.push({ node, key });
-        }
+        if (this.isPatchableNodeCandidate(node)) result.push({ node, key });
       }
       return result.length > 0 ? result : [];
     }
@@ -542,9 +773,9 @@ var ErpGraphSizePatcherPlugin = class extends import_obsidian.Plugin {
     return Array.from(candidates);
   }
   rememberOriginals(target, props) {
-    if (this.originals.has(target)) return;
-    const original = {};
+    const original = this.originals.get(target) || {};
     for (const prop of props) {
+      if (Object.prototype.hasOwnProperty.call(original, prop)) continue;
       if (Object.prototype.hasOwnProperty.call(target, prop)) original[prop] = target[prop];
     }
     this.originals.set(target, original);
@@ -567,8 +798,13 @@ var ErpGraphSizePatcherPlugin = class extends import_obsidian.Plugin {
         } catch (e) {
         }
       }
+      try {
+        delete target.__erpCollisionRadius;
+      } catch (e) {
+      }
       if (original) {
-        for (const prop of ["radius", "r", "size", "nodeSize", "value", "weight"]) {
+        const props = new Set([...Object.keys(original), ...RUNTIME_RESTORE_PROPS]);
+        for (const prop of props) {
           if (Object.prototype.hasOwnProperty.call(original, prop)) {
             target[prop] = original[prop];
           } else {
@@ -639,6 +875,20 @@ var ErpGraphSizePatcherPlugin = class extends import_obsidian.Plugin {
       "links"
     ].includes(key);
   }
+  shouldSkipPhysicsProperty(key) {
+    if (this.shouldSkipProperty(key)) return true;
+    return [
+      "nodeLookup",
+      "nodes",
+      "nodeList",
+      "links",
+      "edges",
+      "linkLookup",
+      "edgeLookup",
+      "source",
+      "target"
+    ].includes(key);
+  }
 };
 var ErpGraphSizePatcherSettingTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
@@ -650,7 +900,7 @@ var ErpGraphSizePatcherSettingTab = class extends import_obsidian.PluginSettingT
     containerEl.empty();
     containerEl.createEl("h2", { text: "ERP Graph Size Patcher" });
     containerEl.createEl("p", {
-      text: "Keeps ERP graph node sizes aligned with the vault folder hierarchy. Notes and links are not modified.",
+      text: "Keeps ERP graph node sizes and runtime collision radii aligned with the vault folder hierarchy. Notes and vault links are not modified.",
       cls: "erp-graph-size-patcher-status"
     });
     new import_obsidian.Setting(containerEl).setName("Auto apply").setDesc("Keep ERP graph sizes applied when Graph View opens or changes.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enabled).onChange(async (value) => {
