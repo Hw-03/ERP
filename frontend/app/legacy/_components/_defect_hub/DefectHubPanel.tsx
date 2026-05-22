@@ -16,6 +16,7 @@ import { DefectFilterBar, type DefectScope, type DefectSort } from "./DefectFilt
 import { DefectDepartmentList } from "./DefectDepartmentList";
 import { RDefectActionModal } from "./RDefectActionModal";
 import { PaPfDefectWizard } from "./PaPfDefectWizard";
+import { AddQuarantineModal } from "./AddQuarantineModal";
 
 /** item_code 2번째 segment 가 process_type. PA/PF 면 BOM 분해 가능. */
 function isPaPfItem(itemCode: string | null | undefined): boolean {
@@ -57,6 +58,7 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
   const [sort, setSort] = useState<DefectSort>("oldest");
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
   const [processingLocation, setProcessingLocation] = useState<DefectLocation | null>(null);
+  const [addQuarantineOpen, setAddQuarantineOpen] = useState(false);
   const [reloadNonce, setReloadNonce] = useState(0);
 
   // 마운트 시 KPI + 목록 동시 로드 (처리 완료 후 reloadNonce 증가 시 재로드)
@@ -127,10 +129,14 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
     setReloadNonce((n) => n + 1);
   }
 
-  // 퀵 액션 — 별도 PR 에서 모달 추가 예정 (PR#5 후속)
   function handleAddQuarantine() {
-    console.log("[DefectHub] 새 격리 추가 — 별도 PR 에서 구현 예정");
+    setAddQuarantineOpen(true);
   }
+  function handleAddQuarantineSubmitted() {
+    setAddQuarantineOpen(false);
+    setReloadNonce((n) => n + 1);
+  }
+  // R 바로 반품/폐기 — 별도 PR (백엔드 정상→폐기 흐름 + 인터뷰 우선순위 확인 후)
   function handleAddRReturn() {
     console.log("[DefectHub] R 바로 반품 — 별도 PR 에서 구현 예정");
   }
@@ -229,6 +235,14 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
           onSubmitted={handleModalSubmitted}
         />
       ) : null}
+
+      {/* 새 격리 추가 모달 */}
+      <AddQuarantineModal
+        open={addQuarantineOpen}
+        onClose={() => setAddQuarantineOpen(false)}
+        currentEmployee={currentEmployee}
+        onSubmitted={handleAddQuarantineSubmitted}
+      />
     </div>
   );
 }

@@ -20,6 +20,10 @@ vi.mock("../PaPfDefectWizard", () => ({
   PaPfDefectWizard: ({ open, location }: { open: boolean; location: { item_code: string } }) =>
     open ? <div data-testid="papf-wizard">{location.item_code}</div> : null,
 }));
+vi.mock("../AddQuarantineModal", () => ({
+  AddQuarantineModal: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="add-quarantine">add</div> : null,
+}));
 
 import { defectsApi } from "@/lib/api/defects";
 
