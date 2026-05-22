@@ -67,6 +67,8 @@ class TransactionTypeEnum(str, enum.Enum):
     TRANSFER_TO_WH = "TRANSFER_TO_WH"
     TRANSFER_DEPT = "TRANSFER_DEPT"
     MARK_DEFECTIVE = "MARK_DEFECTIVE"
+    UNMARK_DEFECTIVE = "UNMARK_DEFECTIVE"
+    DEFECT_SCRAP = "DEFECT_SCRAP"
     SUPPLIER_RETURN = "SUPPLIER_RETURN"
 
 
@@ -235,6 +237,7 @@ class InventoryLocation(Base):
         onupdate=datetime.utcnow,
         server_default=func.now(),
     )
+    defective_at = Column(DateTime, nullable=True, index=True)
 
     __table_args__ = (
         # 5.5-A: 음수 위치 재고 방지. 서비스 레이어에서 막지만 DB-level 안전망.
@@ -368,6 +371,10 @@ class TransactionLog(Base):
     reference_no = Column(String(100), nullable=True, index=True)
     produced_by = Column(String(100), nullable=True)
     notes = Column(Text, nullable=True)
+    # 불량 처리 흐름 — 사유 카테고리(외관/치수/기능/검사통과/기타) + 자유 메모.
+    # 카테고리 enum 은 프론트 상수로만 정의, 백엔드는 자유 문자열로 받음.
+    reason_category = Column(String(32), nullable=True, index=True)
+    reason_memo = Column(Text, nullable=True)
     operation_batch_id = Column(
         UUID(as_uuid=True),
         ForeignKey("io_batches.batch_id", ondelete="SET NULL"),

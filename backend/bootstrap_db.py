@@ -219,6 +219,22 @@ _MIGRATION_DDL: list[str] = [
     # items.item_code (레거시 CSV) DROP + erp_code → item_code rename 은
     # _consolidate_item_code_columns() 헬퍼에서 처리. 멱등 (PRAGMA 로 현재 상태 검사 후
     # 필요한 단계만 수행) — fresh DB / 운영 DB 모두 안전.
+
+    # 2026-05-22: 불량 처리 흐름 재설계 — Phase 1 모델 변경 (docs/defect-handling-redesign.md)
+    # 격리 일자 — 1년 묵은 거 추적용 (허브 정렬·경고 배지)
+    "ALTER TABLE inventory_locations ADD COLUMN defective_at DATETIME",
+    "CREATE INDEX IF NOT EXISTS ix_invloc_defective_at ON inventory_locations(defective_at)",
+    # 사유 필드 — 카테고리(외관/치수/기능/검사통과/기타) + 자유 메모
+    "ALTER TABLE transaction_logs ADD COLUMN reason_category VARCHAR(32)",
+    "CREATE INDEX IF NOT EXISTS ix_tx_reason_category ON transaction_logs(reason_category)",
+    "ALTER TABLE transaction_logs ADD COLUMN reason_memo TEXT",
+    # 기존 DEFECTIVE 행 백필 — updated_at 으로. NULL 이면 1년 경고 오작동.
+    "UPDATE inventory_locations SET defective_at = updated_at "
+    "WHERE status = 'DEFECTIVE' AND defective_at IS NULL",
+
+    # 2026-05-22 (오후): 부서 계층(생산부 그릇) 청소는 `_cleanup_production_hierarchy()`
+    # 헬퍼에서 처리. _MIGRATION_DDL 의 raw 문장으로 두면 fresh DB(parent_id 컬럼 없음)
+    # 에서 "REAL FAILURE" 로 분류되므로 PRAGMA 검사로 안전하게 분기.
 ]
 
 
@@ -280,7 +296,7 @@ def _drop_dead_transaction_type_enum_values() -> None:
             CREATE TYPE transaction_type_enum_new AS ENUM (
                 'RECEIVE','PRODUCE','SHIP','ADJUST','BACKFLUSH','DISASSEMBLE',
                 'TRANSFER_TO_PROD','TRANSFER_TO_WH','TRANSFER_DEPT',
-                'MARK_DEFECTIVE','SUPPLIER_RETURN'
+                'MARK_DEFECTIVE','UNMARK_DEFECTIVE','DEFECT_SCRAP','SUPPLIER_RETURN'
             );
             ALTER TABLE transaction_logs
                 ALTER COLUMN transaction_type
@@ -289,6 +305,53 @@ def _drop_dead_transaction_type_enum_values() -> None:
             DROP TYPE transaction_type_enum;
             ALTER TYPE transaction_type_enum_new RENAME TO transaction_type_enum;
         """))
+
+
+def _cleanup_production_hierarchy() -> None:
+    """어제(2026-05-22 오전) 잠시 만든 "생산부" 그릇 / `parent_id` 컬럼 청소.
+
+    사용자 정의 "부서 결재 역할 = 생산 라인 결재" 단순화에 따라 부서 계층 폐기.
+    멱등 — 이미 정리된 환경이면 모두 NO-OP. fresh DB(컬럼·row 없음) 안전.
+    PRAGMA / SELECT 로 현재 상태 검사 후 필요한 단계만 수행.
+    """
+    def _cols(conn, table: str) -> set[str]:
+        return {r[1] for r in conn.execute(text(f"PRAGMA table_info({table})"))}
+
+    with engine.begin() as conn:
+        dept_cols = _cols(conn, "departments")
+        has_parent_id = "parent_id" in dept_cols
+
+        # 1) "생산부" row + 산하 라인 parent_id 정리 (parent_id 컬럼 있을 때만)
+        if has_parent_id:
+            # 직원 부서 복귀 (룰 기반)
+            conn.execute(text(
+                "UPDATE employees SET department='조립' "
+                "WHERE department='생산부' AND department_role IN ('primary','deputy')"
+            ))
+            conn.execute(text(
+                "UPDATE departments SET parent_id=NULL "
+                "WHERE parent_id=(SELECT id FROM departments WHERE name='생산부')"
+            ))
+            conn.execute(text("DELETE FROM departments WHERE name='생산부'"))
+            conn.execute(text("DROP INDEX IF EXISTS ix_departments_parent_id"))
+            conn.execute(text("ALTER TABLE departments DROP COLUMN parent_id"))
+
+
+def _add_new_transaction_type_values() -> None:
+    """PG only: transaction_type_enum 에 UNMARK_DEFECTIVE, DEFECT_SCRAP 추가.
+
+    2026-05-22 불량 처리 흐름 재설계용 (docs/defect-handling-redesign.md).
+    ALTER TYPE ADD VALUE IF NOT EXISTS — 트랜잭션 외부 실행 필수.
+    SQLite 에서는 no-op.
+    """
+    if engine.dialect.name != "postgresql":
+        return
+    # autocommit 모드 (ALTER TYPE ADD VALUE 는 트랜잭션 내 불가)
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        for value in ("UNMARK_DEFECTIVE", "DEFECT_SCRAP"):
+            conn.execute(text(
+                f"ALTER TYPE transaction_type_enum ADD VALUE IF NOT EXISTS '{value}'"
+            ))
 
 
 def run_migrations() -> dict[str, object]:
@@ -361,6 +424,23 @@ def run_migrations() -> dict[str, object]:
         _drop_dead_transaction_type_enum_values()
     except Exception as exc:  # noqa: BLE001
         msg = f"[migrate] PG enum cleanup failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
+
+    # 불량 처리 흐름 — UNMARK_DEFECTIVE, DEFECT_SCRAP 신규 enum 값 추가 (PG only).
+    try:
+        _add_new_transaction_type_values()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] PG enum add (defect handling) failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
+
+    # 부서 계층(생산부 그릇) 폐기 청소 — 어제 잠시 만든 데이터/컬럼 정리.
+    # 멱등 — fresh DB / 정리 완료 환경 모두 안전 (PRAGMA 검사).
+    try:
+        _cleanup_production_hierarchy()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] production hierarchy cleanup failed: {exc}"
         errors.append(msg)
         logger.warning(msg, exc_info=False)
 

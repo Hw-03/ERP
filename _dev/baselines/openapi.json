@@ -5772,6 +5772,8 @@
           "TRANSFER_TO_WH",
           "TRANSFER_DEPT",
           "MARK_DEFECTIVE",
+          "UNMARK_DEFECTIVE",
+          "DEFECT_SCRAP",
           "SUPPLIER_RETURN"
         ],
         "title": "TransactionTypeEnum",
@@ -10709,16 +10711,16 @@
     },
     "/api/stock-requests/department-queue": {
       "get": {
-        "description": "부서 결재 정/부 승인 대기 목록.\n\nactor 의 부서와 일치하는 요청 중 requires_department_approval=True, 아직 dept 결재 미완료,\n상태가 RESERVED/SUBMITTED 인 것만 반환.",
+        "description": "부서 결재 정/부 승인 대기 목록.\n\n노출 부서 범위 (그릴 합의 — docs/defect-handling-redesign.md):\n  - 부서 정/부: 생산 라인 6개(튜브/고압/진공/튜닝/조립/출하)\n  - 창고 정/부 / admin: 모든 부서",
         "operationId": "list_department_queue_api_stock_requests_department_queue_get",
         "parameters": [
           {
-            "description": "현재 직원 ID — 본인 부서만 노출",
+            "description": "현재 직원 ID — 결재 가능 부서만 노출",
             "in": "query",
             "name": "actor_employee_id",
             "required": true,
             "schema": {
-              "description": "현재 직원 ID — 본인 부서만 노출",
+              "description": "현재 직원 ID — 결재 가능 부서만 노출",
               "format": "uuid",
               "title": "Actor Employee Id",
               "type": "string"
@@ -10771,16 +10773,16 @@
     },
     "/api/stock-requests/department-queue/count": {
       "get": {
-        "description": "부서 승인함 대기 건수 — `list_department_queue` 와 동일 필터.",
+        "description": "부서 승인함 대기 건수 — `list_department_queue` 와 동일 부서 범위 적용.",
         "operationId": "count_department_queue_api_stock_requests_department_queue_count_get",
         "parameters": [
           {
-            "description": "현재 직원 ID — 본인 부서만 카운트",
+            "description": "현재 직원 ID — 결재 가능 부서만 카운트",
             "in": "query",
             "name": "actor_employee_id",
             "required": true,
             "schema": {
-              "description": "현재 직원 ID — 본인 부서만 카운트",
+              "description": "현재 직원 ID — 결재 가능 부서만 카운트",
               "format": "uuid",
               "title": "Actor Employee Id",
               "type": "string"
