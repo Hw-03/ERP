@@ -386,8 +386,14 @@ def get_production_capacity(db: Session = Depends(get_db)):
     if not top_level_ids:
         return empty_response
 
-    # 모든 top-level PF 조회 (limit 제거)
-    top_items_db = db.query(Item).filter(Item.item_id.in_(list(top_level_ids))).all()
+    # 모든 top-level PF 조회 (limit 제거).
+    # process_type_code='PF' 추가 필터 — BOM 트리 최상위에 AF/AA 등 중간 단계가
+    # 잡혀도 시연/대시보드에서는 완성품(PF)만 의미가 있음. KPI 합산도 PF 기준.
+    top_items_db = (
+        db.query(Item)
+        .filter(Item.item_id.in_(list(top_level_ids)), Item.process_type_code == "PF")
+        .all()
+    )
 
     if not top_items_db:
         return empty_response
