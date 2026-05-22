@@ -15,10 +15,10 @@ export function ThemeToggle({ expanded = false }: { expanded?: boolean }) {
     // operator.theme 또는 localStorage에서 테마 읽기 (operator 우선)
     const theme = operator?.theme ?? localStorage.getItem("theme");
     if (theme === "dark") {
-      document.documentElement.classList.add("dark");
+      document.documentElement.setAttribute("data-theme", "dark");
       setIsLight(false);
     } else {
-      document.documentElement.classList.remove("dark");
+      document.documentElement.setAttribute("data-theme", "light");
       setIsLight(true);
     }
   }, [operator?.theme]);
@@ -28,11 +28,7 @@ export function ThemeToggle({ expanded = false }: { expanded?: boolean }) {
     setIsLight(next);
     const newTheme = next ? "light" : "dark";
 
-    if (next) {
-      document.documentElement.classList.remove("dark");
-    } else {
-      document.documentElement.classList.add("dark");
-    }
+    document.documentElement.setAttribute("data-theme", newTheme);
 
     // localStorage에 저장 (항상)
     localStorage.setItem("theme", newTheme);

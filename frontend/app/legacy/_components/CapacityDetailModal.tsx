@@ -225,7 +225,7 @@ export function CapacityDetailModal({
                   {/* 미니 게이지 */}
                   <div
                     className="mt-2 h-1.5 w-full overflow-hidden rounded-full"
-                    style={{ background: "rgba(255,255,255,.05)" }}
+                    style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.text} 10%, transparent)` }}
                   >
                     <div
                       className="h-full"
@@ -243,8 +243,8 @@ export function CapacityDetailModal({
                 <div
                   className="mb-4 rounded-[18px] border p-4"
                   style={{
-                    background: "rgba(255,136,0,.06)",
-                    borderColor: "rgba(255,136,0,.25)",
+                    background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 10%, transparent)`,
+                    borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 30%, transparent)`,
                   }}
                 >
                   <div className="mb-2 flex items-center gap-2">
@@ -261,7 +261,7 @@ export function CapacityDetailModal({
                       <div
                         key={s.part}
                         className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-[10px] px-3 py-2"
-                        style={{ background: "rgba(255,255,255,.03)" }}
+                        style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.text} 5%, transparent)` }}
                       >
                         <div className="min-w-0">
                           <div
@@ -281,7 +281,7 @@ export function CapacityDetailModal({
                         <div
                           className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold"
                           style={{
-                            background: "rgba(255,136,0,.18)",
+                            background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 22%, transparent)`,
                             color: LEGACY_COLORS.yellow,
                           }}
                         >
@@ -354,7 +354,7 @@ export function CapacityDetailModal({
                       className="grid grid-cols-[24px_1fr_120px_120px] items-center border-t px-4 py-2"
                       style={{
                         borderColor: LEGACY_COLORS.border,
-                        background: "rgba(101,169,255,.05)",
+                        background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`,
                       }}
                     >
                       <span />
@@ -415,6 +415,14 @@ export function CapacityDetailModal({
                               >
                                 {item.item_name}
                               </div>
+                              {item.item_code && (
+                                <div
+                                  className="truncate text-xs"
+                                  style={{ color: LEGACY_COLORS.muted2 }}
+                                >
+                                  {item.item_code}
+                                </div>
+                              )}
                               {item.limiting_item && (
                                 <div
                                   className="truncate text-xs"
@@ -447,7 +455,7 @@ export function CapacityDetailModal({
                               className="border-t px-5 py-3"
                               style={{
                                 borderColor: LEGACY_COLORS.border,
-                                background: "rgba(255,255,255,.02)",
+                                background: `color-mix(in srgb, ${LEGACY_COLORS.text} 4%, transparent)`,
                               }}
                             >
                               {loading && (
@@ -532,7 +540,9 @@ function BomChildren({ bom }: { bom: ProductionCheckResponse }) {
           key={`${c.item_code ?? c.item_name}-${i}`}
           className="grid grid-cols-[1fr_70px_70px_70px_28px] items-center gap-2 rounded-[8px] px-2 py-1.5"
           style={{
-            background: c.ok ? "rgba(101,169,255,.04)" : "rgba(255,75,75,.08)",
+            background: c.ok
+              ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 6%, transparent)`
+              : `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
           }}
         >
           <div className="min-w-0">
