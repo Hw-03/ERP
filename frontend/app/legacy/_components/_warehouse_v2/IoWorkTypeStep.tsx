@@ -125,7 +125,9 @@ export function IoSubTypeStep({
   const dept = deptVisibility(subType);
   const showAnyDept = requiresDepartments(subType) && (dept.from || dept.to);
   const cautionTone =
-    subType === "defect_quarantine" || subType === "supplier_return" ? LEGACY_COLORS.red : null;
+    subType === "defect_quarantine" || subType === "supplier_return" || subType === "defect_process"
+      ? LEGACY_COLORS.red
+      : null;
   const deptSectionCount = Number(showAnyDept && dept.from) + Number(showAnyDept && dept.to);
   const nonProcessRows = !showAnyDept
     ? "1fr"
@@ -173,7 +175,13 @@ export function IoSubTypeStep({
       {/* 부서 grid (옛 PROD_DEPTS 6 column 패턴) */}
       {showAnyDept && dept.from && (
         <DeptGrid
-          label={subType === "supplier_return" ? "반품할 부서 (불량 출처)" : subType === "defect_quarantine" ? "불량 격리 부서" : "출발 부서"}
+          label={
+            subType === "supplier_return" ? "반품할 부서 (불량 출처)"
+            : subType === "defect_quarantine" ? "불량 격리 부서"
+            : subType === "defect_restore" ? "격리 해제 부서"
+            : subType === "defect_process" ? "처리할 부서 (불량 출처)"
+            : "출발 부서"
+          }
           value={fromDepartment}
           onChange={onFromDepartmentChange}
           fill
@@ -210,7 +218,9 @@ export function IoSubTypeStep({
           <div className="text-base font-bold leading-relaxed" style={{ color: LEGACY_COLORS.text }}>
             {subType === "supplier_return"
               ? "공급업체 반품은 되돌릴 수 없습니다. 반품 부서(불량 출처)와 수량을 확인하세요."
-              : "불량 격리는 재고가 격리 상태로 이동합니다. 대상 부서를 다시 한 번 확인하세요."}
+              : subType === "defect_process"
+                ? "격리 처리(폐기·분해)는 되돌릴 수 없습니다. 대상 부서와 품목을 확인하세요."
+                : "불량 격리는 재고가 격리 상태로 이동합니다. 대상 부서를 다시 한 번 확인하세요."}
           </div>
         </div>
       )}

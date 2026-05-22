@@ -124,6 +124,8 @@ echo [MES] Detected IP: %IP%
 echo [MES] URL: http://%IP%:3000
 echo.
 
+rem preflight - 포트 8010 좀비 정리 (워커 고아화 재발 방지)
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\dev\stop-backend.ps1"
 start "Backend" cmd /k "cd /d "%~dp0backend" && py -m uvicorn app.main:app --host 0.0.0.0 --port 8010 --reload"
 start "Frontend" cmd /k "cd /d "%~dp0frontend" && npm run dev"
 timeout /t 5 /nobreak >nul

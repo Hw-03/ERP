@@ -67,6 +67,8 @@ class TransactionTypeEnum(str, enum.Enum):
     TRANSFER_TO_WH = "TRANSFER_TO_WH"
     TRANSFER_DEPT = "TRANSFER_DEPT"
     MARK_DEFECTIVE = "MARK_DEFECTIVE"
+    UNMARK_DEFECTIVE = "UNMARK_DEFECTIVE"
+    DEFECT_SCRAP = "DEFECT_SCRAP"
     SUPPLIER_RETURN = "SUPPLIER_RETURN"
 
 
@@ -116,7 +118,6 @@ class Item(Base):
     item_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     item_name = Column(String(200), nullable=False)
     sort_order = Column(Integer, nullable=True, index=True)  # 엑셀 정리본 행 순서
-    spec = Column(Text, nullable=True)
     unit = Column(String(20), nullable=False, default="EA")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
     updated_at = Column(
@@ -129,8 +130,6 @@ class Item(Base):
 
     # Legacy UI display fields (populated from ERP_Master_DB.csv or rule-based defaults)
 
-    barcode = Column(String(100), nullable=True, index=True)
-    legacy_file_type = Column(String(50), nullable=True, index=True)  # 원자재/조립자재/발생부자재/완제품/미분류
     legacy_part = Column(String(50), nullable=True, index=True)       # 자재창고/조립출하/고압파트/진공파트/튜닝파트/출하
     legacy_item_type = Column(String(50), nullable=True)              # part_type from CSV
     supplier = Column(String(200), nullable=True)
@@ -139,7 +138,6 @@ class Item(Base):
     # 4-part item code ([모델기호조합]-[구분코드]-[일련번호]-[옵션코드])
     item_code = Column(String(40), nullable=True, unique=True, index=True)
     model_symbol = Column(String(20), nullable=True, index=True)  # 예: "346", "3", "34678"
-    symbol_slot = Column(SmallInteger, ForeignKey("product_symbols.slot"), nullable=True, index=True)  # deprecated
     process_type_code = Column(String(2), ForeignKey("process_types.code"), nullable=True, index=True)
     option_code = Column(String(10), nullable=True)  # 자유 텍스트 (FK 제거)
     serial_no = Column(Integer, nullable=True)
@@ -235,6 +233,7 @@ class InventoryLocation(Base):
         onupdate=datetime.utcnow,
         server_default=func.now(),
     )
+    defective_at = Column(DateTime, nullable=True, index=True)
 
     __table_args__ = (
         # 5.5-A: 음수 위치 재고 방지. 서비스 레이어에서 막지만 DB-level 안전망.
@@ -368,6 +367,10 @@ class TransactionLog(Base):
     reference_no = Column(String(100), nullable=True, index=True)
     produced_by = Column(String(100), nullable=True)
     notes = Column(Text, nullable=True)
+    # 불량 처리 흐름 — 사유 카테고리(외관/치수/기능/검사통과/기타) + 자유 메모.
+    # 카테고리 enum 은 프론트 상수로만 정의, 백엔드는 자유 문자열로 받음.
+    reason_category = Column(String(32), nullable=True, index=True)
+    reason_memo = Column(Text, nullable=True)
     operation_batch_id = Column(
         UUID(as_uuid=True),
         ForeignKey("io_batches.batch_id", ondelete="SET NULL"),
@@ -531,6 +534,10 @@ class StockRequestTypeEnum(str, enum.Enum):
     # 낱개(manual/adjust_in/adjust_out) 라인 포함 IO — 부서 결재 정/부 승인만 필요.
     # 실제 재고 변동은 io.py 의 _submit_immediate 가 dept 승인 후 실행한다.
     MANUAL_ADJUSTMENT = "manual_adjustment"
+    # 불량 처리 흐름 — 격리 항목 결재 필요 액션 (Phase 2)
+    DEFECT_SCRAP = "defect_scrap"           # 격리 항목 폐기
+    DEFECT_RETURN = "defect_return"         # 격리 항목 공급처 반품
+    DEFECT_DISASSEMBLE = "defect_disassemble"  # PA·PF 격리 항목 분해
 
 
 class RequestBucketEnum(str, enum.Enum):
@@ -598,6 +605,8 @@ class StockRequest(Base):
     completed_at = Column(DateTime, nullable=True)
     reference_no = Column(String(100), nullable=True)
     notes = Column(Text, nullable=True)
+    reason_category = Column(String(50), nullable=True)
+    reason_memo = Column(Text, nullable=True)
     operation_batch_id = Column(
         UUID(as_uuid=True),
         ForeignKey("io_batches.batch_id", ondelete="SET NULL"),

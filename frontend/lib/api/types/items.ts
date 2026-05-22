@@ -10,7 +10,6 @@ import type { Department, InventoryLocationRow } from "./shared";
 export interface Item {
   item_id: string;
   item_name: string;
-  spec: string | null;
   unit: string;
   quantity: number;
   warehouse_qty: number;
@@ -21,8 +20,6 @@ export interface Item {
   last_reserver_name: string | null;
   location: string | null;
   locations: InventoryLocationRow[];
-  barcode: string | null;
-  legacy_file_type: string | null;
   legacy_part: string | null;
   legacy_item_type: string | null;
   supplier: string | null;
@@ -30,7 +27,6 @@ export interface Item {
   item_code: string | null;
   model_symbol: string | null;
   model_slots: number[];
-  symbol_slot: number | null;
   process_type_code: string | null;
   option_code: string | null;
   serial_no: number | null;

@@ -6,7 +6,6 @@ import { PROCESS_TYPE_OPTIONS, MODEL_SLOTS, UNIT_OPTIONS } from "../adminShared"
 
 export type ItemFormData = {
   item_name: string;
-  spec: string;
   legacy_item_type: string;
   supplier: string;
   min_stock: string;
@@ -60,8 +59,7 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showItemCod
     <>
       {/* 텍스트/숫자 필드 */}
       {([
-        { key: "item_name",   label: "품목명",   badge: "필수" as const, type: "text",   placeholder: "예: 텅스텐 필라멘트" },
-        { key: "spec",        label: "규격",     badge: "선택" as const, type: "text",   placeholder: "예: Ø0.3 × L50" },
+        { key: "item_name", label: "품목명", badge: "필수" as const, type: "text", placeholder: "예: 텅스텐 필라멘트" },
       ] as const).map(({ key, label, badge, type, placeholder }) => (
         <div key={key}>
           <FieldLabel label={label} badge={badge} />

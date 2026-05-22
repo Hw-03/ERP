@@ -28,11 +28,17 @@ start.bat
 
 ## 수동 실행
 
-백엔드:
+백엔드 (canonical — 좀비 워커 자동 정리 + 헬스 확인):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\start-backend.ps1
+```
+
+백엔드 (순수 uvicorn):
 
 ```bash
 cd backend
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8010 --reload
 ```
 
 프론트엔드:

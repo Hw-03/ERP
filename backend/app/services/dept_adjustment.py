@@ -280,3 +280,126 @@ def submit_adjustment(
         log_ids.append(log.log_id)
 
     return log_ids
+
+
+# ---------------------------------------------------------------------------
+# 불량 분해 처리
+# ---------------------------------------------------------------------------
+
+
+def submit_defective_disassemble(
+    db: Session,
+    parent_item_id: uuid.UUID,
+    parent_qty: Decimal,
+    parent_dept: DepartmentEnum,
+    child_decisions: list[dict],
+    *,
+    reason_category: str,
+    reason_memo: str,
+    actor: str,
+) -> dict:
+    """격리(DEFECTIVE) 품목 분해 처리.
+
+    child_decisions 형식:
+        [{"item_id": uuid, "action": "keep" | "scrap", "qty": Decimal, "reason_memo": str | None}, ...]
+
+    처리 결과:
+        - 부모: DEFECTIVE 차감 (DISASSEMBLE 트랜잭션)
+        - 자식 keep: 분해 부서 PRODUCTION 입고 (RECEIVE 트랜잭션)
+        - 자식 scrap: 재고 차감 없음, DEFECT_SCRAP 트랜잭션만 기록
+          (자식은 이미 BOM 기준 부서 재고에 없음 — 부모에 내재되어 있으므로 별도 차감 불필요)
+
+    모든 TransactionLog 에 동일 operation_batch_id 공유.
+    """
+    if parent_qty <= 0:
+        raise ValueError("분해 수량은 0보다 커야 합니다.")
+    if not reason_category:
+        raise ValueError("reason_category 는 필수입니다.")
+    if not child_decisions:
+        raise ValueError("자식 결정이 비어 있습니다.")
+
+    batch_id = uuid.uuid4()
+    # TransactionLog.operation_batch_id 는 io_batches FK — 직접 사용 불가.
+    # 대신 reference_no 에 batch_id 를 기록해 그룹 식별자로 활용한다.
+    batch_ref = f"defect-disassemble:{batch_id}"
+
+    # 1) 부모 DEFECTIVE 차감
+    parent_inv = inventory_svc.scrap_defective(
+        db, parent_item_id, parent_qty, parent_dept,
+        reason_category=reason_category,
+        reason_memo=reason_memo,
+        actor=actor,
+    )
+    qty_before_parent = (parent_inv.quantity or Decimal("0")) + parent_qty
+
+    parent_log = TransactionLog(
+        item_id=parent_item_id,
+        transaction_type=TransactionTypeEnum.DISASSEMBLE,
+        quantity_change=-parent_qty,
+        quantity_before=qty_before_parent,
+        quantity_after=parent_inv.quantity,
+        produced_by=actor,
+        notes=f"[defect_disassemble] {reason_category}: {reason_memo or ''}".strip(": "),
+        reason_category=reason_category,
+        reason_memo=reason_memo,
+        reference_no=batch_ref,
+    )
+    db.add(parent_log)
+    db.flush()
+
+    child_log_ids: list[uuid.UUID] = []
+
+    for decision in child_decisions:
+        child_item_id = decision["item_id"]
+        action = decision["action"]
+        child_qty = Decimal(str(decision.get("qty", parent_qty)))
+        child_note = decision.get("reason_memo") or reason_memo or ""
+
+        if action == "keep":
+            # 분해 부서 PRODUCTION 입고
+            child_inv = inventory_svc.receive_confirmed(
+                db, child_item_id, child_qty,
+                bucket="production",
+                dept=parent_dept,
+            )
+            qty_before_child = (child_inv.quantity or Decimal("0")) - child_qty
+            log = TransactionLog(
+                item_id=child_item_id,
+                transaction_type=TransactionTypeEnum.RECEIVE,
+                quantity_change=child_qty,
+                quantity_before=qty_before_child,
+                quantity_after=child_inv.quantity,
+                produced_by=actor,
+                notes=f"[defect_disassemble:keep] {child_note}".strip(),
+                reason_category=reason_category,
+                reason_memo=child_note or None,
+                reference_no=batch_ref,
+            )
+        elif action == "scrap":
+            # 자식 scrap: DEFECT_SCRAP 로그만 (재고 변동 없음 — 부모에 내재)
+            child_inv = inventory_svc.get_or_create_inventory(db, child_item_id)
+            log = TransactionLog(
+                item_id=child_item_id,
+                transaction_type=TransactionTypeEnum.DEFECT_SCRAP,
+                quantity_change=Decimal("0"),
+                quantity_before=child_inv.quantity,
+                quantity_after=child_inv.quantity,
+                produced_by=actor,
+                notes=f"[defect_disassemble:scrap] {child_note}".strip(),
+                reason_category=reason_category,
+                reason_memo=child_note or None,
+                reference_no=batch_ref,
+            )
+        else:
+            raise ValueError(f"알 수 없는 action: {action} (keep 또는 scrap)")
+
+        db.add(log)
+        db.flush()
+        child_log_ids.append(log.log_id)
+
+    return {
+        "batch_id": str(batch_id),
+        "batch_ref": batch_ref,
+        "parent_log_id": parent_log.log_id,
+        "child_log_ids": child_log_ids,
+    }

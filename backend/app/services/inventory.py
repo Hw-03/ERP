@@ -593,6 +593,233 @@ def return_to_supplier(
     return inv
 
 
+def unmark_defective(
+    db: Session,
+    item_id: uuid.UUID,
+    qty: Decimal,
+    dept: DepartmentEnum,
+    *,
+    reason_category: str,
+    reason_memo: str,
+    actor: str,
+    batch_id: Optional[uuid.UUID] = None,
+) -> Inventory:
+    """불량 → 정상 복귀. 같은 부서 DEFECTIVE → PRODUCTION 이동. 총량 변동 없음.
+
+    사유 필수 (reason_category + reason_memo). defective_at NULL 로 초기화.
+    """
+    if qty <= 0:
+        raise ValueError("복귀 수량은 0보다 커야 합니다.")
+    if not reason_category:
+        raise ValueError("reason_category 는 필수입니다.")
+
+    get_or_create_inventory(db, item_id)
+    defective_loc = _lock_location(db, item_id, dept, LocationStatusEnum.DEFECTIVE)
+    _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
+    db.flush()
+
+    result = db.execute(
+        sa_update(InventoryLocation)
+        .where(InventoryLocation.item_id == item_id)
+        .where(InventoryLocation.department == dept)
+        .where(InventoryLocation.status == LocationStatusEnum.DEFECTIVE)
+        .where(InventoryLocation.quantity >= qty)
+        .values(quantity=InventoryLocation.quantity - qty, defective_at=None)
+        .execution_options(synchronize_session=False)
+    )
+    db.flush()
+    if result.rowcount == 0:
+        cur = defective_loc.quantity if defective_loc else Decimal("0")
+        raise ValueError(f"{dept.value} 불량 재고 부족 (현재 {cur}, 요청 {qty}).")
+
+    db.execute(
+        sa_update(InventoryLocation)
+        .where(InventoryLocation.item_id == item_id)
+        .where(InventoryLocation.department == dept)
+        .where(InventoryLocation.status == LocationStatusEnum.PRODUCTION)
+        .values(quantity=func.coalesce(InventoryLocation.quantity, 0) + qty)
+        .execution_options(synchronize_session=False)
+    )
+    db.flush()
+    db.expire_all()
+    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    _sync_total(db, inv)
+    return inv
+
+
+def scrap_defective(
+    db: Session,
+    item_id: uuid.UUID,
+    qty: Decimal,
+    dept: DepartmentEnum,
+    *,
+    reason_category: str,
+    reason_memo: str,
+    actor: str,
+    batch_id: Optional[uuid.UUID] = None,
+) -> Inventory:
+    """불량 재고 폐기. DEFECTIVE 차감 + 총량 감소.
+
+    사유 필수 (reason_category + reason_memo).
+    """
+    if qty <= 0:
+        raise ValueError("폐기 수량은 0보다 커야 합니다.")
+    if not reason_category:
+        raise ValueError("reason_category 는 필수입니다.")
+
+    get_or_create_inventory(db, item_id)
+    defective_loc = _lock_location(db, item_id, dept, LocationStatusEnum.DEFECTIVE)
+    db.flush()
+
+    result = db.execute(
+        sa_update(InventoryLocation)
+        .where(InventoryLocation.item_id == item_id)
+        .where(InventoryLocation.department == dept)
+        .where(InventoryLocation.status == LocationStatusEnum.DEFECTIVE)
+        .where(InventoryLocation.quantity >= qty)
+        .values(quantity=InventoryLocation.quantity - qty)
+        .execution_options(synchronize_session=False)
+    )
+    db.flush()
+    if result.rowcount == 0:
+        cur = defective_loc.quantity if defective_loc else Decimal("0")
+        dept_label = getattr(dept, "value", str(dept))
+        raise ValueError(f"{dept_label} 불량 재고 부족 (현재 {cur}, 요청 {qty}).")
+
+    db.expire_all()
+    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    _sync_total(db, inv)
+    return inv
+
+
+def scrap_normal(
+    db: Session,
+    item_id: uuid.UUID,
+    qty: Decimal,
+    *,
+    source: str,
+    dept_or_warehouse: DepartmentEnum,
+    reason_category: str,
+    reason_memo: str,
+    actor: str,
+    batch_id: Optional[uuid.UUID] = None,
+) -> Inventory:
+    """R 원자재 정상 재고에서 직접 폐기. 총량 감소.
+
+    source="warehouse" → warehouse_qty 차감.
+    source="production" → 해당 부서 PRODUCTION 차감.
+    TransactionLog notes 에 "[from_normal]" 포함.
+    사유 필수.
+    """
+    if qty <= 0:
+        raise ValueError("폐기 수량은 0보다 커야 합니다.")
+    if source not in ("warehouse", "production"):
+        raise ValueError(f"알 수 없는 source: {source} (warehouse 또는 production)")
+    if not reason_category:
+        raise ValueError("reason_category 는 필수입니다.")
+
+    get_or_create_inventory(db, item_id)
+
+    if source == "warehouse":
+        consume_warehouse(db, item_id, qty)
+    else:
+        _lock_location(db, item_id, dept_or_warehouse, LocationStatusEnum.PRODUCTION)
+        db.flush()
+        result = db.execute(
+            sa_update(InventoryLocation)
+            .where(InventoryLocation.item_id == item_id)
+            .where(InventoryLocation.department == dept_or_warehouse)
+            .where(InventoryLocation.status == LocationStatusEnum.PRODUCTION)
+            .where(InventoryLocation.quantity >= qty)
+            .values(quantity=InventoryLocation.quantity - qty)
+            .execution_options(synchronize_session=False)
+        )
+        db.flush()
+        if result.rowcount == 0:
+            loc = db.query(InventoryLocation).filter(
+                InventoryLocation.item_id == item_id,
+                InventoryLocation.department == dept_or_warehouse,
+                InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+            ).first()
+            cur = loc.quantity if loc else Decimal("0")
+            raise ValueError(
+                f"{dept_or_warehouse.value} 생산 재고 부족 (현재 {cur}, 요청 {qty})."
+            )
+        db.expire_all()
+        inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+        _sync_total(db, inv)
+        return inv
+
+    db.expire_all()
+    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    _sync_total(db, inv)
+    return inv
+
+
+def return_to_supplier_from_normal(
+    db: Session,
+    item_id: uuid.UUID,
+    qty: Decimal,
+    *,
+    source: str,
+    dept_or_warehouse: DepartmentEnum,
+    supplier_name: str,
+    reason_category: str,
+    reason_memo: str,
+    actor: str,
+    batch_id: Optional[uuid.UUID] = None,
+) -> Inventory:
+    """R 원자재 정상 재고에서 직접 공급처 반품. 총량 감소.
+
+    source="warehouse" → warehouse_qty 차감.
+    source="production" → 해당 부서 PRODUCTION 차감.
+    사유 필수.
+    """
+    if qty <= 0:
+        raise ValueError("반품 수량은 0보다 커야 합니다.")
+    if source not in ("warehouse", "production"):
+        raise ValueError(f"알 수 없는 source: {source} (warehouse 또는 production)")
+    if not reason_category:
+        raise ValueError("reason_category 는 필수입니다.")
+
+    get_or_create_inventory(db, item_id)
+
+    if source == "warehouse":
+        consume_warehouse(db, item_id, qty)
+    else:
+        _lock_location(db, item_id, dept_or_warehouse, LocationStatusEnum.PRODUCTION)
+        db.flush()
+        result = db.execute(
+            sa_update(InventoryLocation)
+            .where(InventoryLocation.item_id == item_id)
+            .where(InventoryLocation.department == dept_or_warehouse)
+            .where(InventoryLocation.status == LocationStatusEnum.PRODUCTION)
+            .where(InventoryLocation.quantity >= qty)
+            .values(quantity=InventoryLocation.quantity - qty)
+            .execution_options(synchronize_session=False)
+        )
+        db.flush()
+        if result.rowcount == 0:
+            loc = db.query(InventoryLocation).filter(
+                InventoryLocation.item_id == item_id,
+                InventoryLocation.department == dept_or_warehouse,
+                InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+            ).first()
+            cur = loc.quantity if loc else Decimal("0")
+            raise ValueError(
+                f"{dept_or_warehouse.value} 생산 재고 부족 (현재 {cur}, 요청 {qty})."
+            )
+        db.expire_all()
+        inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+        _sync_total(db, inv)
+        return inv
+
+    db.expire_all()
+    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    _sync_total(db, inv)
+    return inv
+
+
 def consume_from_department(
     db: Session,
     item_id: uuid.UUID,

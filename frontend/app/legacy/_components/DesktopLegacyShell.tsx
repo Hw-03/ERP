@@ -72,18 +72,25 @@ export function DesktopLegacyShell() {
     router.push(`?tab=${tab}`, { scroll: false });
   }
 
-  // 브라우저 뒤로/앞으로 → URL ?tab= 변경 시 activeTab 동기화
+  // 브라우저 뒤로/앞으로 → URL ?tab= 변경 시 activeTab 동기화.
+  // defect_dept 쿼리도 함께 읽어 warehouse 탭 진입 시 필터로 전달.
   useEffect(() => {
     const t = searchParams.get("tab") as DesktopTabId | null;
     if (t && VALID_TABS.has(t) && t !== activeTab) {
       setActiveTab(t);
     }
+    const dept = searchParams.get("defect_dept");
+    setDefectDeptFilter(dept);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   const [weekMon, setWeekMon] = useState<Date>(() => getWeekStartMonday(new Date()));
 
   const [warehousePreselected, setWarehousePreselected] = useState<Item | null>(null);
+  const [defectDeptFilter, setDefectDeptFilter] = useState<string | null>(() => {
+    // 초기 URL 에 defect_dept 쿼리가 있으면 읽어 둔다
+    return searchParams.get("defect_dept");
+  });
   const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
   const [capacityModal, setCapacityModal] = useState(false);
   const [stockWarnings, setStockWarnings] = useState<{ low: number; zero: number } | null>(null);
@@ -137,6 +144,7 @@ export function DesktopLegacyShell() {
           onStatusChange={handleStatusChange}
           preselectedItem={warehousePreselected}
           onSubmitSuccess={loadCapacity}
+          defectDeptFilter={defectDeptFilter}
         />
       );
     }
@@ -148,7 +156,7 @@ export function DesktopLegacyShell() {
     }
     return <DesktopAdminView key={key} globalSearch="" onStatusChange={handleStatusChange} />;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse, capacityData, loadCapacity, weekMon]);
+  }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse, capacityData, loadCapacity, weekMon, defectDeptFilter]);
 
   return (
     <>

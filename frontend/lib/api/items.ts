@@ -19,10 +19,8 @@ export const itemsApi = {
       search?: string;
       skip?: number;
       limit?: number;
-      legacyFileType?: string;
       legacyPart?: string;
       legacyItemType?: string;
-      barcode?: string;
       department?: string;
     },
     opts?: { signal?: AbortSignal },
@@ -32,10 +30,8 @@ export const itemsApi = {
     if (params?.search) query.set("search", params.search);
     if (params?.skip !== undefined) query.set("skip", String(params.skip));
     if (params?.limit !== undefined) query.set("limit", String(params.limit));
-    if (params?.legacyFileType) query.set("legacy_file_type", params.legacyFileType);
     if (params?.legacyPart) query.set("legacy_part", params.legacyPart);
     if (params?.legacyItemType) query.set("legacy_item_type", params.legacyItemType);
-    if (params?.barcode) query.set("barcode", params.barcode);
     if (params?.department) query.set("department", params.department);
     return fetcher<Item[]>(toApiUrl(`/api/items?${query}`), opts?.signal);
   },
@@ -45,7 +41,6 @@ export const itemsApi = {
   createItem: async (payload: {
     item_name: string;
     process_type_code?: string;
-    spec?: string;
     unit?: string;
     legacy_item_type?: string;
     supplier?: string;
@@ -59,11 +54,8 @@ export const itemsApi = {
     itemId: string,
     payload: {
       item_name?: string;
-      spec?: string;
       process_type_code?: string;
       unit?: string;
-      barcode?: string;
-      legacy_file_type?: string;
       legacy_part?: string;
       legacy_item_type?: string;
       supplier?: string;

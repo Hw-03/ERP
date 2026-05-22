@@ -22,11 +22,15 @@ export function DesktopWarehouseView({
   onStatusChange,
   preselectedItem,
   onSubmitSuccess,
+  defectDeptFilter,
 }: {
   globalSearch: string;
   onStatusChange: (status: string) => void;
   preselectedItem?: Item | null;
   onSubmitSuccess?: () => void;
+  /** Phase 3: 대시보드 빨간 불량 클릭 → URL ?defect_dept=X 로 전달된 부서명.
+   *  Phase 4 허브 컴포넌트가 이 값을 읽어 자동 필터 적용. */
+  defectDeptFilter?: string | null;
 }) {
   const { employees, items, productModels, loadFailure, setItems } = useWarehouseData({
     globalSearch,
@@ -160,6 +164,8 @@ export function DesktopWarehouseView({
               setPanelRefreshNonce((n) => n + 1);
               onSubmitSuccess?.();
             }}
+            defectDeptFilter={defectDeptFilter}
+            currentEmployee={operator ?? undefined}
           />
         )}
       </div>

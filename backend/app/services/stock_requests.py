@@ -36,6 +36,7 @@ from app.models import (
 )
 from app.database import _is_sqlite
 from app.services import inventory as inventory_svc
+from app.services.dept_hierarchy import can_approve_department
 from app.services.pin_auth import verify_pin
 
 
@@ -54,6 +55,10 @@ _TX_TYPE_BY_REQUEST: dict[StockRequestTypeEnum, TransactionTypeEnum] = {
     StockRequestTypeEnum.MARK_DEFECTIVE_PROD: TransactionTypeEnum.MARK_DEFECTIVE,
     StockRequestTypeEnum.SUPPLIER_RETURN: TransactionTypeEnum.SUPPLIER_RETURN,
     StockRequestTypeEnum.PACKAGE_OUT: TransactionTypeEnum.SHIP,
+    # 불량 처리 흐름 — 결재 필요 액션 (세부 로그는 서비스 함수가 직접 생성)
+    StockRequestTypeEnum.DEFECT_SCRAP: TransactionTypeEnum.DEFECT_SCRAP,
+    StockRequestTypeEnum.DEFECT_RETURN: TransactionTypeEnum.SUPPLIER_RETURN,
+    StockRequestTypeEnum.DEFECT_DISASSEMBLE: TransactionTypeEnum.DISASSEMBLE,
 }
 
 
@@ -191,6 +196,10 @@ _ALLOWED_SHAPES: dict[StockRequestTypeEnum, dict] = {
     # 낱개(manual/adjust) 라인 — 어떤 bucket/dept 조합이든 허용 (요청 유형 다양).
     # 실제 재고 변동은 io.py 의 _submit_immediate 가 dept 승인 후 실행한다.
     StockRequestTypeEnum.MANUAL_ADJUSTMENT: None,  # 검증 건너뜀
+    # 불량 처리 흐름 — bucket 조합 임의 허용 (서비스 함수가 재고 검증)
+    StockRequestTypeEnum.DEFECT_SCRAP: None,
+    StockRequestTypeEnum.DEFECT_RETURN: None,
+    StockRequestTypeEnum.DEFECT_DISASSEMBLE: None,
 }
 
 
@@ -319,6 +328,47 @@ def _preflight_inventory_check(
             )
 
 
+def _preflight_defective_check(
+    db: Session,
+    lines_input: Sequence[LineInput],
+) -> None:
+    """from_bucket==DEFECTIVE 라인의 격리 재고 사전 검증.
+
+    부서 격리(InventoryLocation status=DEFECTIVE) 의 수량이 요청 수량 이상인지
+    확인. 부족 시 ValueError → 라우터에서 422 매핑.
+
+    DEFECT_SCRAP / DEFECT_RETURN / DEFECT_DISASSEMBLE 처럼 from_bucket=DEFECTIVE
+    인 라인이 격리되지 않은 항목을 폐기/반품/분해 하려는 케이스 차단.
+    """
+    needed: dict[tuple, Decimal] = {}
+    for li in lines_input:
+        if li.from_bucket == RequestBucketEnum.DEFECTIVE and li.from_department is not None:
+            key = (li.item_id, li.from_department)
+            needed[key] = needed.get(key, Decimal("0")) + li.quantity
+
+    if not needed:
+        return
+
+    for (item_id, dept), qty in needed.items():
+        loc = (
+            db.query(InventoryLocation)
+            .filter(
+                InventoryLocation.item_id == item_id,
+                InventoryLocation.department == dept,
+                InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
+            )
+            .first()
+        )
+        avail = loc.quantity if loc else Decimal("0")
+        if avail < qty:
+            item = db.query(Item).filter(Item.item_id == item_id).first()
+            item_name = item.item_name if item else str(item_id)
+            dept_label = getattr(dept, "value", str(dept))
+            raise ValueError(
+                f"격리 재고 부족: {item_name} / {dept_label} 불량 {avail}개, 요청 {qty}개."
+            )
+
+
 def _build_request_and_lines(
     db: Session,
     *,
@@ -333,6 +383,8 @@ def _build_request_and_lines(
     client_request_id: Optional[str] = None,
     requires_warehouse_approval_override: Optional[bool] = None,
     requires_department_approval: bool = False,
+    reason_category: Optional[str] = None,
+    reason_memo: Optional[str] = None,
 ) -> StockRequest:
     """StockRequest + StockRequestLine row 생성. 호출자가 사전 검증 책임.
 
@@ -358,6 +410,8 @@ def _build_request_and_lines(
         submitted_at=submitted_at,
         reference_no=reference_no,
         notes=notes,
+        reason_category=reason_category,
+        reason_memo=reason_memo,
     )
     db.add(request)
     db.flush()
@@ -469,6 +523,8 @@ def create_request(
     notes: Optional[str],
     client_request_id: Optional[str] = None,
     requires_department_approval: bool = False,
+    reason_category: Optional[str] = None,
+    reason_memo: Optional[str] = None,
 ) -> StockRequest:
     """요청 생성. 호출자가 db.commit() 책임.
 
@@ -478,8 +534,18 @@ def create_request(
     - 승인 불필요 → 즉시 실행 후 COMPLETED.
     - requires_department_approval=True 면 부서 결재까지 통과해야 COMPLETED.
     """
+    # 불량 처리 흐름은 항상 부서 결재 필요.
+    _DEFECT_TYPES = {
+        StockRequestTypeEnum.DEFECT_SCRAP,
+        StockRequestTypeEnum.DEFECT_RETURN,
+        StockRequestTypeEnum.DEFECT_DISASSEMBLE,
+    }
+    if request_type in _DEFECT_TYPES:
+        requires_department_approval = True
+
     _validate_lines(request_type, lines_input)
     _preflight_inventory_check(db, request_type, lines_input)
+    _preflight_defective_check(db, lines_input)
     now = datetime.utcnow()
     code = _generate_request_code(now)
     request = _build_request_and_lines(
@@ -494,6 +560,8 @@ def create_request(
         submitted_at=now,
         client_request_id=client_request_id,
         requires_department_approval=requires_department_approval,
+        reason_category=reason_category,
+        reason_memo=reason_memo,
     )
     return _finalize_submission(db, request=request, requester=requester, now=now)
 
@@ -565,6 +633,8 @@ def upsert_draft_request(
     lines_input: Sequence[LineInput],
     reference_no: Optional[str],
     notes: Optional[str],
+    reason_category: Optional[str] = None,
+    reason_memo: Optional[str] = None,
 ) -> StockRequest:
     """직원 + request_type 기준 active draft 를 upsert.
 
@@ -594,6 +664,8 @@ def upsert_draft_request(
 
         existing.reference_no = reference_no
         existing.notes = notes
+        existing.reason_category = reason_category
+        existing.reason_memo = reason_memo
         existing.requires_warehouse_approval = any(
             line_requires_approval(li.from_bucket, li.to_bucket) for li in lines_input
         )
@@ -631,6 +703,8 @@ def upsert_draft_request(
         status=StockRequestStatusEnum.DRAFT,
         request_code=None,
         submitted_at=None,
+        reason_category=reason_category,
+        reason_memo=reason_memo,
     )
 
 
@@ -742,6 +816,7 @@ def submit_draft_request(
     ]
     _validate_lines(request.request_type, line_inputs)
     _preflight_inventory_check(db, request.request_type, line_inputs)
+    _preflight_defective_check(db, line_inputs)
 
     now = datetime.utcnow()
     if not request.request_code:
@@ -872,6 +947,69 @@ def _execute_line(
         # 라인별로 창고에서 출고
         inventory_svc.consume_warehouse(db, item_id, qty)
         quantity_change = -qty
+    elif rt == StockRequestTypeEnum.DEFECT_SCRAP:
+        # 격리 항목 폐기 — from_department 에서 DEFECTIVE 차감
+        if line.from_department is None:
+            raise ValueError("격리 항목 폐기는 from_department 가 필요합니다.")
+        reason_cat = request.reason_category or ""
+        reason_memo = request.reason_memo or (request.notes or "")
+        actor_name = approver.name
+        inventory_svc.scrap_defective(
+            db, item_id, qty, line.from_department,
+            reason_category=reason_cat or "기타",
+            reason_memo=reason_memo,
+            actor=actor_name,
+        )
+        quantity_change = -qty
+    elif rt == StockRequestTypeEnum.DEFECT_RETURN:
+        # 격리 항목 공급처 반품 — from_department 에서 DEFECTIVE 차감
+        if line.from_department is None:
+            raise ValueError("격리 항목 공급처 반품은 from_department 가 필요합니다.")
+        reason_cat = request.reason_category or ""
+        reason_memo_val = request.reason_memo or (request.notes or "")
+        actor_name = approver.name
+        inventory_svc.return_to_supplier(db, item_id, qty, line.from_department)
+        quantity_change = -qty
+    elif rt == StockRequestTypeEnum.DEFECT_DISASSEMBLE:
+        # 분해 처리 — notes 에서 child_decisions JSON 추출 후 submit_defective_disassemble 호출.
+        # 분해 시 부모 1라인만 있고 자식 결정은 request.notes 에 JSON 직렬화되어 있다.
+        import json
+        from app.services.dept_adjustment import submit_defective_disassemble
+        if line.from_department is None:
+            raise ValueError("분해 처리는 from_department 가 필요합니다.")
+        reason_cat = request.reason_category or ""
+        reason_memo_val = request.reason_memo or (request.notes or "")
+        # child_decisions 는 request.notes 에 JSON으로 저장됨
+        try:
+            raw = json.loads(request.notes or "{}") if request.notes else {}
+            child_decisions = raw.get("child_decisions", [])
+        except (json.JSONDecodeError, TypeError):
+            child_decisions = []
+        # child qty default → qty (부모와 동일 비율)
+        for cd in child_decisions:
+            if "qty" not in cd:
+                cd["qty"] = str(qty)
+            else:
+                cd["qty"] = str(cd["qty"])
+        if child_decisions:
+            submit_defective_disassemble(
+                db, item_id, qty, line.from_department,
+                child_decisions,
+                reason_category=reason_cat or "기타",
+                reason_memo=reason_memo_val,
+                actor=approver.name,
+            )
+        else:
+            # child_decisions 없으면 단순 scrap_defective (전부 폐기)
+            inventory_svc.scrap_defective(
+                db, item_id, qty, line.from_department,
+                reason_category=reason_cat or "기타",
+                reason_memo=reason_memo_val,
+                actor=approver.name,
+            )
+        quantity_change = -qty
+        # 분해는 서비스 함수가 자체 로그 생성 — 추가 TransactionLog 불필요
+        # (아래 TransactionLog 생성 구문은 _TX_TYPE_BY_REQUEST 로 DISASSEMBLE 로 기록됨)
     else:
         raise ValueError(f"지원하지 않는 요청 유형: {rt}")
 
@@ -1015,12 +1153,15 @@ def approve_request_department(
     if not request.requires_department_approval:
         raise ValueError("부서 결재가 필요하지 않은 요청입니다.")
 
-    dept_role = (getattr(approver, "department_role", None) or "none").lower()
-    level = getattr(getattr(approver, "level", None), "value", approver.level)
-    if dept_role not in ("primary", "deputy") and level != "admin":
-        raise PermissionError("부서 결재 정/부 권한이 없습니다.")
-    if approver.department != request.requester_department:
-        raise PermissionError("다른 부서의 요청은 결재할 수 없습니다.")
+    # 결재 권한 (그릴 합의 — docs/defect-handling-redesign.md):
+    #   - 부서 정/부: 생산 라인 6개(튜브/고압/진공/튜닝/조립/출하) 결재
+    #   - 창고 정/부: 모든 부서 결재
+    #   - admin: 모든 부서 결재
+    # 사람 이름 박지 않음. 자세한 룰은 `dept_hierarchy.can_approve_department`.
+    if not can_approve_department(approver, request.requester_department):
+        raise PermissionError(
+            "결재 권한이 없습니다 (부서 정/부 또는 창고 정/부 필요)."
+        )
     if not verify_pin(approver.pin_hash, pin):
         raise PermissionError("PIN이 일치하지 않습니다.")
 

@@ -12,6 +12,7 @@ venv/
 coverage/
 htmlcov/
 frontend/.vitest/
+.vite/
 
 # Database
 *.db

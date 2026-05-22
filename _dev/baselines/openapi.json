@@ -900,6 +900,138 @@
         "title": "CapacityTopItem",
         "type": "object"
       },
+      "DefectActionResult": {
+        "properties": {
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "quantity",
+          "message"
+        ],
+        "title": "DefectActionResult",
+        "type": "object"
+      },
+      "DefectKpi": {
+        "properties": {
+          "over_one_year": {
+            "title": "Over One Year",
+            "type": "integer"
+          },
+          "pending_approval": {
+            "title": "Pending Approval",
+            "type": "integer"
+          },
+          "processed_today": {
+            "title": "Processed Today",
+            "type": "integer"
+          },
+          "quarantined": {
+            "title": "Quarantined",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "quarantined",
+          "over_one_year",
+          "pending_approval",
+          "processed_today"
+        ],
+        "title": "DefectKpi",
+        "type": "object"
+      },
+      "DefectLocationItem": {
+        "properties": {
+          "defective_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Defective At"
+          },
+          "department": {
+            "title": "Department",
+            "type": "string"
+          },
+          "item_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Code"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string"
+          },
+          "reason_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category"
+          },
+          "reason_memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Memo"
+          }
+        },
+        "required": [
+          "item_id",
+          "item_name",
+          "item_code",
+          "department",
+          "quantity",
+          "defective_at",
+          "reason_category",
+          "reason_memo"
+        ],
+        "title": "DefectLocationItem",
+        "type": "object"
+      },
       "DepartmentCreate": {
         "properties": {
           "color_hex": {
@@ -2306,18 +2438,6 @@
             "title": "Lines",
             "type": "array"
           },
-          "package_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Package Id"
-          },
           "quantity": {
             "anyOf": [
               {
@@ -2378,18 +2498,6 @@
             },
             "title": "Lines",
             "type": "array"
-          },
-          "package_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Package Id"
           },
           "quantity": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -2903,18 +3011,6 @@
             ],
             "title": "Item Id"
           },
-          "package_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Package Id"
-          },
           "quantity": {
             "anyOf": [
               {
@@ -3169,18 +3265,6 @@
       },
       "ItemCreate": {
         "properties": {
-          "barcode": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Barcode"
-          },
           "initial_quantity": {
             "anyOf": [
               {
@@ -3202,18 +3286,6 @@
             "maxLength": 200,
             "title": "Item Name",
             "type": "string"
-          },
-          "legacy_file_type": {
-            "anyOf": [
-              {
-                "maxLength": 50,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Legacy File Type"
           },
           "legacy_item_type": {
             "anyOf": [
@@ -3289,18 +3361,6 @@
             "description": "공정 코드 (TR/HR/.../PF 18개)",
             "title": "Process Type Code"
           },
-          "spec": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "사양",
-            "title": "Spec"
-          },
           "supplier": {
             "anyOf": [
               {
@@ -3329,17 +3389,6 @@
       },
       "ItemResponse": {
         "properties": {
-          "barcode": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Barcode"
-          },
           "bom_completed_at": {
             "anyOf": [
               {
@@ -3376,17 +3425,6 @@
           "item_name": {
             "title": "Item Name",
             "type": "string"
-          },
-          "legacy_file_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Legacy File Type"
           },
           "legacy_item_type": {
             "anyOf": [
@@ -3474,17 +3512,6 @@
             ],
             "title": "Serial No"
           },
-          "spec": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Spec"
-          },
           "supplier": {
             "anyOf": [
               {
@@ -3495,17 +3522,6 @@
               }
             ],
             "title": "Supplier"
-          },
-          "symbol_slot": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Symbol Slot"
           },
           "unit": {
             "title": "Unit",
@@ -3520,7 +3536,6 @@
         "required": [
           "item_id",
           "item_name",
-          "spec",
           "unit",
           "created_at",
           "updated_at"
@@ -3530,18 +3545,6 @@
       },
       "ItemUpdate": {
         "properties": {
-          "barcode": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Barcode"
-          },
           "item_code": {
             "anyOf": [
               {
@@ -3565,18 +3568,6 @@
               }
             ],
             "title": "Item Name"
-          },
-          "legacy_file_type": {
-            "anyOf": [
-              {
-                "maxLength": 50,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Legacy File Type"
           },
           "legacy_item_type": {
             "anyOf": [
@@ -3656,17 +3647,6 @@
             "description": "공정 코드 (TR/HR/.../PF 18개)",
             "title": "Process Type Code"
           },
-          "spec": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Spec"
-          },
           "supplier": {
             "anyOf": [
               {
@@ -3702,17 +3682,6 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Available Quantity",
             "type": "string"
-          },
-          "barcode": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Barcode"
           },
           "bom_completed_at": {
             "anyOf": [
@@ -3778,17 +3747,6 @@
               }
             ],
             "title": "Last Reserver Name"
-          },
-          "legacy_file_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Legacy File Type"
           },
           "legacy_item_type": {
             "anyOf": [
@@ -3920,17 +3878,6 @@
             ],
             "title": "Serial No"
           },
-          "spec": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Spec"
-          },
           "supplier": {
             "anyOf": [
               {
@@ -3941,17 +3888,6 @@
               }
             ],
             "title": "Supplier"
-          },
-          "symbol_slot": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Symbol Slot"
           },
           "unit": {
             "title": "Unit",
@@ -3972,7 +3908,6 @@
         "required": [
           "item_id",
           "item_name",
-          "spec",
           "unit",
           "created_at",
           "updated_at"
@@ -4577,6 +4512,70 @@
         "title": "ProductionReceiptResponse",
         "type": "object"
       },
+      "QuarantineRequest": {
+        "properties": {
+          "actor_employee_id": {
+            "format": "uuid",
+            "title": "Actor Employee Id",
+            "type": "string"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Qty"
+          },
+          "reason_category": {
+            "title": "Reason Category",
+            "type": "string"
+          },
+          "reason_memo": {
+            "title": "Reason Memo",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_dept": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Dept"
+          },
+          "target_dept": {
+            "title": "Target Dept",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "qty",
+          "source",
+          "target_dept",
+          "reason_category",
+          "reason_memo",
+          "actor_employee_id"
+        ],
+        "title": "QuarantineRequest",
+        "type": "object"
+      },
       "RequestBucketEnum": {
         "enum": [
           "warehouse",
@@ -4742,6 +4741,29 @@
             ],
             "title": "Notes"
           },
+          "reason_category": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category"
+          },
+          "reason_memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Memo"
+          },
           "reference_no": {
             "anyOf": [
               {
@@ -4791,6 +4813,29 @@
               }
             ],
             "title": "Notes"
+          },
+          "reason_category": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category"
+          },
+          "reason_memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Memo"
           },
           "reference_no": {
             "anyOf": [
@@ -5294,7 +5339,10 @@
           "mark_defective_prod",
           "supplier_return",
           "package_out",
-          "manual_adjustment"
+          "manual_adjustment",
+          "defect_scrap",
+          "defect_return",
+          "defect_disassemble"
         ],
         "title": "StockRequestTypeEnum",
         "type": "string"
@@ -5772,6 +5820,8 @@
           "TRANSFER_TO_WH",
           "TRANSFER_DEPT",
           "MARK_DEFECTIVE",
+          "UNMARK_DEFECTIVE",
+          "DEFECT_SCRAP",
           "SUPPLIER_RETURN"
         ],
         "title": "TransactionTypeEnum",
@@ -5845,6 +5895,54 @@
           "department"
         ],
         "title": "TransferRequest",
+        "type": "object"
+      },
+      "UnquarantineRequest": {
+        "properties": {
+          "actor_employee_id": {
+            "format": "uuid",
+            "title": "Actor Employee Id",
+            "type": "string"
+          },
+          "dept": {
+            "title": "Dept",
+            "type": "string"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Qty"
+          },
+          "reason_category": {
+            "title": "Reason Category",
+            "type": "string"
+          },
+          "reason_memo": {
+            "title": "Reason Memo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "qty",
+          "dept",
+          "reason_category",
+          "reason_memo",
+          "actor_employee_id"
+        ],
+        "title": "UnquarantineRequest",
         "type": "object"
       },
       "ValidationError": {
@@ -7078,6 +7176,168 @@
         "summary": "제품기호 슬롯 수정",
         "tags": [
           "Codes"
+        ]
+      }
+    },
+    "/api/defects/kpi": {
+      "get": {
+        "description": "KPI 카드 4개:\n- quarantined: DEFECTIVE 위치 수 (quantity > 0)\n- over_one_year: defective_at <= now - 365 days\n- pending_approval: requires_department_approval=true AND status IN (SUBMITTED, RESERVED)\n                    AND request_type IN (DEFECT_SCRAP, DEFECT_RETURN, DEFECT_DISASSEMBLE)\n- processed_today: 오늘 생성된 UNMARK_DEFECTIVE, DEFECT_SCRAP, SUPPLIER_RETURN 트랜잭션 수",
+        "operationId": "get_defect_kpi_api_defects_kpi_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefectKpi"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Defect Kpi",
+        "tags": [
+          "Defects"
+        ]
+      }
+    },
+    "/api/defects/locations": {
+      "get": {
+        "description": "DEFECTIVE 상태 InventoryLocation 목록.\n\n각 (item, department) 조합에 대해 가장 최근 MARK_DEFECTIVE 트랜잭션의 사유를 포함.",
+        "operationId": "list_defect_locations_api_defects_locations_get",
+        "parameters": [
+          {
+            "description": "부서 필터 (없으면 전체)",
+            "in": "query",
+            "name": "department",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "부서 필터 (없으면 전체)",
+              "title": "Department"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DefectLocationItem"
+                  },
+                  "title": "Response List Defect Locations Api Defects Locations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Defect Locations",
+        "tags": [
+          "Defects"
+        ]
+      }
+    },
+    "/api/defects/quarantine": {
+      "post": {
+        "description": "격리 (즉시, 결재 없음). mark_defective 래퍼 + defective_at 채움.",
+        "operationId": "quarantine_api_defects_quarantine_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuarantineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefectActionResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Quarantine",
+        "tags": [
+          "Defects"
+        ]
+      }
+    },
+    "/api/defects/unquarantine": {
+      "post": {
+        "description": "정상 복귀 (즉시, 결재 없음). unmark_defective 래퍼.",
+        "operationId": "unquarantine_api_defects_unquarantine_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnquarantineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefectActionResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unquarantine",
+        "tags": [
+          "Defects"
         ]
       }
     },
@@ -9615,7 +9875,7 @@
             }
           },
           {
-            "description": "품목명, 품목코드, 사양, 위치, 바코드 검색",
+            "description": "품목명, 품목코드, 위치 검색",
             "in": "query",
             "name": "search",
             "required": false,
@@ -9628,26 +9888,8 @@
                   "type": "null"
                 }
               ],
-              "description": "품목명, 품목코드, 사양, 위치, 바코드 검색",
+              "description": "품목명, 품목코드, 위치 검색",
               "title": "Search"
-            }
-          },
-          {
-            "description": "레거시 파일 구분 필터",
-            "in": "query",
-            "name": "legacy_file_type",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "레거시 파일 구분 필터",
-              "title": "Legacy File Type"
             }
           },
           {
@@ -9702,24 +9944,6 @@
               ],
               "description": "레거시 품목 유형 필터",
               "title": "Legacy Item Type"
-            }
-          },
-          {
-            "description": "바코드 검색",
-            "in": "query",
-            "name": "barcode",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "바코드 검색",
-              "title": "Barcode"
             }
           },
           {
@@ -10709,16 +10933,16 @@
     },
     "/api/stock-requests/department-queue": {
       "get": {
-        "description": "부서 결재 정/부 승인 대기 목록.\n\nactor 의 부서와 일치하는 요청 중 requires_department_approval=True, 아직 dept 결재 미완료,\n상태가 RESERVED/SUBMITTED 인 것만 반환.",
+        "description": "부서 결재 정/부 승인 대기 목록.\n\n노출 부서 범위 (그릴 합의 — docs/defect-handling-redesign.md):\n  - 부서 정/부: 생산 라인 6개(튜브/고압/진공/튜닝/조립/출하)\n  - 창고 정/부 / admin: 모든 부서",
         "operationId": "list_department_queue_api_stock_requests_department_queue_get",
         "parameters": [
           {
-            "description": "현재 직원 ID — 본인 부서만 노출",
+            "description": "현재 직원 ID — 결재 가능 부서만 노출",
             "in": "query",
             "name": "actor_employee_id",
             "required": true,
             "schema": {
-              "description": "현재 직원 ID — 본인 부서만 노출",
+              "description": "현재 직원 ID — 결재 가능 부서만 노출",
               "format": "uuid",
               "title": "Actor Employee Id",
               "type": "string"
@@ -10771,16 +10995,16 @@
     },
     "/api/stock-requests/department-queue/count": {
       "get": {
-        "description": "부서 승인함 대기 건수 — `list_department_queue` 와 동일 필터.",
+        "description": "부서 승인함 대기 건수 — `list_department_queue` 와 동일 부서 범위 적용.",
         "operationId": "count_department_queue_api_stock_requests_department_queue_count_get",
         "parameters": [
           {
-            "description": "현재 직원 ID — 본인 부서만 카운트",
+            "description": "현재 직원 ID — 결재 가능 부서만 카운트",
             "in": "query",
             "name": "actor_employee_id",
             "required": true,
             "schema": {
-              "description": "현재 직원 ID — 본인 부서만 카운트",
+              "description": "현재 직원 ID — 결재 가능 부서만 카운트",
               "format": "uuid",
               "title": "Actor Employee Id",
               "type": "string"

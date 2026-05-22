@@ -10,7 +10,6 @@ import type { ItemFormData } from "./ItemFormFields";
 function itemToForm(item: Item): ItemFormData & { item_code: string } {
   return {
     item_name: item.item_name,
-    spec: item.spec ?? "",
     legacy_item_type: item.legacy_item_type ?? "",
     supplier: item.supplier ?? "",
     min_stock: item.min_stock != null ? String(item.min_stock) : "",
@@ -29,7 +28,6 @@ export function EditItemForm({ selectedItem }: { selectedItem: Item }) {
   function handleSave() {
     updateItemFull({
       item_name: form.item_name || undefined,
-      spec: form.spec || undefined,
       legacy_item_type: form.legacy_item_type || undefined,
       supplier: form.supplier || undefined,
       min_stock: form.min_stock ? Number(form.min_stock) : undefined,

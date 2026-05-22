@@ -22,6 +22,7 @@ from app.models import (
     StockRequestTypeEnum,
 )
 from app.routers._errors import ErrorCode, http_error
+from app.services.dept_hierarchy import approvable_departments
 from app.schemas import (
     ReservationLineResponse,
     StockRequestActionRequest,
@@ -76,6 +77,8 @@ def create_stock_request(payload: StockRequestCreate, db: Session = Depends(get_
                 reference_no=payload.reference_no,
                 notes=payload.notes,
                 client_request_id=payload.client_request_id,
+                reason_category=payload.reason_category,
+                reason_memo=payload.reason_memo,
             )
             commit_and_refresh(db, request)
             db.refresh(request)
@@ -172,70 +175,77 @@ def count_warehouse_queue(db: Session = Depends(get_db)) -> dict:
 
 @router.get("/department-queue", response_model=List[StockRequestResponse])
 def list_department_queue(
-    actor_employee_id: uuid.UUID = Query(..., description="현재 직원 ID — 본인 부서만 노출"),
+    actor_employee_id: uuid.UUID = Query(..., description="현재 직원 ID — 결재 가능 부서만 노출"),
     db: Session = Depends(get_db),
     limit: int = Query(100, ge=1, le=500),
 ):
     """부서 결재 정/부 승인 대기 목록.
 
-    actor 의 부서와 일치하는 요청 중 requires_department_approval=True, 아직 dept 결재 미완료,
-    상태가 RESERVED/SUBMITTED 인 것만 반환.
+    노출 부서 범위 (그릴 합의 — docs/defect-handling-redesign.md):
+      - 부서 정/부: 생산 라인 6개(튜브/고압/진공/튜닝/조립/출하)
+      - 창고 정/부 / admin: 모든 부서
     """
     actor = (
         db.query(Employee).filter(Employee.employee_id == actor_employee_id).first()
     )
     if actor is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
-    rows = (
-        db.query(StockRequest)
-        .filter(
-            StockRequest.requires_department_approval.is_(True),
-            # 새 정책 방어선: 창고 승인 필요한 요청은 부서 큐에 노출하지 않음.
-            StockRequest.requires_warehouse_approval.is_(False),
-            StockRequest.department_approved_by_employee_id.is_(None),
-            StockRequest.requester_department == actor.department,
-            StockRequest.status.in_(
-                (
-                    StockRequestStatusEnum.RESERVED,
-                    StockRequestStatusEnum.SUBMITTED,
-                )
-            ),
-        )
-        .order_by(StockRequest.created_at.asc())
-        .limit(limit)
-        .all()
+
+    visible = approvable_departments(actor)
+    if visible is not None and len(visible) == 0:
+        return []
+
+    base_query = db.query(StockRequest).filter(
+        StockRequest.requires_department_approval.is_(True),
+        # 새 정책 방어선: 창고 승인 필요한 요청은 부서 큐에 노출하지 않음.
+        StockRequest.requires_warehouse_approval.is_(False),
+        StockRequest.department_approved_by_employee_id.is_(None),
+        StockRequest.status.in_(
+            (
+                StockRequestStatusEnum.RESERVED,
+                StockRequestStatusEnum.SUBMITTED,
+            )
+        ),
     )
-    return rows
+    if visible is not None:
+        base_query = base_query.filter(StockRequest.requester_department.in_(list(visible)))
+
+    return (
+        base_query.order_by(StockRequest.created_at.asc()).limit(limit).all()
+    )
 
 
 @router.get("/department-queue/count")
 def count_department_queue(
-    actor_employee_id: uuid.UUID = Query(..., description="현재 직원 ID — 본인 부서만 카운트"),
+    actor_employee_id: uuid.UUID = Query(..., description="현재 직원 ID — 결재 가능 부서만 카운트"),
     db: Session = Depends(get_db),
 ) -> dict:
-    """부서 승인함 대기 건수 — `list_department_queue` 와 동일 필터."""
+    """부서 승인함 대기 건수 — `list_department_queue` 와 동일 부서 범위 적용."""
     actor = (
         db.query(Employee).filter(Employee.employee_id == actor_employee_id).first()
     )
     if actor is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
-    n = (
-        db.query(StockRequest)
-        .filter(
-            StockRequest.requires_department_approval.is_(True),
-            StockRequest.requires_warehouse_approval.is_(False),
-            StockRequest.department_approved_by_employee_id.is_(None),
-            StockRequest.requester_department == actor.department,
-            StockRequest.status.in_(
-                (
-                    StockRequestStatusEnum.RESERVED,
-                    StockRequestStatusEnum.SUBMITTED,
-                )
-            ),
-        )
-        .count()
+
+    visible = approvable_departments(actor)
+    if visible is not None and len(visible) == 0:
+        return {"count": 0}
+
+    base_query = db.query(StockRequest).filter(
+        StockRequest.requires_department_approval.is_(True),
+        StockRequest.requires_warehouse_approval.is_(False),
+        StockRequest.department_approved_by_employee_id.is_(None),
+        StockRequest.status.in_(
+            (
+                StockRequestStatusEnum.RESERVED,
+                StockRequestStatusEnum.SUBMITTED,
+            )
+        ),
     )
-    return {"count": int(n)}
+    if visible is not None:
+        base_query = base_query.filter(StockRequest.requester_department.in_(list(visible)))
+
+    return {"count": int(base_query.count())}
 
 
 @router.get("/reservations", response_model=List[ReservationLineResponse])
@@ -305,6 +315,8 @@ def upsert_stock_request_draft(
             lines_input=lines_input,
             reference_no=payload.reference_no,
             notes=payload.notes,
+            reason_category=payload.reason_category,
+            reason_memo=payload.reason_memo,
         )
     except ValueError as exc:
         db.rollback()

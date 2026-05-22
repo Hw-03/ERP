@@ -72,12 +72,10 @@ describe("itemsApi.getItems", () => {
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
     await itemsApi.getItems({
-      legacyFileType: "FILE_A",
       legacyPart: "PART_B",
       legacyItemType: "ITEM_C",
     });
     const url = String(fetchSpy.mock.calls[0][0]);
-    expect(url).toContain("legacy_file_type=FILE_A");
     expect(url).toContain("legacy_part=PART_B");
     expect(url).toContain("legacy_item_type=ITEM_C");
   });

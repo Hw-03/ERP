@@ -35,6 +35,7 @@ from app.routers import (
     admin_audit_csv,
     bom,
     codes,
+    defects,
     departments,
     dept_adjustment,
     employees,
@@ -229,6 +230,7 @@ app.include_router(admin_audit.router, prefix="/api/admin", tags=["Admin Audit"]
 app.include_router(admin_audit_csv.router, prefix="/api/admin", tags=["Admin Audit"])
 app.include_router(stock_requests.router, prefix="/api/stock-requests", tags=["Stock Requests"])
 app.include_router(dept_adjustment.router, prefix="/api/dept-adjustment", tags=["Dept Adjustment"])
+app.include_router(defects.router, prefix="/api/defects", tags=["Defects"])
 
 
 @app.get("/health", tags=["System"])

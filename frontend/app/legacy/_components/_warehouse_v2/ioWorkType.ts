@@ -51,8 +51,10 @@ export const IO_SUB_TYPES: Record<
     { id: "adjust_out", label: "수량보정 출고", description: "선택 품목 수량 감소" },
   ],
   defect: [
-    { id: "defect_quarantine", label: "불량 격리", description: "창고 승인 요청으로 격리" },
-    { id: "supplier_return", label: "공급처 반품", description: "불량 재고를 반품 처리" },
+    { id: "defect_quarantine", label: "새 격리", description: "정상 재고를 격리 처리 (창고 승인)" },
+    { id: "defect_restore",    label: "격리 해제", description: "격리 재고를 정상 복귀 (즉시)" },
+    { id: "defect_process",    label: "격리 처리", description: "격리 재고 폐기·분해 (창고 승인)" },
+    { id: "supplier_return",   label: "공급처 반품", description: "격리 재고를 공급처에 반품 (창고 승인)" },
   ],
 };
 
@@ -84,11 +86,13 @@ export function requiresDepartments(subType: IoSubType) {
     "adjust_out",
     "defect_quarantine",
     "supplier_return",
+    "defect_restore",
+    "defect_process",
   ].includes(subType);
 }
 
 export function requiresApproval(subType: IoSubType) {
-  return ["warehouse_to_dept", "dept_to_warehouse", "defect_quarantine"].includes(subType);
+  return ["warehouse_to_dept", "dept_to_warehouse", "defect_quarantine", "supplier_return", "defect_process"].includes(subType);
 }
 
 /** 백엔드 MANUAL_LINE_ORIGINS 와 동기 — 1라인이라도 낱개면 부서 결재 필요. */
@@ -166,7 +170,7 @@ export function targetDepartmentOf(
   toDepartment: string,
 ): string | null {
   // 출발 부서가 대상인 작업
-  if (subType === "dept_to_warehouse" || subType === "defect_quarantine" || subType === "supplier_return") {
+  if (subType === "dept_to_warehouse" || subType === "defect_quarantine" || subType === "supplier_return" || subType === "defect_restore" || subType === "defect_process") {
     return fromDepartment;
   }
   // 부서 무관 작업
@@ -184,7 +188,8 @@ export function directionWord(dir: DeptIoDirection | null): "입고" | "출고" 
 export function deptVisibility(subType: IoSubType): { from: boolean; to: boolean } {
   if (subType === "warehouse_to_dept") return { from: false, to: true };
   if (subType === "dept_to_warehouse") return { from: true, to: false };
-  if (subType === "defect_quarantine" || subType === "supplier_return") return { from: true, to: false };
+  if (subType === "defect_quarantine" || subType === "supplier_return" || subType === "defect_restore" || subType === "defect_process")
+    return { from: true, to: false };
   if (subType === "dept_transfer") return { from: true, to: true };
   if (
     subType === "produce" ||
@@ -252,6 +257,11 @@ export function lineTagLabel(line: IoLine, subType: IoSubType): { text: string; 
 /** workType 이 출고/비가역 계열이면 true — Step 1 카드 accent 색 결정에 사용. */
 export function isExitWorkType(workType: IoWorkType): boolean {
   return workType === "defect";
+}
+
+/** defect workType에서 격리(DEFECTIVE) 재고를 소스로 쓰는 서브타입인지 판별. */
+export function isDefectInventorySubType(subType: IoSubType): boolean {
+  return subType === "defect_restore" || subType === "defect_process" || subType === "supplier_return";
 }
 
 export { RefreshCcw };

@@ -20,7 +20,6 @@ export const UNIT_OPTIONS = ["EA", "SET", "kg", "g", "m", "mm", "L", "box"];
 export const EMPTY_ADD_FORM = {
   item_name: "",
   process_type_code: "TR",
-  spec: "",
   unit: "EA",
   model_slots: [] as number[],
   option_code: "",

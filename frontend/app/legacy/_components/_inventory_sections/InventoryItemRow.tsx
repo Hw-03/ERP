@@ -34,9 +34,13 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
   const isCritical = qty <= 0 || (minStock > 0 && qty < minStock);
 
   // 재고 분포 게이지 segments
+  // PR#3: DEFECTIVE 구간(빨강)을 정상 구간 뒤에 추가. 순서: 창고 → 부서 정상 → 부서 불량
+  const DEFECT_RED = "#ef4444";
   const total = Math.max(Number(item.quantity), 1);
   const wh = Number(item.warehouse_qty);
-  const depts = (item.locations ?? []).filter((l) => Number(l.quantity) > 0);
+  const allLocs = (item.locations ?? []).filter((l) => Number(l.quantity) > 0);
+  const prodLocs = allLocs.filter((l) => l.status !== "DEFECTIVE");
+  const defectiveLocs = allLocs.filter((l) => l.status === "DEFECTIVE");
   const segments: { pct: number; color: string; label: string }[] = [];
   let used = 0;
   if (wh > 0) {
@@ -44,7 +48,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
     segments.push({ pct, color: "#3ac4b0", label: `창고 ${formatQty(wh)}` });
     used += pct;
   }
-  for (const loc of depts) {
+  for (const loc of prodLocs) {
     const pct = Math.min(100 - used, (Number(loc.quantity) / total) * 100);
     if (pct <= 0) break;
     segments.push({
@@ -54,12 +58,28 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
     });
     used += pct;
   }
+  for (const loc of defectiveLocs) {
+    const pct = Math.min(100 - used, (Number(loc.quantity) / total) * 100);
+    if (pct <= 0) break;
+    segments.push({
+      pct,
+      color: DEFECT_RED,
+      label: `${loc.department} [불량] ${formatQty(loc.quantity)}`,
+    });
+    used += pct;
+  }
 
-  // 부서 배지
+  // 부서 배지 (PRODUCTION 행만, DEFECTIVE는 별도 빨간 배지로 표시)
   const badges: { key: string; label: string; color: string; dim?: boolean }[] = [];
   if (Number(item.warehouse_qty) > 0) badges.push({ key: "창고", label: "창고", color: "#3dd4a0" });
-  for (const l of item.locations.filter((l) => Number(l.quantity) > 0))
+  for (const l of (item.locations ?? []).filter((l) => Number(l.quantity) > 0 && l.status !== "DEFECTIVE"))
     badges.push({ key: l.department, label: l.department, color: getDeptColor(l.department) });
+  // 불량 배지: 불량이 있는 부서에 빨간 [불량] 배지 추가
+  const defectDepts = Array.from(new Set(
+    (item.locations ?? []).filter((l) => l.status === "DEFECTIVE" && Number(l.quantity) > 0).map((l) => l.department)
+  ));
+  for (const dept of defectDepts)
+    badges.push({ key: `${dept}-defect`, label: "[불량]", color: DEFECT_RED });
   if (badges.length === 0) {
     const dept = item.department ?? itemCodeDept(item.item_code);
     if (dept) badges.push({ key: dept, label: dept, color: getDeptColor(dept), dim: true });
@@ -120,11 +140,6 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
       </td>
       <td className="border-b px-4 py-5 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="font-semibold">{item.item_name}</div>
-        {item.spec && (
-          <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            {item.spec}
-          </div>
-        )}
         {Number(item.quantity) === 0 ? (
           <div
             className="mt-[20px] h-[6px] overflow-hidden rounded-full"

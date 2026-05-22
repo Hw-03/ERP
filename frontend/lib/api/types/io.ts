@@ -12,6 +12,8 @@ export type IoSubType =
   | "adjust_in"
   | "adjust_out"
   | "defect_quarantine"
+  | "defect_restore"
+  | "defect_process"
   | "supplier_return";
 
 export type IoSourceKind = "direct_item" | "bom_parent" | "manual";

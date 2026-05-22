@@ -12,7 +12,7 @@ import { IoTargetPicker } from "./IoTargetPicker";
 import { IoBundleCart } from "./IoBundleCart";
 import { IoConfirmStep } from "./IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "./IoSubmitModals";
-import { IO_WORK_TYPES, approvalKind, directionWord, isExitWorkType, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
+import { IO_WORK_TYPES, approvalKind, directionWord, isDefectInventorySubType, isExitWorkType, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
 import { applyBundleQuantityChange, applyLineQuantityChange, applyToggleLine } from "./bomSync";
 import { useIoDraftRestore } from "./useIoDraftRestore";
 import { useIoDraft } from "./useIoDraft";
@@ -20,6 +20,11 @@ import { useIoPreview } from "./useIoPreview";
 import { useIoSubmit } from "./useIoSubmit";
 import { useIoWorkState, type IoStep } from "./useIoWorkState";
 import type { IoComposeViewProps } from "./types";
+import { DefectInventoryPicker } from "./DefectInventoryPicker";
+import { DefectActionStep } from "./DefectActionStep";
+import { defectsApi } from "@/lib/api/defects";
+import { stockRequestsApi } from "@/lib/api/stock-requests";
+import type { Department } from "@/lib/api/types/shared";
 
 function locationQuantity(item: Item, department: string | null | undefined, status: "PRODUCTION" | "DEFECTIVE") {
   if (!department) return 0;
@@ -97,6 +102,8 @@ export function IoComposeView({
   defaultWorkType,
   onStatusChange,
   onSubmitSuccess,
+  defectDeptFilter,
+  currentEmployee,
 }: IoComposeViewProps) {
   const [employeeId, setEmployeeId] = useState(operator?.employee_id ?? "");
   const [search, setSearch] = useState(globalSearch);
@@ -113,6 +120,7 @@ export function IoComposeView({
   const { previewing, previewTarget } = useIoPreview();
   const { drafting, saveDraft } = useIoDraft();
   const { submitting, submit } = useIoSubmit();
+  const [defectSubmitting, setDefectSubmitting] = useState(false);
 
   // 브라우저 뒤로/앞으로 ↔ step 동기화. URL ?step=N 으로 history 엔트리를 쌓아 입출고 위저드 내부에서도
   // 뒤/앞 버튼이 작동하게 함.
@@ -328,6 +336,90 @@ export function IoComposeView({
     state.setWorkType(next);
     setError(null);
     state.goTo(2);
+  }
+
+  // 대시보드 빨간 [불량 N] 클릭으로 진입한 경우 (?defect_dept=X) 마운트 시 자동으로
+  // 워크타입 "defect" 선택 + Step 2 로 진입. 1회만 실행.
+  const defectAutoAppliedRef = useRef(false);
+  useEffect(() => {
+    if (
+      defectDeptFilter
+      && !defectAutoAppliedRef.current
+      && state.workType !== "defect"
+    ) {
+      defectAutoAppliedRef.current = true;
+      handleWorkTypeChange("defect");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defectDeptFilter]);
+
+  async function handleDefectInventorySubmit() {
+    const loc = state.defectSelectedLocation;
+    if (!employeeId || !loc) return;
+    setDefectSubmitting(true);
+    try {
+      const subType = state.subType;
+      const action = state.defectAction;
+      const lines = [{
+        item_id: loc.item_id,
+        quantity: loc.quantity,
+        from_bucket: "defective" as const,
+        from_department: loc.department as Department,
+        to_bucket: "none" as const,
+      }];
+      if (subType === "defect_restore" || action === "restore") {
+        await defectsApi.unquarantine({
+          item_id: loc.item_id,
+          qty: loc.quantity,
+          dept: loc.department,
+          reason_category: state.defectReasonCategory,
+          reason_memo: state.defectReasonMemo,
+          actor_employee_id: employeeId,
+        });
+        setResult({ kind: "success", title: "정상 복귀 완료", message: "격리 재고가 정상 복귀되었습니다." });
+      } else if (subType === "supplier_return") {
+        await stockRequestsApi.createStockRequest({
+          requester_employee_id: employeeId,
+          request_type: "defect_return",
+          reason_category: state.defectReasonCategory,
+          reason_memo: state.defectReasonMemo || null,
+          notes: state.defectReasonMemo || null,
+          lines,
+        });
+        setResult({ kind: "success", title: "결재 요청 완료", message: "창고 결재 요청이 제출되었습니다." });
+      } else if (action === "scrap") {
+        await stockRequestsApi.createStockRequest({
+          requester_employee_id: employeeId,
+          request_type: "defect_scrap",
+          reason_category: state.defectReasonCategory,
+          reason_memo: state.defectReasonMemo || null,
+          notes: state.defectReasonMemo || null,
+          lines,
+        });
+        setResult({ kind: "success", title: "결재 요청 완료", message: "창고 결재 요청이 제출되었습니다." });
+      } else if (action === "disassemble") {
+        const childDecisions = state.defectBomDecisions.map((d) => ({
+          item_id: d.item_id,
+          action: d.action,
+          qty: d.qty,
+        }));
+        await stockRequestsApi.createStockRequest({
+          requester_employee_id: employeeId,
+          request_type: "defect_disassemble",
+          reason_category: state.defectReasonCategory,
+          reason_memo: state.defectReasonMemo || null,
+          notes: JSON.stringify({ child_decisions: childDecisions }),
+          lines,
+        });
+        setResult({ kind: "success", title: "결재 요청 완료", message: "창고 결재 요청이 제출되었습니다." });
+      }
+      state.reset();
+      onStatusChange("불량 처리 완료");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "처리 중 오류가 발생했습니다.");
+    } finally {
+      setDefectSubmitting(false);
+    }
   }
 
   async function handleSubmit() {
@@ -616,45 +708,45 @@ export function IoComposeView({
           className={stepWrapperClass(2)}
         >
           <WizardStepCard
-            n={2}
-            title="세부 작업과 부서 선택"
-            state={stepState(2)}
-            summary={stepTwoSummary}
-            onChange={() => state.goTo(2)}
-            accent={accent}
-            fill={step === 2}
-          >
-            <div className="flex h-full min-h-0 flex-col">
-              <div className="min-h-0 flex-1">
-                <IoSubTypeStep
-                  workType={state.workType}
-                  subType={state.subType}
-                  fromDepartment={state.fromDepartment}
-                  toDepartment={state.toDepartment}
-                  deptIoDirection={state.deptIoDirection}
-                  onSubTypeChange={handleSubTypeChange}
-                  onFromDepartmentChange={changeFromDepartment}
-                  onToDepartmentChange={changeToDepartment}
-                  onDeptIoDirectionChange={(dir) => {
-                    const had = state.bundles.length > 0;
-                    state.setDeptIoDirection(dir);
-                    if (had) onStatusChange("방향 변경으로 작업 묶음을 초기화했습니다.");
-                  }}
-                />
+              n={2}
+              title="세부 작업과 부서 선택"
+              state={stepState(2)}
+              summary={stepTwoSummary}
+              onChange={() => state.goTo(2)}
+              accent={accent}
+              fill={step === 2}
+            >
+              <div className="flex h-full min-h-0 flex-col">
+                <div className="min-h-0 flex-1">
+                  <IoSubTypeStep
+                    workType={state.workType}
+                    subType={state.subType}
+                    fromDepartment={state.fromDepartment}
+                    toDepartment={state.toDepartment}
+                    deptIoDirection={state.deptIoDirection}
+                    onSubTypeChange={handleSubTypeChange}
+                    onFromDepartmentChange={changeFromDepartment}
+                    onToDepartmentChange={changeToDepartment}
+                    onDeptIoDirectionChange={(dir) => {
+                      const had = state.bundles.length > 0;
+                      state.setDeptIoDirection(dir);
+                      if (had) onStatusChange("방향 변경으로 작업 묶음을 초기화했습니다.");
+                    }}
+                  />
+                </div>
+                <div className="mt-auto pt-5">
+                  <button
+                    type="button"
+                    onClick={state.goNext}
+                    disabled={!state.canAdvance[2]}
+                    className="flex w-full items-center justify-center gap-2 rounded-[18px] px-7 py-5 text-lg font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
+                    style={{ background: accent }}
+                  >
+                    {state.canAdvance[2] ? "다음 단계로 →" : "세부 작업과 부서를 선택하세요"}
+                  </button>
+                </div>
               </div>
-              <div className="mt-auto pt-5">
-                <button
-                  type="button"
-                  onClick={state.goNext}
-                  disabled={!state.canAdvance[2]}
-                  className="flex w-full items-center justify-center gap-2 rounded-[18px] px-7 py-5 text-lg font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
-                  style={{ background: accent }}
-                >
-                  {state.canAdvance[2] ? "다음 단계로 →" : "세부 작업과 부서를 선택하세요"}
-                </button>
-              </div>
-            </div>
-          </WizardStepCard>
+            </WizardStepCard>
         </div>
       )}
 
@@ -665,39 +757,51 @@ export function IoComposeView({
         >
           <WizardStepCard
             n={3}
-            title={`${pickerDirectionLabel(state.subType)} 품목 선택`}
+            title={
+              state.workType === "defect" && isDefectInventorySubType(state.subType)
+                ? "처리 대상 선택"
+                : `${pickerDirectionLabel(state.subType)} 품목 선택`
+            }
             state={stepState(3)}
             summary={`${state.bundles.length}개 묶음 · 라인 ${lineCount}개`}
             onChange={() => state.goTo(3)}
             accent={accent}
             fill={step === 3}
           >
-            <IoTargetPicker
-              workType={state.workType}
-              subType={state.subType}
-              deptIoDirection={state.deptIoDirection}
-              bundleSubType={state.bundles.length > 0 ? state.subType : null}
-              bomParents={bomParents}
-              targetDepartment={targetDepartmentOf(state.subType, state.fromDepartment, state.toDepartment)}
-              items={items}
-              productModels={productModels}
-              bundles={state.bundles}
-              search={search}
-              onSearchChange={setSearch}
-              onAddItem={(item, sourceKind, subTypeOverride) =>
-                addItem(item, sourceKind ?? "direct_item", subTypeOverride)}
-              onAdvance={() => {
-                const step4El = stepRefs.current[4];
-                if (!step4El) return;
-                const scrollContainer = findScrollContainer(step4El);
-                if (!scrollContainer) return;
-                // useLayoutEffect 가 set 한 height 가 paint 된 다음 프레임에 측정
-                requestAnimationFrame(() => {
-                  scrollToElement(scrollContainer, step4El, STEP4_SCROLL_OFFSET);
-                });
-              }}
-              busy={previewing}
-            />
+            {state.workType === "defect" && isDefectInventorySubType(state.subType) ? (
+              <DefectInventoryPicker
+                department={state.fromDepartment}
+                selected={state.defectSelectedLocation}
+                onSelect={state.setDefectSelectedLocation}
+                onAdvance={state.goNext}
+              />
+            ) : (
+              <IoTargetPicker
+                workType={state.workType}
+                subType={state.subType}
+                deptIoDirection={state.deptIoDirection}
+                bundleSubType={state.bundles.length > 0 ? state.subType : null}
+                bomParents={bomParents}
+                targetDepartment={targetDepartmentOf(state.subType, state.fromDepartment, state.toDepartment)}
+                items={items}
+                productModels={productModels}
+                bundles={state.bundles}
+                search={search}
+                onSearchChange={setSearch}
+                onAddItem={(item, sourceKind, subTypeOverride) =>
+                  addItem(item, sourceKind ?? "direct_item", subTypeOverride)}
+                onAdvance={() => {
+                  const step4El = stepRefs.current[4];
+                  if (!step4El) return;
+                  const scrollContainer = findScrollContainer(step4El);
+                  if (!scrollContainer) return;
+                  requestAnimationFrame(() => {
+                    scrollToElement(scrollContainer, step4El, STEP4_SCROLL_OFFSET);
+                  });
+                }}
+                busy={previewing}
+              />
+            )}
           </WizardStepCard>
         </div>
       )}
@@ -716,6 +820,24 @@ export function IoComposeView({
             accent={accent}
             fill={step === 4 || (step === 3 && state.bundles.length > 0)}
           >
+            {state.workType === "defect" && isDefectInventorySubType(state.subType) && state.defectSelectedLocation ? (
+              <DefectActionStep
+                subType={state.subType}
+                selectedLocation={state.defectSelectedLocation}
+                action={state.defectAction}
+                reasonCategory={state.defectReasonCategory}
+                reasonMemo={state.defectReasonMemo}
+                bomDecisions={state.defectBomDecisions}
+                onActionChange={state.setDefectAction}
+                onReasonChange={(cat, memo) => {
+                  state.setDefectReasonCategory(cat);
+                  state.setDefectReasonMemo(memo);
+                }}
+                onBomDecisionsChange={state.setDefectBomDecisions}
+                canAdvance={state.canAdvance[4]}
+                onAdvance={handleDefectInventorySubmit}
+              />
+            ) : (
             <IoBundleCart
               bundles={state.bundles}
               subType={state.subType}
@@ -755,11 +877,12 @@ export function IoComposeView({
               }}
               canAdvance={state.canAdvance[4]}
             />
+            )}
           </WizardStepCard>
         </div>
       )}
 
-      {step >= 5 && (
+      {step >= 5 && !(state.workType === "defect" && isDefectInventorySubType(state.subType)) && (
         <div
           ref={(el) => { stepRefs.current[5] = el; }}
           className={stepWrapperClass(5)}

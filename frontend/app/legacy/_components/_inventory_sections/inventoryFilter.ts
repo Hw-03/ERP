@@ -20,10 +20,8 @@ export function matchesSearch(item: Item, keyword: string): boolean {
   const haystack = [
     item.item_code,
     item.item_name,
-    item.spec ?? "",
     item.location ?? "",
     item.supplier ?? "",
-    item.barcode ?? "",
   ]
     .join(" ")
     .toLowerCase();
