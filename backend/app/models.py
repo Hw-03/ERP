@@ -605,6 +605,8 @@ class StockRequest(Base):
     completed_at = Column(DateTime, nullable=True)
     reference_no = Column(String(100), nullable=True)
     notes = Column(Text, nullable=True)
+    reason_category = Column(String(50), nullable=True)
+    reason_memo = Column(Text, nullable=True)
     operation_batch_id = Column(
         UUID(as_uuid=True),
         ForeignKey("io_batches.batch_id", ondelete="SET NULL"),

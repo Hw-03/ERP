@@ -342,6 +342,8 @@ def _build_request_and_lines(
     client_request_id: Optional[str] = None,
     requires_warehouse_approval_override: Optional[bool] = None,
     requires_department_approval: bool = False,
+    reason_category: Optional[str] = None,
+    reason_memo: Optional[str] = None,
 ) -> StockRequest:
     """StockRequest + StockRequestLine row 생성. 호출자가 사전 검증 책임.
 
@@ -367,6 +369,8 @@ def _build_request_and_lines(
         submitted_at=submitted_at,
         reference_no=reference_no,
         notes=notes,
+        reason_category=reason_category,
+        reason_memo=reason_memo,
     )
     db.add(request)
     db.flush()
@@ -478,6 +482,8 @@ def create_request(
     notes: Optional[str],
     client_request_id: Optional[str] = None,
     requires_department_approval: bool = False,
+    reason_category: Optional[str] = None,
+    reason_memo: Optional[str] = None,
 ) -> StockRequest:
     """요청 생성. 호출자가 db.commit() 책임.
 
@@ -512,6 +518,8 @@ def create_request(
         submitted_at=now,
         client_request_id=client_request_id,
         requires_department_approval=requires_department_approval,
+        reason_category=reason_category,
+        reason_memo=reason_memo,
     )
     return _finalize_submission(db, request=request, requester=requester, now=now)
 
@@ -894,8 +902,8 @@ def _execute_line(
         # 격리 항목 폐기 — from_department 에서 DEFECTIVE 차감
         if line.from_department is None:
             raise ValueError("격리 항목 폐기는 from_department 가 필요합니다.")
-        reason_cat = getattr(request, "_reason_category", "") or ""
-        reason_memo = getattr(request, "_reason_memo", "") or (request.notes or "")
+        reason_cat = request.reason_category or ""
+        reason_memo = request.reason_memo or (request.notes or "")
         actor_name = approver.name
         inventory_svc.scrap_defective(
             db, item_id, qty, line.from_department,
@@ -908,8 +916,8 @@ def _execute_line(
         # 격리 항목 공급처 반품 — from_department 에서 DEFECTIVE 차감
         if line.from_department is None:
             raise ValueError("격리 항목 공급처 반품은 from_department 가 필요합니다.")
-        reason_cat = getattr(request, "_reason_category", "") or ""
-        reason_memo_val = getattr(request, "_reason_memo", "") or (request.notes or "")
+        reason_cat = request.reason_category or ""
+        reason_memo_val = request.reason_memo or (request.notes or "")
         actor_name = approver.name
         inventory_svc.return_to_supplier(db, item_id, qty, line.from_department)
         quantity_change = -qty
@@ -920,8 +928,8 @@ def _execute_line(
         from app.services.dept_adjustment import submit_defective_disassemble
         if line.from_department is None:
             raise ValueError("분해 처리는 from_department 가 필요합니다.")
-        reason_cat = getattr(request, "_reason_category", "") or ""
-        reason_memo_val = getattr(request, "_reason_memo", "") or (request.notes or "")
+        reason_cat = request.reason_category or ""
+        reason_memo_val = request.reason_memo or (request.notes or "")
         # child_decisions 는 request.notes 에 JSON으로 저장됨
         try:
             raw = json.loads(request.notes or "{}") if request.notes else {}

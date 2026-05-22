@@ -82,6 +82,8 @@ export function PaPfDefectWizard({
         await stockRequestsApi.createStockRequest({
           requester_employee_id: currentEmployee.employee_id,
           request_type: "defect_scrap",
+          reason_category: category,
+          reason_memo: memo || null,
           notes: memo || null,
           lines: [
             {
@@ -103,6 +105,8 @@ export function PaPfDefectWizard({
         await stockRequestsApi.createStockRequest({
           requester_employee_id: currentEmployee.employee_id,
           request_type: "defect_disassemble",
+          reason_category: category,
+          reason_memo: memo || null,
           notes: JSON.stringify({ child_decisions: childDecisions }),
           lines: [
             {

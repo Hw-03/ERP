@@ -72,6 +72,8 @@ export interface StockRequest {
   completed_at: string | null;
   reference_no: string | null;
   notes: string | null;
+  reason_category: string | null;
+  reason_memo: string | null;
   created_at: string;
   updated_at: string;
   lines: StockRequestLine[];
@@ -82,6 +84,8 @@ export interface StockRequestCreatePayload {
   request_type: StockRequestType;
   reference_no?: string | null;
   notes?: string | null;
+  reason_category?: string | null;
+  reason_memo?: string | null;
   client_request_id?: string;
   lines: Array<{
     item_id: string;
@@ -98,6 +102,8 @@ export interface StockRequestDraftUpsertPayload {
   request_type: StockRequestType;
   reference_no?: string | null;
   notes?: string | null;
+  reason_category?: string | null;
+  reason_memo?: string | null;
   lines: StockRequestCreatePayload["lines"];
 }
 

@@ -125,6 +125,8 @@ describe("RDefectActionModal", () => {
         expect.objectContaining({
           request_type: "defect_scrap",
           requester_employee_id: "emp-001",
+          reason_category: "외관 불량",
+          reason_memo: null,
           lines: expect.arrayContaining([
             expect.objectContaining({
               item_id: "item-001",

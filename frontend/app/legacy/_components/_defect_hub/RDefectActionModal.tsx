@@ -104,7 +104,9 @@ export function RDefectActionModal({
         await stockRequestsApi.createStockRequest({
           requester_employee_id: currentEmployee.employee_id,
           request_type: requestType,
-          notes: [category, memo].filter(Boolean).join(" / "),
+          reason_category: category,
+          reason_memo: memo || null,
+          notes: memo || null,
           lines: [
             {
               item_id: location.item_id,

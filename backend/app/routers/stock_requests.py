@@ -77,6 +77,8 @@ def create_stock_request(payload: StockRequestCreate, db: Session = Depends(get_
                 reference_no=payload.reference_no,
                 notes=payload.notes,
                 client_request_id=payload.client_request_id,
+                reason_category=payload.reason_category,
+                reason_memo=payload.reason_memo,
             )
             commit_and_refresh(db, request)
             db.refresh(request)

@@ -235,6 +235,11 @@ _MIGRATION_DDL: list[str] = [
     # 2026-05-22 (오후): 부서 계층(생산부 그릇) 청소는 `_cleanup_production_hierarchy()`
     # 헬퍼에서 처리. _MIGRATION_DDL 의 raw 문장으로 두면 fresh DB(parent_id 컬럼 없음)
     # 에서 "REAL FAILURE" 로 분류되므로 PRAGMA 검사로 안전하게 분기.
+
+    # 2026-05-22: 불량 처리 사유 — stock_requests 에 reason_category / reason_memo 컬럼 추가
+    # 결재 요청 생성 시 프론트가 전달하는 사유 정보를 DB에 유지하여 승인 시점에도 참조 가능.
+    "ALTER TABLE stock_requests ADD COLUMN reason_category VARCHAR(50)",
+    "ALTER TABLE stock_requests ADD COLUMN reason_memo TEXT",
 ]
 
 

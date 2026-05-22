@@ -200,6 +200,8 @@ describe("PaPfDefectWizard", () => {
       expect(stockRequestsApi.createStockRequest).toHaveBeenCalledWith(
         expect.objectContaining({
           request_type: "defect_scrap",
+          reason_category: "외관 불량",
+          reason_memo: null,
           lines: expect.arrayContaining([
             expect.objectContaining({
               item_id: "item-pa-001",
@@ -251,6 +253,8 @@ describe("PaPfDefectWizard", () => {
       expect(stockRequestsApi.createStockRequest).toHaveBeenCalledWith(
         expect.objectContaining({
           request_type: "defect_disassemble",
+          reason_category: "기능 불량",
+          reason_memo: null,
           lines: expect.arrayContaining([
             expect.objectContaining({
               item_id: "item-pa-001",
