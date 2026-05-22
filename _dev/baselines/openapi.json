@@ -900,6 +900,138 @@
         "title": "CapacityTopItem",
         "type": "object"
       },
+      "DefectActionResult": {
+        "properties": {
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "quantity",
+          "message"
+        ],
+        "title": "DefectActionResult",
+        "type": "object"
+      },
+      "DefectKpi": {
+        "properties": {
+          "over_one_year": {
+            "title": "Over One Year",
+            "type": "integer"
+          },
+          "pending_approval": {
+            "title": "Pending Approval",
+            "type": "integer"
+          },
+          "processed_today": {
+            "title": "Processed Today",
+            "type": "integer"
+          },
+          "quarantined": {
+            "title": "Quarantined",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "quarantined",
+          "over_one_year",
+          "pending_approval",
+          "processed_today"
+        ],
+        "title": "DefectKpi",
+        "type": "object"
+      },
+      "DefectLocationItem": {
+        "properties": {
+          "defective_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Defective At"
+          },
+          "department": {
+            "title": "Department",
+            "type": "string"
+          },
+          "item_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Code"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string"
+          },
+          "reason_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category"
+          },
+          "reason_memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Memo"
+          }
+        },
+        "required": [
+          "item_id",
+          "item_name",
+          "item_code",
+          "department",
+          "quantity",
+          "defective_at",
+          "reason_category",
+          "reason_memo"
+        ],
+        "title": "DefectLocationItem",
+        "type": "object"
+      },
       "DepartmentCreate": {
         "properties": {
           "color_hex": {
@@ -4577,6 +4709,70 @@
         "title": "ProductionReceiptResponse",
         "type": "object"
       },
+      "QuarantineRequest": {
+        "properties": {
+          "actor_employee_id": {
+            "format": "uuid",
+            "title": "Actor Employee Id",
+            "type": "string"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Qty"
+          },
+          "reason_category": {
+            "title": "Reason Category",
+            "type": "string"
+          },
+          "reason_memo": {
+            "title": "Reason Memo",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_dept": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Dept"
+          },
+          "target_dept": {
+            "title": "Target Dept",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "qty",
+          "source",
+          "target_dept",
+          "reason_category",
+          "reason_memo",
+          "actor_employee_id"
+        ],
+        "title": "QuarantineRequest",
+        "type": "object"
+      },
       "RequestBucketEnum": {
         "enum": [
           "warehouse",
@@ -5294,7 +5490,10 @@
           "mark_defective_prod",
           "supplier_return",
           "package_out",
-          "manual_adjustment"
+          "manual_adjustment",
+          "defect_scrap",
+          "defect_return",
+          "defect_disassemble"
         ],
         "title": "StockRequestTypeEnum",
         "type": "string"
@@ -5847,6 +6046,54 @@
           "department"
         ],
         "title": "TransferRequest",
+        "type": "object"
+      },
+      "UnquarantineRequest": {
+        "properties": {
+          "actor_employee_id": {
+            "format": "uuid",
+            "title": "Actor Employee Id",
+            "type": "string"
+          },
+          "dept": {
+            "title": "Dept",
+            "type": "string"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Qty"
+          },
+          "reason_category": {
+            "title": "Reason Category",
+            "type": "string"
+          },
+          "reason_memo": {
+            "title": "Reason Memo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "qty",
+          "dept",
+          "reason_category",
+          "reason_memo",
+          "actor_employee_id"
+        ],
+        "title": "UnquarantineRequest",
         "type": "object"
       },
       "ValidationError": {
@@ -7080,6 +7327,168 @@
         "summary": "제품기호 슬롯 수정",
         "tags": [
           "Codes"
+        ]
+      }
+    },
+    "/api/defects/kpi": {
+      "get": {
+        "description": "KPI 카드 4개:\n- quarantined: DEFECTIVE 위치 수 (quantity > 0)\n- over_one_year: defective_at <= now - 365 days\n- pending_approval: requires_department_approval=true AND status IN (SUBMITTED, RESERVED)\n                    AND request_type IN (DEFECT_SCRAP, DEFECT_RETURN, DEFECT_DISASSEMBLE)\n- processed_today: 오늘 생성된 UNMARK_DEFECTIVE, DEFECT_SCRAP, SUPPLIER_RETURN 트랜잭션 수",
+        "operationId": "get_defect_kpi_api_defects_kpi_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefectKpi"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Defect Kpi",
+        "tags": [
+          "Defects"
+        ]
+      }
+    },
+    "/api/defects/locations": {
+      "get": {
+        "description": "DEFECTIVE 상태 InventoryLocation 목록.\n\n각 (item, department) 조합에 대해 가장 최근 MARK_DEFECTIVE 트랜잭션의 사유를 포함.",
+        "operationId": "list_defect_locations_api_defects_locations_get",
+        "parameters": [
+          {
+            "description": "부서 필터 (없으면 전체)",
+            "in": "query",
+            "name": "department",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "부서 필터 (없으면 전체)",
+              "title": "Department"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DefectLocationItem"
+                  },
+                  "title": "Response List Defect Locations Api Defects Locations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Defect Locations",
+        "tags": [
+          "Defects"
+        ]
+      }
+    },
+    "/api/defects/quarantine": {
+      "post": {
+        "description": "격리 (즉시, 결재 없음). mark_defective 래퍼 + defective_at 채움.",
+        "operationId": "quarantine_api_defects_quarantine_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuarantineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefectActionResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Quarantine",
+        "tags": [
+          "Defects"
+        ]
+      }
+    },
+    "/api/defects/unquarantine": {
+      "post": {
+        "description": "정상 복귀 (즉시, 결재 없음). unmark_defective 래퍼.",
+        "operationId": "unquarantine_api_defects_unquarantine_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnquarantineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefectActionResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unquarantine",
+        "tags": [
+          "Defects"
         ]
       }
     },

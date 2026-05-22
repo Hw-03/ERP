@@ -538,6 +538,10 @@ class StockRequestTypeEnum(str, enum.Enum):
     # 낱개(manual/adjust_in/adjust_out) 라인 포함 IO — 부서 결재 정/부 승인만 필요.
     # 실제 재고 변동은 io.py 의 _submit_immediate 가 dept 승인 후 실행한다.
     MANUAL_ADJUSTMENT = "manual_adjustment"
+    # 불량 처리 흐름 — 격리 항목 결재 필요 액션 (Phase 2)
+    DEFECT_SCRAP = "defect_scrap"           # 격리 항목 폐기
+    DEFECT_RETURN = "defect_return"         # 격리 항목 공급처 반품
+    DEFECT_DISASSEMBLE = "defect_disassemble"  # PA·PF 격리 항목 분해
 
 
 class RequestBucketEnum(str, enum.Enum):

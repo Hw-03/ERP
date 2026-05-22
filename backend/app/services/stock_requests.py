@@ -55,6 +55,10 @@ _TX_TYPE_BY_REQUEST: dict[StockRequestTypeEnum, TransactionTypeEnum] = {
     StockRequestTypeEnum.MARK_DEFECTIVE_PROD: TransactionTypeEnum.MARK_DEFECTIVE,
     StockRequestTypeEnum.SUPPLIER_RETURN: TransactionTypeEnum.SUPPLIER_RETURN,
     StockRequestTypeEnum.PACKAGE_OUT: TransactionTypeEnum.SHIP,
+    # 불량 처리 흐름 — 결재 필요 액션 (세부 로그는 서비스 함수가 직접 생성)
+    StockRequestTypeEnum.DEFECT_SCRAP: TransactionTypeEnum.DEFECT_SCRAP,
+    StockRequestTypeEnum.DEFECT_RETURN: TransactionTypeEnum.SUPPLIER_RETURN,
+    StockRequestTypeEnum.DEFECT_DISASSEMBLE: TransactionTypeEnum.DISASSEMBLE,
 }
 
 
@@ -192,6 +196,10 @@ _ALLOWED_SHAPES: dict[StockRequestTypeEnum, dict] = {
     # 낱개(manual/adjust) 라인 — 어떤 bucket/dept 조합이든 허용 (요청 유형 다양).
     # 실제 재고 변동은 io.py 의 _submit_immediate 가 dept 승인 후 실행한다.
     StockRequestTypeEnum.MANUAL_ADJUSTMENT: None,  # 검증 건너뜀
+    # 불량 처리 흐름 — bucket 조합 임의 허용 (서비스 함수가 재고 검증)
+    StockRequestTypeEnum.DEFECT_SCRAP: None,
+    StockRequestTypeEnum.DEFECT_RETURN: None,
+    StockRequestTypeEnum.DEFECT_DISASSEMBLE: None,
 }
 
 
@@ -479,6 +487,15 @@ def create_request(
     - 승인 불필요 → 즉시 실행 후 COMPLETED.
     - requires_department_approval=True 면 부서 결재까지 통과해야 COMPLETED.
     """
+    # 불량 처리 흐름은 항상 부서 결재 필요.
+    _DEFECT_TYPES = {
+        StockRequestTypeEnum.DEFECT_SCRAP,
+        StockRequestTypeEnum.DEFECT_RETURN,
+        StockRequestTypeEnum.DEFECT_DISASSEMBLE,
+    }
+    if request_type in _DEFECT_TYPES:
+        requires_department_approval = True
+
     _validate_lines(request_type, lines_input)
     _preflight_inventory_check(db, request_type, lines_input)
     now = datetime.utcnow()
@@ -873,6 +890,69 @@ def _execute_line(
         # 라인별로 창고에서 출고
         inventory_svc.consume_warehouse(db, item_id, qty)
         quantity_change = -qty
+    elif rt == StockRequestTypeEnum.DEFECT_SCRAP:
+        # 격리 항목 폐기 — from_department 에서 DEFECTIVE 차감
+        if line.from_department is None:
+            raise ValueError("격리 항목 폐기는 from_department 가 필요합니다.")
+        reason_cat = getattr(request, "_reason_category", "") or ""
+        reason_memo = getattr(request, "_reason_memo", "") or (request.notes or "")
+        actor_name = approver.name
+        inventory_svc.scrap_defective(
+            db, item_id, qty, line.from_department,
+            reason_category=reason_cat or "기타",
+            reason_memo=reason_memo,
+            actor=actor_name,
+        )
+        quantity_change = -qty
+    elif rt == StockRequestTypeEnum.DEFECT_RETURN:
+        # 격리 항목 공급처 반품 — from_department 에서 DEFECTIVE 차감
+        if line.from_department is None:
+            raise ValueError("격리 항목 공급처 반품은 from_department 가 필요합니다.")
+        reason_cat = getattr(request, "_reason_category", "") or ""
+        reason_memo_val = getattr(request, "_reason_memo", "") or (request.notes or "")
+        actor_name = approver.name
+        inventory_svc.return_to_supplier(db, item_id, qty, line.from_department)
+        quantity_change = -qty
+    elif rt == StockRequestTypeEnum.DEFECT_DISASSEMBLE:
+        # 분해 처리 — notes 에서 child_decisions JSON 추출 후 submit_defective_disassemble 호출.
+        # 분해 시 부모 1라인만 있고 자식 결정은 request.notes 에 JSON 직렬화되어 있다.
+        import json
+        from app.services.dept_adjustment import submit_defective_disassemble
+        if line.from_department is None:
+            raise ValueError("분해 처리는 from_department 가 필요합니다.")
+        reason_cat = getattr(request, "_reason_category", "") or ""
+        reason_memo_val = getattr(request, "_reason_memo", "") or (request.notes or "")
+        # child_decisions 는 request.notes 에 JSON으로 저장됨
+        try:
+            raw = json.loads(request.notes or "{}") if request.notes else {}
+            child_decisions = raw.get("child_decisions", [])
+        except (json.JSONDecodeError, TypeError):
+            child_decisions = []
+        # child qty default → qty (부모와 동일 비율)
+        for cd in child_decisions:
+            if "qty" not in cd:
+                cd["qty"] = str(qty)
+            else:
+                cd["qty"] = str(cd["qty"])
+        if child_decisions:
+            submit_defective_disassemble(
+                db, item_id, qty, line.from_department,
+                child_decisions,
+                reason_category=reason_cat or "기타",
+                reason_memo=reason_memo_val,
+                actor=approver.name,
+            )
+        else:
+            # child_decisions 없으면 단순 scrap_defective (전부 폐기)
+            inventory_svc.scrap_defective(
+                db, item_id, qty, line.from_department,
+                reason_category=reason_cat or "기타",
+                reason_memo=reason_memo_val,
+                actor=approver.name,
+            )
+        quantity_change = -qty
+        # 분해는 서비스 함수가 자체 로그 생성 — 추가 TransactionLog 불필요
+        # (아래 TransactionLog 생성 구문은 _TX_TYPE_BY_REQUEST 로 DISASSEMBLE 로 기록됨)
     else:
         raise ValueError(f"지원하지 않는 요청 유형: {rt}")
 
