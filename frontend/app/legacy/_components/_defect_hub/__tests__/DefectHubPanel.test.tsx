@@ -11,6 +11,16 @@ vi.mock("@/lib/api/defects", () => ({
   },
 }));
 
+// 처리 모달 모킹 — DOM 렌더만 검증 (실제 API 호출 X)
+vi.mock("../RDefectActionModal", () => ({
+  RDefectActionModal: ({ open, location }: { open: boolean; location: { item_code: string } }) =>
+    open ? <div data-testid="r-modal">{location.item_code}</div> : null,
+}));
+vi.mock("../PaPfDefectWizard", () => ({
+  PaPfDefectWizard: ({ open, location }: { open: boolean; location: { item_code: string } }) =>
+    open ? <div data-testid="papf-wizard">{location.item_code}</div> : null,
+}));
+
 import { defectsApi } from "@/lib/api/defects";
 
 const mockKpi: DefectKpi = {
@@ -142,23 +152,18 @@ describe("DefectHubPanel", () => {
     });
   });
 
-  it("[처리] 버튼 클릭 시 콜백(console.log)이 호출된다", async () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-
+  it("[처리] 버튼 클릭 시 R 모달이 열린다 (R 품목)", async () => {
     render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
 
     await waitFor(() => {
       expect(screen.getAllByText("처리").length).toBeGreaterThan(0);
     });
 
+    // mockLocations 의 첫 항목 item_code="7-TR-0001" — PA/PF 아님 → R 모달 분기
     const processButtons = screen.getAllByText("처리");
     fireEvent.click(processButtons[0]);
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[DefectHub] 처리 클릭"),
-      expect.any(Object)
-    );
-
-    consoleSpy.mockRestore();
+    expect(await screen.findByTestId("r-modal")).toBeInTheDocument();
+    expect(screen.queryByTestId("papf-wizard")).not.toBeInTheDocument();
   });
 });

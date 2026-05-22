@@ -10,4 +10,8 @@ export const REQUEST_TYPE_LABEL: Record<string, string> = {
   supplier_return: "공급업체 반품",
   package_out: "패키지 출고",
   manual_adjustment: "수동 조정",
+  // 불량 처리 흐름 (Phase 2/5)
+  defect_scrap: "불량 폐기",
+  defect_return: "불량 공급처 반품",
+  defect_disassemble: "불량 분해 (BOM 자식 처리)",
 };

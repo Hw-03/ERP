@@ -14,6 +14,16 @@ import { DefectKpiCards, type DefectKpiKind } from "./DefectKpiCards";
 import { DefectQuickActions } from "./DefectQuickActions";
 import { DefectFilterBar, type DefectScope, type DefectSort } from "./DefectFilterBar";
 import { DefectDepartmentList } from "./DefectDepartmentList";
+import { RDefectActionModal } from "./RDefectActionModal";
+import { PaPfDefectWizard } from "./PaPfDefectWizard";
+
+/** item_code 2번째 segment 가 process_type. PA/PF 면 BOM 분해 가능. */
+function isPaPfItem(itemCode: string | null | undefined): boolean {
+  if (!itemCode) return false;
+  const parts = itemCode.split("-");
+  if (parts.length < 2) return false;
+  return parts[1] === "PA" || parts[1] === "PF";
+}
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const PRODUCTION_LINES = new Set(["튜브", "고압", "진공", "튜닝", "조립", "출하"]);
@@ -46,8 +56,10 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
   const [scope, setScope] = useState<DefectScope>(initialScope);
   const [sort, setSort] = useState<DefectSort>("oldest");
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
+  const [processingLocation, setProcessingLocation] = useState<DefectLocation | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
 
-  // 마운트 시 KPI + 목록 동시 로드
+  // 마운트 시 KPI + 목록 동시 로드 (처리 완료 후 reloadNonce 증가 시 재로드)
   useEffect(() => {
     let cancelled = false;
 
@@ -74,7 +86,7 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
 
     void load();
     return () => { cancelled = true; };
-  }, []);
+  }, [reloadNonce]);
 
   // scope/defectDeptFilter 에 따른 목록 필터
   const filteredLocations = useMemo(() => {
@@ -105,20 +117,25 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
     return result;
   }, [locations, scope, sort, kpiFilter, defectDeptFilter, currentEmployee.department]);
 
-  // [처리] 버튼 클릭 — Phase 5 placeholder
+  // [처리] 버튼 클릭 → 품목 종류에 따라 모달 분기
   function handleProcess(location: DefectLocation) {
-    console.log("[DefectHub] 처리 클릭 — Phase 5 에서 위자드 연결 예정", location);
+    setProcessingLocation(location);
   }
 
-  // 퀵 액션 — Phase 5 placeholder
+  function handleModalSubmitted() {
+    setProcessingLocation(null);
+    setReloadNonce((n) => n + 1);
+  }
+
+  // 퀵 액션 — 별도 PR 에서 모달 추가 예정 (PR#5 후속)
   function handleAddQuarantine() {
-    console.log("[DefectHub] 새 격리 추가 — Phase 5 에서 구현 예정");
+    console.log("[DefectHub] 새 격리 추가 — 별도 PR 에서 구현 예정");
   }
   function handleAddRReturn() {
-    console.log("[DefectHub] R 바로 반품 — Phase 5 에서 구현 예정");
+    console.log("[DefectHub] R 바로 반품 — 별도 PR 에서 구현 예정");
   }
   function handleAddRScrap() {
-    console.log("[DefectHub] R 바로 폐기 — Phase 5 에서 구현 예정");
+    console.log("[DefectHub] R 바로 폐기 — 별도 PR 에서 구현 예정");
   }
 
   function handleKpiCardClick(kind: DefectKpiKind) {
@@ -193,6 +210,25 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
       ) : (
         <DefectDepartmentList locations={filteredLocations} onProcess={handleProcess} />
       )}
+
+      {/* 처리 모달 — 품목 종류(R / PA·PF)에 따라 분기 */}
+      {processingLocation && isPaPfItem(processingLocation.item_code) ? (
+        <PaPfDefectWizard
+          open
+          onClose={() => setProcessingLocation(null)}
+          location={processingLocation}
+          currentEmployee={currentEmployee}
+          onSubmitted={handleModalSubmitted}
+        />
+      ) : processingLocation ? (
+        <RDefectActionModal
+          open
+          onClose={() => setProcessingLocation(null)}
+          location={processingLocation}
+          currentEmployee={currentEmployee}
+          onSubmitted={handleModalSubmitted}
+        />
+      ) : null}
     </div>
   );
 }
