@@ -1,0 +1,40 @@
+---
+type: asset-note
+project: ERP
+layer: docs
+source_path: erp/docs/design/uploads/mob_05_admin_pinlock-76bcdac6.png
+status: active
+updated: 2026-04-27
+source_sha: ed3b4f19ec72
+tags:
+  - erp
+  - docs
+  - documentation
+  - png
+---
+
+# mob_05_admin_pinlock-76bcdac6.png
+
+> [!summary] 역할
+> 현재 개발/운영 판단에 필요한 원본 문서다. Obsidian에서는 이 노트를 통해 빠르게 찾는다.
+
+## 원본 위치
+
+- Source: `docs/design/uploads/mob_05_admin_pinlock-76bcdac6.png`
+- Layer: `docs`
+- Kind: `documentation`
+- Size: `30388` bytes
+
+## 연결
+
+- Parent hub: [[docs/design/uploads/uploads|docs/design/uploads]]
+- Related: [[docs/docs]]
+
+## 읽는 포인트
+
+- 원본 문서의 최신성은 실제 코드와 함께 검증한다.
+- 품목코드 규칙은 `docs/ITEM_CODE_RULES.md`를 우선한다.
+
+## 파일 메모
+
+이 파일은 바이너리/자료 파일이라 노트에 내용을 복사하지 않는다. Obsidian에서는 위치와 목적을 확인하고, 실제 내용은 원본 파일을 연다.

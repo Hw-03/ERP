@@ -1,0 +1,42 @@
+---
+type: code-note
+project: ERP
+layer: backend
+source_path: erp/backend/tests/__init__.py
+status: active
+updated: 2026-04-27
+source_sha: da39a3ee5e6b
+tags:
+  - erp
+  - backend
+  - test
+  - py
+---
+
+# __init__.py
+
+> [!summary] 역할
+> 현재 ERP 동작을 회귀 없이 유지하기 위한 자동 테스트 파일이다.
+
+## 원본 위치
+
+- Source: `backend/tests/__init__.py`
+- Layer: `backend`
+- Kind: `test`
+- Size: `0` bytes
+
+## 연결
+
+- Parent hub: [[backend/tests/tests|backend/tests]]
+- Related: [[backend/backend]]
+
+## 읽는 포인트
+
+- 기능 변경 후 같은 영역 테스트를 먼저 확인한다.
+- 테스트가 문서보다 최신 동작을 더 정확히 말해줄 때가 많다.
+
+## 원본 발췌
+
+````python
+
+````
