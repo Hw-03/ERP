@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { renderHook, act } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 
-const createDepartmentMock = vi.fn();
-const updateDepartmentMock = vi.fn();
-const deleteDepartmentMock = vi.fn();
-const reorderDepartmentsMock = vi.fn();
+const createMutate = vi.fn();
+const updateMutate = vi.fn();
+const deleteMutate = vi.fn();
+const reorderMutate = vi.fn();
 
-vi.mock("@/lib/api", () => ({
-  api: {
-    createDepartment: (...a: any[]) => createDepartmentMock(...a),
-    updateDepartment: (...a: any[]) => updateDepartmentMock(...a),
-    deleteDepartment: (...a: any[]) => deleteDepartmentMock(...a),
-    reorderDepartments: (...a: any[]) => reorderDepartmentsMock(...a),
-  },
+vi.mock("@/lib/queries/useDepartmentsQuery", () => ({
+  useCreateDepartmentMutation: () => ({ mutate: createMutate }),
+  useUpdateDepartmentMutation: () => ({ mutate: updateMutate }),
+  useDeleteDepartmentMutation: () => ({ mutate: deleteMutate }),
+  useReorderDepartmentsMutation: () => ({ mutate: reorderMutate }),
 }));
 
 vi.mock("../../DepartmentsContext", () => ({
@@ -20,6 +20,11 @@ vi.mock("../../DepartmentsContext", () => ({
 }));
 
 import { useAdminDepartmentsCommands } from "../useAdminDepartmentsCommands";
+
+function wrapper({ children }: { children: ReactNode }) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+}
 
 const D = (id: number, name = `D${id}`, is_active = true, color_hex = "#1d4ed8"): any => ({
   id,
@@ -44,43 +49,49 @@ const baseArgs = (over: Partial<Parameters<typeof useAdminDepartmentsCommands>[0
 
 describe("useAdminDepartmentsCommands", () => {
   beforeEach(() => {
-    createDepartmentMock.mockReset();
-    updateDepartmentMock.mockReset();
-    deleteDepartmentMock.mockReset();
-    reorderDepartmentsMock.mockReset();
+    createMutate.mockReset();
+    updateMutate.mockReset();
+    deleteMutate.mockReset();
+    reorderMutate.mockReset();
   });
 
-  it("add — 빈 이름이면 createDepartment 호출 안 함", () => {
+  it("add — 빈 이름이면 createMutation 호출 안 함", () => {
     const args = baseArgs({ getAddName: () => "  " });
-    const { result } = renderHook(() => useAdminDepartmentsCommands(args));
+    const { result } = renderHook(() => useAdminDepartmentsCommands(args), { wrapper });
     act(() => {
       result.current.add();
     });
-    expect(createDepartmentMock).not.toHaveBeenCalled();
+    expect(createMutate).not.toHaveBeenCalled();
   });
 
-  it("add — 이름 있으면 createDepartment 호출 + onAfterAdd + setDepartments", async () => {
-    createDepartmentMock.mockResolvedValue(D(5, "신규"));
+  it("add — 이름 있으면 createMutation.mutate 호출 + onSuccess시 setDepartments", () => {
     const args = baseArgs({ getAddName: () => "신규" });
-    const { result } = renderHook(() => useAdminDepartmentsCommands(args));
+    const { result } = renderHook(() => useAdminDepartmentsCommands(args), { wrapper });
     act(() => {
       result.current.add();
     });
-    await waitFor(() => expect(args.setDepartments).toHaveBeenCalled());
-    expect(createDepartmentMock).toHaveBeenCalledTimes(1);
+    expect(createMutate).toHaveBeenCalledTimes(1);
+    const [payload, opts] = createMutate.mock.calls[0]!;
+    expect(payload.name).toBe("신규");
+    expect(payload.pin).toBe("1234");
+    // onSuccess 시뮬레이션
+    act(() => {
+      opts.onSuccess(D(5, "신규"));
+    });
+    expect(args.setDepartments).toHaveBeenCalled();
     expect(args.onAfterAdd).toHaveBeenCalled();
     expect(args.onStatusChange).toHaveBeenCalledWith("'신규' 부서를 추가했습니다.");
   });
 
-  it("reorder — items 페이로드 + setDepartments 호출", () => {
-    reorderDepartmentsMock.mockResolvedValue(undefined);
+  it("reorder — items 페이로드 + setDepartments 즉시 호출", () => {
     const args = baseArgs({ departments: [D(1), D(2)] });
-    const { result } = renderHook(() => useAdminDepartmentsCommands(args));
+    const { result } = renderHook(() => useAdminDepartmentsCommands(args), { wrapper });
     act(() => {
       result.current.reorder([D(2), D(1)]);
     });
     expect(args.setDepartments).toHaveBeenCalledTimes(1);
-    expect(reorderDepartmentsMock).toHaveBeenCalledWith({
+    expect(reorderMutate).toHaveBeenCalledTimes(1);
+    expect(reorderMutate.mock.calls[0]![0]).toEqual({
       items: [
         { id: 2, display_order: 0 },
         { id: 1, display_order: 1 },
@@ -89,14 +100,16 @@ describe("useAdminDepartmentsCommands", () => {
     });
   });
 
-  it("updateColor — updateDepartment 호출", async () => {
-    updateDepartmentMock.mockResolvedValue(D(1, "D1", true, "#dc2626"));
+  it("updateColor — updateMutation.mutate { id, payload }", () => {
     const args = baseArgs({ departments: [D(1)] });
-    const { result } = renderHook(() => useAdminDepartmentsCommands(args));
+    const { result } = renderHook(() => useAdminDepartmentsCommands(args), { wrapper });
     act(() => {
       result.current.updateColor(1, "#dc2626");
     });
-    await waitFor(() => expect(args.setDepartments).toHaveBeenCalled());
-    expect(updateDepartmentMock).toHaveBeenCalledWith(1, { color_hex: "#dc2626", pin: "1234" });
+    expect(updateMutate).toHaveBeenCalledTimes(1);
+    expect(updateMutate.mock.calls[0]![0]).toEqual({
+      id: 1,
+      payload: { color_hex: "#dc2626", pin: "1234" },
+    });
   });
 });

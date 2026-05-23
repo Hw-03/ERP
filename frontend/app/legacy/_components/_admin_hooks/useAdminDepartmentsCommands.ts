@@ -4,8 +4,13 @@
 // 책임: list-level 명령 — add / deactivate / reactivate / hardDelete / reorder / updateColor.
 
 import type { DepartmentMaster } from "@/lib/api";
-import { api } from "@/lib/api";
 import { employeeColor } from "@/lib/mes/color";
+import {
+  useCreateDepartmentMutation,
+  useDeleteDepartmentMutation,
+  useReorderDepartmentsMutation,
+  useUpdateDepartmentMutation,
+} from "@/lib/queries/useDepartmentsQuery";
 import { useRefreshDepartments } from "../DepartmentsContext";
 
 export const COLOR_PALETTE = [
@@ -87,64 +92,80 @@ export function useAdminDepartmentsCommands({
   getAddName,
 }: UseAdminDepartmentsCommandsArgs): UseAdminDepartmentsCommandsState {
   const refreshDepartments = useRefreshDepartments();
+  const createMutation = useCreateDepartmentMutation();
+  const updateMutation = useUpdateDepartmentMutation();
+  const deleteMutation = useDeleteDepartmentMutation();
+  const reorderMutation = useReorderDepartmentsMutation();
 
   function add() {
     const name = getAddName().trim();
     if (!name) return;
     const color_hex = pickAutoColor(departments);
-    void api
-      .createDepartment({ name, display_order: departments.length, pin: adminPin, color_hex })
-      .then((created) => {
-        setDepartments((prev) => [...prev, created]);
-        onAfterAdd?.();
-        onStatusChange(`'${created.name}' 부서를 추가했습니다.`);
-        void refreshDepartments();
-      })
-      .catch((err: unknown) => onError(err instanceof Error ? err.message : "부서 추가 실패"));
+    createMutation.mutate(
+      { name, display_order: departments.length, pin: adminPin, color_hex },
+      {
+        onSuccess: (created) => {
+          setDepartments((prev) => [...prev, created]);
+          onAfterAdd?.();
+          onStatusChange(`'${created.name}' 부서를 추가했습니다.`);
+          void refreshDepartments();
+        },
+        onError: (err) => onError(err instanceof Error ? err.message : "부서 추가 실패"),
+      },
+    );
   }
 
   function deactivate(id: number) {
     const dept = departments.find((d) => d.id === id);
     if (!dept) return;
     if (!confirm(`'${dept.name}' 부서를 비활성화하시겠습니까?`)) return;
-    void api
-      .updateDepartment(id, { is_active: false, pin: adminPin })
-      .then((updated) => {
-        setDepartments((prev) => prev.map((d) => (d.id === id ? updated : d)));
-        if (selectedDept?.id === id) setSelectedDept(updated);
-        onStatusChange(`'${dept.name}' 부서를 비활성화했습니다.`);
-        void refreshDepartments();
-      })
-      .catch((err: unknown) => onError(err instanceof Error ? err.message : "비활성화 실패"));
+    updateMutation.mutate(
+      { id, payload: { is_active: false, pin: adminPin } },
+      {
+        onSuccess: (updated) => {
+          setDepartments((prev) => prev.map((d) => (d.id === id ? updated : d)));
+          if (selectedDept?.id === id) setSelectedDept(updated);
+          onStatusChange(`'${dept.name}' 부서를 비활성화했습니다.`);
+          void refreshDepartments();
+        },
+        onError: (err) => onError(err instanceof Error ? err.message : "비활성화 실패"),
+      },
+    );
   }
 
   function reactivate(id: number) {
     const dept = departments.find((d) => d.id === id);
     if (!dept) return;
-    void api
-      .updateDepartment(id, { is_active: true, pin: adminPin })
-      .then((updated) => {
-        setDepartments((prev) => prev.map((d) => (d.id === id ? updated : d)));
-        if (selectedDept?.id === id) setSelectedDept(updated);
-        onStatusChange(`'${dept.name}' 부서를 활성화했습니다.`);
-        void refreshDepartments();
-      })
-      .catch((err: unknown) => onError(err instanceof Error ? err.message : "활성화 실패"));
+    updateMutation.mutate(
+      { id, payload: { is_active: true, pin: adminPin } },
+      {
+        onSuccess: (updated) => {
+          setDepartments((prev) => prev.map((d) => (d.id === id ? updated : d)));
+          if (selectedDept?.id === id) setSelectedDept(updated);
+          onStatusChange(`'${dept.name}' 부서를 활성화했습니다.`);
+          void refreshDepartments();
+        },
+        onError: (err) => onError(err instanceof Error ? err.message : "활성화 실패"),
+      },
+    );
   }
 
   function hardDelete(id: number) {
     const dept = departments.find((d) => d.id === id);
     if (!dept) return;
     if (!confirm(`'${dept.name}' 부서를 영구 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
-    void api
-      .deleteDepartment(id, adminPin)
-      .then(() => {
-        setDepartments((prev) => prev.filter((d) => d.id !== id));
-        if (selectedDept?.id === id) setSelectedDept(null);
-        onStatusChange(`'${dept.name}' 부서를 삭제했습니다.`);
-        void refreshDepartments();
-      })
-      .catch((err: unknown) => onError(err instanceof Error ? err.message : "삭제 실패"));
+    deleteMutation.mutate(
+      { id, pin: adminPin },
+      {
+        onSuccess: () => {
+          setDepartments((prev) => prev.filter((d) => d.id !== id));
+          if (selectedDept?.id === id) setSelectedDept(null);
+          onStatusChange(`'${dept.name}' 부서를 삭제했습니다.`);
+          void refreshDepartments();
+        },
+        onError: (err) => onError(err instanceof Error ? err.message : "삭제 실패"),
+      },
+    );
   }
 
   function reorder(ordered: DepartmentMaster[]) {
@@ -159,23 +180,29 @@ export function useAdminDepartmentsCommands({
       display_order: items.find((it) => it.id === d.id)!.display_order,
     }));
     setDepartments(() => reindexed);
-    void api
-      .reorderDepartments({ items, pin: adminPin })
-      .then(() => {
-        void refreshDepartments();
-      })
-      .catch((err: unknown) => onError(err instanceof Error ? err.message : "순서 저장 실패"));
+    reorderMutation.mutate(
+      { items, pin: adminPin },
+      {
+        onSuccess: () => {
+          void refreshDepartments();
+        },
+        onError: (err) => onError(err instanceof Error ? err.message : "순서 저장 실패"),
+      },
+    );
   }
 
   function updateColor(id: number, colorHex: string) {
-    void api
-      .updateDepartment(id, { color_hex: colorHex, pin: adminPin })
-      .then((updated) => {
-        setDepartments((prev) => prev.map((d) => (d.id === id ? updated : d)));
-        if (selectedDept?.id === id) setSelectedDept(updated);
-        void refreshDepartments();
-      })
-      .catch((err: unknown) => onError(err instanceof Error ? err.message : "색상 변경 실패"));
+    updateMutation.mutate(
+      { id, payload: { color_hex: colorHex, pin: adminPin } },
+      {
+        onSuccess: (updated) => {
+          setDepartments((prev) => prev.map((d) => (d.id === id ? updated : d)));
+          if (selectedDept?.id === id) setSelectedDept(updated);
+          void refreshDepartments();
+        },
+        onError: (err) => onError(err instanceof Error ? err.message : "색상 변경 실패"),
+      },
+    );
   }
 
   return { add, deactivate, reactivate, hardDelete, reorder, updateColor };
