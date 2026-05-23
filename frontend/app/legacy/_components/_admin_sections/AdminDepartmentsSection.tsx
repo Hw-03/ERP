@@ -22,6 +22,9 @@ import {
 } from "./_admin_primitives";
 import { useAdminDepartmentsContext } from "./AdminDepartmentsContext";
 import { useRefreshDepartments } from "../DepartmentsContext";
+import { useRegisterAdminDirty } from "./AdminDirtyRegistry";
+import { useUnsavedChangesGuard } from "@/lib/ui/useUnsavedChangesGuard";
+import { UnsavedChangesModal } from "@/lib/ui/UnsavedChangesModal";
 
 function deptColor(d: DepartmentMaster): string {
   return d.color_hex ?? getDepartmentFallbackColor(d.name);
@@ -58,6 +61,15 @@ export function AdminDepartmentsSection({
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [addMode, setAddMode] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DepartmentMaster | null>(null);
+
+  // PR-2 2-3: 부서명 편집 기능(A3)이 아직 worktree 에 없으므로 dirty 는 placeholder(false).
+  // 인프라(가드/모달/registry)는 준비해 두어 A3 머지 후 dirty 노출만 연결하면 바로 동작.
+  const deptDirty = false;
+  const deptSave = async () => {
+    /* placeholder: A3 가 saveDepartment 노출 시 교체 */
+  };
+  useRegisterAdminDirty("departments", deptDirty, deptSave);
+  const { confirmNavigation, modalProps } = useUnsavedChangesGuard(deptDirty, deptSave);
 
   const empCountByDept = useMemo(() => {
     const map = new Map<string, number>();
@@ -107,8 +119,10 @@ export function AdminDepartmentsSection({
   }, [addMode, selectedDept, filteredDepartments, setSelectedDept]);
 
   function handleStartAdd() {
-    setAddMode(true);
-    setSelectedDept(null);
+    confirmNavigation(() => {
+      setAddMode(true);
+      setSelectedDept(null);
+    });
   }
 
   function handleSubmitAdd() {
@@ -118,8 +132,10 @@ export function AdminDepartmentsSection({
   }
 
   function handleSelect(dept: DepartmentMaster) {
-    setAddMode(false);
-    setSelectedDept(selectedDept?.id === dept.id ? null : dept);
+    confirmNavigation(() => {
+      setAddMode(false);
+      setSelectedDept(selectedDept?.id === dept.id ? null : dept);
+    });
   }
 
   async function handleToggleActive(dept: DepartmentMaster) {
@@ -154,6 +170,7 @@ export function AdminDepartmentsSection({
 
   return (
     <>
+      <UnsavedChangesModal {...modalProps} />
       <div className="flex min-h-0 flex-col">
         <AdminPageHeader
           icon={Building2}
