@@ -28,6 +28,55 @@ function deptColor(d: DepartmentMaster): string {
   return d.color_hex ?? getDepartmentFallbackColor(d.name);
 }
 
+// Tailwind 표준 팔레트 — 9 hues × 4 shades = 36 swatches
+const TAILWIND_PALETTE: { name: string; hex: string }[] = [
+  // slate
+  { name: "slate-300", hex: "#cbd5e1" },
+  { name: "slate-500", hex: "#64748b" },
+  { name: "slate-700", hex: "#334155" },
+  { name: "slate-900", hex: "#0f172a" },
+  // red
+  { name: "red-300", hex: "#fca5a5" },
+  { name: "red-500", hex: "#ef4444" },
+  { name: "red-700", hex: "#b91c1c" },
+  { name: "red-900", hex: "#7f1d1d" },
+  // orange
+  { name: "orange-300", hex: "#fdba74" },
+  { name: "orange-500", hex: "#f97316" },
+  { name: "orange-700", hex: "#c2410c" },
+  { name: "orange-900", hex: "#7c2d12" },
+  // amber
+  { name: "amber-300", hex: "#fcd34d" },
+  { name: "amber-500", hex: "#f59e0b" },
+  { name: "amber-700", hex: "#b45309" },
+  { name: "amber-900", hex: "#78350f" },
+  // green
+  { name: "green-300", hex: "#86efac" },
+  { name: "green-500", hex: "#22c55e" },
+  { name: "green-700", hex: "#15803d" },
+  { name: "green-900", hex: "#14532d" },
+  // cyan
+  { name: "cyan-300", hex: "#67e8f9" },
+  { name: "cyan-500", hex: "#06b6d4" },
+  { name: "cyan-700", hex: "#0e7490" },
+  { name: "cyan-900", hex: "#164e63" },
+  // blue
+  { name: "blue-300", hex: "#93c5fd" },
+  { name: "blue-500", hex: "#3b82f6" },
+  { name: "blue-700", hex: "#1d4ed8" },
+  { name: "blue-900", hex: "#1e3a8a" },
+  // violet
+  { name: "violet-300", hex: "#c4b5fd" },
+  { name: "violet-500", hex: "#8b5cf6" },
+  { name: "violet-700", hex: "#6d28d9" },
+  { name: "violet-900", hex: "#4c1d95" },
+  // pink
+  { name: "pink-300", hex: "#f9a8d4" },
+  { name: "pink-500", hex: "#ec4899" },
+  { name: "pink-700", hex: "#be185d" },
+  { name: "pink-900", hex: "#831843" },
+];
+
 interface Props {
   employees: Employee[];
   items: Item[];
@@ -392,8 +441,8 @@ function DeptDetailView({
   onDirtyChange,
 }: DeptDetailViewProps) {
   const savedColor = deptColor(dept);
-  const colorInputRef = useRef<HTMLInputElement>(null);
   const [editForm, setEditForm] = useState({ name: dept.name, color_hex: savedColor });
+  const [colorInputError, setColorInputError] = useState<string | null>(null);
   const [toggleConfirmOpen, setToggleConfirmOpen] = useState(false);
   const refreshDepartments = useRefreshDepartments();
 
@@ -438,8 +487,9 @@ function DeptDetailView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editForm, adminPin]);
 
-  const previewColor = editForm.color_hex;
-  const colorChanged = previewColor.toLowerCase() !== savedColor.toLowerCase();
+  const isValidHex = /^#[0-9a-fA-F]{6}$/.test(editForm.color_hex);
+  const previewColor = isValidHex ? editForm.color_hex : savedColor;
+  const colorChanged = isValidHex && previewColor.toLowerCase() !== savedColor.toLowerCase();
 
   return (
     <div className="flex flex-col gap-4">
@@ -471,45 +521,74 @@ function DeptDetailView({
         title="색상"
         icon={<Palette className="h-3.5 w-3.5" />}
       >
-        <div className="flex items-center gap-3">
-          <div
-            className="h-9 w-9 shrink-0 rounded-full border-2"
-            style={{ background: savedColor, borderColor: LEGACY_COLORS.border }}
-            title="현재 적용된 색상"
-          />
-          {colorChanged && (
-            <>
-              <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                →
-              </span>
-              <div
-                className="h-9 w-9 shrink-0 rounded-full border-2"
-                style={{ background: previewColor, borderColor: LEGACY_COLORS.border }}
+        <div className="flex flex-col gap-3">
+          {/* 미리보기 + 텍스트 입력 */}
+          <div className="flex items-center gap-3">
+            <div
+              className="h-9 w-9 shrink-0 rounded-full border-2"
+              style={{ background: savedColor, borderColor: LEGACY_COLORS.border }}
+              title="현재 저장된 색상"
+            />
+            {colorChanged && (
+              <>
+                <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>→</span>
+                <div
+                  className="h-9 w-9 shrink-0 rounded-full border-2"
+                  style={{ background: previewColor, borderColor: LEGACY_COLORS.border }}
+                  title="미리보기"
+                />
+              </>
+            )}
+            <div className="flex flex-col gap-0.5">
+              <input
+                type="text"
+                value={editForm.color_hex}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setEditForm((f) => ({ ...f, color_hex: val }));
+                  if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+                    setColorInputError(null);
+                  } else {
+                    setColorInputError("올바른 hex 코드를 입력하세요 (예: #3B82F6)");
+                  }
+                }}
+                placeholder="#000000"
+                className="w-32 rounded-[8px] border px-2 py-1 font-mono text-[13px] outline-none focus:border-[var(--c-blue)]"
+                style={{
+                  background: LEGACY_COLORS.s1,
+                  borderColor: colorInputError ? "#ef4444" : LEGACY_COLORS.border,
+                  color: LEGACY_COLORS.text,
+                }}
               />
-            </>
-          )}
-          <span className="ml-2 font-mono text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-            {colorChanged ? previewColor : savedColor}
-          </span>
-          <button
-            type="button"
-            onClick={() => colorInputRef.current?.click()}
-            className="ml-auto rounded-[10px] border px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
-            style={{
-              background: LEGACY_COLORS.s1,
-              borderColor: LEGACY_COLORS.border,
-              color: LEGACY_COLORS.text,
-            }}
-          >
-            색상 선택
-          </button>
-          <input
-            ref={colorInputRef}
-            type="color"
-            value={previewColor}
-            onChange={(e) => setEditForm((f) => ({ ...f, color_hex: e.target.value }))}
-            className="sr-only"
-          />
+              {colorInputError && (
+                <span className="text-[11px]" style={{ color: "#ef4444" }}>
+                  {colorInputError}
+                </span>
+              )}
+            </div>
+          </div>
+          {/* Tailwind 프리셋 팔레트 (9 hues × 4 shades = 36 swatches) */}
+          <div className="grid grid-cols-9 gap-1">
+            {TAILWIND_PALETTE.map((swatch) => (
+              <button
+                key={swatch.hex}
+                type="button"
+                title={`${swatch.name} — ${swatch.hex}`}
+                className="h-7 w-7 rounded-lg border-2 transition-transform hover:scale-110 active:scale-95"
+                style={{
+                  background: swatch.hex,
+                  borderColor:
+                    editForm.color_hex.toLowerCase() === swatch.hex.toLowerCase()
+                      ? LEGACY_COLORS.text
+                      : "transparent",
+                }}
+                onClick={() => {
+                  setEditForm((f) => ({ ...f, color_hex: swatch.hex }));
+                  setColorInputError(null);
+                }}
+              />
+            ))}
+          </div>
         </div>
       </DetailCardSlot>
 

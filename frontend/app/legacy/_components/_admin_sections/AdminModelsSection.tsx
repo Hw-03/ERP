@@ -121,11 +121,6 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
         icon={Layers}
         title="모델 관리"
         description="제품 모델 정보를 등록하고 사용 현황을 확인할 수 있습니다."
-        actions={
-          <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
-            모델 추가
-          </Button>
-        }
       />
 
       <AdminKpiBar
@@ -142,6 +137,11 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
           title="모델 목록"
           countLabel={`${productModels.length}건`}
           width={320}
+          action={
+            <Button variant="primary" size="sm" iconLeft={<Plus className="h-3.5 w-3.5" />} onClick={handleStartAdd}>
+              추가
+            </Button>
+          }
           items={productModels}
           emptyState={<EmptyState variant="no-data" compact title="등록된 모델이 없습니다." />}
           renderItem={(model) => {
