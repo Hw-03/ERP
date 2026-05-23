@@ -79,11 +79,6 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
         icon={Box}
         title="품목 관리"
         description="모든 품목의 정보를 조회하고 관리할 수 있습니다."
-        actions={
-          <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
-            품목 추가
-          </Button>
-        }
       />
 
       <AdminKpiBar
@@ -99,6 +94,11 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
           title="품목 목록"
           countLabel={`${formatQty(visibleItems.length)}건`}
           width={360}
+          action={
+            <Button variant="primary" size="sm" iconLeft={<Plus className="h-3.5 w-3.5" />} onClick={handleStartAdd}>
+              추가
+            </Button>
+          }
           searchValue={itemSearch}
           searchPlaceholder="품목명, 코드 검색"
           onSearchChange={setItemSearch}
@@ -147,7 +147,11 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                 >
                   {item.item_name}
                 </span>
-                {lowStock && <StatusPill label="부족" tone="danger" showDot maxWidth={50} />}
+                {lowStock && (
+                  <div className="shrink-0 min-w-[60px]">
+                    <StatusPill label="부족" tone="danger" showDot maxWidth={50} />
+                  </div>
+                )}
               </button>
             );
           }}
