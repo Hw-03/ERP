@@ -213,6 +213,7 @@ export function DesktopInventoryView({
               onSearchChange={setLocalSearch}
               count={filteredItems.length}
               isFiltered={isFiltered}
+              onResetAllFilters={resetAllFilters}
             />
             <InventoryItemsTable
               error={error}

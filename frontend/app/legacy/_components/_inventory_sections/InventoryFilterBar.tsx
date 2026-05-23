@@ -1,6 +1,6 @@
 "use client";
 
-import { Layers, Search, Sparkles, TrendingUp } from "lucide-react";
+import { Layers, Search, Sparkles, TrendingUp, X } from "lucide-react";
 import type { ProductModel } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common";
@@ -129,12 +129,14 @@ type StickyHeaderProps = {
   onSearchChange: (v: string) => void;
   count: number;
   isFiltered: boolean;
+  onResetAllFilters?: () => void;
 };
 
 export function InventoryTableStickyHeader({
   searchValue,
   onSearchChange,
   isFiltered,
+  onResetAllFilters,
 }: StickyHeaderProps) {
   return (
     <div
@@ -159,6 +161,16 @@ export function InventoryTableStickyHeader({
             >
               <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: LEGACY_COLORS.blue }} />
               필터 적용 중
+              {onResetAllFilters && (
+                <button
+                  onClick={onResetAllFilters}
+                  className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:brightness-90"
+                  style={{ background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white }}
+                  aria-label="필터 초기화"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              )}
             </span>
           )}
         </div>
