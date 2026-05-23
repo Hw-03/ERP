@@ -922,6 +922,7 @@ class DepartmentCreate(BaseModel):
     display_order: int = Field(0)
     pin: str = Field(..., description="관리자 PIN")
     color_hex: Optional[str] = Field(None, max_length=7)
+    io_enabled: Optional[bool] = True
 
 
 class DepartmentUpdate(BaseModel):
@@ -930,6 +931,7 @@ class DepartmentUpdate(BaseModel):
     is_active: Optional[bool] = None
     color_hex: Optional[str] = Field(None, max_length=7)
     pin: str = Field(..., description="관리자 PIN")
+    io_enabled: Optional[bool] = None
 
 
 class DepartmentResponse(BaseModel):
@@ -940,6 +942,7 @@ class DepartmentResponse(BaseModel):
     display_order: int
     is_active: bool
     color_hex: Optional[str] = None
+    io_enabled: bool = True
 
 
 class DepartmentReorderItem(BaseModel):

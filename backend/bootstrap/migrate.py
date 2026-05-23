@@ -208,6 +208,13 @@ _MIGRATION_DDL: list[str] = [
     # 이미 reorder 가 적용된 행(>0)은 덮어쓰지 않는다.
     "ALTER TABLE product_symbols ADD COLUMN display_order INTEGER NOT NULL DEFAULT 0",
     "UPDATE product_symbols SET display_order = slot WHERE display_order = 0 OR display_order IS NULL",
+    # 2026-05-24 (W11-A): 부서별 입출고 권한 토글 — io_enabled 컬럼.
+    # 기본값 1(TRUE). 기존 부서는 모두 TRUE 로 추가됨.
+    "ALTER TABLE departments ADD COLUMN io_enabled BOOLEAN NOT NULL DEFAULT 1",
+    # backfill: PROD_DEPTS 외 부서는 FALSE (프론트 hardcode 동작 보존).
+    # WHERE io_enabled = 1 조건으로 이미 0 으로 설정된 행은 건드리지 않음.
+    "UPDATE departments SET io_enabled = 0 "
+    "WHERE name NOT IN ('튜브', '고압', '진공', '튜닝', '조립', '출하') AND io_enabled = 1",
 ]
 
 

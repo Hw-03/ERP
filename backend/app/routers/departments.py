@@ -39,7 +39,13 @@ def create_department(
 ):
     if db.query(Department).filter(Department.name == payload.name).first():
         raise HTTPException(status_code=409, detail="이미 존재하는 부서명입니다.")
-    dept = Department(name=payload.name, display_order=payload.display_order, is_active=True, color_hex=payload.color_hex)
+    dept = Department(
+        name=payload.name,
+        display_order=payload.display_order,
+        is_active=True,
+        color_hex=payload.color_hex,
+        io_enabled=payload.io_enabled if payload.io_enabled is not None else True,
+    )
     db.add(dept)
     db.commit()
     db.refresh(dept)
@@ -80,6 +86,8 @@ def update_department(
         dept.is_active = payload.is_active
     if payload.color_hex is not None:
         dept.color_hex = payload.color_hex
+    if payload.io_enabled is not None:
+        dept.io_enabled = payload.io_enabled
     db.commit()
     db.refresh(dept)
     return dept

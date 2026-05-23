@@ -44,6 +44,7 @@ class Department(Base):
     display_order = Column(Integer, nullable=False, default=0)
     is_active = Column(Boolean, nullable=False, default=True)
     color_hex = Column(String(7), nullable=True)
+    io_enabled = Column(Boolean, nullable=False, default=True)
 
 
 class Employee(Base):

@@ -1051,6 +1051,18 @@
             "title": "Display Order",
             "type": "integer"
           },
+          "io_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": true,
+            "title": "Io Enabled"
+          },
           "name": {
             "maxLength": 50,
             "title": "Name",
@@ -1148,6 +1160,11 @@
             "title": "Id",
             "type": "integer"
           },
+          "io_enabled": {
+            "default": true,
+            "title": "Io Enabled",
+            "type": "boolean"
+          },
           "is_active": {
             "title": "Is Active",
             "type": "boolean"
@@ -1190,6 +1207,17 @@
               }
             ],
             "title": "Display Order"
+          },
+          "io_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Io Enabled"
           },
           "is_active": {
             "anyOf": [
