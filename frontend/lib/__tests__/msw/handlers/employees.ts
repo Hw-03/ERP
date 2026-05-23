@@ -62,8 +62,8 @@ export const employeesHandlers = [
   ),
 
   http.post("*/api/employees/:employeeId/reset-pin", async ({ request }) => {
-    const body = (await request.json()) as { admin_pin: string };
-    if (body.admin_pin !== "0000")
+    const body = (await request.json()) as { pin: string };
+    if (body.pin !== "0000")
       return HttpResponse.json({ detail: "PIN 불일치" }, { status: 403 });
     return HttpResponse.json(null);
   }),

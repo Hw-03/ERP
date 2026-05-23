@@ -59,7 +59,7 @@ describe("employeesApi.verifyEmployeePin", () => {
 });
 
 describe("employeesApi.resetEmployeePin", () => {
-  it("POSTs admin_pin to /reset-pin (snake_case)", async () => {
+  it("POSTs pin to /reset-pin (snake_case)", async () => {
     const fetchSpy = vi.fn(() =>
       Promise.resolve(makeResponse({})),
     );
@@ -67,7 +67,7 @@ describe("employeesApi.resetEmployeePin", () => {
     await employeesApi.resetEmployeePin("emp-1", "0000");
     const init = fetchSpy.mock.calls[0][1] as RequestInit;
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/employees/emp-1/reset-pin");
-    expect(JSON.parse(init.body as string)).toEqual({ admin_pin: "0000" });
+    expect(JSON.parse(init.body as string)).toEqual({ pin: "0000" });
   });
 });
 

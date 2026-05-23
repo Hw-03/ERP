@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 import uuid
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
@@ -20,6 +20,7 @@ from app.schemas import (
     EmployeeUpdate,
     PinVerifyRequest,
 )
+from app.dependencies.admin import require_admin_pin
 from app.routers.settings import require_admin
 from app.services import rate_limit
 from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin, verify_pin
@@ -356,10 +357,10 @@ def reset_employee_pin(
     employee_id: uuid.UUID,
     payload: EmployeePinResetRequest,
     request: Request,
+    _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
     """직원 PIN을 기본값(0000)으로 초기화 — 관리자 PIN 검증 필요."""
-    require_admin(db, payload.admin_pin)
 
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:

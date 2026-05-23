@@ -1515,15 +1515,15 @@
       },
       "EmployeePinResetRequest": {
         "properties": {
-          "admin_pin": {
+          "pin": {
             "maxLength": 32,
             "minLength": 1,
-            "title": "Admin Pin",
+            "title": "Pin",
             "type": "string"
           }
         },
         "required": [
-          "admin_pin"
+          "pin"
         ],
         "title": "EmployeePinResetRequest",
         "type": "object"
@@ -8217,6 +8217,38 @@
               "title": "Employee Id",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
           }
         ],
         "requestBody": {
@@ -9154,6 +9186,55 @@
           }
         },
         "summary": "Export Transactions Xlsx",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/inventory/transactions/monthly-counts": {
+      "get": {
+        "description": "주어진 year의 월별 거래 건수 반환. 빈 month는 0.\n\n응답 예: { \"2026-01\": 142, \"2026-02\": 89, ..., \"2026-12\": 0 }\narchived_at 이 있는 레코드는 제외한다.",
+        "operationId": "monthly_counts_api_inventory_transactions_monthly_counts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "maximum": 2100,
+              "minimum": 2020,
+              "title": "Year",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Monthly Counts Api Inventory Transactions Monthly Counts Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "연도별 월별 거래 카운트",
         "tags": [
           "Inventory"
         ]

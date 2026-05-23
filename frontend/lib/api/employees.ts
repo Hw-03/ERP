@@ -60,7 +60,7 @@ export const employeesApi = {
 
   // 직원 PIN을 0000으로 초기화 — 관리자 PIN 검증 필요
   resetEmployeePin: (employeeId: string, adminPin: string) =>
-    postJson<void>(toApiUrl(`/api/employees/${employeeId}/reset-pin`), { admin_pin: adminPin }),
+    postJson<void>(toApiUrl(`/api/employees/${employeeId}/reset-pin`), { pin: adminPin }),
 
   // 본인 PIN 변경 — 현재 PIN 검증 필요
   changeMyPin: (employeeId: string, currentPin: string, newPin: string) =>

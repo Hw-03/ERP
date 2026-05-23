@@ -167,7 +167,7 @@ describe("useResetEmployeePinMutation", () => {
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/employees/E1/reset-pin");
     const init = fetchSpy.mock.calls[0][1] as RequestInit;
     expect(init.method).toBe("POST");
-    expect(JSON.parse(init.body as string)).toEqual({ admin_pin: "0000" });
+    expect(JSON.parse(init.body as string)).toEqual({ pin: "0000" });
     // reset-pin은 employees 캐시 무효화 안 함
     expect(invalidateSpy).not.toHaveBeenCalled();
   });
