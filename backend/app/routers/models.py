@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import ItemModel, ProductSymbol
 from app.routers._errors import ErrorCode, http_error
+from app.routers.settings import require_admin
 from app.services._tx import commit_and_refresh, commit_only
 
 router = APIRouter()
@@ -26,6 +27,13 @@ class ProductModelCreate(BaseModel):
     model_config = {"protected_namespaces": ()}
     model_name: str = Field(..., min_length=1, max_length=50)
     symbol: Optional[str] = Field(None, max_length=5)
+
+
+class ProductModelUpdate(BaseModel):
+    model_config = {"protected_namespaces": ()}
+    model_name: Optional[str] = Field(None, min_length=1, max_length=50)
+    symbol: Optional[str] = Field(None, max_length=5)
+    pin: str
 
 
 @router.get("", response_model=List[ProductModelResponse], summary="제품 모델 목록 (예약 제외)")
@@ -74,6 +82,42 @@ def create_model(payload: ProductModelCreate, db: Session = Depends(get_db)):
 
     ps = ProductSymbol(slot=next_slot, symbol=symbol, model_name=payload.model_name, is_reserved=False)
     db.add(ps)
+    commit_and_refresh(db, ps)
+    return ps
+
+
+@router.put(
+    "/{slot}",
+    response_model=ProductModelResponse,
+    summary="제품 모델 수정 (model_name, symbol)",
+)
+def update_model(slot: int, payload: ProductModelUpdate, db: Session = Depends(get_db)):
+    """제품 모델 이름·기호 수정. 관리자 PIN 필요."""
+    require_admin(db, payload.pin)
+    ps = db.query(ProductSymbol).filter(ProductSymbol.slot == slot).first()
+    if not ps:
+        raise http_error(404, ErrorCode.NOT_FOUND, "모델을 찾을 수 없습니다.")
+
+    if payload.model_name is not None:
+        dup = (
+            db.query(ProductSymbol)
+            .filter(ProductSymbol.model_name == payload.model_name, ProductSymbol.slot != slot)
+            .first()
+        )
+        if dup:
+            raise http_error(409, ErrorCode.CONFLICT, "같은 이름의 모델이 이미 존재합니다.")
+        ps.model_name = payload.model_name
+
+    if payload.symbol is not None:
+        dup_sym = (
+            db.query(ProductSymbol)
+            .filter(ProductSymbol.symbol == payload.symbol, ProductSymbol.slot != slot)
+            .first()
+        )
+        if dup_sym:
+            raise http_error(409, ErrorCode.CONFLICT, "같은 기호(symbol)의 모델이 이미 존재합니다.")
+        ps.symbol = payload.symbol
+
     commit_and_refresh(db, ps)
     return ps
 
