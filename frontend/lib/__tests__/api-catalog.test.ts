@@ -61,7 +61,7 @@ describe("catalogApi 잔여 메소드", () => {
   it("deleteModel DELETE /api/models/{slot}", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await catalogApi.deleteModel(3);
+    await catalogApi.deleteModel(3, "0000");
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/models/3");
   });
 

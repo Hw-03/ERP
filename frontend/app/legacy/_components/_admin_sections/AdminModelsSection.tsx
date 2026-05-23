@@ -15,6 +15,7 @@ import {
   AdminPageHeader,
 } from "./_admin_primitives";
 import { useAdminModelsContext } from "./AdminModelsContext";
+import { useRegisterAdminDirty } from "./AdminDirtyRegistry";
 
 interface Props {
   items: Item[];
@@ -43,6 +44,16 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [addMode, setAddMode] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+
+  useRegisterAdminDirty(
+    "models",
+    editDirty,
+    async () => {
+      if (selectedSlot != null) {
+        await Promise.resolve(saveModel(selectedSlot));
+      }
+    },
+  );
   // 드래그 reorder 상태 — 부서 reorder 와 달리 정렬 키가 slot.
   const [dragSlot, setDragSlot] = useState<number | null>(null);
   const [dropTargetSlot, setDropTargetSlot] = useState<number | null>(null);

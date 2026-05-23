@@ -106,7 +106,7 @@ export function useAdminModels({
       return;
     }
     void api
-      .deleteModel(slot)
+      .deleteModel(slot, adminPin)
       .then(() => {
         setProductModels((prev) => prev.filter((m) => m.slot !== slot));
         onStatusChange(`'${model.model_name}' 모델을 삭제했습니다.`);

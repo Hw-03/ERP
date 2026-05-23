@@ -4217,6 +4217,19 @@
         "title": "ProductModelCreate",
         "type": "object"
       },
+      "ProductModelDeleteRequest": {
+        "properties": {
+          "pin": {
+            "title": "Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pin"
+        ],
+        "title": "ProductModelDeleteRequest",
+        "type": "object"
+      },
       "ProductModelReorderItem": {
         "properties": {
           "display_order": {
@@ -10463,7 +10476,7 @@
     },
     "/api/models/{slot}": {
       "delete": {
-        "description": "제품 모델 삭제 (해당 슬롯을 사용하는 품목이 있으면 거부).",
+        "description": "제품 모델 삭제 (해당 슬롯을 사용하는 품목이 있으면 거부). 관리자 PIN 필요.",
         "operationId": "delete_model_api_models__slot__delete",
         "parameters": [
           {
@@ -10474,8 +10487,43 @@
               "title": "Slot",
               "type": "integer"
             }
+          },
+          {
+            "description": "관리자 PIN (deprecated — body 사용 권장)",
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "관리자 PIN (deprecated — body 사용 권장)",
+              "title": "Pin"
+            }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ProductModelDeleteRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "204": {
             "description": "Successful Response"

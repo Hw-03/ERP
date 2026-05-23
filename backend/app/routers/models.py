@@ -2,7 +2,7 @@
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -46,6 +46,11 @@ class ProductModelReorderItem(BaseModel):
 class ProductModelReorderPayload(BaseModel):
     model_config = {"protected_namespaces": ()}
     items: List[ProductModelReorderItem]
+    pin: str
+
+
+class ProductModelDeleteRequest(BaseModel):
+    model_config = {"protected_namespaces": ()}
     pin: str
 
 
@@ -157,8 +162,17 @@ def update_model(slot: int, payload: ProductModelUpdate, db: Session = Depends(g
     response_model=None,
     summary="제품 모델 삭제 (연결 품목 있으면 409)",
 )
-def delete_model(slot: int, db: Session = Depends(get_db)) -> None:
-    """제품 모델 삭제 (해당 슬롯을 사용하는 품목이 있으면 거부)."""
+def delete_model(
+    slot: int,
+    pin: Optional[str] = Query(None, description="관리자 PIN (deprecated — body 사용 권장)"),
+    body: Optional[ProductModelDeleteRequest] = Body(None),
+    db: Session = Depends(get_db),
+) -> None:
+    """제품 모델 삭제 (해당 슬롯을 사용하는 품목이 있으면 거부). 관리자 PIN 필요."""
+    effective_pin = (body.pin if body and body.pin else None) or pin
+    if not effective_pin:
+        raise http_error(400, ErrorCode.BAD_REQUEST, "관리자 PIN 이 필요합니다.")
+    require_admin(db, effective_pin)
     ps = db.query(ProductSymbol).filter(ProductSymbol.slot == slot).first()
     if not ps:
         raise http_error(404, ErrorCode.NOT_FOUND, "모델을 찾을 수 없습니다.")

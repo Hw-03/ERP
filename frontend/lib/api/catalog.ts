@@ -28,7 +28,8 @@ export const catalogApi = {
     payload: { model_name?: string; symbol?: string; pin: string },
   ) => putJson<ProductModel>(toApiUrl(`/api/models/${slot}`), payload),
 
-  deleteModel: (slot: number) => deleteJson<void>(toApiUrl(`/api/models/${slot}`)),
+  deleteModel: (slot: number, pin: string) =>
+    deleteJson<void>(toApiUrl(`/api/models/${slot}`), { pin }),
 
   reorderModels: (payload: {
     items: { slot: number; display_order: number }[];
