@@ -1,8 +1,8 @@
 import { http, HttpResponse } from "msw";
 
 const sampleDepartments = [
-  { id: 1, name: "AS1", display_order: 0, is_active: true, color_hex: "#1d4ed8" },
-  { id: 2, name: "AS2", display_order: 1, is_active: true, color_hex: "#c2410c" },
+  { id: 1, name: "AS1", display_order: 0, is_active: true, color_hex: "#1d4ed8", io_enabled: true },
+  { id: 2, name: "AS2", display_order: 1, is_active: true, color_hex: "#c2410c", io_enabled: false },
 ];
 
 export const departmentsHandlers = [
@@ -13,6 +13,7 @@ export const departmentsHandlers = [
       name: string;
       display_order?: number;
       color_hex?: string;
+      io_enabled?: boolean;
       pin: string;
     };
     if (body.pin !== "0000")
@@ -24,6 +25,7 @@ export const departmentsHandlers = [
         display_order: body.display_order ?? 2,
         is_active: true,
         color_hex: body.color_hex ?? "#6d28d9",
+        io_enabled: body.io_enabled ?? true,
       },
       { status: 201 },
     );
@@ -34,6 +36,7 @@ export const departmentsHandlers = [
       name?: string;
       is_active?: boolean;
       color_hex?: string | null;
+      io_enabled?: boolean;
       pin: string;
     };
     if (body.pin !== "0000")
@@ -44,6 +47,7 @@ export const departmentsHandlers = [
       display_order: 0,
       is_active: body.is_active ?? true,
       color_hex: body.color_hex ?? "#1d4ed8",
+      io_enabled: body.io_enabled ?? true,
     });
   }),
 

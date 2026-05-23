@@ -455,7 +455,12 @@ function DeptDetailView({
   onDirtyChange,
 }: DeptDetailViewProps) {
   const savedColor = deptColor(dept);
-  const [editForm, setEditForm] = useState({ name: dept.name, color_hex: savedColor });
+  const savedIoEnabled = dept.io_enabled ?? true;
+  const [editForm, setEditForm] = useState({
+    name: dept.name,
+    color_hex: savedColor,
+    io_enabled: savedIoEnabled,
+  });
   const [colorInputError, setColorInputError] = useState<string | null>(null);
   const [toggleConfirmOpen, setToggleConfirmOpen] = useState(false);
   const refreshDepartments = useRefreshDepartments();
@@ -463,13 +468,18 @@ function DeptDetailView({
   // dept 변경 시 폼 초기화
   useEffect(() => {
     const color = deptColor(dept);
-    setEditForm({ name: dept.name, color_hex: color });
+    setEditForm({
+      name: dept.name,
+      color_hex: color,
+      io_enabled: dept.io_enabled ?? true,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dept.id, dept.color_hex, dept.name]);
+  }, [dept.id, dept.color_hex, dept.name, dept.io_enabled]);
 
   const dirty =
     editForm.name !== dept.name ||
-    editForm.color_hex.toLowerCase() !== savedColor.toLowerCase();
+    editForm.color_hex.toLowerCase() !== savedColor.toLowerCase() ||
+    editForm.io_enabled !== savedIoEnabled;
 
   // dirty 변경 알림
   useEffect(() => {
@@ -481,6 +491,7 @@ function DeptDetailView({
       .updateDepartment(dept.id, {
         name: editForm.name.trim() || dept.name,
         color_hex: editForm.color_hex,
+        io_enabled: editForm.io_enabled,
         pin: adminPin,
       })
       .then((updated) => {
@@ -529,6 +540,34 @@ function DeptDetailView({
         <MetaCell label="소속 직원" value={`${empCount}명`} tone={LEGACY_COLORS.purple} />
         <MetaCell label="관련 품목" value={`${itemCount}개`} tone={LEGACY_COLORS.blue} />
       </div>
+
+      {/* 입출고 권한 (W11) */}
+      <DetailCardSlot title="입출고 권한">
+        <label className="inline-flex cursor-pointer items-center gap-3 py-1">
+          <input
+            type="checkbox"
+            checked={editForm.io_enabled}
+            onChange={(e) =>
+              setEditForm((f) => ({ ...f, io_enabled: e.target.checked }))
+            }
+            className="h-4 w-4 cursor-pointer rounded border"
+            style={{
+              accentColor: LEGACY_COLORS.blue,
+              borderColor: LEGACY_COLORS.border,
+            }}
+          />
+          <span
+            className="text-[13px] font-bold"
+            style={{
+              color: editForm.io_enabled ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
+            }}
+          >
+            {editForm.io_enabled
+              ? "사용 가능 (입출고 화면 접근 허용)"
+              : "사용 불가 (입출고 화면 차단)"}
+          </span>
+        </label>
+      </DetailCardSlot>
 
       {/* 색상 변경 */}
       <DetailCardSlot

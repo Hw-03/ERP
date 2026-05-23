@@ -109,9 +109,25 @@ export function isDepartmentApprover(op: OperatorLike): boolean {
   return op.department_role === "primary" || op.department_role === "deputy";
 }
 
-export function canEnterIO(op: OperatorLike): boolean {
+/**
+ * W11: 부서별 입출고 권한.
+ *
+ * - 창고 직원은 io_enabled 무관하게 항상 허용.
+ * - departmentsMap 이 전달되고 해당 부서의 io_enabled 가 정의되어 있으면 그걸 사용.
+ * - departmentsMap 미전달 또는 항목 누락 시 PROD_DEPTS 기반 legacy fallback.
+ */
+export function canEnterIO(
+  op: OperatorLike,
+  departmentsMap?: Map<string, { io_enabled?: boolean }>,
+): boolean {
   if (!op) return false;
   if (isWarehouseStaff(op)) return true;
+  if (departmentsMap) {
+    const dept = departmentsMap.get(op.department);
+    if (dept && typeof dept.io_enabled === "boolean") {
+      return dept.io_enabled;
+    }
+  }
   return PROD_DEPTS.includes(op.department);
 }
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
+import { useDepartmentsQuery } from "@/lib/queries/useDepartmentsQuery";
 import { canEnterIO, isDepartmentApprover } from "./_warehouse_steps";
 import { useWarehouseData } from "./_warehouse_hooks/useWarehouseData";
 import { WarehouseHeader } from "./_warehouse_sections/WarehouseHeader";
@@ -100,7 +101,13 @@ export function DesktopWarehouseView({
       .catch(() => {});
   }, [canSeeDeptQueue, operatorEmployeeId, panelRefreshNonce]);
 
-  if (operator && !canEnterIO(operator)) {
+  const { data: departments } = useDepartmentsQuery();
+  const departmentsMap = useMemo(() => {
+    if (!departments) return undefined;
+    return new Map(departments.map((d) => [d.name, d]));
+  }, [departments]);
+
+  if (operator && !canEnterIO(operator, departmentsMap)) {
     return <WarehouseAccessDenied department={operator.department ?? ""} />;
   }
 

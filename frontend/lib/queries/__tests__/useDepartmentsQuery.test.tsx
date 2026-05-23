@@ -118,6 +118,35 @@ describe("useUpdateDepartmentMutation", () => {
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.departments.all }),
     );
   });
+
+  it("W11: payload 에 io_enabled 가 PUT body 로 전달됨", async () => {
+    const updated = {
+      id: 7,
+      name: "Tube",
+      display_order: 0,
+      is_active: true,
+      io_enabled: false,
+    };
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse(updated)));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const client = makeClient();
+
+    const { result } = renderHook(() => useUpdateDepartmentMutation(), {
+      wrapper: makeWrapper(client),
+    });
+
+    await result.current.mutateAsync({
+      id: 7,
+      payload: { io_enabled: false, pin: "0000" },
+    });
+
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("PUT");
+    const body = JSON.parse(String(init.body));
+    expect(body.io_enabled).toBe(false);
+    expect(body.pin).toBe("0000");
+  });
 });
 
 describe("useDeleteDepartmentMutation", () => {
