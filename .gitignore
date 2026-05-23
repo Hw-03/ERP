@@ -61,6 +61,11 @@ Thumbs.db
 /*-snap.yml
 /verify-*.yml
 
+# Demo verification artifacts (W12-C, 시연 검증용 임시 스크린샷·후보 데이터)
+/s[0-9]*.png
+/*.xlsx
+_dev/demo-verify/
+
 # Local / personal files
 workspace.ahk
 backend/query_test.py
