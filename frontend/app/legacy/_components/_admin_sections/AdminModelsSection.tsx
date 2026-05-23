@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Layers, Plus, Trash2, X } from "lucide-react";
+import { Layers, Plus, Save, Trash2, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { BOMDetailEntry, Item, ProductModel } from "@/lib/api";
 import { Button } from "@/lib/ui/Button";
@@ -31,6 +31,12 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
     setModelAddSymbol,
     addModel,
     deleteModel,
+    editForm,
+    setEditForm,
+    editDirty,
+    editSaving,
+    initEditForm,
+    saveModel,
   } = ctx;
 
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
@@ -43,7 +49,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
   );
   const idle = productModels.length - inUse.length;
 
-  // KPI: 연결 품목 총합 (선택과 무관하게 전체 모델별 매핑된 품목 수)
+  // KPI: 연결 품목 총합
   const totalLinkedItems = useMemo(() => {
     let count = 0;
     for (const it of items) {
@@ -52,7 +58,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
     return count;
   }, [items]);
 
-  // 첫 항목 자동 선택 (사용 중인 모델이 있으면 첫 번째)
+  // 첫 항목 자동 선택
   useEffect(() => {
     if (selectedSlot !== null) return;
     if (addMode) return;
@@ -64,6 +70,12 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
     () => productModels.find((m) => m.slot === selectedSlot) ?? null,
     [productModels, selectedSlot],
   );
+
+  // 선택 모델 변경 시 editForm 초기화
+  useEffect(() => {
+    if (selected) initEditForm(selected);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.slot]);
 
   const linkedItems = useMemo(
     () =>
@@ -160,8 +172,9 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
                   borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
                 }}
               >
+                {/* 기호 배지 */}
                 <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[15px] font-black"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-black"
                   style={{
                     background: used ? LEGACY_COLORS.blue : LEGACY_COLORS.s3,
                     color: used ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
@@ -169,19 +182,23 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
                 >
                   {model.symbol ?? "?"}
                 </div>
+                {/* 텍스트 */}
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[14px] font-bold" style={{ color: LEGACY_COLORS.text }}>
+                  <div className="truncate text-[13px] font-bold leading-tight" style={{ color: LEGACY_COLORS.text }}>
                     {model.model_name ?? `슬롯 ${model.slot}`}
                   </div>
-                  <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
                     M-{String(model.slot).padStart(4, "0")}
                   </div>
                 </div>
-                <StatusPill
-                  label={used ? "사용 중" : "비활성"}
-                  tone={used ? "success" : "neutral"}
-                  showDot
-                />
+                {/* 상태 배지 — shrink-0 으로 자리 고정 */}
+                <div className="shrink-0">
+                  <StatusPill
+                    label={used ? "사용 중" : "비활성"}
+                    tone={used ? "success" : "neutral"}
+                    showDot
+                  />
+                </div>
               </button>
             );
           }}
@@ -212,33 +229,35 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
           }
           actions={
             addMode ? (
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
+                iconLeft={<X className="h-3.5 w-3.5" />}
                 onClick={() => setAddMode(false)}
-                className="flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
-                style={{
-                  background: LEGACY_COLORS.s2,
-                  borderColor: LEGACY_COLORS.border,
-                  color: LEGACY_COLORS.muted2,
-                }}
               >
-                <X className="h-3.5 w-3.5" />
                 취소
-              </button>
+              </Button>
             ) : selected ? (
-              <button
-                type="button"
-                onClick={() => handleDelete(selected.slot)}
-                className="flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
-                style={{
-                  background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
-                  borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`,
-                  color: LEGACY_COLORS.red,
-                }}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                삭제
-              </button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  iconLeft={<Save className="h-3.5 w-3.5" />}
+                  disabled={!editDirty || editSaving}
+                  loading={editSaving}
+                  onClick={() => saveModel(selected.slot)}
+                >
+                  저장
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  iconLeft={<Trash2 className="h-3.5 w-3.5" />}
+                  onClick={() => handleDelete(selected.slot)}
+                >
+                  삭제
+                </Button>
+              </div>
             ) : null
           }
         >
@@ -251,7 +270,13 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
               onSubmit={handleSubmitAdd}
             />
           ) : selected ? (
-            <ModelDetailView model={selected} linkedItems={linkedItems} linkedBomCount={linkedBomCount} />
+            <ModelDetailView
+              model={selected}
+              linkedItems={linkedItems}
+              linkedBomCount={linkedBomCount}
+              editForm={editForm}
+              setEditForm={setEditForm}
+            />
           ) : (
             <EmptyState
               variant="no-data"
@@ -344,27 +369,73 @@ function ModelAddForm({
   );
 }
 
+import type { ModelEditForm } from "../_admin_hooks/useAdminModels";
+
 interface ModelDetailViewProps {
   model: ProductModel;
   linkedItems: Item[];
   linkedBomCount: number;
+  editForm: ModelEditForm;
+  setEditForm: (updater: (prev: ModelEditForm) => ModelEditForm) => void;
 }
 
-function ModelDetailView({ model, linkedItems, linkedBomCount }: ModelDetailViewProps) {
+function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEditForm }: ModelDetailViewProps) {
   return (
     <div className="flex flex-col gap-5">
-      <DetailGrid
-        rows={[
-          { label: "모델 코드", value: `M-${String(model.slot).padStart(4, "0")}` },
-          { label: "모델명", value: model.model_name ?? "—" },
-          { label: "기호", value: model.symbol ?? "—" },
-          {
-            label: "상태",
-            value: model.model_name ? "사용 중" : "비활성",
-            tone: model.model_name ? LEGACY_COLORS.green : LEGACY_COLORS.muted2,
-          },
-        ]}
-      />
+      {/* 편집 가능 필드 */}
+      <div
+        className="rounded-[14px] border p-4"
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      >
+        <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+          {/* 모델 코드 — 읽기 전용 */}
+          <EditFieldRow label="모델 코드">
+            <div className="text-[14px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+              M-{String(model.slot).padStart(4, "0")}
+            </div>
+          </EditFieldRow>
+
+          {/* 상태 — 읽기 전용 */}
+          <EditFieldRow label="상태">
+            <StatusPill
+              label={model.model_name ? "사용 중" : "비활성"}
+              tone={model.model_name ? "success" : "neutral"}
+            />
+          </EditFieldRow>
+
+          {/* 모델명 — 편집 */}
+          <div className="col-span-2">
+            <EditFieldRow label="모델명">
+              <input
+                value={editForm.model_name}
+                onChange={(e) => setEditForm((f) => ({ ...f, model_name: e.target.value }))}
+                placeholder="모델명 입력"
+                className="w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none focus:border-[var(--c-blue)]"
+                style={{
+                  background: LEGACY_COLORS.s1,
+                  borderColor: LEGACY_COLORS.border,
+                  color: LEGACY_COLORS.text,
+                }}
+              />
+            </EditFieldRow>
+          </div>
+
+          {/* 기호 — 편집 */}
+          <EditFieldRow label="기호 (1-5자)">
+            <input
+              value={editForm.symbol}
+              onChange={(e) => setEditForm((f) => ({ ...f, symbol: e.target.value.slice(0, 5) }))}
+              placeholder="예: A"
+              className="w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none focus:border-[var(--c-blue)]"
+              style={{
+                background: LEGACY_COLORS.s1,
+                borderColor: LEGACY_COLORS.border,
+                color: LEGACY_COLORS.text,
+              }}
+            />
+          </EditFieldRow>
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <SummaryStat
@@ -412,24 +483,13 @@ function ModelDetailView({ model, linkedItems, linkedBomCount }: ModelDetailView
   );
 }
 
-function DetailGrid({ rows }: { rows: { label: string; value: string; tone?: string }[] }) {
+function EditFieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div
-      className="rounded-[14px] border p-4"
-      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-    >
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-        {rows.map((row) => (
-          <div key={row.label} className="flex flex-col gap-1">
-            <div className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: LEGACY_COLORS.muted2 }}>
-              {row.label}
-            </div>
-            <div className="text-[14px] font-bold" style={{ color: row.tone ?? LEGACY_COLORS.text }}>
-              {row.value}
-            </div>
-          </div>
-        ))}
+    <div className="flex flex-col gap-1.5">
+      <div className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: LEGACY_COLORS.muted2 }}>
+        {label}
       </div>
+      {children}
     </div>
   );
 }
