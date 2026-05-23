@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { LEGACY_COLORS, employeeColor } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
@@ -19,9 +19,16 @@ interface Props {
 function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
   const [hovered, setHovered] = useState<string | null>(null);
 
+  // 주차 전환 시 셀 위치가 흔들리지 않도록 process_code 사전 순으로 안정 정렬.
+  // (백엔드 응답이 주차마다 다른 순서로 올 수 있어 발생하는 위치 이동을 방지)
+  const sortedGroups = useMemo(
+    () => [...groups].sort((a, b) => a.process_code.localeCompare(b.process_code)),
+    [groups],
+  );
+
   return (
     <div className="grid grid-cols-1 gap-1.5">
-      {groups.map((g) => {
+      {sortedGroups.map((g) => {
         const isActive = g.process_code === selected;
         const isHover = hovered === g.process_code;
         const isDecreasing = g.delta < 0;

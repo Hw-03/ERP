@@ -9,7 +9,6 @@ import {
   Layers,
   Lock,
   Network,
-  PanelRight,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -51,11 +50,9 @@ interface Props {
   section: AdminSection;
   onSelect: (next: AdminSection) => void;
   onLock: () => void;
-  showRightPanel?: boolean;
-  onTogglePanel?: () => void;
 }
 
-export function AdminSidebar({ section, onSelect, onLock, showRightPanel, onTogglePanel }: Props) {
+export function AdminSidebar({ section, onSelect, onLock }: Props) {
   return (
     <section
       className="flex min-h-0 flex-col overflow-hidden rounded-[20px] border p-4"
@@ -124,26 +121,6 @@ export function AdminSidebar({ section, onSelect, onLock, showRightPanel, onTogg
           danger
         />
         <div className="flex gap-2">
-          {onTogglePanel && (
-            <button
-              type="button"
-              onClick={onTogglePanel}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border transition-colors hover:brightness-[1.04]"
-              style={{
-                background: showRightPanel
-                  ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
-                  : LEGACY_COLORS.s2,
-                borderColor: showRightPanel
-                  ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 50%, transparent)`
-                  : LEGACY_COLORS.border,
-                color: showRightPanel ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
-              }}
-              title="요약 패널"
-              aria-label="요약 패널 토글"
-            >
-              <PanelRight className="h-4 w-4" />
-            </button>
-          )}
           <button
             type="button"
             onClick={onLock}

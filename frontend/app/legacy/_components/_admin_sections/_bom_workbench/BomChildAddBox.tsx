@@ -164,6 +164,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
                 key={f.id}
                 type="button"
                 onClick={() => setStageFilter(f.id)}
+                aria-pressed={active}
                 className="rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors"
                 style={{
                   background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,

@@ -2,13 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PanelRight } from "lucide-react";
-import { DesktopRightPanel } from "./DesktopRightPanel";
 import { DesktopPinLock } from "./DesktopPinLock";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { AdminSidebar } from "./_admin_sections/AdminSidebar";
 import { AdminSectionContent } from "./_admin_sections/AdminSectionContent";
-import { AdminRightPanelContent } from "./_admin_sections/AdminRightPanelContent";
 import { useAdminBootstrap } from "./_admin_hooks/useAdminBootstrap";
 import { useAdminSettings } from "./_admin_hooks/useAdminSettings";
 import { useAdminViewState, type AdminSection } from "./_admin_hooks/useAdminViewState";
@@ -30,13 +27,11 @@ export function DesktopAdminView({
     unlocked,
     adminPin,
     section,
-    showRightPanel,
     selectedDept,
     setSelectedDept,
     unlock,
     lock,
     selectSection,
-    togglePanel,
   } = useAdminViewState("models");
 
   const [message, setMessage] = useState("");
@@ -90,8 +85,6 @@ export function DesktopAdminView({
           section={section}
           onSelect={guardedSelectSection}
           onLock={lock}
-          showRightPanel={showRightPanel}
-          onTogglePanel={togglePanel}
         />
 
         {/* 워크스페이스 */}
@@ -156,39 +149,6 @@ export function DesktopAdminView({
         </section>
       </div>
 
-      <div
-        className="shrink-0 overflow-hidden"
-        style={{
-          width: showRightPanel ? 420 : 0,
-          transition: "width 160ms cubic-bezier(0.4, 0, 0.2, 1)",
-        }}
-      >
-        <div
-          className="h-full pl-4"
-          style={{
-            opacity: showRightPanel ? 1 : 0,
-            transform: showRightPanel ? "translateX(0)" : "translateX(18px)",
-            transition: "opacity 260ms ease, transform 260ms ease",
-            willChange: "transform, opacity",
-          }}
-        >
-          <DesktopRightPanel title="관리 요약" subtitle="현재 작업 중인 관리자 영역의 핵심 수치를 요약합니다.">
-            <AdminRightPanelContent
-              section={section}
-              selectedDept={selectedDept}
-              setSelectedDept={setSelectedDept}
-              departments={departments}
-              setDepartments={setDepartments}
-              adminPin={adminPin}
-              onStatusChange={onStatusChange}
-              setMessage={setMessage}
-              items={items}
-              employees={employees}
-              allBomRows={allBomRows}
-            />
-          </DesktopRightPanel>
-        </div>
-      </div>
     </div>
   );
 }

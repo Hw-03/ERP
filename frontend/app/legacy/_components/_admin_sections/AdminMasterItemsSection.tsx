@@ -52,15 +52,18 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
   // 항목 변경(트리거 a) 가드 — 같은 페이지에서 다른 품목 선택.
   const { confirmNavigation } = useLocalDirtyGuard(dirty, saveItem);
 
-  // KPI: 정상 / 부족 (사용자 결정에 따라 비활성 제거, 3개)
+  // KPI: 전체 / 정상 / 부족 / 품절 — 대시보드와 동일 4분기
   const stats = useMemo(() => {
     let ok = 0;
     let low = 0;
+    let zero = 0;
     for (const it of visibleItems) {
-      if (it.min_stock != null && Number(it.quantity) < Number(it.min_stock)) low += 1;
+      const qty = Number(it.quantity);
+      if (qty <= 0) zero += 1;
+      else if (it.min_stock != null && qty < Number(it.min_stock)) low += 1;
       else ok += 1;
     }
-    return { ok, low };
+    return { ok, low, zero };
   }, [visibleItems]);
 
   // 첫 진입 시 첫 visibleItem 자동 선택 (addMode가 아닐 때만)
@@ -102,7 +105,8 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
         items={[
           { key: "all", label: "전체 품목", value: visibleItems.length, hint: "필터·검색 적용 결과", tone: LEGACY_COLORS.blue },
           { key: "ok", label: "정상", value: stats.ok, hint: "안전재고 충족", tone: LEGACY_COLORS.green },
-          { key: "low", label: "부족", value: stats.low, hint: "안전재고 미만", tone: LEGACY_COLORS.red },
+          { key: "low", label: "부족", value: stats.low, hint: "안전재고 미만", tone: LEGACY_COLORS.yellow },
+          { key: "zero", label: "품절", value: stats.zero, hint: "재고 0 이하", tone: LEGACY_COLORS.red },
         ]}
       />
 
@@ -129,13 +133,16 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
           }
           renderItem={(item) => {
             const isSelected = selectedItem?.item_id === item.item_id;
+            const qty = Number(item.quantity);
+            const zeroStock = qty <= 0;
             const lowStock =
-              item.min_stock != null && Number(item.quantity) < Number(item.min_stock);
+              !zeroStock && item.min_stock != null && qty < Number(item.min_stock);
             return (
               <button
                 key={item.item_id}
                 type="button"
                 onClick={() => handleSelectItem(item, isSelected)}
+                aria-pressed={isSelected}
                 className="flex w-full items-center gap-2 rounded-[10px] border px-3 py-2 text-left transition-colors hover:brightness-[1.04]"
                 style={{
                   background: isSelected
@@ -161,11 +168,15 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                 >
                   {item.item_name}
                 </span>
-                {lowStock && (
-                  <div className="shrink-0 min-w-[60px]">
-                    <StatusPill label="부족" tone="danger" showDot maxWidth={50} />
+                {zeroStock ? (
+                  <div className="shrink-0">
+                    <StatusPill label="품절" tone="danger" showDot maxWidth={70} />
                   </div>
-                )}
+                ) : lowStock ? (
+                  <div className="shrink-0">
+                    <StatusPill label="부족" tone="warning" showDot maxWidth={70} />
+                  </div>
+                ) : null}
               </button>
             );
           }}

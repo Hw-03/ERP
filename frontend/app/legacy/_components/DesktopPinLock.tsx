@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties } from "react";
-import { ArrowLeft, Delete, Loader2, LockKeyhole } from "lucide-react";
+import { Delete, Loader2, LockKeyhole } from "lucide-react";
 import { api } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 
@@ -10,7 +10,7 @@ type StyleWithVars = CSSProperties & Record<`--${string}`, string>;
 type KeyDef =
   | { kind: "digit"; value: string }
   | { kind: "back" }
-  | { kind: "clear" };
+  | { kind: "empty" };
 
 const KEYS: KeyDef[] = [
   { kind: "digit", value: "1" },
@@ -22,9 +22,9 @@ const KEYS: KeyDef[] = [
   { kind: "digit", value: "7" },
   { kind: "digit", value: "8" },
   { kind: "digit", value: "9" },
-  { kind: "back" },
+  { kind: "empty" },
   { kind: "digit", value: "0" },
-  { kind: "clear" },
+  { kind: "back" },
 ];
 
 const PIN_LENGTH = 4;
@@ -68,12 +68,6 @@ export function DesktopPinLock({
   const removeDigit = () => {
     if (loading) return;
     setPin((current) => current.slice(0, -1));
-    setError(false);
-  };
-
-  const clearPin = () => {
-    if (loading) return;
-    setPin("");
     setError(false);
   };
 
@@ -206,25 +200,20 @@ export function DesktopPinLock({
         {/* 키패드 */}
         <div className="grid grid-cols-3 gap-2.5">
           {KEYS.map((key, index) => {
+            if (key.kind === "empty") {
+              return <div key={index} />;
+            }
             const isDigit = key.kind === "digit";
             const isBack = key.kind === "back";
-            const isClear = key.kind === "clear";
             const disabled =
               loading ||
               (isDigit && pin.length >= PIN_LENGTH) ||
-              (isBack && pin.length === 0) ||
-              (isClear && pin.length === 0);
-            const onClick = isDigit
-              ? () => addDigit(key.value)
-              : isBack
-                ? removeDigit
-                : clearPin;
+              (isBack && pin.length === 0);
+            const onClick = isDigit ? () => addDigit(key.value) : removeDigit;
             const label = isDigit ? (
               <span className="text-[22px] font-bold">{key.value}</span>
-            ) : isBack ? (
-              <Delete className="h-5 w-5" strokeWidth={2.25} />
             ) : (
-              <span className="text-[13px] font-bold tracking-[0.04em]">지우기</span>
+              <Delete className="h-5 w-5" strokeWidth={2.25} />
             );
             return (
               <button
@@ -257,22 +246,6 @@ export function DesktopPinLock({
           })}
         </div>
 
-        {/* 취소 액션 */}
-        {onCancel ? (
-          <div className="mt-7 flex justify-center">
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={loading}
-              className="group inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-3 py-2 text-[13px] text-[color:var(--c-muted2)] transition-colors hover:text-[color:var(--c-blue)] disabled:opacity-40 disabled:hover:text-[color:var(--c-muted2)] lg:min-h-0 lg:px-2 lg:py-1"
-            >
-              <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
-              <span className="underline-offset-4 group-hover:underline">
-                취소하고 메인으로 돌아가기
-              </span>
-            </button>
-          </div>
-        ) : null}
       </div>
     </div>
   );

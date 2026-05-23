@@ -202,6 +202,7 @@ export function AdminEmployeesSection() {
                   key={employee.employee_id}
                   type="button"
                   onClick={() => handleSelectEmployee(employee)}
+                  aria-pressed={active}
                   className="flex w-full items-center gap-2.5 rounded-[10px] border px-3 py-2 text-left transition-colors hover:brightness-[1.04]"
                   style={{
                     background: active

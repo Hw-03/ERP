@@ -80,6 +80,7 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showItemCod
           <input
             type="number"
             min={0}
+            step={1}
             value={form.initial_quantity ?? ""}
             onChange={(e) => setForm((f) => ({ ...f, initial_quantity: e.target.value }))}
             placeholder="0"
@@ -99,6 +100,7 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showItemCod
           <input
             type={type}
             min={type === "number" ? 0 : undefined}
+            step={type === "number" ? 1 : undefined}
             value={form[key] ?? ""}
             onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
             placeholder={placeholder}
@@ -176,13 +178,17 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showItemCod
             );
           })}
         </div>
-        {form.model_slots.length > 0 && (
+        {form.model_slots.length > 0 ? (
           <div className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.purple }}>
             제품 기호:{" "}
             {MODEL_SLOTS.filter((m) => form.model_slots.includes(m.slot))
               .map((m) => m.symbol)
               .sort()
               .join("")}
+          </div>
+        ) : (
+          <div className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+            사용 제품이 지정되지 않았습니다. 위 칩을 클릭해 모델 슬롯을 선택하세요.
           </div>
         )}
       </div>

@@ -143,6 +143,32 @@
     color: var(--c-text);
     @apply rounded-xl px-4 py-2 font-medium transition-colors duration-150 focus:outline-none;
   }
+
+  /* 전역 button 시그널 — 라이트는 검은 계열, 다크는 흰 계열 (배경 대비 잘 보이도록) */
+  button {
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  }
+  :root[data-theme="dark"] button {
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+
+  /* 선택된 버튼 — KPI / 사이드바 메뉴 / 탭 / 리스트 active 상태에 strong inset shadow */
+  button[aria-current]:not([aria-current="false"]),
+  button[aria-pressed="true"],
+  button[aria-selected="true"] {
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+  :root[data-theme="dark"] button[aria-current]:not([aria-current="false"]),
+  :root[data-theme="dark"] button[aria-pressed="true"],
+  :root[data-theme="dark"] button[aria-selected="true"] {
+    box-shadow: inset 0 2px 8px rgba(255, 255, 255, 0.18);
+  }
+
+  /* opt-out — 아이콘 X 버튼·드래그 핸들·색상 팔레트 등에 적용 */
+  button.no-btn-inset,
+  :root[data-theme="dark"] button.no-btn-inset {
+    box-shadow: none;
+  }
 }
 
 /* 스크롤바 숨김 (스크롤은 유지) */

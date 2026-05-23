@@ -29,6 +29,7 @@ export function BomDeptTabs({ value, onChange }: Props) {
             key={chip.letter}
             type="button"
             onClick={() => onChange(chip.letter)}
+            aria-pressed={active}
             className="flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors"
             style={{
               background: active ? color : LEGACY_COLORS.s1,

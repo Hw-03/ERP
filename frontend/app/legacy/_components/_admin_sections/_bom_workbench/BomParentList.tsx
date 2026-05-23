@@ -107,6 +107,7 @@ export function BomParentList({
                 key={f.id}
                 type="button"
                 onClick={() => setStageFilter(f.id)}
+                aria-pressed={active}
                 className="rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors"
                 style={{
                   background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
@@ -138,6 +139,7 @@ export function BomParentList({
                 key={i.item_id}
                 type="button"
                 onClick={() => onSelect(i.item_id)}
+                aria-pressed={isSelected}
                 className="grid w-full items-center gap-3 px-3 py-2 text-left transition-colors"
                 style={{
                   gridTemplateColumns: "auto 1fr auto",

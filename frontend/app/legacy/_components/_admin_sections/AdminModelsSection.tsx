@@ -242,6 +242,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
                 <button
                   type="button"
                   onClick={() => handleSelectModel(model.slot)}
+                  aria-pressed={active}
                   className="flex w-full items-center gap-3 rounded-[12px] border px-3 py-2.5 text-left transition-colors hover:brightness-[1.04]"
                   style={{
                     background: active
@@ -322,26 +323,16 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
                 취소
               </Button>
             ) : selected ? (
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  iconLeft={<Save className="h-3.5 w-3.5" />}
-                  disabled={!editDirty || editSaving}
-                  loading={editSaving}
-                  onClick={() => saveModel(selected.slot)}
-                >
-                  저장
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  iconLeft={<Trash2 className="h-3.5 w-3.5" />}
-                  onClick={() => handleDelete(selected.slot)}
-                >
-                  삭제
-                </Button>
-              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                iconLeft={<Save className="h-3.5 w-3.5" />}
+                disabled={!editDirty || editSaving}
+                loading={editSaving}
+                onClick={() => saveModel(selected.slot)}
+              >
+                저장
+              </Button>
             ) : null
           }
         >
@@ -360,6 +351,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
               linkedBomCount={linkedBomCount}
               editForm={editForm}
               setEditForm={setEditForm}
+              onRequestDelete={() => handleDelete(selected.slot)}
             />
           ) : (
             <EmptyState
@@ -461,9 +453,10 @@ interface ModelDetailViewProps {
   linkedBomCount: number;
   editForm: ModelEditForm;
   setEditForm: (updater: (prev: ModelEditForm) => ModelEditForm) => void;
+  onRequestDelete: () => void;
 }
 
-function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEditForm }: ModelDetailViewProps) {
+function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEditForm, onRequestDelete }: ModelDetailViewProps) {
   return (
     <div className="flex flex-col gap-5">
       {/* 편집 가능 필드 */}
@@ -563,6 +556,21 @@ function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEdit
           </div>
         </div>
       )}
+
+      {/* 모델 삭제 — 전폭 하단 버튼. ConfirmModal + PIN 인증으로 보호됨. */}
+      <button
+        type="button"
+        onClick={onRequestDelete}
+        className="mt-2 flex w-full items-center justify-center gap-2 rounded-[12px] border px-4 py-3 text-[14px] font-bold transition-colors hover:brightness-110"
+        style={{
+          background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
+          borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 35%, transparent)`,
+          color: LEGACY_COLORS.red,
+        }}
+      >
+        <Trash2 className="h-4 w-4" />
+        이 모델 삭제
+      </button>
     </div>
   );
 }

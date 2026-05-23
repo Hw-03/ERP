@@ -127,6 +127,9 @@ function BundleRows({
   const parentLine = getHistoryBomParentLine(bundle);
   const childLines = parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines;
   const includedChildLines = childLines.filter((l) => l.included);
+  // 회귀 fix: source_kind 가 "bom_parent" 가 아니어도 lines 가 여럿이면 펼쳐서 표시.
+  // 백엔드 응답의 source_kind 변경 또는 origin 누락에도 견디게 한다.
+  const canExpand = isBomParent || childLines.length > 0;
 
   // 헤더 우측 수량 — 부모 라인 있으면 sub_type 기반 부호+색.
   // 단품(BOM 아님)은 bundle.quantity 가 라인 수(1)로 들어가는 경우가 있어 의미 없음 →
@@ -143,8 +146,8 @@ function BundleRows({
     <>
       {/* 번들 헤더 — 5컬럼 정렬 */}
       <tr
-        onClick={isBomParent ? onToggle : undefined}
-        className={isBomParent ? "cursor-pointer hover:brightness-105" : undefined}
+        onClick={canExpand ? onToggle : undefined}
+        className={canExpand ? "cursor-pointer hover:brightness-105" : undefined}
         style={{ background: "rgba(101,169,255,.03)" }}
       >
         {/* 일시 */}
@@ -167,7 +170,7 @@ function BundleRows({
         {/* 품목명 (toggle + title + N개 포함) */}
         <td className="border-b px-4 py-2" style={{ borderColor: LEGACY_COLORS.border, paddingLeft: "1.5rem" }}>
           <div className="flex items-center gap-1.5">
-            {isBomParent ? (
+            {canExpand ? (
               expanded
                 ? <ChevronDown className="h-3 w-3 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
                 : <ChevronRight className="h-3 w-3 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
@@ -175,7 +178,7 @@ function BundleRows({
             <span className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
               {bundle.title}
             </span>
-            {isBomParent && (
+            {canExpand && (
               <span className="shrink-0 text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
                 ({includedChildLines.length}개 포함)
               </span>
@@ -197,7 +200,7 @@ function BundleRows({
       </tr>
 
       {/* BOM 하위 라인 — 부모 자기 자신 제외, 6컬럼 정렬 */}
-      {isBomParent && expanded && childLines.map((line) => (
+      {canExpand && expanded && childLines.map((line) => (
         <BomLineRow key={line.line_id} line={line} batch={batch} bundle={bundle} />
       ))}
     </>

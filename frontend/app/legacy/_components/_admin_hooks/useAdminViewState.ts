@@ -27,13 +27,11 @@ export interface UseAdminViewStateResult {
   unlocked: boolean;
   adminPin: string;
   section: AdminSection;
-  showRightPanel: boolean;
   selectedDept: DepartmentMaster | null;
   setSelectedDept: React.Dispatch<React.SetStateAction<DepartmentMaster | null>>;
   unlock: (pin: string) => void;
   lock: () => void;
   selectSection: (next: AdminSection) => void;
-  togglePanel: () => void;
 }
 
 export function useAdminViewState(initialSection: AdminSection = "items"): UseAdminViewStateResult {
@@ -41,7 +39,6 @@ export function useAdminViewState(initialSection: AdminSection = "items"): UseAd
   const [unlocked, setUnlocked] = useState(false);
   const [adminPin, setAdminPin] = useState("");
   const [section, setSection] = useState<AdminSection>(initialSection);
-  const [showRightPanel, setShowRightPanel] = useState(false);
   const [selectedDept, setSelectedDept] = useState<DepartmentMaster | null>(null);
 
   const unlock = useCallback((pin: string) => {
@@ -62,20 +59,14 @@ export function useAdminViewState(initialSection: AdminSection = "items"): UseAd
     setSection(next);
   }, []);
 
-  const togglePanel = useCallback(() => {
-    setShowRightPanel((v) => !v);
-  }, []);
-
   return {
     unlocked,
     adminPin,
     section,
-    showRightPanel,
     selectedDept,
     setSelectedDept,
     unlock,
     lock,
     selectSection,
-    togglePanel,
   };
 }

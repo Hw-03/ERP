@@ -88,7 +88,7 @@ function StatBox({
   return (
     <div
       className="flex flex-col gap-1 rounded-[20px] border p-3 lg:p-4 text-left"
-      style={{ background: tint(color, 6), borderColor: tint(color, 22) }}
+      style={{ background: "transparent", borderColor: tint(color, 22) }}
     >
       <div
         className="flex items-center gap-1.5 whitespace-nowrap text-xs font-bold"
