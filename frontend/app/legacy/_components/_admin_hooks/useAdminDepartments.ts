@@ -72,6 +72,9 @@ export type AdminDepartmentsState = {
   hardDeleteDepartment: (id: number) => void;
   reorderDepartments: (ordered: DepartmentMaster[]) => void;
   updateDepartmentColor: (id: number, colorHex: string) => void;
+  /** 저장되지 않은 편집 여부 (PR-2 unsaved guard에서 읽음) */
+  dirty: boolean;
+  setDirty: (v: boolean) => void;
 };
 
 export function useAdminDepartments({
@@ -84,6 +87,7 @@ export function useAdminDepartments({
   adminPin,
 }: UseAdminDepartmentsArgs): AdminDepartmentsState {
   const [addName, setAddName] = useState("");
+  const [dirty, setDirty] = useState(false);
   const refreshDepartments = useRefreshDepartments();
 
   function _addDepartment() {
@@ -188,5 +192,7 @@ export function useAdminDepartments({
     hardDeleteDepartment: _hardDeleteDepartment,
     reorderDepartments: _reorderDepartments,
     updateDepartmentColor: _updateDepartmentColor,
+    dirty,
+    setDirty,
   };
 }
