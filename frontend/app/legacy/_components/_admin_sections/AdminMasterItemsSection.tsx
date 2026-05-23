@@ -17,6 +17,9 @@ import {
 import { useAdminMasterItemsContext } from "./AdminMasterItemsContext";
 import { AddItemForm } from "./_master_items_parts/AddItemForm";
 import { EditItemForm } from "./_master_items_parts/EditItemForm";
+import { useRegisterAdminDirty } from "./AdminDirtyRegistry";
+import { useUnsavedChangesGuard } from "@/lib/ui/useUnsavedChangesGuard";
+import { UnsavedChangesModal } from "@/lib/ui/UnsavedChangesModal";
 
 type DetailTab = "info" | "stock" | "bom" | "history";
 
@@ -41,9 +44,15 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
     addMode,
     setAddMode,
     saveItem,
+    dirty,
   } = useAdminMasterItemsContext();
 
   const [tab, setTab] = useState<DetailTab>("info");
+
+  // PR-2 2-3: 활성 섹션 dirty/save 를 상위 registry 에 등록 (탭/사이드바 가드).
+  useRegisterAdminDirty("items", dirty, saveItem);
+  // 항목 변경(트리거 a) 가드 — 같은 페이지에서 다른 품목 선택.
+  const { confirmNavigation, modalProps } = useUnsavedChangesGuard(dirty, saveItem);
 
   // KPI: 정상 / 부족 (사용자 결정에 따라 비활성 제거, 3개)
   const stats = useMemo(() => {
@@ -70,11 +79,22 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
   }, [selectedItem?.item_id]);
 
   function handleStartAdd() {
-    setAddMode(true);
-    setSelectedItem(null);
+    confirmNavigation(() => {
+      setAddMode(true);
+      setSelectedItem(null);
+    });
+  }
+
+  function handleSelectItem(item: Item, isSelected: boolean) {
+    confirmNavigation(() => {
+      setAddMode(false);
+      setSelectedItem(isSelected ? null : item);
+    });
   }
 
   return (
+    <>
+    <UnsavedChangesModal {...modalProps} />
     <div className="flex min-h-0 flex-col">
       <AdminPageHeader
         icon={Box}
@@ -119,10 +139,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
               <button
                 key={item.item_id}
                 type="button"
-                onClick={() => {
-                  setAddMode(false);
-                  setSelectedItem(isSelected ? null : item);
-                }}
+                onClick={() => handleSelectItem(item, isSelected)}
                 className="flex w-full items-center gap-2 rounded-[10px] border px-3 py-2 text-left transition-colors hover:brightness-[1.04]"
                 style={{
                   background: isSelected
@@ -187,7 +204,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
             !addMode && selectedItem && tab === "info" ? (
               <button
                 type="button"
-                onClick={saveItem}
+                onClick={() => void saveItem()}
                 className="flex items-center gap-1 rounded-[10px] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:brightness-110"
                 style={{ background: LEGACY_COLORS.blue }}
               >
@@ -210,6 +227,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
         </AdminDetailCard>
       </div>
     </div>
+    </>
   );
 }
 

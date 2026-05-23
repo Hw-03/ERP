@@ -88,7 +88,8 @@ export type AdminMasterItemsState = {
   /** 편집 폼 (context로 끌어올림 — PR-2.2-2) */
   editForm: ItemEditForm;
   setEditForm: (updater: (f: ItemEditForm) => ItemEditForm) => void;
-  saveItem: () => void;
+  /** 저장 — PR-2 2-3 unsaved guard 와 호환되도록 Promise 반환 */
+  saveItem: () => Promise<void>;
   /** unsaved guard용 dirty 플래그 (PR-2.2-3에서 사용) */
   dirty: boolean;
 };
@@ -190,7 +191,7 @@ export function useAdminMasterItems({
     }
   }
 
-  async function _saveItem() {
+  async function _saveItem(): Promise<void> {
     if (!selectedItem) return;
     try {
       const payload: UpdateItemPayload = {
@@ -230,7 +231,7 @@ export function useAdminMasterItems({
     updateItemFull: (p) => void _updateItemFull(p),
     editForm,
     setEditForm: _setEditFormWithDirty,
-    saveItem: () => void _saveItem(),
+    saveItem: _saveItem,
     dirty,
   };
 }

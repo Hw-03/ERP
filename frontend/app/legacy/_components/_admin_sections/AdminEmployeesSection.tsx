@@ -18,6 +18,9 @@ import {
 } from "./_admin_primitives";
 import { useAdminEmployeesContext } from "./AdminEmployeesContext";
 import { AssignedModelsEditor } from "./AssignedModelsEditor";
+import { useRegisterAdminDirty } from "./AdminDirtyRegistry";
+import { useUnsavedChangesGuard } from "@/lib/ui/useUnsavedChangesGuard";
+import { UnsavedChangesModal } from "@/lib/ui/UnsavedChangesModal";
 
 const ASSEMBLY_DEPT = "조립";
 
@@ -69,7 +72,13 @@ export function AdminEmployeesSection() {
     requestDelete,
     confirmDelete,
     cancelDelete,
+    dirty,
   } = ctx;
+
+  // PR-2 2-3: 활성 섹션 dirty/save 를 상위 registry 에 등록 (탭/사이드바 가드).
+  useRegisterAdminDirty("employees", dirty, saveEmployee);
+  // 항목 변경(트리거 a) 가드 — 같은 페이지에서 다른 직원 선택.
+  const { confirmNavigation, modalProps } = useUnsavedChangesGuard(dirty, saveEmployee);
 
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState<string>("ALL");
@@ -125,8 +134,17 @@ export function AdminEmployeesSection() {
   }, [empAddMode, selectedEmployee, filteredEmployees, setSelectedEmployee]);
 
   function handleStartAdd() {
-    setEmpAddMode(true);
-    setSelectedEmployee(null);
+    confirmNavigation(() => {
+      setEmpAddMode(true);
+      setSelectedEmployee(null);
+    });
+  }
+
+  function handleSelectEmployee(employee: Employee) {
+    confirmNavigation(() => {
+      setSelectedEmployee(employee);
+      setEmpAddMode(false);
+    });
   }
 
   return (
@@ -185,10 +203,7 @@ export function AdminEmployeesSection() {
                 <button
                   key={employee.employee_id}
                   type="button"
-                  onClick={() => {
-                    setSelectedEmployee(employee);
-                    setEmpAddMode(false);
-                  }}
+                  onClick={() => handleSelectEmployee(employee)}
                   className="flex w-full items-center gap-2.5 rounded-[10px] border px-3 py-2 text-left transition-colors hover:brightness-[1.04]"
                   style={{
                     background: active
@@ -291,6 +306,8 @@ export function AdminEmployeesSection() {
           </AdminDetailCard>
         </div>
       </div>
+
+      <UnsavedChangesModal {...modalProps} />
 
       <ConfirmModal
         open={confirmTarget !== null}

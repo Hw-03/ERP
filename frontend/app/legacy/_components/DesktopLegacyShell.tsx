@@ -19,6 +19,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { api, type ProductionCapacity } from "@/lib/api";
 import type { Item } from "@/lib/api";
 import { CapacityDetailModal } from "./CapacityDetailModal";
+import { AdminDirtyProvider, useAdminDirty } from "./_admin_sections/AdminDirtyRegistry";
 
 const VALID_TABS = new Set<DesktopTabId>(["dashboard", "warehouse", "history", "weekly", "admin"]);
 const DEFAULT_STATUS = "DEXCOWIN MES System";
@@ -32,8 +33,17 @@ const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
 };
 
 export function DesktopLegacyShell() {
+  return (
+    <AdminDirtyProvider>
+      <DesktopLegacyShellInner />
+    </AdminDirtyProvider>
+  );
+}
+
+function DesktopLegacyShellInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { confirmAdminNavigation } = useAdminDirty();
 
   const initialTab = (() => {
     const t = searchParams.get("tab") as DesktopTabId | null;
@@ -68,8 +78,16 @@ export function DesktopLegacyShell() {
       }
       return;
     }
-    setActiveTab(tab);
-    router.push(`?tab=${tab}`, { scroll: false });
+    // 트리거 (c) — 메인 탭 변경. activeTab === 'admin' 일 때만 가드 (다른 탭은 dirty 없음).
+    const doSwitch = () => {
+      setActiveTab(tab);
+      router.push(`?tab=${tab}`, { scroll: false });
+    };
+    if (activeTab === "admin") {
+      confirmAdminNavigation(doSwitch);
+    } else {
+      doSwitch();
+    }
   }
 
   // 브라우저 뒤로/앞으로 → URL ?tab= 변경 시 activeTab 동기화.

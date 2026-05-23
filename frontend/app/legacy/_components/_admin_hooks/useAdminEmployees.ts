@@ -36,7 +36,9 @@ export type AdminEmployeesState = {
   /* 2차: 정보 수정 / PIN 초기화 */
   editForm: EmployeeEditForm;
   setEditForm: (updater: (f: EmployeeEditForm) => EmployeeEditForm) => void;
-  saveEmployee: () => void;
+  saveEmployee: () => Promise<void>;
+  /** 저장 안 한 편집 여부 (PR-2 2-3 unsaved guard) */
+  dirty: boolean;
   pinResetTarget: Employee | null;
   pinResetAdminPin: string;
   setPinResetAdminPin: (v: string) => void;
@@ -183,7 +185,8 @@ export function useAdminEmployees({
     cancelConfirm: () => confirm.setConfirmTarget(null),
     editForm: form.editForm,
     setEditForm: form.setEditForm,
-    saveEmployee: () => void _saveEmployee(),
+    saveEmployee: _saveEmployee,
+    dirty: form.dirty,
     pinResetTarget: confirm.pinResetTarget,
     pinResetAdminPin: confirm.pinResetAdminPin,
     setPinResetAdminPin: confirm.setPinResetAdminPin,
