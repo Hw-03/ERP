@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Box, Plus } from "lucide-react";
+import { Box, Plus, Save } from "lucide-react";
 import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
@@ -40,6 +40,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
     setItemSearch,
     addMode,
     setAddMode,
+    saveItem,
   } = useAdminMasterItemsContext();
 
   const [tab, setTab] = useState<DetailTab>("info");
@@ -180,6 +181,19 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
               ) : (
                 <StatusPill label="정상" tone="success" />
               )
+            ) : null
+          }
+          actions={
+            !addMode && selectedItem && tab === "info" ? (
+              <button
+                type="button"
+                onClick={saveItem}
+                className="flex items-center gap-1 rounded-[10px] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:brightness-110"
+                style={{ background: LEGACY_COLORS.blue }}
+              >
+                <Save className="h-3.5 w-3.5" />
+                저장
+              </button>
             ) : null
           }
           tabs={!addMode && selectedItem ? DETAIL_TABS : undefined}
