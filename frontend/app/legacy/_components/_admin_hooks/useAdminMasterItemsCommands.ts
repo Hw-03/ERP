@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import type { Item } from "@/lib/api";
-import { api } from "@/lib/api";
+import { useCreateItemMutation } from "@/lib/queries/useItemsQuery";
 import { EMPTY_ADD_FORM, type AddForm } from "../_admin_sections/adminShared";
 
 export type UseAdminMasterItemsCommandsArgs = {
@@ -34,6 +34,7 @@ export function useAdminMasterItemsCommands({
 }: UseAdminMasterItemsCommandsArgs): UseAdminMasterItemsCommandsState {
   const [addMode, setAddMode] = useState(false);
   const [addForm, setAddForm] = useState<AddForm>(EMPTY_ADD_FORM);
+  const createMutation = useCreateItemMutation();
 
   async function _add(): Promise<void> {
     if (!addForm.item_name.trim()) {
@@ -41,7 +42,7 @@ export function useAdminMasterItemsCommands({
       return;
     }
     try {
-      const created = await api.createItem({
+      const created = await createMutation.mutateAsync({
         item_name: addForm.item_name.trim(),
         process_type_code: addForm.process_type_code || undefined,
         unit: addForm.unit || "EA",

@@ -2,6 +2,7 @@ import { setupServer } from "msw/node";
 import { modelsHandlers } from "./handlers/models";
 import { departmentsHandlers } from "./handlers/departments";
 import { employeesHandlers } from "./handlers/employees";
+import { itemsHandlers } from "./handlers/items";
 import { transactionsHandlers } from "./handlers/transactions";
 import { bomHandlers } from "./handlers/bom";
 import { inventoryHandlers } from "./handlers/inventory";
@@ -14,6 +15,7 @@ export const server = setupServer(
   ...modelsHandlers,
   ...departmentsHandlers,
   ...employeesHandlers,
+  ...itemsHandlers,
   ...transactionsHandlers,
   ...bomHandlers,
   ...inventoryHandlers,
