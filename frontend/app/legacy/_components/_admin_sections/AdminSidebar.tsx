@@ -6,7 +6,6 @@ import {
   Building2,
   Download,
   FileArchive,
-  KeyRound,
   Layers,
   Lock,
   Network,
@@ -37,9 +36,9 @@ export const SECTIONS: SectionMeta[] = [
 
 export const SETTINGS_ENTRY: SectionMeta = {
   id: "settings",
-  label: "설정",
-  description: "관리자 PIN, 데이터 초기화",
-  icon: KeyRound,
+  label: "보안",
+  description: "관리자 PIN을 변경하여 계정 보안을 강화하세요.",
+  icon: ShieldCheck,
 };
 
 const SECTION_GROUPS: { title: string; ids: AdminSection[] }[] = [
