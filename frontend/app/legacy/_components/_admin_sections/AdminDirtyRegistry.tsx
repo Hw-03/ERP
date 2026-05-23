@@ -52,10 +52,8 @@ export function AdminDirtyProvider({ children }: { children: ReactNode }) {
 
   // 어느 entry 라도 dirty 면 dirty
   const aggregateDirty = useMemo(() => {
-    for (const e of entriesRef.current.values()) {
-      if (e.dirty) return true;
-    }
-    return false;
+    const list = Array.from(entriesRef.current.values());
+    return list.some((e) => e.dirty);
     // version 이 dependency — entry 갱신 시 bump 호출로 재계산.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version]);
@@ -63,8 +61,8 @@ export function AdminDirtyProvider({ children }: { children: ReactNode }) {
   // 활성 entry 중 dirty 인 것의 save 를 모두 순차 호출 (보통 1개)
   const aggregateSave = useCallback(async () => {
     const dirtyEntries = Array.from(entriesRef.current.values()).filter((e) => e.dirty);
-    for (const e of dirtyEntries) {
-      await Promise.resolve(e.save());
+    for (let i = 0; i < dirtyEntries.length; i += 1) {
+      await Promise.resolve(dirtyEntries[i]!.save());
     }
   }, []);
 
