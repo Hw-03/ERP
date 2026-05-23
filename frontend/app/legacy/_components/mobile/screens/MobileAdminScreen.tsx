@@ -58,15 +58,12 @@ export function MobileAdminScreen({
 
   const {
     pinForm, setPinForm,
-    resetPin, setResetPin,
     saveMessage,
     showSave,
     changePin,
-    resetDatabase,
   } = useAdminSettings({
     onStatusChange,
     onError: setMessage,
-    onAfterReset: loadData,
   });
 
   if (!unlocked) {
@@ -236,10 +233,7 @@ export function MobileAdminScreen({
           refreshItems={refreshItems}
           pinForm={pinForm}
           setPinForm={setPinForm}
-          resetPin={resetPin}
-          setResetPin={setResetPin}
           changePin={changePin}
-          resetDatabase={resetDatabase}
           adminPin={adminPin}
         />
       </div>

@@ -57,15 +57,12 @@ export function DesktopAdminView({
 
   const {
     pinForm, setPinForm,
-    resetPin, setResetPin,
     saveMessage,
     showSave,
     changePin,
-    resetDatabase,
   } = useAdminSettings({
     onStatusChange,
     onError: setMessage,
-    onAfterReset: loadData,
   });
 
   if (!unlocked) {
@@ -146,10 +143,7 @@ export function DesktopAdminView({
               refreshItems={refreshItems}
               pinForm={pinForm}
               setPinForm={setPinForm}
-              resetPin={resetPin}
-              setResetPin={setResetPin}
               changePin={changePin}
-              resetDatabase={resetDatabase}
               adminPin={adminPin}
             />
           </div>
