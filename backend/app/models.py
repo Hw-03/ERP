@@ -442,6 +442,8 @@ class ProductSymbol(Base):
     is_finished_good = Column(Boolean, nullable=False, default=False)
     is_reserved = Column(Boolean, nullable=False, default=True)
     notes = Column(Text, nullable=True)
+    # 모델 관리 화면 표시 순서 (드래그 reorder 결과 저장). 기본값은 slot 과 동일하게 백필됨.
+    display_order = Column(Integer, nullable=False, default=0, server_default="0")
 
 
 class ItemModel(Base):

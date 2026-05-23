@@ -241,6 +241,11 @@ _MIGRATION_DDL: list[str] = [
     # 결재 요청 생성 시 프론트가 전달하는 사유 정보를 DB에 유지하여 승인 시점에도 참조 가능.
     "ALTER TABLE stock_requests ADD COLUMN reason_category VARCHAR(50)",
     "ALTER TABLE stock_requests ADD COLUMN reason_memo TEXT",
+    # 2026-05-23 (PR-2.2-5b): 모델 관리 드래그 reorder 지원 — display_order 컬럼.
+    # 기본값 0 으로 ADD 한 뒤, NULL/0 인 행만 slot 값으로 백필 (slot 자체가 자연 정렬 키).
+    # 이미 reorder 가 적용된 행(>0)은 덮어쓰지 않는다.
+    "ALTER TABLE product_symbols ADD COLUMN display_order INTEGER NOT NULL DEFAULT 0",
+    "UPDATE product_symbols SET display_order = slot WHERE display_order = 0 OR display_order IS NULL",
 ]
 
 
