@@ -13,6 +13,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 
 export const DEPT_LETTERS = ["T", "H", "V", "N", "A", "P"] as const;
 export type DeptLetter = (typeof DEPT_LETTERS)[number];
+export type BomDeptFilter = DeptLetter | "ALL";
 
 export const DEPT_LETTER_TO_NAME: Record<DeptLetter, string> = {
   T: "튜브",
