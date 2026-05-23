@@ -6,7 +6,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TruncatedText } from "@/lib/ui";
 import { BomBadge } from "./BomBadge";
 import { BomSearchInput } from "./BomSearchInput";
-import { BOM_STATUS_META, bomStatusOf, stageOf, type DeptLetter, type StageLetter } from "./bomDept";
+import { BOM_STATUS_META, bomStatusOf, stageOf, type BomDeptFilter, type StageLetter } from "./bomDept";
 import type { StatusFilter } from "./BomStatsRow";
 import { EmptyState } from "../../common";
 
@@ -21,7 +21,7 @@ import { EmptyState } from "../../common";
  * statusFilter 는 상단 KPI(BomStatsRow) 가 제어.
  */
 interface Props {
-  dept: DeptLetter;
+  dept: BomDeptFilter;
   items: Item[];
   allBomRows: BOMDetailEntry[];
   completedSet: Set<string>;
@@ -67,7 +67,10 @@ export function BomParentList({
   const list = useMemo(() => {
     const kw = search.trim().toLowerCase();
     return items
-      .filter((i) => i.process_type_code?.[0] === dept)
+      .filter((i) => {
+        if (dept !== "ALL" && i.process_type_code?.[0] !== dept) return false;
+        return true;
+      })
       .filter((i) => {
         if (mode === "edit") return stageOf(i.process_type_code) !== "R";
         return true;

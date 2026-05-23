@@ -16,7 +16,7 @@ import { BomReviewModal } from "./BomReviewModal";
 import { BomStatsRow, type StatusFilter } from "./BomStatsRow";
 import { BomWhereUsedPanel } from "./BomWhereUsedPanel";
 import { BomUnmatchedRawsDrawer } from "./BomUnmatchedRawsDrawer";
-import { bomStatusOf, stageOf, type DeptLetter } from "./bomDept";
+import { bomStatusOf, stageOf, type BomDeptFilter } from "./bomDept";
 
 interface Props {
   items: Item[];
@@ -38,7 +38,7 @@ export function BomWorkbench({
   onStatusChange,
   onError,
 }: Props) {
-  const [dept, setDept] = useState<DeptLetter>("A");
+  const [dept, setDept] = useState<BomDeptFilter>("A");
   const [parentId, setParentId] = useState("");
   const [mode, setMode] = useState<Mode>("edit");
   const [bomRows, setBomRows] = useState<BOMEntry[]>([]);
@@ -58,12 +58,13 @@ export function BomWorkbench({
     return m;
   }, [allBomRows]);
 
-  // 현재 부서의 부모 후보 (R 단계 제외)
+  // 현재 부서의 부모 후보 (R 단계 제외, "ALL"일 때는 부서 필터 스킵)
   const parentCandidates = useMemo(
     () =>
-      items.filter(
-        (i) => i.process_type_code?.[0] === dept && stageOf(i.process_type_code) !== "R",
-      ),
+      items.filter((i) => {
+        if (dept !== "ALL" && i.process_type_code?.[0] !== dept) return false;
+        return stageOf(i.process_type_code) !== "R";
+      }),
     [items, dept],
   );
 
@@ -81,10 +82,10 @@ export function BomWorkbench({
     return { total: parentCandidates.length, done, wip, todo };
   }, [parentCandidates, completedSet, childCountMap]);
 
-  // 첫 부모 자동 선택 (부서/모드 바뀔 때)
+  // 첫 부모 자동 선택 (부서/모드 바뀔 때, "ALL"일 때는 부서 필터 스킵)
   const modeCandidates = useMemo(() => {
     return items.filter((i) => {
-      if (i.process_type_code?.[0] !== dept) return false;
+      if (dept !== "ALL" && i.process_type_code?.[0] !== dept) return false;
       if (mode === "edit") return stageOf(i.process_type_code) !== "R";
       return true;
     });
@@ -127,7 +128,7 @@ export function BomWorkbench({
     };
   }, [parentId]);
 
-  function handleDeptChange(next: DeptLetter) {
+  function handleDeptChange(next: BomDeptFilter) {
     setDept(next);
     setParentId("");
   }
@@ -140,9 +141,10 @@ export function BomWorkbench({
 
   const rawItems = useMemo(
     () =>
-      items.filter(
-        (i) => i.process_type_code?.[0] === dept && stageOf(i.process_type_code) === "R",
-      ),
+      items.filter((i) => {
+        if (dept !== "ALL" && i.process_type_code?.[0] !== dept) return false;
+        return stageOf(i.process_type_code) === "R";
+      }),
     [items, dept],
   );
   const childIdSet = useMemo(
