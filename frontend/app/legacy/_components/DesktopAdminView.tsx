@@ -11,7 +11,8 @@ import { AdminSectionContent } from "./_admin_sections/AdminSectionContent";
 import { AdminRightPanelContent } from "./_admin_sections/AdminRightPanelContent";
 import { useAdminBootstrap } from "./_admin_hooks/useAdminBootstrap";
 import { useAdminSettings } from "./_admin_hooks/useAdminSettings";
-import { useAdminViewState } from "./_admin_hooks/useAdminViewState";
+import { useAdminViewState, type AdminSection } from "./_admin_hooks/useAdminViewState";
+import { useAdminDirty } from "./_admin_sections/AdminDirtyRegistry";
 
 /**
  * 섹션 헤더와 KPI는 각 섹션이 직접 그린다 (AdminPageHeader / AdminKpiBar 사용).
@@ -39,6 +40,11 @@ export function DesktopAdminView({
   } = useAdminViewState("models");
 
   const [message, setMessage] = useState("");
+  const { confirmAdminNavigation } = useAdminDirty();
+
+  // 트리거 (b) — 사이드바 섹션 변경 가드
+  const guardedSelectSection = (next: AdminSection) =>
+    confirmAdminNavigation(() => selectSection(next));
 
   const {
     items, setItems,
@@ -85,7 +91,7 @@ export function DesktopAdminView({
       >
         <AdminSidebar
           section={section}
-          onSelect={selectSection}
+          onSelect={guardedSelectSection}
           onLock={lock}
           showRightPanel={showRightPanel}
           onTogglePanel={togglePanel}
