@@ -956,3 +956,42 @@ class DepartmentDeleteRequest(BaseModel):
     """DELETE /departments/{id} 의 선택적 body — PIN 을 query 대신 body 로 전달."""
 
     pin: Optional[str] = Field(None, description="관리자 PIN")
+
+
+class ProductModelResponse(BaseModel):
+    model_config = {"protected_namespaces": (), "from_attributes": True}
+    slot: int
+    symbol: Optional[str]
+    model_name: Optional[str]
+    is_reserved: bool
+    display_order: int = 0
+
+
+class ProductModelCreate(BaseModel):
+    model_config = {"protected_namespaces": ()}
+    model_name: str = Field(..., min_length=1, max_length=50)
+    symbol: Optional[str] = Field(None, max_length=5)
+
+
+class ProductModelUpdate(BaseModel):
+    model_config = {"protected_namespaces": ()}
+    model_name: Optional[str] = Field(None, min_length=1, max_length=50)
+    symbol: Optional[str] = Field(None, max_length=5)
+    pin: str
+
+
+class ProductModelReorderItem(BaseModel):
+    model_config = {"protected_namespaces": ()}
+    slot: int
+    display_order: int
+
+
+class ProductModelReorderPayload(BaseModel):
+    model_config = {"protected_namespaces": ()}
+    items: List[ProductModelReorderItem]
+    pin: str
+
+
+class ProductModelDeleteRequest(BaseModel):
+    model_config = {"protected_namespaces": ()}
+    pin: str

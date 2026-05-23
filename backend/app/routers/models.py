@@ -3,55 +3,23 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ItemModel, ProductSymbol
 from app.routers._errors import ErrorCode, http_error
 from app.routers.settings import require_admin
+from app.schemas import (
+    ProductModelCreate,
+    ProductModelDeleteRequest,
+    ProductModelReorderItem,
+    ProductModelReorderPayload,
+    ProductModelResponse,
+    ProductModelUpdate,
+)
 from app.services._tx import commit_and_refresh, commit_only
 
 router = APIRouter()
-
-
-class ProductModelResponse(BaseModel):
-    model_config = {"protected_namespaces": (), "from_attributes": True}
-    slot: int
-    symbol: Optional[str]
-    model_name: Optional[str]
-    is_reserved: bool
-    display_order: int = 0
-
-
-class ProductModelCreate(BaseModel):
-    model_config = {"protected_namespaces": ()}
-    model_name: str = Field(..., min_length=1, max_length=50)
-    symbol: Optional[str] = Field(None, max_length=5)
-
-
-class ProductModelUpdate(BaseModel):
-    model_config = {"protected_namespaces": ()}
-    model_name: Optional[str] = Field(None, min_length=1, max_length=50)
-    symbol: Optional[str] = Field(None, max_length=5)
-    pin: str
-
-
-class ProductModelReorderItem(BaseModel):
-    model_config = {"protected_namespaces": ()}
-    slot: int
-    display_order: int
-
-
-class ProductModelReorderPayload(BaseModel):
-    model_config = {"protected_namespaces": ()}
-    items: List[ProductModelReorderItem]
-    pin: str
-
-
-class ProductModelDeleteRequest(BaseModel):
-    model_config = {"protected_namespaces": ()}
-    pin: str
 
 
 @router.get("", response_model=List[ProductModelResponse], summary="제품 모델 목록 (예약 제외)")
