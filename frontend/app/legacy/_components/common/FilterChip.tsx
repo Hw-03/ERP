@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import { Button } from "@/lib/ui/Button";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 
 interface Props {
@@ -15,10 +16,10 @@ interface Props {
 function FilterChipImpl({ active, label, onClick, tone = LEGACY_COLORS.blue, size = "md", className = "" }: Props) {
   const px = size === "sm" ? "px-3 py-1" : "px-4 py-2";
   return (
-    <button
-      type="button"
+    <Button
+      variant={active ? "ghost" : "secondary"}
       onClick={onClick}
-      className={`whitespace-nowrap rounded-full border ${px} text-sm font-semibold transition-all hover:brightness-110 ${className}`}
+      className={`whitespace-nowrap rounded-full ${px} text-sm ${className}`}
       style={{
         background: active ? `color-mix(in srgb, ${tone} 14%, transparent)` : LEGACY_COLORS.s2,
         borderColor: active ? tone : LEGACY_COLORS.border,
@@ -26,7 +27,7 @@ function FilterChipImpl({ active, label, onClick, tone = LEGACY_COLORS.blue, siz
       }}
     >
       {label}
-    </button>
+    </Button>
   );
 }
 
