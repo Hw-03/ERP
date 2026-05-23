@@ -19,7 +19,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { api, type ProductionCapacity } from "@/lib/api";
 import type { Item } from "@/lib/api";
 import { CapacityDetailModal } from "./CapacityDetailModal";
-import { AdminDirtyProvider, useAdminDirty } from "./_admin_sections/AdminDirtyRegistry";
+import { DirtyGuardProvider, useConfirmNavigation } from "@/lib/ui/dirty-guard";
 
 const VALID_TABS = new Set<DesktopTabId>(["dashboard", "warehouse", "history", "weekly", "admin"]);
 const DEFAULT_STATUS = "DEXCOWIN MES System";
@@ -34,16 +34,16 @@ const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
 
 export function DesktopLegacyShell() {
   return (
-    <AdminDirtyProvider>
+    <DirtyGuardProvider>
       <DesktopLegacyShellInner />
-    </AdminDirtyProvider>
+    </DirtyGuardProvider>
   );
 }
 
 function DesktopLegacyShellInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { confirmAdminNavigation } = useAdminDirty();
+  const confirmAdminNavigation = useConfirmNavigation();
 
   const initialTab = (() => {
     const t = searchParams.get("tab") as DesktopTabId | null;

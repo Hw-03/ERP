@@ -23,9 +23,7 @@ import {
 } from "./_admin_primitives";
 import { useAdminDepartmentsContext } from "./AdminDepartmentsContext";
 import { useRefreshDepartments } from "../DepartmentsContext";
-import { useRegisterAdminDirty } from "./AdminDirtyRegistry";
-import { useUnsavedChangesGuard } from "@/lib/ui/useUnsavedChangesGuard";
-import { UnsavedChangesModal } from "@/lib/ui/UnsavedChangesModal";
+import { useRegisterDirty, useLocalDirtyGuard } from "@/lib/ui/dirty-guard";
 
 function deptColor(d: DepartmentMaster): string {
   return d.color_hex ?? getDepartmentFallbackColor(d.name);
@@ -120,8 +118,8 @@ export function AdminDepartmentsSection({
   const deptSave = async () => {
     /* placeholder: A3 가 saveDepartment 노출 시 교체 */
   };
-  useRegisterAdminDirty("departments", deptDirty, deptSave);
-  const { confirmNavigation, modalProps } = useUnsavedChangesGuard(deptDirty, deptSave);
+  useRegisterDirty("departments", deptDirty, deptSave);
+  const { confirmNavigation } = useLocalDirtyGuard(deptDirty, deptSave);
 
   const empCountByDept = useMemo(() => {
     const map = new Map<string, number>();
@@ -222,7 +220,6 @@ export function AdminDepartmentsSection({
 
   return (
     <>
-      <UnsavedChangesModal {...modalProps} />
       <div className="flex min-h-0 flex-col">
         <AdminPageHeader
           icon={Building2}

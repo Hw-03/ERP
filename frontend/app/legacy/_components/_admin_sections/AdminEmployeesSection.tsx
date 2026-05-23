@@ -18,9 +18,7 @@ import {
 } from "./_admin_primitives";
 import { useAdminEmployeesContext } from "./AdminEmployeesContext";
 import { AssignedModelsEditor } from "./AssignedModelsEditor";
-import { useRegisterAdminDirty } from "./AdminDirtyRegistry";
-import { useUnsavedChangesGuard } from "@/lib/ui/useUnsavedChangesGuard";
-import { UnsavedChangesModal } from "@/lib/ui/UnsavedChangesModal";
+import { useRegisterDirty, useLocalDirtyGuard } from "@/lib/ui/dirty-guard";
 
 const ASSEMBLY_DEPT = "조립";
 
@@ -75,10 +73,10 @@ export function AdminEmployeesSection() {
     dirty,
   } = ctx;
 
-  // PR-2 2-3: 활성 섹션 dirty/save 를 상위 registry 에 등록 (탭/사이드바 가드).
-  useRegisterAdminDirty("employees", dirty, saveEmployee);
+  // 활성 섹션 dirty/save 를 상위 registry 에 등록 (탭/사이드바 가드).
+  useRegisterDirty("employees", dirty, saveEmployee);
   // 항목 변경(트리거 a) 가드 — 같은 페이지에서 다른 직원 선택.
-  const { confirmNavigation, modalProps } = useUnsavedChangesGuard(dirty, saveEmployee);
+  const { confirmNavigation } = useLocalDirtyGuard(dirty, saveEmployee);
 
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState<string>("ALL");
@@ -306,8 +304,6 @@ export function AdminEmployeesSection() {
           </AdminDetailCard>
         </div>
       </div>
-
-      <UnsavedChangesModal {...modalProps} />
 
       <ConfirmModal
         open={confirmTarget !== null}

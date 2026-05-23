@@ -15,7 +15,7 @@ import {
   AdminPageHeader,
 } from "./_admin_primitives";
 import { useAdminModelsContext } from "./AdminModelsContext";
-import { useRegisterAdminDirty } from "./AdminDirtyRegistry";
+import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 
 interface Props {
   items: Item[];
@@ -45,7 +45,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
   const [addMode, setAddMode] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
-  useRegisterAdminDirty(
+  useRegisterDirty(
     "models",
     editDirty,
     async () => {
