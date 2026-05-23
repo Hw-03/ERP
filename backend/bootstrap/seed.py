@@ -1,0 +1,267 @@
+"""bootstrap.seed — 참조 데이터 시드 + item_code 백필 + flow_rules 리셋 + check.
+
+- `seed_reference_data()` : Department / Employee / ProductSymbol /
+   OptionCode / ProcessType / ProcessFlowRule 비어 있을 때만 시드 (멱등)
+- `backfill_item_codes()` : item_code NULL 인 품목에 4-part 코드 자동 부여
+- `reset_flow_rules()`    : process_flow_rules 초기화 후 _PROCESS_FLOW_RULES 재시드
+- `check_db()`            : 쓰지 않고 상태만 리포트
+"""
+from __future__ import annotations
+
+from app.database import SessionLocal
+from app.models import (
+    Department,
+    DepartmentEnum,
+    Employee,
+    EmployeeAssignedModel,  # noqa: F401 — metadata registration
+    EmployeeLevelEnum,
+    Item,
+    OptionCode,
+    ProcessFlowRule,
+    ProcessType,
+    ProductSymbol,
+)
+from app.services.pin_auth import DEFAULT_PIN_HASH
+from app.utils.item_code import make_item_code
+
+# ---------------------------------------------------------------------------
+# 시드 데이터 정의
+# ---------------------------------------------------------------------------
+_EMPLOYEE_SEED: list[tuple] = [
+    ("E04", "김건호", "조립/과장", DepartmentEnum.ASSEMBLY, EmployeeLevelEnum.MANAGER),
+    ("E01", "김민재", "조립/대리", DepartmentEnum.ASSEMBLY, EmployeeLevelEnum.STAFF),
+    ("E02", "김종숙", "조립/주임", DepartmentEnum.ASSEMBLY, EmployeeLevelEnum.STAFF),
+    ("E06", "김현우", "조립/사원", DepartmentEnum.ASSEMBLY, EmployeeLevelEnum.STAFF),
+    ("E05", "남재원", "조립/사원", DepartmentEnum.ASSEMBLY, EmployeeLevelEnum.STAFF),
+    ("E03", "이계숙", "조립/주임", DepartmentEnum.ASSEMBLY, EmployeeLevelEnum.STAFF),
+    ("E22", "이필욱", "조립/부장", DepartmentEnum.ASSEMBLY, EmployeeLevelEnum.MANAGER),
+    ("E07", "이형진", "조립/사원", DepartmentEnum.ASSEMBLY, EmployeeLevelEnum.STAFF),
+    ("E09", "김재현", "진공/사원", DepartmentEnum.VACUUM, EmployeeLevelEnum.STAFF),
+    ("E10", "이지훈", "진공/대리", DepartmentEnum.VACUUM, EmployeeLevelEnum.STAFF),
+    ("E08", "허동현", "진공/사원", DepartmentEnum.VACUUM, EmployeeLevelEnum.STAFF),
+    ("E11", "김지현", "고압/주임", DepartmentEnum.HIGH_VOLTAGE, EmployeeLevelEnum.STAFF),
+    ("E12", "민애경", "고압/주임", DepartmentEnum.HIGH_VOLTAGE, EmployeeLevelEnum.STAFF),
+    ("E13", "오세현", "튜닝/사원", DepartmentEnum.TUNING, EmployeeLevelEnum.STAFF),
+    ("E14", "이지현", "튜닝/사원", DepartmentEnum.TUNING, EmployeeLevelEnum.STAFF),
+    ("E15", "김도영", "튜브/주임", DepartmentEnum.TUBE, EmployeeLevelEnum.STAFF),
+    ("E21", "문종현", "AS/대리", DepartmentEnum.AS, EmployeeLevelEnum.STAFF),
+    ("E16", "이성민", "연구소/책임", DepartmentEnum.RESEARCH, EmployeeLevelEnum.MANAGER),
+    ("E17", "오성식", "연구소/주임", DepartmentEnum.RESEARCH, EmployeeLevelEnum.STAFF),
+    ("E18", "류승범", "기타/대표", DepartmentEnum.ETC, EmployeeLevelEnum.ADMIN),
+    ("E19", "최윤영", "기타/과장", DepartmentEnum.ETC, EmployeeLevelEnum.MANAGER),
+    ("E20", "박성현", "기타/부장", DepartmentEnum.ETC, EmployeeLevelEnum.MANAGER),
+    ("E23", "양승규", "영업/부장", DepartmentEnum.SALES, EmployeeLevelEnum.MANAGER),
+    ("E24", "김예진", "영업/대리", DepartmentEnum.SALES, EmployeeLevelEnum.STAFF),
+    ("E25", "심이리나", "영업/과장", DepartmentEnum.SALES, EmployeeLevelEnum.MANAGER),
+    ("E26", "드미트리", "영업/사원", DepartmentEnum.SALES, EmployeeLevelEnum.STAFF),
+]
+
+_PRODUCT_SYMBOL_ASSIGNED: list[tuple] = [
+    (1, "3", "DX3000"),
+    (2, "7", "COCOON"),
+    (3, "8", "SOLO"),
+    (4, "4", "ADX4000W"),
+    (5, "6", "ADX6000FB"),
+]
+
+_OPTION_CODES: list[tuple] = [
+    ("BG", "블랙 유광", "Black Glossy", "#111111"),
+    ("WM", "화이트 무광", "White Matte", "#F7F7F7"),
+    ("SV", "실버", "Silver", "#C0C0C0"),
+]
+
+_PROCESS_TYPES: list[tuple] = [
+    ("TR", "T", "R", 10, "튜브 원자재"),
+    ("TA", "T", "A", 20, "튜브 중간공정"),
+    ("TF", "T", "F", 25, "튜브 공정완료"),
+    ("HR", "H", "R", 15, "고압 원자재"),
+    ("HA", "H", "A", 30, "고압 중간공정"),
+    ("HF", "H", "F", 35, "고압 공정완료"),
+    ("VR", "V", "R", 25, "진공 원자재"),
+    ("VA", "V", "A", 40, "진공 중간공정"),
+    ("VF", "V", "F", 45, "진공 공정완료"),
+    ("NR", "N", "R", 50, "튜닝 원자재"),
+    ("NA", "N", "A", 55, "튜닝 중간공정"),
+    ("NF", "N", "F", 60, "튜닝 공정완료"),
+    ("AR", "A", "R", 45, "조립 원자재"),
+    ("AA", "A", "A", 65, "조립 중간공정"),
+    ("AF", "A", "F", 70, "조립 공정완료"),
+    ("PR", "P", "R", 55, "출하 원자재"),
+    ("PA", "P", "A", 75, "출하 중간공정"),
+    ("PF", "P", "F", 80, "출하 공정완료"),
+]
+
+_PROCESS_FLOW_RULES: list[tuple] = [
+    # 부서 내 흐름 (R→A, A→F) — consumes_codes는 OR 조건 (쉼표 구분)
+    ("TR", "TA", "TR"),       # TR + TR → TA
+    ("TA", "TF", "TR,TA"),    # TA + (TR 또는 TA) → TF
+    ("HR", "HA", "HR"),       # HR + HR → HA
+    ("HA", "HF", "HR,HA"),    # HA + (HR 또는 HA) → HF
+    ("VR", "VA", "VR"),       # VR + VR → VA
+    ("VA", "VF", "VR,VA"),    # VA + (VR 또는 VA) → VF
+    ("NR", "NA", "NR"),       # NR + NR → NA
+    ("NA", "NF", "NR,NA"),    # NA + (NR 또는 NA) → NF
+    ("AR", "AA", "AR"),       # AR + AR → AA
+    ("AA", "AF", "AR,AA"),    # AA + (AR 또는 AA) → AF
+    ("PR", "PA", "PR"),       # PR + PR → PA
+    ("PA", "PF", "PR,PA"),    # PA + (PR 또는 PA) → PF
+    # 부서 간 이전 (이전 부서 F → 다음 부서 A)
+    ("TF", "HA", "HR"),       # TF + HR → HA
+    ("HF", "VA", "VR"),       # HF + VR → VA
+    ("VF", "NA", "NR"),       # VF + NR → NA
+    ("NF", "AA", "AR"),       # NF + AR → AA
+    ("AF", "PA", "PR"),       # AF + PR → PA
+]
+
+
+def seed_reference_data() -> dict[str, int]:
+    """참조 테이블이 비어 있을 때만 시드. idempotent."""
+    counts = {"departments": 0, "employees": 0, "symbols": 0, "options": 0, "process_types": 0, "flow_rules": 0}
+    db = SessionLocal()
+    try:
+        if db.query(Department).count() == 0:
+            _DEPT_SEED = ["조립", "고압", "진공", "튜닝", "튜브", "AS", "연구", "영업", "출하", "기타"]
+            for i, name in enumerate(_DEPT_SEED):
+                db.add(Department(name=name, display_order=i, is_active=True))
+                counts["departments"] += 1
+            db.commit()
+
+        if db.query(Employee).count() == 0:
+            for idx, (code, name, role, dept, level) in enumerate(_EMPLOYEE_SEED, start=1):
+                db.add(
+                    Employee(
+                        employee_code=code,
+                        name=name,
+                        role=role,
+                        department=dept,
+                        level=level,
+                        display_order=idx,
+                        is_active="true",
+                        pin_hash=DEFAULT_PIN_HASH,  # 기본 PIN: 0000
+                    )
+                )
+                counts["employees"] += 1
+            db.commit()
+
+        if db.query(ProductSymbol).count() == 0:
+            for slot, symbol, model in _PRODUCT_SYMBOL_ASSIGNED:
+                db.add(
+                    ProductSymbol(
+                        slot=slot,
+                        symbol=symbol,
+                        model_name=model,
+                        is_finished_good=True,
+                        is_reserved=False,
+                    )
+                )
+                counts["symbols"] += 1
+            for slot in range(6, 101):
+                db.add(ProductSymbol(slot=slot, symbol=None, model_name=None, is_reserved=True))
+                counts["symbols"] += 1
+            db.commit()
+
+        if db.query(OptionCode).count() == 0:
+            for code, ko, en, color in _OPTION_CODES:
+                db.add(OptionCode(code=code, label_ko=ko, label_en=en, color_hex=color))
+                counts["options"] += 1
+            db.commit()
+
+        if db.query(ProcessType).count() == 0:
+            for code, prefix, suffix, order, desc in _PROCESS_TYPES:
+                db.add(
+                    ProcessType(
+                        code=code,
+                        prefix=prefix,
+                        suffix=suffix,
+                        stage_order=order,
+                        description=desc,
+                    )
+                )
+                counts["process_types"] += 1
+            db.commit()
+
+        if db.query(ProcessFlowRule).count() == 0:
+            for src, dst, consumes in _PROCESS_FLOW_RULES:
+                db.add(ProcessFlowRule(from_type=src, to_type=dst, consumes_codes=consumes))
+                counts["flow_rules"] += 1
+            db.commit()
+    finally:
+        db.close()
+    return counts
+
+
+# ---------------------------------------------------------------------------
+# 품목 코드 백필
+# ---------------------------------------------------------------------------
+def backfill_item_codes() -> int:
+    """item_code 미할당 품목에 자동 부여. 기존 serial_no 와 충돌하지 않도록 그룹별 최대값+1."""
+    db = SessionLocal()
+    try:
+        targets = db.query(Item).filter(Item.item_code.is_(None)).all()
+        if not targets:
+            return 0
+
+        symbol_map: dict[int, str] = {
+            ps.slot: ps.symbol for ps in db.query(ProductSymbol).all() if ps.symbol
+        }
+
+        serial_counter: dict[tuple, int] = {}
+        for item in db.query(Item).filter(Item.serial_no.isnot(None)).all():
+            key = (item.symbol_slot, item.process_type_code)
+            serial_counter[key] = max(serial_counter.get(key, 0), item.serial_no or 0)
+
+        count = 0
+        for item in targets:
+            pt = item.process_type_code  # 공정코드는 18개 단일 기준 — 추론 없이 그대로 사용
+            if pt is None:
+                continue
+
+            slot = item.symbol_slot
+            symbol = symbol_map.get(slot, "공") if slot else "공"
+            opt = "BG" if pt == "PA" else None
+
+            key = (slot, pt)
+            serial_counter[key] = serial_counter.get(key, 0) + 1
+            serial = serial_counter[key]
+
+            item.symbol_slot = slot
+            item.serial_no = serial
+            item.option_code = opt
+            item.item_code = make_item_code(symbol, pt, serial, opt)
+            count += 1
+
+        db.commit()
+        return count
+    finally:
+        db.close()
+
+
+def reset_flow_rules() -> int:
+    """process_flow_rules 테이블을 초기화하고 현행 _PROCESS_FLOW_RULES로 재시드."""
+    db = SessionLocal()
+    try:
+        db.query(ProcessFlowRule).delete()
+        db.commit()
+        for src, dst, consumes in _PROCESS_FLOW_RULES:
+            db.add(ProcessFlowRule(from_type=src, to_type=dst, consumes_codes=consumes))
+        db.commit()
+        return len(_PROCESS_FLOW_RULES)
+    finally:
+        db.close()
+
+
+def check_db() -> dict:
+    """실행하지 않고 현재 상태만 리포트."""
+    db = SessionLocal()
+    try:
+        report = {
+            "employees": db.query(Employee).count(),
+            "process_types": db.query(ProcessType).count(),
+            "product_symbols": db.query(ProductSymbol).count(),
+            "option_codes": db.query(OptionCode).count(),
+            "items": db.query(Item).count(),
+            "items_missing_item_code": db.query(Item).filter(Item.item_code.is_(None)).count(),
+        }
+    finally:
+        db.close()
+    return report
