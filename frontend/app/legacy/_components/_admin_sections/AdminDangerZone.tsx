@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AlertTriangle, DatabaseBackup, KeyRound, RefreshCw, Settings as SettingsIcon } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { Button } from "@/lib/ui/Button";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { AdminPageHeader } from "./_admin_primitives";
 
@@ -122,15 +123,15 @@ export function AdminDangerZone({
                   }
                 />
               </div>
-              <button
-                type="button"
+              <Button
+                variant="primary"
+                size="md"
                 onClick={onChangePin}
                 disabled={!canChangePin}
-                className="mt-4 rounded-[12px] px-5 py-2.5 text-[13px] font-bold text-white transition-opacity disabled:opacity-40"
-                style={{ background: LEGACY_COLORS.blue }}
+                className="mt-4"
               >
                 PIN 변경
-              </button>
+              </Button>
             </div>
           </div>
 
