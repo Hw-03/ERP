@@ -13,6 +13,7 @@ import { HistoryStatsBar } from "../../_history_sections/HistoryStatsBar";
 import { HistoryDetailPanel } from "../../_history_sections/HistoryDetailPanel";
 import { HistoryBatchDetailPanel } from "../../_history_sections/HistoryBatchDetailPanel";
 import { useHistoryData } from "../../_hooks/useHistoryData";
+import { useMonthlyCountsQuery } from "@/lib/queries/useTransactionsQuery";
 import { parseUtc, toDateKey, formatHistoryDate } from "../../_history_sections/historyFormat";
 import {
   getHistoryActor,
@@ -151,34 +152,18 @@ export function MobileHistoryScreen() {
     } else setCalendarMonth((m) => m + 1);
   }
 
-  // 연 뷰 — 그 해 12개월 거래 건수 집계. calendarOpen + calendarYear 단위 fetch.
-  const [monthlyCountMap, setMonthlyCountMap] = useState<Map<number, number>>(new Map());
-  useEffect(() => {
-    if (!calendarOpen) return;
-    const ctrl = new AbortController();
-    void api
-      .getTransactions(
-        {
-          limit: 20000,
-          skip: 0,
-          dateFrom: `${calendarYear}-01-01`,
-          dateTo: `${calendarYear}-12-31`,
-        },
-        { signal: ctrl.signal },
-      )
-      .then((data) => {
-        const m = new Map<number, number>();
-        for (const log of data) {
-          const d = parseUtc(log.created_at);
-          if (d.getFullYear() !== calendarYear) continue;
-          const mi = d.getMonth();
-          m.set(mi, (m.get(mi) ?? 0) + 1);
-        }
-        setMonthlyCountMap(m);
-      })
-      .catch(() => {});
-    return () => ctrl.abort();
-  }, [calendarOpen, calendarYear]);
+  // 연 뷰 — 그 해 12개월 거래 건수 집계.
+  // /monthly-counts?year=YYYY 신 endpoint — limit 제한 없이 집계값만 반환.
+  const { data: monthlyCountsRaw } = useMonthlyCountsQuery(calendarYear);
+  const monthlyCountMap = useMemo(() => {
+    const m = new Map<number, number>();
+    if (!monthlyCountsRaw) return m;
+    for (const [key, count] of Object.entries(monthlyCountsRaw)) {
+      const month = parseInt(key.split("-")[1], 10) - 1;
+      if (count > 0) m.set(month, count);
+    }
+    return m;
+  }, [monthlyCountsRaw]);
 
   const calendarDayMap = useMemo(() => {
     const map = new Map<string, TransactionLog[]>();

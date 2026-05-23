@@ -16,8 +16,9 @@ import {
   getWeekStartMonday,
 } from "./_weekly_sections/WeeklyWeekPicker";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { api, type ProductionCapacity } from "@/lib/api";
-import type { Item } from "@/lib/api";
+import { api } from "@/lib/api";
+import type { Item, ProductionCapacity } from "@/lib/api";
+import { useProductionCapacityQuery } from "@/lib/queries/useProductionQuery";
 import { CapacityDetailModal } from "./CapacityDetailModal";
 import { DirtyGuardProvider, useConfirmNavigation } from "@/lib/ui/dirty-guard";
 
@@ -109,27 +110,9 @@ function DesktopLegacyShellInner() {
     // 초기 URL 에 defect_dept 쿼리가 있으면 읽어 둔다
     return searchParams.get("defect_dept");
   });
-  const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
+  const { data: capacityData = null, refetch: refetchCapacity } = useProductionCapacityQuery();
   const [capacityModal, setCapacityModal] = useState(false);
   const [stockWarnings, setStockWarnings] = useState<{ low: number; zero: number } | null>(null);
-
-  const loadCapacity = useCallback(() => {
-    void api.getProductionCapacity().then(setCapacityData).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    loadCapacity();
-  }, [loadCapacity]);
-
-  // window focus 시 capacity 만 백그라운드 갱신 — 자식 컴포넌트는 리마운트하지 않음
-  // (다른 창 갔다 돌아왔을 때 사용자 입력이 사라지는 문제 방지)
-  useEffect(() => {
-    function handleFocus() {
-      loadCapacity();
-    }
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
-  }, [loadCapacity]);
 
   const activeMeta = TAB_META[activeTab];
 
@@ -163,7 +146,7 @@ function DesktopLegacyShellInner() {
           globalSearch=""
           onStatusChange={handleStatusChange}
           preselectedItem={warehousePreselected}
-          onSubmitSuccess={loadCapacity}
+          onSubmitSuccess={() => { void refetchCapacity(); }}
           defectDeptFilter={defectDeptFilter}
         />
       );
@@ -176,7 +159,7 @@ function DesktopLegacyShellInner() {
     }
     return <DesktopAdminView key={key} globalSearch="" onStatusChange={handleStatusChange} />;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse, capacityData, loadCapacity, weekMon, defectDeptFilter]);
+  }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse, capacityData, refetchCapacity, weekMon, defectDeptFilter]);
 
   return (
     <>
@@ -200,7 +183,7 @@ function DesktopLegacyShellInner() {
             icon={activeMeta.icon}
             onRefresh={() => {
               setRefreshNonce((current) => current + 1);
-              loadCapacity();
+              void refetchCapacity();
             }}
             status={status}
             statusNonce={statusNonce}

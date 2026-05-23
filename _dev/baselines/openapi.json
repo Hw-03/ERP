@@ -1515,15 +1515,15 @@
       },
       "EmployeePinResetRequest": {
         "properties": {
-          "admin_pin": {
+          "pin": {
             "maxLength": 32,
             "minLength": 1,
-            "title": "Admin Pin",
+            "title": "Pin",
             "type": "string"
           }
         },
         "required": [
-          "admin_pin"
+          "pin"
         ],
         "title": "EmployeePinResetRequest",
         "type": "object"
@@ -7490,6 +7490,40 @@
       },
       "post": {
         "operationId": "create_department_api_departments_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -7531,6 +7565,40 @@
     "/api/departments/reorder": {
       "patch": {
         "operationId": "reorder_departments_api_departments_reorder_patch",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -7582,7 +7650,6 @@
             }
           },
           {
-            "description": "관리자 PIN (deprecated — body 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -7595,8 +7662,23 @@
                   "type": "null"
                 }
               ],
-              "description": "관리자 PIN (deprecated — body 사용 권장)",
               "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
             }
           }
         ],
@@ -7647,6 +7729,38 @@
             "schema": {
               "title": "Dept Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
             }
           }
         ],
@@ -8102,6 +8216,38 @@
               "format": "uuid",
               "title": "Employee Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
             }
           }
         ],
@@ -9040,6 +9186,55 @@
           }
         },
         "summary": "Export Transactions Xlsx",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/inventory/transactions/monthly-counts": {
+      "get": {
+        "description": "주어진 year의 월별 거래 건수 반환. 빈 month는 0.\n\n응답 예: { \"2026-01\": 142, \"2026-02\": 89, ..., \"2026-12\": 0 }\narchived_at 이 있는 레코드는 제외한다.",
+        "operationId": "monthly_counts_api_inventory_transactions_monthly_counts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "maximum": 2100,
+              "minimum": 2020,
+              "title": "Year",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Monthly Counts Api Inventory Transactions Monthly Counts Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "연도별 월별 거래 카운트",
         "tags": [
           "Inventory"
         ]
@@ -10438,6 +10633,40 @@
       "patch": {
         "description": "드래그 reorder 결과를 영구 저장. 부서 reorder 와 동일 패턴.\n\n- PIN 검증 후 payload.items 의 (slot, display_order) 쌍을 일괄 갱신.\n- 존재하지 않는 slot 은 조용히 스킵 (부분 갱신 허용).",
         "operationId": "reorder_models_api_models_reorder_patch",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -10489,7 +10718,6 @@
             }
           },
           {
-            "description": "관리자 PIN (deprecated — body 사용 권장)",
             "in": "query",
             "name": "pin",
             "required": false,
@@ -10502,8 +10730,23 @@
                   "type": "null"
                 }
               ],
-              "description": "관리자 PIN (deprecated — body 사용 권장)",
               "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
             }
           }
         ],
@@ -10555,6 +10798,38 @@
             "schema": {
               "title": "Slot",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
             }
           }
         ],

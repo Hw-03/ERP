@@ -1,14 +1,14 @@
 """Product model (ProductSymbol) CRUD router."""
 
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.admin import require_admin_pin
 from app.models import ItemModel, ProductSymbol
 from app.routers._errors import ErrorCode, http_error
-from app.routers.settings import require_admin
 from app.schemas import (
     ProductModelCreate,
     ProductModelDeleteRequest,
@@ -36,13 +36,16 @@ def list_models(db: Session = Depends(get_db)):
 
 
 @router.patch("/reorder", summary="제품 모델 표시 순서 재배치")
-def reorder_models(payload: ProductModelReorderPayload, db: Session = Depends(get_db)):
+def reorder_models(
+    payload: ProductModelReorderPayload,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
     """드래그 reorder 결과를 영구 저장. 부서 reorder 와 동일 패턴.
 
     - PIN 검증 후 payload.items 의 (slot, display_order) 쌍을 일괄 갱신.
     - 존재하지 않는 slot 은 조용히 스킵 (부분 갱신 허용).
     """
-    require_admin(db, payload.pin)
     reorder_by_display_order(
         db, ProductSymbol, "slot",
         [(item.slot, item.display_order) for item in payload.items],
@@ -94,9 +97,13 @@ def create_model(payload: ProductModelCreate, db: Session = Depends(get_db)):
     response_model=ProductModelResponse,
     summary="제품 모델 수정 (model_name, symbol)",
 )
-def update_model(slot: int, payload: ProductModelUpdate, db: Session = Depends(get_db)):
+def update_model(
+    slot: int,
+    payload: ProductModelUpdate,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
     """제품 모델 이름·기호 수정. 관리자 PIN 필요."""
-    require_admin(db, payload.pin)
     ps = db.query(ProductSymbol).filter(ProductSymbol.slot == slot).first()
     if not ps:
         raise http_error(404, ErrorCode.NOT_FOUND, "모델을 찾을 수 없습니다.")
@@ -133,15 +140,12 @@ def update_model(slot: int, payload: ProductModelUpdate, db: Session = Depends(g
 )
 def delete_model(
     slot: int,
+    _admin: Annotated[None, Depends(require_admin_pin)],
     pin: Optional[str] = Query(None, description="관리자 PIN (deprecated — body 사용 권장)"),
     body: Optional[ProductModelDeleteRequest] = Body(None),
     db: Session = Depends(get_db),
 ) -> None:
     """제품 모델 삭제 (해당 슬롯을 사용하는 품목이 있으면 거부). 관리자 PIN 필요."""
-    effective_pin = (body.pin if body and body.pin else None) or pin
-    if not effective_pin:
-        raise http_error(400, ErrorCode.BAD_REQUEST, "관리자 PIN 이 필요합니다.")
-    require_admin(db, effective_pin)
     ps = db.query(ProductSymbol).filter(ProductSymbol.slot == slot).first()
     if not ps:
         raise http_error(404, ErrorCode.NOT_FOUND, "모델을 찾을 수 없습니다.")

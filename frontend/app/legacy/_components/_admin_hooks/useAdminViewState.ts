@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import type { DepartmentMaster } from "@/lib/api";
+import { useAdminSession } from "@/lib/auth/admin-session";
 
 /**
  * 관리자 화면의 UI 상태 묶음.
@@ -36,6 +37,7 @@ export interface UseAdminViewStateResult {
 }
 
 export function useAdminViewState(initialSection: AdminSection = "items"): UseAdminViewStateResult {
+  const { setPin, clearPin } = useAdminSession();
   const [unlocked, setUnlocked] = useState(false);
   const [adminPin, setAdminPin] = useState("");
   const [section, setSection] = useState<AdminSection>(initialSection);
@@ -45,11 +47,16 @@ export function useAdminViewState(initialSection: AdminSection = "items"): UseAd
   const unlock = useCallback((pin: string) => {
     setAdminPin(pin);
     setUnlocked(true);
-  }, []);
+    // W3-B: 세션에 PIN 등록 → 이후 모든 admin API 요청이 자동으로
+    // X-Admin-Pin 헤더로 인증된다. 기존 body.pin 전송도 그대로 호환.
+    setPin(pin);
+  }, [setPin]);
 
   const lock = useCallback(() => {
     setUnlocked(false);
-  }, []);
+    // 잠금 시 세션 PIN 도 정리 — 다음 요청부터 헤더 미주입.
+    clearPin();
+  }, [clearPin]);
 
   const selectSection = useCallback((next: AdminSection) => {
     setSection(next);

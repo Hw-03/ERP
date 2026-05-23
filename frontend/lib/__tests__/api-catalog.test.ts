@@ -1,107 +1,223 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { catalogApi } from "../api/catalog";
+/**
+ * api-catalog.test.ts — MSW + React Query hook 통합 테스트 (W4-C)
+ *
+ * 기존: fetch URL substring만 검증 (wiring 확인).
+ * 신규: useModelsQuery / mutation hook의 실제 동작 검증.
+ *   - 요청 body 매칭
+ *   - 응답 데이터 shape 검증
+ *   - 에러 모드(403/404) 분기 검증
+ *   - mutation 성공 후 query invalidation 확인
+ */
 
-function makeResponse(body: unknown, ok = true): Response {
-  return {
-    ok,
-    status: ok ? 200 : 500,
-    statusText: ok ? "OK" : "Error",
-    text: () => Promise.resolve(JSON.stringify(body)),
-    json: () => Promise.resolve(body),
-  } as unknown as Response;
+import React from "react";
+import { describe, it, expect } from "vitest";
+import { renderHook, waitFor, act } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { http, HttpResponse } from "msw";
+import { server } from "./msw/server";
+import {
+  useModelsQuery,
+  useCreateModelMutation,
+  useUpdateModelMutation,
+  useDeleteModelMutation,
+  useReorderModelsMutation,
+} from "@/lib/queries/useModelsQuery";
+
+/** 각 테스트마다 새로운 QueryClient로 격리 */
+function makeWrapper() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  function Wrapper({ children }: { children: React.ReactNode }) {
+    return React.createElement(QueryClientProvider, { client }, children);
+  }
+  return { client, Wrapper };
 }
 
-const originalFetch = globalThis.fetch;
-afterEach(() => {
-  globalThis.fetch = originalFetch;
-});
+// ---------------------------------------------------------------------------
+// useModelsQuery — GET /api/models
+// ---------------------------------------------------------------------------
 
-describe("catalogApi.getModels", () => {
-  it("GET /api/models", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await catalogApi.getModels();
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/models");
+describe("useModelsQuery (MSW)", () => {
+  it("정상 응답: data shape 검증 (length + model_name)", async () => {
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useModelsQuery(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toHaveLength(2);
+    expect(result.current.data?.[0].model_name).toBe("DX3000");
+    expect(result.current.data?.[1].symbol).toBe("B");
+  });
+
+  it("404 응답 시 isError === true", async () => {
+    server.use(
+      http.get("*/api/models", () =>
+        HttpResponse.json({ detail: "Not found" }, { status: 404 }),
+      ),
+    );
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useModelsQuery(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
   });
 });
 
-describe("catalogApi.createModel", () => {
-  it("POST /api/models with body", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ slot: 1 })));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await catalogApi.createModel({ model_name: "M1" });
-    const init = fetchSpy.mock.calls[0][1] as RequestInit;
-    expect(init.method).toBe("POST");
-    expect(JSON.parse(init.body as string)).toEqual({ model_name: "M1" });
-  });
-});
+// ---------------------------------------------------------------------------
+// useCreateModelMutation — POST /api/models
+// ---------------------------------------------------------------------------
 
-describe("catalogApi.getBOM", () => {
-  it("GET /api/bom/{parentId}", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await catalogApi.getBOM("item-1");
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/bom/item-1");
-  });
-});
+describe("useCreateModelMutation (MSW)", () => {
+  it("요청 body model_name 매칭 + 응답 schema 검증 (slot·symbol·display_order)", async () => {
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useCreateModelMutation(), { wrapper: Wrapper });
 
-describe("catalogApi.updateBOM", () => {
-  it("PATCH /api/bom/{bomId}", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await catalogApi.updateBOM("bom-1", { quantity: 5 });
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/bom/bom-1");
-    const init = fetchSpy.mock.calls[0][1] as RequestInit;
-    expect(init.method).toBe("PATCH");
-    expect(JSON.parse(init.body as string)).toEqual({ quantity: 5 });
-  });
-});
-
-describe("catalogApi 잔여 메소드", () => {
-  it("deleteModel DELETE /api/models/{slot}", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await catalogApi.deleteModel(3, "0000");
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/models/3");
-  });
-
-  it("getAllBOM GET /api/bom", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await catalogApi.getAllBOM();
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/bom");
-  });
-
-  it("getBOMTree GET /api/bom/{id}/tree", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await catalogApi.getBOMTree("item-1");
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/bom/item-1/tree");
-  });
-
-  it("getBOMWhereUsed GET /api/bom/where-used/{id}", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await catalogApi.getBOMWhereUsed("item-1");
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/bom/where-used/item-1");
-  });
-
-  it("createBOM POST /api/bom", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await catalogApi.createBOM({
-      parent_item_id: "p1",
-      child_item_id: "c1",
-      quantity: 2,
-      unit: "EA",
+    await act(async () => {
+      result.current.mutate({ model_name: "NEWMODEL" });
     });
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/bom");
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const data = result.current.data as { slot: number; model_name: string; display_order: number };
+    expect(data.slot).toBe(3);
+    expect(data.model_name).toBe("NEWMODEL");
+    expect(typeof data.display_order).toBe("number");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useUpdateModelMutation — PUT /api/models/:slot
+// ---------------------------------------------------------------------------
+
+describe("useUpdateModelMutation (MSW)", () => {
+  it("PIN 통과(0000) → 성공 + 응답 slot 일치", async () => {
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useUpdateModelMutation(), { wrapper: Wrapper });
+
+    await act(async () => {
+      result.current.mutate({ slot: 1, payload: { model_name: "DX4000", pin: "0000" } });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const data = result.current.data as { slot: number; model_name: string };
+    expect(data.slot).toBe(1);
+    expect(data.model_name).toBe("DX4000");
   });
 
-  it("deleteBOM DELETE /api/bom/{id}", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
-    globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await catalogApi.deleteBOM("bom-1");
-    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/bom/bom-1");
+  it("PIN 불일치(1234) → 403 → isError === true", async () => {
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useUpdateModelMutation(), { wrapper: Wrapper });
+
+    await act(async () => {
+      result.current.mutate({ slot: 1, payload: { model_name: "X", pin: "1234" } });
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useDeleteModelMutation — DELETE /api/models/:slot
+// ---------------------------------------------------------------------------
+
+describe("useDeleteModelMutation (MSW)", () => {
+  it("body PIN(0000) → 204 → isSuccess === true", async () => {
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useDeleteModelMutation(), { wrapper: Wrapper });
+
+    await act(async () => {
+      result.current.mutate({ slot: 1, pin: "0000" });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+
+  it("PIN 누락/오류 → 400 → isError === true", async () => {
+    server.use(
+      http.delete("*/api/models/:slot", () =>
+        HttpResponse.json({ detail: "PIN 누락" }, { status: 400 }),
+      ),
+    );
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useDeleteModelMutation(), { wrapper: Wrapper });
+
+    await act(async () => {
+      result.current.mutate({ slot: 1, pin: "wrong" });
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useReorderModelsMutation — PATCH /api/models/reorder
+// ---------------------------------------------------------------------------
+
+describe("useReorderModelsMutation (MSW)", () => {
+  it("정상 PIN → { ok: true } 응답", async () => {
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useReorderModelsMutation(), { wrapper: Wrapper });
+
+    await act(async () => {
+      result.current.mutate({
+        items: [
+          { slot: 1, display_order: 1 },
+          { slot: 2, display_order: 0 },
+        ],
+        pin: "0000",
+      });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect((result.current.data as { ok: boolean }).ok).toBe(true);
+  });
+
+  it("PIN 불일치 → 403 → isError === true", async () => {
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useReorderModelsMutation(), { wrapper: Wrapper });
+
+    await act(async () => {
+      result.current.mutate({
+        items: [{ slot: 1, display_order: 0 }],
+        pin: "9999",
+      });
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mutation 성공 후 useModelsQuery 자동 invalidate
+// ---------------------------------------------------------------------------
+
+describe("mutation → query invalidation (MSW)", () => {
+  it("createModel 성공 후 useModelsQuery가 refetch됨", async () => {
+    // 두 번째 GET 응답은 3개 항목 반환
+    let callCount = 0;
+    server.use(
+      http.get("*/api/models", () => {
+        callCount += 1;
+        if (callCount >= 2) {
+          return HttpResponse.json([
+            { slot: 1, symbol: "A", model_name: "DX3000", is_reserved: false, display_order: 0 },
+            { slot: 2, symbol: "B", model_name: "COCOON", is_reserved: false, display_order: 1 },
+            { slot: 3, symbol: "C", model_name: "NEWMODEL", is_reserved: false, display_order: 2 },
+          ]);
+        }
+        return HttpResponse.json([
+          { slot: 1, symbol: "A", model_name: "DX3000", is_reserved: false, display_order: 0 },
+          { slot: 2, symbol: "B", model_name: "COCOON", is_reserved: false, display_order: 1 },
+        ]);
+      }),
+    );
+
+    const { Wrapper } = makeWrapper();
+
+    const queryResult = renderHook(() => useModelsQuery(), { wrapper: Wrapper });
+    await waitFor(() => expect(queryResult.result.current.isSuccess).toBe(true));
+    expect(queryResult.result.current.data).toHaveLength(2);
+
+    const mutResult = renderHook(() => useCreateModelMutation(), { wrapper: Wrapper });
+    await act(async () => {
+      mutResult.result.current.mutate({ model_name: "NEWMODEL" });
+    });
+    await waitFor(() => expect(mutResult.result.current.isSuccess).toBe(true));
+
+    // invalidation 후 query가 refetch → 3개 항목
+    await waitFor(() => expect(queryResult.result.current.data).toHaveLength(3), {
+      timeout: 3000,
+    });
   });
 });

@@ -12,7 +12,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from pydantic import BaseModel
-from sqlalchemy import and_, case, func, or_, select
+from sqlalchemy import and_, case, extract, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -334,6 +334,32 @@ def _verify_editor(db: Session, employee_id: uuid.UUID, pin: str) -> Employee:
     if not verify_pin(employee.pin_hash, pin):
         raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
     return employee
+
+
+@router.get("/transactions/monthly-counts", summary="연도별 월별 거래 카운트")
+def monthly_counts(
+    year: int = Query(..., ge=2020, le=2100),
+    db: Session = Depends(get_db),
+) -> dict[str, int]:
+    """주어진 year의 월별 거래 건수 반환. 빈 month는 0.
+
+    응답 예: { "2026-01": 142, "2026-02": 89, ..., "2026-12": 0 }
+    archived_at 이 있는 레코드는 제외한다.
+    """
+    rows = (
+        db.query(
+            extract("month", TransactionLog.created_at).label("month"),
+            func.count(TransactionLog.log_id).label("count"),
+        )
+        .filter(
+            extract("year", TransactionLog.created_at) == year,
+            TransactionLog.archived_at.is_(None),
+        )
+        .group_by(extract("month", TransactionLog.created_at))
+        .all()
+    )
+    counts = {f"{year:04d}-{int(r.month):02d}": int(r.count) for r in rows}
+    return {f"{year:04d}-{m:02d}": counts.get(f"{year:04d}-{m:02d}", 0) for m in range(1, 13)}
 
 
 @router.get("/transactions", response_model=List[TransactionLogResponse])
