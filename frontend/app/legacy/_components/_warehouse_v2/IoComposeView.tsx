@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { Button } from "@/lib/ui/Button";
 import { tint } from "@/lib/mes/colorUtils";
 import { api, type BOMDetailEntry, type IoBundle, type IoLine, type IoSourceKind, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
 import { ApiError } from "@/lib/api-core";
@@ -735,15 +736,16 @@ export function IoComposeView({
                   />
                 </div>
                 <div className="mt-auto pt-5">
-                  <button
-                    type="button"
+                  <Button
+                    variant="primary"
+                    size="lg"
                     onClick={state.goNext}
                     disabled={!state.canAdvance[2]}
-                    className="flex w-full items-center justify-center gap-2 rounded-[18px] px-7 py-5 text-lg font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
+                    className="w-full rounded-[18px] px-7 py-5 text-lg font-black"
                     style={{ background: accent }}
                   >
                     {state.canAdvance[2] ? "다음 단계로 →" : "세부 작업과 부서를 선택하세요"}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </WizardStepCard>
