@@ -16,6 +16,9 @@ import {
 import { useAdminMasterItemsContext } from "./AdminMasterItemsContext";
 import { AddItemForm } from "./_master_items_parts/AddItemForm";
 import { EditItemForm } from "./_master_items_parts/EditItemForm";
+import { useRegisterAdminDirty } from "./AdminDirtyRegistry";
+import { useUnsavedChangesGuard } from "@/lib/ui/useUnsavedChangesGuard";
+import { UnsavedChangesModal } from "@/lib/ui/UnsavedChangesModal";
 
 type DetailTab = "info" | "stock" | "bom" | "history";
 
@@ -39,9 +42,15 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
     setItemSearch,
     addMode,
     setAddMode,
+    editDirty,
+    saveActiveEdit,
   } = useAdminMasterItemsContext();
 
   const [tab, setTab] = useState<DetailTab>("info");
+
+  // PR-2 2-3: 활성 EditItemForm 의 dirty/save 를 상위 registry 에 등록 + 로컬 가드
+  useRegisterAdminDirty("items", editDirty, saveActiveEdit);
+  const { confirmNavigation, modalProps } = useUnsavedChangesGuard(editDirty, saveActiveEdit);
 
   // KPI: 정상 / 부족 (사용자 결정에 따라 비활성 제거, 3개)
   const stats = useMemo(() => {
@@ -68,11 +77,22 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
   }, [selectedItem?.item_id]);
 
   function handleStartAdd() {
-    setAddMode(true);
-    setSelectedItem(null);
+    confirmNavigation(() => {
+      setAddMode(true);
+      setSelectedItem(null);
+    });
+  }
+
+  function handleSelectItem(item: Item, isSelected: boolean) {
+    confirmNavigation(() => {
+      setAddMode(false);
+      setSelectedItem(isSelected ? null : item);
+    });
   }
 
   return (
+    <>
+    <UnsavedChangesModal {...modalProps} />
     <div className="flex min-h-0 flex-col">
       <AdminPageHeader
         icon={Box}
@@ -123,10 +143,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
               <button
                 key={item.item_id}
                 type="button"
-                onClick={() => {
-                  setAddMode(false);
-                  setSelectedItem(isSelected ? null : item);
-                }}
+                onClick={() => handleSelectItem(item, isSelected)}
                 className="flex w-full items-center gap-2 rounded-[10px] border px-3 py-2 text-left transition-colors hover:brightness-[1.04]"
                 style={{
                   background: isSelected
@@ -197,6 +214,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
         </AdminDetailCard>
       </div>
     </div>
+    </>
   );
 }
 

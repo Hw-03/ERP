@@ -3,7 +3,7 @@
 // AdminMasterItemsSection 전용 hook.
 // 품목 마스터 검색/선택/추가/필드 저장 상태와 액션을 한 곳에 모은다.
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { Item } from "@/lib/api";
 import { api } from "@/lib/api";
 import { EMPTY_ADD_FORM, type AddForm } from "../_admin_sections/adminShared";
@@ -46,7 +46,15 @@ export type AdminMasterItemsState = {
     field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "item_code" | "process_type_code",
     value: string,
   ) => void;
-  updateItemFull: (payload: UpdateItemPayload) => void;
+  updateItemFull: (payload: UpdateItemPayload) => Promise<void>;
+  /** PR-2 2-3: 활성 EditItemForm 의 dirty/save 등록.
+   *  EditItemForm 마운트 시 register, 언마운트 시 register(false, noop).
+   */
+  registerEditState: (dirty: boolean, save: () => Promise<void> | void) => void;
+  /** 활성 EditItemForm 의 dirty 여부 */
+  editDirty: boolean;
+  /** 활성 EditItemForm 의 save 실행 (없으면 no-op) */
+  saveActiveEdit: () => Promise<void>;
 };
 
 export function useAdminMasterItems({
@@ -61,6 +69,21 @@ export function useAdminMasterItems({
   const [itemSearch, setItemSearch] = useState("");
   const [addMode, setAddMode] = useState(false);
   const [addForm, setAddForm] = useState<AddForm>(EMPTY_ADD_FORM);
+  const [editDirty, setEditDirty] = useState(false);
+  const editSaveRef = useRef<(() => Promise<void> | void) | null>(null);
+
+  const registerEditState = useCallback(
+    (dirty: boolean, save: () => Promise<void> | void) => {
+      editSaveRef.current = save;
+      setEditDirty(dirty);
+    },
+    [],
+  );
+
+  const saveActiveEdit = useCallback(async () => {
+    const fn = editSaveRef.current;
+    if (fn) await Promise.resolve(fn());
+  }, []);
 
   const visibleItems = useMemo(() => {
     const keyword = `${globalSearch} ${itemSearch}`.trim().toLowerCase();
@@ -140,6 +163,9 @@ export function useAdminMasterItems({
     visibleItems,
     addItem: () => void _addItem(),
     saveItemField: (f, v) => void _saveItemField(f, v),
-    updateItemFull: (p) => void _updateItemFull(p),
+    updateItemFull: _updateItemFull,
+    registerEditState,
+    editDirty,
+    saveActiveEdit,
   };
 }
