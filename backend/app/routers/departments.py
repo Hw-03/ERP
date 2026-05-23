@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models import Department
 from app.routers._errors import ErrorCode, http_error
 from app.routers.settings import require_admin
+from app.services.reorder import reorder_by_display_order
 from app.schemas import (
     DepartmentCreate,
     DepartmentDeleteRequest,
@@ -49,10 +50,10 @@ def create_department(
 @router.patch("/reorder")
 def reorder_departments(payload: DepartmentReorderPayload, db: Session = Depends(get_db)):
     require_admin(db, payload.pin)
-    for item in payload.items:
-        dept = db.query(Department).filter(Department.id == item.id).first()
-        if dept:
-            dept.display_order = item.display_order
+    reorder_by_display_order(
+        db, Department, "id",
+        [(item.id, item.display_order) for item in payload.items],
+    )
     db.commit()
     return {"ok": True}
 

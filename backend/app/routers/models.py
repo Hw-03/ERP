@@ -18,6 +18,7 @@ from app.schemas import (
     ProductModelUpdate,
 )
 from app.services._tx import commit_and_refresh, commit_only
+from app.services.reorder import reorder_by_display_order
 
 router = APIRouter()
 
@@ -42,10 +43,10 @@ def reorder_models(payload: ProductModelReorderPayload, db: Session = Depends(ge
     - 존재하지 않는 slot 은 조용히 스킵 (부분 갱신 허용).
     """
     require_admin(db, payload.pin)
-    for item in payload.items:
-        ps = db.query(ProductSymbol).filter(ProductSymbol.slot == item.slot).first()
-        if ps:
-            ps.display_order = item.display_order
+    reorder_by_display_order(
+        db, ProductSymbol, "slot",
+        [(item.slot, item.display_order) for item in payload.items],
+    )
     db.commit()
     return {"ok": True}
 
