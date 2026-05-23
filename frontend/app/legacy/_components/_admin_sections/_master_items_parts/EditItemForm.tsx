@@ -1,7 +1,7 @@
 "use client";
 
 import type { Item } from "@/lib/api";
-import type { ItemEditForm } from "../../../_admin_hooks/useAdminMasterItems";
+import type { ItemEditForm } from "../../_admin_hooks/useAdminMasterItems";
 import { useAdminMasterItemsContext } from "../AdminMasterItemsContext";
 import { ItemFormFields } from "./ItemFormFields";
 import type { ItemFormData } from "./ItemFormFields";
