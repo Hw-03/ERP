@@ -5,7 +5,12 @@
 // 기존 useAdminEmployees.ts 의 4 async operation 을 hook 으로 추출.
 
 import type { Employee } from "@/lib/api";
-import { api } from "@/lib/api";
+import {
+  useCreateEmployeeMutation,
+  useDeleteEmployeeMutation,
+  useResetEmployeePinMutation,
+  useUpdateEmployeeMutation,
+} from "@/lib/queries/useEmployeesQuery";
 import type { EmployeeAddForm } from "../_admin_sections/adminShared";
 
 export type UseAdminEmployeesCommandsArgs = {
@@ -26,6 +31,11 @@ export function useAdminEmployeesCommands({
   onStatusChange,
   onError,
 }: UseAdminEmployeesCommandsArgs): UseAdminEmployeesCommandsState {
+  const createMutation = useCreateEmployeeMutation();
+  const updateMutation = useUpdateEmployeeMutation();
+  const deleteMutation = useDeleteEmployeeMutation();
+  const resetPinMutation = useResetEmployeePinMutation();
+
   async function add(input: EmployeeAddForm): Promise<Employee | null> {
     if (!input.name.trim()) {
       onError("이름은 필수입니다.");
@@ -33,7 +43,7 @@ export function useAdminEmployeesCommands({
     }
     const isAssembly = input.department === "조립";
     try {
-      const created = await api.createEmployee({
+      const created = await createMutation.mutateAsync({
         name: input.name.trim(),
         role: input.role.trim(),
         department: input.department as Employee["department"],
@@ -53,8 +63,9 @@ export function useAdminEmployeesCommands({
 
   async function toggleActive(employee: Employee): Promise<Employee | null> {
     try {
-      const updated = await api.updateEmployee(employee.employee_id, {
-        is_active: !employee.is_active,
+      const updated = await updateMutation.mutateAsync({
+        employeeId: employee.employee_id,
+        payload: { is_active: !employee.is_active },
       });
       setEmployees((current) =>
         current.map((entry) => (entry.employee_id === employee.employee_id ? updated : entry)),
@@ -71,7 +82,7 @@ export function useAdminEmployeesCommands({
     employee: Employee,
   ): Promise<{ deleted: boolean; updated: Employee | null } | null> {
     try {
-      const result = await api.deleteEmployee(employee.employee_id);
+      const result = await deleteMutation.mutateAsync(employee.employee_id);
       if (result.result === "deleted") {
         setEmployees((current) => current.filter((e) => e.employee_id !== employee.employee_id));
         onStatusChange(`'${employee.name}' 직원을 영구 삭제했습니다.`);
@@ -93,7 +104,10 @@ export function useAdminEmployeesCommands({
   async function resetPin(employee: Employee, adminPin: string): Promise<boolean> {
     if (!adminPin.trim()) return false;
     try {
-      await api.resetEmployeePin(employee.employee_id, adminPin.trim());
+      await resetPinMutation.mutateAsync({
+        employeeId: employee.employee_id,
+        adminPin: adminPin.trim(),
+      });
       onStatusChange(`'${employee.name}' PIN을 0000으로 초기화했습니다.`);
       return true;
     } catch (error) {
