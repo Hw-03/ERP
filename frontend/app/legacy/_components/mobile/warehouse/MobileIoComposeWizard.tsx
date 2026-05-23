@@ -101,7 +101,11 @@ export function MobileIoComposeWizard({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
   const [bomParents, setBomParents] = useState<Set<string>>(() => new Set());
+  // 가드 key 는 `${item_id}__${workType}` — workType 변경 시 bundles reset 되므로
+  // 같은 preselectedItem 이라도 재적용되어야 한다.
   const preselectedHandledRef = useRef<string | null>(null);
+  // BOM 부모 품목으로 진입한 경우 자동 추가하지 않고 picker 에서 row 만 강조.
+  const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
   const restoredDraftRef = useRef<string | null>(null);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveBatchIdRef = useRef<string | null>(null);
@@ -223,12 +227,20 @@ export function MobileIoComposeWizard({
 
   useEffect(() => {
     if (!preselectedItem) return;
-    if (preselectedHandledRef.current === preselectedItem.item_id) return;
+    // workType 변경 시 bundles 가 reset 되므로 key 에 workType 포함.
+    const handledKey = `${preselectedItem.item_id}__${state.workType}`;
+    if (preselectedHandledRef.current === handledKey) return;
     if (state.workType === "process" && state.deptIoDirection == null) return;
-    preselectedHandledRef.current = preselectedItem.item_id;
-    void addItem(preselectedItem);
+    preselectedHandledRef.current = handledKey;
+    if (bomParents.has(preselectedItem.item_id)) {
+      // BOM 부모: 자동 카트 추가하지 않고 picker 에서 row 만 강조.
+      setHighlightItemId(preselectedItem.item_id);
+    } else {
+      setHighlightItemId(null);
+      void addItem(preselectedItem);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preselectedItem?.item_id, state.workType, state.deptIoDirection]);
+  }, [preselectedItem?.item_id, state.workType, state.deptIoDirection, bomParents]);
 
   function getAvailable(line: IoLine): number | null {
     const item = items.find((row) => row.item_id === line.item_id);
@@ -435,6 +447,7 @@ export function MobileIoComposeWizard({
             bundles={state.bundles}
             search={search}
             onSearchChange={setSearch}
+            highlightItemId={highlightItemId}
             onAddItem={(item, sourceKind, subTypeOverride) =>
               addItem(item, sourceKind ?? "direct_item", subTypeOverride)
             }

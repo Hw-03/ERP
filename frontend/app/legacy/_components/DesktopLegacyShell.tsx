@@ -118,7 +118,9 @@ export function DesktopLegacyShell() {
   const handleGoToWarehouse = useCallback((item: Item) => {
     setWarehousePreselected(item);
     setActiveTab("warehouse");
-  }, []);
+    // URL 도 함께 갱신해야 입출고 위저드의 ?step=N push 가 dashboard 잔여 쿼리와 충돌하지 않는다.
+    router.push("?tab=warehouse", { scroll: false });
+  }, [router]);
 
   const content = useMemo(() => {
     const key = activeTab === "admin" ? "admin" : `${activeTab}-${refreshNonce}`;

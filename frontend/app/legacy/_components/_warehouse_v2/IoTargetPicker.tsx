@@ -38,6 +38,13 @@ interface Props {
   onAddItem: (item: Item, sourceKind?: "direct_item" | "manual", subTypeOverride?: IoSubType) => void;
   onAdvance: () => void;
   busy?: boolean;
+  /**
+   * 대시보드에서 BOM 부모 품목으로 진입했을 때, 자동 카트 추가는 보류하고
+   * 해당 row 만 시각적으로 강조한다. row 가 마운트되면 scrollIntoView 로 가운데
+   * 정렬되며 2초간 배경 flash. `${item_id}__${workType}` 처럼 외부에서 키를
+   * 갱신하면 다시 발동.
+   */
+  highlightItemId?: string | null;
 }
 
 const STAGE_OPTIONS = [
@@ -134,6 +141,7 @@ export function IoTargetPicker({
   onAddItem,
   onAdvance,
   busy,
+  highlightItemId,
 }: Props) {
   const [dept, setDept] = useState("ALL");
   const [model, setModel] = useState("전체");
@@ -302,6 +310,7 @@ export function IoTargetPicker({
           bomParents={bomParents}
           hasBomBundle={bundles.some((b) => b.source_kind === "bom_parent")}
           hasSingleBundle={bundles.some((b) => b.source_kind === "direct_item")}
+          highlightItemId={highlightItemId ?? null}
         />
       </div>
 
@@ -351,6 +360,7 @@ function ItemTable({
   bomParents,
   hasBomBundle,
   hasSingleBundle,
+  highlightItemId,
 }: {
   items: Item[];
   displayLimit: number;
@@ -366,6 +376,7 @@ function ItemTable({
   bomParents: Set<string>;
   hasBomBundle: boolean;
   hasSingleBundle: boolean;
+  highlightItemId: string | null;
 }) {
   const isProcess = workType === "process" && deptIoDirection != null;
   const bomTarget = isProcess ? deptIoSubType(deptIoDirection!, "bom") : null;
@@ -441,10 +452,11 @@ function ItemTable({
             const hasOthers = Array.from(prodByDept.keys()).some((d) => d !== impliedDeptName);
             const noDeptStock = prodByDept.size === 0;
             const wQty = Number(item.warehouse_qty) || 0;
+            const isHighlight = highlightItemId === item.item_id;
             return (
-              <tr
+              <HighlightableRow
                 key={item.item_id}
-                className="transition-colors hover:brightness-110"
+                isHighlight={isHighlight}
               >
                 <td className="px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
                   <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
@@ -614,7 +626,7 @@ function ItemTable({
                     )}
                   </span>
                 </td>
-              </tr>
+              </HighlightableRow>
             );
           })}
           {items.length === 0 && (
@@ -652,5 +664,53 @@ function ItemTable({
         </div>
       )}
     </>
+  );
+}
+
+// 대시보드에서 BOM 부모 품목으로 진입했을 때, 해당 row 가 마운트되면 즉시
+// scrollIntoView 로 가운데 정렬 + 2초간 배경 flash 효과로 사용자 시선을 유도.
+// 자동 카트 추가는 하지 않고 사용자가 직접 BOM/낱개를 선택하게 한다.
+function HighlightableRow({
+  isHighlight,
+  children,
+}: {
+  isHighlight: boolean;
+  children: React.ReactNode;
+}) {
+  const rowRef = useRef<HTMLTableRowElement | null>(null);
+  const [flash, setFlash] = useState(false);
+
+  useEffect(() => {
+    if (!isHighlight) return;
+    const el = rowRef.current;
+    if (!el) return;
+    try {
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+    } catch {
+      // older browsers 또는 SSR fallback
+      el.scrollIntoView();
+    }
+    setFlash(true);
+    const timer = window.setTimeout(() => setFlash(false), 2000);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [isHighlight]);
+
+  return (
+    <tr
+      ref={rowRef}
+      className="transition-colors hover:brightness-110"
+      style={
+        flash
+          ? {
+              background: `${LEGACY_COLORS.blue}26`, // ~15% alpha
+              transition: "background-color 0.4s ease",
+            }
+          : undefined
+      }
+    >
+      {children}
+    </tr>
   );
 }

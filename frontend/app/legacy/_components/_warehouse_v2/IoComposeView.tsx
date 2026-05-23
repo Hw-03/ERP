@@ -112,7 +112,11 @@ export function IoComposeView({
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
   // BOM 부모 item_id 집합 — process workType에서 "BOM 적용" 버튼 활성 판단용. 마운트 시 1회 fetch.
   const [bomParents, setBomParents] = useState<Set<string>>(() => new Set());
+  // 가드 key 는 `${item_id}__${workType}` — workType 변경 시 bundles 가 reset 되므로
+  // 같은 preselectedItem 이라도 재적용되어야 한다.
   const preselectedHandledRef = useRef<string | null>(null);
+  // BOM 부모 품목으로 진입한 경우 자동 추가하지 않고 Step 3 picker 에서 row 만 강조한다.
+  const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
   const restoredDraftRef = useRef<string | null>(null);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveBatchIdRef = useRef<string | null>(null);
@@ -289,13 +293,24 @@ export function IoComposeView({
 
   useEffect(() => {
     if (!preselectedItem) return;
-    if (preselectedHandledRef.current === preselectedItem.item_id) return;
+    // workType 변경 시 bundles 가 reset 되므로(useIoWorkState), 같은 품목이라도
+    // workType 별로 다시 적용되도록 key 에 workType 을 포함.
+    const handledKey = `${preselectedItem.item_id}__${state.workType}`;
+    if (preselectedHandledRef.current === handledKey) return;
     // process workType + 방향 미선택이면 자동 추가 보류 (Step 2에서 방향 선택 후 다시 진입해야 함)
     if (state.workType === "process" && state.deptIoDirection == null) return;
-    preselectedHandledRef.current = preselectedItem.item_id;
-    void addItem(preselectedItem);
+    preselectedHandledRef.current = handledKey;
+    if (bomParents.has(preselectedItem.item_id)) {
+      // BOM 부모: 자동 카트 추가하지 않고 Step 3 picker 에서 해당 row 만 강조.
+      // 낱개/BOM 선택은 사용자가 직접.
+      setHighlightItemId(preselectedItem.item_id);
+    } else {
+      // 일반 품목: 기존 흐름대로 자동 카트 추가.
+      setHighlightItemId(null);
+      void addItem(preselectedItem);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preselectedItem?.item_id, state.workType, state.deptIoDirection]);
+  }, [preselectedItem?.item_id, state.workType, state.deptIoDirection, bomParents]);
 
   function getAvailable(line: IoLine): number | null {
     const item = items.find((row) => row.item_id === line.item_id);
@@ -802,6 +817,7 @@ export function IoComposeView({
                 bundles={state.bundles}
                 search={search}
                 onSearchChange={setSearch}
+                highlightItemId={highlightItemId}
                 onAddItem={(item, sourceKind, subTypeOverride) =>
                   addItem(item, sourceKind ?? "direct_item", subTypeOverride)}
                 onAdvance={() => {
