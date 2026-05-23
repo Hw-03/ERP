@@ -4,7 +4,12 @@
 
 import { useState } from "react";
 import type { ProductModel } from "@/lib/api";
-import { api } from "@/lib/api";
+import {
+  useCreateModelMutation,
+  useDeleteModelMutation,
+  useReorderModelsMutation,
+  useUpdateModelMutation,
+} from "@/lib/queries/useModelsQuery";
 
 export type UseAdminModelsArgs = {
   productModels: ProductModel[];
@@ -52,6 +57,12 @@ export function useAdminModels({
   const [editBase, setEditBase] = useState<ModelEditForm>({ model_name: "", symbol: "" });
   const [editSaving, setEditSaving] = useState(false);
 
+  // React Query mutations (W4-A)
+  const createModelMutation = useCreateModelMutation();
+  const updateModelMutation = useUpdateModelMutation();
+  const deleteModelMutation = useDeleteModelMutation();
+  const reorderModelsMutation = useReorderModelsMutation();
+
   const editDirty =
     editForm.model_name !== editBase.model_name || editForm.symbol !== editBase.symbol;
 
@@ -67,32 +78,41 @@ export function useAdminModels({
       return;
     }
     setEditSaving(true);
-    void api
-      .updateModel(slot, {
-        model_name: editForm.model_name.trim(),
-        symbol: editForm.symbol.trim() || undefined,
-        pin: adminPin,
-      })
-      .then((updated) => {
-        setProductModels((prev) => prev.map((m) => (m.slot === slot ? updated : m)));
-        setEditBase({ model_name: updated.model_name ?? "", symbol: updated.symbol ?? "" });
-        onStatusChange(`'${updated.model_name}' 모델을 저장했습니다.`);
-      })
-      .catch((err) => onError(err instanceof Error ? err.message : "저장 실패"))
-      .finally(() => setEditSaving(false));
+    updateModelMutation.mutate(
+      {
+        slot,
+        payload: {
+          model_name: editForm.model_name.trim(),
+          symbol: editForm.symbol.trim() || undefined,
+          pin: adminPin,
+        },
+      },
+      {
+        onSuccess: (updated) => {
+          setProductModels((prev) => prev.map((m) => (m.slot === slot ? updated : m)));
+          setEditBase({ model_name: updated.model_name ?? "", symbol: updated.symbol ?? "" });
+          onStatusChange(`'${updated.model_name}' 모델을 저장했습니다.`);
+        },
+        onError: (err) => onError(err instanceof Error ? err.message : "저장 실패"),
+        onSettled: () => setEditSaving(false),
+      },
+    );
   }
 
   function _addModel() {
     if (!modelAddName.trim()) return;
-    void api
-      .createModel({ model_name: modelAddName.trim(), symbol: modelAddSymbol.trim() || undefined })
-      .then((created) => {
-        setProductModels((prev) => [...prev, created]);
-        setModelAddName("");
-        setModelAddSymbol("");
-        onStatusChange(`'${created.model_name}' 모델을 추가했습니다.`);
-      })
-      .catch((err) => onError(err instanceof Error ? err.message : "모델 추가 실패"));
+    createModelMutation.mutate(
+      { model_name: modelAddName.trim(), symbol: modelAddSymbol.trim() || undefined },
+      {
+        onSuccess: (created) => {
+          setProductModels((prev) => [...prev, created]);
+          setModelAddName("");
+          setModelAddSymbol("");
+          onStatusChange(`'${created.model_name}' 모델을 추가했습니다.`);
+        },
+        onError: (err) => onError(err instanceof Error ? err.message : "모델 추가 실패"),
+      },
+    );
   }
 
   function _deleteModel(slot: number) {
@@ -105,13 +125,16 @@ export function useAdminModels({
     ) {
       return;
     }
-    void api
-      .deleteModel(slot, adminPin)
-      .then(() => {
-        setProductModels((prev) => prev.filter((m) => m.slot !== slot));
-        onStatusChange(`'${model.model_name}' 모델을 삭제했습니다.`);
-      })
-      .catch((err) => onError(err instanceof Error ? err.message : "삭제 실패"));
+    deleteModelMutation.mutate(
+      { slot, pin: adminPin },
+      {
+        onSuccess: () => {
+          setProductModels((prev) => prev.filter((m) => m.slot !== slot));
+          onStatusChange(`'${model.model_name}' 모델을 삭제했습니다.`);
+        },
+        onError: (err) => onError(err instanceof Error ? err.message : "삭제 실패"),
+      },
+    );
   }
 
   function _reorderModels(ordered: ProductModel[]) {
@@ -119,11 +142,13 @@ export function useAdminModels({
     const items = ordered.map((m, i) => ({ slot: m.slot, display_order: i }));
     const reindexed = ordered.map((m, i) => ({ ...m, display_order: i }));
     setProductModels(() => reindexed);
-    void api
-      .reorderModels({ items, pin: adminPin })
-      .catch((err) =>
-        onError(err instanceof Error ? err.message : "모델 순서 저장 실패"),
-      );
+    reorderModelsMutation.mutate(
+      { items, pin: adminPin },
+      {
+        onError: (err) =>
+          onError(err instanceof Error ? err.message : "모델 순서 저장 실패"),
+      },
+    );
   }
 
   return {
