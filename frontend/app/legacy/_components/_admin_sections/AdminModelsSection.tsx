@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Layers, Plus, Trash2, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { BOMDetailEntry, Item, ProductModel } from "@/lib/api";
+import { Button } from "@/lib/ui/Button";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { EmptyState } from "../common";
 import { StatusPill } from "../common/StatusPill";
@@ -121,15 +122,9 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
         title="모델 관리"
         description="제품 모델 정보를 등록하고 사용 현황을 확인할 수 있습니다."
         actions={
-          <button
-            type="button"
-            onClick={handleStartAdd}
-            className="flex items-center gap-1.5 rounded-[12px] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-110"
-            style={{ background: LEGACY_COLORS.blue }}
-          >
-            <Plus className="h-4 w-4" />
+          <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
             모델 추가
-          </button>
+          </Button>
         }
       />
 

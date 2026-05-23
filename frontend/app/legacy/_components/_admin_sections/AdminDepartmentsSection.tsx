@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Building2, Palette, Plus, Trash2, X } from "lucide-react";
+import { Building2, Palette, Plus, Save, Trash2, X } from "lucide-react";
 import {
   api,
   type DepartmentMaster,
@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { getDepartmentFallbackColor, normalizeDepartment } from "@/lib/mes/department";
+import { Button } from "@/lib/ui/Button";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { EmptyState } from "../common";
 import { FilterChip } from "../common/FilterChip";
@@ -51,6 +52,7 @@ export function AdminDepartmentsSection({
     addDepartmentMaster,
     selectedDept,
     setSelectedDept,
+    setDirty,
   } = useAdminDepartmentsContext();
   const refreshDepartments = useRefreshDepartments();
 
@@ -58,6 +60,7 @@ export function AdminDepartmentsSection({
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [addMode, setAddMode] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DepartmentMaster | null>(null);
+  const deptSaveRef = useRef<(() => void) | null>(null);
 
   const empCountByDept = useMemo(() => {
     const map = new Map<string, number>();
@@ -160,15 +163,9 @@ export function AdminDepartmentsSection({
           title="부서 관리"
           description="조직의 부서를 관리하고 색상·구성원을 설정합니다."
           actions={
-            <button
-              type="button"
-              onClick={handleStartAdd}
-              className="flex items-center gap-1.5 rounded-[12px] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-110"
-              style={{ background: LEGACY_COLORS.blue }}
-            >
-              <Plus className="h-4 w-4" />
+            <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
               부서 추가
-            </button>
+            </Button>
           }
         />
 
@@ -261,19 +258,13 @@ export function AdminDepartmentsSection({
             }
             actions={
               addMode ? (
-                <button
-                  type="button"
-                  onClick={() => setAddMode(false)}
-                  className="flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
-                  style={{
-                    background: LEGACY_COLORS.s2,
-                    borderColor: LEGACY_COLORS.border,
-                    color: LEGACY_COLORS.muted2,
-                  }}
-                >
-                  <X className="h-3.5 w-3.5" />
+                <Button variant="secondary" size="sm" iconLeft={<X className="h-3.5 w-3.5" />} onClick={() => setAddMode(false)}>
                   취소
-                </button>
+                </Button>
+              ) : selectedDept ? (
+                <Button variant="primary" size="sm" iconLeft={<Save className="h-3.5 w-3.5" />} onClick={() => deptSaveRef.current?.()}>
+                  저장
+                </Button>
               ) : null
             }
           >
@@ -295,6 +286,8 @@ export function AdminDepartmentsSection({
                 onError={onError}
                 onToggleActive={() => handleToggleActive(selectedDept)}
                 onRequestDelete={() => setDeleteTarget(selectedDept)}
+                onSaveRef={(fn) => { deptSaveRef.current = fn; }}
+                onDirtyChange={setDirty}
               />
             ) : (
               <EmptyState
@@ -379,6 +372,8 @@ interface DeptDetailViewProps {
   onError: (msg: string) => void;
   onToggleActive: () => void;
   onRequestDelete: () => void;
+  onSaveRef?: (fn: (() => void) | null) => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 function DeptDetailView({
@@ -393,40 +388,79 @@ function DeptDetailView({
   onError,
   onToggleActive,
   onRequestDelete,
+  onSaveRef,
+  onDirtyChange,
 }: DeptDetailViewProps) {
   const savedColor = deptColor(dept);
   const colorInputRef = useRef<HTMLInputElement>(null);
-  const [localColor, setLocalColor] = useState(savedColor);
+  const [editForm, setEditForm] = useState({ name: dept.name, color_hex: savedColor });
   const [toggleConfirmOpen, setToggleConfirmOpen] = useState(false);
   const refreshDepartments = useRefreshDepartments();
 
+  // dept 변경 시 폼 초기화
   useEffect(() => {
-    setLocalColor(deptColor(dept));
-    // dept 객체 자체를 deps로 넣으면 매 렌더마다 트리거됨 — 핵심 식별 필드만 watch
+    const color = deptColor(dept);
+    setEditForm({ name: dept.name, color_hex: color });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dept.id, dept.color_hex, dept.name]);
 
-  const colorChanged = localColor.toLowerCase() !== savedColor.toLowerCase();
+  const dirty =
+    editForm.name !== dept.name ||
+    editForm.color_hex.toLowerCase() !== savedColor.toLowerCase();
 
-  function applyColor() {
+  // dirty 변경 알림
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+
+  function save() {
     void api
-      .updateDepartment(dept.id, { color_hex: localColor, pin: adminPin })
+      .updateDepartment(dept.id, {
+        name: editForm.name.trim() || dept.name,
+        color_hex: editForm.color_hex,
+        pin: adminPin,
+      })
       .then((updated) => {
         onSetDepartments((prev) => prev.map((d) => (d.id === dept.id ? updated : d)));
         setSelectedDept(updated);
-        onStatusChange(`'${dept.name}' 색상을 변경했습니다.`);
+        onStatusChange(`'${updated.name}' 부서 정보를 저장했습니다.`);
         void refreshDepartments();
       })
       .catch((err: unknown) =>
-        onError(err instanceof Error ? err.message : "색상 변경 실패"),
+        onError(err instanceof Error ? err.message : "저장 실패"),
       );
   }
 
+  // 저장 함수 ref 노출 (부모가 헤더 버튼에서 호출)
+  useEffect(() => {
+    onSaveRef?.(save);
+    return () => onSaveRef?.(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editForm, adminPin]);
+
+  const previewColor = editForm.color_hex;
+  const colorChanged = previewColor.toLowerCase() !== savedColor.toLowerCase();
+
   return (
     <div className="flex flex-col gap-4">
-      {/* 메타 그리드 4개 */}
+      {/* 메타 그리드 */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MetaCell label="부서명" value={dept.name} />
+        <div className="flex flex-col gap-1">
+          <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: LEGACY_COLORS.muted2 }}>
+            부서명
+          </span>
+          <input
+            type="text"
+            value={editForm.name}
+            onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+            className="w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none focus:border-[var(--c-blue)]"
+            style={{
+              background: LEGACY_COLORS.s1,
+              borderColor: LEGACY_COLORS.border,
+              color: LEGACY_COLORS.text,
+            }}
+          />
+        </div>
         <MetaCell label="코드" value={`DPT-${String(dept.id).padStart(2, "0")}`} mono />
         <MetaCell label="소속 직원" value={`${empCount}명`} tone={LEGACY_COLORS.purple} />
         <MetaCell label="관련 품목" value={`${itemCount}개`} tone={LEGACY_COLORS.blue} />
@@ -450,12 +484,12 @@ function DeptDetailView({
               </span>
               <div
                 className="h-9 w-9 shrink-0 rounded-full border-2"
-                style={{ background: localColor, borderColor: LEGACY_COLORS.border }}
+                style={{ background: previewColor, borderColor: LEGACY_COLORS.border }}
               />
             </>
           )}
           <span className="ml-2 font-mono text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-            {colorChanged ? localColor : savedColor}
+            {colorChanged ? previewColor : savedColor}
           </span>
           <button
             type="button"
@@ -472,20 +506,10 @@ function DeptDetailView({
           <input
             ref={colorInputRef}
             type="color"
-            value={localColor}
-            onChange={(e) => setLocalColor(e.target.value)}
+            value={previewColor}
+            onChange={(e) => setEditForm((f) => ({ ...f, color_hex: e.target.value }))}
             className="sr-only"
           />
-          {colorChanged && (
-            <button
-              type="button"
-              onClick={applyColor}
-              className="rounded-[10px] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:brightness-110"
-              style={{ background: LEGACY_COLORS.blue }}
-            >
-              적용
-            </button>
-          )}
         </div>
       </DetailCardSlot>
 

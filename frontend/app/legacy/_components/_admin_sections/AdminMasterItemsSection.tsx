@@ -5,6 +5,7 @@ import { Box, Plus } from "lucide-react";
 import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
+import { Button } from "@/lib/ui/Button";
 import { EmptyState } from "../common";
 import { StatusPill } from "../common/StatusPill";
 import {
@@ -79,15 +80,9 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
         title="품목 관리"
         description="모든 품목의 정보를 조회하고 관리할 수 있습니다."
         actions={
-          <button
-            type="button"
-            onClick={handleStartAdd}
-            className="flex items-center gap-1.5 rounded-[12px] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-110"
-            style={{ background: LEGACY_COLORS.blue }}
-          >
-            <Plus className="h-4 w-4" />
+          <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
             품목 추가
-          </button>
+          </Button>
         }
       />
 

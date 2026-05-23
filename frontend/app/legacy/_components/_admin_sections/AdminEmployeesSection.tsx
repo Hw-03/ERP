@@ -5,6 +5,7 @@ import { Plus, Save, Trash2, Users, X } from "lucide-react";
 import { api, type DepartmentMaster, type DepartmentRole, type Employee, type EmployeeLevel, type ProductModel, type WarehouseRole } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment, getDepartmentFallbackColor } from "@/lib/mes/department";
+import { Button } from "@/lib/ui/Button";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { EmptyState } from "../common";
 import { AppSelect } from "../common/AppSelect";
@@ -136,15 +137,9 @@ export function AdminEmployeesSection() {
           title="직원 관리"
           description="직원 정보·권한·PIN을 등록하고 관리합니다."
           actions={
-            <button
-              type="button"
-              onClick={handleStartAdd}
-              className="flex items-center gap-1.5 rounded-[12px] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-110"
-              style={{ background: LEGACY_COLORS.blue }}
-            >
-              <Plus className="h-4 w-4" />
+            <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
               직원 추가
-            </button>
+            </Button>
           }
         />
 
@@ -257,29 +252,13 @@ export function AdminEmployeesSection() {
             }
             actions={
               empAddMode ? (
-                <button
-                  type="button"
-                  onClick={() => setEmpAddMode(false)}
-                  className="flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
-                  style={{
-                    background: LEGACY_COLORS.s2,
-                    borderColor: LEGACY_COLORS.border,
-                    color: LEGACY_COLORS.muted2,
-                  }}
-                >
-                  <X className="h-3.5 w-3.5" />
+                <Button variant="secondary" size="sm" iconLeft={<X className="h-3.5 w-3.5" />} onClick={() => setEmpAddMode(false)}>
                   취소
-                </button>
+                </Button>
               ) : selectedEmployee ? (
-                <button
-                  type="button"
-                  onClick={saveEmployee}
-                  className="flex items-center gap-1 rounded-[10px] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:brightness-110"
-                  style={{ background: LEGACY_COLORS.blue }}
-                >
-                  <Save className="h-3.5 w-3.5" />
+                <Button variant="primary" size="sm" iconLeft={<Save className="h-3.5 w-3.5" />} onClick={saveEmployee}>
                   저장
-                </button>
+                </Button>
               ) : null
             }
           >
