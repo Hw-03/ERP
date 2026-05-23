@@ -1,12 +1,14 @@
 "use client";
 
-// AdminEmployeesSection 전용 hook.
-// Round-15 (#2): form/confirm sub-hook 으로 분리, 본 hook 은 4 async operation 조율.
+// AdminEmployeesSection 전용 wrapper hook.
+// W5: List/Form/Commands 3-hook 으로 분해.
+// — Form/Confirm sub-hook 은 Round-15 부터 존재 — Commands 추출 + List 추출로 표준화.
 
 import type { DepartmentMaster, Employee } from "@/lib/api";
 import { api } from "@/lib/api";
 import { useAdminEmployeesForm, type EmployeeEditForm } from "./useAdminEmployeesForm";
 import { useAdminEmployeesConfirm } from "./useAdminEmployeesConfirm";
+import { useAdminEmployeesCommands } from "./useAdminEmployeesCommands";
 import type { EmployeeAddForm } from "../_admin_sections/adminShared";
 
 export type { EmployeeEditForm } from "./useAdminEmployeesForm";
@@ -62,48 +64,27 @@ export function useAdminEmployees({
 }: UseAdminEmployeesArgs): AdminEmployeesState {
   const form = useAdminEmployeesForm(employees);
   const confirm = useAdminEmployeesConfirm();
+  const commands = useAdminEmployeesCommands({ setEmployees, onStatusChange, onError });
 
-  async function _addEmployee() {
-    if (!form.empAddForm.name.trim()) {
-      onError("이름은 필수입니다.");
-      return;
-    }
-    const isAssembly = form.empAddForm.department === "조립";
-    try {
-      const created = await api.createEmployee({
-        name: form.empAddForm.name.trim(),
-        role: form.empAddForm.role.trim(),
-        department: form.empAddForm.department as Employee["department"],
-        phone: form.empAddForm.phone.trim() || undefined,
-        warehouse_role: form.empAddForm.warehouse_role,
-        department_role: form.empAddForm.department_role,
-        assigned_model_slots: isAssembly ? form.empAddForm.assigned_model_slots : [],
-      });
-      setEmployees((current) => [...current, created]);
-      form.resetAddForm();
-      form.setSelectedEmployee(created);
-      onStatusChange(`'${created.name}' 직원을 추가했습니다.`);
-    } catch (error) {
-      onError(error instanceof Error ? error.message : "직원 추가에 실패했습니다.");
-    }
+  function addEmployee() {
+    void commands.add(form.empAddForm).then((created) => {
+      if (created) {
+        form.resetAddForm();
+        form.setSelectedEmployee(created);
+      }
+    });
   }
 
-  async function _doToggleEmployee(employee: Employee) {
-    try {
-      const updated = await api.updateEmployee(employee.employee_id, { is_active: !employee.is_active });
-      setEmployees((current) =>
-        current.map((entry) => (entry.employee_id === employee.employee_id ? updated : entry)),
-      );
-      form.setSelectedEmployee(updated);
+  function confirmToggle() {
+    const target = confirm.confirmTarget;
+    if (!target) return;
+    void commands.toggleActive(target).then((updated) => {
       confirm.setConfirmTarget(null);
-      onStatusChange(`${updated.name} 직원 상태를 변경했습니다.`);
-    } catch (error) {
-      confirm.setConfirmTarget(null);
-      onError(error instanceof Error ? error.message : "직원 상태 변경 실패");
-    }
+      if (updated) form.setSelectedEmployee(updated);
+    });
   }
 
-  async function _saveEmployee() {
+  async function saveEmployee() {
     if (!form.selectedEmployee) return;
     if (!form.editForm.name.trim()) {
       onError("이름은 필수입니다.");
@@ -111,16 +92,19 @@ export function useAdminEmployees({
     }
     const isAssembly = form.editForm.department === "조립";
     try {
-      const updated = await api.updateEmployee(form.selectedEmployee.employee_id, {
-        name: form.editForm.name.trim(),
-        role: form.editForm.role.trim(),
-        phone: form.editForm.phone.trim() || undefined,
-        department: form.editForm.department as Employee["department"],
-        level: form.editForm.level,
-        warehouse_role: form.editForm.warehouse_role,
-        department_role: form.editForm.department_role,
-        assigned_model_slots: isAssembly ? form.editForm.assigned_model_slots : [],
-      });
+      const updated = await api.updateEmployee(
+        form.selectedEmployee.employee_id,
+        {
+          name: form.editForm.name.trim(),
+          role: form.editForm.role.trim(),
+          phone: form.editForm.phone.trim() || undefined,
+          department: form.editForm.department as Employee["department"],
+          level: form.editForm.level,
+          warehouse_role: form.editForm.warehouse_role,
+          department_role: form.editForm.department_role,
+          assigned_model_slots: isAssembly ? form.editForm.assigned_model_slots : [],
+        },
+      );
       setEmployees((current) =>
         current.map((e) => (e.employee_id === updated.employee_id ? updated : e)),
       );
@@ -131,42 +115,36 @@ export function useAdminEmployees({
     }
   }
 
-  async function _doDeleteEmployee(employee: Employee) {
-    try {
-      const result = await api.deleteEmployee(employee.employee_id);
-      if (result.result === "deleted") {
-        setEmployees((current) => current.filter((e) => e.employee_id !== employee.employee_id));
+  function confirmDelete() {
+    const target = confirm.deleteTarget;
+    if (!target) return;
+    void commands.delete(target).then((result) => {
+      confirm.setDeleteTarget(null);
+      if (!result) return;
+      if (result.deleted) {
         form.setSelectedEmployee(null);
-        onStatusChange(`'${employee.name}' 직원을 영구 삭제했습니다.`);
-      } else {
-        const updated = { ...employee, is_active: false };
-        setEmployees((current) =>
-          current.map((e) => (e.employee_id === employee.employee_id ? updated : e)),
-        );
-        form.setSelectedEmployee(updated);
-        onStatusChange(`'${employee.name}' 직원을 비활성화했습니다. (거래 이력 보존)`);
+      } else if (result.updated) {
+        form.setSelectedEmployee(result.updated);
       }
-      confirm.setDeleteTarget(null);
-    } catch (error) {
-      confirm.setDeleteTarget(null);
-      onError(error instanceof Error ? error.message : "직원 삭제 실패");
-    }
+    });
   }
 
-  async function _doResetPin(employee: Employee) {
+  function confirmPinReset() {
+    const target = confirm.pinResetTarget;
+    if (!target) return;
     if (!confirm.pinResetAdminPin.trim()) {
       confirm.setPinResetError("관리자 PIN을 입력하세요.");
       return;
     }
-    try {
-      await api.resetEmployeePin(employee.employee_id, confirm.pinResetAdminPin.trim());
-      confirm.setPinResetTarget(null);
-      confirm.setPinResetAdminPin("");
-      confirm.setPinResetError("");
-      onStatusChange(`'${employee.name}' PIN을 0000으로 초기화했습니다.`);
-    } catch (error) {
-      confirm.setPinResetError(error instanceof Error ? error.message : "PIN 초기화 실패");
-    }
+    void commands.resetPin(target, confirm.pinResetAdminPin).then((ok) => {
+      if (ok) {
+        confirm.setPinResetTarget(null);
+        confirm.setPinResetAdminPin("");
+        confirm.setPinResetError("");
+      } else {
+        confirm.setPinResetError("PIN 초기화 실패");
+      }
+    });
   }
 
   return {
@@ -178,25 +156,25 @@ export function useAdminEmployees({
     setEmpAddMode: form.setEmpAddMode,
     empAddForm: form.empAddForm,
     setEmpAddForm: form.setEmpAddForm,
-    addEmployee: () => void _addEmployee(),
+    addEmployee,
     toggleEmployee: (e) => confirm.setConfirmTarget(e),
     confirmTarget: confirm.confirmTarget,
-    confirmToggle: () => { if (confirm.confirmTarget) void _doToggleEmployee(confirm.confirmTarget); },
+    confirmToggle,
     cancelConfirm: () => confirm.setConfirmTarget(null),
     editForm: form.editForm,
     setEditForm: form.setEditForm,
-    saveEmployee: _saveEmployee,
+    saveEmployee,
     dirty: form.dirty,
     pinResetTarget: confirm.pinResetTarget,
     pinResetAdminPin: confirm.pinResetAdminPin,
     setPinResetAdminPin: confirm.setPinResetAdminPin,
     pinResetError: confirm.pinResetError,
     requestPinReset: confirm.requestPinReset,
-    confirmPinReset: () => { if (confirm.pinResetTarget) void _doResetPin(confirm.pinResetTarget); },
+    confirmPinReset,
     cancelPinReset: confirm.cancelPinReset,
     deleteTarget: confirm.deleteTarget,
     requestDelete: (e) => confirm.setDeleteTarget(e),
-    confirmDelete: () => { if (confirm.deleteTarget) void _doDeleteEmployee(confirm.deleteTarget); },
+    confirmDelete,
     cancelDelete: () => confirm.setDeleteTarget(null),
   };
 }
