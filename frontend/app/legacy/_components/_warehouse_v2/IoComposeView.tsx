@@ -259,15 +259,27 @@ export function IoComposeView({
       state.setSubType(subTypeOverride);
     }
     try {
+      // 이미 같은 품목이 카트에 있으면 수량 합산, 없으면 append.
+      const existingIdx = state.bundles.findIndex((b) => b.source_item_id === item.item_id);
+      const prevQty = existingIdx !== -1 ? state.bundles[existingIdx].quantity : 0;
       const response = await previewTarget({
         employeeId,
         workType: state.workType,
         subType: effectiveSubType,
         fromDepartment: state.fromDepartment,
         toDepartment: state.toDepartment,
-        target: { source_kind: sourceKind, item_id: item.item_id, quantity: 1 },
+        target: { source_kind: sourceKind, item_id: item.item_id, quantity: prevQty + 1 },
       });
-      state.setBundles((prev) => [...prev, ...normalizeBundles(response.bundles)]);
+      const newBundles = normalizeBundles(response.bundles);
+      if (existingIdx !== -1) {
+        state.setBundles((prev) => {
+          const next = [...prev];
+          next.splice(existingIdx, 1, ...newBundles);
+          return next;
+        });
+      } else {
+        state.setBundles((prev) => [...prev, ...newBundles]);
+      }
       onStatusChange(`${item.item_name} 작업 묶음 생성`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "품목 전개에 실패했습니다.");
