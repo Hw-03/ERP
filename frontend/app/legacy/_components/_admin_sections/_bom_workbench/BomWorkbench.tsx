@@ -5,6 +5,7 @@ import { ArrowRightLeft, Download, Network, Pencil } from "lucide-react";
 import { api } from "@/lib/api";
 import type { BOMDetailEntry, BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { Button } from "@/lib/ui/Button";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { AdminPageHeader } from "../_admin_primitives";
 import { BomDeptTabs } from "./BomDeptTabs";
@@ -303,50 +304,57 @@ export function BomWorkbench({
         description="부모-자식 자재 구성을 편집하고 사용처를 조회합니다."
         actions={
           <div className="flex items-center gap-2">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
+              iconLeft={<Download size={13} />}
               onClick={exportCompletedBom}
               disabled={completedCount === 0}
-              className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-              style={{
-                background: LEGACY_COLORS.s1,
-                borderColor: LEGACY_COLORS.border,
-                color: LEGACY_COLORS.text,
-              }}
               title={
                 completedCount === 0
                   ? "완료된 BOM 이 없습니다."
                   : "완료된 BOM 을 JSON·CSV 로 내보냅니다."
               }
+              style={{
+                background: LEGACY_COLORS.s1,
+                borderColor: LEGACY_COLORS.border,
+                color: LEGACY_COLORS.text,
+              }}
             >
-              <Download size={13} /> BOM 내보내기
-            </button>
+              BOM 내보내기
+            </Button>
             <div
               className="flex items-center gap-1 rounded-full border p-1"
               style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
             >
-              <button
-                type="button"
+              <Button
+                variant={mode === "edit" ? "primary" : "ghost"}
+                size="sm"
+                iconLeft={<Pencil size={13} />}
                 onClick={() => setMode("edit")}
-                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-bold transition-colors"
-                style={{
-                  background: mode === "edit" ? LEGACY_COLORS.blue : "transparent",
-                  color: mode === "edit" ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
-                }}
+                className="rounded-full"
+                style={
+                  mode === "edit"
+                    ? { background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white, borderColor: "transparent" }
+                    : { background: "transparent", color: LEGACY_COLORS.muted, borderColor: "transparent" }
+                }
               >
-                <Pencil size={13} /> 편집
-              </button>
-              <button
-                type="button"
+                편집
+              </Button>
+              <Button
+                variant={mode === "whereused" ? "primary" : "ghost"}
+                size="sm"
+                iconLeft={<ArrowRightLeft size={13} />}
                 onClick={() => setMode("whereused")}
-                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-bold transition-colors"
-                style={{
-                  background: mode === "whereused" ? LEGACY_COLORS.blue : "transparent",
-                  color: mode === "whereused" ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
-                }}
+                className="rounded-full"
+                style={
+                  mode === "whereused"
+                    ? { background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white, borderColor: "transparent" }
+                    : { background: "transparent", color: LEGACY_COLORS.muted, borderColor: "transparent" }
+                }
               >
-                <ArrowRightLeft size={13} /> 사용처
-              </button>
+                사용처
+              </Button>
             </div>
           </div>
         }
