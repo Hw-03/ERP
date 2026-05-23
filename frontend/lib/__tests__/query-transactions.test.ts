@@ -16,6 +16,7 @@ import {
   useTransactionEditsQuery,
   useMetaEditTransactionMutation,
   useQuantityCorrectTransactionMutation,
+  useMonthlyCountsQuery,
 } from "@/lib/queries/useTransactionsQuery";
 
 function makeWrapper() {
@@ -144,6 +145,34 @@ describe("useMetaEditTransactionMutation (MSW)", () => {
 // ---------------------------------------------------------------------------
 // useQuantityCorrectTransactionMutation
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// useMonthlyCountsQuery — GET /api/inventory/transactions/monthly-counts
+// ---------------------------------------------------------------------------
+
+describe("useMonthlyCountsQuery (MSW)", () => {
+  it("정상 응답: 12개월 키 + 값 검증", async () => {
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useMonthlyCountsQuery(2026), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    const data = result.current.data!;
+    expect(Object.keys(data)).toHaveLength(12);
+    expect(data["2026-05"]).toBe(142);
+    expect(data["2026-07"]).toBe(89);
+    expect(data["2026-01"]).toBe(0);
+  });
+
+  it("422 응답 시 isError === true (유효하지 않은 year)", async () => {
+    server.use(
+      http.get("*/api/inventory/transactions/monthly-counts", () =>
+        HttpResponse.json({ detail: "year 범위 오류" }, { status: 422 }),
+      ),
+    );
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useMonthlyCountsQuery(1999), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+});
 
 describe("useQuantityCorrectTransactionMutation (MSW)", () => {
   it("PIN 통과 → original + correction 응답 검증", async () => {

@@ -58,6 +58,16 @@ describe("productionApi", () => {
     expect(productionApi.getItemsExportUrl({ category: "raw" })).toContain("category=raw");
   });
 
+  it("getMonthlyCounts GET /transactions/monthly-counts?year=2026", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ "2026-01": 0, "2026-05": 10 })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const result = await productionApi.getMonthlyCounts(2026);
+    const url = String(fetchSpy.mock.calls[0][0]);
+    expect(url).toContain("/api/inventory/transactions/monthly-counts");
+    expect(url).toContain("year=2026");
+    expect(result["2026-05"]).toBe(10);
+  });
+
   it("getTransactionsExportUrl includes start_date / end_date defaults", () => {
     const url = productionApi.getTransactionsExportUrl();
     expect(url).toContain("start_date=");

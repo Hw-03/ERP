@@ -57,6 +57,13 @@ export function useMetaEditTransactionMutation() {
   });
 }
 
+export function useMonthlyCountsQuery(year: number) {
+  return useQuery({
+    queryKey: queryKeys.transactions.monthlyCounts(year),
+    queryFn: () => productionApi.getMonthlyCounts(year),
+  });
+}
+
 export function useQuantityCorrectTransactionMutation() {
   const qc = useQueryClient();
   return useMutation({

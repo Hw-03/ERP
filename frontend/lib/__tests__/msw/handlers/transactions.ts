@@ -58,7 +58,22 @@ const sampleEditLog: TransactionEditLog[] = [
   },
 ];
 
+const sampleMonthlyCounts: Record<string, number> = {
+  "2026-01": 0, "2026-02": 0, "2026-03": 5, "2026-04": 0,
+  "2026-05": 142, "2026-06": 0, "2026-07": 89, "2026-08": 0,
+  "2026-09": 0, "2026-10": 0, "2026-11": 0, "2026-12": 0,
+};
+
 export const transactionsHandlers = [
+  http.get("*/api/inventory/transactions/monthly-counts", ({ request }) => {
+    const url = new URL(request.url);
+    const year = url.searchParams.get("year");
+    if (!year || isNaN(Number(year)) || Number(year) < 2020 || Number(year) > 2100) {
+      return HttpResponse.json({ detail: "year 범위 오류" }, { status: 422 });
+    }
+    return HttpResponse.json(sampleMonthlyCounts);
+  }),
+
   http.get("*/api/inventory/transactions", () =>
     HttpResponse.json(sampleTransactions),
   ),
