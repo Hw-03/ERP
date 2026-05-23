@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import ItemModel, ProductSymbol
 from app.routers._errors import ErrorCode, http_error
+from app.routers.settings import require_admin
 from app.services._tx import commit_and_refresh, commit_only
 
 router = APIRouter()
@@ -20,12 +21,25 @@ class ProductModelResponse(BaseModel):
     symbol: Optional[str]
     model_name: Optional[str]
     is_reserved: bool
+    display_order: int = 0
 
 
 class ProductModelCreate(BaseModel):
     model_config = {"protected_namespaces": ()}
     model_name: str = Field(..., min_length=1, max_length=50)
     symbol: Optional[str] = Field(None, max_length=5)
+
+
+class ProductModelReorderItem(BaseModel):
+    model_config = {"protected_namespaces": ()}
+    slot: int
+    display_order: int
+
+
+class ProductModelReorderPayload(BaseModel):
+    model_config = {"protected_namespaces": ()}
+    items: List[ProductModelReorderItem]
+    pin: str
 
 
 @router.get("", response_model=List[ProductModelResponse], summary="제품 모델 목록 (예약 제외)")
@@ -35,9 +49,25 @@ def list_models(db: Session = Depends(get_db)):
         db.query(ProductSymbol)
         .filter(ProductSymbol.model_name.isnot(None))
         .filter(ProductSymbol.is_reserved == False)  # noqa: E712
-        .order_by(ProductSymbol.slot)
+        .order_by(ProductSymbol.display_order.asc(), ProductSymbol.slot.asc())
         .all()
     )
+
+
+@router.patch("/reorder", summary="제품 모델 표시 순서 재배치")
+def reorder_models(payload: ProductModelReorderPayload, db: Session = Depends(get_db)):
+    """드래그 reorder 결과를 영구 저장. 부서 reorder 와 동일 패턴.
+
+    - PIN 검증 후 payload.items 의 (slot, display_order) 쌍을 일괄 갱신.
+    - 존재하지 않는 slot 은 조용히 스킵 (부분 갱신 허용).
+    """
+    require_admin(db, payload.pin)
+    for item in payload.items:
+        ps = db.query(ProductSymbol).filter(ProductSymbol.slot == item.slot).first()
+        if ps:
+            ps.display_order = item.display_order
+    db.commit()
+    return {"ok": True}
 
 
 @router.post(
