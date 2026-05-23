@@ -151,6 +151,35 @@ export function MobileHistoryScreen() {
     } else setCalendarMonth((m) => m + 1);
   }
 
+  // 연 뷰 — 그 해 12개월 거래 건수 집계. calendarOpen + calendarYear 단위 fetch.
+  const [monthlyCountMap, setMonthlyCountMap] = useState<Map<number, number>>(new Map());
+  useEffect(() => {
+    if (!calendarOpen) return;
+    const ctrl = new AbortController();
+    void api
+      .getTransactions(
+        {
+          limit: 20000,
+          skip: 0,
+          dateFrom: `${calendarYear}-01-01`,
+          dateTo: `${calendarYear}-12-31`,
+        },
+        { signal: ctrl.signal },
+      )
+      .then((data) => {
+        const m = new Map<number, number>();
+        for (const log of data) {
+          const d = parseUtc(log.created_at);
+          if (d.getFullYear() !== calendarYear) continue;
+          const mi = d.getMonth();
+          m.set(mi, (m.get(mi) ?? 0) + 1);
+        }
+        setMonthlyCountMap(m);
+      })
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, [calendarOpen, calendarYear]);
+
   const calendarDayMap = useMemo(() => {
     const map = new Map<string, TransactionLog[]>();
     for (const log of calendarLogs) {
@@ -382,6 +411,7 @@ export function MobileHistoryScreen() {
             calendarLoading={calendarLoading}
             calendarDays={calendarDays}
             calendarDayMap={calendarDayMap}
+            monthlyCountMap={monthlyCountMap}
             todayKey={todayKey}
             selectedDay={selectedDay}
             setSelectedDay={setSelectedDay}

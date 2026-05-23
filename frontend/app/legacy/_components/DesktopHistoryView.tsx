@@ -155,8 +155,36 @@ export function DesktopHistoryView() {
   }
 
   // 연 뷰(iOS 캘린더 스타일 줌) — 그 해 12개월 거래 건수 집계.
-  // 3-3a 커밋 단계에서는 빈 Map. 3-3b 커밋에서 calendarYear 단위 fetch 로 채움.
+  // calendarOpen 동안 calendarYear 가 바뀔 때마다 한 해 거래를 한 번 fetch 해 0~11 월별 카운트로 정리.
+  // 월 뷰의 calendarLogs(한 달치) 와는 독립 — 연 뷰 헤더 클릭 즉시 12개월 농도 표시.
   const [monthlyCountMap, setMonthlyCountMap] = useState<Map<number, number>>(new Map());
+
+  useEffect(() => {
+    if (!calendarOpen) return;
+    const ctrl = new AbortController();
+    void api
+      .getTransactions(
+        {
+          limit: 20000,
+          skip: 0,
+          dateFrom: `${calendarYear}-01-01`,
+          dateTo: `${calendarYear}-12-31`,
+        },
+        { signal: ctrl.signal },
+      )
+      .then((data) => {
+        const m = new Map<number, number>();
+        for (const log of data) {
+          const d = parseUtc(log.created_at);
+          if (d.getFullYear() !== calendarYear) continue;
+          const mi = d.getMonth();
+          m.set(mi, (m.get(mi) ?? 0) + 1);
+        }
+        setMonthlyCountMap(m);
+      })
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, [calendarOpen, calendarYear]);
 
   const calendarDayMap = useMemo(() => {
     const map = new Map<string, TransactionLog[]>();
