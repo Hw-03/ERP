@@ -30,6 +30,11 @@ export const catalogApi = {
 
   deleteModel: (slot: number) => deleteJson<void>(toApiUrl(`/api/models/${slot}`)),
 
+  reorderModels: (payload: {
+    items: { slot: number; display_order: number }[];
+    pin: string;
+  }) => patchJson<{ ok: boolean }>(toApiUrl("/api/models/reorder"), payload),
+
   // BOM --------------------------------------------------------------------
   getAllBOM: () => fetcher<BOMDetailEntry[]>(toApiUrl("/api/bom")),
   getBOM: (parentItemId: string) => fetcher<BOMEntry[]>(toApiUrl(`/api/bom/${parentItemId}`)),

@@ -41,4 +41,5 @@ export interface ProductModel {
   symbol: string | null;
   model_name: string | null;
   is_reserved: boolean;
+  display_order?: number;
 }

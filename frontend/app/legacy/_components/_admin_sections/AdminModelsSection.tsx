@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Layers, Plus, Save, Trash2, X } from "lucide-react";
+import { GripVertical, Layers, Plus, Save, Trash2, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { BOMDetailEntry, Item, ProductModel } from "@/lib/api";
 import { Button } from "@/lib/ui/Button";
@@ -37,11 +37,60 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
     editSaving,
     initEditForm,
     saveModel,
+    reorderModels,
   } = ctx;
 
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [addMode, setAddMode] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+  // 드래그 reorder 상태 — 부서 reorder 와 달리 정렬 키가 slot.
+  const [dragSlot, setDragSlot] = useState<number | null>(null);
+  const [dropTargetSlot, setDropTargetSlot] = useState<number | null>(null);
+
+  function handleDragStart(e: React.DragEvent, slot: number) {
+    setDragSlot(slot);
+    e.dataTransfer.effectAllowed = "move";
+    // Firefox 호환을 위한 더미 데이터.
+    try {
+      e.dataTransfer.setData("text/plain", String(slot));
+    } catch {
+      // jsdom 등 일부 환경에서 setData 실패 — 무시.
+    }
+  }
+
+  function handleDragOver(e: React.DragEvent, slot: number) {
+    if (dragSlot === null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dropTargetSlot !== slot) setDropTargetSlot(slot);
+  }
+
+  function handleDrop(e: React.DragEvent, slot: number) {
+    e.preventDefault();
+    if (dragSlot === null || dragSlot === slot) {
+      setDragSlot(null);
+      setDropTargetSlot(null);
+      return;
+    }
+    const fromIdx = productModels.findIndex((m) => m.slot === dragSlot);
+    const toIdx = productModels.findIndex((m) => m.slot === slot);
+    if (fromIdx < 0 || toIdx < 0) {
+      setDragSlot(null);
+      setDropTargetSlot(null);
+      return;
+    }
+    const next = [...productModels];
+    const [moved] = next.splice(fromIdx, 1);
+    if (moved) next.splice(toIdx, 0, moved);
+    reorderModels(next);
+    setDragSlot(null);
+    setDropTargetSlot(null);
+  }
+
+  function handleDragEnd() {
+    setDragSlot(null);
+    setDropTargetSlot(null);
+  }
 
   const inUse = useMemo(
     () => productModels.filter((m) => Boolean(m.model_name)),
@@ -159,47 +208,71 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
           renderItem={(model) => {
             const active = selected?.slot === model.slot;
             const used = Boolean(model.model_name);
+            const isDragging = dragSlot === model.slot;
+            const isDropTarget =
+              dragSlot !== null && dropTargetSlot === model.slot && dragSlot !== model.slot;
             return (
-              <button
+              <div
                 key={model.slot}
-                type="button"
-                onClick={() => handleSelectModel(model.slot)}
-                className="flex w-full items-center gap-3 rounded-[12px] border px-3 py-2.5 text-left transition-colors hover:brightness-[1.04]"
-                style={{
-                  background: active
-                    ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
-                    : LEGACY_COLORS.s2,
-                  borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                }}
+                draggable
+                onDragStart={(e) => handleDragStart(e, model.slot)}
+                onDragOver={(e) => handleDragOver(e, model.slot)}
+                onDrop={(e) => handleDrop(e, model.slot)}
+                onDragEnd={handleDragEnd}
+                className="relative"
+                style={{ opacity: isDragging ? 0.4 : 1 }}
               >
-                {/* 기호 배지 */}
-                <div
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-black"
+                {isDropTarget && (
+                  <div
+                    className="pointer-events-none absolute inset-x-0 -top-1 h-0.5 rounded-full"
+                    style={{ background: LEGACY_COLORS.blue }}
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleSelectModel(model.slot)}
+                  className="flex w-full items-center gap-3 rounded-[12px] border px-3 py-2.5 text-left transition-colors hover:brightness-[1.04]"
                   style={{
-                    background: used ? LEGACY_COLORS.blue : LEGACY_COLORS.s3,
-                    color: used ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
+                    background: active
+                      ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
+                      : LEGACY_COLORS.s2,
+                    borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
                   }}
                 >
-                  {model.symbol ?? "?"}
-                </div>
-                {/* 텍스트 */}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-bold leading-tight" style={{ color: LEGACY_COLORS.text }}>
-                    {model.model_name ?? `슬롯 ${model.slot}`}
-                  </div>
-                  <div className="mt-0.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                    M-{String(model.slot).padStart(4, "0")}
-                  </div>
-                </div>
-                {/* 상태 배지 — shrink-0 으로 자리 고정 */}
-                <div className="shrink-0">
-                  <StatusPill
-                    label={used ? "사용 중" : "비활성"}
-                    tone={used ? "success" : "neutral"}
-                    showDot
+                  <GripVertical
+                    className="h-4 w-4 shrink-0 cursor-grab"
+                    style={{ color: LEGACY_COLORS.muted2 }}
+                    aria-label="드래그 핸들"
                   />
-                </div>
-              </button>
+                  {/* 기호 배지 */}
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[15px] font-black"
+                    style={{
+                      background: used ? LEGACY_COLORS.blue : LEGACY_COLORS.s3,
+                      color: used ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
+                    }}
+                  >
+                    {model.symbol ?? "?"}
+                  </div>
+                  {/* 텍스트 */}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[14px] font-bold" style={{ color: LEGACY_COLORS.text }}>
+                      {model.model_name ?? `슬롯 ${model.slot}`}
+                    </div>
+                    <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                      M-{String(model.slot).padStart(4, "0")}
+                    </div>
+                  </div>
+                  {/* 상태 배지 */}
+                  <div className="shrink-0">
+                    <StatusPill
+                      label={used ? "사용 중" : "비활성"}
+                      tone={used ? "success" : "neutral"}
+                      showDot
+                    />
+                  </div>
+                </button>
+              </div>
             );
           }}
         />
