@@ -113,6 +113,7 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
         setProductModels={setProductModels}
         onStatusChange={onStatusChange}
         onError={setMessage}
+        adminPin={adminPin}
       >
         <AdminModelsSection items={items} allBomRows={allBomRows} />
       </AdminModelsProvider>

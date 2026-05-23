@@ -11,6 +11,7 @@ export type UseAdminModelsArgs = {
   setProductModels: (updater: (prev: ProductModel[]) => ProductModel[]) => void;
   onStatusChange: (msg: string) => void;
   onError: (msg: string) => void;
+  adminPin: string;
 };
 
 export type AdminModelsState = {
@@ -21,6 +22,7 @@ export type AdminModelsState = {
   setModelAddSymbol: (v: string) => void;
   addModel: () => void;
   deleteModel: (slot: number) => void;
+  reorderModels: (ordered: ProductModel[]) => void;
 };
 
 export function useAdminModels({
@@ -28,6 +30,7 @@ export function useAdminModels({
   setProductModels,
   onStatusChange,
   onError,
+  adminPin,
 }: UseAdminModelsArgs): AdminModelsState {
   const [modelAddName, setModelAddName] = useState("");
   const [modelAddSymbol, setModelAddSymbol] = useState("");
@@ -64,6 +67,18 @@ export function useAdminModels({
       .catch((err) => onError(err instanceof Error ? err.message : "삭제 실패"));
   }
 
+  function _reorderModels(ordered: ProductModel[]) {
+    // 부서 reorder 패턴 복제 — 새 순서를 즉시 로컬에 반영 후 백엔드 저장.
+    const items = ordered.map((m, i) => ({ slot: m.slot, display_order: i }));
+    const reindexed = ordered.map((m, i) => ({ ...m, display_order: i }));
+    setProductModels(() => reindexed);
+    void api
+      .reorderModels({ items, pin: adminPin })
+      .catch((err) =>
+        onError(err instanceof Error ? err.message : "모델 순서 저장 실패"),
+      );
+  }
+
   return {
     productModels,
     modelAddName,
@@ -72,5 +87,6 @@ export function useAdminModels({
     setModelAddSymbol,
     addModel: _addModel,
     deleteModel: _deleteModel,
+    reorderModels: _reorderModels,
   };
 }
