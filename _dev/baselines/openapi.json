@@ -4217,8 +4217,52 @@
         "title": "ProductModelCreate",
         "type": "object"
       },
+      "ProductModelReorderItem": {
+        "properties": {
+          "display_order": {
+            "title": "Display Order",
+            "type": "integer"
+          },
+          "slot": {
+            "title": "Slot",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "slot",
+          "display_order"
+        ],
+        "title": "ProductModelReorderItem",
+        "type": "object"
+      },
+      "ProductModelReorderPayload": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProductModelReorderItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "pin": {
+            "title": "Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "pin"
+        ],
+        "title": "ProductModelReorderPayload",
+        "type": "object"
+      },
       "ProductModelResponse": {
         "properties": {
+          "display_order": {
+            "default": 0,
+            "title": "Display Order",
+            "type": "integer"
+          },
           "is_reserved": {
             "title": "Is Reserved",
             "type": "boolean"
@@ -4257,6 +4301,44 @@
           "is_reserved"
         ],
         "title": "ProductModelResponse",
+        "type": "object"
+      },
+      "ProductModelUpdate": {
+        "properties": {
+          "model_name": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name"
+          },
+          "pin": {
+            "title": "Pin",
+            "type": "string"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "maxLength": 5,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          }
+        },
+        "required": [
+          "pin"
+        ],
+        "title": "ProductModelUpdate",
         "type": "object"
       },
       "ProductSymbolResponse": {
@@ -10339,6 +10421,46 @@
         ]
       }
     },
+    "/api/models/reorder": {
+      "patch": {
+        "description": "드래그 reorder 결과를 영구 저장. 부서 reorder 와 동일 패턴.\n\n- PIN 검증 후 payload.items 의 (slot, display_order) 쌍을 일괄 갱신.\n- 존재하지 않는 slot 은 조용히 스킵 (부분 갱신 허용).",
+        "operationId": "reorder_models_api_models_reorder_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductModelReorderPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "제품 모델 표시 순서 재배치",
+        "tags": [
+          "Models"
+        ]
+      }
+    },
     "/api/models/{slot}": {
       "delete": {
         "description": "제품 모델 삭제 (해당 슬롯을 사용하는 품목이 있으면 거부).",
@@ -10370,6 +10492,57 @@
           }
         },
         "summary": "제품 모델 삭제 (연결 품목 있으면 409)",
+        "tags": [
+          "Models"
+        ]
+      },
+      "put": {
+        "description": "제품 모델 이름·기호 수정. 관리자 PIN 필요.",
+        "operationId": "update_model_api_models__slot__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slot",
+            "required": true,
+            "schema": {
+              "title": "Slot",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductModelUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductModelResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "제품 모델 수정 (model_name, symbol)",
         "tags": [
           "Models"
         ]
