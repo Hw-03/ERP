@@ -11,6 +11,12 @@ export type UseAdminModelsArgs = {
   setProductModels: (updater: (prev: ProductModel[]) => ProductModel[]) => void;
   onStatusChange: (msg: string) => void;
   onError: (msg: string) => void;
+  adminPin: string;
+};
+
+export type ModelEditForm = {
+  model_name: string;
+  symbol: string;
 };
 
 export type AdminModelsState = {
@@ -21,6 +27,13 @@ export type AdminModelsState = {
   setModelAddSymbol: (v: string) => void;
   addModel: () => void;
   deleteModel: (slot: number) => void;
+  // 인라인 편집
+  editForm: ModelEditForm;
+  setEditForm: (updater: (prev: ModelEditForm) => ModelEditForm) => void;
+  editDirty: boolean;
+  editSaving: boolean;
+  initEditForm: (model: ProductModel) => void;
+  saveModel: (slot: number) => void;
 };
 
 export function useAdminModels({
@@ -28,9 +41,45 @@ export function useAdminModels({
   setProductModels,
   onStatusChange,
   onError,
+  adminPin,
 }: UseAdminModelsArgs): AdminModelsState {
   const [modelAddName, setModelAddName] = useState("");
   const [modelAddSymbol, setModelAddSymbol] = useState("");
+
+  // 인라인 편집 상태
+  const [editForm, setEditForm] = useState<ModelEditForm>({ model_name: "", symbol: "" });
+  const [editBase, setEditBase] = useState<ModelEditForm>({ model_name: "", symbol: "" });
+  const [editSaving, setEditSaving] = useState(false);
+
+  const editDirty =
+    editForm.model_name !== editBase.model_name || editForm.symbol !== editBase.symbol;
+
+  function initEditForm(model: ProductModel) {
+    const base = { model_name: model.model_name ?? "", symbol: model.symbol ?? "" };
+    setEditForm(base);
+    setEditBase(base);
+  }
+
+  function _saveModel(slot: number) {
+    if (!editForm.model_name.trim()) {
+      onError("모델명을 입력하세요.");
+      return;
+    }
+    setEditSaving(true);
+    void api
+      .updateModel(slot, {
+        model_name: editForm.model_name.trim(),
+        symbol: editForm.symbol.trim() || undefined,
+        pin: adminPin,
+      })
+      .then((updated) => {
+        setProductModels((prev) => prev.map((m) => (m.slot === slot ? updated : m)));
+        setEditBase({ model_name: updated.model_name ?? "", symbol: updated.symbol ?? "" });
+        onStatusChange(`'${updated.model_name}' 모델을 저장했습니다.`);
+      })
+      .catch((err) => onError(err instanceof Error ? err.message : "저장 실패"))
+      .finally(() => setEditSaving(false));
+  }
 
   function _addModel() {
     if (!modelAddName.trim()) return;
@@ -72,5 +121,11 @@ export function useAdminModels({
     setModelAddSymbol,
     addModel: _addModel,
     deleteModel: _deleteModel,
+    editForm,
+    setEditForm,
+    editDirty,
+    editSaving,
+    initEditForm,
+    saveModel: _saveModel,
   };
 }

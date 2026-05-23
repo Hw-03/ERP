@@ -47,10 +47,7 @@ export interface AdminSectionContentProps {
 
   pinForm: PinForm;
   setPinForm: Dispatch<SetStateAction<PinForm>>;
-  resetPin: string;
-  setResetPin: Dispatch<SetStateAction<string>>;
   changePin: () => Promise<void>;
-  resetDatabase: () => Promise<void>;
   adminPin: string;
 }
 
@@ -63,8 +60,8 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
     departments, setDepartments,
     selectedDept, setSelectedDept,
     allBomRows, refreshAllBom, refreshItems,
-    pinForm, setPinForm, resetPin, setResetPin,
-    changePin, resetDatabase, adminPin,
+    pinForm, setPinForm,
+    changePin, adminPin,
   } = props;
 
   if (section === "items") {
@@ -113,6 +110,7 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
         setProductModels={setProductModels}
         onStatusChange={onStatusChange}
         onError={setMessage}
+        adminPin={adminPin}
       >
         <AdminModelsSection items={items} allBomRows={allBomRows} />
       </AdminModelsProvider>
@@ -156,10 +154,7 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
       <AdminDangerZone
         pinForm={pinForm}
         setPinForm={setPinForm}
-        resetPin={resetPin}
-        setResetPin={setResetPin}
         onChangePin={() => void changePin()}
-        onResetDatabase={() => void resetDatabase()}
       />
     );
   }
