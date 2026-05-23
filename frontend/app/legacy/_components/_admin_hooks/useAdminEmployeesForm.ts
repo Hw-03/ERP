@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DepartmentRole, Employee, EmployeeLevel, WarehouseRole } from "@/lib/api";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../_admin_sections/adminShared";
 
@@ -77,11 +77,33 @@ export function useAdminEmployeesForm(employees: Employee[]) {
     setEmpAddMode(false);
   }
 
+  // PR-2 2-3: 저장 안 한 편집 여부.
+  // selectedEmployee 의 원본 vs 현재 editForm 비교.
+  const dirty = useMemo(() => {
+    if (!selectedEmployee) return false;
+    const orig = toEditForm(selectedEmployee);
+    if (orig.name !== editForm.name) return true;
+    if (orig.role !== editForm.role) return true;
+    if (orig.phone !== editForm.phone) return true;
+    if (orig.department !== editForm.department) return true;
+    if (orig.level !== editForm.level) return true;
+    if (orig.warehouse_role !== editForm.warehouse_role) return true;
+    if (orig.department_role !== editForm.department_role) return true;
+    const a = orig.assigned_model_slots;
+    const b = editForm.assigned_model_slots;
+    if (a.length !== b.length) return true;
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] !== b[i]) return true;
+    }
+    return false;
+  }, [selectedEmployee, editForm]);
+
   return {
     selectedEmployee, setSelectedEmployee,
     empAddMode, setEmpAddMode,
     empAddForm, setEmpAddForm,
     editForm, setEditForm,
     resetAddForm,
+    dirty,
   };
 }
