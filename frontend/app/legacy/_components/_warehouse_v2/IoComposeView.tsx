@@ -20,6 +20,8 @@ import { useIoDraft } from "./useIoDraft";
 import { useIoPreview } from "./useIoPreview";
 import { useIoSubmit } from "./useIoSubmit";
 import { useIoWorkState, type IoStep } from "./useIoWorkState";
+import { useIoUrlSync } from "./useIoUrlSync";
+import { useIoPreselect } from "./useIoPreselect";
 import type { IoComposeViewProps } from "./types";
 import { DefectInventoryPicker } from "./DefectInventoryPicker";
 import { DefectActionStep } from "./DefectActionStep";
@@ -112,9 +114,8 @@ export function IoComposeView({
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
   // BOM 부모 item_id 집합 — process workType에서 "BOM 적용" 버튼 활성 판단용. 마운트 시 1회 fetch.
   const [bomParents, setBomParents] = useState<Set<string>>(() => new Set());
-  // 가드 key 는 `${item_id}__${workType}` — workType 변경 시 bundles 가 reset 되므로
-  // 같은 preselectedItem 이라도 재적용되어야 한다.
-  const preselectedHandledRef = useRef<string | null>(null);
+  // BOM 적재 완료 플래그 — useIoPreselect 의 race 가드 (S1: 빈 set 상태에서 BOM 부모를 일반 품목으로 오인하던 결함).
+  const [bomParentsLoaded, setBomParentsLoaded] = useState(false);
   // BOM 부모 품목으로 진입한 경우 자동 추가하지 않고 Step 3 picker 에서 row 만 강조한다.
   const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
   const restoredDraftRef = useRef<string | null>(null);
@@ -128,57 +129,18 @@ export function IoComposeView({
   const [defectSubmitting, setDefectSubmitting] = useState(false);
 
   // 브라우저 뒤로/앞으로 ↔ step 동기화. URL ?step=N 으로 history 엔트리를 쌓아 입출고 위저드 내부에서도
-  // 뒤/앞 버튼이 작동하게 함.
+  // 뒤/앞 버튼이 작동하게 함. effect 는 useIoUrlSync 로 격리.
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const urlStep = useMemo<IoStep>(() => {
-    const raw = Number(searchParams.get("step"));
-    return raw >= 1 && raw <= 5 ? (raw as IoStep) : 1;
-  }, [searchParams]);
-  // URL→state 동기화 직후 state→URL effect 가 다시 push 하는 것을 1회 차단.
-  const skipNextPushRef = useRef(false);
-  // step 을 2 단계 이상 점프할 때(예: 3 → 5) 중간 단계도 history 에 쌓기 위한 deferred target.
-  // URL 이 중간 step 으로 갱신되는 것을 기다린 뒤 최종 step 으로 advance.
-  const pendingFinalStepRef = useRef<IoStep | null>(null);
-
-  // state.step 변경 → URL push
-  useEffect(() => {
-    if (skipNextPushRef.current) {
-      skipNextPushRef.current = false;
-      return;
-    }
-    if (urlStep === state.step) return;
-    const next = new URLSearchParams(searchParams.toString());
-    next.set("step", String(state.step));
-    router.push(`${pathname}?${next.toString()}`, { scroll: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.step]);
-
-  // URL step 변경 (뒤로/앞으로) → state.goTo (도달 불가 step 은 clamp)
-  useEffect(() => {
-    if (urlStep === state.step) {
-      // URL 이 state 를 따라잡았을 때 — 보류된 다음 단계가 있으면 advance.
-      if (pendingFinalStepRef.current != null && pendingFinalStepRef.current !== state.step) {
-        const target = pendingFinalStepRef.current;
-        pendingFinalStepRef.current = null;
-        state.goTo(target);
-      }
-      return;
-    }
-    let target: IoStep = urlStep;
-    for (let s = 1; s < target; s += 1) {
-      if (!state.canAdvance[s as IoStep]) {
-        target = s as IoStep;
-        break;
-      }
-    }
-    // URL 으로 들어온 변경은 pending 을 취소 (사용자가 뒤로/앞으로 누른 경우 자동 advance 중단).
-    pendingFinalStepRef.current = null;
-    skipNextPushRef.current = true;
-    state.goTo(target);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlStep]);
+  const { pendingFinalStepRef } = useIoUrlSync({
+    step: state.step,
+    goTo: state.goTo,
+    canAdvance: state.canAdvance,
+    router,
+    searchParams,
+    pathname,
+  });
 
   useEffect(() => {
     if (operator?.employee_id && !employeeId) setEmployeeId(operator.employee_id);
@@ -194,9 +156,14 @@ export function IoComposeView({
       .then((rows: BOMDetailEntry[]) => {
         if (cancelled) return;
         setBomParents(new Set(rows.map((row) => row.parent_item_id)));
+        // 빈 set 도 "로딩 끝" 으로 표시해야 preselect 가 일반 품목으로 진행. 실패는 catch 에서 동일 처리.
+        setBomParentsLoaded(true);
       })
       .catch(() => {
-        // BOM 조회 실패 시 빈 set 유지 → "BOM 적용" 버튼은 모든 품목에서 disabled
+        if (cancelled) return;
+        // BOM 조회 실패 시 빈 set 유지 → "BOM 적용" 버튼은 모든 품목에서 disabled.
+        // 그래도 preselect 가 보류 상태로 잠기지 않도록 loaded=true 로 풀어준다.
+        setBomParentsLoaded(true);
       });
     return () => {
       cancelled = true;
@@ -291,26 +258,17 @@ export function IoComposeView({
     }
   }
 
-  useEffect(() => {
-    if (!preselectedItem) return;
-    // workType 변경 시 bundles 가 reset 되므로(useIoWorkState), 같은 품목이라도
-    // workType 별로 다시 적용되도록 key 에 workType 을 포함.
-    const handledKey = `${preselectedItem.item_id}__${state.workType}`;
-    if (preselectedHandledRef.current === handledKey) return;
-    // process workType + 방향 미선택이면 자동 추가 보류 (Step 2에서 방향 선택 후 다시 진입해야 함)
-    if (state.workType === "process" && state.deptIoDirection == null) return;
-    preselectedHandledRef.current = handledKey;
-    if (bomParents.has(preselectedItem.item_id)) {
-      // BOM 부모: 자동 카트 추가하지 않고 Step 3 picker 에서 해당 row 만 강조.
-      // 낱개/BOM 선택은 사용자가 직접.
-      setHighlightItemId(preselectedItem.item_id);
-    } else {
-      // 일반 품목: 기존 흐름대로 자동 카트 추가.
-      setHighlightItemId(null);
-      void addItem(preselectedItem);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preselectedItem?.item_id, state.workType, state.deptIoDirection, bomParents]);
+  // preselect 자동 적용 — BOM 부모면 하이라이트만, 일반 품목이면 자동 카트 추가.
+  // race 가드: bomParents 가 아직 로드 안 됐으면 보류 (S1 시연 결함 대응).
+  useIoPreselect({
+    preselectedItem,
+    bomParents,
+    bomParentsLoaded,
+    workType: state.workType,
+    deptIoDirection: state.deptIoDirection,
+    addItem,
+    setHighlightItemId,
+  });
 
   function getAvailable(line: IoLine): number | null {
     const item = items.find((row) => row.item_id === line.item_id);
