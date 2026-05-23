@@ -377,6 +377,8 @@ export function MobileHistoryScreen() {
             calendarMonth={calendarMonth}
             prevMonth={prevMonth}
             nextMonth={nextMonth}
+            setCalendarYear={setCalendarYear}
+            setCalendarMonth={setCalendarMonth}
             calendarLoading={calendarLoading}
             calendarDays={calendarDays}
             calendarDayMap={calendarDayMap}

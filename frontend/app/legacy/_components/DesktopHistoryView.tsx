@@ -154,6 +154,10 @@ export function DesktopHistoryView() {
     } else setCalendarMonth((m) => m + 1);
   }
 
+  // 연 뷰(iOS 캘린더 스타일 줌) — 그 해 12개월 거래 건수 집계.
+  // 3-3a 커밋 단계에서는 빈 Map. 3-3b 커밋에서 calendarYear 단위 fetch 로 채움.
+  const [monthlyCountMap, setMonthlyCountMap] = useState<Map<number, number>>(new Map());
+
   const calendarDayMap = useMemo(() => {
     const map = new Map<string, TransactionLog[]>();
     for (const log of calendarLogs) {
@@ -375,9 +379,12 @@ export function DesktopHistoryView() {
             calendarMonth={calendarMonth}
             prevMonth={prevMonth}
             nextMonth={nextMonth}
+            setCalendarYear={setCalendarYear}
+            setCalendarMonth={setCalendarMonth}
             calendarLoading={calendarLoading}
             calendarDays={calendarDays}
             calendarDayMap={calendarDayMap}
+            monthlyCountMap={monthlyCountMap}
             todayKey={todayKey}
             selectedDay={selectedDay}
             setSelectedDay={setSelectedDay}
