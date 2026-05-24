@@ -215,6 +215,17 @@ _MIGRATION_DDL: list[str] = [
     # WHERE io_enabled = 1 조건으로 이미 0 으로 설정된 행은 건드리지 않음.
     "UPDATE departments SET io_enabled = 0 "
     "WHERE name NOT IN ('튜브', '고압', '진공', '튜닝', '조립', '출하') AND io_enabled = 1",
+    # 2026-05-24 (W12-#7): 직원별 입출고 권한 토글 — employees.io_enabled.
+    # 부서 io_enabled 와 AND 결합 (둘 다 TRUE 일 때만 입출고 화면 진입 허용).
+    # 기본값 1(TRUE). 기존 직원은 모두 TRUE 로 추가된 뒤, 본인 부서의 io_enabled 값으로 백필.
+    # → 부서가 차단(FALSE) 상태였던 직원은 마이그레이션 후에도 동일하게 차단 유지.
+    "ALTER TABLE employees ADD COLUMN io_enabled BOOLEAN NOT NULL DEFAULT 1",
+    # 백필: 직원.io_enabled = (부서.io_enabled). 부서 이름이 일치하는 부서가 없으면 그대로 1 유지.
+    "UPDATE employees SET io_enabled = ("
+    "SELECT departments.io_enabled FROM departments WHERE departments.name = employees.department"
+    ") WHERE EXISTS ("
+    "SELECT 1 FROM departments WHERE departments.name = employees.department"
+    ")",
 ]
 
 

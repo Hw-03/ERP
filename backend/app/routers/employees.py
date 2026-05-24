@@ -156,6 +156,7 @@ def create_employee(payload: EmployeeCreate, request: Request, db: Session = Dep
         level=payload.level,
         warehouse_role=role_value,
         department_role=dept_role_value,
+        io_enabled=payload.io_enabled if payload.io_enabled is not None else True,
         display_order=payload.display_order,
         is_active="true" if payload.is_active else "false",
     )
@@ -222,6 +223,10 @@ def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, request: Re
     if payload.is_active is not None:
         if employee.is_active != payload.is_active:
             employee.is_active = payload.is_active; changed.append("is_active")
+    if payload.io_enabled is not None:
+        if bool(employee.io_enabled) != bool(payload.io_enabled):
+            employee.io_enabled = bool(payload.io_enabled)
+            changed.append("io_enabled")
 
     if payload.assigned_model_slots is not None:
         current = _assigned_slots_for(db, employee.employee_id)
@@ -418,6 +423,7 @@ def _to_response(
         department_role=(employee.department_role or "none"),
         display_order=int(employee.display_order),
         is_active=bool(employee.is_active),
+        io_enabled=bool(getattr(employee, "io_enabled", True)),
         created_at=employee.created_at,
         updated_at=employee.updated_at,
         pin_last_changed=getattr(employee, "pin_last_changed", None),
