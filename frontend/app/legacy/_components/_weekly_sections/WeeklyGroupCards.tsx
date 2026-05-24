@@ -27,7 +27,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
   );
 
   return (
-    <div className="grid grid-cols-1 gap-1.5">
+    <div className="flex h-full flex-col gap-1">
       {sortedGroups.map((g) => {
         const isActive = g.process_code === selected;
         const isHover = hovered === g.process_code;
@@ -48,7 +48,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
             onMouseEnter={() => setHovered(g.process_code)}
             onMouseLeave={() => setHovered(null)}
             aria-pressed={isActive}
-            className="relative overflow-hidden rounded-[12px] border text-left transition-colors hover:brightness-110"
+            className="relative flex min-h-0 flex-1 flex-col justify-center overflow-hidden rounded-[12px] border text-left transition-colors hover:brightness-110"
             style={{
               background: isActive
                 ? tint(tone, 8, LEGACY_COLORS.s2)
@@ -79,15 +79,15 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
               }}
             />
             {/* 상단 행 한 줄: 부서명 · 공정코드 · 증감 */}
-            <div className="flex items-center gap-2 py-1.5 pl-3 pr-2">
+            <div className="flex items-center gap-2 py-1 pl-2.5 pr-2">
               <span
-                className="text-[15px] font-black tracking-[-0.01em] leading-none"
+                className="text-[14px] font-black tracking-[-0.01em] leading-none"
                 style={{ color: isQuiet ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text }}
               >
                 {g.dept_name}
               </span>
               <span
-                className="shrink-0 rounded-[5px] px-1.5 py-0.5 text-[10px] font-black"
+                className="inline-flex shrink-0 items-center rounded-[5px] px-1.5 py-0.5 text-[10px] font-black leading-none"
                 style={{
                   background: isQuiet
                     ? tint(LEGACY_COLORS.muted2, 10, LEGACY_COLORS.s2)
@@ -102,7 +102,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
               <div className="ml-auto flex items-center gap-1.5">
                 {g.delta !== 0 ? (
                   <span
-                    className="text-[19px] font-black leading-none tabular-nums"
+                    className="text-[17px] font-black leading-none tabular-nums"
                     style={{ color: deltaColor }}
                   >
                     {g.delta > 0 ? `+${formatQty(g.delta)}` : formatQty(g.delta)}
@@ -128,9 +128,10 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
                 )}
               </div>
             </div>
-            {/* 하단 행 한 줄: 입고 · 출고 · 현재 */}
+            {/* 하단 행 한 줄: 입고 · 출고 · 현재. leading-none 으로 line-height 부풀음 제거 →
+                상·하단 행이 카드 안에서 정확히 수직 가운데 정렬됨. */}
             <div
-              className="flex items-center justify-between gap-2 border-t px-3 py-1.5 text-[12px] tabular-nums"
+              className="flex items-center justify-between gap-2 border-t px-2.5 py-1 text-[11px] leading-none tabular-nums"
               style={{ borderColor: tint(LEGACY_COLORS.border, 60, "transparent") }}
             >
               <span

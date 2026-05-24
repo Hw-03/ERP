@@ -10,6 +10,7 @@
 - If docs and live code disagree, trust the live code.
 - Do not edit `_archive/`, `_backup/`, or `frontend/_archive/` unless explicitly asked.
 - Do not casually edit `_attic/`; it contains archived source material, backups, and old working notes.
+- **주간보고 화면은 동결(완성)** — `frontend/app/legacy/_components/_weekly_sections/` 디렉터리 전체와 `frontend/app/legacy/_components/DesktopWeeklyReportView.tsx` 는 수정 금지. 명시적 수정 요청이 있을 때만 손대고, 그렇지 않은 경우(주변 리팩터·전역 변경·이름 통일 등)는 해당 파일들을 우회. (동결일: 2026-05-24)
 - Do not mix sample data with real data.
 - Do not perform large refactors, folder moves, or renames unless explicitly asked.
 - Do not rename legacy internal identifiers such as `xray-erp` unless explicitly asked.

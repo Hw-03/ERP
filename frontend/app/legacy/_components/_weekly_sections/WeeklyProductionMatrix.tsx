@@ -55,7 +55,15 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
       aria-label="모델별 공정 생산 매트릭스"
       tabIndex={0}
     >
-      <table className="w-full border-collapse">
+      {/* table-fixed + colgroup width — 주차/데이터가 바뀌어도 열 너비/위치 고정.
+          border-collapse + 자동 너비는 셀 내용(굵기·자릿수·"—")에 따라 열 폭이 흔들림. */}
+      <table className="w-full table-fixed border-collapse">
+        <colgroup>
+          <col style={{ width: "16%" }} />
+          {COLS.map((c) => (
+            <col key={c.key} style={{ width: "14%" }} />
+          ))}
+        </colgroup>
         <thead>
           <tr style={{ background: LEGACY_COLORS.s2 }}>
             <th

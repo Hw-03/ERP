@@ -250,52 +250,54 @@ export function WeeklyWeekPicker({ weekMon, onChange }: Props) {
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-y-0.5 gap-x-0">
-            {getWeeksOfMonth(calMonth.getFullYear(), calMonth.getMonth()).flatMap(
-              (week) => {
-                const sun = week[0];
-                // 일~토 구성이므로 월(index 1)이 주차 기준 시작일
-                const mon = new Date(sun.getTime() + 86400000);
-                const weekKey = toDateStr(mon);
-                const isSelectedWeek = weekKey === weekStartStr;
-                const isHovered = hoveredWeek === weekKey;
-                const isFuture =
-                  toDateStr(mon) > toDateStr(getWeekStartMonday(new Date()));
-                return week.map((d, dayIdx) => {
-                  const isOutside = d.getMonth() !== calMonth.getMonth();
-                  const isFirst = dayIdx === 0;
-                  const isLast = dayIdx === 6;
-                  return (
-                    <button
-                      key={d.toISOString()}
-                      onClick={() => {
-                        if (!isFuture) {
-                          onChange(new Date(mon));
-                          setOpen(false);
-                        }
-                      }}
-                      onMouseEnter={() => !isFuture && setHoveredWeek(weekKey)}
-                      onMouseLeave={() => setHoveredWeek(null)}
-                      disabled={isFuture}
-                      title={isFuture ? "미래 주차는 선택 불가" : undefined}
-                      className={`flex flex-col items-center border-y px-1 py-1.5 transition-colors disabled:opacity-30 ${
-                        isFirst ? "rounded-l-[10px] border-l" : ""
-                      } ${isLast ? "rounded-r-[10px] border-r" : "border-r-0"}`}
-                      style={{
-                        background: isSelectedWeek
-                          ? "rgba(101,169,255,.18)"
-                          : isHovered
-                          ? "rgba(101,169,255,.08)"
-                          : LEGACY_COLORS.s2,
-                        borderColor: isSelectedWeek
-                          ? LEGACY_COLORS.blue
-                          : isHovered
-                          ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 40%, transparent)`
-                          : LEGACY_COLORS.border,
-                      }}
-                    >
+          {/* 주간보고 — 의미상 주 단위 선택이므로 클릭 타깃을 주(week) 단위 1개 <button> 으로 통합.
+              내부 7개 일자 숫자는 <span> 으로만 노출. 어느 셀을 눌러도 결국 같은 주가 선택되므로
+              UI(클릭 가능 영역)와 의미를 일치시킨다. */}
+          <div className="flex flex-col gap-y-0.5">
+            {getWeeksOfMonth(calMonth.getFullYear(), calMonth.getMonth()).map((week) => {
+              const sun = week[0];
+              // 일~토 구성이므로 월(index 1)이 주차 기준 시작일
+              const mon = new Date(sun.getTime() + 86400000);
+              const weekKey = toDateStr(mon);
+              const isSelectedWeek = weekKey === weekStartStr;
+              const isHovered = hoveredWeek === weekKey;
+              const isFuture =
+                toDateStr(mon) > toDateStr(getWeekStartMonday(new Date()));
+              return (
+                <button
+                  key={weekKey}
+                  type="button"
+                  disabled={isFuture}
+                  onClick={() => {
+                    if (!isFuture) {
+                      onChange(new Date(mon));
+                      setOpen(false);
+                    }
+                  }}
+                  onMouseEnter={() => !isFuture && setHoveredWeek(weekKey)}
+                  onMouseLeave={() => setHoveredWeek(null)}
+                  aria-pressed={isSelectedWeek}
+                  title={isFuture ? "미래 주차는 선택 불가" : undefined}
+                  className="grid grid-cols-7 rounded-[10px] border px-1 py-1.5 transition-colors disabled:opacity-30"
+                  style={{
+                    background: isSelectedWeek
+                      ? "rgba(101,169,255,.18)"
+                      : isHovered
+                      ? "rgba(101,169,255,.08)"
+                      : LEGACY_COLORS.s2,
+                    borderColor: isSelectedWeek
+                      ? LEGACY_COLORS.blue
+                      : isHovered
+                      ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 40%, transparent)`
+                      : LEGACY_COLORS.border,
+                  }}
+                >
+                  {week.map((d) => {
+                    const isOutside = d.getMonth() !== calMonth.getMonth();
+                    return (
                       <span
-                        className="text-sm font-bold"
+                        key={d.toISOString()}
+                        className="text-center text-sm font-bold"
                         style={{
                           color: isOutside
                             ? LEGACY_COLORS.muted2
@@ -306,11 +308,11 @@ export function WeeklyWeekPicker({ weekMon, onChange }: Props) {
                       >
                         {d.getDate()}
                       </span>
-                    </button>
-                  );
-                });
-              }
-            )}
+                    );
+                  })}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
