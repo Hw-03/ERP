@@ -175,7 +175,7 @@ function TabButton({
         <div
           className="flex h-[46px] w-[46px] items-center justify-center rounded-[16px] transition-all duration-150 group-hover:brightness-110 group-hover:scale-[1.05]"
           style={{
-            background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
+            background: active ? LEGACY_COLORS.blue : "transparent",
             color: active ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
           }}
         >

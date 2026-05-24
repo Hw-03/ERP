@@ -63,7 +63,7 @@ export function ThemeToggle({ expanded = false }: { expanded?: boolean }) {
         <div
           className="flex h-[46px] w-[46px] items-center justify-center rounded-[16px] transition-all duration-150 group-hover:brightness-110 group-hover:scale-[1.05]"
           style={{
-            background: LEGACY_COLORS.s2,
+            background: "transparent",
             color: isLight ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2,
           }}
         >
