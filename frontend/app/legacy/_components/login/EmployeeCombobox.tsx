@@ -163,15 +163,27 @@ export function EmployeeCombobox({
           className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-[var(--c-muted)]"
           style={{ color: "var(--c-text)" }}
         />
-        <ChevronDown
-          size={16}
-          style={{
-            color: "var(--c-muted)",
-            flexShrink: 0,
-            transition: "transform 0.18s ease",
-            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label={open ? "직원 목록 닫기" : "직원 목록 열기"}
+          disabled={disabled}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            setOpen((prev) => !prev);
+            inputRef.current?.focus();
           }}
-        />
+          className="no-btn-inset flex shrink-0 items-center justify-center bg-transparent p-0"
+          style={{ color: "var(--c-muted)", cursor: disabled ? "default" : "pointer" }}
+        >
+          <ChevronDown
+            size={16}
+            style={{
+              transition: "transform 0.18s ease",
+              transform: open ? "rotate(180deg)" : "rotate(0deg)",
+            }}
+          />
+        </button>
       </div>
 
       {open && (

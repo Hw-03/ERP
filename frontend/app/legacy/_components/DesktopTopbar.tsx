@@ -190,7 +190,7 @@ export function DesktopTopbar({
                     setDropdownOpen(false);
                     setShowLogoutModal(true);
                   }}
-                  className="flex w-full items-center gap-2 rounded-[14px] px-3 py-2 text-sm font-semibold transition-opacity hover:opacity-80"
+                  className="mt-1.5 flex w-full items-center gap-2 rounded-[14px] px-3 py-2 text-sm font-semibold transition-opacity hover:opacity-80"
                   style={{
                     color: LEGACY_COLORS.red,
                     background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
