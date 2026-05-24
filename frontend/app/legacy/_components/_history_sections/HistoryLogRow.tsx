@@ -26,7 +26,7 @@ import { useDeptColor } from "../DepartmentsContext";
 import { formatHistoryDate } from "./historyFormat";
 import { rowTint } from "./historyTheme";
 import { getHistoryDisplayLabel, getSingleLogMovement } from "./historyBatchInterpreter";
-import { MemoCell, MovementSummaryCell } from "./historyTableHelpers";
+import { HISTORY_CELL_TRANSITION, MemoCell, MovementSummaryCell } from "./historyTableHelpers";
 import { isReworkOperation } from "./transactionTaxonomy";
 
 const TX_ICON = {
@@ -51,9 +51,12 @@ type Props = {
   log: TransactionLog;
   selected: boolean;
   onSelect: (log: TransactionLog) => void;
+  /** 우측 패널 열림 — 일시/구분 셀 좌우 패딩 압축. */
+  compact?: boolean;
 };
 
-function HistoryLogRowImpl({ log, selected, onSelect }: Props) {
+function HistoryLogRowImpl({ log, selected, onSelect, compact }: Props) {
+  const padX = compact ? "px-2" : "px-4";
   // 재작업(DISASSEMBLE)은 빨강 강제 — transactionColor 의 muted/회색 fallback 덮어씀.
   const tcolor = isReworkOperation(log) ? LEGACY_COLORS.red : transactionColor(log.transaction_type);
 
@@ -90,8 +93,8 @@ function HistoryLogRowImpl({ log, selected, onSelect }: Props) {
       }}
     >
       <td
-        className="whitespace-nowrap border-b px-4 py-3 text-xs"
-        style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+        className={`whitespace-nowrap border-b ${padX} py-3 text-xs`}
+        style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, transition: HISTORY_CELL_TRANSITION }}
       >
         <div className="flex items-center justify-center gap-1.5">
           {/* 묶음 행 chevron 폭과 같은 spacer — 일시 정렬 축을 맞춤. */}
@@ -99,7 +102,7 @@ function HistoryLogRowImpl({ log, selected, onSelect }: Props) {
           {formatHistoryDate(log.created_at)}
         </div>
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`whitespace-nowrap border-b ${padX} py-3 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
         <span
           className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-bold tracking-wide"
           style={{ background: `color-mix(in srgb, ${tcolor} 14%, transparent)`, color: tcolor }}

@@ -10,7 +10,7 @@ import { EmptyState, LoadingSkeleton } from "../common";
 import { formatHistoryDate } from "./historyFormat";
 import type { HistorySelection } from "./historyConstants";
 import { HistoryLogRow } from "./HistoryLogRow";
-import { BatchHeader, OpBatchHeader, buildGroups } from "./historyTableHelpers";
+import { BatchHeader, OpBatchHeader, buildGroups, HISTORY_CELL_TRANSITION } from "./historyTableHelpers";
 import { BomBatchDetail } from "./BomBatchDetail";
 
 type Props = {
@@ -29,10 +29,23 @@ type Props = {
   onLoadMore: () => void;
 };
 
-const COLUMNS: { label: string; width?: string; minWidth?: string; align?: "left" | "center"; hidden?: boolean }[] = [
+type ColSpec = { label: string; width?: string; minWidth?: string; align?: "left" | "center"; hidden?: boolean; px?: string };
+
+// 평상시(우측 패널 닫힘) — 여유 간격
+const COLUMNS_DEFAULT: ColSpec[] = [
   { label: "일시", width: "140px", align: "center" },
   { label: "구분", width: "130px", align: "center" },
   { label: "품목명", minWidth: "180px" },
+  { label: "변동요약", width: "150px", align: "center" },
+  { label: "담당자", width: "130px", align: "center", hidden: true },
+  { label: "메모", width: "70px", align: "center", hidden: true },
+];
+
+// 우측 패널 열림 — 가로 폭 좁아져 일시/구분 압축, 품목명 우선
+const COLUMNS_COMPACT: ColSpec[] = [
+  { label: "일시", width: "112px", align: "center", px: "px-2" },
+  { label: "구분", width: "104px", align: "center", px: "px-2" },
+  { label: "품목명", minWidth: "240px" },
   { label: "변동요약", width: "150px", align: "center" },
   { label: "담당자", width: "130px", align: "center", hidden: true },
   { label: "메모", width: "70px", align: "center", hidden: true },
@@ -209,6 +222,10 @@ export function HistoryTable({
     });
   }
 
+  // 우측 패널이 열리면 가로 공간이 좁아져 일시/구분 컬럼을 압축, 품목명에 더 많은 폭을 줌.
+  const compact = selection != null;
+  const COLUMNS = compact ? COLUMNS_COMPACT : COLUMNS_DEFAULT;
+
   const allExpanded = batchKeys.length > 0 && batchKeys.every((k) => expandedGroups.has(k));
 
   function toggleAll() {
@@ -259,12 +276,12 @@ export function HistoryTable({
           <table className="min-w-full border-separate border-spacing-0 text-sm">
             <thead className="sticky top-0 z-10">
               <tr style={{ background: LEGACY_COLORS.s2 }}>
-                {COLUMNS.map(({ label, width, minWidth, align, hidden }) => (
+                {COLUMNS.map(({ label, width, minWidth, align, hidden, px }) => (
                   <th
                     key={label}
                     scope="col"
-                    className={`whitespace-nowrap border-b px-4 py-3 text-xs font-bold${hidden ? " hidden sm:table-cell" : ""} ${align === "center" ? "text-center" : "text-left"}`}
-                    style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth }}
+                    className={`whitespace-nowrap border-b ${px ?? "px-4"} py-3 text-xs font-bold${hidden ? " hidden sm:table-cell" : ""} ${align === "center" ? "text-center" : "text-left"}`}
+                    style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width, minWidth, transition: HISTORY_CELL_TRANSITION }}
                   >
                     {label}
                   </th>
@@ -280,6 +297,7 @@ export function HistoryTable({
                       log={group.log}
                       selected={selectedLogId === group.log.log_id}
                       onSelect={onSelectLog}
+                      compact={compact}
                     />
                   );
                 }
@@ -303,6 +321,7 @@ export function HistoryTable({
                         }}
                         batch={batch}
                         rowRef={opBatchRowRef}
+                        compact={compact}
                       />
                       {expanded && (
                         <BomBatchDetail
@@ -310,6 +329,7 @@ export function HistoryTable({
                           colSpan={COLUMNS.length}
                           cache={batchCache}
                           onCached={handleCacheBatch}
+                          compact={compact}
                         />
                       )}
                     </Fragment>
@@ -331,6 +351,7 @@ export function HistoryTable({
                         onSelectLog(group.logs[0]);
                         expandGroup(group.refNo);
                       }}
+                      compact={compact}
                     />
                     {expanded &&
                       group.logs.map((log) => (
@@ -339,6 +360,7 @@ export function HistoryTable({
                           log={log}
                           selected={selectedLogId === log.log_id}
                           onSelect={onSelectLog}
+                          compact={compact}
                         />
                       ))}
                   </Fragment>
