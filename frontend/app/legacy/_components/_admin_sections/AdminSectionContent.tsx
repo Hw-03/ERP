@@ -73,6 +73,7 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
         onStatusChange={onStatusChange}
         onError={setMessage}
         onShowSave={showSave}
+        adminPin={adminPin}
       >
         <AdminMasterItemsSection allBomRows={allBomRows} />
       </AdminMasterItemsProvider>

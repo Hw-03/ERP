@@ -20,6 +20,7 @@ export type UseAdminMasterItemsArgs = {
   onError: (msg: string) => void;
   /** 짧은 토스트(상단 우측 비공식 메시지) — DesktopAdminView 의 showSave 와 호환 */
   onShowSave?: (msg: string) => void;
+  adminPin: string;
 };
 
 type UpdateItemPayload = {
@@ -46,6 +47,7 @@ export type AdminMasterItemsState = {
   setAddForm: (updater: (f: AddForm) => AddForm) => void;
   visibleItems: Item[];
   addItem: () => void;
+  reorderItems: (ordered: Item[]) => void;
   saveItemField: (
     field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "item_code" | "process_type_code",
     value: string,
@@ -66,6 +68,7 @@ export function useAdminMasterItems({
   onStatusChange,
   onError,
   onShowSave,
+  adminPin,
 }: UseAdminMasterItemsArgs): AdminMasterItemsState {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
 
@@ -84,6 +87,7 @@ export function useAdminMasterItems({
     onStatusChange,
     onError,
     onShowSave,
+    adminPin,
   });
 
   return {
@@ -97,6 +101,7 @@ export function useAdminMasterItems({
     setAddForm: commands.setAddForm,
     visibleItems: list.visibleItems,
     addItem: commands.add,
+    reorderItems: commands.reorder,
     saveItemField: form.saveField,
     updateItemFull: form.updateFull,
     editForm: form.form,

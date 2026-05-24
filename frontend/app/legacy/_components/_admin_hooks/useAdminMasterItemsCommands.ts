@@ -1,12 +1,15 @@
 "use client";
 
 // W5: MasterItems 도메인 Commands sub-hook.
-// 책임: list-level 명령 — add + addMode/addForm 상태.
+// 책임: list-level 명령 — add + addMode/addForm 상태 + reorder.
 // (delete 는 현재 도메인 미지원 — 비활성/비활성화는 saveField/updateFull 로 처리.)
 
 import { useState } from "react";
 import type { Item } from "@/lib/api";
-import { useCreateItemMutation } from "@/lib/queries/useItemsQuery";
+import {
+  useCreateItemMutation,
+  useReorderItemsMutation,
+} from "@/lib/queries/useItemsQuery";
 import { EMPTY_ADD_FORM, type AddForm } from "../_admin_sections/adminShared";
 
 export type UseAdminMasterItemsCommandsArgs = {
@@ -15,6 +18,7 @@ export type UseAdminMasterItemsCommandsArgs = {
   onStatusChange: (msg: string) => void;
   onError: (msg: string) => void;
   onShowSave?: (msg: string) => void;
+  adminPin: string;
 };
 
 export type UseAdminMasterItemsCommandsState = {
@@ -23,6 +27,7 @@ export type UseAdminMasterItemsCommandsState = {
   addForm: AddForm;
   setAddForm: (updater: (f: AddForm) => AddForm) => void;
   add: () => void;
+  reorder: (ordered: Item[]) => void;
 };
 
 export function useAdminMasterItemsCommands({
@@ -31,10 +36,12 @@ export function useAdminMasterItemsCommands({
   onStatusChange,
   onError,
   onShowSave,
+  adminPin,
 }: UseAdminMasterItemsCommandsArgs): UseAdminMasterItemsCommandsState {
   const [addMode, setAddMode] = useState(false);
   const [addForm, setAddForm] = useState<AddForm>(EMPTY_ADD_FORM);
   const createMutation = useCreateItemMutation();
+  const reorderMutation = useReorderItemsMutation();
 
   async function _add(): Promise<void> {
     if (!addForm.item_name.trim()) {
@@ -64,11 +71,26 @@ export function useAdminMasterItemsCommands({
     }
   }
 
+  function reorder(ordered: Item[]) {
+    const items = ordered.map((it, i) => ({ item_id: it.item_id, display_order: i }));
+    // 낙관적 업데이트 — 즉시 새 순서로 보이게.
+    // sort_order 는 백엔드 전용 컬럼이라 프론트 Item 타입에 없음 → 순서만 갈아끼움.
+    setItems(() => ordered);
+    reorderMutation.mutate(
+      { items, pin: adminPin },
+      {
+        onError: (err) =>
+          onError(err instanceof Error ? err.message : "품목 순서 저장 실패"),
+      },
+    );
+  }
+
   return {
     addMode,
     setAddMode,
     addForm,
     setAddForm,
     add: () => void _add(),
+    reorder,
   };
 }

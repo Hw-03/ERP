@@ -69,4 +69,9 @@ export const itemsApi = {
   /** BOM 완료 상태 토글 — 사용자가 명시적으로 "완료로 표시"/"완료 해제"를 누를 때만 호출. */
   updateBomCompletion: async (itemId: string, completed: boolean) =>
     patchJson<Item>(toApiUrl(`/api/items/${itemId}/bom-completion`), { completed }),
+
+  reorderItems: (payload: {
+    items: { item_id: string; display_order: number }[];
+    pin: string;
+  }) => patchJson<{ ok: boolean }>(toApiUrl("/api/items/reorder"), payload),
 };

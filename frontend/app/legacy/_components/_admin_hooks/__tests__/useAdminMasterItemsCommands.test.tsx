@@ -4,9 +4,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 const createMutateAsync = vi.fn();
+const reorderMutate = vi.fn();
 
 vi.mock("@/lib/queries/useItemsQuery", () => ({
   useCreateItemMutation: () => ({ mutateAsync: createMutateAsync }),
+  useReorderItemsMutation: () => ({ mutate: reorderMutate }),
 }));
 
 import { useAdminMasterItemsCommands } from "../useAdminMasterItemsCommands";
@@ -21,6 +23,7 @@ const baseArgs = (over: Partial<Parameters<typeof useAdminMasterItemsCommands>[0
   setSelectedItem: vi.fn(),
   onStatusChange: vi.fn(),
   onError: vi.fn(),
+  adminPin: "0000",
   ...over,
 });
 
