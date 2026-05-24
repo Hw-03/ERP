@@ -3415,6 +3415,46 @@
         "title": "ItemCreate",
         "type": "object"
       },
+      "ItemReorderItem": {
+        "properties": {
+          "display_order": {
+            "title": "Display Order",
+            "type": "integer"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "display_order"
+        ],
+        "title": "ItemReorderItem",
+        "type": "object"
+      },
+      "ItemReorderPayload": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemReorderItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "pin": {
+            "title": "Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "pin"
+        ],
+        "title": "ItemReorderPayload",
+        "type": "object"
+      },
       "ItemResponse": {
         "properties": {
           "bom_completed_at": {
@@ -10438,6 +10478,80 @@
           }
         },
         "summary": "Export Items Xlsx",
+        "tags": [
+          "Items"
+        ]
+      }
+    },
+    "/api/items/reorder": {
+      "patch": {
+        "description": "드래그 reorder 결과를 영구 저장. 모델 reorder 와 동일 패턴.\n\n- PIN 검증 후 payload.items 의 (item_id, display_order) 쌍을 Item.sort_order 로 일괄 갱신.\n- 존재하지 않는 item_id 는 조용히 스킵 (부분 갱신 허용).",
+        "operationId": "reorder_items_api_items_reorder_patch",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemReorderPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "품목 표시 순서 재배치",
         "tags": [
           "Items"
         ]

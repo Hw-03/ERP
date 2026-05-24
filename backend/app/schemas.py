@@ -306,6 +306,16 @@ class BomCompletionUpdate(BaseModel):
     completed: bool = Field(..., description="True=완료로 표시, False=완료 해제")
 
 
+class ItemReorderItem(BaseModel):
+    item_id: uuid.UUID
+    display_order: int
+
+
+class ItemReorderPayload(BaseModel):
+    items: List[ItemReorderItem]
+    pin: str
+
+
 class BOMResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
