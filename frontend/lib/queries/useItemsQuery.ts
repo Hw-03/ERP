@@ -60,3 +60,12 @@ export function useUpdateBomCompletionMutation() {
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.items.all }),
   });
 }
+
+export function useReorderItemsMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Parameters<typeof itemsApi.reorderItems>[0]) =>
+      itemsApi.reorderItems(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.items.all }),
+  });
+}

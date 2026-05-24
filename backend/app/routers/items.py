@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 import csv
 from io import StringIO
 import uuid
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
@@ -14,12 +14,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
+from app.dependencies.admin import require_admin_pin
 from app.models import Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     BomCompletionUpdate,
     InventoryLocationResponse,
     ItemCreate,
+    ItemReorderPayload,
     ItemResponse,
     ItemUpdate,
     ItemWithInventory,
@@ -31,6 +33,7 @@ from app.services import inventory as inventory_svc
 from app.services import stock_math
 from app.services._tx import commit_and_refresh
 from app.services.export_helpers import csv_streaming_response
+from app.services.reorder import reorder_by_display_order
 
 router = APIRouter()
 
@@ -249,6 +252,26 @@ def list_items(
         )
         for item, inv in rows
     ]
+
+
+@router.patch("/reorder", summary="품목 표시 순서 재배치")
+def reorder_items(
+    payload: ItemReorderPayload,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
+    """드래그 reorder 결과를 영구 저장. 모델 reorder 와 동일 패턴.
+
+    - PIN 검증 후 payload.items 의 (item_id, display_order) 쌍을 Item.sort_order 로 일괄 갱신.
+    - 존재하지 않는 item_id 는 조용히 스킵 (부분 갱신 허용).
+    """
+    reorder_by_display_order(
+        db, Item, "item_id",
+        [(item.item_id, item.display_order) for item in payload.items],
+        order_field="sort_order",
+    )
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/export.csv")

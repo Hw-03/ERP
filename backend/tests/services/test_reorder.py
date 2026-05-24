@@ -88,3 +88,25 @@ def test_nonexistent_key_silent_skip(db_session):
     assert updated == 1
     db_session.refresh(d1)
     assert d1.display_order == 5
+
+
+def test_custom_order_field(db_session, make_item):
+    """order_field 옵션 — Item.sort_order 갱신 (display_order 대신)."""
+    i1 = make_item(name="품목1")
+    i2 = make_item(name="품목2")
+    db_session.commit()
+
+    updated = reorder_by_display_order(
+        db_session,
+        type(i1),
+        "item_id",
+        [(i1.item_id, 7), (i2.item_id, 3)],
+        order_field="sort_order",
+    )
+    db_session.commit()
+
+    assert updated == 2
+    db_session.refresh(i1)
+    db_session.refresh(i2)
+    assert i1.sort_order == 7
+    assert i2.sort_order == 3

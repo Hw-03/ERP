@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Box, Plus, Save } from "lucide-react";
+import { Box, GripVertical, Plus, Save } from "lucide-react";
 import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
@@ -43,9 +43,58 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
     setAddMode,
     saveItem,
     dirty,
+    reorderItems,
   } = useAdminMasterItemsContext();
 
   const [tab, setTab] = useState<DetailTab>("info");
+
+  // 드래그 reorder 상태 — 모델 reorder 와 동일 패턴. 정렬 키는 item_id.
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+
+  function handleDragStart(e: React.DragEvent, id: string) {
+    setDragId(id);
+    e.dataTransfer.effectAllowed = "move";
+    try {
+      e.dataTransfer.setData("text/plain", id);
+    } catch {
+      // jsdom 등 일부 환경에서 setData 실패 — 무시.
+    }
+  }
+
+  function handleDragOver(e: React.DragEvent, id: string) {
+    if (dragId === null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dropTargetId !== id) setDropTargetId(id);
+  }
+
+  function handleDrop(e: React.DragEvent, id: string) {
+    e.preventDefault();
+    if (dragId === null || dragId === id) {
+      setDragId(null);
+      setDropTargetId(null);
+      return;
+    }
+    const fromIdx = visibleItems.findIndex((it) => it.item_id === dragId);
+    const toIdx = visibleItems.findIndex((it) => it.item_id === id);
+    if (fromIdx < 0 || toIdx < 0) {
+      setDragId(null);
+      setDropTargetId(null);
+      return;
+    }
+    const next = [...visibleItems];
+    const [moved] = next.splice(fromIdx, 1);
+    if (moved) next.splice(toIdx, 0, moved);
+    reorderItems(next);
+    setDragId(null);
+    setDropTargetId(null);
+  }
+
+  function handleDragEnd() {
+    setDragId(null);
+    setDropTargetId(null);
+  }
 
   // 활성 섹션 dirty/save 를 상위 registry 에 등록 (탭/사이드바 가드).
   useRegisterDirty("items", dirty, saveItem);
@@ -137,47 +186,71 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
             const zeroStock = qty <= 0;
             const lowStock =
               !zeroStock && item.min_stock != null && qty < Number(item.min_stock);
+            const isDragging = dragId === item.item_id;
+            const isDropTarget =
+              dragId !== null && dropTargetId === item.item_id && dragId !== item.item_id;
             return (
-              <button
+              <div
                 key={item.item_id}
-                type="button"
-                onClick={() => handleSelectItem(item, isSelected)}
-                aria-pressed={isSelected}
-                className="flex w-full items-center gap-2 rounded-[10px] border px-3 py-2 text-left transition-colors hover:brightness-[1.04]"
-                style={{
-                  background: isSelected
-                    ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
-                    : LEGACY_COLORS.s2,
-                  borderColor: isSelected ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                }}
+                draggable
+                onDragStart={(e) => handleDragStart(e, item.item_id)}
+                onDragOver={(e) => handleDragOver(e, item.item_id)}
+                onDrop={(e) => handleDrop(e, item.item_id)}
+                onDragEnd={handleDragEnd}
+                className="relative"
+                style={{ opacity: isDragging ? 0.4 : 1 }}
               >
-                <span
-                  className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-black tabular-nums"
+                {isDropTarget && (
+                  <div
+                    className="pointer-events-none absolute inset-x-0 -top-1 h-0.5 rounded-full"
+                    style={{ background: LEGACY_COLORS.blue }}
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleSelectItem(item, isSelected)}
+                  aria-pressed={isSelected}
+                  className="flex w-full items-center gap-2 rounded-[10px] border px-3 py-2 text-left transition-colors hover:brightness-[1.04]"
                   style={{
                     background: isSelected
-                      ? LEGACY_COLORS.blue
-                      : `color-mix(in srgb, ${LEGACY_COLORS.muted2} 16%, transparent)`,
-                    color: isSelected ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
+                      ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
+                      : LEGACY_COLORS.s2,
+                    borderColor: isSelected ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
                   }}
                 >
-                  {item.item_code ?? "—"}
-                </span>
-                <span
-                  className="min-w-0 flex-1 truncate text-[13px] font-semibold"
-                  style={{ color: LEGACY_COLORS.text }}
-                >
-                  {item.item_name}
-                </span>
-                {zeroStock ? (
-                  <div className="shrink-0">
-                    <StatusPill label="품절" tone="danger" showDot maxWidth={70} />
-                  </div>
-                ) : lowStock ? (
-                  <div className="shrink-0">
-                    <StatusPill label="부족" tone="warning" showDot maxWidth={70} />
-                  </div>
-                ) : null}
-              </button>
+                  <GripVertical
+                    className="h-4 w-4 shrink-0 cursor-grab"
+                    style={{ color: LEGACY_COLORS.muted2 }}
+                    aria-label="드래그 핸들"
+                  />
+                  <span
+                    className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-black tabular-nums"
+                    style={{
+                      background: isSelected
+                        ? LEGACY_COLORS.blue
+                        : `color-mix(in srgb, ${LEGACY_COLORS.muted2} 16%, transparent)`,
+                      color: isSelected ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
+                    }}
+                  >
+                    {item.item_code ?? "—"}
+                  </span>
+                  <span
+                    className="min-w-0 flex-1 truncate text-[13px] font-semibold"
+                    style={{ color: LEGACY_COLORS.text }}
+                  >
+                    {item.item_name}
+                  </span>
+                  {zeroStock ? (
+                    <div className="shrink-0">
+                      <StatusPill label="품절" tone="danger" showDot maxWidth={70} />
+                    </div>
+                  ) : lowStock ? (
+                    <div className="shrink-0">
+                      <StatusPill label="부족" tone="warning" showDot maxWidth={70} />
+                    </div>
+                  ) : null}
+                </button>
+              </div>
             );
           }}
         />

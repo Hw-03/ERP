@@ -15,13 +15,17 @@ def reorder_by_display_order(
     model_class: Type[Any],
     key_field: str,
     items: Iterable[Tuple[Any, int]],
+    *,
+    order_field: str = "display_order",
 ) -> int:
-    """주어진 (key, display_order) 쌍에 따라 model_class 의 display_order 일괄 갱신.
+    """주어진 (key, order) 쌍에 따라 model_class 의 정렬 컬럼 일괄 갱신.
 
-    - key_field: 식별자 컬럼 이름 (예: "id", "slot")
-    - items: (key, display_order) 시퀀스
+    - key_field: 식별자 컬럼 이름 (예: "id", "slot", "item_id")
+    - items: (key, order) 시퀀스
+    - order_field: 갱신할 정렬 컬럼 이름. 기본값 "display_order" — 부서·모델과 호환.
+      Item 처럼 컬럼명이 다른 엔티티(`sort_order`)는 명시적으로 전달.
     - 검증:
-        * display_order 음수 거부 → 400 BAD_REQUEST
+        * order 음수 거부 → 400 BAD_REQUEST
         * 동일 key 중복 거부 → 400 BAD_REQUEST
         * 존재하지 않는 key 는 silent skip (부분 갱신 허용, 부서·모델 기존 동작 보존)
     - 트랜잭션: 호출자가 commit 책임. 본 함수는 mutation 만 수행.
@@ -39,6 +43,6 @@ def reorder_by_display_order(
     for key, order in items_list:
         obj = db.query(model_class).filter(column == key).first()
         if obj is not None:
-            obj.display_order = order
+            setattr(obj, order_field, order)
             updated += 1
     return updated
