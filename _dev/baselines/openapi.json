@@ -1464,6 +1464,18 @@
             ],
             "title": "Employee Code"
           },
+          "io_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": true,
+            "title": "Io Enabled"
+          },
           "is_active": {
             "default": true,
             "title": "Is Active",
@@ -1591,6 +1603,11 @@
             "format": "uuid",
             "title": "Employee Id",
             "type": "string"
+          },
+          "io_enabled": {
+            "default": true,
+            "title": "Io Enabled",
+            "type": "boolean"
           },
           "is_active": {
             "title": "Is Active",
@@ -1740,6 +1757,17 @@
               }
             ],
             "title": "Display Order"
+          },
+          "io_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Io Enabled"
           },
           "is_active": {
             "anyOf": [

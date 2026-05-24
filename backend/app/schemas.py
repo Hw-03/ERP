@@ -126,6 +126,8 @@ class EmployeeCreate(BaseModel):
     department_role: str = Field("none", description="부서 결재 역할 (none/primary/deputy)")
     display_order: int = 0
     is_active: bool = True
+    # W12-#7: 직원별 입출고 권한. 부서 io_enabled 와 AND 결합.
+    io_enabled: Optional[bool] = True
     # 조립 부서 직원의 담당 모델 slot 목록. 리스트 순서 = priority (앞=상위).
     assigned_model_slots: Optional[List[int]] = None
 
@@ -140,6 +142,8 @@ class EmployeeUpdate(BaseModel):
     department_role: Optional[str] = Field(None, description="부서 결재 역할 (none/primary/deputy)")
     display_order: Optional[int] = None
     is_active: Optional[bool] = None
+    # W12-#7: 직원별 입출고 권한. None=변경 없음.
+    io_enabled: Optional[bool] = None
     # 조립 부서 직원의 담당 모델 slot 목록. None=변경 없음, []=전부 제거.
     assigned_model_slots: Optional[List[int]] = None
 
@@ -158,6 +162,8 @@ class EmployeeResponse(BaseModel):
     department_role: str = "none"
     display_order: int
     is_active: bool
+    # W12-#7: 직원별 입출고 권한. 마이그레이션 이전 응답 호환을 위해 기본 True.
+    io_enabled: bool = True
     created_at: UtcDatetime
     updated_at: UtcDatetime
     pin_last_changed: Optional[UtcDatetime] = None
