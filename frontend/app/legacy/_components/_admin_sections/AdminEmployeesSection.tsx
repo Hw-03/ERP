@@ -578,6 +578,36 @@ function EmployeeDetailGrid({
               {deptMeta.hint}
             </div>
           </FieldRow>
+          {/* W12-#7: 직원별 입출고 권한 토글. 부서 io_enabled 와 AND 결합. */}
+          <FieldRow label="입출고 권한">
+            <label className="inline-flex cursor-pointer items-center gap-3 py-1">
+              <input
+                type="checkbox"
+                checked={form.io_enabled}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, io_enabled: e.target.checked }))
+                }
+                className="h-4 w-4 cursor-pointer rounded border"
+                style={{
+                  accentColor: LEGACY_COLORS.blue,
+                  borderColor: LEGACY_COLORS.border,
+                }}
+              />
+              <span
+                className="text-[13px] font-bold"
+                style={{
+                  color: form.io_enabled ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
+                }}
+              >
+                {form.io_enabled
+                  ? "사용 가능 (입출고 화면 접근 허용)"
+                  : "사용 불가 (입출고 화면 차단)"}
+              </span>
+            </label>
+            <div className="mt-1.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+              부서 입출고 권한과 AND 결합됩니다. 둘 다 사용 가능일 때만 허용.
+            </div>
+          </FieldRow>
         </div>
       </DetailCardSlot>
 

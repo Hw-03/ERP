@@ -20,6 +20,8 @@ export type EmployeeEditForm = {
   level: EmployeeLevel;
   warehouse_role: WarehouseRole;
   department_role: DepartmentRole;
+  /** W12-#7: 직원별 입출고 권한. 부서 io_enabled 와 AND 결합. */
+  io_enabled: boolean;
   /** 조립 부서 직원의 담당 모델 slot 목록 (배열 순서 = 우선순위, 0=1순위). */
   assigned_model_slots: number[];
 };
@@ -32,6 +34,7 @@ const EMPTY_EDIT_FORM: EmployeeEditForm = {
   level: "staff",
   warehouse_role: "none",
   department_role: "none",
+  io_enabled: true,
   assigned_model_slots: [],
 };
 
@@ -44,6 +47,7 @@ function toEditForm(emp: Employee): EmployeeEditForm {
     level: (emp.level ?? "staff") as EmployeeLevel,
     warehouse_role: (emp.warehouse_role ?? "none") as WarehouseRole,
     department_role: (emp.department_role ?? "none") as DepartmentRole,
+    io_enabled: emp.io_enabled ?? true,
     assigned_model_slots: emp.assigned_model_slots ?? [],
   };
 }
@@ -89,6 +93,7 @@ export function useAdminEmployeesForm(employees: Employee[]) {
     if (orig.level !== editForm.level) return true;
     if (orig.warehouse_role !== editForm.warehouse_role) return true;
     if (orig.department_role !== editForm.department_role) return true;
+    if (orig.io_enabled !== editForm.io_enabled) return true;
     const a = orig.assigned_model_slots;
     const b = editForm.assigned_model_slots;
     if (a.length !== b.length) return true;

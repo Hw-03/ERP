@@ -92,4 +92,36 @@ describe("canEnterIO", () => {
     const map = new Map([["설계", { io_enabled: true }]]);
     expect(canEnterIO(designOperator, map)).toBe(true);
   });
+
+  // ──────────────── W12-#7: 직원 io_enabled 와 AND 결합 ────────────────
+
+  it("직원 io_enabled=false 면 부서가 허용이어도 차단", () => {
+    const map = new Map([["튜브", { io_enabled: true }]]);
+    const blockedTubeWorker: Operator = {
+      ...tubeWorker,
+      io_enabled: false,
+    };
+    expect(canEnterIO(blockedTubeWorker, map)).toBe(false);
+  });
+
+  it("직원 io_enabled=false 는 창고 직원도 차단 (관리자 강제 비활성)", () => {
+    const map = new Map([["창고", { io_enabled: true }]]);
+    const blockedWh: Operator = { ...warehousePrimary, io_enabled: false };
+    expect(canEnterIO(blockedWh, map)).toBe(false);
+  });
+
+  it("직원 io_enabled=true + 부서 io_enabled=true → true", () => {
+    const map = new Map([["튜브", { io_enabled: true }]]);
+    expect(canEnterIO({ ...tubeWorker, io_enabled: true }, map)).toBe(true);
+  });
+
+  it("직원 io_enabled=true + 부서 io_enabled=false → false (부서 차단 우선)", () => {
+    const map = new Map([["튜브", { io_enabled: false }]]);
+    expect(canEnterIO({ ...tubeWorker, io_enabled: true }, map)).toBe(false);
+  });
+
+  it("직원 io_enabled 미정의(undefined) 는 기존 동작 유지", () => {
+    const map = new Map([["튜브", { io_enabled: true }]]);
+    expect(canEnterIO(tubeWorker, map)).toBe(true);
+  });
 });

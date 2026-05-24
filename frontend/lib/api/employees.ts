@@ -30,6 +30,8 @@ export const employeesApi = {
     department_role?: DepartmentRole;
     display_order?: number;
     is_active?: boolean;
+    /** W12-#7: 직원별 입출고 권한. 부서 io_enabled 와 AND 결합. */
+    io_enabled?: boolean;
     /** 조립 부서 직원의 담당 모델 slot 목록 (배열 순서 = 우선순위). */
     assigned_model_slots?: number[];
   }) => postJson<Employee>(toApiUrl("/api/employees"), payload),
@@ -46,6 +48,8 @@ export const employeesApi = {
       department_role?: DepartmentRole;
       display_order?: number;
       is_active?: boolean;
+      /** W12-#7: 직원별 입출고 권한. */
+      io_enabled?: boolean;
       /** 담당 모델 slot 목록. null=변경 없음, []=전부 제거. */
       assigned_model_slots?: number[];
     },

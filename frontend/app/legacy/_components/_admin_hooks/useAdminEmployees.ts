@@ -102,6 +102,7 @@ export function useAdminEmployees({
           level: form.editForm.level,
           warehouse_role: form.editForm.warehouse_role,
           department_role: form.editForm.department_role,
+          io_enabled: form.editForm.io_enabled,
           assigned_model_slots: isAssembly ? form.editForm.assigned_model_slots : [],
         },
       );

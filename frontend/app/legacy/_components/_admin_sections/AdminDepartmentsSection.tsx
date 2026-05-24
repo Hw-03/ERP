@@ -537,7 +537,7 @@ function DeptDetailView({
         <MetaCell label="관련 품목" value={`${itemCount}개`} tone={LEGACY_COLORS.blue} />
       </div>
 
-      {/* 입출고 권한 (W11) */}
+      {/* 입출고 권한 (W11 + W12-#7) */}
       <DetailCardSlot title="입출고 권한">
         <label className="inline-flex cursor-pointer items-center gap-3 py-1">
           <input
@@ -563,6 +563,9 @@ function DeptDetailView({
               : "사용 불가 (입출고 화면 차단)"}
           </span>
         </label>
+        <div className="mt-1.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+          직원별 입출고 권한과 AND 결합됩니다. 둘 다 사용 가능일 때만 허용.
+        </div>
       </DetailCardSlot>
 
       {/* 색상 변경 */}
