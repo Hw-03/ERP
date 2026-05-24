@@ -57,7 +57,7 @@ describe("RDefectActionModal", () => {
     expect(screen.getByText(/7-MAT-0001/)).toBeInTheDocument();
     expect(screen.getByLabelText(/정상 복귀/i) ?? screen.getByText("정상 복귀")).toBeInTheDocument();
     expect(screen.getByText("폐기")).toBeInTheDocument();
-    expect(screen.getByText("공급처 반품")).toBeInTheDocument();
+    expect(screen.getByText("원자재 반품")).toBeInTheDocument();
   });
 
   it("open=false 면 아무것도 렌더하지 않는다", () => {

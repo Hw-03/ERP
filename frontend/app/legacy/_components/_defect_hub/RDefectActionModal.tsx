@@ -15,7 +15,7 @@ type RAction = "unquarantine" | "scrap" | "return";
 const ACTION_LABELS: Record<RAction, string> = {
   unquarantine: "정상 복귀",
   scrap: "폐기",
-  return: "공급처 반품",
+  return: "원자재 반품",
 };
 
 const ACTION_DESC: Record<RAction, string> = {

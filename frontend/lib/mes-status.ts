@@ -75,8 +75,11 @@ export const TRANSACTION_META: Record<TransactionType, TransactionMeta> = {
   TRANSFER_TO_PROD: { label: "창고 반출", tone: "info" },
   TRANSFER_TO_WH: { label: "창고이동", tone: "info" },
   TRANSFER_DEPT: { label: "부서이동", tone: "info" },
-  MARK_DEFECTIVE: { label: "불량", tone: "danger" },
-  SUPPLIER_RETURN: { label: "원자재 반품", tone: "neutral" },
+  // 불량 처리 5종 — 전부 danger(빨강) 톤 통일, 아이콘으로 구분
+  MARK_DEFECTIVE: { label: "새 격리", tone: "danger" },
+  UNMARK_DEFECTIVE: { label: "격리 해제", tone: "danger" },
+  DEFECT_SCRAP: { label: "폐기", tone: "danger" },
+  SUPPLIER_RETURN: { label: "원자재 반품", tone: "danger" },
 };
 
 /**
@@ -108,6 +111,8 @@ export type TransactionIconName =
   | "Wrench"            // DISASSEMBLE
   | "ArrowRightLeft"    // TRANSFER_TO_PROD / TRANSFER_TO_WH / TRANSFER_DEPT
   | "ShieldAlert"       // MARK_DEFECTIVE
+  | "Undo2"             // UNMARK_DEFECTIVE
+  | "Trash2"            // DEFECT_SCRAP
   | "PackageX"          // SUPPLIER_RETURN
   | "Activity";         // 기타 / 기본
 
@@ -133,6 +138,9 @@ export function transactionColor(type: TransactionType | string): string {
     case "BACKFLUSH":
       return "#fb923c";
     case "MARK_DEFECTIVE":
+    case "UNMARK_DEFECTIVE":
+    case "DEFECT_SCRAP":
+    case "SUPPLIER_RETURN":
       return LEGACY_COLORS.red;
     case "TRANSFER_TO_PROD":
     case "TRANSFER_TO_WH":
@@ -140,8 +148,6 @@ export function transactionColor(type: TransactionType | string): string {
       return LEGACY_COLORS.blue;
     case "DISASSEMBLE":
       return LEGACY_COLORS.red;
-    case "SUPPLIER_RETURN":
-      return LEGACY_COLORS.muted;
     default:
       return LEGACY_COLORS.muted2;
   }
@@ -167,6 +173,10 @@ export function transactionIconName(type: TransactionType | string): Transaction
       return "ArrowRightLeft";
     case "MARK_DEFECTIVE":
       return "ShieldAlert";
+    case "UNMARK_DEFECTIVE":
+      return "Undo2";
+    case "DEFECT_SCRAP":
+      return "Trash2";
     case "SUPPLIER_RETURN":
       return "PackageX";
     default:

@@ -217,9 +217,9 @@ export function IoSubTypeStep({
           <AlertTriangle className="h-8 w-8 shrink-0" style={{ color: cautionTone }} />
           <div className="text-base font-bold leading-relaxed" style={{ color: LEGACY_COLORS.text }}>
             {subType === "supplier_return"
-              ? "공급업체 반품은 되돌릴 수 없습니다. 반품 부서(불량 출처)와 수량을 확인하세요."
+              ? "원자재 반품은 되돌릴 수 없습니다. 반품 부서(불량 출처)와 수량을 확인하세요."
               : subType === "defect_process"
-                ? "격리 처리(폐기·분해)는 되돌릴 수 없습니다. 대상 부서와 품목을 확인하세요."
+                ? "격리 처리(폐기·재작업)는 되돌릴 수 없습니다. 대상 부서와 품목을 확인하세요."
                 : "불량 격리는 재고가 격리 상태로 이동합니다. 대상 부서를 다시 한 번 확인하세요."}
           </div>
         </div>

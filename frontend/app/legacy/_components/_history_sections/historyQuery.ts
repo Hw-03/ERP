@@ -23,8 +23,10 @@ export const OPERATION_OPTIONS: OperationOption[] = [
   { value: "TRANSFER_DEPT", label: "부서 이동" },
   { value: "DISASSEMBLE", label: "재작업" },
   { value: "ADJUST", label: "수량 조정" },
-  { value: "MARK_DEFECTIVE", label: "불량 처리" },
-  { value: "SUPPLIER_RETURN", label: "공급사 반품" },
+  { value: "MARK_DEFECTIVE", label: "새 격리" },
+  { value: "UNMARK_DEFECTIVE", label: "격리 해제" },
+  { value: "DEFECT_SCRAP", label: "폐기" },
+  { value: "SUPPLIER_RETURN", label: "원자재 반품" },
 ];
 
 export const DATE_OPTIONS = [

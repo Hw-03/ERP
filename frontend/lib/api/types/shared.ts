@@ -24,6 +24,8 @@ export type TransactionType =
   | "TRANSFER_TO_WH"
   | "TRANSFER_DEPT"
   | "MARK_DEFECTIVE"
+  | "UNMARK_DEFECTIVE"
+  | "DEFECT_SCRAP"
   | "SUPPLIER_RETURN";
 
 export type LocationStatus = "PRODUCTION" | "DEFECTIVE";

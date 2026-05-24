@@ -6,19 +6,19 @@ import {
 } from "../mes/transaction";
 
 describe("mes/transaction barrel", () => {
-  it("re-exports TRANSACTION_META with 11 keys", () => {
+  it("re-exports TRANSACTION_META with 13 keys", () => {
     const required = [
       "RECEIVE", "PRODUCE", "SHIP", "ADJUST", "BACKFLUSH",
       "DISASSEMBLE",
       "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "TRANSFER_DEPT",
-      "MARK_DEFECTIVE", "SUPPLIER_RETURN",
+      "MARK_DEFECTIVE", "UNMARK_DEFECTIVE", "DEFECT_SCRAP", "SUPPLIER_RETURN",
     ];
     expect(Object.keys(TRANSACTION_META).sort()).toEqual(required.sort());
   });
 
   it("getTransactionLabel returns Korean label for known type", () => {
     expect(getTransactionLabel("RECEIVE")).toBe("원자재 입고");
-    expect(getTransactionLabel("MARK_DEFECTIVE")).toBe("불량");
+    expect(getTransactionLabel("MARK_DEFECTIVE")).toBe("새 격리");
     expect(getTransactionLabel("TRANSFER_DEPT")).toBe("부서이동");
   });
 

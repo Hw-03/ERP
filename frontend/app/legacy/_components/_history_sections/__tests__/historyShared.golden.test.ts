@@ -187,9 +187,9 @@ describe("getHistoryOperationLabel", () => {
     expect(getHistoryOperationLabel({ transaction_type: "TRANSFER_DEPT" }, batch)).toBe("부서 이동");
   });
 
-  it("sub_type=defect_quarantine → '불량 처리'", () => {
+  it("sub_type=defect_quarantine → '새 격리'", () => {
     const batch = makeBatch({ sub_type: "defect_quarantine" });
-    expect(getHistoryOperationLabel({ transaction_type: "MARK_DEFECTIVE" }, batch)).toBe("불량 처리");
+    expect(getHistoryOperationLabel({ transaction_type: "MARK_DEFECTIVE" }, batch)).toBe("새 격리");
   });
 
   it("모든 tx 타입 매핑 확인", () => {
@@ -203,8 +203,10 @@ describe("getHistoryOperationLabel", () => {
       ["PRODUCE", "생산 등록"],
       ["DISASSEMBLE", "재작업"],
       ["ADJUST", "수량 조정"],
-      ["MARK_DEFECTIVE", "불량 처리"],
-      ["SUPPLIER_RETURN", "공급사 반품"],
+      ["MARK_DEFECTIVE", "새 격리"],
+      ["UNMARK_DEFECTIVE", "격리 해제"],
+      ["DEFECT_SCRAP", "폐기"],
+      ["SUPPLIER_RETURN", "원자재 반품"],
     ];
     for (const [tx, expected] of cases) {
       expect(getHistoryOperationLabel({ transaction_type: tx })).toBe(expected);
@@ -226,9 +228,11 @@ describe("getHistoryFlowLabel", () => {
       ["BACKFLUSH", "자동차감"],
       ["PRODUCE", "생산 입고"],
       ["DISASSEMBLE", "재작업"],
-      ["MARK_DEFECTIVE", "불량 처리"],
+      ["MARK_DEFECTIVE", "새 격리"],
+      ["UNMARK_DEFECTIVE", "격리 해제"],
+      ["DEFECT_SCRAP", "폐기"],
       ["ADJUST", "수량 조정"],
-      ["SUPPLIER_RETURN", "공급사 반품"],
+      ["SUPPLIER_RETURN", "원자재 반품"],
     ];
     for (const [tx, expected] of cases) {
       expect(getHistoryFlowLabel({ transaction_type: tx })).toBe(expected);

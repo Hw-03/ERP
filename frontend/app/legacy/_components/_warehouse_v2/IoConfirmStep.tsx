@@ -90,7 +90,7 @@ function confirmCopy(
     return { title: `격리 처리를 ${verb}`, tone: "danger", confirmLabel };
   }
   if (subType === "supplier_return") {
-    return { title: `공급처 반품을 ${verb}`, tone: "danger", confirmLabel };
+    return { title: `원자재 반품을 ${verb}`, tone: "danger", confirmLabel };
   }
   if (subType === "warehouse_to_dept") {
     return { title: `창고 반출을 ${verb}`, tone: "danger", confirmLabel };

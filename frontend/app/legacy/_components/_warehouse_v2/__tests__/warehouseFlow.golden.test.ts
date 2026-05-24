@@ -138,8 +138,8 @@ describe("ioWorkType 상수", () => {
       ["adjust_out", "수량보정 출고", "선택 품목 수량 감소"],
       ["defect_quarantine", "새 격리", "정상 재고를 격리 처리 (창고 승인)"],
       ["defect_restore", "격리 해제", "격리 재고를 정상 복귀 (즉시)"],
-      ["defect_process", "격리 처리", "격리 재고 폐기·분해 (창고 승인)"],
-      ["supplier_return", "공급처 반품", "격리 재고를 공급처에 반품 (창고 승인)"],
+      ["defect_process", "격리 처리", "격리 재고 폐기·재작업 (창고 승인)"],
+      ["supplier_return", "원자재 반품", "격리 재고를 공급처에 반품 (창고 승인)"],
     ]);
   });
 
@@ -194,7 +194,7 @@ describe("subTypeLabel", () => {
       adjust_in: "수량보정 입고",
       adjust_out: "수량보정 출고",
       defect_quarantine: "새 격리",
-      supplier_return: "공급처 반품",
+      supplier_return: "원자재 반품",
     });
   });
 });

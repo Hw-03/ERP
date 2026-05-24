@@ -135,8 +135,8 @@ const _SUB_TYPE_OPERATION: Record<string, string> = {
   adjust_in: "수량 조정",
   adjust_out: "수량 조정",
   receive_supplier: "원자재 입고",
-  supplier_return: "공급사 반품",
-  defect_quarantine: "불량 처리",
+  supplier_return: "원자재 반품",
+  defect_quarantine: "새 격리",
 };
 
 const _TX_OPERATION: Record<string, string> = {
@@ -149,8 +149,10 @@ const _TX_OPERATION: Record<string, string> = {
   PRODUCE: "생산 등록",
   DISASSEMBLE: "재작업",
   ADJUST: "수량 조정",
-  MARK_DEFECTIVE: "불량 처리",
-  SUPPLIER_RETURN: "공급사 반품",
+  MARK_DEFECTIVE: "새 격리",
+  UNMARK_DEFECTIVE: "격리 해제",
+  DEFECT_SCRAP: "폐기",
+  SUPPLIER_RETURN: "원자재 반품",
 };
 
 const _DISPLAY_SUB_LABEL: Record<string, string> = {
@@ -172,7 +174,9 @@ const _DISPLAY_SUB_LABEL: Record<string, string> = {
   TRANSFER_TO_PROD: "창고에서 부서로 이동",
   TRANSFER_TO_WH: "부서에서 창고로 이동",
   MARK_DEFECTIVE: "정상 재고 → 불량 재고",
-  SUPPLIER_RETURN: "공급사로 돌려보냄",
+  UNMARK_DEFECTIVE: "불량 재고 → 정상 재고",
+  DEFECT_SCRAP: "불량 재고 폐기",
+  SUPPLIER_RETURN: "불량 재고 공급사 반품",
 };
 
 // ──────────────────────────────────────────────────────────────────
@@ -247,9 +251,11 @@ export function getHistoryFlowLabel(
     case "BACKFLUSH": return "자동차감";
     case "PRODUCE": return "생산 입고";
     case "DISASSEMBLE": return "재작업";
-    case "MARK_DEFECTIVE": return "불량 처리";
+    case "MARK_DEFECTIVE": return "새 격리";
+    case "UNMARK_DEFECTIVE": return "격리 해제";
+    case "DEFECT_SCRAP": return "폐기";
     case "ADJUST": return "수량 조정";
-    case "SUPPLIER_RETURN": return "공급사 반품";
+    case "SUPPLIER_RETURN": return "원자재 반품";
     default: return log.transaction_type;
   }
 }
@@ -613,15 +619,18 @@ export function getHistoryMovementSummary(
 const _SINGLE_OP: Record<string, { verb: string; tone: MovementTone; signed?: boolean }> = {
   RECEIVE: { verb: "입고", tone: "success" },
   SHIP: { verb: "출고", tone: "danger" },
-  SUPPLIER_RETURN: { verb: "반품", tone: "danger" },
   ADJUST: { verb: "조정", tone: "warning", signed: true },
   TRANSFER_TO_PROD: { verb: "이동", tone: "info" },
   TRANSFER_TO_WH: { verb: "이동", tone: "info" },
   TRANSFER_DEPT: { verb: "이동", tone: "info" },
-  MARK_DEFECTIVE: { verb: "불량", tone: "danger" },
   BACKFLUSH: { verb: "자동 차감", tone: "danger" },
   PRODUCE: { verb: "생산", tone: "success" },
   DISASSEMBLE: { verb: "재작업", tone: "danger" },
+  // 불량 처리 4종 — 전부 danger 톤, 라벨은 구분 알약과 동일
+  MARK_DEFECTIVE: { verb: "새 격리", tone: "danger" },
+  UNMARK_DEFECTIVE: { verb: "격리 해제", tone: "danger" },
+  DEFECT_SCRAP: { verb: "폐기", tone: "danger" },
+  SUPPLIER_RETURN: { verb: "원자재 반품", tone: "danger" },
 };
 
 export function getSingleLogMovement(log: {
