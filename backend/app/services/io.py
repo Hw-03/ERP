@@ -416,7 +416,111 @@ def preview(
     }
 
 
-def _batch_to_payload(batch: IoBatch) -> dict:
+def _line_to_dict(line: IoLine) -> dict:
+    return {
+        "line_id": line.line_id,
+        "item_id": line.item_id,
+        "item_name": line.item_name_snapshot,
+        "item_code": line.item_code_snapshot,
+        "unit": line.unit,
+        "direction": line.direction,
+        "from_bucket": line.from_bucket,
+        "from_department": line.from_department,
+        "to_bucket": line.to_bucket,
+        "to_department": line.to_department,
+        "quantity": line.quantity,
+        "bom_expected": line.bom_expected,
+        "included": line.included,
+        "origin": line.origin,
+        "edited": line.edited,
+        "has_children": line.has_children_snapshot,
+        "shortage": line.shortage,
+        "exclusion_note": line.exclusion_note,
+    }
+
+
+def _bom_fallback_child_lines(
+    db: Optional[Session],
+    bundle: IoBundle,
+    parent_line: IoLine,
+) -> list[dict]:
+    """옛 BOM bundle 의 자식 라인이 저장되지 않은 케이스 보충.
+
+    - 시연 D-5 회귀(#1) — 과거 입출고 중 BOM 자식 IoLine 이 저장 안 된 데이터가 다수 존재.
+    - 응답 시점에 BOM 마스터를 조회해 표시용 자식 라인을 생성. DB 는 건드리지 않음.
+    - origin="bom_fallback" 으로 표시해 프론트가 식별 가능 (현재는 그대로 표시).
+    """
+    if db is None or bundle.source_item_id is None:
+        return []
+    from app.models import BOM
+
+    rows = (
+        db.query(BOM)
+        .filter(BOM.parent_item_id == bundle.source_item_id)
+        .all()
+    )
+    if not rows:
+        return []
+    qty_decimal = Decimal(str(parent_line.quantity or 0))
+    fallback: list[dict] = []
+    for r in rows:
+        child = r.child_item
+        if child is None:
+            continue
+        expected = Decimal(str(r.quantity or 0)) * qty_decimal
+        fallback.append(
+            {
+                "line_id": uuid.uuid4(),
+                "item_id": r.child_item_id,
+                "item_name": child.item_name,
+                "item_code": child.item_code,
+                "unit": r.unit or "EA",
+                "direction": parent_line.direction,
+                "from_bucket": parent_line.from_bucket,
+                "from_department": parent_line.from_department,
+                "to_bucket": parent_line.to_bucket,
+                "to_department": parent_line.to_department,
+                "quantity": expected,
+                "bom_expected": expected,
+                "included": True,
+                "origin": "bom_fallback",
+                "edited": False,
+                "has_children": False,
+                "shortage": 0,
+                "exclusion_note": None,
+            }
+        )
+    return fallback
+
+
+def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
+    bundles_payload: list[dict] = []
+    for bundle in batch.bundles:
+        lines_payload = [_line_to_dict(line) for line in bundle.lines]
+        # 옛 데이터 회귀 보완 — BOM 부모 bundle 인데 자식 라인이 누락된 경우 BOM 마스터로 보충.
+        if (
+            db is not None
+            and bundle.source_kind == "bom_parent"
+            and bundle.source_item_id is not None
+        ):
+            parent_line = next(
+                (line for line in bundle.lines if line.origin == "direct"),
+                None,
+            )
+            has_children = any(line.origin != "direct" for line in bundle.lines)
+            if parent_line is not None and not has_children:
+                lines_payload.extend(_bom_fallback_child_lines(db, bundle, parent_line))
+        bundles_payload.append(
+            {
+                "bundle_id": bundle.bundle_id,
+                "source_kind": bundle.source_kind,
+                "title": bundle.title_snapshot,
+                "source_item_id": bundle.source_item_id,
+                "quantity": bundle.quantity,
+                "expanded_level": bundle.expanded_level,
+                "lines": lines_payload,
+            }
+        )
     return {
         "batch_id": batch.batch_id,
         "work_type": batch.work_type,
@@ -435,40 +539,7 @@ def _batch_to_payload(batch: IoBatch) -> dict:
         "updated_at": batch.updated_at,
         "submitted_at": batch.submitted_at,
         "completed_at": batch.completed_at,
-        "bundles": [
-            {
-                "bundle_id": bundle.bundle_id,
-                "source_kind": bundle.source_kind,
-                "title": bundle.title_snapshot,
-                "source_item_id": bundle.source_item_id,
-                "quantity": bundle.quantity,
-                "expanded_level": bundle.expanded_level,
-                "lines": [
-                    {
-                        "line_id": line.line_id,
-                        "item_id": line.item_id,
-                        "item_name": line.item_name_snapshot,
-                        "item_code": line.item_code_snapshot,
-                        "unit": line.unit,
-                        "direction": line.direction,
-                        "from_bucket": line.from_bucket,
-                        "from_department": line.from_department,
-                        "to_bucket": line.to_bucket,
-                        "to_department": line.to_department,
-                        "quantity": line.quantity,
-                        "bom_expected": line.bom_expected,
-                        "included": line.included,
-                        "origin": line.origin,
-                        "edited": line.edited,
-                        "has_children": line.has_children_snapshot,
-                        "shortage": line.shortage,
-                        "exclusion_note": line.exclusion_note,
-                    }
-                    for line in bundle.lines
-                ],
-            }
-            for bundle in batch.bundles
-        ],
+        "bundles": bundles_payload,
     }
 
 
@@ -998,7 +1069,7 @@ def submit_existing_draft(
 
 def get_batch(db: Session, *, batch_id: uuid.UUID) -> Optional[dict]:
     batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
-    return _batch_to_payload(batch) if batch else None
+    return _batch_to_payload(batch, db=db) if batch else None
 
 
 def sync_batch_from_stock_request(db: Session, request: StockRequest) -> None:
