@@ -128,14 +128,16 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
                 )}
               </div>
             </div>
-            {/* 하단 행 한 줄: 입고 · 출고 · 현재. leading-none 으로 line-height 부풀음 제거 →
-                상·하단 행이 카드 안에서 정확히 수직 가운데 정렬됨. */}
+            {/* 하단 행 한 줄: 입고 · 출고 · 현재.
+                grid grid-cols-3 으로 셀 위치를 1/3 등분 고정 — justify-between 은 좌·우
+                child 너비에 따라 가운데 child 위치가 흔들려 카드 간 정렬이 깨짐(예: 출하 전부 0
+                vs 조립 현재 25,200). 각 셀 안에서 left/center/right 정렬로 컬럼처럼 줄세움. */}
             <div
-              className="flex items-center justify-between gap-2 border-t px-2.5 py-1 text-[11px] leading-none tabular-nums"
+              className="grid grid-cols-3 items-center border-t px-2.5 py-1 text-[11px] leading-none tabular-nums"
               style={{ borderColor: tint(LEGACY_COLORS.border, 60, "transparent") }}
             >
               <span
-                className={g.in_qty > 0 ? "font-semibold" : "font-medium"}
+                className={`text-left ${g.in_qty > 0 ? "font-semibold" : "font-medium"}`}
                 style={{
                   color:
                     g.in_qty > 0
@@ -146,7 +148,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
                 입고 {formatQty(g.in_qty)}
               </span>
               <span
-                className={g.out_qty > 0 ? "font-semibold" : "font-medium"}
+                className={`text-center ${g.out_qty > 0 ? "font-semibold" : "font-medium"}`}
                 style={{
                   color:
                     g.out_qty > 0
@@ -157,7 +159,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
                 출고 {formatQty(g.out_qty)}
               </span>
               <span
-                className={g.current_qty > 0 ? "font-semibold" : "font-medium"}
+                className={`text-right ${g.current_qty > 0 ? "font-semibold" : "font-medium"}`}
                 style={{
                   color: g.current_qty > 0 ? LEGACY_COLORS.muted2 : ZERO_FADE,
                 }}
