@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import (
+    BOM,
     DepartmentEnum,
     Employee,
     InventoryLocation,
@@ -52,6 +53,8 @@ class DefectLocationItem(BaseModel):
     defective_at: Optional[datetime]
     reason_category: Optional[str]
     reason_memo: Optional[str]
+    # BOM 자식 보유 여부. 프론트 격리 처리 액션에서 "재작업" 옵션 노출 조건.
+    has_bom: bool = False
 
 
 class DefectKpi(BaseModel):
@@ -125,6 +128,15 @@ def list_defect_locations(
 
     rows = q.order_by(InventoryLocation.defective_at.asc().nullsfirst()).all()
 
+    # BOM 자식 보유 item_id 집합 일괄 조회 — 격리 처리 "재작업" 옵션 노출 조건.
+    item_ids = {loc.item_id for loc, _ in rows}
+    bom_items = set(
+        row[0]
+        for row in (
+            db.query(BOM.parent_item_id).filter(BOM.parent_item_id.in_(item_ids)).distinct().all()
+        )
+    ) if item_ids else set()
+
     result: List[DefectLocationItem] = []
     for loc, item in rows:
         # 해당 (item, dept) 의 최근 MARK_DEFECTIVE 로그 조회
@@ -147,6 +159,7 @@ def list_defect_locations(
                 defective_at=loc.defective_at,
                 reason_category=last_log.reason_category if last_log else None,
                 reason_memo=last_log.reason_memo if last_log else None,
+                has_bom=item.item_id in bom_items,
             )
         )
     return result

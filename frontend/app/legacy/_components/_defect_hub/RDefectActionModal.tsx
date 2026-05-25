@@ -159,7 +159,7 @@ export function RDefectActionModal({
             </div>
             <div className="mt-0.5 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
               {location.department} [불량] / 격리{" "}
-              {new Date(location.defective_at).toLocaleDateString("ko-KR")}
+              {location.defective_at ? new Date(location.defective_at).toLocaleDateString("ko-KR") : "기록 없음"}
             </div>
           </div>
         </div>

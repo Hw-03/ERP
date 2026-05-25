@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, ArrowRight, ChevronDown, History, Pencil } from "lucide-react";
+import { Activity, ArrowRight, ChevronDown, History, Pencil, StickyNote } from "lucide-react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch } from "@/lib/api/types/io";
@@ -16,8 +16,9 @@ import {
   getHistoryDisplayLabel,
   getHistoryWorkTypeLabel,
   getSingleLogMovement,
+  parseTransactionNotes,
 } from "./historyBatchInterpreter";
-import { FlowBadge, MemoCell, MovementSummaryCell } from "./historyTableHelpers";
+import { FlowBadge, MovementSummaryCell } from "./historyTableHelpers";
 import {
   QUANTITY_CORRECTABLE_TYPES,
   TransactionEditUnifiedModal,
@@ -113,6 +114,8 @@ export function HistoryDetailPanel({
   return (
     <div className="space-y-4">
       <HistoryDetailHero log={selected} flow={flow} editCount={editCount} />
+
+      <HistoryDetailMemo notes={selected.notes} />
 
       <HistoryDetailMetaStrip
         log={selected}
@@ -281,7 +284,9 @@ function HistoryDetailMetaStrip({
   onEditClick: () => void;
 }) {
   const processMeta = PROCESS_TYPE_META[log.item_process_type_code ?? ""];
-  const actor = getHistoryActor(log);
+  const reqName = getHistoryActor(log);
+  // 승인자: 백엔드가 stock_request 있으면 그 approved_by_name, 없으면 요청자 자신.
+  const approverName = log.approver_name ?? reqName;
 
   return (
     <div
@@ -304,11 +309,15 @@ function HistoryDetailMetaStrip({
           {log.item_code ?? "-"}
         </span>
         <span style={{ color: LEGACY_COLORS.muted2 }}>·</span>
-        <span style={{ color: LEGACY_COLORS.muted2 }}>담당자</span>
+        <span style={{ color: LEGACY_COLORS.muted2 }}>요청자</span>
         <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>
-          {actor}
+          {reqName}
         </span>
-        <MemoCell notes={log.notes} />
+        <span style={{ color: LEGACY_COLORS.muted2 }}>·</span>
+        <span style={{ color: LEGACY_COLORS.muted2 }}>승인자</span>
+        <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>
+          {approverName}
+        </span>
         <span style={{ color: LEGACY_COLORS.muted2 }}>
           {formatHistoryDateTimeLong(log.created_at)}
         </span>
@@ -323,6 +332,39 @@ function HistoryDetailMetaStrip({
           정정
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * 메모 섹션 — 사용자가 직접 입력한 메모만 노출. 시스템 자동 생성 노트
+ * (요청 승인 처리, [dept_adj], [격리] 등)는 parseTransactionNotes 가 걸러냄.
+ * HistoryBatchDetailPanel 에서도 재사용.
+ */
+export function HistoryDetailMemo({ notes }: { notes: string | null | undefined }) {
+  const { userMemo } = parseTransactionNotes(notes);
+  if (!userMemo) return null;
+  return (
+    <div
+      className="rounded-[20px] border p-4"
+      style={{
+        background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 5%, ${LEGACY_COLORS.s2})`,
+        borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 22%, ${LEGACY_COLORS.border})`,
+      }}
+    >
+      <div
+        className="mb-2 flex items-center gap-1.5 text-xs font-bold tracking-wide"
+        style={{ color: LEGACY_COLORS.blue }}
+      >
+        <StickyNote className="h-3.5 w-3.5" />
+        메모
+      </div>
+      <div
+        className="whitespace-pre-wrap break-words text-sm leading-relaxed"
+        style={{ color: LEGACY_COLORS.text }}
+      >
+        {userMemo}
+      </div>
     </div>
   );
 }

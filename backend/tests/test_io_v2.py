@@ -201,6 +201,113 @@ def test_io_submit_receive_is_immediate(client, db_session, make_item):
     assert db_session.query(IoBatch).count() == 1
 
 
+def test_io_submit_shortage_message_includes_contributing_parents(
+    client, db_session, make_item, make_bom
+):
+    """회귀: 같은 자식 부품이 여러 BOM 부모에 등록돼 합산 시 재고 초과될 때,
+    에러 메시지에 어느 부모가 얼마씩 기여했는지(상위 3개) 표시되는지 검증.
+    개선 전: '재고 부족: X / 가능 52 / 요청 64' — 사용자가 어디서 줄여야 할지 모름."""
+    shared_child = make_item(name="공통자식", warehouse_qty=Decimal("3"))
+    parent_a = make_item(name="부모A", warehouse_qty=Decimal("0"))
+    parent_b = make_item(name="부모B", warehouse_qty=Decimal("0"))
+    make_bom(parent_a.item_id, shared_child.item_id, Decimal("2"))
+    make_bom(parent_b.item_id, shared_child.item_id, Decimal("2"))
+    requester = _make_employee(db_session, warehouse_role="primary")
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {"source_kind": "direct_item", "item_id": str(parent_a.item_id), "quantity": "1"},
+                {"source_kind": "direct_item", "item_id": str(parent_b.item_id), "quantity": "1"},
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+    # 각 부모 BOM 자식 2 + 2 = 4 요청, 재고 3 → 부족 1
+    res = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert res.status_code == 422, res.json()
+    detail = res.json().get("detail")
+    detail_text = detail if isinstance(detail, str) else str(detail)
+    assert "재고 부족" in detail_text
+    assert "공통자식" in detail_text
+    # 핵심: 합산에 기여한 부모 이름과 양이 표시돼야 함
+    assert "부모A" in detail_text, f"contributor breakdown missing: {detail_text}"
+    assert "부모B" in detail_text, f"contributor breakdown missing: {detail_text}"
+
+
+def test_io_submit_warehouse_to_dept_links_all_logs_to_batch(
+    client, db_session, make_item, make_bom
+):
+    """회귀: autoflush=False 환경에서 _link_stock_request 의 UPDATE 가
+    마지막 라인의 TransactionLog 를 놓쳐 NULL 로 남던 버그(입출고 내역에서
+    BOM 묶음의 마지막 자식이 solo row 로 분리되어 보이던 현상)."""
+    parent = make_item(name="BomParent", warehouse_qty=Decimal("0"))
+    # 마지막 라인까지 batch_id 가 박히는지 확인하려면 라인 ≥ 2 필요. 3개로 여유.
+    children = [
+        make_item(name=f"BomChild{i}", warehouse_qty=Decimal("100")) for i in range(3)
+    ]
+    for child in children:
+        make_bom(parent.item_id, child.item_id, Decimal("1"))
+    # 자가승인 가능한 창고 정 — 즉시 실행 경로(_execute_all_lines) 진입.
+    requester = _make_employee(db_session, warehouse_role="primary")
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(parent.item_id),
+                    "quantity": "1",
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+
+    res = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert res.status_code == 201, res.json()
+    assert res.json()["status"] == "completed"
+
+    batch = db_session.query(IoBatch).one()
+    logs = db_session.query(TransactionLog).all()
+    assert len(logs) == len(children), f"expected {len(children)} logs, got {len(logs)}"
+    # 핵심: 모든 로그가 batch.batch_id 로 묶여 있어야 함 (마지막 라인 포함).
+    assert all(log.operation_batch_id == batch.batch_id for log in logs), (
+        f"orphan logs found: "
+        f"{[(str(l.item_id)[:8], l.operation_batch_id) for l in logs]}"
+    )
+
+
 def test_io_submit_draft_endpoint_completes_batch(client, db_session, make_item):
     item = make_item(name="Raw Draft", warehouse_qty=Decimal("0"))
     requester = _make_employee(db_session)

@@ -17,12 +17,19 @@ export interface DefectInventoryPickerProps {
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
-function isOverOneYear(defectiveAt: string): boolean {
-  return Date.now() - new Date(defectiveAt).getTime() > ONE_YEAR_MS;
+// null/invalid 입력 방어 — new Date(null)=epoch(1970) 으로 "56년 전" 으로 보이는 과거 버그 차단.
+function isOverOneYear(defectiveAt: string | null): boolean {
+  if (!defectiveAt) return false;
+  const t = new Date(defectiveAt).getTime();
+  if (!Number.isFinite(t)) return false;
+  return Date.now() - t > ONE_YEAR_MS;
 }
 
-function formatRelative(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
+function formatRelative(iso: string | null): string {
+  if (!iso) return "기록 없음";
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return "기록 없음";
+  const diffMs = Date.now() - t;
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   if (diffDays < 30) return `${diffDays}일 전`;
   const diffMonths = Math.floor(diffDays / 30);
@@ -40,13 +47,15 @@ export function DefectInventoryPicker({
   const [locations, setLocations] = useState<DefectLocation[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // 빈 department (supplier_return 의 "창고" sentinel) → 전 부서 통합 조회.
+  const isAllMode = !department || department === "창고";
   useEffect(() => {
     setLoading(true);
     defectsApi
-      .listDefects(department)
+      .listDefects(isAllMode ? undefined : department)
       .then(setLocations)
       .finally(() => setLoading(false));
-  }, [department]);
+  }, [department, isAllMode]);
 
   if (loading) {
     return (
@@ -68,7 +77,7 @@ export function DefectInventoryPicker({
           className="rounded-[14px] border px-6 py-8 text-center"
           style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
         >
-          <p className="text-base font-bold">해당 부서에 격리된 재고가 없습니다.</p>
+          <p className="text-base font-bold">{isAllMode ? "격리된 재고가 없습니다." : "해당 부서에 격리된 재고가 없습니다."}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -114,6 +123,14 @@ export function DefectInventoryPicker({
                       style={{ color: LEGACY_COLORS.muted }}
                     >
                       <span>격리 수량 {formatQty(Number(loc.quantity))}개</span>
+                      {isAllMode && (
+                        <span
+                          className="rounded-full px-2 py-0.5 font-bold"
+                          style={{ background: tint(LEGACY_COLORS.muted2, 14), color: LEGACY_COLORS.muted }}
+                        >
+                          {loc.department}
+                        </span>
+                      )}
                       <span>{formatRelative(loc.defective_at)}</span>
                       {loc.reason_category && (
                         <span

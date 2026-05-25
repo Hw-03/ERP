@@ -7,7 +7,6 @@ import type { IoSubType } from "./types";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import type { ChildDecision } from "../_defect_hub/DisassembleTree";
 import { ReasonFormFields } from "../_defect_hub/ReasonFormFields";
-import { DisassembleTree } from "../_defect_hub/DisassembleTree";
 
 interface DefectActionStepProps {
   subType: IoSubType;
@@ -42,7 +41,7 @@ function SummaryCard({ location }: { location: DefectLocation }) {
         <span>{location.item_code}</span>
         <span>격리 수량 {formatQty(Number(location.quantity))}개</span>
         <span>{location.department}</span>
-        <span>격리 {new Date(location.defective_at).toLocaleDateString("ko-KR")}</span>
+        <span>격리 {location.defective_at ? new Date(location.defective_at).toLocaleDateString("ko-KR") : "기록 없음"}</span>
       </div>
     </div>
   );
@@ -73,11 +72,9 @@ export function DefectActionStep({
   canAdvance,
   onAdvance,
 }: DefectActionStepProps) {
-  const isPaPf =
-    selectedLocation.item_code.startsWith("PA-") ||
-    selectedLocation.item_code.startsWith("PF-") ||
-    selectedLocation.item_code.startsWith("PA") ||
-    selectedLocation.item_code.startsWith("PF");
+  // 재작업(disassemble) 노출 조건: BOM 자식이 등록된 품목. 백엔드 has_bom 플래그 사용.
+  // 기존 isPaPf prefix 휴리스틱 대체 — BOM 등록 여부가 더 정확.
+  const hasBom = selectedLocation.has_bom;
 
   if (subType === "defect_restore") {
     return (
@@ -129,7 +126,7 @@ export function DefectActionStep({
             color: LEGACY_COLORS.yellow,
           }}
         >
-          원자재 반품 (창고 결재 필요)
+          원자재 반품 (출처 부서 결재 필요)
         </div>
 
         <ReasonFormFields
@@ -154,7 +151,7 @@ export function DefectActionStep({
   }
 
   // defect_process
-  const options = isPaPf ? PROCESS_OPTIONS : PROCESS_OPTIONS.filter((o) => o.value !== "disassemble");
+  const options = hasBom ? PROCESS_OPTIONS : PROCESS_OPTIONS.filter((o) => o.value !== "disassemble");
 
   return (
     <div className="flex flex-col gap-4">
@@ -194,13 +191,16 @@ export function DefectActionStep({
       </div>
 
       {action === "disassemble" && (
-        <DisassembleTree
-          parentItemId={selectedLocation.item_id}
-          parentQty={Number(selectedLocation.quantity)}
-          parentDept={selectedLocation.department}
-          decisions={bomDecisions}
-          onChange={onBomDecisionsChange}
-        />
+        <div
+          className="rounded-[12px] border px-4 py-3 text-xs font-bold"
+          style={{
+            background: tint(LEGACY_COLORS.blue, 8),
+            borderColor: tint(LEGACY_COLORS.blue, 30),
+            color: LEGACY_COLORS.blue,
+          }}
+        >
+          재작업은 다음 단계에서 BOM 자식별 정상/폐기 수량을 결정합니다.
+        </div>
       )}
 
       <ReasonFormFields
@@ -218,7 +218,11 @@ export function DefectActionStep({
         className="flex w-full items-center justify-center gap-2 rounded-[18px] px-7 py-5 text-lg font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
         style={{ background: LEGACY_COLORS.red }}
       >
-        {canAdvance ? "제출하기 →" : "처리 방법과 사유를 선택하세요"}
+        {!canAdvance
+          ? "처리 방법과 사유를 선택하세요"
+          : action === "disassemble"
+            ? "다음 단계 (재작업 결정) →"
+            : "제출하기 →"}
       </button>
     </div>
   );

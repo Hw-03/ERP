@@ -971,6 +971,11 @@
             "title": "Department",
             "type": "string"
           },
+          "has_bom": {
+            "default": false,
+            "title": "Has Bom",
+            "type": "boolean"
+          },
           "item_code": {
             "anyOf": [
               {
@@ -2328,6 +2333,29 @@
       },
       "IoBatchResponse": {
         "properties": {
+          "approver_employee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approver Employee Id"
+          },
+          "approver_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approver Name"
+          },
           "batch_id": {
             "format": "uuid",
             "title": "Batch Id",
@@ -2506,6 +2534,17 @@
             ],
             "title": "Quantity"
           },
+          "source_item_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Item Code"
+          },
           "source_item_id": {
             "anyOf": [
               {
@@ -2559,6 +2598,17 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
             "type": "string"
+          },
+          "source_item_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Item Code"
           },
           "source_item_id": {
             "anyOf": [
@@ -5673,6 +5723,17 @@
       },
       "TransactionLogResponse": {
         "properties": {
+          "approver_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approver Name"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",

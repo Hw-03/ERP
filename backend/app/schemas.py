@@ -444,6 +444,8 @@ class TransactionLogResponse(BaseModel):
     reference_no: Optional[str]
     produced_by: Optional[str]
     requester_name: Optional[str] = None
+    # 승인자(요청을 수락한 사람). 직접 처리 시 = 요청자.
+    approver_name: Optional[str] = None
     notes: Optional[str]
     operation_batch_id: Optional[uuid.UUID] = None
     created_at: UtcDatetime
@@ -851,6 +853,7 @@ class IoBundlePayload(BaseModel):
     source_kind: str
     title: str
     source_item_id: Optional[uuid.UUID] = None
+    source_item_code: Optional[str] = None
     quantity: Decimal
     expanded_level: int = 1
     lines: List[IoLinePayload] = Field(default_factory=list)
@@ -896,6 +899,9 @@ class IoBatchResponse(BaseModel):
     requester_employee_id: uuid.UUID
     requester_name: str
     requester_department: str
+    # 승인자(요청을 수락한 사람). stock_request 경로 → 그 request 의 approved_by. 직접 처리(stock_request 없음) → 요청자 자신.
+    approver_employee_id: Optional[uuid.UUID] = None
+    approver_name: Optional[str] = None
     from_department: Optional[str] = None
     to_department: Optional[str] = None
     requires_approval: bool

@@ -77,6 +77,8 @@ export function IoLineRow({
     line.bom_expected != null &&
     Number(line.bom_expected) > 0;
   const stepperDisabled = disabled || qtyLocked;
+  // + 버튼은 미체크 상태에서도 활성 — qty=0 자동 해제된 라인 복귀용. qtyLocked 만 차단.
+  const incrementDisabled = qtyLocked;
   const shortage = line.included && line.shortage > 0;
   const titleColor = disabled ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text;
   const rowBackground = shortage ? tint(LEGACY_COLORS.red, 8) : "transparent";
@@ -213,10 +215,10 @@ export function IoLineRow({
               color: LEGACY_COLORS.text,
             }}
           />
-          <StepBtn tone={LEGACY_COLORS.green} disabled={stepperDisabled} onClick={() => onStep(1)}>
+          <StepBtn tone={LEGACY_COLORS.green} disabled={incrementDisabled} onClick={() => onStep(1)}>
             +1
           </StepBtn>
-          <StepBtn tone={LEGACY_COLORS.green} disabled={stepperDisabled} onClick={() => onStep(10)}>
+          <StepBtn tone={LEGACY_COLORS.green} disabled={incrementDisabled} onClick={() => onStep(10)}>
             +10
           </StepBtn>
         </div>

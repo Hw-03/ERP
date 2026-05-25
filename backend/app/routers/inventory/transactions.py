@@ -23,6 +23,7 @@ from app.models import (
     Item,
     ItemModel,
     ProductSymbol,
+    StockRequest,
     TransactionEditLog,
     TransactionLog,
     TransactionTypeEnum,
@@ -289,7 +290,11 @@ _TX_ROW_COLOR = {
 
 
 def _to_log_response(
-    log: TransactionLog, item: Item, edit_count: int = 0, requester_name: Optional[str] = None
+    log: TransactionLog,
+    item: Item,
+    edit_count: int = 0,
+    requester_name: Optional[str] = None,
+    approver_name: Optional[str] = None,
 ) -> TransactionLogResponse:
     return TransactionLogResponse(
         log_id=log.log_id,
@@ -306,6 +311,7 @@ def _to_log_response(
         reference_no=log.reference_no,
         produced_by=log.produced_by,
         requester_name=requester_name,
+        approver_name=approver_name,
         notes=log.notes,
         operation_batch_id=log.operation_batch_id,
         created_at=log.created_at,
@@ -449,15 +455,37 @@ def list_transactions(
     # IoBatch outerjoin + requester_name search 적용 검토.
     rows = query.order_by(TransactionLog.created_at.desc()).offset(skip).limit(limit).all()
 
-    # operation_batch_id 기준으로 IoBatch 일괄 조회 → requester_name 매핑
+    # operation_batch_id 기준으로 IoBatch 일괄 조회 → requester_name + approver_name 매핑.
+    # 승인자(요청을 수락한 사람): stock_request 있으면 그 request 의 approved_by_name, 없으면 요청자 자신(직접 처리 케이스).
     batch_ids = {log.operation_batch_id for log, _, _ in rows if log.operation_batch_id}
-    batch_map: dict[uuid.UUID, str] = {}
+    batch_map: dict[uuid.UUID, tuple[Optional[str], Optional[str]]] = {}
     if batch_ids:
-        batches = db.query(IoBatch.batch_id, IoBatch.requester_name).filter(IoBatch.batch_id.in_(batch_ids)).all()
-        batch_map = {b.batch_id: b.requester_name for b in batches}
+        batches = (
+            db.query(IoBatch.batch_id, IoBatch.requester_name, IoBatch.stock_request_id)
+            .filter(IoBatch.batch_id.in_(batch_ids))
+            .all()
+        )
+        sr_ids = [b.stock_request_id for b in batches if b.stock_request_id]
+        sr_approver: dict[uuid.UUID, Optional[str]] = {}
+        if sr_ids:
+            for sr_id, app_name in (
+                db.query(StockRequest.request_id, StockRequest.approved_by_name)
+                .filter(StockRequest.request_id.in_(sr_ids))
+                .all()
+            ):
+                sr_approver[sr_id] = app_name
+        for b in batches:
+            approver = sr_approver.get(b.stock_request_id) if b.stock_request_id else None
+            batch_map[b.batch_id] = (b.requester_name, approver or b.requester_name)
 
     return [
-        _to_log_response(log, item, int(edit_count or 0), requester_name=batch_map.get(log.operation_batch_id))
+        _to_log_response(
+            log,
+            item,
+            int(edit_count or 0),
+            requester_name=batch_map.get(log.operation_batch_id, (None, None))[0],
+            approver_name=batch_map.get(log.operation_batch_id, (None, None))[1],
+        )
         for log, item, edit_count in rows
     ]
 

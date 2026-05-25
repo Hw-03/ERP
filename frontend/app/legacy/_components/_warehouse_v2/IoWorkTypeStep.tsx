@@ -176,7 +176,7 @@ export function IoSubTypeStep({
       {showAnyDept && dept.from && (
         <DeptGrid
           label={
-            subType === "supplier_return" ? "반품할 부서 (불량 출처)"
+            subType === "supplier_return" ? "출처"
             : subType === "defect_quarantine" ? "불량 격리 부서"
             : subType === "defect_restore" ? "격리 해제 부서"
             : subType === "defect_process" ? "처리할 부서 (불량 출처)"
@@ -184,6 +184,11 @@ export function IoSubTypeStep({
           }
           value={fromDepartment}
           onChange={onFromDepartmentChange}
+          options={
+            subType === "supplier_return" ? ["창고"]
+            : subType === "defect_quarantine" ? [...PROD_DEPTS, "창고"]
+            : undefined
+          }
           fill
         />
       )}
@@ -232,18 +237,24 @@ function DeptGrid({
   label,
   value,
   onChange,
+  options,
   fill = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  // supplier_return 같이 옵션 제한이 필요한 sub_type 에서 ["창고"] 등 단일 옵션 주입. 미지정시 PROD_DEPTS.
+  options?: readonly string[];
   fill?: boolean;
 }) {
+  const items = options ?? PROD_DEPTS;
+  // 7개 옵션(PROD_DEPTS + 창고) 일 때 grid-cols-7 자동. 그 외엔 기존 grid-cols-6 유지.
+  const colsClass = items.length === 7 ? "grid-cols-7" : "grid-cols-6";
   return (
     <div className={fill ? "flex min-h-0 flex-col" : undefined}>
       <Step2Label label={label} />
-      <div className={fill ? "grid min-h-0 flex-1 grid-cols-6 gap-3" : "grid grid-cols-6 gap-3"}>
-        {PROD_DEPTS.map((d) => {
+      <div className={fill ? `grid min-h-0 flex-1 ${colsClass} gap-3` : `grid ${colsClass} gap-3`}>
+        {items.map((d) => {
           const active = d === value;
           const deptColor = MES_DEPARTMENT_COLORS[d as keyof typeof MES_DEPARTMENT_COLORS] ?? LEGACY_COLORS.purple;
           return (

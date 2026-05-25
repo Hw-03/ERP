@@ -47,6 +47,7 @@ export interface IoBundle {
   source_kind: IoSourceKind;
   title: string;
   source_item_id: string | null;
+  source_item_code: string | null;
   quantity: number;
   expanded_level: number;
   lines: IoLine[];
@@ -94,6 +95,9 @@ export interface IoBatch {
   requester_employee_id: string;
   requester_name: string;
   requester_department: Department | string;
+  /** 승인자(요청을 수락한 사람). 직접 처리 시 = 요청자. */
+  approver_employee_id: string | null;
+  approver_name: string | null;
   from_department: Department | string | null;
   to_department: Department | string | null;
   requires_approval: boolean;

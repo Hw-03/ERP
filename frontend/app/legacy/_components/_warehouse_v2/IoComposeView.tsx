@@ -13,7 +13,7 @@ import { IoTargetPicker } from "./IoTargetPicker";
 import { IoBundleCart } from "./IoBundleCart";
 import { IoConfirmStep } from "./IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "./IoSubmitModals";
-import { IO_WORK_TYPES, approvalKind, directionWord, isDefectInventorySubType, isExitWorkType, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
+import { IO_WORK_TYPES, approvalKind, deptVisibility, directionWord, isDefectInventorySubType, isExitWorkType, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
 import { applyBundleQuantityChange, applyLineQuantityChange, applyToggleLine } from "./bomSync";
 import { useIoDraftRestore } from "./useIoDraftRestore";
 import { useIoDraft } from "./useIoDraft";
@@ -25,6 +25,7 @@ import { useIoPreselect } from "./useIoPreselect";
 import type { IoComposeViewProps } from "./types";
 import { DefectInventoryPicker } from "./DefectInventoryPicker";
 import { DefectActionStep } from "./DefectActionStep";
+import { DisassembleTree, toServerDecision } from "../_defect_hub/DisassembleTree";
 import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { Department } from "@/lib/api/types/shared";
@@ -384,11 +385,8 @@ export function IoComposeView({
         });
         setResult({ kind: "success", title: "결재 요청 완료", message: "창고 결재 요청이 제출되었습니다." });
       } else if (action === "disassemble") {
-        const childDecisions = state.defectBomDecisions.map((d) => ({
-          item_id: d.item_id,
-          action: d.action,
-          qty: d.qty,
-        }));
+        // 재귀 트리 페이로드 — 중간 노드는 children 포함, leaf 는 keep_qty/scrap 분할.
+        const childDecisions = state.defectBomDecisions.map(toServerDecision);
         await stockRequestsApi.createStockRequest({
           requester_employee_id: employeeId,
           request_type: "defect_disassemble",
@@ -429,7 +427,7 @@ export function IoComposeView({
       }
     }
     try {
-      const kind = approvalKind(state.subType, state.bundles);
+      const kind = approvalKind(state.subType, state.bundles, state.fromDepartment);
       const response = await submit({
         employeeId,
         workType: state.workType,
@@ -475,9 +473,21 @@ export function IoComposeView({
   const dept = requiresDepartments(state.subType)
     ? `${state.fromDepartment} → ${state.toDepartment}`
     : "부서 무관";
-  const stepTwoSummary = state.workType === "process"
-    ? `${directionWord(state.deptIoDirection)} · ${state.toDepartment}`
-    : `${subTypeText} · ${dept}`;
+  const stepTwoSummary = (() => {
+    if (state.workType === "process") {
+      return `${directionWord(state.deptIoDirection)} · ${state.toDepartment}`;
+    }
+    // 라벨에 이미 방향이 박힌 subType — 라벨의 "부서" 자리를 실제 부서명으로 치환
+    if (state.subType === "warehouse_to_dept") return `창고 → ${state.toDepartment}`;
+    if (state.subType === "dept_to_warehouse") return `${state.fromDepartment} → 창고`;
+    if (!requiresDepartments(state.subType)) return `${subTypeText} · 부서 무관`;
+    // 그 외 — deptVisibility 가 의미있는 부서만 한 번 표기
+    const vis = deptVisibility(state.subType);
+    if (vis.from && vis.to) return `${subTypeText} · ${state.fromDepartment} → ${state.toDepartment}`;
+    if (vis.from) return `${subTypeText} · ${state.fromDepartment}`;
+    if (vis.to) return `${subTypeText} · ${state.toDepartment}`;
+    return subTypeText;
+  })();
   const includedCount = state.includedLines.length;
   const excludedCount = state.excludedLines.length;
   const lineCount = state.bundles.reduce((acc, b) => acc + b.lines.length, 0);
@@ -745,8 +755,8 @@ export function IoComposeView({
           <WizardStepCard
             n={3}
             title={
-              state.workType === "defect" && isDefectInventorySubType(state.subType)
-                ? "처리 대상 선택"
+              state.workType === "defect"
+                ? (isDefectInventorySubType(state.subType) ? "처리 대상 선택" : "불량 격리 대상 품목 선택")
                 : `${pickerDirectionLabel(state.subType)} 품목 선택`
             }
             state={stepState(3)}
@@ -823,7 +833,12 @@ export function IoComposeView({
                 }}
                 onBomDecisionsChange={state.setDefectBomDecisions}
                 canAdvance={state.canAdvance[4]}
-                onAdvance={handleDefectInventorySubmit}
+                // 재작업(disassemble) 은 Step 5 에서 결정 입력 후 제출. 그 외는 즉시 제출.
+                onAdvance={
+                  state.subType === "defect_process" && state.defectAction === "disassemble"
+                    ? () => state.goTo(5)
+                    : handleDefectInventorySubmit
+                }
               />
             ) : (
             <IoBundleCart
@@ -891,10 +906,50 @@ export function IoComposeView({
               hasShortage={state.hasShortage}
               hasInvalidQuantity={state.hasInvalidQuantity}
               submitting={submitting || drafting}
-              approvalKind={approvalKind(state.subType, state.bundles)}
+              approvalKind={approvalKind(state.subType, state.bundles, state.fromDepartment)}
               onNotesChange={state.setNotes}
               onSubmit={handleSubmit}
             />
+          </WizardStepCard>
+        </div>
+      )}
+
+      {/* Step 5 — defect_process + disassemble 전용 (BOM 재귀 분해 결정) */}
+      {step >= 5
+        && state.workType === "defect"
+        && state.subType === "defect_process"
+        && state.defectAction === "disassemble"
+        && state.defectSelectedLocation && (
+        <div
+          ref={(el) => { stepRefs.current[5] = el; }}
+          className={stepWrapperClass(5)}
+        >
+          <WizardStepCard
+            n={5}
+            title="재작업 결정"
+            state={stepState(5)}
+            summary="BOM 분해 — 자식별 정상/폐기 수량 결정"
+            accent={accent}
+            fill={step === 5}
+          >
+            <div className="flex flex-col gap-4">
+              <DisassembleTree
+                parentItemId={state.defectSelectedLocation.item_id}
+                parentQty={Number(state.defectSelectedLocation.quantity)}
+                parentDept={state.defectSelectedLocation.department}
+                decisions={state.defectBomDecisions}
+                onChange={state.setDefectBomDecisions}
+              />
+              <button
+                type="button"
+                onClick={handleDefectInventorySubmit}
+                disabled={!state.canAdvance[5] || defectSubmitting}
+                className="flex w-full items-center justify-center gap-2 rounded-[18px] px-7 py-5 text-lg font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
+                style={{ background: LEGACY_COLORS.red }}
+              >
+                {state.canAdvance[5] ? "재작업 제출하기 →" : "정상 수량을 0..총수량 범위로 입력하세요"}
+              </button>
+            </div>
           </WizardStepCard>
         </div>
       )}

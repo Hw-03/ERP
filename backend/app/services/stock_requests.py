@@ -534,14 +534,24 @@ def create_request(
     - 승인 불필요 → 즉시 실행 후 COMPLETED.
     - requires_department_approval=True 면 부서 결재까지 통과해야 COMPLETED.
     """
-    # 불량 처리 흐름은 항상 부서 결재 필요.
+    # 불량 격리/처리 결재 룰: 격리 출처가 "창고" 면 창고 정/부 결재, 그 외 부서면 그 부서 정/부 결재.
+    # 정/부 권한자 직접 처리 시 _finalize_submission 이 즉시 완료로 흡수 — 별도 분기 불필요.
     _DEFECT_TYPES = {
+        StockRequestTypeEnum.MARK_DEFECTIVE_WH,
+        StockRequestTypeEnum.MARK_DEFECTIVE_PROD,
         StockRequestTypeEnum.DEFECT_SCRAP,
         StockRequestTypeEnum.DEFECT_RETURN,
         StockRequestTypeEnum.DEFECT_DISASSEMBLE,
     }
+    warehouse_override: Optional[bool] = None
     if request_type in _DEFECT_TYPES:
-        requires_department_approval = True
+        source_dept = lines_input[0].from_department if lines_input else None
+        if source_dept == "창고" or source_dept is None:
+            warehouse_override = True
+            requires_department_approval = False
+        else:
+            warehouse_override = False
+            requires_department_approval = True
 
     _validate_lines(request_type, lines_input)
     _preflight_inventory_check(db, request_type, lines_input)
@@ -559,6 +569,7 @@ def create_request(
         request_code=code,
         submitted_at=now,
         client_request_id=client_request_id,
+        requires_warehouse_approval_override=warehouse_override,
         requires_department_approval=requires_department_approval,
         reason_category=reason_category,
         reason_memo=reason_memo,

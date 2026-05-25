@@ -169,3 +169,17 @@ export const patchJson = <T>(url: string, body?: unknown): Promise<T> =>
   writeJson<T>(url, "PATCH", body);
 export const deleteJson = <T = void>(url: string, body?: unknown): Promise<T> =>
   writeJson<T>(url, "DELETE", body);
+
+/**
+ * 백엔드 Decimal 직렬화 정규화 — Pydantic v2 의 Decimal → JSON 은 string ("2.00") 으로 떨어진다.
+ * 프론트 타입은 `number` 로 선언돼 있어도 실제는 string 인 경우가 많아 input value 에 "2.00" 처럼
+ * 노출되는 결함이 반복됨. 각 API wrapper 에서 수치 필드를 받자마자 이 헬퍼로 강제 변환.
+ */
+export function toNumber(v: unknown, fallback = 0): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : fallback;
+  }
+  return fallback;
+}

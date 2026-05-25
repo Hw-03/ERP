@@ -385,17 +385,20 @@ describe("getHistoryLineSignedQuantity", () => {
     expect(result.tone).toBe("increase");
   });
 
-  it("sub_type=warehouse_to_dept → -10 EA (decrease)", () => {
+  it("sub_type=warehouse_to_dept → '10 EA' (plain, 위치 이동이라 +/- 없음)", () => {
     const batch = makeBatch({ sub_type: "warehouse_to_dept" });
     const result = getHistoryLineSignedQuantity(baseLine, batch);
-    expect(result.sign).toBe("-");
-    expect(result.label).toBe("-10 EA");
+    expect(result.sign).toBe("");
+    expect(result.label).toBe("10 EA");
+    expect(result.tone).toBe("muted");
   });
 
-  it("sub_type=dept_to_warehouse → +10 EA (increase)", () => {
+  it("sub_type=dept_to_warehouse → '10 EA' (plain, 위치 이동이라 +/- 없음)", () => {
     const batch = makeBatch({ sub_type: "dept_to_warehouse" });
     const result = getHistoryLineSignedQuantity(baseLine, batch);
-    expect(result.sign).toBe("+");
+    expect(result.sign).toBe("");
+    expect(result.label).toBe("10 EA");
+    expect(result.tone).toBe("muted");
   });
 
   it("sub_type=dept_transfer → 이동 10 EA (move)", () => {

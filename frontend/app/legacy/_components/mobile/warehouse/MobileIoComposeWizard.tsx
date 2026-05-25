@@ -313,7 +313,7 @@ export function MobileIoComposeWizard({
       }
     }
     try {
-      const kind = approvalKind(state.subType, state.bundles);
+      const kind = approvalKind(state.subType, state.bundles, state.fromDepartment);
       const response = await submit({
         employeeId,
         workType: state.workType,
@@ -509,7 +509,7 @@ export function MobileIoComposeWizard({
             hasShortage={state.hasShortage}
             hasInvalidQuantity={state.hasInvalidQuantity}
             submitting={submitting || drafting}
-            approvalKind={approvalKind(state.subType, state.bundles)}
+            approvalKind={approvalKind(state.subType, state.bundles, state.fromDepartment)}
             onNotesChange={state.setNotes}
             onSubmit={handleSubmit}
           />

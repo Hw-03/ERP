@@ -136,10 +136,10 @@ describe("ioWorkType 상수", () => {
       ["disassemble", "분해", "상위 품목 출고 + 회수 품목 입고"],
       ["adjust_in", "수량보정 입고", "선택 품목 수량 증가"],
       ["adjust_out", "수량보정 출고", "선택 품목 수량 감소"],
-      ["defect_quarantine", "새 격리", "정상 재고를 격리 처리 (창고 승인)"],
+      ["defect_quarantine", "새 격리", "선택 부서의 정상 재고를 격리 처리 (해당 부서 결재)"],
       ["defect_restore", "격리 해제", "격리 재고를 정상 복귀 (즉시)"],
-      ["defect_process", "격리 처리", "격리 재고 폐기·재작업 (창고 승인)"],
-      ["supplier_return", "원자재 반품", "격리 재고를 공급처에 반품 (창고 승인)"],
+      ["defect_process", "격리 처리", "격리 재고 폐기·재작업 (출처 부서 결재)"],
+      ["supplier_return", "원자재 반품", "격리 재고를 공급처에 반품 (출처 부서 결재)"],
     ]);
   });
 
@@ -1106,5 +1106,68 @@ describe("[bomSync] applyBundleQuantityChange", () => {
     expect(c.quantity).toBe(10); // 5 * 2 강제
     expect(c.shortage).toBe(7); // max(0, 10 - 3)
     expect(c.edited).toBe(false);
+  });
+});
+
+describe("[bomSync] qty=0 자동 체크 해제", () => {
+  // hasInvalidQuantity 가드(qty<=0 included 라인은 submit 차단)에 걸려 사용자가 0 으로 줄였을 때
+  // 비활성화 버튼만 남던 dead-end UX 제거. 0 으로 줄이면 included=false 로 자동 전환.
+  it("단품 라인 qty=0 → included=false", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        lines: [makeLine({ line_id: "S", origin: "bom_auto", bom_expected: 5, quantity: 5, included: true })],
+      }),
+    ];
+    const next = applyLineQuantityChange(bundles, "B", "S", 0, 0, "warehouse_to_dept", availMap({ S: 100 }));
+    expect(next[0].lines[0].quantity).toBe(0);
+    expect(next[0].lines[0].included).toBe(false);
+    expect(next[0].lines[0].shortage).toBe(0);
+  });
+
+  it("상위(direct) qty=0 → 부모 + 비례 자식 모두 included=false", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        lines: [
+          makeLine({ line_id: "P", origin: "direct", quantity: 3, included: true }),
+          makeLine({ line_id: "C", origin: "bom_auto", bom_expected: 2, quantity: 6, included: true, edited: false }),
+        ],
+      }),
+    ];
+    const next = applyLineQuantityChange(bundles, "B", "P", 0, 0, "warehouse_to_dept", availMap({ C: 100 }));
+    const [p, c] = next[0].lines;
+    expect(p.quantity).toBe(0);
+    expect(p.included).toBe(false);
+    expect(c.quantity).toBe(0);
+    expect(c.included).toBe(false);
+  });
+
+  it("번들 qty=0 → 미편집 자식 included=false", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        quantity: 3,
+        lines: [
+          makeLine({ line_id: "C1", origin: "bom_auto", bom_expected: 2, included: true, edited: false }),
+        ],
+      }),
+    ];
+    const next = applyBundleQuantityChange(bundles, "B", 0, "warehouse_to_dept", availMap({ C1: 100 }));
+    expect(next[0].quantity).toBe(0);
+    expect(next[0].lines[0].quantity).toBe(0);
+    expect(next[0].lines[0].included).toBe(false);
+  });
+
+  it("qty>0 으로 복귀 → 자동 재체크 (included=true)", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        lines: [makeLine({ line_id: "S", origin: "bom_auto", bom_expected: 5, quantity: 0, included: false })],
+      }),
+    ];
+    const next = applyLineQuantityChange(bundles, "B", "S", 5, 0, "warehouse_to_dept", availMap({ S: 100 }));
+    expect(next[0].lines[0].quantity).toBe(5);
+    expect(next[0].lines[0].included).toBe(true);
   });
 });

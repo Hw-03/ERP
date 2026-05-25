@@ -133,10 +133,14 @@ function BundleRows({
   // BOM 부모 라인은 헤더로 흡수 — 자식 목록에서 제외. helper 단일 진입.
   const parentLine = getHistoryBomParentLine(bundle);
   const childLines = parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines;
-  const includedChildLines = childLines.filter((l) => l.included);
+  // 단품(BOM 아님) + 단일 라인 → 번들 헤더가 곧 그 품목. 자동차감 자식 행을 노출하면
+  // 동일 정보(이름·코드·수량)가 중복되고 "자동차감" 라벨도 의미 없음(BOM 차감 아님).
+  // → 헤더 우측 슬롯에 바로 item_code 노출하고 expand 비활성화.
+  const isSingleLineDirect = !isBomParent && childLines.length === 1;
+  const singleLineCode = isSingleLineDirect ? childLines[0].item_code : null;
   // 회귀 fix: source_kind 가 "bom_parent" 가 아니어도 lines 가 여럿이면 펼쳐서 표시.
   // 백엔드 응답의 source_kind 변경 또는 origin 누락에도 견디게 한다.
-  const canExpand = isBomParent || childLines.length > 0;
+  const canExpand = isBomParent || (!isSingleLineDirect && childLines.length > 0);
 
   // 헤더 우측 수량 — 부모 라인 있으면 sub_type 기반 부호+색.
   // 단품(BOM 아님)은 bundle.quantity 가 라인 수(1)로 들어가는 경우가 있어 의미 없음 →
@@ -146,7 +150,18 @@ function BundleRows({
     : bundle.lines.length === 1
       ? getHistoryLineSignedQuantity(bundle.lines[0], batch, bundle)
       : null;
-  const headerQtyText = headerSigned ? headerSigned.label : `${formatQty(bundle.quantity)}`;
+  // BOM 상위 headerSigned 가 없는 경로(예: BOM warehouse_to_dept 의 부모 라인 없음)는
+  // bundle.quantity 만으로 단위가 빠져 자식 라인 "N EA" 와 정렬이 어색. 라인 unit 가 단일이면
+  // 그 unit 을 헤더에도 붙여 통일.
+  const bundleUnit = (() => {
+    const units = new Set(bundle.lines.map((l) => (l.unit ?? "").trim()).filter(Boolean));
+    return units.size === 1 ? Array.from(units)[0] : null;
+  })();
+  const headerQtyText = headerSigned
+    ? headerSigned.label
+    : bundleUnit
+      ? `${formatQty(bundle.quantity)} ${bundleUnit}`
+      : `${formatQty(bundle.quantity)}`;
   const headerQtyColor = headerSigned ? SIGN_TONE_HEX[headerSigned.tone] : LEGACY_COLORS.muted2;
 
   return (
@@ -175,7 +190,7 @@ function BundleRows({
           </span>
         </td>
         {/* 품목명 — chevron 들여쓰기 px-4 로 통일(parent Layers 아이콘과 같은 x),
-            (N개 포함)은 우측 고정폭 슬롯에 좌측 정렬해서 item_code 와 동일 패턴 */}
+            우측 고정폭 슬롯에 item_code 노출(BOM 상위 + 단품 헤더 동일 패턴). */}
         <td className="border-b px-4 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
           <div className="flex items-center gap-1.5">
             {canExpand ? (
@@ -186,9 +201,14 @@ function BundleRows({
             <span className="min-w-0 flex-1 truncate text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
               {bundle.title}
             </span>
-            {canExpand && (
+            {canExpand && bundle.source_item_code && (
               <span className="w-[6rem] shrink-0 text-right text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                ({includedChildLines.length}개 포함)
+                {bundle.source_item_code}
+              </span>
+            )}
+            {isSingleLineDirect && singleLineCode && (
+              <span className="w-[6rem] shrink-0 text-right text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                {singleLineCode}
               </span>
             )}
           </div>

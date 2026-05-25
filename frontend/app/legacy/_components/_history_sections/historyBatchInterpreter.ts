@@ -126,6 +126,63 @@ export function getBatchFlowEndpoints(batch: IoBatch): BatchFlowEndpoints | null
 // 라벨 맵
 // ──────────────────────────────────────────────────────────────────
 
+/**
+ * TransactionLog.notes 파싱 — 시스템 자동 생성 메타와 사용자가 직접 입력한 메모를 분리.
+ *
+ * 백엔드가 자동으로 채우는 패턴(6 종):
+ *   1·2. "요청 (승인|즉시) 처리: {code} / {from} → {to} / {qty}개 / 요청자 {name}" (stock_requests.py)
+ *      3. 위 1·2 끝에 " / 비고: {사용자 입력}" 가 덧붙는 경우 — 비고만이 사용자 메모
+ *      4. "[dept_adj:{sub}] {op}: {reason}" (dept_adjustment.py) — reason 이 사용자 입력
+ *      5. "[defect_disassemble(:keep|:scrap)?] {note}" (dept_adjustment.py) — note 가 사용자 입력
+ *      6. "[격리] {src} → {tgt}" / "[정상복귀] {dept}" (defects.py) — 사용자 입력 없음
+ *
+ * 위 6 종 외엔 입출고 2.0 wizard 에서 사용자가 직접 입력한 비고(batch.notes 그대로) → 전체가 사용자 메모.
+ *
+ * 반환: `userMemo` (null 이면 사용자 메모 없음 — UI 에서 메모 카드/알약 미노출).
+ */
+export function parseTransactionNotes(notes: string | null | undefined): {
+  userMemo: string | null;
+} {
+  const text = notes?.trim();
+  if (!text) return { userMemo: null };
+
+  // 1·2·3: 요청 (승인|즉시) 처리 — "/ 비고: ..." 가 있으면 그 부분만 사용자 메모.
+  if (/^요청 (?:승인|즉시) 처리:/.test(text)) {
+    const parts = text.split(/\s*\/\s*비고:\s*/);
+    const userPart = parts.length > 1 ? parts.slice(1).join(" / 비고: ").trim() : "";
+    return { userMemo: userPart || null };
+  }
+
+  // 4: [dept_adj:{sub}] {op}: {reason} — reason 추출
+  const adjMatch = text.match(/^\[dept_adj:[^\]]+\][^:]*:\s*(.*)$/);
+  if (adjMatch) {
+    const reason = adjMatch[1]?.trim() ?? "";
+    return { userMemo: reason || null };
+  }
+
+  // 5a: [defect_disassemble] {category}: {memo}
+  const disPMatch = text.match(/^\[defect_disassemble\][^:]*:\s*(.*)$/);
+  if (disPMatch) {
+    const memo = disPMatch[1]?.trim() ?? "";
+    return { userMemo: memo || null };
+  }
+
+  // 5b/5c: [defect_disassemble:keep|scrap] {childNote}
+  const disCMatch = text.match(/^\[defect_disassemble:(?:keep|scrap)\]\s*(.*)$/);
+  if (disCMatch) {
+    const child = disCMatch[1]?.trim() ?? "";
+    return { userMemo: child || null };
+  }
+
+  // 6: [격리] / [정상복귀] — 사용자 입력 없음
+  if (/^\[격리\]\s/.test(text) || /^\[정상복귀\]/.test(text)) {
+    return { userMemo: null };
+  }
+
+  // 알려진 시스템 prefix 아님 → 전체가 사용자 메모
+  return { userMemo: text };
+}
+
 const _SUB_TYPE_OPERATION: Record<string, string> = {
   produce: "생산 등록",
   disassemble: "재작업",
@@ -413,8 +470,11 @@ export function getHistoryLineSignedQuantity(
       else if (isBomChild) setIncrease();
       else matched = false;
       break;
-    case "warehouse_to_dept": setDecrease(); break;
-    case "dept_to_warehouse": setIncrease(); break;
+    case "warehouse_to_dept":
+    case "dept_to_warehouse":
+      // 창고 ↔ 부서는 위치 이동이라 +/- 의 의미가 없음. BOM 상위 헤더 plain 표시와 통일.
+      sign = ""; tone = "muted"; label = _withUnit(qty, unit);
+      break;
     case "receive_supplier": setIncrease(); break;
     case "supplier_return":
     case "defect_quarantine":

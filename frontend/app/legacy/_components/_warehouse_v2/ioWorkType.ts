@@ -51,10 +51,10 @@ export const IO_SUB_TYPES: Record<
     { id: "adjust_out", label: "수량보정 출고", description: "선택 품목 수량 감소" },
   ],
   defect: [
-    { id: "defect_quarantine", label: "새 격리", description: "정상 재고를 격리 처리 (창고 승인)" },
+    { id: "defect_quarantine", label: "새 격리", description: "선택 부서의 정상 재고를 격리 처리 (해당 부서 결재)" },
     { id: "defect_restore",    label: "격리 해제", description: "격리 재고를 정상 복귀 (즉시)" },
-    { id: "defect_process",    label: "격리 처리", description: "격리 재고 폐기·재작업 (창고 승인)" },
-    { id: "supplier_return",   label: "원자재 반품", description: "격리 재고를 공급처에 반품 (창고 승인)" },
+    { id: "defect_process",    label: "격리 처리", description: "격리 재고 폐기·재작업 (출처 부서 결재)" },
+    { id: "supplier_return",   label: "원자재 반품", description: "격리 재고를 공급처에 반품 (출처 부서 결재)" },
   ],
 };
 
@@ -114,8 +114,20 @@ export type ApprovalKind = "none" | "warehouse" | "department";
  *  - department: manual_adjustment 등 낱개 라인 단독
  *  - none: 즉시 반영
  */
-export function approvalKind(subType: IoSubType, bundles: IoBundle[]): ApprovalKind {
-  if (requiresApproval(subType)) return "warehouse";
+export function approvalKind(
+  subType: IoSubType,
+  bundles: IoBundle[],
+  fromDepartment?: string | null,
+): ApprovalKind {
+  if (requiresApproval(subType)) {
+    // 불량 격리/처리: 격리 출처가 "창고" 면 창고 결재, 그 외 부서면 그 부서 결재.
+    // 백엔드 stock_requests.create_inventory_request 의 동일 분기와 동기.
+    const defectSubTypes: IoSubType[] = ["defect_quarantine", "supplier_return", "defect_process"];
+    if (defectSubTypes.includes(subType)) {
+      return !fromDepartment || fromDepartment === "창고" ? "warehouse" : "department";
+    }
+    return "warehouse";
+  }
   if (hasManualLine(bundles)) return "department";
   return "none";
 }

@@ -20,6 +20,8 @@ export interface TransactionLog {
   reference_no: string | null;
   produced_by: string | null;
   requester_name: string | null;
+  /** 승인자(요청을 수락한 사람). 직접 처리 시 = 요청자. */
+  approver_name: string | null;
   notes: string | null;
   operation_batch_id: string | null;
   created_at: string;

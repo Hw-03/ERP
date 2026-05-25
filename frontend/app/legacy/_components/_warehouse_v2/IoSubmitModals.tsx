@@ -24,7 +24,7 @@ export function IoSubmitModals({ result, onClose }: Props) {
       onClose={onClose}
       onConfirm={onClose}
     >
-      <p className="text-sm">{result?.message}</p>
+      <p className="whitespace-pre-line text-sm leading-relaxed">{result?.message}</p>
     </ConfirmModal>
   );
 }

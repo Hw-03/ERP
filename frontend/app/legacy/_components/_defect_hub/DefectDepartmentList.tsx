@@ -9,13 +9,17 @@ import type { DefectLocation } from "@/lib/api/types/defects";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
-function isOverOneYear(defectiveAt: string): boolean {
+function isOverOneYear(defectiveAt: string | null): boolean {
+  if (!defectiveAt) return false;
   const at = new Date(defectiveAt).getTime();
+  if (!Number.isFinite(at)) return false;
   return Date.now() - at > ONE_YEAR_MS;
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string | null): string {
+  if (!iso) return "기록 없음";
   const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "기록 없음";
   const yy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");

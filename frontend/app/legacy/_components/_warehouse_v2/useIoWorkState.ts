@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
 import { DEFAULT_SUB_TYPE, isDefectInventorySubType, type DeptIoDirection } from "./ioWorkType";
 import type { DefectLocation } from "@/lib/api/types/defects";
-import type { ChildDecision } from "../_defect_hub/DisassembleTree";
+import { validateDecisionTree, type ChildDecision } from "../_defect_hub/DisassembleTree";
 
 export type IoStep = 1 | 2 | 3 | 4 | 5;
 
@@ -69,6 +69,8 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
 
   const canAdvance = useMemo<Record<IoStep, boolean>>(() => {
     const defectInvMode = workType === "defect" && isDefectInventorySubType(subType);
+    // 재작업(disassemble) 시 Step 5 가 BOM 분해 결정. 그 외 defect 케이스는 Step 4 에서 submit.
+    const isDisassemble = subType === "defect_process" && defectAction === "disassemble";
     return {
       1: true,
       2: workType !== "process" || deptIoDirection != null,
@@ -76,9 +78,11 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
       4: defectInvMode
         ? !!defectReasonCategory && (subType !== "defect_process" || !!defectAction)
         : includedLines.length > 0 && !hasShortage && !hasInvalidQuantity,
-      5: true,
+      5: isDisassemble
+        ? defectBomDecisions.length > 0 && validateDecisionTree(defectBomDecisions)
+        : true,
     };
-  }, [workType, subType, deptIoDirection, bundles.length, includedLines.length, hasShortage, hasInvalidQuantity, defectSelectedLocation, defectAction, defectReasonCategory]);
+  }, [workType, subType, deptIoDirection, bundles.length, includedLines.length, hasShortage, hasInvalidQuantity, defectSelectedLocation, defectAction, defectReasonCategory, defectBomDecisions]);
 
   function goNext() {
     setStep((s) => (s < 5 ? ((s + 1) as IoStep) : s));

@@ -298,18 +298,24 @@ def submit_defective_disassemble(
     reason_memo: str,
     actor: str,
 ) -> dict:
-    """격리(DEFECTIVE) 품목 분해 처리.
+    """격리(DEFECTIVE) 품목 분해 처리 — 재귀 트리 + 수량 분할 지원.
 
-    child_decisions 형식:
-        [{"item_id": uuid, "action": "keep" | "scrap", "qty": Decimal, "reason_memo": str | None}, ...]
+    child_decisions 형식 (재귀):
+        leaf:    {"item_id": uuid, "qty": Decimal, "keep_qty": Decimal, "reason_memo": str|None}
+        nested:  {"item_id": uuid, "qty": Decimal, "children": [<재귀>]}
+        호환(legacy 1-depth): {"item_id": uuid, "action": "keep"|"scrap", "qty": Decimal, ...}
+
+    의미:
+    - leaf 노드: keep_qty 만큼 부서 PRODUCTION 입고 (RECEIVE), 나머지 (qty - keep_qty) 폐기 (DEFECT_SCRAP)
+    - children 있는 노드: 자기 자체 정상/폐기 처리 안 함(분해됨), 자식들 재귀 처리
 
     처리 결과:
         - 부모: DEFECTIVE 차감 (DISASSEMBLE 트랜잭션)
-        - 자식 keep: 분해 부서 PRODUCTION 입고 (RECEIVE 트랜잭션)
-        - 자식 scrap: 재고 차감 없음, DEFECT_SCRAP 트랜잭션만 기록
-          (자식은 이미 BOM 기준 부서 재고에 없음 — 부모에 내재되어 있으므로 별도 차감 불필요)
+        - 각 leaf 의 keep_qty>0 → RECEIVE 로그 + 재고 입고
+        - 각 leaf 의 scrap_qty>0 → DEFECT_SCRAP 로그 (재고 변동 없음 — 부모에 내재)
+        - 중간 노드(children 보유) → 트랜잭션 로그 없음, 자식만 처리
 
-    모든 TransactionLog 에 동일 operation_batch_id 공유.
+    모든 TransactionLog 에 동일 batch_ref 공유.
     """
     if parent_qty <= 0:
         raise ValueError("분해 수량은 0보다 커야 합니다.")
@@ -348,25 +354,49 @@ def submit_defective_disassemble(
     db.flush()
 
     child_log_ids: list[uuid.UUID] = []
+    _MAX_DEPTH = 10  # explode_bom 과 동일
 
-    for decision in child_decisions:
-        child_item_id = decision["item_id"]
-        action = decision["action"]
-        child_qty = Decimal(str(decision.get("qty", parent_qty)))
+    def process(decision: dict, depth: int) -> None:
+        if depth > _MAX_DEPTH:
+            raise ValueError(f"분해 트리 깊이 한도 초과(>{_MAX_DEPTH}): {decision.get('item_id')}")
+        item_id = decision["item_id"]
+        qty = Decimal(str(decision.get("qty", parent_qty)))
+        children = decision.get("children")
+        if children:
+            # 중간 노드 — 자기 자체 처리 skip, 자식 재귀
+            for child in children:
+                process(child, depth + 1)
+            return
+
+        # leaf — keep_qty / scrap_qty 분리 처리. legacy action 호환.
+        if "keep_qty" in decision:
+            keep_qty = Decimal(str(decision["keep_qty"]))
+        elif decision.get("action") == "keep":
+            keep_qty = qty
+        elif decision.get("action") == "scrap":
+            keep_qty = Decimal("0")
+        else:
+            raise ValueError(
+                f"자식 결정에 keep_qty 또는 action 이 필요합니다: {decision}"
+            )
+        if keep_qty < 0 or keep_qty > qty:
+            raise ValueError(
+                f"keep_qty({keep_qty}) 가 범위(0..{qty}) 를 벗어났습니다: item_id={item_id}"
+            )
+        scrap_qty = qty - keep_qty
         child_note = decision.get("reason_memo") or reason_memo or ""
 
-        if action == "keep":
-            # 분해 부서 PRODUCTION 입고
+        if keep_qty > 0:
             child_inv = inventory_svc.receive_confirmed(
-                db, child_item_id, child_qty,
+                db, item_id, keep_qty,
                 bucket="production",
                 dept=parent_dept,
             )
-            qty_before_child = (child_inv.quantity or Decimal("0")) - child_qty
+            qty_before_child = (child_inv.quantity or Decimal("0")) - keep_qty
             log = TransactionLog(
-                item_id=child_item_id,
+                item_id=item_id,
                 transaction_type=TransactionTypeEnum.RECEIVE,
-                quantity_change=child_qty,
+                quantity_change=keep_qty,
                 quantity_before=qty_before_child,
                 quantity_after=child_inv.quantity,
                 produced_by=actor,
@@ -375,27 +405,30 @@ def submit_defective_disassemble(
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
             )
-        elif action == "scrap":
-            # 자식 scrap: DEFECT_SCRAP 로그만 (재고 변동 없음 — 부모에 내재)
-            child_inv = inventory_svc.get_or_create_inventory(db, child_item_id)
+            db.add(log)
+            db.flush()
+            child_log_ids.append(log.log_id)
+
+        if scrap_qty > 0:
+            scrap_inv = inventory_svc.get_or_create_inventory(db, item_id)
             log = TransactionLog(
-                item_id=child_item_id,
+                item_id=item_id,
                 transaction_type=TransactionTypeEnum.DEFECT_SCRAP,
                 quantity_change=Decimal("0"),
-                quantity_before=child_inv.quantity,
-                quantity_after=child_inv.quantity,
+                quantity_before=scrap_inv.quantity,
+                quantity_after=scrap_inv.quantity,
                 produced_by=actor,
                 notes=f"[defect_disassemble:scrap] {child_note}".strip(),
                 reason_category=reason_category,
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
             )
-        else:
-            raise ValueError(f"알 수 없는 action: {action} (keep 또는 scrap)")
+            db.add(log)
+            db.flush()
+            child_log_ids.append(log.log_id)
 
-        db.add(log)
-        db.flush()
-        child_log_ids.append(log.log_id)
+    for decision in child_decisions:
+        process(decision, depth=1)
 
     return {
         "batch_id": str(batch_id),

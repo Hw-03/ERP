@@ -11,6 +11,7 @@ Inventory.quantity = warehouse_qty + Σ InventoryLocation.quantity (불변식).
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 import uuid
@@ -540,12 +541,16 @@ def mark_defective(
             cur = src_check.quantity if src_check else Decimal("0")
             raise ValueError(f"{source_dept.value} 생산 재고 부족 (현재 {cur}, 요청 {qty}).")
 
+    # defective_at: 최초 격리 시점 보존. NULL 인 경우만 utcnow 로 채워 frontend new Date(null)=1970 버그 차단.
     db.execute(
         sa_update(InventoryLocation)
         .where(InventoryLocation.item_id == item_id)
         .where(InventoryLocation.department == target_dept)
         .where(InventoryLocation.status == LocationStatusEnum.DEFECTIVE)
-        .values(quantity=func.coalesce(InventoryLocation.quantity, 0) + qty)
+        .values(
+            quantity=func.coalesce(InventoryLocation.quantity, 0) + qty,
+            defective_at=func.coalesce(InventoryLocation.defective_at, datetime.utcnow()),
+        )
         .execution_options(synchronize_session=False)
     )
     db.flush()

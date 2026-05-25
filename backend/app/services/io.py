@@ -196,8 +196,13 @@ def _route_for_sub_type(
         dept = _default_production_dept(item, to_department or from_department)
         return ("adjust", "production", dept, "none", None)
     if sub_type == "defect_quarantine":
-        target = to_department or from_department or DepartmentEnum.ASSEMBLY.value
-        return ("defective", "warehouse", None, "defective", target)
+        # 사용자가 Step 2 에서 선택한 부서가 from_department 로 전달됨.
+        # "창고" 면 창고 자체 재고를 격리(WAREHOUSE→DEFECTIVE), 그 외 부서면 그 부서 PRODUCTION→DEFECTIVE.
+        # stock_requests.create_inventory_request 의 from_dept 기반 결재 분기와 동기 — None/"창고" → 창고 결재.
+        source = from_department or to_department
+        if source is None or source == "창고":
+            return ("defective", "warehouse", None, "defective", "창고")
+        return ("defective", "production", source, "defective", source)
     if sub_type == "supplier_return":
         source = from_department or to_department or DepartmentEnum.ASSEMBLY.value
         return ("out", "defective", source, "none", None)
@@ -229,6 +234,7 @@ def _direct_item_bundle(
         "source_kind": "bom_parent" if should_expand else source_kind,
         "title": item.item_name,
         "source_item_id": item.item_id,
+        "source_item_code": item.item_code,
         "quantity": quantity,
         "expanded_level": 1,
         "lines": [],
@@ -516,11 +522,21 @@ def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
                 "source_kind": bundle.source_kind,
                 "title": bundle.title_snapshot,
                 "source_item_id": bundle.source_item_id,
+                "source_item_code": bundle.source_item.item_code if bundle.source_item else None,
                 "quantity": bundle.quantity,
                 "expanded_level": bundle.expanded_level,
                 "lines": lines_payload,
             }
         )
+    # 승인자: stock_request 가 있으면 그 request 의 approved_by (창고 결재자). 없거나 NULL 이면 요청자 자신
+    # (정/부 직원 직접 처리 시 결재 없이 바로 — 사용자 정의로는 요청자=승인자).
+    approver_employee_id: Optional[uuid.UUID] = batch.requester_employee_id
+    approver_name: Optional[str] = batch.requester_name
+    if db is not None and batch.stock_request_id is not None:
+        sr = db.query(StockRequest).filter(StockRequest.request_id == batch.stock_request_id).first()
+        if sr is not None and sr.approved_by_employee_id is not None:
+            approver_employee_id = sr.approved_by_employee_id
+            approver_name = sr.approved_by_name or batch.requester_name
     return {
         "batch_id": batch.batch_id,
         "work_type": batch.work_type,
@@ -529,6 +545,8 @@ def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
         "requester_employee_id": batch.requester_employee_id,
         "requester_name": batch.requester_name,
         "requester_department": batch.requester_department,
+        "approver_employee_id": approver_employee_id,
+        "approver_name": approver_name,
         "from_department": batch.from_department,
         "to_department": batch.to_department,
         "requires_approval": batch.requires_approval,
@@ -689,10 +707,21 @@ def _included_lines(batch: IoBatch) -> list[IoLine]:
     return [line for bundle in batch.bundles for line in bundle.lines if line.included]
 
 
+def _fmt_qty(d: Decimal) -> str:
+    """Decimal → 사용자 표시용 문자열. 소수점 trailing 0 제거. 예: 2.0000 → '2', 1.5000 → '1.5'."""
+    n = d.normalize()
+    s = format(n, "f")
+    if "." in s:
+        s = s.rstrip("0").rstrip(".")
+    return s or "0"
+
+
 def _validate_included_lines(db: Session, lines: Sequence[IoLine]) -> None:
     if not lines:
         raise ValueError("실제 반영할 품목이 없습니다.")
     needed: dict[tuple[str, Optional[str], uuid.UUID], Decimal] = {}
+    # 같은 (bucket, dept, item) 키에 기여한 (bundle_title, quantity) 목록 — 부족 시 출처 표시용.
+    contributors: dict[tuple[str, Optional[str], uuid.UUID], list[tuple[str, Decimal]]] = {}
     for line in lines:
         qty = _d(line.quantity)
         if qty <= 0:
@@ -701,21 +730,38 @@ def _validate_included_lines(db: Session, lines: Sequence[IoLine]) -> None:
             continue
         key = (line.from_bucket, line.from_department, line.item_id)
         needed[key] = needed.get(key, Decimal("0")) + qty
+        bundle_title = line.bundle.title_snapshot if line.bundle else "?"
+        contributors.setdefault(key, []).append((bundle_title, qty))
     for (bucket, department, item_id), qty in needed.items():
         available = _bucket_available(db, item_id=item_id, bucket=bucket, department=department)
         if available < qty:
             item = _get_item(db, item_id)
-            raise ValueError(
-                f"재고 부족: {item.item_name} / 가능 {available} / 요청 {qty}"
+            # 합산 출처 — bundle 단위로 다시 묶어 큰 순으로 정렬, 상위 3개 까지만 노출.
+            by_bundle: dict[str, Decimal] = {}
+            for title, q in contributors.get((bucket, department, item_id), []):
+                by_bundle[title] = by_bundle.get(title, Decimal("0")) + q
+            ordered = sorted(by_bundle.items(), key=lambda kv: kv[1], reverse=True)
+            shortfall = _fmt_qty(qty - available)
+            header = (
+                f"재고 부족: {item.item_name}\n"
+                f"가능 {_fmt_qty(available)} / 요청 {_fmt_qty(qty)} ({shortfall} 부족)"
             )
+            if ordered:
+                bullets = "\n".join(f"  • {t}: {_fmt_qty(q)}" for t, q in ordered[:3])
+                more = f"\n  • 외 {len(ordered) - 3}건" if len(ordered) > 3 else ""
+                raise ValueError(f"{header}\n{bullets}{more}")
+            raise ValueError(header)
 
 
-def _stock_request_type(sub_type: str) -> StockRequestTypeEnum:
+def _stock_request_type(sub_type: str, *, from_bucket: Optional[str] = None) -> StockRequestTypeEnum:
     if sub_type == "warehouse_to_dept":
         return StockRequestTypeEnum.WAREHOUSE_TO_DEPT
     if sub_type == "dept_to_warehouse":
         return StockRequestTypeEnum.DEPT_TO_WAREHOUSE
     if sub_type == "defect_quarantine":
+        # _resolve_line_route(defect_quarantine) 가 부서 격리는 PRODUCTION, 창고 격리는 WAREHOUSE 로 분기.
+        if from_bucket == "production":
+            return StockRequestTypeEnum.MARK_DEFECTIVE_PROD
         return StockRequestTypeEnum.MARK_DEFECTIVE_WH
     raise ValueError(f"승인 요청으로 처리할 수 없는 작업입니다: {sub_type}")
 
@@ -744,6 +790,11 @@ def _link_stock_request(db: Session, *, batch: IoBatch, request: StockRequest, l
         request_line.operation_line_id = io_line.line_id
 
     if request.request_code:
+        # SessionLocal(autoflush=False) — _execute_all_lines 의 마지막 라인이 db.add() 만 하고
+        # 아직 INSERT 전인 상태로 세션에 떠 있다(직전 라인들은 다음 iteration 의 inventory 함수
+        # db.flush() 가 강제로 보냈지만 last 만 flush 트리거가 없음). UPDATE 전에 명시적
+        # flush 해야 마지막 TransactionLog 까지 INSERT 되어 매치 대상이 됨.
+        db.flush()
         db.query(TransactionLog).filter(
             TransactionLog.reference_no == request.request_code,
             TransactionLog.operation_batch_id.is_(None),
@@ -777,7 +828,10 @@ def _submit_approval(
     request = stock_request_svc.create_request(
         db,
         requester=requester,
-        request_type=_stock_request_type(batch.sub_type),
+        request_type=_stock_request_type(
+            batch.sub_type,
+            from_bucket=lines[0].from_bucket if lines else None,
+        ),
         lines_input=inputs,
         reference_no=batch.reference_no,
         notes=batch.notes,

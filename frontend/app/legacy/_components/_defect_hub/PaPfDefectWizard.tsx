@@ -8,7 +8,7 @@ import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import type { Department } from "@/lib/api/types/shared";
-import { DisassembleTree, type ChildDecision } from "./DisassembleTree";
+import { DisassembleTree, toServerDecision, type ChildDecision } from "./DisassembleTree";
 import { ReasonFormFields } from "./ReasonFormFields";
 
 type DisposalAction = "unquarantine" | "scrap" | "disassemble";
@@ -96,12 +96,8 @@ export function PaPfDefectWizard({
           ],
         });
       } else {
-        // disassemble
-        const childDecisions = decisions.map((d) => ({
-          item_id: d.item_id,
-          action: d.action,
-          qty: d.qty,
-        }));
+        // disassemble — 재귀 트리 페이로드
+        const childDecisions = decisions.map(toServerDecision);
         await stockRequestsApi.createStockRequest({
           requester_employee_id: currentEmployee.employee_id,
           request_type: "defect_disassemble",
@@ -130,7 +126,7 @@ export function PaPfDefectWizard({
 
   if (!open || !mounted) return null;
 
-  const formatDate = (iso: string) => iso.slice(0, 10);
+  const formatDate = (iso: string | null) => (iso ? iso.slice(0, 10) : "-");
 
   return createPortal(
     <div

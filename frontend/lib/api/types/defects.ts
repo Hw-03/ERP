@@ -9,9 +9,11 @@ export interface DefectLocation {
   item_code: string;
   department: string;
   quantity: number;
-  defective_at: string; // ISO 8601 datetime string
+  defective_at: string | null; // ISO 8601 datetime string. 레거시 데이터로 NULL 가능 — UI 방어 필수.
   reason_category?: string | null;
   reason_memo?: string | null;
+  /** BOM 자식 보유 여부. 격리 처리 "재작업" 옵션 노출 조건. */
+  has_bom: boolean;
 }
 
 export interface DefectKpi {

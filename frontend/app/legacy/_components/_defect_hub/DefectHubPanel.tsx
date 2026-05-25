@@ -103,16 +103,18 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
     }
     // scope === "all" → 필터 없음
 
-    // KPI 카드 클릭 필터
+    // KPI 카드 클릭 필터. defective_at NULL 인 행은 비교 불가 → 제외(보수적).
     if (kpiFilter === "over_one_year") {
-      result = result.filter((loc) => Date.now() - new Date(loc.defective_at).getTime() > ONE_YEAR_MS);
+      result = result.filter(
+        (loc) => loc.defective_at != null && Date.now() - new Date(loc.defective_at).getTime() > ONE_YEAR_MS,
+      );
     }
     // "quarantined" / "pending" / "today" 는 목록 레벨 필터 불가 (KPI 카운트만 표시)
 
-    // 정렬
+    // 정렬 — NULL defective_at 은 0 으로 처리(가장 오래된 쪽으로).
     result = [...result].sort((a, b) => {
-      const ta = new Date(a.defective_at).getTime();
-      const tb = new Date(b.defective_at).getTime();
+      const ta = a.defective_at ? new Date(a.defective_at).getTime() : 0;
+      const tb = b.defective_at ? new Date(b.defective_at).getTime() : 0;
       return sort === "oldest" ? ta - tb : tb - ta;
     });
 

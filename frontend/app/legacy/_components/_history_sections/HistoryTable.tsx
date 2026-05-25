@@ -37,7 +37,7 @@ const COLUMNS_DEFAULT: ColSpec[] = [
   { label: "구분", width: "130px", align: "center" },
   { label: "품목명", minWidth: "180px" },
   { label: "변동요약", width: "150px", align: "center" },
-  { label: "담당자", width: "130px", align: "center", hidden: true },
+  { label: "요청자", width: "130px", align: "center", hidden: true },
   { label: "메모", width: "70px", align: "center", hidden: true },
 ];
 
@@ -47,7 +47,7 @@ const COLUMNS_COMPACT: ColSpec[] = [
   { label: "구분", width: "104px", align: "center", px: "px-2" },
   { label: "품목명", minWidth: "240px" },
   { label: "변동요약", width: "150px", align: "center" },
-  { label: "담당자", width: "130px", align: "center", hidden: true },
+  { label: "요청자", width: "130px", align: "center", hidden: true },
   { label: "메모", width: "70px", align: "center", hidden: true },
 ];
 

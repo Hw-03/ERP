@@ -37,7 +37,7 @@ export function WarehouseSectionTabs({
     { id: "mine", label: "내 요청", tone: LEGACY_COLORS.purple },
   ];
   if (showQueue) tabs.push({ id: "queue", label: "창고 승인함", tone: LEGACY_COLORS.yellow });
-  if (showDeptQueue) tabs.push({ id: "dept-queue", label: "부서 승인함", tone: LEGACY_COLORS.purple });
+  if (showDeptQueue) tabs.push({ id: "dept-queue", label: "부서 승인함", tone: LEGACY_COLORS.cyan });
 
   const badgeFor = (id: WarehouseSectionTab): number | null => {
     if (id === "cart" && cartCount > 0) return cartCount;
