@@ -21,6 +21,15 @@
 - Never auto-commit or auto-push.
 - Commit and push only when the user explicitly asks.
 - When explicitly asked to commit and push, run the required local checks first to avoid GitHub CI failures, and unless told otherwise, commit and push only the changes made in the current session.
+- **Commit message 형식 (필수): `YYYY-MM-DD area: 요약`**
+  - 예: `2026-05-26 backend: 시리얼 부여 수정`, `2026-05-26 vault: Obsidian 설정 갱신`
+  - `area`는 자유 분류 — `frontend`, `backend`, `desktop`, `mobile`, `admin`, `docs`, `data`, `fix`, `refactor`, `chore`, `vault`, `defect`, `items`, `ux`, `weekly`, `history`, `capacity` 등 작업 영역
+  - **금지 패턴** (절대 사용 X):
+    - Conventional Commits: `type(scope): X` (예: `fix(items): X`, `docs(vault): X`)
+    - Bracket prefix: `[chore] X`, `[W12-A] X`, `[defect][io] X`
+    - 혼합형: `2026-05-26 fix(items): X` (날짜는 OK지만 area에 `type(scope)` 금지)
+  - Merge 커밋(`Merge ...`)은 git이 만든 자동 메시지 그대로 유지 — 수정 X
+  - 본문(body)은 자유 형식. 위 규칙은 제목 1줄에만 적용.
 
 ## DB / Run / Verify
 
