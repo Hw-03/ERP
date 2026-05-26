@@ -9,6 +9,8 @@ import type { WeeklyGroupReport } from "@/lib/api/types/weekly";
 // 0/무변동 값 de-emphasis — 단 WCAG AA 충족 필요(투명 30% 는 미달) → 솔리드 muted2(5.55:1).
 const ZERO_FADE = LEGACY_COLORS.muted2;
 
+const PROCESS_ORDER: Record<string, number> = { TF: 0, HF: 1, VF: 2, NF: 3, AF: 4, PF: 5 };
+
 interface Props {
   groups: WeeklyGroupReport[];
   selected: string;
@@ -19,10 +21,13 @@ interface Props {
 function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
   const [hovered, setHovered] = useState<string | null>(null);
 
-  // 주차 전환 시 셀 위치가 흔들리지 않도록 process_code 사전 순으로 안정 정렬.
-  // (백엔드 응답이 주차마다 다른 순서로 올 수 있어 발생하는 위치 이동을 방지)
+  // 튜브→고압→진공→튜닝→조립→출하 순 고정 (주차마다 순서 흔들림 방지)
   const sortedGroups = useMemo(
-    () => [...groups].sort((a, b) => a.process_code.localeCompare(b.process_code)),
+    () =>
+      [...groups].sort(
+        (a, b) =>
+          (PROCESS_ORDER[a.process_code] ?? 99) - (PROCESS_ORDER[b.process_code] ?? 99),
+      ),
     [groups],
   );
 

@@ -67,9 +67,12 @@ export function getBatchFlowEndpoints(batch: IoBatch): BatchFlowEndpoints | null
   // 부서 내 작업(생산·재작업 등 batch.from_department == batch.to_department) 은
   // 부모(out)/자식(in) 라인이 반대 방향이라 _bucketSlot mix 가 발생하지만,
   // 사용자 인지상 "한 부서 안에서 끝나는 작업" — 그 부서로 단일 표기.
+  // 단, 창고 관련 sub_type(receive_supplier, warehouse_to_dept 등)은 bucket 분석 필요.
+  const subType = batch.sub_type ?? null;
+  const sameDeptOnlyTypes = new Set(["produce", "disassemble", "adjust_in", "adjust_out"]);
   const batchFrom = _deptName(batch.from_department);
   const batchTo = _deptName(batch.to_department);
-  if (batchFrom && batchTo && batchFrom === batchTo) {
+  if (batchFrom && batchTo && batchFrom === batchTo && (!subType || sameDeptOnlyTypes.has(subType))) {
     return { from: batchFrom, to: batchTo, mixed: false };
   }
 
@@ -92,8 +95,6 @@ export function getBatchFlowEndpoints(batch: IoBatch): BatchFlowEndpoints | null
     if (f && t) return { from: f, to: t, mixed: false };
     return null;
   }
-
-  const subType = batch.sub_type ?? null;
 
   let fromLabel: string;
   let mixedFrom = false;
@@ -194,6 +195,8 @@ const _SUB_TYPE_OPERATION: Record<string, string> = {
   receive_supplier: "원자재 입고",
   supplier_return: "원자재 반품",
   defect_quarantine: "새 격리",
+  defect_restore: "격리 해제",
+  defect_process: "격리 폐기",
 };
 
 const _TX_OPERATION: Record<string, string> = {
@@ -219,6 +222,8 @@ const _DISPLAY_SUB_LABEL: Record<string, string> = {
   warehouse_to_dept: "창고에서 부서로 이동",
   dept_to_warehouse: "부서에서 창고로 이동",
   defect_quarantine: "정상 재고 → 불량 재고",
+  defect_restore: "불량 재고 → 정상 재고",
+  defect_process: "불량 재고 폐기",
   supplier_return: "공급사로 돌려보냄",
   adjust_in: "재고 수량 직접 수정",
   adjust_out: "재고 수량 직접 수정",
@@ -647,6 +652,10 @@ export function getHistoryMovementSummary(
     parts.push({ label: `반품 ${_distinctItemCount(included)}품목`, tone: "danger" });
   } else if (sub === "defect_quarantine" || tx === "MARK_DEFECTIVE") {
     parts.push({ label: `불량 ${_distinctItemCount(included)}품목`, tone: "danger" });
+  } else if (sub === "defect_restore" || tx === "UNMARK_DEFECTIVE") {
+    parts.push({ label: `해제 ${_distinctItemCount(included)}품목`, tone: "success" });
+  } else if (sub === "defect_process" || tx === "DEFECT_SCRAP") {
+    parts.push({ label: `폐기 ${_distinctItemCount(included)}품목`, tone: "danger" });
   } else if (sub === "adjust_in" || sub === "adjust_out" || tx === "ADJUST") {
     const inc: typeof included = [];
     const dec: typeof included = [];
