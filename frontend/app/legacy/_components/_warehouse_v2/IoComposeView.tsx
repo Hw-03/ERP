@@ -769,7 +769,7 @@ export function IoComposeView({
               <DefectInventoryPicker
                 department={state.fromDepartment}
                 selected={state.defectSelectedLocation}
-                onSelect={state.setDefectSelectedLocation}
+                onSelect={state.selectDefectLocation}
                 onAdvance={state.goNext}
               />
             ) : (
@@ -832,6 +832,8 @@ export function IoComposeView({
                   state.setDefectReasonMemo(memo);
                 }}
                 onBomDecisionsChange={state.setDefectBomDecisions}
+                processQty={state.defectProcessQty}
+                onProcessQtyChange={state.setDefectProcessQty}
                 canAdvance={state.canAdvance[4]}
                 // 재작업(disassemble) 은 Step 5 에서 결정 입력 후 제출. 그 외는 즉시 제출.
                 onAdvance={
@@ -879,6 +881,7 @@ export function IoComposeView({
                 // state.goTo(5) → step=5 → 자동 스크롤 useEffect 가 Step 4 collapsed top 으로.
               }}
               canAdvance={state.canAdvance[4]}
+              hasShortage={state.hasShortage}
             />
             )}
           </WizardStepCard>
@@ -932,23 +935,29 @@ export function IoComposeView({
             accent={accent}
             fill={step === 5}
           >
-            <div className="flex flex-col gap-4">
-              <DisassembleTree
-                parentItemId={state.defectSelectedLocation.item_id}
-                parentQty={Number(state.defectSelectedLocation.quantity)}
-                parentDept={state.defectSelectedLocation.department}
-                decisions={state.defectBomDecisions}
-                onChange={state.setDefectBomDecisions}
-              />
-              <button
-                type="button"
-                onClick={handleDefectInventorySubmit}
-                disabled={!state.canAdvance[5] || defectSubmitting}
-                className="flex w-full items-center justify-center gap-2 rounded-[18px] px-7 py-5 text-lg font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
-                style={{ background: LEGACY_COLORS.red }}
-              >
-                {state.canAdvance[5] ? "재작업 제출하기 →" : "정상 수량을 0..총수량 범위로 입력하세요"}
-              </button>
+            <div className="flex h-full min-h-0 flex-col gap-4">
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <DisassembleTree
+                  parentItemId={state.defectSelectedLocation.item_id}
+                  parentItemName={state.defectSelectedLocation.item_name}
+                  parentItemCode={state.defectSelectedLocation.item_code}
+                  parentQty={Number(state.defectSelectedLocation.quantity)}
+                  parentDept={state.defectSelectedLocation.department}
+                  decisions={state.defectBomDecisions}
+                  onChange={state.setDefectBomDecisions}
+                />
+              </div>
+              <div className="mt-auto">
+                <button
+                  type="button"
+                  onClick={handleDefectInventorySubmit}
+                  disabled={!state.canAdvance[5] || defectSubmitting}
+                  className="flex w-full items-center justify-center gap-2 rounded-[18px] px-7 py-5 text-lg font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
+                  style={{ background: LEGACY_COLORS.red }}
+                >
+                  {state.canAdvance[5] ? "재작업 제출하기 →" : "정상 수량을 0..총수량 범위로 입력하세요"}
+                </button>
+              </div>
             </div>
           </WizardStepCard>
         </div>

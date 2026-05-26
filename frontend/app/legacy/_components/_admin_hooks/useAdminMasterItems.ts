@@ -59,6 +59,8 @@ export type AdminMasterItemsState = {
   ) => void;
   saveItem: () => Promise<void>;
   dirty: boolean;
+  deleteItem: (itemId: string) => Promise<void>;
+  restoreItem: (itemId: string) => Promise<void>;
 };
 
 export function useAdminMasterItems({
@@ -108,5 +110,7 @@ export function useAdminMasterItems({
     setEditForm: form.setForm,
     saveItem: form.save,
     dirty: form.dirty,
+    deleteItem: commands.deleteItem,
+    restoreItem: commands.restoreItem,
   };
 }

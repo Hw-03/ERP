@@ -153,15 +153,11 @@ export function deptIoDirectionOf(subType: IoSubType): DeptIoDirection | null {
   return null;
 }
 
-// Step 3 picker 타이틀의 입/출 접두 ("입고 품목 선택" / "출고 품목 선택").
-// subType이 입고 성격이면 "입고", 그 외는 모두 "출고".
-export function pickerDirectionLabel(subType: IoSubType): "입고" | "출고" {
-  if (
-    subType === "receive_supplier" ||
-    subType === "warehouse_to_dept" ||
-    subType === "produce" ||
-    subType === "adjust_in"
-  ) return "입고";
+// Step 3 picker 타이틀 접두. 창고 방향이 명확한 sub_type은 "창고 반출/반입", 그 외 "입고/출고".
+export function pickerDirectionLabel(subType: IoSubType): "입고" | "출고" | "창고 반출" | "창고 반입" {
+  if (subType === "warehouse_to_dept") return "창고 반출";
+  if (subType === "dept_to_warehouse") return "창고 반입";
+  if (subType === "receive_supplier" || subType === "produce" || subType === "adjust_in") return "입고";
   return "출고";
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../../common/EmptyState";
 
@@ -34,6 +34,20 @@ export function AdminListPanel<T>({
   footer,
   width = 320,
 }: AdminListPanelProps<T>) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // 드래그 중 마우스 휠로 스크롤 — HTML5 drag가 기본 스크롤을 막으므로 non-passive 리스너로 수동 처리.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    function onWheel(e: WheelEvent) {
+      el!.scrollTop += e.deltaY;
+      e.preventDefault();
+    }
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
   return (
     <div
       className="flex min-h-0 shrink-0 flex-col gap-3 rounded-[20px] border p-3"
@@ -80,7 +94,7 @@ export function AdminListPanel<T>({
         </div>
       )}
       {filters && <div className="flex shrink-0 flex-wrap gap-1.5">{filters}</div>}
-      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-0.5">
+      <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-0.5">
         {items.length === 0
           ? emptyState ?? <EmptyState variant="no-data" compact />
           : items.map((item) => renderItem(item))}

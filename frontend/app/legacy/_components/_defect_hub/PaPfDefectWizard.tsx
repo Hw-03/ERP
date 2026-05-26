@@ -218,6 +218,8 @@ export function PaPfDefectWizard({
               </div>
               <DisassembleTree
                 parentItemId={location.item_id}
+                parentItemName={location.item_name}
+                parentItemCode={location.item_code}
                 parentQty={location.quantity}
                 parentDept={location.department}
                 decisions={decisions}

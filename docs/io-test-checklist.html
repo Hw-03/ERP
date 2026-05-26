@@ -446,7 +446,11 @@ python scripts/clear_pending_batches.py --yes</pre>
 
 <!-- 메모 -->
 <h2>발견 이슈 메모</h2>
-<textarea class="memo" placeholder="이슈 위치 / 현상 / 재현 방법 기록..."></textarea>
+<div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+  <span style="font-size:12px; color:#666;">자동 저장됨 (브라우저 종료 후 재오픈해도 유지)</span>
+  <button onclick="clearMemo()" style="font-size:11px; padding:2px 8px; border:1px solid #ddd; border-radius:3px; background:#fff; cursor:pointer; color:#dc2626;">초기화</button>
+</div>
+<textarea id="memo" class="memo" placeholder="이슈 위치 / 현상 / 재현 방법 기록..."></textarea>
 
 <script>
   function toggle(header) {
@@ -456,10 +460,19 @@ python scripts/clear_pending_batches.py --yes</pre>
     body.classList.toggle('hidden');
   }
 
-  // 체크하면 라인 긋기
+  // 체크 상태 localStorage 복원 + 저장
+  const CB_KEY = 'io-test-checklist-checks';
+  const savedChecks = JSON.parse(localStorage.getItem(CB_KEY) ?? '{}');
   document.querySelectorAll('.check-item input[type=checkbox]').forEach(cb => {
+    if (savedChecks[cb.id]) {
+      cb.checked = true;
+      cb.closest('.check-item').classList.add('done');
+    }
     cb.addEventListener('change', () => {
       cb.closest('.check-item').classList.toggle('done', cb.checked);
+      const checks = JSON.parse(localStorage.getItem(CB_KEY) ?? '{}');
+      if (cb.checked) checks[cb.id] = true; else delete checks[cb.id];
+      localStorage.setItem(CB_KEY, JSON.stringify(checks));
     });
   });
 
@@ -474,6 +487,20 @@ python scripts/clear_pending_batches.py --yes</pre>
       cb.dispatchEvent(new Event('change', { bubbles: true }));
     });
   });
+
+  // 메모 localStorage 자동 저장
+  const MEMO_KEY = 'io-test-checklist-memo';
+  const memoEl = document.getElementById('memo');
+  memoEl.value = localStorage.getItem(MEMO_KEY) ?? '';
+  memoEl.addEventListener('input', () => {
+    localStorage.setItem(MEMO_KEY, memoEl.value);
+  });
+
+  function clearMemo() {
+    if (!confirm('메모를 초기화할까요?')) return;
+    memoEl.value = '';
+    localStorage.removeItem(MEMO_KEY);
+  }
 </script>
 </body>
 </html>

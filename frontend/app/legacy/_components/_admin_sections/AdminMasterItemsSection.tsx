@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, GripVertical, Plus, Save } from "lucide-react";
 import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -44,54 +44,64 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
     saveItem,
     dirty,
     reorderItems,
+    deleteItem,
+    restoreItem,
   } = useAdminMasterItemsContext();
 
   const [tab, setTab] = useState<DetailTab>("info");
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
 
-  // 드래그 reorder 상태 — 모델 reorder 와 동일 패턴. 정렬 키는 item_id.
+  // 드래그 reorder — Pointer Events 기반 (HTML5 DnD 는 drag 중 wheel 이벤트 차단).
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const dragIdRef = useRef<string | null>(null);
+  const dropTargetIdRef = useRef<string | null>(null);
+  const isDraggingRef = useRef(false);
+  const pointerStartYRef = useRef(0);
 
-  function handleDragStart(e: React.DragEvent, id: string) {
-    setDragId(id);
-    e.dataTransfer.effectAllowed = "move";
-    try {
-      e.dataTransfer.setData("text/plain", id);
-    } catch {
-      // jsdom 등 일부 환경에서 setData 실패 — 무시.
-    }
+  function findItemIdAtPoint(x: number, y: number): string | null {
+    const el = document.elementFromPoint(x, y);
+    return el?.closest("[data-item-id]")?.getAttribute("data-item-id") ?? null;
   }
 
-  function handleDragOver(e: React.DragEvent, id: string) {
-    if (dragId === null) return;
+  function handleGripPointerDown(e: React.PointerEvent, id: string) {
     e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    if (dropTargetId !== id) setDropTargetId(id);
+    e.stopPropagation();
+    dragIdRef.current = id;
+    pointerStartYRef.current = e.clientY;
+    isDraggingRef.current = false;
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
   }
 
-  function handleDrop(e: React.DragEvent, id: string) {
-    e.preventDefault();
-    if (dragId === null || dragId === id) {
-      setDragId(null);
-      setDropTargetId(null);
-      return;
+  function handleGripPointerMove(e: React.PointerEvent, id: string) {
+    if (dragIdRef.current !== id) return;
+    if (!isDraggingRef.current && Math.abs(e.clientY - pointerStartYRef.current) > 5) {
+      isDraggingRef.current = true;
+      setDragId(id);
     }
-    const fromIdx = visibleItems.findIndex((it) => it.item_id === dragId);
-    const toIdx = visibleItems.findIndex((it) => it.item_id === id);
-    if (fromIdx < 0 || toIdx < 0) {
-      setDragId(null);
-      setDropTargetId(null);
-      return;
+    if (!isDraggingRef.current) return;
+    const target = findItemIdAtPoint(e.clientX, e.clientY);
+    const next = target && target !== id ? target : null;
+    if (next !== dropTargetIdRef.current) {
+      dropTargetIdRef.current = next;
+      setDropTargetId(next);
     }
-    const next = [...visibleItems];
-    const [moved] = next.splice(fromIdx, 1);
-    if (moved) next.splice(toIdx, 0, moved);
-    reorderItems(next);
-    setDragId(null);
-    setDropTargetId(null);
   }
 
-  function handleDragEnd() {
+  function handleGripPointerUp(e: React.PointerEvent, id: string) {
+    if (isDraggingRef.current && dragIdRef.current && dropTargetIdRef.current) {
+      const fromIdx = visibleItems.findIndex((it) => it.item_id === dragIdRef.current);
+      const toIdx = visibleItems.findIndex((it) => it.item_id === dropTargetIdRef.current);
+      if (fromIdx >= 0 && toIdx >= 0 && fromIdx !== toIdx) {
+        const next = [...visibleItems];
+        const [moved] = next.splice(fromIdx, 1);
+        if (moved) next.splice(toIdx, 0, moved);
+        reorderItems(next);
+      }
+    }
+    dragIdRef.current = null;
+    dropTargetIdRef.current = null;
+    isDraggingRef.current = false;
     setDragId(null);
     setDropTargetId(null);
   }
@@ -123,9 +133,10 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
     setSelectedItem(visibleItems[0]);
   }, [addMode, selectedItem, visibleItems, setSelectedItem]);
 
-  // 선택이 바뀌면 첫 탭으로 리셋
+  // 선택이 바뀌면 첫 탭으로 리셋 + 삭제 확인 닫기
   useEffect(() => {
     setTab("info");
+    setDeleteConfirm(false);
   }, [selectedItem?.item_id]);
 
   function handleStartAdd() {
@@ -159,11 +170,11 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
         ]}
       />
 
-      <div className="flex min-h-0 flex-1 gap-4">
+      <div className="grid min-h-0 flex-1 gap-4" style={{ gridTemplateColumns: "55fr 45fr", gridTemplateRows: "1fr" }}>
         <AdminListPanel
           title="품목 목록"
           countLabel={`${formatQty(visibleItems.length)}건`}
-          width={360}
+          width="100%"
           action={
             <Button variant="primary" size="sm" iconLeft={<Plus className="h-3.5 w-3.5" />} onClick={handleStartAdd}>
               추가
@@ -182,6 +193,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
           }
           renderItem={(item) => {
             const isSelected = selectedItem?.item_id === item.item_id;
+            const isDeleted = !!item.deleted_at;
             const qty = Number(item.quantity);
             const zeroStock = qty <= 0;
             const lowStock =
@@ -192,13 +204,9 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
             return (
               <div
                 key={item.item_id}
-                draggable
-                onDragStart={(e) => handleDragStart(e, item.item_id)}
-                onDragOver={(e) => handleDragOver(e, item.item_id)}
-                onDrop={(e) => handleDrop(e, item.item_id)}
-                onDragEnd={handleDragEnd}
+                data-item-id={item.item_id}
                 className="relative"
-                style={{ opacity: isDragging ? 0.4 : 1 }}
+                style={{ opacity: isDragging ? 0.4 : isDeleted ? 0.5 : 1 }}
               >
                 {isDropTarget && (
                   <div
@@ -220,8 +228,11 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                 >
                   <GripVertical
                     className="h-4 w-4 shrink-0 cursor-grab"
-                    style={{ color: LEGACY_COLORS.muted2 }}
+                    style={{ color: LEGACY_COLORS.muted2, touchAction: "none" }}
                     aria-label="드래그 핸들"
+                    onPointerDown={(e) => handleGripPointerDown(e, item.item_id)}
+                    onPointerMove={(e) => handleGripPointerMove(e, item.item_id)}
+                    onPointerUp={(e) => handleGripPointerUp(e, item.item_id)}
                   />
                   <span
                     className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-black tabular-nums"
@@ -236,11 +247,18 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                   </span>
                   <span
                     className="min-w-0 flex-1 truncate text-[13px] font-semibold"
-                    style={{ color: LEGACY_COLORS.text }}
+                    style={{
+                      color: isDeleted ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
+                      textDecoration: isDeleted ? "line-through" : "none",
+                    }}
                   >
                     {item.item_name}
                   </span>
-                  {zeroStock ? (
+                  {isDeleted ? (
+                    <div className="shrink-0">
+                      <StatusPill label="삭제됨" tone="danger" showDot maxWidth={90} />
+                    </div>
+                  ) : zeroStock ? (
                     <div className="shrink-0">
                       <StatusPill label="품절" tone="danger" showDot maxWidth={70} />
                     </div>
@@ -248,7 +266,11 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                     <div className="shrink-0">
                       <StatusPill label="부족" tone="warning" showDot maxWidth={70} />
                     </div>
-                  ) : null}
+                  ) : (
+                    <div className="shrink-0">
+                      <StatusPill label="정상" tone="success" showDot maxWidth={70} />
+                    </div>
+                  )}
                 </button>
               </div>
             );
@@ -296,6 +318,54 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
           tabs={!addMode && selectedItem ? DETAIL_TABS : undefined}
           activeTab={tab}
           onTabChange={(id) => setTab(id as DetailTab)}
+          footer={
+            !addMode && selectedItem ? (
+              selectedItem.deleted_at ? (
+                <button
+                  type="button"
+                  onClick={() => void restoreItem(selectedItem.item_id)}
+                  className="flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-110"
+                  style={{ background: LEGACY_COLORS.green }}
+                >
+                  복구
+                </button>
+              ) : deleteConfirm ? (
+                <div className="flex items-center gap-2">
+                  <span className="flex-1 text-[12px] font-semibold" style={{ color: LEGACY_COLORS.text }}>
+                    정말 삭제하시겠습니까?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirm(false)}
+                    className="rounded-[8px] px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
+                    style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteConfirm(false);
+                      void deleteItem(selectedItem.item_id);
+                    }}
+                    className="rounded-[8px] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:brightness-110"
+                    style={{ background: LEGACY_COLORS.red }}
+                  >
+                    삭제 확인
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirm(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold transition-colors hover:brightness-110"
+                  style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.red, border: `1px solid ${LEGACY_COLORS.red as string}` }}
+                >
+                  삭제
+                </button>
+              )
+            ) : null
+          }
         >
           {addMode ? (
             <AddItemForm />
@@ -332,7 +402,7 @@ function ItemDetailTabs({
 }
 
 function ItemStockTab({ item }: { item: Item }) {
-  const safety = item.min_stock ?? 0;
+  const safety = Math.round(Number(item.min_stock ?? 0));
   const current = Number(item.quantity);
   const warehouse = Number(item.warehouse_qty ?? 0);
   const status =

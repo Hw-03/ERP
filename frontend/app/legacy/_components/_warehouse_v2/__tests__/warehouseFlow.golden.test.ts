@@ -362,8 +362,8 @@ describe("pickerDirectionLabel", () => {
     const map = Object.fromEntries(ALL_SUB_TYPES.map((s) => [s, pickerDirectionLabel(s)]));
     expect(map).toEqual({
       receive_supplier: "입고",
-      warehouse_to_dept: "입고",
-      dept_to_warehouse: "출고",
+      warehouse_to_dept: "창고 반출",
+      dept_to_warehouse: "창고 반입",
       produce: "입고",
       disassemble: "출고",
       dept_transfer: "출고",

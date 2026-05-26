@@ -17,6 +17,7 @@ export interface AdminDetailCardProps {
   activeTab?: string;
   onTabChange?: (id: string) => void;
   children: ReactNode;
+  footer?: ReactNode;
 }
 
 export function AdminDetailCard({
@@ -28,6 +29,7 @@ export function AdminDetailCard({
   activeTab,
   onTabChange,
   children,
+  footer,
 }: AdminDetailCardProps) {
   return (
     <div
@@ -90,6 +92,14 @@ export function AdminDetailCard({
         </div>
       )}
       <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
+      {footer && (
+        <div
+          className="shrink-0 border-t px-5 py-3"
+          style={{ borderColor: LEGACY_COLORS.border }}
+        >
+          {footer}
+        </div>
+      )}
     </div>
   );
 }

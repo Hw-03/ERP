@@ -32,17 +32,30 @@ export const EMPTY_ITEM_EDIT_FORM: ItemEditForm = {
   item_code: "",
 };
 
+const SYMBOL_TO_SLOT: Record<string, number> = { "3": 1, "7": 2, "8": 3, "4": 4, "6": 5 };
+
+function inferModelSlots(code: string): number[] {
+  const seg = code.split("-")[0] ?? "";
+  return seg
+    .split("")
+    .map((ch) => SYMBOL_TO_SLOT[ch])
+    .filter((s): s is number => s !== undefined)
+    .sort((a, b) => a - b);
+}
+
 export function itemToEditForm(item: Item): ItemEditForm {
+  const savedSlots = item.model_slots ?? [];
+  const itemCode = item.item_code ?? "";
   return {
     item_name: item.item_name,
     legacy_item_type: item.legacy_item_type ?? "",
     supplier: item.supplier ?? "",
-    min_stock: item.min_stock != null ? String(item.min_stock) : "",
+    min_stock: item.min_stock != null ? String(Math.round(Number(item.min_stock))) : "",
     process_type_code: item.process_type_code ?? "TR",
     unit: item.unit ?? "EA",
-    model_slots: item.model_slots ?? [],
+    model_slots: savedSlots.length > 0 ? savedSlots : inferModelSlots(itemCode),
     option_code: item.option_code ?? "",
-    item_code: item.item_code ?? "",
+    item_code: itemCode,
   };
 }
 

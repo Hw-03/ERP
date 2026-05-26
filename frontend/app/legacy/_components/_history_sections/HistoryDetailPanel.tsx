@@ -216,13 +216,17 @@ function HistoryDetailHero({
           >
             {eps.from}
           </span>
-          <ArrowRight className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />
-          <span
-            className="rounded-full border px-2.5 py-0.5 font-bold"
-            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-          >
-            {eps.to}
-          </span>
+          {eps.from !== eps.to && (
+            <>
+              <ArrowRight className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />
+              <span
+                className="rounded-full border px-2.5 py-0.5 font-bold"
+                style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+              >
+                {eps.to}
+              </span>
+            </>
+          )}
           {workType && (
             <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
               ({workType})
@@ -293,34 +297,34 @@ function HistoryDetailMetaStrip({
       className="flex flex-wrap items-center justify-between gap-2 rounded-[20px] border px-4 py-3"
       style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
     >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-        {processMeta && (
-          <span
-            className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold"
-            style={{
-              background: `color-mix(in srgb, ${processMeta.color} 16%, transparent)`,
-              color: processMeta.color,
-            }}
-          >
-            {processMeta.label}
+      <div className="flex flex-col gap-1 text-xs">
+        <div className="flex flex-wrap items-center gap-x-2">
+          {processMeta && (
+            <span
+              className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold"
+              style={{
+                background: `color-mix(in srgb, ${processMeta.color} 16%, transparent)`,
+                color: processMeta.color,
+              }}
+            >
+              {processMeta.label}
+            </span>
+          )}
+          <span style={{ color: LEGACY_COLORS.muted2 }}>
+            {log.item_code ?? "-"}
           </span>
-        )}
-        <span style={{ color: LEGACY_COLORS.muted2 }}>
-          {log.item_code ?? "-"}
-        </span>
-        <span style={{ color: LEGACY_COLORS.muted2 }}>·</span>
-        <span style={{ color: LEGACY_COLORS.muted2 }}>요청자</span>
-        <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>
-          {reqName}
-        </span>
-        <span style={{ color: LEGACY_COLORS.muted2 }}>·</span>
-        <span style={{ color: LEGACY_COLORS.muted2 }}>승인자</span>
-        <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>
-          {approverName}
-        </span>
-        <span style={{ color: LEGACY_COLORS.muted2 }}>
-          {formatHistoryDateTimeLong(log.created_at)}
-        </span>
+        </div>
+        <div className="flex flex-col gap-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+          <span>{formatHistoryDateTimeLong(log.created_at)}</span>
+          <span>
+            요청자{" "}
+            <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>{reqName}</span>
+          </span>
+          <span>
+            승인자{" "}
+            <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>{approverName}</span>
+          </span>
+        </div>
       </div>
       {canEdit && (
         <button

@@ -70,6 +70,12 @@ export const itemsApi = {
   updateBomCompletion: async (itemId: string, completed: boolean) =>
     patchJson<Item>(toApiUrl(`/api/items/${itemId}/bom-completion`), { completed }),
 
+  softDeleteItem: (itemId: string) =>
+    patchJson<Item>(toApiUrl(`/api/items/${itemId}/soft-delete`), {}),
+
+  restoreItem: (itemId: string) =>
+    patchJson<Item>(toApiUrl(`/api/items/${itemId}/restore`), {}),
+
   reorderItems: (payload: {
     items: { item_id: string; display_order: number }[];
     pin: string;

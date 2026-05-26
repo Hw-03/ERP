@@ -111,29 +111,10 @@ export function isDepartmentApprover(op: OperatorLike): boolean {
   return op.department_role === "primary" || op.department_role === "deputy";
 }
 
-/**
- * 입출고 화면 진입 가드.
- *
- * - W11: 부서별 io_enabled. departmentsMap 이 있고 항목 io_enabled 가 정의되면 그걸 사용.
- *   미전달/항목 누락 시 PROD_DEPTS 기반 legacy fallback.
- * - W12-#7: 직원별 io_enabled 와 AND 결합. op.io_enabled === false 면 항상 차단.
- *   창고 정직원/부직원은 부서 권한과 무관하게 항상 허용하지만, **직원 io_enabled=false 면 차단**한다.
- */
-export function canEnterIO(
-  op: OperatorLike,
-  departmentsMap?: Map<string, { io_enabled?: boolean }>,
-): boolean {
+/** 입출고 화면 진입 가드. 직원별 io_enabled 만 확인. */
+export function canEnterIO(op: OperatorLike): boolean {
   if (!op) return false;
-  // W12-#7: 직원 io_enabled 가 명시적으로 false 면 (창고 직원 포함) 무조건 차단.
-  if (op.io_enabled === false) return false;
-  if (isWarehouseStaff(op)) return true;
-  if (departmentsMap) {
-    const dept = departmentsMap.get(op.department);
-    if (dept && typeof dept.io_enabled === "boolean") {
-      return dept.io_enabled;
-    }
-  }
-  return PROD_DEPTS.includes(op.department);
+  return op.io_enabled !== false;
 }
 
 export function workTypesForOperator(op: OperatorLike): WorkType[] {

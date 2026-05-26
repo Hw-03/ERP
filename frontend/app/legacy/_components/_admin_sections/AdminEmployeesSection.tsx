@@ -578,7 +578,6 @@ function EmployeeDetailGrid({
               {deptMeta.hint}
             </div>
           </FieldRow>
-          {/* W12-#7: 직원별 입출고 권한 토글. 부서 io_enabled 와 AND 결합. */}
           <FieldRow label="입출고 권한">
             <label className="inline-flex cursor-pointer items-center gap-3 py-1">
               <input
@@ -605,7 +604,7 @@ function EmployeeDetailGrid({
               </span>
             </label>
             <div className="mt-1.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-              부서 입출고 권한과 AND 결합됩니다. 둘 다 사용 가능일 때만 허용.
+              직원 개별 권한. 체크 해제 시 입출고 화면 접근 차단.
             </div>
           </FieldRow>
         </div>

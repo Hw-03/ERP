@@ -22,10 +22,13 @@ export interface ChildDecision {
   reason_memo: string;
   has_bom: boolean;       // 자식이 또 BOM 부모인가 (펼치기 버튼 노출 여부)
   children: ChildDecision[] | null;  // null=미펼침, []=펼침했지만 자식 없음, [...]=펼친 결과
+  manuallySet?: boolean;            // 사용자가 직접 편집했으면 true — 상위 cascade 에서 제외
 }
 
 interface DisassembleTreeProps {
   parentItemId: string;
+  parentItemName: string;
+  parentItemCode: string;
   parentQty: number;
   parentDept: string;
   decisions: ChildDecision[];
@@ -52,15 +55,35 @@ function toChildDecision(line: {
     item_name: line.item_name,
     item_code: line.item_code ?? "",
     qty,
-    keep_qty: qty,   // 기본: 전부 정상
+    keep_qty: 0,     // 기본: 전부 폐기
     reason_memo: "",
+    manuallySet: false,
     has_bom: line.has_children,
     children: null,
   };
 }
 
+function cascadeKeepQty(
+  children: ChildDecision[],
+  parentKeepQty: number,
+  parentQty: number,
+): ChildDecision[] {
+  if (parentQty <= 0) return children;
+  const ratio = parentKeepQty / parentQty;
+  return children.map((child) => {
+    if (child.manuallySet) return child;
+    const newKeep = Math.min(child.qty, Math.round(ratio * child.qty));
+    if (child.children && child.children.length > 0) {
+      return { ...child, children: cascadeKeepQty(child.children, newKeep, child.qty) };
+    }
+    return { ...child, keep_qty: newKeep };
+  });
+}
+
 export function DisassembleTree({
   parentItemId,
+  parentItemName,
+  parentItemCode,
   parentQty,
   parentDept: _parentDept,
   decisions,
@@ -68,6 +91,7 @@ export function DisassembleTree({
 }: DisassembleTreeProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [parentKeepQty, setParentKeepQty] = useState(0);
 
   // mount 시 1-depth BOM 자식 로드 → decisions 초기화 (decisions 이미 있으면 skip — draft 복원 대비)
   useEffect(() => {
@@ -83,7 +107,7 @@ export function DisassembleTree({
       .getBomTemplate(parentItemId, "disassembly", parentQty)
       .then((res) => {
         if (cancelled) return;
-        onChange(res.lines.map(toChildDecision));
+        onChange(res.lines.filter((l) => l.item_id !== parentItemId).map(toChildDecision));
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -114,23 +138,73 @@ export function DisassembleTree({
       </div>
     );
   }
-  if (decisions.length === 0) {
-    return (
-      <div className="py-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted }}>
-        BOM 자식 항목이 없습니다.
-      </div>
-    );
-  }
-
   function updateAt(idx: number, next: ChildDecision) {
     onChange(decisions.map((d, i) => (i === idx ? next : d)));
   }
 
+  function handleParentKeepChange(raw: number) {
+    const next = clamp(raw, 0, parentQty);
+    setParentKeepQty(next);
+    onChange(cascadeKeepQty(decisions, next, parentQty));
+  }
+
   return (
     <div className="flex flex-col gap-2">
-      {decisions.map((d, idx) => (
-        <TreeNode key={`${d.item_id}-${idx}`} node={d} depth={0} onChange={(n) => updateAt(idx, n)} />
-      ))}
+      {/* 상위 품목 — 항상 전량 폐기, 입력 없음 */}
+      <div
+        className="rounded-[14px] border"
+        style={{ borderColor: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 6) }}
+      >
+        <div className="flex items-center gap-2 px-4 py-2.5">
+          <ChevronDown className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.red }} />
+          <Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.red }} />
+          <span className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
+            {parentItemName}
+          </span>
+          {parentItemCode && (
+            <span className="text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+              {parentItemCode}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-3 px-4 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black" style={{ color: LEGACY_COLORS.blue }}>정상</span>
+            <input
+              type="number"
+              min={0}
+              max={parentQty}
+              value={parentKeepQty}
+              onChange={(e) => handleParentKeepChange(Number(e.target.value))}
+              className="w-16 rounded-[8px] border px-2 py-1 text-center text-base font-black"
+              style={{
+                borderColor: parentKeepQty === 0 ? LEGACY_COLORS.red : parentKeepQty === parentQty ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+                background: LEGACY_COLORS.s1,
+                color: LEGACY_COLORS.text,
+              }}
+              aria-label="상위 품목 정상 수량"
+            />
+            <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>/</span>
+            <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>폐기</span>
+            <span className="inline-block min-w-[2rem] text-center text-base font-black" style={{ color: LEGACY_COLORS.red }}>
+              {formatQty(Math.max(0, parentQty - parentKeepQty))}
+            </span>
+          </div>
+          <span className="text-[10px] font-black tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
+            — 하위 품목 회수 결정 —
+          </span>
+        </div>
+      </div>
+
+      {decisions.length === 0 ? (
+        <div className="py-2 pl-5 text-xs font-bold" style={{ color: LEGACY_COLORS.muted }}>
+          BOM 자식 항목이 없습니다.
+        </div>
+      ) : (
+        decisions.map((d, idx) => (
+          <TreeNode key={`${d.item_id}-${idx}`} node={d} depth={1} cascadeRatio={parentQty > 0 ? parentKeepQty / parentQty : 0} onChange={(n) => updateAt(idx, n)} />
+        ))
+      )}
     </div>
   );
 }
@@ -142,10 +216,12 @@ export function DisassembleTree({
 function TreeNode({
   node,
   depth,
+  cascadeRatio,
   onChange,
 }: {
   node: ChildDecision;
   depth: number;
+  cascadeRatio: number;
   onChange: (next: ChildDecision) => void;
 }) {
   const [expanding, setExpanding] = useState(false);
@@ -182,7 +258,11 @@ function TreeNode({
     setExpandError(null);
     try {
       const res = await deptAdjustmentApi.getBomTemplate(node.item_id, "disassembly", node.qty);
-      const children = res.lines.map(toChildDecision);
+      const rawChildren = res.lines.filter((l) => l.item_id !== node.item_id).map(toChildDecision);
+      const effectiveKeep = node.manuallySet
+        ? node.keep_qty
+        : Math.min(node.qty, Math.round(cascadeRatio * node.qty));
+      const children = cascadeKeepQty(rawChildren, effectiveKeep, node.qty);
       onChange({ ...node, children, keep_qty: 0 });
     } catch (err) {
       setExpandError(err instanceof Error ? err.message : "자식 BOM 로드 실패");
@@ -192,8 +272,8 @@ function TreeNode({
   }
 
   function handleCollapse() {
-    // 접으면 leaf 모드로 전환 — 기본 전부 정상
-    onChange({ ...node, children: null, keep_qty: node.qty });
+    const cascadedKeep = Math.min(node.qty, Math.round(cascadeRatio * node.qty));
+    onChange({ ...node, children: null, keep_qty: cascadedKeep, manuallySet: false });
   }
 
   return (
@@ -234,6 +314,14 @@ function TreeNode({
             {node.item_code}
           </span>
         )}
+        {node.manuallySet && !isDecomposed && (
+          <span
+            className="rounded-full px-1.5 py-0.5 text-[9px] font-black"
+            style={{ background: "#fef3c7", color: "#92400e" }}
+          >
+            수동
+          </span>
+        )}
         <span className="ml-auto whitespace-nowrap text-xs font-bold" style={{ color: LEGACY_COLORS.muted }}>
           총 {formatQty(node.qty)}개
         </span>
@@ -251,7 +339,7 @@ function TreeNode({
               value={Number(node.keep_qty) || 0}
               onChange={(e) => {
                 const raw = Number(e.target.value);
-                onChange({ ...node, keep_qty: clamp(raw, 0, node.qty) });
+                onChange({ ...node, keep_qty: clamp(raw, 0, node.qty), manuallySet: true });
               }}
               className="w-16 rounded-[8px] border px-2 py-1 text-center text-base font-black"
               style={{
@@ -314,6 +402,7 @@ function TreeNode({
               key={`${child.item_id}-${idx}`}
               node={child}
               depth={depth + 1}
+              cascadeRatio={cascadeRatio}
               onChange={(updated) => {
                 const next = [...(node.children ?? [])];
                 next[idx] = updated;

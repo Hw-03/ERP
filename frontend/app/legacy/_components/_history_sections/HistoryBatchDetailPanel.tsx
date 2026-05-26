@@ -229,17 +229,15 @@ function HistoryBatchHero({
         </div>
       )}
 
-      {/* 4줄: 메타 — 일시 · 요청자 · 승인자 */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+      {/* 4줄: 메타 — 일시 / 요청자 / 승인자 */}
+      <div className="flex flex-col gap-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
         <span>{formatHistoryDateTimeLong(first.created_at)}</span>
-        <span>·</span>
         <span>
           요청자{" "}
           <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>
             {reqName}
           </span>
         </span>
-        <span>·</span>
         <span>
           승인자{" "}
           <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>

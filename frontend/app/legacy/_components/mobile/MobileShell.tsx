@@ -23,7 +23,6 @@ import type { Item } from "@/lib/api";
 import { CapacityDetailModal } from "../CapacityDetailModal";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { canEnterIO } from "../_warehouse_steps";
-import { useDepartmentsQuery } from "@/lib/queries/useDepartmentsQuery";
 
 export type MobileTabId = "dashboard" | "warehouse" | "history" | "weekly" | "admin";
 
@@ -105,20 +104,14 @@ export function MobileShell() {
     return () => window.removeEventListener("focus", handleFocus);
   }, [loadCapacity]);
 
-  const { data: departments } = useDepartmentsQuery();
-  const departmentsMap = useMemo(() => {
-    if (!departments) return undefined;
-    return new Map(departments.map((d) => [d.name, d]));
-  }, [departments]);
-
   const visibleTabs = useMemo(() => {
     const allTabs: MobileTabId[] = ["dashboard", "warehouse", "history", "weekly", "admin"];
     if (!operator) return allTabs;
     return allTabs.filter((tab) => {
-      if (tab === "warehouse") return canEnterIO(operator, departmentsMap);
+      if (tab === "warehouse") return canEnterIO(operator);
       return true;
     });
-  }, [operator, departmentsMap]);
+  }, [operator]);
 
   const content = useMemo(() => {
     const key = activeTab === "admin" ? "admin" : `${activeTab}-${refreshNonce}`;

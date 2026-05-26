@@ -10,6 +10,7 @@ import {
   useCreateItemMutation,
   useReorderItemsMutation,
 } from "@/lib/queries/useItemsQuery";
+import { itemsApi } from "@/lib/api/items";
 import { EMPTY_ADD_FORM, type AddForm } from "../_admin_sections/adminShared";
 
 export type UseAdminMasterItemsCommandsArgs = {
@@ -28,6 +29,8 @@ export type UseAdminMasterItemsCommandsState = {
   setAddForm: (updater: (f: AddForm) => AddForm) => void;
   add: () => void;
   reorder: (ordered: Item[]) => void;
+  deleteItem: (itemId: string) => Promise<void>;
+  restoreItem: (itemId: string) => Promise<void>;
 };
 
 export function useAdminMasterItemsCommands({
@@ -85,6 +88,28 @@ export function useAdminMasterItemsCommands({
     );
   }
 
+  async function deleteItem(itemId: string): Promise<void> {
+    try {
+      const updated = await itemsApi.softDeleteItem(itemId);
+      setItems((prev) => prev.map((it) => (it.item_id === itemId ? updated : it)));
+      setSelectedItem(updated);
+      onStatusChange("품목이 삭제됐습니다. 목록에서 복구할 수 있습니다.");
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "품목 삭제에 실패했습니다.");
+    }
+  }
+
+  async function restoreItem(itemId: string): Promise<void> {
+    try {
+      const updated = await itemsApi.restoreItem(itemId);
+      setItems((prev) => prev.map((it) => (it.item_id === itemId ? updated : it)));
+      setSelectedItem(updated);
+      onStatusChange("품목이 복구됐습니다.");
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "품목 복구에 실패했습니다.");
+    }
+  }
+
   return {
     addMode,
     setAddMode,
@@ -92,5 +117,7 @@ export function useAdminMasterItemsCommands({
     setAddForm,
     add: () => void _add(),
     reorder,
+    deleteItem,
+    restoreItem,
   };
 }
