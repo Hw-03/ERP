@@ -168,16 +168,16 @@ def validate_code(db: Session, code: ItemCode) -> None:
 
 
 def next_serial(db: Session, symbol: str, process_type: str) -> int:
-    """Return the next available serial for (symbol, process_type), based on
-    existing Item.serial_no values under that prefix. Serial is scoped to the
-    combination to avoid colliding across product/process dimensions."""
+    """Return the next available serial for the given process_type.
+
+    운영 컨벤션: serial 은 process_type 안에서 모델 무관 전역 유일.
+    예: AR 카테고리에서 3-AR-0335, 4-AR-0336 처럼 모델이 달라도 시리얼은 겹치지 않게 메김.
+    `symbol` 인자는 시그니처 호환을 위해 유지(향후 모델별 카운터 분리 가능성)하되,
+    현재는 카테고리 스코프로만 카운트한다.
+    """
     max_serial = (
         db.query(func.max(Item.serial_no))
-        .filter(
-            Item.process_type_code == process_type,
-            # Items sharing the same symbol prefix
-            Item.item_code.like(f"{symbol}-{process_type}-%"),
-        )
+        .filter(Item.process_type_code == process_type)
         .scalar()
     )
     return int(max_serial or 0) + 1
