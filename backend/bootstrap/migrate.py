@@ -215,6 +215,8 @@ _MIGRATION_DDL: list[str] = [
     # WHERE io_enabled = 1 조건으로 이미 0 으로 설정된 행은 건드리지 않음.
     "UPDATE departments SET io_enabled = 0 "
     "WHERE name NOT IN ('튜브', '고압', '진공', '튜닝', '조립', '출하') AND io_enabled = 1",
+    # 2026-05-26: 품목 소프트 삭제 — deleted_at NULL=활성, 값있으면 삭제됨
+    "ALTER TABLE items ADD COLUMN deleted_at DATETIME",
     # 2026-05-24 (W12-#7): 직원별 입출고 권한 토글 — employees.io_enabled.
     # 부서 io_enabled 와 AND 결합 (둘 다 TRUE 일 때만 입출고 화면 진입 허용).
     # 기본값 1(TRUE). 기존 직원은 모두 TRUE 로 추가된 뒤, 본인 부서의 io_enabled 값으로 백필.

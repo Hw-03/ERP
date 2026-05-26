@@ -820,6 +820,14 @@
             "title": "Maximum",
             "type": "integer"
           },
+          "representative_items": {
+            "description": "모델(model_symbol) 별 대표 PF 만 골라낸 리스트. 프론트 메인 패널/모달 상단은 합계 대신 이 배열을 표시. 정렬: model_symbol 오름차순.",
+            "items": {
+              "$ref": "#/components/schemas/CapacityTopItem"
+            },
+            "title": "Representative Items",
+            "type": "array"
+          },
           "status": {
             "default": "no_target",
             "description": "표시 분기용 상태. no_target=BOM 자체 없음 / bom_not_registered=top item 있지만 BOM 전개 불가 / not_producible=계산 됐지만 모두 0 / producible=하나 이상 생산 가능.",
@@ -853,6 +861,12 @@
             "description": "BOM 직계 자식(중간재·반제품)의 available 기준 즉시 생산 가능량.",
             "title": "Immediate",
             "type": "integer"
+          },
+          "is_representative": {
+            "default": false,
+            "description": "해당 모델의 대표 PF 여부. 1단계: model_symbol 별 자연 정렬 첫 PF.",
+            "title": "Is Representative",
+            "type": "boolean"
           },
           "item_code": {
             "anyOf": [
@@ -889,6 +903,18 @@
             "description": "BOM leaf 까지 전개한 모든 하위 자재의 available 기준 이론 최대 생산 가능량.",
             "title": "Maximum",
             "type": "integer"
+          },
+          "model_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "모델 식별자 (items.model_symbol). 모델 그룹화·대표 PF 선정 기준.",
+            "title": "Model Symbol"
           }
         },
         "required": [
@@ -3552,6 +3578,18 @@
             "title": "Created At",
             "type": "string"
           },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
+          },
           "item_code": {
             "anyOf": [
               {
@@ -3851,6 +3889,18 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Defective Total",
             "type": "string"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
           },
           "department": {
             "anyOf": [
@@ -10789,6 +10839,94 @@
           }
         },
         "summary": "Update Bom Completion",
+        "tags": [
+          "Items"
+        ]
+      }
+    },
+    "/api/items/{item_id}/restore": {
+      "patch": {
+        "description": "삭제된 품목 복구 — deleted_at 초기화.",
+        "operationId": "restore_item_api_items__item_id__restore_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Item",
+        "tags": [
+          "Items"
+        ]
+      }
+    },
+    "/api/items/{item_id}/soft-delete": {
+      "patch": {
+        "description": "품목 소프트 삭제 — deleted_at 세팅 + BOM 연결 제거. 입출고 내역은 보존.",
+        "operationId": "soft_delete_item_api_items__item_id__soft_delete_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Soft Delete Item",
         "tags": [
           "Items"
         ]

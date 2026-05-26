@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, ShoppingCart, AlertCircle, CheckCircle2 } from "lucide-react";
+import { ChevronDown, ChevronRight, ShoppingCart, AlertCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { productionApi } from "@/lib/api/production";
 import type {
   ProductionCapacity,
@@ -11,6 +11,7 @@ import type {
 } from "@/lib/api/types/production";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
+import { getModelLabel } from "@/lib/mes/model-labels";
 
 type FilterMode = "producible" | "shortage" | "all";
 
@@ -53,6 +54,10 @@ export function CapacityDetailModal({
     () => capacityData?.top_items ?? [],
     [capacityData],
   );
+  const representativeItems = useMemo(
+    () => capacityData?.representative_items ?? [],
+    [capacityData],
+  );
   const hasItems = items.length > 0;
 
   // ── E: 요약 통계 ────────────────────────────────────────────
@@ -62,7 +67,7 @@ export function CapacityDetailModal({
   );
   const shortageCount = items.length - producibleCount;
 
-  // ── D: 쇼핑 리스트 — 병목 부품 집계 ──────────────────────────
+  // ── D: 공유 자재 — 병목 부품을 N종 PF가 공유하는 시각으로 집계 ──
   const shoppingList = useMemo(() => {
     const map = new Map<string, { count: number; pfs: string[] }>();
     for (const it of items) {
@@ -87,11 +92,12 @@ export function CapacityDetailModal({
     return items;
   }, [items, filterMode]);
 
-  // ── C: 시리즈 그룹화 ────────────────────────────────────────
+  // ── C: 모델 단위 그룹화 (model_symbol). 없으면 "미분류".
+  // 표시 라벨은 그룹 내 대표 PF (없으면 첫 PF) 의 시리즈명 사용.
   const groupedItems = useMemo(() => {
     const groups = new Map<string, ProductionCapacityItem[]>();
     for (const it of filteredItems) {
-      const key = (it.item_name.split("_")[0] || "기타").trim();
+      const key = (it.model_symbol ?? "").trim() || "미분류";
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(it);
     }
@@ -99,13 +105,15 @@ export function CapacityDetailModal({
       arr.sort((a, b) => b.immediate - a.immediate);
     });
     return Array.from(groups.entries())
-      .map(([key, arr]) => ({
-        key,
-        items: arr,
-        sumImm: arr.reduce((s, x) => s + x.immediate, 0),
-        sumMax: arr.reduce((s, x) => s + x.maximum, 0),
-      }))
-      .sort((a, b) => b.sumImm - a.sumImm);
+      .map(([key, arr]) => {
+        const rep = arr.find((x) => x.is_representative) ?? arr[0];
+        const label =
+          key === "미분류"
+            ? key
+            : getModelLabel(key, rep?.item_name) || `모델${key}`;
+        return { key, label, items: arr };
+      })
+      .sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
   }, [filteredItems]);
 
   // ── A: 행 클릭 → BOM 자식 펼침 (lazy fetch + cache) ──────────
@@ -157,7 +165,17 @@ export function CapacityDetailModal({
             생산 가능수량 상세
           </div>
           <div className="mt-1 text-xs leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
-            즉시: 중간재(공정 재고)를 활용해 빠르게 만들 수 있는 수량 · 최대: 하위 자재 전부 투입 시 이론치
+            즉시: 중간재(공정 재고) 활용 · 최대: 하위 자재 전부 투입 시 이론치
+          </div>
+          <div
+            className="mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+            style={{
+              background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 14%, transparent)`,
+              color: LEGACY_COLORS.yellow,
+            }}
+          >
+            <AlertTriangle className="h-3 w-3" />
+            각 PF 수치는 단독 가정 · 같은 자재 공유 PF 가 있어 동시에 다 못 만듦
           </div>
         </div>
 
@@ -165,78 +183,78 @@ export function CapacityDetailModal({
         <div className="flex-1 overflow-y-auto px-7 py-5">
           {hasItems ? (
             <>
-              {/* E: 요약 헤더 — 즉시·최대·종류 통계 */}
-              <div className="mb-4 grid grid-cols-3 gap-3">
+              {/* E: 모델별 대표 PF 요약 — 메인 패널과 같은 정보 */}
+              {representativeItems.length > 0 ? (
                 <div
-                  className="rounded-[18px] border p-4"
+                  className="mb-4 rounded-[18px] border p-3"
                   style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
                 >
                   <div
-                    className="text-xs font-bold uppercase tracking-[0.15em]"
+                    className="mb-2 text-xs font-bold uppercase tracking-[0.15em]"
                     style={{ color: LEGACY_COLORS.muted2 }}
                   >
-                    즉시 생산 합계
+                    모델별 대표 PF — 즉시 / 최대
                   </div>
-                  <div
-                    className="mt-1 text-[28px] font-black leading-tight"
-                    style={{ color: LEGACY_COLORS.cyan }}
-                  >
-                    {formatQty(capacityData!.immediate)}
+                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                    {representativeItems.map((rep) => {
+                      const isZero = rep.immediate === 0;
+                      return (
+                        <div
+                          key={rep.item_id}
+                          className="grid grid-cols-[auto_1fr_auto] items-baseline gap-2 rounded-[10px] px-2.5 py-1.5"
+                          style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.text} 4%, transparent)` }}
+                        >
+                          <span
+                            className="text-sm font-black"
+                            style={{ color: LEGACY_COLORS.blue }}
+                          >
+                            {getModelLabel(rep.model_symbol, rep.item_name) || rep.item_name}
+                          </span>
+                          <span
+                            className="truncate text-[11px]"
+                            style={{ color: LEGACY_COLORS.muted2 }}
+                            title={rep.item_name}
+                          >
+                            {rep.item_name}
+                          </span>
+                          <span className="inline-flex items-baseline gap-1 text-sm">
+                            <span
+                              className="font-black"
+                              style={{ color: isZero ? LEGACY_COLORS.yellow : LEGACY_COLORS.cyan }}
+                            >
+                              {formatQty(rep.immediate)}
+                            </span>
+                            <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
+                            <span className="font-bold" style={{ color: LEGACY_COLORS.blue }}>
+                              {formatQty(rep.maximum)}
+                            </span>
+                          </span>
+                          {isZero && rep.limiting_item && (
+                            <span
+                              className="col-span-3 text-[11px]"
+                              style={{ color: LEGACY_COLORS.yellow }}
+                            >
+                              병목: {rep.limiting_item}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
+              ) : (
+                // 구버전 fallback — model_symbol 없는 환경
                 <div
-                  className="rounded-[18px] border p-4"
-                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+                  className="mb-4 rounded-[18px] border p-4 text-sm"
+                  style={{
+                    background: LEGACY_COLORS.s2,
+                    borderColor: LEGACY_COLORS.border,
+                    color: LEGACY_COLORS.muted2,
+                  }}
                 >
-                  <div
-                    className="text-xs font-bold uppercase tracking-[0.15em]"
-                    style={{ color: LEGACY_COLORS.muted2 }}
-                  >
-                    최대 생산 합계
-                  </div>
-                  <div
-                    className="mt-1 text-[28px] font-black leading-tight"
-                    style={{ color: LEGACY_COLORS.blue }}
-                  >
-                    {formatQty(capacityData!.maximum)}
-                  </div>
+                  모델별 대표 PF 정보 없음 — 아래 목록에서 PF 별 단독 수치 확인
                 </div>
-                <div
-                  className="rounded-[18px] border p-4"
-                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-                >
-                  <div
-                    className="text-xs font-bold uppercase tracking-[0.15em]"
-                    style={{ color: LEGACY_COLORS.muted2 }}
-                  >
-                    생산 가능 종류
-                  </div>
-                  <div className="mt-1 flex items-baseline gap-2 leading-tight">
-                    <span
-                      className="text-[28px] font-black"
-                      style={{ color: LEGACY_COLORS.cyan }}
-                    >
-                      {producibleCount}
-                    </span>
-                    <span className="text-base font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                      / {items.length}종
-                    </span>
-                  </div>
-                  {/* 미니 게이지 */}
-                  <div
-                    className="mt-2 h-1.5 w-full overflow-hidden rounded-full"
-                    style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.text} 10%, transparent)` }}
-                  >
-                    <div
-                      className="h-full"
-                      style={{
-                        width: `${items.length > 0 ? (producibleCount / items.length) * 100 : 0}%`,
-                        background: LEGACY_COLORS.cyan,
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
+              )}
 
               {/* D: 쇼핑 리스트 — 병목 부품 집계 */}
               {shoppingList.length > 0 && (
@@ -253,8 +271,14 @@ export function CapacityDetailModal({
                       className="text-sm font-bold"
                       style={{ color: LEGACY_COLORS.yellow }}
                     >
-                      우선 발주 후보 — 이것만 들여오면 추가 생산 가능
+                      공유 자재 — 한 자재가 여러 PF 의 병목
                     </span>
+                  </div>
+                  <div
+                    className="mb-2 text-[11px] leading-relaxed"
+                    style={{ color: LEGACY_COLORS.muted2 }}
+                  >
+                    이 자재 한 종을 들여오면 아래 PF 들이 동시에 추가로 만들 수 있게 됨
                   </div>
                   <div className="space-y-1.5">
                     {shoppingList.map((s) => (
@@ -285,7 +309,7 @@ export function CapacityDetailModal({
                             color: LEGACY_COLORS.yellow,
                           }}
                         >
-                          +{s.count}종 생산 가능
+                          공유 PF {s.count}종
                         </div>
                       </div>
                     ))}
@@ -343,13 +367,13 @@ export function CapacityDetailModal({
                     className="px-4 py-6 text-center text-sm"
                     style={{ color: LEGACY_COLORS.muted2 }}
                   >
-                    조건에 맞는 PF가 없습니다.
+                    조건에 맞는 PF 가 없습니다.
                   </div>
                 )}
 
                 {groupedItems.map((group) => (
                   <div key={group.key}>
-                    {/* 시리즈 헤더 */}
+                    {/* 모델 그룹 헤더 — 단독 합은 거짓이라 제거. "모델N · M종" 만 표시. */}
                     <div
                       className="grid grid-cols-[24px_1fr_120px_120px] items-center border-t px-4 py-2"
                       style={{
@@ -362,7 +386,7 @@ export function CapacityDetailModal({
                         className="text-sm font-black"
                         style={{ color: LEGACY_COLORS.blue }}
                       >
-                        {group.key}{" "}
+                        {group.label}{" "}
                         <span
                           className="text-xs font-bold"
                           style={{ color: LEGACY_COLORS.muted2 }}
@@ -370,18 +394,8 @@ export function CapacityDetailModal({
                           · {group.items.length}종
                         </span>
                       </span>
-                      <span
-                        className="text-right text-xs font-bold"
-                        style={{ color: LEGACY_COLORS.cyan }}
-                      >
-                        {formatQty(group.sumImm)}
-                      </span>
-                      <span
-                        className="text-right text-xs"
-                        style={{ color: LEGACY_COLORS.muted2 }}
-                      >
-                        {formatQty(group.sumMax)}
-                      </span>
+                      <span />
+                      <span />
                     </div>
 
                     {/* 그룹 내부 PF 행 */}

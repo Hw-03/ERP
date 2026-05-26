@@ -15,7 +15,7 @@ from sqlalchemy import func
 
 from app.database import get_db
 from app.dependencies.admin import require_admin_pin
-from app.models import Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
+from app.models import BOM, Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     BomCompletionUpdate,
@@ -97,6 +97,7 @@ def _to_item_with_inventory(
         option_code=item.option_code,
         serial_no=item.serial_no,
         bom_completed_at=item.bom_completed_at,
+        deleted_at=item.deleted_at,
         created_at=item.created_at,
         updated_at=item.updated_at,
         quantity=fig.total,
@@ -211,7 +212,11 @@ def list_items(
             )
         )
 
-    rows = query.order_by(Item.sort_order, Item.item_code).offset(skip).limit(limit).all()
+    rows = query.order_by(
+        Item.deleted_at.is_(None).desc(),
+        Item.sort_order,
+        Item.item_code,
+    ).offset(skip).limit(limit).all()
     if not rows:
         return []
 
@@ -480,6 +485,60 @@ def update_bom_completion(
         target_type="item",
         target_id=str(item.item_id),
         payload_summary=f"{item.item_name}: {'완료' if payload.completed else '완료 해제'}",
+    )
+
+    commit_and_refresh(db, item)
+    return item
+
+
+@router.patch("/{item_id}/soft-delete", response_model=ItemResponse)
+def soft_delete_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+    """품목 소프트 삭제 — deleted_at 세팅 + BOM 연결 제거. 입출고 내역은 보존."""
+    item = db.query(Item).filter(Item.item_id == item_id).first()
+    if not item:
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+    if item.deleted_at is not None:
+        raise http_error(409, ErrorCode.CONFLICT, "이미 삭제된 품목입니다.")
+
+    db.query(BOM).filter(
+        (BOM.parent_item_id == item_id) | (BOM.child_item_id == item_id)
+    ).delete(synchronize_session=False)
+
+    item.deleted_at = datetime.now(UTC).replace(tzinfo=None)
+    item.updated_at = datetime.now(UTC).replace(tzinfo=None)
+
+    audit.record(
+        db,
+        request=request,
+        action="item.delete",
+        target_type="item",
+        target_id=str(item.item_id),
+        payload_summary=f"{item.item_name} ({item.item_code or 'no-code'})",
+    )
+
+    commit_and_refresh(db, item)
+    return item
+
+
+@router.patch("/{item_id}/restore", response_model=ItemResponse)
+def restore_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+    """삭제된 품목 복구 — deleted_at 초기화."""
+    item = db.query(Item).filter(Item.item_id == item_id).first()
+    if not item:
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+    if item.deleted_at is None:
+        raise http_error(409, ErrorCode.CONFLICT, "삭제되지 않은 품목입니다.")
+
+    item.deleted_at = None
+    item.updated_at = datetime.now(UTC).replace(tzinfo=None)
+
+    audit.record(
+        db,
+        request=request,
+        action="item.restore",
+        target_type="item",
+        target_id=str(item.item_id),
+        payload_summary=f"{item.item_name} ({item.item_code or 'no-code'})",
     )
 
     commit_and_refresh(db, item)

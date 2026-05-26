@@ -111,8 +111,16 @@ def make_item(db_session):
 
     def _make(*, name: str = "테스트품목", process_type_code: str = "TR",
               warehouse_qty: Decimal = Decimal("0"),
-              pending: Decimal = Decimal("0")) -> Item:
-        item = Item(item_name=name, process_type_code=process_type_code, unit="EA")
+              pending: Decimal = Decimal("0"),
+              model_symbol: str | None = None,
+              item_code: str | None = None) -> Item:
+        item = Item(
+            item_name=name,
+            process_type_code=process_type_code,
+            unit="EA",
+            model_symbol=model_symbol,
+            item_code=item_code,
+        )
         db_session.add(item)
         db_session.flush()
         inv = Inventory(

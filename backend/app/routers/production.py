@@ -376,6 +376,7 @@ def get_production_capacity(db: Session = Depends(get_db)):
         "limiting_item": None,
         "status": "no_target",
         "top_items": [],
+        "representative_items": [],
     }
 
     # BOM parent 중 다른 BOM의 child가 아닌 것 = 최상위 품목
@@ -463,6 +464,8 @@ def get_production_capacity(db: Session = Depends(get_db)):
             "item_id": str(item.item_id),
             "item_name": item.item_name,
             "item_code": item.item_code,
+            "model_symbol": item.model_symbol,
+            "is_representative": False,
             "immediate": imm,
             "maximum": mx,
             "limiting_item": bottleneck_name,
@@ -475,7 +478,31 @@ def get_production_capacity(db: Session = Depends(get_db)):
             "limiting_item": None,
             "status": "bom_not_registered",
             "top_items": [],
+            "representative_items": [],
         }
+
+    # 모델별 대표 PF 선정: model_symbol 별 그룹화 → 자연 정렬 첫 PF.
+    # 정렬 키는 item_code (있으면), 없으면 item_name.
+    representatives: Dict[str, dict] = {}
+    for r in top_results:
+        ms = r.get("model_symbol")
+        if not ms:
+            continue
+        sort_key = (r.get("item_code") or r.get("item_name") or "")
+        cur = representatives.get(ms)
+        if cur is None:
+            representatives[ms] = r
+        else:
+            cur_key = (cur.get("item_code") or cur.get("item_name") or "")
+            if sort_key < cur_key:
+                representatives[ms] = r
+    for r in representatives.values():
+        r["is_representative"] = True
+
+    representative_items = sorted(
+        representatives.values(),
+        key=lambda r: (r.get("model_symbol") or ""),
+    )
 
     total_immediate = sum(r["immediate"] for r in top_results)
     total_maximum = sum(r["maximum"] for r in top_results)
@@ -493,4 +520,5 @@ def get_production_capacity(db: Session = Depends(get_db)):
         "limiting_item": bottleneck_name,
         "status": status_value,
         "top_items": sorted(top_results, key=lambda r: r["immediate"]),
+        "representative_items": representative_items,
     }

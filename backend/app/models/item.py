@@ -61,6 +61,9 @@ class Item(Base):
     # BOM 완료 워크플로우 — 사용자가 명시적으로 "완료로 표시"를 누를 때만 set/clear
     bom_completed_at = Column(DateTime, nullable=True)
 
+    # 소프트 삭제 — NULL 이면 활성, 값 있으면 삭제됨
+    deleted_at = Column(DateTime, nullable=True)
+
     inventory = relationship("Inventory", back_populates="item", uselist=False, cascade="all, delete-orphan")
     bom_as_parent = relationship(
         "BOM",

@@ -75,6 +75,7 @@ class ItemResponse(BaseModel):
     option_code: Optional[str] = None
     serial_no: Optional[int] = None
     bom_completed_at: Optional[UtcDatetime] = None
+    deleted_at: Optional[UtcDatetime] = None
     created_at: UtcDatetime
     updated_at: UtcDatetime
 
@@ -656,6 +657,14 @@ class CapacityTopItem(BaseModel):
     item_id: str
     item_name: str
     item_code: Optional[str] = None
+    model_symbol: Optional[str] = Field(
+        None,
+        description="모델 식별자 (items.model_symbol). 모델 그룹화·대표 PF 선정 기준.",
+    )
+    is_representative: bool = Field(
+        False,
+        description="해당 모델의 대표 PF 여부. 1단계: model_symbol 별 자연 정렬 첫 PF.",
+    )
     immediate: int = Field(
         ...,
         description="BOM 직계 자식(중간재·반제품)의 available 기준 즉시 생산 가능량.",
@@ -700,6 +709,14 @@ class CapacityResponse(BaseModel):
         ),
     )
     top_items: List[CapacityTopItem] = Field(default_factory=list)
+    representative_items: List[CapacityTopItem] = Field(
+        default_factory=list,
+        description=(
+            "모델(model_symbol) 별 대표 PF 만 골라낸 리스트. "
+            "프론트 메인 패널/모달 상단은 합계 대신 이 배열을 표시. "
+            "정렬: model_symbol 오름차순."
+        ),
+    )
 
 
 class IntegrityCheckResponse(BaseModel):
