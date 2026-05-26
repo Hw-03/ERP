@@ -347,9 +347,10 @@ export function IoComposeView({
     try {
       const subType = state.subType;
       const action = state.defectAction;
+      const processQty = state.defectProcessQty;
       const lines = [{
         item_id: loc.item_id,
-        quantity: loc.quantity,
+        quantity: processQty,
         from_bucket: "defective" as const,
         from_department: loc.department as Department,
         to_bucket: "none" as const,
@@ -357,7 +358,7 @@ export function IoComposeView({
       if (subType === "defect_restore" || action === "restore") {
         await defectsApi.unquarantine({
           item_id: loc.item_id,
-          qty: loc.quantity,
+          qty: processQty,
           dept: loc.department,
           reason_category: state.defectReasonCategory,
           reason_memo: state.defectReasonMemo,
@@ -941,7 +942,7 @@ export function IoComposeView({
                   parentItemId={state.defectSelectedLocation.item_id}
                   parentItemName={state.defectSelectedLocation.item_name}
                   parentItemCode={state.defectSelectedLocation.item_code}
-                  parentQty={Number(state.defectSelectedLocation.quantity)}
+                  parentQty={state.defectProcessQty || Number(state.defectSelectedLocation.quantity)}
                   parentDept={state.defectSelectedLocation.department}
                   decisions={state.defectBomDecisions}
                   onChange={state.setDefectBomDecisions}

@@ -15,6 +15,8 @@ interface DefectActionStepProps {
   reasonCategory: string;
   reasonMemo: string;
   bomDecisions: ChildDecision[];
+  processQty: number;
+  onProcessQtyChange: (qty: number) => void;
   onActionChange: (a: "scrap" | "restore" | "supplier_return" | "disassemble") => void;
   onReasonChange: (category: string, memo: string) => void;
   onBomDecisionsChange: (decisions: ChildDecision[]) => void;
@@ -22,7 +24,16 @@ interface DefectActionStepProps {
   onAdvance: () => void;
 }
 
-function SummaryCard({ location }: { location: DefectLocation }) {
+function SummaryCard({
+  location,
+  processQty,
+  onProcessQtyChange,
+}: {
+  location: DefectLocation;
+  processQty: number;
+  onProcessQtyChange: (qty: number) => void;
+}) {
+  const maxQty = Number(location.quantity);
   return (
     <div
       className="rounded-[14px] border px-5 py-4"
@@ -39,9 +50,26 @@ function SummaryCard({ location }: { location: DefectLocation }) {
         style={{ color: LEGACY_COLORS.muted2 }}
       >
         <span>{location.item_code}</span>
-        <span>격리 수량 {formatQty(Number(location.quantity))}개</span>
         <span>{location.department}</span>
         <span>격리 {location.defective_at ? new Date(location.defective_at).toLocaleDateString("ko-KR") : "기록 없음"}</span>
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>처리 수량</span>
+        <input
+          type="number"
+          min={1}
+          max={maxQty}
+          value={processQty}
+          onChange={(e) => {
+            const v = Math.max(1, Math.min(maxQty, Number(e.target.value) || 1));
+            onProcessQtyChange(v);
+          }}
+          className="w-16 rounded-[8px] border px-2 py-1 text-center text-base font-black"
+          style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1, color: LEGACY_COLORS.text }}
+        />
+        <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+          / 총 {formatQty(maxQty)}개 격리
+        </span>
       </div>
     </div>
   );
@@ -66,6 +94,8 @@ export function DefectActionStep({
   reasonCategory,
   reasonMemo,
   bomDecisions,
+  processQty,
+  onProcessQtyChange,
   onActionChange,
   onReasonChange,
   onBomDecisionsChange,
@@ -79,7 +109,7 @@ export function DefectActionStep({
   if (subType === "defect_restore") {
     return (
       <div className="flex flex-col gap-4">
-        <SummaryCard location={selectedLocation} />
+        <SummaryCard location={selectedLocation} processQty={processQty} onProcessQtyChange={onProcessQtyChange} />
 
         <div
           className="rounded-[12px] border px-4 py-3 text-sm font-bold"
@@ -116,7 +146,7 @@ export function DefectActionStep({
   if (subType === "supplier_return") {
     return (
       <div className="flex flex-col gap-4">
-        <SummaryCard location={selectedLocation} />
+        <SummaryCard location={selectedLocation} processQty={processQty} onProcessQtyChange={onProcessQtyChange} />
 
         <div
           className="rounded-[12px] border px-4 py-3 text-sm font-bold"
@@ -155,7 +185,7 @@ export function DefectActionStep({
 
   return (
     <div className="flex flex-col gap-4">
-      <SummaryCard location={selectedLocation} />
+      <SummaryCard location={selectedLocation} processQty={processQty} onProcessQtyChange={onProcessQtyChange} />
 
       <div className="flex flex-col gap-2">
         {options.map((opt) => (

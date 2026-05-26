@@ -30,6 +30,12 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
   const [defectReasonCategory, setDefectReasonCategory] = useState("");
   const [defectReasonMemo, setDefectReasonMemo] = useState("");
   const [defectBomDecisions, setDefectBomDecisions] = useState<ChildDecision[]>([]);
+  const [defectProcessQty, setDefectProcessQty] = useState<number>(0);
+
+  function selectDefectLocation(loc: DefectLocation | null) {
+    setDefectSelectedLocation(loc);
+    setDefectProcessQty(loc ? Number(loc.quantity) : 0);
+  }
 
   function setWorkType(next: IoWorkType) {
     setWorkTypeBase(next);
@@ -41,6 +47,7 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
     setDefectReasonCategory("");
     setDefectReasonMemo("");
     setDefectBomDecisions([]);
+    setDefectProcessQty(0);
     setStep(1);
   }
 
@@ -76,13 +83,16 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
       2: workType !== "process" || deptIoDirection != null,
       3: defectInvMode ? defectSelectedLocation !== null : bundles.length > 0,
       4: defectInvMode
-        ? !!defectReasonCategory && (subType !== "defect_process" || !!defectAction)
+        ? !!defectReasonCategory
+            && (subType !== "defect_process" || !!defectAction)
+            && defectProcessQty > 0
+            && defectProcessQty <= Number(defectSelectedLocation?.quantity ?? 0)
         : includedLines.length > 0 && !hasShortage && !hasInvalidQuantity,
       5: isDisassemble
         ? defectBomDecisions.length > 0 && validateDecisionTree(defectBomDecisions)
         : true,
     };
-  }, [workType, subType, deptIoDirection, bundles.length, includedLines.length, hasShortage, hasInvalidQuantity, defectSelectedLocation, defectAction, defectReasonCategory, defectBomDecisions]);
+  }, [workType, subType, deptIoDirection, bundles.length, includedLines.length, hasShortage, hasInvalidQuantity, defectSelectedLocation, defectAction, defectReasonCategory, defectBomDecisions, defectProcessQty]);
 
   function goNext() {
     setStep((s) => (s < 5 ? ((s + 1) as IoStep) : s));
@@ -125,6 +135,7 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
     setDefectReasonCategory("");
     setDefectReasonMemo("");
     setDefectBomDecisions([]);
+    setDefectProcessQty(0);
     setStep(1);
   }
 
@@ -148,6 +159,7 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
     defectReasonCategory,
     defectReasonMemo,
     defectBomDecisions,
+    defectProcessQty,
     setWorkType,
     setSubType,
     setFromDepartment,
@@ -158,6 +170,8 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
     setDeptIoDirection,
     setDeptIoDirectionRaw,
     setDefectSelectedLocation,
+    selectDefectLocation,
+    setDefectProcessQty,
     setDefectAction,
     setDefectReasonCategory,
     setDefectReasonMemo,

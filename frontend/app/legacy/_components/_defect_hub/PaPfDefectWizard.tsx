@@ -36,6 +36,7 @@ export function PaPfDefectWizard({
 
   const [action, setAction] = useState<DisposalAction>("disassemble");
   const [decisions, setDecisions] = useState<ChildDecision[]>([]);
+  const [processQty, setProcessQty] = useState<number>(Number(location.quantity));
   const [category, setCategory] = useState("");
   const [memo, setMemo] = useState("");
   const [busy, setBusy] = useState(false);
@@ -72,7 +73,7 @@ export function PaPfDefectWizard({
       if (action === "unquarantine") {
         await defectsApi.unquarantine({
           item_id: location.item_id,
-          qty: location.quantity,
+          qty: processQty,
           dept: location.department,
           reason_category: category,
           reason_memo: memo,
@@ -88,7 +89,7 @@ export function PaPfDefectWizard({
           lines: [
             {
               item_id: location.item_id,
-              quantity: location.quantity,
+              quantity: processQty,
               from_bucket: "defective",
               from_department: location.department as Department,
               to_bucket: "none",
@@ -107,7 +108,7 @@ export function PaPfDefectWizard({
           lines: [
             {
               item_id: location.item_id,
-              quantity: location.quantity,
+              quantity: processQty,
               from_bucket: "defective",
               from_department: location.department as Department,
               to_bucket: "none",
@@ -167,6 +168,26 @@ export function PaPfDefectWizard({
 
         {/* 스크롤 영역 */}
         <div className="flex flex-col gap-5 overflow-y-auto px-6 py-5">
+          {/* 처리 수량 */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>처리 수량</span>
+            <input
+              type="number"
+              min={1}
+              max={Number(location.quantity)}
+              value={processQty}
+              onChange={(e) => {
+                const v = Math.max(1, Math.min(Number(location.quantity), Number(e.target.value) || 1));
+                setProcessQty(v);
+              }}
+              className="w-16 rounded-[8px] border px-2 py-1 text-center text-base font-black"
+              style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
+            />
+            <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
+              / 총 {location.quantity}개 격리
+            </span>
+          </div>
+
           {/* 처리 방식 선택 */}
           <div className="flex flex-col gap-3">
             <div className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
@@ -220,7 +241,7 @@ export function PaPfDefectWizard({
                 parentItemId={location.item_id}
                 parentItemName={location.item_name}
                 parentItemCode={location.item_code}
-                parentQty={location.quantity}
+                parentQty={processQty}
                 parentDept={location.department}
                 decisions={decisions}
                 onChange={setDecisions}
