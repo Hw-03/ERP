@@ -62,6 +62,8 @@ export function InlineSearch({
           onChange(next);
         }}
         placeholder={placeholder}
+        inputMode="search"
+        enterKeyHint="search"
         className={clsx("h-11 min-w-0 flex-1 bg-transparent outline-none", TYPO.body)}
         style={{ color: LEGACY_COLORS.text }}
       />

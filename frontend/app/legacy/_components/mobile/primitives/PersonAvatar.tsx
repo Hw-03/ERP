@@ -55,7 +55,7 @@ export function PersonAvatar({
         {firstEmployeeLetter(name)}
       </div>
       {showLabel ? (
-        <div className={clsx(TYPO.caption, "font-semibold")} style={{ color: selected ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}>
+        <div className={clsx(TYPO.body, "font-semibold")} style={{ color: selected ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}>
           {name}
         </div>
       ) : null}

@@ -29,7 +29,7 @@ export function ErrorAlert({
   return (
     <div
       role="alert"
-      className={clsx(TYPO.caption, "rounded-[10px] px-3 py-2", className)}
+      className={clsx(TYPO.body, "rounded-[10px] px-3 py-2", className)}
       style={{
         background: `${color}18`,
         color,

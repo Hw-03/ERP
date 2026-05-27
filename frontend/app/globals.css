@@ -117,6 +117,15 @@
   ::-webkit-scrollbar-thumb:hover {
     background: var(--c-muted);
   }
+
+  /* 모바일 iOS 자동 줌 방지: input 폰트 크기 16px 이상으로 유지 */
+  @media (max-width: 1023px) {
+    input,
+    textarea,
+    select {
+      font-size: 16px;
+    }
+  }
 }
 
 @layer components {

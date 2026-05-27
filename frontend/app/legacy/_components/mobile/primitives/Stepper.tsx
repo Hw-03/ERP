@@ -55,6 +55,7 @@ export function Stepper({
       </button>
       <input
         type="number"
+        inputMode="numeric"
         value={Number.isFinite(value) ? value : 0}
         onChange={(e) => {
           const n = Number(e.target.value);
