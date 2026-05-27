@@ -249,6 +249,8 @@ export function MobileDashboardScreen({
                   onClearDepts={() => setSelectedDepts([])}
                   onClearModels={() => setSelectedModels([])}
                   onClearProcessSteps={() => setSelectedProcessSteps([])}
+                  onResetAll={resetAllFilters}
+                  isAnyFilterActive={isFiltered}
                 />
               )}
             </div>

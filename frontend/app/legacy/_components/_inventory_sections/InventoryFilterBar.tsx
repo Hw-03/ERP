@@ -1,6 +1,6 @@
 "use client";
 
-import { Layers, Search, Sparkles, TrendingUp, X } from "lucide-react";
+import { Layers, RotateCcw, Search, Sparkles, TrendingUp } from "lucide-react";
 import type { ProductModel } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common";
@@ -25,6 +25,8 @@ type FiltersProps = {
   onClearDepts: () => void;
   onClearModels: () => void;
   onClearProcessSteps: () => void;
+  onResetAll: () => void;
+  isAnyFilterActive: boolean;
 };
 
 export function InventoryFilters({
@@ -39,6 +41,8 @@ export function InventoryFilters({
   onClearDepts,
   onClearModels,
   onClearProcessSteps,
+  onResetAll,
+  isAnyFilterActive,
 }: FiltersProps) {
   if (!open) return null;
   return (
@@ -120,6 +124,20 @@ export function InventoryFilters({
           ))}
         </div>
       </div>
+      <button
+        type="button"
+        onClick={onResetAll}
+        disabled={!isAnyFilterActive}
+        className="xl:col-span-3 flex w-full items-center justify-center gap-2 rounded-[16px] border px-4 py-2.5 text-sm font-bold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+        style={{
+          background: LEGACY_COLORS.s2,
+          borderColor: LEGACY_COLORS.border,
+          color: isAnyFilterActive ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
+        }}
+      >
+        <RotateCcw className="h-4 w-4" />
+        전체 초기화
+      </button>
     </div>
   );
 }
@@ -151,28 +169,6 @@ export function InventoryTableStickyHeader({
           <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
             자재 목록
           </span>
-          {isFiltered && (
-            <span
-              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold"
-              style={{
-                background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`,
-                color: LEGACY_COLORS.blue,
-              }}
-            >
-              <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: LEGACY_COLORS.blue }} />
-              필터 적용 중
-              {onResetAllFilters && (
-                <button
-                  onClick={onResetAllFilters}
-                  className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:brightness-90"
-                  style={{ background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white }}
-                  aria-label="필터 초기화"
-                >
-                  <X className="h-2.5 w-2.5" />
-                </button>
-              )}
-            </span>
-          )}
         </div>
         <div
           className="flex min-w-[240px] flex-1 items-center gap-2 rounded-[14px] border px-3 py-2"

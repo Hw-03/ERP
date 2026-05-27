@@ -381,6 +381,11 @@ export function MobileHistoryScreen() {
                 selectedOps={selectedOps}
                 toggleOp={toggleOp}
                 clearOps={() => setSelectedOps([])}
+                onResetAll={() => {
+                  setSelectedDepts([]);
+                  setSelectedModels([]);
+                  setSelectedOps([]);
+                }}
               />
             </section>
           )}

@@ -200,6 +200,14 @@ export function DesktopInventoryView({
               onClearDepts={() => setSelectedDepts([])}
               onClearModels={() => setSelectedModels([])}
               onClearProcessSteps={() => setSelectedProcessSteps([])}
+              onResetAll={resetAllFilters}
+              isAnyFilterActive={
+                selectedDepts.length > 0 ||
+                selectedModels.length > 0 ||
+                selectedProcessSteps.length > 0 ||
+                kpi !== "ALL" ||
+                localSearch.length > 0
+              }
             />
           </section>
 

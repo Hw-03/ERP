@@ -111,14 +111,6 @@ export function HistoryFilterBar({
         >
           <Filter className="h-3.5 w-3.5" />
           필터
-          {activeFilterCount > 0 && (
-            <span
-              className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[11px] font-bold leading-none text-white"
-              style={{ background: LEGACY_COLORS.blue }}
-            >
-              {activeFilterCount}
-            </span>
-          )}
           <ChevronDown
             className="h-3.5 w-3.5 transition-transform"
             style={{ transform: filterPanelOpen ? "rotate(180deg)" : undefined }}
