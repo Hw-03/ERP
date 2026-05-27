@@ -14,6 +14,7 @@ import { BomChildAddBox } from "./BomChildAddBox";
 import { BomEditPanel } from "./BomEditPanel";
 import { BomReviewModal } from "./BomReviewModal";
 import { BomStatsRow, type StatusFilter } from "./BomStatsRow";
+import { BomParentHeader } from "./BomParentHeader";
 import { BomWhereUsedPanel } from "./BomWhereUsedPanel";
 import { BomUnmatchedRawsDrawer } from "./BomUnmatchedRawsDrawer";
 import { bomStatusOf, stageOf, type BomDeptFilter } from "./bomDept";
@@ -376,9 +377,18 @@ export function BomWorkbench({
         </div>
       )}
 
-      {/* 부서 탭 */}
-      <div className="mb-3">
-        <BomDeptTabs value={dept} onChange={handleDeptChange} />
+      {/* 부서 탭 + 선택된 부모 헤더 (한 줄) */}
+      <div className="mb-3 flex min-w-0 items-center gap-3">
+        <div className="shrink-0">
+          <BomDeptTabs value={dept} onChange={handleDeptChange} />
+        </div>
+        <BomParentHeader
+          parent={parent}
+          mode={mode}
+          childCount={mode === "edit" ? bomRows.length : whereUsedRows.length}
+          isCompleted={isCompleted}
+          onOpenReview={() => setReviewOpen(true)}
+        />
       </div>
 
       {/* 메인: 좌(상위) | 중(자식추가) | 우(현재구성) */}
@@ -424,12 +434,10 @@ export function BomWorkbench({
                 parent={parent}
                 bomRows={bomRows}
                 items={items}
-                isCompleted={isCompleted}
                 onSaveQty={handleSaveQty}
                 onRequestDelete={(row, childName) =>
                   setDeleteRequest({ bomId: row.bom_id, childName })
                 }
-                onOpenReview={() => setReviewOpen(true)}
               />
             </div>
           </>
