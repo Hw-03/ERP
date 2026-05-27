@@ -25,13 +25,17 @@ const DEPARTMENT_ALIAS: Record<string, string> = {
 /**
  * 부서별 fallback 색상 (DB color_hex 부재 시에만 사용).
  * 키는 정규화된 부서 이름.
+ *
+ * 모든 부서가 DB 에 색이 채워져 있으면 본 표는 사실상 dead path 안전망이지만,
+ * DB 와 drift 가 생기지 않도록 hex 값을 DB 와 정확히 일치시켜 둠.
+ * 변경 절차: admin 에서 색상 변경 → DB 업데이트 → 본 표도 동일 hex 로 손수 갱신.
  */
 export const MES_DEPARTMENT_COLORS: Record<string, string> = {
-  "조립": "#1d4ed8", // blue-700
-  "고압": "#c2410c", // orange-700
+  "조립": "#3b82f6", // blue-500 — 가시성 개선 (라이트/다크 양쪽 mid-tone)
+  "고압": "#d97706", // amber-600 — 가시성 개선
+  "튜브": "#16a34a", // green-600 — 가시성 개선
   "진공": "#6d28d9", // violet-700
   "튜닝": "#0e7490", // cyan-700
-  "튜브": "#4d7c0f", // lime-700
   "서비스": "#047857", // emerald-700
   "AS": "#be185d", // pink-700
   "연구": "#b45309", // amber-700

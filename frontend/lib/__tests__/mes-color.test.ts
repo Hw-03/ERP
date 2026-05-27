@@ -51,11 +51,12 @@ describe("mes/color barrel — LEGACY_COLORS", () => {
 
 describe("employeeColor (Round-10F 정책 (A))", () => {
   it("returns MES_DEPARTMENT_COLORS hex for known 부서", () => {
-    expect(employeeColor("조립")).toBe("#1d4ed8");
-    expect(employeeColor("고압")).toBe("#c2410c");
+    // 조립/고압/튜브 는 가시성 개선 mid-tone (라이트/다크 모두 보임).
+    expect(employeeColor("조립")).toBe("#3b82f6");
+    expect(employeeColor("고압")).toBe("#d97706");
+    expect(employeeColor("튜브")).toBe("#16a34a");
     expect(employeeColor("진공")).toBe("#6d28d9");
     expect(employeeColor("튜닝")).toBe("#0e7490");
-    expect(employeeColor("튜브")).toBe("#4d7c0f");
     expect(employeeColor("AS")).toBe("#be185d");
     expect(employeeColor("연구")).toBe("#b45309");
     expect(employeeColor("영업")).toBe("#b91c1c");
