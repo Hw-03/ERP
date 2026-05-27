@@ -119,6 +119,24 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
     model_sym = slots_to_model_symbol(model_slots) if model_slots else ""
     opt = payload.option_code or None
 
+    # (item_name, process_type_code) 동일한 활성 품목이 이미 있으면 409.
+    # SQLite 라 DB 레벨 UniqueConstraint 가 없는 상태에서 앱 레벨 안전망.
+    existing_dup = (
+        db.query(Item)
+        .filter(
+            Item.item_name == payload.item_name,
+            Item.process_type_code == pt,
+            Item.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if existing_dup is not None:
+        raise http_error(
+            status.HTTP_409_CONFLICT,
+            ErrorCode.CONFLICT,
+            f"같은 카테고리에 이미 '{payload.item_name}' 품목이 있습니다.",
+        )
+
     serial = None
     item_code = None
     if pt and model_sym:
