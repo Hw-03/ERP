@@ -428,7 +428,7 @@ export function MobileHistoryScreen() {
                 <button
                   type="button"
                   onClick={goBack}
-                  className="mb-2 inline-flex min-h-[36px] items-center gap-1 rounded-[12px] border px-3 py-1.5 text-xs font-bold"
+                  className="mb-2 inline-flex min-h-[44px] items-center gap-1 rounded-[12px] border px-3 py-1.5 text-xs font-bold"
                   style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}
                 >
                   ← 뒤로

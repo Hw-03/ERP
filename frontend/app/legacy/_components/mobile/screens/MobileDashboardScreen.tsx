@@ -137,6 +137,14 @@ export function MobileDashboardScreen({
     setDisplayLimit(PAGE_SIZE);
   }, [filteredItems]);
 
+  // 필터 변경 시 짧은 스켈레톤(200ms) — 즉시 결과가 깜빡이는 인지부담 완화.
+  const [filterChanging, setFilterChanging] = useState(false);
+  useEffect(() => {
+    setFilterChanging(true);
+    const t = setTimeout(() => setFilterChanging(false), 200);
+    return () => clearTimeout(t);
+  }, [selectedDepts, selectedModels, selectedProcessSteps, kpi]);
+
   if (selectedItem) lastSelectedItemRef.current = selectedItem;
   const displayItem = selectedItem ?? lastSelectedItemRef.current;
 
@@ -256,7 +264,7 @@ export function MobileDashboardScreen({
             </div>
             <InventoryItemsTable
               error={error}
-              loading={loading}
+              loading={loading || filterChanging}
               filteredItems={filteredItems}
               displayLimit={displayLimit}
               setDisplayLimit={setDisplayLimit}
