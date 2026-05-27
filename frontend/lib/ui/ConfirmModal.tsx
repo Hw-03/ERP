@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -78,8 +78,6 @@ export function ConfirmModal({
   useEffect(() => {
     setMounted(true);
   }, []);
-  // backdrop 직접 mousedown 추적 — input 안에서 드래그 시작해 backdrop 위에서 mouseup 한 경우 닫지 않게 함.
-  const downOnBackdropRef = useRef(false);
 
   if (!open || !mounted) return null;
 
@@ -91,16 +89,6 @@ export function ConfirmModal({
     <div
       className="fixed inset-0 z-[400] flex items-center justify-center px-4"
       style={{ background: "rgba(0,0,0,.55)" }}
-      onMouseDown={(e) => {
-        downOnBackdropRef.current = e.target === e.currentTarget;
-      }}
-      onMouseUp={(e) => {
-        const downOnBackdrop = downOnBackdropRef.current;
-        downOnBackdropRef.current = false;
-        if (busy) return;
-        // 양방향 드래그 모두 차단 — mousedown 도 mouseup 도 backdrop 위에서 일어나야 닫음.
-        if (downOnBackdrop && e.target === e.currentTarget) onClose();
-      }}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
