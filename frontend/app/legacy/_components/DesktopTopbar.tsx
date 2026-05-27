@@ -6,6 +6,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { StatusPill, inferToneFromStatus } from "./common";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
+import { Toast, type ToastState } from "@/lib/ui/Toast";
 import { api } from "@/lib/api";
 import { clearCurrentOperator, useCurrentOperator } from "./login/useCurrentOperator";
 
@@ -52,6 +53,7 @@ export function DesktopTopbar({
   const [pinConfirm, setPinConfirm] = useState("");
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinBusy, setPinBusy] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   useEffect(() => {
     if (!dropdownOpen) return;
@@ -244,6 +246,10 @@ export function DesktopTopbar({
           try {
             await api.changeMyPin(operator.employee_id, pinCurrent, pinNew);
             setShowPinModal(false);
+            setPinCurrent("");
+            setPinNew("");
+            setPinConfirm("");
+            setToast({ message: "PIN 이 변경되었습니다.", type: "success" });
           } catch (e) {
             setPinError(e instanceof Error ? e.message : "PIN 변경에 실패했습니다.");
           } finally {
@@ -272,6 +278,8 @@ export function DesktopTopbar({
           {pinError && <div className="text-xs" style={{ color: LEGACY_COLORS.red }}>{pinError}</div>}
         </div>
       </ConfirmModal>
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </header>
   );
 }

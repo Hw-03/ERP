@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DesktopPinLock } from "./DesktopPinLock";
-import { LEGACY_COLORS } from "@/lib/mes/color";
 import { AdminSidebar } from "./_admin_sections/AdminSidebar";
 import { AdminSectionContent } from "./_admin_sections/AdminSectionContent";
 import { useAdminBootstrap } from "./_admin_hooks/useAdminBootstrap";
 import { useAdminSettings } from "./_admin_hooks/useAdminSettings";
 import { useAdminViewState, type AdminSection } from "./_admin_hooks/useAdminViewState";
 import { useConfirmNavigation } from "@/lib/ui/dirty-guard";
+import { Toast, type ToastState } from "@/lib/ui/Toast";
 
 /**
  * 섹션 헤더와 KPI는 각 섹션이 직접 그린다 (AdminPageHeader / AdminKpiBar 사용).
@@ -35,6 +35,7 @@ export function DesktopAdminView({
   } = useAdminViewState("models");
 
   const [message, setMessage] = useState("");
+  const [toast, setToast] = useState<ToastState | null>(null);
   const confirmAdminNavigation = useConfirmNavigation();
 
   // 트리거 (b) — 사이드바 섹션 변경 가드
@@ -66,6 +67,14 @@ export function DesktopAdminView({
     onError: setMessage,
   });
 
+  // message / saveMessage → toast 동기화. inline 박스 제거하고 우상단 토스트로 통일.
+  useEffect(() => {
+    if (message) setToast({ message, type: "error" });
+  }, [message]);
+  useEffect(() => {
+    if (saveMessage) setToast({ message: saveMessage, type: "success" });
+  }, [saveMessage]);
+
   if (!unlocked) {
     return (
       <DesktopPinLock
@@ -89,36 +98,6 @@ export function DesktopAdminView({
 
         {/* 워크스페이스 */}
         <section className="flex flex-col overflow-auto lg:min-h-0 lg:overflow-hidden">
-          {/* 토스트 영역 (섹션 헤더는 각 섹션이 직접 렌더링) */}
-          {(saveMessage || message) && (
-            <div role="alert" aria-live="polite" className="mb-3 flex shrink-0 flex-col gap-2">
-              {saveMessage && (
-                <div
-                  className="rounded-[14px] border px-4 py-2.5 text-[13px] font-bold"
-                  style={{
-                    background: `color-mix(in srgb, ${LEGACY_COLORS.green} 14%, transparent)`,
-                    borderColor: `color-mix(in srgb, ${LEGACY_COLORS.green} 40%, transparent)`,
-                    color: LEGACY_COLORS.green,
-                  }}
-                >
-                  {saveMessage}
-                </div>
-              )}
-              {message && (
-                <div
-                  className="rounded-[14px] border px-4 py-2.5 text-[13px] font-bold"
-                  style={{
-                    background: `color-mix(in srgb, ${LEGACY_COLORS.red} 12%, transparent)`,
-                    borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 35%, transparent)`,
-                    color: LEGACY_COLORS.red,
-                  }}
-                >
-                  {message}
-                </div>
-              )}
-            </div>
-          )}
-
           {/* 섹션별 콘텐츠 */}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <AdminSectionContent
@@ -149,6 +128,7 @@ export function DesktopAdminView({
         </section>
       </div>
 
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }
