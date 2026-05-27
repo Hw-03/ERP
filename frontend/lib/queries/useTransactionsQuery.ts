@@ -24,14 +24,14 @@ type SummaryParams = Parameters<typeof productionApi.getTransactionsSummary>[0];
 export function useTransactionsQuery(params?: TransactionParams) {
   return useQuery({
     queryKey: queryKeys.transactions.list(params),
-    queryFn: ({ signal }) => productionApi.getTransactions(params, { signal }),
+    queryFn: () => productionApi.getTransactions(params),
   });
 }
 
 export function useTransactionsSummaryQuery(params?: SummaryParams) {
   return useQuery({
     queryKey: queryKeys.transactions.summary(params),
-    queryFn: ({ signal }) => productionApi.getTransactionsSummary(params, { signal }),
+    queryFn: () => productionApi.getTransactionsSummary(params),
   });
 }
 

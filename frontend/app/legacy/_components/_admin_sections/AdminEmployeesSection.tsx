@@ -174,7 +174,7 @@ export function AdminEmployeesSection() {
             countLabel={`${filteredEmployees.length}명`}
             width={320}
             searchValue={search}
-            searchPlaceholder="이름·부서·역할 검색"
+            searchPlaceholder="이름·부서·직급 검색"
             onSearchChange={setSearch}
             filters={
               <AppSelect
@@ -392,7 +392,7 @@ function EmployeeAddInline({ form, setForm, departments, productModels, onSubmit
             placeholder="예: 홍길동"
           />
         </FieldRow>
-        <FieldRow label="역할" htmlFor="emp-add-role">
+        <FieldRow label="직급" htmlFor="emp-add-role">
           <TextInput
             id="emp-add-role"
             value={form.role}
@@ -504,7 +504,7 @@ function EmployeeDetailGrid({
               onChange={(v) => setForm((f) => ({ ...f, name: v }))}
             />
           </FieldRow>
-          <FieldRow label="역할" htmlFor="emp-edit-role">
+          <FieldRow label="직급" htmlFor="emp-edit-role">
             <TextInput
               id="emp-edit-role"
               value={form.role}

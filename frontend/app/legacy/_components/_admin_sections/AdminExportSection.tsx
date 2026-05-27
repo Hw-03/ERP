@@ -246,7 +246,7 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
     }
     if (scope === "employees") {
       const emps = await api.getEmployees({ activeOnly: !inactive });
-      const headers = ["이름", "부서", "역할", "등급", "창고 역할", "활성"];
+      const headers = ["이름", "부서", "직급", "등급", "창고 역할", "활성"];
       const rows = emps.map((e) => [
         e.name,
         e.department,

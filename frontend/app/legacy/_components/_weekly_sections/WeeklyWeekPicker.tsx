@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
-import { StatusPill } from "../common";
 
 const CAL_MIN = new Date(2026, 0, 1);
 
@@ -181,8 +180,11 @@ export function WeeklyWeekPicker({ weekMon, onChange }: Props) {
       </button>
 
       {isThisWeek && (
-        <span className="hidden lg:inline-flex">
-          <StatusPill label="이번 주" tone="success" showDot={false} />
+        <span
+          className="hidden text-xs font-bold lg:inline-flex"
+          style={{ color: LEGACY_COLORS.green }}
+        >
+          이번 주
         </span>
       )}
 

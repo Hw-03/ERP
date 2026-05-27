@@ -178,8 +178,12 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
           {visibleBadges.map((b) => (
             <span
               key={b.key}
-              className={`text-sm font-bold${b.dim ? " opacity-50" : ""}`}
-              style={{ color: b.color }}
+              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-bold${b.dim ? " opacity-50" : ""}`}
+              style={{
+                color: b.color,
+                background: `color-mix(in srgb, ${b.color} 14%, transparent)`,
+                borderColor: `color-mix(in srgb, ${b.color} 35%, transparent)`,
+              }}
             >
               {b.label}
             </span>

@@ -294,8 +294,6 @@ function DirectionCard({
   onClick: () => void;
 }) {
   const Icon = dir === "in" ? ArrowDownToLine : ArrowUpFromLine;
-  const title = dir === "in" ? "생산" : "분해";
-  const subtitle = dir === "in" ? "입고" : "출고";
   const activeColor = dir === "out" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   return (
     <button
@@ -310,14 +308,18 @@ function DirectionCard({
       }}
     >
       <Icon className="h-16 w-16 shrink-0" />
-      <div className="flex flex-col items-center gap-2 leading-tight">
-        <span className="text-4xl font-black">{title}</span>
-        <span
-          className="h-[4px] w-28 rounded-full"
-          style={{ background: active ? activeColor : LEGACY_COLORS.text }}
-        />
-        <span className="text-4xl font-black">{subtitle}</span>
-      </div>
+      {dir === "in" ? (
+        <div className="flex flex-col items-center gap-2 leading-tight">
+          <span className="text-4xl font-black">생산</span>
+          <span
+            className="h-[4px] w-28 rounded-full"
+            style={{ background: active ? activeColor : LEGACY_COLORS.text }}
+          />
+          <span className="text-4xl font-black">입고</span>
+        </div>
+      ) : (
+        <span className="text-4xl font-black leading-tight">출고</span>
+      )}
     </button>
   );
 }

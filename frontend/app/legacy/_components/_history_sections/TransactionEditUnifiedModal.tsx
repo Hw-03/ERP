@@ -267,7 +267,10 @@ export function TransactionEditUnifiedModal({
 
           {/* 공통 — 사유 / 수정자 / PIN */}
           <div className="border-t pt-3" style={{ borderColor: LEGACY_COLORS.border }}>
-            <FieldRow label="정정 사유 (필수)">
+            <div>
+              <div className="mb-1 text-xs font-bold uppercase tracking-[0.15em]" style={{ color: LEGACY_COLORS.muted2 }}>
+                정정 사유 <span style={{ color: LEGACY_COLORS.red }}>(필수)</span>
+              </div>
               <input
                 type="text"
                 value={reason}
@@ -276,7 +279,7 @@ export function TransactionEditUnifiedModal({
                 className="w-full rounded-[12px] border px-3 py-2 text-sm outline-none"
                 style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
               />
-            </FieldRow>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <FieldRow label="수정자">

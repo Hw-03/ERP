@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
@@ -50,6 +51,8 @@ export function MyRequestRow({
   const cancelable = req.status === "submitted" || req.status === "reserved";
   const typeLabel = REQUEST_TYPE_LABEL[req.request_type] ?? req.request_type;
   const statusColor = STATUS_COLOR[req.status] ?? LEGACY_COLORS.muted2;
+  const [notesExpanded, setNotesExpanded] = useState(false);
+  const notesLong = (req.notes ?? "").length > 60;
 
   const firstLine = req.lines[0];
   const fromDept = firstLine?.from_department ? normalizeDepartment(firstLine.from_department) : null;
@@ -91,16 +94,23 @@ export function MyRequestRow({
         </div>
       )}
 
-      <div className="mt-3 flex flex-col gap-1 text-sm" style={{ color: LEGACY_COLORS.text }}>
-        {req.lines.slice(0, 5).map((line) => (
-          <div key={line.line_id} className="flex flex-wrap items-center gap-2">
-            <span style={{ color: LEGACY_COLORS.muted2 }}>{line.item_code_snapshot ?? "-"}</span>
-            <span>{line.item_name_snapshot}</span>
-            <span className="ml-auto font-bold">{formatQty(line.quantity)}{" "}개</span>
-          </div>
-        ))}
+      <div className="mt-3 flex flex-col text-sm" style={{ color: LEGACY_COLORS.text }}>
+        {req.lines.slice(0, 5).map((line, idx) => {
+          const isLast = idx === Math.min(req.lines.length, 5) - 1 && req.lines.length <= 5;
+          return (
+            <div
+              key={line.line_id}
+              className="flex flex-wrap items-center gap-2 py-1.5"
+              style={!isLast ? { borderBottom: `1px solid ${LEGACY_COLORS.border}` } : undefined}
+            >
+              <span style={{ color: LEGACY_COLORS.muted2 }}>{line.item_code_snapshot ?? "-"}</span>
+              <span>{line.item_name_snapshot}</span>
+              <span className="font-bold">{formatQty(line.quantity)}{" "}개</span>
+            </div>
+          );
+        })}
         {req.lines.length > 5 && (
-          <div className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
+          <div className="pt-1.5 text-xs" style={{ color: LEGACY_COLORS.muted }}>
             외 {req.lines.length - 5}건
           </div>
         )}
@@ -108,7 +118,23 @@ export function MyRequestRow({
 
       {req.notes && (
         <div className="mt-2 text-xs" style={{ color: LEGACY_COLORS.muted }}>
-          비고: {req.notes}
+          <span className="font-bold">비고:</span>{" "}
+          <span
+            className={!notesExpanded && notesLong ? "line-clamp-2" : undefined}
+            style={{ whiteSpace: "pre-wrap" }}
+          >
+            {req.notes}
+          </span>
+          {notesLong && (
+            <button
+              type="button"
+              onClick={() => setNotesExpanded((v) => !v)}
+              className="ml-1 font-bold underline-offset-2 hover:underline"
+              style={{ color: LEGACY_COLORS.cyan }}
+            >
+              {notesExpanded ? "접기" : "더보기"}
+            </button>
+          )}
         </div>
       )}
       {req.rejected_reason && (

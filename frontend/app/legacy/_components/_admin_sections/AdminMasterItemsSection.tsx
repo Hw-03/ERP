@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Box, GripVertical, Plus, Save } from "lucide-react";
+import { Box, GripVertical, Plus, Save, Trash2 } from "lucide-react";
 import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
@@ -303,15 +303,23 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
             ) : null
           }
           actions={
-            !addMode && selectedItem && tab === "info" ? (
+            !addMode &&
+            selectedItem &&
+            tab === "info" &&
+            !selectedItem.deleted_at &&
+            !deleteConfirm ? (
               <button
                 type="button"
-                onClick={() => void saveItem()}
-                className="flex items-center gap-1 rounded-[10px] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:brightness-110"
-                style={{ background: LEGACY_COLORS.blue }}
+                onClick={() => setDeleteConfirm(true)}
+                className="flex items-center gap-1 rounded-[10px] px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
+                style={{
+                  background: LEGACY_COLORS.s2,
+                  color: LEGACY_COLORS.red,
+                  border: `1px solid ${LEGACY_COLORS.red as string}`,
+                }}
               >
-                <Save className="h-3.5 w-3.5" />
-                저장
+                <Trash2 className="h-3.5 w-3.5" />
+                삭제
               </button>
             ) : null
           }
@@ -354,6 +362,16 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                     삭제 확인
                   </button>
                 </div>
+              ) : tab === "info" ? (
+                <button
+                  type="button"
+                  onClick={() => void saveItem()}
+                  className="flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-110"
+                  style={{ background: LEGACY_COLORS.blue }}
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  저장
+                </button>
               ) : (
                 <button
                   type="button"
@@ -361,6 +379,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                   className="flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold transition-colors hover:brightness-110"
                   style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.red, border: `1px solid ${LEGACY_COLORS.red as string}` }}
                 >
+                  <Trash2 className="h-3.5 w-3.5" />
                   삭제
                 </button>
               )
