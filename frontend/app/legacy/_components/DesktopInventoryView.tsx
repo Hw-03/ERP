@@ -240,6 +240,7 @@ export function DesktopInventoryView({
         headerBadge={headerBadge}
         onClose={() => setSelectedItem(null)}
         onGoToWarehouse={onGoToWarehouse}
+        imageFilename={displayItem?.item_code ? imageManifest[displayItem.item_code] : undefined}
       />
     </div>
   );

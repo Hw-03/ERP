@@ -19,6 +19,7 @@ export interface DesktopInventoryRightPanelProps {
   headerBadge: React.ReactNode;
   onClose: () => void;
   onGoToWarehouse: (item: Item) => void;
+  imageFilename?: string;
 }
 
 export function DesktopInventoryRightPanel({
@@ -28,6 +29,7 @@ export function DesktopInventoryRightPanel({
   headerBadge,
   onClose,
   onGoToWarehouse,
+  imageFilename,
 }: DesktopInventoryRightPanelProps) {
   return (
     <SlidePanel open={!!selectedItem} onClose={onClose}>
@@ -37,7 +39,12 @@ export function DesktopInventoryRightPanel({
           subtitle={displayItem.legacy_part ? `${displayItem.item_code} · ${displayItem.legacy_part}` : (displayItem.item_code ?? undefined)}
           headerBadge={headerBadge}
         >
-          <InventoryDetailPanel item={displayItem} logs={itemLogs} onGoToWarehouse={onGoToWarehouse} />
+          <InventoryDetailPanel
+            item={displayItem}
+            logs={itemLogs}
+            onGoToWarehouse={onGoToWarehouse}
+            imageFilename={imageFilename}
+          />
         </DesktopRightPanel>
       )}
     </SlidePanel>
