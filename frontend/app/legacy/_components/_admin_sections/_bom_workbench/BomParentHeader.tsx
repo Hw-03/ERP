@@ -5,7 +5,7 @@ import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TruncatedText } from "@/lib/ui";
 import { BomBadge } from "./BomBadge";
-import { BOM_STATUS_META } from "./bomDept";
+import { BOM_STATUS_META, deptColor, deptOf } from "./bomDept";
 
 /**
  * 선택된 BOM 부모(또는 사용처 모드에서 선택된 품목) 헤더 카드.
@@ -42,10 +42,18 @@ export function BomParentHeader({
   const subtitleSuffix =
     mode === "edit" ? `${childCount}개 자식` : `${childCount}개 부모에서 사용`;
 
+  // 카드 자체 강조 — process_type 색으로 살짝 틴트 + 보더 강조.
+  // BomBadge 와 같은 색 계열로 톤 일치 (조립/출하/고압 등 부서마다 다름).
+  const letter = deptOf(parent.process_type_code);
+  const accent = letter ? deptColor(letter) : LEGACY_COLORS.blue;
+
   return (
     <div
       className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border px-4 py-2"
-      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+      style={{
+        background: LEGACY_COLORS.s2,
+        borderColor: `color-mix(in srgb, ${accent} 35%, ${LEGACY_COLORS.border})`,
+      }}
     >
       <BomBadge processTypeCode={parent.process_type_code} />
       <div className="min-w-0 flex-1">
