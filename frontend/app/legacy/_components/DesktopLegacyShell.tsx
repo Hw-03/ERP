@@ -79,16 +79,14 @@ function DesktopLegacyShellInner() {
       }
       return;
     }
-    // 트리거 (c) — 메인 탭 변경. activeTab === 'admin' 일 때만 가드 (다른 탭은 dirty 없음).
+    // 트리거 (c) — 메인 탭 변경. dirty 등록된 섹션(admin / warehouse-io)이 있으면
+    // 가드. 없으면 즉시 이동. confirmAdminNavigation 은 useConfirmNavigation 의
+    // 결과로, 등록된 모든 dirty entry 를 자동 집계한다.
     const doSwitch = () => {
       setActiveTab(tab);
       router.push(`?tab=${tab}`, { scroll: false });
     };
-    if (activeTab === "admin") {
-      confirmAdminNavigation(doSwitch);
-    } else {
-      doSwitch();
-    }
+    confirmAdminNavigation(doSwitch);
   }
 
   // 브라우저 뒤로/앞으로 → URL ?tab= 변경 시 activeTab 동기화.

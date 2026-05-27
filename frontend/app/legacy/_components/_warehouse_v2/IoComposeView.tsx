@@ -22,6 +22,7 @@ import { useIoSubmit } from "./useIoSubmit";
 import { useIoWorkState, type IoStep } from "./useIoWorkState";
 import { useIoUrlSync } from "./useIoUrlSync";
 import { useIoPreselect } from "./useIoPreselect";
+import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import type { IoComposeViewProps } from "./types";
 import { DefectInventoryPicker } from "./DefectInventoryPicker";
 import { DefectActionStep } from "./DefectActionStep";
@@ -273,6 +274,28 @@ export function IoComposeView({
     addItem,
     setHighlightItemId,
   });
+
+  // 입출고 작업 중(bundles 있음) 다른 화면으로 이동 시 '저장할까요?' 모달.
+  // 자동 저장은 그대로 작동 — dirty 일 때만 가드 모달이 한 번 더 사용자에게 묻는 흐름.
+  const ioDirty = state.bundles.length > 0 && !!employeeId;
+  useRegisterDirty(
+    "warehouse-io",
+    ioDirty,
+    async () => {
+      if (!employeeId) return;
+      if (state.bundles.length === 0) return;
+      await saveDraft({
+        employeeId,
+        workType: state.workType,
+        subType: state.subType,
+        fromDepartment: state.fromDepartment,
+        toDepartment: state.toDepartment,
+        referenceNo: state.referenceNo,
+        notes: state.notes,
+        bundles: state.bundles,
+      });
+    },
+  );
 
   function getAvailable(line: IoLine): number | null {
     const item = items.find((row) => row.item_id === line.item_id);
