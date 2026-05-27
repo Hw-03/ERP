@@ -21,6 +21,7 @@ import { IoTargetPicker } from "../../_warehouse_v2/IoTargetPicker";
 import { IoBundleCart } from "../../_warehouse_v2/IoBundleCart";
 import { IoConfirmStep } from "../../_warehouse_v2/IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "../../_warehouse_v2/IoSubmitModals";
+import { Toast, type ToastState } from "@/lib/ui/Toast";
 import {
   approvalKind,
   isExitWorkType,
@@ -100,6 +101,7 @@ export function MobileIoComposeWizard({
   const [search, setSearch] = useState(globalSearch);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [bomParents, setBomParents] = useState<Set<string>>(() => new Set());
   // 가드 key 는 `${item_id}__${workType}` — workType 변경 시 bundles reset 되므로
   // 같은 preselectedItem 이라도 재적용되어야 한다.
@@ -292,6 +294,39 @@ export function MobileIoComposeWizard({
     state.setWorkType(next);
     setError(null);
     state.goTo(2);
+  }
+
+  async function handleSaveDraft() {
+    if (!employeeId) {
+      setError("작업자를 선택하세요.");
+      return;
+    }
+    if (state.bundles.length === 0) return;
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+    try {
+      const response = await saveDraft({
+        employeeId,
+        workType: state.workType,
+        subType: state.subType,
+        fromDepartment: state.fromDepartment,
+        toDepartment: state.toDepartment,
+        referenceNo: state.referenceNo,
+        notes: state.notes,
+        bundles: state.bundles,
+      });
+      autosaveBatchIdRef.current = response.batch_id;
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, "0");
+      const mm = String(now.getMinutes()).padStart(2, "0");
+      onStatusChange(`저장됨 · ${hh}:${mm}`);
+      setToast({ message: "저장되었습니다. 나중에 이어서 진행할 수 있습니다.", type: "success" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.";
+      setToast({ message, type: "error" });
+    }
   }
 
   async function handleSubmit() {
@@ -508,10 +543,12 @@ export function MobileIoComposeWizard({
             notes={state.notes}
             hasShortage={state.hasShortage}
             hasInvalidQuantity={state.hasInvalidQuantity}
-            submitting={submitting || drafting}
+            submitting={submitting}
+            saving={drafting}
             approvalKind={approvalKind(state.subType, state.bundles, state.fromDepartment)}
             onNotesChange={state.setNotes}
             onSubmit={handleSubmit}
+            onSaveDraft={handleSaveDraft}
           />
         )}
       </div>
@@ -535,6 +572,7 @@ export function MobileIoComposeWizard({
       )}
 
       <IoSubmitModals result={result} onClose={() => setResult(null)} />
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

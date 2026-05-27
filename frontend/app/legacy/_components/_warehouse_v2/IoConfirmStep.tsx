@@ -8,6 +8,7 @@ import {
   ChevronUp,
   ClipboardCheck,
   Layers,
+  Save,
 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -24,9 +25,11 @@ interface Props {
   hasShortage: boolean;
   hasInvalidQuantity: boolean;
   submitting: boolean;
+  saving: boolean;
   approvalKind: ApprovalKind;
   onNotesChange: (value: string) => void;
   onSubmit: () => void;
+  onSaveDraft: () => void;
 }
 
 const APPROVAL_META: Record<
@@ -84,10 +87,10 @@ function confirmCopy(
     return { title: `불량 격리를 ${verb}`, tone: "danger", confirmLabel };
   }
   if (subType === "defect_restore") {
-    return { title: `격리 해제(정상 복귀)를 ${verb}`, tone: "danger", confirmLabel };
+    return { title: `불량 해제(정상 복귀)를 ${verb}`, tone: "danger", confirmLabel };
   }
   if (subType === "defect_process") {
-    return { title: `격리 처리를 ${verb}`, tone: "danger", confirmLabel };
+    return { title: `불량 처리를 ${verb}`, tone: "danger", confirmLabel };
   }
   if (subType === "supplier_return") {
     return { title: `원자재 반품을 ${verb}`, tone: "danger", confirmLabel };
@@ -139,9 +142,11 @@ export function IoConfirmStep({
   hasShortage,
   hasInvalidQuantity,
   submitting,
+  saving,
   approvalKind,
   onNotesChange,
   onSubmit,
+  onSaveDraft,
 }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const meta = APPROVAL_META[approvalKind];
@@ -173,7 +178,8 @@ export function IoConfirmStep({
   );
 
   const submitDisabled =
-    submitting || includedLines.length === 0 || hasShortage || hasInvalidQuantity;
+    submitting || saving || includedLines.length === 0 || hasShortage || hasInvalidQuantity;
+  const saveDisabled = submitting || saving || bundles.length === 0;
   const accent = directionAccent(subType);
   const isCaution = subType === "defect_quarantine" || subType === "supplier_return";
   const blockerText = hasShortage
@@ -267,18 +273,34 @@ export function IoConfirmStep({
         </div>
       )}
 
-      {/* 큰 한 줄 실행 버튼 (옛 ExecuteStep 패턴) */}
-      <button
-        type="button"
-        onClick={() => setConfirmOpen(true)}
-        disabled={submitDisabled}
-        className="flex w-full items-center justify-center gap-3 rounded-[22px] px-7 py-7 text-xl font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
-        style={{ background: accent }}
-      >
-        {isCaution && !submitting && <AlertTriangle className="h-6 w-6" />}
-        {!isCaution && <ClipboardCheck className="h-6 w-6" />}
-        {submitting ? "처리 중..." : meta.submitText(includedLines.length)}
-      </button>
+      {/* 액션 버튼 행 — [저장하기] + [제출확인] */}
+      <div className="flex items-stretch gap-3">
+        <button
+          type="button"
+          onClick={onSaveDraft}
+          disabled={saveDisabled}
+          className="flex shrink-0 items-center justify-center gap-2 rounded-[22px] border-2 px-6 py-7 text-base font-black transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
+          style={{
+            borderColor: LEGACY_COLORS.border,
+            background: LEGACY_COLORS.s2,
+            color: LEGACY_COLORS.text,
+          }}
+        >
+          <Save className="h-5 w-5" />
+          {saving ? "저장 중..." : "저장하기"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirmOpen(true)}
+          disabled={submitDisabled}
+          className="flex flex-1 items-center justify-center gap-3 rounded-[22px] px-7 py-7 text-xl font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
+          style={{ background: accent }}
+        >
+          {isCaution && !submitting && <AlertTriangle className="h-6 w-6" />}
+          {!isCaution && <ClipboardCheck className="h-6 w-6" />}
+          {submitting ? "처리 중..." : meta.submitText(includedLines.length)}
+        </button>
+      </div>
       </div>
 
       <ConfirmModal
