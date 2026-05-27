@@ -7,10 +7,11 @@ import { FilterChip } from "../common";
 
 const DEPT_CHIPS = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
 
-const PROCESS_STEP_CHIPS: { value: "R" | "A" | "F"; label: string }[] = [
+const PROCESS_STEP_CHIPS: { value: "R" | "A" | "F" | "DEFECT"; label: string }[] = [
   { value: "R", label: "원자재" },
   { value: "A", label: "중간공정" },
   { value: "F", label: "공정완료" },
+  { value: "DEFECT", label: "불량" },
 ];
 
 type FiltersProps = {

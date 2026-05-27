@@ -126,7 +126,13 @@ export function DesktopInventoryView({
         }
         if (selectedProcessSteps.length > 0) {
           const stage = item.process_type_code?.slice(-1).toUpperCase() ?? "";
-          if (!selectedProcessSteps.includes(stage)) return false;
+          const hasDefect = item.locations.some(
+            (loc) => loc.status === "DEFECTIVE" && (loc.quantity ?? 0) > 0,
+          );
+          const matches = selectedProcessSteps.some(
+            (s) => s === stage || (s === "DEFECT" && hasDefect),
+          );
+          if (!matches) return false;
         }
         return true;
       }),
