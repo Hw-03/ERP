@@ -41,7 +41,7 @@ export function SegmentedControl<T extends string>({
             aria-selected={isActive}
             onClick={() => onChange(tab.id)}
             className={clsx(
-              "flex flex-1 items-center justify-center gap-1 rounded-[10px] px-2 py-[7px] font-bold transition-[background-color]",
+              "flex flex-1 items-center justify-center gap-1.5 rounded-[10px] px-2 py-[7px] font-bold transition-[background-color]",
               TYPO.caption,
             )}
             style={{
@@ -55,7 +55,7 @@ export function SegmentedControl<T extends string>({
             <span className="truncate">{tab.label}</span>
             {tab.badge != null && tab.badge !== "" && tab.badge !== 0 ? (
               <span
-                className="rounded-full px-1.5 py-[1px] text-[10px] font-black tabular-nums"
+                className="rounded-full px-1.5 py-[1px] text-[11px] font-black tabular-nums"
                 style={{
                   background: isActive
                     ? `${LEGACY_COLORS.blue as string}26`

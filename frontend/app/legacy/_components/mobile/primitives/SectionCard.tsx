@@ -33,8 +33,8 @@ export function SectionCard({
           <div className="min-w-0">
             {title ? (
               <div
-                className={clsx(TYPO.overline, "font-bold uppercase tracking-[2px]")}
-                style={{ color: LEGACY_COLORS.muted2 }}
+                className={clsx(TYPO.title, "font-bold")}
+                style={{ color: LEGACY_COLORS.text }}
               >
                 {title}
               </div>
