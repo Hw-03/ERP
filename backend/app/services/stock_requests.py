@@ -1051,6 +1051,7 @@ def _execute_line(
             produced_by=approver.name,
             notes=note,
             operation_batch_id=getattr(request, "operation_batch_id", None),
+            department=str(line.from_department) if line.from_department else None,
         )
     )
 

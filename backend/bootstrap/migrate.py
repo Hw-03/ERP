@@ -228,6 +228,11 @@ _MIGRATION_DDL: list[str] = [
     ") WHERE EXISTS ("
     "SELECT 1 FROM departments WHERE departments.name = employees.department"
     ")",
+    # 2026-05-27: 불량·수량조정 부서 필터 수정 — 직접 생성된 TransactionLog 에 부서 기록.
+    # IoBatch 없이 생성되는 MARK_DEFECTIVE/UNMARK_DEFECTIVE/DEFECT_SCRAP/SUPPLIER_RETURN 트랜잭션의
+    # 부서 라벨을 _department_label_expr() 에서 이 컬럼으로 폴백.
+    "ALTER TABLE transaction_logs ADD COLUMN department VARCHAR(50)",
+    "CREATE INDEX IF NOT EXISTS ix_tx_department ON transaction_logs(department)",
 ]
 
 

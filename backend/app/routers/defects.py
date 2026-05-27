@@ -310,6 +310,7 @@ def quarantine(payload: QuarantineRequest, db: Session = Depends(get_db)):
             notes=f"[격리] {payload.source} → {payload.target_dept}",
             reason_category=payload.reason_category,
             reason_memo=payload.reason_memo or None,
+            department=str(target_dept),
         )
     )
     db.commit()
@@ -373,6 +374,7 @@ def unquarantine(payload: UnquarantineRequest, db: Session = Depends(get_db)):
             notes=f"[정상복귀] {payload.dept}",
             reason_category=payload.reason_category,
             reason_memo=payload.reason_memo or None,
+            department=str(dept),
         )
     )
     db.commit()

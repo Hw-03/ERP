@@ -349,6 +349,7 @@ def submit_defective_disassemble(
         reason_category=reason_category,
         reason_memo=reason_memo,
         reference_no=batch_ref,
+        department=str(parent_dept),
     )
     db.add(parent_log)
     db.flush()
@@ -404,6 +405,7 @@ def submit_defective_disassemble(
                 reason_category=reason_category,
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
+                department=str(parent_dept),
             )
             db.add(log)
             db.flush()
@@ -422,6 +424,7 @@ def submit_defective_disassemble(
                 reason_category=reason_category,
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
+                department=str(parent_dept),
             )
             db.add(log)
             db.flush()

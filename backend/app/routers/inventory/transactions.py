@@ -84,17 +84,22 @@ _SUMMARY_DEPT_TYPES = [
     TransactionTypeEnum.DISASSEMBLE,
 ]
 _SUMMARY_ADJUST_TYPES = [TransactionTypeEnum.ADJUST]
+_SUMMARY_DEFECT_TYPES = [
+    TransactionTypeEnum.MARK_DEFECTIVE,
+    TransactionTypeEnum.UNMARK_DEFECTIVE,
+    TransactionTypeEnum.DEFECT_SCRAP,
+    TransactionTypeEnum.SUPPLIER_RETURN,
+]
 
 
 def _department_label_expr():
-    """거래 한 건의 부서 라벨 식 — 3단계 판정.
+    """거래 한 건의 부서 라벨 식.
 
-    1) _SUMMARY_DEPT_TYPES(부서계열): IoBatch.to/from_department 가 있으면 그 부서,
-       배치/부서 없으면 '미상'.
-    2) _SUMMARY_WAREHOUSE_TYPES(창고계열): 부서 개념이 없으므로 고정 '창고'.
-    3) 그 외(ADJUST/MARK_DEFECTIVE/SUPPLIER_RETURN … 무-맥락): '미상'.
-
-    summary 의 부서별 카운트와 summary/list 의 department 필터가 같은 식을 공유.
+    1) 부서계열(PRODUCE/BACKFLUSH/…): IoBatch.to/from_department.
+    2) 창고계열(RECEIVE/SHIP/…): 고정 '창고'.
+    3) 수량조정(ADJUST): IoBatch.to/from_department (io.py 통해 배치 있음).
+    4) 불량계열(MARK_DEFECTIVE/…): IoBatch 우선, 없으면 TransactionLog.department.
+    5) 그 외: '미상'.
     """
     return case(
         (
@@ -102,6 +107,19 @@ def _department_label_expr():
             func.coalesce(IoBatch.to_department, IoBatch.from_department, "미상"),
         ),
         (TransactionLog.transaction_type.in_(_SUMMARY_WAREHOUSE_TYPES), "창고"),
+        (
+            TransactionLog.transaction_type.in_(_SUMMARY_ADJUST_TYPES),
+            func.coalesce(IoBatch.to_department, IoBatch.from_department, "미상"),
+        ),
+        (
+            TransactionLog.transaction_type.in_(_SUMMARY_DEFECT_TYPES),
+            func.coalesce(
+                IoBatch.to_department,
+                IoBatch.from_department,
+                TransactionLog.department,
+                "미상",
+            ),
+        ),
         else_="미상",
     )
 

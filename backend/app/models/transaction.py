@@ -70,6 +70,7 @@ class TransactionLog(Base):
         nullable=True,
         index=True,
     )
+    department = Column(String(50), nullable=True, index=True)
     created_at = Column(
         DateTime,
         nullable=False,
