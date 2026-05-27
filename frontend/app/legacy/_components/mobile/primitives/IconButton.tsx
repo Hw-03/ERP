@@ -8,8 +8,9 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 type Variant = "ghost" | "solid" | "outline";
 type Size = "sm" | "md" | "lg";
 
+// hit-area: sm=44px(아이콘 16), md=44px(아이콘 20), lg=48px(아이콘 22)
 const SIZE: Record<Size, { box: string; icon: number }> = {
-  sm: { box: "h-9 w-9", icon: 16 },
+  sm: { box: "h-11 w-11", icon: 16 },
   md: { box: "h-11 w-11", icon: 20 },
   lg: { box: "h-12 w-12", icon: 22 },
 };

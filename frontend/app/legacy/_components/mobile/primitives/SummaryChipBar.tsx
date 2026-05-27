@@ -46,25 +46,18 @@ export function SummaryChipBar({
           >
             <span className="truncate max-w-[160px]">{chip.label}</span>
             {chip.onRemove ? (
-              <span
-                role="button"
-                tabIndex={0}
+              <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   chip.onRemove?.();
                 }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.stopPropagation();
-                    chip.onRemove?.();
-                  }
-                }}
-                className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full"
-                style={{ background: `${tone as string}33` }}
+                className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-full"
+                style={{ background: `${tone as string}33`, margin: "-13px -13px -13px 0" }}
                 aria-label="제거"
               >
                 <X size={11} strokeWidth={2.5} />
-              </span>
+              </button>
             ) : null}
           </Wrapper>
         );

@@ -47,7 +47,7 @@ export function Stepper({
       <button
         type="button"
         onClick={() => onChange(clamp(value - step))}
-        className="flex h-10 w-10 items-center justify-center"
+        className="flex min-h-[44px] min-w-[44px] items-center justify-center"
         style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
         aria-label="감소"
       >
@@ -67,7 +67,7 @@ export function Stepper({
       <button
         type="button"
         onClick={() => onChange(clamp(value + step))}
-        className="flex h-10 w-10 items-center justify-center"
+        className="flex min-h-[44px] min-w-[44px] items-center justify-center"
         style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
         aria-label="증가"
       >
