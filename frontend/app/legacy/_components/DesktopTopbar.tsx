@@ -6,7 +6,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { StatusPill, inferToneFromStatus } from "./common";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
-import { Toast, type ToastState } from "@/lib/ui/Toast";
+import { ResultModal } from "./common/ResultModal";
 import { api } from "@/lib/api";
 import { clearCurrentOperator, useCurrentOperator } from "./login/useCurrentOperator";
 
@@ -53,7 +53,7 @@ export function DesktopTopbar({
   const [pinConfirm, setPinConfirm] = useState("");
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinBusy, setPinBusy] = useState(false);
-  const [toast, setToast] = useState<ToastState | null>(null);
+  const [pinSuccessOpen, setPinSuccessOpen] = useState(false);
 
   useEffect(() => {
     if (!dropdownOpen) return;
@@ -249,7 +249,7 @@ export function DesktopTopbar({
             setPinCurrent("");
             setPinNew("");
             setPinConfirm("");
-            setToast({ message: "PIN 이 변경되었습니다.", type: "success" });
+            setPinSuccessOpen(true);
           } catch (e) {
             setPinError(e instanceof Error ? e.message : "PIN 변경에 실패했습니다.");
           } finally {
@@ -279,7 +279,13 @@ export function DesktopTopbar({
         </div>
       </ConfirmModal>
 
-      <Toast toast={toast} onClose={() => setToast(null)} />
+      <ResultModal
+        open={pinSuccessOpen}
+        kind="success"
+        title="PIN이 변경되었습니다."
+        closeLabel="확인"
+        onClose={() => setPinSuccessOpen(false)}
+      />
     </header>
   );
 }
