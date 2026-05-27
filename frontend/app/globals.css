@@ -29,6 +29,11 @@
     --c-muted: #72829a;
     --c-muted2: #56657e;
     --c-panel-glow: radial-gradient(circle at top right, rgba(47, 116, 231, 0.08), transparent 36%);
+    /* 메시지 배경 — 텍스트(green/red/yellow) 대비 4.5:1 이상 보장하는 불투명 옅은 색.
+       기존 color-mix() 합성은 부모 배경에 따라 대비가 변하는 문제가 있다. */
+    --c-success-bg: #e6f7f2;
+    --c-error-bg: #fdeaea;
+    --c-warning-bg: #fef6e4;
     --c-card-shadow: 0 24px 64px rgba(45, 70, 106, 0.12);
     --c-popup-bg: #ffffff;
     --c-popup-shadow: 0 12px 28px rgba(45, 70, 106, 0.16);
@@ -76,6 +81,10 @@
     --c-muted: #72829a;
     --c-muted2: #9badc7;
     --c-panel-glow: radial-gradient(circle at top right, rgba(101, 169, 255, 0.16), transparent 32%);
+    /* 메시지 배경 — 다크 모드용 어두운 틴트, 밝은 텍스트 대비 확보. */
+    --c-success-bg: #0a2420;
+    --c-error-bg: #2b0d0d;
+    --c-warning-bg: #261d00;
     --c-card-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
     --c-popup-bg: #101a2b;
     --c-popup-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
