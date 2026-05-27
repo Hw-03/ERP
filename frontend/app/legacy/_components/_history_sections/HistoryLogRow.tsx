@@ -76,6 +76,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, compact }: Props) {
 
   return (
     <tr
+      data-log-id={log.log_id}
       onClick={handleSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {

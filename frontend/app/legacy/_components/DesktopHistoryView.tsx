@@ -81,6 +81,8 @@ export function DesktopHistoryView() {
   const [calendarMonth, setCalendarMonth] = useState(now.getMonth());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const lastSelectionRef = useRef<HistorySelection | null>(null);
+  // 13-2번: navigateToLog 가 다른 날짜로 이동했을 때 그 거래 행을 리스트에서 찾아 scrollIntoView.
+  const pendingScrollLogIdRef = useRef<string | null>(null);
 
   const periodLabel = selectedDay
     ? selectedDay
@@ -258,6 +260,19 @@ export function DesktopHistoryView() {
     return () => ctrl.abort();
   }, [dateFilter, selectedDay]);
 
+  // 13-2번: 다른 날짜로 navigate 후 logs 가 로드되면 해당 거래 행으로 스크롤.
+  useEffect(() => {
+    const targetId = pendingScrollLogIdRef.current;
+    if (!targetId) return;
+    if (loading) return;
+    if (!logs.some((l) => l.log_id === targetId)) return;
+    const el = document.querySelector(`[data-log-id="${targetId}"]`) as HTMLElement | null;
+    if (el) {
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      pendingScrollLogIdRef.current = null;
+    }
+  }, [logs, loading]);
+
   function handleLogUpdated(updated: TransactionLog) {
     setLogs((prev) => prev.map((l) => (l.log_id === updated.log_id ? updated : l)));
     setSelection({ kind: "log", log: updated });
@@ -289,7 +304,15 @@ export function DesktopHistoryView() {
   }
 
   // 우측 패널 내부 드릴(BOM 하위 라인·이 품목 최근 거래) — 현재 선택을 스택에 쌓고 이동.
+  // 13-2번: 클릭한 로그가 다른 날짜에 속하면 selectedDay 를 그 날짜로 자동 조정해서
+  // 리스트가 해당 거래를 포함하게 한 뒤, 효과(useEffect 으로 logs 로드 완료 시점에)
+  // 로 그 행으로 scrollIntoView.
   function navigateToLog(log: TransactionLog) {
+    const logYmd = toDateKey(log.created_at);
+    if (logYmd && logYmd !== selectedDay) {
+      setSelectedDay(logYmd);
+    }
+    pendingScrollLogIdRef.current = log.log_id;
     setSelection((cur) => {
       if (cur && !(cur.kind === "log" && cur.log.log_id === log.log_id)) {
         setSelectionStack((s) => [...s, cur]);
