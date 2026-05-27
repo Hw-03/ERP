@@ -5,6 +5,7 @@ import { api, type Item, type StockRequestReservationLine, type TransactionLog }
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { formatQty } from "@/lib/mes/format";
+import { getStockState } from "@/lib/mes/inventory";
 import { useDeptColorLookup } from "../DepartmentsContext";
 import { InventoryDetailLogList } from "./InventoryDetailLogList";
 import { InventoryDetailLocations } from "./InventoryDetailLocations";
@@ -20,6 +21,8 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
   const [reservations, setReservations] = useState<StockRequestReservationLine[]>([]);
   const pendingQty = Number(item.pending_quantity) || 0;
   const availableQty = Number(item.available_quantity) || 0;
+  const minStockRaw = item.min_stock == null ? 0 : Number(item.min_stock);
+  const availableState = getStockState(availableQty, minStockRaw > 0 ? minStockRaw : null);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,7 +81,7 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
               <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                 사용 가능 재고
               </div>
-              <div className="mt-1 text-xl font-black" style={{ color: LEGACY_COLORS.green }}>
+              <div className="mt-1 text-xl font-black" style={{ color: availableState.color }}>
                 {formatQty(availableQty)}
               </div>
             </div>

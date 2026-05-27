@@ -70,7 +70,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
   }
 
   // 부서 배지 (PRODUCTION 행만, DEFECTIVE는 별도 빨간 배지로 표시)
-  const badges: { key: string; label: string; color: string; dim?: boolean }[] = [];
+  const badges: { key: string; label: string; color: string }[] = [];
   if (Number(item.warehouse_qty) > 0) badges.push({ key: "창고", label: "창고", color: "#3dd4a0" });
   for (const l of (item.locations ?? []).filter((l) => Number(l.quantity) > 0 && l.status !== "DEFECTIVE"))
     badges.push({ key: l.department, label: l.department, color: getDeptColor(l.department) });
@@ -82,7 +82,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
     badges.push({ key: `${dept}-defect`, label: "[불량]", color: DEFECT_RED });
   if (badges.length === 0) {
     const dept = item.department ?? itemCodeDept(item.item_code);
-    if (dept) badges.push({ key: dept, label: dept, color: getDeptColor(dept), dim: true });
+    if (dept) badges.push({ key: dept, label: dept, color: getDeptColor(dept) });
   }
   const visibleBadges = badges.slice(0, 2);
   const extraBadges = badges.length - 2;
@@ -178,7 +178,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
           {visibleBadges.map((b) => (
             <span
               key={b.key}
-              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-bold${b.dim ? " opacity-50" : ""}`}
+              className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-bold"
               style={{
                 color: b.color,
                 background: `color-mix(in srgb, ${b.color} 14%, transparent)`,

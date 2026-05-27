@@ -294,9 +294,13 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
           }
           status={
             !addMode && selectedItem ? (
-              selectedItem.min_stock != null &&
-              Number(selectedItem.quantity) < Number(selectedItem.min_stock) ? (
-                <StatusPill label="안전재고 부족" tone="danger" />
+              selectedItem.quantity == null ? (
+                <StatusPill label="재고 미설정" tone="neutral" />
+              ) : Number(selectedItem.quantity) <= 0 ? (
+                <StatusPill label="품절" tone="danger" />
+              ) : selectedItem.min_stock != null &&
+                Number(selectedItem.quantity) < Number(selectedItem.min_stock) ? (
+                <StatusPill label="안전재고 부족" tone="warning" />
               ) : (
                 <StatusPill label="정상" tone="success" />
               )
