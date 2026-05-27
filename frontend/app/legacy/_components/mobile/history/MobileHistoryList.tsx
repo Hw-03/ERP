@@ -1,6 +1,6 @@
 "use client";
 
-import { Layers, Package } from "lucide-react";
+import { Layers, Loader2, Package } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { transactionColor } from "@/lib/mes-status";
@@ -97,7 +97,7 @@ export function MobileHistoryList({
               <div className="mt-2 flex items-center gap-1.5">
                 <Package className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
                 <span
-                  className="truncate text-sm font-black"
+                  className="truncate text-sm font-bold"
                   style={{ color: LEGACY_COLORS.text }}
                 >
                   {log.item_name}
@@ -148,7 +148,7 @@ export function MobileHistoryList({
             </div>
             <div className="mt-2 flex items-center gap-1.5">
               <Package className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
-              <span className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
+              <span className="truncate text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
                 {first.item_name}
                 {logs.length > 1 && (
                   <span style={{ color: LEGACY_COLORS.muted2 }}> 외 {logs.length - 1}건</span>
@@ -174,7 +174,14 @@ export function MobileHistoryList({
             color: LEGACY_COLORS.blue,
           }}
         >
-          {loadingMore ? "불러오는 중…" : "더 보기"}
+          {loadingMore ? (
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              불러오는 중…
+            </span>
+          ) : (
+            "더 보기"
+          )}
         </button>
       )}
     </div>
