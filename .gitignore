@@ -63,6 +63,7 @@ Thumbs.db
 
 # Demo verification artifacts (W12-C, 시연 검증용 임시 스크린샷·후보 데이터)
 /s[0-9]*.png
+/post-merge-*.png
 /*.xlsx
 _dev/demo-verify/
 
