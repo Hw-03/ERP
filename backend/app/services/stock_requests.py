@@ -1306,16 +1306,17 @@ def reject_request_department(
     pin: str,
     reason: str,
 ) -> StockRequest:
-    """부서 결재 반려. 권한/부서 매칭 + PIN + 사유 필수."""
+    """부서 결재 반려. 권한 + PIN + 사유 필수.
+
+    권한 룰은 `can_approve_department` 와 동일 (승인/반려 대칭).
+    """
     if not request.requires_department_approval:
         raise ValueError("부서 결재가 필요하지 않은 요청입니다.")
 
-    dept_role = (getattr(approver, "department_role", None) or "none").lower()
-    level = getattr(getattr(approver, "level", None), "value", approver.level)
-    if dept_role not in ("primary", "deputy") and level != "admin":
-        raise PermissionError("부서 결재 정/부 권한이 없습니다.")
-    if approver.department != request.requester_department:
-        raise PermissionError("다른 부서의 요청은 반려할 수 없습니다.")
+    if not can_approve_department(approver, request.requester_department):
+        raise PermissionError(
+            "결재 권한이 없습니다 (부서 정/부 또는 창고 정/부 필요)."
+        )
     if not verify_pin(approver.pin_hash, pin):
         raise PermissionError("PIN이 일치하지 않습니다.")
     if not reason or not reason.strip():
