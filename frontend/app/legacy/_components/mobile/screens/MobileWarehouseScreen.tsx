@@ -32,11 +32,15 @@ export function MobileWarehouseScreen({
   onStatusChange,
   preselectedItem,
   onSubmitSuccess,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  defectDeptFilter: _defectDeptFilter,
 }: {
   globalSearch: string;
   onStatusChange: (status: string) => void;
   preselectedItem?: Item | null;
   onSubmitSuccess?: () => void;
+  /** Worker 2 연동 예약 — defect 부서 필터 URL 파라미터 전달용. */
+  defectDeptFilter?: string | null;
 }) {
   const { employees, items, productModels, loadFailure, setItems } = useWarehouseData({
     globalSearch,
