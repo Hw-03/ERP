@@ -94,11 +94,12 @@ export function ConfirmModal({
       onMouseDown={(e) => {
         downOnBackdropRef.current = e.target === e.currentTarget;
       }}
-      onClick={(e) => {
+      onMouseUp={(e) => {
         const downOnBackdrop = downOnBackdropRef.current;
         downOnBackdropRef.current = false;
         if (busy) return;
-        if (e.target === e.currentTarget && downOnBackdrop) onClose();
+        // 양방향 드래그 모두 차단 — mousedown 도 mouseup 도 backdrop 위에서 일어나야 닫음.
+        if (downOnBackdrop && e.target === e.currentTarget) onClose();
       }}
       role="dialog"
       aria-modal="true"
