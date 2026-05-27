@@ -3,8 +3,8 @@
  *
  * - 일반 품목: 자동 카트 추가 (addItem 호출)
  * - BOM 부모: 자동 추가 안 함, picker 에서 row 만 하이라이트
- * - workType 변경 시 bundles 가 reset 되므로 같은 preselectedItem 이라도 재적용
- *   (key = `${item_id}__${workType}`)
+ * - workType / subType / 부서 변경 시 bundles 가 reset 되므로 같은 preselectedItem
+ *   이라도 재적용. 가드 key 에 네 필드를 모두 포함.
  * - process workType + 방향 미선택 상태에서는 자동 적용 보류
  * - bomParents 가 빈 set 인 동안(=BOM 데이터 아직 로딩 중)에는 effect 보류
  *   → S1 시연 검증 race 결함 대응
@@ -25,6 +25,9 @@ export type UseIoPreselectArgs = {
    */
   bomParentsLoaded: boolean;
   workType: IoWorkType;
+  subType: string;
+  fromDepartment: string | null;
+  toDepartment: string | null;
   deptIoDirection: "in" | "out" | null;
   addItem: (item: Item) => Promise<void> | void;
   setHighlightItemId: (id: string | null) => void;
@@ -36,20 +39,23 @@ export function useIoPreselect(args: UseIoPreselectArgs): void {
     bomParents,
     bomParentsLoaded,
     workType,
+    subType,
+    fromDepartment,
+    toDepartment,
     deptIoDirection,
     addItem,
     setHighlightItemId,
   } = args;
 
-  // 가드 key 는 `${item_id}__${workType}` — workType 변경 시 bundles 가 reset 되므로
-  // 같은 preselectedItem 이라도 재적용되어야 한다.
+  // 가드 key — workType/subType/부서 변경 시마다 bundles 가 reset 되므로 동일 preselect
+  // 가 다시 적용되어야 함. (이전엔 workType 만 포함 — subType·부서 바꾸면 자동 카트 미반영 버그)
   const handledRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!preselectedItem) return;
     // BOM 부모 set 이 아직 로딩 안 됨 — 보류 (S1 race 대응)
     if (!bomParentsLoaded) return;
-    const handledKey = `${preselectedItem.item_id}__${workType}`;
+    const handledKey = `${preselectedItem.item_id}__${workType}__${subType}__${fromDepartment ?? ""}__${toDepartment ?? ""}`;
     if (handledRef.current === handledKey) return;
     // process workType + 방향 미선택이면 자동 추가 보류 (Step 2에서 방향 선택 후 다시 진입해야 함)
     if (workType === "process" && deptIoDirection == null) return;
@@ -64,5 +70,5 @@ export function useIoPreselect(args: UseIoPreselectArgs): void {
       void addItem(preselectedItem);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preselectedItem?.item_id, workType, deptIoDirection, bomParents, bomParentsLoaded]);
+  }, [preselectedItem?.item_id, workType, subType, fromDepartment, toDepartment, deptIoDirection, bomParents, bomParentsLoaded]);
 }
