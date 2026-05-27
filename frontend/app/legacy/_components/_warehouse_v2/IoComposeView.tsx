@@ -276,7 +276,8 @@ export function IoComposeView({
   });
 
   // 입출고 작업 중(bundles 있음) 다른 화면으로 이동 시 '저장할까요?' 모달.
-  // 자동 저장은 그대로 작동 — dirty 일 때만 가드 모달이 한 번 더 사용자에게 묻는 흐름.
+  // 자동 저장은 그대로 작동 — '저장하지 않고 이동' 선택 시에는 discard 콜백으로
+  // 이미 백엔드에 저장된 임시본을 삭제해 사용자 의도와 일치시킨다.
   const ioDirty = state.bundles.length > 0 && !!employeeId;
   useRegisterDirty(
     "warehouse-io",
@@ -294,6 +295,22 @@ export function IoComposeView({
         notes: state.notes,
         bundles: state.bundles,
       });
+    },
+    async () => {
+      // '저장하지 않고 이동' — 펜딩 autosave 취소 + 이미 저장된 batch 삭제.
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+      const batchId = autosaveBatchIdRef.current;
+      if (batchId && employeeId) {
+        try {
+          await api.deleteDraft(batchId, employeeId);
+        } catch {
+          /* 폐기 실패도 진행 — 사용자가 이미 폐기 선택 */
+        }
+        autosaveBatchIdRef.current = null;
+      }
     },
   );
 

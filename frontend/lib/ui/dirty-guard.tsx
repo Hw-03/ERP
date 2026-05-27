@@ -42,6 +42,8 @@ type ModalState = {
 type DirtyEntry = {
   dirty: boolean;
   save: () => Promise<void> | void;
+  /** "저장하지 않고 이동" 선택 시 호출. 자동 저장된 임시본 폐기 등에 사용. */
+  discard?: () => Promise<void> | void;
 };
 
 type ProviderContextValue = {
@@ -220,6 +222,22 @@ export function DirtyGuardProvider({ children }: { children: ReactNode }) {
 
   const handleProceedWithoutSave = useCallback(() => {
     if (modal.busy) return;
+    // 등록된 dirty entry 들의 discard() 를 fire-and-forget 으로 호출. 자동 저장된 임시본
+    // 폐기 등은 백그라운드에서 처리하고 사용자 navigate 는 즉시 진행 (실패해도 진행).
+    Array.from(registryRef.current.values()).forEach((entry) => {
+      if (entry.dirty && entry.discard) {
+        try {
+          const result = entry.discard();
+          if (result && typeof (result as Promise<void>).then === "function") {
+            (result as Promise<void>).catch(() => {
+              /* discard 실패 무시 — 사용자가 이미 폐기 선택 */
+            });
+          }
+        } catch {
+          /* sync throw 도 무시 */
+        }
+      }
+    });
     const proceed = modal.proceed;
     setModal((prev) => ({ ...prev, open: false }));
     proceed();
@@ -250,21 +268,31 @@ export function DirtyGuardProvider({ children }: { children: ReactNode }) {
 /**
  * 섹션에서 자기 dirty/save 를 Provider 레지스트리에 등록.
  * 상위의 useConfirmNavigation() 이 aggregate dirty 체크에 사용.
+ * discard 는 "저장하지 않고 이동" 선택 시 호출 — 자동 저장된 임시본 폐기 등에 사용 (optional).
  */
 export function useRegisterDirty(
   key: string,
   dirty: boolean,
   save: () => Promise<void> | void,
+  discard?: () => Promise<void> | void,
 ): void {
   const ctx = useContext(DirtyGuardContext);
   const saveRef = useRef(save);
+  const discardRef = useRef(discard);
   useEffect(() => {
     saveRef.current = save;
   }, [save]);
+  useEffect(() => {
+    discardRef.current = discard;
+  }, [discard]);
 
   useEffect(() => {
     if (!ctx) return;
-    ctx.registryRef.current.set(key, { dirty, save: () => saveRef.current() });
+    ctx.registryRef.current.set(key, {
+      dirty,
+      save: () => saveRef.current(),
+      discard: () => discardRef.current?.(),
+    });
     ctx.bumpVersion();
     return () => {
       ctx.registryRef.current.delete(key);
