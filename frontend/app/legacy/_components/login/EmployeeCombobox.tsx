@@ -36,16 +36,21 @@ export function EmployeeCombobox({
   const listRef = useRef<HTMLUListElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  const sortedEmployees = useMemo(
+    () => [...employees].sort((a, b) => a.name.localeCompare(b.name, "ko-KR")),
+    [employees],
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return employees;
-    return employees.filter(
+    if (!q) return sortedEmployees;
+    return sortedEmployees.filter(
       (e) =>
         e.name.toLowerCase().includes(q) ||
         e.department.toLowerCase().includes(q) ||
         e.employee_code.toLowerCase().includes(q),
     );
-  }, [employees, query]);
+  }, [sortedEmployees, query]);
 
   useEffect(() => {
     setActive(0);
