@@ -96,6 +96,7 @@ export function MobileIoComposeWizard({
   defaultWorkType,
   onStatusChange,
   onSubmitSuccess,
+  defectDeptFilter,
 }: IoComposeViewProps) {
   const [employeeId, setEmployeeId] = useState(operator?.employee_id ?? "");
   const [search, setSearch] = useState(globalSearch);
@@ -296,6 +297,21 @@ export function MobileIoComposeWizard({
     state.goTo(2);
   }
 
+  // 대시보드 빨간 [불량 N] 클릭으로 진입한 경우 (?defect_dept=X) 마운트 시 자동으로
+  // 워크타입 "defect" 선택 + Step 2 로 진입. 1회만 실행. (IoComposeView 와 동일 로직)
+  const defectAutoAppliedRef = useRef(false);
+  useEffect(() => {
+    if (
+      defectDeptFilter
+      && !defectAutoAppliedRef.current
+      && state.workType !== "defect"
+    ) {
+      defectAutoAppliedRef.current = true;
+      handleWorkTypeChange("defect");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defectDeptFilter]);
+
   async function handleSaveDraft() {
     if (!employeeId) {
       setError("작업자를 선택하세요.");
@@ -407,7 +423,7 @@ export function MobileIoComposeWizard({
     <div className="flex h-full min-h-0 flex-1 flex-col" style={{ background: LEGACY_COLORS.bg }}>
       {/* 헤더: 뒤로 + 진행바 */}
       <div
-        className="sticky top-0 z-10 flex items-center gap-2 border-b px-3 py-2.5"
+        className="fixed top-0 inset-x-0 z-10 flex items-center gap-2 border-b px-3 py-2.5"
         style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
       >
         {step > 1 ? (
@@ -420,8 +436,8 @@ export function MobileIoComposeWizard({
         </div>
       </div>
 
-      {/* 본문: 현재 스텝만 풀스크린 스크롤 */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+      {/* 본문: 현재 스텝만 풀스크린 스크롤. 헤더가 fixed 이므로 pt-14 로 헤더 높이(약 56px) 보상. */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-14 pb-3">
         <h2 className="mb-3 text-base font-black" style={{ color: LEGACY_COLORS.text }}>
           {stepTitle}
         </h2>
