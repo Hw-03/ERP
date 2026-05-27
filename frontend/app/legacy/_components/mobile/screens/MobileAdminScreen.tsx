@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Lock } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DesktopPinLock } from "../../DesktopPinLock";
 import { SubScreenHeader } from "../primitives";
@@ -38,6 +38,7 @@ export function MobileAdminScreen({
     selectedDept,
     setSelectedDept,
     unlock,
+    lock,
     selectSection,
   } = useAdminViewState("models");
 
@@ -83,6 +84,14 @@ export function MobileAdminScreen({
     setSummaryOpen(false);
   }
 
+  // 잠금 시 드릴다운 / 요약 상태도 초기화 — 다음 unlock 후 허브부터 시작.
+  function handleLock() {
+    setEntered(null);
+    setSummaryOpen(false);
+    setMessage("");
+    lock();
+  }
+
   // ── 허브 (섹션 리스트) ──
   if (entered == null) {
     return (
@@ -91,9 +100,24 @@ export function MobileAdminScreen({
         style={{ background: LEGACY_COLORS.bg }}
       >
         <div className="flex flex-col gap-2.5 px-3 py-4">
-          <h2 className="px-1 text-lg font-black" style={{ color: LEGACY_COLORS.text }}>
-            관리자
-          </h2>
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>
+              관리자
+            </h2>
+            <button
+              type="button"
+              onClick={handleLock}
+              className="flex items-center gap-1.5 rounded-[12px] border px-3 py-1.5 text-xs font-bold transition-colors active:brightness-95"
+              style={{
+                background: LEGACY_COLORS.s2,
+                borderColor: LEGACY_COLORS.border,
+                color: LEGACY_COLORS.muted2,
+              }}
+            >
+              <Lock className="h-3.5 w-3.5" />
+              잠금
+            </button>
+          </div>
           {ALL_SECTIONS.map((s) => {
             const Icon = s.icon;
             return (
@@ -147,7 +171,7 @@ export function MobileAdminScreen({
             style={{
               background: summaryOpen ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
               borderColor: LEGACY_COLORS.border,
-              color: summaryOpen ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
+              color: summaryOpen ? LEGACY_COLORS.white : LEGACY_COLORS.text,
             }}
           >
             요약
@@ -162,7 +186,7 @@ export function MobileAdminScreen({
               <div
                 className="rounded-[12px] border px-4 py-2.5 text-[13px] font-bold"
                 style={{
-                  background: `color-mix(in srgb, ${LEGACY_COLORS.green} 14%, transparent)`,
+                  background: LEGACY_COLORS.successBg,
                   borderColor: `color-mix(in srgb, ${LEGACY_COLORS.green} 40%, transparent)`,
                   color: LEGACY_COLORS.green,
                 }}
@@ -174,7 +198,7 @@ export function MobileAdminScreen({
               <div
                 className="rounded-[12px] border px-4 py-2.5 text-[13px] font-bold"
                 style={{
-                  background: `color-mix(in srgb, ${LEGACY_COLORS.red} 12%, transparent)`,
+                  background: LEGACY_COLORS.errorBg,
                   borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 35%, transparent)`,
                   color: LEGACY_COLORS.red,
                 }}
