@@ -51,9 +51,9 @@ export const IO_SUB_TYPES: Record<
     { id: "adjust_out", label: "수량보정 출고", description: "선택 품목 수량 감소" },
   ],
   defect: [
-    { id: "defect_quarantine", label: "새 격리", description: "선택 부서의 정상 재고를 격리 처리 (해당 부서 결재)" },
-    { id: "defect_restore",    label: "격리 해제", description: "격리 재고를 정상 복귀 (즉시)" },
-    { id: "defect_process",    label: "격리 처리", description: "격리 재고 폐기·재작업 (출처 부서 결재)" },
+    { id: "defect_quarantine", label: "새 불량", description: "선택 부서의 정상 재고를 불량 격리 (해당 부서 결재)" },
+    { id: "defect_restore",    label: "불량 해제", description: "격리 재고를 정상 복귀 (즉시)" },
+    { id: "defect_process",    label: "불량 처리", description: "격리 재고 폐기·재작업 (출처 부서 결재)" },
     { id: "supplier_return",   label: "원자재 반품", description: "격리 재고를 공급처에 반품 (출처 부서 결재)" },
   ],
 };

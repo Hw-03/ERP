@@ -185,7 +185,7 @@ export function AddQuarantineModal({
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.red }} />
           <div>
             <div id={titleId} className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>
-              새 격리 추가
+              새 불량 추가
             </div>
             <div className="mt-0.5 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
               정상 재고에서 불량 항목을 격리합니다. 즉시 처리 (결재 불필요).

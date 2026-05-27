@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
@@ -124,20 +124,12 @@ export function IoSubTypeStep({
   const subRows = IO_SUB_TYPES[workType];
   const dept = deptVisibility(subType);
   const showAnyDept = requiresDepartments(subType) && (dept.from || dept.to);
-  const cautionTone =
-    subType === "defect_quarantine" || subType === "supplier_return" || subType === "defect_process"
-      ? LEGACY_COLORS.red
-      : null;
   const deptSectionCount = Number(showAnyDept && dept.from) + Number(showAnyDept && dept.to);
   const nonProcessRows = !showAnyDept
     ? "1fr"
-    : cautionTone && deptSectionCount === 1
-      ? "3fr 5fr 2fr"
-      : deptSectionCount >= 2
-        ? cautionTone
-          ? "3fr 3fr 3fr 2fr"
-          : "3fr 1fr 1fr"
-        : "4fr 6fr";
+    : deptSectionCount >= 2
+      ? "3fr 1fr 1fr"
+      : "4fr 6fr";
 
   return (
     <div className="grid h-full min-h-0 gap-6" style={{ gridTemplateRows: nonProcessRows }}>
@@ -178,7 +170,7 @@ export function IoSubTypeStep({
           label={
             subType === "supplier_return" ? "출처"
             : subType === "defect_quarantine" ? "불량 격리 부서"
-            : subType === "defect_restore" ? "격리 해제 부서"
+            : subType === "defect_restore" ? "불량 해제 부서"
             : subType === "defect_process" ? "처리할 부서 (불량 출처)"
             : "출발 부서"
           }
@@ -186,7 +178,7 @@ export function IoSubTypeStep({
           onChange={onFromDepartmentChange}
           options={
             subType === "supplier_return" ? ["창고"]
-            : subType === "defect_quarantine" ? [...PROD_DEPTS, "창고"]
+            : subType === "defect_quarantine" || subType === "defect_restore" || subType === "defect_process" ? [...PROD_DEPTS, "창고"]
             : undefined
           }
           fill
@@ -210,25 +202,6 @@ export function IoSubTypeStep({
         />
       )}
 
-      {/* caution */}
-      {cautionTone && (
-        <div
-          className="flex h-full min-h-[92px] items-center gap-4 rounded-[18px] border px-6 py-5"
-          style={{
-            background: tint(cautionTone, 8),
-            borderColor: tint(cautionTone, 40),
-          }}
-        >
-          <AlertTriangle className="h-8 w-8 shrink-0" style={{ color: cautionTone }} />
-          <div className="text-base font-bold leading-relaxed" style={{ color: LEGACY_COLORS.text }}>
-            {subType === "supplier_return"
-              ? "원자재 반품은 되돌릴 수 없습니다. 반품 부서(불량 출처)와 수량을 확인하세요."
-              : subType === "defect_process"
-                ? "격리 처리(폐기·재작업)는 되돌릴 수 없습니다. 대상 부서와 품목을 확인하세요."
-                : "불량 격리는 재고가 격리 상태로 이동합니다. 대상 부서를 다시 한 번 확인하세요."}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -249,7 +222,7 @@ function DeptGrid({
 }) {
   const items = options ?? PROD_DEPTS;
   // 7개 옵션(PROD_DEPTS + 창고) 일 때 grid-cols-7 자동. 그 외엔 기존 grid-cols-6 유지.
-  const colsClass = items.length === 7 ? "grid-cols-7" : "grid-cols-6";
+  const colsClass = items.length === 1 ? "grid-cols-1" : items.length === 7 ? "grid-cols-7" : "grid-cols-6";
   return (
     <div className={fill ? "flex min-h-0 flex-col" : undefined}>
       <Step2Label label={label} />
@@ -318,7 +291,14 @@ function DirectionCard({
           <span className="text-4xl font-black">입고</span>
         </div>
       ) : (
-        <span className="text-4xl font-black leading-tight">출고</span>
+        <div className="flex flex-col items-center gap-2 leading-tight">
+          <span className="text-4xl font-black">출하</span>
+          <span
+            className="h-[4px] w-28 rounded-full"
+            style={{ background: active ? activeColor : LEGACY_COLORS.text }}
+          />
+          <span className="text-4xl font-black">출고</span>
+        </div>
       )}
     </button>
   );

@@ -74,7 +74,7 @@ describe("AddQuarantineModal", () => {
 
   it("열렸을 때 제목과 기본 필드가 보인다", () => {
     render(<AddQuarantineModal {...defaultProps} />);
-    expect(screen.getByText("새 격리 추가")).toBeInTheDocument();
+    expect(screen.getByText("새 불량 추가")).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/품목 코드 또는 이름 검색/)).toBeInTheDocument();
     expect(screen.getByText(/창고 재고/)).toBeInTheDocument();
     expect(screen.getByText(/부서 재고/)).toBeInTheDocument();

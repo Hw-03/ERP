@@ -9,20 +9,21 @@ import { formatQty } from "@/lib/mes/format";
 
 /**
  * BOM 분해 결정 노드 — 재귀 트리.
- * - leaf 노드: `keep_qty` (0..qty) 입력. 폐기 수량 = qty - keep_qty 자동 계산.
- * - 중간 노드(children != null && children.length > 0): "분해됨" — 자기 자체 정상/폐기 결정 없음, 자식 재귀.
+ * - leaf 노드 (children=null 또는 nodeMode="whole"): keep_qty 입력 → 그 품목 자체 입고.
+ * - split 노드 (nodeMode="split", children 있음): 자식들이 각각 결정 단위.
  * - has_bom=true 이고 미펼침이면 ▶ 버튼 노출, 클릭 시 BOM 자식 lazy load.
  */
 export interface ChildDecision {
   item_id: string;
   item_name: string;
   item_code: string;
-  qty: number;            // 부모 × 자식 1개당 수량 (해당 노드의 총 수량)
-  keep_qty: number;       // 정상 복귀 수량 (0..qty). children 있으면 무시.
+  qty: number;            // 해당 노드의 총 수량
+  keep_qty: number;       // 정상 복귀 수량 (0..qty). split 모드에서는 cascade 기준값.
   reason_memo: string;
-  has_bom: boolean;       // 자식이 또 BOM 부모인가 (펼치기 버튼 노출 여부)
-  children: ChildDecision[] | null;  // null=미펼침, []=펼침했지만 자식 없음, [...]=펼친 결과
-  manuallySet?: boolean;            // 사용자가 직접 편집했으면 true — 상위 cascade 에서 제외
+  has_bom: boolean;
+  children: ChildDecision[] | null;  // null=미펼침, []=펼쳤지만 자식 없음, [...]=펼친 결과
+  manuallySet?: boolean;
+  nodeMode?: "whole" | "split"; // 펼친 상태일 때만 의미. "whole"=이 품목 통째로, "split"=하위 품목별 처리
 }
 
 interface DisassembleTreeProps {
@@ -47,15 +48,13 @@ function toChildDecision(line: {
   quantity: number;
   has_children: boolean;
 }): ChildDecision {
-  // 백엔드 Decimal 직렬화는 string("2.00") 일 수 있음 → api wrapper 가 1차 정규화하지만,
-  // 컴포넌트 내부에서도 Number() 안전망. input value 에 소수점 노출 차단.
   const qty = Number(line.quantity);
   return {
     item_id: line.item_id,
     item_name: line.item_name,
     item_code: line.item_code ?? "",
     qty,
-    keep_qty: 0,     // 기본: 전부 폐기
+    keep_qty: 0,
     reason_memo: "",
     manuallySet: false,
     has_bom: line.has_children,
@@ -63,6 +62,8 @@ function toChildDecision(line: {
   };
 }
 
+// 부모 keep 비율을 자식 전체에 비례 전파.
+// 중간 노드도 keep_qty를 업데이트해야 "whole" 모드에서 cascade가 반영됨.
 function cascadeKeepQty(
   children: ChildDecision[],
   parentKeepQty: number,
@@ -74,7 +75,8 @@ function cascadeKeepQty(
     if (child.manuallySet) return child;
     const newKeep = Math.min(child.qty, Math.round(ratio * child.qty));
     if (child.children && child.children.length > 0) {
-      return { ...child, children: cascadeKeepQty(child.children, newKeep, child.qty) };
+      // 중간 노드도 keep_qty 갱신 (whole 모드 receipt에 사용) + 자식 재귀
+      return { ...child, keep_qty: newKeep, children: cascadeKeepQty(child.children, newKeep, child.qty) };
     }
     return { ...child, keep_qty: newKeep };
   });
@@ -93,7 +95,6 @@ export function DisassembleTree({
   const [error, setError] = useState<string | null>(null);
   const [parentKeepQty, setParentKeepQty] = useState(0);
 
-  // mount 시 1-depth BOM 자식 로드 → decisions 초기화 (decisions 이미 있으면 skip — draft 복원 대비)
   useEffect(() => {
     if (decisions.length > 0) {
       setLoading(false);
@@ -124,7 +125,7 @@ export function DisassembleTree({
   if (loading) {
     return (
       <div className="py-4 text-center text-xs font-bold" style={{ color: LEGACY_COLORS.muted }}>
-        BOM 자식 목록 로딩 중...
+        BOM 하위 품목 로딩 중...
       </div>
     );
   }
@@ -138,6 +139,7 @@ export function DisassembleTree({
       </div>
     );
   }
+
   function updateAt(idx: number, next: ChildDecision) {
     onChange(decisions.map((d, i) => (i === idx ? next : d)));
   }
@@ -150,7 +152,7 @@ export function DisassembleTree({
 
   return (
     <div className="flex flex-col gap-2">
-      {/* 상위 품목 — 항상 전량 폐기, 입력 없음 */}
+      {/* 상위 품목 — 전량 분해 대상 */}
       <div
         className="rounded-[14px] border"
         style={{ borderColor: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 6) }}
@@ -198,11 +200,17 @@ export function DisassembleTree({
 
       {decisions.length === 0 ? (
         <div className="py-2 pl-5 text-xs font-bold" style={{ color: LEGACY_COLORS.muted }}>
-          BOM 자식 항목이 없습니다.
+          BOM 하위 품목이 없습니다.
         </div>
       ) : (
         decisions.map((d, idx) => (
-          <TreeNode key={`${d.item_id}-${idx}`} node={d} depth={1} cascadeRatio={parentQty > 0 ? parentKeepQty / parentQty : 0} onChange={(n) => updateAt(idx, n)} />
+          <TreeNode
+            key={`${d.item_id}-${idx}`}
+            node={d}
+            depth={1}
+            cascadeRatio={parentQty > 0 ? parentKeepQty / parentQty : 0}
+            onChange={(n) => updateAt(idx, n)}
+          />
         ))
       )}
     </div>
@@ -228,13 +236,16 @@ function TreeNode({
   const [expandError, setExpandError] = useState<string | null>(null);
 
   const expanded = node.children !== null;
-  const isDecomposed = expanded && (node.children?.length ?? 0) > 0;
+  const hasChildren = expanded && (node.children?.length ?? 0) > 0;
+  const nodeMode = node.nodeMode ?? "whole"; // 펼쳤을 때 기본: 이 품목 통째로
+  // isDecomposed: "하위 품목별 처리" 모드일 때만 true (백엔드 중간 노드 처리)
+  const isDecomposed = hasChildren && nodeMode === "split";
+
   const scrapQty = Math.max(0, node.qty - node.keep_qty);
   const allKeep = !isDecomposed && node.keep_qty === node.qty;
   const allScrap = !isDecomposed && node.keep_qty === 0 && node.qty > 0;
-  const split = !isDecomposed && !allKeep && !allScrap;
+  const isSplitQty = !isDecomposed && !allKeep && !allScrap;
 
-  // 정상/폐기 톤
   const keepColor = LEGACY_COLORS.blue;
   const scrapColor = LEGACY_COLORS.red;
   const borderColor = isDecomposed
@@ -263,9 +274,10 @@ function TreeNode({
         ? node.keep_qty
         : Math.min(node.qty, Math.round(cascadeRatio * node.qty));
       const children = cascadeKeepQty(rawChildren, effectiveKeep, node.qty);
-      onChange({ ...node, children, keep_qty: 0 });
+      // 기본값: "이 품목 통째로" — keep_qty 보존
+      onChange({ ...node, children, keep_qty: effectiveKeep, nodeMode: "whole" });
     } catch (err) {
-      setExpandError(err instanceof Error ? err.message : "자식 BOM 로드 실패");
+      setExpandError(err instanceof Error ? err.message : "하위 품목 BOM 로드 실패");
     } finally {
       setExpanding(false);
     }
@@ -273,7 +285,16 @@ function TreeNode({
 
   function handleCollapse() {
     const cascadedKeep = Math.min(node.qty, Math.round(cascadeRatio * node.qty));
-    onChange({ ...node, children: null, keep_qty: cascadedKeep, manuallySet: false });
+    onChange({ ...node, children: null, keep_qty: cascadedKeep, manuallySet: false, nodeMode: undefined });
+  }
+
+  function switchToSplit() {
+    const children = cascadeKeepQty(node.children!, node.keep_qty, node.qty);
+    onChange({ ...node, nodeMode: "split", children });
+  }
+
+  function switchToWhole() {
+    onChange({ ...node, nodeMode: "whole" });
   }
 
   return (
@@ -285,7 +306,7 @@ function TreeNode({
         marginLeft: depth > 0 ? depth * 20 : undefined,
       }}
     >
-      {/* 헤더 행: chevron + 품목명 + 코드 + 총 수량 */}
+      {/* 헤더 행 */}
       <div className="flex items-center gap-2 px-4 py-2.5">
         {node.has_bom ? (
           <button
@@ -294,7 +315,6 @@ function TreeNode({
             disabled={expanding}
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-black/5"
             aria-label={expanded ? "접기" : "펼치기"}
-            title={expanded ? "접기 (leaf 모드로 전환)" : "분해해서 자식 결정"}
           >
             {expanded ? (
               <ChevronDown className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
@@ -327,8 +347,9 @@ function TreeNode({
         </span>
       </div>
 
-      {/* leaf: 정상/폐기 수량 입력 행 */}
-      {!isDecomposed && (
+      {/* 수량 입력 행 */}
+      {!isDecomposed ? (
+        /* leaf 또는 "이 품목 통째로" 모드: 정상/폐기 입력 */
         <div className="flex flex-wrap items-center gap-3 px-4 pb-3">
           <div className="flex items-center gap-2">
             <span className="text-xs font-black" style={{ color: keepColor }}>정상</span>
@@ -343,7 +364,7 @@ function TreeNode({
               }}
               className="w-16 rounded-[8px] border px-2 py-1 text-center text-base font-black"
               style={{
-                borderColor: split ? LEGACY_COLORS.border : borderColor,
+                borderColor: isSplitQty ? LEGACY_COLORS.border : borderColor,
                 background: LEGACY_COLORS.s1,
                 color: LEGACY_COLORS.text,
               }}
@@ -372,15 +393,55 @@ function TreeNode({
             aria-label={`${node.item_name} 메모`}
           />
         </div>
+      ) : (
+        /* "하위 품목별 처리" 모드: cascade 기준 입력 */
+        <div className="flex items-center gap-2 px-4 pb-2.5">
+          <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>하위 분배 기준</span>
+          <input
+            type="number"
+            min={0}
+            max={node.qty}
+            value={Number(node.keep_qty) || 0}
+            onChange={(e) => {
+              const newKeep = clamp(Number(e.target.value), 0, node.qty);
+              const children = cascadeKeepQty(node.children!, newKeep, node.qty);
+              onChange({ ...node, keep_qty: newKeep, children, manuallySet: true });
+            }}
+            className="w-14 rounded-[8px] border px-2 py-1 text-center text-sm font-bold"
+            style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}
+            aria-label={`${node.item_name} 하위 분배 기준`}
+          />
+          <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>/ {formatQty(node.qty)}</span>
+        </div>
       )}
 
-      {/* 분해됨 라벨 */}
-      {isDecomposed && (
-        <div
-          className="px-4 pb-2 text-[10px] font-black tracking-[1.5px]"
-          style={{ color: LEGACY_COLORS.muted2 }}
-        >
-          — 분해됨 (자식들이 결정 단위) —
+      {/* 펼쳐진 상태: "이 품목 통째로" / "하위 품목별 처리" 토글 */}
+      {hasChildren && (
+        <div className="flex items-center gap-1.5 px-4 pb-3">
+          <button
+            type="button"
+            onClick={switchToWhole}
+            className="rounded-full px-3 py-1 text-[11px] font-black transition-colors"
+            style={{
+              background: nodeMode === "whole" ? LEGACY_COLORS.blue : "transparent",
+              color: nodeMode === "whole" ? "#fff" : LEGACY_COLORS.muted2,
+              border: `1px solid ${nodeMode === "whole" ? LEGACY_COLORS.blue : LEGACY_COLORS.border}`,
+            }}
+          >
+            이 품목 통째로
+          </button>
+          <button
+            type="button"
+            onClick={switchToSplit}
+            className="rounded-full px-3 py-1 text-[11px] font-black transition-colors"
+            style={{
+              background: nodeMode === "split" ? LEGACY_COLORS.blue : "transparent",
+              color: nodeMode === "split" ? "#fff" : LEGACY_COLORS.muted2,
+              border: `1px solid ${nodeMode === "split" ? LEGACY_COLORS.blue : LEGACY_COLORS.border}`,
+            }}
+          >
+            하위 품목별 처리
+          </button>
         </div>
       )}
 
@@ -394,9 +455,12 @@ function TreeNode({
         </div>
       )}
 
-      {/* 재귀 자식 */}
+      {/* 재귀 자식 — "이 품목 통째로" 모드에서는 흐릿하게 비활성 */}
       {expanded && (node.children?.length ?? 0) > 0 && (
-        <div className="flex flex-col gap-2 px-3 pb-3">
+        <div
+          className="flex flex-col gap-2 px-3 pb-3"
+          style={nodeMode === "whole" ? { opacity: 0.35, pointerEvents: "none" } : undefined}
+        >
           {node.children!.map((child, idx) => (
             <TreeNode
               key={`${child.item_id}-${idx}`}
@@ -420,7 +484,6 @@ function TreeNode({
 // 검증 + 서버 페이로드 변환 (외부 사용)
 // ──────────────────────────────────────────────────────────────────
 
-/** 트리 전체 valid? leaf 는 0<=keep_qty<=qty, 중간 노드는 children 비어있지 않음. */
 export function validateDecisionTree(decisions: ChildDecision[]): boolean {
   for (const d of decisions) {
     if (!isValidNode(d)) return false;
@@ -429,23 +492,27 @@ export function validateDecisionTree(decisions: ChildDecision[]): boolean {
 }
 
 function isValidNode(node: ChildDecision): boolean {
-  if (node.children !== null && node.children.length > 0) {
-    // 중간 노드 — 자식 모두 valid
+  const nodeMode = node.nodeMode ?? "whole";
+  if (node.children !== null && node.children.length > 0 && nodeMode === "split") {
+    // "하위 품목별 처리" 중간 노드 — 자식 모두 valid
     return node.children.every(isValidNode);
   }
-  // leaf — keep_qty 범위
+  // leaf 또는 "이 품목 통째로" — keep_qty 범위 체크
   return Number.isFinite(node.keep_qty) && node.keep_qty >= 0 && node.keep_qty <= node.qty;
 }
 
-/** 트리 → 백엔드 child_decisions 페이로드. children 있으면 nested, 없으면 leaf. */
+/** 트리 → 백엔드 child_decisions 페이로드 */
 export function toServerDecision(node: ChildDecision): Record<string, unknown> {
-  if (node.children !== null && node.children.length > 0) {
+  const nodeMode = node.nodeMode ?? "whole";
+  if (node.children !== null && node.children.length > 0 && nodeMode === "split") {
+    // "하위 품목별 처리" — 중간 노드 (자식들만 재귀)
     return {
       item_id: node.item_id,
       qty: node.qty,
       children: node.children.map(toServerDecision),
     };
   }
+  // leaf 또는 "이 품목 통째로" — 이 품목 자체 keep_qty 반영
   return {
     item_id: node.item_id,
     qty: node.qty,

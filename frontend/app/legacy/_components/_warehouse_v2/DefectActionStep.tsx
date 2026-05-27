@@ -82,7 +82,7 @@ type ActionOption = {
 };
 
 const PROCESS_OPTIONS: ActionOption[] = [
-  { value: "restore", label: "정상 복귀", desc: "격리 해제 후 정상 재고로 복귀합니다." },
+  { value: "restore", label: "정상 복귀", desc: "불량 해제 후 정상 재고로 복귀합니다." },
   { value: "scrap", label: "폐기", desc: "재고에서 영구 제거합니다. 창고 결재 후 처리됩니다." },
   { value: "disassemble", label: "재작업", desc: "PA/PF 조립품 분해. 자식 부품 처리를 선택합니다." },
 ];
