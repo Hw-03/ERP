@@ -22,6 +22,7 @@
 - Commit and push only when the user explicitly asks.
 - When explicitly asked to commit and push, run the required local checks first to avoid GitHub CI failures, and unless told otherwise, commit and push only the changes made in the current session.
 - **Commit message 형식 (필수): `YYYY-MM-DD area: 요약`**
+  - **날짜는 커밋 직전 `date +%Y-%m-%d` (Bash) 또는 `Get-Date -Format yyyy-MM-dd` (PowerShell) 로 확인한 실제 시점.** 세션 시작 시 컨텍스트에 박힌 날짜를 그대로 쓰면 세션이 자정을 넘어갔을 때 어긋남.
   - 예: `2026-05-26 backend: 시리얼 부여 수정`, `2026-05-26 vault: Obsidian 설정 갱신`
   - `area`는 자유 분류 — `frontend`, `backend`, `desktop`, `mobile`, `admin`, `docs`, `data`, `fix`, `refactor`, `chore`, `vault`, `defect`, `items`, `ux`, `weekly`, `history`, `capacity` 등 작업 영역
   - **금지 패턴** (절대 사용 X):
