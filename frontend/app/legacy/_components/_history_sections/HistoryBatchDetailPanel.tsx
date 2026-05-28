@@ -168,8 +168,7 @@ function HistoryBatchHero({
   }
 
   const reqName = batch?.requester_name ?? getHistoryActor(first);
-  // 승인자(요청을 수락한 사람). 백엔드가 stock_request 있으면 그 approved_by, 없으면 요청자 자신으로 채움.
-  const approverName = batch?.approver_name ?? first.approver_name ?? reqName;
+  const approverName = batch?.approver_name ?? first.approver_name ?? null;
 
   return (
     <div className="rounded-[20px] border p-4 space-y-3" style={heroStyle}>
@@ -238,12 +237,14 @@ function HistoryBatchHero({
             {reqName}
           </span>
         </span>
-        <span>
-          승인자{" "}
-          <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>
-            {approverName}
+        {approverName && (
+          <span>
+            승인자{" "}
+            <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>
+              {approverName}
+            </span>
           </span>
-        </span>
+        )}
       </div>
     </div>
   );

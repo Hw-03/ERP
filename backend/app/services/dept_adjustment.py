@@ -345,7 +345,7 @@ def submit_defective_disassemble(
         quantity_before=qty_before_parent,
         quantity_after=parent_inv.quantity,
         produced_by=actor,
-        notes=f"[defect_disassemble] {reason_category}: {reason_memo or ''}".strip(": "),
+        notes=None,
         reason_category=reason_category,
         reason_memo=reason_memo,
         reference_no=batch_ref,
@@ -360,7 +360,7 @@ def submit_defective_disassemble(
     def process(decision: dict, depth: int) -> None:
         if depth > _MAX_DEPTH:
             raise ValueError(f"분해 트리 깊이 한도 초과(>{_MAX_DEPTH}): {decision.get('item_id')}")
-        item_id = decision["item_id"]
+        item_id = uuid.UUID(str(decision["item_id"]))
         qty = Decimal(str(decision.get("qty", parent_qty)))
         children = decision.get("children")
         if children:
@@ -401,7 +401,7 @@ def submit_defective_disassemble(
                 quantity_before=qty_before_child,
                 quantity_after=child_inv.quantity,
                 produced_by=actor,
-                notes=f"[defect_disassemble:keep] {child_note}".strip(),
+                notes=None,
                 reason_category=reason_category,
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
@@ -416,11 +416,11 @@ def submit_defective_disassemble(
             log = TransactionLog(
                 item_id=item_id,
                 transaction_type=TransactionTypeEnum.DEFECT_SCRAP,
-                quantity_change=Decimal("0"),
+                quantity_change=-scrap_qty,
                 quantity_before=scrap_inv.quantity,
                 quantity_after=scrap_inv.quantity,
                 produced_by=actor,
-                notes=f"[defect_disassemble:scrap] {child_note}".strip(),
+                notes=None,
                 reason_category=reason_category,
                 reason_memo=child_note or None,
                 reference_no=batch_ref,

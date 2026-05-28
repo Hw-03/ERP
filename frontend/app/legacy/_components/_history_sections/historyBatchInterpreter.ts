@@ -175,7 +175,11 @@ export function parseTransactionNotes(notes: string | null | undefined): {
     return { userMemo: child || null };
   }
 
-  // 6: [격리] / [정상복귀] — 사용자 입력 없음
+  // 6: 격리: / 정상 복귀: — 사용자 입력 없음
+  if (/^격리:/.test(text) || /^정상 복귀:/.test(text)) {
+    return { userMemo: null };
+  }
+  // 6(legacy): [격리] / [정상복귀] 이전 형식도 호환
   if (/^\[격리\]\s/.test(text) || /^\[정상복귀\]/.test(text)) {
     return { userMemo: null };
   }
@@ -185,8 +189,8 @@ export function parseTransactionNotes(notes: string | null | undefined): {
 }
 
 const _SUB_TYPE_OPERATION: Record<string, string> = {
-  produce: "생산 등록",
-  disassemble: "재작업",
+  produce: "생산 | 입고",
+  disassemble: "분해 | 출고",
   warehouse_to_dept: "창고 반출",
   dept_to_warehouse: "창고 반입",
   dept_transfer: "부서 이동",
@@ -206,8 +210,8 @@ const _TX_OPERATION: Record<string, string> = {
   TRANSFER_TO_WH: "창고 반입",
   TRANSFER_DEPT: "부서 이동",
   BACKFLUSH: "자동 차감",
-  PRODUCE: "생산 등록",
-  DISASSEMBLE: "재작업",
+  PRODUCE: "생산 | 입고",
+  DISASSEMBLE: "분해 | 출고",
   ADJUST: "수량 조정",
   MARK_DEFECTIVE: "새 격리",
   UNMARK_DEFECTIVE: "격리 해제",
@@ -697,7 +701,7 @@ const _SINGLE_OP: Record<string, { verb: string; tone: MovementTone; signed?: bo
   DISASSEMBLE: { verb: "재작업", tone: "danger" },
   // 불량 처리 4종 — 전부 danger 톤, 라벨은 구분 알약과 동일
   MARK_DEFECTIVE: { verb: "새 격리", tone: "danger" },
-  UNMARK_DEFECTIVE: { verb: "격리 해제", tone: "danger" },
+  UNMARK_DEFECTIVE: { verb: "격리 해제", tone: "success" },
   DEFECT_SCRAP: { verb: "폐기", tone: "danger" },
   SUPPLIER_RETURN: { verb: "원자재 반품", tone: "danger" },
 };

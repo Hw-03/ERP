@@ -181,7 +181,6 @@ export function IoConfirmStep({
     submitting || saving || includedLines.length === 0 || hasShortage || hasInvalidQuantity;
   const saveDisabled = submitting || saving || bundles.length === 0;
   const accent = directionAccent(subType);
-  const isCaution = subType === "defect_quarantine" || subType === "supplier_return";
   const blockerText = hasShortage
     ? "재고 부족 라인이 있어 제출할 수 없습니다. Step 4에서 라인을 다시 확인하세요."
     : hasInvalidQuantity
@@ -242,23 +241,6 @@ export function IoConfirmStep({
       <div className="mt-auto flex flex-col gap-5">
         <Field label="메모 (선택)" value={notes} onChange={onNotesChange} placeholder="작업 메모" />
 
-      {/* caution */}
-      {isCaution && (
-        <div
-          className="flex items-start gap-3 rounded-[16px] border px-4 py-3 text-sm"
-          style={{
-            background: tint(LEGACY_COLORS.red, 8),
-            borderColor: tint(LEGACY_COLORS.red, 40),
-            color: LEGACY_COLORS.red,
-          }}
-        >
-          <AlertTriangle className="h-5 w-5 shrink-0" />
-          <span className="font-bold">
-            되돌릴 수 없습니다. 최종 확인 팝업에서 한 번 더 점검하세요.
-          </span>
-        </div>
-      )}
-
       {/* blocker */}
       {blockerText && (
         <div
@@ -296,8 +278,7 @@ export function IoConfirmStep({
           className="flex flex-1 items-center justify-center gap-3 rounded-[22px] px-7 py-7 text-xl font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
           style={{ background: accent }}
         >
-          {isCaution && !submitting && <AlertTriangle className="h-6 w-6" />}
-          {!isCaution && <ClipboardCheck className="h-6 w-6" />}
+          <ClipboardCheck className="h-6 w-6" />
           {submitting ? "처리 중..." : meta.submitText(includedLines.length)}
         </button>
       </div>

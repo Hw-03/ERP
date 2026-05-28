@@ -419,7 +419,7 @@ export function IoComposeView({
           notes: state.defectReasonMemo || null,
           lines,
         });
-        setResult({ kind: "success", title: "결재 요청 완료", message: "창고 결재 요청이 제출되었습니다." });
+        setResult({ kind: "success", title: "처리 완료", message: "즉시 반영되었습니다." });
       } else if (action === "scrap") {
         await stockRequestsApi.createStockRequest({
           requester_employee_id: employeeId,
@@ -429,7 +429,7 @@ export function IoComposeView({
           notes: state.defectReasonMemo || null,
           lines,
         });
-        setResult({ kind: "success", title: "결재 요청 완료", message: "창고 결재 요청이 제출되었습니다." });
+        setResult({ kind: "success", title: "처리 완료", message: "즉시 반영되었습니다." });
       } else if (action === "disassemble") {
         // 재귀 트리 페이로드 — 중간 노드는 children 포함, leaf 는 keep_qty/scrap 분할.
         const childDecisions = state.defectBomDecisions.map(toServerDecision);
@@ -441,7 +441,7 @@ export function IoComposeView({
           notes: JSON.stringify({ child_decisions: childDecisions }),
           lines,
         });
-        setResult({ kind: "success", title: "결재 요청 완료", message: "창고 결재 요청이 제출되었습니다." });
+        setResult({ kind: "success", title: "처리 완료", message: "즉시 반영되었습니다." });
       }
       state.reset();
       onStatusChange("불량 처리 완료");

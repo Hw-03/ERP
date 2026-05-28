@@ -203,7 +203,7 @@ export function MemoCell({ notes }: { notes?: string | null }) {
   );
 }
 
-function ChevronToggleBtn({
+export function ChevronToggleBtn({
   expanded,
   onToggle,
 }: { expanded: boolean; onToggle: () => void }) {

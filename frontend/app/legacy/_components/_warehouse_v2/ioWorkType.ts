@@ -51,10 +51,10 @@ export const IO_SUB_TYPES: Record<
     { id: "adjust_out", label: "수량보정 출고", description: "선택 품목 수량 감소" },
   ],
   defect: [
-    { id: "defect_quarantine", label: "새 불량", description: "선택 부서의 정상 재고를 불량 격리 (해당 부서 결재)" },
+    { id: "defect_quarantine", label: "새 불량", description: "선택 부서의 정상 재고를 불량 격리" },
     { id: "defect_restore",    label: "불량 해제", description: "격리 재고를 정상 복귀 (즉시)" },
-    { id: "defect_process",    label: "불량 처리", description: "격리 재고 폐기·재작업 (출처 부서 결재)" },
-    { id: "supplier_return",   label: "원자재 반품", description: "격리 재고를 공급처에 반품 (출처 부서 결재)" },
+    { id: "defect_process",    label: "불량 처리", description: "격리 재고 폐기·재작업" },
+    { id: "supplier_return",   label: "원자재 반품", description: "격리 재고를 공급처에 반품" },
   ],
 };
 
@@ -92,7 +92,7 @@ export function requiresDepartments(subType: IoSubType) {
 }
 
 export function requiresApproval(subType: IoSubType) {
-  return ["warehouse_to_dept", "dept_to_warehouse", "defect_quarantine", "supplier_return", "defect_process"].includes(subType);
+  return ["warehouse_to_dept", "dept_to_warehouse"].includes(subType);
 }
 
 /** 백엔드 MANUAL_LINE_ORIGINS 와 동기 — 1라인이라도 낱개면 부서 결재 필요. */
@@ -114,20 +114,20 @@ export type ApprovalKind = "none" | "warehouse" | "department";
  *  - department: manual_adjustment 등 낱개 라인 단독
  *  - none: 즉시 반영
  */
+const _DEFECT_SUB_TYPES: IoSubType[] = [
+  "defect_quarantine", "defect_restore", "defect_process", "supplier_return",
+];
+
 export function approvalKind(
   subType: IoSubType,
   bundles: IoBundle[],
   fromDepartment?: string | null,
 ): ApprovalKind {
   if (requiresApproval(subType)) {
-    // 불량 격리/처리: 격리 출처가 "창고" 면 창고 결재, 그 외 부서면 그 부서 결재.
-    // 백엔드 stock_requests.create_inventory_request 의 동일 분기와 동기.
-    const defectSubTypes: IoSubType[] = ["defect_quarantine", "supplier_return", "defect_process"];
-    if (defectSubTypes.includes(subType)) {
-      return !fromDepartment || fromDepartment === "창고" ? "warehouse" : "department";
-    }
     return "warehouse";
   }
+  // 불량 관련 작업은 항상 즉시 처리 — manual line 여부 무관하게 "none".
+  if (_DEFECT_SUB_TYPES.includes(subType)) return "none";
   if (hasManualLine(bundles)) return "department";
   return "none";
 }
@@ -233,6 +233,13 @@ export function getItemActionMode(subType: IoSubType): ItemActionMode {
     return "bom_or_single";
   }
   return "single_only";
+}
+
+/** 한 묶음 카트 안에서 BOM 묶음과 낱개 묶음을 같이 가질 수 있는지.
+ *  현재는 창고 입출고(warehouse_to_dept/dept_to_warehouse)만 true.
+ *  produce/disassemble 은 BOM 강제(isBomForced) 흐름과 백엔드 분기가 달라 락 유지. */
+export function allowsMixedBundles(subType: IoSubType): boolean {
+  return subType === "warehouse_to_dept" || subType === "dept_to_warehouse";
 }
 
 export type LineTagTone = "green" | "red" | "blue" | "purple" | "muted";

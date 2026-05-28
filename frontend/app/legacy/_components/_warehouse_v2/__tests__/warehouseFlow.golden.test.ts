@@ -29,6 +29,7 @@ import {
   deptIoDirectionOf,
   pickerDirectionLabel,
   deptIoDisplayLabel,
+  allowsMixedBundles,
   getItemActionMode,
   lineTagLabel,
   isExitWorkType,
@@ -136,10 +137,10 @@ describe("ioWorkType 상수", () => {
       ["disassemble", "분해", "상위 품목 출고 + 회수 품목 입고"],
       ["adjust_in", "수량보정 입고", "선택 품목 수량 증가"],
       ["adjust_out", "수량보정 출고", "선택 품목 수량 감소"],
-      ["defect_quarantine", "새 불량", "선택 부서의 정상 재고를 불량 격리 (해당 부서 결재)"],
+      ["defect_quarantine", "새 불량", "선택 부서의 정상 재고를 불량 격리"],
       ["defect_restore", "불량 해제", "격리 재고를 정상 복귀 (즉시)"],
-      ["defect_process", "불량 처리", "격리 재고 폐기·재작업 (출처 부서 결재)"],
-      ["supplier_return", "원자재 반품", "격리 재고를 공급처에 반품 (출처 부서 결재)"],
+      ["defect_process", "불량 처리", "격리 재고 폐기·재작업"],
+      ["supplier_return", "원자재 반품", "격리 재고를 공급처에 반품"],
     ]);
   });
 
@@ -235,8 +236,8 @@ describe("requiresApproval", () => {
       dept_transfer: false,
       adjust_in: false,
       adjust_out: false,
-      defect_quarantine: true,
-      supplier_return: true,
+      defect_quarantine: false,
+      supplier_return: false,
     });
   });
 });
@@ -283,8 +284,9 @@ describe("approvalKind", () => {
     const withManual = [makeBundle({ lines: [makeLine({ origin: "manual" })] })];
     expect(approvalKind("warehouse_to_dept", [])).toBe("warehouse");
     expect(approvalKind("dept_to_warehouse", withManual)).toBe("warehouse");
-    expect(approvalKind("defect_quarantine", withManual)).toBe("warehouse");
-    expect(approvalKind("supplier_return", [])).toBe("warehouse");
+    // 불량 관련 sub_type 은 새 정책상 즉시 처리(none) — manual line 여부 무관.
+    expect(approvalKind("defect_quarantine", withManual)).toBe("none");
+    expect(approvalKind("supplier_return", [])).toBe("none");
   });
 
   it("비결재 subType + manual line → department", () => {
@@ -413,6 +415,27 @@ describe("getItemActionMode", () => {
       adjust_out: "single_only",
       defect_quarantine: "single_only",
       supplier_return: "single_only",
+    });
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────
+// allowsMixedBundles — 창고 입출고만 BOM·낱개 혼합 허용
+// ──────────────────────────────────────────────────────────────────
+describe("allowsMixedBundles", () => {
+  it("창고 입출고 sub_type만 true", () => {
+    const map = Object.fromEntries(ALL_SUB_TYPES.map((s) => [s, allowsMixedBundles(s)]));
+    expect(map).toEqual({
+      receive_supplier: false,
+      warehouse_to_dept: true,
+      dept_to_warehouse: true,
+      produce: false,
+      disassemble: false,
+      dept_transfer: false,
+      adjust_in: false,
+      adjust_out: false,
+      defect_quarantine: false,
+      supplier_return: false,
     });
   });
 });

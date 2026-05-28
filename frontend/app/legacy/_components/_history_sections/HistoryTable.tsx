@@ -12,6 +12,8 @@ import type { HistorySelection } from "./historyConstants";
 import { HistoryLogRow } from "./HistoryLogRow";
 import { BatchHeader, OpBatchHeader, buildGroups, HISTORY_CELL_TRANSITION } from "./historyTableHelpers";
 import { BomBatchDetail } from "./BomBatchDetail";
+import { ReworkBatchHeader } from "./ReworkBatchHeader";
+import { ReworkBatchDetail } from "./ReworkBatchDetail";
 
 type Props = {
   loading: boolean;
@@ -337,6 +339,37 @@ export function HistoryTable({
                 }
 
                 // type === "batch" (reference_no 기준 레거시 그룹)
+                // 재작업(defect-disassemble) 배치 → 트리 뷰
+                if (group.refNo.startsWith("defect-disassemble:")) {
+                  const expanded = expandedGroups.has(group.refNo);
+                  const parentLog = group.logs.find((l) => l.transaction_type === "DISASSEMBLE") ?? group.logs[0];
+                  const childLogs = group.logs.filter((l) => l.transaction_type !== "DISASSEMBLE");
+                  const isSelected = selectedLogId === group.logs[0]?.log_id;
+                  return (
+                    <Fragment key={`ref-${group.refNo}`}>
+                      <ReworkBatchHeader
+                        group={group}
+                        expanded={expanded}
+                        onToggle={() => toggleGroup(group.refNo)}
+                        selected={isSelected}
+                        onSelect={() => {
+                          onSelectLog(group.logs[0]);
+                          expandGroup(group.refNo);
+                        }}
+                        compact={compact}
+                      />
+                      {expanded && (
+                        <ReworkBatchDetail
+                          logs={childLogs}
+                          parentItemId={parentLog.item_id}
+                          colSpan={COLUMNS.length}
+                          compact={compact}
+                        />
+                      )}
+                    </Fragment>
+                  );
+                }
+
                 // op_batch 가 아니라 IoBatch 가 없으므로 클릭 시 첫 로그 상세를 연다.
                 const expanded = expandedGroups.has(group.refNo);
                 const isSelected = selectedLogId === group.logs[0]?.log_id;

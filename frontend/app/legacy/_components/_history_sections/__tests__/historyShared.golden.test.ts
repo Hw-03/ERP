@@ -104,14 +104,14 @@ describe("getHistoryDisplayLabel", () => {
     expect(getHistoryDisplayLabel({ transaction_type: "RECEIVE" })).toBe("원자재 입고");
   });
 
-  it("batch sub_type=produce → 생산 등록", () => {
+  it("batch sub_type=produce → 생산 | 입고", () => {
     const batch = makeBatch({ sub_type: "produce" });
-    expect(getHistoryDisplayLabel({ transaction_type: "PRODUCE" }, batch)).toBe("생산 등록");
+    expect(getHistoryDisplayLabel({ transaction_type: "PRODUCE" }, batch)).toBe("생산 | 입고");
   });
 
-  it("batch sub_type=disassemble → 재작업", () => {
+  it("batch sub_type=disassemble → 분해 | 출고", () => {
     const batch = makeBatch({ sub_type: "disassemble" });
-    expect(getHistoryDisplayLabel({ transaction_type: "DISASSEMBLE" }, batch)).toBe("재작업");
+    expect(getHistoryDisplayLabel({ transaction_type: "DISASSEMBLE" }, batch)).toBe("분해 | 출고");
   });
 
   it("batch sub_type=warehouse_to_dept → 창고 반출", () => {
@@ -200,8 +200,8 @@ describe("getHistoryOperationLabel", () => {
       ["TRANSFER_TO_WH", "창고 반입"],
       ["TRANSFER_DEPT", "부서 이동"],
       ["BACKFLUSH", "자동 차감"],
-      ["PRODUCE", "생산 등록"],
-      ["DISASSEMBLE", "재작업"],
+      ["PRODUCE", "생산 | 입고"],
+      ["DISASSEMBLE", "분해 | 출고"],
       ["ADJUST", "수량 조정"],
       ["MARK_DEFECTIVE", "새 격리"],
       ["UNMARK_DEFECTIVE", "격리 해제"],
@@ -323,10 +323,10 @@ describe("describeBatchFlow", () => {
     expect(result.secondary).toBe("창고로 들어옴");
   });
 
-  it("produce batch → primary=생산 등록, secondary=부품 차감 + 완제품 입고", () => {
+  it("produce batch → primary=생산 | 입고, secondary=부품 차감 + 완제품 입고", () => {
     const batch = makeBatch({ sub_type: "produce", bundles: [] });
     const result = describeBatchFlow({ transaction_type: "PRODUCE" }, batch);
-    expect(result.primary).toBe("생산 등록");
+    expect(result.primary).toBe("생산 | 입고");
     expect(result.secondary).toBe("부품 차감 + 완제품 입고");
   });
 

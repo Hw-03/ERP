@@ -292,7 +292,7 @@ function DirectionCard({
         </div>
       ) : (
         <div className="flex flex-col items-center gap-2 leading-tight">
-          <span className="text-4xl font-black">출하</span>
+          <span className="text-4xl font-black">분해</span>
           <span
             className="h-[4px] w-28 rounded-full"
             style={{ background: active ? activeColor : LEGACY_COLORS.text }}

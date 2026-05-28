@@ -75,9 +75,8 @@ export const TRANSACTION_META: Record<TransactionType, TransactionMeta> = {
   TRANSFER_TO_PROD: { label: "창고 반출", tone: "info" },
   TRANSFER_TO_WH: { label: "창고이동", tone: "info" },
   TRANSFER_DEPT: { label: "부서이동", tone: "info" },
-  // 불량 처리 5종 — 전부 danger(빨강) 톤 통일, 아이콘으로 구분
   MARK_DEFECTIVE: { label: "새 격리", tone: "danger" },
-  UNMARK_DEFECTIVE: { label: "격리 해제", tone: "danger" },
+  UNMARK_DEFECTIVE: { label: "격리 해제", tone: "success" },
   DEFECT_SCRAP: { label: "폐기", tone: "danger" },
   SUPPLIER_RETURN: { label: "원자재 반품", tone: "danger" },
 };
@@ -137,8 +136,9 @@ export function transactionColor(type: TransactionType | string): string {
       return LEGACY_COLORS.cyan;
     case "BACKFLUSH":
       return "#fb923c";
-    case "MARK_DEFECTIVE":
     case "UNMARK_DEFECTIVE":
+      return LEGACY_COLORS.green;
+    case "MARK_DEFECTIVE":
     case "DEFECT_SCRAP":
     case "SUPPLIER_RETURN":
       return LEGACY_COLORS.red;

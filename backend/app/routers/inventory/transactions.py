@@ -474,7 +474,6 @@ def list_transactions(
     rows = query.order_by(TransactionLog.created_at.desc()).offset(skip).limit(limit).all()
 
     # operation_batch_id 기준으로 IoBatch 일괄 조회 → requester_name + approver_name 매핑.
-    # 승인자(요청을 수락한 사람): stock_request 있으면 그 request 의 approved_by_name, 없으면 요청자 자신(직접 처리 케이스).
     batch_ids = {log.operation_batch_id for log, _, _ in rows if log.operation_batch_id}
     batch_map: dict[uuid.UUID, tuple[Optional[str], Optional[str]]] = {}
     if batch_ids:
@@ -486,15 +485,25 @@ def list_transactions(
         sr_ids = [b.stock_request_id for b in batches if b.stock_request_id]
         sr_approver: dict[uuid.UUID, Optional[str]] = {}
         if sr_ids:
-            for sr_id, app_name in (
-                db.query(StockRequest.request_id, StockRequest.approved_by_name)
+            for sr_id, app_name, app_emp_id, req_emp_id in (
+                db.query(
+                    StockRequest.request_id,
+                    StockRequest.approved_by_name,
+                    StockRequest.approved_by_employee_id,
+                    StockRequest.requester_employee_id,
+                )
                 .filter(StockRequest.request_id.in_(sr_ids))
                 .all()
             ):
-                sr_approver[sr_id] = app_name
+                # 요청자와 결재자가 다른 경우만 별도 승인자로 인정.
+                # 같으면 자동결재(즉시 처리) → 승인자 null.
+                if app_emp_id and app_emp_id != req_emp_id:
+                    sr_approver[sr_id] = app_name
+                else:
+                    sr_approver[sr_id] = None
         for b in batches:
             approver = sr_approver.get(b.stock_request_id) if b.stock_request_id else None
-            batch_map[b.batch_id] = (b.requester_name, approver or b.requester_name)
+            batch_map[b.batch_id] = (b.requester_name, approver)
 
     return [
         _to_log_response(

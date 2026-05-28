@@ -182,7 +182,7 @@ describe("PaPfDefectWizard", () => {
     expect(screen.getByText("정상 복귀로 변경")).toBeInTheDocument();
   });
 
-  it("'전부 폐기' 선택 → DisassembleTree 미표시, 결재 요청 클릭 → createStockRequest(DEFECT_SCRAP)", async () => {
+  it("'전부 폐기' 선택 → DisassembleTree 미표시, 즉시 처리 클릭 → 확인팝업 → createStockRequest(DEFECT_SCRAP)", async () => {
     render(<PaPfDefectWizard {...defaultProps} />);
 
     fireEvent.click(screen.getByLabelText(/전부 폐기/));
@@ -194,7 +194,10 @@ describe("PaPfDefectWizard", () => {
       target: { value: "외관 불량" },
     });
 
-    fireEvent.click(screen.getByText("결재 요청 →"));
+    // 즉시 처리 → 확인 팝업 → 확인 버튼
+    fireEvent.click(screen.getByText("즉시 처리 →"));
+    await waitFor(() => expect(screen.getByText("폐기 확인")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("즉시 처리"));
 
     await waitFor(() => {
       expect(stockRequestsApi.createStockRequest).toHaveBeenCalledWith(
@@ -247,7 +250,10 @@ describe("PaPfDefectWizard", () => {
     const keepInput = screen.getByLabelText("게터 정상 수량");
     fireEvent.change(keepInput, { target: { value: "0" } });
 
-    fireEvent.click(screen.getByText("결재 요청 →"));
+    // 즉시 처리 → 확인 팝업 → 확인 버튼
+    fireEvent.click(screen.getByText("즉시 처리 →"));
+    await waitFor(() => expect(screen.getByText("재작업(분해) 확인")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("즉시 처리"));
 
     await waitFor(() => {
       expect(stockRequestsApi.createStockRequest).toHaveBeenCalledWith(
@@ -276,10 +282,10 @@ describe("PaPfDefectWizard", () => {
     });
   });
 
-  it("카테고리 미선택 시 결재 요청 버튼 비활성", () => {
+  it("카테고리 미선택 시 즉시 처리 버튼 비활성", () => {
     render(<PaPfDefectWizard {...defaultProps} />);
 
-    const submitBtn = screen.getByText("결재 요청 →");
+    const submitBtn = screen.getByText("즉시 처리 →");
     expect(submitBtn).toBeDisabled();
   });
 

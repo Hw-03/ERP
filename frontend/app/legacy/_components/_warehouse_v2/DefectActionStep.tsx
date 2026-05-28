@@ -148,17 +148,6 @@ export function DefectActionStep({
       <div className="flex flex-col gap-4">
         <SummaryCard location={selectedLocation} processQty={processQty} onProcessQtyChange={onProcessQtyChange} />
 
-        <div
-          className="rounded-[12px] border px-4 py-3 text-sm font-bold"
-          style={{
-            background: tint(LEGACY_COLORS.yellow, 8),
-            borderColor: tint(LEGACY_COLORS.yellow, 30),
-            color: LEGACY_COLORS.yellow,
-          }}
-        >
-          원자재 반품 (출처 부서 결재 필요)
-        </div>
-
         <ReasonFormFields
           category={reasonCategory}
           memo={reasonMemo}

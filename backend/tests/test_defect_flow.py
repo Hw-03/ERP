@@ -210,11 +210,10 @@ def test_defect_scrap_via_stock_request(db_session, client, make_item):
     inv_before = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     qty_before = inv_before.quantity
 
-    # DEFECT_SCRAP 결재 요청
+    # DEFECT_SCRAP 제출 — 불량 작업은 자동결재(즉시 완료)
     res = client.post("/api/stock-requests", json={
         "requester_employee_id": str(requester.employee_id),
         "request_type": "defect_scrap",
-        "requires_department_approval": True,
         "lines": [{
             "item_id": str(item.item_id),
             "quantity": "4",
@@ -225,15 +224,7 @@ def test_defect_scrap_via_stock_request(db_session, client, make_item):
         "notes": "폐기 처리",
     })
     assert res.status_code == 201, res.json()
-    req_id = res.json()["request_id"]
-
-    # 부서 결재 승인
-    approve_res = client.post(f"/api/stock-requests/{req_id}/department-approve", json={
-        "actor_employee_id": str(approver.employee_id),
-        "pin": "1234",
-    })
-    assert approve_res.status_code == 200, approve_res.json()
-    assert approve_res.json()["status"] == "completed"
+    assert res.json()["status"] == "completed"  # 즉시 완료
 
     db_session.expire_all()
     inv_after = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()

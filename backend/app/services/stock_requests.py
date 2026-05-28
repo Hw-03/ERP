@@ -473,14 +473,22 @@ def _finalize_submission(
             db, request, lines, operator_name=requester.name, approver=requester
         )
         request.status = StockRequestStatusEnum.COMPLETED
-        # 기존 관례: 즉시 완료 시 approved_at 은 무조건 채워 감사 추적용으로 사용한다.
-        request.approved_by_employee_id = requester.employee_id
-        request.approved_by_name = requester.name
+        # 결재권자가 본인 요청을 자가승인한 경우(창고 primary/deputy, 부서장 등)만 approved_by 기록.
+        # 결재 자체가 불필요한 타입(불량 전체 등 requires_*=False)은 approved_by = null 유지 —
+        # 같은 사람이 요청자·승인자로 동시에 표시되는 혼란 방지.
+        requester_self_approved = (
+            (request.requires_warehouse_approval and requester_role in ("primary", "deputy"))
+            or (request.requires_department_approval and requester_dept_role in ("primary", "deputy"))
+            or is_admin
+        )
+        if requester_self_approved:
+            request.approved_by_employee_id = requester.employee_id
+            request.approved_by_name = requester.name
+            if request.requires_department_approval:
+                request.department_approved_by_employee_id = requester.employee_id
+                request.department_approved_by_name = requester.name
+                request.department_approved_at = now
         request.approved_at = now
-        if request.requires_department_approval:
-            request.department_approved_by_employee_id = requester.employee_id
-            request.department_approved_by_name = requester.name
-            request.department_approved_at = now
         request.completed_at = now
         for line in lines:
             line.status = StockRequestStatusEnum.COMPLETED
@@ -545,13 +553,8 @@ def create_request(
     }
     warehouse_override: Optional[bool] = None
     if request_type in _DEFECT_TYPES:
-        source_dept = lines_input[0].from_department if lines_input else None
-        if source_dept == "창고" or source_dept is None:
-            warehouse_override = True
-            requires_department_approval = False
-        else:
-            warehouse_override = False
-            requires_department_approval = True
+        warehouse_override = False
+        requires_department_approval = False
 
     _validate_lines(request_type, lines_input)
     _preflight_inventory_check(db, request_type, lines_input)
@@ -989,7 +992,7 @@ def _execute_line(
         if line.from_department is None:
             raise ValueError("분해 처리는 from_department 가 필요합니다.")
         reason_cat = request.reason_category or ""
-        reason_memo_val = request.reason_memo or (request.notes or "")
+        reason_memo_val = request.reason_memo or ""
         # child_decisions 는 request.notes 에 JSON으로 저장됨
         try:
             raw = json.loads(request.notes or "{}") if request.notes else {}
@@ -1037,8 +1040,13 @@ def _execute_line(
         f"{from_label} → {to_label} / {qty}개 / "
         f"요청자 {request.requester_name}"
     )
-    if request.notes:
+    if request.notes and rt != StockRequestTypeEnum.DEFECT_DISASSEMBLE:
         note += f" / 비고: {request.notes}"
+
+    # DEFECT_DISASSEMBLE: submit_defective_disassemble 이 이미 부모 DISASSEMBLE 로그를 생성함.
+    # 여기서 중복 생성하면 "분해|출고" 행이 별도로 나타남 — 건너뜀.
+    if rt == StockRequestTypeEnum.DEFECT_DISASSEMBLE:
+        return
 
     db.add(
         TransactionLog(

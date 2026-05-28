@@ -15,13 +15,13 @@ export type OperationOption = { value: TransactionType; label: string };
 
 export const OPERATION_OPTIONS: OperationOption[] = [
   { value: "RECEIVE", label: "원자재 입고" },
-  { value: "PRODUCE", label: "생산 등록" },
+  { value: "PRODUCE", label: "생산 | 입고" },
   { value: "SHIP", label: "출고" },
   { value: "BACKFLUSH", label: "자동 차감" },
   { value: "TRANSFER_TO_PROD", label: "창고 반출" },
   { value: "TRANSFER_TO_WH", label: "창고 반입" },
   { value: "TRANSFER_DEPT", label: "부서 이동" },
-  { value: "DISASSEMBLE", label: "재작업" },
+  { value: "DISASSEMBLE", label: "분해 | 출고" },
   { value: "ADJUST", label: "수량 조정" },
   { value: "MARK_DEFECTIVE", label: "새 격리" },
   { value: "UNMARK_DEFECTIVE", label: "격리 해제" },

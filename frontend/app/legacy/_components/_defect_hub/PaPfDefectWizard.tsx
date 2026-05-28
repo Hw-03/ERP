@@ -10,6 +10,7 @@ import type { DefectLocation } from "@/lib/api/types/defects";
 import type { Department } from "@/lib/api/types/shared";
 import { DisassembleTree, toServerDecision, type ChildDecision } from "./DisassembleTree";
 import { ReasonFormFields } from "./ReasonFormFields";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 
 type DisposalAction = "unquarantine" | "scrap" | "disassemble";
 
@@ -41,6 +42,7 @@ export function PaPfDefectWizard({
   const [memo, setMemo] = useState("");
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   // ESC 닫기
   useEffect(() => {
@@ -61,8 +63,8 @@ export function PaPfDefectWizard({
 
   const submitLabel: Record<DisposalAction, string> = {
     unquarantine: "정상 복귀로 변경",
-    scrap: "결재 요청 →",
-    disassemble: "결재 요청 →",
+    scrap: "즉시 처리 →",
+    disassemble: "즉시 처리 →",
   };
 
   async function handleSubmit() {
@@ -198,7 +200,7 @@ export function PaPfDefectWizard({
                 [
                   { value: "unquarantine", label: "정상 복귀 (잘못 격리)" },
                   { value: "scrap", label: "전부 폐기 (BOM 통째)" },
-                  { value: "disassemble", label: "분해 + 자식 처리 (결재 필요)" },
+                  { value: "disassemble", label: "분해 + 자식 처리" },
                 ] as { value: DisposalAction; label: string }[]
               ).map(({ value, label }) => (
                 <label
@@ -294,7 +296,13 @@ export function PaPfDefectWizard({
           </button>
           <button
             type="button"
-            onClick={() => void handleSubmit()}
+            onClick={() => {
+              if (action === "unquarantine") {
+                void handleSubmit();
+              } else {
+                setConfirmOpen(true);
+              }
+            }}
             disabled={!canSubmit}
             className="rounded-[14px] px-5 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
             style={{ background: LEGACY_COLORS.red }}
@@ -303,6 +311,22 @@ export function PaPfDefectWizard({
           </button>
         </div>
       </div>
+      <ConfirmModal
+        open={confirmOpen}
+        title={action === "scrap" ? "폐기 확인" : "재작업(분해) 확인"}
+        tone="danger"
+        cautionMessage="이 작업은 즉시 반영됩니다."
+        confirmLabel="즉시 처리"
+        busy={busy}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }}
+      >
+        <span style={{ color: LEGACY_COLORS.text }}>
+          {action === "scrap"
+            ? `${location.item_name} × ${processQty}개를 폐기합니다.`
+            : `${location.item_name} × ${processQty}개를 분해·재작업합니다.`}
+        </span>
+      </ConfirmModal>
     </div>,
     document.body,
   );

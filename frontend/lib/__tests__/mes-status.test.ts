@@ -117,9 +117,9 @@ describe("transactionColor", () => {
     expect(transactionColor("DISASSEMBLE")).toBe(LEGACY_COLORS.red);
   });
 
-  it("불량 처리 5종 모두 red", () => {
+  it("불량 처리 — 격리/폐기/반품/재작업 red, 격리해제 green", () => {
     expect(transactionColor("MARK_DEFECTIVE")).toBe(LEGACY_COLORS.red);
-    expect(transactionColor("UNMARK_DEFECTIVE")).toBe(LEGACY_COLORS.red);
+    expect(transactionColor("UNMARK_DEFECTIVE")).toBe(LEGACY_COLORS.green);  // 격리 해제는 초록
     expect(transactionColor("DEFECT_SCRAP")).toBe(LEGACY_COLORS.red);
     expect(transactionColor("SUPPLIER_RETURN")).toBe(LEGACY_COLORS.red);
     expect(transactionColor("DISASSEMBLE")).toBe(LEGACY_COLORS.red);

@@ -17,6 +17,7 @@ import { DEPT_LETTER_TO_NAME, deptOf, stageOf, type DeptLetter } from "../_admin
 import { LabeledSelect, SettingLabel } from "./_atoms";
 import type { IoBundle, IoSubType, IoWorkType, Item, ProductModel } from "./types";
 import {
+  allowsMixedBundles,
   deptIoSubType,
   getItemActionMode,
   type DeptIoDirection,
@@ -310,6 +311,7 @@ export function IoTargetPicker({
           bomParents={bomParents}
           hasBomBundle={bundles.some((b) => b.source_kind === "bom_parent")}
           hasSingleBundle={bundles.some((b) => b.source_kind === "direct_item")}
+          allowMix={allowsMixedBundles(subType)}
           highlightItemId={highlightItemId ?? null}
         />
       </div>
@@ -360,6 +362,7 @@ function ItemTable({
   bomParents,
   hasBomBundle,
   hasSingleBundle,
+  allowMix,
   highlightItemId,
 }: {
   items: Item[];
@@ -376,6 +379,7 @@ function ItemTable({
   bomParents: Set<string>;
   hasBomBundle: boolean;
   hasSingleBundle: boolean;
+  allowMix: boolean;
   highlightItemId: string | null;
 }) {
   const isProcess = workType === "process" && deptIoDirection != null;
@@ -561,10 +565,10 @@ function ItemTable({
                       );
                     })() : mode === "bom_or_single" ? (() => {
                       const hasBom = bomParents.has(item.item_id);
-                      // 한 작업 안에서 BOM 묶음과 낱개 묶음을 섞으면 백엔드가 거절 — 둘 중 한쪽이
-                      // 이미 카트에 있으면 반대쪽 버튼을 잠근다.
-                      const bomLockedByMode = hasSingleBundle;
-                      const singleLockedByMode = hasBomBundle;
+                      // 창고 입출고(allowMix)는 BOM·낱개 혼합 허용 — 새 결재 정책상 한 요청에서 같이 처리.
+                      // 그 외(produce/disassemble)는 종전대로 한쪽만 활성 — BOM 강제와 흐름 분기가 달라 락 유지.
+                      const bomLockedByMode = !allowMix && hasSingleBundle;
+                      const singleLockedByMode = !allowMix && hasBomBundle;
                       const bomDisabled = busy || bomLockedByMode || !hasBom;
                       const singleDisabled = busy || singleLockedByMode;
                       const bomTitle = !hasBom
