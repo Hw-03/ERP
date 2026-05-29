@@ -18,8 +18,8 @@ describe("mes/transaction barrel", () => {
 
   it("getTransactionLabel returns Korean label for known type", () => {
     expect(getTransactionLabel("RECEIVE")).toBe("원자재 입고");
-    expect(getTransactionLabel("MARK_DEFECTIVE")).toBe("새 격리");
-    expect(getTransactionLabel("TRANSFER_DEPT")).toBe("부서이동");
+    expect(getTransactionLabel("MARK_DEFECTIVE")).toBe("새 불량");
+    expect(getTransactionLabel("TRANSFER_DEPT")).toBe("부서 → 부서");
   });
 
   it("getTransactionLabel returns input as-is for unknown type", () => {

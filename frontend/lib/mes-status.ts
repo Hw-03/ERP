@@ -65,20 +65,23 @@ export interface TransactionMeta {
   tone: MesTone;
 }
 
+// 라벨은 모두 glossary 단일 사전(P0-1)에서 가져옴. tone 만 본 모듈에서 정의.
+import { TRANSACTION_TYPE_LABEL as _TX_LABEL } from "@/lib/io/glossary";
+
 export const TRANSACTION_META: Record<TransactionType, TransactionMeta> = {
-  RECEIVE: { label: "원자재 입고", tone: "success" },
-  PRODUCE: { label: "생산입고", tone: "info" },
-  SHIP: { label: "출고", tone: "info" },
-  ADJUST: { label: "조정", tone: "warning" },
-  BACKFLUSH: { label: "자동차감", tone: "info" },
-  DISASSEMBLE: { label: "재작업", tone: "danger" },
-  TRANSFER_TO_PROD: { label: "창고 반출", tone: "info" },
-  TRANSFER_TO_WH: { label: "창고이동", tone: "info" },
-  TRANSFER_DEPT: { label: "부서이동", tone: "info" },
-  MARK_DEFECTIVE: { label: "새 격리", tone: "danger" },
-  UNMARK_DEFECTIVE: { label: "격리 해제", tone: "success" },
-  DEFECT_SCRAP: { label: "폐기", tone: "danger" },
-  SUPPLIER_RETURN: { label: "원자재 반품", tone: "danger" },
+  RECEIVE: { label: _TX_LABEL.RECEIVE, tone: "success" },
+  PRODUCE: { label: _TX_LABEL.PRODUCE, tone: "info" },
+  SHIP: { label: _TX_LABEL.SHIP, tone: "info" },
+  ADJUST: { label: _TX_LABEL.ADJUST, tone: "warning" },
+  BACKFLUSH: { label: _TX_LABEL.BACKFLUSH, tone: "info" },
+  DISASSEMBLE: { label: _TX_LABEL.DISASSEMBLE, tone: "danger" },
+  TRANSFER_TO_PROD: { label: _TX_LABEL.TRANSFER_TO_PROD, tone: "info" },
+  TRANSFER_TO_WH: { label: _TX_LABEL.TRANSFER_TO_WH, tone: "info" },
+  TRANSFER_DEPT: { label: _TX_LABEL.TRANSFER_DEPT, tone: "info" },
+  MARK_DEFECTIVE: { label: _TX_LABEL.MARK_DEFECTIVE, tone: "danger" },
+  UNMARK_DEFECTIVE: { label: _TX_LABEL.UNMARK_DEFECTIVE, tone: "success" },
+  DEFECT_SCRAP: { label: _TX_LABEL.DEFECT_SCRAP, tone: "danger" },
+  SUPPLIER_RETURN: { label: _TX_LABEL.SUPPLIER_RETURN, tone: "danger" },
 };
 
 /**

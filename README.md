@@ -2,7 +2,7 @@
 
 DEXCOWIN의 품목, 재고, BOM, 입출고를 관리하는 경량 MES 프로토타입.
 
-**현재 안정성 점수**: ~96/100 (Round-10A 완료, 2026-05-02). 세부 추적: [docs/CODEX_PROGRESS.md](docs/CODEX_PROGRESS.md)
+**현재 안정성 점수**: ~96/100 (Round-10A 완료, 2026-05-02). 세부 추적: `_attic/docs/CODEX_PROGRESS.md` *(보관 중 — 복귀 검토 대상)*
 
 ## 현재 기준
 
@@ -123,8 +123,8 @@ ERP/
 │       └── mes/          MES 디자인시스템 (color/format/status/...)
 ├── data/                 입력 자료 (xlsx · csv) + db_backups/ (DB 백업 단일 보관소)
 ├── docs/                 기준 · 운영 · 구조 · 인수인계
-│   ├── openapi.json      FastAPI baseline (CI drift 검사 기준)
-│   └── research/         외부 연구 보고서
+├── _dev/baselines/       FastAPI OpenAPI baseline (CI drift 검사 기준)
+│   └── openapi.json
 ├── scripts/              보조 스크립트
 │   ├── ops/              백업 · 헬스체크 · 재고 정합
 │   ├── migrations/       DB 스키마 / 코드 정제
@@ -141,19 +141,29 @@ ERP/
 
 ## 문서 허브
 
+### 활성 (docs/)
+
 | 문서 | 대상 | 내용 |
 |---|---|---|
-| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | 현장 사용자 | 화면별 사용법 (대시보드 / 입출고 / 내역 / 관리자) |
+| [docs/CONTEXT.md](docs/CONTEXT.md) | 신규 합류자 | 도메인 한눈 보기 (조직·품목·재고·BOM·입출고·결재) — 코드 보기 전 필독 |
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | 운영자 | 365일 운영, 시작·재시작, 포트 충돌, 백업, 1차 장애 대응 |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 개발자 | 폴더 구조·레이어·재고 3-bucket 모델·wizard 흐름 |
-| [docs/ERD.md](docs/ERD.md) | 개발자 | 엔티티 관계도(Mermaid) + 자재→재고→생산→출하 흐름 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 개발자 | 폴더 구조·레이어·재고 3-bucket 모델 *(V2 흐름은 갱신 예정 — STALE 마커 참조)* |
+| [docs/ERD.md](docs/ERD.md) | 개발자 | 엔티티 관계도(Mermaid) *(V2 IoBatch/IoBundle/IoLine 누락 — STALE 마커 참조)* |
 | [docs/GLOSSARY.md](docs/GLOSSARY.md) | 모두 | 도메인 용어 단일 소스 (부서·공정코드·재고 모델·에러코드) |
 | [docs/ITEM_CODE_RULES.md](docs/ITEM_CODE_RULES.md) | 모두 | 품목코드 최종 기준 |
-| [docs/AI_HANDOVER.md](docs/AI_HANDOVER.md) | AI 협업자 | 인수인계 (Phase 4·5 결과 포함) |
-| [docs/CODEX_PROGRESS.md](docs/CODEX_PROGRESS.md) | 모두 | 큰 기능 단위 진행 기록 |
-| [docs/BACKEND_REFACTOR_PLAN.md](docs/BACKEND_REFACTOR_PLAN.md) | 다음 작업 | 백엔드 개선 진행 / 보류 사유 |
-| [docs/FRONTEND_HOOKS_PLAN.md](docs/FRONTEND_HOOKS_PLAN.md) | 다음 작업 | 프론트 hook·뷰 분할 진행 / 보류 사유 |
-| [docs/research/MOBILE_BARCODE_ARCHITECTURE.md](docs/research/MOBILE_BARCODE_ARCHITECTURE.md) | 다음 작업 검토 | 모바일 바코드 스캐너 아키텍처 외부 연구 |
+| [docs/ATTIC_POLICY.md](docs/ATTIC_POLICY.md) | 유지보수 | `_attic/` / `_backup/` 보관·복귀·삭제 정책 |
+| [docs/adr/](docs/adr/) | 모두 | 아키텍처 결정 기록 (Architecture Decision Records) |
+
+### 보관 중 (`_attic/docs/`)
+
+다음 문서들은 `_attic/docs/` 에 보관되어 있으며 향후 복귀 검토 대상. 정책은 [docs/ATTIC_POLICY.md](docs/ATTIC_POLICY.md).
+
+- `USER_GUIDE.md` — 현장 사용자 가이드 (V2 갱신 후 복귀 예정)
+- `CODEX_PROGRESS.md` — 큰 기능 단위 진행 기록
+- `BACKEND_REFACTOR_PLAN.md` — 백엔드 개선 진행 / 보류 사유
+- `FRONTEND_HOOKS_PLAN.md` — 프론트 hook·뷰 분할 진행 / 보류 사유
+- `_attic/ai/AI_HANDOVER.md` — AI 협업자 인수인계 (Phase 4·5 결과)
+- `_attic/docs/research/MOBILE_BARCODE_ARCHITECTURE.md` — 모바일 바코드 스캐너 외부 연구
 
 ## 검증
 
@@ -191,12 +201,12 @@ GET  /api/production/capacity
 
 ### API 변경 시 OpenAPI baseline 갱신
 
-backend 라우터/스키마 수정 시 `docs/openapi.json` 갱신 필수 (CI drift 검사):
+backend 라우터/스키마 수정 시 `_dev/baselines/openapi.json` 갱신 필수 (CI drift 검사 — `.github/workflows/ci.yml`):
 
 ```bash
 cd backend
 python -c "from app.main import app; import json; \
-  open('../docs/openapi.json','w',encoding='utf-8').write(\
+  open('../_dev/baselines/openapi.json','w',encoding='utf-8').write(\
   json.dumps(app.openapi(),indent=2,sort_keys=True,ensure_ascii=False)+chr(10))"
 ```
 

@@ -7,6 +7,11 @@
 import type { Department } from "@/lib/api/types/shared";
 import type { IoBatch } from "@/lib/api/types/io";
 import { formatQty } from "@/lib/mes/format";
+import {
+  SUB_TYPE_LABEL as _SUB_LABEL,
+  TRANSACTION_TYPE_LABEL as _TX_LABEL,
+  WORK_TYPE_LABEL as _WORK_LABEL,
+} from "@/lib/io/glossary";
 
 // ──────────────────────────────────────────────────────────────────
 // 내부 헬퍼
@@ -31,9 +36,9 @@ function _labelNoneBucket(subType: string | null | undefined, side: "from" | "to
     case "supplier_return":
       return side === "to" ? "외부" : null;
     case "produce":
-      return "생산";
+      return _SUB_LABEL.produce;
     case "disassemble":
-      return "재작업";
+      return _SUB_LABEL.disassemble;
     case "adjust_in":
     case "adjust_out":
       return "수량 조정";
@@ -188,36 +193,24 @@ export function parseTransactionNotes(notes: string | null | undefined): {
   return { userMemo: text };
 }
 
+// 작업 의도 라벨 — base 라벨은 모두 glossary 단일 사전에서 가져옴 (P0-1).
+// 일부 키만 history 컨텍스트에 맞춰 변형 (예: dept_transfer 는 "부서 이동" 으로 동사형 유지).
 const _SUB_TYPE_OPERATION: Record<string, string> = {
-  produce: "생산 | 입고",
-  disassemble: "분해 | 출고",
-  warehouse_to_dept: "창고 반출",
-  dept_to_warehouse: "창고 반입",
-  dept_transfer: "부서 이동",
-  adjust_in: "수량 조정",
-  adjust_out: "수량 조정",
-  receive_supplier: "원자재 입고",
-  supplier_return: "원자재 반품",
-  defect_quarantine: "새 격리",
-  defect_restore: "격리 해제",
-  defect_process: "격리 폐기",
+  produce: _SUB_LABEL.produce,
+  disassemble: _SUB_LABEL.disassemble,
+  warehouse_to_dept: _SUB_LABEL.warehouse_to_dept,
+  dept_to_warehouse: _SUB_LABEL.dept_to_warehouse,
+  dept_transfer: _SUB_LABEL.dept_transfer,
+  adjust_in: _SUB_LABEL.adjust_in,
+  adjust_out: _SUB_LABEL.adjust_out,
+  receive_supplier: _SUB_LABEL.receive_supplier,
+  supplier_return: _SUB_LABEL.supplier_return,
+  defect_quarantine: _SUB_LABEL.defect_quarantine,
+  defect_restore: _SUB_LABEL.defect_restore,
+  defect_process: _SUB_LABEL.defect_process,
 };
 
-const _TX_OPERATION: Record<string, string> = {
-  RECEIVE: "원자재 입고",
-  SHIP: "출고",
-  TRANSFER_TO_PROD: "창고 반출",
-  TRANSFER_TO_WH: "창고 반입",
-  TRANSFER_DEPT: "부서 이동",
-  BACKFLUSH: "자동 차감",
-  PRODUCE: "생산 | 입고",
-  DISASSEMBLE: "분해 | 출고",
-  ADJUST: "수량 조정",
-  MARK_DEFECTIVE: "새 격리",
-  UNMARK_DEFECTIVE: "격리 해제",
-  DEFECT_SCRAP: "폐기",
-  SUPPLIER_RETURN: "원자재 반품",
-};
+const _TX_OPERATION: Record<string, string> = _TX_LABEL;
 
 const _DISPLAY_SUB_LABEL: Record<string, string> = {
   // sub_type
@@ -261,12 +254,7 @@ export function getHistoryOperationLabel(
   return _TX_OPERATION[log.transaction_type] ?? log.transaction_type;
 }
 
-const _WORK_TYPE_LABEL: Record<string, string> = {
-  receive: "원자재 입고",
-  warehouse_io: "창고 입출고",
-  process: "부서 작업",
-  defect: "불량",
-};
+const _WORK_TYPE_LABEL: Record<string, string> = _WORK_LABEL;
 
 /** IoBatch.work_type 코드의 한글 라벨. 미매핑이면 원문 그대로(안전). */
 export function getHistoryWorkTypeLabel(workType: string): string {
@@ -316,12 +304,12 @@ export function getHistoryFlowLabel(
     case "TRANSFER_DEPT": return "부서 ↔ 부서";
     case "BACKFLUSH": return "자동차감";
     case "PRODUCE": return "생산 입고";
-    case "DISASSEMBLE": return "재작업";
-    case "MARK_DEFECTIVE": return "새 격리";
-    case "UNMARK_DEFECTIVE": return "격리 해제";
-    case "DEFECT_SCRAP": return "폐기";
-    case "ADJUST": return "수량 조정";
-    case "SUPPLIER_RETURN": return "원자재 반품";
+    case "DISASSEMBLE": return _TX_LABEL.DISASSEMBLE;
+    case "MARK_DEFECTIVE": return _TX_LABEL.MARK_DEFECTIVE;
+    case "UNMARK_DEFECTIVE": return _TX_LABEL.UNMARK_DEFECTIVE;
+    case "DEFECT_SCRAP": return _TX_LABEL.DEFECT_SCRAP;
+    case "ADJUST": return _TX_LABEL.ADJUST;
+    case "SUPPLIER_RETURN": return _TX_LABEL.SUPPLIER_RETURN;
     default: return log.transaction_type;
   }
 }
@@ -689,21 +677,23 @@ export function getHistoryMovementSummary(
 // 둘 다 0/null 인 레거시는 동사만(절대 "+0" 표기 안 함).
 // ──────────────────────────────────────────────────────────────────
 
+// 단건(낱개) 알약 verb — base 라벨은 glossary TRANSACTION_TYPE_LABEL.
+// tone 만 history UI 컨텍스트에서 정의.
 const _SINGLE_OP: Record<string, { verb: string; tone: MovementTone; signed?: boolean }> = {
   RECEIVE: { verb: "입고", tone: "success" },
-  SHIP: { verb: "출고", tone: "danger" },
+  SHIP: { verb: _TX_LABEL.SHIP, tone: "danger" },
   ADJUST: { verb: "조정", tone: "warning", signed: true },
   TRANSFER_TO_PROD: { verb: "이동", tone: "info" },
   TRANSFER_TO_WH: { verb: "이동", tone: "info" },
   TRANSFER_DEPT: { verb: "이동", tone: "info" },
-  BACKFLUSH: { verb: "자동 차감", tone: "danger" },
-  PRODUCE: { verb: "생산", tone: "success" },
-  DISASSEMBLE: { verb: "재작업", tone: "danger" },
+  BACKFLUSH: { verb: _TX_LABEL.BACKFLUSH, tone: "danger" },
+  PRODUCE: { verb: _TX_LABEL.PRODUCE, tone: "success" },
+  DISASSEMBLE: { verb: _TX_LABEL.DISASSEMBLE, tone: "danger" },
   // 불량 처리 4종 — 전부 danger 톤, 라벨은 구분 알약과 동일
-  MARK_DEFECTIVE: { verb: "새 격리", tone: "danger" },
-  UNMARK_DEFECTIVE: { verb: "격리 해제", tone: "success" },
-  DEFECT_SCRAP: { verb: "폐기", tone: "danger" },
-  SUPPLIER_RETURN: { verb: "원자재 반품", tone: "danger" },
+  MARK_DEFECTIVE: { verb: _TX_LABEL.MARK_DEFECTIVE, tone: "danger" },
+  UNMARK_DEFECTIVE: { verb: _TX_LABEL.UNMARK_DEFECTIVE, tone: "success" },
+  DEFECT_SCRAP: { verb: _TX_LABEL.DEFECT_SCRAP, tone: "danger" },
+  SUPPLIER_RETURN: { verb: _TX_LABEL.SUPPLIER_RETURN, tone: "danger" },
 };
 
 export function getSingleLogMovement(log: {
