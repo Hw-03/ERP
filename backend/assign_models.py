@@ -1,68 +1,26 @@
-"""[DEPRECATED] legacy_model 기반 모델 할당 스크립트 — legacy_model 컬럼 제거로 폐기.
+"""[DEPRECATED — 2026-05-29 폐기]
 
-모델 연결은 품목 코드 파싱(parse_item_code → model_slots) 또는
-관리자 UI(AdminItemsSection)에서 직접 model_slots 수정으로 관리.
+기존 동작: legacy_model 키워드 매칭으로 ItemModel(item_id, slot) 다대다 행 생성.
+
+폐기 이유:
+- legacy_model 컬럼 이미 제거.
+- 411개 item_models 가 비어있던 채로 '김민재 SOLO 필터' 실패 발생.
+- 회사 규약상 item_code prefix(첫 '-' 앞 글자열)의 각 글자가 ProductSymbol.symbol 과
+  1:1 대응 — 별도 매핑 테이블 불필요.
+- ItemModel ORM 클래스 + item_models 테이블 폐기됨.
+
+대체 경로:
+- 응답 model_slots: `app.utils.item_code.item_code_to_model_slots(item.item_code)`
+- 거래 모델 필터: `_model_filter(db, model)` (transactions.py) — prefix LIKE OR.
+- 신규 품목 생성: AdminItemsSection 에서 model_slots 입력 → item_code 가
+  prefix 를 가지면 자동 매핑.
+
+이 파일은 실행되지 않는다 (import 즉시 SystemExit).
 """
 import sys
-import os
-sys.path.insert(0, os.path.dirname(__file__))
 
-from app.database import SessionLocal
-from app.models import Item, ItemModel
-
-db = SessionLocal()
-
-SLOT_KEYWORDS = [
-    (1, ["DX3000"]),
-    (2, ["COCOON"]),
-    (3, ["SOLO"]),
-    (4, ["ADX4000W"]),
-    (5, ["ADX6000FB", "ADX6000S"]),
-]
-ALL_SLOTS = [1, 2, 3, 4, 5]
-
-existing = set(
-    (str(r.item_id), r.slot)
-    for r in db.query(ItemModel.item_id, ItemModel.slot).all()
+sys.stderr.write(
+    "assign_models.py is deprecated (2026-05-29). item_models is gone — "
+    "model mapping is now derived from item_code prefix. See module docstring.\n"
 )
-
-items = db.query(Item).all()
-added = 0
-skipped = 0
-
-for item in items:
-    lm = (item.legacy_model or "").strip()
-
-    matched_slots = []
-    for slot, keywords in SLOT_KEYWORDS:
-        if any(kw in lm for kw in keywords):
-            matched_slots.append(slot)
-
-    # 매칭 없거나 "공용" 포함 → 전체 슬롯
-    if not matched_slots or "공용" in lm:
-        matched_slots = ALL_SLOTS
-
-    for slot in matched_slots:
-        key = (str(item.item_id), slot)
-        if key in existing:
-            skipped += 1
-            continue
-        db.add(ItemModel(item_id=item.item_id, slot=slot))
-        existing.add(key)
-        added += 1
-
-db.commit()
-
-# 검증
-unlinked = (
-    db.query(Item)
-    .filter(~Item.item_id.in_(db.query(ItemModel.item_id).distinct()))
-    .count()
-)
-total = db.query(Item).count()
-
-print(f"추가된 연결: {added}개")
-print(f"이미 존재(스킵): {skipped}개")
-print(f"전체 품목: {total}개 / 미연결: {unlinked}개")
-
-db.close()
+sys.exit(1)

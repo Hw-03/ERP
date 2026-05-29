@@ -237,6 +237,10 @@ _MIGRATION_DDL: list[str] = [
     # 권동환 사원 요청 #3 (사번 기반 audit) 의 마스터/설정 변경 audit 영구 저장.
     "ALTER TABLE admin_audit_logs ADD COLUMN actor_employee_code VARCHAR(16)",
     "CREATE INDEX IF NOT EXISTS ix_aal_actor_emp ON admin_audit_logs(actor_employee_code)",
+    # 2026-05-29: item_models 폐기 — 모델 매핑은 item_code prefix 에서 유도.
+    # 411개 row 가 비어있던 상태로 김민재 사원 SOLO 필터 실패 원인. ItemModel ORM 클래스
+    # 제거와 함께 테이블도 DROP. backup: backend/_backup/mes_pre_item_models_drop_2026-05-29.db
+    "DROP TABLE IF EXISTS item_models",
 ]
 
 

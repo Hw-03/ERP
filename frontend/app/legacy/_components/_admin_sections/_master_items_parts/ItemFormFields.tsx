@@ -54,6 +54,82 @@ const inputStyle = {
   color: LEGACY_COLORS.text,
 };
 
+/** model_slots + process_type_code 로 권장 prefix 계산 */
+function previewCodePrefix(slots: number[], processType: string): string {
+  const sorted = [...slots].sort((a, b) => a - b);
+  const symbols = sorted
+    .map((s) => MODEL_SLOTS.find((m) => m.slot === s)?.symbol)
+    .filter(Boolean)
+    .join("");
+  if (!symbols || !processType) return "";
+  return `${symbols}-${processType}-`;
+}
+
+const CODE_PARSE = /^([0-9]+)-([A-Z]{2})-(\d{4})(?:-(\w+))?$/;
+
+/** form 상태에서 표시할 코드 미리보기 계산.
+ *  - 카테고리 변경 시 새 카테고리는 백엔드 의존이라 "???? (저장 시 부여)" 안내.
+ *  - 모델만 변경 (또는 미변경) 시 serial 유지, prefix·option 갱신.
+ */
+function previewFullCode(form: ItemFormData): string {
+  const prefix = previewCodePrefix(form.model_slots, form.process_type_code);
+  if (!prefix) return form.item_code || "(자동 부여)";
+
+  const m = (form.item_code || "").match(CODE_PARSE);
+  if (!m) {
+    // 기존 코드 패턴 모름 — 미리보기는 prefix 만 보여줌.
+    return `${prefix}???? (저장 시 부여)`;
+  }
+  const [, , oldPt, serial] = m;
+  if (oldPt !== form.process_type_code) {
+    return `${prefix}???? (저장 시 부여)`;
+  }
+  const opt = form.option_code ? `-${form.option_code}` : "";
+  return `${prefix}${serial}${opt}`;
+}
+
+function ItemCodeSection({
+  form,
+}: {
+  form: ItemFormData;
+}) {
+  const prefix = previewCodePrefix(form.model_slots, form.process_type_code);
+
+  return (
+    <div>
+      <FieldLabel label="품목 코드" />
+      {prefix && (
+        <div className="mb-2 flex items-center gap-2 flex-wrap">
+          <span
+            className="rounded-[10px] px-3 py-1 text-sm font-mono"
+            style={{
+              background: `color-mix(in srgb, ${LEGACY_COLORS.purple} 12%, transparent)`,
+              color: LEGACY_COLORS.purple,
+              border: `1px solid color-mix(in srgb, ${LEGACY_COLORS.purple} 30%, transparent)`,
+            }}
+          >
+            현재 코드 prefix: <strong>{prefix}</strong>
+          </span>
+        </div>
+      )}
+      <div
+        className="w-full rounded-[18px] border px-4 py-3 text-base font-mono"
+        style={{
+          ...inputStyle,
+          background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 8%, transparent)`,
+          color: form.item_code ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
+        }}
+        aria-readonly
+      >
+        {previewFullCode(form)}
+      </div>
+      <p className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+        품목 코드는 사용제품·카테고리·옵션에서 자동 계산됩니다. 사용제품만 바꾸면 번호 유지(즉시 미리 보임), 카테고리를 바꾸면 새 카테고리의 다음 번호가 저장 시 부여됩니다.
+      </p>
+    </div>
+  );
+}
+
 export function ItemFormFields({ form, setForm, showInitialQuantity, showItemCode }: Props) {
   return (
     <>
@@ -111,17 +187,7 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showItemCod
       ))}
 
       {showItemCode && (
-        <div>
-          <FieldLabel label="품목 코드" badge="선택" />
-          <input
-            type="text"
-            value={form.item_code ?? ""}
-            onChange={(e) => setForm((f) => ({ ...f, item_code: e.target.value }))}
-            placeholder="예: 346-AR-0001"
-            className="w-full rounded-[18px] border px-4 py-3 text-base outline-none"
-            style={inputStyle}
-          />
-        </div>
+        <ItemCodeSection form={form} />
       )}
 
       {/* 카테고리 */}

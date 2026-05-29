@@ -1565,14 +1565,14 @@
       "EmployeePinChangeRequest": {
         "properties": {
           "current_pin": {
-            "maxLength": 20,
+            "maxLength": 4,
             "minLength": 1,
             "title": "Current Pin",
             "type": "string"
           },
           "new_pin": {
-            "maxLength": 20,
-            "minLength": 1,
+            "maxLength": 4,
+            "minLength": 4,
             "title": "New Pin",
             "type": "string"
           }
@@ -10767,7 +10767,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ItemResponse"
+                  "$ref": "#/components/schemas/ItemWithInventory"
                 }
               }
             },

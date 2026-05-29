@@ -15,7 +15,7 @@ from sqlalchemy import func
 
 from app.database import get_db
 from app.dependencies.admin import require_admin_pin
-from app.models import BOM, Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
+from app.models import BOM, Inventory, InventoryLocation, Item, LocationStatusEnum
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     BomCompletionUpdate,
@@ -26,7 +26,12 @@ from app.schemas import (
     ItemUpdate,
     ItemWithInventory,
 )
-from app.utils.item_code import make_item_code, next_serial_no, slots_to_model_symbol
+from app.utils.item_code import (
+    item_code_to_model_slots,
+    make_item_code,
+    next_serial_no,
+    slots_to_model_symbol,
+)
 from app.models import ProductSymbol
 from app.services import audit
 from app.services import inventory as inventory_svc
@@ -78,10 +83,10 @@ def _to_item_with_inventory(
         ]
 
     if model_slots is None:
-        model_slots = [
-            row.slot
-            for row in db.query(ItemModel).filter(ItemModel.item_id == item.item_id).all()
-        ]
+        # 회사 규약: item_code prefix(첫 '-' 앞 글자열) 가 모델을 결정.
+        # 예: "8-AR-0307" → SOLO(slot 3), "78-PR-0042" → COCOON+SOLO(slot 2,3).
+        # 별도 item_models 테이블 없이 코드만 보면 됨.
+        model_slots = item_code_to_model_slots(item.item_code)
 
     return ItemWithInventory(
         item_id=item.item_id,
@@ -163,9 +168,6 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
     )
     db.add(item)
     db.flush()
-
-    for slot in model_slots:
-        db.add(ItemModel(item_id=item.item_id, slot=slot))
 
     init_qty = payload.initial_quantity if payload.initial_quantity is not None else 0
     inventory = Inventory(item_id=item.item_id, quantity=init_qty, warehouse_qty=init_qty)
@@ -267,11 +269,6 @@ def list_items(
             )
         )
 
-    model_rows = db.query(ItemModel).filter(ItemModel.item_id.in_(item_ids)).all()
-    slots_by_item: dict = {}
-    for row in model_rows:
-        slots_by_item.setdefault(row.item_id, []).append(row.slot)
-
     return [
         _to_item_with_inventory(
             db,
@@ -279,7 +276,7 @@ def list_items(
             inv,
             figures=figures_map.get(item.item_id),
             locations=locations_by_item.get(item.item_id, []),
-            model_slots=slots_by_item.get(item.item_id, []),
+            model_slots=item_code_to_model_slots(item.item_code),
         )
         for item, inv in rows
     ]
@@ -439,39 +436,72 @@ def get_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
     return _to_item_with_inventory(db, item, inventory, figures=figures)
 
 
-@router.put("/{item_id}", response_model=ItemResponse)
+@router.put("/{item_id}", response_model=ItemWithInventory)
 def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: Session = Depends(get_db)):
     item = db.query(Item).filter(Item.item_id == item_id).first()
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
     changed: list[str] = []
+    # process_type/model/option 변경 감지 — item_code 자동 재계산용.
+    # 일반 필드(item_name·unit 등)는 코드와 무관하므로 그대로 setattr.
     for field in (
-        "item_name", "process_type_code", "unit",
+        "item_name", "unit",
         "legacy_part", "legacy_item_type",
-        "supplier", "min_stock", "option_code",
+        "supplier", "min_stock",
     ):
         new_val = getattr(payload, field)
         if new_val is not None and getattr(item, field) != new_val:
             setattr(item, field, new_val)
             changed.append(field)
 
+    # 모델·카테고리·옵션 변경은 item_code 재계산 트리거.
+    # 의도: 사용자는 모델·카테고리만 바꾸고 item_code 는 자동 부여.
+    #   - 모델만 변경 → serial 유지, prefix 만 새로.
+    #   - 카테고리 변경 → 새 카테고리의 next_serial_no 부여 (번호 풀이 다르므로).
+    #   - 옵션 변경 → suffix 만 갱신.
+    new_pt = payload.process_type_code if payload.process_type_code is not None else item.process_type_code
     if payload.model_slots is not None:
-        db.query(ItemModel).filter(ItemModel.item_id == item.item_id).delete()
-        for slot in payload.model_slots:
-            db.add(ItemModel(item_id=item.item_id, slot=slot))
-        item.model_symbol = slots_to_model_symbol(payload.model_slots) or None
-        changed.append("model_slots")
+        new_model_sym = slots_to_model_symbol(payload.model_slots) or None
+    else:
+        new_model_sym = item.model_symbol
+    new_option = payload.option_code if payload.option_code is not None else item.option_code
 
-    if payload.item_code is not None and payload.item_code != item.item_code:
-        exists = db.query(Item).filter(
-            Item.item_code == payload.item_code,
-            Item.item_id != item.item_id,
-        ).first()
-        if exists:
-            raise http_error(409, ErrorCode.CONFLICT, f"'{payload.item_code}' 코드는 이미 사용 중입니다.")
-        item.item_code = payload.item_code
-        changed.append("item_code")
+    pt_changed = payload.process_type_code is not None and payload.process_type_code != item.process_type_code
+    model_changed = payload.model_slots is not None and new_model_sym != item.model_symbol
+    option_changed = payload.option_code is not None and payload.option_code != item.option_code
+
+    if pt_changed or model_changed or option_changed:
+        # serial 결정: 카테고리 변경 시 새 카테고리에서 next_serial_no, 그 외엔 기존 유지.
+        if pt_changed:
+            if new_model_sym and new_pt:
+                item.serial_no = next_serial_no(new_model_sym, new_pt, db)
+            item.process_type_code = new_pt
+            changed.append("process_type_code")
+        if model_changed:
+            item.model_symbol = new_model_sym
+            changed.append("model_slots")
+        if option_changed:
+            item.option_code = new_option
+            changed.append("option_code")
+
+        # item_code 재조립. model/category 가 비어있으면 None 으로 둠 (등록 직후 미완 상태와 동일).
+        if new_model_sym and new_pt and item.serial_no:
+            item.item_code = make_item_code(new_model_sym, new_pt, item.serial_no, new_option or None)
+            # 안전망 — 중복 검사 (이론상 발생 안 해야 함).
+            dup = db.query(Item).filter(
+                Item.item_code == item.item_code,
+                Item.item_id != item.item_id,
+            ).first()
+            if dup is not None:
+                raise http_error(
+                    409,
+                    ErrorCode.CONFLICT,
+                    f"'{item.item_code}' 코드가 이미 사용 중입니다. 데이터 점검이 필요합니다.",
+                )
+            changed.append("item_code")
+        else:
+            item.item_code = None
 
     item.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
@@ -493,7 +523,10 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
             item=item.item_code or "-",
             changed=",".join(changed),
         )
-    return item
+    # 응답에 inventory 동봉 — 좌측 list API 와 동일한 ItemWithInventory 형태로 보내
+    # 저장 직후 우측 카드의 재고/창고 표시가 빈칸이 되는 잔여 UI 버그 방지.
+    inventory = db.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+    return _to_item_with_inventory(db, item, inventory)
 
 
 @router.patch("/{item_id}/bom-completion", response_model=ItemResponse)

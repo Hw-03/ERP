@@ -1,4 +1,9 @@
-"""품목·BOM·품목-모델 매핑 도메인."""
+"""품목·BOM 도메인.
+
+품목-모델 매핑은 별도 테이블 없이 item_code prefix (첫 '-' 앞 글자열) 에서
+유도한다 — 회사 규약상 각 글자가 ProductSymbol.symbol 과 1:1 대응이라
+이중 출처를 둘 이유가 없음. 헬퍼: app.utils.item_code.item_code_to_model_slots.
+"""
 
 import uuid
 from datetime import datetime
@@ -10,7 +15,6 @@ from sqlalchemy import (
     Index,
     Integer,
     Numeric,
-    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -24,7 +28,6 @@ from app.models.base import Base
 __all__ = [
     "Item",
     "BOM",
-    "ItemModel",
 ]
 
 
@@ -97,15 +100,3 @@ class BOM(Base):
 
     parent_item = relationship("Item", foreign_keys=[parent_item_id], back_populates="bom_as_parent")
     child_item = relationship("Item", foreign_keys=[child_item_id], back_populates="bom_as_child")
-
-
-class ItemModel(Base):
-    """품목-제품 다대다 연결 테이블. 품목이 어떤 제품에 사용되는지 기록."""
-    __tablename__ = "item_models"
-
-    item_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("items.item_id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    slot = Column(SmallInteger, ForeignKey("product_symbols.slot"), primary_key=True)

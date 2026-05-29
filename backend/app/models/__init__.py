@@ -36,7 +36,6 @@ from app.models.io_batch import (
 from app.models.item import (
     BOM,
     Item,
-    ItemModel,
 )
 from app.models.stock_request import (
     RequestBucketEnum,
@@ -67,7 +66,6 @@ __all__ = [
     # item / BOM
     "Item",
     "BOM",
-    "ItemModel",
     # code masters
     "ProductSymbol",
     "OptionCode",

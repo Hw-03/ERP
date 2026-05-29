@@ -123,6 +123,8 @@ export function useAdminMasterItemsForm({
   async function save(): Promise<void> {
     if (!selectedItem) return;
     try {
+      // item_code 는 백엔드가 (model_symbol, process_type_code, serial_no, option_code) 에서 자동 부여.
+      // 프론트에서 보내지 않음 — 사용자가 손으로 입력 못 함.
       const payload: UpdateItemPayload = {
         item_name: form.item_name || undefined,
         legacy_item_type: form.legacy_item_type || undefined,
@@ -132,11 +134,13 @@ export function useAdminMasterItemsForm({
         unit: form.unit || undefined,
         model_slots: form.model_slots,
         option_code: form.option_code || undefined,
-        item_code: form.item_code || undefined,
       };
       const updated = await api.updateItem(selectedItem.item_id, payload);
       setItems((current) => current.map((it) => (it.item_id === updated.item_id ? updated : it)));
       setSelectedItem(updated);
+      // 백엔드 응답으로 form 갱신 — 새 item_code 가 폼에 반영되도록.
+      // useEffect deps 가 selectedItem.item_id 라 같은 부품 갱신은 발화 안 함 → 명시 호출 필요.
+      setFormState(itemToEditForm(updated));
       setDirty(false);
       onStatusChange(`${updated.item_name} 정보를 저장했습니다.`);
       onShowSave?.("저장됐습니다.");

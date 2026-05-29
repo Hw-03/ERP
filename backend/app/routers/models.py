@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies.admin import require_admin_pin
-from app.models import ItemModel, ProductSymbol
+from app.models import Item, ProductSymbol
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     ProductModelCreate,
@@ -150,14 +150,28 @@ def delete_model(
     if not ps:
         raise http_error(404, ErrorCode.NOT_FOUND, "모델을 찾을 수 없습니다.")
 
-    # 해당 slot을 사용하는 품목 확인
-    linked_items = db.query(ItemModel).filter(ItemModel.slot == slot).count()
-    if linked_items > 0:
-        raise http_error(
-            409,
-            ErrorCode.CONFLICT,
-            f"이 모델을 사용하는 품목이 {linked_items}개 있습니다. 먼저 품목 연결을 해제하세요.",
+    # 해당 slot을 사용하는 품목 확인 — item_code prefix(첫 '-' 앞)에 symbol 글자 포함이면 사용 중.
+    # transactions._model_filter 와 동일한 substr/instr 패턴 (SQLite 운영 전제).
+    if ps.symbol:
+        from sqlalchemy import func as _f
+        sym = ps.symbol.replace("%", "\\%").replace("_", "\\_")
+        dash_pos = _f.instr(Item.item_code, "-")
+        prefix_expr = _f.substr(Item.item_code, 1, dash_pos - 1)
+        linked_items = (
+            db.query(Item)
+            .filter(
+                Item.item_code.isnot(None),
+                dash_pos > 0,
+                prefix_expr.like(f"%{sym}%", escape="\\"),
+            )
+            .count()
         )
+        if linked_items > 0:
+            raise http_error(
+                409,
+                ErrorCode.CONFLICT,
+                f"이 모델을 사용하는 품목이 {linked_items}개 있습니다. 먼저 품목 연결을 해제하세요.",
+            )
 
     db.delete(ps)
     commit_only(db)

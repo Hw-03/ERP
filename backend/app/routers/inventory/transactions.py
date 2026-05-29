@@ -21,7 +21,6 @@ from app.models import (
     IoBatch,
     Inventory,
     Item,
-    ItemModel,
     ProductSymbol,
     StockRequest,
     TransactionEditLog,
@@ -140,24 +139,42 @@ def _process_step_filter(process_step: Optional[str]):
     return last_char.in_(steps)
 
 
-def _model_filter(model: Optional[str]):
-    """item_models ↔ product_symbols.model_name IN 필터. 쉼표 복수.
-    품목-모델 다대다라 join 대신 EXISTS 로 거래 row 중복(카운트 왜곡) 회피. 없으면 None.
+def _model_filter(db: Session, model: Optional[str]):
+    """model_name IN 필터 — Item.item_code prefix 기반.
+
+    회사 규약: 품목 코드의 첫 '-' 앞 글자열의 각 글자가 ProductSymbol.symbol 과 1:1 대응.
+    예: "8-AR-0307"·"78-PR-0042" 둘 다 SOLO(symbol='8') 매칭.
+    실제 DB 최대 prefix 길이는 5자(34678-…) — 안전 상한 6자까지 OR LIKE 절들로 처리.
+    쉼표 복수 model_name OR 결합. 매칭되는 symbol 없으면 None (필터 무력화).
+
+    Item 테이블이 이미 join 되어 있어야 함 (list_transactions/summary 빌더 기준).
     """
     if not model:
         return None
     names = [m.strip() for m in model.split(",") if m.strip()]
     if not names:
         return None
-    return (
-        select(ItemModel.item_id)
-        .join(ProductSymbol, ProductSymbol.slot == ItemModel.slot)
-        .where(
-            ItemModel.item_id == TransactionLog.item_id,
-            ProductSymbol.model_name.in_(names),
-        )
-        .exists()
-    )
+    symbols = [
+        row[0]
+        for row in db.query(ProductSymbol.symbol)
+        .filter(ProductSymbol.model_name.in_(names), ProductSymbol.symbol.isnot(None))
+        .all()
+    ]
+    if not symbols:
+        return None
+    # prefix = item_code 의 첫 '-' 앞 부분만 잘라낸 뒤 그 안에 symbol 글자 포함 여부 검사.
+    # SQLite/PostgreSQL 공통 함수: instr(필드, '-') / substr(필드, 1, n).
+    # PostgreSQL 은 strpos(필드, '-') 와 substr 가 동일 시그니처 → func.instr 호출이 동작 안 함
+    #   (PG 는 instr 없음). DB 가 SQLite 라는 게 운영 전제 — _attic/docs/openapi.json baseline.
+    dash_pos = func.instr(Item.item_code, "-")
+    prefix_expr = func.substr(Item.item_code, 1, dash_pos - 1)
+    clauses = []
+    for sym in symbols:
+        # 단일 문자 symbol 운영 전제. '%' '_' 들어가도 escape 처리 후 LIKE.
+        s = sym.replace("%", "\\%").replace("_", "\\_")
+        clauses.append(prefix_expr.like(f"%{s}%", escape="\\"))
+    # dash_pos == 0 (코드에 '-' 없음) 또는 item_code NULL 은 자연히 매칭 실패.
+    return and_(Item.item_code.isnot(None), dash_pos > 0, or_(*clauses))
 
 
 def _department_filter(department: Optional[str]):
@@ -453,7 +470,7 @@ def list_transactions(
     _ps = _process_step_filter(process_step)
     if _ps is not None:
         query = query.filter(_ps)
-    _md = _model_filter(model)
+    _md = _model_filter(db, model)
     if _md is not None:
         query = query.filter(_md)
     if date_from:
@@ -581,7 +598,7 @@ def get_transactions_summary(
     _ps = _process_step_filter(process_step)
     if _ps is not None:
         query = query.filter(_ps)
-    _md = _model_filter(model)
+    _md = _model_filter(db, model)
     if _md is not None:
         query = query.filter(_md)
 
