@@ -123,8 +123,8 @@ ERP/
 │       └── mes/          MES 디자인시스템 (color/format/status/...)
 ├── data/                 입력 자료 (xlsx · csv) + db_backups/ (DB 백업 단일 보관소)
 ├── docs/                 기준 · 운영 · 구조 · 인수인계
-│   ├── openapi.json      FastAPI baseline (CI drift 검사 기준)
-│   └── research/         외부 연구 보고서
+├── _dev/baselines/       FastAPI OpenAPI baseline (CI drift 검사 기준)
+│   └── openapi.json
 ├── scripts/              보조 스크립트
 │   ├── ops/              백업 · 헬스체크 · 재고 정합
 │   ├── migrations/       DB 스키마 / 코드 정제
@@ -200,12 +200,12 @@ GET  /api/production/capacity
 
 ### API 변경 시 OpenAPI baseline 갱신
 
-backend 라우터/스키마 수정 시 `docs/openapi.json` 갱신 필수 (CI drift 검사):
+backend 라우터/스키마 수정 시 `_dev/baselines/openapi.json` 갱신 필수 (CI drift 검사 — `.github/workflows/ci.yml`):
 
 ```bash
 cd backend
 python -c "from app.main import app; import json; \
-  open('../docs/openapi.json','w',encoding='utf-8').write(\
+  open('../_dev/baselines/openapi.json','w',encoding='utf-8').write(\
   json.dumps(app.openapi(),indent=2,sort_keys=True,ensure_ascii=False)+chr(10))"
 ```
 
