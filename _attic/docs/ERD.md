@@ -1,6 +1,10 @@
 # 엔티티 관계도 (ERD)
 
-핵심 엔티티 간 관계를 한 장에 정리. 자세한 컬럼 목록은 `backend/app/models.py` 가 단일 소스.
+> **[STALE 2026-05-29]** 본 ERD 는 V1 (Item / Inventory / InventoryLocation / BOM / TransactionLog)
+> 기준이며, V2 입출고 모델(`IoBatch` / `IoBundle` / `IoLine`) 과 `StockRequest`(결재 워크플로) 가
+> 누락되어 있다. 컬럼 정의는 `backend/app/models/` 가 단일 소스. V2 모델은 다음 갱신 시 반영.
+
+핵심 엔티티 간 관계를 한 장에 정리. 자세한 컬럼 목록은 `backend/app/models/` 가 단일 소스.
 
 ```mermaid
 erDiagram
