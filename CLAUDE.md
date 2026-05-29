@@ -8,8 +8,8 @@
 - backend entry: `backend/app/main.py`
 - Before editing frontend code, verify the real render/import path first.
 - If docs and live code disagree, trust the live code.
-- Do not edit `_archive/`, `_backup/`, or `frontend/_archive/` unless explicitly asked.
-- Do not casually edit `_attic/`; it contains archived source material, backups, and old working notes.
+- Do not edit `_archive/` or `frontend/_archive/` unless explicitly asked.
+- Do not casually edit `_attic/`; it is the boxed-up storage for everything not at a tool-required path — domain docs (GLOSSARY/CONTEXT/ADR/ARCHITECTURE/ERD/OPERATIONS), one-off backend scripts, DB backups, ONBOARDING, finished plans.
 - **주간보고 화면은 동결(완성)**
   - 프론트: `frontend/app/legacy/_components/_weekly_sections/` 디렉터리 전체 + `frontend/app/legacy/_components/DesktopWeeklyReportView.tsx` (동결일: 2026-05-24)
   - 백엔드: `backend/app/routers/inventory/weekly_report.py` (동결일: 2026-05-29)
@@ -65,6 +65,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\stop-backend.ps1
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
 ```
+
+## 자료 위치 (2026-05-29 정리 후)
+
+루트·각 폴더에는 도구가 자동 참조하는 파일만 남기고, 나머지는 모두 `_attic/` 보관소로 통합.
+
+- 도메인 사전·가이드 (GLOSSARY/CONTEXT/ARCHITECTURE/ERD/ADR/OPERATIONS/ITEM_CODE_RULES/ATTIC_POLICY): `_attic/docs/`
+- 1회성 backend 스크립트 (seed, sync, archive, backup): `_attic/backend-scripts/`
+  - 실행: `cd backend && python ../_attic/backend-scripts/<script>.py`
+  - sys.path 가 `backend/` 자동 추가하도록 패치됨
+- DB 백업: `_attic/data/db_backups/` (로컬, `.gitignore` 매칭 — 추적 X)
+- 신규 합류자 가이드: `_attic/ONBOARDING.md`
+- 활성 DB: `backend/mes.db` (단일 — `app.db`, `erp.db` 흔적 제거됨)
 
 ---
 

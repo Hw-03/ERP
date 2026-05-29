@@ -1,58 +1,53 @@
-# Attic / Backup 정책
+# Attic 정책
 
-`_attic/`, `_attic/_archive/`, `backend/_backup/` 같은 보관층의 운영 기준.
-**본 문서는 정책만 명시한다. 실제 파일 이동·삭제는 사용자 결정 시점에 별도 PR로 한다.**
+## 정의 (2026-05-29 재정의)
 
-## 현황 (2026-05-29 기준)
+**`_attic/` = 강제 위치 없는 모든 자료의 보관소.**
 
-| 위치 | 규모 | 내용 |
-|---|---|---|
-| `_attic/` | 약 924 파일 / ~197MB | 구버전 프론트엔드, 설계 문서, 발표 자료, 회귀 스크린샷 |
-| `_attic/docs/` | 24 파일 | `ARCHITECTURE.md`, `ERD.md`, `GLOSSARY.md`, `ONBOARDING.md` 등 — 일부는 현 코드와 정합 |
-| `_attic/_archive/` | 4 파일 | 이미지, BOM 가족 초안 등 |
-| `backend/_backup/` | DB 백업 ~10개 / ~28MB | SQLite 스냅샷 (`mes_pre_*.db`) |
+루트(`c:/ERP/`)와 큰 폴더(`backend/`, `frontend/`)에는 도구(Claude Code, npm, pytest, git, CI, docker)가 자동 참조하는 파일만 둔다. 그 외 모든 자료 — 도메인 사전·가이드, 1회성 backend 스크립트, DB 백업, ONBOARDING, 끝난 plan, 옛 발표 자료, 회귀 스크린샷 — 은 모두 `_attic/` 으로 통합.
 
-## 보관 (Keep)
+(이전 정의 "6개월 이상 참조되지 않은 사본" 은 폐기 — 자주 참조하는 활성 사전도 attic 에 둔다. 위치가 본질이 아니라 정책이 본질.)
 
-다음 조건에 모두 해당하면 `_attic/` 에 둔다.
-- 활성 코드 트리에서 더 이상 참조되지 않는다
-- 과거 회의/감사/디버깅 맥락을 보존해야 한다
-- 6개월 이내에 다시 열어볼 가능성이 있다
+## 현재 구조
 
-## 복귀 (Restore to `docs/`)
+| 경로 | 내용 |
+|---|---|
+| `_attic/docs/` | 도메인 사전·가이드 (GLOSSARY/CONTEXT/ARCHITECTURE/ERD/ADR/OPERATIONS/ITEM_CODE_RULES/ATTIC_POLICY), 끝난 plan, 발표·연구 자료, feedback 메모 |
+| `_attic/backend-scripts/` | 1회성 backend 스크립트 (seed/sync/archive/backup) — `cd backend && python ../_attic/backend-scripts/<f>.py` |
+| `_attic/data/db_backups/` | mes.db 스냅샷 (`backup_db.py` 자동 저장, `.gitignore` 매칭 — 추적 X) |
+| `_attic/ONBOARDING.md` | 신규 합류자 가이드 |
+| `_attic/ai/` | AI 협업자 인수인계 자료 |
+| `_attic/_archive/`, `_attic/frontend/`, `_attic/backend/`, `_attic/outputs/` | 옛 코드·자산 (참고용) |
 
-다음 중 하나라도 해당하면 활성 `docs/` 로 복귀시킨다.
-- 현 코드의 실제 동작과 정합한다 (사람이 대조 검증)
-- README 가 링크하고 있는데 깨져 있다
-- 신규 개발자 온보딩에 필수다
+## 보관 / 이동 기준
 
-복귀 시 outdated 섹션이 있으면 `> [STALE YYYY-MM-DD] 재검토 필요` 마커를 남긴다.
+`_attic/` 에 둘 것:
+- 도구가 강제하는 경로(npm 의 `package.json`, pytest 의 `pytest.ini`, git 의 `.gitignore`, Claude Code 의 `CLAUDE.md`, GitHub 의 `README.md`/`/.github/workflows/`, CI 가 읽는 `_dev/baselines/`, 사용자 매일 entry point 인 `start.bat`)가 아닌 모든 자료.
 
-**우선 복귀 대상 (P1-1 에서 처리):**
-- `_attic/docs/ARCHITECTURE.md` → `docs/ARCHITECTURE.md`
-- `_attic/docs/ERD.md` → `docs/ERD.md`
-- `_attic/docs/GLOSSARY.md` → `docs/GLOSSARY.md` (P0-1 / P0-2 결과 반영)
+루트·`backend/`·`frontend/` 에 남길 것:
+- 위 도구가 자동 참조하는 파일/폴더만.
+
+## DB 백업 (특별 규정)
+
+- 자동 생성 위치: `_attic/data/db_backups/`
+- `.gitignore` 매칭 (`*.db.bak*`, `_attic/data/db_backups/`) — repo 추적 X, 로컬만.
+- 누적 시 외부 NAS/스토리지로 이관 후 로컬 삭제.
 
 ## 삭제 (Delete from repo)
 
-다음에 해당하면 repo 에서 제거한다 (외부 스토리지로 이관 후).
-- 바이너리 백업 (DB 파일, 이미지) 가 누적되어 repo 크기를 키운다
-- 동일 내용의 더 최신 버전이 존재한다
-- 6개월 이상 누구도 참조하지 않았다
-
-**우선 삭제 검토 대상:**
-- `backend/_backup/mes_pre_*.db` ~10개 / ~28MB — DB 스냅샷
-  - 외부 NAS 또는 클라우드 스토리지로 이관 후 repo 에서 제거
-  - 또는 Git LFS 도입 검토 (현재 미사용)
-- `_attic/screenshots/`, `_attic/regression-2026-04-*` — 시기 지난 회귀 스크린샷
+다음에 해당하면 repo 에서 제거 (외부 스토리지로 이관 후).
+- 바이너리 백업이 누적되어 repo 크기 압박.
+- 동일 내용의 더 최신 버전이 존재.
+- 6개월 이상 누구도 참조하지 않음 + 활성 코드에서도 참조 X.
 
 ## 실행 규칙
 
-1. **함부로 손대지 않는다** — CLAUDE.md L12 의 "casually edit 금지" 룰을 준수.
-2. **단일 PR / 단일 카테고리** — "DB 백업 정리 PR", "구 회귀 스크린샷 정리 PR" 식으로 나눈다.
+1. **함부로 손대지 않는다** — CLAUDE.md 의 "casually edit 금지" 룰 준수.
+2. **단일 PR / 단일 카테고리** — "DB 백업 정리 PR", "옛 발표 자료 정리 PR" 식으로 나눈다.
 3. **삭제 전 백업** — 외부 스토리지 이관 확인 후에만 `git rm`.
-4. **사용자 승인 필수** — 본 정책 문서는 가이드일 뿐, 실행은 사용자가 시점·범위를 지정한 PR 에서만.
+4. **사용자 승인 필수** — 본 정책은 가이드. 실행은 사용자가 시점·범위를 지정한 PR 에서만.
 
-## 관련 메모리
+## 관련
 
 - [project_kwon_donghwan_requests](C:\Users\user\.claude\projects\c--ERP\memory\project_kwon_donghwan_requests.md) — `%TEMP%` 찌꺼기 정리 요청과 같은 맥락 (저장 공간 위생)
+- 2026-05-29 cleanup 커밋: `8dd5c9a9` (루트), `b4b1cf16` (backend), 이후 (안전망)
