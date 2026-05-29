@@ -145,6 +145,7 @@ ERP/
 
 | 문서 | 대상 | 내용 |
 |---|---|---|
+| [docs/CONTEXT.md](docs/CONTEXT.md) | 신규 합류자 | 도메인 한눈 보기 (조직·품목·재고·BOM·입출고·결재) — 코드 보기 전 필독 |
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | 운영자 | 365일 운영, 시작·재시작, 포트 충돌, 백업, 1차 장애 대응 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 개발자 | 폴더 구조·레이어·재고 3-bucket 모델 *(V2 흐름은 갱신 예정 — STALE 마커 참조)* |
 | [docs/ERD.md](docs/ERD.md) | 개발자 | 엔티티 관계도(Mermaid) *(V2 IoBatch/IoBundle/IoLine 누락 — STALE 마커 참조)* |
