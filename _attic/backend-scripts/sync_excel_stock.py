@@ -19,7 +19,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 
-BACKEND_DIR = Path(__file__).resolve().parent
+BACKEND_DIR = Path(__file__).resolve().parents[2] / "backend"
 PROJECT_ROOT = BACKEND_DIR.parent
 DATA_DIR = PROJECT_ROOT / "data"
 CSV_PATH = DATA_DIR / "ERP_Master_DB.csv"

@@ -23,7 +23,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 
-BACKEND_DIR = Path(__file__).resolve().parent
+BACKEND_DIR = Path(__file__).resolve().parents[2] / "backend"
 PROJECT_ROOT = BACKEND_DIR.parent
 CSV_PATH = PROJECT_ROOT / "data" / "ERP_Master_DB.csv"
 SQLITE_PATH = BACKEND_DIR / "mes.db"

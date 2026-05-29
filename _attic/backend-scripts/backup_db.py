@@ -20,8 +20,9 @@ from datetime import datetime
 from pathlib import Path
 
 
-DB_SRC = Path(__file__).parent / "mes.db"
-BACKUP_DIR = Path(__file__).parent
+_ATTIC = Path(__file__).resolve().parents[1]
+DB_SRC = _ATTIC.parent / "backend" / "mes.db"
+BACKUP_DIR = _ATTIC / "data" / "db_backups"
 
 
 def backup(label: str, keep_days: int, no_cleanup: bool) -> None:
