@@ -28,6 +28,9 @@ node_modules/
 .next/
 out/
 build/
+
+# Obsidian vault metadata — 사용자별 설정. 추적 안 함.
+.obsidian/
 npm-debug.log*
 
 # TypeScript build
