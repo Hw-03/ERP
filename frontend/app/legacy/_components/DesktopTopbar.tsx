@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ElementType, type ReactNode } from "r
 import { ChevronDown, KeyRound, LogOut, RefreshCw } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
+import { PIN_LENGTH } from "@/lib/auth/constants";
 import { StatusPill, inferToneFromStatus } from "./common";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { ResultModal } from "./common/ResultModal";
@@ -236,12 +237,13 @@ export function DesktopTopbar({
         title="PIN 변경"
         confirmLabel="변경"
         busy={pinBusy}
+        confirmDisabled={pinCurrent.length !== PIN_LENGTH || pinNew.length !== PIN_LENGTH || pinConfirm.length !== PIN_LENGTH}
         onClose={() => { if (!pinBusy) setShowPinModal(false); }}
         onConfirm={async () => {
           if (!operator) return;
           setPinError(null);
           if (pinNew !== pinConfirm) { setPinError("새 PIN과 확인 PIN이 일치하지 않습니다."); return; }
-          if (!pinNew) { setPinError("새 PIN을 입력해 주세요."); return; }
+          if (pinNew.length !== PIN_LENGTH) { setPinError(`PIN은 ${PIN_LENGTH}자리 숫자여야 합니다.`); return; }
           setPinBusy(true);
           try {
             await api.changeMyPin(operator.employee_id, pinCurrent, pinNew);
@@ -268,8 +270,10 @@ export function DesktopTopbar({
               <input
                 type="password"
                 inputMode="numeric"
+                pattern="\d{4}"
+                maxLength={PIN_LENGTH}
                 value={value}
-                onChange={(e) => onChange(e.target.value)}
+                onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, PIN_LENGTH))}
                 className="w-full rounded-[12px] border px-4 py-2.5 text-sm outline-none focus:border-[var(--c-blue)]"
                 style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
               />

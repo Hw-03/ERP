@@ -82,7 +82,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
             ref={inputRef}
             type="number"
             min="0"
-            step="any"
+            step="0.01"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commit}
@@ -114,7 +114,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
             }}
             title="클릭하여 수량 수정"
           >
-            ×{formatQty(row.quantity)} {unit}
+            ×{formatQty(row.quantity, { maximumFractionDigits: 2, trimTrailingZeros: true })} {unit}
           </button>
         )}
       </div>

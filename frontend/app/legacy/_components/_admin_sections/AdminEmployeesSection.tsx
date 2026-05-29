@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, Save, Trash2, Users, X } from "lucide-react";
 import { api, type DepartmentMaster, type DepartmentRole, type Employee, type EmployeeLevel, type ProductModel, type WarehouseRole } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { PIN_LENGTH } from "@/lib/auth/constants";
 import { normalizeDepartment, getDepartmentFallbackColor } from "@/lib/mes/department";
 import { Button } from "@/lib/ui/Button";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
@@ -331,6 +332,7 @@ export function AdminEmployeesSection() {
         tone="caution"
         cautionMessage="기존 PIN은 더 이상 사용할 수 없게 됩니다. 관리자 PIN을 입력하세요."
         confirmLabel="초기화"
+        confirmDisabled={pinResetAdminPin.length !== PIN_LENGTH}
         onClose={cancelPinReset}
         onConfirm={confirmPinReset}
       >
@@ -344,9 +346,10 @@ export function AdminEmployeesSection() {
           <input
             type="password"
             inputMode="numeric"
-            maxLength={32}
+            pattern="\d{4}"
+            maxLength={PIN_LENGTH}
             value={pinResetAdminPin}
-            onChange={(e) => setPinResetAdminPin(e.target.value)}
+            onChange={(e) => setPinResetAdminPin(e.target.value.replace(/\D/g, "").slice(0, PIN_LENGTH))}
             placeholder="0000"
             className="w-full rounded-[12px] border px-3 py-2 text-sm tracking-widest outline-none"
             style={{

@@ -6,7 +6,15 @@
 
 import hashlib
 
+from fastapi import HTTPException
+
 DEFAULT_PIN = "0000"
+
+
+def validate_pin(pin: str) -> None:
+    """PIN이 정확히 4자리 숫자인지 검증. 아니면 HTTP 422."""
+    if not (len(pin) == 4 and pin.isdigit()):
+        raise HTTPException(status_code=422, detail="PIN 은 4자리 숫자여야 합니다")
 
 
 def hash_pin(pin: str) -> str:

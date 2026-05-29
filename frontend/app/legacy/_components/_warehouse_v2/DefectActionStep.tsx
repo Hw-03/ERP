@@ -57,18 +57,19 @@ function SummaryCard({
         <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>처리 수량</span>
         <input
           type="number"
-          min={1}
+          min={0.01}
           max={maxQty}
+          step="0.01"
           value={processQty}
           onChange={(e) => {
-            const v = Math.max(1, Math.min(maxQty, Number(e.target.value) || 1));
+            const v = Math.max(0.01, Math.min(maxQty, parseFloat(e.target.value) || 0.01));
             onProcessQtyChange(v);
           }}
           className="w-16 rounded-[8px] border px-2 py-1 text-center text-base font-black"
           style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1, color: LEGACY_COLORS.text }}
         />
         <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-          / 총 {formatQty(maxQty)}개 격리
+          / 총 {formatQty(maxQty, { maximumFractionDigits: 2, trimTrailingZeros: true })}개 격리
         </span>
       </div>
     </div>

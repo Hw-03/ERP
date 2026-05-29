@@ -8,7 +8,7 @@
  * 작업자 식별용 PIN — 실제 보안 인증이 아님.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import {
   api,
@@ -199,13 +199,10 @@ export function TransactionEditUnifiedModal({
                 />
               </FieldRow>
               <FieldRow label="담당자">
-                <input
-                  type="text"
+                <ProducedByCombobox
+                  employees={employees}
                   value={producedBy}
-                  onChange={(e) => setProducedBy(e.target.value)}
-                  placeholder="예: 홍길동(조립)"
-                  className="w-full rounded-[12px] border px-3 py-2 text-sm outline-none"
-                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                  onChange={setProducedBy}
                 />
               </FieldRow>
             </>
@@ -357,6 +354,181 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
         {label}
       </div>
       {children}
+    </div>
+  );
+}
+
+/** 담당자(produced_by) 자동완성 — 직원 마스터에서 이름 선택, 빈 값 허용. */
+function ProducedByCombobox({
+  employees,
+  value,
+  onChange,
+}: {
+  employees: Employee[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const listId = useId();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  const sorted = useMemo(
+    () => [...employees].sort((a, b) => a.name.localeCompare(b.name, "ko-KR")),
+    [employees],
+  );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return sorted;
+    return sorted.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        e.department.toLowerCase().includes(q) ||
+        e.employee_code.toLowerCase().includes(q),
+    );
+  }, [sorted, query]);
+
+  /* 기존 값이 마스터에 없는 옛 이름인지 */
+  const isLegacyValue =
+    value.trim() !== "" && !employees.some((e) => e.name === value);
+
+  useEffect(() => { setActiveIdx(0); }, [query]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    window.addEventListener("mousedown", handler);
+    return () => window.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !listRef.current) return;
+    listRef.current
+      .querySelector<HTMLLIElement>(`[data-idx="${activeIdx}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [open, activeIdx]);
+
+  function commit(name: string) {
+    onChange(name);
+    setQuery("");
+    setOpen(false);
+  }
+
+  function handleKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setOpen(true);
+      setActiveIdx((i) => Math.min(i + 1, Math.max(filtered.length - 1, 0)));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIdx((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      if (open && filtered[activeIdx]) {
+        e.preventDefault();
+        commit(filtered[activeIdx].name);
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+      setQuery("");
+    }
+  }
+
+  /* 표시값: 드롭다운 열리면 query, 닫히면 선택된 이름 */
+  const displayValue = open ? query : value;
+
+  const noMatch = open && query.trim() !== "" && filtered.length === 0;
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        ref={inputRef}
+        type="text"
+        role="combobox"
+        aria-controls={listId}
+        aria-expanded={open}
+        aria-autocomplete="list"
+        aria-activedescendant={
+          open && filtered[activeIdx] ? `${listId}-opt-${activeIdx}` : undefined
+        }
+        autoComplete="off"
+        placeholder="이름 또는 부서 검색"
+        value={displayValue}
+        onClick={() => setOpen(true)}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        onKeyDown={handleKey}
+        className="w-full rounded-[12px] border px-3 py-2 text-sm outline-none"
+        style={{
+          background: LEGACY_COLORS.s2,
+          borderColor: open ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+          color: LEGACY_COLORS.text,
+        }}
+      />
+      {/* 기존 자유 텍스트 값 경고 */}
+      {isLegacyValue && !open && (
+        <p className="mt-1 text-xs" style={{ color: LEGACY_COLORS.yellow }}>
+          직원 마스터에 없는 이름입니다. 변경 시 목록에서 다시 선택하세요.
+        </p>
+      )}
+      {/* 검색 후 결과 없음 안내 */}
+      {noMatch && (
+        <p className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+          직원 마스터에 없는 이름입니다. 관리자에게 직원 등록을 요청하세요.
+        </p>
+      )}
+      {open && filtered.length > 0 && (
+        <ul
+          ref={listRef}
+          id={listId}
+          role="listbox"
+          className="absolute left-0 right-0 z-30 mt-1.5 max-h-48 overflow-y-auto rounded-[14px] border py-1.5"
+          style={{
+            background: "var(--c-popup-bg)",
+            borderColor: LEGACY_COLORS.border,
+            boxShadow: "var(--c-popup-shadow)",
+          }}
+        >
+          {filtered.map((emp, idx) => {
+            const isActive = idx === activeIdx;
+            const isSelected = emp.name === value;
+            return (
+              <li
+                key={emp.employee_id}
+                id={`${listId}-opt-${idx}`}
+                data-idx={idx}
+                role="option"
+                aria-selected={isSelected}
+                onMouseDown={(e) => e.preventDefault()}
+                onMouseEnter={() => setActiveIdx(idx)}
+                onClick={() => commit(emp.name)}
+                className="mx-1 flex cursor-pointer items-center justify-between rounded-[10px] px-3 py-2 text-sm font-bold transition-colors"
+                style={{
+                  background: isActive
+                    ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`
+                    : isSelected
+                      ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
+                      : "transparent",
+                  color: isSelected ? LEGACY_COLORS.blue : LEGACY_COLORS.text,
+                }}
+              >
+                <span>{emp.name}</span>
+                <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                  {emp.department}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

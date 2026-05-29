@@ -32,6 +32,7 @@ interface Props {
   busy?: boolean;
   busyLabel?: string;
   confirmAccent?: string;
+  confirmDisabled?: boolean;
 }
 
 export function ConfirmModal({
@@ -47,6 +48,7 @@ export function ConfirmModal({
   busy = false,
   busyLabel = "처리 중...",
   confirmAccent,
+  confirmDisabled = false,
 }: Props) {
   // ESC 닫기 / Enter 확인 — busy 중에는 잠금
   useEffect(() => {
@@ -144,7 +146,7 @@ export function ConfirmModal({
           <button
             type="button"
             onClick={() => void onConfirm()}
-            disabled={busy}
+            disabled={busy || confirmDisabled}
             className="rounded-[14px] px-5 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
             style={{ background: accent }}
           >

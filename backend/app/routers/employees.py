@@ -23,7 +23,7 @@ from app.schemas import (
 from app.dependencies.admin import require_admin_pin
 from app.routers.settings import require_admin
 from app.services import rate_limit
-from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin, verify_pin
+from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin, validate_pin, verify_pin
 from app.services import audit
 from app.services._tx import commit_and_refresh, commit_only
 from app._actor import set_actor
@@ -341,6 +341,7 @@ def change_employee_pin(
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원입니다.")
     if not verify_pin(employee.pin_hash, payload.current_pin):
         raise http_error(403, ErrorCode.FORBIDDEN, "현재 PIN이 올바르지 않습니다.")
+    validate_pin(payload.new_pin)
     if payload.current_pin == payload.new_pin:
         raise http_error(422, ErrorCode.UNPROCESSABLE, "새 PIN은 현재 PIN과 달라야 합니다.")
 

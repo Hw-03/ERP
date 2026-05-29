@@ -112,8 +112,8 @@ class EmployeePinResetRequest(BaseModel):
 
 class EmployeePinChangeRequest(BaseModel):
     # 본인 PIN 변경 — 현재 PIN 검증 필요
-    current_pin: str = Field(..., min_length=1, max_length=20)
-    new_pin: str = Field(..., min_length=1, max_length=20)
+    current_pin: str = Field(..., min_length=1, max_length=4)
+    new_pin: str = Field(..., min_length=4, max_length=4)
 
 
 class EmployeeCreate(BaseModel):

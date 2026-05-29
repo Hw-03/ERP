@@ -31,11 +31,27 @@ function toValidDate(value: string | Date | null | undefined): Date | null {
 /**
  * 수량 포맷 — "1,234". null/NaN/공백은 "-".
  * legacyUi.ts::formatNumber 와 동일 동작 (ko-KR 콤마, 정수).
+ *
+ * options.maximumFractionDigits: 기본 0 (정수 표시). 불량·BOM 은 2 권장.
+ * options.trimTrailingZeros: true 이면 후행 0 제거 ("1.50" → "1.5").
  */
-export function formatQty(value: number | string | null | undefined): string {
+export interface FormatQtyOptions {
+  maximumFractionDigits?: number;
+  trimTrailingZeros?: boolean;
+}
+
+export function formatQty(
+  value: number | string | null | undefined,
+  options: FormatQtyOptions = {},
+): string {
   const n = toFiniteNumber(value);
   if (n === null) return PLACEHOLDER;
-  return n.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
+  const { maximumFractionDigits = 0, trimTrailingZeros = false } = options;
+  const formatted = n.toLocaleString("ko-KR", { maximumFractionDigits });
+  if (trimTrailingZeros && formatted.includes(".")) {
+    return formatted.replace(/\.?0+$/, "");
+  }
+  return formatted;
 }
 
 /**

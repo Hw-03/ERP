@@ -189,7 +189,7 @@ export function DisassembleTree({
             <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>/</span>
             <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>폐기</span>
             <span className="inline-block min-w-[2rem] text-center text-base font-black" style={{ color: LEGACY_COLORS.red }}>
-              {formatQty(Math.max(0, parentQty - parentKeepQty))}
+              {formatQty(Math.max(0, parentQty - parentKeepQty), { maximumFractionDigits: 2, trimTrailingZeros: true })}
             </span>
           </div>
           <span className="text-[10px] font-black tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -347,7 +347,7 @@ function TreeNode({
           </span>
         )}
         <span className="ml-auto whitespace-nowrap text-xs font-bold" style={{ color: LEGACY_COLORS.muted }}>
-          총 {formatQty(node.qty)}개
+          총 {formatQty(node.qty, { maximumFractionDigits: 2, trimTrailingZeros: true })}개
         </span>
       </div>
 
@@ -380,7 +380,7 @@ function TreeNode({
               className="inline-block min-w-[2rem] text-center text-base font-black"
               style={{ color: scrapColor }}
             >
-              {formatQty(scrapQty)}
+              {formatQty(scrapQty, { maximumFractionDigits: 2, trimTrailingZeros: true })}
             </span>
           </div>
           <input
@@ -415,7 +415,7 @@ function TreeNode({
             style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}
             aria-label={`${node.item_name} 하위 분배 기준`}
           />
-          <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>/ {formatQty(node.qty)}</span>
+          <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>/ {formatQty(node.qty, { maximumFractionDigits: 2, trimTrailingZeros: true })}</span>
         </div>
       )}
 
