@@ -91,7 +91,7 @@ describe("getTransactionLabel / getTransactionTone", () => {
   it("정의된 타입 — 매핑 반환", () => {
     expect(getTransactionLabel("RECEIVE")).toBe("원자재 입고");
     expect(getTransactionTone("RECEIVE")).toBe("success");
-    expect(getTransactionLabel("MARK_DEFECTIVE")).toBe("새 격리");
+    expect(getTransactionLabel("MARK_DEFECTIVE")).toBe("새 불량");
     expect(getTransactionTone("MARK_DEFECTIVE")).toBe("danger");
   });
 

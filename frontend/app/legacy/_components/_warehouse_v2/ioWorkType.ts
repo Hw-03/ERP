@@ -7,6 +7,12 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
+import {
+  SUB_TYPE_DESCRIPTION,
+  SUB_TYPE_LABEL,
+  WORK_TYPE_DESCRIPTION,
+  WORK_TYPE_LABEL,
+} from "@/lib/io/glossary";
 
 const MANUAL_ORIGINS = new Set(["manual", "adjust_in", "adjust_out"]);
 
@@ -16,10 +22,10 @@ export const IO_WORK_TYPES: Array<{
   description: string;
   icon: LucideIcon;
 }> = [
-  { id: "receive", label: "원자재 입고", description: "발주 품목 입고", icon: Boxes },
-  { id: "warehouse_io", label: "창고 입출고", description: "창고↔부서", icon: ArrowLeftRight },
-  { id: "process", label: "부서 입출고", description: "부서 내 작업", icon: Wrench },
-  { id: "defect", label: "불량", description: "불량 재고 격리", icon: AlertTriangle },
+  { id: "receive", label: WORK_TYPE_LABEL.receive, description: WORK_TYPE_DESCRIPTION.receive, icon: Boxes },
+  { id: "warehouse_io", label: WORK_TYPE_LABEL.warehouse_io, description: WORK_TYPE_DESCRIPTION.warehouse_io, icon: ArrowLeftRight },
+  { id: "process", label: WORK_TYPE_LABEL.process, description: WORK_TYPE_DESCRIPTION.process, icon: Wrench },
+  { id: "defect", label: WORK_TYPE_LABEL.defect, description: WORK_TYPE_DESCRIPTION.defect, icon: AlertTriangle },
 ];
 
 export function canSeeWorkType(
@@ -33,28 +39,24 @@ export function canSeeWorkType(
   return true;
 }
 
+const _row = (id: IoSubType) => ({
+  id,
+  label: SUB_TYPE_LABEL[id],
+  description: SUB_TYPE_DESCRIPTION[id],
+});
+
 export const IO_SUB_TYPES: Record<
   IoWorkType,
   Array<{ id: IoSubType; label: string; description: string }>
 > = {
-  receive: [
-    { id: "receive_supplier", label: "외부 입고", description: "선택 품목을 창고 재고로 증가" },
-  ],
-  warehouse_io: [
-    { id: "warehouse_to_dept", label: "창고 → 부서", description: "BOM 1단계 하위 품목 자동 포함" },
-    { id: "dept_to_warehouse", label: "부서 → 창고", description: "반납할 하위 품목만 체크" },
-  ],
-  process: [
-    { id: "produce", label: "생산", description: "하위 자재 출고 + 결과 품목 입고" },
-    { id: "disassemble", label: "분해", description: "상위 품목 출고 + 회수 품목 입고" },
-    { id: "adjust_in", label: "수량보정 입고", description: "선택 품목 수량 증가" },
-    { id: "adjust_out", label: "수량보정 출고", description: "선택 품목 수량 감소" },
-  ],
+  receive: [_row("receive_supplier")],
+  warehouse_io: [_row("warehouse_to_dept"), _row("dept_to_warehouse")],
+  process: [_row("produce"), _row("disassemble"), _row("adjust_in"), _row("adjust_out")],
   defect: [
-    { id: "defect_quarantine", label: "새 불량", description: "선택 부서의 정상 재고를 불량 격리" },
-    { id: "defect_restore",    label: "불량 해제", description: "격리 재고를 정상 복귀 (즉시)" },
-    { id: "defect_process",    label: "불량 처리", description: "격리 재고 폐기·재작업" },
-    { id: "supplier_return",   label: "원자재 반품", description: "격리 재고를 공급처에 반품" },
+    _row("defect_quarantine"),
+    _row("defect_restore"),
+    _row("defect_process"),
+    _row("supplier_return"),
   ],
 };
 

@@ -130,7 +130,7 @@ describe("ioWorkType 상수", () => {
       .flat()
       .map((r) => [r.id, r.label, r.description]);
     expect(labels).toEqual([
-      ["receive_supplier", "외부 입고", "선택 품목을 창고 재고로 증가"],
+      ["receive_supplier", "원자재 입고", "선택 품목을 창고 재고로 증가"],
       ["warehouse_to_dept", "창고 → 부서", "BOM 1단계 하위 품목 자동 포함"],
       ["dept_to_warehouse", "부서 → 창고", "반납할 하위 품목만 체크"],
       ["produce", "생산", "하위 자재 출고 + 결과 품목 입고"],
@@ -186,7 +186,7 @@ describe("subTypeLabel", () => {
   it("모든 subType 라벨 고정", () => {
     const map = Object.fromEntries(ALL_SUB_TYPES.map((s) => [s, subTypeLabel(s)]));
     expect(map).toEqual({
-      receive_supplier: "외부 입고",
+      receive_supplier: "원자재 입고",
       warehouse_to_dept: "창고 → 부서",
       dept_to_warehouse: "부서 → 창고",
       produce: "생산",
