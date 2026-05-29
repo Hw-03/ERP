@@ -13,7 +13,6 @@ from app.models.base import (
 )
 from app.models.code import (
     OptionCode,
-    ProcessFlowRule,
     ProcessType,
     ProductSymbol,
 )
@@ -50,8 +49,6 @@ from app.models.transaction import (
     TransactionLog,
     TransactionTypeEnum,
 )
-from app.models.variance import VarianceLog
-
 __all__ = [
     # Base / 공통
     "Base",
@@ -70,7 +67,6 @@ __all__ = [
     "ProductSymbol",
     "OptionCode",
     "ProcessType",
-    "ProcessFlowRule",
     # inventory
     "Inventory",
     "InventoryLocation",
@@ -89,8 +85,7 @@ __all__ = [
     "IoBatch",
     "IoBundle",
     "IoLine",
-    # variance / system / audit
-    "VarianceLog",
+    # system / audit
     "SystemSetting",
     "AdminAuditLog",
 ]

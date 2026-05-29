@@ -36,7 +36,6 @@ from bootstrap import (
     bootstrap_all,
     backfill_item_codes,
     check_db,
-    reset_flow_rules,
     run_migrations,
     run_schema_create_all,
     seed_reference_data,
@@ -85,7 +84,6 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--migrate", action="store_true", help="run ALTER TABLE migrations")
     parser.add_argument("--seed", action="store_true", help="seed reference data")
     parser.add_argument("--item-code-backfill", action="store_true", help="backfill item codes")
-    parser.add_argument("--reset-flow-rules", action="store_true", help="process_flow_rules 초기화 및 재시드")
     parser.add_argument("--check", action="store_true", help="report DB state without writing")
     return parser.parse_args(argv)
 
@@ -133,10 +131,6 @@ def main(argv: list[str] | None = None) -> int:
         count = backfill_item_codes()
         print(f"[item-code-backfill] {count} items updated")
         did_something = True
-    if getattr(args, "reset_flow_rules", False):
-        count = reset_flow_rules()
-        print(f"[reset-flow-rules] {count}개 규칙으로 재시드 완료")
-        did_something = True
 
     if not did_something:
         print("Nothing to do. Try: python bootstrap_db.py --all  (or --help)")
@@ -150,7 +144,6 @@ __all__ = [
     "run_migrations",
     "seed_reference_data",
     "backfill_item_codes",
-    "reset_flow_rules",
     "check_db",
     "main",
 ]

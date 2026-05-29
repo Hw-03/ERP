@@ -1,14 +1,12 @@
-"""제품 코드·공정 코드 마스터 (ProductSymbol / OptionCode / ProcessType / ProcessFlowRule)."""
+"""제품 코드·공정 코드 마스터 (ProductSymbol / OptionCode / ProcessType)."""
 
 from sqlalchemy import (
     Boolean,
     Column,
-    ForeignKey,
     Integer,
     SmallInteger,
     String,
     Text,
-    UniqueConstraint,
 )
 
 from app.models.base import Base
@@ -17,7 +15,6 @@ __all__ = [
     "ProductSymbol",
     "OptionCode",
     "ProcessType",
-    "ProcessFlowRule",
 ]
 
 
@@ -52,17 +49,3 @@ class ProcessType(Base):
     suffix = Column(String(1), nullable=False)   # R(Raw) / A(Assembly)
     stage_order = Column(SmallInteger, nullable=False, default=0)
     description = Column(Text, nullable=True)
-
-
-class ProcessFlowRule(Base):
-    __tablename__ = "process_flow_rules"
-
-    rule_id = Column(Integer, primary_key=True, autoincrement=True)
-    from_type = Column(String(2), ForeignKey("process_types.code"), nullable=False)
-    to_type = Column(String(2), ForeignKey("process_types.code"), nullable=False)
-    # Additional input codes that must be consumed (comma separated). 예: TA+HR->HA => "HR"
-    consumes_codes = Column(String(200), nullable=True)
-
-    __table_args__ = (
-        UniqueConstraint("from_type", "to_type", name="uq_flow_rule"),
-    )

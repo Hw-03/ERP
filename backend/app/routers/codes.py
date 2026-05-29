@@ -6,14 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import OptionCode, ProcessFlowRule, ProcessType, ProductSymbol
+from app.models import OptionCode, ProcessType, ProductSymbol
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     ItemCodeGenerateRequest,
     ItemCodeParseRequest,
     ItemCodeResponse,
     OptionCodeResponse,
-    ProcessFlowRuleResponse,
     ProcessTypeResponse,
     ProductSymbolResponse,
     ProductSymbolUpdate,
@@ -93,11 +92,6 @@ def list_options(db: Session = Depends(get_db)):
 @router.get("/process-types", response_model=List[ProcessTypeResponse], summary="공정 코드 목록")
 def list_process_types(db: Session = Depends(get_db)):
     return db.query(ProcessType).order_by(ProcessType.stage_order, ProcessType.code).all()
-
-
-@router.get("/process-flows", response_model=List[ProcessFlowRuleResponse], summary="공정 흐름 규칙 목록")
-def list_process_flows(db: Session = Depends(get_db)):
-    return db.query(ProcessFlowRule).order_by(ProcessFlowRule.rule_id).all()
 
 
 # ---- 4-part code operations ------------------------------------------------

@@ -578,15 +578,6 @@ class ProcessTypeResponse(BaseModel):
     description: Optional[str]
 
 
-class ProcessFlowRuleResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    rule_id: int
-    from_type: str
-    to_type: str
-    consumes_codes: Optional[str]
-
-
 class ItemCodeParseRequest(BaseModel):
     code: str = Field(..., description="4-part 품목 코드 문자열")
 
@@ -605,25 +596,6 @@ class ItemCodeResponse(BaseModel):
     symbol_slots: List[int]
     formatted_full: str       # zero-padded: "3-PA-0012-BG"
     formatted_compact: str    # leading zeros stripped: "3-PA-12-BG"
-
-
-# =============================================================================
-# Variance logs
-# =============================================================================
-
-
-class VarianceLogResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    var_id: uuid.UUID
-    item_id: uuid.UUID
-    item_code: Optional[str] = None
-    item_name: Optional[str] = None
-    bom_expected: Decimal
-    actual_used: Decimal
-    diff: Decimal
-    note: Optional[str] = None
-    created_at: UtcDatetime
 
 
 # =============================================================================

@@ -4264,41 +4264,6 @@
         "title": "PinVerifyRequest",
         "type": "object"
       },
-      "ProcessFlowRuleResponse": {
-        "properties": {
-          "consumes_codes": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Consumes Codes"
-          },
-          "from_type": {
-            "title": "From Type",
-            "type": "string"
-          },
-          "rule_id": {
-            "title": "Rule Id",
-            "type": "integer"
-          },
-          "to_type": {
-            "title": "To Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "rule_id",
-          "from_type",
-          "to_type",
-          "consumes_codes"
-        ],
-        "title": "ProcessFlowRuleResponse",
-        "type": "object"
-      },
       "ProcessTypeResponse": {
         "properties": {
           "code": {
@@ -6280,83 +6245,6 @@
         "title": "ValidationError",
         "type": "object"
       },
-      "VarianceLogResponse": {
-        "properties": {
-          "actual_used": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Actual Used",
-            "type": "string"
-          },
-          "bom_expected": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Bom Expected",
-            "type": "string"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "diff": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Diff",
-            "type": "string"
-          },
-          "item_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Item Code"
-          },
-          "item_id": {
-            "format": "uuid",
-            "title": "Item Id",
-            "type": "string"
-          },
-          "item_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Item Name"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          },
-          "var_id": {
-            "format": "uuid",
-            "title": "Var Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "var_id",
-          "item_id",
-          "bom_expected",
-          "actual_used",
-          "diff",
-          "created_at"
-        ],
-        "title": "VarianceLogResponse",
-        "type": "object"
-      },
       "WeeklyGroupReport": {
         "properties": {
           "current_qty": {
@@ -7349,31 +7237,6 @@
           }
         },
         "summary": "4-파트 품목 코드 파싱",
-        "tags": [
-          "Codes"
-        ]
-      }
-    },
-    "/api/codes/process-flows": {
-      "get": {
-        "operationId": "list_process_flows_api_codes_process_flows_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ProcessFlowRuleResponse"
-                  },
-                  "title": "Response List Process Flows Api Codes Process Flows Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "공정 흐름 규칙 목록",
         "tags": [
           "Codes"
         ]
@@ -12582,83 +12445,6 @@
         "summary": "Submit Stock Request Draft",
         "tags": [
           "Stock Requests"
-        ]
-      }
-    },
-    "/api/variance": {
-      "get": {
-        "operationId": "list_variance_api_variance_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "item_id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Item Id"
-            }
-          },
-          {
-            "in": "query",
-            "name": "skip",
-            "required": false,
-            "schema": {
-              "default": 0,
-              "minimum": 0,
-              "title": "Skip",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 100,
-              "maximum": 500,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/VarianceLogResponse"
-                  },
-                  "title": "Response List Variance Api Variance Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Variance 로그 조회",
-        "tags": [
-          "Variance"
         ]
       }
     },

@@ -48,7 +48,6 @@ from app.routers import (
     production,
     settings,
     stock_requests,
-    variance,
 )
 from app.services import audit_csv as audit_csv_svc
 
@@ -252,7 +251,6 @@ app.include_router(io.router, prefix="/api/io", tags=["Inventory IO"])
 app.include_router(bom.router, prefix="/api/bom", tags=["BOM"])
 app.include_router(production.router, prefix="/api/production", tags=["Production"])
 app.include_router(codes.router, prefix="/api/codes", tags=["Codes"])
-app.include_router(variance.router, prefix="/api/variance", tags=["Variance"])
 app.include_router(models_router.router, prefix="/api/models", tags=["Models"])
 app.include_router(admin_audit.router, prefix="/api/admin", tags=["Admin Audit"])
 app.include_router(admin_audit_csv.router, prefix="/api/admin", tags=["Admin Audit"])

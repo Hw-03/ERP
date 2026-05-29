@@ -295,11 +295,7 @@ def _consolidate_item_code_columns() -> None:
 
 
 def _drop_unused_item_columns() -> None:
-    """spec / barcode / legacy_file_type — 미사용 컬럼 제거. 멱등.
-
-    symbol_slot 은 FK(→ product_symbols.slot)가 있어 SQLite DROP COLUMN 불가.
-    ORM 모델에서 제거됐으므로 API 노출은 없음 — DB에 그대로 남겨둔다.
-    """
+    """spec / barcode / legacy_file_type — 미사용 컬럼 제거. 멱등."""
     to_drop = {"spec", "barcode", "legacy_file_type"}
     with engine.connect() as conn:
         cols = {r[1] for r in conn.execute(text("PRAGMA table_info(items)"))}
@@ -308,6 +304,105 @@ def _drop_unused_item_columns() -> None:
                 conn.execute(text(f"DROP INDEX IF EXISTS ix_items_{col}"))
                 conn.execute(text(f"ALTER TABLE items DROP COLUMN {col}"))
         conn.commit()
+
+
+def _drop_dead_m1_objects() -> None:
+    """2026-04-17 M1 커밋 잔재 3종 제거 (variance_logs / process_flow_rules / items.symbol_slot).
+
+    - variance_logs : INSERT 코드 0건. 단순 DROP TABLE.
+    - process_flow_rules : 프론트 사용 0건. 17줄은 docs/legacy-process-flow-rules.md 에 보존.
+    - items.symbol_slot : FK(→ product_symbols.slot) 때문에 DROP COLUMN 불가 →
+      테이블 재생성. items 컬럼 정의는 backend/app/models/item.py 기준.
+
+    items 는 자식 FK 가 많아 PRAGMA foreign_keys=OFF 를 _트랜잭션 밖_에서 적용해야 한다.
+    SQLAlchemy connection 으로는 statement 실행 시점이 이미 BEGIN 안이라 효과가 없으므로
+    raw DBAPI connection + 명시적 BEGIN/COMMIT 으로 처리. 멱등 — 이미 정리된 환경이면 NO-OP.
+    """
+    raw = engine.raw_connection()
+    try:
+        cur = raw.cursor()
+        # 멱등 short-circuit — 현재 상태 점검
+        cur.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' "
+            "AND name IN ('variance_logs','process_flow_rules')"
+        )
+        dead_tables = [r[0] for r in cur.fetchall()]
+        cur.execute("PRAGMA table_info(items)")
+        item_cols = [r[1] for r in cur.fetchall()]
+        has_symbol_slot = "symbol_slot" in item_cols
+        if not dead_tables and not has_symbol_slot:
+            cur.close()
+            return
+
+        # FK 비활성 (트랜잭션 밖에서만 적용됨)
+        cur.execute("PRAGMA foreign_keys=OFF")
+        try:
+            cur.execute("BEGIN")
+            for tbl in dead_tables:
+                cur.execute(f"DROP TABLE {tbl}")
+            if has_symbol_slot:
+                cur.execute("DROP INDEX IF EXISTS ix_items_symbol_slot")
+                cur.execute("""
+                    CREATE TABLE items_new (
+                        item_id UUID NOT NULL,
+                        item_name VARCHAR(200) NOT NULL,
+                        sort_order INTEGER,
+                        unit VARCHAR(20) NOT NULL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                        legacy_part VARCHAR(50),
+                        legacy_item_type VARCHAR(50),
+                        supplier VARCHAR(200),
+                        min_stock NUMERIC(15, 4),
+                        model_symbol VARCHAR(20),
+                        process_type_code VARCHAR(2),
+                        option_code VARCHAR(10),
+                        serial_no INTEGER,
+                        bom_completed_at DATETIME,
+                        item_code VARCHAR(40),
+                        deleted_at DATETIME,
+                        PRIMARY KEY (item_id),
+                        FOREIGN KEY(process_type_code) REFERENCES process_types (code)
+                    )
+                """)
+                cur.execute("""
+                    INSERT INTO items_new
+                        (item_id, item_name, sort_order, unit, created_at, updated_at,
+                         legacy_part, legacy_item_type, supplier, min_stock,
+                         model_symbol, process_type_code, option_code, serial_no,
+                         bom_completed_at, item_code, deleted_at)
+                    SELECT item_id, item_name, sort_order, unit, created_at, updated_at,
+                           legacy_part, legacy_item_type, supplier, min_stock,
+                           model_symbol, process_type_code, option_code, serial_no,
+                           bom_completed_at, item_code, deleted_at
+                    FROM items
+                """)
+                cur.execute("DROP TABLE items")
+                cur.execute("ALTER TABLE items_new RENAME TO items")
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS ix_items_process_type_code ON items (process_type_code)"
+                )
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS ix_items_model_symbol ON items (model_symbol)"
+                )
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS ix_items_sort_order ON items (sort_order)"
+                )
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS ix_items_legacy_part ON items (legacy_part)"
+                )
+                cur.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ix_items_item_code ON items(item_code)"
+                )
+            cur.execute("COMMIT")
+        except Exception:
+            cur.execute("ROLLBACK")
+            raise
+        finally:
+            cur.execute("PRAGMA foreign_keys=ON")
+            cur.close()
+    finally:
+        raw.close()
 
 
 def _drop_dead_transaction_type_enum_values() -> None:
@@ -603,11 +698,20 @@ def run_migrations() -> dict[str, object]:
         errors.append(msg)
         logger.warning(msg, exc_info=False)
 
-    # spec/barcode/legacy_file_type/symbol_slot — 미사용 컬럼 제거. 멱등.
+    # spec/barcode/legacy_file_type — 미사용 컬럼 제거. 멱등.
     try:
         _drop_unused_item_columns()
     except Exception as exc:  # noqa: BLE001
         msg = f"[migrate] unused item columns drop failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
+
+    # M1(2026-04-17) 잔재 3종 제거 — variance_logs / process_flow_rules /
+    # items.symbol_slot. 멱등.
+    try:
+        _drop_dead_m1_objects()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] dead M1 objects drop failed: {exc}"
         errors.append(msg)
         logger.warning(msg, exc_info=False)
 

@@ -1,9 +1,8 @@
-"""bootstrap.seed — 참조 데이터 시드 + item_code 백필 + flow_rules 리셋 + check.
+"""bootstrap.seed — 참조 데이터 시드 + item_code 백필 + check.
 
 - `seed_reference_data()` : Department / Employee / ProductSymbol /
-   OptionCode / ProcessType / ProcessFlowRule 비어 있을 때만 시드 (멱등)
+   OptionCode / ProcessType 비어 있을 때만 시드 (멱등)
 - `backfill_item_codes()` : item_code NULL 인 품목에 4-part 코드 자동 부여
-- `reset_flow_rules()`    : process_flow_rules 초기화 후 _PROCESS_FLOW_RULES 재시드
 - `check_db()`            : 쓰지 않고 상태만 리포트
 """
 from __future__ import annotations
@@ -17,7 +16,6 @@ from app.models import (
     EmployeeLevelEnum,
     Item,
     OptionCode,
-    ProcessFlowRule,
     ProcessType,
     ProductSymbol,
 )
@@ -91,32 +89,9 @@ _PROCESS_TYPES: list[tuple] = [
     ("PF", "P", "F", 80, "출하 공정완료"),
 ]
 
-_PROCESS_FLOW_RULES: list[tuple] = [
-    # 부서 내 흐름 (R→A, A→F) — consumes_codes는 OR 조건 (쉼표 구분)
-    ("TR", "TA", "TR"),       # TR + TR → TA
-    ("TA", "TF", "TR,TA"),    # TA + (TR 또는 TA) → TF
-    ("HR", "HA", "HR"),       # HR + HR → HA
-    ("HA", "HF", "HR,HA"),    # HA + (HR 또는 HA) → HF
-    ("VR", "VA", "VR"),       # VR + VR → VA
-    ("VA", "VF", "VR,VA"),    # VA + (VR 또는 VA) → VF
-    ("NR", "NA", "NR"),       # NR + NR → NA
-    ("NA", "NF", "NR,NA"),    # NA + (NR 또는 NA) → NF
-    ("AR", "AA", "AR"),       # AR + AR → AA
-    ("AA", "AF", "AR,AA"),    # AA + (AR 또는 AA) → AF
-    ("PR", "PA", "PR"),       # PR + PR → PA
-    ("PA", "PF", "PR,PA"),    # PA + (PR 또는 PA) → PF
-    # 부서 간 이전 (이전 부서 F → 다음 부서 A)
-    ("TF", "HA", "HR"),       # TF + HR → HA
-    ("HF", "VA", "VR"),       # HF + VR → VA
-    ("VF", "NA", "NR"),       # VF + NR → NA
-    ("NF", "AA", "AR"),       # NF + AR → AA
-    ("AF", "PA", "PR"),       # AF + PR → PA
-]
-
-
 def seed_reference_data() -> dict[str, int]:
     """참조 테이블이 비어 있을 때만 시드. idempotent."""
-    counts = {"departments": 0, "employees": 0, "symbols": 0, "options": 0, "process_types": 0, "flow_rules": 0}
+    counts = {"departments": 0, "employees": 0, "symbols": 0, "options": 0, "process_types": 0}
     db = SessionLocal()
     try:
         if db.query(Department).count() == 0:
@@ -179,12 +154,6 @@ def seed_reference_data() -> dict[str, int]:
                 )
                 counts["process_types"] += 1
             db.commit()
-
-        if db.query(ProcessFlowRule).count() == 0:
-            for src, dst, consumes in _PROCESS_FLOW_RULES:
-                db.add(ProcessFlowRule(from_type=src, to_type=dst, consumes_codes=consumes))
-                counts["flow_rules"] += 1
-            db.commit()
     finally:
         db.close()
     return counts
@@ -194,20 +163,21 @@ def seed_reference_data() -> dict[str, int]:
 # 품목 코드 백필
 # ---------------------------------------------------------------------------
 def backfill_item_codes() -> int:
-    """item_code 미할당 품목에 자동 부여. 기존 serial_no 와 충돌하지 않도록 그룹별 최대값+1."""
+    """item_code 미할당 품목에 자동 부여. 기존 serial_no 와 충돌하지 않도록 그룹별 최대값+1.
+
+    그룹 키는 (model_symbol, process_type_code) — model_symbol 이 단일 문자(`3`,`7`,...)
+    또는 다중 문자(`346`) 모두 진실 소스. 코드는 ProductSymbol.symbol 과 1:1 매핑이라
+    별도 슬롯 컬럼 없이도 그대로 사용 가능.
+    """
     db = SessionLocal()
     try:
         targets = db.query(Item).filter(Item.item_code.is_(None)).all()
         if not targets:
             return 0
 
-        symbol_map: dict[int, str] = {
-            ps.slot: ps.symbol for ps in db.query(ProductSymbol).all() if ps.symbol
-        }
-
         serial_counter: dict[tuple, int] = {}
         for item in db.query(Item).filter(Item.serial_no.isnot(None)).all():
-            key = (item.symbol_slot, item.process_type_code)
+            key = (item.model_symbol, item.process_type_code)
             serial_counter[key] = max(serial_counter.get(key, 0), item.serial_no or 0)
 
         count = 0
@@ -216,15 +186,13 @@ def backfill_item_codes() -> int:
             if pt is None:
                 continue
 
-            slot = item.symbol_slot
-            symbol = symbol_map.get(slot, "공") if slot else "공"
+            symbol = item.model_symbol or "공"
             opt = "BG" if pt == "PA" else None
 
-            key = (slot, pt)
+            key = (item.model_symbol, pt)
             serial_counter[key] = serial_counter.get(key, 0) + 1
             serial = serial_counter[key]
 
-            item.symbol_slot = slot
             item.serial_no = serial
             item.option_code = opt
             item.item_code = make_item_code(symbol, pt, serial, opt)
@@ -232,20 +200,6 @@ def backfill_item_codes() -> int:
 
         db.commit()
         return count
-    finally:
-        db.close()
-
-
-def reset_flow_rules() -> int:
-    """process_flow_rules 테이블을 초기화하고 현행 _PROCESS_FLOW_RULES로 재시드."""
-    db = SessionLocal()
-    try:
-        db.query(ProcessFlowRule).delete()
-        db.commit()
-        for src, dst, consumes in _PROCESS_FLOW_RULES:
-            db.add(ProcessFlowRule(from_type=src, to_type=dst, consumes_codes=consumes))
-        db.commit()
-        return len(_PROCESS_FLOW_RULES)
     finally:
         db.close()
 

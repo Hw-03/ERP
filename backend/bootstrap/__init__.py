@@ -4,7 +4,7 @@
 
 - bootstrap.init    — `Base.metadata.create_all` (스키마)
 - bootstrap.migrate — 멱등 ALTER TABLE / 보조 마이그레이션 헬퍼
-- bootstrap.seed    — 참조 데이터 시드 + item_code 백필 + flow_rules 리셋
+- bootstrap.seed    — 참조 데이터 시드 + item_code 백필
 
 `backend/bootstrap_db.py` 는 얇은 CLI wrapper 로 남아 기존 명령
 (`python bootstrap_db.py --all` 등)을 그대로 지원한다. 외부 호출자
@@ -23,7 +23,6 @@ from .migrate import (
 from .seed import (
     backfill_item_codes,
     check_db,
-    reset_flow_rules,
     seed_reference_data,
 )
 
@@ -47,7 +46,6 @@ __all__ = [
     "run_migrations",
     "seed_reference_data",
     "backfill_item_codes",
-    "reset_flow_rules",
     "check_db",
     # 하위호환 — bootstrap_db 모듈 속성으로도 노출되는 내부 심볼.
     "_MIGRATION_DDL",
