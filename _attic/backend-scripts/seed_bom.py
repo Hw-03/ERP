@@ -9,7 +9,8 @@ import random
 import uuid
 from decimal import Decimal
 
-sys.path.insert(0, os.path.dirname(__file__))
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
 
 from app.database import SessionLocal
 from app.models import Item, BOM
