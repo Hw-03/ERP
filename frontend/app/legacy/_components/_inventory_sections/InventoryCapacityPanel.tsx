@@ -99,6 +99,11 @@ export function InventoryCapacityPanel({
           </span>
         )
       )}
+      {interactive && (
+        <span className="ml-auto shrink-0 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+          자세히 보기
+        </span>
+      )}
     </>
   );
   if (interactive) {
