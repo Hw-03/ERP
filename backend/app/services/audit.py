@@ -39,10 +39,14 @@ def record(
     payload_summary: Optional[str] = None,
     request: Optional[Request] = None,
     actor_pin_role: str = "admin",
+    actor_employee_code: Optional[str] = None,
 ) -> AdminAuditLog:
     rid = None
+    actor_emp = actor_employee_code
     if request is not None:
         rid = getattr(request.state, "request_id", None)
+        if actor_emp is None:
+            actor_emp = getattr(request.state, "actor_emp", None)
     log = AdminAuditLog(
         action=action,
         target_type=target_type,
@@ -50,6 +54,7 @@ def record(
         payload_summary=payload_summary,
         request_id=rid,
         actor_pin_role=actor_pin_role,
+        actor_employee_code=actor_emp,
     )
     db.add(log)
     return log

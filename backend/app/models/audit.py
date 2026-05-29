@@ -21,6 +21,9 @@ class AdminAuditLog(Base):
 
     audit_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     actor_pin_role = Column(String(32), nullable=False, default="admin")
+    # 사번 — request.state.actor_emp 가 PIN 검증 후 박힌 직원 코드 (PR-C).
+    # NULL = 사번 부착 없이 admin PIN 만으로 실행된 액션 (예: 백필 스크립트).
+    actor_employee_code = Column(String(16), nullable=True, index=True)
     action = Column(String(64), nullable=False, index=True)
     target_type = Column(String(64), nullable=False, index=True)
     target_id = Column(String(64), nullable=True)

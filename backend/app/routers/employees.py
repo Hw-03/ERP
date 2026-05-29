@@ -26,6 +26,7 @@ from app.services import rate_limit
 from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin, verify_pin
 from app.services import audit
 from app.services._tx import commit_and_refresh, commit_only
+from app._actor import set_actor
 
 router = APIRouter()
 
@@ -321,6 +322,7 @@ def verify_employee_pin(
         raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
 
     rate_limit.record_success(rl_key)
+    set_actor(request, employee)
     return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
 
 
@@ -342,6 +344,7 @@ def change_employee_pin(
     if payload.current_pin == payload.new_pin:
         raise http_error(422, ErrorCode.UNPROCESSABLE, "새 PIN은 현재 PIN과 달라야 합니다.")
 
+    set_actor(request, employee)
     employee.pin_hash = hash_pin(payload.new_pin)
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
     employee.pin_last_changed = datetime.now(UTC).replace(tzinfo=None)

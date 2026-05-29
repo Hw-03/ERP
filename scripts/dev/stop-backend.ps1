@@ -29,7 +29,11 @@ function Get-UvicornPythonPids {
 for ($attempt = 1; $attempt -le 3; $attempt++) {
     $listenPids   = Get-Port8010Pids
     $uvicornPids  = Get-UvicornPythonPids
-    $allPids      = @($listenPids + $uvicornPids) | Sort-Object -Unique
+    # typed array 끼리 + 했을 때 op_Addition 못 찾는 케이스 회피 — 한 칸씩 [object[]] 에 채움.
+    $combined = @()
+    if ($listenPids)  { foreach ($p in $listenPids)  { $combined += [int]$p } }
+    if ($uvicornPids) { foreach ($p in $uvicornPids) { $combined += [int]$p } }
+    $allPids = @($combined | Sort-Object -Unique)
 
     if ($allPids.Count -eq 0) { break }
 

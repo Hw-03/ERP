@@ -19,6 +19,7 @@ import uuid
 from sqlalchemy import func, update as sa_update
 from sqlalchemy.orm import Session
 
+from app._evt import emit as _evt_emit
 from app.database import _is_sqlite
 from app.models import (
     DepartmentEnum,
@@ -881,6 +882,12 @@ def adjust_warehouse(
         delta 는 warehouse_qty 변화량. 라우터가 TransactionLog 에 사용.
     """
     if new_warehouse_qty < 0:
+        _evt_emit(
+            "neg_block",
+            level="warning",
+            item_id=str(item_id)[:8],
+            attempted=str(new_warehouse_qty),
+        )
         raise ValueError("창고 수량은 음수일 수 없습니다.")
     inv = _lock_inventory(db, item_id)
     qty_before = inv.quantity or Decimal("0")

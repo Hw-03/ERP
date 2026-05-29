@@ -13,6 +13,7 @@ from app.routers._errors import ErrorCode, http_error
 from app.schemas import BOMCreate, BOMDetailResponse, BOMResponse, BOMTreeNode, BOMUpdate
 from app.services import audit
 from app.services._tx import commit_and_refresh, commit_only
+from app._evt import emit as _evt_emit
 from app.services.bom import BomCache, build_bom_cache
 
 router = APIRouter()
@@ -112,6 +113,14 @@ def create_bom(payload: BOMCreate, request: Request, db: Session = Depends(get_d
     )
 
     commit_and_refresh(db, bom_entry)
+    _evt_emit(
+        "bom_create",
+        request=request,
+        parent=parent.item_code,
+        child=child.item_code,
+        qty=str(payload.quantity),
+        unit=payload.unit,
+    )
     return bom_entry
 
 
@@ -142,6 +151,13 @@ def update_bom(bom_id: uuid.UUID, payload: BOMUpdate, request: Request, db: Sess
         )
 
     commit_and_refresh(db, bom_entry)
+    if changed:
+        _evt_emit(
+            "bom_update",
+            request=request,
+            bom_id=str(bom_entry.bom_id)[:8],
+            changed=",".join(changed),
+        )
     return bom_entry
 
 
@@ -205,8 +221,16 @@ def delete_bom(bom_id: uuid.UUID, request: Request, db: Session = Depends(get_db
         target_id=str(bom_entry.bom_id),
         payload_summary=f"parent={bom_entry.parent_item_id} child={bom_entry.child_item_id}",
     )
+    parent_id = bom_entry.parent_item_id
+    child_id = bom_entry.child_item_id
     db.delete(bom_entry)
     commit_only(db)
+    _evt_emit(
+        "bom_delete",
+        request=request,
+        parent_id=str(parent_id)[:8],
+        child_id=str(child_id)[:8],
+    )
 
 
 @router.get("/where-used/{item_id}", response_model=List[BOMDetailResponse])

@@ -40,6 +40,7 @@ from app.services import audit, inventory as inventory_svc
 from app.services._tx import commit_only
 from app.services.export_helpers import csv_streaming_response
 from app.services.pin_auth import verify_pin
+from app._actor import set_actor
 
 
 router = APIRouter()
@@ -348,7 +349,12 @@ def _log_snapshot(log: TransactionLog) -> dict:
     }
 
 
-def _verify_editor(db: Session, employee_id: uuid.UUID, pin: str) -> Employee:
+def _verify_editor(
+    db: Session,
+    employee_id: uuid.UUID,
+    pin: str,
+    request: Optional[Request] = None,
+) -> Employee:
     """수정자 직원 + PIN 검증. 작업자 식별용 — 실제 보안 인증이 아님."""
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
@@ -357,6 +363,7 @@ def _verify_editor(db: Session, employee_id: uuid.UUID, pin: str) -> Employee:
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 거래를 수정할 수 없습니다.")
     if not verify_pin(employee.pin_hash, pin):
         raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
+    set_actor(request, employee)
     return employee
 
 
@@ -803,7 +810,7 @@ def meta_edit_transaction(
             f"이 거래 유형({log.transaction_type.value})은 수정을 지원하지 않습니다.",
         )
 
-    editor = _verify_editor(db, payload.edited_by_employee_id, payload.edited_by_pin)
+    editor = _verify_editor(db, payload.edited_by_employee_id, payload.edited_by_pin, request)
 
     before = _log_snapshot(log)
 
@@ -931,7 +938,7 @@ def quantity_correct_transaction(
             "이미 수량 보정된 거래입니다. 추가 보정은 별도 정책 확정 후 가능합니다.",
         )
 
-    editor = _verify_editor(db, payload.edited_by_employee_id, payload.edited_by_pin)
+    editor = _verify_editor(db, payload.edited_by_employee_id, payload.edited_by_pin, request)
 
     delta = new_qty - log.quantity_change
 

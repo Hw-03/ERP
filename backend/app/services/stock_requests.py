@@ -18,8 +18,10 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Iterable, List, Optional, Sequence
 
+from fastapi import Request
 from sqlalchemy.orm import Session
 
+from app._actor import set_actor
 from app.models import (
     DepartmentEnum,
     Employee,
@@ -1093,6 +1095,7 @@ def approve_request(
     *,
     approver: Employee,
     pin: str,
+    http_request: Optional[Request] = None,
 ) -> StockRequest:
     """승인 + 재고 반영을 한 트랜잭션에서 처리.
 
@@ -1106,6 +1109,7 @@ def approve_request(
         raise PermissionError("창고 담당자만 승인할 수 있습니다.")
     if not verify_pin(approver.pin_hash, pin):
         raise PermissionError("PIN이 일치하지 않습니다.")
+    set_actor(http_request, approver)
 
     # 이미 완료된 경우 멱등 반환 (중복 승인 클릭 / 동시 승인 2번째 요청)
     if request.status == StockRequestStatusEnum.COMPLETED:
@@ -1162,6 +1166,7 @@ def approve_request_department(
     *,
     approver: Employee,
     pin: str,
+    http_request: Optional[Request] = None,
 ) -> StockRequest:
     """부서 결재 승인.
 
@@ -1184,6 +1189,7 @@ def approve_request_department(
         )
     if not verify_pin(approver.pin_hash, pin):
         raise PermissionError("PIN이 일치하지 않습니다.")
+    set_actor(http_request, approver)
 
     if request.status == StockRequestStatusEnum.COMPLETED:
         return request
@@ -1277,12 +1283,14 @@ def reject_request(
     approver: Employee,
     pin: str,
     reason: str,
+    http_request: Optional[Request] = None,
 ) -> StockRequest:
     role = (approver.warehouse_role or "none").lower()
     if role not in ("primary", "deputy"):
         raise PermissionError("창고 담당자만 반려할 수 있습니다.")
     if not verify_pin(approver.pin_hash, pin):
         raise PermissionError("PIN이 일치하지 않습니다.")
+    set_actor(http_request, approver)
     if not reason or not reason.strip():
         raise ValueError("반려 사유를 입력하세요.")
     # 이미 반려된 경우 멱등 반환
@@ -1314,6 +1322,7 @@ def reject_request_department(
     approver: Employee,
     pin: str,
     reason: str,
+    http_request: Optional[Request] = None,
 ) -> StockRequest:
     """부서 결재 반려. 권한 + PIN + 사유 필수.
 
@@ -1328,6 +1337,7 @@ def reject_request_department(
         )
     if not verify_pin(approver.pin_hash, pin):
         raise PermissionError("PIN이 일치하지 않습니다.")
+    set_actor(http_request, approver)
     if not reason or not reason.strip():
         raise ValueError("반려 사유를 입력하세요.")
 
@@ -1359,6 +1369,7 @@ def cancel_request(
     *,
     requester: Employee,
     pin: str,
+    http_request: Optional[Request] = None,
 ) -> StockRequest:
     """요청자 본인 또는 관리자(level=admin) 취소."""
     is_self = request.requester_employee_id == requester.employee_id
@@ -1370,6 +1381,7 @@ def cancel_request(
         raise PermissionError("본인 요청 또는 관리자만 취소할 수 있습니다.")
     if not verify_pin(requester.pin_hash, pin):
         raise PermissionError("PIN이 일치하지 않습니다.")
+    set_actor(http_request, requester)
     # 이미 취소된 경우 멱등 반환
     if request.status == StockRequestStatusEnum.CANCELLED:
         return request

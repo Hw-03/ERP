@@ -32,6 +32,7 @@ from app.services import audit
 from app.services import inventory as inventory_svc
 from app.services import stock_math
 from app.services._tx import commit_and_refresh
+from app._evt import emit as _evt_emit
 from app.services.export_helpers import csv_streaming_response
 from app.services.reorder import reorder_by_display_order
 
@@ -180,6 +181,13 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
     )
 
     commit_and_refresh(db, item)
+    _evt_emit(
+        "item_create",
+        request=request,
+        item=item.item_code or "-",
+        name=item.item_name,
+        init_qty=str(init_qty),
+    )
     return item
 
 
@@ -478,6 +486,13 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
         )
 
     commit_and_refresh(db, item)
+    if changed:
+        _evt_emit(
+            "item_update",
+            request=request,
+            item=item.item_code or "-",
+            changed=",".join(changed),
+        )
     return item
 
 
@@ -535,6 +550,12 @@ def soft_delete_item(item_id: uuid.UUID, request: Request, db: Session = Depends
     )
 
     commit_and_refresh(db, item)
+    _evt_emit(
+        "item_delete",
+        request=request,
+        item=item.item_code or "-",
+        name=item.item_name,
+    )
     return item
 
 
@@ -560,4 +581,10 @@ def restore_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get
     )
 
     commit_and_refresh(db, item)
+    _evt_emit(
+        "item_restore",
+        request=request,
+        item=item.item_code or "-",
+        name=item.item_name,
+    )
     return item

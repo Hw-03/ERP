@@ -233,6 +233,10 @@ _MIGRATION_DDL: list[str] = [
     # 부서 라벨을 _department_label_expr() 에서 이 컬럼으로 폴백.
     "ALTER TABLE transaction_logs ADD COLUMN department VARCHAR(50)",
     "CREATE INDEX IF NOT EXISTS ix_tx_department ON transaction_logs(department)",
+    # 2026-05-29: AdminAuditLog 에 사번(actor_employee_code) 컬럼 추가.
+    # 권동환 사원 요청 #3 (사번 기반 audit) 의 마스터/설정 변경 audit 영구 저장.
+    "ALTER TABLE admin_audit_logs ADD COLUMN actor_employee_code VARCHAR(16)",
+    "CREATE INDEX IF NOT EXISTS ix_aal_actor_emp ON admin_audit_logs(actor_employee_code)",
 ]
 
 

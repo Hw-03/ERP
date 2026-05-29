@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -19,6 +19,7 @@ from app.schemas import (
     IoSubmitRequest,
     IoSubmitResponse,
 )
+from app._evt import emit as _evt_emit
 from app.services import io as io_svc
 from app.services._tx import commit_only
 
@@ -42,7 +43,7 @@ def preview_io(payload: IoPreviewRequest, db: Session = Depends(get_db)):
 
 
 @router.put("/draft", response_model=IoBatchResponse)
-def save_io_draft(payload: IoDraftUpsert, db: Session = Depends(get_db)):
+def save_io_draft(payload: IoDraftUpsert, http_request: Request, db: Session = Depends(get_db)):
     try:
         draft = io_svc.save_draft(db, payload)
     except PermissionError as exc:
@@ -52,6 +53,15 @@ def save_io_draft(payload: IoDraftUpsert, db: Session = Depends(get_db)):
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
     commit_only(db)
+    _evt_emit(
+        "io_draft",
+        request=http_request,
+        batch_id=str(draft.get("batch_id"))[:8],
+        work_type=draft.get("work_type"),
+        sub_type=draft.get("sub_type"),
+        lines=len(draft.get("bundles") or []),
+        requester=draft.get("requester_name"),
+    )
     return draft
 
 
@@ -101,10 +111,21 @@ def delete_io_draft(
 
 
 @router.post("/submit", response_model=IoSubmitResponse, status_code=status.HTTP_201_CREATED)
-def submit_io(payload: IoSubmitRequest, db: Session = Depends(get_db)):
+def submit_io(payload: IoSubmitRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         result = io_svc.submit(db, payload)
         commit_only(db)
+        _batch = result.get("batch") or {}
+        _evt_emit(
+            "io_submit",
+            request=http_request,
+            batch_id=str(_batch.get("batch_id"))[:8],
+            work_type=_batch.get("work_type"),
+            sub_type=_batch.get("sub_type"),
+            lines=len(_batch.get("bundles") or []),
+            requires_approval=result.get("requires_approval"),
+            requester=_batch.get("requester_name"),
+        )
         return result
     except PermissionError as exc:
         db.rollback()
@@ -139,6 +160,7 @@ def submit_io(payload: IoSubmitRequest, db: Session = Depends(get_db)):
 )
 def submit_io_draft(
     batch_id: uuid.UUID,
+    http_request: Request,
     requester_employee_id: uuid.UUID = Query(...),
     db: Session = Depends(get_db),
 ):
@@ -155,6 +177,18 @@ def submit_io_draft(
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
     commit_only(db)
+    _batch = result.get("batch") or {}
+    _evt_emit(
+        "io_submit",
+        request=http_request,
+        batch_id=str(_batch.get("batch_id"))[:8],
+        work_type=_batch.get("work_type"),
+        sub_type=_batch.get("sub_type"),
+        lines=len(_batch.get("bundles") or []),
+        requires_approval=result.get("requires_approval"),
+        requester=_batch.get("requester_name"),
+        source="draft",
+    )
     return result
 
 

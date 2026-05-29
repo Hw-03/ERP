@@ -62,6 +62,11 @@ if _is_sqlite:
         conn.exec_driver_sql("BEGIN IMMEDIATE")
 
 
+from app._slow_query import install_slow_query_hook  # noqa: E402
+
+install_slow_query_hook(engine)
+
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
