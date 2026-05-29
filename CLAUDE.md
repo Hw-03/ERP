@@ -66,6 +66,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\stop-backend.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
 ```
 
+## 세션 인수인계
+
+새 세션 시작 시 가장 먼저 확인: `_attic/handoff/` 의 가장 최근 날짜 파일.
+현재 최신: `_attic/handoff/2026-05-29-handoff.md` (정리 작업 결과 + 사원님 답장 대기 + 남은 작업 후보).
+
 ## 자료 위치 (2026-05-29 정리 후)
 
 루트·각 폴더에는 도구가 자동 참조하는 파일만 남기고, 나머지는 모두 `_attic/` 보관소로 통합.
