@@ -54,11 +54,10 @@ class Item(Base):
     supplier = Column(String(200), nullable=True)
     min_stock = Column(Numeric(15, 4), nullable=True)
 
-    # 4-part item code ([모델기호조합]-[구분코드]-[일련번호]-[옵션코드])
+    # 3-part item code ([모델기호조합]-[구분코드]-[일련번호])
     item_code = Column(String(40), nullable=True, unique=True, index=True)
     model_symbol = Column(String(20), nullable=True, index=True)  # 예: "346", "3", "34678"
     process_type_code = Column(String(2), ForeignKey("process_types.code"), nullable=True, index=True)
-    option_code = Column(String(10), nullable=True)  # 자유 텍스트 (FK 제거)
     serial_no = Column(Integer, nullable=True)
 
     # BOM 완료 워크플로우 — 사용자가 명시적으로 "완료로 표시"를 누를 때만 set/clear

@@ -1,12 +1,12 @@
 """품목 코드 일관성 일괄 정리.
 
-item_code 가 (model_symbol, process_type_code, serial_no, option_code) 와
+item_code 가 (model_symbol, process_type_code, serial_no) 와
 어긋난 부품을 점검하고, --apply 옵션 시 갱신한다.
 
 - 카테고리 어긋남 (item_code 의 카테고리 != item.process_type_code):
   새 카테고리에서 next_serial_no 부여. serial_no 갱신.
-- 모델/option 어긋남 (카테고리는 같은데 prefix·suffix 가 어긋남):
-  serial 유지, prefix·suffix 만 갱신.
+- 모델 어긋남 (카테고리는 같은데 prefix 가 어긋남):
+  serial 유지, prefix 만 갱신.
 
 사용법:
   python scripts/repair_item_codes.py            # dry-run (변경 후보만 출력)
@@ -30,7 +30,7 @@ from app.database import SessionLocal  # noqa: E402
 from app.models import Item  # noqa: E402
 from app.utils.item_code import make_item_code, next_serial_no  # noqa: E402
 
-CODE_PATTERN = re.compile(r"^(?P<prefix>[0-9]+)-(?P<pt>[A-Z]{2})-(?P<serial>\d{4})(?:-(?P<opt>\w+))?$")
+CODE_PATTERN = re.compile(r"^(?P<prefix>[0-9]+)-(?P<pt>[A-Z]{2})-(?P<serial>\d{4})$")
 
 
 def parse_code(code: str) -> dict | None:
@@ -41,11 +41,6 @@ def parse_code(code: str) -> dict | None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--apply", action="store_true", help="실제 변경 적용 (기본은 dry-run)")
-    parser.add_argument(
-        "--include-option-suffix",
-        action="store_true",
-        help="option suffix 누락만 어긋난 케이스도 포함 (기본은 카테고리·모델 어긋남만)",
-    )
     args = parser.parse_args()
 
     if args.apply:
@@ -77,11 +72,10 @@ def main() -> int:
             sym = item.model_symbol
             pt = item.process_type_code
             serial = item.serial_no
-            opt = item.option_code
             if not sym or not pt or serial is None:
                 continue
 
-            expected_same_serial = make_item_code(sym, pt, serial, opt or None)
+            expected_same_serial = make_item_code(sym, pt, serial)
             if item.item_code == expected_same_serial:
                 continue  # 일치 — 건너뜀
 
@@ -97,19 +91,14 @@ def main() -> int:
                 else:
                     category_counter[pt] += 1
                 new_serial = category_counter[pt]
-                new_code = make_item_code(sym, pt, new_serial, opt or None)
+                new_code = make_item_code(sym, pt, new_serial)
                 candidates.append((item, "category", new_code))
             else:
-                # serial 유지. prefix(모델) 와 option 어긋남 구분.
+                # serial 유지. prefix(모델) 어긋남.
                 old_prefix = parsed["prefix"] if parsed else None
                 model_changed = old_prefix is not None and old_prefix != sym
-                # option_only = 모델은 맞는데 option suffix 만 어긋남
                 if model_changed:
                     candidates.append((item, "prefix", expected_same_serial))
-                else:
-                    if not args.include_option_suffix:
-                        continue  # option 만 어긋남 — 기본 skip.
-                    candidates.append((item, "option_only", expected_same_serial))
 
         # 출력
         print(f"\n어긋난 부품 총 {len(candidates)}개\n")

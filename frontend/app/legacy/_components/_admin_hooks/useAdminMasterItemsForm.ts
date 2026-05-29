@@ -16,7 +16,6 @@ export type ItemEditForm = {
   process_type_code: string;
   unit: string;
   model_slots: number[];
-  option_code: string;
   item_code: string;
 };
 
@@ -28,7 +27,6 @@ export const EMPTY_ITEM_EDIT_FORM: ItemEditForm = {
   process_type_code: "TR",
   unit: "EA",
   model_slots: [],
-  option_code: "",
   item_code: "",
 };
 
@@ -54,7 +52,6 @@ export function itemToEditForm(item: Item): ItemEditForm {
     process_type_code: item.process_type_code ?? "TR",
     unit: item.unit ?? "EA",
     model_slots: savedSlots.length > 0 ? savedSlots : inferModelSlots(itemCode),
-    option_code: item.option_code ?? "",
     item_code: itemCode,
   };
 }
@@ -68,7 +65,6 @@ type UpdateItemPayload = {
   process_type_code?: string;
   unit?: string;
   model_slots?: number[];
-  option_code?: string;
   item_code?: string;
 };
 
@@ -123,7 +119,7 @@ export function useAdminMasterItemsForm({
   async function save(): Promise<void> {
     if (!selectedItem) return;
     try {
-      // item_code 는 백엔드가 (model_symbol, process_type_code, serial_no, option_code) 에서 자동 부여.
+      // item_code 는 백엔드가 (model_symbol, process_type_code, serial_no) 에서 자동 부여.
       // 프론트에서 보내지 않음 — 사용자가 손으로 입력 못 함.
       const payload: UpdateItemPayload = {
         item_name: form.item_name || undefined,
@@ -133,7 +129,6 @@ export function useAdminMasterItemsForm({
         process_type_code: form.process_type_code || undefined,
         unit: form.unit || undefined,
         model_slots: form.model_slots,
-        option_code: form.option_code || undefined,
       };
       const updated = await api.updateItem(selectedItem.item_id, payload);
       setItems((current) => current.map((it) => (it.item_id === updated.item_id ? updated : it)));

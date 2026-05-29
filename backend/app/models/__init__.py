@@ -12,7 +12,6 @@ from app.models.base import (
     DeptAdjSubTypeEnum,
 )
 from app.models.code import (
-    OptionCode,
     ProcessType,
     ProductSymbol,
 )
@@ -65,7 +64,6 @@ __all__ = [
     "BOM",
     # code masters
     "ProductSymbol",
-    "OptionCode",
     "ProcessType",
     # inventory
     "Inventory",

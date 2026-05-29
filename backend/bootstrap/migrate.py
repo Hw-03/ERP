@@ -52,10 +52,9 @@ _MIGRATION_DDL: list[str] = [
     "ALTER TABLE items ADD COLUMN legacy_item_type VARCHAR(50)",
     "ALTER TABLE items ADD COLUMN supplier VARCHAR(200)",
     "ALTER TABLE items ADD COLUMN min_stock NUMERIC(15,4)",
-    # M1: 4-part item code
+    # M1: 3-part item code
     "ALTER TABLE items ADD COLUMN erp_code VARCHAR(40)",
     "ALTER TABLE items ADD COLUMN process_type_code VARCHAR(2)",
-    "ALTER TABLE items ADD COLUMN option_code VARCHAR(2)",
     "ALTER TABLE items ADD COLUMN serial_no INTEGER",
     # 다중 모델 지원: Item 에 직접 붙은 요약 컬럼 + ItemModel 테이블 (테이블은 create_all 이 생성)
     "ALTER TABLE items ADD COLUMN model_symbol VARCHAR(20)",
@@ -356,7 +355,6 @@ def _drop_dead_m1_objects() -> None:
                         min_stock NUMERIC(15, 4),
                         model_symbol VARCHAR(20),
                         process_type_code VARCHAR(2),
-                        option_code VARCHAR(10),
                         serial_no INTEGER,
                         bom_completed_at DATETIME,
                         item_code VARCHAR(40),
@@ -369,11 +367,11 @@ def _drop_dead_m1_objects() -> None:
                     INSERT INTO items_new
                         (item_id, item_name, sort_order, unit, created_at, updated_at,
                          legacy_part, legacy_item_type, supplier, min_stock,
-                         model_symbol, process_type_code, option_code, serial_no,
+                         model_symbol, process_type_code, serial_no,
                          bom_completed_at, item_code, deleted_at)
                     SELECT item_id, item_name, sort_order, unit, created_at, updated_at,
                            legacy_part, legacy_item_type, supplier, min_stock,
-                           model_symbol, process_type_code, option_code, serial_no,
+                           model_symbol, process_type_code, serial_no,
                            bom_completed_at, item_code, deleted_at
                     FROM items
                 """)
@@ -483,6 +481,20 @@ def _add_new_transaction_type_values() -> None:
             conn.execute(text(
                 f"ALTER TYPE transaction_type_enum ADD VALUE IF NOT EXISTS '{value}'"
             ))
+
+
+def _drop_option_codes() -> None:
+    """option_codes 마스터 + items.option_code 컬럼 제거. 멱등.
+
+    items.option_code 는 FK 없는 단순 VARCHAR(10) → SQLite 의 DROP COLUMN
+    직접 사용 가능 (3.35+). 테이블 재생성 불필요.
+    """
+    with engine.connect() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS option_codes"))
+        cols = {r[1] for r in conn.execute(text("PRAGMA table_info(items)"))}
+        if "option_code" in cols:
+            conn.execute(text("ALTER TABLE items DROP COLUMN option_code"))
+        conn.commit()
 
 
 def _fix_io_bundles_package_id() -> None:
@@ -721,6 +733,14 @@ def run_migrations() -> dict[str, object]:
         _cleanup_production_hierarchy()
     except Exception as exc:  # noqa: BLE001
         msg = f"[migrate] production hierarchy cleanup failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
+
+    # option_codes 마스터 + items.option_code 컬럼 폐기 — 사용자 결정. 멱등.
+    try:
+        _drop_option_codes()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] option codes drop failed: {exc}"
         errors.append(msg)
         logger.warning(msg, exc_info=False)
 

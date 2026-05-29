@@ -3296,19 +3296,6 @@
       },
       "ItemCodeGenerateRequest": {
         "properties": {
-          "option": {
-            "anyOf": [
-              {
-                "maxLength": 2,
-                "minLength": 2,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Option"
-          },
           "process_type": {
             "maxLength": 2,
             "minLength": 2,
@@ -3332,7 +3319,7 @@
       "ItemCodeParseRequest": {
         "properties": {
           "code": {
-            "description": "4-part 품목 코드 문자열",
+            "description": "3-part 품목 코드 문자열",
             "title": "Code",
             "type": "string"
           }
@@ -3352,17 +3339,6 @@
           "formatted_full": {
             "title": "Formatted Full",
             "type": "string"
-          },
-          "option": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Option"
           },
           "process_type": {
             "title": "Process Type",
@@ -3466,19 +3442,6 @@
             },
             "title": "Model Slots",
             "type": "array"
-          },
-          "option_code": {
-            "anyOf": [
-              {
-                "maxLength": 10,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "옵션/스펙 코드 (예: BG)",
-            "title": "Option Code"
           },
           "process_type_code": {
             "anyOf": [
@@ -3663,17 +3626,6 @@
             ],
             "title": "Model Symbol"
           },
-          "option_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Option Code"
-          },
           "process_type_code": {
             "anyOf": [
               {
@@ -3805,18 +3757,6 @@
               }
             ],
             "title": "Model Slots"
-          },
-          "option_code": {
-            "anyOf": [
-              {
-                "maxLength": 10,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Option Code"
           },
           "process_type_code": {
             "anyOf": [
@@ -4016,17 +3956,6 @@
             ],
             "title": "Model Symbol"
           },
-          "option_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Option Code"
-          },
           "pending_quantity": {
             "default": "0",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -4205,48 +4134,6 @@
           "message"
         ],
         "title": "MessageResponse",
-        "type": "object"
-      },
-      "OptionCodeResponse": {
-        "properties": {
-          "code": {
-            "title": "Code",
-            "type": "string"
-          },
-          "color_hex": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Color Hex"
-          },
-          "label_en": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Label En"
-          },
-          "label_ko": {
-            "title": "Label Ko",
-            "type": "string"
-          }
-        },
-        "required": [
-          "code",
-          "label_ko",
-          "label_en",
-          "color_hex"
-        ],
-        "title": "OptionCodeResponse",
         "type": "object"
       },
       "PinVerifyRequest": {
@@ -7170,32 +7057,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "4-파트 품목 코드 자동 생성",
-        "tags": [
-          "Codes"
-        ]
-      }
-    },
-    "/api/codes/options": {
-      "get": {
-        "operationId": "list_options_api_codes_options_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/OptionCodeResponse"
-                  },
-                  "title": "Response List Options Api Codes Options Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "옵션 코드 목록",
+        "summary": "3-파트 품목 코드 자동 생성",
         "tags": [
           "Codes"
         ]
@@ -7236,7 +7098,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "4-파트 품목 코드 파싱",
+        "summary": "3-파트 품목 코드 파싱",
         "tags": [
           "Codes"
         ]

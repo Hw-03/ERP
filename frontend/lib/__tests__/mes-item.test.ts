@@ -27,7 +27,6 @@ const stubItem = (overrides: Partial<Item> = {}): Item => ({
   model_symbol: null,
   model_slots: [],
   process_type_code: null,
-  option_code: null,
   serial_no: null,
   created_at: "2026-01-01T00:00:00",
   updated_at: "2026-01-01T00:00:00",

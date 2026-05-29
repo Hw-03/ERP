@@ -1,8 +1,8 @@
 """bootstrap.seed — 참조 데이터 시드 + item_code 백필 + check.
 
 - `seed_reference_data()` : Department / Employee / ProductSymbol /
-   OptionCode / ProcessType 비어 있을 때만 시드 (멱등)
-- `backfill_item_codes()` : item_code NULL 인 품목에 4-part 코드 자동 부여
+   ProcessType 비어 있을 때만 시드 (멱등)
+- `backfill_item_codes()` : item_code NULL 인 품목에 3-part 코드 자동 부여
 - `check_db()`            : 쓰지 않고 상태만 리포트
 """
 from __future__ import annotations
@@ -15,7 +15,6 @@ from app.models import (
     EmployeeAssignedModel,  # noqa: F401 — metadata registration
     EmployeeLevelEnum,
     Item,
-    OptionCode,
     ProcessType,
     ProductSymbol,
 )
@@ -62,12 +61,6 @@ _PRODUCT_SYMBOL_ASSIGNED: list[tuple] = [
     (5, "6", "ADX6000FB"),
 ]
 
-_OPTION_CODES: list[tuple] = [
-    ("BG", "블랙 유광", "Black Glossy", "#111111"),
-    ("WM", "화이트 무광", "White Matte", "#F7F7F7"),
-    ("SV", "실버", "Silver", "#C0C0C0"),
-]
-
 _PROCESS_TYPES: list[tuple] = [
     ("TR", "T", "R", 10, "튜브 원자재"),
     ("TA", "T", "A", 20, "튜브 중간공정"),
@@ -91,7 +84,7 @@ _PROCESS_TYPES: list[tuple] = [
 
 def seed_reference_data() -> dict[str, int]:
     """참조 테이블이 비어 있을 때만 시드. idempotent."""
-    counts = {"departments": 0, "employees": 0, "symbols": 0, "options": 0, "process_types": 0}
+    counts = {"departments": 0, "employees": 0, "symbols": 0, "process_types": 0}
     db = SessionLocal()
     try:
         if db.query(Department).count() == 0:
@@ -133,12 +126,6 @@ def seed_reference_data() -> dict[str, int]:
             for slot in range(6, 101):
                 db.add(ProductSymbol(slot=slot, symbol=None, model_name=None, is_reserved=True))
                 counts["symbols"] += 1
-            db.commit()
-
-        if db.query(OptionCode).count() == 0:
-            for code, ko, en, color in _OPTION_CODES:
-                db.add(OptionCode(code=code, label_ko=ko, label_en=en, color_hex=color))
-                counts["options"] += 1
             db.commit()
 
         if db.query(ProcessType).count() == 0:
@@ -187,15 +174,13 @@ def backfill_item_codes() -> int:
                 continue
 
             symbol = item.model_symbol or "공"
-            opt = "BG" if pt == "PA" else None
 
             key = (item.model_symbol, pt)
             serial_counter[key] = serial_counter.get(key, 0) + 1
             serial = serial_counter[key]
 
             item.serial_no = serial
-            item.option_code = opt
-            item.item_code = make_item_code(symbol, pt, serial, opt)
+            item.item_code = make_item_code(symbol, pt, serial)
             count += 1
 
         db.commit()
@@ -212,7 +197,6 @@ def check_db() -> dict:
             "employees": db.query(Employee).count(),
             "process_types": db.query(ProcessType).count(),
             "product_symbols": db.query(ProductSymbol).count(),
-            "option_codes": db.query(OptionCode).count(),
             "items": db.query(Item).count(),
             "items_missing_item_code": db.query(Item).filter(Item.item_code.is_(None)).count(),
         }

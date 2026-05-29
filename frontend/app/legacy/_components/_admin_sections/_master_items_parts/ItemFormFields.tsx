@@ -12,7 +12,6 @@ export type ItemFormData = {
   process_type_code: string;
   unit: string;
   model_slots: number[];
-  option_code: string;
   initial_quantity?: string;
   item_code?: string;
 };
@@ -84,8 +83,7 @@ function previewFullCode(form: ItemFormData): string {
   if (oldPt !== form.process_type_code) {
     return `${prefix}???? (저장 시 부여)`;
   }
-  const opt = form.option_code ? `-${form.option_code}` : "";
-  return `${prefix}${serial}${opt}`;
+  return `${prefix}${serial}`;
 }
 
 function ItemCodeSection({
@@ -259,19 +257,6 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showItemCod
         )}
       </div>
 
-      {/* 옵션/스펙 코드 */}
-      <div>
-        <FieldLabel label="옵션/스펙 코드" />
-        <input
-          type="text"
-          value={form.option_code}
-          onChange={(e) => setForm((f) => ({ ...f, option_code: e.target.value.toUpperCase() }))}
-          placeholder="예: BG (블랙 유광), WM (화이트 무광)"
-          maxLength={10}
-          className="w-full rounded-[18px] border px-4 py-3 text-base outline-none"
-          style={inputStyle}
-        />
-      </div>
     </>
   );
 }

@@ -47,7 +47,6 @@ export const itemsApi = {
     min_stock?: number;
     initial_quantity?: number;
     model_slots?: number[];
-    option_code?: string;
   }) => postJson<Item>(toApiUrl("/api/items"), payload),
 
   updateItem: async (
@@ -61,7 +60,6 @@ export const itemsApi = {
       supplier?: string;
       min_stock?: number;
       item_code?: string;
-      option_code?: string;
       model_slots?: number[];
     },
   ) => putJson<Item>(toApiUrl(`/api/items/${itemId}`), payload),

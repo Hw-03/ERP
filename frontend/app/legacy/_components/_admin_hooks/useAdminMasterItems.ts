@@ -32,7 +32,6 @@ type UpdateItemPayload = {
   process_type_code?: string;
   unit?: string;
   model_slots?: number[];
-  option_code?: string;
   item_code?: string;
 };
 

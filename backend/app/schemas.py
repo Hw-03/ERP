@@ -41,7 +41,6 @@ class ItemCreate(BaseModel):
     min_stock: Optional[Decimal] = None
     initial_quantity: Optional[Decimal] = Field(None, description="초기 재고 수량 (기본 0)")
     model_slots: List[int] = Field(default=[], description="사용 제품 슬롯 목록 (1=DX3000, 2=COCOON, 3=SOLO, 4=ADX4000W, 5=ADX6000)")
-    option_code: Optional[str] = Field(None, max_length=10, description="옵션/스펙 코드 (예: BG)")
 
 
 class ItemUpdate(BaseModel):
@@ -53,7 +52,6 @@ class ItemUpdate(BaseModel):
     supplier: Optional[str] = Field(None, max_length=200)
     min_stock: Optional[Decimal] = None
     item_code: Optional[str] = Field(None, max_length=40)
-    option_code: Optional[str] = Field(None, max_length=10)
     model_slots: Optional[List[int]] = None
 
 
@@ -72,7 +70,6 @@ class ItemResponse(BaseModel):
     model_symbol: Optional[str] = None
     model_slots: List[int] = []
     process_type_code: Optional[str] = None
-    option_code: Optional[str] = None
     serial_no: Optional[int] = None
     bom_completed_at: Optional[UtcDatetime] = None
     deleted_at: Optional[UtcDatetime] = None
@@ -559,15 +556,6 @@ class WeeklyReportResponse(BaseModel):
     production_matrix: List[WeeklyProductionModelRow] = []
 
 
-class OptionCodeResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    code: str
-    label_ko: str
-    label_en: Optional[str]
-    color_hex: Optional[str]
-
-
 class ProcessTypeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -579,23 +567,21 @@ class ProcessTypeResponse(BaseModel):
 
 
 class ItemCodeParseRequest(BaseModel):
-    code: str = Field(..., description="4-part 품목 코드 문자열")
+    code: str = Field(..., description="3-part 품목 코드 문자열")
 
 
 class ItemCodeGenerateRequest(BaseModel):
     symbol: str = Field(..., min_length=1, max_length=5)
     process_type: str = Field(..., min_length=2, max_length=2)
-    option: Optional[str] = Field(None, min_length=2, max_length=2)
 
 
 class ItemCodeResponse(BaseModel):
     symbol: str
     process_type: str
     serial: int
-    option: Optional[str] = None
     symbol_slots: List[int]
-    formatted_full: str       # zero-padded: "3-PA-0012-BG"
-    formatted_compact: str    # leading zeros stripped: "3-PA-12-BG"
+    formatted_full: str       # zero-padded: "3-PA-0012"
+    formatted_compact: str    # leading zeros stripped: "3-PA-12"
 
 
 # =============================================================================

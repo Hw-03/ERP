@@ -1,10 +1,10 @@
-"""4-part 품목 코드 utilities: parse, format, validate, generate.
+"""3-part 품목 코드 utilities: parse, format, validate, generate.
 
-Code format: [제품기호]-[구분코드]-[일련번호]-[옵션코드]
+Code format: [제품기호]-[구분코드]-[일련번호]
 
 Examples
-    376-TR-0012-BG   (raw material shared across DX3000, COCOON, ADX6000FB)
-    3-PA-0012-WM     (DX3000 finished good, white matte)
+    376-TR-0012   (raw material shared across DX3000, COCOON, ADX6000FB)
+    3-PA-0012     (DX3000 finished good)
 
 Rules
     - Symbol is a non-empty string composed of single-slot digits (e.g. "3",
@@ -15,20 +15,18 @@ Rules
     - Process type is always exactly 2 characters from process_types.code.
     - Serial is a zero-padded integer (default width 4). Leading zeros are
       stripped on display via format_item_code(compact=True).
-    - Option is exactly 2 characters from option_codes.code, or empty/None
-      for items without options.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Item, OptionCode, ProcessType, ProductSymbol
+from app.models import Item, ProcessType, ProductSymbol
 
 
 SERIAL_PAD_WIDTH = 4
@@ -45,7 +43,6 @@ class ItemCode:
     symbol: str                  # e.g. "3" or "376"
     process_type: str            # e.g. "TR", "PA"
     serial: int                  # integer (no padding)
-    option: Optional[str] = None # e.g. "BG" or None
     symbol_slots: List[int] = field(default_factory=list)  # resolved slot ids
 
     def format(self, *, compact: bool = False) -> str:
@@ -58,21 +55,20 @@ class ItemCode:
 
 
 def parse_item_code(raw: str) -> ItemCode:
-    """Parse a 4-part code. Accepts both compact ("3-PA-12-BG") and zero-padded
-    ("3-PA-0012-BG") forms. Option segment is optional."""
+    """Parse a 3-part code. Accepts both compact ("3-PA-12") and zero-padded
+    ("3-PA-0012") forms."""
     if not raw or not isinstance(raw, str):
         raise ValueError("코드 문자열이 비었습니다.")
 
     tokens = raw.strip().upper().split("-")
-    if len(tokens) not in (3, 4):
-        raise ValueError(f"코드 토큰 개수가 잘못되었습니다: {raw!r} (3 또는 4개 기대)")
+    if len(tokens) != 3:
+        raise ValueError(f"코드 토큰 개수가 잘못되었습니다: {raw!r} (3개 기대)")
 
     for tok in tokens:
         if not tok or not CODE_TOKEN_RE.match(tok):
             raise ValueError(f"토큰에 허용되지 않는 문자가 있습니다: {tok!r}")
 
     symbol, process_type, serial_str = tokens[0], tokens[1], tokens[2]
-    option = tokens[3] if len(tokens) == 4 else None
 
     if not symbol.isdigit():
         raise ValueError(f"제품기호는 숫자만 허용됩니다: {symbol!r}")
@@ -84,14 +80,11 @@ def parse_item_code(raw: str) -> ItemCode:
         raise ValueError(f"일련번호는 정수여야 합니다: {serial_str!r}") from exc
     if serial < 0:
         raise ValueError("일련번호는 0 이상이어야 합니다.")
-    if option is not None and len(option) != 2:
-        raise ValueError(f"옵션코드는 2자여야 합니다: {option!r}")
 
     return ItemCode(
         symbol=symbol,
         process_type=process_type,
         serial=serial,
-        option=option,
         symbol_slots=_split_symbol(symbol),
     )
 
@@ -102,10 +95,7 @@ def format_item_code(code: ItemCode, *, compact: bool = False) -> str:
         serial_part = str(code.serial)
     else:
         serial_part = f"{code.serial:0{SERIAL_PAD_WIDTH}d}"
-    parts = [code.symbol, code.process_type, serial_part]
-    if code.option:
-        parts.append(code.option)
-    return "-".join(parts)
+    return "-".join([code.symbol, code.process_type, serial_part])
 
 
 def _split_symbol(symbol: str) -> List[int]:
@@ -155,11 +145,6 @@ def validate_code(db: Session, code: ItemCode) -> None:
                 f"기호 '{code.symbol}' 은(는) 완제품 배정 슬롯이 아닙니다."
             )
 
-    # Option (if present) must exist
-    if code.option:
-        opt_row = db.query(OptionCode).filter(OptionCode.code == code.option).one_or_none()
-        if opt_row is None:
-            raise ValueError(f"옵션코드 '{code.option}' 은(는) 정의되지 않았습니다.")
 
 
 # ---------------------------------------------------------------------------
@@ -188,19 +173,16 @@ def generate_code(
     *,
     symbol: str,
     process_type: str,
-    option: Optional[str] = None,
 ) -> ItemCode:
     """Build a new ItemCode with an auto-assigned serial. Validates against
     master tables before returning."""
     symbol = symbol.strip()
     process_type = process_type.strip().upper()
-    option = option.strip().upper() if option else None
 
     code = ItemCode(
         symbol=symbol,
         process_type=process_type,
         serial=next_serial(db, symbol, process_type),
-        option=option,
         symbol_slots=_split_symbol(symbol),
     )
     validate_code(db, code)

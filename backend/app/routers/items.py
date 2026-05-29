@@ -100,7 +100,6 @@ def _to_item_with_inventory(
         model_symbol=item.model_symbol,
         model_slots=model_slots,
         process_type_code=item.process_type_code,
-        option_code=item.option_code,
         serial_no=item.serial_no,
         bom_completed_at=item.bom_completed_at,
         deleted_at=item.deleted_at,
@@ -123,7 +122,6 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
     pt = payload.process_type_code or None
     model_slots = payload.model_slots or []
     model_sym = slots_to_model_symbol(model_slots) if model_slots else ""
-    opt = payload.option_code or None
 
     # (item_name, process_type_code) 동일한 활성 품목이 이미 있으면 409.
     # SQLite 라 DB 레벨 UniqueConstraint 가 없는 상태에서 앱 레벨 안전망.
@@ -147,7 +145,7 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
     item_code = None
     if pt and model_sym:
         serial = next_serial_no(model_sym, pt, db)
-        item_code = make_item_code(model_sym, pt, serial, opt)
+        item_code = make_item_code(model_sym, pt, serial)
 
     # 신규 항목은 목록 맨 끝으로. sort_order 미설정 시 NULL 이 되어 SQLite 가 맨앞에 정렬해버림.
     next_sort = (db.query(func.max(Item.sort_order)).scalar() or 0) + 1
@@ -162,7 +160,6 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         process_type_code=pt,
         model_symbol=model_sym or None,
         serial_no=serial,
-        option_code=opt,
         item_code=item_code,
         sort_order=next_sort,
     )
@@ -455,23 +452,20 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
             setattr(item, field, new_val)
             changed.append(field)
 
-    # 모델·카테고리·옵션 변경은 item_code 재계산 트리거.
+    # 모델·카테고리 변경은 item_code 재계산 트리거.
     # 의도: 사용자는 모델·카테고리만 바꾸고 item_code 는 자동 부여.
     #   - 모델만 변경 → serial 유지, prefix 만 새로.
     #   - 카테고리 변경 → 새 카테고리의 next_serial_no 부여 (번호 풀이 다르므로).
-    #   - 옵션 변경 → suffix 만 갱신.
     new_pt = payload.process_type_code if payload.process_type_code is not None else item.process_type_code
     if payload.model_slots is not None:
         new_model_sym = slots_to_model_symbol(payload.model_slots) or None
     else:
         new_model_sym = item.model_symbol
-    new_option = payload.option_code if payload.option_code is not None else item.option_code
 
     pt_changed = payload.process_type_code is not None and payload.process_type_code != item.process_type_code
     model_changed = payload.model_slots is not None and new_model_sym != item.model_symbol
-    option_changed = payload.option_code is not None and payload.option_code != item.option_code
 
-    if pt_changed or model_changed or option_changed:
+    if pt_changed or model_changed:
         # serial 결정: 카테고리 변경 시 새 카테고리에서 next_serial_no, 그 외엔 기존 유지.
         if pt_changed:
             if new_model_sym and new_pt:
@@ -481,13 +475,10 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
         if model_changed:
             item.model_symbol = new_model_sym
             changed.append("model_slots")
-        if option_changed:
-            item.option_code = new_option
-            changed.append("option_code")
 
         # item_code 재조립. model/category 가 비어있으면 None 으로 둠 (등록 직후 미완 상태와 동일).
         if new_model_sym and new_pt and item.serial_no:
-            item.item_code = make_item_code(new_model_sym, new_pt, item.serial_no, new_option or None)
+            item.item_code = make_item_code(new_model_sym, new_pt, item.serial_no)
             # 안전망 — 중복 검사 (이론상 발생 안 해야 함).
             dup = db.query(Item).filter(
                 Item.item_code == item.item_code,

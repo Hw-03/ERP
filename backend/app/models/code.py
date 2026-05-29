@@ -1,4 +1,4 @@
-"""제품 코드·공정 코드 마스터 (ProductSymbol / OptionCode / ProcessType)."""
+"""제품 코드·공정 코드 마스터 (ProductSymbol / ProcessType)."""
 
 from sqlalchemy import (
     Boolean,
@@ -13,7 +13,6 @@ from app.models.base import Base
 
 __all__ = [
     "ProductSymbol",
-    "OptionCode",
     "ProcessType",
 ]
 
@@ -30,15 +29,6 @@ class ProductSymbol(Base):
     notes = Column(Text, nullable=True)
     # 모델 관리 화면 표시 순서 (드래그 reorder 결과 저장). 기본값은 slot 과 동일하게 백필됨.
     display_order = Column(Integer, nullable=False, default=0, server_default="0")
-
-
-class OptionCode(Base):
-    __tablename__ = "option_codes"
-
-    code = Column(String(2), primary_key=True)
-    label_ko = Column(String(50), nullable=False)
-    label_en = Column(String(50), nullable=True)
-    color_hex = Column(String(7), nullable=True)
 
 
 class ProcessType(Base):

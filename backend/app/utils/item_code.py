@@ -1,7 +1,7 @@
-"""4-part item code generation utility.
+"""3-part item code generation utility.
 
-Format: {model_symbol}-{process_type}-{serial:04d}[-{option}]
-Example: 346-AR-0001, 3-PA-0001-BG, 34-TR-0023
+Format: {model_symbol}-{process_type}-{serial:04d}
+Example: 346-AR-0001, 3-PA-0001, 34-TR-0023
 model_symbol = 각 제품 기호를 오름차순 정렬해 연결 (DX3000→"3", ADX4000W→"4", ADX6000→"6")
 
 품목 분류 단일 기준은 process_type_code 18개 (README/docs/ITEM_CODE_RULES.md).
@@ -58,11 +58,9 @@ def make_item_code(
     model_symbol: str,
     process_type: str,
     serial_no: int,
-    option_code: str | None = None,
 ) -> str:
     """품목 코드 문자열 생성."""
-    base = f"{model_symbol}-{process_type}-{serial_no:04d}"
-    return f"{base}-{option_code}" if option_code else base
+    return f"{model_symbol}-{process_type}-{serial_no:04d}"
 
 
 def next_serial_no(model_symbol: str, process_type: str, db: Session) -> int:

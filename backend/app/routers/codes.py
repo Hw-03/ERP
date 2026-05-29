@@ -1,4 +1,4 @@
-"""Code master router: 제품기호 / 옵션 / 공정 / 흐름 + 4-파트 코드 파싱·생성."""
+"""Code master router: 제품기호 / 공정 / 흐름 + 3-파트 코드 파싱·생성."""
 
 from typing import List
 
@@ -6,13 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import OptionCode, ProcessType, ProductSymbol
+from app.models import ProcessType, ProductSymbol
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     ItemCodeGenerateRequest,
     ItemCodeParseRequest,
     ItemCodeResponse,
-    OptionCodeResponse,
     ProcessTypeResponse,
     ProductSymbolResponse,
     ProductSymbolUpdate,
@@ -78,14 +77,6 @@ def update_symbol(slot: int, payload: ProductSymbolUpdate, request: Request, db:
     return row
 
 
-# ---- Option Codes -----------------------------------------------------------
-
-
-@router.get("/options", response_model=List[OptionCodeResponse], summary="옵션 코드 목록")
-def list_options(db: Session = Depends(get_db)):
-    return db.query(OptionCode).order_by(OptionCode.code).all()
-
-
 # ---- Process Types ----------------------------------------------------------
 
 
@@ -97,7 +88,7 @@ def list_process_types(db: Session = Depends(get_db)):
 # ---- 4-part code operations ------------------------------------------------
 
 
-@router.post("/parse", response_model=ItemCodeResponse, summary="4-파트 품목 코드 파싱")
+@router.post("/parse", response_model=ItemCodeResponse, summary="3-파트 품목 코드 파싱")
 def parse_code(payload: ItemCodeParseRequest, db: Session = Depends(get_db)):
     try:
         code = code_svc.parse_item_code(payload.code)
@@ -108,7 +99,6 @@ def parse_code(payload: ItemCodeParseRequest, db: Session = Depends(get_db)):
         symbol=code.symbol,
         process_type=code.process_type,
         serial=code.serial,
-        option=code.option,
         symbol_slots=code.symbol_slots,
         formatted_full=code.format(compact=False),
         formatted_compact=code.format(compact=True),
@@ -119,7 +109,7 @@ def parse_code(payload: ItemCodeParseRequest, db: Session = Depends(get_db)):
     "/generate",
     response_model=ItemCodeResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="4-파트 품목 코드 자동 생성",
+    summary="3-파트 품목 코드 자동 생성",
 )
 def generate_code(payload: ItemCodeGenerateRequest, db: Session = Depends(get_db)):
     try:
@@ -127,7 +117,6 @@ def generate_code(payload: ItemCodeGenerateRequest, db: Session = Depends(get_db
             db,
             symbol=payload.symbol,
             process_type=payload.process_type,
-            option=payload.option,
         )
     except ValueError as exc:
         raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, str(exc))
@@ -135,7 +124,6 @@ def generate_code(payload: ItemCodeGenerateRequest, db: Session = Depends(get_db
         symbol=code.symbol,
         process_type=code.process_type,
         serial=code.serial,
-        option=code.option,
         symbol_slots=code.symbol_slots,
         formatted_full=code.format(compact=False),
         formatted_compact=code.format(compact=True),

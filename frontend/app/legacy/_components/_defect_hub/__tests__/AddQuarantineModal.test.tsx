@@ -39,7 +39,6 @@ const mockItem = {
   model_symbol: null,
   model_slots: [],
   process_type_code: "TR",
-  option_code: null,
   serial_no: null,
   bom_completed_at: null,
   created_at: "2026-01-01T00:00:00.000Z",

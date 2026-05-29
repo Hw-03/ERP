@@ -22,7 +22,6 @@ export const EMPTY_ADD_FORM = {
   process_type_code: "TR",
   unit: "EA",
   model_slots: [] as number[],
-  option_code: "",
   legacy_item_type: "",
   supplier: "",
   min_stock: "",
