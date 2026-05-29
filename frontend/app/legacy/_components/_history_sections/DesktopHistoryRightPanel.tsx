@@ -79,7 +79,12 @@ export function DesktopHistoryRightPanel({
       {displaySelection?.kind === "batch" && (() => {
         const batch = batchCache.get(displaySelection.batchId) ?? null;
         const first = displaySelection.logs[0];
-        const titleText = batch && batch.bundles.length > 0
+        // 재작업(DISASSEMBLE 포함) batch 는 헤더 행과 동일하게 부모 품목명으로 표기.
+        // bundles[0].title 은 created_at 정렬에 따라 자식 부품명이 올 수 있어 헷갈림.
+        const disassembleLog = displaySelection.logs.find((l) => l.transaction_type === "DISASSEMBLE");
+        const titleText = disassembleLog
+          ? `${disassembleLog.item_name} 재작업`
+          : batch && batch.bundles.length > 0
           ? (batch.bundles.length > 1
               ? `${batch.bundles[0].title} 외 ${batch.bundles.length - 1}건`
               : batch.bundles[0].title)

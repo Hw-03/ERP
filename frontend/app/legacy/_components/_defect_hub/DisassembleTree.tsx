@@ -313,17 +313,21 @@ function TreeNode({
             type="button"
             onClick={expanded ? handleCollapse : handleExpand}
             disabled={expanding}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-black/5"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors hover:brightness-110"
+            style={{
+              background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`,
+              border: `1px solid color-mix(in srgb, ${LEGACY_COLORS.blue} 30%, transparent)`,
+            }}
             aria-label={expanded ? "접기" : "펼치기"}
           >
             {expanded ? (
               <ChevronDown className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
             ) : (
-              <ChevronRight className="h-4 w-4" style={{ color: LEGACY_COLORS.muted2 }} />
+              <ChevronRight className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
             )}
           </button>
         ) : (
-          <span className="inline-block w-6 shrink-0" />
+          <span className="inline-block w-7 shrink-0" />
         )}
         <Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
         <span className="text-sm font-black truncate" style={{ color: LEGACY_COLORS.text }}>
