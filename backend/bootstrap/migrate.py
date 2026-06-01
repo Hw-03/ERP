@@ -446,6 +446,107 @@ def _drop_dead_m1_objects() -> None:
         raw.close()
 
 
+def _unify_quantity_columns_to_integer() -> None:
+    """수량 컬럼 선언타입 NUMERIC(15,4)/REAL → INTEGER 통일 (스키마 진실화).
+
+    앱은 이미 IntQuantity 로 쓰기 시점 int 강제 — 이 함수는 기존 DB 선언타입만 모델과
+    일치시킨다(동작 변화 없음). fresh DB 는 create_all 이 이미 INTEGER 라 전부 NO-OP.
+    items 등 자식 FK 많은 테이블 포함 → _drop_dead_m1_objects 와 동일하게 raw_connection +
+    PRAGMA foreign_keys=OFF(트랜잭션 밖). 현재 sqlite_master DDL 을 읽어 수량 컬럼 타입만 치환
+    → ORM 드리프트(없던 FK·중복 인덱스) 회피. 멱등 — 대상 컬럼이 이미 INTEGER 면 스킵.
+    """
+    import re
+
+    qty_cols = {
+        "items": {"min_stock"},
+        "bom": {"quantity"},
+        "inventory": {"quantity", "warehouse_qty", "pending_quantity"},
+        "inventory_locations": {"quantity"},
+        "transaction_logs": {"quantity_change", "quantity_before", "quantity_after", "transfer_qty"},
+        "io_bundles": {"quantity"},
+        "io_lines": {"quantity", "bom_expected", "shortage"},
+        "stock_request_lines": {"quantity"},
+    }
+    # io_lines 는 stock_request_lines.operation_line_id 가 참조 → 먼저. items 는 자식 7개라 마지막.
+    order = [
+        "bom", "inventory", "inventory_locations", "transaction_logs",
+        "io_bundles", "io_lines", "stock_request_lines", "items",
+    ]
+
+    # 0) 소수 수량 올림(ceil) — 정수 전용 정책 위반 데이터 정리. 타입 재생성보다 먼저 해야
+    #    INTEGER 컬럼에 REAL 값(0.1 등)이 잔류하지 않는다. 멱등(소수 없으면 NO-OP).
+    with engine.begin() as conn:
+        for tbl, cols in qty_cols.items():
+            for col in cols:
+                conn.execute(text(
+                    f"UPDATE {tbl} SET {col} = CAST({col} AS INTEGER) + "
+                    f"(CASE WHEN {col} > CAST({col} AS INTEGER) THEN 1 ELSE 0 END) "
+                    f"WHERE {col} IS NOT NULL AND {col} <> CAST({col} AS INTEGER)"
+                ))
+
+    raw = engine.raw_connection()
+    try:
+        cur = raw.cursor()
+        for table in order:
+            cur.execute(f"PRAGMA table_info({table})")
+            info = [(r[1], (r[2] or "")) for r in cur.fetchall()]
+            if not info:
+                continue  # 테이블 부재(방어)
+            targets = qty_cols[table]
+            need = [c for c, t in info if c in targets and t.strip().upper() != "INTEGER"]
+            if not need:
+                continue  # 이미 INTEGER → 멱등 스킵
+
+            cur.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,))
+            create_sql = cur.fetchone()[0]
+            cur.execute(
+                "SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name=? AND sql IS NOT NULL",
+                (table,),
+            )
+            index_sqls = [r[0] for r in cur.fetchall()]
+
+            typed_sql = create_sql
+            for col in need:
+                typed_sql = re.sub(
+                    rf"(\b{re.escape(col)}\b\s+)(NUMERIC\s*\(\s*\d+\s*,\s*\d+\s*\)|REAL)",
+                    r"\1INTEGER",
+                    typed_sql,
+                )
+            if typed_sql == create_sql:
+                # 대상 컬럼이 변환 가능한 타입(NUMERIC/REAL)이 아님 → 불필요한 재생성 방지, 스킵
+                continue
+            new_create = re.sub(
+                rf'CREATE TABLE\s+(?:IF NOT EXISTS\s+)?("?){re.escape(table)}\1',
+                f"CREATE TABLE {table}_new",
+                typed_sql,
+                count=1,
+            )
+
+            allcols = ", ".join(f'"{c}"' for c, _ in info)
+
+            cur.execute("PRAGMA foreign_keys=OFF")
+            try:
+                cur.execute("BEGIN")
+                cur.execute(new_create)
+                cur.execute(f"INSERT INTO {table}_new ({allcols}) SELECT {allcols} FROM {table}")
+                cur.execute(f"DROP TABLE {table}")
+                cur.execute(f"ALTER TABLE {table}_new RENAME TO {table}")
+                for isql in index_sqls:
+                    cur.execute(isql)
+                violations = cur.execute("PRAGMA foreign_key_check").fetchall()
+                if violations:
+                    raise RuntimeError(f"foreign_key_check 위반(after {table} rebuild): {violations}")
+                cur.execute("COMMIT")
+            except Exception:
+                cur.execute("ROLLBACK")
+                raise
+            finally:
+                cur.execute("PRAGMA foreign_keys=ON")
+        cur.close()
+    finally:
+        raw.close()
+
+
 def _drop_dead_transaction_type_enum_values() -> None:
     """PG only: transaction_type_enum 에서 죽은 5종 값(SCRAP/LOSS/RETURN/
     RESERVE/RESERVE_RELEASE)을 제거.
@@ -794,6 +895,15 @@ def run_migrations() -> dict[str, object]:
         _rename_item_code_to_mes_code()
     except Exception as exc:  # noqa: BLE001
         msg = f"[migrate] item_code → mes_code rename failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
+
+    # 2026-06-02: 수량 컬럼 선언타입 NUMERIC/REAL → INTEGER 정합 (스키마 진실화). 멱등.
+    # 테이블 재생성을 동반하므로 모든 컬럼 rename 이후(맨 끝)에 실행.
+    try:
+        _unify_quantity_columns_to_integer()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] quantity column integer unify failed: {exc}"
         errors.append(msg)
         logger.warning(msg, exc_info=False)
 
