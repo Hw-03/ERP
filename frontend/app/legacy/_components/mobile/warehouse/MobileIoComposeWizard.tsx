@@ -53,21 +53,6 @@ function locationQuantity(
   );
 }
 
-// Pydantic Decimal 은 JSON 에서 문자열("1.0000")로 직렬화된다 — number 로 타이핑돼 있으나 실값은 string.
-// stepper 산술/합계가 string concat 으로 깨지므로 bundle 수신 즉시 number 로 정규화.
-function normalizeBundles(bundles: IoBundle[]): IoBundle[] {
-  return bundles.map((bundle) => ({
-    ...bundle,
-    quantity: Number(bundle.quantity),
-    lines: bundle.lines.map((line) => ({
-      ...line,
-      quantity: Number(line.quantity),
-      shortage: Number(line.shortage),
-      bom_expected: line.bom_expected == null ? null : Number(line.bom_expected),
-    })),
-  }));
-}
-
 const STEP_META: { key: string; label: string }[] = [
   { key: "1", label: "작업 유형" },
   { key: "2", label: "세부 작업" },
@@ -145,7 +130,6 @@ export function MobileIoComposeWizard({
     restoredDraftRef,
     autosaveBatchIdRef,
     state,
-    normalizeBundles,
     onStatusChange,
   });
 
@@ -212,7 +196,7 @@ export function MobileIoComposeWizard({
         toDepartment: state.toDepartment,
         target: { source_kind: sourceKind, item_id: item.item_id, quantity: prevQty + 1 },
       });
-      const newBundles = normalizeBundles(response.bundles);
+      const newBundles = response.bundles;
       if (existingIdx !== -1) {
         state.setBundles((prev) => {
           const next = [...prev];
