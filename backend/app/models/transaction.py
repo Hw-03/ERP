@@ -10,7 +10,6 @@ from sqlalchemy import (
     Enum as SAEnum,
     ForeignKey,
     Index,
-    Numeric,
     String,
     Text,
     func,
@@ -18,7 +17,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import Base
+from app.models.base import Base, IntQuantity
 
 __all__ = [
     "TransactionTypeEnum",
@@ -53,10 +52,10 @@ class TransactionLog(Base):
         nullable=False,
         index=True,
     )
-    quantity_change = Column(Numeric(15, 4), nullable=False)
-    quantity_before = Column(Numeric(15, 4), nullable=True)
-    quantity_after = Column(Numeric(15, 4), nullable=True)
-    transfer_qty = Column(Numeric(15, 4), nullable=True)
+    quantity_change = Column(IntQuantity, nullable=False)
+    quantity_before = Column(IntQuantity, nullable=True)
+    quantity_after = Column(IntQuantity, nullable=True)
+    transfer_qty = Column(IntQuantity, nullable=True)
     reference_no = Column(String(100), nullable=True, index=True)
     produced_by = Column(String(100), nullable=True)
     notes = Column(Text, nullable=True)

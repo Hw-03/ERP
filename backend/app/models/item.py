@@ -14,7 +14,6 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
-    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -23,7 +22,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import Base
+from app.models.base import Base, IntQuantity
 
 __all__ = [
     "Item",
@@ -52,7 +51,7 @@ class Item(Base):
     legacy_part = Column(String(50), nullable=True, index=True)       # 자재창고/조립출하/고압파트/진공파트/튜닝파트/출하
     legacy_item_type = Column(String(50), nullable=True)              # part_type from CSV
     supplier = Column(String(200), nullable=True)
-    min_stock = Column(Numeric(15, 4), nullable=True)
+    min_stock = Column(IntQuantity, nullable=True)
 
     # 3-part item code ([모델기호조합]-[구분코드]-[일련번호])
     mes_code = Column(String(40), nullable=True, unique=True, index=True)
@@ -87,7 +86,7 @@ class BOM(Base):
     bom_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     parent_item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
     child_item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
-    quantity = Column(Numeric(15, 4), nullable=False)
+    quantity = Column(IntQuantity, nullable=False)
     unit = Column(String(20), nullable=False, default="EA")
     notes = Column(Text, nullable=True)
 

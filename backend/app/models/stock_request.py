@@ -12,7 +12,6 @@ from sqlalchemy import (
     Enum as SAEnum,
     ForeignKey,
     Index,
-    Numeric,
     String,
     Text,
     func,
@@ -20,7 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import Base
+from app.models.base import Base, IntQuantity
 
 __all__ = [
     "StockRequestStatusEnum",
@@ -168,7 +167,7 @@ class StockRequestLine(Base):
     )
     item_name_snapshot = Column(String(200), nullable=False)
     mes_code_snapshot = Column(String(50), nullable=True)
-    quantity = Column(Numeric(15, 4), nullable=False)
+    quantity = Column(IntQuantity, nullable=False)
     from_bucket = Column(
         SAEnum(RequestBucketEnum, name="request_bucket_enum", create_type=True),
         nullable=False,

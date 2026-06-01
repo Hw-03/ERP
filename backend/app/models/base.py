@@ -6,7 +6,7 @@
 
 import enum
 
-from sqlalchemy import String
+from sqlalchemy import Integer, String
 from sqlalchemy.types import TypeDecorator
 
 from app.database import Base  # noqa: F401 — re-export
@@ -14,6 +14,7 @@ from app.database import Base  # noqa: F401 — re-export
 __all__ = [
     "Base",
     "BoolAsString",
+    "IntQuantity",
     "DepartmentEnum",
     "DeptAdjSubTypeEnum",
 ]
@@ -45,6 +46,22 @@ class BoolAsString(TypeDecorator):
         if isinstance(value, bool):
             return value
         return str(value).lower() in ("true", "1", "yes", "t")
+
+
+class IntQuantity(TypeDecorator):
+    """수량 전용 정수 타입 — 바인딩 시 Decimal/float/str 입력을 int 로 강제.
+
+    전 품목 EA 단위라 수량엔 소수가 없다(소수 입력은 schemas 의 int 가 422 로 거부).
+    서비스가 계산 편의로 Decimal 을 넘겨도 DB 에는 정수만 저장되도록 경계에서 강제한다.
+    """
+
+    impl = Integer
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        return int(value)
 
 
 class DepartmentEnum(str, enum.Enum):

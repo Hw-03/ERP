@@ -2,7 +2,6 @@
 
 import uuid
 from datetime import datetime
-from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
@@ -12,7 +11,6 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
-    Numeric,
     String,
     Text,
     func,
@@ -20,7 +18,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import Base
+from app.models.base import Base, IntQuantity
 
 __all__ = [
     "IoBatch",
@@ -96,7 +94,7 @@ class IoBundle(Base):
         index=True,
     )
     title_snapshot = Column(String(220), nullable=False)
-    quantity = Column(Numeric(15, 4), nullable=False)
+    quantity = Column(IntQuantity, nullable=False)
     expanded_level = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
 
@@ -136,13 +134,13 @@ class IoLine(Base):
     from_department = Column(String(50), nullable=True)
     to_bucket = Column(String(20), nullable=False)
     to_department = Column(String(50), nullable=True)
-    quantity = Column(Numeric(15, 4), nullable=False)
-    bom_expected = Column(Numeric(15, 4), nullable=True)
+    quantity = Column(IntQuantity, nullable=False)
+    bom_expected = Column(IntQuantity, nullable=True)
     included = Column(Boolean, nullable=False, default=True)
     origin = Column(String(24), nullable=False)
     edited = Column(Boolean, nullable=False, default=False)
     has_children_snapshot = Column(Boolean, nullable=False, default=False)
-    shortage = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
+    shortage = Column(IntQuantity, nullable=False, default=0)
     exclusion_note = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
 

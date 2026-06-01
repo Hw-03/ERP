@@ -3,7 +3,6 @@
 import enum
 import uuid
 from datetime import datetime
-from decimal import Decimal
 
 from sqlalchemy import (
     CheckConstraint,
@@ -12,7 +11,7 @@ from sqlalchemy import (
     Enum as SAEnum,
     ForeignKey,
     Index,
-    Numeric,
+    Integer,
     String,
     UniqueConstraint,
     func,
@@ -20,7 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import Base
+from app.models.base import Base, IntQuantity
 
 __all__ = [
     "LocationStatusEnum",
@@ -46,11 +45,11 @@ class Inventory(Base):
         index=True,
     )
     # quantity = warehouse_qty + Σ(InventoryLocation.quantity). 서비스 레이어가 동기화 보장.
-    quantity = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
+    quantity = Column(IntQuantity, nullable=False, default=0)
     # 창고 보관량. 가용 재고 계산에 포함.
-    warehouse_qty = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
+    warehouse_qty = Column(IntQuantity, nullable=False, default=0)
     # 큐 배치 예약분 (warehouse_qty 대비). Available = warehouse + production_total − pending.
-    pending_quantity = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
+    pending_quantity = Column(IntQuantity, nullable=False, default=0)
     last_reserver_employee_id = Column(
         UUID(as_uuid=True),
         ForeignKey("employees.employee_id", ondelete="SET NULL"),
@@ -99,7 +98,7 @@ class InventoryLocation(Base):
         nullable=False,
         index=True,
     )
-    quantity = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
+    quantity = Column(IntQuantity, nullable=False, default=0)
     updated_at = Column(
         DateTime,
         nullable=False,
