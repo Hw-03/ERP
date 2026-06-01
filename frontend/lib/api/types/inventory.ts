@@ -14,7 +14,7 @@ export interface InventorySummary {
 export interface InventoryMutationResponse {
   inventory_id: string;
   item_id: string;
-  quantity: string;
+  quantity: number;
   location: string | null;
   updated_at: string;
 }

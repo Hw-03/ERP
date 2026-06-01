@@ -30,7 +30,7 @@ const sampleSummary: InventorySummary = {
 const sampleMutationResponse: InventoryMutationResponse = {
   inventory_id: "inv-1",
   item_id: "item-1",
-  quantity: "10",
+  quantity: 10,
   location: null,
   updated_at: "2026-05-01T09:00:00Z",
 };

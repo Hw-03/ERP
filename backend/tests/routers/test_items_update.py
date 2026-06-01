@@ -77,17 +77,24 @@ def test_update_item_supplier(client, make_item):
     assert res.json()["supplier"] == "신규공급사 ABC"
 
 
-def test_update_item_min_stock_decimal(client, make_item):
-    """min_stock 은 Decimal — 문자열 / 숫자 둘 다 허용되는지."""
+def test_update_item_min_stock_integer_only(client, make_item):
+    """min_stock 은 정수 전용 — 소수는 거부(422), 정수는 허용·정수 직렬화."""
     item = make_item(name="안전재고", process_type_code="VR")
 
+    # 소수는 거부
     res = client.put(
         f"/api/items/{item.item_id}",
         json={"min_stock": "12.5"},
     )
+    assert res.status_code == 422, res.text
+
+    # 정수는 허용 + 정수(JSON number)로 직렬화
+    res = client.put(
+        f"/api/items/{item.item_id}",
+        json={"min_stock": 12},
+    )
     assert res.status_code == 200, res.text
-    # 응답 직렬화는 string 또는 float — 둘 다 12.5 동등성으로 검증
-    assert float(res.json()["min_stock"]) == 12.5
+    assert res.json()["min_stock"] == 12
 
 
 def test_update_item_empty_payload_no_change(client, make_item):

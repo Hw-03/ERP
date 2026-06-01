@@ -325,18 +325,10 @@
             "type": "string"
           },
           "quantity": {
-            "anyOf": [
-              {
-                "exclusiveMinimum": 0.0,
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
             "description": "필요 수량",
-            "title": "Quantity"
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
           },
           "unit": {
             "default": "EA",
@@ -402,9 +394,8 @@
             "title": "Parent Mes Code"
           },
           "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
-            "type": "string"
+            "type": "integer"
           },
           "unit": {
             "title": "Unit",
@@ -454,9 +445,8 @@
             "type": "string"
           },
           "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
-            "type": "string"
+            "type": "integer"
           },
           "unit": {
             "title": "Unit",
@@ -485,10 +475,9 @@
             "type": "array"
           },
           "current_stock": {
-            "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "default": 0,
             "title": "Current Stock",
-            "type": "string"
+            "type": "integer"
           },
           "item_id": {
             "format": "uuid",
@@ -522,9 +511,8 @@
             "title": "Process Type Code"
           },
           "required_quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Required Quantity",
-            "type": "string"
+            "type": "integer"
           },
           "unit": {
             "title": "Unit",
@@ -546,11 +534,7 @@
             "anyOf": [
               {
                 "exclusiveMinimum": 0.0,
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
@@ -629,19 +613,16 @@
             "title": "Process Type Code"
           },
           "required_quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Required Quantity",
-            "type": "string"
+            "type": "integer"
           },
           "stock_after": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Stock After",
-            "type": "string"
+            "type": "integer"
           },
           "stock_before": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Stock Before",
-            "type": "string"
+            "type": "integer"
           }
         },
         "required": [
@@ -1414,17 +1395,9 @@
             "title": "Produced By"
           },
           "quantity": {
-            "anyOf": [
-              {
-                "exclusiveMinimum": 0.0,
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
-            "title": "Quantity"
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
           },
           "reference_no": {
             "anyOf": [
@@ -2091,18 +2064,10 @@
             "title": "Produced By"
           },
           "quantity": {
-            "anyOf": [
-              {
-                "minimum": 0.0,
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
             "description": "조정 후 최종 수량",
-            "title": "Quantity"
+            "minimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
           },
           "reason": {
             "description": "조정 사유",
@@ -2140,9 +2105,8 @@
             "type": "string"
           },
           "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
-            "type": "string"
+            "type": "integer"
           },
           "status": {
             "$ref": "#/components/schemas/LocationStatusEnum"
@@ -2203,18 +2167,10 @@
             "title": "Produced By"
           },
           "quantity": {
-            "anyOf": [
-              {
-                "exclusiveMinimum": 0.0,
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
             "description": "입고 수량",
-            "title": "Quantity"
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
           },
           "reference_no": {
             "anyOf": [
@@ -2240,16 +2196,14 @@
       "InventoryResponse": {
         "properties": {
           "available_quantity": {
-            "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "default": 0,
             "title": "Available Quantity",
-            "type": "string"
+            "type": "integer"
           },
           "defective_total": {
-            "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "default": 0,
             "title": "Defective Total",
-            "type": "string"
+            "type": "integer"
           },
           "inventory_id": {
             "format": "uuid",
@@ -2292,21 +2246,18 @@
             "type": "array"
           },
           "pending_quantity": {
-            "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "default": 0,
             "title": "Pending Quantity",
-            "type": "string"
+            "type": "integer"
           },
           "production_total": {
-            "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "default": 0,
             "title": "Production Total",
-            "type": "string"
+            "type": "integer"
           },
           "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
-            "type": "string"
+            "type": "integer"
           },
           "updated_at": {
             "format": "date-time",
@@ -2314,10 +2265,9 @@
             "type": "string"
           },
           "warehouse_qty": {
-            "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "default": 0,
             "title": "Warehouse Qty",
-            "type": "string"
+            "type": "integer"
           }
         },
         "required": [
@@ -2344,9 +2294,8 @@
             "type": "integer"
           },
           "total_quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Quantity",
-            "type": "string"
+            "type": "integer"
           }
         },
         "required": [
@@ -2389,7 +2338,7 @@
           },
           "bundles": {
             "items": {
-              "$ref": "#/components/schemas/IoBundlePayload-Output"
+              "$ref": "#/components/schemas/IoBundlePayload"
             },
             "title": "Bundles",
             "type": "array"
@@ -2529,7 +2478,7 @@
         "title": "IoBatchResponse",
         "type": "object"
       },
-      "IoBundlePayload-Input": {
+      "IoBundlePayload": {
         "properties": {
           "bundle_id": {
             "format": "uuid",
@@ -2543,87 +2492,14 @@
           },
           "lines": {
             "items": {
-              "$ref": "#/components/schemas/IoLinePayload-Input"
+              "$ref": "#/components/schemas/IoLinePayload"
             },
             "title": "Lines",
             "type": "array"
           },
           "quantity": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
-            "title": "Quantity"
-          },
-          "source_item_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Item Id"
-          },
-          "source_kind": {
-            "title": "Source Kind",
-            "type": "string"
-          },
-          "source_mes_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Mes Code"
-          },
-          "title": {
-            "title": "Title",
-            "type": "string"
-          }
-        },
-        "required": [
-          "bundle_id",
-          "source_kind",
-          "title",
-          "quantity"
-        ],
-        "title": "IoBundlePayload",
-        "type": "object"
-      },
-      "IoBundlePayload-Output": {
-        "properties": {
-          "bundle_id": {
-            "format": "uuid",
-            "title": "Bundle Id",
-            "type": "string"
-          },
-          "expanded_level": {
-            "default": 1,
-            "title": "Expanded Level",
-            "type": "integer"
-          },
-          "lines": {
-            "items": {
-              "$ref": "#/components/schemas/IoLinePayload-Output"
-            },
-            "title": "Lines",
-            "type": "array"
-          },
-          "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
-            "type": "string"
+            "type": "integer"
           },
           "source_item_id": {
             "anyOf": [
@@ -2670,7 +2546,7 @@
         "properties": {
           "bundles": {
             "items": {
-              "$ref": "#/components/schemas/IoBundlePayload-Input"
+              "$ref": "#/components/schemas/IoBundlePayload"
             },
             "title": "Bundles",
             "type": "array"
@@ -2754,16 +2630,12 @@
         "title": "IoDraftUpsert",
         "type": "object"
       },
-      "IoLinePayload-Input": {
+      "IoLinePayload": {
         "properties": {
           "bom_expected": {
             "anyOf": [
               {
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
@@ -2846,162 +2718,13 @@
             "type": "string"
           },
           "quantity": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
-            "title": "Quantity"
-          },
-          "shortage": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
-            "default": "0",
-            "title": "Shortage"
-          },
-          "to_bucket": {
-            "title": "To Bucket",
-            "type": "string"
-          },
-          "to_department": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "To Department"
-          },
-          "unit": {
-            "default": "EA",
-            "title": "Unit",
-            "type": "string"
-          }
-        },
-        "required": [
-          "line_id",
-          "item_id",
-          "item_name",
-          "direction",
-          "from_bucket",
-          "to_bucket",
-          "quantity",
-          "origin"
-        ],
-        "title": "IoLinePayload",
-        "type": "object"
-      },
-      "IoLinePayload-Output": {
-        "properties": {
-          "bom_expected": {
-            "anyOf": [
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Bom Expected"
-          },
-          "direction": {
-            "title": "Direction",
-            "type": "string"
-          },
-          "edited": {
-            "default": false,
-            "title": "Edited",
-            "type": "boolean"
-          },
-          "exclusion_note": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Exclusion Note"
-          },
-          "from_bucket": {
-            "title": "From Bucket",
-            "type": "string"
-          },
-          "from_department": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "From Department"
-          },
-          "has_children": {
-            "default": false,
-            "title": "Has Children",
-            "type": "boolean"
-          },
-          "included": {
-            "default": true,
-            "title": "Included",
-            "type": "boolean"
-          },
-          "item_id": {
-            "format": "uuid",
-            "title": "Item Id",
-            "type": "string"
-          },
-          "item_name": {
-            "title": "Item Name",
-            "type": "string"
-          },
-          "line_id": {
-            "format": "uuid",
-            "title": "Line Id",
-            "type": "string"
-          },
-          "mes_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Mes Code"
-          },
-          "origin": {
-            "title": "Origin",
-            "type": "string"
-          },
-          "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
-            "type": "string"
+            "type": "integer"
           },
           "shortage": {
-            "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "default": 0,
             "title": "Shortage",
-            "type": "string"
+            "type": "integer"
           },
           "to_bucket": {
             "title": "To Bucket",
@@ -3102,7 +2825,7 @@
         "properties": {
           "bundles": {
             "items": {
-              "$ref": "#/components/schemas/IoBundlePayload-Output"
+              "$ref": "#/components/schemas/IoBundlePayload"
             },
             "title": "Bundles",
             "type": "array"
@@ -3144,18 +2867,10 @@
             "title": "Item Id"
           },
           "quantity": {
-            "anyOf": [
-              {
-                "exclusiveMinimum": 0.0,
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
-            "default": "1",
-            "title": "Quantity"
+            "default": 1,
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
           },
           "source_kind": {
             "default": "direct_item",
@@ -3171,7 +2886,7 @@
         "properties": {
           "bundles": {
             "items": {
-              "$ref": "#/components/schemas/IoBundlePayload-Input"
+              "$ref": "#/components/schemas/IoBundlePayload"
             },
             "title": "Bundles",
             "type": "array"
@@ -3299,11 +3014,7 @@
           "initial_quantity": {
             "anyOf": [
               {
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
@@ -3345,11 +3056,7 @@
           "min_stock": {
             "anyOf": [
               {
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
@@ -3521,8 +3228,7 @@
           "min_stock": {
             "anyOf": [
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
@@ -3655,11 +3361,7 @@
           "min_stock": {
             "anyOf": [
               {
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
@@ -3725,10 +3427,9 @@
       "ItemWithInventory": {
         "properties": {
           "available_quantity": {
-            "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "default": 0,
             "title": "Available Quantity",
-            "type": "string"
+            "type": "integer"
           },
           "bom_completed_at": {
             "anyOf": [
@@ -3748,10 +3449,9 @@
             "type": "string"
           },
           "defective_total": {
-            "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "default": 0,
             "title": "Defective Total",
-            "type": "string"
+            "type": "integer"
           },
           "deleted_at": {
             "anyOf": [
@@ -3851,8 +3551,7 @@
           "min_stock": {
             "anyOf": [
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
@@ -3880,10 +3579,9 @@
             "title": "Model Symbol"
           },
           "pending_quantity": {
-            "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "default": 0,
             "title": "Pending Quantity",
-            "type": "string"
+            "type": "integer"
           },
           "process_type_code": {
             "anyOf": [
@@ -3897,22 +3595,20 @@
             "title": "Process Type Code"
           },
           "production_total": {
-            "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "default": 0,
             "title": "Production Total",
-            "type": "string"
+            "type": "integer"
           },
           "quantity": {
             "anyOf": [
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "default": "0",
+            "default": 0,
             "title": "Quantity"
           },
           "serial_no": {
@@ -3947,10 +3643,9 @@
             "type": "string"
           },
           "warehouse_qty": {
-            "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "default": 0,
             "title": "Warehouse Qty",
-            "type": "string"
+            "type": "integer"
           }
         },
         "required": [
@@ -3992,17 +3687,9 @@
             "title": "Operator"
           },
           "quantity": {
-            "anyOf": [
-              {
-                "exclusiveMinimum": 0.0,
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
-            "title": "Quantity"
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
           },
           "reason": {
             "anyOf": [
@@ -4194,10 +3881,9 @@
       "ProcessTypeSummary": {
         "properties": {
           "defective_qty_sum": {
-            "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "default": 0,
             "title": "Defective Qty Sum",
-            "type": "string"
+            "type": "integer"
           },
           "item_count": {
             "title": "Item Count",
@@ -4212,21 +3898,18 @@
             "type": "string"
           },
           "production_qty_sum": {
-            "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "default": 0,
             "title": "Production Qty Sum",
-            "type": "string"
+            "type": "integer"
           },
           "total_quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Quantity",
-            "type": "string"
+            "type": "integer"
           },
           "warehouse_qty_sum": {
-            "default": "0",
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "default": 0,
             "title": "Warehouse Qty Sum",
-            "type": "string"
+            "type": "integer"
           }
         },
         "required": [
@@ -4557,18 +4240,10 @@
             "title": "Produced By"
           },
           "quantity": {
-            "anyOf": [
-              {
-                "exclusiveMinimum": 0.0,
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
             "description": "생산 수량",
-            "title": "Quantity"
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
           },
           "reference_no": {
             "anyOf": [
@@ -4614,9 +4289,8 @@
             "type": "string"
           },
           "produced_quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Produced Quantity",
-            "type": "string"
+            "type": "integer"
           },
           "reference_no": {
             "anyOf": [
@@ -4746,9 +4420,8 @@
             "type": "string"
           },
           "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
-            "type": "string"
+            "type": "integer"
           },
           "request_code": {
             "anyOf": [
@@ -5030,17 +4703,9 @@
             "type": "string"
           },
           "quantity": {
-            "anyOf": [
-              {
-                "exclusiveMinimum": 0.0,
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
-            "title": "Quantity"
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
           },
           "to_bucket": {
             "$ref": "#/components/schemas/RequestBucketEnum"
@@ -5125,9 +4790,8 @@
             "title": "Operation Line Id"
           },
           "quantity": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
-            "type": "string"
+            "type": "integer"
           },
           "request_id": {
             "format": "uuid",
@@ -5526,17 +5190,9 @@
             "title": "Operator"
           },
           "quantity": {
-            "anyOf": [
-              {
-                "exclusiveMinimum": 0.0,
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
-            "title": "Quantity"
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
           },
           "reference_no": {
             "anyOf": [
@@ -5723,8 +5379,7 @@
           "quantity_after": {
             "anyOf": [
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
@@ -5735,8 +5390,7 @@
           "quantity_before": {
             "anyOf": [
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
@@ -5745,9 +5399,8 @@
             "title": "Quantity Before"
           },
           "quantity_change": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity Change",
-            "type": "string"
+            "type": "integer"
           },
           "reference_no": {
             "anyOf": [
@@ -5777,8 +5430,7 @@
           "transfer_qty": {
             "anyOf": [
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
@@ -5881,17 +5533,9 @@
             "type": "string"
           },
           "quantity_change": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
             "description": "RECEIVE: 양수, SHIP: 음수",
-            "title": "Quantity Change"
+            "title": "Quantity Change",
+            "type": "integer"
           },
           "reason": {
             "minLength": 1,
@@ -6018,17 +5662,9 @@
             "title": "Produced By"
           },
           "quantity": {
-            "anyOf": [
-              {
-                "exclusiveMinimum": 0.0,
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
-            "title": "Quantity"
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
           },
           "reference_no": {
             "anyOf": [
@@ -6135,23 +5771,20 @@
       "WeeklyGroupReport": {
         "properties": {
           "current_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Current Qty",
-            "type": "string"
+            "type": "integer"
           },
           "delta": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Delta",
-            "type": "string"
+            "type": "integer"
           },
           "dept_name": {
             "title": "Dept Name",
             "type": "string"
           },
           "in_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "In Qty",
-            "type": "string"
+            "type": "integer"
           },
           "item_count": {
             "title": "Item Count",
@@ -6169,14 +5802,12 @@
             "type": "string"
           },
           "out_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Out Qty",
-            "type": "string"
+            "type": "integer"
           },
           "prev_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Prev Qty",
-            "type": "string"
+            "type": "integer"
           },
           "process_code": {
             "title": "Process Code",
@@ -6201,19 +5832,16 @@
       "WeeklyItemReport": {
         "properties": {
           "current_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Current Qty",
-            "type": "string"
+            "type": "integer"
           },
           "delta": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Delta",
-            "type": "string"
+            "type": "integer"
           },
           "in_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "In Qty",
-            "type": "string"
+            "type": "integer"
           },
           "item_id": {
             "title": "Item Id",
@@ -6235,14 +5863,12 @@
             "title": "Mes Code"
           },
           "out_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Out Qty",
-            "type": "string"
+            "type": "integer"
           },
           "prev_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Prev Qty",
-            "type": "string"
+            "type": "integer"
           }
         },
         "required": [
@@ -6261,14 +5887,12 @@
       "WeeklyProductionModelRow": {
         "properties": {
           "af_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Af Qty",
-            "type": "string"
+            "type": "integer"
           },
           "hf_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Hf Qty",
-            "type": "string"
+            "type": "integer"
           },
           "model_key": {
             "title": "Model Key",
@@ -6279,29 +5903,24 @@
             "type": "string"
           },
           "nf_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Nf Qty",
-            "type": "string"
+            "type": "integer"
           },
           "pf_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Pf Qty",
-            "type": "string"
+            "type": "integer"
           },
           "tf_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Tf Qty",
-            "type": "string"
+            "type": "integer"
           },
           "total_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Qty",
-            "type": "string"
+            "type": "integer"
           },
           "vf_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Vf Qty",
-            "type": "string"
+            "type": "integer"
           }
         },
         "required": [
@@ -6379,19 +5998,16 @@
             "type": "integer"
           },
           "total_current_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Current Qty",
-            "type": "string"
+            "type": "integer"
           },
           "total_in_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total In Qty",
-            "type": "string"
+            "type": "integer"
           },
           "total_out_qty": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total Out Qty",
-            "type": "string"
+            "type": "integer"
           }
         },
         "required": [
