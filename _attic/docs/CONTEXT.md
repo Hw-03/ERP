@@ -6,8 +6,9 @@
 
 ## 무엇을 만드는 회사인가
 
-DEXCOWIN — 정밀 X-Ray 장비 제조사. 부품 종 ~970개, 11공정 (튜브 → 고압 → 진공 → 튜닝 →
-조립 → 출하 계열, 각 R/A/F 단계 = 18개 process_type_code).
+DEXCOWIN — 정밀 X-Ray 장비 제조사. 제조 흐름은 6개 부서 계열(튜브 → 고압 → 진공 → 튜닝 →
+조립 → 출하) × R/A/F 3단계 = 18개 process_type_code(실사용 16종)로 분류한다.
+(품목 수 등 변동 숫자는 문서에 적지 않는다 — `python _attic/backend-scripts/facts.py` 로 확인.)
 
 ## 조직
 
@@ -24,10 +25,10 @@ DEXCOWIN — 정밀 X-Ray 장비 제조사. 부품 종 ~970개, 11공정 (튜브
 
 ## 품목 (Item)
 
-970+ 종. 모든 품목은 다음을 갖는다:
-- `process_type_code` (2글자) — 부서 계열 + R/A/F 단계 (예: `TR`, `AA`, `PF`)
-- `legacy_model` — DX3000(3) / ADX4000W(4) / ADX6000FB(6) / COCOON(7) / SOLO(8) 같은 모델 슬롯
-- `erp_code` / `mes_code` — 외부 ERP 와 MES 내부 분류 (대규모 변경 진행 중)
+모든 품목은 다음을 갖는다: (전체 품목 수는 `facts.py` 참조)
+- `process_type_code` (2글자) — 부서 계열 + R/A/F 단계 (예: `TR`, `AA`, `PF`). R=원자재 / A=중간공정 / F=공정완료
+- `model_symbol` / `model_slots` — 모델 기호 조합 (3=DX3000 · 7=COCOON · 8=SOLO · 4=ADX4000W · 6=ADX6000FB). 마스터는 `product_symbols`(slot↔symbol↔model_name)
+- `item_code` — 모델기호+공정코드+일련번호 를 합친 품목코드(단일 기준). ※ `erp_code`/`mes_code` 컬럼은 **없음**(과거 개념, 이미 `item_code`로 통합). 'mes_code'로의 이름 변경은 계획 단계.
 
 상세 규칙: [ITEM_CODE_RULES.md](ITEM_CODE_RULES.md), [GLOSSARY.md](GLOSSARY.md) "공정코드".
 

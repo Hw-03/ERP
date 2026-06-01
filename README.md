@@ -111,7 +111,7 @@ http://localhost:3000
 ERP/
 ├── backend/              FastAPI · SQLAlchemy · SQLite
 │   ├── app/              routers / services / models
-│   ├── mes.db            기준 스냅샷 (722 품목, 정리본 기준)
+│   ├── mes.db            활성 DB (품목 수 등은 `python _attic/backend-scripts/facts.py` 로 확인)
 │   └── requirements.txt
 ├── frontend/             Next.js 14 · Tailwind
 │   ├── app/legacy/       현재 활성 셸 (대시보드/입출고/내역/관리자)

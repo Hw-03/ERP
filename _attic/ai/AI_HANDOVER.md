@@ -21,10 +21,10 @@
 ## 현재 상태 (2026-05-03 Round-17 update)
 
 - 프로젝트: DEXCOWIN 재고 관리 MES (경량 MES 프로토타입)
-- 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/erp.db`)
+- 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/mes.db`)
 - 프론트엔드: Next.js 14 + Tailwind CSS
 - 주 화면: `/legacy` (대시보드 / 입출고 / 입출고 내역 / 관리자)
-- 기준 데이터: 통합 품목 971건
+- 기준 데이터: 품목 수는 `python _attic/backend-scripts/facts.py` 로 확인 (문서에 박지 않음)
 - 현재 브랜치: `main`
 - 외부 객관 평가: 11 카테고리 평균 87.5 → ~95 추정 (Round-13 ~ Round-17 누적)
 

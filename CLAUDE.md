@@ -8,6 +8,7 @@
 - backend entry: `backend/app/main.py`
 - Before editing frontend code, verify the real render/import path first.
 - If docs and live code disagree, trust the live code.
+- 변동 수치(품목 수·공정/모델 종수 등)는 문서에 박지 말 것. 실제 값은 `python _attic/backend-scripts/facts.py` 로 확인한다 (문서엔 이 명령만 안내). 과거 스냅샷을 기록한 진행/인수인계 로그는 그대로 둠.
 - Do not edit `_archive/` or `frontend/_archive/` unless explicitly asked.
 - Do not casually edit `_attic/`; it is the boxed-up storage for everything not at a tool-required path — domain docs (GLOSSARY/CONTEXT/ADR/ARCHITECTURE/ERD/OPERATIONS), one-off backend scripts, DB backups, ONBOARDING, finished plans.
 - **주간보고 화면은 동결(완성)**
