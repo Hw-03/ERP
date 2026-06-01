@@ -73,11 +73,8 @@ def production_receipt(
     shortage_errors = []
     for comp_item_id, required_qty in merged.items():
         inv = invs_map.get(comp_item_id)
-        # 생산 BACKFLUSH는 창고 가용분 기준으로 사전 검사 (warehouse - pending)
-        current_avail = (
-            (inv.warehouse_qty or Decimal("0")) - (inv.pending_quantity or Decimal("0"))
-            if inv else Decimal("0")
-        )
+        # 생산 BACKFLUSH는 창고 가용분(warehouse - pending) 기준 사전 검사 — stock_math 단일 소스.
+        current_avail = stock_math.figures_from_inventory(inv).warehouse_available
         if current_avail < required_qty:
             comp_item = items_map.get(comp_item_id)
             shortage_errors.append(

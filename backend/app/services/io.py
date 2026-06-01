@@ -33,6 +33,7 @@ from app.models import (
 )
 from app.services import bom as bom_svc
 from app.services import inventory as inventory_svc
+from app.services import stock_math
 from app.services import stock_requests as stock_request_svc
 
 
@@ -83,7 +84,8 @@ def _bucket_available(
 ) -> Decimal:
     if bucket == "warehouse":
         inv = inventory_svc.get_or_create_inventory(db, item_id)
-        return _d(inv.warehouse_qty) - _d(inv.pending_quantity)
+        # 가용 정의(warehouse - pending)는 stock_math 단일 소스를 따른다.
+        return stock_math.figures_from_inventory(inv).warehouse_available
     if bucket == "production" and department:
         loc = (
             db.query(InventoryLocation)
