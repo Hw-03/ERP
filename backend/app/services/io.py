@@ -116,6 +116,15 @@ def _default_production_dept(item: Item, fallback: Optional[str]) -> str:
     return _enum_value(mapped) or DepartmentEnum.ASSEMBLY.value
 
 
+def _component_source_dept(item: Item, fallback: Optional[str]) -> str:
+    """BOM 부품 차감/복귀 부서 — 부품의 소속 공정 우선(코드 기준), 없으면 작업 부서.
+    _default_production_dept 의 역(逆): 결과 라인은 작업 부서 우선, 부품 라인은 소속 공정 우선.
+    A/F 접미(생산 중간품, 예: NF 튜닝보드)는 소속 공정으로 매핑되고,
+    R 접미(원자재)는 매핑이 없어 작업 부서를 유지한다(기존 동작 보존)."""
+    mapped = inventory_svc.dept_for_process_type(item.process_type_code)
+    return _enum_value(mapped) or fallback or DepartmentEnum.ASSEMBLY.value
+
+
 def _line_dict(
     db: Session,
     *,
@@ -178,14 +187,18 @@ def _route_for_sub_type(
     if sub_type == "dept_to_warehouse":
         return ("move", "production", from_department, "warehouse", None)
     if sub_type == "produce":
-        dept = _default_production_dept(item, to_department or from_department)
         if role == "result":
+            dept = _default_production_dept(item, to_department or from_department)
             return ("in", "none", None, "production", dept)
+        # 부품: 작업 부서가 아니라 부품의 소속 공정에서 차감 (튜닝 보드는 튜닝에서).
+        dept = _component_source_dept(item, to_department or from_department)
         return ("out", "production", dept, "none", None)
     if sub_type == "disassemble":
-        dept = _default_production_dept(item, from_department or to_department)
         if role == "result":
+            dept = _default_production_dept(item, from_department or to_department)
             return ("out", "production", dept, "none", None)
+        # 회수 부품: 소속 공정으로 복귀.
+        dept = _component_source_dept(item, from_department or to_department)
         return ("in", "none", None, "production", dept)
     if sub_type == "dept_transfer":
         return ("move", "production", from_department, "production", to_department)

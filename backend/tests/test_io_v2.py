@@ -542,6 +542,82 @@ def test_io_immediate_adjust_out_decreases_production_quantity(
     assert tx[0].transaction_type == TransactionTypeEnum.ADJUST
 
 
+def test_io_produce_component_sources_from_home_dept(
+    client, db_session, make_item, make_location, make_bom
+):
+    """생산 시 BOM 부품은 작업 부서가 아니라 부품의 소속 공정에서 차감되어야 한다.
+    조립이 NF(튜닝) 보드를 부품으로 갖는 완제품을 생산할 때, 보드 재고가 튜닝에만 있어도
+    재고 부족으로 막히지 않고 튜닝에서 차감된다."""
+    parent = make_item(name="완제품", process_type_code="AF", warehouse_qty=Decimal("0"))
+    board = make_item(name="튜닝 보드", process_type_code="NF", warehouse_qty=Decimal("0"))
+    # 보드는 튜닝 PRODUCTION 에만 있고 조립엔 0.
+    make_location(board.item_id, department=DepartmentEnum.TUNING, quantity=Decimal("10"))
+    db_session.flush()
+    inv = db_session.query(Inventory).filter(Inventory.item_id == board.item_id).first()
+    inv.quantity = Decimal("10")  # 위치 합과 총량 동기화
+    make_bom(parent.item_id, board.item_id, Decimal("1"))
+    requester = _make_employee(db_session)  # 생산은 결재 비대상 — 일반 직원으로 즉시 완료
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {"source_kind": "direct_item", "item_id": str(parent.item_id), "quantity": "2"}
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+    lines = preview.json()["bundles"][0]["lines"]
+    board_line = next(l for l in lines if l["item_id"] == str(board.item_id))
+    # 핵심: 차감 출처가 조립이 아니라 보드의 소속 공정(튜닝) — 재고 부족 없음.
+    assert board_line["from_department"] == DepartmentEnum.TUNING.value
+    assert board_line["from_bucket"] == "production"
+    assert board_line["origin"] == "bom_auto"
+    assert Decimal(str(board_line["shortage"])) == Decimal("0")
+
+    res = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert res.status_code == 201, res.json()
+    assert res.json()["status"] == "completed"
+
+    # 튜닝 보드는 튜닝에서 2 차감 → 8.
+    tuning_loc = (
+        db_session.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == board.item_id,
+            InventoryLocation.department == DepartmentEnum.TUNING,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        )
+        .first()
+    )
+    assert tuning_loc is not None and tuning_loc.quantity == Decimal("8")
+
+    # 완제품은 작업 부서(조립) PRODUCTION 에 2 적재.
+    parent_loc = (
+        db_session.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == parent.item_id,
+            InventoryLocation.department == DepartmentEnum.ASSEMBLY,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        )
+        .first()
+    )
+    assert parent_loc is not None and parent_loc.quantity == Decimal("2")
+
+
 def test_io_submit_adjust_out_blocks_on_shortage(
     client, db_session, make_item, make_location
 ):
