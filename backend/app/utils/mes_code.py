@@ -11,7 +11,8 @@ suffix 'F' = F타입(완성/출하성 — 창고 배치 불가).
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-# slot → 표시 기호 (ProductSymbol 테이블의 새 값과 동기화)
+# slot → 표시 기호. 마스터는 product_symbols 테이블(시드 bootstrap.seed._PRODUCT_SYMBOL_ASSIGNED).
+# 파싱 핫패스라 여기에 미러링한다 — 둘의 동기화는 tests/test_model_symbol_sync.py 가 강제(드리프트 시 실패).
 SLOT_TO_SYMBOL: dict[int, str] = {
     1: "3",   # DX3000
     2: "7",   # COCOON

@@ -27,7 +27,7 @@ DEXCOWIN — 정밀 X-Ray 장비 제조사. 제조 흐름은 6개 부서 계열(
 
 모든 품목은 다음을 갖는다: (전체 품목 수는 `facts.py` 참조)
 - `process_type_code` (2글자) — 부서 계열 + R/A/F 단계 (예: `TR`, `AA`, `PF`). R=원자재 / A=중간공정 / F=공정완료
-- `model_symbol` / `model_slots` — 모델 기호 조합 (3=DX3000 · 7=COCOON · 8=SOLO · 4=ADX4000W · 6=ADX6000FB). 마스터는 `product_symbols`(slot↔symbol↔model_name)
+- `model_symbol` — **DB 저장 컬럼**. 슬롯 기호를 오름차순 연결한 문자열(예: 슬롯 `[1,4,5]` → `"346"`). 한편 `model_slots`(예: `[1,4,5]`)는 **DB 컬럼이 아니라** `mes_code` prefix 에서 파생하는 표시값(`utils/mes_code.mes_code_to_model_slots`). 마스터는 `product_symbols`(slot↔symbol↔model_name): slot 1=DX3000("3") · 2=COCOON("7") · 3=SOLO("8") · 4=ADX4000W("4") · 5=ADX6000FB("6"). ※ slot 번호 ≠ 기호 숫자(예 slot 1 의 기호는 "3").
 - `mes_code` — 모델기호+공정코드+일련번호 를 합친 품목코드(단일 기준). ※ `erp_code` 컬럼은 **없음**(과거 개념). `item_code → mes_code` 전면 리네임 완료(2026-06-01).
 
 상세 규칙: [ITEM_CODE_RULES.md](ITEM_CODE_RULES.md), [GLOSSARY.md](GLOSSARY.md) "공정코드".
