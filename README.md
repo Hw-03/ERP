@@ -2,11 +2,9 @@
 
 DEXCOWIN의 품목, 재고, BOM, 입출고를 관리하는 경량 MES 프로토타입.
 
-**현재 안정성 점수**: ~96/100 (Round-10A 완료, 2026-05-02). 세부 추적: `_attic/docs/CODEX_PROGRESS.md` *(보관 중 — 복귀 검토 대상)*
-
 ## 현재 기준
 
-- 기준 품목 수: 722건
+- 품목 수 등 기준정보 수치: `python _attic/backend-scripts/facts.py` 로 확인 (문서에 박지 않음)
 - 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/mes.db`)
 - 프론트엔드: Next.js 14 + Tailwind CSS
 - 주 사용 화면: `/legacy` (데스크톱 셸: 대시보드 / 입출고 / 입출고 내역 / 관리자)
@@ -84,7 +82,7 @@ http://localhost:3000
 품목 코드 포맷:
 
 ```text
-{모델기호}-{process_type_code}-{일련번호:04d}[-{옵션코드}]
+{모델기호}-{process_type_code}-{일련번호:04d}
 ```
 
 모델기호 목록:
@@ -101,7 +99,6 @@ http://localhost:3000
 
 ```text
 346-AF-0001
-3-PA-0001-BG
 34-TR-0023
 ```
 
@@ -121,7 +118,6 @@ ERP/
 │       │   └── types/    도메인별 type 정본 (Round-10A #2)
 │       ├── api-core.ts   fetch 헬퍼 (postJson/putJson/deleteJson/parseError)
 │       └── mes/          MES 디자인시스템 (color/format/status/...)
-├── data/                 입력 자료 (xlsx · csv) + db_backups/ (DB 백업 단일 보관소)
 ├── _dev/baselines/       FastAPI OpenAPI baseline (CI drift 검사 기준)
 │   └── openapi.json
 ├── scripts/              보조 스크립트
@@ -134,7 +130,6 @@ ERP/
 │   ├── backend-scripts/  1회성 backend 스크립트 (seed/sync/archive/backup)
 │   ├── data/db_backups/  DB 백업 (로컬, .gitignore 매칭)
 │   └── ONBOARDING.md     신규 합류자 가이드
-├── _archive/             보관용 — 작업 대상 아님
 ├── start.bat             통합 실행 (Windows)
 ├── README.md             이 문서
 └── CLAUDE.md             AI/개발자 작업 규칙

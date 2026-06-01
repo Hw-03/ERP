@@ -1,6 +1,9 @@
 # AI Handover
 
-이 문서는 Claude/Codex가 같은 MES 프로젝트를 이어서 작업할 때 보는 최신 인수인계 문서다.
+> **[STALE — 2026-05-03~08 스냅샷]** 과거 시점 기록이다. 현재 진실은 코드/DB 와 `_attic/docs/CONTEXT.md`·`GLOSSARY.md`,
+> 수치는 `python _attic/backend-scripts/facts.py`. 아래 루트 구조(`docs/`·`data/`·`outputs/`·`erp.db`·`queue.py`)·경로는 현재와 다름 — 참고용으로만.
+
+이 문서는 과거(2026-05) Claude/Codex 작업 인수인계 기록이다.
 
 ## 2026-05-08 — 루트 정리 (참조 변경)
 

@@ -28,7 +28,7 @@ DEXCOWIN — 정밀 X-Ray 장비 제조사. 제조 흐름은 6개 부서 계열(
 모든 품목은 다음을 갖는다: (전체 품목 수는 `facts.py` 참조)
 - `process_type_code` (2글자) — 부서 계열 + R/A/F 단계 (예: `TR`, `AA`, `PF`). R=원자재 / A=중간공정 / F=공정완료
 - `model_symbol` / `model_slots` — 모델 기호 조합 (3=DX3000 · 7=COCOON · 8=SOLO · 4=ADX4000W · 6=ADX6000FB). 마스터는 `product_symbols`(slot↔symbol↔model_name)
-- `item_code` — 모델기호+공정코드+일련번호 를 합친 품목코드(단일 기준). ※ `erp_code`/`mes_code` 컬럼은 **없음**(과거 개념, 이미 `item_code`로 통합). 'mes_code'로의 이름 변경은 계획 단계.
+- `mes_code` — 모델기호+공정코드+일련번호 를 합친 품목코드(단일 기준). ※ `erp_code` 컬럼은 **없음**(과거 개념). `item_code → mes_code` 전면 리네임 완료(2026-06-01).
 
 상세 규칙: [ITEM_CODE_RULES.md](ITEM_CODE_RULES.md), [GLOSSARY.md](GLOSSARY.md) "공정코드".
 
@@ -39,8 +39,8 @@ DEXCOWIN — 정밀 X-Ray 장비 제조사. 제조 흐름은 6개 부서 계열(
 - **production** — 부서별 PRODUCTION 상태 합계 (`InventoryLocation`)
 - **defective** — 부서별 DEFECTIVE 상태 합계 (`InventoryLocation`)
 
-총재고 = warehouse + production + defective. 이 불변식은 `services/integrity.py` 가
-주기적으로 검증한다.
+총재고 = warehouse + production + defective. 이 불변식은 `services/inventory` 의 `_sync_total` 이
+모든 재고 변경 경로에서 유지하고, `services/integrity.py` 가 on-demand 로 점검·복구한다.
 
 ## BOM
 
