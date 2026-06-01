@@ -1,8 +1,8 @@
-"""bootstrap.seed — 참조 데이터 시드 + item_code 백필 + check.
+"""bootstrap.seed — 참조 데이터 시드 + mes_code 백필 + check.
 
 - `seed_reference_data()` : Department / Employee / ProductSymbol /
    ProcessType 비어 있을 때만 시드 (멱등)
-- `backfill_item_codes()` : item_code NULL 인 품목에 3-part 코드 자동 부여
+- `backfill_mes_codes()` : mes_code NULL 인 품목에 3-part 코드 자동 부여
 - `check_db()`            : 쓰지 않고 상태만 리포트
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ from app.models import (
     ProductSymbol,
 )
 from app.services.pin_auth import DEFAULT_PIN_HASH
-from app.utils.item_code import make_item_code
+from app.utils.mes_code import make_mes_code
 
 # ---------------------------------------------------------------------------
 # 시드 데이터 정의
@@ -149,8 +149,8 @@ def seed_reference_data() -> dict[str, int]:
 # ---------------------------------------------------------------------------
 # 품목 코드 백필
 # ---------------------------------------------------------------------------
-def backfill_item_codes() -> int:
-    """item_code 미할당 품목에 자동 부여. 기존 serial_no 와 충돌하지 않도록 그룹별 최대값+1.
+def backfill_mes_codes() -> int:
+    """mes_code 미할당 품목에 자동 부여. 기존 serial_no 와 충돌하지 않도록 그룹별 최대값+1.
 
     그룹 키는 (model_symbol, process_type_code) — model_symbol 이 단일 문자(`3`,`7`,...)
     또는 다중 문자(`346`) 모두 진실 소스. 코드는 ProductSymbol.symbol 과 1:1 매핑이라
@@ -158,7 +158,7 @@ def backfill_item_codes() -> int:
     """
     db = SessionLocal()
     try:
-        targets = db.query(Item).filter(Item.item_code.is_(None)).all()
+        targets = db.query(Item).filter(Item.mes_code.is_(None)).all()
         if not targets:
             return 0
 
@@ -180,7 +180,7 @@ def backfill_item_codes() -> int:
             serial = serial_counter[key]
 
             item.serial_no = serial
-            item.item_code = make_item_code(symbol, pt, serial)
+            item.mes_code = make_mes_code(symbol, pt, serial)
             count += 1
 
         db.commit()
@@ -198,7 +198,7 @@ def check_db() -> dict:
             "process_types": db.query(ProcessType).count(),
             "product_symbols": db.query(ProductSymbol).count(),
             "items": db.query(Item).count(),
-            "items_missing_item_code": db.query(Item).filter(Item.item_code.is_(None)).count(),
+            "items_missing_mes_code": db.query(Item).filter(Item.mes_code.is_(None)).count(),
         }
     finally:
         db.close()

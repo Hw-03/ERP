@@ -14,7 +14,7 @@ Rules
       symbol (len == 1 and the symbol maps to a finished-good slot).
     - Process type is always exactly 2 characters from process_types.code.
     - Serial is a zero-padded integer (default width 4). Leading zeros are
-      stripped on display via format_item_code(compact=True).
+      stripped on display via format_mes_code(compact=True).
 """
 
 from __future__ import annotations
@@ -39,14 +39,14 @@ CODE_TOKEN_RE = re.compile(r"^[0-9A-Za-z]+$")
 
 
 @dataclass
-class ItemCode:
+class MesCode:
     symbol: str                  # e.g. "3" or "376"
     process_type: str            # e.g. "TR", "PA"
     serial: int                  # integer (no padding)
     symbol_slots: List[int] = field(default_factory=list)  # resolved slot ids
 
     def format(self, *, compact: bool = False) -> str:
-        return format_item_code(self, compact=compact)
+        return format_mes_code(self, compact=compact)
 
 
 # ---------------------------------------------------------------------------
@@ -54,7 +54,7 @@ class ItemCode:
 # ---------------------------------------------------------------------------
 
 
-def parse_item_code(raw: str) -> ItemCode:
+def parse_mes_code(raw: str) -> MesCode:
     """Parse a 3-part code. Accepts both compact ("3-PA-12") and zero-padded
     ("3-PA-0012") forms."""
     if not raw or not isinstance(raw, str):
@@ -81,7 +81,7 @@ def parse_item_code(raw: str) -> ItemCode:
     if serial < 0:
         raise ValueError("일련번호는 0 이상이어야 합니다.")
 
-    return ItemCode(
+    return MesCode(
         symbol=symbol,
         process_type=process_type,
         serial=serial,
@@ -89,7 +89,7 @@ def parse_item_code(raw: str) -> ItemCode:
     )
 
 
-def format_item_code(code: ItemCode, *, compact: bool = False) -> str:
+def format_mes_code(code: MesCode, *, compact: bool = False) -> str:
     """Render to canonical string. compact=True drops leading zeros on serial."""
     if compact:
         serial_part = str(code.serial)
@@ -111,7 +111,7 @@ def _split_symbol(symbol: str) -> List[int]:
 # ---------------------------------------------------------------------------
 
 
-def validate_code(db: Session, code: ItemCode) -> None:
+def validate_code(db: Session, code: MesCode) -> None:
     """Raise ValueError if any part does not match master tables or rules."""
     # Symbol: every digit must map to an assigned (non-reserved) product_symbol
     for digit in code.symbol:
@@ -173,13 +173,13 @@ def generate_code(
     *,
     symbol: str,
     process_type: str,
-) -> ItemCode:
-    """Build a new ItemCode with an auto-assigned serial. Validates against
+) -> MesCode:
+    """Build a new MesCode with an auto-assigned serial. Validates against
     master tables before returning."""
     symbol = symbol.strip()
     process_type = process_type.strip().upper()
 
-    code = ItemCode(
+    code = MesCode(
         symbol=symbol,
         process_type=process_type,
         serial=next_serial(db, symbol, process_type),

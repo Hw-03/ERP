@@ -129,7 +129,7 @@ class IoLine(Base):
         index=True,
     )
     item_name_snapshot = Column(String(200), nullable=False)
-    item_code_snapshot = Column(String(50), nullable=True)
+    mes_code_snapshot = Column(String(50), nullable=True)
     unit = Column(String(20), nullable=False, default="EA")
     direction = Column(String(20), nullable=False)
     from_bucket = Column(String(20), nullable=False)

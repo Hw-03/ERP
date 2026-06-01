@@ -123,16 +123,16 @@ def test_capacity_representative_items_by_model(
     # 모델 3: PF-3-002 를 먼저 add 해도, 자연 정렬은 PF-3-001 이 대표.
     pf3_b = make_item(
         name="모델3-002", process_type_code="PF",
-        warehouse_qty=Decimal("0"), model_symbol="3", item_code="PF-3-002",
+        warehouse_qty=Decimal("0"), model_symbol="3", mes_code="PF-3-002",
     )
     pf3_a = make_item(
         name="모델3-001", process_type_code="PF",
-        warehouse_qty=Decimal("0"), model_symbol="3", item_code="PF-3-001",
+        warehouse_qty=Decimal("0"), model_symbol="3", mes_code="PF-3-001",
     )
     # 모델 4: 한 종
     pf4 = make_item(
         name="모델4-001", process_type_code="PF",
-        warehouse_qty=Decimal("0"), model_symbol="4", item_code="PF-4-001",
+        warehouse_qty=Decimal("0"), model_symbol="4", mes_code="PF-4-001",
     )
     p3 = make_item(name="자재3", process_type_code="AA", warehouse_qty=Decimal("10"))
     p4 = make_item(name="자재4", process_type_code="AA", warehouse_qty=Decimal("5"))
@@ -153,19 +153,19 @@ def test_capacity_representative_items_by_model(
     assert len(reps) == 2
     assert [r["model_symbol"] for r in reps] == ["3", "4"]
 
-    # 모델3 대표 = item_code 자연 정렬상 PF-3-001
+    # 모델3 대표 = mes_code 자연 정렬상 PF-3-001
     rep3 = reps[0]
-    assert rep3["item_code"] == "PF-3-001"
+    assert rep3["mes_code"] == "PF-3-001"
     assert rep3["is_representative"] is True
     assert rep3["model_symbol"] == "3"
 
     # 모델4 대표
     rep4 = reps[1]
-    assert rep4["item_code"] == "PF-4-001"
+    assert rep4["mes_code"] == "PF-4-001"
     assert rep4["is_representative"] is True
 
     # top_items 내 비대표 PF 는 is_representative=False
-    pf3_b_in_top = next(t for t in data["top_items"] if t["item_code"] == "PF-3-002")
+    pf3_b_in_top = next(t for t in data["top_items"] if t["mes_code"] == "PF-3-002")
     assert pf3_b_in_top["is_representative"] is False
 
 

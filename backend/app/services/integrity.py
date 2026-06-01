@@ -25,7 +25,7 @@ _D0 = Decimal("0")
 @dataclass
 class InventoryMismatch:
     item_id: uuid.UUID
-    item_code: Optional[str]
+    mes_code: Optional[str]
     item_name: Optional[str]
     recorded_total: Decimal      # Inventory.quantity
     computed_total: Decimal      # warehouse + loc_sum (실제 합)
@@ -41,9 +41,9 @@ class InventoryMismatch:
     def to_dict(self) -> dict:
         return {
             "item_id": str(self.item_id),
-            "item_code": self.item_code,
+            "mes_code": self.mes_code,
             "item_name": self.item_name,
-            "item_code": self.item_code,
+            "mes_code": self.mes_code,
             "recorded_total": float(self.recorded_total),
             "computed_total": float(self.computed_total),
             "warehouse_qty": float(self.warehouse_qty),
@@ -105,7 +105,7 @@ def check_inventory_consistency(db: Session) -> list[InventoryMismatch]:
             mismatches.append(
                 InventoryMismatch(
                     item_id=inv.item_id,
-                    item_code=item.item_code if item else None,
+                    mes_code=item.mes_code if item else None,
                     item_name=item.item_name if item else None,
                     recorded_total=recorded,
                     computed_total=computed,
@@ -142,7 +142,7 @@ def repair_inventory_totals(db: Session, *, dry_run: bool = True) -> RepairRepor
             samples.append(
                 InventoryMismatch(
                     item_id=inv.item_id,
-                    item_code=item.item_code if item else None,
+                    mes_code=item.mes_code if item else None,
                     item_name=item.item_name if item else None,
                     recorded_total=recorded,
                     computed_total=computed,

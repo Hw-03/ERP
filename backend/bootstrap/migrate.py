@@ -293,6 +293,49 @@ def _consolidate_item_code_columns() -> None:
         conn.commit()
 
 
+def _rename_item_code_to_mes_code() -> None:
+    """items.item_code → mes_code rename + snapshot 컬럼(stock_request_lines, io_lines)
+    의 item_code_snapshot → mes_code_snapshot. 멱등.
+
+    `_consolidate_item_code_columns()` 와 동일 패턴. fresh DB 는 create_all 이 이미
+    mes_code 로 만들지만, _MIGRATION_DDL 의 historical "ADD COLUMN erp_code" →
+    _consolidate 가 (item_code 없음 분기에서) item_code 유령을 다시 만든다. 그 유령을
+    여기서 정리한다. 반드시 run_migrations 의 맨 끝(모든 item_code 생성 헬퍼 이후)에서 호출.
+    """
+    def _cols(conn, table: str) -> set[str]:
+        return {r[1] for r in conn.execute(text(f"PRAGMA table_info({table})"))}
+
+    with engine.connect() as conn:
+        items_cols = _cols(conn, "items")
+        if "item_code" in items_cols:
+            conn.execute(text("DROP INDEX IF EXISTS ix_items_item_code"))
+            conn.execute(text("DROP INDEX IF EXISTS ix_items_mes_code"))
+            if "mes_code" in items_cols:
+                # 두 컬럼 공존: fresh DB(create_all 이 mes_code 생성)에 historical 체인이
+                # item_code 유령을 다시 만든 케이스. item_code 가 모두 NULL 이면 유령 → DROP.
+                item_non_null = conn.execute(
+                    text("SELECT COUNT(*) FROM items WHERE item_code IS NOT NULL")
+                ).scalar()
+                if item_non_null == 0:
+                    conn.execute(text("ALTER TABLE items DROP COLUMN item_code"))
+                else:
+                    conn.execute(text("ALTER TABLE items DROP COLUMN mes_code"))
+                    conn.execute(text("ALTER TABLE items RENAME COLUMN item_code TO mes_code"))
+            else:
+                conn.execute(text("ALTER TABLE items RENAME COLUMN item_code TO mes_code"))
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_items_mes_code ON items(mes_code)"
+            ))
+        # snapshot 컬럼 — 동일 패턴 (fresh DB 는 create_all 이 mes_code_snapshot 로 생성)
+        for table in ("stock_request_lines", "io_lines"):
+            cols = _cols(conn, table)
+            if "item_code_snapshot" in cols and "mes_code_snapshot" not in cols:
+                conn.execute(text(
+                    f"ALTER TABLE {table} RENAME COLUMN item_code_snapshot TO mes_code_snapshot"
+                ))
+        conn.commit()
+
+
 def _drop_unused_item_columns() -> None:
     """spec / barcode / legacy_file_type — 미사용 컬럼 제거. 멱등."""
     to_drop = {"spec", "barcode", "legacy_file_type"}
@@ -741,6 +784,16 @@ def run_migrations() -> dict[str, object]:
         _drop_option_codes()
     except Exception as exc:  # noqa: BLE001
         msg = f"[migrate] option codes drop failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
+
+    # 2026-06-01: items.item_code → mes_code rename (+ snapshot 컬럼). 멱등.
+    # 모든 item_code 생성 헬퍼(_consolidate_item_code_columns, _drop_dead_m1_objects)
+    # 이후에 실행해야 안전하므로 run_migrations 의 맨 끝에서 호출.
+    try:
+        _rename_item_code_to_mes_code()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] item_code → mes_code rename failed: {exc}"
         errors.append(msg)
         logger.warning(msg, exc_info=False)
 

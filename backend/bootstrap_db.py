@@ -3,7 +3,7 @@
 실제 책임은 `bootstrap/` 패키지로 분리됨:
 - `bootstrap.init`    — `Base.metadata.create_all`
 - `bootstrap.migrate` — 멱등 ALTER TABLE / 보조 마이그레이션
-- `bootstrap.seed`    — 참조 데이터 시드 + item_code 백필
+- `bootstrap.seed`    — 참조 데이터 시드 + mes_code 백필
 
 FastAPI 앱 시작 시 자동 실행되던 부작용들을 여기로 옮겼다.
 `uvicorn app.main:app` 만으로는 DB 가 변하지 않는다. 초기 설치 / 스키마 변경 /
@@ -14,7 +14,7 @@ Usage:
     python bootstrap_db.py --all                # 스키마 + 마이그레이션 + 시드 + 품목코드 백필
     python bootstrap_db.py --schema --migrate   # DDL 관련만
     python bootstrap_db.py --seed               # 참조 데이터 (Employee/ProductSymbol/…)
-    python bootstrap_db.py --item-code-backfill # item_code NULL 품목에 코드 부여
+    python bootstrap_db.py --mes-code-backfill  # mes_code NULL 품목에 코드 부여
     python bootstrap_db.py --check              # 실행하지 않고 DB 상태만 점검
 
 모듈로도 import 가능:
@@ -34,7 +34,7 @@ if str(BACKEND_DIR) not in sys.path:
 
 from bootstrap import (
     bootstrap_all,
-    backfill_item_codes,
+    backfill_mes_codes,
     check_db,
     run_migrations,
     run_schema_create_all,
@@ -83,7 +83,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--schema", action="store_true", help="run create_all")
     parser.add_argument("--migrate", action="store_true", help="run ALTER TABLE migrations")
     parser.add_argument("--seed", action="store_true", help="seed reference data")
-    parser.add_argument("--item-code-backfill", action="store_true", help="backfill item codes")
+    parser.add_argument("--mes-code-backfill", action="store_true", help="backfill mes codes")
     parser.add_argument("--check", action="store_true", help="report DB state without writing")
     return parser.parse_args(argv)
 
@@ -127,9 +127,9 @@ def main(argv: list[str] | None = None) -> int:
         seeded = seed_reference_data()
         print(f"[seed] {seeded}")
         did_something = True
-    if args.all or args.item_code_backfill:
-        count = backfill_item_codes()
-        print(f"[item-code-backfill] {count} items updated")
+    if args.all or args.mes_code_backfill:
+        count = backfill_mes_codes()
+        print(f"[mes-code-backfill] {count} items updated")
         did_something = True
 
     if not did_something:
@@ -143,7 +143,7 @@ __all__ = [
     "run_schema_create_all",
     "run_migrations",
     "seed_reference_data",
-    "backfill_item_codes",
+    "backfill_mes_codes",
     "check_db",
     "main",
 ]

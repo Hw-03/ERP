@@ -49,7 +49,7 @@ router = APIRouter()
 class DefectLocationItem(BaseModel):
     item_id: uuid.UUID
     item_name: str
-    item_code: Optional[str]
+    mes_code: Optional[str]
     department: str
     quantity: Decimal
     defective_at: Optional[datetime]
@@ -155,7 +155,7 @@ def list_defect_locations(
             DefectLocationItem(
                 item_id=item.item_id,
                 item_name=item.item_name,
-                item_code=item.item_code,
+                mes_code=item.mes_code,
                 department=loc.department,
                 quantity=loc.quantity,
                 defective_at=loc.defective_at,
@@ -320,7 +320,7 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
     _evt_emit(
         "defect_mark",
         request=http_request,
-        item=item.item_code,
+        item=item.mes_code,
         qty=str(payload.qty),
         source=payload.source,
         target_dept=payload.target_dept,
@@ -394,7 +394,7 @@ def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Sessio
     _evt_emit(
         "defect_unmark",
         request=http_request,
-        item=item.item_code,
+        item=item.mes_code,
         qty=str(payload.qty),
         dept=payload.dept,
         reason=payload.reason_category,

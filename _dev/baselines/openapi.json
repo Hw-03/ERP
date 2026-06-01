@@ -97,17 +97,6 @@
             "title": "Has Children",
             "type": "boolean"
           },
-          "item_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Item Code"
-          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
@@ -116,6 +105,17 @@
           "item_name": {
             "title": "Item Name",
             "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
           },
           "process_type_code": {
             "anyOf": [
@@ -152,7 +152,7 @@
         "required": [
           "item_id",
           "item_name",
-          "item_code",
+          "mes_code",
           "process_type_code",
           "unit",
           "direction",
@@ -361,17 +361,6 @@
             "title": "Bom Id",
             "type": "string"
           },
-          "child_item_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Child Item Code"
-          },
           "child_item_id": {
             "format": "uuid",
             "title": "Child Item Id",
@@ -381,7 +370,7 @@
             "title": "Child Item Name",
             "type": "string"
           },
-          "parent_item_code": {
+          "child_mes_code": {
             "anyOf": [
               {
                 "type": "string"
@@ -390,7 +379,7 @@
                 "type": "null"
               }
             ],
-            "title": "Parent Item Code"
+            "title": "Child Mes Code"
           },
           "parent_item_id": {
             "format": "uuid",
@@ -400,6 +389,17 @@
           "parent_item_name": {
             "title": "Parent Item Name",
             "type": "string"
+          },
+          "parent_mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Mes Code"
           },
           "quantity": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -415,10 +415,10 @@
           "bom_id",
           "parent_item_id",
           "parent_item_name",
-          "parent_item_code",
+          "parent_mes_code",
           "child_item_id",
           "child_item_name",
-          "child_item_code",
+          "child_mes_code",
           "quantity",
           "unit"
         ],
@@ -490,17 +490,6 @@
             "title": "Current Stock",
             "type": "string"
           },
-          "item_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Item Code"
-          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
@@ -509,6 +498,17 @@
           "item_name": {
             "title": "Item Name",
             "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
           },
           "process_type_code": {
             "anyOf": [
@@ -597,17 +597,6 @@
       },
       "BackflushDetail": {
         "properties": {
-          "item_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Item Code"
-          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
@@ -616,6 +605,17 @@
           "item_name": {
             "title": "Item Name",
             "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
           },
           "process_type_code": {
             "anyOf": [
@@ -664,7 +664,11 @@
             "title": "Current Stock",
             "type": "number"
           },
-          "item_code": {
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "mes_code": {
             "anyOf": [
               {
                 "type": "string"
@@ -673,11 +677,7 @@
                 "type": "null"
               }
             ],
-            "title": "Item Code"
-          },
-          "item_name": {
-            "title": "Item Name",
-            "type": "string"
+            "title": "Mes Code"
           },
           "ok": {
             "title": "Ok",
@@ -868,17 +868,6 @@
             "title": "Is Representative",
             "type": "boolean"
           },
-          "item_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Item Code"
-          },
           "item_id": {
             "title": "Item Id",
             "type": "string"
@@ -903,6 +892,17 @@
             "description": "BOM leaf 까지 전개한 모든 하위 자재의 available 기준 이론 최대 생산 가능량.",
             "title": "Maximum",
             "type": "integer"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
           },
           "model_symbol": {
             "anyOf": [
@@ -1002,17 +1002,6 @@
             "title": "Has Bom",
             "type": "boolean"
           },
-          "item_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Item Code"
-          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
@@ -1021,6 +1010,17 @@
           "item_name": {
             "title": "Item Name",
             "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
           },
           "quantity": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -1053,7 +1053,7 @@
         "required": [
           "item_id",
           "item_name",
-          "item_code",
+          "mes_code",
           "department",
           "quantity",
           "defective_at",
@@ -2560,17 +2560,6 @@
             ],
             "title": "Quantity"
           },
-          "source_item_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Item Code"
-          },
           "source_item_id": {
             "anyOf": [
               {
@@ -2586,6 +2575,17 @@
           "source_kind": {
             "title": "Source Kind",
             "type": "string"
+          },
+          "source_mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Mes Code"
           },
           "title": {
             "title": "Title",
@@ -2625,17 +2625,6 @@
             "title": "Quantity",
             "type": "string"
           },
-          "source_item_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Item Code"
-          },
           "source_item_id": {
             "anyOf": [
               {
@@ -2651,6 +2640,17 @@
           "source_kind": {
             "title": "Source Kind",
             "type": "string"
+          },
+          "source_mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Mes Code"
           },
           "title": {
             "title": "Title",
@@ -2816,17 +2816,6 @@
             "title": "Included",
             "type": "boolean"
           },
-          "item_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Item Code"
-          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
@@ -2840,6 +2829,17 @@
             "format": "uuid",
             "title": "Line Id",
             "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
           },
           "origin": {
             "title": "Origin",
@@ -2963,17 +2963,6 @@
             "title": "Included",
             "type": "boolean"
           },
-          "item_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Item Code"
-          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
@@ -2987,6 +2976,17 @@
             "format": "uuid",
             "title": "Line Id",
             "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
           },
           "origin": {
             "title": "Origin",
@@ -3294,83 +3294,6 @@
         "title": "IoSubmitResponse",
         "type": "object"
       },
-      "ItemCodeGenerateRequest": {
-        "properties": {
-          "process_type": {
-            "maxLength": 2,
-            "minLength": 2,
-            "title": "Process Type",
-            "type": "string"
-          },
-          "symbol": {
-            "maxLength": 5,
-            "minLength": 1,
-            "title": "Symbol",
-            "type": "string"
-          }
-        },
-        "required": [
-          "symbol",
-          "process_type"
-        ],
-        "title": "ItemCodeGenerateRequest",
-        "type": "object"
-      },
-      "ItemCodeParseRequest": {
-        "properties": {
-          "code": {
-            "description": "3-part 품목 코드 문자열",
-            "title": "Code",
-            "type": "string"
-          }
-        },
-        "required": [
-          "code"
-        ],
-        "title": "ItemCodeParseRequest",
-        "type": "object"
-      },
-      "ItemCodeResponse": {
-        "properties": {
-          "formatted_compact": {
-            "title": "Formatted Compact",
-            "type": "string"
-          },
-          "formatted_full": {
-            "title": "Formatted Full",
-            "type": "string"
-          },
-          "process_type": {
-            "title": "Process Type",
-            "type": "string"
-          },
-          "serial": {
-            "title": "Serial",
-            "type": "integer"
-          },
-          "symbol": {
-            "title": "Symbol",
-            "type": "string"
-          },
-          "symbol_slots": {
-            "items": {
-              "type": "integer"
-            },
-            "title": "Symbol Slots",
-            "type": "array"
-          }
-        },
-        "required": [
-          "symbol",
-          "process_type",
-          "serial",
-          "symbol_slots",
-          "formatted_full",
-          "formatted_compact"
-        ],
-        "title": "ItemCodeResponse",
-        "type": "object"
-      },
       "ItemCreate": {
         "properties": {
           "initial_quantity": {
@@ -3553,17 +3476,6 @@
             ],
             "title": "Deleted At"
           },
-          "item_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Item Code"
-          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
@@ -3594,6 +3506,17 @@
               }
             ],
             "title": "Legacy Part"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
           },
           "min_stock": {
             "anyOf": [
@@ -3681,18 +3604,6 @@
       },
       "ItemUpdate": {
         "properties": {
-          "item_code": {
-            "anyOf": [
-              {
-                "maxLength": 40,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Item Code"
-          },
           "item_name": {
             "anyOf": [
               {
@@ -3728,6 +3639,18 @@
               }
             ],
             "title": "Legacy Part"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
           },
           "min_stock": {
             "anyOf": [
@@ -3853,17 +3776,6 @@
             ],
             "title": "Department"
           },
-          "item_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Item Code"
-          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
@@ -3924,6 +3836,17 @@
             },
             "title": "Locations",
             "type": "array"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
           },
           "min_stock": {
             "anyOf": [
@@ -4121,6 +4044,83 @@
           "target_department"
         ],
         "title": "MarkDefectiveRequest",
+        "type": "object"
+      },
+      "MesCodeGenerateRequest": {
+        "properties": {
+          "process_type": {
+            "maxLength": 2,
+            "minLength": 2,
+            "title": "Process Type",
+            "type": "string"
+          },
+          "symbol": {
+            "maxLength": 5,
+            "minLength": 1,
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "process_type"
+        ],
+        "title": "MesCodeGenerateRequest",
+        "type": "object"
+      },
+      "MesCodeParseRequest": {
+        "properties": {
+          "code": {
+            "description": "3-part 품목 코드 문자열",
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "MesCodeParseRequest",
+        "type": "object"
+      },
+      "MesCodeResponse": {
+        "properties": {
+          "formatted_compact": {
+            "title": "Formatted Compact",
+            "type": "string"
+          },
+          "formatted_full": {
+            "title": "Formatted Full",
+            "type": "string"
+          },
+          "process_type": {
+            "title": "Process Type",
+            "type": "string"
+          },
+          "serial": {
+            "title": "Serial",
+            "type": "integer"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "symbol_slots": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Symbol Slots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "symbol",
+          "process_type",
+          "serial",
+          "symbol_slots",
+          "formatted_full",
+          "formatted_compact"
+        ],
+        "title": "MesCodeResponse",
         "type": "object"
       },
       "MessageResponse": {
@@ -5087,17 +5087,6 @@
             ],
             "title": "From Department"
           },
-          "item_code_snapshot": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Item Code Snapshot"
-          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
@@ -5111,6 +5100,17 @@
             "format": "uuid",
             "title": "Line Id",
             "type": "string"
+          },
+          "mes_code_snapshot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code Snapshot"
           },
           "operation_line_id": {
             "anyOf": [
@@ -5646,17 +5646,6 @@
             "title": "Edit Count",
             "type": "integer"
           },
-          "item_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Item Code"
-          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
@@ -5685,6 +5674,17 @@
             "format": "uuid",
             "title": "Log Id",
             "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
           },
           "notes": {
             "anyOf": [
@@ -6215,7 +6215,15 @@
             "title": "In Qty",
             "type": "string"
           },
-          "item_code": {
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "mes_code": {
             "anyOf": [
               {
                 "type": "string"
@@ -6224,15 +6232,7 @@
                 "type": "null"
               }
             ],
-            "title": "Item Code"
-          },
-          "item_id": {
-            "title": "Item Id",
-            "type": "string"
-          },
-          "item_name": {
-            "title": "Item Name",
-            "type": "string"
+            "title": "Mes Code"
           },
           "out_qty": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -6247,7 +6247,7 @@
         },
         "required": [
           "item_id",
-          "item_code",
+          "mes_code",
           "item_name",
           "prev_qty",
           "in_qty",
@@ -7029,7 +7029,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ItemCodeGenerateRequest"
+                "$ref": "#/components/schemas/MesCodeGenerateRequest"
               }
             }
           },
@@ -7040,7 +7040,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ItemCodeResponse"
+                  "$ref": "#/components/schemas/MesCodeResponse"
                 }
               }
             },
@@ -7070,7 +7070,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ItemCodeParseRequest"
+                "$ref": "#/components/schemas/MesCodeParseRequest"
               }
             }
           },
@@ -7081,7 +7081,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ItemCodeResponse"
+                  "$ref": "#/components/schemas/MesCodeResponse"
                 }
               }
             },

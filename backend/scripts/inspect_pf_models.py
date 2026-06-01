@@ -23,11 +23,11 @@ def main() -> None:
         print(f"  {repr(ms):20s} {cnt}건")
 
     print()
-    print("== PF 샘플 (model_symbol, item_code, item_name) ==")
+    print("== PF 샘플 (model_symbol, mes_code, item_name) ==")
     for row in cur.execute(
-        "SELECT model_symbol, item_code, item_name FROM items "
+        "SELECT model_symbol, mes_code, item_name FROM items "
         "WHERE process_type_code='PF' "
-        "ORDER BY model_symbol, COALESCE(item_code, item_name) "
+        "ORDER BY model_symbol, COALESCE(mes_code, item_name) "
         "LIMIT 40"
     ).fetchall():
         print(f"  ms={repr(row[0]):8s} code={repr(row[1]):20s} name={row[2]}")
@@ -35,9 +35,9 @@ def main() -> None:
     print()
     print("== 모델별 자연 정렬 첫 PF (= 자동 대표 PF) ==")
     rows = cur.execute(
-        "SELECT model_symbol, item_code, item_name FROM items "
+        "SELECT model_symbol, mes_code, item_name FROM items "
         "WHERE process_type_code='PF' AND model_symbol IS NOT NULL "
-        "ORDER BY model_symbol, COALESCE(item_code, item_name)"
+        "ORDER BY model_symbol, COALESCE(mes_code, item_name)"
     ).fetchall()
     seen = set()
     for ms, code, name in rows:

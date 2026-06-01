@@ -26,9 +26,9 @@ from app.schemas import (
     ItemUpdate,
     ItemWithInventory,
 )
-from app.utils.item_code import (
-    item_code_to_model_slots,
-    make_item_code,
+from app.utils.mes_code import (
+    mes_code_to_model_slots,
+    make_mes_code,
     next_serial_no,
     slots_to_model_symbol,
 )
@@ -83,10 +83,10 @@ def _to_item_with_inventory(
         ]
 
     if model_slots is None:
-        # 회사 규약: item_code prefix(첫 '-' 앞 글자열) 가 모델을 결정.
+        # 회사 규약: mes_code prefix(첫 '-' 앞 글자열) 가 모델을 결정.
         # 예: "8-AR-0307" → SOLO(slot 3), "78-PR-0042" → COCOON+SOLO(slot 2,3).
         # 별도 item_models 테이블 없이 코드만 보면 됨.
-        model_slots = item_code_to_model_slots(item.item_code)
+        model_slots = mes_code_to_model_slots(item.mes_code)
 
     return ItemWithInventory(
         item_id=item.item_id,
@@ -96,7 +96,7 @@ def _to_item_with_inventory(
         legacy_item_type=item.legacy_item_type,
         supplier=item.supplier,
         min_stock=item.min_stock,
-        item_code=item.item_code,
+        mes_code=item.mes_code,
         model_symbol=item.model_symbol,
         model_slots=model_slots,
         process_type_code=item.process_type_code,
@@ -142,10 +142,10 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         )
 
     serial = None
-    item_code = None
+    mes_code = None
     if pt and model_sym:
         serial = next_serial_no(model_sym, pt, db)
-        item_code = make_item_code(model_sym, pt, serial)
+        mes_code = make_mes_code(model_sym, pt, serial)
 
     # 신규 항목은 목록 맨 끝으로. sort_order 미설정 시 NULL 이 되어 SQLite 가 맨앞에 정렬해버림.
     next_sort = (db.query(func.max(Item.sort_order)).scalar() or 0) + 1
@@ -160,7 +160,7 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         process_type_code=pt,
         model_symbol=model_sym or None,
         serial_no=serial,
-        item_code=item_code,
+        mes_code=mes_code,
         sort_order=next_sort,
     )
     db.add(item)
@@ -176,14 +176,14 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         action="item.create",
         target_type="item",
         target_id=str(item.item_id),
-        payload_summary=f"{item.item_name} ({item.item_code or 'no-code'}, init {init_qty})",
+        payload_summary=f"{item.item_name} ({item.mes_code or 'no-code'}, init {init_qty})",
     )
 
     commit_and_refresh(db, item)
     _evt_emit(
         "item_create",
         request=request,
-        item=item.item_code or "-",
+        item=item.mes_code or "-",
         name=item.item_name,
         init_qty=str(init_qty),
     )
@@ -232,7 +232,7 @@ def list_items(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.item_code.ilike(pattern),
+                Item.mes_code.ilike(pattern),
                 Inventory.location.ilike(pattern),
             )
         )
@@ -240,7 +240,7 @@ def list_items(
     rows = query.order_by(
         Item.deleted_at.is_(None).desc(),
         Item.sort_order,
-        Item.item_code,
+        Item.mes_code,
     ).offset(skip).limit(limit).all()
     if not rows:
         return []
@@ -273,7 +273,7 @@ def list_items(
             inv,
             figures=figures_map.get(item.item_id),
             locations=locations_by_item.get(item.item_id, []),
-            model_slots=item_code_to_model_slots(item.item_code),
+            model_slots=mes_code_to_model_slots(item.mes_code),
         )
         for item, inv in rows
     ]
@@ -301,16 +301,16 @@ def reorder_items(
 
 @router.get("/export.csv")
 def export_items_csv(db: Session = Depends(get_db)):
-    rows = _build_item_query(db).order_by(Item.item_code).all()
+    rows = _build_item_query(db).order_by(Item.mes_code).all()
 
     buffer = StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["item_code", "item_name", "process_type_code", "unit", "quantity", "location", "updated_at"])
+    writer.writerow(["mes_code", "item_name", "process_type_code", "unit", "quantity", "location", "updated_at"])
 
     for item, inventory in rows:
         writer.writerow(
             [
-                item.item_code or "",
+                item.mes_code or "",
                 item.item_name,
                 item.process_type_code or "",
                 item.unit,
@@ -361,11 +361,11 @@ def export_items_xlsx(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.item_code.ilike(pattern),
+                Item.mes_code.ilike(pattern),
                 Inventory.location.ilike(pattern),
             )
         )
-    rows = query.order_by(Item.process_type_code, Item.item_code).all()
+    rows = query.order_by(Item.process_type_code, Item.mes_code).all()
 
     # 가용수량 계산: stock_math 를 한 번 bulk 로 불러 경로별 재구현을 피한다.
     figures_map = stock_math.bulk_compute(db, [it.item_id for it, _ in rows])
@@ -390,7 +390,7 @@ def export_items_xlsx(
         min_stock = float(item.min_stock) if item.min_stock else None
 
         row_data = [
-            item.item_code or "",
+            item.mes_code or "",
             item.item_name,
             item.process_type_code or "",
             item.unit,
@@ -440,7 +440,7 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
     changed: list[str] = []
-    # process_type/model/option 변경 감지 — item_code 자동 재계산용.
+    # process_type/model/option 변경 감지 — mes_code 자동 재계산용.
     # 일반 필드(item_name·unit 등)는 코드와 무관하므로 그대로 setattr.
     for field in (
         "item_name", "unit",
@@ -452,8 +452,8 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
             setattr(item, field, new_val)
             changed.append(field)
 
-    # 모델·카테고리 변경은 item_code 재계산 트리거.
-    # 의도: 사용자는 모델·카테고리만 바꾸고 item_code 는 자동 부여.
+    # 모델·카테고리 변경은 mes_code 재계산 트리거.
+    # 의도: 사용자는 모델·카테고리만 바꾸고 mes_code 는 자동 부여.
     #   - 모델만 변경 → serial 유지, prefix 만 새로.
     #   - 카테고리 변경 → 새 카테고리의 next_serial_no 부여 (번호 풀이 다르므로).
     new_pt = payload.process_type_code if payload.process_type_code is not None else item.process_type_code
@@ -476,23 +476,23 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
             item.model_symbol = new_model_sym
             changed.append("model_slots")
 
-        # item_code 재조립. model/category 가 비어있으면 None 으로 둠 (등록 직후 미완 상태와 동일).
+        # mes_code 재조립. model/category 가 비어있으면 None 으로 둠 (등록 직후 미완 상태와 동일).
         if new_model_sym and new_pt and item.serial_no:
-            item.item_code = make_item_code(new_model_sym, new_pt, item.serial_no)
+            item.mes_code = make_mes_code(new_model_sym, new_pt, item.serial_no)
             # 안전망 — 중복 검사 (이론상 발생 안 해야 함).
             dup = db.query(Item).filter(
-                Item.item_code == item.item_code,
+                Item.mes_code == item.mes_code,
                 Item.item_id != item.item_id,
             ).first()
             if dup is not None:
                 raise http_error(
                     409,
                     ErrorCode.CONFLICT,
-                    f"'{item.item_code}' 코드가 이미 사용 중입니다. 데이터 점검이 필요합니다.",
+                    f"'{item.mes_code}' 코드가 이미 사용 중입니다. 데이터 점검이 필요합니다.",
                 )
-            changed.append("item_code")
+            changed.append("mes_code")
         else:
-            item.item_code = None
+            item.mes_code = None
 
     item.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
@@ -511,7 +511,7 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
         _evt_emit(
             "item_update",
             request=request,
-            item=item.item_code or "-",
+            item=item.mes_code or "-",
             changed=",".join(changed),
         )
     # 응답에 inventory 동봉 — 좌측 list API 와 동일한 ItemWithInventory 형태로 보내
@@ -570,14 +570,14 @@ def soft_delete_item(item_id: uuid.UUID, request: Request, db: Session = Depends
         action="item.delete",
         target_type="item",
         target_id=str(item.item_id),
-        payload_summary=f"{item.item_name} ({item.item_code or 'no-code'})",
+        payload_summary=f"{item.item_name} ({item.mes_code or 'no-code'})",
     )
 
     commit_and_refresh(db, item)
     _evt_emit(
         "item_delete",
         request=request,
-        item=item.item_code or "-",
+        item=item.mes_code or "-",
         name=item.item_name,
     )
     return item
@@ -601,14 +601,14 @@ def restore_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get
         action="item.restore",
         target_type="item",
         target_id=str(item.item_id),
-        payload_summary=f"{item.item_name} ({item.item_code or 'no-code'})",
+        payload_summary=f"{item.item_name} ({item.mes_code or 'no-code'})",
     )
 
     commit_and_refresh(db, item)
     _evt_emit(
         "item_restore",
         request=request,
-        item=item.item_code or "-",
+        item=item.mes_code or "-",
         name=item.item_name,
     )
     return item

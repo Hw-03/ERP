@@ -51,7 +51,7 @@ class ItemUpdate(BaseModel):
     legacy_item_type: Optional[str] = Field(None, max_length=50)
     supplier: Optional[str] = Field(None, max_length=200)
     min_stock: Optional[Decimal] = None
-    item_code: Optional[str] = Field(None, max_length=40)
+    mes_code: Optional[str] = Field(None, max_length=40)
     model_slots: Optional[List[int]] = None
 
 
@@ -66,7 +66,7 @@ class ItemResponse(BaseModel):
     supplier: Optional[str] = None
     min_stock: Optional[Decimal] = None
     # item code fields
-    item_code: Optional[str] = None
+    mes_code: Optional[str] = None
     model_symbol: Optional[str] = None
     model_slots: List[int] = []
     process_type_code: Optional[str] = None
@@ -335,17 +335,17 @@ class BOMDetailResponse(BaseModel):
     bom_id: uuid.UUID
     parent_item_id: uuid.UUID
     parent_item_name: str
-    parent_item_code: Optional[str]
+    parent_mes_code: Optional[str]
     child_item_id: uuid.UUID
     child_item_name: str
-    child_item_code: Optional[str]
+    child_mes_code: Optional[str]
     quantity: Decimal
     unit: str
 
 
 class BOMTreeNode(BaseModel):
     item_id: uuid.UUID
-    item_code: Optional[str] = None
+    mes_code: Optional[str] = None
     item_name: str
     process_type_code: Optional[str] = None
     unit: str
@@ -367,7 +367,7 @@ class ProductionReceiptRequest(BaseModel):
 
 class BackflushDetail(BaseModel):
     item_id: uuid.UUID
-    item_code: Optional[str] = None
+    mes_code: Optional[str] = None
     item_name: str
     process_type_code: Optional[str] = None
     required_quantity: Decimal
@@ -430,7 +430,7 @@ class TransactionLogResponse(BaseModel):
 
     log_id: uuid.UUID
     item_id: uuid.UUID
-    item_code: Optional[str] = None
+    mes_code: Optional[str] = None
     item_name: str
     item_process_type_code: Optional[str] = None
     item_unit: str
@@ -498,7 +498,7 @@ class ProductSymbolUpdate(BaseModel):
 
 class WeeklyItemReport(BaseModel):
     item_id: str
-    item_code: Optional[str]
+    mes_code: Optional[str]
     item_name: str
     prev_qty: Decimal
     in_qty: Decimal
@@ -566,16 +566,16 @@ class ProcessTypeResponse(BaseModel):
     description: Optional[str]
 
 
-class ItemCodeParseRequest(BaseModel):
+class MesCodeParseRequest(BaseModel):
     code: str = Field(..., description="3-part 품목 코드 문자열")
 
 
-class ItemCodeGenerateRequest(BaseModel):
+class MesCodeGenerateRequest(BaseModel):
     symbol: str = Field(..., min_length=1, max_length=5)
     process_type: str = Field(..., min_length=2, max_length=2)
 
 
-class ItemCodeResponse(BaseModel):
+class MesCodeResponse(BaseModel):
     symbol: str
     process_type: str
     serial: int
@@ -588,7 +588,7 @@ class ItemCodeResponse(BaseModel):
 # Phase 5.3-A — 운영 도구 응답 schema (BOM 가능 여부 / 생산 capacity / 정합성)
 # =============================================================================
 class BomCheckComponent(BaseModel):
-    item_code: Optional[str] = None
+    mes_code: Optional[str] = None
     item_name: str
     process_type_code: Optional[str] = None
     unit: str
@@ -614,7 +614,7 @@ CapacityStatus = Literal["no_target", "bom_not_registered", "not_producible", "p
 class CapacityTopItem(BaseModel):
     item_id: str
     item_name: str
-    item_code: Optional[str] = None
+    mes_code: Optional[str] = None
     model_symbol: Optional[str] = Field(
         None,
         description="모델 식별자 (items.model_symbol). 모델 그룹화·대표 PF 선정 기준.",
@@ -751,7 +751,7 @@ class StockRequestLineResponse(BaseModel):
     request_id: uuid.UUID
     item_id: uuid.UUID
     item_name_snapshot: str
-    item_code_snapshot: Optional[str] = None
+    mes_code_snapshot: Optional[str] = None
     quantity: Decimal
     from_bucket: RequestBucketEnum
     from_department: Optional[str] = None
@@ -806,7 +806,7 @@ class IoLinePayload(BaseModel):
     line_id: uuid.UUID
     item_id: uuid.UUID
     item_name: str
-    item_code: Optional[str] = None
+    mes_code: Optional[str] = None
     unit: str = "EA"
     direction: str
     from_bucket: str
@@ -828,7 +828,7 @@ class IoBundlePayload(BaseModel):
     source_kind: str
     title: str
     source_item_id: Optional[uuid.UUID] = None
-    source_item_code: Optional[str] = None
+    source_mes_code: Optional[str] = None
     quantity: Decimal
     expanded_level: int = 1
     lines: List[IoLinePayload] = Field(default_factory=list)

@@ -81,7 +81,7 @@ def production_receipt(
         if current_avail < required_qty:
             comp_item = items_map.get(comp_item_id)
             shortage_errors.append(
-                f"[{comp_item.item_code}] {comp_item.item_name}: 필요 {required_qty} {comp_item.unit}, "
+                f"[{comp_item.mes_code}] {comp_item.item_name}: 필요 {required_qty} {comp_item.unit}, "
                 f"가용 {current_avail} {comp_item.unit}, 부족 {required_qty - current_avail}"
             )
 
@@ -127,7 +127,7 @@ def production_receipt(
             backflushed.append(
                 BackflushDetail(
                     item_id=comp_item_id,
-                    item_code=comp_item.item_code,
+                    mes_code=comp_item.mes_code,
                     item_name=comp_item.item_name,
                     process_type_code=comp_item.process_type_code,
                     required_quantity=required_qty,
@@ -250,7 +250,7 @@ def check_production_feasibility(
             all_ok = False
         result.append(
             {
-                "item_code": comp_item.item_code,
+                "mes_code": comp_item.mes_code,
                 "item_name": comp_item.item_name,
                 "process_type_code": comp_item.process_type_code,
                 "unit": comp_item.unit,
@@ -463,7 +463,7 @@ def get_production_capacity(db: Session = Depends(get_db)):
         top_results.append({
             "item_id": str(item.item_id),
             "item_name": item.item_name,
-            "item_code": item.item_code,
+            "mes_code": item.mes_code,
             "model_symbol": item.model_symbol,
             "is_representative": False,
             "immediate": imm,
@@ -482,18 +482,18 @@ def get_production_capacity(db: Session = Depends(get_db)):
         }
 
     # 모델별 대표 PF 선정: model_symbol 별 그룹화 → 자연 정렬 첫 PF.
-    # 정렬 키는 item_code (있으면), 없으면 item_name.
+    # 정렬 키는 mes_code (있으면), 없으면 item_name.
     representatives: Dict[str, dict] = {}
     for r in top_results:
         ms = r.get("model_symbol")
         if not ms:
             continue
-        sort_key = (r.get("item_code") or r.get("item_name") or "")
+        sort_key = (r.get("mes_code") or r.get("item_name") or "")
         cur = representatives.get(ms)
         if cur is None:
             representatives[ms] = r
         else:
-            cur_key = (cur.get("item_code") or cur.get("item_name") or "")
+            cur_key = (cur.get("mes_code") or cur.get("item_name") or "")
             if sort_key < cur_key:
                 representatives[ms] = r
     for r in representatives.values():

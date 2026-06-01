@@ -33,7 +33,7 @@ def slots_to_model_symbol(slots: list[int]) -> str:
 _SYMBOL_TO_SLOT: dict[str, int] = {sym: slot for slot, sym in SLOT_TO_SYMBOL.items()}
 
 
-def item_code_to_model_slots(item_code: str | None) -> list[int]:
+def mes_code_to_model_slots(mes_code: str | None) -> list[int]:
     """품목 코드 prefix(첫 '-' 앞 글자열) → 모델 slot 리스트.
 
     회사 규약상 prefix 각 글자는 ProductSymbol.symbol 과 1:1 대응.
@@ -41,20 +41,20 @@ def item_code_to_model_slots(item_code: str | None) -> list[int]:
         "78-PR-0042" → [2, 3]  (COCOON + SOLO)
         "34678-PR-0168" → [1, 2, 3, 4, 5]  (전체 공용)
 
-    item_code 가 None 이거나 '-' 가 없으면 [].
+    mes_code 가 None 이거나 '-' 가 없으면 [].
     매칭 안 되는 글자는 무시. 결과는 slot 오름차순, 중복 제거.
     """
-    if not item_code:
+    if not mes_code:
         return []
-    dash = item_code.find("-")
+    dash = mes_code.find("-")
     if dash <= 0:
         return []
-    prefix = item_code[:dash]
+    prefix = mes_code[:dash]
     slots = {_SYMBOL_TO_SLOT[ch] for ch in prefix if ch in _SYMBOL_TO_SLOT}
     return sorted(slots)
 
 
-def make_item_code(
+def make_mes_code(
     model_symbol: str,
     process_type: str,
     serial_no: int,

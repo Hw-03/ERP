@@ -1,8 +1,8 @@
 """품목·BOM 도메인.
 
-품목-모델 매핑은 별도 테이블 없이 item_code prefix (첫 '-' 앞 글자열) 에서
+품목-모델 매핑은 별도 테이블 없이 mes_code prefix (첫 '-' 앞 글자열) 에서
 유도한다 — 회사 규약상 각 글자가 ProductSymbol.symbol 과 1:1 대응이라
-이중 출처를 둘 이유가 없음. 헬퍼: app.utils.item_code.item_code_to_model_slots.
+이중 출처를 둘 이유가 없음. 헬퍼: app.utils.mes_code.mes_code_to_model_slots.
 """
 
 import uuid
@@ -55,7 +55,7 @@ class Item(Base):
     min_stock = Column(Numeric(15, 4), nullable=True)
 
     # 3-part item code ([모델기호조합]-[구분코드]-[일련번호])
-    item_code = Column(String(40), nullable=True, unique=True, index=True)
+    mes_code = Column(String(40), nullable=True, unique=True, index=True)
     model_symbol = Column(String(20), nullable=True, index=True)  # 예: "346", "3", "34678"
     process_type_code = Column(String(2), ForeignKey("process_types.code"), nullable=True, index=True)
     serial_no = Column(Integer, nullable=True)
