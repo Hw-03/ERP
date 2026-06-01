@@ -5,7 +5,7 @@ import { useAdminMasterItemsList } from "../useAdminMasterItemsList";
 const I = (id: string, name: string, code: string): any => ({
   item_id: id,
   item_name: name,
-  item_code: code,
+  mes_code: code,
 });
 
 describe("useAdminMasterItemsList", () => {
@@ -37,14 +37,14 @@ describe("useAdminMasterItemsList", () => {
       useAdminMasterItemsList({ items, globalSearch: "C-002" }),
     );
     expect(result.current.visibleItems).toHaveLength(1);
-    expect(result.current.visibleItems[0]!.item_code).toBe("C-002");
+    expect(result.current.visibleItems[0]!.mes_code).toBe("C-002");
   });
 
   it("globalSearch + itemSearch 조합 — 공백으로 합쳐 부분 매치", () => {
     const { result } = renderHook(() =>
       useAdminMasterItemsList({ items, globalSearch: "센서" }),
     );
-    // 'globalSearch + itemSearch' 가 'item_name + item_code' 안에 모두 포함되어야 함.
+    // 'globalSearch + itemSearch' 가 'item_name + mes_code' 안에 모두 포함되어야 함.
     expect(result.current.visibleItems.map((i) => i.item_name)).toEqual(["센서"]);
   });
 

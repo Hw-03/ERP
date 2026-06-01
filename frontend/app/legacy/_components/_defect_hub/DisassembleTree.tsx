@@ -16,7 +16,7 @@ import { formatQty } from "@/lib/mes/format";
 export interface ChildDecision {
   item_id: string;
   item_name: string;
-  item_code: string;
+  mes_code: string;
   qty: number;            // 해당 노드의 총 수량
   keep_qty: number;       // 정상 복귀 수량 (0..qty). split 모드에서는 cascade 기준값.
   reason_memo: string;
@@ -29,7 +29,7 @@ export interface ChildDecision {
 interface DisassembleTreeProps {
   parentItemId: string;
   parentItemName: string;
-  parentItemCode: string;
+  parentMesCode: string;
   parentQty: number;
   parentDept: string;
   decisions: ChildDecision[];
@@ -44,7 +44,7 @@ function clamp(n: number, min: number, max: number): number {
 function toChildDecision(line: {
   item_id: string;
   item_name: string;
-  item_code: string | null;
+  mes_code: string | null;
   quantity: number;
   has_children: boolean;
 }): ChildDecision {
@@ -52,7 +52,7 @@ function toChildDecision(line: {
   return {
     item_id: line.item_id,
     item_name: line.item_name,
-    item_code: line.item_code ?? "",
+    mes_code: line.mes_code ?? "",
     qty,
     keep_qty: 0,
     reason_memo: "",
@@ -85,7 +85,7 @@ function cascadeKeepQty(
 export function DisassembleTree({
   parentItemId,
   parentItemName,
-  parentItemCode,
+  parentMesCode,
   parentQty,
   parentDept: _parentDept,
   decisions,
@@ -163,9 +163,9 @@ export function DisassembleTree({
           <span className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
             {parentItemName}
           </span>
-          {parentItemCode && (
+          {parentMesCode && (
             <span className="text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              {parentItemCode}
+              {parentMesCode}
             </span>
           )}
         </div>
@@ -333,9 +333,9 @@ function TreeNode({
         <span className="text-sm font-black truncate" style={{ color: LEGACY_COLORS.text }}>
           {node.item_name}
         </span>
-        {node.item_code && (
+        {node.mes_code && (
           <span className="text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-            {node.item_code}
+            {node.mes_code}
           </span>
         )}
         {node.manuallySet && !isDecomposed && (

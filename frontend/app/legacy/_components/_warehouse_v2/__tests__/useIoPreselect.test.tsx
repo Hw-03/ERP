@@ -16,7 +16,7 @@ import type { Item, IoWorkType } from "@/lib/api";
 function makeItem(item_id = "ITEM-001"): Item {
   return {
     item_id,
-    item_code: "C-001",
+    mes_code: "C-001",
     item_name: "테스트 부품",
     unit: "EA",
     warehouse_qty: 0,

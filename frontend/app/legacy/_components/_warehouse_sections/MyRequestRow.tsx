@@ -103,7 +103,7 @@ export function MyRequestRow({
               className="flex flex-wrap items-center gap-2 py-1.5"
               style={!isLast ? { borderBottom: `1px solid ${LEGACY_COLORS.border}` } : undefined}
             >
-              <span style={{ color: LEGACY_COLORS.muted2 }}>{line.item_code_snapshot ?? "-"}</span>
+              <span style={{ color: LEGACY_COLORS.muted2 }}>{line.mes_code_snapshot ?? "-"}</span>
               <span>{line.item_name_snapshot}</span>
               <span className="font-bold">{formatQty(line.quantity)}{" "}개</span>
             </div>

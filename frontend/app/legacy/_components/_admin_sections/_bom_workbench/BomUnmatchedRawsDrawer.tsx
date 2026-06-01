@@ -80,7 +80,7 @@ export function BomUnmatchedRawsDrawer({ rawItems, childIdSet }: Props) {
                 </TruncatedText>
               </div>
               <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                {i.item_code}
+                {i.mes_code}
               </div>
             </div>
           ))}

@@ -13,7 +13,7 @@ import { useAdminMasterItemsForm } from "../useAdminMasterItemsForm";
 const I = (over: Partial<any> = {}): any => ({
   item_id: "1",
   item_name: "프로브",
-  item_code: "P-001",
+  mes_code: "P-001",
   process_type_code: "TR",
   unit: "EA",
   model_slots: [],
@@ -46,7 +46,7 @@ describe("useAdminMasterItemsForm", () => {
       useAdminMasterItemsForm(baseArgs({ selectedItem: item })),
     );
     expect(result.current.form.item_name).toBe("프로브");
-    expect(result.current.form.item_code).toBe("P-001");
+    expect(result.current.form.mes_code).toBe("P-001");
     expect(result.current.dirty).toBe(false);
   });
 

@@ -49,7 +49,7 @@ function SummaryCard({
         className="mt-0.5 flex flex-wrap items-center gap-3 text-xs font-bold"
         style={{ color: LEGACY_COLORS.muted2 }}
       >
-        <span>{location.item_code}</span>
+        <span>{location.mes_code}</span>
         <span>{location.department}</span>
         <span>격리 {location.defective_at ? new Date(location.defective_at).toLocaleDateString("ko-KR") : "기록 없음"}</span>
       </div>

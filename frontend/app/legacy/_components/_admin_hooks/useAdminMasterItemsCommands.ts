@@ -66,7 +66,7 @@ export function useAdminMasterItemsCommands({
       setSelectedItem(created);
       setAddMode(false);
       setAddForm(() => EMPTY_ADD_FORM);
-      onStatusChange(`'${created.item_name}' 품목이 추가됐습니다. (${created.item_code})`);
+      onStatusChange(`'${created.item_name}' 품목이 추가됐습니다. (${created.mes_code})`);
       onShowSave?.(`'${created.item_name}' 품목이 추가됐습니다.`);
     } catch (error) {
       onError(error instanceof Error ? error.message : "품목 추가에 실패했습니다.");

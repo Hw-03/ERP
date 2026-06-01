@@ -6,7 +6,7 @@
 export interface DefectLocation {
   item_id: string;
   item_name: string;
-  item_code: string;
+  mes_code: string;
   department: string;
   quantity: number;
   defective_at: string | null; // ISO 8601 datetime string. 레거시 데이터로 NULL 가능 — UI 방어 필수.

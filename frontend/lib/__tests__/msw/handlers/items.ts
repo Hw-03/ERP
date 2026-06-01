@@ -3,7 +3,7 @@ import { http, HttpResponse } from "msw";
 const sampleItems = [
   {
     item_id: "I001",
-    item_code: "I001",
+    mes_code: "I001",
     item_name: "샘플품목A",
     process_type_code: "PA",
     unit: "EA",
@@ -13,7 +13,7 @@ const sampleItems = [
   },
   {
     item_id: "I002",
-    item_code: "I002",
+    mes_code: "I002",
     item_name: "샘플품목B",
     process_type_code: "PF",
     unit: "EA",
@@ -48,7 +48,7 @@ export const itemsHandlers = [
     return HttpResponse.json(
       {
         item_id: "I003",
-        item_code: "I003",
+        mes_code: "I003",
         item_name: body.item_name,
         process_type_code: body.process_type_code ?? "PA",
         unit: body.unit ?? "EA",
@@ -61,7 +61,7 @@ export const itemsHandlers = [
     const body = (await request.json()) as { item_name?: string };
     return HttpResponse.json({
       item_id: String(params.itemId),
-      item_code: String(params.itemId),
+      mes_code: String(params.itemId),
       item_name: body.item_name ?? "샘플품목A",
       process_type_code: "PA",
       unit: "EA",
@@ -72,7 +72,7 @@ export const itemsHandlers = [
     const body = (await request.json()) as { completed: boolean };
     return HttpResponse.json({
       item_id: String(params.itemId),
-      item_code: String(params.itemId),
+      mes_code: String(params.itemId),
       item_name: "샘플품목A",
       bom_completed: body.completed,
     });

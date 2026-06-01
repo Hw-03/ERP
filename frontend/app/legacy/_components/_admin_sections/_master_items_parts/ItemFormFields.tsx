@@ -13,14 +13,14 @@ export type ItemFormData = {
   unit: string;
   model_slots: number[];
   initial_quantity?: string;
-  item_code?: string;
+  mes_code?: string;
 };
 
 interface Props {
   form: ItemFormData;
   setForm: (updater: (f: ItemFormData) => ItemFormData) => void;
   showInitialQuantity?: boolean;
-  showItemCode?: boolean;
+  showMesCode?: boolean;
 }
 
 function FieldLabel({ label, badge }: { label: string; badge?: "필수" | "선택" }) {
@@ -72,9 +72,9 @@ const CODE_PARSE = /^([0-9]+)-([A-Z]{2})-(\d{4})(?:-(\w+))?$/;
  */
 function previewFullCode(form: ItemFormData): string {
   const prefix = previewCodePrefix(form.model_slots, form.process_type_code);
-  if (!prefix) return form.item_code || "(자동 부여)";
+  if (!prefix) return form.mes_code || "(자동 부여)";
 
-  const m = (form.item_code || "").match(CODE_PARSE);
+  const m = (form.mes_code || "").match(CODE_PARSE);
   if (!m) {
     // 기존 코드 패턴 모름 — 미리보기는 prefix 만 보여줌.
     return `${prefix}???? (저장 시 부여)`;
@@ -86,7 +86,7 @@ function previewFullCode(form: ItemFormData): string {
   return `${prefix}${serial}`;
 }
 
-function ItemCodeSection({
+function MesCodeSection({
   form,
 }: {
   form: ItemFormData;
@@ -115,7 +115,7 @@ function ItemCodeSection({
         style={{
           ...inputStyle,
           background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 8%, transparent)`,
-          color: form.item_code ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
+          color: form.mes_code ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
         }}
         aria-readonly
       >
@@ -128,7 +128,7 @@ function ItemCodeSection({
   );
 }
 
-export function ItemFormFields({ form, setForm, showInitialQuantity, showItemCode }: Props) {
+export function ItemFormFields({ form, setForm, showInitialQuantity, showMesCode }: Props) {
   return (
     <>
       {/* 텍스트/숫자 필드 */}
@@ -184,8 +184,8 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showItemCod
         </div>
       ))}
 
-      {showItemCode && (
-        <ItemCodeSection form={form} />
+      {showMesCode && (
+        <MesCodeSection form={form} />
       )}
 
       {/* 카테고리 */}

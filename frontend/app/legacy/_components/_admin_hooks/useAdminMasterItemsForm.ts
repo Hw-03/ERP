@@ -16,7 +16,7 @@ export type ItemEditForm = {
   process_type_code: string;
   unit: string;
   model_slots: number[];
-  item_code: string;
+  mes_code: string;
 };
 
 export const EMPTY_ITEM_EDIT_FORM: ItemEditForm = {
@@ -27,7 +27,7 @@ export const EMPTY_ITEM_EDIT_FORM: ItemEditForm = {
   process_type_code: "TR",
   unit: "EA",
   model_slots: [],
-  item_code: "",
+  mes_code: "",
 };
 
 const SYMBOL_TO_SLOT: Record<string, number> = { "3": 1, "7": 2, "8": 3, "4": 4, "6": 5 };
@@ -43,7 +43,7 @@ function inferModelSlots(code: string): number[] {
 
 export function itemToEditForm(item: Item): ItemEditForm {
   const savedSlots = item.model_slots ?? [];
-  const itemCode = item.item_code ?? "";
+  const mesCode = item.mes_code ?? "";
   return {
     item_name: item.item_name,
     legacy_item_type: item.legacy_item_type ?? "",
@@ -51,8 +51,8 @@ export function itemToEditForm(item: Item): ItemEditForm {
     min_stock: item.min_stock != null ? String(Math.round(Number(item.min_stock))) : "",
     process_type_code: item.process_type_code ?? "TR",
     unit: item.unit ?? "EA",
-    model_slots: savedSlots.length > 0 ? savedSlots : inferModelSlots(itemCode),
-    item_code: itemCode,
+    model_slots: savedSlots.length > 0 ? savedSlots : inferModelSlots(mesCode),
+    mes_code: mesCode,
   };
 }
 
@@ -65,7 +65,7 @@ type UpdateItemPayload = {
   process_type_code?: string;
   unit?: string;
   model_slots?: number[];
-  item_code?: string;
+  mes_code?: string;
 };
 
 export type UseAdminMasterItemsFormArgs = {
@@ -83,7 +83,7 @@ export type UseAdminMasterItemsFormState = {
   dirty: boolean;
   save: () => Promise<void>;
   saveField: (
-    field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "item_code" | "process_type_code",
+    field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "mes_code" | "process_type_code",
     value: string,
   ) => void;
   updateFull: (payload: UpdateItemPayload) => void;
@@ -119,7 +119,7 @@ export function useAdminMasterItemsForm({
   async function save(): Promise<void> {
     if (!selectedItem) return;
     try {
-      // item_code 는 백엔드가 (model_symbol, process_type_code, serial_no) 에서 자동 부여.
+      // mes_code 는 백엔드가 (model_symbol, process_type_code, serial_no) 에서 자동 부여.
       // 프론트에서 보내지 않음 — 사용자가 손으로 입력 못 함.
       const payload: UpdateItemPayload = {
         item_name: form.item_name || undefined,
@@ -133,7 +133,7 @@ export function useAdminMasterItemsForm({
       const updated = await api.updateItem(selectedItem.item_id, payload);
       setItems((current) => current.map((it) => (it.item_id === updated.item_id ? updated : it)));
       setSelectedItem(updated);
-      // 백엔드 응답으로 form 갱신 — 새 item_code 가 폼에 반영되도록.
+      // 백엔드 응답으로 form 갱신 — 새 mes_code 가 폼에 반영되도록.
       // useEffect deps 가 selectedItem.item_id 라 같은 부품 갱신은 발화 안 함 → 명시 호출 필요.
       setFormState(itemToEditForm(updated));
       setDirty(false);
@@ -145,7 +145,7 @@ export function useAdminMasterItemsForm({
   }
 
   async function _saveField(
-    field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "item_code" | "process_type_code",
+    field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "mes_code" | "process_type_code",
     value: string,
   ): Promise<void> {
     if (!selectedItem) return;

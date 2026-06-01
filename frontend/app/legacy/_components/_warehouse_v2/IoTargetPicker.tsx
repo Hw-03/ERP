@@ -472,7 +472,7 @@ function ItemTable({
                   style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                 >
                   <span className="text-sm font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {keepCodeOnOneLine(item.item_code)}
+                    {keepCodeOnOneLine(item.mes_code)}
                   </span>
                 </td>
                 <td

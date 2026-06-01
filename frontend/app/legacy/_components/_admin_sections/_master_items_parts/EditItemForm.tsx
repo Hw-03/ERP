@@ -21,9 +21,9 @@ export function EditItemForm({ selectedItem }: { selectedItem: Item }) {
       <div className="text-base font-bold">{selectedItem.item_name}</div>
 
       <ItemFormFields
-        form={editForm as unknown as ItemFormData & { item_code: string }}
+        form={editForm as unknown as ItemFormData & { mes_code: string }}
         setForm={handleSetForm}
-        showItemCode
+        showMesCode
       />
     </div>
   );

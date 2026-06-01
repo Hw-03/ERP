@@ -116,7 +116,7 @@ export function DefectInventoryPicker({
                       className="text-xs font-bold"
                       style={{ color: LEGACY_COLORS.muted2 }}
                     >
-                      {loc.item_code}
+                      {loc.mes_code}
                     </span>
                     <div
                       className="mt-0.5 flex flex-wrap items-center gap-2 text-xs"

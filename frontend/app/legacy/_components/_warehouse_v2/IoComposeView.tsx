@@ -1022,7 +1022,7 @@ export function IoComposeView({
                 <DisassembleTree
                   parentItemId={state.defectSelectedLocation.item_id}
                   parentItemName={state.defectSelectedLocation.item_name}
-                  parentItemCode={state.defectSelectedLocation.item_code}
+                  parentMesCode={state.defectSelectedLocation.mes_code}
                   parentQty={state.defectProcessQty || Number(state.defectSelectedLocation.quantity)}
                   parentDept={state.defectSelectedLocation.department}
                   decisions={state.defectBomDecisions}

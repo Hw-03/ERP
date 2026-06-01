@@ -6,10 +6,10 @@ const sampleBomList: BOMDetailEntry[] = [
     bom_id: "bom-1",
     parent_item_id: "parent-1",
     parent_item_name: "완제품A",
-    parent_item_code: "FA-001",
+    parent_mes_code: "FA-001",
     child_item_id: "child-1",
     child_item_name: "부품X",
-    child_item_code: "PX-001",
+    child_mes_code: "PX-001",
     quantity: 2,
     unit: "EA",
   },
@@ -17,10 +17,10 @@ const sampleBomList: BOMDetailEntry[] = [
     bom_id: "bom-2",
     parent_item_id: "parent-1",
     parent_item_name: "완제품A",
-    parent_item_code: "FA-001",
+    parent_mes_code: "FA-001",
     child_item_id: "child-2",
     child_item_name: "부품Y",
-    child_item_code: "PY-002",
+    child_mes_code: "PY-002",
     quantity: 1,
     unit: "EA",
   },
@@ -37,7 +37,7 @@ const sampleBomEntry: BOMEntry = {
 
 const sampleBomTree: BOMTreeNode = {
   item_id: "parent-1",
-  item_code: "FA-001",
+  mes_code: "FA-001",
   item_name: "완제품A",
   process_type_code: "AF",
   unit: "EA",
@@ -46,7 +46,7 @@ const sampleBomTree: BOMTreeNode = {
   children: [
     {
       item_id: "child-1",
-      item_code: "PX-001",
+      mes_code: "PX-001",
       item_name: "부품X",
       process_type_code: "TR",
       unit: "EA",

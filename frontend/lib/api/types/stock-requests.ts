@@ -36,7 +36,7 @@ export interface StockRequestLine {
   request_id: string;
   item_id: string;
   item_name_snapshot: string;
-  item_code_snapshot: string | null;
+  mes_code_snapshot: string | null;
   quantity: number;
   from_bucket: RequestBucket;
   from_department: Department | null;

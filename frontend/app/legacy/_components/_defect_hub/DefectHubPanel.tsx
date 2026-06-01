@@ -18,10 +18,10 @@ import { RDefectActionModal } from "./RDefectActionModal";
 import { PaPfDefectWizard } from "./PaPfDefectWizard";
 import { AddQuarantineModal } from "./AddQuarantineModal";
 
-/** item_code 2번째 segment 가 process_type. PA/PF 면 BOM 분해 가능. */
-function isPaPfItem(itemCode: string | null | undefined): boolean {
-  if (!itemCode) return false;
-  const parts = itemCode.split("-");
+/** mes_code 2번째 segment 가 process_type. PA/PF 면 BOM 분해 가능. */
+function isPaPfItem(mesCode: string | null | undefined): boolean {
+  if (!mesCode) return false;
+  const parts = mesCode.split("-");
   if (parts.length < 2) return false;
   return parts[1] === "PA" || parts[1] === "PF";
 }
@@ -220,7 +220,7 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
       )}
 
       {/* 처리 모달 — 품목 종류(R / PA·PF)에 따라 분기 */}
-      {processingLocation && isPaPfItem(processingLocation.item_code) ? (
+      {processingLocation && isPaPfItem(processingLocation.mes_code) ? (
         <PaPfDefectWizard
           open
           onClose={() => setProcessingLocation(null)}

@@ -61,7 +61,7 @@ export function BomParentHeader({
           {parent.item_name}
         </TruncatedText>
         <TruncatedText className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-          {parent.item_code ?? "(코드 없음)"} · {subtitleSuffix}
+          {parent.mes_code ?? "(코드 없음)"} · {subtitleSuffix}
         </TruncatedText>
       </div>
       {mode === "edit" && (

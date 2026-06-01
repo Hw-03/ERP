@@ -3,7 +3,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { itemCodeDept } from "@/lib/mes/process";
+import { mesCodeDept } from "@/lib/mes/process";
 import { InventoryKpiPanel, type KpiFilter } from "./_inventory_sections/InventoryKpiPanel";
 import { InventoryCapacityPanel } from "./_inventory_sections/InventoryCapacityPanel";
 import { InventoryFilterToggleButton } from "./_inventory_sections/InventoryFilterToggleButton";
@@ -114,7 +114,7 @@ export function DesktopInventoryView({
             d === "창고"
               ? (item.warehouse_qty ?? 0) > 0
               : item.department === d ||
-                itemCodeDept(item.item_code) === d ||
+                mesCodeDept(item.mes_code) === d ||
                 item.locations.some((loc) => loc.department === d),
           );
           if (!inDept) return false;
@@ -254,7 +254,7 @@ export function DesktopInventoryView({
         headerBadge={headerBadge}
         onClose={() => setSelectedItem(null)}
         onGoToWarehouse={onGoToWarehouse}
-        imageFilename={displayItem?.item_code ? imageManifest[displayItem.item_code] : undefined}
+        imageFilename={displayItem?.mes_code ? imageManifest[displayItem.mes_code] : undefined}
       />
     </div>
   );

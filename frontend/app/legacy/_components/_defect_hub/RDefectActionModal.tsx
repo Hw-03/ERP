@@ -154,7 +154,7 @@ export function RDefectActionModal({
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.red }} />
           <div>
             <div id={titleId} className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>
-              [처리] {location.item_code} {location.item_name}{" "}
+              [처리] {location.mes_code} {location.item_name}{" "}
               <span style={{ color: LEGACY_COLORS.muted }}>× {Number(location.quantity)}개</span>
             </div>
             <div className="mt-0.5 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>

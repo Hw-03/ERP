@@ -311,7 +311,7 @@ function HistoryDetailMetaStrip({
             </span>
           )}
           <span style={{ color: LEGACY_COLORS.muted2 }}>
-            {log.item_code ?? "-"}
+            {log.mes_code ?? "-"}
           </span>
         </div>
         <div className="flex flex-col gap-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>

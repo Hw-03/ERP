@@ -5,7 +5,7 @@ const sampleTransactions: TransactionLog[] = [
   {
     log_id: "log-1",
     item_id: "item-1",
-    item_code: "MC-001",
+    mes_code: "MC-001",
     item_name: "메인 커버",
     item_process_type_code: "TR",
     item_unit: "EA",
@@ -26,7 +26,7 @@ const sampleTransactions: TransactionLog[] = [
   {
     log_id: "log-2",
     item_id: "item-2",
-    item_code: "MC-002",
+    mes_code: "MC-002",
     item_name: "하우징",
     item_process_type_code: "TA",
     item_unit: "EA",

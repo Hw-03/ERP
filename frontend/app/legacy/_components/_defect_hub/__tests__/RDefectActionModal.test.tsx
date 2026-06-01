@@ -21,7 +21,7 @@ import { stockRequestsApi } from "@/lib/api/stock-requests";
 const mockLocation: DefectLocation = {
   item_id: "item-001",
   item_name: "텅스텐 와이어",
-  item_code: "7-MAT-0001",
+  mes_code: "7-MAT-0001",
   department: "조립",
   quantity: 5,
   defective_at: "2025-08-15T00:00:00.000Z",

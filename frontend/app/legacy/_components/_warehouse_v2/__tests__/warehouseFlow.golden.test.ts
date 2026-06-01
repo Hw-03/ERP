@@ -54,7 +54,7 @@ function makeLine(overrides: Partial<IoLine> = {}): IoLine {
     line_id: "l1",
     item_id: "ITEM-001",
     item_name: "테스트 부품",
-    item_code: null,
+    mes_code: null,
     unit: "EA",
     direction: "in",
     from_bucket: "none",

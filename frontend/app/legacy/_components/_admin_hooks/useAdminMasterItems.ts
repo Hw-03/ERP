@@ -32,7 +32,7 @@ type UpdateItemPayload = {
   process_type_code?: string;
   unit?: string;
   model_slots?: number[];
-  item_code?: string;
+  mes_code?: string;
 };
 
 export type AdminMasterItemsState = {
@@ -48,7 +48,7 @@ export type AdminMasterItemsState = {
   addItem: () => void;
   reorderItems: (ordered: Item[]) => void;
   saveItemField: (
-    field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "item_code" | "process_type_code",
+    field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "mes_code" | "process_type_code",
     value: string,
   ) => void;
   updateItemFull: (payload: UpdateItemPayload) => void;

@@ -149,9 +149,9 @@ function NodeRows({
             <span className="min-w-0 flex-1 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
               {node.item_name}
             </span>
-            {isFirst && node.item_code && (
+            {isFirst && node.mes_code && (
               <span className="w-[6rem] shrink-0 text-right text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                {node.item_code}
+                {node.mes_code}
               </span>
             )}
           </div>
@@ -194,7 +194,7 @@ function NodeRows({
                 <span className="shrink-0 text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>└</span>
               )}
               <span className="min-w-0 flex-1 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>{node.item_name}</span>
-              {node.item_code && <span className="w-[6rem] shrink-0 text-right text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{node.item_code}</span>}
+              {node.mes_code && <span className="w-[6rem] shrink-0 text-right text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{node.mes_code}</span>}
             </div>
           </td>
           <td className="whitespace-nowrap border-b px-4 py-1.5 text-center text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>-</td>
@@ -254,9 +254,9 @@ function FlatLogRow({ log, compact }: { log: TransactionLog; compact?: boolean }
           <span className="min-w-0 flex-1 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
             {log.item_name}
           </span>
-          {log.item_code && (
+          {log.mes_code && (
             <span className="w-[6rem] shrink-0 text-right text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-              {log.item_code}
+              {log.mes_code}
             </span>
           )}
         </div>

@@ -13,12 +13,12 @@ vi.mock("@/lib/api/defects", () => ({
 
 // 처리 모달 모킹 — DOM 렌더만 검증 (실제 API 호출 X)
 vi.mock("../RDefectActionModal", () => ({
-  RDefectActionModal: ({ open, location }: { open: boolean; location: { item_code: string } }) =>
-    open ? <div data-testid="r-modal">{location.item_code}</div> : null,
+  RDefectActionModal: ({ open, location }: { open: boolean; location: { mes_code: string } }) =>
+    open ? <div data-testid="r-modal">{location.mes_code}</div> : null,
 }));
 vi.mock("../PaPfDefectWizard", () => ({
-  PaPfDefectWizard: ({ open, location }: { open: boolean; location: { item_code: string } }) =>
-    open ? <div data-testid="papf-wizard">{location.item_code}</div> : null,
+  PaPfDefectWizard: ({ open, location }: { open: boolean; location: { mes_code: string } }) =>
+    open ? <div data-testid="papf-wizard">{location.mes_code}</div> : null,
 }));
 vi.mock("../AddQuarantineModal", () => ({
   AddQuarantineModal: ({ open }: { open: boolean }) =>
@@ -39,7 +39,7 @@ const mockLocations: DefectLocation[] = [
   {
     item_id: "item-001",
     item_name: "전극(70kV)",
-    item_code: "7-TR-0001",
+    mes_code: "7-TR-0001",
     department: "조립",
     quantity: 3,
     defective_at: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString(), // 200일 전
@@ -49,7 +49,7 @@ const mockLocations: DefectLocation[] = [
   {
     item_id: "item-002",
     item_name: "게터",
-    item_code: "7-TR-0003",
+    mes_code: "7-TR-0003",
     department: "진공",
     quantity: 8,
     defective_at: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString(), // 400일 전 (1년 초과)
@@ -163,7 +163,7 @@ describe("DefectHubPanel", () => {
       expect(screen.getAllByText("처리").length).toBeGreaterThan(0);
     });
 
-    // mockLocations 의 첫 항목 item_code="7-TR-0001" — PA/PF 아님 → R 모달 분기
+    // mockLocations 의 첫 항목 mes_code="7-TR-0001" — PA/PF 아님 → R 모달 분기
     const processButtons = screen.getAllByText("처리");
     fireEvent.click(processButtons[0]);
 

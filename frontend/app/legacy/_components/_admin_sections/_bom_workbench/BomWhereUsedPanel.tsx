@@ -77,7 +77,7 @@ export function BomWhereUsedPanel({ selected, rows, items, onSelectParent }: Pro
                       {r.parent_item_name}
                     </TruncatedText>
                     <TruncatedText className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                      {r.parent_item_code ?? "(코드 없음)"}
+                      {r.parent_mes_code ?? "(코드 없음)"}
                     </TruncatedText>
                   </div>
                   <div className="text-right text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
