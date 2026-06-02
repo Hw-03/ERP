@@ -29,9 +29,23 @@ function formatDate(iso: string | null): string {
 interface Props {
   locations: DefectLocation[];
   onProcess: (location: DefectLocation) => void;
+  /** 다중선택 모드 활성 (데스크톱 일괄 처리). 미지정 시 기존 동작(모바일 등). */
+  selectable?: boolean;
+  /** 선택된 항목 키 집합 — `${item_id}__${department}`. */
+  selectedKeys?: Set<string>;
+  /** 체크박스 토글. has_bom(PA/PF) 행에는 체크박스를 노출하지 않는다. */
+  onToggleSelect?: (location: DefectLocation) => void;
 }
 
-export function DefectDepartmentList({ locations, onProcess }: Props) {
+const locKey = (loc: DefectLocation) => `${loc.item_id}__${loc.department}`;
+
+export function DefectDepartmentList({
+  locations,
+  onProcess,
+  selectable = false,
+  selectedKeys,
+  onToggleSelect,
+}: Props) {
   // 부서별 그룹핑
   const grouped = groupByDepartment(locations);
   const depts = Object.keys(grouped).sort();
@@ -97,11 +111,27 @@ export function DefectDepartmentList({ locations, onProcess }: Props) {
               <div className="divide-y" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}>
                 {rows.map((loc, idx) => {
                   const warn = isOverOneYear(loc.defective_at);
+                  // 일괄 대상은 단순(non-BOM) 항목만. PA/PF(has_bom)는 1건 전체화면 분해.
+                  const showCheckbox = selectable && !loc.has_bom;
+                  const checked = selectedKeys?.has(locKey(loc)) ?? false;
                   return (
                     <div
                       key={`${loc.item_id}-${idx}`}
                       className="flex items-center gap-4 px-5 py-3"
                     >
+                      {selectable && (
+                        showCheckbox ? (
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => onToggleSelect?.(loc)}
+                            className="h-4 w-4 shrink-0 accent-red-500"
+                            aria-label={`${loc.item_name} 선택`}
+                          />
+                        ) : (
+                          <span className="h-4 w-4 shrink-0" aria-hidden />
+                        )
+                      )}
                       {/* 품목 정보 */}
                       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <div className="flex items-center gap-2">
