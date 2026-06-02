@@ -279,6 +279,60 @@ def _operation_filter(transaction_types: Optional[str]):
     return or_(*clauses)
 
 
+def _apply_common_filters(
+    query,
+    db: Session,
+    *,
+    transaction_types: Optional[str],
+    search: Optional[str],
+    department: Optional[str],
+    model: Optional[str],
+    process_step: Optional[str],
+    date_from: Optional[date],
+    date_to: Optional[date],
+    include_archived: bool,
+):
+    """list_transactions / get_transactions_summary 공통 필터.
+
+    TransactionLog + Item join + IoBatch outerjoin 이 이미 적용된 query 를 받아
+    화면 공통 조건(operation 구분·기간·아카이브·검색·부서·공정·모델)을 AND 로 덧붙인다.
+    item_id/transaction_type/reference_no 같은 list 전용 필터는 호출부가 직접 처리.
+    """
+    if transaction_types:
+        _op_f = _operation_filter(transaction_types)
+        if _op_f is not None:
+            query = query.filter(_op_f)
+    _dept_f = _department_filter(department)
+    if _dept_f is not None:
+        query = query.filter(_dept_f)
+    _ps = _process_step_filter(process_step)
+    if _ps is not None:
+        query = query.filter(_ps)
+    _md = _model_filter(db, model)
+    if _md is not None:
+        query = query.filter(_md)
+    if date_from:
+        query = query.filter(TransactionLog.created_at >= datetime.combine(date_from, time.min))
+    if date_to:
+        query = query.filter(TransactionLog.created_at <= datetime.combine(date_to, time.max))
+    if not include_archived:
+        query = query.filter(TransactionLog.archived_at.is_(None))
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                Item.item_name.ilike(pattern),
+                Item.mes_code.ilike(pattern),
+                TransactionLog.reference_no.ilike(pattern),
+                TransactionLog.notes.ilike(pattern),
+                TransactionLog.produced_by.ilike(pattern),
+                # 화면에 우선 표시되는 요청자(IoBatch.requester_name) 도 검색 대상.
+                IoBatch.requester_name.ilike(pattern),
+            )
+        )
+    return query
+
+
 class TransactionSummaryResponse(BaseModel):
     """입출고 내역 화면 KPI — 조건 전체 카운트(페이지네이션과 무관)."""
     total: int
@@ -455,43 +509,23 @@ def list_transactions(
     if transaction_type:
         query = query.filter(TransactionLog.transaction_type == transaction_type)
 
-    # 복수 transaction_types: 화면 표시 구분 기준 operation-aware 필터
-    # (sub_type 우선 라벨 → 재작업 묶음 내 BACKFLUSH 도 DISASSEMBLE 로 잡힘)
-    if transaction_types:
-        _op_f = _operation_filter(transaction_types)
-        if _op_f is not None:
-            query = query.filter(_op_f)
-
     if reference_no:
         query = query.filter(TransactionLog.reference_no == reference_no)
-    _dept_f = _department_filter(department)
-    if _dept_f is not None:
-        query = query.filter(_dept_f)
-    _ps = _process_step_filter(process_step)
-    if _ps is not None:
-        query = query.filter(_ps)
-    _md = _model_filter(db, model)
-    if _md is not None:
-        query = query.filter(_md)
-    if date_from:
-        query = query.filter(TransactionLog.created_at >= datetime.combine(date_from, time.min))
-    if date_to:
-        query = query.filter(TransactionLog.created_at <= datetime.combine(date_to, time.max))
-    if not include_archived:
-        query = query.filter(TransactionLog.archived_at.is_(None))
-    if search:
-        pattern = f"%{search}%"
-        query = query.filter(
-            or_(
-                Item.item_name.ilike(pattern),
-                Item.mes_code.ilike(pattern),
-                TransactionLog.reference_no.ilike(pattern),
-                TransactionLog.notes.ilike(pattern),
-                TransactionLog.produced_by.ilike(pattern),
-                # 화면에 우선 표시되는 요청자(IoBatch.requester_name) 도 검색 대상.
-                IoBatch.requester_name.ilike(pattern),
-            )
-        )
+
+    # 복수 transaction_types / 부서 / 공정 / 모델 / 기간 / 아카이브 / 검색:
+    # summary 와 동일한 공통 필터 빌더로 위임.
+    query = _apply_common_filters(
+        query,
+        db,
+        transaction_types=transaction_types,
+        search=search,
+        department=department,
+        model=model,
+        process_step=process_step,
+        date_from=date_from,
+        date_to=date_to,
+        include_archived=include_archived,
+    )
 
     # TODO(history-overhaul-fixup): export.csv/xlsx 도 동일하게
     # IoBatch outerjoin + requester_name search 적용 검토.
@@ -568,39 +602,19 @@ def get_transactions_summary(
         .outerjoin(IoBatch, TransactionLog.operation_batch_id == IoBatch.batch_id)
     )
 
-    # 복수 transaction_types: operation-aware 필터
-    if transaction_types:
-        _op_f = _operation_filter(transaction_types)
-        if _op_f is not None:
-            query = query.filter(_op_f)
-
-    if date_from:
-        query = query.filter(TransactionLog.created_at >= datetime.combine(date_from, time.min))
-    if date_to:
-        query = query.filter(TransactionLog.created_at <= datetime.combine(date_to, time.max))
-    if not include_archived:
-        query = query.filter(TransactionLog.archived_at.is_(None))
-    if search:
-        pattern = f"%{search}%"
-        query = query.filter(
-            or_(
-                Item.item_name.ilike(pattern),
-                Item.mes_code.ilike(pattern),
-                TransactionLog.reference_no.ilike(pattern),
-                TransactionLog.notes.ilike(pattern),
-                TransactionLog.produced_by.ilike(pattern),
-                IoBatch.requester_name.ilike(pattern),
-            )
-        )
-    _dept_f = _department_filter(department)
-    if _dept_f is not None:
-        query = query.filter(_dept_f)
-    _ps = _process_step_filter(process_step)
-    if _ps is not None:
-        query = query.filter(_ps)
-    _md = _model_filter(db, model)
-    if _md is not None:
-        query = query.filter(_md)
+    # list_transactions 와 동일한 공통 필터 빌더로 위임.
+    query = _apply_common_filters(
+        query,
+        db,
+        transaction_types=transaction_types,
+        search=search,
+        department=department,
+        model=model,
+        process_step=process_step,
+        date_from=date_from,
+        date_to=date_to,
+        include_archived=include_archived,
+    )
 
     # 한 번의 집계 쿼리로 4개 카운트.
     agg = query.with_entities(
