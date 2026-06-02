@@ -248,3 +248,38 @@ GLOSSARY 통일안과 어긋나는 화면 라벨 (사용자가 실제로 보는 
 - `_` 접두어 규칙 / `_archive` 3곳 차이
 
 **완료기준:** CONTEXT.md 가이드 추가 + 처음 보는 사람이 위 항목 안 헷갈림. **주의:** 실제 rename은 별건(명시 승인). 지금은 문서화만.
+
+---
+
+## 9. 처리 결과 — 자율 실행 (2026-06-02, 브랜치 `cleanup/code-review-fixes`)
+
+> Wave 0~4 자율 실행. 각 Wave `verify_local` 그린 게이트 통과 후 커밋·푸시. backend pytest 432 + frontend 643 그린 유지. PR로 머지 검토.
+
+### 완료 ✅
+| 항목 | 처리 | 커밋 |
+|---|---|---|
+| §8-1 안정성 테스트 | inv/sr/io 회귀 110 + inv_calc 8 | `1541fe7e`·`86f38e78` |
+| §5 R2-4 음수가드 | DB CHECK 이미 방어 → 재평가 + 방어망 테스트 | `86f38e78` |
+| §5 R2-6 캐시 빈맵 | 경고 로그 | `121f0c63` |
+| §7 함수분리(빨간불 4) | production·sr_execution·io_preview·io_dispatch | `972391b4`~`3b2ebed4` |
+| §1 중복제거·N+1 | transactions 필터빌더·defects 일괄 조회 | `4bbbb7c8`·`2297682e` |
+| §7 inv_defective 분기중복 | `_consume_normal_source` 추출 | `aee2707e` |
+| §4-1 용어 2곳 | 새 불량/불량 해제/불량 처리 | `dc6fedfe` |
+| §4-2 import 순환 | sr_approval 5/6 정적화(io_persist 무순환) | `d81160f7` |
+| §8-3 죽은코드 | components 3 `_attic` + `toNumber` 제거 | `fcd5797d` |
+| §8-2·8-4 문서 | CODING_STYLE + CONTEXT 이름가이드 | `ce186907` |
+| §5 R2-1 staleTime | 도메인별 차등(VOLATILE 30s/MASTER 30m) | `4426342c` |
+| §5 R2-3 getModels | `useModelsQuery` 7곳 캐시 공유 | `e984a90e` |
+| §2 useEffect | 의도적 정당 → 의도 주석 보강 | `9f8700be` |
+
+### 보류 ⏭️ (위험 대비 실익 낮음 — R2식 보수적 판단, 사유 기록)
+- **에러표준 전수통일(§3)**: 라우터 광범위 + 프론트 에러 파싱 영향 + 회귀 위험 → 점진 마이그레이션. CODING_STYLE에 "새 코드는 `http_error`" 기준만.
+- **mes_code 부분 unique(R2-5)**: `serial_no` 단조증가(`max+1`)로 소프트삭제 후 충돌이 실질적으로 없음 + `items` 테이블 재생성 위험 + 다른 세션 generated 컬럼 영역.
+- **inv_defective 인자 dataclass(§7 인자폭증)**: 호출자(sr_execution 14핸들러 등) 광범위 영향 + 키워드 전용 인자라 이미 명시적. 분기 중복만 헬퍼로 추출.
+- **R2-2 admin훅 통합**: 테스트가 `useAdminDepartmentsList`를 직접 import → 제거 시 회귀.
+- **R2-3 getModels 2곳**: `useAdminBootstrap`(Promise.all 원자 그룹)·고아 `useModels`(소비처 0).
+
+### 재평가 결론 (에이전트 진단 vs 실제 코드)
+- **R2-4**: `Inventory`/`InventoryLocation` DB CHECK 4중으로 이미 방어 → "가드 부재"는 오판. Python 가드 대신 방어망 테스트로 고정.
+- **StockRequestLine.status 인덱스**: 이미 존재(`ix_stock_request_line_item_status`) → 추가 불필요.
+- **useEffect 회피 3곳**: 전부 의도적·정확한 deps 최적화(특정 필드만) → 버그 아님, 주석만 보강.
