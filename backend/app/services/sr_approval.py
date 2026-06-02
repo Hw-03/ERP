@@ -16,8 +16,14 @@ from app.models import (
     StockRequestTypeEnum,
 )
 from app.services.dept_hierarchy import can_approve_department
+from app.services.io_persist import sync_batch_from_stock_request
 from app.services.pin_auth import verify_pin
 from app.services.sr_execution import _execute_all_lines, release_reservation
+
+# 주의: io_dispatch.execute_batch_after_dept_approval 만 함수 내부 지연 import 한다.
+# 정적 import 하면 순환 고리가 닫힌다:
+#   sr_approval → io_dispatch → stock_requests(top-level) → sr_approval(부분 초기화)
+# → ImportError. io_persist 는 stock_requests 를 import 하지 않아 순환이 없으므로 위처럼 정적 import 가능.
 
 
 class FailedApprovalError(Exception):
@@ -88,9 +94,7 @@ def approve_request(
     for line in request.lines:
         line.status = StockRequestStatusEnum.COMPLETED
 
-    from app.services import io as io_svc
-
-    io_svc.sync_batch_from_stock_request(db, request)
+    sync_batch_from_stock_request(db, request)
 
     return request
 
@@ -107,7 +111,7 @@ def approve_request_department(
 
     - actor: department_role in {primary, deputy} 또는 admin
     - actor.department == request.requester_department (다른 부서 결재 불가)
-    - MANUAL_ADJUSTMENT 단독: 승인 즉시 io_svc.execute_batch_after_dept_approval 호출
+    - MANUAL_ADJUSTMENT 단독: 승인 즉시 io_dispatch.execute_batch_after_dept_approval 호출
     - 듀얼(창고+부서): 양쪽 모두 충족 시 _execute_all_lines, 아니면 status 유지
     """
     if not request.requires_department_approval:
@@ -146,11 +150,13 @@ def approve_request_department(
         return request
 
     # 실행 경로 분기
-    from app.services import io as io_svc
+    # 지연 import: io_dispatch 는 stock_requests 를 top-level import 하고,
+    # stock_requests 는 다시 sr_approval 을 re-export → 정적 import 시 순환 ImportError.
+    from app.services.io_dispatch import execute_batch_after_dept_approval
 
     if request.request_type == StockRequestTypeEnum.MANUAL_ADJUSTMENT:
-        # io.py 가 원본 IoBatch 라인을 _apply_line 식으로 실행.
-        io_svc.execute_batch_after_dept_approval(db, request=request, approver=approver)
+        # io_dispatch 가 원본 IoBatch 라인을 _apply_line 식으로 실행.
+        execute_batch_after_dept_approval(db, request=request, approver=approver)
     else:
         # 듀얼 승인 케이스 — _execute_all_lines.
         try:
@@ -170,7 +176,7 @@ def approve_request_department(
     for line in request.lines:
         line.status = StockRequestStatusEnum.COMPLETED
 
-    io_svc.sync_batch_from_stock_request(db, request)
+    sync_batch_from_stock_request(db, request)
     return request
 
 
@@ -210,9 +216,7 @@ def mark_failed_approval(
     request.rejected_by_name = approver.name
     request.rejected_at = now
     request.rejected_reason = f"승인 실패: {reason}"
-    from app.services import io as io_svc
-
-    io_svc.sync_batch_from_stock_request(db, request)
+    sync_batch_from_stock_request(db, request)
     return request
 
 
@@ -249,9 +253,7 @@ def reject_request(
     request.rejected_reason = reason.strip()
     for line in request.lines:
         line.status = StockRequestStatusEnum.REJECTED
-    from app.services import io as io_svc
-
-    io_svc.sync_batch_from_stock_request(db, request)
+    sync_batch_from_stock_request(db, request)
     return request
 
 
@@ -297,9 +299,7 @@ def reject_request_department(
     request.rejected_reason = reason.strip()
     for line in request.lines:
         line.status = StockRequestStatusEnum.REJECTED
-    from app.services import io as io_svc
-
-    io_svc.sync_batch_from_stock_request(db, request)
+    sync_batch_from_stock_request(db, request)
     return request
 
 
@@ -339,7 +339,5 @@ def cancel_request(
     request.cancelled_at = now
     for line in request.lines:
         line.status = StockRequestStatusEnum.CANCELLED
-    from app.services import io as io_svc
-
-    io_svc.sync_batch_from_stock_request(db, request)
+    sync_batch_from_stock_request(db, request)
     return request
