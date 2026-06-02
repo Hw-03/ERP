@@ -3,6 +3,7 @@
 
 $env:PORT                 = "3001"
 $env:BACKEND_INTERNAL_URL = "http://localhost:8011"
+$env:NEXT_PUBLIC_APP_TITLE = "MES 개발"
 
 Set-Location "C:\ERP\frontend"
 npm run dev
