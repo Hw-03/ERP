@@ -283,3 +283,26 @@ GLOSSARY 통일안과 어긋나는 화면 라벨 (사용자가 실제로 보는 
 - **R2-4**: `Inventory`/`InventoryLocation` DB CHECK 4중으로 이미 방어 → "가드 부재"는 오판. Python 가드 대신 방어망 테스트로 고정.
 - **StockRequestLine.status 인덱스**: 이미 존재(`ix_stock_request_line_item_status`) → 추가 불필요.
 - **useEffect 회피 3곳**: 전부 의도적·정확한 deps 최적화(특정 필드만) → 버그 아님, 주석만 보강.
+
+---
+
+## 10. 잔여 이슈 2차 해소 (2026-06-02 — 보류 5건 전부 구현 + e2e 확인 + rebase)
+
+> 사용자 결정으로 §9 보류 5건을 **전부 구현**(위험 감수). e2e 검증 + rebase로 PR #18 머지 가능 상태.
+
+### 보류 5건 → 완료 ✅
+| 보류 항목 | 처리 | 커밋 |
+|---|---|---|
+| R2-3 getModels 2곳 | 고아 useModels `_attic` + useAdminBootstrap `useModelsQuery({enabled:unlocked})` | `a01a13d6` |
+| R2-2 admin훅 | useAdminDepartmentsList 인라인+삭제, 테스트 재작성 | `224ad043` |
+| inv_defective dataclass | ReasonContext/DefectSource/NormalSource + 호출처 전체(sr_execution 6·io_dispatch·routers 3) | `f641a91f` |
+| 에러표준(§3) | departments·admin_audit_csv 7곳 `http_error` (프론트 호환) | `507fc98c` |
+| mes_code 부분unique(R2-5) | 부분 Index + 멱등 마이그레이션(dev 복사본으로 전체→부분 교체·멱등 검증) | `274a2e0a` |
+
+### e2e 검증 결과 ⚠️
+- 용어 변경은 **정적 안전**(내역 탭 banned 0건).
+- **e2e 인프라 미완 발견**: `@playwright/test` 미설치 + `/legacy` 로그인 게이트로 e2e가 baseline 부터 미작동(3 failed — 모두 페이지 진입 단계). **내 변경과 무관.** e2e 활성화는 별도 작업(`npm i -D @playwright/test` + 로그인 헬퍼/E2E 시드).
+
+### 추가 재평가 (2차)
+- **에러표준(§3)**: 구식 `raise HTTPException` 실제 **2파일 7곳**뿐(§3 "95%" 과장). 프론트 `extractErrorMessage`가 str/dict 모두 호환 → 안전.
+- **mes_code 부분unique**: `serial_no` 단조증가로 실 충돌은 드물지만, 부분 unique + 멱등 마이그레이션을 안전하게 구현·검증.
