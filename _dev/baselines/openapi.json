@@ -1394,6 +1394,19 @@
             ],
             "title": "Produced By"
           },
+          "producer_employee_code": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "처리자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정",
+            "title": "Producer Employee Code"
+          },
           "quantity": {
             "exclusiveMinimum": 0.0,
             "title": "Quantity",
@@ -2063,6 +2076,19 @@
             "description": "처리자",
             "title": "Produced By"
           },
+          "producer_employee_code": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "처리자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정",
+            "title": "Producer Employee Code"
+          },
           "quantity": {
             "description": "조정 후 최종 수량",
             "minimum": 0.0,
@@ -2165,6 +2191,19 @@
             ],
             "description": "처리자",
             "title": "Produced By"
+          },
+          "producer_employee_code": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "처리자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정",
+            "title": "Producer Employee Code"
           },
           "quantity": {
             "description": "입고 수량",
@@ -4239,6 +4278,19 @@
             "description": "작업자",
             "title": "Produced By"
           },
+          "producer_employee_code": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "작업자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정",
+            "title": "Producer Employee Code"
+          },
           "quantity": {
             "description": "생산 수량",
             "exclusiveMinimum": 0.0,
@@ -5189,6 +5241,19 @@
             ],
             "title": "Operator"
           },
+          "producer_employee_code": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "처리자 사번 — 제공 시 직원 DB 조회·검증 후 operator(produced_by) 자동 설정",
+            "title": "Producer Employee Code"
+          },
           "quantity": {
             "exclusiveMinimum": 0.0,
             "title": "Quantity",
@@ -5375,6 +5440,18 @@
               }
             ],
             "title": "Produced By"
+          },
+          "producer_employee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Producer Employee Id"
           },
           "quantity_after": {
             "anyOf": [
@@ -5660,6 +5737,19 @@
               }
             ],
             "title": "Produced By"
+          },
+          "producer_employee_code": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "처리자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정",
+            "title": "Producer Employee Code"
           },
           "quantity": {
             "exclusiveMinimum": 0.0,

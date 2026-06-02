@@ -200,6 +200,7 @@ class InventoryReceive(BaseModel):
     location: Optional[str] = Field(None, max_length=100, description="보관 위치")
     reference_no: Optional[str] = Field(None, max_length=100, description="참조 번호")
     produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
+    producer_employee_code: Optional[str] = Field(None, max_length=30, description="처리자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정")
     notes: Optional[str] = Field(None, description="비고")
 
 
@@ -210,6 +211,7 @@ class InventoryAdjust(BaseModel):
     location: Optional[str] = Field(None, max_length=100, description="보관 위치")
     reference_no: Optional[str] = Field(None, max_length=100, description="참조 번호")
     produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
+    producer_employee_code: Optional[str] = Field(None, max_length=30, description="처리자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정")
 
 
 class InventoryResponse(BaseModel):
@@ -237,6 +239,7 @@ class TransferRequest(BaseModel):
     notes: Optional[str] = Field(None, description="비고")
     reference_no: Optional[str] = Field(None, max_length=100)
     produced_by: Optional[str] = Field(None, max_length=100)
+    producer_employee_code: Optional[str] = Field(None, max_length=30, description="처리자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정")
 
 
 class DeptTransferRequest(BaseModel):
@@ -248,6 +251,7 @@ class DeptTransferRequest(BaseModel):
     notes: Optional[str] = None
     reference_no: Optional[str] = Field(None, max_length=100)
     produced_by: Optional[str] = Field(None, max_length=100)
+    producer_employee_code: Optional[str] = Field(None, max_length=30, description="처리자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정")
 
 
 class MarkDefectiveRequest(BaseModel):
@@ -274,6 +278,7 @@ class SupplierReturnRequest(BaseModel):
     reference_no: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
     operator: Optional[str] = Field(None, max_length=100)
+    producer_employee_code: Optional[str] = Field(None, max_length=30, description="처리자 사번 — 제공 시 직원 DB 조회·검증 후 operator(produced_by) 자동 설정")
 
 
 class ProcessTypeSummary(BaseModel):
@@ -361,6 +366,7 @@ class ProductionReceiptRequest(BaseModel):
     quantity: int = Field(..., gt=0, description="생산 수량")
     reference_no: Optional[str] = Field(None, max_length=100, description="참조 번호")
     produced_by: Optional[str] = Field(None, max_length=100, description="작업자")
+    producer_employee_code: Optional[str] = Field(None, max_length=30, description="작업자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정")
     notes: Optional[str] = Field(None, description="비고")
 
 
@@ -440,6 +446,7 @@ class TransactionLogResponse(BaseModel):
     transfer_qty: Optional[int] = None
     reference_no: Optional[str]
     produced_by: Optional[str]
+    producer_employee_id: Optional[uuid.UUID] = None
     requester_name: Optional[str] = None
     # 승인자(요청을 수락한 사람). 직접 처리 시 = 요청자.
     approver_name: Optional[str] = None

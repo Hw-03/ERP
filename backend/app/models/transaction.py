@@ -57,6 +57,12 @@ class TransactionLog(Base):
     transfer_qty = Column(IntQuantity, nullable=True)
     reference_no = Column(String(100), nullable=True, index=True)
     produced_by = Column(String(100), nullable=True)
+    producer_employee_id = Column(
+        UUIDString,
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     notes = Column(Text, nullable=True)
     # 불량 처리 흐름 — 사유 카테고리(외관/치수/기능/검사통과/기타) + 자유 메모.
     # 카테고리 enum 은 프론트 상수로만 정의, 백엔드는 자유 문자열로 받음.

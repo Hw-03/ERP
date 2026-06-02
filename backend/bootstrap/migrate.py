@@ -161,6 +161,9 @@ _MIGRATION_DDL: list[str] = [
     # 거래 로그 아카이브 시각 (NULL = 미아카이브)
     "ALTER TABLE transaction_logs ADD COLUMN archived_at DATETIME",
     "CREATE INDEX IF NOT EXISTS ix_transaction_logs_archived_at ON transaction_logs(archived_at)",
+    # 2026-06-02: 사번 감사 보강 — 직접 입출고 엔드포인트에서 사번 검증 성공 시 채움 (nullable)
+    "ALTER TABLE transaction_logs ADD COLUMN producer_employee_id CHAR(36)",
+    "CREATE INDEX IF NOT EXISTS ix_tx_producer_employee ON transaction_logs(producer_employee_id)",
     # 부서 결재 — 낱개 manual/adjust 라인 포함 시 추가 승인 (warehouse_approval 와 독립)
     "ALTER TABLE stock_requests ADD COLUMN requires_department_approval BOOLEAN NOT NULL DEFAULT 0",
     "ALTER TABLE stock_requests ADD COLUMN department_approved_by_employee_id CHAR(36)",

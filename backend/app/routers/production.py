@@ -23,6 +23,7 @@ from app.services.bom import BomCache, build_bom_cache
 from app.services.bom import explode_bom as _explode_bom_svc
 from app.services.bom import merge_requirements
 from app.routers._errors import ErrorCode, http_error
+from app.routers.inventory._tx_helper import resolve_producer
 
 router = APIRouter()
 
@@ -42,6 +43,8 @@ def production_receipt(
     produced_item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if not produced_item:
         raise http_error(404, ErrorCode.NOT_FOUND, "생산 대상 품목을 찾을 수 없습니다.")
+
+    producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
 
     try:
         component_requirements = _explode_bom(db, payload.item_id, payload.quantity)
@@ -114,7 +117,8 @@ def production_receipt(
                 quantity_before=qty_before,
                 quantity_after=inv.quantity,
                 reference_no=payload.reference_no,
-                produced_by=payload.produced_by,
+                produced_by=producer_name or payload.produced_by,
+                producer_employee_id=producer_id,
                 notes=f"생산 입고 Backflush: {produced_item.item_name} x {payload.quantity}",
             )
             db.add(log)
@@ -152,7 +156,8 @@ def production_receipt(
             quantity_before=prod_qty_before,
             quantity_after=produced_inv.quantity,
             reference_no=payload.reference_no,
-            produced_by=payload.produced_by,
+            produced_by=producer_name or payload.produced_by,
+            producer_employee_id=producer_id,
             notes=payload.notes or f"생산 입고: {produced_item.item_name} x {payload.quantity}",
         )
         db.add(produce_log)
