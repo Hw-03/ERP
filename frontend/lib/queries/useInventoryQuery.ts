@@ -18,12 +18,15 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { inventoryApi } from "@/lib/api/inventory";
+import { STALE_TIME } from "./client";
 import { queryKeys } from "./keys";
 
 export function useInventorySummaryQuery() {
   return useQuery({
     queryKey: queryKeys.inventory.summary(),
     queryFn: () => inventoryApi.getInventorySummary(),
+    // 재고는 입출고·이동·불량으로 수시 변동 → 짧게 (R2-1).
+    staleTime: STALE_TIME.VOLATILE,
   });
 }
 
@@ -32,6 +35,8 @@ export function useItemLocationsQuery(itemId: string) {
     queryKey: queryKeys.inventory.locations(itemId),
     queryFn: () => inventoryApi.getItemLocations(itemId),
     enabled: Boolean(itemId),
+    // 재고는 입출고·이동·불량으로 수시 변동 → 짧게 (R2-1).
+    staleTime: STALE_TIME.VOLATILE,
   });
 }
 

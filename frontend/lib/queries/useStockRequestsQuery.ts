@@ -13,6 +13,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { StockRequestActionPayload, StockRequestCreatePayload } from "@/lib/api/types";
+import { STALE_TIME } from "./client";
 import { queryKeys } from "./keys";
 
 /** 창고 승인 대기열 */
@@ -20,6 +21,8 @@ export function useWarehouseQueueQuery() {
   return useQuery({
     queryKey: queryKeys.stockRequests.warehouseQueue(),
     queryFn: () => stockRequestsApi.listWarehouseQueue(),
+    // 승인 대기열: 제출~승인자 노출 지연을 줄여야 함 → 짧게 (R2-1).
+    staleTime: STALE_TIME.VOLATILE,
   });
 }
 
@@ -29,6 +32,8 @@ export function useDepartmentQueueQuery(actorEmployeeId: string) {
     queryKey: queryKeys.stockRequests.departmentQueue(actorEmployeeId),
     queryFn: () => stockRequestsApi.listDepartmentQueue(actorEmployeeId),
     enabled: !!actorEmployeeId,
+    // 승인 대기열: 제출~승인자 노출 지연을 줄여야 함 → 짧게 (R2-1).
+    staleTime: STALE_TIME.VOLATILE,
   });
 }
 
@@ -38,6 +43,8 @@ export function useMyStockRequestsQuery(employeeId: string) {
     queryKey: queryKeys.stockRequests.myList(employeeId),
     queryFn: () => stockRequestsApi.listMyStockRequests(employeeId),
     enabled: !!employeeId,
+    // 내 요청 상태가 승인 흐름 따라 자주 바뀜 → 짧게 (R2-1).
+    staleTime: STALE_TIME.VOLATILE,
   });
 }
 

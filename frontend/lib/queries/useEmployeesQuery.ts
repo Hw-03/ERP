@@ -12,6 +12,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { employeesApi } from "@/lib/api/employees";
+import { STALE_TIME } from "./client";
 import { queryKeys } from "./keys";
 
 export function useEmployeesQuery(params?: Parameters<typeof employeesApi.getEmployees>[0]) {
@@ -22,6 +23,8 @@ export function useEmployeesQuery(params?: Parameters<typeof employeesApi.getEmp
         : undefined,
     ),
     queryFn: () => employeesApi.getEmployees(params),
+    // 마스터 데이터: 변경이 드물어 재요청을 더 아낀다 (R2-1).
+    staleTime: STALE_TIME.MASTER,
   });
 }
 
