@@ -287,9 +287,11 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
             db,
             payload.item_id,
             payload.qty,
-            source=payload.source,
-            target_dept=target_dept,
-            source_dept=source_dept,
+            inventory_svc.DefectSource(
+                kind=payload.source,
+                target_dept=target_dept,
+                source_dept=source_dept,
+            ),
         )
     except ValueError as exc:
         raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc))
@@ -374,9 +376,11 @@ def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Sessio
             payload.item_id,
             payload.qty,
             dept,
-            reason_category=payload.reason_category,
-            reason_memo=payload.reason_memo or "",
-            actor=actor.name,
+            inventory_svc.ReasonContext(
+                category=payload.reason_category,
+                memo=payload.reason_memo or "",
+                actor=actor.name,
+            ),
         )
     except ValueError as exc:
         raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc))

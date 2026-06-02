@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
@@ -27,30 +28,77 @@ from app.services.inv_calc import _sync_total
 from app.services.inv_transfer import consume_warehouse
 
 
+# ---------------------------------------------------------------------------
+# 옵션 객체 (인자 묶음)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ReasonContext:
+    """사유·감사 묶음 (reason_category/reason_memo/actor/batch_id).
+
+    unmark_defective / scrap_defective / scrap_normal /
+    return_to_supplier_from_normal 공통.
+    """
+
+    category: str
+    memo: str = ""
+    actor: str = ""
+    batch_id: Optional[uuid.UUID] = None
+
+
+@dataclass(frozen=True)
+class DefectSource:
+    """불량 등록(mark_defective) 출처·격리 부서 묶음.
+
+    kind="warehouse" → 창고 차감.
+    kind="production" → source_dept 의 PRODUCTION 차감 (source_dept 필수).
+    target_dept → 격리(DEFECTIVE)될 부서.
+    """
+
+    kind: str
+    target_dept: DepartmentEnum
+    source_dept: Optional[DepartmentEnum] = None
+
+
+@dataclass(frozen=True)
+class NormalSource:
+    """정상 재고 직접 처리(scrap_normal/return_to_supplier_from_normal) 출처 묶음.
+
+    kind="warehouse" → warehouse_qty 차감.
+    kind="production" → dept_or_warehouse 의 PRODUCTION 차감.
+    supplier_name 은 공급처 반품 시 참고용 (재고 계산에는 미사용).
+    """
+
+    kind: str
+    dept_or_warehouse: DepartmentEnum
+    supplier_name: str = ""
+
+
 def mark_defective(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
-    *,
-    source: str,
-    target_dept: DepartmentEnum,
-    source_dept: Optional[DepartmentEnum] = None,
+    source: DefectSource,
 ) -> Inventory:
     """불량 등록. 총량 변동 없음 (위치만 이동)."""
+    kind = source.kind
+    target_dept = source.target_dept
+    source_dept = source.source_dept
     if qty <= 0:
         raise ValueError("불량 수량은 0보다 커야 합니다.")
-    if source == "production" and source_dept is None:
+    if kind == "production" and source_dept is None:
         raise ValueError("source=production일 때 source_dept는 필수입니다.")
-    if source not in ("warehouse", "production"):
-        raise ValueError(f"알 수 없는 source: {source} (warehouse 또는 production)")
+    if kind not in ("warehouse", "production"):
+        raise ValueError(f"알 수 없는 source: {kind} (warehouse 또는 production)")
 
     get_or_create_inventory(db, item_id)
     _lock_location(db, item_id, target_dept, LocationStatusEnum.DEFECTIVE)
-    if source == "production":
+    if kind == "production":
         _lock_location(db, item_id, source_dept, LocationStatusEnum.PRODUCTION)
     db.flush()
 
-    if source == "warehouse":
+    if kind == "warehouse":
         result = db.execute(
             sa_update(Inventory)
             .where(Inventory.item_id == item_id)
@@ -149,19 +197,15 @@ def unmark_defective(
     item_id: uuid.UUID,
     qty: Decimal,
     dept: DepartmentEnum,
-    *,
-    reason_category: str,
-    reason_memo: str,
-    actor: str,
-    batch_id: Optional[uuid.UUID] = None,
+    reason: ReasonContext,
 ) -> Inventory:
     """불량 → 정상 복귀. 같은 부서 DEFECTIVE → PRODUCTION 이동. 총량 변동 없음.
 
-    사유 필수 (reason_category + reason_memo). defective_at NULL 로 초기화.
+    사유 필수 (reason.category). defective_at NULL 로 초기화.
     """
     if qty <= 0:
         raise ValueError("복귀 수량은 0보다 커야 합니다.")
-    if not reason_category:
+    if not reason.category:
         raise ValueError("reason_category 는 필수입니다.")
 
     get_or_create_inventory(db, item_id)
@@ -203,19 +247,15 @@ def scrap_defective(
     item_id: uuid.UUID,
     qty: Decimal,
     dept: DepartmentEnum,
-    *,
-    reason_category: str,
-    reason_memo: str,
-    actor: str,
-    batch_id: Optional[uuid.UUID] = None,
+    reason: ReasonContext,
 ) -> Inventory:
     """불량 재고 폐기. DEFECTIVE 차감 + 총량 감소.
 
-    사유 필수 (reason_category + reason_memo).
+    사유 필수 (reason.category).
     """
     if qty <= 0:
         raise ValueError("폐기 수량은 0보다 커야 합니다.")
-    if not reason_category:
+    if not reason.category:
         raise ValueError("reason_category 는 필수입니다.")
 
     get_or_create_inventory(db, item_id)
@@ -292,56 +332,45 @@ def scrap_normal(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
-    *,
-    source: str,
-    dept_or_warehouse: DepartmentEnum,
-    reason_category: str,
-    reason_memo: str,
-    actor: str,
-    batch_id: Optional[uuid.UUID] = None,
+    source: NormalSource,
+    reason: ReasonContext,
 ) -> Inventory:
     """R 원자재 정상 재고에서 직접 폐기. 총량 감소.
 
-    source="warehouse" → warehouse_qty 차감.
-    source="production" → 해당 부서 PRODUCTION 차감.
+    source.kind="warehouse" → warehouse_qty 차감.
+    source.kind="production" → 해당 부서 PRODUCTION 차감.
     사유 필수.
     """
     if qty <= 0:
         raise ValueError("폐기 수량은 0보다 커야 합니다.")
-    if source not in ("warehouse", "production"):
-        raise ValueError(f"알 수 없는 source: {source} (warehouse 또는 production)")
-    if not reason_category:
+    if source.kind not in ("warehouse", "production"):
+        raise ValueError(f"알 수 없는 source: {source.kind} (warehouse 또는 production)")
+    if not reason.category:
         raise ValueError("reason_category 는 필수입니다.")
 
     get_or_create_inventory(db, item_id)
-    return _consume_normal_source(db, item_id, qty, source, dept_or_warehouse)
+    return _consume_normal_source(db, item_id, qty, source.kind, source.dept_or_warehouse)
 
 
 def return_to_supplier_from_normal(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
-    *,
-    source: str,
-    dept_or_warehouse: DepartmentEnum,
-    supplier_name: str,
-    reason_category: str,
-    reason_memo: str,
-    actor: str,
-    batch_id: Optional[uuid.UUID] = None,
+    source: NormalSource,
+    reason: ReasonContext,
 ) -> Inventory:
     """R 원자재 정상 재고에서 직접 공급처 반품. 총량 감소.
 
-    source="warehouse" → warehouse_qty 차감.
-    source="production" → 해당 부서 PRODUCTION 차감.
+    source.kind="warehouse" → warehouse_qty 차감.
+    source.kind="production" → 해당 부서 PRODUCTION 차감.
     사유 필수.
     """
     if qty <= 0:
         raise ValueError("반품 수량은 0보다 커야 합니다.")
-    if source not in ("warehouse", "production"):
-        raise ValueError(f"알 수 없는 source: {source} (warehouse 또는 production)")
-    if not reason_category:
+    if source.kind not in ("warehouse", "production"):
+        raise ValueError(f"알 수 없는 source: {source.kind} (warehouse 또는 production)")
+    if not reason.category:
         raise ValueError("reason_category 는 필수입니다.")
 
     get_or_create_inventory(db, item_id)
-    return _consume_normal_source(db, item_id, qty, source, dept_or_warehouse)
+    return _consume_normal_source(db, item_id, qty, source.kind, source.dept_or_warehouse)

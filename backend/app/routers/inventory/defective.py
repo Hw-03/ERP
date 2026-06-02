@@ -30,9 +30,11 @@ def mark_defective(payload: MarkDefectiveRequest, db: Session = Depends(get_db))
     try:
         inventory_svc.mark_defective(
             db, payload.item_id, payload.quantity,
-            source=payload.source,
-            target_dept=payload.target_department,
-            source_dept=payload.source_department,
+            inventory_svc.DefectSource(
+                kind=payload.source,
+                target_dept=payload.target_department,
+                source_dept=payload.source_department,
+            ),
         )
     except ValueError as exc:
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))

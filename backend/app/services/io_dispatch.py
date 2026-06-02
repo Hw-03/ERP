@@ -327,9 +327,11 @@ def _apply_defective(db: Session, line: IoLine, qty: Decimal) -> tuple[Transacti
         db,
         line.item_id,
         qty,
-        source=line.from_bucket,
-        source_dept=line.from_department,
-        target_dept=line.to_department,
+        inventory_svc.DefectSource(
+            kind=line.from_bucket,
+            source_dept=line.from_department,
+            target_dept=line.to_department,
+        ),
     )
     return TransactionTypeEnum.MARK_DEFECTIVE, Decimal("0")
 

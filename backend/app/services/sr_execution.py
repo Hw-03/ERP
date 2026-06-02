@@ -113,7 +113,8 @@ def _handle_mark_defective_wh(db, request, line, approver, qty, item_id) -> Deci
     if line.to_department is None:
         raise ValueError("창고발 불량 등록은 격리 부서가 필요합니다.")
     inventory_svc.mark_defective(
-        db, item_id, qty, source="warehouse", target_dept=line.to_department
+        db, item_id, qty,
+        inventory_svc.DefectSource(kind="warehouse", target_dept=line.to_department),
     )
     return _NO_QTY_CHANGE
 
@@ -125,9 +126,11 @@ def _handle_mark_defective_prod(db, request, line, approver, qty, item_id) -> De
         db,
         item_id,
         qty,
-        source="production",
-        source_dept=line.from_department,
-        target_dept=line.to_department,
+        inventory_svc.DefectSource(
+            kind="production",
+            source_dept=line.from_department,
+            target_dept=line.to_department,
+        ),
     )
     return _NO_QTY_CHANGE
 
@@ -154,9 +157,11 @@ def _handle_defect_scrap(db, request, line, approver, qty, item_id) -> Decimal:
     actor_name = approver.name
     inventory_svc.scrap_defective(
         db, item_id, qty, line.from_department,
-        reason_category=reason_cat or _DEFAULT_REASON_CATEGORY,
-        reason_memo=reason_memo,
-        actor=actor_name,
+        inventory_svc.ReasonContext(
+            category=reason_cat or _DEFAULT_REASON_CATEGORY,
+            memo=reason_memo,
+            actor=actor_name,
+        ),
     )
     return -qty
 
@@ -177,11 +182,12 @@ def _handle_scrap_normal(db, request, line, approver, qty, item_id) -> Decimal:
     source = _source_from_bucket(line)
     inventory_svc.scrap_normal(
         db, item_id, qty,
-        source=source,
-        dept_or_warehouse=line.from_department,
-        reason_category=request.reason_category or _DEFAULT_REASON_CATEGORY,
-        reason_memo=request.reason_memo or (request.notes or ""),
-        actor=approver.name,
+        inventory_svc.NormalSource(kind=source, dept_or_warehouse=line.from_department),
+        inventory_svc.ReasonContext(
+            category=request.reason_category or _DEFAULT_REASON_CATEGORY,
+            memo=request.reason_memo or (request.notes or ""),
+            actor=approver.name,
+        ),
     )
     return -qty
 
@@ -191,12 +197,14 @@ def _handle_return_normal(db, request, line, approver, qty, item_id) -> Decimal:
     source = _source_from_bucket(line)
     inventory_svc.return_to_supplier_from_normal(
         db, item_id, qty,
-        source=source,
-        dept_or_warehouse=line.from_department,
-        supplier_name="",
-        reason_category=request.reason_category or _DEFAULT_REASON_CATEGORY,
-        reason_memo=request.reason_memo or (request.notes or ""),
-        actor=approver.name,
+        inventory_svc.NormalSource(
+            kind=source, dept_or_warehouse=line.from_department, supplier_name=""
+        ),
+        inventory_svc.ReasonContext(
+            category=request.reason_category or _DEFAULT_REASON_CATEGORY,
+            memo=request.reason_memo or (request.notes or ""),
+            actor=approver.name,
+        ),
     )
     return -qty
 
@@ -234,9 +242,11 @@ def _handle_defect_disassemble(db, request, line, approver, qty, item_id) -> Dec
         # child_decisions 없으면 단순 scrap_defective (전부 폐기)
         inventory_svc.scrap_defective(
             db, item_id, qty, line.from_department,
-            reason_category=reason_cat or _DEFAULT_REASON_CATEGORY,
-            reason_memo=reason_memo_val,
-            actor=approver.name,
+            inventory_svc.ReasonContext(
+                category=reason_cat or _DEFAULT_REASON_CATEGORY,
+                memo=reason_memo_val,
+                actor=approver.name,
+            ),
         )
     # 분해는 서비스 함수가 자체 로그 생성 — 추가 TransactionLog 불필요
     # (아래 TransactionLog 생성 구문은 _TX_TYPE_BY_REQUEST 로 DISASSEMBLE 로 기록됨)
