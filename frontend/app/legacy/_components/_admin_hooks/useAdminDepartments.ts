@@ -3,9 +3,8 @@
 // AdminDepartmentsSection 전용 wrapper hook.
 // W5: List/Form/Commands 3-hook 으로 분해 후 호환 표면 유지.
 
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import type { DepartmentMaster } from "@/lib/api";
-import { useAdminDepartmentsList } from "./useAdminDepartmentsList";
 import { useAdminDepartmentsForm } from "./useAdminDepartmentsForm";
 import { useAdminDepartmentsCommands } from "./useAdminDepartmentsCommands";
 
@@ -48,7 +47,8 @@ export function useAdminDepartments({
   onError,
   adminPin,
 }: UseAdminDepartmentsArgs): AdminDepartmentsState {
-  const list = useAdminDepartmentsList({ departments });
+  // List sub-hook 인라인 — 부서 도메인은 검색·필터 UI 없음 (visibleItems = departments pass-through).
+  const visibleItems = useMemo(() => departments, [departments]);
   const form = useAdminDepartmentsForm();
 
   // commands.add 가 form.addName 을 읽도록 ref 로 전달 (closure stale 방지).
@@ -68,7 +68,7 @@ export function useAdminDepartments({
   });
 
   return {
-    departments: list.items,
+    departments: visibleItems,
     addName: form.form.addName,
     setAddName: form.setAddName,
     selectedDept,
