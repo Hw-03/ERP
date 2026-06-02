@@ -14,12 +14,14 @@ import { catalogApi } from "@/lib/api/catalog";
 import { STALE_TIME } from "./client";
 import { queryKeys } from "./keys";
 
-export function useModelsQuery() {
+export function useModelsQuery(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.models.list(),
     queryFn: () => catalogApi.getModels(),
     // 마스터 데이터: 변경이 드물어 재요청을 더 아낀다 (R2-1).
     staleTime: STALE_TIME.MASTER,
+    // 게이트 보존: 호출처에서 enabled=false 면 fetch 보류 (기본 true).
+    enabled: options?.enabled ?? true,
   });
 }
 
