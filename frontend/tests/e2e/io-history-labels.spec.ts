@@ -26,6 +26,7 @@ test.describe("라벨 일관성 (glossary 단일 사전)", () => {
       "재작업",
       "새 격리",
       "격리 해제",
+      "폐기",
       "격리 폐기",
       "창고 반출",
       "창고 반입",
@@ -48,7 +49,7 @@ test.describe("라벨 일관성 (glossary 단일 사전)", () => {
     await page.getByRole("tab", { name: /내역/ }).first().click();
 
     // 폐기된 라벨이 내역에도 안 보임
-    const banned = ["재작업", "새 격리", "격리 해제", "격리 폐기"];
+    const banned = ["재작업", "새 격리", "격리 해제", "폐기", "격리 폐기"];
     for (const word of banned) {
       await expect(
         page.locator(`text=/^${word}$/`),
