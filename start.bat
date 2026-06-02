@@ -129,6 +129,5 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\dev\stop-backe
 start "Backend" cmd /k "cd /d "%~dp0backend" && py -m uvicorn app.main:app --host 0.0.0.0 --port 8011 --reload"
 start "Frontend" cmd /k "cd /d "%~dp0frontend" && set "PORT=3001" && set "BACKEND_INTERNAL_URL=http://localhost:8011" && npm run dev"
 timeout /t 5 /nobreak >nul
-start "" "http://%IP%:3001"
 
 endlocal
