@@ -7,7 +7,7 @@ import { ItemFormFields } from "./ItemFormFields";
 import type { ItemFormData } from "./ItemFormFields";
 
 export function EditItemForm({ selectedItem }: { selectedItem: Item }) {
-  const { editForm, setEditForm } = useAdminMasterItemsContext();
+  const { editForm, setEditForm, productModels } = useAdminMasterItemsContext();
 
   function handleSetForm(updater: (f: ItemFormData) => ItemFormData) {
     setEditForm((f: ItemEditForm) => {
@@ -24,6 +24,7 @@ export function EditItemForm({ selectedItem }: { selectedItem: Item }) {
         form={editForm as unknown as ItemFormData & { mes_code: string }}
         setForm={handleSetForm}
         showMesCode
+        productModels={productModels}
       />
     </div>
   );

@@ -13,6 +13,7 @@ export function AddItemForm() {
     addForm,
     setAddForm,
     addItem: onAddItem,
+    productModels,
   } = useAdminMasterItemsContext();
 
   return (
@@ -35,6 +36,7 @@ export function AddItemForm() {
         form={addForm as ItemFormData & { initial_quantity: string }}
         setForm={setAddForm as (u: (f: ItemFormData) => ItemFormData) => void}
         showInitialQuantity
+        productModels={productModels}
       />
 
       <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>

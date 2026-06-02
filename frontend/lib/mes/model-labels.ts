@@ -11,6 +11,7 @@ const MODEL_DISPLAY_NAME: Record<string, string> = {
   "6": "ADX6000FB",
   "7": "COCOON",
   "8": "SOLO",
+  "9": "신제품",
 };
 
 /**

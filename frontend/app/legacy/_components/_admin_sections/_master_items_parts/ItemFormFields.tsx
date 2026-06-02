@@ -2,7 +2,8 @@
 
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { AppSelect } from "../../common/AppSelect";
-import { PROCESS_TYPE_OPTIONS, MODEL_SLOTS, UNIT_OPTIONS } from "../adminShared";
+import { PROCESS_TYPE_OPTIONS, UNIT_OPTIONS } from "../adminShared";
+import type { ProductModel } from "@/lib/api";
 
 export type ItemFormData = {
   item_name: string;
@@ -21,6 +22,7 @@ interface Props {
   setForm: (updater: (f: ItemFormData) => ItemFormData) => void;
   showInitialQuantity?: boolean;
   showMesCode?: boolean;
+  productModels?: ProductModel[];
 }
 
 function FieldLabel({ label, badge }: { label: string; badge?: "필수" | "선택" }) {
@@ -54,10 +56,10 @@ const inputStyle = {
 };
 
 /** model_slots + process_type_code 로 권장 prefix 계산 */
-function previewCodePrefix(slots: number[], processType: string): string {
+function previewCodePrefix(slots: number[], processType: string, models: ProductModel[]): string {
   const sorted = [...slots].sort((a, b) => a - b);
   const symbols = sorted
-    .map((s) => MODEL_SLOTS.find((m) => m.slot === s)?.symbol)
+    .map((s) => models.find((m) => m.slot === s)?.symbol)
     .filter(Boolean)
     .join("");
   if (!symbols || !processType) return "";
@@ -70,8 +72,8 @@ const CODE_PARSE = /^([0-9]+)-([A-Z]{2})-(\d{4})(?:-(\w+))?$/;
  *  - 카테고리 변경 시 새 카테고리는 백엔드 의존이라 "???? (저장 시 부여)" 안내.
  *  - 모델만 변경 (또는 미변경) 시 serial 유지, prefix·option 갱신.
  */
-function previewFullCode(form: ItemFormData): string {
-  const prefix = previewCodePrefix(form.model_slots, form.process_type_code);
+function previewFullCode(form: ItemFormData, models: ProductModel[]): string {
+  const prefix = previewCodePrefix(form.model_slots, form.process_type_code, models);
   if (!prefix) return form.mes_code || "(자동 부여)";
 
   const m = (form.mes_code || "").match(CODE_PARSE);
@@ -88,10 +90,12 @@ function previewFullCode(form: ItemFormData): string {
 
 function MesCodeSection({
   form,
+  models,
 }: {
   form: ItemFormData;
+  models: ProductModel[];
 }) {
-  const prefix = previewCodePrefix(form.model_slots, form.process_type_code);
+  const prefix = previewCodePrefix(form.model_slots, form.process_type_code, models);
 
   return (
     <div>
@@ -119,7 +123,7 @@ function MesCodeSection({
         }}
         aria-readonly
       >
-        {previewFullCode(form)}
+        {previewFullCode(form, models)}
       </div>
       <p className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
         품목 코드는 사용제품·카테고리·옵션에서 자동 계산됩니다. 사용제품만 바꾸면 번호 유지(즉시 미리 보임), 카테고리를 바꾸면 새 카테고리의 다음 번호가 저장 시 부여됩니다.
@@ -128,7 +132,7 @@ function MesCodeSection({
   );
 }
 
-export function ItemFormFields({ form, setForm, showInitialQuantity, showMesCode }: Props) {
+export function ItemFormFields({ form, setForm, showInitialQuantity, showMesCode, productModels = [] }: Props) {
   return (
     <>
       {/* 텍스트/숫자 필드 */}
@@ -185,7 +189,7 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showMesCode
       ))}
 
       {showMesCode && (
-        <MesCodeSection form={form} />
+        <MesCodeSection form={form} models={productModels} />
       )}
 
       {/* 카테고리 */}
@@ -216,7 +220,7 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showMesCode
       <div>
         <FieldLabel label="사용 제품" />
         <div className="flex flex-wrap gap-2">
-          {MODEL_SLOTS.map(({ slot, label, symbol }) => {
+          {productModels.map(({ slot, model_name, symbol }) => {
             const checked = form.model_slots.includes(slot);
             return (
               <button
@@ -237,7 +241,7 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showMesCode
                   color: checked ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
                 }}
               >
-                {label} <span style={{ opacity: 0.7 }}>({symbol})</span>
+                {model_name ?? symbol} <span style={{ opacity: 0.7 }}>({symbol})</span>
               </button>
             );
           })}
@@ -245,7 +249,7 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showMesCode
         {form.model_slots.length > 0 ? (
           <div className="mt-1.5 text-xs" style={{ color: LEGACY_COLORS.purple }}>
             제품 기호:{" "}
-            {MODEL_SLOTS.filter((m) => form.model_slots.includes(m.slot))
+            {productModels.filter((m) => form.model_slots.includes(m.slot))
               .map((m) => m.symbol)
               .sort()
               .join("")}

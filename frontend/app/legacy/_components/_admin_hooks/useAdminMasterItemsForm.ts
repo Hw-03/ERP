@@ -30,7 +30,7 @@ export const EMPTY_ITEM_EDIT_FORM: ItemEditForm = {
   mes_code: "",
 };
 
-const SYMBOL_TO_SLOT: Record<string, number> = { "3": 1, "7": 2, "8": 3, "4": 4, "6": 5 };
+const SYMBOL_TO_SLOT: Record<string, number> = { "3": 1, "7": 2, "8": 3, "4": 4, "6": 5, "9": 6 };
 
 function inferModelSlots(code: string): number[] {
   const seg = code.split("-")[0] ?? "";
