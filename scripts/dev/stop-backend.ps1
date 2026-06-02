@@ -17,10 +17,10 @@ function Get-Port8011Pids {
 }
 
 function Get-UvicornPythonPids {
-    # CIM_Process.CommandLine 검사 — uvicorn app.main:app 패턴
+    # CIM_Process.CommandLine 검사 — uvicorn app.main:app + 포트 8011 패턴
     @(
         Get-CimInstance Win32_Process -Filter "Name='python.exe' OR Name='py.exe'" -ErrorAction SilentlyContinue |
-            Where-Object { $_.CommandLine -and ($_.CommandLine -match 'uvicorn\s+app\.main:app') } |
+            Where-Object { $_.CommandLine -and ($_.CommandLine -match 'uvicorn\s+app\.main:app') -and ($_.CommandLine -match '--port\s+8011') } |
             Select-Object -ExpandProperty ProcessId
     )
 }
