@@ -14,10 +14,9 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import Base, IntQuantity
+from app.models.base import Base, IntQuantity, UUIDString
 
 __all__ = [
     "TransactionTypeEnum",
@@ -45,8 +44,8 @@ class TransactionTypeEnum(str, enum.Enum):
 class TransactionLog(Base):
     __tablename__ = "transaction_logs"
 
-    log_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
+    log_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
+    item_id = Column(UUIDString, ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
     transaction_type = Column(
         SAEnum(TransactionTypeEnum, name="transaction_type_enum", create_type=True),
         nullable=False,
@@ -64,7 +63,7 @@ class TransactionLog(Base):
     reason_category = Column(String(32), nullable=True, index=True)
     reason_memo = Column(Text, nullable=True)
     operation_batch_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("io_batches.batch_id", ondelete="SET NULL"),
         nullable=True,
         index=True,
@@ -96,15 +95,15 @@ class TransactionEditLog(Base):
 
     __tablename__ = "transaction_edit_logs"
 
-    edit_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    edit_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
     original_log_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("transaction_logs.log_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     edited_by_employee_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("employees.employee_id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -113,7 +112,7 @@ class TransactionEditLog(Base):
     before_payload = Column(Text, nullable=False)  # JSON 스냅샷
     after_payload = Column(Text, nullable=False)  # JSON 스냅샷
     correction_log_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("transaction_logs.log_id", ondelete="SET NULL"),
         nullable=True,
     )  # 4차 수량 보정 시 생성된 ADJUST 거래 참조

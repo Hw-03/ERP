@@ -16,10 +16,9 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import Base, IntQuantity
+from app.models.base import Base, IntQuantity, UUIDString
 
 __all__ = [
     "StockRequestStatusEnum",
@@ -71,11 +70,11 @@ class StockRequest(Base):
 
     __tablename__ = "stock_requests"
 
-    request_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
     request_code = Column(String(40), unique=True, nullable=True, index=True)
     client_request_id = Column(String(64), unique=True, nullable=True, index=True)
     requester_employee_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("employees.employee_id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
@@ -97,14 +96,14 @@ class StockRequest(Base):
     reserved_at = Column(DateTime, nullable=True)
     submitted_at = Column(DateTime, nullable=True)
     approved_by_employee_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("employees.employee_id", ondelete="SET NULL"),
         nullable=True,
     )
     approved_by_name = Column(String(100), nullable=True)
     approved_at = Column(DateTime, nullable=True)
     rejected_by_employee_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("employees.employee_id", ondelete="SET NULL"),
         nullable=True,
     )
@@ -114,7 +113,7 @@ class StockRequest(Base):
     # 부서 결재 (낱개 manual/adjust 라인 포함 시 추가로 요구). warehouse_approval 와 독립적.
     requires_department_approval = Column(Boolean, nullable=False, default=False, server_default="0")
     department_approved_by_employee_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("employees.employee_id", ondelete="SET NULL"),
         nullable=True,
     )
@@ -127,7 +126,7 @@ class StockRequest(Base):
     reason_category = Column(String(50), nullable=True)
     reason_memo = Column(Text, nullable=True)
     operation_batch_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("io_batches.batch_id", ondelete="SET NULL"),
         nullable=True,
         index=True,
@@ -152,15 +151,15 @@ class StockRequest(Base):
 class StockRequestLine(Base):
     __tablename__ = "stock_request_lines"
 
-    line_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    line_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
     request_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("stock_requests.request_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     item_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("items.item_id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
@@ -184,7 +183,7 @@ class StockRequestLine(Base):
         default=StockRequestStatusEnum.SUBMITTED,
     )
     operation_line_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("io_lines.line_id", ondelete="SET NULL"),
         nullable=True,
         index=True,

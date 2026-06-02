@@ -15,10 +15,9 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import Base, IntQuantity
+from app.models.base import Base, IntQuantity, UUIDString
 
 __all__ = [
     "IoBatch",
@@ -32,12 +31,12 @@ class IoBatch(Base):
 
     __tablename__ = "io_batches"
 
-    batch_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    batch_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
     work_type = Column(String(32), nullable=False, index=True)
     sub_type = Column(String(40), nullable=False, index=True)
     status = Column(String(24), nullable=False, default="draft", index=True)
     requester_employee_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("employees.employee_id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
@@ -47,7 +46,7 @@ class IoBatch(Base):
     from_department = Column(String(50), nullable=True)
     to_department = Column(String(50), nullable=True)
     requires_approval = Column(Boolean, nullable=False, default=False)
-    stock_request_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    stock_request_id = Column(UUIDString, nullable=True, index=True)
     reference_no = Column(String(100), nullable=True, index=True)
     notes = Column(Text, nullable=True)
     client_request_id = Column(String(64), nullable=True, unique=True, index=True)
@@ -79,16 +78,16 @@ class IoBundle(Base):
 
     __tablename__ = "io_bundles"
 
-    bundle_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    bundle_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
     batch_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("io_batches.batch_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     source_kind = Column(String(24), nullable=False)
     source_item_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("items.item_id", ondelete="SET NULL"),
         nullable=True,
         index=True,
@@ -113,15 +112,15 @@ class IoLine(Base):
 
     __tablename__ = "io_lines"
 
-    line_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    line_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
     bundle_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("io_bundles.bundle_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     item_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("items.item_id", ondelete="RESTRICT"),
         nullable=False,
         index=True,

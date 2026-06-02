@@ -16,10 +16,9 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import Base, IntQuantity
+from app.models.base import Base, IntQuantity, UUIDString
 
 __all__ = [
     "LocationStatusEnum",
@@ -36,9 +35,9 @@ class LocationStatusEnum(str, enum.Enum):
 class Inventory(Base):
     __tablename__ = "inventory"
 
-    inventory_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    inventory_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
     item_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("items.item_id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
@@ -51,7 +50,7 @@ class Inventory(Base):
     # 큐 배치 예약분 (warehouse_qty 대비). Available = warehouse + production_total − pending.
     pending_quantity = Column(IntQuantity, nullable=False, default=0)
     last_reserver_employee_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("employees.employee_id", ondelete="SET NULL"),
         nullable=True,
     )
@@ -85,9 +84,9 @@ class InventoryLocation(Base):
     Inventory와는 item_id로 매칭되며 직접 쿼리로 접근한다 (관계 매핑 없음)."""
     __tablename__ = "inventory_locations"
 
-    location_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    location_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
     item_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("items.item_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
