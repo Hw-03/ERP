@@ -5,7 +5,7 @@ import Image from "next/image";
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { itemCodeDept } from "@/lib/mes/process";
+import { mesCodeDept } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";
 import { ImageLightbox } from "@/lib/ui/ImageLightbox";
@@ -83,7 +83,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
   for (const dept of defectDepts)
     badges.push({ key: `${dept}-defect`, label: "[불량]", color: DEFECT_RED });
   if (badges.length === 0) {
-    const dept = item.department ?? itemCodeDept(item.item_code);
+    const dept = item.department ?? mesCodeDept(item.mes_code);
     if (dept) badges.push({ key: dept, label: dept, color: getDeptColor(dept) });
   }
   const visibleBadges = badges.slice(0, 2);
@@ -186,7 +186,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
         className="hidden sm:table-cell border-b px-4 py-5 align-middle whitespace-nowrap text-sm"
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
       >
-        {item.item_code ?? "-"}
+        {item.mes_code ?? "-"}
       </td>
       <td
         className="hidden sm:table-cell border-b px-4 py-5 align-middle whitespace-nowrap"

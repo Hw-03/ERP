@@ -1,16 +1,16 @@
 """품목 코드 일관성 일괄 정리.
 
-item_code 가 (model_symbol, process_type_code, serial_no) 와
+mes_code 가 (model_symbol, process_type_code, serial_no) 와
 어긋난 부품을 점검하고, --apply 옵션 시 갱신한다.
 
-- 카테고리 어긋남 (item_code 의 카테고리 != item.process_type_code):
+- 카테고리 어긋남 (mes_code 의 카테고리 != item.process_type_code):
   새 카테고리에서 next_serial_no 부여. serial_no 갱신.
 - 모델 어긋남 (카테고리는 같은데 prefix 가 어긋남):
   serial 유지, prefix 만 갱신.
 
 사용법:
-  python scripts/repair_item_codes.py            # dry-run (변경 후보만 출력)
-  python scripts/repair_item_codes.py --apply    # 실제 변경 적용
+  python scripts/repair_mes_codes.py            # dry-run (변경 후보만 출력)
+  python scripts/repair_mes_codes.py --apply    # 실제 변경 적용
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 from app.database import SessionLocal  # noqa: E402
 from app.models import Item  # noqa: E402
-from app.utils.item_code import make_item_code, next_serial_no  # noqa: E402
+from app.utils.mes_code import make_mes_code, next_serial_no  # noqa: E402
 
 CODE_PATTERN = re.compile(r"^(?P<prefix>[0-9]+)-(?P<pt>[A-Z]{2})-(?P<serial>\d{4})$")
 
@@ -58,7 +58,7 @@ def main() -> int:
         items = (
             db.query(Item)
             .filter(Item.deleted_at.is_(None))
-            .filter(Item.item_code.isnot(None))
+            .filter(Item.mes_code.isnot(None))
             .order_by(Item.process_type_code, Item.serial_no)
             .all()
         )
@@ -75,12 +75,12 @@ def main() -> int:
             if not sym or not pt or serial is None:
                 continue
 
-            expected_same_serial = make_item_code(sym, pt, serial)
-            if item.item_code == expected_same_serial:
+            expected_same_serial = make_mes_code(sym, pt, serial)
+            if item.mes_code == expected_same_serial:
                 continue  # 일치 — 건너뜀
 
             # 어긋남. 어떤 종류인지 분류.
-            parsed = parse_code(item.item_code or "")
+            parsed = parse_code(item.mes_code or "")
             old_pt = parsed["pt"] if parsed else None
             category_changed = old_pt is not None and old_pt != pt
 
@@ -91,7 +91,7 @@ def main() -> int:
                 else:
                     category_counter[pt] += 1
                 new_serial = category_counter[pt]
-                new_code = make_item_code(sym, pt, new_serial)
+                new_code = make_mes_code(sym, pt, new_serial)
                 candidates.append((item, "category", new_code))
             else:
                 # serial 유지. prefix(모델) 어긋남.
@@ -105,7 +105,7 @@ def main() -> int:
         print(f"{'kind':16} {'old_code':28} -> {'new_code':28}  name")
         print("-" * 100)
         for item, kind, new_code in candidates:
-            print(f"{kind:16} {item.item_code:28} -> {new_code:28}  {item.item_name[:40]}")
+            print(f"{kind:16} {item.mes_code:28} -> {new_code:28}  {item.item_name[:40]}")
 
         if not args.apply:
             print("\n[dry-run] 실제 변경하려면 --apply 옵션을 추가하세요.")
@@ -118,7 +118,7 @@ def main() -> int:
             parsed_new = parse_code(new_code)
             if parsed_new:
                 item.serial_no = int(parsed_new["serial"])
-            item.item_code = new_code
+            item.mes_code = new_code
             item.updated_at = datetime.now(UTC).replace(tzinfo=None)
         db.commit()
         print(f"[apply] done - {len(candidates)} updated.")

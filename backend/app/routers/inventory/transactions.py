@@ -140,7 +140,7 @@ def _process_step_filter(process_step: Optional[str]):
 
 
 def _model_filter(db: Session, model: Optional[str]):
-    """model_name IN 필터 — Item.item_code prefix 기반.
+    """model_name IN 필터 — Item.mes_code prefix 기반.
 
     회사 규약: 품목 코드의 첫 '-' 앞 글자열의 각 글자가 ProductSymbol.symbol 과 1:1 대응.
     예: "8-AR-0307"·"78-PR-0042" 둘 다 SOLO(symbol='8') 매칭.
@@ -162,19 +162,19 @@ def _model_filter(db: Session, model: Optional[str]):
     ]
     if not symbols:
         return None
-    # prefix = item_code 의 첫 '-' 앞 부분만 잘라낸 뒤 그 안에 symbol 글자 포함 여부 검사.
+    # prefix = mes_code 의 첫 '-' 앞 부분만 잘라낸 뒤 그 안에 symbol 글자 포함 여부 검사.
     # SQLite/PostgreSQL 공통 함수: instr(필드, '-') / substr(필드, 1, n).
     # PostgreSQL 은 strpos(필드, '-') 와 substr 가 동일 시그니처 → func.instr 호출이 동작 안 함
     #   (PG 는 instr 없음). DB 가 SQLite 라는 게 운영 전제 — _attic/docs/openapi.json baseline.
-    dash_pos = func.instr(Item.item_code, "-")
-    prefix_expr = func.substr(Item.item_code, 1, dash_pos - 1)
+    dash_pos = func.instr(Item.mes_code, "-")
+    prefix_expr = func.substr(Item.mes_code, 1, dash_pos - 1)
     clauses = []
     for sym in symbols:
         # 단일 문자 symbol 운영 전제. '%' '_' 들어가도 escape 처리 후 LIKE.
         s = sym.replace("%", "\\%").replace("_", "\\_")
         clauses.append(prefix_expr.like(f"%{s}%", escape="\\"))
-    # dash_pos == 0 (코드에 '-' 없음) 또는 item_code NULL 은 자연히 매칭 실패.
-    return and_(Item.item_code.isnot(None), dash_pos > 0, or_(*clauses))
+    # dash_pos == 0 (코드에 '-' 없음) 또는 mes_code NULL 은 자연히 매칭 실패.
+    return and_(Item.mes_code.isnot(None), dash_pos > 0, or_(*clauses))
 
 
 def _department_filter(department: Optional[str]):
@@ -335,7 +335,7 @@ def _to_log_response(
     return TransactionLogResponse(
         log_id=log.log_id,
         item_id=log.item_id,
-        item_code=item.item_code,
+        mes_code=item.mes_code,
         item_name=item.item_name,
         item_process_type_code=item.process_type_code,
         item_unit=item.unit,
@@ -484,7 +484,7 @@ def list_transactions(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.item_code.ilike(pattern),
+                Item.mes_code.ilike(pattern),
                 TransactionLog.reference_no.ilike(pattern),
                 TransactionLog.notes.ilike(pattern),
                 TransactionLog.produced_by.ilike(pattern),
@@ -585,7 +585,7 @@ def get_transactions_summary(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.item_code.ilike(pattern),
+                Item.mes_code.ilike(pattern),
                 TransactionLog.reference_no.ilike(pattern),
                 TransactionLog.notes.ilike(pattern),
                 TransactionLog.produced_by.ilike(pattern),
@@ -661,7 +661,7 @@ def export_transactions_csv(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.item_code.ilike(pattern),
+                Item.mes_code.ilike(pattern),
                 TransactionLog.reference_no.ilike(pattern),
                 TransactionLog.notes.ilike(pattern),
                 TransactionLog.produced_by.ilike(pattern),
@@ -677,7 +677,7 @@ def export_transactions_csv(
         [
             "created_at",
             "transaction_type",
-            "item_code",
+            "mes_code",
             "item_name",
             "process_type_code",
             "quantity_change",
@@ -693,7 +693,7 @@ def export_transactions_csv(
             [
                 log.created_at.isoformat(),
                 log.transaction_type.value,
-                item.item_code or "",
+                item.mes_code or "",
                 item.item_name,
                 item.process_type_code or "",
                 float(log.quantity_change),
@@ -734,7 +734,7 @@ def export_transactions_xlsx(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.item_code.ilike(pattern),
+                Item.mes_code.ilike(pattern),
                 TransactionLog.reference_no.ilike(pattern),
                 TransactionLog.notes.ilike(pattern),
                 TransactionLog.produced_by.ilike(pattern),
@@ -770,7 +770,7 @@ def export_transactions_xlsx(
         row_data = [
             log.created_at.strftime("%Y-%m-%d %H:%M") if log.created_at else "",
             tx_label.get(tx_val, tx_val),
-            item.item_code or "",
+            item.mes_code or "",
             item.item_name,
             item.process_type_code or "",
             float(log.quantity_change),

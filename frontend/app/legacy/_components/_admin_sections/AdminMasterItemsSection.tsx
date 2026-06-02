@@ -243,7 +243,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                       color: isSelected ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
                     }}
                   >
-                    {item.item_code ?? "—"}
+                    {item.mes_code ?? "—"}
                   </span>
                   <span
                     className="min-w-0 flex-1 truncate text-[13px] font-semibold"
@@ -289,7 +289,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
             addMode
               ? "필요한 항목을 채우고 추가 버튼을 눌러주세요."
               : selectedItem
-                ? selectedItem.item_code ?? undefined
+                ? selectedItem.mes_code ?? undefined
                 : undefined
           }
           status={
@@ -499,7 +499,7 @@ function ItemBomTab({
       <BomList
         title="구성품 (이 품목이 부모인 BOM)"
         rows={composition.map((r) => ({
-          code: r.child_item_code,
+          code: r.child_mes_code,
           name: r.child_item_name,
           qty: r.quantity,
           unit: r.unit,
@@ -509,7 +509,7 @@ function ItemBomTab({
       <BomList
         title="사용처 (이 품목이 자식으로 들어간 부모)"
         rows={usedIn.map((r) => ({
-          code: r.parent_item_code,
+          code: r.parent_mes_code,
           name: r.parent_item_name,
           qty: r.quantity,
           unit: r.unit,

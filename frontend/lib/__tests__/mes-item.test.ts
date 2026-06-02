@@ -23,7 +23,7 @@ const stubItem = (overrides: Partial<Item> = {}): Item => ({
   legacy_item_type: null,
   supplier: null,
   min_stock: null,
-  item_code: "ITM-AA-00001",
+  mes_code: "ITM-AA-00001",
   model_symbol: null,
   model_slots: [],
   process_type_code: null,
@@ -35,7 +35,7 @@ const stubItem = (overrides: Partial<Item> = {}): Item => ({
 });
 
 describe("buildItemSearchLabel", () => {
-  it("formats as 'item_code / name'", () => {
+  it("formats as 'mes_code / name'", () => {
     expect(buildItemSearchLabel(stubItem())).toBe("ITM-AA-00001 / Widget A");
   });
 });

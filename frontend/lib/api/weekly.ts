@@ -7,7 +7,6 @@ import type { WeeklyProductionModelRow, WeeklyReportResponse } from "./types/wee
  * 백엔드 Pydantic Decimal 은 JSON 에서 문자열("2.0000")로 직렬화되는데 타입은
  * number 로 선언돼 있다. 그대로 두면 `reduce((s,r)=>s+r.total_qty, 0)` 가
  * `0 + "2.0000"` → 문자열 연결로 "총 022.00008.0000…개" 처럼 깨진다.
- * (IoComposeView 의 normalizeBundles 와 동일한 경계-정규화 관례.)
  */
 function normalizeMatrix(rows: WeeklyProductionModelRow[]): WeeklyProductionModelRow[] {
   return rows.map((r) => ({

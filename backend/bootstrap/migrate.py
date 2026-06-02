@@ -161,6 +161,9 @@ _MIGRATION_DDL: list[str] = [
     # 거래 로그 아카이브 시각 (NULL = 미아카이브)
     "ALTER TABLE transaction_logs ADD COLUMN archived_at DATETIME",
     "CREATE INDEX IF NOT EXISTS ix_transaction_logs_archived_at ON transaction_logs(archived_at)",
+    # 2026-06-02: 사번 감사 보강 — 직접 입출고 엔드포인트에서 사번 검증 성공 시 채움 (nullable)
+    "ALTER TABLE transaction_logs ADD COLUMN producer_employee_id CHAR(36)",
+    "CREATE INDEX IF NOT EXISTS ix_tx_producer_employee ON transaction_logs(producer_employee_id)",
     # 부서 결재 — 낱개 manual/adjust 라인 포함 시 추가 승인 (warehouse_approval 와 독립)
     "ALTER TABLE stock_requests ADD COLUMN requires_department_approval BOOLEAN NOT NULL DEFAULT 0",
     "ALTER TABLE stock_requests ADD COLUMN department_approved_by_employee_id CHAR(36)",
@@ -293,6 +296,60 @@ def _consolidate_item_code_columns() -> None:
         conn.commit()
 
 
+def _rename_item_code_to_mes_code() -> None:
+    """items.item_code → mes_code rename + snapshot 컬럼(stock_request_lines, io_lines)
+    의 item_code_snapshot → mes_code_snapshot. 멱등.
+
+    `_consolidate_item_code_columns()` 와 동일 패턴. fresh DB 는 create_all 이 이미
+    mes_code 로 만들지만, _MIGRATION_DDL 의 historical "ADD COLUMN erp_code" →
+    _consolidate 가 (item_code 없음 분기에서) item_code 유령을 다시 만든다. 그 유령을
+    여기서 정리한다. 반드시 run_migrations 의 맨 끝(모든 item_code 생성 헬퍼 이후)에서 호출.
+    """
+    def _cols(conn, table: str) -> set[str]:
+        return {r[1] for r in conn.execute(text(f"PRAGMA table_info({table})"))}
+
+    with engine.connect() as conn:
+        items_ddl = (conn.execute(text(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='items'"
+        )).scalar() or "")
+        # 생성열 mes_code 는 PRAGMA table_info 에 안 잡히므로 DDL 로 판별한다.
+        # (create_all 이 mes_code 를 GENERATED 로 만든 fresh DB 케이스.)
+        mes_generated = "GENERATED" in items_ddl.upper()
+        items_cols = _cols(conn, "items")
+        if mes_generated:
+            # mes_code 가 이미 생성열 — rename 불필요. historical item_code 유령만 제거.
+            if "item_code" in items_cols:
+                conn.execute(text("DROP INDEX IF EXISTS ix_items_item_code"))
+                conn.execute(text("ALTER TABLE items DROP COLUMN item_code"))
+        elif "item_code" in items_cols:
+            conn.execute(text("DROP INDEX IF EXISTS ix_items_item_code"))
+            conn.execute(text("DROP INDEX IF EXISTS ix_items_mes_code"))
+            if "mes_code" in items_cols:
+                # 두 컬럼 공존: fresh DB(create_all 이 mes_code 생성)에 historical 체인이
+                # item_code 유령을 다시 만든 케이스. item_code 가 모두 NULL 이면 유령 → DROP.
+                item_non_null = conn.execute(
+                    text("SELECT COUNT(*) FROM items WHERE item_code IS NOT NULL")
+                ).scalar()
+                if item_non_null == 0:
+                    conn.execute(text("ALTER TABLE items DROP COLUMN item_code"))
+                else:
+                    conn.execute(text("ALTER TABLE items DROP COLUMN mes_code"))
+                    conn.execute(text("ALTER TABLE items RENAME COLUMN item_code TO mes_code"))
+            else:
+                conn.execute(text("ALTER TABLE items RENAME COLUMN item_code TO mes_code"))
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_items_mes_code ON items(mes_code)"
+            ))
+        # snapshot 컬럼 — 동일 패턴 (fresh DB 는 create_all 이 mes_code_snapshot 로 생성)
+        for table in ("stock_request_lines", "io_lines"):
+            cols = _cols(conn, table)
+            if "item_code_snapshot" in cols and "mes_code_snapshot" not in cols:
+                conn.execute(text(
+                    f"ALTER TABLE {table} RENAME COLUMN item_code_snapshot TO mes_code_snapshot"
+                ))
+        conn.commit()
+
+
 def _drop_unused_item_columns() -> None:
     """spec / barcode / legacy_file_type — 미사용 컬럼 제거. 멱등."""
     to_drop = {"spec", "barcode", "legacy_file_type"}
@@ -399,6 +456,107 @@ def _drop_dead_m1_objects() -> None:
         finally:
             cur.execute("PRAGMA foreign_keys=ON")
             cur.close()
+    finally:
+        raw.close()
+
+
+def _unify_quantity_columns_to_integer() -> None:
+    """수량 컬럼 선언타입 NUMERIC(15,4)/REAL → INTEGER 통일 (스키마 진실화).
+
+    앱은 이미 IntQuantity 로 쓰기 시점 int 강제 — 이 함수는 기존 DB 선언타입만 모델과
+    일치시킨다(동작 변화 없음). fresh DB 는 create_all 이 이미 INTEGER 라 전부 NO-OP.
+    items 등 자식 FK 많은 테이블 포함 → _drop_dead_m1_objects 와 동일하게 raw_connection +
+    PRAGMA foreign_keys=OFF(트랜잭션 밖). 현재 sqlite_master DDL 을 읽어 수량 컬럼 타입만 치환
+    → ORM 드리프트(없던 FK·중복 인덱스) 회피. 멱등 — 대상 컬럼이 이미 INTEGER 면 스킵.
+    """
+    import re
+
+    qty_cols = {
+        "items": {"min_stock"},
+        "bom": {"quantity"},
+        "inventory": {"quantity", "warehouse_qty", "pending_quantity"},
+        "inventory_locations": {"quantity"},
+        "transaction_logs": {"quantity_change", "quantity_before", "quantity_after", "transfer_qty"},
+        "io_bundles": {"quantity"},
+        "io_lines": {"quantity", "bom_expected", "shortage"},
+        "stock_request_lines": {"quantity"},
+    }
+    # io_lines 는 stock_request_lines.operation_line_id 가 참조 → 먼저. items 는 자식 7개라 마지막.
+    order = [
+        "bom", "inventory", "inventory_locations", "transaction_logs",
+        "io_bundles", "io_lines", "stock_request_lines", "items",
+    ]
+
+    # 0) 소수 수량 올림(ceil) — 정수 전용 정책 위반 데이터 정리. 타입 재생성보다 먼저 해야
+    #    INTEGER 컬럼에 REAL 값(0.1 등)이 잔류하지 않는다. 멱등(소수 없으면 NO-OP).
+    with engine.begin() as conn:
+        for tbl, cols in qty_cols.items():
+            for col in cols:
+                conn.execute(text(
+                    f"UPDATE {tbl} SET {col} = CAST({col} AS INTEGER) + "
+                    f"(CASE WHEN {col} > CAST({col} AS INTEGER) THEN 1 ELSE 0 END) "
+                    f"WHERE {col} IS NOT NULL AND {col} <> CAST({col} AS INTEGER)"
+                ))
+
+    raw = engine.raw_connection()
+    try:
+        cur = raw.cursor()
+        for table in order:
+            cur.execute(f"PRAGMA table_info({table})")
+            info = [(r[1], (r[2] or "")) for r in cur.fetchall()]
+            if not info:
+                continue  # 테이블 부재(방어)
+            targets = qty_cols[table]
+            need = [c for c, t in info if c in targets and t.strip().upper() != "INTEGER"]
+            if not need:
+                continue  # 이미 INTEGER → 멱등 스킵
+
+            cur.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,))
+            create_sql = cur.fetchone()[0]
+            cur.execute(
+                "SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name=? AND sql IS NOT NULL",
+                (table,),
+            )
+            index_sqls = [r[0] for r in cur.fetchall()]
+
+            typed_sql = create_sql
+            for col in need:
+                typed_sql = re.sub(
+                    rf"(\b{re.escape(col)}\b\s+)(NUMERIC\s*\(\s*\d+\s*,\s*\d+\s*\)|REAL)",
+                    r"\1INTEGER",
+                    typed_sql,
+                )
+            if typed_sql == create_sql:
+                # 대상 컬럼이 변환 가능한 타입(NUMERIC/REAL)이 아님 → 불필요한 재생성 방지, 스킵
+                continue
+            new_create = re.sub(
+                rf'CREATE TABLE\s+(?:IF NOT EXISTS\s+)?("?){re.escape(table)}\1',
+                f"CREATE TABLE {table}_new",
+                typed_sql,
+                count=1,
+            )
+
+            allcols = ", ".join(f'"{c}"' for c, _ in info)
+
+            cur.execute("PRAGMA foreign_keys=OFF")
+            try:
+                cur.execute("BEGIN")
+                cur.execute(new_create)
+                cur.execute(f"INSERT INTO {table}_new ({allcols}) SELECT {allcols} FROM {table}")
+                cur.execute(f"DROP TABLE {table}")
+                cur.execute(f"ALTER TABLE {table}_new RENAME TO {table}")
+                for isql in index_sqls:
+                    cur.execute(isql)
+                violations = cur.execute("PRAGMA foreign_key_check").fetchall()
+                if violations:
+                    raise RuntimeError(f"foreign_key_check 위반(after {table} rebuild): {violations}")
+                cur.execute("COMMIT")
+            except Exception:
+                cur.execute("ROLLBACK")
+                raise
+            finally:
+                cur.execute("PRAGMA foreign_keys=ON")
+        cur.close()
     finally:
         raw.close()
 
@@ -613,6 +771,134 @@ def _fix_queue_batches_fk() -> None:
         conn.commit()
 
 
+def _normalize_bom_uuid() -> None:
+    """bom.bom_id 의 hyphen 포함 행을 no-hyphen hex 로 일괄 정규화.
+
+    배경: PostgreSQL UUID dialect 가 SQLite 에서 no-hyphen hex(32자)로 바인딩하는데,
+    일부 행이 hyphen 포함 36자 형식으로 삽입됨 → ORM filter 가 해당 행을 찾지 못해
+    BOM 삭제·수정이 404 로 실패. 전체 18 테이블 조사 결과 bom.bom_id 만 영향.
+    멱등 — hyphen 포함 행이 없으면 NO-OP.
+    """
+    with engine.connect() as conn:
+        count = conn.execute(
+            text("SELECT COUNT(*) FROM bom WHERE bom_id LIKE '%-%'")
+        ).scalar()
+        if not count:
+            return
+        conn.execute(text(
+            "UPDATE bom SET bom_id = replace(bom_id, '-', '') WHERE bom_id LIKE '%-%'"
+        ))
+        conn.commit()
+
+
+def _promote_model_9() -> None:
+    """제품 모델 "9" 등록 — slot 6 예약행 승격 + 순수 "9-…" 품목 model_symbol 백필.
+
+    기존 DB 는 product_symbols 가 이미 시드되어 seed_reference_data 가 스킵하므로
+    (시드는 빈 테이블에만 동작) 여기서 slot 6 을 승격한다. Part A 의 items 재생성
+    (model_symbol NOT NULL) 보다 **먼저** 실행해야 model_symbol IS NULL 2건이
+    NOT NULL 위반을 일으키지 않는다. 멱등 — 이미 승격/백필된 환경이면 UPDATE 0행.
+    """
+    with engine.connect() as conn:
+        conn.execute(text(
+            "UPDATE product_symbols "
+            "SET symbol='9', model_name='신제품', is_reserved=0 "
+            "WHERE slot=6 AND symbol IS NULL"
+        ))
+        conn.execute(text(
+            "UPDATE items SET model_symbol='9' "
+            "WHERE model_symbol IS NULL AND mes_code LIKE '9-%'"
+        ))
+        conn.commit()
+
+
+def _recreate_items_with_generated_mes_code() -> None:
+    """items.mes_code 를 STORED generated 컬럼으로 전환 + 분해필드 NOT NULL + min_stock CHECK.
+
+    SQLite 는 기존 컬럼을 generated 로 ALTER 못 함 → 테이블 재생성(_drop_dead_m1_objects 패턴:
+    raw_connection + PRAGMA foreign_keys=OFF(트랜잭션 밖) + 명시 BEGIN/COMMIT).
+    멱등 — items DDL 에 GENERATED 가 이미 있으면 NO-OP.
+    선행: _promote_model_9 (model_symbol NULL=0). items 재생성기 중 마지막에 실행.
+    컬럼 정의는 현행 mes.db DDL 기준(min_stock INTEGER — 수량 정수화 반영).
+    생성열 mes_code 는 INSERT 컬럼 목록에서 제외 — SQLite 가 분해필드에서 계산한다.
+    """
+    if engine.dialect.name != "sqlite":
+        return
+    raw = engine.raw_connection()
+    try:
+        cur = raw.cursor()
+        row = cur.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='items'"
+        ).fetchone()
+        if row is None:
+            cur.close()
+            return
+        if "GENERATED" in (row[0] or "").upper():
+            cur.close()
+            return
+        cur.execute("PRAGMA foreign_keys=OFF")
+        try:
+            cur.execute("BEGIN")
+            cur.execute(
+                """
+                CREATE TABLE items_new (
+                    item_id UUID NOT NULL,
+                    item_name VARCHAR(200) NOT NULL,
+                    sort_order INTEGER,
+                    unit VARCHAR(20) NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    legacy_part VARCHAR(50),
+                    legacy_item_type VARCHAR(50),
+                    supplier VARCHAR(200),
+                    min_stock INTEGER,
+                    model_symbol VARCHAR(20) NOT NULL,
+                    process_type_code VARCHAR(2) NOT NULL,
+                    serial_no INTEGER NOT NULL,
+                    bom_completed_at DATETIME,
+                    mes_code VARCHAR(40) GENERATED ALWAYS AS (
+                        model_symbol || '-' || process_type_code || '-' || printf('%04d', serial_no)
+                    ) STORED,
+                    deleted_at DATETIME,
+                    PRIMARY KEY (item_id),
+                    CONSTRAINT ck_items_min_stock_nonneg CHECK (min_stock >= 0 OR min_stock IS NULL),
+                    FOREIGN KEY(process_type_code) REFERENCES process_types (code)
+                )
+                """
+            )
+            cur.execute(
+                """
+                INSERT INTO items_new
+                    (item_id, item_name, sort_order, unit, created_at, updated_at,
+                     legacy_part, legacy_item_type, supplier, min_stock,
+                     model_symbol, process_type_code, serial_no, bom_completed_at, deleted_at)
+                SELECT item_id, item_name, sort_order, unit, created_at, updated_at,
+                       legacy_part, legacy_item_type, supplier, min_stock,
+                       model_symbol, process_type_code, serial_no, bom_completed_at, deleted_at
+                FROM items
+                """
+            )
+            cur.execute("DROP TABLE items")
+            cur.execute("ALTER TABLE items_new RENAME TO items")
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_items_mes_code ON items(mes_code)")
+            cur.execute("CREATE INDEX IF NOT EXISTS ix_items_process_type_code ON items (process_type_code)")
+            cur.execute("CREATE INDEX IF NOT EXISTS ix_items_model_symbol ON items (model_symbol)")
+            cur.execute("CREATE INDEX IF NOT EXISTS ix_items_sort_order ON items (sort_order)")
+            cur.execute("CREATE INDEX IF NOT EXISTS ix_items_legacy_part ON items (legacy_part)")
+            violations = cur.execute("PRAGMA foreign_key_check").fetchall()
+            if violations:
+                raise RuntimeError(f"foreign_key_check 위반(after items generated rebuild): {violations}")
+            cur.execute("COMMIT")
+        except Exception:
+            cur.execute("ROLLBACK")
+            raise
+        finally:
+            cur.execute("PRAGMA foreign_keys=ON")
+            cur.close()
+    finally:
+        raw.close()
+
+
 def run_migrations() -> dict[str, object]:
     """누락된 컬럼/인덱스/테이블을 반영. 각 문장을 3분류한다.
 
@@ -741,6 +1027,53 @@ def run_migrations() -> dict[str, object]:
         _drop_option_codes()
     except Exception as exc:  # noqa: BLE001
         msg = f"[migrate] option codes drop failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
+
+    # 2026-06-01: items.item_code → mes_code rename (+ snapshot 컬럼). 멱등.
+    # 모든 item_code 생성 헬퍼(_consolidate_item_code_columns, _drop_dead_m1_objects)
+    # 이후에 실행해야 안전하므로 run_migrations 의 맨 끝에서 호출.
+    try:
+        _rename_item_code_to_mes_code()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] item_code → mes_code rename failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
+
+    # 2026-06-02: 수량 컬럼 선언타입 NUMERIC/REAL → INTEGER 정합 (스키마 진실화). 멱등.
+    # 테이블 재생성을 동반하므로 모든 컬럼 rename 이후(맨 끝)에 실행.
+    try:
+        _unify_quantity_columns_to_integer()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] quantity column integer unify failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
+
+    # 2026-06-02: bom.bom_id UUID 포맷 정규화 (hyphen → no-hyphen hex). 멱등.
+    # PostgreSQL UUID dialect 가 no-hyphen hex 로 바인딩해 hyphen 포함 행을 찾지 못함
+    # → BOM 자식 삭제·수정 404 실패 원인. 전체 테이블 조사 결과 bom.bom_id 만 영향.
+    try:
+        _normalize_bom_uuid()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] bom UUID normalize failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
+
+    # 2026-06-02: 제품 모델 "9" 정식 등록 — slot 6 예약행 승격 + 순수 "9-…" 품목 백필.
+    # 아래 생성열 재생성(model_symbol NOT NULL) 보다 반드시 먼저. 멱등.
+    try:
+        _promote_model_9()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] model '9' promote/backfill failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
+
+    # 2026-06-02: items.mes_code → STORED generated 컬럼 + 분해필드 NOT NULL + min_stock CHECK.
+    # 진실소스 단일화(드리프트 원천 차단). 테이블 재생성 동반 → items 재생성기 중 맨 끝에서 실행. 멱등.
+    try:
+        _recreate_items_with_generated_mes_code()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] items generated mes_code recreation failed: {exc}"
         errors.append(msg)
         logger.warning(msg, exc_info=False)
 

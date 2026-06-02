@@ -32,13 +32,11 @@ export function MobileWarehouseScreen({
   onStatusChange,
   preselectedItem,
   onSubmitSuccess,
-  defectDeptFilter,
 }: {
   globalSearch: string;
   onStatusChange: (status: string) => void;
   preselectedItem?: Item | null;
   onSubmitSuccess?: () => void;
-  defectDeptFilter?: string | null;
 }) {
   const { employees, items, productModels, loadFailure, setItems } = useWarehouseData({
     globalSearch,
@@ -143,7 +141,6 @@ export function MobileWarehouseScreen({
             setItems={setItems}
             preselectedItem={preselectedItem}
             restoreDraft={restoreIoDraft}
-            defectDeptFilter={defectDeptFilter}
             onStatusChange={(status) => {
               onStatusChange(status);
               setPanelRefreshNonce((n) => n + 1);

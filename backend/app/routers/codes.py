@@ -9,9 +9,9 @@ from app.database import get_db
 from app.models import ProcessType, ProductSymbol
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
-    ItemCodeGenerateRequest,
-    ItemCodeParseRequest,
-    ItemCodeResponse,
+    MesCodeGenerateRequest,
+    MesCodeParseRequest,
+    MesCodeResponse,
     ProcessTypeResponse,
     ProductSymbolResponse,
     ProductSymbolUpdate,
@@ -88,14 +88,14 @@ def list_process_types(db: Session = Depends(get_db)):
 # ---- 4-part code operations ------------------------------------------------
 
 
-@router.post("/parse", response_model=ItemCodeResponse, summary="3-파트 품목 코드 파싱")
-def parse_code(payload: ItemCodeParseRequest, db: Session = Depends(get_db)):
+@router.post("/parse", response_model=MesCodeResponse, summary="3-파트 품목 코드 파싱")
+def parse_code(payload: MesCodeParseRequest, db: Session = Depends(get_db)):
     try:
-        code = code_svc.parse_item_code(payload.code)
+        code = code_svc.parse_mes_code(payload.code)
         code_svc.validate_code(db, code)
     except ValueError as exc:
         raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, str(exc))
-    return ItemCodeResponse(
+    return MesCodeResponse(
         symbol=code.symbol,
         process_type=code.process_type,
         serial=code.serial,
@@ -107,11 +107,11 @@ def parse_code(payload: ItemCodeParseRequest, db: Session = Depends(get_db)):
 
 @router.post(
     "/generate",
-    response_model=ItemCodeResponse,
+    response_model=MesCodeResponse,
     status_code=status.HTTP_201_CREATED,
     summary="3-파트 품목 코드 자동 생성",
 )
-def generate_code(payload: ItemCodeGenerateRequest, db: Session = Depends(get_db)):
+def generate_code(payload: MesCodeGenerateRequest, db: Session = Depends(get_db)):
     try:
         code = code_svc.generate_code(
             db,
@@ -120,7 +120,7 @@ def generate_code(payload: ItemCodeGenerateRequest, db: Session = Depends(get_db
         )
     except ValueError as exc:
         raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, str(exc))
-    return ItemCodeResponse(
+    return MesCodeResponse(
         symbol=code.symbol,
         process_type=code.process_type,
         serial=code.serial,

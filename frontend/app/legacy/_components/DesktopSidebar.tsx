@@ -3,17 +3,18 @@
 import { useState } from "react";
 import Image from "next/image";
 import type { ElementType } from "react";
-import { BarChart2, Boxes, History, Settings2, Warehouse } from "lucide-react";
+import { AlertTriangle, BarChart2, Boxes, History, Settings2, Warehouse } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ThemeToggle } from "./ThemeToggle";
 
-export type DesktopTabId = "dashboard" | "warehouse" | "history" | "weekly" | "admin";
+export type DesktopTabId = "dashboard" | "warehouse" | "defect" | "history" | "weekly" | "admin";
 
 type TabDef = { id: DesktopTabId; label: string; subtitle: string; icon: ElementType };
 
 const MAIN_TABS: TabDef[] = [
   { id: "dashboard", label: "대시보드", subtitle: "현황과 안전재고 확인", icon: Boxes },
   { id: "warehouse", label: "입출고", subtitle: "입고와 출고 작업 처리", icon: Warehouse },
+  { id: "defect", label: "불량", subtitle: "격리·폐기·반품 처리", icon: AlertTriangle },
   { id: "history", label: "입출고 내역", subtitle: "입출고 이력 조회", icon: History },
   { id: "weekly", label: "주간보고", subtitle: "생산·재고 흐름", icon: BarChart2 },
 ];

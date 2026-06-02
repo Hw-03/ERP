@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   BarChart2,
   Boxes,
   History as HistoryIcon,
@@ -13,6 +14,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import {
   MobileDashboardScreen,
   MobileWarehouseScreen,
+  MobileDefectScreen,
   MobileHistoryScreen,
   MobileWeeklyScreen,
   MobileAdminScreen,
@@ -25,11 +27,12 @@ import { useCurrentOperator } from "../login/useCurrentOperator";
 import { canEnterIO } from "../_warehouse_steps";
 import { MobileUserMenuSheet } from "./MobileUserMenuSheet";
 
-export type MobileTabId = "dashboard" | "warehouse" | "history" | "weekly" | "admin";
+export type MobileTabId = "dashboard" | "warehouse" | "defect" | "history" | "weekly" | "admin";
 
 const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
   dashboard: { label: "대시보드", icon: Boxes },
   warehouse: { label: "입출고", icon: Warehouse },
+  defect: { label: "불량", icon: AlertTriangle },
   history: { label: "내역", icon: HistoryIcon },
   weekly: { label: "주간보고", icon: BarChart2 },
   admin: { label: "관리", icon: Settings2 },
@@ -57,7 +60,7 @@ export function MobileShell() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const t = params.get("tab");
-    const valid: MobileTabId[] = ["dashboard", "warehouse", "history", "weekly", "admin"];
+    const valid: MobileTabId[] = ["dashboard", "warehouse", "defect", "history", "weekly", "admin"];
     if (t && (valid as string[]).includes(t)) setActiveTab(t as MobileTabId);
     const d = params.get("defect_dept");
     if (d) setDefectDeptFilter(d);
@@ -114,10 +117,10 @@ export function MobileShell() {
   }, [loadCapacity]);
 
   const visibleTabs = useMemo(() => {
-    const allTabs: MobileTabId[] = ["dashboard", "warehouse", "history", "weekly", "admin"];
+    const allTabs: MobileTabId[] = ["dashboard", "warehouse", "defect", "history", "weekly", "admin"];
     if (!operator) return allTabs;
     return allTabs.filter((tab) => {
-      if (tab === "warehouse") return canEnterIO(operator);
+      if (tab === "warehouse" || tab === "defect") return canEnterIO(operator);
       return true;
     });
   }, [operator]);
@@ -146,9 +149,11 @@ export function MobileShell() {
           onStatusChange={handleStatusChange}
           preselectedItem={warehousePreselected}
           onSubmitSuccess={loadCapacity}
-          defectDeptFilter={defectDeptFilter}
         />
       );
+    }
+    if (activeTab === "defect") {
+      return <MobileDefectScreen key={key} defectDeptFilter={defectDeptFilter} />;
     }
     if (activeTab === "history") {
       return <MobileHistoryScreen key={key} />;

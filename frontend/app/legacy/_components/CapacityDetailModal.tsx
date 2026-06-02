@@ -429,12 +429,12 @@ export function CapacityDetailModal({
                               >
                                 {item.item_name}
                               </div>
-                              {item.item_code && (
+                              {item.mes_code && (
                                 <div
                                   className="truncate text-xs"
                                   style={{ color: LEGACY_COLORS.muted2 }}
                                 >
-                                  {item.item_code}
+                                  {item.mes_code}
                                 </div>
                               )}
                               {item.limiting_item && (
@@ -551,7 +551,7 @@ function BomChildren({ bom }: { bom: ProductionCheckResponse }) {
       </div>
       {bom.components.map((c, i) => (
         <div
-          key={`${c.item_code ?? c.item_name}-${i}`}
+          key={`${c.mes_code ?? c.item_name}-${i}`}
           className="grid grid-cols-[1fr_70px_70px_70px_28px] items-center gap-2 rounded-[8px] px-2 py-1.5"
           style={{
             background: c.ok
@@ -566,12 +566,12 @@ function BomChildren({ bom }: { bom: ProductionCheckResponse }) {
             >
               {c.item_name}
             </div>
-            {c.item_code && (
+            {c.mes_code && (
               <div
                 className="truncate text-[10px]"
                 style={{ color: LEGACY_COLORS.muted2 }}
               >
-                {c.item_code}
+                {c.mes_code}
               </div>
             )}
           </div>

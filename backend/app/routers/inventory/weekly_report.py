@@ -136,7 +136,7 @@ def get_weekly_report(
         db.query(Item, Inventory)
         .outerjoin(Inventory, Item.item_id == Inventory.item_id)
         .filter(Item.process_type_code.in_(_F_CODES))
-        .order_by(Item.item_code)
+        .order_by(Item.mes_code)
         .all()
     )
 
@@ -213,7 +213,7 @@ def get_weekly_report(
         group_items[code].append(
             WeeklyItemReport(
                 item_id=str(item.item_id),
-                item_code=item.item_code,
+                mes_code=item.mes_code,
                 item_name=item.item_name,
                 prev_qty=prev_qty,
                 in_qty=in_qty,

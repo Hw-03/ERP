@@ -59,7 +59,7 @@ def list_inventory(
     if process_type_code:
         q = q.filter(Item.process_type_code == process_type_code)
 
-    rows = q.order_by(Item.item_code).offset(skip).limit(limit).all()
+    rows = q.order_by(Item.mes_code).offset(skip).limit(limit).all()
     return to_response_bulk(db, rows)
 
 

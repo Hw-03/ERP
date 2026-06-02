@@ -244,9 +244,9 @@ def test_summary_process_step_filter(client, db_session, make_item):
 
 
 def test_summary_model_filter(client, db_session, make_item):
-    """model = product_symbols.model_name IN 필터 — Item.item_code prefix 기반.
+    """model = product_symbols.model_name IN 필터 — Item.mes_code prefix 기반.
 
-    회사 규약: item_code 의 첫 '-' 앞 글자열 각 글자 = ProductSymbol.symbol.
+    회사 규약: mes_code 의 첫 '-' 앞 글자열 각 글자 = ProductSymbol.symbol.
     DX3000(symbol='A') 매칭은 "A-…" 또는 prefix 중 어느 자리든 'A' 포함이면 OK.
     같은 품목이 prefix 안에 여러 symbol("AB-…") 가져도 거래 카운트는 1건이어야 함.
     """
@@ -255,12 +255,12 @@ def test_summary_model_filter(client, db_session, make_item):
     a = make_item(
         name="DX3000부품",
         warehouse_qty=Decimal("0"),
-        item_code="AB-AR-9001",  # prefix "AB" = DX3000 + DX1000 (공용)
+        model_symbol="AB", process_type_code="AR", serial_no=9001,  # 생성열 → "AB-AR-9001" (DX3000+DX1000 공용)
     )
     b = make_item(
         name="무관품",
         warehouse_qty=Decimal("0"),
-        item_code="C-AR-9002",  # 다른 symbol, 매칭 안 됨
+        model_symbol="C", process_type_code="AR", serial_no=9002,  # 생성열 → "C-AR-9002" (매칭 안 됨)
     )
     db_session.flush()
     _seed_log(db_session, a, TransactionTypeEnum.RECEIVE, Decimal("1"))

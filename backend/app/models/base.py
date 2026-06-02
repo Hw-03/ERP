@@ -5,8 +5,9 @@
 """
 
 import enum
+import uuid as _uuid
 
-from sqlalchemy import String
+from sqlalchemy import Integer, String
 from sqlalchemy.types import TypeDecorator
 
 from app.database import Base  # noqa: F401 — re-export
@@ -14,6 +15,8 @@ from app.database import Base  # noqa: F401 — re-export
 __all__ = [
     "Base",
     "BoolAsString",
+    "IntQuantity",
+    "UUIDString",
     "DepartmentEnum",
     "DeptAdjSubTypeEnum",
 ]
@@ -45,6 +48,51 @@ class BoolAsString(TypeDecorator):
         if isinstance(value, bool):
             return value
         return str(value).lower() in ("true", "1", "yes", "t")
+
+
+class IntQuantity(TypeDecorator):
+    """수량 전용 정수 타입 — 바인딩 시 Decimal/float/str 입력을 int 로 강제.
+
+    전 품목 EA 단위라 수량엔 소수가 없다(소수 입력은 schemas 의 int 가 422 로 거부).
+    서비스가 계산 편의로 Decimal 을 넘겨도 DB 에는 정수만 저장되도록 경계에서 강제한다.
+    """
+
+    impl = Integer
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        return int(value)
+
+
+class UUIDString(TypeDecorator):
+    """UUID 저장 타입 — SQLite에서 no-hyphen hex(32자)로 일관 저장·조회.
+
+    PostgreSQL UUID dialect 는 write 시 no-hyphen hex 변환, read 시 raw 문자열 반환.
+    이 타입은 양방향 정규화: 어떤 경로로 삽입되든 read 시 uuid.UUID 객체로 반환하며,
+    write 시 hyphen 포함 문자열도 no-hyphen hex 로 강제해 포맷 혼재를 원천 차단.
+    """
+
+    impl = String(32)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, _uuid.UUID):
+            return value.hex
+        return str(value).replace("-", "")
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, _uuid.UUID):
+            return value
+        try:
+            return _uuid.UUID(str(value))
+        except (ValueError, AttributeError):
+            return value
 
 
 class DepartmentEnum(str, enum.Enum):

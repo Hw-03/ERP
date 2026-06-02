@@ -35,7 +35,7 @@ export function useAdminMasterItemsList({
     const keyword = `${globalSearch} ${itemSearch}`.trim().toLowerCase();
     if (!keyword) return items;
     return items.filter((item) =>
-      `${item.item_name} ${item.item_code}`.toLowerCase().includes(keyword),
+      `${item.item_name} ${item.mes_code}`.toLowerCase().includes(keyword),
     );
   }, [globalSearch, itemSearch, items]);
 

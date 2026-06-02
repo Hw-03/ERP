@@ -64,7 +64,7 @@ describe("useAdminMasterItemsCommands", () => {
     createMutateAsync.mockResolvedValue({
       item_id: "100",
       item_name: "신규",
-      item_code: "N-001",
+      mes_code: "N-001",
     });
     const args = baseArgs();
     const { result } = renderHook(() => useAdminMasterItemsCommands(args), { wrapper });

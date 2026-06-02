@@ -17,14 +17,7 @@ import { DefectDepartmentList } from "./DefectDepartmentList";
 import { RDefectActionModal } from "./RDefectActionModal";
 import { PaPfDefectWizard } from "./PaPfDefectWizard";
 import { AddQuarantineModal } from "./AddQuarantineModal";
-
-/** item_code 2번째 segment 가 process_type. PA/PF 면 BOM 분해 가능. */
-function isPaPfItem(itemCode: string | null | undefined): boolean {
-  if (!itemCode) return false;
-  const parts = itemCode.split("-");
-  if (parts.length < 2) return false;
-  return parts[1] === "PA" || parts[1] === "PF";
-}
+import { AddRDirectModal } from "./AddRDirectModal";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const PRODUCTION_LINES = new Set(["튜브", "고압", "진공", "튜닝", "조립", "출하"]);
@@ -59,6 +52,7 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
   const [processingLocation, setProcessingLocation] = useState<DefectLocation | null>(null);
   const [addQuarantineOpen, setAddQuarantineOpen] = useState(false);
+  const [rDirectMode, setRDirectMode] = useState<"scrap" | "return" | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
 
   // 마운트 시 KPI + 목록 동시 로드 (처리 완료 후 reloadNonce 증가 시 재로드)
@@ -138,12 +132,16 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
     setAddQuarantineOpen(false);
     setReloadNonce((n) => n + 1);
   }
-  // R 바로 반품/폐기 — 별도 PR (백엔드 정상→폐기 흐름 + 인터뷰 우선순위 확인 후)
+  // R 바로 반품/폐기 — 정상 재고에서 격리 없이 즉시 처리.
   function handleAddRReturn() {
-    console.log("[DefectHub] R 바로 반품 — 별도 PR 에서 구현 예정");
+    setRDirectMode("return");
   }
   function handleAddRScrap() {
-    console.log("[DefectHub] R 바로 폐기 — 별도 PR 에서 구현 예정");
+    setRDirectMode("scrap");
+  }
+  function handleRDirectSubmitted() {
+    setRDirectMode(null);
+    setReloadNonce((n) => n + 1);
   }
 
   function handleKpiCardClick(kind: DefectKpiKind) {
@@ -220,7 +218,7 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
       )}
 
       {/* 처리 모달 — 품목 종류(R / PA·PF)에 따라 분기 */}
-      {processingLocation && isPaPfItem(processingLocation.item_code) ? (
+      {processingLocation && processingLocation.has_bom ? (
         <PaPfDefectWizard
           open
           onClose={() => setProcessingLocation(null)}
@@ -244,6 +242,15 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
         onClose={() => setAddQuarantineOpen(false)}
         currentEmployee={currentEmployee}
         onSubmitted={handleAddQuarantineSubmitted}
+      />
+
+      {/* R 바로 폐기/반품 모달 */}
+      <AddRDirectModal
+        open={rDirectMode !== null}
+        mode={rDirectMode ?? "scrap"}
+        onClose={() => setRDirectMode(null)}
+        currentEmployee={currentEmployee}
+        onSubmitted={handleRDirectSubmitted}
       />
     </div>
   );

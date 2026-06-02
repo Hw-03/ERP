@@ -8,7 +8,7 @@ import type { TransactionType } from "./shared";
 export interface TransactionLog {
   log_id: string;
   item_id: string;
-  item_code: string | null;
+  mes_code: string | null;
   item_name: string;
   item_process_type_code: string | null;
   item_unit: string;
@@ -43,7 +43,7 @@ export interface TransactionEditLog {
 }
 
 export interface ProductionCheckComponent {
-  item_code: string | null;
+  mes_code: string | null;
   item_name: string;
   process_type_code: string | null;
   unit: string;
@@ -70,7 +70,7 @@ export type ProductionCapacityStatus =
 export interface ProductionCapacityItem {
   item_id: string;
   item_name: string;
-  item_code: string | null;
+  mes_code: string | null;
   /** 모델 식별자(items.model_symbol). 그룹화·대표 PF 선정 기준. */
   model_symbol?: string | null;
   /** 해당 모델의 대표 PF 여부. */
@@ -94,7 +94,7 @@ export interface ProductionCapacity {
 
 export interface BackflushDetail {
   item_id: string;
-  item_code: string | null;
+  mes_code: string | null;
   item_name: string;
   process_type_code: string | null;
   required_quantity: number;

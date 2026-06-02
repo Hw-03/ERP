@@ -1,5 +1,4 @@
 import {
-  AlertTriangle,
   ArrowLeftRight,
   Boxes,
   RefreshCcw,
@@ -25,7 +24,8 @@ export const IO_WORK_TYPES: Array<{
   { id: "receive", label: WORK_TYPE_LABEL.receive, description: WORK_TYPE_DESCRIPTION.receive, icon: Boxes },
   { id: "warehouse_io", label: WORK_TYPE_LABEL.warehouse_io, description: WORK_TYPE_DESCRIPTION.warehouse_io, icon: ArrowLeftRight },
   { id: "process", label: WORK_TYPE_LABEL.process, description: WORK_TYPE_DESCRIPTION.process, icon: Wrench },
-  { id: "defect", label: WORK_TYPE_LABEL.defect, description: WORK_TYPE_DESCRIPTION.defect, icon: AlertTriangle },
+  // 불량(defect) 워크타입은 별도 최상위 "불량" 탭으로 분리됨 — 입출고 메뉴에서 제외.
+  // (IoWorkType 유니온과 glossary/helper 의 defect 분기는 입출고 내역·타입 보존 위해 그대로 둔다.)
 ];
 
 export function canSeeWorkType(

@@ -18,9 +18,7 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
-
-from app.models.base import Base, BoolAsString
+from app.models.base import Base, BoolAsString, UUIDString
 
 __all__ = [
     "EmployeeLevelEnum",
@@ -50,7 +48,7 @@ class Department(Base):
 class Employee(Base):
     __tablename__ = "employees"
 
-    employee_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    employee_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
     employee_code = Column(String(30), unique=True, nullable=False, index=True)
     name = Column(String(100), nullable=False, index=True)
     role = Column(String(100), nullable=False)
@@ -105,7 +103,7 @@ class EmployeeAssignedModel(Base):
     __tablename__ = "employee_assigned_models"
 
     employee_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("employees.employee_id", ondelete="CASCADE"),
         primary_key=True,
     )

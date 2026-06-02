@@ -22,10 +22,10 @@ def main() -> None:
     # 대표 PF 목록 (모델별 자연 정렬 첫 PF)
     rows = cur.execute(
         """
-        SELECT item_id, item_code, item_name, model_symbol
+        SELECT item_id, mes_code, item_name, model_symbol
         FROM items
         WHERE process_type_code='PF' AND model_symbol IS NOT NULL
-        ORDER BY model_symbol, COALESCE(item_code, item_name)
+        ORDER BY model_symbol, COALESCE(mes_code, item_name)
         """
     ).fetchall()
     rep_by_model: dict[str, tuple] = {}
@@ -64,7 +64,7 @@ def analyze_tree(cur, root_id: str, stage_by_code: dict[str, int]) -> None:
             max_depth = max(max_depth, depth)
 
             row = cur.execute(
-                "SELECT i.item_code, i.item_name, i.process_type_code, "
+                "SELECT i.mes_code, i.item_name, i.process_type_code, "
                 "       COALESCE(inv.warehouse_qty,0)+COALESCE(inv.pending_quantity,0) "
                 "FROM items i LEFT JOIN inventory inv ON inv.item_id=i.item_id "
                 "WHERE i.item_id=?",

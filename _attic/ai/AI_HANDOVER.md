@@ -1,6 +1,9 @@
 # AI Handover
 
-이 문서는 Claude/Codex가 같은 MES 프로젝트를 이어서 작업할 때 보는 최신 인수인계 문서다.
+> **[STALE — 2026-05-03~08 스냅샷]** 과거 시점 기록이다. 현재 진실은 코드/DB 와 `_attic/docs/CONTEXT.md`·`GLOSSARY.md`,
+> 수치는 `python _attic/backend-scripts/facts.py`. 아래 루트 구조(`docs/`·`data/`·`outputs/`·`erp.db`·`queue.py`)·경로는 현재와 다름 — 참고용으로만.
+
+이 문서는 과거(2026-05) Claude/Codex 작업 인수인계 기록이다.
 
 ## 2026-05-08 — 루트 정리 (참조 변경)
 
@@ -21,10 +24,10 @@
 ## 현재 상태 (2026-05-03 Round-17 update)
 
 - 프로젝트: DEXCOWIN 재고 관리 MES (경량 MES 프로토타입)
-- 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/erp.db`)
+- 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/mes.db`)
 - 프론트엔드: Next.js 14 + Tailwind CSS
 - 주 화면: `/legacy` (대시보드 / 입출고 / 입출고 내역 / 관리자)
-- 기준 데이터: 통합 품목 971건
+- 기준 데이터: 품목 수는 `python _attic/backend-scripts/facts.py` 로 확인 (문서에 박지 않음)
 - 현재 브랜치: `main`
 - 외부 객관 평가: 11 카테고리 평균 87.5 → ~95 추정 (Round-13 ~ Round-17 누적)
 

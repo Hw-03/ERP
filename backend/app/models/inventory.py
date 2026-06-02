@@ -3,7 +3,6 @@
 import enum
 import uuid
 from datetime import datetime
-from decimal import Decimal
 
 from sqlalchemy import (
     CheckConstraint,
@@ -12,15 +11,14 @@ from sqlalchemy import (
     Enum as SAEnum,
     ForeignKey,
     Index,
-    Numeric,
+    Integer,
     String,
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import Base
+from app.models.base import Base, IntQuantity, UUIDString
 
 __all__ = [
     "LocationStatusEnum",
@@ -37,22 +35,22 @@ class LocationStatusEnum(str, enum.Enum):
 class Inventory(Base):
     __tablename__ = "inventory"
 
-    inventory_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    inventory_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
     item_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("items.item_id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
         index=True,
     )
     # quantity = warehouse_qty + Σ(InventoryLocation.quantity). 서비스 레이어가 동기화 보장.
-    quantity = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
+    quantity = Column(IntQuantity, nullable=False, default=0)
     # 창고 보관량. 가용 재고 계산에 포함.
-    warehouse_qty = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
+    warehouse_qty = Column(IntQuantity, nullable=False, default=0)
     # 큐 배치 예약분 (warehouse_qty 대비). Available = warehouse + production_total − pending.
-    pending_quantity = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
+    pending_quantity = Column(IntQuantity, nullable=False, default=0)
     last_reserver_employee_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("employees.employee_id", ondelete="SET NULL"),
         nullable=True,
     )
@@ -86,9 +84,9 @@ class InventoryLocation(Base):
     Inventory와는 item_id로 매칭되며 직접 쿼리로 접근한다 (관계 매핑 없음)."""
     __tablename__ = "inventory_locations"
 
-    location_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    location_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
     item_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("items.item_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -99,7 +97,7 @@ class InventoryLocation(Base):
         nullable=False,
         index=True,
     )
-    quantity = Column(Numeric(15, 4), nullable=False, default=Decimal("0"))
+    quantity = Column(IntQuantity, nullable=False, default=0)
     updated_at = Column(
         DateTime,
         nullable=False,

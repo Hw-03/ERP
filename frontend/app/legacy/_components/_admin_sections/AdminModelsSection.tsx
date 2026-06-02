@@ -544,7 +544,7 @@ function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEdit
                   {it.item_name}
                 </div>
                 <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {it.item_code ?? "—"}
+                  {it.mes_code ?? "—"}
                 </span>
               </div>
             ))}

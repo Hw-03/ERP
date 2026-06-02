@@ -6,13 +6,11 @@ export type AdjDirection = "in" | "out" | "defective" | "scrap";
 export interface AdjLineTemplate {
   item_id: string;
   item_name: string;
-  item_code: string | null;
+  mes_code: string | null;
   process_type_code: string | null;
   unit: string;
   direction: AdjDirection;
-  /** 백엔드 Decimal 원본은 string("2.00"). deptAdjustmentApi 의 normalizeAdjLine 이 number 로 정규화. */
   quantity: number;
-  /** 동일 — number 로 정규화됨. null 가능. */
   bom_expected: number | null;
   has_children: boolean;
   department: Department;

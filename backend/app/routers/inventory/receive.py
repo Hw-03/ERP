@@ -15,6 +15,7 @@ from app.services import inventory as inventory_svc
 from app.services._tx import commit_and_refresh
 
 from ._shared import to_response
+from ._tx_helper import resolve_producer
 
 
 router = APIRouter()
@@ -26,6 +27,7 @@ def receive_inventory(payload: InventoryReceive, db: Session = Depends(get_db)):
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
+    producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
     inventory = inventory_svc.get_or_create_inventory(db, payload.item_id)
     qty_before = inventory.quantity or Decimal("0")
     inventory_svc.receive_confirmed(db, payload.item_id, payload.quantity, bucket="warehouse")
@@ -40,7 +42,8 @@ def receive_inventory(payload: InventoryReceive, db: Session = Depends(get_db)):
             quantity_before=qty_before,
             quantity_after=inventory.quantity,
             reference_no=payload.reference_no,
-            produced_by=payload.produced_by,
+            produced_by=producer_name or payload.produced_by,
+            producer_employee_id=producer_id,
             notes=payload.notes,
         )
     )
@@ -58,6 +61,7 @@ def adjust_inventory(payload: InventoryAdjust, db: Session = Depends(get_db)):
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
+    producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
     try:
         inventory, qty_before, delta = inventory_svc.adjust_warehouse(
             db, payload.item_id, payload.quantity, location=payload.location
@@ -73,7 +77,8 @@ def adjust_inventory(payload: InventoryAdjust, db: Session = Depends(get_db)):
             quantity_before=qty_before,
             quantity_after=inventory.quantity,
             reference_no=payload.reference_no,
-            produced_by=payload.produced_by,
+            produced_by=producer_name or payload.produced_by,
+            producer_employee_id=producer_id,
             notes=payload.reason,
         )
     )

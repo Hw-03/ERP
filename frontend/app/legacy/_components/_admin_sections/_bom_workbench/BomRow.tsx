@@ -54,7 +54,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
   }
 
   const childName = childItem?.item_name ?? "(삭제된 품목)";
-  const itemCode = childItem?.item_code ?? "";
+  const mesCode = childItem?.mes_code ?? "";
   const unit = row.unit || childItem?.unit || "EA";
 
   return (
@@ -70,9 +70,9 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
         <TruncatedText className="truncate text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
           {childName}
         </TruncatedText>
-        {itemCode && (
+        {mesCode && (
           <TruncatedText className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            {itemCode}
+            {mesCode}
           </TruncatedText>
         )}
       </div>

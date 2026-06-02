@@ -1,7 +1,6 @@
 """Pydantic schemas for the DEXCOWIN MES API."""
 
 from datetime import datetime, timezone
-from decimal import Decimal
 from typing import Annotated, List, Literal, Optional
 import uuid
 
@@ -38,8 +37,8 @@ class ItemCreate(BaseModel):
     legacy_part: Optional[str] = Field(None, max_length=50)
     legacy_item_type: Optional[str] = Field(None, max_length=50)
     supplier: Optional[str] = Field(None, max_length=200)
-    min_stock: Optional[Decimal] = None
-    initial_quantity: Optional[Decimal] = Field(None, description="초기 재고 수량 (기본 0)")
+    min_stock: Optional[int] = None
+    initial_quantity: Optional[int] = Field(None, description="초기 재고 수량 (기본 0)")
     model_slots: List[int] = Field(default=[], description="사용 제품 슬롯 목록 (1=DX3000, 2=COCOON, 3=SOLO, 4=ADX4000W, 5=ADX6000)")
 
 
@@ -50,8 +49,8 @@ class ItemUpdate(BaseModel):
     legacy_part: Optional[str] = Field(None, max_length=50)
     legacy_item_type: Optional[str] = Field(None, max_length=50)
     supplier: Optional[str] = Field(None, max_length=200)
-    min_stock: Optional[Decimal] = None
-    item_code: Optional[str] = Field(None, max_length=40)
+    min_stock: Optional[int] = None
+    mes_code: Optional[str] = Field(None, max_length=40)
     model_slots: Optional[List[int]] = None
 
 
@@ -64,9 +63,9 @@ class ItemResponse(BaseModel):
     legacy_part: Optional[str] = None
     legacy_item_type: Optional[str] = None
     supplier: Optional[str] = None
-    min_stock: Optional[Decimal] = None
+    min_stock: Optional[int] = None
     # item code fields
-    item_code: Optional[str] = None
+    mes_code: Optional[str] = None
     model_symbol: Optional[str] = None
     model_slots: List[int] = []
     process_type_code: Optional[str] = None
@@ -81,16 +80,16 @@ class InventoryLocationResponse(BaseModel):
     """부서×상태(생산/불량) 단위 재고 분포."""
     department: str
     status: LocationStatusEnum
-    quantity: Decimal
+    quantity: int
 
 
 class ItemWithInventory(ItemResponse):
-    quantity: Optional[Decimal] = Decimal("0")
-    warehouse_qty: Decimal = Decimal("0")
-    production_total: Decimal = Decimal("0")
-    defective_total: Decimal = Decimal("0")
-    pending_quantity: Decimal = Decimal("0")
-    available_quantity: Decimal = Decimal("0")
+    quantity: Optional[int] = 0
+    warehouse_qty: int = 0
+    production_total: int = 0
+    defective_total: int = 0
+    pending_quantity: int = 0
+    available_quantity: int = 0
     last_reserver_name: Optional[str] = None
     location: Optional[str] = None
     locations: List[InventoryLocationResponse] = []
@@ -197,20 +196,22 @@ class IntegrityCheckBody(BaseModel):
 
 class InventoryReceive(BaseModel):
     item_id: uuid.UUID = Field(..., description="입고 대상 품목 ID")
-    quantity: Decimal = Field(..., gt=0, description="입고 수량")
+    quantity: int = Field(..., gt=0, description="입고 수량")
     location: Optional[str] = Field(None, max_length=100, description="보관 위치")
     reference_no: Optional[str] = Field(None, max_length=100, description="참조 번호")
     produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
+    producer_employee_code: Optional[str] = Field(None, max_length=30, description="처리자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정")
     notes: Optional[str] = Field(None, description="비고")
 
 
 class InventoryAdjust(BaseModel):
     item_id: uuid.UUID = Field(..., description="재고 조정 대상 품목 ID")
-    quantity: Decimal = Field(..., ge=0, description="조정 후 최종 수량")
+    quantity: int = Field(..., ge=0, description="조정 후 최종 수량")
     reason: str = Field(..., min_length=1, description="조정 사유")
     location: Optional[str] = Field(None, max_length=100, description="보관 위치")
     reference_no: Optional[str] = Field(None, max_length=100, description="참조 번호")
     produced_by: Optional[str] = Field(None, max_length=100, description="처리자")
+    producer_employee_code: Optional[str] = Field(None, max_length=30, description="처리자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정")
 
 
 class InventoryResponse(BaseModel):
@@ -218,12 +219,12 @@ class InventoryResponse(BaseModel):
 
     inventory_id: uuid.UUID
     item_id: uuid.UUID
-    quantity: Decimal                              # 총합 (= warehouse + production_total + defective_total)
-    warehouse_qty: Decimal = Decimal("0")
-    production_total: Decimal = Decimal("0")
-    defective_total: Decimal = Decimal("0")
-    pending_quantity: Decimal = Decimal("0")
-    available_quantity: Decimal = Decimal("0")     # warehouse + production - pending (defective 제외)
+    quantity: int                              # 총합 (= warehouse + production_total + defective_total)
+    warehouse_qty: int = 0
+    production_total: int = 0
+    defective_total: int = 0
+    pending_quantity: int = 0
+    available_quantity: int = 0     # warehouse + production - pending (defective 제외)
     last_reserver_name: Optional[str] = None
     location: Optional[str]
     updated_at: UtcDatetime
@@ -233,22 +234,24 @@ class InventoryResponse(BaseModel):
 class TransferRequest(BaseModel):
     """창고↔부서 이동 (transfer-to-production / transfer-to-warehouse 공용)."""
     item_id: uuid.UUID
-    quantity: Decimal = Field(..., gt=0)
+    quantity: int = Field(..., gt=0)
     department: str
     notes: Optional[str] = Field(None, description="비고")
     reference_no: Optional[str] = Field(None, max_length=100)
     produced_by: Optional[str] = Field(None, max_length=100)
+    producer_employee_code: Optional[str] = Field(None, max_length=30, description="처리자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정")
 
 
 class DeptTransferRequest(BaseModel):
     """부서간 이동."""
     item_id: uuid.UUID
-    quantity: Decimal = Field(..., gt=0)
+    quantity: int = Field(..., gt=0)
     from_department: str
     to_department: str
     notes: Optional[str] = None
     reference_no: Optional[str] = Field(None, max_length=100)
     produced_by: Optional[str] = Field(None, max_length=100)
+    producer_employee_code: Optional[str] = Field(None, max_length=30, description="처리자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정")
 
 
 class MarkDefectiveRequest(BaseModel):
@@ -259,7 +262,7 @@ class MarkDefectiveRequest(BaseModel):
     target_department: 격리될 부서
     """
     item_id: uuid.UUID
-    quantity: Decimal = Field(..., gt=0)
+    quantity: int = Field(..., gt=0)
     source: str = Field(..., description="warehouse | production")
     source_department: Optional[str] = None
     target_department: str
@@ -270,39 +273,40 @@ class MarkDefectiveRequest(BaseModel):
 class SupplierReturnRequest(BaseModel):
     """공급업체 반품: 부서별 DEFECTIVE 차감."""
     item_id: uuid.UUID
-    quantity: Decimal = Field(..., gt=0)
+    quantity: int = Field(..., gt=0)
     from_department: str
     reference_no: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
     operator: Optional[str] = Field(None, max_length=100)
+    producer_employee_code: Optional[str] = Field(None, max_length=30, description="처리자 사번 — 제공 시 직원 DB 조회·검증 후 operator(produced_by) 자동 설정")
 
 
 class ProcessTypeSummary(BaseModel):
     process_type_code: str
     label: str
     item_count: int
-    total_quantity: Decimal
-    warehouse_qty_sum: Decimal = Decimal("0")
-    production_qty_sum: Decimal = Decimal("0")
-    defective_qty_sum: Decimal = Decimal("0")
+    total_quantity: int
+    warehouse_qty_sum: int = 0
+    production_qty_sum: int = 0
+    defective_qty_sum: int = 0
 
 
 class InventorySummaryResponse(BaseModel):
     process_types: List[ProcessTypeSummary]
     total_items: int
-    total_quantity: Decimal
+    total_quantity: int
 
 
 class BOMCreate(BaseModel):
     parent_item_id: uuid.UUID = Field(..., description="상위 품목 ID")
     child_item_id: uuid.UUID = Field(..., description="하위 품목 ID")
-    quantity: Decimal = Field(..., gt=0, description="필요 수량")
+    quantity: int = Field(..., gt=0, description="필요 수량")
     unit: str = Field("EA", max_length=20, description="수량 단위")
     notes: Optional[str] = Field(None, description="비고")
 
 
 class BOMUpdate(BaseModel):
-    quantity: Optional[Decimal] = Field(None, gt=0)
+    quantity: Optional[int] = Field(None, gt=0)
     unit: Optional[str] = Field(None, max_length=20)
 
 
@@ -326,7 +330,7 @@ class BOMResponse(BaseModel):
     bom_id: uuid.UUID
     parent_item_id: uuid.UUID
     child_item_id: uuid.UUID
-    quantity: Decimal
+    quantity: int
     unit: str
     notes: Optional[str]
 
@@ -335,22 +339,22 @@ class BOMDetailResponse(BaseModel):
     bom_id: uuid.UUID
     parent_item_id: uuid.UUID
     parent_item_name: str
-    parent_item_code: Optional[str]
+    parent_mes_code: Optional[str]
     child_item_id: uuid.UUID
     child_item_name: str
-    child_item_code: Optional[str]
-    quantity: Decimal
+    child_mes_code: Optional[str]
+    quantity: int
     unit: str
 
 
 class BOMTreeNode(BaseModel):
     item_id: uuid.UUID
-    item_code: Optional[str] = None
+    mes_code: Optional[str] = None
     item_name: str
     process_type_code: Optional[str] = None
     unit: str
-    required_quantity: Decimal
-    current_stock: Decimal = Decimal("0")
+    required_quantity: int
+    current_stock: int = 0
     children: List["BOMTreeNode"] = []
 
 
@@ -359,20 +363,21 @@ BOMTreeNode.model_rebuild()
 
 class ProductionReceiptRequest(BaseModel):
     item_id: uuid.UUID = Field(..., description="생산 입고 대상 품목 ID")
-    quantity: Decimal = Field(..., gt=0, description="생산 수량")
+    quantity: int = Field(..., gt=0, description="생산 수량")
     reference_no: Optional[str] = Field(None, max_length=100, description="참조 번호")
     produced_by: Optional[str] = Field(None, max_length=100, description="작업자")
+    producer_employee_code: Optional[str] = Field(None, max_length=30, description="작업자 사번 — 제공 시 직원 DB 조회·검증 후 produced_by 자동 설정")
     notes: Optional[str] = Field(None, description="비고")
 
 
 class BackflushDetail(BaseModel):
     item_id: uuid.UUID
-    item_code: Optional[str] = None
+    mes_code: Optional[str] = None
     item_name: str
     process_type_code: Optional[str] = None
-    required_quantity: Decimal
-    stock_before: Decimal
-    stock_after: Decimal
+    required_quantity: int
+    stock_before: int
+    stock_after: int
 
 
 class ProductionReceiptResponse(BaseModel):
@@ -380,7 +385,7 @@ class ProductionReceiptResponse(BaseModel):
     message: str
     produced_item_id: uuid.UUID
     produced_item_name: str
-    produced_quantity: Decimal
+    produced_quantity: int
     reference_no: Optional[str]
     backflushed_components: List[BackflushDetail]
     transaction_ids: List[uuid.UUID]
@@ -405,7 +410,7 @@ class TransactionMetaEditRequest(BaseModel):
 class TransactionQuantityCorrectionRequest(BaseModel):
     """RECEIVE/SHIP 수량 보정 요청. SHIP은 quantity_change가 음수여야 함."""
 
-    quantity_change: Decimal = Field(..., description="RECEIVE: 양수, SHIP: 음수")
+    quantity_change: int = Field(..., description="RECEIVE: 양수, SHIP: 음수")
     reason: str = Field(..., min_length=1)
     edited_by_employee_id: uuid.UUID
     edited_by_pin: str = Field(..., min_length=1, max_length=20)
@@ -430,17 +435,18 @@ class TransactionLogResponse(BaseModel):
 
     log_id: uuid.UUID
     item_id: uuid.UUID
-    item_code: Optional[str] = None
+    mes_code: Optional[str] = None
     item_name: str
     item_process_type_code: Optional[str] = None
     item_unit: str
     transaction_type: TransactionTypeEnum
-    quantity_change: Decimal
-    quantity_before: Optional[Decimal]
-    quantity_after: Optional[Decimal]
-    transfer_qty: Optional[Decimal] = None
+    quantity_change: int
+    quantity_before: Optional[int]
+    quantity_after: Optional[int]
+    transfer_qty: Optional[int] = None
     reference_no: Optional[str]
     produced_by: Optional[str]
+    producer_employee_id: Optional[uuid.UUID] = None
     requester_name: Optional[str] = None
     # 승인자(요청을 수락한 사람). 직접 처리 시 = 요청자.
     approver_name: Optional[str] = None
@@ -498,13 +504,13 @@ class ProductSymbolUpdate(BaseModel):
 
 class WeeklyItemReport(BaseModel):
     item_id: str
-    item_code: Optional[str]
+    mes_code: Optional[str]
     item_name: str
-    prev_qty: Decimal
-    in_qty: Decimal
-    out_qty: Decimal
-    current_qty: Decimal
-    delta: Decimal
+    prev_qty: int
+    in_qty: int
+    out_qty: int
+    current_qty: int
+    delta: int
 
 
 class WeeklyGroupReport(BaseModel):
@@ -512,11 +518,11 @@ class WeeklyGroupReport(BaseModel):
     dept_name: str
     label: str
     item_count: int
-    prev_qty: Decimal
-    in_qty: Decimal
-    out_qty: Decimal
-    current_qty: Decimal
-    delta: Decimal
+    prev_qty: int
+    in_qty: int
+    out_qty: int
+    current_qty: int
+    delta: int
     items: List[WeeklyItemReport]
 
 
@@ -527,9 +533,9 @@ class WeeklyWarning(BaseModel):
 
 
 class WeeklyReportSummary(BaseModel):
-    total_current_qty: Decimal
-    total_in_qty: Decimal
-    total_out_qty: Decimal
+    total_current_qty: int
+    total_in_qty: int
+    total_out_qty: int
     groups_increasing: int
     groups_decreasing: int
     groups_unchanged: int
@@ -538,13 +544,13 @@ class WeeklyReportSummary(BaseModel):
 class WeeklyProductionModelRow(BaseModel):
     model_key: str
     model_label: str
-    tf_qty: Decimal
-    hf_qty: Decimal
-    vf_qty: Decimal
-    nf_qty: Decimal
-    af_qty: Decimal
-    pf_qty: Decimal
-    total_qty: Decimal
+    tf_qty: int
+    hf_qty: int
+    vf_qty: int
+    nf_qty: int
+    af_qty: int
+    pf_qty: int
+    total_qty: int
 
 
 class WeeklyReportResponse(BaseModel):
@@ -566,16 +572,16 @@ class ProcessTypeResponse(BaseModel):
     description: Optional[str]
 
 
-class ItemCodeParseRequest(BaseModel):
+class MesCodeParseRequest(BaseModel):
     code: str = Field(..., description="3-part 품목 코드 문자열")
 
 
-class ItemCodeGenerateRequest(BaseModel):
+class MesCodeGenerateRequest(BaseModel):
     symbol: str = Field(..., min_length=1, max_length=5)
     process_type: str = Field(..., min_length=2, max_length=2)
 
 
-class ItemCodeResponse(BaseModel):
+class MesCodeResponse(BaseModel):
     symbol: str
     process_type: str
     serial: int
@@ -588,7 +594,7 @@ class ItemCodeResponse(BaseModel):
 # Phase 5.3-A — 운영 도구 응답 schema (BOM 가능 여부 / 생산 capacity / 정합성)
 # =============================================================================
 class BomCheckComponent(BaseModel):
-    item_code: Optional[str] = None
+    mes_code: Optional[str] = None
     item_name: str
     process_type_code: Optional[str] = None
     unit: str
@@ -614,7 +620,7 @@ CapacityStatus = Literal["no_target", "bom_not_registered", "not_producible", "p
 class CapacityTopItem(BaseModel):
     item_id: str
     item_name: str
-    item_code: Optional[str] = None
+    mes_code: Optional[str] = None
     model_symbol: Optional[str] = Field(
         None,
         description="모델 식별자 (items.model_symbol). 모델 그룹화·대표 PF 선정 기준.",
@@ -703,7 +709,7 @@ class IntegrityRepairResponse(BaseModel):
 
 class StockRequestLineCreate(BaseModel):
     item_id: uuid.UUID
-    quantity: Decimal = Field(..., gt=0)
+    quantity: int = Field(..., gt=0)
     from_bucket: RequestBucketEnum
     from_department: Optional[str] = None
     to_bucket: RequestBucketEnum
@@ -751,8 +757,8 @@ class StockRequestLineResponse(BaseModel):
     request_id: uuid.UUID
     item_id: uuid.UUID
     item_name_snapshot: str
-    item_code_snapshot: Optional[str] = None
-    quantity: Decimal
+    mes_code_snapshot: Optional[str] = None
+    quantity: int
     from_bucket: RequestBucketEnum
     from_department: Optional[str] = None
     to_bucket: RequestBucketEnum
@@ -799,27 +805,27 @@ class StockRequestResponse(BaseModel):
 class IoPreviewTarget(BaseModel):
     source_kind: str = Field("direct_item", max_length=24)
     item_id: Optional[uuid.UUID] = None
-    quantity: Decimal = Field(Decimal("1"), gt=0)
+    quantity: int = Field(1, gt=0)
 
 
 class IoLinePayload(BaseModel):
     line_id: uuid.UUID
     item_id: uuid.UUID
     item_name: str
-    item_code: Optional[str] = None
+    mes_code: Optional[str] = None
     unit: str = "EA"
     direction: str
     from_bucket: str
     from_department: Optional[str] = None
     to_bucket: str
     to_department: Optional[str] = None
-    quantity: Decimal
-    bom_expected: Optional[Decimal] = None
+    quantity: int
+    bom_expected: Optional[int] = None
     included: bool = True
     origin: str
     edited: bool = False
     has_children: bool = False
-    shortage: Decimal = Decimal("0")
+    shortage: int = 0
     exclusion_note: Optional[str] = None
 
 
@@ -828,8 +834,8 @@ class IoBundlePayload(BaseModel):
     source_kind: str
     title: str
     source_item_id: Optional[uuid.UUID] = None
-    source_item_code: Optional[str] = None
-    quantity: Decimal
+    source_mes_code: Optional[str] = None
+    quantity: int
     expanded_level: int = 1
     lines: List[IoLinePayload] = Field(default_factory=list)
 
@@ -907,7 +913,7 @@ class ReservationLineResponse(BaseModel):
     request_code: Optional[str] = None
     requester_name: str
     requester_department: str
-    quantity: Decimal
+    quantity: int
     from_bucket: RequestBucketEnum
     to_bucket: RequestBucketEnum
     to_department: Optional[str] = None

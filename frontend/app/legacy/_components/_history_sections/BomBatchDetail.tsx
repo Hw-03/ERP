@@ -135,9 +135,9 @@ function BundleRows({
   const childLines = parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines;
   // 단품(BOM 아님) + 단일 라인 → 번들 헤더가 곧 그 품목. 자동차감 자식 행을 노출하면
   // 동일 정보(이름·코드·수량)가 중복되고 "자동차감" 라벨도 의미 없음(BOM 차감 아님).
-  // → 헤더 우측 슬롯에 바로 item_code 노출하고 expand 비활성화.
+  // → 헤더 우측 슬롯에 바로 mes_code 노출하고 expand 비활성화.
   const isSingleLineDirect = !isBomParent && childLines.length === 1;
-  const singleLineCode = isSingleLineDirect ? childLines[0].item_code : null;
+  const singleLineCode = isSingleLineDirect ? childLines[0].mes_code : null;
   // 회귀 fix: source_kind 가 "bom_parent" 가 아니어도 lines 가 여럿이면 펼쳐서 표시.
   // 백엔드 응답의 source_kind 변경 또는 origin 누락에도 견디게 한다.
   const canExpand = isBomParent || (!isSingleLineDirect && childLines.length > 0);
@@ -190,7 +190,7 @@ function BundleRows({
           </span>
         </td>
         {/* 품목명 — chevron 들여쓰기 px-4 로 통일(parent Layers 아이콘과 같은 x),
-            우측 고정폭 슬롯에 item_code 노출(BOM 상위 + 단품 헤더 동일 패턴). */}
+            우측 고정폭 슬롯에 mes_code 노출(BOM 상위 + 단품 헤더 동일 패턴). */}
         <td className="border-b px-4 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
           <div className="flex items-center gap-1.5">
             {canExpand ? (
@@ -201,9 +201,9 @@ function BundleRows({
             <span className="min-w-0 flex-1 truncate text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
               {bundle.title}
             </span>
-            {canExpand && bundle.source_item_code && (
+            {canExpand && bundle.source_mes_code && (
               <span className="w-[6rem] shrink-0 text-right text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                {bundle.source_item_code}
+                {bundle.source_mes_code}
               </span>
             )}
             {isSingleLineDirect && singleLineCode && (
@@ -266,16 +266,16 @@ function BomLineRow({ line, batch, bundle, compact }: { line: IoLine; batch: IoB
         </div>
       </td>
       {/* 품목명 — └ 들여쓰기 px-4 로 통일(parent Layers/chevron 과 같은 x),
-          item_code 는 우측 고정폭 슬롯에 좌측 정렬해서 행 간 코드 열 정렬 */}
+          mes_code 는 우측 고정폭 슬롯에 좌측 정렬해서 행 간 코드 열 정렬 */}
       <td className="border-b px-4 py-1.5" style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex items-center gap-2">
           <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>└</span>
           <span className="min-w-0 flex-1 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
             {line.item_name}
           </span>
-          {line.item_code && (
+          {line.mes_code && (
             <span className="w-[6rem] shrink-0 text-right text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-              {line.item_code}
+              {line.mes_code}
             </span>
           )}
         </div>

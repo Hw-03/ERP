@@ -27,7 +27,11 @@ export type StockRequestType =
   | "manual_adjustment"
   | "defect_scrap"
   | "defect_return"
-  | "defect_disassemble";
+  | "defect_disassemble"
+  // R 정상 재고 바로 폐기/반품 — 격리를 거치지 않고 정상(창고/부서) 재고에서 즉시 처리.
+  // 백엔드 StockRequestTypeEnum 의 SCRAP_NORMAL/RETURN_NORMAL 값과 정확히 일치.
+  | "scrap_normal"
+  | "return_normal";
 
 export type RequestBucket = "warehouse" | "production" | "defective" | "none";
 
@@ -36,7 +40,7 @@ export interface StockRequestLine {
   request_id: string;
   item_id: string;
   item_name_snapshot: string;
-  item_code_snapshot: string | null;
+  mes_code_snapshot: string | null;
   quantity: number;
   from_bucket: RequestBucket;
   from_department: Department | null;

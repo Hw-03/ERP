@@ -25,7 +25,7 @@ export interface AddQuarantineModalProps {
  * 새 격리 추가 모달.
  *
  * 입력:
- *   - 품목 검색 (item_code / item_name)
+ *   - 품목 검색 (mes_code / item_name)
  *   - 출처: 창고 재고 OR 부서 재고 (라디오)
  *     · 창고 재고 → target_dept select (어느 부서로 격리할지)
  *     · 부서 재고 → source_dept select (= target_dept 자동, 같은 부서 안에서 격리)
@@ -207,7 +207,7 @@ export function AddQuarantineModal({
             >
               <div className="flex flex-col">
                 <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {selected.item_code ?? "(코드 없음)"}
+                  {selected.mes_code ?? "(코드 없음)"}
                 </span>
                 <span className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
                   {selected.item_name}
@@ -263,7 +263,7 @@ export function AddQuarantineModal({
                         style={{ background: LEGACY_COLORS.s1 }}
                       >
                         <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                          {it.item_code ?? "(코드 없음)"}
+                          {it.mes_code ?? "(코드 없음)"}
                         </span>
                         <span className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
                           {it.item_name}

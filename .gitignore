@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 *.pyo
 .env
+.env*.local
 .venv
 venv/
 
@@ -73,6 +74,7 @@ _dev/demo-verify/
 # Local / personal files
 workspace.ahk
 backend/query_test.py
+skills-lock.json
 
 # Obsidian vault (vault-sync 브랜치 전용, main에서 제외)
 vault/

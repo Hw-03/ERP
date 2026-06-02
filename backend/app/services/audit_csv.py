@@ -104,15 +104,15 @@ def _fmt_num(value) -> str:
 def row_from_log(log: TransactionLog, item: Item | None) -> list[str]:
     """`TransactionLog` 1건 → CSV 한 줄 (11컬럼)."""
     tx_value = log.transaction_type.value if hasattr(log.transaction_type, "value") else str(log.transaction_type)
-    item_code = ""
+    mes_code = ""
     item_name = ""
     if item:
-        item_code = item.item_code or ""
+        mes_code = item.mes_code or ""
         item_name = item.item_name or ""
     return [
         log.created_at.strftime("%Y-%m-%d %H:%M:%S") if log.created_at else "",
         TX_TYPE_LABEL_KO.get(tx_value, tx_value),
-        item_code,
+        mes_code,
         item_name,
         _fmt_num(log.quantity_change),
         _fmt_num(log.quantity_before),

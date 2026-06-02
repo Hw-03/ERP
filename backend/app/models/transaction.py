@@ -10,15 +10,13 @@ from sqlalchemy import (
     Enum as SAEnum,
     ForeignKey,
     Index,
-    Numeric,
     String,
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import Base
+from app.models.base import Base, IntQuantity, UUIDString
 
 __all__ = [
     "TransactionTypeEnum",
@@ -46,26 +44,32 @@ class TransactionTypeEnum(str, enum.Enum):
 class TransactionLog(Base):
     __tablename__ = "transaction_logs"
 
-    log_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
+    log_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
+    item_id = Column(UUIDString, ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
     transaction_type = Column(
         SAEnum(TransactionTypeEnum, name="transaction_type_enum", create_type=True),
         nullable=False,
         index=True,
     )
-    quantity_change = Column(Numeric(15, 4), nullable=False)
-    quantity_before = Column(Numeric(15, 4), nullable=True)
-    quantity_after = Column(Numeric(15, 4), nullable=True)
-    transfer_qty = Column(Numeric(15, 4), nullable=True)
+    quantity_change = Column(IntQuantity, nullable=False)
+    quantity_before = Column(IntQuantity, nullable=True)
+    quantity_after = Column(IntQuantity, nullable=True)
+    transfer_qty = Column(IntQuantity, nullable=True)
     reference_no = Column(String(100), nullable=True, index=True)
     produced_by = Column(String(100), nullable=True)
+    producer_employee_id = Column(
+        UUIDString,
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     notes = Column(Text, nullable=True)
     # 불량 처리 흐름 — 사유 카테고리(외관/치수/기능/검사통과/기타) + 자유 메모.
     # 카테고리 enum 은 프론트 상수로만 정의, 백엔드는 자유 문자열로 받음.
     reason_category = Column(String(32), nullable=True, index=True)
     reason_memo = Column(Text, nullable=True)
     operation_batch_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("io_batches.batch_id", ondelete="SET NULL"),
         nullable=True,
         index=True,
@@ -97,15 +101,15 @@ class TransactionEditLog(Base):
 
     __tablename__ = "transaction_edit_logs"
 
-    edit_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    edit_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
     original_log_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("transaction_logs.log_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     edited_by_employee_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("employees.employee_id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -114,7 +118,7 @@ class TransactionEditLog(Base):
     before_payload = Column(Text, nullable=False)  # JSON 스냅샷
     after_payload = Column(Text, nullable=False)  # JSON 스냅샷
     correction_log_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("transaction_logs.log_id", ondelete="SET NULL"),
         nullable=True,
     )  # 4차 수량 보정 시 생성된 ADJUST 거래 참조

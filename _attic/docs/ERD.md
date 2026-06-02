@@ -1,8 +1,9 @@
 # 엔티티 관계도 (ERD)
 
-> **[STALE 2026-05-29]** 본 ERD 는 V1 (Item / Inventory / InventoryLocation / BOM / TransactionLog)
-> 기준이며, V2 입출고 모델(`IoBatch` / `IoBundle` / `IoLine`) 과 `StockRequest`(결재 워크플로) 가
-> 누락되어 있다. 컬럼 정의는 `backend/app/models/` 가 단일 소스. V2 모델은 다음 갱신 시 반영.
+> **[부분 STALE 2026-06-01]** 본 ERD 는 V1 핵심 엔티티(Item / Inventory / InventoryLocation / BOM /
+> TransactionLog) 기준. V2 입출고(`io_batches`/`io_bundles`/`io_lines`)·결재(`stock_requests`/`stock_request_lines`)
+> 는 누락. **모델↔품목 매핑은 별도 테이블이 아니라 `mes_code` prefix 에서 파생**(`ItemModel`/`ProductModel` 테이블 없음).
+> 컬럼 정의는 `backend/app/models/` 가 단일 소스.
 
 핵심 엔티티 간 관계를 한 장에 정리. 자세한 컬럼 목록은 `backend/app/models/` 가 단일 소스.
 
@@ -11,22 +12,19 @@ erDiagram
     Item ||--o| Inventory : "1:1"
     Item ||--o{ InventoryLocation : "부서×상태별"
     Item ||--o{ TransactionLog : "이력"
-    Item ||--o{ ItemModel : "모델 슬롯"
     Item ||--o{ BOM : "parent"
     Item ||--o{ BOM : "child"
 
     Employee ||--o{ TransactionLog : "produced_by"
-    ProductModel ||--o{ ItemModel : "slot"
-
-    QueueBatch ||--o{ QueueBatchItem : "구성"
-    QueueBatchItem }o--|| Item : "참조"
 
     Item {
         uuid item_id PK
         string item_name
-        string erp_code
+        string mes_code "품목코드 (모델기호+공정코드+일련번호) — 2026-06-01 item_code→mes_code"
         string process_type_code "2자리 코드 (TR/TA/TF 등 18종) — category 필드는 2026-04-29 제거됨"
-        string legacy_model
+        string model_symbol
+        string legacy_part
+        string legacy_item_type "원자재/완성품/반제품류 (현역)"
         decimal min_stock
     }
 

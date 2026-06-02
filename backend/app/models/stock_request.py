@@ -12,15 +12,13 @@ from sqlalchemy import (
     Enum as SAEnum,
     ForeignKey,
     Index,
-    Numeric,
     String,
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import Base
+from app.models.base import Base, IntQuantity, UUIDString
 
 __all__ = [
     "StockRequestStatusEnum",
@@ -58,6 +56,9 @@ class StockRequestTypeEnum(str, enum.Enum):
     DEFECT_SCRAP = "defect_scrap"           # 격리 항목 폐기
     DEFECT_RETURN = "defect_return"         # 격리 항목 공급처 반품
     DEFECT_DISASSEMBLE = "defect_disassemble"  # PA·PF 격리 항목 분해
+    # R 정상 재고 바로 처리 — 격리 미경유, 정상(창고/부서) 재고에서 곧장 처리
+    SCRAP_NORMAL = "scrap_normal"           # 정상 재고 바로 폐기
+    RETURN_NORMAL = "return_normal"         # 정상 재고 바로 공급처 반품
 
 
 class RequestBucketEnum(str, enum.Enum):
@@ -72,11 +73,11 @@ class StockRequest(Base):
 
     __tablename__ = "stock_requests"
 
-    request_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
     request_code = Column(String(40), unique=True, nullable=True, index=True)
     client_request_id = Column(String(64), unique=True, nullable=True, index=True)
     requester_employee_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("employees.employee_id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
@@ -98,14 +99,14 @@ class StockRequest(Base):
     reserved_at = Column(DateTime, nullable=True)
     submitted_at = Column(DateTime, nullable=True)
     approved_by_employee_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("employees.employee_id", ondelete="SET NULL"),
         nullable=True,
     )
     approved_by_name = Column(String(100), nullable=True)
     approved_at = Column(DateTime, nullable=True)
     rejected_by_employee_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("employees.employee_id", ondelete="SET NULL"),
         nullable=True,
     )
@@ -115,7 +116,7 @@ class StockRequest(Base):
     # 부서 결재 (낱개 manual/adjust 라인 포함 시 추가로 요구). warehouse_approval 와 독립적.
     requires_department_approval = Column(Boolean, nullable=False, default=False, server_default="0")
     department_approved_by_employee_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("employees.employee_id", ondelete="SET NULL"),
         nullable=True,
     )
@@ -128,7 +129,7 @@ class StockRequest(Base):
     reason_category = Column(String(50), nullable=True)
     reason_memo = Column(Text, nullable=True)
     operation_batch_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("io_batches.batch_id", ondelete="SET NULL"),
         nullable=True,
         index=True,
@@ -153,22 +154,22 @@ class StockRequest(Base):
 class StockRequestLine(Base):
     __tablename__ = "stock_request_lines"
 
-    line_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    line_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
     request_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("stock_requests.request_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     item_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("items.item_id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
     )
     item_name_snapshot = Column(String(200), nullable=False)
-    item_code_snapshot = Column(String(50), nullable=True)
-    quantity = Column(Numeric(15, 4), nullable=False)
+    mes_code_snapshot = Column(String(50), nullable=True)
+    quantity = Column(IntQuantity, nullable=False)
     from_bucket = Column(
         SAEnum(RequestBucketEnum, name="request_bucket_enum", create_type=True),
         nullable=False,
@@ -185,7 +186,7 @@ class StockRequestLine(Base):
         default=StockRequestStatusEnum.SUBMITTED,
     )
     operation_line_id = Column(
-        UUID(as_uuid=True),
+        UUIDString,
         ForeignKey("io_lines.line_id", ondelete="SET NULL"),
         nullable=True,
         index=True,

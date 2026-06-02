@@ -15,6 +15,7 @@ from app.services import inventory as inventory_svc
 from app.services._tx import commit_and_refresh
 
 from ._shared import to_response
+from ._tx_helper import resolve_producer
 
 
 router = APIRouter()
@@ -25,6 +26,7 @@ def transfer_to_production(payload: TransferRequest, db: Session = Depends(get_d
     item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+    producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
     inventory = inventory_svc.get_or_create_inventory(db, payload.item_id)
     qty_before = inventory.quantity or Decimal("0")
     try:
@@ -43,7 +45,8 @@ def transfer_to_production(payload: TransferRequest, db: Session = Depends(get_d
             quantity_after=inventory.quantity,
             transfer_qty=payload.quantity,
             reference_no=payload.reference_no,
-            produced_by=payload.produced_by,
+            produced_by=producer_name or payload.produced_by,
+            producer_employee_id=producer_id,
             notes=payload.notes or f"창고 → {payload.department.value} 이동 ({payload.quantity})",
         )
     )
@@ -56,6 +59,7 @@ def transfer_to_warehouse(payload: TransferRequest, db: Session = Depends(get_db
     item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+    producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
     inventory = inventory_svc.get_or_create_inventory(db, payload.item_id)
     qty_before = inventory.quantity or Decimal("0")
     try:
@@ -74,7 +78,8 @@ def transfer_to_warehouse(payload: TransferRequest, db: Session = Depends(get_db
             quantity_after=inventory.quantity,
             transfer_qty=payload.quantity,
             reference_no=payload.reference_no,
-            produced_by=payload.produced_by,
+            produced_by=producer_name or payload.produced_by,
+            producer_employee_id=producer_id,
             notes=payload.notes or f"{payload.department.value} → 창고 복귀 ({payload.quantity})",
         )
     )
@@ -87,6 +92,7 @@ def transfer_between_depts(payload: DeptTransferRequest, db: Session = Depends(g
     item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+    producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
     inventory = inventory_svc.get_or_create_inventory(db, payload.item_id)
     qty_before = inventory.quantity or Decimal("0")
     try:
@@ -106,7 +112,8 @@ def transfer_between_depts(payload: DeptTransferRequest, db: Session = Depends(g
             quantity_after=inventory.quantity,
             transfer_qty=payload.quantity,
             reference_no=payload.reference_no,
-            produced_by=payload.produced_by,
+            produced_by=producer_name or payload.produced_by,
+            producer_employee_id=producer_id,
             notes=payload.notes or f"{payload.from_department.value} → {payload.to_department.value} 이동 ({payload.quantity})",
         )
     )

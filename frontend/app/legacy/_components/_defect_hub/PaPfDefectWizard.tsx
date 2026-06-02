@@ -160,7 +160,7 @@ export function PaPfDefectWizard({
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.red }} />
           <div className="flex flex-col gap-0.5">
             <div id={titleId} className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>
-              [처리] {location.item_code} {location.item_name} × {location.quantity}개
+              [처리] {location.mes_code} {location.item_name} × {location.quantity}개
             </div>
             <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
               {location.department} [불량] / 격리 {formatDate(location.defective_at)}
@@ -242,7 +242,7 @@ export function PaPfDefectWizard({
               <DisassembleTree
                 parentItemId={location.item_id}
                 parentItemName={location.item_name}
-                parentItemCode={location.item_code}
+                parentMesCode={location.mes_code}
                 parentQty={processQty}
                 parentDept={location.department}
                 decisions={decisions}

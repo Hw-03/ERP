@@ -1,29 +1,29 @@
 """품목·BOM 도메인.
 
-품목-모델 매핑은 별도 테이블 없이 item_code prefix (첫 '-' 앞 글자열) 에서
+품목-모델 매핑은 별도 테이블 없이 mes_code prefix (첫 '-' 앞 글자열) 에서
 유도한다 — 회사 규약상 각 글자가 ProductSymbol.symbol 과 1:1 대응이라
-이중 출처를 둘 이유가 없음. 헬퍼: app.utils.item_code.item_code_to_model_slots.
+이중 출처를 둘 이유가 없음. 헬퍼: app.utils.mes_code.mes_code_to_model_slots.
 """
 
 import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    CheckConstraint,
     Column,
+    Computed,
     DateTime,
     ForeignKey,
     Index,
     Integer,
-    Numeric,
     String,
     Text,
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import Base
+from app.models.base import Base, IntQuantity, UUIDString
 
 __all__ = [
     "Item",
@@ -33,8 +33,11 @@ __all__ = [
 
 class Item(Base):
     __tablename__ = "items"
+    __table_args__ = (
+        CheckConstraint("min_stock >= 0 OR min_stock IS NULL", name="ck_items_min_stock_nonneg"),
+    )
 
-    item_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    item_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
     item_name = Column(String(200), nullable=False)
     sort_order = Column(Integer, nullable=True, index=True)  # 엑셀 정리본 행 순서
     unit = Column(String(20), nullable=False, default="EA")
@@ -52,10 +55,20 @@ class Item(Base):
     legacy_part = Column(String(50), nullable=True, index=True)       # 자재창고/조립출하/고압파트/진공파트/튜닝파트/출하
     legacy_item_type = Column(String(50), nullable=True)              # part_type from CSV
     supplier = Column(String(200), nullable=True)
-    min_stock = Column(Numeric(15, 4), nullable=True)
+    min_stock = Column(IntQuantity, nullable=True)
 
     # 3-part item code ([모델기호조합]-[구분코드]-[일련번호])
-    item_code = Column(String(40), nullable=True, unique=True, index=True)
+    # mes_code 는 분해필드 3종에서 DB 가 계산하는 STORED 생성열 — 진실소스는 분해필드, 직접 쓰기 불가.
+    # printf 는 SQLite 전용. PG 활성화 시 표현식을 to_char(serial_no,'FM0000') 로 분기.
+    mes_code = Column(
+        String(40),
+        Computed(
+            "model_symbol || '-' || process_type_code || '-' || printf('%04d', serial_no)",
+            persisted=True,  # STORED
+        ),
+        unique=True,
+        index=True,
+    )
     model_symbol = Column(String(20), nullable=True, index=True)  # 예: "346", "3", "34678"
     process_type_code = Column(String(2), ForeignKey("process_types.code"), nullable=True, index=True)
     serial_no = Column(Integer, nullable=True)
@@ -84,10 +97,10 @@ class Item(Base):
 class BOM(Base):
     __tablename__ = "bom"
 
-    bom_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    parent_item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
-    child_item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
-    quantity = Column(Numeric(15, 4), nullable=False)
+    bom_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
+    parent_item_id = Column(UUIDString, ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
+    child_item_id = Column(UUIDString, ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
+    quantity = Column(IntQuantity, nullable=False)
     unit = Column(String(20), nullable=False, default="EA")
     notes = Column(Text, nullable=True)
 

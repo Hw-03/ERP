@@ -4,7 +4,7 @@
 // W5: List/Form/Commands 3-hook 으로 분해 후 호환 표면 유지.
 
 import { useState } from "react";
-import type { Item } from "@/lib/api";
+import type { Item, ProductModel } from "@/lib/api";
 import { useAdminMasterItemsList } from "./useAdminMasterItemsList";
 import { useAdminMasterItemsForm } from "./useAdminMasterItemsForm";
 import { useAdminMasterItemsCommands } from "./useAdminMasterItemsCommands";
@@ -21,6 +21,7 @@ export type UseAdminMasterItemsArgs = {
   /** 짧은 토스트(상단 우측 비공식 메시지) — DesktopAdminView 의 showSave 와 호환 */
   onShowSave?: (msg: string) => void;
   adminPin: string;
+  productModels: ProductModel[];
 };
 
 type UpdateItemPayload = {
@@ -32,7 +33,7 @@ type UpdateItemPayload = {
   process_type_code?: string;
   unit?: string;
   model_slots?: number[];
-  item_code?: string;
+  mes_code?: string;
 };
 
 export type AdminMasterItemsState = {
@@ -48,7 +49,7 @@ export type AdminMasterItemsState = {
   addItem: () => void;
   reorderItems: (ordered: Item[]) => void;
   saveItemField: (
-    field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "item_code" | "process_type_code",
+    field: "item_name" | "spec" | "barcode" | "supplier" | "min_stock" | "unit" | "mes_code" | "process_type_code",
     value: string,
   ) => void;
   updateItemFull: (payload: UpdateItemPayload) => void;
@@ -60,6 +61,7 @@ export type AdminMasterItemsState = {
   dirty: boolean;
   deleteItem: (itemId: string) => Promise<void>;
   restoreItem: (itemId: string) => Promise<void>;
+  productModels: ProductModel[];
 };
 
 export function useAdminMasterItems({
@@ -70,6 +72,7 @@ export function useAdminMasterItems({
   onError,
   onShowSave,
   adminPin,
+  productModels,
 }: UseAdminMasterItemsArgs): AdminMasterItemsState {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
 
@@ -111,5 +114,6 @@ export function useAdminMasterItems({
     dirty: form.dirty,
     deleteItem: commands.deleteItem,
     restoreItem: commands.restoreItem,
+    productModels,
   };
 }

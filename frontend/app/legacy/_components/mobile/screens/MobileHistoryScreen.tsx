@@ -332,7 +332,7 @@ export function MobileHistoryScreen() {
       : "내역 상세";
   const sheetSubtitle =
     displaySelection?.kind === "log"
-      ? `${displaySelection.log.item_code ?? "-"} · ${formatHistoryDate(
+      ? `${displaySelection.log.mes_code ?? "-"} · ${formatHistoryDate(
           displaySelection.log.created_at,
         )}`
       : displaySelection?.kind === "batch"

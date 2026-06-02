@@ -21,7 +21,7 @@ import { itemsApi } from "@/lib/api/items";
 const mockItem = {
   item_id: "item-001",
   item_name: "전극(70kV)",
-  item_code: "7-TR-0001",
+  mes_code: "7-TR-0001",
   unit: "EA",
   quantity: 100,
   warehouse_qty: 50,

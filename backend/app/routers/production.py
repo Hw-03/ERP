@@ -23,6 +23,7 @@ from app.services.bom import BomCache, build_bom_cache
 from app.services.bom import explode_bom as _explode_bom_svc
 from app.services.bom import merge_requirements
 from app.routers._errors import ErrorCode, http_error
+from app.routers.inventory._tx_helper import resolve_producer
 
 router = APIRouter()
 
@@ -42,6 +43,8 @@ def production_receipt(
     produced_item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if not produced_item:
         raise http_error(404, ErrorCode.NOT_FOUND, "생산 대상 품목을 찾을 수 없습니다.")
+
+    producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
 
     try:
         component_requirements = _explode_bom(db, payload.item_id, payload.quantity)
@@ -73,15 +76,12 @@ def production_receipt(
     shortage_errors = []
     for comp_item_id, required_qty in merged.items():
         inv = invs_map.get(comp_item_id)
-        # 생산 BACKFLUSH는 창고 가용분 기준으로 사전 검사 (warehouse - pending)
-        current_avail = (
-            (inv.warehouse_qty or Decimal("0")) - (inv.pending_quantity or Decimal("0"))
-            if inv else Decimal("0")
-        )
+        # 생산 BACKFLUSH는 창고 가용분(warehouse - pending) 기준 사전 검사 — stock_math 단일 소스.
+        current_avail = stock_math.figures_from_inventory(inv).warehouse_available
         if current_avail < required_qty:
             comp_item = items_map.get(comp_item_id)
             shortage_errors.append(
-                f"[{comp_item.item_code}] {comp_item.item_name}: 필요 {required_qty} {comp_item.unit}, "
+                f"[{comp_item.mes_code}] {comp_item.item_name}: 필요 {required_qty} {comp_item.unit}, "
                 f"가용 {current_avail} {comp_item.unit}, 부족 {required_qty - current_avail}"
             )
 
@@ -117,7 +117,8 @@ def production_receipt(
                 quantity_before=qty_before,
                 quantity_after=inv.quantity,
                 reference_no=payload.reference_no,
-                produced_by=payload.produced_by,
+                produced_by=producer_name or payload.produced_by,
+                producer_employee_id=producer_id,
                 notes=f"생산 입고 Backflush: {produced_item.item_name} x {payload.quantity}",
             )
             db.add(log)
@@ -127,7 +128,7 @@ def production_receipt(
             backflushed.append(
                 BackflushDetail(
                     item_id=comp_item_id,
-                    item_code=comp_item.item_code,
+                    mes_code=comp_item.mes_code,
                     item_name=comp_item.item_name,
                     process_type_code=comp_item.process_type_code,
                     required_quantity=required_qty,
@@ -155,7 +156,8 @@ def production_receipt(
             quantity_before=prod_qty_before,
             quantity_after=produced_inv.quantity,
             reference_no=payload.reference_no,
-            produced_by=payload.produced_by,
+            produced_by=producer_name or payload.produced_by,
+            producer_employee_id=producer_id,
             notes=payload.notes or f"생산 입고: {produced_item.item_name} x {payload.quantity}",
         )
         db.add(produce_log)
@@ -250,7 +252,7 @@ def check_production_feasibility(
             all_ok = False
         result.append(
             {
-                "item_code": comp_item.item_code,
+                "mes_code": comp_item.mes_code,
                 "item_name": comp_item.item_name,
                 "process_type_code": comp_item.process_type_code,
                 "unit": comp_item.unit,
@@ -463,7 +465,7 @@ def get_production_capacity(db: Session = Depends(get_db)):
         top_results.append({
             "item_id": str(item.item_id),
             "item_name": item.item_name,
-            "item_code": item.item_code,
+            "mes_code": item.mes_code,
             "model_symbol": item.model_symbol,
             "is_representative": False,
             "immediate": imm,
@@ -482,18 +484,18 @@ def get_production_capacity(db: Session = Depends(get_db)):
         }
 
     # 모델별 대표 PF 선정: model_symbol 별 그룹화 → 자연 정렬 첫 PF.
-    # 정렬 키는 item_code (있으면), 없으면 item_name.
+    # 정렬 키는 mes_code (있으면), 없으면 item_name.
     representatives: Dict[str, dict] = {}
     for r in top_results:
         ms = r.get("model_symbol")
         if not ms:
             continue
-        sort_key = (r.get("item_code") or r.get("item_name") or "")
+        sort_key = (r.get("mes_code") or r.get("item_name") or "")
         cur = representatives.get(ms)
         if cur is None:
             representatives[ms] = r
         else:
-            cur_key = (cur.get("item_code") or cur.get("item_name") or "")
+            cur_key = (cur.get("mes_code") or cur.get("item_name") or "")
             if sort_key < cur_key:
                 representatives[ms] = r
     for r in representatives.values():

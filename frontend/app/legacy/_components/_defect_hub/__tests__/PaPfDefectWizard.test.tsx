@@ -66,7 +66,7 @@ import { PaPfDefectWizard } from "../PaPfDefectWizard";
 const mockLocation: DefectLocation = {
   item_id: "item-pa-001",
   item_name: "전극 어셈블리",
-  item_code: "7-TR-0001",
+  mes_code: "7-TR-0001",
   department: "조립",
   quantity: 5,
   defective_at: "2025-08-15T00:00:00.000Z",
@@ -86,7 +86,7 @@ const mockBomTemplate = {
     {
       item_id: "child-001",
       item_name: "필라멘트",
-      item_code: "F-001",
+      mes_code: "F-001",
       unit: "개",
       direction: "out" as const,
       quantity: 5,
@@ -99,7 +99,7 @@ const mockBomTemplate = {
     {
       item_id: "child-002",
       item_name: "게터",
-      item_code: "G-001",
+      mes_code: "G-001",
       unit: "개",
       direction: "out" as const,
       quantity: 5,

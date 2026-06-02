@@ -53,21 +53,6 @@ function locationQuantity(
   );
 }
 
-// Pydantic Decimal 은 JSON 에서 문자열("1.0000")로 직렬화된다 — number 로 타이핑돼 있으나 실값은 string.
-// stepper 산술/합계가 string concat 으로 깨지므로 bundle 수신 즉시 number 로 정규화.
-function normalizeBundles(bundles: IoBundle[]): IoBundle[] {
-  return bundles.map((bundle) => ({
-    ...bundle,
-    quantity: Number(bundle.quantity),
-    lines: bundle.lines.map((line) => ({
-      ...line,
-      quantity: Number(line.quantity),
-      shortage: Number(line.shortage),
-      bom_expected: line.bom_expected == null ? null : Number(line.bom_expected),
-    })),
-  }));
-}
-
 const STEP_META: { key: string; label: string }[] = [
   { key: "1", label: "작업 유형" },
   { key: "2", label: "세부 작업" },
@@ -96,7 +81,6 @@ export function MobileIoComposeWizard({
   defaultWorkType,
   onStatusChange,
   onSubmitSuccess,
-  defectDeptFilter,
 }: IoComposeViewProps) {
   const [employeeId, setEmployeeId] = useState(operator?.employee_id ?? "");
   const [search, setSearch] = useState(globalSearch);
@@ -145,7 +129,6 @@ export function MobileIoComposeWizard({
     restoredDraftRef,
     autosaveBatchIdRef,
     state,
-    normalizeBundles,
     onStatusChange,
   });
 
@@ -212,7 +195,7 @@ export function MobileIoComposeWizard({
         toDepartment: state.toDepartment,
         target: { source_kind: sourceKind, item_id: item.item_id, quantity: prevQty + 1 },
       });
-      const newBundles = normalizeBundles(response.bundles);
+      const newBundles = response.bundles;
       if (existingIdx !== -1) {
         state.setBundles((prev) => {
           const next = [...prev];
@@ -296,21 +279,6 @@ export function MobileIoComposeWizard({
     setError(null);
     state.goTo(2);
   }
-
-  // 대시보드 빨간 [불량 N] 클릭으로 진입한 경우 (?defect_dept=X) 마운트 시 자동으로
-  // 워크타입 "defect" 선택 + Step 2 로 진입. 1회만 실행. (IoComposeView 와 동일 로직)
-  const defectAutoAppliedRef = useRef(false);
-  useEffect(() => {
-    if (
-      defectDeptFilter
-      && !defectAutoAppliedRef.current
-      && state.workType !== "defect"
-    ) {
-      defectAutoAppliedRef.current = true;
-      handleWorkTypeChange("defect");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defectDeptFilter]);
 
   async function handleSaveDraft() {
     if (!employeeId) {
