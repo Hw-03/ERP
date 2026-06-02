@@ -240,11 +240,13 @@ export function TransactionEditUnifiedModal({
               </div>
               <FieldRow label={`보정 수량 (${isShip ? "양수 입력 → 음수 저장" : "양수만"})`}>
                 <input
-                  type="number"
-                  min="0"
-                  step="any"
+                  type="text"
+                  inputMode="numeric"
                   value={qty}
-                  onChange={(e) => setQty(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || /^\d*\.?\d*$/.test(v)) setQty(v);
+                  }}
                   className="w-full rounded-[12px] border px-3 py-2 text-base outline-none"
                   style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
                 />

@@ -147,7 +147,7 @@ def list_warehouse_queue(db: Session = Depends(get_db), limit: int = Query(100, 
                 )
             ),
         )
-        .order_by(StockRequest.created_at.asc())
+        .order_by(StockRequest.created_at.desc())
         .limit(limit)
         .all()
     )
@@ -212,7 +212,7 @@ def list_department_queue(
         base_query = base_query.filter(StockRequest.requester_department.in_(list(visible)))
 
     return (
-        base_query.order_by(StockRequest.created_at.asc()).limit(limit).all()
+        base_query.order_by(StockRequest.created_at.desc()).limit(limit).all()
     )
 
 

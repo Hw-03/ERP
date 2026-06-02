@@ -134,13 +134,6 @@ export function IoLineRow({
           borderColor: line.included ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
           color: line.included ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
         }}
-        title={
-          qtyLocked
-            ? "상위 품목과 함께 자동 처리"
-            : line.included
-              ? "재고 반영 포함"
-              : line.exclusion_note || "이번 작업 제외"
-        }
         aria-pressed={line.included}
       >
         {line.included ? <Check className="h-4 w-4" /> : <MinusCircle className="h-3.5 w-3.5" />}
@@ -168,6 +161,13 @@ export function IoLineRow({
             style={{ background: tint(tagColor, 14), color: tagColor }}
           >
             {tag.text}
+          </span>
+          <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
+            {qtyLocked
+              ? "상위 품목과 함께 자동 처리"
+              : line.included
+                ? "재고 반영 포함"
+                : line.exclusion_note || "이번 작업 제외"}
           </span>
         </div>
       </div>
