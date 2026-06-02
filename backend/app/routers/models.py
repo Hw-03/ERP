@@ -19,6 +19,7 @@ from app.schemas import (
 )
 from app.services._tx import commit_and_refresh, commit_only
 from app.services.reorder import reorder_by_display_order
+from app.utils.mes_code import refresh_symbol_cache
 
 router = APIRouter()
 
@@ -61,22 +62,31 @@ def reorder_models(
     summary="제품 모델 신규 등록 (slot 자동 배정)",
 )
 def create_model(payload: ProductModelCreate, db: Session = Depends(get_db)):
-    """새 제품 모델 추가."""
+    """새 제품 모델 추가 — 예약(reserved) 슬롯 1개를 승격(promote)한다.
+
+    슬롯 행은 시드에서 1~100 전부 미리 생성됨(예약분 symbol/model_name=NULL,
+    is_reserved=True). 신규 등록 = 가장 낮은 예약 슬롯을 골라 symbol/model_name 채우고
+    is_reserved=False 로 전환. (구버전은 '행이 없는 빈 slot 번호'를 찾으려다
+    시드가 1~100 을 모두 채워 항상 None → 400 버그였음.)
+    """
     # 이름 중복 확인
     existing_name = db.query(ProductSymbol).filter(ProductSymbol.model_name == payload.model_name).first()
     if existing_name:
         raise http_error(409, ErrorCode.CONFLICT, "같은 이름의 모델이 이미 존재합니다.")
 
-    # 다음 빈 slot 찾기 (1~100)
-    used_slots = {ps.slot for ps in db.query(ProductSymbol).all()}
-    next_slot = next((s for s in range(1, 101) if s not in used_slots), None)
-    if next_slot is None:
-        raise http_error(400, ErrorCode.BAD_REQUEST, "슬롯이 모두 사용 중입니다.")
+    # 가장 낮은 예약 슬롯(symbol IS NULL, is_reserved=True) 선택
+    target = (
+        db.query(ProductSymbol)
+        .filter(ProductSymbol.is_reserved == True, ProductSymbol.symbol.is_(None))  # noqa: E712
+        .order_by(ProductSymbol.slot.asc())
+        .first()
+    )
+    if target is None:
+        raise http_error(400, ErrorCode.BAD_REQUEST, "등록 가능한 예약 슬롯이 없습니다.")
 
-    # symbol 처리: 제공 안 하면 slot 번호를 문자로 사용
+    # symbol 처리: 제공 안 하면 미사용 단일 문자 자동 배정
     symbol = payload.symbol
     if not symbol:
-        # 숫자 기반 symbol 자동 생성 (단일 문자)
         for candidate in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789":
             if not db.query(ProductSymbol).filter(ProductSymbol.symbol == candidate).first():
                 symbol = candidate
@@ -86,10 +96,12 @@ def create_model(payload: ProductModelCreate, db: Session = Depends(get_db)):
         if dup:
             raise http_error(409, ErrorCode.CONFLICT, "같은 기호(symbol)의 모델이 이미 존재합니다.")
 
-    ps = ProductSymbol(slot=next_slot, symbol=symbol, model_name=payload.model_name, is_reserved=False)
-    db.add(ps)
-    commit_and_refresh(db, ps)
-    return ps
+    target.symbol = symbol
+    target.model_name = payload.model_name
+    target.is_reserved = False
+    commit_and_refresh(db, target)
+    refresh_symbol_cache(db)
+    return target
 
 
 @router.put(
@@ -129,6 +141,7 @@ def update_model(
         ps.symbol = payload.symbol
 
     commit_and_refresh(db, ps)
+    refresh_symbol_cache(db)
     return ps
 
 
@@ -175,3 +188,4 @@ def delete_model(
 
     db.delete(ps)
     commit_only(db)
+    refresh_symbol_cache(db)

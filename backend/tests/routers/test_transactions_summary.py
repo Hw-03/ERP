@@ -255,12 +255,12 @@ def test_summary_model_filter(client, db_session, make_item):
     a = make_item(
         name="DX3000부품",
         warehouse_qty=Decimal("0"),
-        mes_code="AB-AR-9001",  # prefix "AB" = DX3000 + DX1000 (공용)
+        model_symbol="AB", process_type_code="AR", serial_no=9001,  # 생성열 → "AB-AR-9001" (DX3000+DX1000 공용)
     )
     b = make_item(
         name="무관품",
         warehouse_qty=Decimal("0"),
-        mes_code="C-AR-9002",  # 다른 symbol, 매칭 안 됨
+        model_symbol="C", process_type_code="AR", serial_no=9002,  # 생성열 → "C-AR-9002" (매칭 안 됨)
     )
     db_session.flush()
     _seed_log(db_session, a, TransactionTypeEnum.RECEIVE, Decimal("1"))

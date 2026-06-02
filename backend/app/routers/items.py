@@ -123,6 +123,14 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
     model_slots = payload.model_slots or []
     model_sym = slots_to_model_symbol(model_slots) if model_slots else ""
 
+    # 모든 품목은 카테고리와 모델을 가진다(불변식) — mes_code 생성열 + 분해필드 NOT NULL 의 전제.
+    if not (pt and model_sym):
+        raise http_error(
+            422,
+            ErrorCode.UNPROCESSABLE,
+            "품목 등록에는 카테고리와 사용 제품(모델)이 모두 필요합니다.",
+        )
+
     # (item_name, process_type_code) 동일한 활성 품목이 이미 있으면 409.
     # SQLite 라 DB 레벨 UniqueConstraint 가 없는 상태에서 앱 레벨 안전망.
     existing_dup = (
@@ -141,11 +149,7 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
             f"같은 카테고리에 이미 '{payload.item_name}' 품목이 있습니다.",
         )
 
-    serial = None
-    mes_code = None
-    if pt and model_sym:
-        serial = next_serial_no(model_sym, pt, db)
-        mes_code = make_mes_code(model_sym, pt, serial)
+    serial = next_serial_no(model_sym, pt, db)
 
     # 신규 항목은 목록 맨 끝으로. sort_order 미설정 시 NULL 이 되어 SQLite 가 맨앞에 정렬해버림.
     next_sort = (db.query(func.max(Item.sort_order)).scalar() or 0) + 1
@@ -158,9 +162,8 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         supplier=payload.supplier,
         min_stock=payload.min_stock,
         process_type_code=pt,
-        model_symbol=model_sym or None,
+        model_symbol=model_sym,
         serial_no=serial,
-        mes_code=mes_code,
         sort_order=next_sort,
     )
     db.add(item)
@@ -466,33 +469,36 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
     model_changed = payload.model_slots is not None and new_model_sym != item.model_symbol
 
     if pt_changed or model_changed:
+        # 모델·카테고리는 mes_code(생성열)의 진실소스이자 NOT NULL — 변경 결과가 비면 거부.
+        if not (new_model_sym and new_pt):
+            raise http_error(
+                422,
+                ErrorCode.UNPROCESSABLE,
+                "카테고리와 사용 제품(모델)은 비울 수 없습니다.",
+            )
         # serial 결정: 카테고리 변경 시 새 카테고리에서 next_serial_no, 그 외엔 기존 유지.
         if pt_changed:
-            if new_model_sym and new_pt:
-                item.serial_no = next_serial_no(new_model_sym, new_pt, db)
+            item.serial_no = next_serial_no(new_model_sym, new_pt, db)
             item.process_type_code = new_pt
             changed.append("process_type_code")
         if model_changed:
             item.model_symbol = new_model_sym
             changed.append("model_slots")
 
-        # mes_code 재조립. model/category 가 비어있으면 None 으로 둠 (등록 직후 미완 상태와 동일).
-        if new_model_sym and new_pt and item.serial_no:
-            item.mes_code = make_mes_code(new_model_sym, new_pt, item.serial_no)
-            # 안전망 — 중복 검사 (이론상 발생 안 해야 함).
-            dup = db.query(Item).filter(
-                Item.mes_code == item.mes_code,
-                Item.item_id != item.item_id,
-            ).first()
-            if dup is not None:
-                raise http_error(
-                    409,
-                    ErrorCode.CONFLICT,
-                    f"'{item.mes_code}' 코드가 이미 사용 중입니다. 데이터 점검이 필요합니다.",
-                )
-            changed.append("mes_code")
-        else:
-            item.mes_code = None
+        # mes_code 는 분해필드에서 DB 가 계산(생성열) — 직접 쓰지 않는다.
+        # 재계산될 코드의 중복만 사전 점검(친절한 409).
+        prospective = make_mes_code(new_model_sym, new_pt, item.serial_no)
+        dup = db.query(Item).filter(
+            Item.mes_code == prospective,
+            Item.item_id != item.item_id,
+        ).first()
+        if dup is not None:
+            raise http_error(
+                409,
+                ErrorCode.CONFLICT,
+                f"'{prospective}' 코드가 이미 사용 중입니다. 데이터 점검이 필요합니다.",
+            )
+        changed.append("mes_code")
 
     item.updated_at = datetime.now(UTC).replace(tzinfo=None)
 

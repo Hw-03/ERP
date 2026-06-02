@@ -2,7 +2,7 @@
 
 - `seed_reference_data()` : Department / Employee / ProductSymbol /
    ProcessType 비어 있을 때만 시드 (멱등)
-- `backfill_mes_codes()` : mes_code NULL 인 품목에 3-part 코드 자동 부여
+- `backfill_mes_codes()` : (생성열 전환 후) no-op — mes_code 는 DB 가 계산
 - `check_db()`            : 쓰지 않고 상태만 리포트
 """
 from __future__ import annotations
@@ -19,7 +19,6 @@ from app.models import (
     ProductSymbol,
 )
 from app.services.pin_auth import DEFAULT_PIN_HASH
-from app.utils.mes_code import make_mes_code
 
 # ---------------------------------------------------------------------------
 # 시드 데이터 정의
@@ -59,6 +58,7 @@ _PRODUCT_SYMBOL_ASSIGNED: list[tuple] = [
     (3, "8", "SOLO"),
     (4, "4", "ADX4000W"),
     (5, "6", "ADX6000FB"),
+    (6, "9", "신제품"),  # 9 prefix 품목 15건의 모델
 ]
 
 _PROCESS_TYPES: list[tuple] = [
@@ -123,7 +123,7 @@ def seed_reference_data() -> dict[str, int]:
                     )
                 )
                 counts["symbols"] += 1
-            for slot in range(6, 101):
+            for slot in range(7, 101):
                 db.add(ProductSymbol(slot=slot, symbol=None, model_name=None, is_reserved=True))
                 counts["symbols"] += 1
             db.commit()
@@ -150,43 +150,13 @@ def seed_reference_data() -> dict[str, int]:
 # 품목 코드 백필
 # ---------------------------------------------------------------------------
 def backfill_mes_codes() -> int:
-    """mes_code 미할당 품목에 자동 부여. 기존 serial_no 와 충돌하지 않도록 그룹별 최대값+1.
+    """mes_code 는 이제 분해필드에서 DB 가 계산하는 STORED 생성열 — 별도 백필 불필요.
 
-    그룹 키는 (model_symbol, process_type_code) — model_symbol 이 단일 문자(`3`,`7`,...)
-    또는 다중 문자(`346`) 모두 진실 소스. 코드는 ProductSymbol.symbol 과 1:1 매핑이라
-    별도 슬롯 컬럼 없이도 그대로 사용 가능.
+    분해필드(model_symbol/process_type_code/serial_no)가 NOT NULL 이라 미완 품목이 없고,
+    mes_code 직접 쓰기는 SQLite 가 거부한다. 호출 호환(bootstrap_all·bootstrap_db.py)을
+    위해 시그니처만 유지하고 0 을 반환한다.
     """
-    db = SessionLocal()
-    try:
-        targets = db.query(Item).filter(Item.mes_code.is_(None)).all()
-        if not targets:
-            return 0
-
-        serial_counter: dict[tuple, int] = {}
-        for item in db.query(Item).filter(Item.serial_no.isnot(None)).all():
-            key = (item.model_symbol, item.process_type_code)
-            serial_counter[key] = max(serial_counter.get(key, 0), item.serial_no or 0)
-
-        count = 0
-        for item in targets:
-            pt = item.process_type_code  # 공정코드는 18개 단일 기준 — 추론 없이 그대로 사용
-            if pt is None:
-                continue
-
-            symbol = item.model_symbol or "공"
-
-            key = (item.model_symbol, pt)
-            serial_counter[key] = serial_counter.get(key, 0) + 1
-            serial = serial_counter[key]
-
-            item.serial_no = serial
-            item.mes_code = make_mes_code(symbol, pt, serial)
-            count += 1
-
-        db.commit()
-        return count
-    finally:
-        db.close()
+    return 0
 
 
 def check_db() -> dict:

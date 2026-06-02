@@ -63,6 +63,12 @@ def db_session() -> Session:
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     session = SessionLocal()
 
+    # mes_code 의 symbol↔slot 캐시는 전역 프로세스-로컬이다. 테스트 간 누수를 막기 위해
+    # 시작/종료에 비운다. (운영 캐시는 app startup + 모델 CRUD 때 적재. 테스트에서 파생
+    # 결과가 필요하면 mc.refresh_symbol_cache(session) 을 직접 호출한다.)
+    from app.utils import mes_code as _mc
+    _mc.invalidate_symbol_cache()
+
     # process_types FK 참조 테이블 시드 (items.process_type_code FK 충족)
     from app.models import ProcessType
     _PT_SEED = [
@@ -80,6 +86,7 @@ def db_session() -> Session:
     try:
         yield session
     finally:
+        _mc.invalidate_symbol_cache()
         session.close()
         Base.metadata.drop_all(bind=engine)
         engine.dispose()
@@ -113,13 +120,15 @@ def make_item(db_session):
               warehouse_qty: Decimal = Decimal("0"),
               pending: Decimal = Decimal("0"),
               model_symbol: str | None = None,
-              mes_code: str | None = None) -> Item:
+              serial_no: int | None = None) -> Item:
+        # mes_code 는 생성열 — 직접 설정 불가. 분해필드(model_symbol/process_type/serial)를
+        # 주면 SQLite 가 자동 계산한다. 셋 다 채워야 mes_code 가 NULL 이 아니다.
         item = Item(
             item_name=name,
             process_type_code=process_type_code,
             unit="EA",
             model_symbol=model_symbol,
-            mes_code=mes_code,
+            serial_no=serial_no,
         )
         db_session.add(item)
         db_session.flush()

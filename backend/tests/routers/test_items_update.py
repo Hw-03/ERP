@@ -11,7 +11,8 @@ from __future__ import annotations
 
 
 def test_update_item_changes_process_type_code(client, make_item):
-    item = make_item(name="공정변경대상", process_type_code="TR")
+    # 모든 품목은 모델을 가진다(불변식) — 공정 변경 시 422 가드를 통과하려면 모델 필요.
+    item = make_item(name="공정변경대상", process_type_code="TR", model_symbol="3", serial_no=1)
 
     # 변경 전 baseline
     res = client.get(f"/api/items/{item.item_id}")

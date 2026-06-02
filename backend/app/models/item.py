@@ -9,7 +9,9 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    CheckConstraint,
     Column,
+    Computed,
     DateTime,
     ForeignKey,
     Index,
@@ -19,10 +21,9 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.models.base import Base, IntQuantity
+from app.models.base import Base, IntQuantity, UUIDString
 
 __all__ = [
     "Item",
@@ -32,8 +33,11 @@ __all__ = [
 
 class Item(Base):
     __tablename__ = "items"
+    __table_args__ = (
+        CheckConstraint("min_stock >= 0 OR min_stock IS NULL", name="ck_items_min_stock_nonneg"),
+    )
 
-    item_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    item_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
     item_name = Column(String(200), nullable=False)
     sort_order = Column(Integer, nullable=True, index=True)  # 엑셀 정리본 행 순서
     unit = Column(String(20), nullable=False, default="EA")
@@ -54,7 +58,17 @@ class Item(Base):
     min_stock = Column(IntQuantity, nullable=True)
 
     # 3-part item code ([모델기호조합]-[구분코드]-[일련번호])
-    mes_code = Column(String(40), nullable=True, unique=True, index=True)
+    # mes_code 는 분해필드 3종에서 DB 가 계산하는 STORED 생성열 — 진실소스는 분해필드, 직접 쓰기 불가.
+    # printf 는 SQLite 전용. PG 활성화 시 표현식을 to_char(serial_no,'FM0000') 로 분기.
+    mes_code = Column(
+        String(40),
+        Computed(
+            "model_symbol || '-' || process_type_code || '-' || printf('%04d', serial_no)",
+            persisted=True,  # STORED
+        ),
+        unique=True,
+        index=True,
+    )
     model_symbol = Column(String(20), nullable=True, index=True)  # 예: "346", "3", "34678"
     process_type_code = Column(String(2), ForeignKey("process_types.code"), nullable=True, index=True)
     serial_no = Column(Integer, nullable=True)
@@ -83,9 +97,9 @@ class Item(Base):
 class BOM(Base):
     __tablename__ = "bom"
 
-    bom_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    parent_item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
-    child_item_id = Column(UUID(as_uuid=True), ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
+    bom_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
+    parent_item_id = Column(UUIDString, ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
+    child_item_id = Column(UUIDString, ForeignKey("items.item_id", ondelete="CASCADE"), nullable=False, index=True)
     quantity = Column(IntQuantity, nullable=False)
     unit = Column(String(20), nullable=False, default="EA")
     notes = Column(Text, nullable=True)

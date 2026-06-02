@@ -141,6 +141,27 @@ _log.info(
 )
 
 
+@app.on_event("startup")
+def _warm_symbol_cache() -> None:
+    """제품 모델 symbol↔slot 캐시를 기동 시 1회 적재(읽기 전용, DB 변경 없음).
+
+    요청 도중에는 캐시를 재적재하지 않는다(엔진의 BEGIN IMMEDIATE 와 2번째 세션이
+    충돌해 데드락). 기동 시점엔 동시 요청이 없어 안전. 실패해도 기동은 계속하며,
+    캐시는 빈 맵으로 두고 모델 CRUD 시 재적재된다.
+    """
+    try:
+        from app.database import SessionLocal
+        from app.utils.mes_code import refresh_symbol_cache
+
+        db = SessionLocal()
+        try:
+            refresh_symbol_cache(db)
+        finally:
+            db.close()
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("evt=symbol_cache_warm_failed err=%s", exc)
+
+
 @app.on_event("shutdown")
 def _log_shutdown() -> None:
     _log.info("evt=system_shutdown boot_id=%s", _BOOT_ID)
