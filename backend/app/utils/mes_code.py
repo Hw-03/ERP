@@ -8,8 +8,12 @@ model_symbol = 각 제품 기호를 오름차순 정렬해 연결 (DX3000→"3",
 suffix 'F' = F타입(완성/출하성 — 창고 배치 불가).
 """
 
+import logging
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger("mes")
 
 # slot↔표시기호 매핑의 단일 진실은 product_symbols 테이블이다. 파싱 핫패스라 프로세스-로컬
 # 캐시에 적재해 두고 읽기만 한다. **요청 처리 도중에는 절대 새 DB 세션을 열지 않는다** —
@@ -57,7 +61,16 @@ def slots_to_model_symbol(slots: list[int]) -> str:
     """
     slot_to_symbol = _maps()["slot_to_symbol"]
     symbols = sorted(slot_to_symbol[s] for s in slots if s in slot_to_symbol)
-    return "".join(symbols)
+    result = "".join(symbols)
+    if slots and not result:
+        # R2-6: slots 가 있는데 결과가 비면 캐시 미적재/매핑 누락 — 빈 model_symbol 은
+        # 빈 mes_code 로 이어지므로 silent 대신 경고로 가시화 (데드락 방지 위해 재적재는 안 함).
+        logger.warning(
+            "slots_to_model_symbol(%s) → 빈 문자열. symbol 캐시 미적재 또는 매핑 누락 — "
+            "mes_code 가 빈 모델기호로 생성될 위험. startup refresh_symbol_cache 확인 필요.",
+            slots,
+        )
+    return result
 
 
 def mes_code_to_model_slots(mes_code: str | None) -> list[int]:

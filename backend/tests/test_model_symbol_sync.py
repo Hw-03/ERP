@@ -32,3 +32,30 @@ def test_runtime_derivation_matches_master(db_session):
     assert mc.mes_code_to_model_slots("Z-AR-0001") == []
     assert mc.mes_code_to_model_slots(None) == []
     assert mc.mes_code_to_model_slots("nodash") == []
+
+
+def test_empty_cache_returns_empty_and_warns(db_session, monkeypatch):
+    """캐시 미적재 상태에서 slots 호출 → 빈 문자열 + 경고 로그 (R2-6).
+
+    빈 model_symbol 은 빈 mes_code 로 이어지므로 silent 가 아니라 경고로 가시화한다.
+    """
+    mc.invalidate_symbol_cache()  # conftest 가 이미 비우지만 명시
+    warnings: list = []
+    monkeypatch.setattr(mc.logger, "warning", lambda *a, **k: warnings.append(a))
+    result = mc.slots_to_model_symbol([1, 4])
+    assert result == ""
+    assert len(warnings) == 1  # 빈 결과 → 정확히 1회 경고
+
+
+def test_loaded_cache_no_warning(db_session, monkeypatch):
+    """캐시 적재 + 유효 slots → 정상 결과, 경고 없음."""
+    from app.models import ProductSymbol
+
+    db_session.add(ProductSymbol(slot=1, symbol="3", model_name="DX3000", is_reserved=False))
+    db_session.commit()
+    mc.refresh_symbol_cache(db_session)
+    warnings: list = []
+    monkeypatch.setattr(mc.logger, "warning", lambda *a, **k: warnings.append(a))
+    result = mc.slots_to_model_symbol([1])
+    assert result == "3"
+    assert warnings == []  # 정상 → 경고 없음
