@@ -19,9 +19,9 @@ const ACTION_LABELS: Record<RAction, string> = {
 };
 
 const ACTION_DESC: Record<RAction, string> = {
-  unquarantine: "잘못 격리된 경우. 즉시 처리 (결재 불필요).",
-  scrap: "재고에서 제거합니다. 결재 후 처리됩니다.",
-  return: "공급처에 반품합니다. 결재 후 처리됩니다.",
+  unquarantine: "잘못 격리된 경우. 즉시 정상 재고로 복귀.",
+  scrap: "재고에서 제거합니다. 즉시 처리됩니다.",
+  return: "공급처에 반품합니다. 즉시 처리됩니다.",
 };
 
 export interface RDefectActionModalProps {
@@ -200,9 +200,9 @@ export function RDefectActionModal({
                   {act !== "unquarantine" && (
                     <span
                       className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-black text-white"
-                      style={{ background: LEGACY_COLORS.yellow }}
+                      style={{ background: LEGACY_COLORS.red }}
                     >
-                      결재 필요
+                      즉시 처리
                     </span>
                   )}
                 </div>

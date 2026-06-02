@@ -3,14 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ElementType } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BarChart2, Boxes, History, Settings2, Warehouse } from "lucide-react";
+import { AlertTriangle, BarChart2, Boxes, History, Settings2, Warehouse } from "lucide-react";
 import { DesktopSidebar, type DesktopTabId } from "./DesktopSidebar";
 import { DesktopTopbar } from "./DesktopTopbar";
 import { DesktopInventoryView } from "./DesktopInventoryView";
 import { DesktopWarehouseView } from "./DesktopWarehouseView";
+import { DesktopDefectView } from "./DesktopDefectView";
 import { DesktopAdminView } from "./DesktopAdminView";
 import { DesktopHistoryView } from "./DesktopHistoryView";
 import { DesktopWeeklyReportView } from "./DesktopWeeklyReportView";
+import { useCurrentOperator } from "./login/useCurrentOperator";
 import {
   WeeklyWeekPicker,
   getWeekStartMonday,
@@ -22,12 +24,13 @@ import { useProductionCapacityQuery } from "@/lib/queries/useProductionQuery";
 import { CapacityDetailModal } from "./CapacityDetailModal";
 import { DirtyGuardProvider, useConfirmNavigation } from "@/lib/ui/dirty-guard";
 
-const VALID_TABS = new Set<DesktopTabId>(["dashboard", "warehouse", "history", "weekly", "admin"]);
+const VALID_TABS = new Set<DesktopTabId>(["dashboard", "warehouse", "defect", "history", "weekly", "admin"]);
 const DEFAULT_STATUS = "DEXCOWIN MES System";
 
 const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
   dashboard: { title: "대시보드", icon: Boxes },
   warehouse: { title: "입출고", icon: Warehouse },
+  defect: { title: "불량", icon: AlertTriangle },
   history: { title: "입출고 내역", icon: History },
   weekly: { title: "주간보고", icon: BarChart2 },
   admin: { title: "관리자", icon: Settings2 },
@@ -45,6 +48,7 @@ function DesktopLegacyShellInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const confirmAdminNavigation = useConfirmNavigation();
+  const operator = useCurrentOperator();
 
   const initialTab = (() => {
     const t = searchParams.get("tab") as DesktopTabId | null;
@@ -90,13 +94,16 @@ function DesktopLegacyShellInner() {
   }
 
   // 브라우저 뒤로/앞으로 → URL ?tab= 변경 시 activeTab 동기화.
-  // defect_dept 쿼리도 함께 읽어 warehouse 탭 진입 시 필터로 전달.
+  // defect_dept 쿼리도 함께 읽어 불량 탭 진입 시 부서 필터로 전달.
+  // ?defect_dept= 만 있고 ?tab= 이 없으면(레거시 링크 호환) 불량 탭으로 재라우팅.
   useEffect(() => {
     const t = searchParams.get("tab") as DesktopTabId | null;
+    const dept = searchParams.get("defect_dept");
     if (t && VALID_TABS.has(t) && t !== activeTab) {
       setActiveTab(t);
+    } else if (!t && dept && activeTab !== "defect") {
+      setActiveTab("defect");
     }
-    const dept = searchParams.get("defect_dept");
     setDefectDeptFilter(dept);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -145,7 +152,16 @@ function DesktopLegacyShellInner() {
           onStatusChange={handleStatusChange}
           preselectedItem={warehousePreselected}
           onSubmitSuccess={() => { void refetchCapacity(); }}
+        />
+      );
+    }
+    if (activeTab === "defect") {
+      return (
+        <DesktopDefectView
+          key={key}
+          operator={operator}
           defectDeptFilter={defectDeptFilter}
+          onStatusChange={handleStatusChange}
         />
       );
     }
@@ -157,7 +173,7 @@ function DesktopLegacyShellInner() {
     }
     return <DesktopAdminView key={key} globalSearch="" onStatusChange={handleStatusChange} />;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse, capacityData, refetchCapacity, weekMon, defectDeptFilter]);
+  }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator]);
 
   return (
     <>

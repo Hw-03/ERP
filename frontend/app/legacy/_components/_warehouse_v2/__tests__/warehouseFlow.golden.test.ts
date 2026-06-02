@@ -104,12 +104,11 @@ const ALL_SUB_TYPES: IoSubType[] = [
 // IO_WORK_TYPES / IO_SUB_TYPES / 상수
 // ──────────────────────────────────────────────────────────────────
 describe("ioWorkType 상수", () => {
-  it("IO_WORK_TYPES id/label 고정", () => {
+  it("IO_WORK_TYPES id/label 고정 (defect 는 별도 '불량' 탭으로 분리되어 입출고 메뉴에서 제외)", () => {
     expect(IO_WORK_TYPES.map((r) => [r.id, r.label, r.description])).toEqual([
       ["receive", "원자재 입고", "발주 품목 입고"],
       ["warehouse_io", "창고 입출고", "창고↔부서"],
       ["process", "부서 입출고", "부서 내 작업"],
-      ["defect", "불량", "불량 재고 격리"],
     ]);
   });
 

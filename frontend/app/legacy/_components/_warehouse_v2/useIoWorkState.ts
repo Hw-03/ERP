@@ -1,8 +1,6 @@
 import { useMemo, useState } from "react";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
-import { DEFAULT_SUB_TYPE, isDefectInventorySubType, type DeptIoDirection } from "./ioWorkType";
-import type { DefectLocation } from "@/lib/api/types/defects";
-import { validateDecisionTree, type ChildDecision } from "../_defect_hub/DisassembleTree";
+import { DEFAULT_SUB_TYPE, type DeptIoDirection } from "./ioWorkType";
 
 export type IoStep = 1 | 2 | 3 | 4 | 5;
 
@@ -25,29 +23,12 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
   const [step, setStep] = useState<IoStep>(1);
   // process workType 한정: 방향(입고/출고) 선택. null = 미선택 → Step 2 advance 차단.
   const [deptIoDirection, setDeptIoDirectionBase] = useState<DeptIoDirection | null>(null);
-  const [defectSelectedLocation, setDefectSelectedLocation] = useState<DefectLocation | null>(null);
-  const [defectAction, setDefectAction] = useState<"scrap" | "restore" | "supplier_return" | "disassemble" | null>(null);
-  const [defectReasonCategory, setDefectReasonCategory] = useState("");
-  const [defectReasonMemo, setDefectReasonMemo] = useState("");
-  const [defectBomDecisions, setDefectBomDecisions] = useState<ChildDecision[]>([]);
-  const [defectProcessQty, setDefectProcessQty] = useState<number>(0);
-
-  function selectDefectLocation(loc: DefectLocation | null) {
-    setDefectSelectedLocation(loc);
-    setDefectProcessQty(loc ? Number(loc.quantity) : 0);
-  }
 
   function setWorkType(next: IoWorkType) {
     setWorkTypeBase(next);
     setSubType(DEFAULT_SUB_TYPE[next]);
     setDeptIoDirectionBase(null);
     setBundles([]);
-    setDefectSelectedLocation(null);
-    setDefectAction(null);
-    setDefectReasonCategory("");
-    setDefectReasonMemo("");
-    setDefectBomDecisions([]);
-    setDefectProcessQty(0);
     setStep(1);
   }
 
@@ -75,24 +56,14 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
   const hasInvalidQuantity = includedLines.some((line) => line.quantity <= 0);
 
   const canAdvance = useMemo<Record<IoStep, boolean>>(() => {
-    const defectInvMode = workType === "defect" && isDefectInventorySubType(subType);
-    // 재작업(disassemble) 시 Step 5 가 BOM 분해 결정. 그 외 defect 케이스는 Step 4 에서 submit.
-    const isDisassemble = subType === "defect_process" && defectAction === "disassemble";
     return {
       1: true,
       2: workType !== "process" || deptIoDirection != null,
-      3: defectInvMode ? defectSelectedLocation !== null : bundles.length > 0,
-      4: defectInvMode
-        ? !!defectReasonCategory
-            && (subType !== "defect_process" || !!defectAction)
-            && defectProcessQty > 0
-            && defectProcessQty <= Number(defectSelectedLocation?.quantity ?? 0)
-        : includedLines.length > 0 && !hasShortage && !hasInvalidQuantity,
-      5: isDisassemble
-        ? defectBomDecisions.length > 0 && validateDecisionTree(defectBomDecisions)
-        : true,
+      3: bundles.length > 0,
+      4: includedLines.length > 0 && !hasShortage && !hasInvalidQuantity,
+      5: true,
     };
-  }, [workType, subType, deptIoDirection, bundles.length, includedLines.length, hasShortage, hasInvalidQuantity, defectSelectedLocation, defectAction, defectReasonCategory, defectBomDecisions, defectProcessQty]);
+  }, [workType, deptIoDirection, bundles.length, includedLines.length, hasShortage, hasInvalidQuantity]);
 
   function goNext() {
     setStep((s) => (s < 5 ? ((s + 1) as IoStep) : s));
@@ -130,12 +101,6 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
     setBundles([]);
     setNotes("");
     setReferenceNo("");
-    setDefectSelectedLocation(null);
-    setDefectAction(null);
-    setDefectReasonCategory("");
-    setDefectReasonMemo("");
-    setDefectBomDecisions([]);
-    setDefectProcessQty(0);
     setStep(1);
   }
 
@@ -154,12 +119,6 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
     hasShortage,
     hasInvalidQuantity,
     canAdvance,
-    defectSelectedLocation,
-    defectAction,
-    defectReasonCategory,
-    defectReasonMemo,
-    defectBomDecisions,
-    defectProcessQty,
     setWorkType,
     setSubType,
     setFromDepartment,
@@ -169,13 +128,6 @@ export function useIoWorkState(initialWorkType?: IoWorkType, initialDepartment?:
     setReferenceNo,
     setDeptIoDirection,
     setDeptIoDirectionRaw,
-    setDefectSelectedLocation,
-    selectDefectLocation,
-    setDefectProcessQty,
-    setDefectAction,
-    setDefectReasonCategory,
-    setDefectReasonMemo,
-    setDefectBomDecisions,
     updateLine,
     removeLine,
     goNext,

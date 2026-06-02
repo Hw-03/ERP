@@ -5201,7 +5201,9 @@
           "manual_adjustment",
           "defect_scrap",
           "defect_return",
-          "defect_disassemble"
+          "defect_disassemble",
+          "scrap_normal",
+          "return_normal"
         ],
         "title": "StockRequestTypeEnum",
         "type": "string"

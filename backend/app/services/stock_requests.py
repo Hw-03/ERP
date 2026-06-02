@@ -201,6 +201,9 @@ def create_request(
         StockRequestTypeEnum.DEFECT_SCRAP,
         StockRequestTypeEnum.DEFECT_RETURN,
         StockRequestTypeEnum.DEFECT_DISASSEMBLE,
+        # R 정상 재고 바로 폐기/반품 — 기존 불량 처리와 동일하게 즉시 처리(결재 없음)로 통일.
+        StockRequestTypeEnum.SCRAP_NORMAL,
+        StockRequestTypeEnum.RETURN_NORMAL,
     }
     warehouse_override: Optional[bool] = None
     if request_type in _DEFECT_TYPES:

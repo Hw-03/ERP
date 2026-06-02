@@ -39,6 +39,9 @@ _TX_TYPE_BY_REQUEST: dict[StockRequestTypeEnum, TransactionTypeEnum] = {
     StockRequestTypeEnum.DEFECT_SCRAP: TransactionTypeEnum.DEFECT_SCRAP,
     StockRequestTypeEnum.DEFECT_RETURN: TransactionTypeEnum.SUPPLIER_RETURN,
     StockRequestTypeEnum.DEFECT_DISASSEMBLE: TransactionTypeEnum.DISASSEMBLE,
+    # R 정상 재고 바로 처리 — 기존 거래 유형 재사용(폐기=DEFECT_SCRAP, 반품=SUPPLIER_RETURN)
+    StockRequestTypeEnum.SCRAP_NORMAL: TransactionTypeEnum.DEFECT_SCRAP,
+    StockRequestTypeEnum.RETURN_NORMAL: TransactionTypeEnum.SUPPLIER_RETURN,
 }
 
 
@@ -184,6 +187,9 @@ _ALLOWED_SHAPES: dict[StockRequestTypeEnum, dict] = {
     StockRequestTypeEnum.DEFECT_SCRAP: None,
     StockRequestTypeEnum.DEFECT_RETURN: None,
     StockRequestTypeEnum.DEFECT_DISASSEMBLE: None,
+    # R 정상 재고 바로 폐기/반품 — bucket(warehouse/production) 임의 허용, 서비스 함수가 재고 검증
+    StockRequestTypeEnum.SCRAP_NORMAL: None,
+    StockRequestTypeEnum.RETURN_NORMAL: None,
 }
 
 

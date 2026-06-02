@@ -56,6 +56,9 @@ class StockRequestTypeEnum(str, enum.Enum):
     DEFECT_SCRAP = "defect_scrap"           # 격리 항목 폐기
     DEFECT_RETURN = "defect_return"         # 격리 항목 공급처 반품
     DEFECT_DISASSEMBLE = "defect_disassemble"  # PA·PF 격리 항목 분해
+    # R 정상 재고 바로 처리 — 격리 미경유, 정상(창고/부서) 재고에서 곧장 처리
+    SCRAP_NORMAL = "scrap_normal"           # 정상 재고 바로 폐기
+    RETURN_NORMAL = "return_normal"         # 정상 재고 바로 공급처 반품
 
 
 class RequestBucketEnum(str, enum.Enum):

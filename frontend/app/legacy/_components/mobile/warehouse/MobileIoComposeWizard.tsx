@@ -81,7 +81,6 @@ export function MobileIoComposeWizard({
   defaultWorkType,
   onStatusChange,
   onSubmitSuccess,
-  defectDeptFilter,
 }: IoComposeViewProps) {
   const [employeeId, setEmployeeId] = useState(operator?.employee_id ?? "");
   const [search, setSearch] = useState(globalSearch);
@@ -280,21 +279,6 @@ export function MobileIoComposeWizard({
     setError(null);
     state.goTo(2);
   }
-
-  // 대시보드 빨간 [불량 N] 클릭으로 진입한 경우 (?defect_dept=X) 마운트 시 자동으로
-  // 워크타입 "defect" 선택 + Step 2 로 진입. 1회만 실행. (IoComposeView 와 동일 로직)
-  const defectAutoAppliedRef = useRef(false);
-  useEffect(() => {
-    if (
-      defectDeptFilter
-      && !defectAutoAppliedRef.current
-      && state.workType !== "defect"
-    ) {
-      defectAutoAppliedRef.current = true;
-      handleWorkTypeChange("defect");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defectDeptFilter]);
 
   async function handleSaveDraft() {
     if (!employeeId) {

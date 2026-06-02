@@ -160,6 +160,31 @@ def _execute_line(
         actor_name = approver.name
         inventory_svc.return_to_supplier(db, item_id, qty, line.from_department)
         quantity_change = -qty
+    elif rt == StockRequestTypeEnum.SCRAP_NORMAL:
+        # R 정상 재고 바로 폐기 — 격리 미경유. 창고면 warehouse, 부서면 PRODUCTION 차감.
+        source = "warehouse" if line.from_bucket == RequestBucketEnum.WAREHOUSE else "production"
+        inventory_svc.scrap_normal(
+            db, item_id, qty,
+            source=source,
+            dept_or_warehouse=line.from_department,
+            reason_category=request.reason_category or "기타",
+            reason_memo=request.reason_memo or (request.notes or ""),
+            actor=approver.name,
+        )
+        quantity_change = -qty
+    elif rt == StockRequestTypeEnum.RETURN_NORMAL:
+        # R 정상 재고 바로 공급처 반품 — 격리 미경유.
+        source = "warehouse" if line.from_bucket == RequestBucketEnum.WAREHOUSE else "production"
+        inventory_svc.return_to_supplier_from_normal(
+            db, item_id, qty,
+            source=source,
+            dept_or_warehouse=line.from_department,
+            supplier_name="",
+            reason_category=request.reason_category or "기타",
+            reason_memo=request.reason_memo or (request.notes or ""),
+            actor=approver.name,
+        )
+        quantity_change = -qty
     elif rt == StockRequestTypeEnum.DEFECT_DISASSEMBLE:
         # 분해 처리 — notes 에서 child_decisions JSON 추출 후 submit_defective_disassemble 호출.
         # 분해 시 부모 1라인만 있고 자식 결정은 request.notes 에 JSON 직렬화되어 있다.
