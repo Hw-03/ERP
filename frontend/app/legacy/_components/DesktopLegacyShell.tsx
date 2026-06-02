@@ -172,6 +172,9 @@ function DesktopLegacyShellInner() {
       return <DesktopWeeklyReportView key={key} weekMon={weekMon} />;
     }
     return <DesktopAdminView key={key} globalSearch="" onStatusChange={handleStatusChange} />;
+    // deps 는 실제로 렌더 결과를 바꾸는 값만 나열. handleStatusChange(useCallback []),
+    // setStockWarnings/setCapacityModal(setter), handleTabChange 는 안정적이거나 결과에
+    // 영향이 없어 의도적으로 제외 — 누락이 아니라 최소 deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator]);
 
