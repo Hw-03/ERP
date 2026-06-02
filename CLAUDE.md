@@ -25,7 +25,7 @@
 
 After completing a plan, always place the recommended model at the very top of the plan shown to the user:
 
-> **Recommended model: Sonnet** — [one-line reason]
+> **추천 모델 : Sonnet** — [한 줄 이유]
 
 Criteria:
 - **Haiku**: Simple repetitive tasks. e.g. variable rename, file search, minor text edits.
