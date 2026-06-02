@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+**Always respond in Korean. Conclusion first, short and clear.**
+
 ## Project Rules
 
 - Official system name: **DEXCOWIN MES**. Do not call it ERP or X-Ray in user-facing text or documents.
@@ -8,33 +10,45 @@
 - backend entry: `backend/app/main.py`
 - Before editing frontend code, verify the real render/import path first.
 - If docs and live code disagree, trust the live code.
-- 변동 수치(품목 수·공정/모델 종수 등)는 문서에 박지 말 것. 실제 값은 `python _attic/backend-scripts/facts.py` 로 확인한다 (문서엔 이 명령만 안내). 과거 스냅샷을 기록한 진행/인수인계 로그는 그대로 둠.
+- Do not hardcode variable counts (item count, process/model count, etc.) in documents. Check actual values with `python _attic/backend-scripts/facts.py` (documents should only reference this command). Leave historical snapshot logs as-is.
 - Do not edit `_archive/` or `frontend/_archive/` unless explicitly asked.
 - Do not casually edit `_attic/`; it is the boxed-up storage for everything not at a tool-required path — domain docs (GLOSSARY/CONTEXT/ADR/ARCHITECTURE/ERD/OPERATIONS), one-off backend scripts, DB backups, ONBOARDING, finished plans.
-- **주간보고 화면은 동결(완성)**
-  - 프론트: `frontend/app/legacy/_components/_weekly_sections/` 디렉터리 전체 + `frontend/app/legacy/_components/DesktopWeeklyReportView.tsx` (동결일: 2026-05-24)
-  - 백엔드: `backend/app/routers/inventory/weekly_report.py` (동결일: 2026-05-29)
-  - 명시적 수정 요청이 있을 때만 손대고, 그렇지 않은 경우(주변 리팩터·전역 변경·이름 통일 등)는 해당 파일들을 우회. 신규 `TransactionTypeEnum` 추가 시에는 weekly_report.py 의 분류 set(`PRODUCTION_TX_TYPES` / `NON_PRODUCTION_TX_TYPES`) 만 갱신.
+- **Weekly report screen is frozen (complete)**
+  - Frontend: entire `frontend/app/legacy/_components/_weekly_sections/` directory + `frontend/app/legacy/_components/DesktopWeeklyReportView.tsx` (frozen: 2026-05-24)
+  - Backend: `backend/app/routers/inventory/weekly_report.py` (frozen: 2026-05-29)
+  - Touch only when explicitly asked. Bypass these files for surrounding refactors, global renames, etc. When adding a new `TransactionTypeEnum`, only update the classification sets (`PRODUCTION_TX_TYPES` / `NON_PRODUCTION_TX_TYPES`) in weekly_report.py.
 - Do not mix sample data with real data.
 - Do not perform large refactors, folder moves, or renames unless explicitly asked.
 - Do not rename legacy internal identifiers such as `xray-erp` unless explicitly asked.
-- Respond in Korean, conclusion first, short and clear.
+
+## Plan Mode — Model Recommendation
+
+After completing a plan, always place the recommended model at the very top of the plan shown to the user:
+
+> **Recommended model: Sonnet** — [one-line reason]
+
+Criteria:
+- **Haiku**: Simple repetitive tasks. e.g. variable rename, file search, minor text edits.
+- **Sonnet**: General development tasks. e.g. bug fix, add a router, API integration, moderate refactor.
+- **Opus**: High-complexity judgment tasks. e.g. redesigning the stock request state machine, security-related auth changes, structural changes spanning many files.
+
+---
 
 ## Commit / Push
 
 - Never auto-commit or auto-push.
 - Commit and push only when the user explicitly asks.
 - When explicitly asked to commit and push, run the required local checks first to avoid GitHub CI failures, and unless told otherwise, commit and push only the changes made in the current session.
-- **Commit message 형식 (필수): `YYYY-MM-DD area: 요약`**
-  - **날짜는 커밋 직전 `date +%Y-%m-%d` (Bash) 또는 `Get-Date -Format yyyy-MM-dd` (PowerShell) 로 확인한 실제 시점.** 세션 시작 시 컨텍스트에 박힌 날짜를 그대로 쓰면 세션이 자정을 넘어갔을 때 어긋남.
-  - 예: `2026-05-26 backend: 시리얼 부여 수정`, `2026-05-26 vault: Obsidian 설정 갱신`
-  - `area`는 자유 분류 — `frontend`, `backend`, `desktop`, `mobile`, `admin`, `docs`, `data`, `fix`, `refactor`, `chore`, `vault`, `defect`, `items`, `ux`, `weekly`, `history`, `capacity` 등 작업 영역
-  - **금지 패턴** (절대 사용 X):
-    - Conventional Commits: `type(scope): X` (예: `fix(items): X`, `docs(vault): X`)
+- **Required commit message format: `YYYY-MM-DD area: summary`**
+  - **Always check the real date immediately before committing** using `date +%Y-%m-%d` (Bash) or `Get-Date -Format yyyy-MM-dd` (PowerShell). Do not reuse the date baked into session context — sessions can span midnight.
+  - Examples: `2026-05-26 backend: fix serial assignment`, `2026-05-26 vault: update Obsidian config`
+  - `area` is free-form — `frontend`, `backend`, `desktop`, `mobile`, `admin`, `docs`, `data`, `fix`, `refactor`, `chore`, `vault`, `defect`, `items`, `ux`, `weekly`, `history`, `capacity`, etc.
+  - **Forbidden patterns** (never use):
+    - Conventional Commits: `type(scope): X` (e.g. `fix(items): X`, `docs(vault): X`)
     - Bracket prefix: `[chore] X`, `[W12-A] X`, `[defect][io] X`
-    - 혼합형: `2026-05-26 fix(items): X` (날짜는 OK지만 area에 `type(scope)` 금지)
-  - Merge 커밋(`Merge ...`)은 git이 만든 자동 메시지 그대로 유지 — 수정 X
-  - 본문(body)은 자유 형식. 위 규칙은 제목 1줄에만 적용.
+    - Mixed: `2026-05-26 fix(items): X` (date is OK but `type(scope)` in area is forbidden)
+  - Merge commits (`Merge ...`) keep git's auto-generated message as-is — do not edit.
+  - The body is free-form. The above rules apply to the subject line only.
 
 ## DB / Run / Verify
 
@@ -47,19 +61,19 @@ cd backend
 python bootstrap_db.py --all
 ```
 
-- Run backend (canonical — 좀비 워커 자동 정리 + /health/live 확인):
+- Run backend (canonical — auto-cleans zombie workers + checks /health/live):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\start-backend.ps1
 ```
 
-- Stop backend (포트 8010 잡은 모든 PID 강제 종료):
+- Stop backend (force-kills all PIDs on port 8010):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\stop-backend.ps1
 ```
 
-- 백엔드에 로그가 0줄이면 좀비 의심 — stop 실행 후 start 로 재기동.
+- If the backend shows 0 log lines, suspect a zombie — run stop then start.
 
 - Before commit/push, run:
 
@@ -67,22 +81,21 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\stop-backend.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
 ```
 
-## 세션 인수인계
+## Session Handoff
 
-새 세션 시작 시 가장 먼저 확인: `_attic/handoff/` 의 가장 최근 날짜 파일.
-현재 최신: `_attic/handoff/2026-05-29-handoff.md` (정리 작업 결과 + 사원님 답장 대기 + 남은 작업 후보).
+At the start of a new session, check the most recent file in `_attic/handoff/` first (newest date in filename).
 
-## 자료 위치 (2026-05-29 정리 후)
+## Resource Locations
 
-루트·각 폴더에는 도구가 자동 참조하는 파일만 남기고, 나머지는 모두 `_attic/` 보관소로 통합.
+Only files automatically referenced by tools remain at the root and in each folder. Everything else is consolidated into `_attic/`.
 
-- 도메인 사전·가이드 (GLOSSARY/CONTEXT/ARCHITECTURE/ERD/ADR/OPERATIONS/ITEM_CODE_RULES/ATTIC_POLICY): `_attic/docs/`
-- 1회성 backend 스크립트 (seed, sync, archive, backup): `_attic/backend-scripts/`
-  - 실행: `cd backend && python ../_attic/backend-scripts/<script>.py`
-  - sys.path 가 `backend/` 자동 추가하도록 패치됨
-- DB 백업: `_attic/data/db_backups/` (로컬, `.gitignore` 매칭 — 추적 X)
-- 신규 합류자 가이드: `_attic/ONBOARDING.md`
-- 활성 DB: `backend/mes.db` (단일 — `app.db`, `erp.db` 흔적 제거됨)
+- Domain glossary and guides (GLOSSARY/CONTEXT/ARCHITECTURE/ERD/ADR/OPERATIONS/ITEM_CODE_RULES/ATTIC_POLICY): `_attic/docs/`
+- One-off backend scripts (seed, sync, archive, backup): `_attic/backend-scripts/`
+  - Run: `cd backend && python ../_attic/backend-scripts/<script>.py`
+  - `sys.path` is patched to auto-include `backend/`
+- DB backups: `_attic/data/db_backups/` (local only, matched by `.gitignore` — not tracked)
+- New member guide: `_attic/ONBOARDING.md`
+- Active DB: `backend/mes.db` (single — `app.db`, `erp.db` traces removed)
 
 ---
 
