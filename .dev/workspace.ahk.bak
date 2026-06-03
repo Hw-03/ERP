@@ -1,0 +1,82 @@
+#Requires AutoHotkey v2.0
+#SingleInstance Force
+
+Sleep 3000
+
+; ─── agentmemory 메모리 서버 (최소화) ──────────────────
+Run 'wt.exe -w new cmd /k "agentmemory"'
+if WinWait("ahk_exe WindowsTerminal.exe", , 10)
+    WinMinimize "ahk_exe WindowsTerminal.exe"
+Sleep 2000
+
+; ─── 데스크탑1 "Claude" ───────────────────────────
+; 오른쪽: VS Code ERP (max)  |  왼쪽: Chrome (서버 뜬 후)
+Send "#^{Left}"
+Sleep 300
+Send "#^{Left}"
+Sleep 300
+Send "#^{Left}"
+Sleep 500
+
+Run '"C:\Users\user\AppData\Local\Programs\Microsoft VS Code\Code.exe" "c:\ERP"'
+WinWait "ahk_exe Code.exe",, 15
+WinMove 0, 0, 100, 100, "ahk_exe Code.exe"
+WinMaximize "ahk_exe Code.exe"
+
+; ─── 데스크탑2 "Codex" ───────────────────────────
+; 왼쪽: Obsidian (max)  |  오른쪽: Codex (max)
+Send "#^{Right}"
+Sleep 800
+
+Run "C:\Users\user\AppData\Local\Programs\Obsidian\Obsidian.exe"
+WinWait "ahk_exe Obsidian.exe",, 15
+Sleep 1500
+WinMove -1920, 0, 960, 540, "ahk_exe Obsidian.exe"
+Sleep 300
+WinMaximize "ahk_exe Obsidian.exe"
+
+Run "explorer.exe shell:AppsFolder\OpenAI.Codex_2p2nqsd0c76g0!App"
+WinWait "Codex ahk_exe Codex.exe",, 20
+WinMove 0, 0, 100, 100, "Codex ahk_exe Codex.exe"
+WinMaximize "Codex ahk_exe Codex.exe"
+
+; ─── 데스크탑3 "backend, frontend" ───────────────
+; 오른쪽 왼쪽절반: 백엔드  |  오른쪽 오른쪽절반: 프론트엔드
+Send "#^{Right}"
+Sleep 800
+
+Run 'wt.exe -w new cmd /k "cd /d c:\ERP\backend && py -m uvicorn app.main:app --host 0.0.0.0 --port 8010 --reload"'
+WinWait "ahk_exe WindowsTerminal.exe",, 15
+hwndBackend := WinGetID("ahk_exe WindowsTerminal.exe")
+WinMove -7, 0, 960, 1039, "ahk_id " hwndBackend
+
+Sleep 1500
+
+Run 'wt.exe -w new cmd /k "cd /d c:\ERP\frontend && npm run dev -- --hostname 0.0.0.0 --port 3000"'
+hwndFrontend := 0
+deadline := A_TickCount + 15000
+while (A_TickCount < deadline) {
+    for hwnd in WinGetList("ahk_exe WindowsTerminal.exe") {
+        if (hwnd != hwndBackend) {
+            hwndFrontend := hwnd
+            break
+        }
+    }
+    if (hwndFrontend)
+        break
+    Sleep 500
+}
+if (hwndFrontend)
+    WinMove 960, 0, 960, 1039, "ahk_id " hwndFrontend
+
+; ─── 서버 준비 대기 후 데스크탑1 복귀 → Chrome ──────
+Sleep 10000
+Send "#^{Left}"
+Sleep 300
+Send "#^{Left}"
+Sleep 500
+
+Run "http://192.168.0.63:3000"
+WinWait "ahk_exe chrome.exe",, 20
+WinMove -1920, 0, 960, 540, "ahk_exe chrome.exe"
+WinMaximize "ahk_exe chrome.exe"
