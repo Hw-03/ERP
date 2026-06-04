@@ -15,6 +15,8 @@ import { AdminAuditLogSection } from "./AdminAuditLogSection";
 import { AdminDangerZone } from "./AdminDangerZone";
 import { AdminDepartmentsProvider } from "./AdminDepartmentsContext";
 import { AdminDepartmentsSection } from "./AdminDepartmentsSection";
+import { AdminWarehouseStructureSection } from "./AdminWarehouseStructureSection";
+import { AdminWarehousePlacementSection } from "./AdminWarehousePlacementSection";
 
 /**
  * Round-11A (#4) 추출 — DesktopAdminView 의 section 별 콘텐츠 분기.
@@ -139,6 +141,12 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
         />
       </AdminDepartmentsProvider>
     );
+  }
+  if (section === "warehouseStructure") {
+    return <AdminWarehouseStructureSection onStatusChange={onStatusChange} onError={setMessage} />;
+  }
+  if (section === "warehousePlacement") {
+    return <AdminWarehousePlacementSection items={items} onStatusChange={onStatusChange} onError={setMessage} />;
   }
   if (section === "export") {
     return (

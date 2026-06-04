@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>창고 지도 — DEXCOWIN MES</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+<style>
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── MES CSS 변수 (globals.css :root 1:1 복제) ── */
+:root {
+  --c-bg: #eff4fb;
+  --c-s1: rgba(255,255,255,0.92);
+  --c-s2: rgba(244,247,252,0.96);
+  --c-s3: rgba(230,236,245,0.96);
+  --c-s4: rgba(214,224,237,0.98);
+  --c-border: rgba(76,97,130,0.1);
+  --c-border-strong: rgba(70,122,222,0.22);
+  --c-blue: #2f74e7;
+  --c-green: #179f72;
+  --c-red: #d95a5a;
+  --c-yellow: #b98619;
+  --c-purple: #6f59e8;
+  --c-cyan: #078db0;
+  --c-text: #101a2b;
+  --c-muted: #72829a;
+  --c-muted2: #56657e;
+  --c-panel-glow: radial-gradient(circle at top right, rgba(47,116,231,0.08), transparent 36%);
+  --c-success-bg: #e6f7f2;
+  --c-error-bg: #fdeaea;
+  --c-warning-bg: #fef6e4;
+  --c-card-shadow: 0 24px 64px rgba(45,70,106,0.12);
+  --c-popup-bg: #ffffff;
+  --c-popup-shadow: 0 12px 28px rgba(45,70,106,0.16);
+  --c-radius-xl: 32px;
+  --c-radius-lg: 24px;
+  --c-radius-md: 18px;
+  --c-radius-sm: 14px;
+  --c-radius-xs: 8px;
+  --sidebar-hover-mix: 18%;
+}
+
+:root[data-theme="dark"] {
+  --c-bg: #07101d;
+  --c-s1: rgba(11,21,36,0.92);
+  --c-s2: rgba(18,31,51,0.92);
+  --c-s3: rgba(28,44,68,0.9);
+  --c-s4: rgba(39,58,87,0.88);
+  --c-border: rgba(165,190,220,0.12);
+  --c-border-strong: rgba(149,197,255,0.28);
+  --c-blue: #65a9ff;
+  --c-green: #43d39d;
+  --c-red: #ff7b7b;
+  --c-yellow: #f6c667;
+  --c-purple: #8e7dff;
+  --c-cyan: #4ec9f5;
+  --c-text: #edf2fb;
+  --c-muted: #72829a;
+  --c-muted2: #9badc7;
+  --c-panel-glow: radial-gradient(circle at top right, rgba(101,169,255,0.16), transparent 32%);
+  --c-success-bg: #0a2420;
+  --c-error-bg: #2b0d0d;
+  --c-warning-bg: #261d00;
+  --c-card-shadow: 0 24px 80px rgba(0,0,0,0.28);
+  --c-popup-bg: #101a2b;
+  --c-popup-shadow: 0 12px 28px rgba(0,0,0,0.5);
+  --sidebar-hover-mix: 50%;
+}
+
+/* ── Base ── */
+html { font-family: "Pretendard","Noto Sans KR",system-ui,sans-serif; -webkit-font-smoothing: antialiased; }
+body { background: var(--c-bg); color: var(--c-text); height: 100vh; overflow: hidden; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--c-s3); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--c-muted); }
+
+/* ── Button inset signal (globals.css 165-189) ── */
+button { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08); cursor: pointer; border: none; font-family: inherit; background: transparent; }
+:root[data-theme="dark"] button { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
+button[aria-current]:not([aria-current="false"]),
+button[aria-pressed="true"] { box-shadow: inset 0 2px 8px rgba(0,0,0,0.15); }
+:root[data-theme="dark"] button[aria-current]:not([aria-current="false"]),
+:root[data-theme="dark"] button[aria-pressed="true"] { box-shadow: inset 0 2px 8px rgba(255,255,255,0.18); }
+button.no-inset,
+:root[data-theme="dark"] button.no-inset { box-shadow: none; }
+
+/* ── Shell ── */
+.shell { display: flex; height: 100vh; overflow: hidden; gap: 12px; padding: 12px; background: var(--c-bg); }
+
+/* ── Sidebar ── */
+.sidebar {
+  flex-shrink: 0; width: 72px;
+  transition: width 180ms cubic-bezier(0.4,0,0.2,1);
+  border-radius: var(--c-radius-xl); background: var(--c-s1);
+  border: 1px solid var(--c-border); box-shadow: var(--c-card-shadow);
+  padding: 16px 10px; display: flex; flex-direction: column; gap: 2px; overflow: hidden;
+}
+.sidebar:hover { width: 220px; }
+.sb-brand { display: flex; align-items: center; gap: 10px; padding: 4px 2px 12px; border-bottom: 1px solid var(--c-border); margin-bottom: 6px; white-space: nowrap; overflow: hidden; }
+.sb-icon-chip { width: 32px; height: 32px; flex-shrink: 0; border-radius: 10px; background: color-mix(in srgb, var(--c-blue) 14%, var(--c-s2)); color: var(--c-blue); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 900; }
+.sb-brand-name { font-size: 12px; font-weight: 800; color: var(--c-text); letter-spacing: -0.01em; }
+.sb-tab { display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 10px; border-radius: 14px; color: var(--c-muted2); font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; transition: background 150ms, color 150ms; text-align: left; width: 100%; }
+.sb-tab:hover { background: color-mix(in srgb, var(--c-muted2) var(--sidebar-hover-mix), transparent); color: var(--c-text); }
+.sb-tab.active { background: color-mix(in srgb, var(--c-blue) 12%, var(--c-s2)); color: var(--c-blue); }
+.sb-tab svg { width: 18px; height: 18px; flex-shrink: 0; }
+.sb-spacer { flex: 1; }
+.sb-theme { display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 10px; border-radius: 12px; color: var(--c-muted); font-size: 12px; white-space: nowrap; overflow: hidden; transition: background 150ms; width: 100%; }
+.sb-theme:hover { background: color-mix(in srgb, var(--c-muted) 14%, transparent); color: var(--c-text); }
+.sb-theme svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+/* ── Main ── */
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+
+/* ── Topbar ── */
+.topbar { flex-shrink: 0; display: flex; align-items: center; gap: 12px; border-radius: 28px; background: var(--c-s1); border: 1px solid var(--c-border); box-shadow: var(--c-card-shadow); padding: 10px 20px; background-image: var(--c-panel-glow); }
+.topbar-chip { width: 38px; height: 38px; flex-shrink: 0; border-radius: 16px; background: var(--c-s2); color: var(--c-blue); display: flex; align-items: center; justify-content: center; font-size: 17px; }
+.topbar-title { font-size: 21px; font-weight: 900; color: var(--c-text); letter-spacing: -0.02em; }
+.topbar-spacer { flex: 1; }
+.topbar-user { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 12px; background: var(--c-s2); border: 1px solid var(--c-border); font-size: 13px; color: var(--c-text); font-weight: 600; }
+
+/* ── Content row ── */
+.content-row { flex: 1; min-height: 0; overflow: hidden; display: flex; }
+
+/* ── Map card ── */
+.map-card { flex: 1; min-width: 0; display: flex; flex-direction: column; border-radius: var(--c-radius-lg); background: var(--c-s1); border: 1px solid var(--c-border); box-shadow: var(--c-card-shadow); background-image: var(--c-panel-glow); overflow: hidden; }
+
+/* ── Card header strip ── */
+.card-header { flex-shrink: 0; height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 16px; border-bottom: 1px solid var(--c-border); }
+.back-btn { height: 32px; padding: 0 12px; border-radius: var(--c-radius-sm); background: var(--c-s2); border: 1px solid var(--c-border); color: var(--c-text); font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 4px; transition: background 150ms, border-color 150ms; white-space: nowrap; }
+.back-btn:hover { background: var(--c-s3); border-color: var(--c-border-strong); }
+.back-btn.hidden { opacity: 0; pointer-events: none; }
+.breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; flex: 1; min-width: 0; overflow: hidden; }
+.crumb { color: var(--c-blue); cursor: pointer; white-space: nowrap; }
+.crumb:hover { text-decoration: underline; }
+.crumb.cur { color: var(--c-text); font-weight: 600; cursor: default; }
+.sep { color: var(--c-muted); }
+
+/* ── Search ── */
+.search-wrap { position: relative; flex-shrink: 0; }
+.search-box { display: flex; align-items: center; gap: 6px; background: var(--c-s2); border: 1px solid var(--c-border); border-radius: var(--c-radius-xs); padding: 5px 10px; width: 260px; transition: border-color 0.15s, box-shadow 0.15s; }
+.search-box:focus-within { border-color: var(--c-blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-blue) 22%, transparent); }
+.search-box svg { flex-shrink: 0; color: var(--c-blue); width: 14px; height: 14px; }
+.search-input { flex: 1; background: transparent; border: none; outline: none; font-size: 13px; font-family: inherit; color: var(--c-text); min-width: 0; }
+.search-input::placeholder { color: var(--c-muted); }
+.search-clear { width: 18px; height: 18px; border-radius: 9999px; background: color-mix(in srgb, var(--c-muted2) 15%, transparent); color: var(--c-muted2); display: none; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; }
+.search-clear.show { display: flex; }
+.search-results { position: absolute; top: calc(100% + 6px); right: 0; width: 340px; max-height: 320px; overflow-y: auto; background: var(--c-popup-bg); border: 1px solid var(--c-border); border-radius: var(--c-radius-sm); box-shadow: var(--c-popup-shadow); z-index: 50; display: none; }
+.search-results.open { display: block; }
+.sr-hdr { padding: 8px 12px; font-size: 11px; color: var(--c-muted); border-bottom: 1px solid var(--c-border); font-weight: 600; }
+.sr-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--c-border); transition: background 100ms; }
+.sr-row:last-child { border-bottom: none; }
+.sr-row:hover { background: color-mix(in srgb, var(--c-blue) 8%, transparent); }
+.sr-bar { width: 4px; height: 30px; border-radius: 2px; flex-shrink: 0; }
+.sr-loc { font-size: 12px; color: var(--c-text); font-weight: 600; }
+.sr-name { font-size: 11px; color: var(--c-muted2); margin-top: 1px; }
+.sr-qty { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--c-text); background: var(--c-s2); border-radius: 6px; padding: 2px 6px; flex-shrink: 0; }
+.search-empty { background: var(--c-warning-bg); color: var(--c-yellow); border-radius: var(--c-radius-xs); padding: 6px 10px; font-size: 12px; position: absolute; top: calc(100% + 6px); right: 0; width: 260px; display: none; z-index: 50; }
+.search-empty.open { display: block; }
+
+/* ── Stage ── */
+.stage { flex: 1; position: relative; overflow: hidden; min-height: 0; }
+.stage-layer { position: absolute; inset: 0; opacity: 0; pointer-events: none; transform: translateX(0); transition: opacity 240ms ease, transform 240ms cubic-bezier(0.4,0,0.2,1); will-change: transform,opacity; overflow: hidden; }
+.stage-layer.active { opacity: 1; pointer-events: auto; transform: translateX(0); }
+.stage-layer.from-right { transform: translateX(24px); opacity: 0; }
+.stage-layer.to-left    { transform: translateX(-24px); opacity: 0; }
+
+/* ── Floor stage ── */
+.floor-stage { display: flex; align-items: center; justify-content: center; height: 100%; padding: 24px; background: var(--c-s2); }
+.warehouse-wrap { transform-origin: center center; }
+.warehouse { position: relative; width: 880px; height: 300px; background: var(--c-s4); border: 1px solid var(--c-border-strong); border-radius: var(--c-radius-md); overflow: hidden; }
+.warehouse::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(color-mix(in srgb, var(--c-muted2) 8%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--c-muted2) 8%, transparent) 1px, transparent 1px); background-size: 40px 40px; pointer-events: none; }
+.entrance-tag { position: absolute; bottom: 8px; right: 12px; background: var(--c-warning-bg); color: var(--c-yellow); font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 9999px; letter-spacing: 0.5px; border: 1px solid color-mix(in srgb, var(--c-yellow) 25%, transparent); }
+.angle-block { position: absolute; background: var(--c-s1); border: 1px solid var(--c-border); border-radius: 16px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; box-shadow: var(--c-card-shadow); transition: transform 0.15s, box-shadow 0.15s, border-color 0.18s, background 0.18s; z-index: 1; }
+.angle-block:hover { transform: scale(1.03); border-color: var(--c-border-strong); box-shadow: 0 8px 24px rgba(47,116,231,0.18); background: color-mix(in srgb, var(--c-blue) 8%, var(--c-s1)); z-index: 10; }
+.angle-block.wm-hit { outline: 2px solid var(--c-blue); outline-offset: 1px; animation: wmPulse 1.2s ease-out 2; }
+.angle-block .al { font-size: 11px; font-weight: 700; color: var(--c-text); pointer-events: none; text-align: center; }
+.angle-block .as { font-size: 9px; color: var(--c-muted2); pointer-events: none; text-align: center; }
+.angle-badge { position: absolute; top: -5px; right: -5px; background: var(--c-blue); color: #fff; font-size: 9px; font-weight: 700; border-radius: 9999px; min-width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; padding: 0 3px; z-index: 11; }
+
+/* ── Front stage ── */
+.front-stage { display: flex; flex-direction: column; height: 100%; background: var(--c-s2); }
+.front-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 12px 16px 10px; overflow: hidden; }
+.front-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.front-title { font-size: 13px; font-weight: 700; color: var(--c-text); flex-shrink: 0; }
+.grid-outer { flex: 1; min-height: 0; display: flex; gap: 8px; align-items: flex-start; overflow: auto; }
+.layer-labels { display: flex; flex-direction: column; gap: 4px; padding-top: 4px; }
+.ll { display: flex; align-items: center; justify-content: flex-end; font-size: 11px; color: var(--c-muted2); padding-right: 6px; font-weight: 600; }
+.angle-grid { display: grid; gap: 4px; background: var(--c-s3); padding: 4px; border: 1px solid var(--c-border); border-radius: 16px; }
+.gc { border-radius: 12px; cursor: pointer; overflow: hidden; user-select: none; transition: outline 0.1s; }
+.gc:hover { outline: 1.5px solid color-mix(in srgb, var(--c-blue) 40%, transparent); box-shadow: var(--c-popup-shadow); }
+.gc.wm-hit { outline: 2px solid var(--c-blue); outline-offset: -1px; animation: wmPulse 1.2s ease-out 2; }
+.gc.slotted { display: flex !important; background: var(--c-s4); padding: 2px; gap: 2px; align-items: stretch; justify-content: stretch; }
+.front-legend { display: flex; gap: 12px; font-size: 11px; color: var(--c-muted2); align-items: center; padding: 0 4px; flex-wrap: wrap; }
+.legend-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; display: inline-block; vertical-align: middle; }
+
+/* ── Jari / Box ── */
+.jari-col { flex: 1; display: flex; flex-direction: column; overflow: hidden; border-radius: 4px; }
+.box-unit { display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; transition: filter 0.1s; }
+.box-unit.is-front { font-size: 8px; border-radius: 3px; flex-direction: column; align-items: flex-start; justify-content: flex-start; padding: 2px 3px; line-height: 1.3; overflow: hidden; gap: 0; }
+.bx-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; font-weight: 700; }
+.bx-qty  { opacity: 0.65; font-weight: 500; font-size: 0.9em; }
+.box-unit.is-row   { font-size: 10px; font-weight: 700; border-radius: 5px; }
+.box-unit:hover { filter: brightness(1.06); }
+.box-full  { background: color-mix(in srgb, var(--dept,#475569) 16%, var(--c-s1)); box-shadow: inset 3px 0 0 0 var(--dept,#475569); color: color-mix(in srgb, var(--dept,#475569) 45%, var(--c-text)); }
+.box-empty { background: var(--c-s2); box-shadow: inset 0 0 0 1px var(--c-border); }
+@supports not (color: color-mix(in srgb, red, blue)) {
+  .box-full { background: var(--dept,#475569); color: #fff; box-shadow: none; }
+}
+
+/* ── Row stage ── */
+.row-stage { display: flex; flex-direction: column; height: 100%; background: var(--c-s2); }
+.row-body { flex: 1; display: flex; gap: 16px; padding: 16px; overflow: hidden; min-height: 0; }
+.row-left { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.row-left-title { font-size: 12px; color: var(--c-muted2); font-weight: 600; }
+.mini-grid-wrap { display: flex; gap: 5px; }
+.mini-grid { display: grid; gap: 3px; background: var(--c-s3); padding: 3px; border: 1px solid var(--c-border); border-radius: 10px; }
+.mc { border-radius: 3px; cursor: pointer; transition: transform .12s; }
+.mc:hover { transform: scale(1.15); }
+.mc.empty { background: var(--c-s2); box-shadow: inset 0 0 0 1px var(--c-border); }
+.mc.sel-col { outline: 3px solid var(--c-yellow); outline-offset: -1px; }
+.mc.wm-hit-mc { outline: 2px solid var(--c-blue); outline-offset: -1px; }
+.row-center { flex: 1; background: var(--c-s1); border: 1px solid var(--c-border); border-radius: var(--c-radius-md); overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.row-center-hdr { display: flex; background: var(--c-s2); border-bottom: 1px solid var(--c-border); padding: 6px 8px; font-size: 11px; font-weight: 700; color: var(--c-muted2); flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.4px; }
+.rch-lbl  { width: 44px; flex-shrink: 0; }
+.rch-jari { flex: 1; text-align: center; }
+#layer-rows { overflow-y: auto; flex: 1; }
+.layer-row { display: flex; align-items: stretch; border-bottom: 1px solid var(--c-border); cursor: pointer; transition: background .15s; }
+.layer-row:hover  { background: color-mix(in srgb, var(--c-blue) 6%, transparent); }
+.layer-row.sel    { background: color-mix(in srgb, var(--c-blue) 10%, transparent); border-left: 3px solid var(--c-blue); }
+.layer-row.wm-hit-row { background: color-mix(in srgb, var(--c-blue) 12%, transparent); border-left: 3px solid var(--c-blue); }
+.lr-lbl { width: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--c-muted2); background: var(--c-s2); border-right: 1px solid var(--c-border); }
+.lr-jari { flex: 1; padding: 4px 6px; border-right: 1px solid var(--c-border); display: flex; }
+.lr-jari:last-child { border-right: none; }
+
+/* ── SlidePanel ── */
+.sp-outer { flex-shrink: 0; overflow: hidden; width: 0; transition: width 160ms cubic-bezier(0.4,0,0.2,1); }
+.sp-outer.open { width: 436px; }
+.sp-inner { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; padding-left: 16px; opacity: 0; transform: translateX(18px); transition: opacity 260ms ease, transform 260ms ease; will-change: transform,opacity; }
+.sp-outer.open .sp-inner { opacity: 1; transform: translateX(0); }
+.sp-card { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; border-radius: var(--c-radius-lg); background: var(--c-s1); border: 1px solid var(--c-border); box-shadow: var(--c-card-shadow); background-image: var(--c-panel-glow); position: relative; }
+.sp-close { position: absolute; right: 8px; top: 8px; z-index: 10; width: 28px; height: 28px; border-radius: 9999px; background: color-mix(in srgb, var(--c-muted2) 15%, transparent); color: var(--c-muted2); display: flex; align-items: center; justify-content: center; font-size: 13px; transition: background 150ms; }
+.sp-close:hover { background: color-mix(in srgb, var(--c-muted2) 28%, transparent); }
+.sp-hdr { padding: 16px 40px 12px 16px; border-bottom: 1px solid var(--c-border); flex-shrink: 0; }
+.sp-hdr h3 { font-size: 14px; font-weight: 700; color: var(--c-text); }
+.sp-loc { font-size: 12px; color: var(--c-muted2); margin-top: 2px; }
+.sp-body { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; }
+.dp-section { display: flex; flex-direction: column; gap: 5px; }
+.dp-lbl { font-size: 10px; font-weight: 700; color: var(--c-muted2); text-transform: uppercase; letter-spacing: 0.8px; }
+.dp-empty-msg { color: var(--c-muted); font-size: 13px; padding: 28px 0; text-align: center; }
+.dp-stack-item { padding: 8px 10px; background: var(--c-s2); border-radius: 10px; border: 1px solid var(--c-border); margin-bottom: 4px; display: flex; flex-direction: column; gap: 4px; }
+.dp-size-tag { font-size: 11px; font-weight: 700; color: var(--c-blue); }
+.dp-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.dp-chip { background: var(--c-s1); border: 1px solid var(--c-border); border-radius: 8px; padding: 2px 8px; font-size: 12px; color: var(--c-text); }
+.dp-chip.match { border-color: var(--c-blue); color: var(--c-blue); font-weight: 700; }
+
+/* ── Animations ── */
+@keyframes wmPulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-blue) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 10px color-mix(in srgb, var(--c-blue) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* ── prefers-reduced-motion (globals 239-254) ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- ══ Sidebar ══ -->
+<aside class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-icon-chip">M</div>
+    <span class="sb-brand-name">DEXCOWIN MES</span>
+  </div>
+  <button class="sb-tab" onclick="void 0">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+    <span>대시보드</span>
+  </button>
+  <button class="sb-tab" onclick="void 0">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span>입출고</span>
+  </button>
+  <button class="sb-tab active" aria-current="page">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M3 12h3M18 12h3M12 3v3M12 18v3"/><path d="M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
+    <span>창고 지도</span>
+  </button>
+  <button class="sb-tab" onclick="void 0">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>불량</span>
+  </button>
+  <div class="sb-spacer"></div>
+  <button class="sb-theme no-inset" id="theme-btn" onclick="toggleTheme()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    <span id="theme-lbl">라이트</span>
+  </button>
+</aside>
+
+<!-- ══ Main ══ -->
+<div class="main">
+  <header class="topbar">
+    <div class="topbar-chip">🗺</div>
+    <div class="topbar-title">창고 지도</div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-user">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      관리자
+    </div>
+  </header>
+
+  <div class="content-row">
+    <!-- Map card -->
+    <div class="map-card">
+      <!-- Header strip -->
+      <div class="card-header">
+        <button class="back-btn hidden" id="back-btn" onclick="goBack()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          뒤로
+        </button>
+        <div class="breadcrumb" id="breadcrumb">
+          <span class="crumb cur">창고 지도</span>
+        </div>
+        <!-- Search -->
+        <div class="search-wrap">
+          <label class="search-box" id="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="search-input" id="search-input" type="text" placeholder="품목명 검색  (/)" aria-label="품목 위치 검색" autocomplete="off">
+            <button class="search-clear no-inset" id="search-clear" title="지우기">✕</button>
+          </label>
+          <div class="search-results" id="search-results" role="listbox"></div>
+          <div class="search-empty" id="search-empty"></div>
+        </div>
+      </div>
+
+      <!-- Stage -->
+      <div class="stage">
+        <!-- Layer 0: Floor -->
+        <div class="stage-layer active" id="layer-floor">
+          <div class="floor-stage">
+            <div class="warehouse-wrap" id="warehouse-wrap">
+              <div class="warehouse" id="warehouse">
+                <div class="entrance-tag">▼ 입구</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Layer 1: Front view -->
+        <div class="stage-layer" id="layer-front">
+          <div class="front-stage">
+            <div class="front-body">
+              <div class="front-wrap">
+                <div class="front-title" id="front-title"></div>
+                <div class="grid-outer">
+                  <div class="layer-labels" id="layer-labels-front"></div>
+                  <div class="angle-grid" id="angle-grid"></div>
+                </div>
+                <div class="front-legend">
+                  <span style="display:flex;align-items:center;gap:4px"><span class="legend-dot" style="background:var(--c-s2);box-shadow:inset 0 0 0 1px var(--c-border)"></span>비어있음</span>
+                  <span style="display:flex;align-items:center;gap:4px"><span class="legend-dot" style="background:color-mix(in srgb,#3b82f6 16%,var(--c-s1));box-shadow:inset 3px 0 0 0 #3b82f6"></span>박스 있음 (부서색)</span>
+                  <span>높이: 대=전체 · 중=2/3 · 소=1/3</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Layer 2: Row detail -->
+        <div class="stage-layer" id="layer-row">
+          <div class="row-stage">
+            <div class="row-body">
+              <div class="row-left">
+                <div class="row-left-title" id="mini-title"></div>
+                <div class="mini-grid-wrap">
+                  <div class="layer-labels" id="layer-labels-mini"></div>
+                  <div class="mini-grid" id="mini-grid"></div>
+                </div>
+              </div>
+              <div class="row-center">
+                <div class="row-center-hdr">
+                  <div class="rch-lbl">층</div>
+                  <div class="rch-jari">자리 1</div>
+                  <div class="rch-jari">자리 2</div>
+                  <div class="rch-jari">자리 3</div>
+                </div>
+                <div id="layer-rows"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SlidePanel (map-card의 flex 형제) -->
+    <div class="sp-outer" id="sp-outer">
+      <div class="sp-inner">
+        <div class="sp-card">
+          <button class="sp-close no-inset" onclick="closePanel()" aria-label="패널 닫기">✕</button>
+          <div class="sp-hdr">
+            <h3 id="sp-title">상세</h3>
+            <div class="sp-loc" id="sp-loc"></div>
+          </div>
+          <div class="sp-body" id="sp-body">
+            <div class="dp-empty-msg">칸을 클릭하세요</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- .shell -->
+
+<script>
+// ═══════════════════════════════════
+// Dept colors
+// ═══════════════════════════════════
+const DEPT_COLORS = {
+  '조립':'#3b82f6','고압':'#d97706','튜브':'#16a34a','진공':'#6d28d9',
+  '튜닝':'#0e7490','서비스':'#047857','AS':'#be185d','연구':'#b45309',
+  '영업':'#b91c1c','출하':'#0f766e','기타':'#475569'
+};
+const deptColor = n => DEPT_COLORS[n] || DEPT_COLORS['기타'];
+
+// ═══════════════════════════════════
+// Data
+// ═══════════════════════════════════
+const ANGLES = [
+  {id:1,label:'앵글 1',rows:6,layers:6},{id:2,label:'앵글 2',rows:6,layers:6},
+  {id:3,label:'앵글 3',rows:6,layers:6},{id:4,label:'앵글 4',rows:6,layers:6},
+  {id:5,label:'앵글 5',rows:6,layers:6},{id:6,label:'앵글 6',rows:6,layers:6},
+  {id:7,label:'앵글 7',rows:3,layers:6},{id:8,label:'앵글 8',rows:3,layers:6},
+  {id:9,label:'앵글 9',rows:4,layers:6},
+];
+const POSITIONS = {
+  9:{x:12,y:15,w:57,h:116},6:{x:146,y:15,w:646,h:60},
+  8:{x:146,y:100,w:72,h:87},7:{x:218,y:100,w:72,h:87},
+  5:{x:334,y:100,w:74,h:172},4:{x:408,y:100,w:74,h:172},
+  3:{x:526,y:100,w:74,h:172},2:{x:600,y:100,w:74,h:172},
+  1:{x:718,y:100,w:74,h:172},
+};
+// ── Mock data generator (deterministic, 85% fill) ──
+// Wang hash — 균등 분포, sin 기반 주기적 쏠림 없음
+function _h(n) {
+  n = n | 0;
+  n = (n ^ 61) ^ (n >>> 16);
+  n = Math.imul(n, 9) | 0;
+  n = n ^ (n >>> 4);
+  n = Math.imul(n, 0x27d4eb2d) | 0;
+  n = n ^ (n >>> 15);
+  return (n >>> 0) / 4294967296;
+}
+// seed: (a,r,l,purpose) → 오버플로 없이 32비트 범위 유지
+function rng(a,r,l,p) { return _h(((a*31+r)*37+l)*41+(p|0)); }
+const _ITEMS = {
+  '조립':['조립볼트 M6','조립볼트 M8','너트 M6','너트 M8','와셔','스프링와셔','제어보드','회로기판','냉각팬','방열판 대','방열판 소','O링','퓨즈','커넥터 A','절연캡'],
+  '고압':['고압케이블','고압변압기','고압커넥터','고압스위치','고압콘덴서','절연테이프','고압릴레이','전압조정기'],
+  '진공':['진공펌프 소형','진공펌프 C형','진공호스','진공밸브','진공게이지','진공필터','진공오일','진공챔버'],
+  '튜브':['X-Ray 튜브 A형','X-Ray 튜브 B형','X-Ray 필터','튜브 하우징','양극판','음극판','콜리메이터'],
+  '튜닝':['튜닝키트','조정나사','캘리브레이션 판','각도조정판','수평조정 블록','레벨측정기'],
+  '출하':['포장박스 대','포장박스 소','완충재','라벨지','테이프','마커','포장지','봉인씰'],
+};
+const _DW = ['조립','조립','조립','조립','조립','고압','고압','진공','진공','튜브','튜브','튜닝','출하'];
+function _gi(a,r,l,p) { const d=_DW[Math.floor(rng(a,r,l,p)*_DW.length)]; const it=_ITEMS[d]; return {name:it[Math.floor(rng(a,r,l,p+50)*it.length)],qty:1+Math.floor(rng(a,r,l,p+100)*12),dept:d}; }
+function _gs(a,r,l,ji) {
+  const t=Math.floor(rng(a,r,l,20+ji*5)*5), b=ji*100;
+  if(t===0) return [{size:'대',items:[_gi(a,r,l,b+1)]}];
+  if(t===1) return [{size:'중',items:[_gi(a,r,l,b+2)]},{size:'소',items:[_gi(a,r,l,b+3)]}];
+  if(t===2) return [{size:'소',items:[_gi(a,r,l,b+4)]},{size:'소',items:[_gi(a,r,l,b+5)]}];
+  if(t===3) return [{size:'소',items:[_gi(a,r,l,b+6)]}];
+  return [{size:'소',items:[_gi(a,r,l,b+7)]},{size:'소',items:[_gi(a,r,l,b+8)]},{size:'소',items:[_gi(a,r,l,b+9)]}];
+}
+function _gc(a,r,l) {
+  if(rng(a,r,l,0)>0.85) return null;
+  const jaris=[];
+  for(let ji=0;ji<3;ji++) jaris.push(rng(a,r,l,ji+1)>0.25?{stack:_gs(a,r,l,ji)}:{stack:[]});
+  if(jaris.every(j=>!j.stack.length)) jaris[Math.floor(rng(a,r,l,10)*3)]={stack:_gs(a,r,l,3)};
+  return {a,r,l,jaris};
+}
+const CELLS=[];
+ANGLES.forEach(ag=>{ for(let r=1;r<=ag.rows;r++) for(let l=1;l<=ag.layers;l++) { const c=_gc(ag.id,r,l); if(c) CELLS.push(c); } });
+
+// ═══════════════════════════════════
+// Helpers
+// ═══════════════════════════════════
+const getAngle = id => ANGLES.find(a=>a.id===id);
+const cellData = (a,r,l) => CELLS.find(c=>c.a===a&&c.r===r&&c.l===l)||null;
+const EMPTY_JARI = () => ({stack:[]});
+function getJaris(a,r,l) {
+  const c = cellData(a,r,l);
+  if(!c) return [EMPTY_JARI(),EMPTY_JARI(),EMPTY_JARI()];
+  const j = c.jaris||[];
+  return [j[0]||EMPTY_JARI(),j[1]||EMPTY_JARI(),j[2]||EMPTY_JARI()];
+}
+function sizeUnit(s) { return s==='대'?3:s==='중'?2:1; }
+function stackHeight(st) { return (st||[]).reduce((s,b)=>s+sizeUnit(b.size),0); }
+function cellOccupied(a,r,l) { return getJaris(a,r,l).some(j=>j.stack.length>0); }
+
+function stackDeptColor(stack) {
+  if(!stack||!stack.length) return null;
+  const t={};
+  for(const box of stack) for(const item of (box.items||[])) { const d=item.dept||'기타'; t[d]=(t[d]||0)+(item.qty||1); }
+  const s=Object.entries(t).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
+  return s.length ? deptColor(s[0][0]) : null;
+}
+function cellDeptColor(a,r,l) {
+  const t={};
+  for(const j of getJaris(a,r,l)) for(const box of (j.stack||[])) for(const item of (box.items||[])) { const d=item.dept||'기타'; t[d]=(t[d]||0)+(item.qty||1); }
+  const s=Object.entries(t).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
+  return s.length ? deptColor(s[0][0]) : null;
+}
+
+// Build jari column: scale='front'|'row'
+function makeJariCol(jari, scale) {
+  const col = document.createElement('div');
+  col.className = 'jari-col';
+  const stack = jari.stack||[];
+  const used = stackHeight(stack);
+  const empty = 3 - used;
+  if(empty>0) {
+    const e = document.createElement('div');
+    e.className = 'box-unit box-empty ' + (scale==='front'?'is-front':'is-row');
+    e.style.flex = empty;
+    col.appendChild(e);
+  }
+  ;[...stack].reverse().forEach(box=>{
+    const b = document.createElement('div');
+    b.className = 'box-unit box-full ' + (scale==='front'?'is-front':'is-row');
+    b.style.flex = sizeUnit(box.size);
+    const col_dept = stackDeptColor([box]);
+    if(col_dept) b.style.setProperty('--dept', col_dept);
+    if(scale==='row') {
+      b.textContent = box.size;
+    } else {
+      const item = box.items[0];
+      if(item) {
+        const nm=document.createElement('span'); nm.className='bx-name'; nm.textContent=item.name; b.appendChild(nm);
+        const qt=document.createElement('span'); qt.className='bx-qty'; qt.textContent='×'+item.qty; b.appendChild(qt);
+      }
+    }
+    b.title = box.items.map(i=>`${i.name} ×${i.qty}`).join('\n');
+    col.appendChild(b);
+  });
+  return col;
+}
+
+// ═══════════════════════════════════
+// State
+// ═══════════════════════════════════
+let navHistory = [];
+let curAngle = null, curRow = null, curLayer = null;
+let cellW = 160, cellH = 65;
+
+function computeFrontCellSize(ag) {
+  const body = document.querySelector('.front-body');
+  if (!body || !body.clientHeight) return;
+  const llW = 50; // layer-labels width
+  const gap = 4, pad = 8; // angle-grid gap / padding*2
+  const titleH = 28, legendH = 26;
+  const availW = body.clientWidth - llW - (ag.rows-1)*gap - pad - 40;
+  const availH = body.clientHeight - titleH - legendH - (ag.layers-1)*gap - pad - 8;
+  cellW = Math.max(44, Math.floor(availW / ag.rows));
+  cellH = Math.max(24, Math.floor(availH / ag.layers));
+}
+
+// ═══════════════════════════════════
+// Stage transitions
+// ═══════════════════════════════════
+let curStage = 'floor';
+const DEPTH = {floor:0,front:1,row:2};
+
+function navigateTo(name) {
+  if(name===curStage) return;
+  const fromEl = document.getElementById('layer-'+curStage);
+  const toEl   = document.getElementById('layer-'+name);
+  const deeper = DEPTH[name] > DEPTH[curStage];
+
+  fromEl.classList.remove('active');
+  fromEl.classList.add(deeper ? 'to-left' : 'from-right');
+
+  // Prepare incoming layer off-screen, then activate in next frame
+  toEl.classList.remove('active');
+  toEl.classList.add(deeper ? 'from-right' : 'to-left');
+
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    toEl.classList.remove('from-right','to-left');
+    toEl.classList.add('active');
+    fromEl.addEventListener('transitionend',()=>fromEl.classList.remove('to-left','from-right'),{once:true});
+  }));
+
+  curStage = name;
+  document.getElementById('back-btn').classList.toggle('hidden', name==='floor');
+}
+
+function goBack() {
+  closePanel();
+  const prev = navHistory.pop();
+  if(!prev||prev==='floor') { navigateTo('floor'); renderBreadcrumb('floor'); }
+  else if(prev==='front') { curRow=null; curLayer=null; renderFront(); navigateTo('front'); renderBreadcrumb('front'); }
+}
+
+// ═══════════════════════════════════
+// Breadcrumb
+// ═══════════════════════════════════
+function renderBreadcrumb(stage) {
+  const bc = document.getElementById('breadcrumb');
+  if(stage==='floor') {
+    bc.innerHTML = '<span class="crumb cur">창고 지도</span>';
+  } else if(stage==='front') {
+    const ag = getAngle(curAngle);
+    bc.innerHTML = `<span class="crumb" id="bc-floor">창고 지도</span><span class="sep">›</span><span class="crumb cur">${ag.label}</span>`;
+    document.getElementById('bc-floor').onclick = ()=>{ navHistory=[]; navigateTo('floor'); renderBreadcrumb('floor'); };
+  } else {
+    const ag = getAngle(curAngle);
+    bc.innerHTML = `<span class="crumb" id="bc-floor2">창고 지도</span><span class="sep">›</span><span class="crumb" id="bc-front2">${ag.label}</span><span class="sep">›</span><span class="crumb cur">${curRow}줄</span>`;
+    document.getElementById('bc-floor2').onclick = ()=>{ navHistory=[]; navigateTo('floor'); renderBreadcrumb('floor'); };
+    document.getElementById('bc-front2').onclick = ()=>{ navHistory=['floor']; curRow=null; curLayer=null; renderFront(); navigateTo('front'); renderBreadcrumb('front'); };
+  }
+}
+
+// ═══════════════════════════════════
+// Floor Plan
+// ═══════════════════════════════════
+function renderFloor() {
+  const wh = document.getElementById('warehouse');
+  wh.querySelectorAll('.angle-block').forEach(e=>e.remove());
+  ANGLES.forEach(ag=>{
+    const p = POSITIONS[ag.id]; if(!p) return;
+    const b = document.createElement('div');
+    b.className = 'angle-block'; b.dataset.aid = ag.id;
+    Object.assign(b.style,{left:p.x+'px',top:p.y+'px',width:p.w+'px',height:p.h+'px'});
+    b.innerHTML = `<span class="al">${ag.label}</span><span class="as">${ag.rows}줄·${ag.layers}층</span>`;
+    b.onclick = ()=>{ navHistory=['floor']; curAngle=ag.id; curRow=null; curLayer=null; renderFront(); navigateTo('front'); renderBreadcrumb('front'); };
+    wh.appendChild(b);
+  });
+  fitWarehouse();
+}
+
+function fitWarehouse() {
+  const wrap = document.getElementById('warehouse-wrap');
+  const stage = document.getElementById('layer-floor');
+  const aw = stage.clientWidth-32, ah = stage.clientHeight-32;
+  const sc = Math.min(aw/880, ah/300);
+  wrap.style.transform = `scale(${sc})`;
+}
+
+// ═══════════════════════════════════
+// Front View
+// ═══════════════════════════════════
+function renderFront() {
+  const ag = getAngle(curAngle);
+  computeFrontCellSize(ag);
+  document.getElementById('front-title').textContent = `${ag.label} 정면도`;
+  const ll = document.getElementById('layer-labels-front');
+  ll.innerHTML = '';
+  for(let l=ag.layers;l>=1;l--) {
+    const d=document.createElement('div'); d.className='ll'; d.style.height=cellH+'px'; d.textContent=l+'층'; ll.appendChild(d);
+  }
+  const grid = document.getElementById('angle-grid');
+  grid.innerHTML = '';
+  grid.style.gridTemplateColumns=`repeat(${ag.rows},${cellW}px)`;
+  grid.style.gridTemplateRows=`repeat(${ag.layers},${cellH}px)`;
+  for(let l=ag.layers;l>=1;l--) {
+    for(let r=1;r<=ag.rows;r++) {
+      const d=document.createElement('div');
+      d.className='gc slotted'; d.title=`${r}줄 ${l}층`; d.dataset.r=r; d.dataset.l=l;
+      const cr=r,cl=l;
+      d.onclick=()=>{ navHistory.push('front'); curRow=cr; curLayer=cl; renderRow(); navigateTo('row'); renderBreadcrumb('row'); openPanel(cr,cl); };
+      getJaris(curAngle,r,l).forEach(j=>d.appendChild(makeJariCol(j,'front')));
+      grid.appendChild(d);
+    }
+  }
+}
+
+// ═══════════════════════════════════
+// Row Detail
+// ═══════════════════════════════════
+function renderRow() {
+  const ag = getAngle(curAngle);
+  document.getElementById('mini-title').textContent = ag.label;
+  const mll = document.getElementById('layer-labels-mini');
+  mll.innerHTML = '';
+  for(let l=ag.layers;l>=1;l--) {
+    const d=document.createElement('div'); d.className='ll'; d.style.cssText='height:24px;font-size:10px;'; d.textContent=l+'층'; mll.appendChild(d);
+  }
+  const mg = document.getElementById('mini-grid');
+  mg.innerHTML = '';
+  mg.style.gridTemplateColumns=`repeat(${ag.rows},28px)`;
+  mg.style.gridTemplateRows=`repeat(${ag.layers},24px)`;
+  for(let l=ag.layers;l>=1;l--) {
+    for(let r=1;r<=ag.rows;r++) {
+      const occ=cellOccupied(curAngle,r,l);
+      const d=document.createElement('div');
+      d.className=`mc ${occ?'occupied':'empty'}${r===curRow?' sel-col':''}`;
+      d.style.cssText='width:28px;height:24px;'; d.title=`${r}줄 ${l}층`;
+      d.dataset.r=r; d.dataset.l=l;
+      if(occ) { const col=cellDeptColor(curAngle,r,l); if(col) d.style.background=`color-mix(in srgb,${col} 22%,var(--c-s1))`; }
+      const cr=r; d.onclick=()=>{ curRow=cr; curLayer=null; renderRow(); renderBreadcrumb('row'); };
+      mg.appendChild(d);
+    }
+  }
+  const lr = document.getElementById('layer-rows');
+  lr.innerHTML = '';
+  for(let l=ag.layers;l>=1;l--) {
+    const jaris=getJaris(curAngle,curRow,l);
+    const row=document.createElement('div');
+    row.className='layer-row'+(l===curLayer?' sel':''); row.dataset.l=l; row.style.minHeight=cellH+'px';
+    const lbl=document.createElement('div'); lbl.className='lr-lbl'; lbl.textContent=l+'층'; row.appendChild(lbl);
+    jaris.forEach(j=>{ const cell=document.createElement('div'); cell.className='lr-jari'; cell.appendChild(makeJariCol(j,'row')); row.appendChild(cell); });
+    const cl=l;
+    row.onclick=()=>{ lr.querySelectorAll('.layer-row').forEach(r=>r.classList.remove('sel')); row.classList.add('sel'); curLayer=cl; openPanel(curRow,cl); };
+    lr.appendChild(row);
+  }
+}
+
+// ═══════════════════════════════════
+// SlidePanel
+// ═══════════════════════════════════
+function openPanel(r, l, matchQ) {
+  const ag = getAngle(curAngle);
+  document.getElementById('sp-title').textContent = `${r}줄 ${l}층`;
+  document.getElementById('sp-loc').textContent = `${ag.label} · ${r}줄 · ${l}층`;
+  const jaris = getJaris(curAngle,r,l);
+  const body = document.getElementById('sp-body');
+  body.innerHTML = '';
+  let any=false;
+  jaris.forEach((jari,ji)=>{
+    const sec=document.createElement('div'); sec.className='dp-section';
+    const lbl=document.createElement('div'); lbl.className='dp-lbl'; lbl.textContent=`자리 ${ji+1}`; sec.appendChild(lbl);
+    if(!jari.stack.length) {
+      const emp=document.createElement('div'); emp.style.cssText='color:var(--c-muted);font-size:13px;padding:2px 0;'; emp.textContent='비어있음'; sec.appendChild(emp);
+    } else {
+      any=true;
+      jari.stack.forEach(box=>{
+        const item=document.createElement('div'); item.className='dp-stack-item';
+        const st=document.createElement('div'); st.className='dp-size-tag'; st.textContent=`[${{대:'대형',중:'중형',소:'소형'}[box.size]||box.size}]`; item.appendChild(st);
+        const chips=document.createElement('div'); chips.className='dp-chips';
+        box.items.forEach(i=>{ const ch=document.createElement('div'); ch.className='dp-chip'+(matchQ&&i.name.toLowerCase().includes(matchQ.toLowerCase())?' match':''); ch.textContent=`${i.name} ×${i.qty}`; chips.appendChild(ch); });
+        item.appendChild(chips); sec.appendChild(item);
+      });
+    }
+    body.appendChild(sec);
+  });
+  if(!any) { const m=document.createElement('div'); m.className='dp-empty-msg'; m.textContent='이 칸은 비어있습니다'; body.appendChild(m); }
+  document.getElementById('sp-outer').classList.add('open');
+}
+
+function closePanel() { document.getElementById('sp-outer').classList.remove('open'); }
+
+// ═══════════════════════════════════
+// Search
+// ═══════════════════════════════════
+const sinput = document.getElementById('search-input');
+const sclear = document.getElementById('search-clear');
+const sresults = document.getElementById('search-results');
+const sempty = document.getElementById('search-empty');
+
+function getAllItems() {
+  const out=[];
+  CELLS.forEach(cell=>{
+    (cell.jaris||[]).forEach((j,ji)=>{
+      (j.stack||[]).forEach(box=>{
+        (box.items||[]).forEach(item=>{ out.push({a:cell.a,r:cell.r,l:cell.l,jari:ji+1,item,box}); });
+      });
+    });
+  });
+  return out;
+}
+
+sinput.addEventListener('input', doSearch);
+sinput.addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(); });
+
+function doSearch() {
+  const q = sinput.value.trim();
+  sclear.classList.toggle('show', q.length>0);
+  sresults.classList.remove('open'); sempty.classList.remove('open'); clearHits();
+  if(!q) return;
+
+  const lq = q.toLowerCase();
+  const hits = getAllItems().filter(r=>r.item.name.toLowerCase().includes(lq));
+  const grouped = {};
+  hits.forEach(h=>{ const k=`${h.a}-${h.r}-${h.l}`; if(!grouped[k]) grouped[k]={a:h.a,r:h.r,l:h.l,items:[]}; grouped[k].items.push(h.item); });
+  const results = Object.values(grouped);
+
+  // Floor angle badges
+  const ac={};
+  results.forEach(r=>{ ac[r.a]=(ac[r.a]||0)+1; });
+  document.querySelectorAll('.angle-block').forEach(el=>{
+    const aid=+el.dataset.aid;
+    if(ac[aid]) { const b=document.createElement('div'); b.className='angle-badge'; b.textContent=ac[aid]; el.appendChild(b); el.classList.add('wm-hit'); }
+  });
+
+  if(!results.length) { sempty.textContent=`"${q}" 위치를 찾을 수 없습니다`; sempty.classList.add('open'); return; }
+
+  if(results.length===1) { doNavigateTo(results[0], q); return; }
+
+  sresults.innerHTML=`<div class="sr-hdr">${results.length}개 위치에서 발견</div>`;
+  results.forEach(res=>{
+    const ag=getAngle(res.a); const col=cellDeptColor(res.a,res.r,res.l)||DEPT_COLORS['기타'];
+    const row=document.createElement('div'); row.className='sr-row'; row.setAttribute('role','option');
+    row.innerHTML=`<div class="sr-bar" style="background:${col}"></div><div><div class="sr-loc">${ag.label} · ${res.r}줄 · ${res.l}층</div><div class="sr-name">${res.items.map(i=>i.name).join(', ')}</div></div><div class="sr-qty">×${res.items.reduce((s,i)=>s+i.qty,0)}</div>`;
+    row.onclick=()=>{ sresults.classList.remove('open'); doNavigateTo(res,q); };
+    sresults.appendChild(row);
+  });
+  sresults.classList.add('open');
+}
+
+function doNavigateTo(res, q) {
+  const tA=res.a, tR=res.r, tL=res.l;
+  if(curAngle!==tA || curStage==='floor') { curAngle=tA; renderFront(); navigateTo('front'); renderBreadcrumb('front'); navHistory=['floor']; }
+  setTimeout(()=>{
+    curRow=tR; curLayer=tL; renderRow(); navigateTo('row'); renderBreadcrumb('row'); navHistory=['floor','front'];
+    setTimeout(()=>{
+      document.querySelectorAll('#layer-rows .layer-row').forEach(row=>{
+        if(+row.dataset.l===tL) { row.classList.add('wm-hit-row'); row.scrollIntoView({block:'center',behavior:'smooth'}); pulseEl(row); }
+      });
+      openPanel(tR,tL,q);
+    },280);
+  },260);
+}
+
+function pulseEl(el) {
+  el.classList.remove('wm-hit'); void el.offsetWidth; el.classList.add('wm-hit');
+}
+
+function clearHits() {
+  document.querySelectorAll('.wm-hit').forEach(el=>el.classList.remove('wm-hit'));
+  document.querySelectorAll('.wm-hit-row').forEach(el=>el.classList.remove('wm-hit-row'));
+  document.querySelectorAll('.angle-badge').forEach(el=>el.remove());
+}
+
+sclear.addEventListener('click', ()=>{ sinput.value=''; sclear.classList.remove('show'); sresults.classList.remove('open'); sempty.classList.remove('open'); clearHits(); });
+
+document.addEventListener('click', e=>{
+  if(!document.getElementById('search-box').contains(e.target)&&!sresults.contains(e.target)) sresults.classList.remove('open');
+});
+
+// ═══════════════════════════════════
+// Keyboard
+// ═══════════════════════════════════
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape') {
+    if(document.getElementById('sp-outer').classList.contains('open')) closePanel();
+    else if(sinput.value) { sinput.value=''; sclear.classList.remove('show'); sresults.classList.remove('open'); sempty.classList.remove('open'); clearHits(); }
+  }
+  if(e.key==='/'&&document.activeElement!==sinput) { e.preventDefault(); sinput.focus(); }
+});
+
+// ═══════════════════════════════════
+// Theme
+// ═══════════════════════════════════
+function toggleTheme() {
+  const dark = document.documentElement.getAttribute('data-theme')==='dark';
+  document.documentElement.setAttribute('data-theme', dark?'':'dark');
+  document.getElementById('theme-lbl').textContent = dark?'라이트':'다크';
+}
+
+// ═══════════════════════════════════
+// Init
+// ═══════════════════════════════════
+window.addEventListener('resize', fitWarehouse);
+renderFloor();
+renderBreadcrumb('floor');
+</script>
+</body>
+</html>
