@@ -21,15 +21,11 @@
 
 메모리 정정: `project_dept_approval_routing_bug` → **해소됨**(548cdc2d, `dept_hierarchy.can_approve_department`). 재플래그 금지.
 
-## D3 — 불량 처리 redesign 잔여 〔후속, brainstorming 선행〕
+## D3 — 불량 처리 화면 〔거의 완성 — 전용 핸드오프 참조〕
 
-기준 문서: [defect-handling-redesign.md](../docs/defect-handling-redesign.md)(2026-05-21 합의). 백엔드 다수 준비됨, 프론트 미완 3건:
-1. **PA·PF 격리 항목 BOM 트리 펼침** — 격리 화면에서 완제품/조립품의 하위 자재 트리 표시.
-2. **부서 간 격리 이동 + 처리** — 격리 재고를 다른 부서로 이동(현재 같은 부서 내만).
-3. **대시보드 위치별 재고에 불량(빨강) 표시** — `InventoryLocation` DEFECTIVE 를 대시보드 위치 카드에 시각화.
-
-코드 출발점: 불량 화면 `frontend/app/legacy/_components/`(불량 탭), 백엔드 `app/services/inv_defective.py`·`app/routers/defects.py`. e2e 는 `io-defect.spec.ts`(격리/해제)까지 커버 — 위 3건 구현 시 spec 확장 대상.
-**열린 질문**: BOM 트리 펼침 UX(깊이·기본 펼침?), 부서간 이동의 결재 필요 여부, 대시보드 표시 위치/색 규칙. → brainstorming 필요.
+→ **[defect-screen-followup.md](2026-06-04-defect-screen-followup.md)** 로 분리(정밀 조사 결과).
+**정정**: "남은 3건" 중 2건(PA·PF 분해 BOM 트리·대시보드 불량 빨강 표시)은 **이미 구현 완료**였다.
+진짜 남은 건 **"부서 간 격리 이동" 1건뿐**(원래 설계도 "보류"). 급한 작업 없음.
 
 ## D4 — 창고 앵글맵 시각화 〔후속, brainstorming 선행〕
 
