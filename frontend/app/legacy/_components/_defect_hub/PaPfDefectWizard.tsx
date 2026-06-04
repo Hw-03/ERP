@@ -324,7 +324,7 @@ export function PaPfDefectWizard({
         <span style={{ color: LEGACY_COLORS.text }}>
           {action === "scrap"
             ? `${location.item_name} × ${processQty}개를 폐기합니다.`
-            : `${location.item_name} × ${processQty}개를 분해·재작업합니다.`}
+            : `${location.item_name} × ${processQty}개를 분해·재작업합니다. 회수하지 않은 하위 품목은 폐기되지 않고 격리로 이동합니다.`}
         </span>
       </ConfirmModal>
     </div>,

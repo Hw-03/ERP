@@ -190,13 +190,13 @@ export function DisassembleTree({
               aria-label="상위 품목 정상 수량"
             />
             <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>/</span>
-            <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>폐기</span>
-            <span className="inline-block min-w-[2rem] text-center text-base font-black" style={{ color: LEGACY_COLORS.red }}>
+            <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.yellow }}>격리</span>
+            <span className="inline-block min-w-[2rem] text-center text-base font-black" style={{ color: LEGACY_COLORS.yellow }}>
               {formatQty(Math.max(0, parentQty - parentKeepQty), { maximumFractionDigits: 2, trimTrailingZeros: true })}
             </span>
           </div>
           <span className="text-[10px] font-black tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
-            — 하위 품목 회수 결정 —
+            — 하위 품목 회수 결정 (회수 외 = 격리) —
           </span>
         </div>
       </div>
@@ -250,7 +250,8 @@ function TreeNode({
   const isSplitQty = !isDecomposed && !allKeep && !allScrap;
 
   const keepColor = LEGACY_COLORS.blue;
-  const scrapColor = LEGACY_COLORS.red;
+  // 회수 외 잔량은 폐기가 아니라 격리로 이동 — 폐기(red)와 구분되는 보류 톤(yellow).
+  const scrapColor = LEGACY_COLORS.yellow;
   const borderColor = isDecomposed
     ? LEGACY_COLORS.border
     : allKeep
@@ -356,7 +357,7 @@ function TreeNode({
 
       {/* 수량 입력 행 */}
       {!isDecomposed ? (
-        /* leaf 또는 "이 품목 통째로" 모드: 정상/폐기 입력 */
+        /* leaf 또는 "이 품목 통째로" 모드: 정상/격리 입력 (회수 외 = 격리) */
         <div className="flex flex-wrap items-center gap-3 px-4 pb-3">
           <div className="flex items-center gap-2">
             <span className="text-xs font-black" style={{ color: keepColor }}>정상</span>
@@ -378,7 +379,7 @@ function TreeNode({
               aria-label={`${node.item_name} 정상 수량`}
             />
             <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>/</span>
-            <span className="text-xs font-bold" style={{ color: scrapColor }}>폐기</span>
+            <span className="text-xs font-bold" style={{ color: scrapColor }}>격리</span>
             <span
               className="inline-block min-w-[2rem] text-center text-base font-black"
               style={{ color: scrapColor }}

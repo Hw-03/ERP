@@ -283,6 +283,47 @@ def scrap_defective(
     return inv
 
 
+def receive_defective(
+    db: Session,
+    item_id: uuid.UUID,
+    qty: Decimal,
+    dept: DepartmentEnum,
+    reason: ReasonContext,
+) -> Inventory:
+    """분해 등으로 '생성'되는 자식을 격리(DEFECTIVE)로 신규 적재. 총량 증가.
+
+    mark_defective 와 달리 출처(PRODUCTION/창고) 차감이 없다 — 분해 시점에
+    자식 재고는 아직 존재하지 않으므로, keep_qty 의 PRODUCTION 신규 입고
+    (receive_confirmed)와 대칭으로 DEFECTIVE 버킷에 신규 적재한다.
+    defective_at 기록. 사유 필수.
+    """
+    if qty <= 0:
+        raise ValueError("격리 수량은 0보다 커야 합니다.")
+    if not reason.category:
+        raise ValueError("reason_category 는 필수입니다.")
+
+    get_or_create_inventory(db, item_id)
+    _lock_location(db, item_id, dept, LocationStatusEnum.DEFECTIVE)
+    db.flush()
+
+    db.execute(
+        sa_update(InventoryLocation)
+        .where(InventoryLocation.item_id == item_id)
+        .where(InventoryLocation.department == dept)
+        .where(InventoryLocation.status == LocationStatusEnum.DEFECTIVE)
+        .values(
+            quantity=func.coalesce(InventoryLocation.quantity, 0) + qty,
+            defective_at=func.coalesce(InventoryLocation.defective_at, datetime.utcnow()),
+        )
+        .execution_options(synchronize_session=False)
+    )
+    db.flush()
+    db.expire_all()
+    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    _sync_total(db, inv)
+    return inv
+
+
 def _consume_normal_source(
     db: Session,
     item_id: uuid.UUID,
