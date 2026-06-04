@@ -64,6 +64,7 @@ from app.services.inv_defective import (  # noqa: F401
     ReasonContext,
     mark_defective,
     unmark_defective,
+    receive_defective,
     scrap_defective,
     scrap_normal,
     return_to_supplier,

@@ -416,13 +416,27 @@ def submit_defective_disassemble(
             child_log_ids.append(log.log_id)
 
         if scrap_qty > 0:
-            scrap_inv = inventory_svc.get_or_create_inventory(db, item_id)
+            # 회수하지 않은 잔량은 폐기로 소실시키지 않고 분해 부서의 격리(DEFECTIVE)로
+            # 적재한다. keep_qty(PRODUCTION 입고)와 대칭으로 신규 적재 → 총량 증가.
+            # 이후 폐기 여부는 불량 허브의 격리→폐기(결재) 흐름에서 결정한다.
+            q_inv = inventory_svc.receive_defective(
+                db,
+                item_id,
+                scrap_qty,
+                parent_dept,
+                inventory_svc.ReasonContext(
+                    category=reason_category,
+                    memo=child_note or reason_memo,
+                    actor=actor,
+                ),
+            )
+            qty_before_q = (q_inv.quantity or Decimal("0")) - scrap_qty
             log = TransactionLog(
                 item_id=item_id,
-                transaction_type=TransactionTypeEnum.DEFECT_SCRAP,
-                quantity_change=-scrap_qty,
-                quantity_before=scrap_inv.quantity,
-                quantity_after=scrap_inv.quantity,
+                transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
+                quantity_change=scrap_qty,
+                quantity_before=qty_before_q,
+                quantity_after=q_inv.quantity,
                 produced_by=actor,
                 notes=None,
                 reason_category=reason_category,
