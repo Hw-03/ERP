@@ -240,7 +240,7 @@ _MIGRATION_DDL: list[str] = [
     "ALTER TABLE admin_audit_logs ADD COLUMN actor_employee_code VARCHAR(16)",
     "CREATE INDEX IF NOT EXISTS ix_aal_actor_emp ON admin_audit_logs(actor_employee_code)",
     # 2026-05-29: item_models 폐기 — 모델 매핑은 item_code prefix 에서 유도.
-    # 411개 row 가 비어있던 상태로 김민재 사원 SOLO 필터 실패 원인. ItemModel ORM 클래스
+    # 411개 row 가 비어있던 상태로 김민재 대리 SOLO 필터 실패 원인. ItemModel ORM 클래스
     # 제거와 함께 테이블도 DROP. backup: backend/_backup/mes_pre_item_models_drop_2026-05-29.db
     "DROP TABLE IF EXISTS item_models",
 ]
@@ -899,11 +899,12 @@ def _recreate_items_with_generated_mes_code() -> None:
         raw.close()
 
 
-def _make_mes_code_partial_unique() -> None:
-    """ix_items_mes_code 를 전체 unique → 부분 unique(WHERE deleted_at IS NULL) 로 교체.
+def _make_mes_code_global_unique() -> None:
+    """ix_items_mes_code 를 부분 unique(WHERE deleted_at IS NULL) → 전체 unique 로 복원.
 
-    소프트삭제된 품목과 같은 mes_code 재등록을 허용한다(R2-5). 멱등 — 이미 부분이면 NO-OP.
-    SQLite 전용(dev). PG 는 create_all 의 postgresql_where 부분 인덱스로 신규 생성.
+    소프트삭제된 mes_code 도 영구 점유해 같은 코드 재등록을 차단한다(이력 추적성). R2-5 회귀.
+    멱등 — 이미 전체면 NO-OP. SQLite 전용(dev).
+    next_serial_no 가 삭제 포함 전체 max+1 이라 정상 신규 등록은 영향 없음.
     """
     if engine.dialect.name != "sqlite":
         return
@@ -912,12 +913,11 @@ def _make_mes_code_partial_unique() -> None:
             "SELECT sql FROM sqlite_master WHERE type='index' AND name='ix_items_mes_code'"
         )).fetchone()
         existing = (row[0] if row else "") or ""
-        if "WHERE" in existing.upper():
-            return  # 이미 부분 unique
+        if existing and "WHERE" not in existing.upper():
+            return  # 이미 전체 unique
         conn.execute(text("DROP INDEX IF EXISTS ix_items_mes_code"))
         conn.execute(text(
-            "CREATE UNIQUE INDEX IF NOT EXISTS ix_items_mes_code "
-            "ON items(mes_code) WHERE deleted_at IS NULL"
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_items_mes_code ON items(mes_code)"
         ))
         conn.commit()
 
@@ -1100,12 +1100,12 @@ def run_migrations() -> dict[str, object]:
         errors.append(msg)
         logger.warning(msg, exc_info=False)
 
-    # 2026-06-02: ix_items_mes_code 전체 unique → 부분 unique(deleted_at IS NULL).
-    # 소프트삭제 후 동일 mes_code 재등록 허용(R2-5). items 재생성 이후 실행. 멱등.
+    # ix_items_mes_code 부분 unique(deleted_at IS NULL) → 전체 unique 복원.
+    # 소프트삭제된 mes_code 도 영구 점유해 재사용 차단(R2-5 회귀). items 재생성 이후 실행. 멱등.
     try:
-        _make_mes_code_partial_unique()
+        _make_mes_code_global_unique()
     except Exception as exc:  # noqa: BLE001
-        msg = f"[migrate] mes_code partial unique failed: {exc}"
+        msg = f"[migrate] mes_code global unique restore failed: {exc}"
         errors.append(msg)
         logger.warning(msg, exc_info=False)
 
