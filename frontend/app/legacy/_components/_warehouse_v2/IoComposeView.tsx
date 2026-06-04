@@ -176,6 +176,7 @@ export function IoComposeView({
           toDepartment: state.toDepartment,
           referenceNo: state.referenceNo,
           notes: state.notes,
+          batchId: autosaveBatchIdRef.current,
           bundles: state.bundles,
         });
         autosaveBatchIdRef.current = result.batch_id;
@@ -262,7 +263,7 @@ export function IoComposeView({
     async () => {
       if (!employeeId) return;
       if (state.bundles.length === 0) return;
-      await saveDraft({
+      const saved = await saveDraft({
         employeeId,
         workType: state.workType,
         subType: state.subType,
@@ -270,8 +271,10 @@ export function IoComposeView({
         toDepartment: state.toDepartment,
         referenceNo: state.referenceNo,
         notes: state.notes,
+        batchId: autosaveBatchIdRef.current,
         bundles: state.bundles,
       });
+      autosaveBatchIdRef.current = saved.batch_id;
     },
     async () => {
       // '저장하지 않고 이동' — 펜딩 autosave 취소 + 이미 저장된 batch 삭제.
@@ -312,10 +315,21 @@ export function IoComposeView({
     return null;
   }
 
+  // 새 작업 시작(작업유형/세부작업/부서 변경) — 진행 중 임시저장 슬롯과의 연결을 끊는다.
+  // 그래야 다음 저장이 기존 슬롯을 덮지 않고 새 슬롯으로 쌓여 '작업 중' 탭에 누적된다.
+  function beginNewCompositionSlot() {
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+    autosaveBatchIdRef.current = null;
+  }
+
   function changeFromDepartment(next: string) {
     state.setFromDepartment(next);
     if (state.bundles.length > 0) {
       state.setBundles([]);
+      beginNewCompositionSlot();
       onStatusChange("부서 변경으로 작업 묶음을 초기화했습니다.");
     }
   }
@@ -324,6 +338,7 @@ export function IoComposeView({
     state.setToDepartment(next);
     if (state.bundles.length > 0) {
       state.setBundles([]);
+      beginNewCompositionSlot();
       onStatusChange("부서 변경으로 작업 묶음을 초기화했습니다.");
     }
   }
@@ -331,11 +346,13 @@ export function IoComposeView({
   function handleSubTypeChange(next: IoSubType) {
     state.setSubType(next);
     state.setBundles([]);
+    beginNewCompositionSlot();
   }
 
   function handleWorkTypeChange(next: IoWorkType) {
     state.setWorkType(next);
     setError(null);
+    beginNewCompositionSlot();
     state.goTo(2);
   }
 
@@ -359,6 +376,7 @@ export function IoComposeView({
         toDepartment: state.toDepartment,
         referenceNo: state.referenceNo,
         notes: state.notes,
+        batchId: autosaveBatchIdRef.current,
         bundles: state.bundles,
       });
       autosaveBatchIdRef.current = response.batch_id;

@@ -119,6 +119,23 @@ describe("ioApi.saveDraft", () => {
     expect(url).toContain("/api/io/draft");
     expect((init as RequestInit).method).toBe("PUT");
   });
+
+  it("PUT /api/io/draft forwards batch_id for in-place update", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ batch_id: "b-9" })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await ioApi.saveDraft({
+      requester_employee_id: "e-1",
+      work_type: "receive",
+      sub_type: "receive_supplier",
+      batch_id: "b-9",
+      bundles: [],
+    });
+
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.batch_id).toBe("b-9");
+  });
 });
 
 // ── getDraft ──────────────────────────────────────────────────────────────────

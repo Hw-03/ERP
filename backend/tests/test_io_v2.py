@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from decimal import Decimal
 
 from app.models import (
@@ -713,3 +714,108 @@ def test_io_submit_without_client_request_id_skips_idempotency(client, db_sessio
     assert second.status_code == 201
     assert first.json()["batch"]["batch_id"] != second.json()["batch"]["batch_id"]
     assert db_session.query(IoBatch).count() == 2
+
+
+# ---------------------------------------------------------------------------
+# F5 — 임시저장 누적(새 슬롯) / batch_id 기반 in-place 갱신
+# ---------------------------------------------------------------------------
+
+
+def _preview_receive_bundles(client, requester, item, qty: str = "3"):
+    res = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "targets": [
+                {"source_kind": "direct_item", "item_id": str(item.item_id), "quantity": qty}
+            ],
+        },
+    )
+    assert res.status_code == 200, res.json()
+    return res.json()["bundles"]
+
+
+def _put_receive_draft(client, requester, bundles, batch_id=None):
+    body = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "receive",
+        "sub_type": "receive_supplier",
+        "bundles": bundles,
+    }
+    if batch_id is not None:
+        body["batch_id"] = batch_id
+    return client.put("/api/io/draft", json=body)
+
+
+def test_io_draft_save_stacks_new_slots(client, db_session, make_item):
+    """batch_id 없이 저장하면 같은 (work_type, sub_type)라도 새 슬롯이 누적된다."""
+    item_a = make_item(name="Draft A", warehouse_qty=Decimal("0"))
+    item_b = make_item(name="Draft B", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    r1 = _put_receive_draft(client, requester, _preview_receive_bundles(client, requester, item_a))
+    assert r1.status_code == 200, r1.json()
+    r2 = _put_receive_draft(client, requester, _preview_receive_bundles(client, requester, item_b))
+    assert r2.status_code == 200, r2.json()
+
+    assert r1.json()["batch_id"] != r2.json()["batch_id"]
+    drafts = client.get(
+        f"/api/io/drafts?requester_employee_id={requester.employee_id}"
+    ).json()
+    assert len(drafts) == 2
+
+
+def test_io_draft_save_with_batch_id_updates_in_place(client, db_session, make_item):
+    """batch_id를 실어 보내면 해당 draft만 갱신되고 슬롯 수는 늘지 않는다."""
+    item = make_item(name="Draft Inplace", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    bundles = _preview_receive_bundles(client, requester, item)
+    first = _put_receive_draft(client, requester, bundles)
+    assert first.status_code == 200, first.json()
+    batch_id = first.json()["batch_id"]
+
+    again = _put_receive_draft(client, requester, bundles, batch_id=batch_id)
+    assert again.status_code == 200, again.json()
+    assert again.json()["batch_id"] == batch_id
+
+    drafts = client.get(
+        f"/api/io/drafts?requester_employee_id={requester.employee_id}"
+    ).json()
+    assert len(drafts) == 1
+    assert drafts[0]["batch_id"] == batch_id
+
+
+def test_io_draft_update_others_batch_forbidden(client, db_session, make_item):
+    """타인의 draft batch_id로 갱신 시도 시 403."""
+    item = make_item(name="Draft Owner", warehouse_qty=Decimal("0"))
+    owner = _make_employee(db_session, code="OWN1", name="Owner")
+    other = _make_employee(db_session, code="OTH1", name="Other")
+    db_session.commit()
+
+    first = _put_receive_draft(client, owner, _preview_receive_bundles(client, owner, item))
+    batch_id = first.json()["batch_id"]
+
+    res = _put_receive_draft(
+        client, other, _preview_receive_bundles(client, other, item), batch_id=batch_id
+    )
+    assert res.status_code == 403, res.json()
+
+
+def test_io_draft_update_unknown_batch_unprocessable(client, db_session, make_item):
+    """존재하지 않는 batch_id로 갱신 시도 시 422."""
+    item = make_item(name="Draft Unknown", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    res = _put_receive_draft(
+        client,
+        requester,
+        _preview_receive_bundles(client, requester, item),
+        batch_id=str(uuid.uuid4()),
+    )
+    assert res.status_code == 422, res.json()

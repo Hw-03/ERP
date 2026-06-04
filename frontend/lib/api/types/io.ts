@@ -84,6 +84,8 @@ export interface IoDraftPayload {
   reference_no?: string | null;
   notes?: string | null;
   client_request_id?: string | null;
+  // 이어 작업 중인 draft의 batch_id. 있으면 갱신, 없으면 새 슬롯 생성.
+  batch_id?: string | null;
   bundles: IoBundle[];
 }
 

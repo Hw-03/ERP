@@ -2583,6 +2583,18 @@
       },
       "IoDraftUpsert": {
         "properties": {
+          "batch_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id"
+          },
           "bundles": {
             "items": {
               "$ref": "#/components/schemas/IoBundlePayload"
@@ -2923,6 +2935,18 @@
       },
       "IoSubmitRequest": {
         "properties": {
+          "batch_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id"
+          },
           "bundles": {
             "items": {
               "$ref": "#/components/schemas/IoBundlePayload"
