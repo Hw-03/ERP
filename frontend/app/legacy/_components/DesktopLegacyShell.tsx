@@ -95,6 +95,24 @@ function DesktopLegacyShellInner() {
     confirmAdminNavigation(doSwitch);
   }
 
+  // 알림 클릭 딥링크 — 해당 탭(+섹션)으로 이동. section 은 입출고 섹션(queue/dept-queue/mine).
+  function handleNotificationNavigate(tab: string, section: string | null) {
+    if (!VALID_TABS.has(tab as DesktopTabId)) return;
+    const target = tab as DesktopTabId;
+    confirmAdminNavigation(() => {
+      router.push(
+        section ? `?tab=${target}&section=${section}` : `?tab=${target}`,
+        { scroll: false },
+      );
+      if (target === activeTab) {
+        // 같은 탭이면 리마운트를 강제해 섹션 초기화 로직(?section=)이 다시 실행되게 한다.
+        setRefreshNonce((n) => n + 1);
+      } else {
+        setActiveTab(target);
+      }
+    });
+  }
+
   // 브라우저 뒤로/앞으로 → URL ?tab= 변경 시 activeTab 동기화.
   // defect_dept 쿼리도 함께 읽어 불량 탭 진입 시 부서 필터로 전달.
   // ?defect_dept= 만 있고 ?tab= 이 없으면(레거시 링크 호환) 불량 탭으로 재라우팅.
@@ -214,6 +232,7 @@ function DesktopLegacyShellInner() {
                 <WeeklyWeekPicker weekMon={weekMon} onChange={setWeekMon} />
               ) : undefined
             }
+            onNavigate={handleNotificationNavigate}
           />
 
           <div className="mt-1 min-h-0 flex-1 overflow-hidden flex">{content}</div>

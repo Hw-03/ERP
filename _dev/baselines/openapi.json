@@ -3886,6 +3886,142 @@
         "title": "MessageResponse",
         "type": "object"
       },
+      "NotificationListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "unread_count": {
+            "title": "Unread Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "unread_count"
+        ],
+        "title": "NotificationListResponse",
+        "type": "object"
+      },
+      "NotificationMarkReadRequest": {
+        "properties": {
+          "notification_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notification Ids"
+          },
+          "recipient_employee_id": {
+            "format": "uuid",
+            "title": "Recipient Employee Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "recipient_employee_id"
+        ],
+        "title": "NotificationMarkReadRequest",
+        "type": "object"
+      },
+      "NotificationResponse": {
+        "properties": {
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "is_read": {
+            "title": "Is Read",
+            "type": "boolean"
+          },
+          "notification_id": {
+            "format": "uuid",
+            "title": "Notification Id",
+            "type": "string"
+          },
+          "recipient_employee_id": {
+            "format": "uuid",
+            "title": "Recipient Employee Id",
+            "type": "string"
+          },
+          "related_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Request Id"
+          },
+          "target_section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Section"
+          },
+          "target_tab": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Tab"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "notification_id",
+          "recipient_employee_id",
+          "type",
+          "title",
+          "is_read",
+          "created_at"
+        ],
+        "title": "NotificationResponse",
+        "type": "object"
+      },
       "PinVerifyRequest": {
         "properties": {
           "pin": {
@@ -11299,6 +11435,136 @@
         ]
       }
     },
+    "/api/notifications": {
+      "get": {
+        "operationId": "list_notifications_api_notifications_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "recipient_employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Recipient Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Notifications",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/notifications/mark-read": {
+      "post": {
+        "description": "본인의 안 읽은 알림을 읽음 처리. notification_ids 가 없으면 전체.",
+        "operationId": "mark_read_api_notifications_mark_read_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationMarkReadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Read",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/notifications/unread-count": {
+      "get": {
+        "operationId": "unread_count_api_notifications_unread_count_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "recipient_employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Recipient Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Unread Count Api Notifications Unread Count Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unread Count",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
     "/api/production/bom-check/{item_id}": {
       "get": {
         "operationId": "check_production_feasibility_api_production_bom_check__item_id__get",
@@ -13450,6 +13716,10 @@
     {
       "description": "관리자 액션 감사로그 조회 (마스터/설정 변경).",
       "name": "Admin Audit"
+    },
+    {
+      "description": "결재 알림 — 요청 도착/승인/반려.",
+      "name": "Notifications"
     }
   ]
 }

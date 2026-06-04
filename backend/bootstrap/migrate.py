@@ -243,6 +243,23 @@ _MIGRATION_DDL: list[str] = [
     # 411개 row 가 비어있던 상태로 김민재 대리 SOLO 필터 실패 원인. ItemModel ORM 클래스
     # 제거와 함께 테이블도 DROP. backup: backend/_backup/mes_pre_item_models_drop_2026-05-29.db
     "DROP TABLE IF EXISTS item_models",
+    # 2026-06-04: 결재 알림 — 요청 도착(승인자)/승인·반려(요청자) 알림 영속 테이블.
+    """CREATE TABLE IF NOT EXISTS notifications (
+        notification_id CHAR(36) PRIMARY KEY,
+        recipient_employee_id CHAR(36) NOT NULL REFERENCES employees(employee_id) ON DELETE CASCADE,
+        type VARCHAR(32) NOT NULL,
+        title VARCHAR(200) NOT NULL,
+        body TEXT,
+        target_tab VARCHAR(32),
+        target_section VARCHAR(32),
+        related_request_id CHAR(36) REFERENCES stock_requests(request_id) ON DELETE SET NULL,
+        is_read BOOLEAN NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_notifications_recipient ON notifications(recipient_employee_id)",
+    "CREATE INDEX IF NOT EXISTS ix_notification_recipient_unread ON notifications(recipient_employee_id, is_read)",
+    "CREATE INDEX IF NOT EXISTS ix_notifications_related_request ON notifications(related_request_id)",
+    "CREATE INDEX IF NOT EXISTS ix_notifications_created_at ON notifications(created_at)",
 ]
 
 

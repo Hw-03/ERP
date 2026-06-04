@@ -10,6 +10,7 @@ import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { ResultModal } from "./common/ResultModal";
 import { api } from "@/lib/api";
 import { clearCurrentOperator, useCurrentOperator } from "./login/useCurrentOperator";
+import { NotificationBell } from "./notifications/NotificationBell";
 
 const DEFAULT_STATUS = "DEXCOWIN MES System";
 
@@ -33,6 +34,7 @@ export function DesktopTopbar({
   status,
   statusNonce,
   titleAddon,
+  onNavigate,
 }: {
   title: string;
   icon?: ElementType;
@@ -41,6 +43,7 @@ export function DesktopTopbar({
   status?: string;
   statusNonce?: number;
   titleAddon?: ReactNode;
+  onNavigate?: (tab: string, section: string | null) => void;
 }) {
   const operator = useCurrentOperator();
   const roleLabel = operator ? WAREHOUSE_ROLE_LABEL[operator.warehouse_role] ?? null : null;
@@ -98,6 +101,8 @@ export function DesktopTopbar({
             })()}
           </span>
         )}
+
+        <NotificationBell onNavigate={onNavigate} />
 
         {actionSlot}
 

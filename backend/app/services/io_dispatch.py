@@ -25,6 +25,7 @@ from app.models import (
 )
 from app.services import inventory as inventory_svc
 from app.services import stock_requests as stock_request_svc
+from app.services import notifications as notif_svc
 from app.services.io_preview import (
     APPROVAL_SUB_TYPES,
     MANUAL_LINE_ORIGINS,
@@ -174,6 +175,8 @@ def _submit_approval(
         requires_department_approval=force_dept_approval,
     )
     _link_stock_request(db, batch=batch, request=request, lines=lines)
+    # 창고 결재 대기 요청 도착 → 창고 정/부에게 알림 (io 라우터가 커밋).
+    notif_svc.notify_request_arrived(db, request)
 
 
 def _submit_dept_only_approval(db: Session, *, requester: Employee, batch: IoBatch) -> None:
@@ -217,6 +220,10 @@ def _submit_dept_only_approval(db: Session, *, requester: Employee, batch: IoBat
         batch.completed_at = now
         batch.updated_at = now
         db.flush()
+
+    # 자가승인으로 즉시 완료된 경우엔 notify_request_arrived 가 상태 가드로 아무 것도 안 한다.
+    # 부서 결재 대기로 남은 경우에만 부서 승인자에게 도착 알림 (io 라우터가 커밋).
+    notif_svc.notify_request_arrived(db, request)
 
 
 def execute_batch_after_dept_approval(

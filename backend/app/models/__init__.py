@@ -31,6 +31,10 @@ from app.models.io_batch import (
     IoBundle,
     IoLine,
 )
+from app.models.notification import (
+    Notification,
+    NotificationTypeEnum,
+)
 from app.models.item import (
     BOM,
     Item,
@@ -89,6 +93,9 @@ __all__ = [
     "IoBatch",
     "IoBundle",
     "IoLine",
+    # notifications
+    "Notification",
+    "NotificationTypeEnum",
     # system / audit
     "SystemSetting",
     "AdminAuditLog",

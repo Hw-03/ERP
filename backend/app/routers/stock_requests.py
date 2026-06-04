@@ -33,6 +33,7 @@ from app.schemas import (
 )
 from app.services import stock_requests as svc
 from app.services._tx import commit_and_refresh, commit_only
+from app.services import notifications as notif_svc
 from app._evt import emit as _evt_emit
 
 
@@ -81,6 +82,8 @@ def create_stock_request(payload: StockRequestCreate, db: Session = Depends(get_
                 reason_category=payload.reason_category,
                 reason_memo=payload.reason_memo,
             )
+            # 결재 대기 요청이면 승인 담당자에게 도착 알림 (커밋 전 같은 트랜잭션).
+            notif_svc.notify_request_arrived(db, request)
             commit_and_refresh(db, request)
             db.refresh(request)
             return request
@@ -414,6 +417,7 @@ def approve_stock_request(
 ):
     request = _load_request_for_action(db, request_id)
     approver = _load_actor(db, payload.actor_employee_id)
+    prev_status = request.status
 
     try:
         svc.approve_request(db, request, approver=approver, pin=payload.pin, http_request=http_request)
@@ -432,6 +436,12 @@ def approve_stock_request(
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
+    # 이번 호출로 실제 COMPLETED 전이됐을 때만 요청자에게 승인 알림 (부분/멱등 제외).
+    if (
+        request.status == StockRequestStatusEnum.COMPLETED
+        and prev_status != StockRequestStatusEnum.COMPLETED
+    ):
+        notif_svc.notify_request_decided(db, request, decision="approved")
     commit_and_refresh(db, request)
     _evt_emit(
         "sr_approve_warehouse",
@@ -467,6 +477,7 @@ def reject_stock_request(
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
+    notif_svc.notify_request_decided(db, request, decision="rejected")
     commit_and_refresh(db, request)
     _evt_emit(
         "sr_reject_warehouse",
@@ -487,6 +498,7 @@ def department_approve_stock_request(
     """부서 결재 승인 — department_role in (primary/deputy) 또는 admin."""
     request = _load_request_for_action(db, request_id)
     approver = _load_actor(db, payload.actor_employee_id)
+    prev_status = request.status
 
     try:
         svc.approve_request_department(db, request, approver=approver, pin=payload.pin, http_request=http_request)
@@ -504,6 +516,11 @@ def department_approve_stock_request(
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
+    if (
+        request.status == StockRequestStatusEnum.COMPLETED
+        and prev_status != StockRequestStatusEnum.COMPLETED
+    ):
+        notif_svc.notify_request_decided(db, request, decision="approved")
     commit_and_refresh(db, request)
     _evt_emit(
         "sr_approve_dept",
@@ -540,6 +557,7 @@ def department_reject_stock_request(
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
+    notif_svc.notify_request_decided(db, request, decision="rejected")
     commit_and_refresh(db, request)
     _evt_emit(
         "sr_reject_dept",
@@ -593,6 +611,7 @@ def submit_stock_request_draft(
                 request_id=request_id,
                 requester_employee_id=payload.requester_employee_id,
             )
+            notif_svc.notify_request_arrived(db, request)
             commit_and_refresh(db, request)
             return request
         except IntegrityError as exc:
