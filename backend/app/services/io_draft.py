@@ -10,8 +10,12 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from datetime import datetime
+
 from app.models import IoBatch
+from app.services.io_preview import APPROVAL_SUB_TYPES
 from app.services.io_persist import (
+    _add_bundles_and_lines,
     _batch_to_payload,
     _load_requester,
     _persist_batch,
@@ -19,20 +23,40 @@ from app.services.io_persist import (
 
 
 def save_draft(db: Session, payload) -> dict:
+    """임시저장. batch_id 가 오면 해당 draft 를 제자리 갱신, 없으면 새 슬롯 누적.
+
+    덮어쓰기(이전 동작) 제거 — 같은 (work_type, sub_type) 라도 batch_id 가 없으면
+    새 draft 가 쌓여 '작업 중' 탭에서 여러 작업을 이어서 진행할 수 있다.
+    """
     requester = _load_requester(db, payload.requester_employee_id)
-    existing = (
-        db.query(IoBatch)
-        .filter(
-            IoBatch.requester_employee_id == requester.employee_id,
-            IoBatch.work_type == payload.work_type,
-            IoBatch.sub_type == payload.sub_type,
-            IoBatch.status == "draft",
+    incoming_batch_id = getattr(payload, "batch_id", None)
+
+    if incoming_batch_id is not None:
+        batch = (
+            db.query(IoBatch)
+            .filter(IoBatch.batch_id == incoming_batch_id)
+            .first()
         )
-        .first()
-    )
-    if existing is not None:
-        db.delete(existing)
+        if batch is None or batch.status != "draft":
+            raise ValueError("임시저장 작업을 찾을 수 없습니다.")
+        if batch.requester_employee_id != requester.employee_id:
+            raise PermissionError("본인 임시저장 작업만 수정할 수 있습니다.")
+        # 메타 갱신 + 자식 교체. client_request_id 는 보존(submit 멱등성).
+        batch.work_type = payload.work_type
+        batch.sub_type = payload.sub_type
+        batch.from_department = payload.from_department
+        batch.to_department = payload.to_department
+        batch.requires_approval = payload.sub_type in APPROVAL_SUB_TYPES
+        batch.reference_no = payload.reference_no
+        batch.notes = payload.notes
+        batch.updated_at = datetime.utcnow()
+        # cascade='all, delete-orphan' — 비우고 flush 해서 기존 자식을 INSERT 전에 DELETE.
+        batch.bundles.clear()
         db.flush()
+        _add_bundles_and_lines(db, batch, payload)
+        db.refresh(batch)
+        return _batch_to_payload(batch)
+
     batch = _persist_batch(db, requester=requester, payload=payload, status="draft")
     return _batch_to_payload(batch)
 

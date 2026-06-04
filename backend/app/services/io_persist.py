@@ -193,6 +193,14 @@ def _persist_batch(
     db.add(batch)
     db.flush()
 
+    _add_bundles_and_lines(db, batch, payload)
+    db.refresh(batch)
+    return batch
+
+
+def _add_bundles_and_lines(db: Session, batch: IoBatch, payload) -> None:
+    """payload.bundles → IoBundle/IoLine 적재. 신규 생성(_persist_batch)과
+    draft in-place 갱신(io_draft.save_draft)이 공유하는 단일 적재 루프."""
     for incoming_bundle in payload.bundles:
         bundle = IoBundle(
             bundle_id=incoming_bundle.bundle_id,
@@ -230,8 +238,6 @@ def _persist_batch(
                 )
             )
     db.flush()
-    db.refresh(batch)
-    return batch
 
 
 def _load_requester(db: Session, employee_id: uuid.UUID) -> Employee:

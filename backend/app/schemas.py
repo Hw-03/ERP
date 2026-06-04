@@ -865,6 +865,9 @@ class IoDraftUpsert(BaseModel):
     reference_no: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
     client_request_id: Optional[str] = Field(None, max_length=64)
+    # 이어 작업 중인 draft의 batch_id. 있으면 해당 draft를 갱신, 없으면 새 슬롯 생성.
+    # submit 경로(IoSubmitRequest)는 이 값을 무시한다.
+    batch_id: Optional[uuid.UUID] = None
     bundles: List[IoBundlePayload] = Field(default_factory=list)
 
 
