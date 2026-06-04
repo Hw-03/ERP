@@ -243,6 +243,41 @@ _MIGRATION_DDL: list[str] = [
     # 411개 row 가 비어있던 상태로 김민재 대리 SOLO 필터 실패 원인. ItemModel ORM 클래스
     # 제거와 함께 테이블도 DROP. backup: backend/_backup/mes_pre_item_models_drop_2026-05-29.db
     "DROP TABLE IF EXISTS item_models",
+    # 2026-06-04: 튜브→고압/진공 인수인계서.
+    """CREATE TABLE IF NOT EXISTS handovers (
+        handover_id CHAR(36) PRIMARY KEY,
+        handover_code VARCHAR(40),
+        status VARCHAR(20) NOT NULL DEFAULT 'draft',
+        author_employee_id CHAR(36) NOT NULL REFERENCES employees(employee_id) ON DELETE RESTRICT,
+        author_name VARCHAR(100) NOT NULL,
+        from_department VARCHAR(50) NOT NULL DEFAULT '튜브',
+        to_department VARCHAR(50) NOT NULL,
+        title VARCHAR(200) NOT NULL,
+        process_content TEXT,
+        product_name VARCHAR(200),
+        doc_date DATETIME,
+        analysis_text TEXT,
+        notes TEXT,
+        received_by_employee_id CHAR(36) REFERENCES employees(employee_id) ON DELETE SET NULL,
+        received_by_name VARCHAR(100),
+        received_at DATETIME,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )""",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ix_handovers_code ON handovers(handover_code)",
+    "CREATE INDEX IF NOT EXISTS ix_handovers_status ON handovers(status)",
+    "CREATE INDEX IF NOT EXISTS ix_handovers_author ON handovers(author_employee_id)",
+    """CREATE TABLE IF NOT EXISTS handover_lines (
+        line_id CHAR(36) PRIMARY KEY,
+        handover_id CHAR(36) NOT NULL REFERENCES handovers(handover_id) ON DELETE CASCADE,
+        item_id CHAR(36) NOT NULL REFERENCES items(item_id) ON DELETE RESTRICT,
+        item_name_snapshot VARCHAR(200) NOT NULL,
+        mes_code_snapshot VARCHAR(50),
+        quantity INTEGER NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_handover_lines_handover ON handover_lines(handover_id)",
+    "CREATE INDEX IF NOT EXISTS ix_handover_lines_item ON handover_lines(item_id)",
 ]
 
 

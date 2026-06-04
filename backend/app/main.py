@@ -41,6 +41,7 @@ from app.routers import (
     departments,
     dept_adjustment,
     employees,
+    handover,
     inventory,
     io,
     items,
@@ -93,6 +94,7 @@ app = FastAPI(
         {"name": "Codes", "description": "코드 마스터 (제품기호/옵션/공정)."},
         {"name": "Variance", "description": "차이 분석."},
         {"name": "Admin Audit", "description": "관리자 액션 감사로그 조회 (마스터/설정 변경)."},
+        {"name": "Handover", "description": "튜브→고압/진공 인수인계서."},
     ],
 )
 
@@ -277,6 +279,7 @@ app.include_router(models_router.router, prefix="/api/models", tags=["Models"])
 app.include_router(admin_audit.router, prefix="/api/admin", tags=["Admin Audit"])
 app.include_router(admin_audit_csv.router, prefix="/api/admin", tags=["Admin Audit"])
 app.include_router(stock_requests.router, prefix="/api/stock-requests", tags=["Stock Requests"])
+app.include_router(handover.router, prefix="/api/handovers", tags=["Handover"])
 app.include_router(dept_adjustment.router, prefix="/api/dept-adjustment", tags=["Dept Adjustment"])
 app.include_router(defects.router, prefix="/api/defects", tags=["Defects"])
 app.include_router(warehouse_map.router, prefix="/api/warehouse-map", tags=["Warehouse Map"])

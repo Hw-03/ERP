@@ -49,12 +49,16 @@ export function DesktopWarehouseView({
     return eid ? deptQueueCountCache.get(eid) ?? 0 : 0;
   });
   const [restoreIoDraft, setRestoreIoDraft] = useState<IoBatch | null>(null);
+  const [handoverInboxCount, setHandoverInboxCount] = useState(0);
 
   const operatorEmployeeId = operator?.employee_id ?? employeeId;
   const canSeeQueue =
     (operator?.warehouse_role ?? "none") === "primary" ||
     (operator?.warehouse_role ?? "none") === "deputy";
   const canSeeDeptQueue = isDepartmentApprover(operator);
+  // 인수인계: 작성(튜브 부서원) 또는 인수 확인(부서 결재 가능자) 가능하면 탭 노출.
+  const canReceiveHandover = canSeeDeptQueue;
+  const showHandover = (operator?.department ?? "") === "튜브" || canReceiveHandover;
 
   useEffect(() => {
     if (operator && employeeId === "") setEmployeeId(operator.employee_id);
@@ -96,6 +100,14 @@ export function DesktopWarehouseView({
       .catch(() => {});
   }, [canSeeDeptQueue, operatorEmployeeId, panelRefreshNonce]);
 
+  useEffect(() => {
+    if (!canReceiveHandover || !operatorEmployeeId) return;
+    api
+      .countHandoverInbox(operatorEmployeeId)
+      .then(({ count }) => setHandoverInboxCount(count))
+      .catch(() => {});
+  }, [canReceiveHandover, operatorEmployeeId, panelRefreshNonce]);
+
   if (operator && !canEnterIO(operator)) {
     return <WarehouseAccessDenied department={operator.department ?? ""} />;
   }
@@ -114,19 +126,23 @@ export function DesktopWarehouseView({
           onChange={setSectionTab}
           showQueue={canSeeQueue}
           showDeptQueue={canSeeDeptQueue}
+          showHandover={showHandover}
           cartCount={cartCount}
           queueCount={warehouseQueueCount}
           deptQueueCount={deptQueueCount}
+          handoverInboxCount={handoverInboxCount}
         />
 
         <WarehouseDraftPanelTabs
           sectionTab={sectionTab}
           canSeeQueue={canSeeQueue}
           canSeeDeptQueue={canSeeDeptQueue}
+          operator={operator}
           operatorEmployeeId={operator?.employee_id}
           employeeId={employeeId}
           refreshNonce={panelRefreshNonce}
           globalSearch={globalSearch}
+          items={items}
           setItems={setItems}
           onContinueDraft={handleLegacyDraftContinue}
           onContinueIoDraft={(draft) => {
