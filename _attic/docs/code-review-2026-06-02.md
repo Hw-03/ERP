@@ -299,9 +299,19 @@ GLOSSARY 통일안과 어긋나는 화면 라벨 (사용자가 실제로 보는 
 | 에러표준(§3) | departments·admin_audit_csv 7곳 `http_error` (프론트 호환) | `507fc98c` |
 | mes_code 부분unique(R2-5) | 부분 Index + 멱등 마이그레이션(dev 복사본으로 전체→부분 교체·멱등 검증) | `274a2e0a` |
 
-### e2e 검증 결과 ⚠️
+### e2e 검증 결과 ⚠️ → 해소 ✅ (2026-06-04)
 - 용어 변경은 **정적 안전**(내역 탭 banned 0건).
-- **e2e 인프라 미완 발견**: `@playwright/test` 미설치 + `/legacy` 로그인 게이트로 e2e가 baseline 부터 미작동(3 failed — 모두 페이지 진입 단계). **내 변경과 무관.** e2e 활성화는 별도 작업(`npm i -D @playwright/test` + 로그인 헬퍼/E2E 시드).
+- ~~**e2e 인프라 미완 발견**: `@playwright/test` 미설치 + `/legacy` 로그인 게이트로 e2e가 baseline 부터 미작동(3 failed).~~ → **2026-06-04 전부 해소**.
+
+#### e2e 인프라 완성 (2026-06-04, 커밋 `4c152b9b`) ✅
+- **전용 DB 격리**: `frontend/tests/e2e/global-setup.ts`/`global-teardown.ts` — 전용 `backend/mes_e2e.db`(부트스트랩·시드) + 전용 백엔드 포트 8021 + 전용 프론트 3100(`BACKEND_INTERNAL_URL` 프록시). teardown 에서 실 `backend/mes.db` SHA256 불변 검증 — **실 DB 절대 미접촉 보장**.
+- **로그인 우회**: `_helpers.ts` `loginAsOperator` — MesLoginGate 3중 검증(operator·boot_id·활성직원)을 런타임 조회로 inject(고정값 불가).
+- **시드**: 창고/부서 primary 역할 부여 + 품목/BOM + 조립 부서 생산재고(produce 전제, `transfer_to_production`).
+- **쓰기 4 spec 전부 그린**(`test.fixme` 제거, app 코드 미접촉·role/text 셀렉터만):
+  - io-receive(낱개→**부서 결재**), io-process-produce(BOM→**즉시 반영**), io-warehouse-to-dept·io-dept-to-warehouse(**창고 결재**) + io-history-labels(라벨 baseline). **총 7 테스트 그린**.
+  - 라이브 정책 재확인: receive 는 "즉시반영"이 아니라 **낱개 라인→부서 결재**(`hasManualLine`), produce 는 **즉시 반영**(BOM 라인은 manual 아님). io-history-labels 는 라이브 UI 기준 정정(work type 3개·정규식 메타문자 버그 수정).
+- **verify 통합**: `scripts/dev/verify_e2e.ps1` 신설 + `verify_local.ps1 -IncludeE2E` 스위치.
+- **PR #18 MERGED**(2026-06-04) + dev `mes.db` 부분 unique 적용 확인(`ix_items_mes_code … WHERE deleted_at IS NULL`).
 
 ### 추가 재평가 (2차)
 - **에러표준(§3)**: 구식 `raise HTTPException` 실제 **2파일 7곳**뿐(§3 "95%" 과장). 프론트 `extractErrorMessage`가 str/dict 모두 호환 → 안전.
