@@ -12,12 +12,17 @@
 }
 
 .cell {
-  transition: outline 0.1s;
   cursor: pointer;
 }
-.cell:hover {
-  outline: 1.5px solid color-mix(in srgb, var(--c-blue) 40%, transparent);
-  box-shadow: var(--c-popup-shadow);
+
+.boxHover {
+  transition: outline 0.08s, filter 0.08s;
+  cursor: default;
+}
+.boxHover:hover {
+  outline: 2px solid var(--c-blue);
+  outline-offset: -1px;
+  filter: brightness(1.08);
 }
 
 .hit {
@@ -33,11 +38,7 @@
 }
 
 .layerRow {
-  transition: background 0.15s;
   cursor: pointer;
-}
-.layerRow:hover {
-  background: color-mix(in srgb, var(--c-blue) 6%, transparent);
 }
 
 .miniCell {

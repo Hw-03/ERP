@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { WarehouseAngle, WarehouseBox } from "@/lib/api/warehouse-map";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { JariColumn } from "./JariColumn";
@@ -159,7 +159,7 @@ export function FloorStage({
 }
 
 // ═══════════════════════════════════════════════════════
-// Front stage — 정면도 (앵글 내 줄×층 그리드, 칸=자리3)
+// Front stage — 정면도 (단일 그리드: 줄 헤더 + 층 라벨 + 셀)
 // ═══════════════════════════════════════════════════════
 export function FrontStage({
   angle,
@@ -173,15 +173,15 @@ export function FrontStage({
   onCellClick: (row: number, layer: number) => void;
 }) {
   const bodyRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: 150, h: 64 });
+  const [cellH, setCellH] = useState(64);
 
   useEffect(() => {
     const el = bodyRef.current;
     if (!el) return;
     const fit = () => {
-      const availH = el.clientHeight - 30 - (angle.layers - 1) * 4 - 16;
-      const h = Math.max(40, Math.floor(availH / angle.layers));
-      setSize({ w: 0, h });
+      // body 높이 − 제목(28) − 줄헤더(22) − 행간 gap(layers*6) − 패딩(22)
+      const availH = el.clientHeight - 28 - 22 - angle.layers * 6 - 22;
+      setCellH(Math.max(40, Math.floor(availH / angle.layers)));
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -208,14 +208,44 @@ export function FrontStage({
       <div style={{ fontSize: 13, fontWeight: 700, color: LEGACY_COLORS.text, marginBottom: 6 }}>
         {angle.label} 정면도
       </div>
-      <div style={{ display: "flex", gap: 8, alignItems: "flex-start", width: "100%", flex: 1, minHeight: 0 }}>
-        {/* layer labels */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 4, flexShrink: 0 }}>
-          {layers.map((l) => (
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "grid",
+          rowGap: 4,
+          columnGap: 12,
+          gridTemplateColumns: `34px repeat(${angle.rows}, minmax(72px, 1fr))`,
+          gridTemplateRows: `22px repeat(${angle.layers}, ${cellH}px)`,
+        }}
+      >
+        {/* 코너 + 줄 헤더(상단) */}
+        <div />
+        {rows.map((r) => (
+          <div
+            key={`h${r}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 11,
+              fontWeight: 700,
+              color: LEGACY_COLORS.muted2,
+              borderRadius: 6,
+              background: r % 2 === 0
+                ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 6%, ${LEGACY_COLORS.s2})`
+                : LEGACY_COLORS.s2,
+            }}
+          >
+            {r}줄
+          </div>
+        ))}
+
+        {/* 본문: 각 층 → [층 라벨] + 칸들 */}
+        {layers.map((l) => (
+          <Fragment key={l}>
             <div
-              key={l}
               style={{
-                height: size.h,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "flex-end",
@@ -227,24 +257,7 @@ export function FrontStage({
             >
               {l}층
             </div>
-          ))}
-        </div>
-        {/* grid */}
-        <div
-          style={{
-            flex: 1,
-            display: "grid",
-            gap: 4,
-            padding: 4,
-            background: LEGACY_COLORS.s4,
-            border: `1px solid ${LEGACY_COLORS.border}`,
-            borderRadius: 16,
-            gridTemplateColumns: `repeat(${angle.rows}, minmax(64px, 1fr))`,
-            gridTemplateRows: `repeat(${angle.layers}, ${size.h}px)`,
-          }}
-        >
-          {layers.map((l) =>
-            rows.map((r) => {
+            {rows.map((r) => {
               const k = cellKey(angle.id, r, l);
               const stacks = jariStacks(cellIndex.get(k), angle.jaris_per_cell);
               return (
@@ -257,7 +270,11 @@ export function FrontStage({
                     display: "flex",
                     gap: 2,
                     padding: 2,
-                    background: LEGACY_COLORS.s2,
+                    minWidth: 0,
+                    background: r % 2 === 0
+                      ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 5%, ${LEGACY_COLORS.s2})`
+                      : LEGACY_COLORS.s2,
+                    border: `1px solid ${LEGACY_COLORS.border}`,
                     borderRadius: 8,
                     overflow: "hidden",
                   }}
@@ -267,16 +284,16 @@ export function FrontStage({
                   ))}
                 </div>
               );
-            }),
-          )}
-        </div>
+            })}
+          </Fragment>
+        ))}
       </div>
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════
-// Row stage — 줄 확대 (미니맵 + 층별 자리 테이블)
+// Row stage — 줄 확대 (상단 가로 미니맵 + 층별 자리 테이블, 층 높이 가득)
 // ═══════════════════════════════════════════════════════
 export function RowStage({
   angle,
@@ -304,80 +321,90 @@ export function RowStage({
         flex: 1,
         minHeight: 0,
         display: "flex",
-        gap: 16,
+        flexDirection: "column",
+        gap: 10,
         padding: 16,
         background: LEGACY_COLORS.s2,
         overflow: "hidden",
       }}
     >
-      {/* mini overview */}
-      <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, marginRight: 8 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: LEGACY_COLORS.muted2 }}>{angle.label}</div>
-        <div style={{ display: "flex", gap: 5 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            {layers.map((l) => (
-              <div
-                key={l}
-                style={{
-                  height: 24,
-                  display: "flex",
-                  alignItems: "center",
-                  fontSize: 10,
-                  color: LEGACY_COLORS.muted2,
-                  paddingRight: 4,
-                }}
-              >
-                {l}층
-              </div>
-            ))}
-          </div>
-          <div
-            style={{
-              display: "grid",
-              gap: 3,
-              padding: 3,
-              background: LEGACY_COLORS.s3,
-              border: `1px solid ${LEGACY_COLORS.border}`,
-              borderRadius: 10,
-              gridTemplateColumns: `repeat(${angle.rows}, 28px)`,
-              gridTemplateRows: `repeat(${angle.layers}, 24px)`,
-            }}
-          >
-            {layers.map((l) =>
-              rows.map((r) => {
-                const boxes = cellIndex.get(cellKey(angle.id, r, l));
-                const occ = cellOccupied(boxes);
-                const col = occ ? cellColor(boxes) : null;
-                return (
-                  <div
-                    key={`${r}-${l}`}
-                    title={`${r}줄 ${l}층`}
-                    onClick={() => onRowChange(r)}
-                    className={styles.miniCell}
-                    style={{
-                      width: 28,
-                      height: 24,
-                      borderRadius: 3,
-                      background: occ && col
-                        ? `color-mix(in srgb, ${col} 40%, ${LEGACY_COLORS.s1})`
-                        : "transparent",
-                      border: occ ? undefined : `1px dashed color-mix(in srgb, ${LEGACY_COLORS.muted2} 30%, transparent)`,
-                      outline: r === curRow ? `2px solid ${LEGACY_COLORS.blue}` : undefined,
-                      outlineOffset: r === curRow ? -1 : undefined,
-                    }}
-                  />
-                );
-              }),
-            )}
-          </div>
+      {/* 상단 미니맵 — 가운데 정렬·폭 70% (줄=열, 층=행).
+          앵글·줄 정보는 상단 브레드크럼에 있어 별도 캡션 생략. */}
+      <div style={{ flexShrink: 0, display: "flex", justifyContent: "center" }}>
+        <div style={{ width: "50%" }}>
+        <div
+          style={{
+            display: "grid",
+            width: "100%",
+            gap: 3,
+            padding: 4,
+            background: LEGACY_COLORS.s3,
+            border: `1px solid ${LEGACY_COLORS.border}`,
+            borderRadius: 10,
+            gridTemplateColumns: `repeat(${angle.rows}, minmax(0, 1fr))`,
+            gridTemplateRows: `repeat(${angle.layers}, 14px)`,
+          }}
+        >
+          {layers.map((l) =>
+            rows.map((r) => {
+              const boxes = cellIndex.get(cellKey(angle.id, r, l));
+              const occ = cellOccupied(boxes);
+              const col = occ ? cellColor(boxes) : null;
+              const cur = r === curRow;
+              return (
+                <div
+                  key={`${r}-${l}`}
+                  title={`${r}줄 ${l}층`}
+                  onClick={() => onRowChange(r)}
+                  className={styles.miniCell}
+                  style={{
+                    height: 14,
+                    borderRadius: 3,
+                    background: occ && col
+                      ? `color-mix(in srgb, ${col} 45%, ${LEGACY_COLORS.s1})`
+                      : "transparent",
+                    border: occ ? undefined : `1px dashed color-mix(in srgb, ${LEGACY_COLORS.muted2} 28%, transparent)`,
+                    outline: cur ? `2px solid ${LEGACY_COLORS.blue}` : undefined,
+                    outlineOffset: -1,
+                    zIndex: cur ? 1 : undefined,
+                  }}
+                />
+              );
+            }),
+          )}
+        </div>
+        {/* 줄 번호 라벨 (열 아래, 그리드와 동일 정렬) */}
+        <div
+          style={{
+            display: "grid",
+            width: "100%",
+            gap: 3,
+            padding: "3px 4px 0",
+            gridTemplateColumns: `repeat(${angle.rows}, minmax(0, 1fr))`,
+          }}
+        >
+          {rows.map((r) => (
+            <div
+              key={r}
+              style={{
+                textAlign: "center",
+                fontSize: 10,
+                fontWeight: r === curRow ? 700 : 500,
+                color: r === curRow ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
+              }}
+            >
+              {r}줄
+            </div>
+          ))}
+        </div>
         </div>
       </div>
 
-      {/* layer table */}
+      {/* 층별 자리 테이블 — 높이 가득 채움 */}
       <div
         style={{
           flex: 1,
-          minWidth: 0,
+          minHeight: 0,
           display: "flex",
           flexDirection: "column",
           background: LEGACY_COLORS.s1,
@@ -407,7 +434,7 @@ export function RowStage({
             </div>
           ))}
         </div>
-        <div style={{ overflowY: "auto", flex: 1 }}>
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflowY: "auto" }}>
           {layers.map((l) => {
             const stacks = jariStacks(cellIndex.get(cellKey(angle.id, curRow, l)), angle.jaris_per_cell);
             const sel = l === selectedLayer;
@@ -417,10 +444,11 @@ export function RowStage({
                 onClick={() => onLayerClick(l)}
                 className={`${styles.layerRow} ${pulseLayer === l ? styles.hit : ""}`}
                 style={{
+                  flex: 1,
+                  minHeight: 72,
                   display: "flex",
                   alignItems: "stretch",
                   borderBottom: `1px solid ${LEGACY_COLORS.border}`,
-                  minHeight: 72,
                   background: sel ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)` : undefined,
                   borderLeft: sel ? `3px solid ${LEGACY_COLORS.blue}` : "3px solid transparent",
                 }}
@@ -446,6 +474,7 @@ export function RowStage({
                     key={ji}
                     style={{
                       flex: 1,
+                      minWidth: 0,
                       padding: "4px 6px",
                       borderRight: ji < angle.jaris_per_cell - 1 ? `1px solid ${LEGACY_COLORS.border}` : undefined,
                       display: "flex",
