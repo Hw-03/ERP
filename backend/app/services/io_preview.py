@@ -23,11 +23,12 @@ from app.services import bom as bom_svc
 from app.services import inventory as inventory_svc
 from app.services import stock_math
 
+# 결재 규칙 단일 원천(approval_rules). io.py / io_dispatch / io_persist 가 본 모듈에서
+# 이 이름들을 re-export·import 하므로 네임스페이스에 노출한다.
+from app.services.approval_rules import APPROVAL_SUB_TYPES, MANUAL_LINE_ORIGINS  # noqa: F401
+
 
 WORK_TYPES = {"receive", "warehouse_io", "process", "defect"}
-APPROVAL_SUB_TYPES = {"warehouse_to_dept", "dept_to_warehouse", "defect_quarantine"}
-# 낱개 라인 origin — 부서 결재 정/부 승인 필요.
-MANUAL_LINE_ORIGINS = frozenset({"manual", "adjust_in", "adjust_out"})
 
 
 def _d(value) -> Decimal:

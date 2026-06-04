@@ -193,8 +193,8 @@ _ALLOWED_SHAPES: dict[StockRequestTypeEnum, dict] = {
 }
 
 
-# 낱개 라인 origin — io.py 의 IoLine.origin 과 동기화.
-MANUAL_LINE_ORIGINS = frozenset({"manual", "adjust_in", "adjust_out"})
+# 낱개 라인 origin — 결재 규칙 단일 원천(approval_rules)에서 re-export(stock_requests 가 import).
+from app.services.approval_rules import MANUAL_LINE_ORIGINS  # noqa: E402,F401
 
 
 def validate_line_shape_for_request_type(
