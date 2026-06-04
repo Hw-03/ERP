@@ -38,10 +38,11 @@ function toOperator(emp: any): OperatorLike {
 /**
  * 로그인 게이트를 통과하도록 localStorage 를 inject 한다. page.goto 전에 호출할 것.
  * @param opts.role "warehouse" | "department" — 해당 역할 primary(없으면 deputy) 직원 우선 선택.
+ * @param opts.code 특정 employee_code 직원으로 로그인(2-세션 결재 테스트용). role 보다 우선.
  */
 export async function loginAsOperator(
   page: Page,
-  opts: { role?: "warehouse" | "department" } = {},
+  opts: { role?: "warehouse" | "department"; code?: string } = {},
 ): Promise<OperatorLike> {
   const session = await (await page.request.get("/api/app-session")).json();
   const emps: any[] = await (await page.request.get("/api/employees?active_only=true")).json();
@@ -53,6 +54,7 @@ export async function loginAsOperator(
         ? "department_role"
         : null;
   const emp =
+    (opts.code && emps.find((e) => e.employee_code === opts.code)) ||
     (roleKey &&
       (emps.find((e) => e[roleKey] === "primary") || emps.find((e) => e[roleKey] === "deputy"))) ||
     emps[0];

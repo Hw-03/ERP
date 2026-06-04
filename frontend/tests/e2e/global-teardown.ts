@@ -21,23 +21,44 @@ function sha256(file: string): string {
   return createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 }
 
-function killBackend() {
-  // 1) pid 파일로 트리 종료
-  if (fs.existsSync(PID_FILE)) {
-    const pid = fs.readFileSync(PID_FILE, "utf-8").trim();
-    if (pid) spawnSync("taskkill", ["/PID", pid, "/T", "/F"]);
-  }
-  // 2) 포트 점유 잔존 프로세스 폴백 종료(netstat → taskkill)
-  const ns = spawnSync("netstat", ["-ano"], { encoding: "utf-8" });
-  if (ns.stdout) {
-    const pids = new Set<string>();
-    for (const line of ns.stdout.split(/\r?\n/)) {
-      if (line.includes(`:${BACKEND_PORT}`) && /LISTENING/i.test(line)) {
-        const pid = line.trim().split(/\s+/).pop();
-        if (pid && /^\d+$/.test(pid)) pids.add(pid);
+const IS_WIN = process.platform === "win32";
+
+function killPid(pid: number) {
+  if (!pid) return;
+  if (IS_WIN) {
+    spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"]);
+  } else {
+    // detached spawn 은 새 프로세스 그룹의 리더 → 그룹(-pid) kill, 실패 시 단건.
+    try {
+      process.kill(-pid, "SIGKILL");
+    } catch {
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch {
+        /* 이미 종료 */
       }
     }
-    for (const pid of pids) spawnSync("taskkill", ["/PID", pid, "/T", "/F"]);
+  }
+}
+
+function killBackend() {
+  // 1) pid 파일로 종료
+  if (fs.existsSync(PID_FILE)) {
+    const pid = parseInt(fs.readFileSync(PID_FILE, "utf-8").trim(), 10);
+    if (pid) killPid(pid);
+  }
+  // 2) 포트 점유 잔존 프로세스 폴백 종료 (Windows: netstat, POSIX: lsof)
+  if (IS_WIN) {
+    const ns = spawnSync("netstat", ["-ano"], { encoding: "utf-8" });
+    for (const line of (ns.stdout ?? "").split(/\r?\n/)) {
+      if (line.includes(`:${BACKEND_PORT}`) && /LISTENING/i.test(line)) {
+        const pid = line.trim().split(/\s+/).pop();
+        if (pid && /^\d+$/.test(pid)) spawnSync("taskkill", ["/PID", pid, "/T", "/F"]);
+      }
+    }
+  } else {
+    // lsof 미설치 환경도 있으므로 best-effort.
+    spawnSync("bash", ["-c", `lsof -ti tcp:${BACKEND_PORT} | xargs -r kill -9`]);
   }
 }
 

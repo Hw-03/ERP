@@ -105,3 +105,49 @@ jobs:
       - name: Bundle size gate
         working-directory: frontend
         run: npm run check:bundle-size
+
+  e2e:
+    name: E2E (Playwright · 전용 DB)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      # globalSetup 이 전용 mes_e2e.db 부트스트랩·시드·백엔드(8021) 기동, webServer 가 next dev(3100).
+      # 실 backend/mes.db 는 CI 체크아웃에 없음(.gitignore) → 해시 가드 자동 생략.
+      - name: Playwright E2E
+        working-directory: frontend
+        run: npx playwright test
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+          retention-days: 7

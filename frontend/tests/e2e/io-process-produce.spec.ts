@@ -44,4 +44,24 @@ test.describe("입출고 V2 — 부서 입출고(생산)", () => {
     // 종착: 완료 다이얼로그 (즉시 반영)
     await expect(page.getByRole("dialog", { name: /완료/ })).toBeVisible();
   });
+
+  test("생산 BOM 자식 라인은 강제 잠김 — 제외/수량편집 불가", async ({ page }) => {
+    // isBomForced("produce")=true → 자식(bom_auto) 라인의 포함 토글·수량이 잠긴다.
+    // README 의 "BOM 자동 전개 / 포함·제외" 중 produce 분기는 '제외 불가(잠김)'가 정답.
+    await gotoWarehouseCompose(page);
+    await pickWorkType(page, /부서 입출고/);
+    await page.getByRole("button", { name: "생산 입고" }).first().click();
+    await page.getByRole("button", { name: /다음 단계로/ }).click();
+    await page
+      .getByRole("row", { name: /E2E조립튜브/ })
+      .getByRole("button", { name: "BOM", exact: true })
+      .click();
+
+    // 품목 확인 묶음 카드 펼치기 → 자식 라인 노출
+    await page.getByRole("button", { name: /E2E조립튜브 기준 수량/ }).click();
+
+    // 자식은 "상위 품목과 함께 자동 처리" + 수량 잠김(자동 계산, disabled)
+    await expect(page.getByText("상위 품목과 함께 자동 처리")).toBeVisible();
+    await expect(page.getByRole("spinbutton", { name: /자동 계산/ })).toBeDisabled();
+  });
 });
