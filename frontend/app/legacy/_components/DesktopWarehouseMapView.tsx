@@ -35,6 +35,8 @@ export function DesktopWarehouseMapView({
   const [hitAngles, setHitAngles] = useState<Map<number, number> | null>(null);
   const [pulse, setPulse] = useState<{ angleId?: number; cellKey?: string; layer?: number } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // history drill depth — 드릴다운을 browser history에 쌓아 브라우저 뒤로가기 지원 (DesktopHistoryView 선례)
+  const wmDepthRef = useRef(0);
 
   // ── Load map ──
   useEffect(() => {
@@ -81,29 +83,57 @@ export function DesktopWarehouseMapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panel, query]);
 
+  // ── Browser back/forward ──
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    type WmState = { wm?: { stage: Stage; angleId: number; row?: number }; wmDepth?: number } | null;
+    const onPop = (e: PopStateEvent) => {
+      const s = e.state as WmState;
+      wmDepthRef.current = s?.wmDepth ?? 0;
+      const wm = s?.wm;
+      if (!wm) {
+        setStage("floor"); setCurAngle(null); setPanel(null);
+      } else if (wm.stage === "front") {
+        const angle = map?.angles.find((a) => a.id === wm.angleId) ?? null;
+        if (angle) { setCurAngle(angle); setStage("front"); }
+        else { setStage("floor"); setCurAngle(null); }
+        setPanel(null);
+      } else if (wm.stage === "row" && wm.row != null) {
+        const angle = map?.angles.find((a) => a.id === wm.angleId) ?? null;
+        if (angle) { setCurAngle(angle); setCurRow(wm.row); setStage("row"); }
+        setPanel(null);
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [map]);
+
   // ── Navigation ──
   function openAngle(a: WarehouseAngle) {
     setCurAngle(a);
     setStage("front");
     setPanel(null);
+    wmDepthRef.current += 1;
+    window.history.pushState({ wm: { stage: "front", angleId: a.id }, wmDepth: wmDepthRef.current }, "");
   }
   function openCell(row: number, layer: number) {
     if (!curAngle) return;
     setCurRow(row);
     setStage("row");
     setPanel({ angle: curAngle, row, layer });
+    wmDepthRef.current += 1;
+    window.history.pushState({ wm: { stage: "row", angleId: curAngle.id, row }, wmDepth: wmDepthRef.current }, "");
   }
   function openLayer(layer: number) {
     if (!curAngle) return;
     setPanel({ angle: curAngle, row: curRow, layer });
   }
-  function goBack() {
-    setPanel(null);
-    if (stage === "row") setStage("front");
-    else if (stage === "front") {
-      setStage("floor");
-      setCurAngle(null);
-    }
+  function handleRowChange(row: number) {
+    setCurRow(row);
+    window.history.replaceState(
+      { wm: { stage: "row", angleId: curAngle?.id, row }, wmDepth: wmDepthRef.current },
+      "",
+    );
   }
 
   // ── Search ──
@@ -159,17 +189,28 @@ export function DesktopWarehouseMapView({
     setMatchQuery(q);
     setPulse({ layer: hit.layer });
     window.setTimeout(() => setPulse(null), 1600);
+    const d1 = wmDepthRef.current + 1;
+    const d2 = wmDepthRef.current + 2;
+    window.history.pushState({ wm: { stage: "front", angleId: a.id }, wmDepth: d1 }, "");
+    window.history.pushState({ wm: { stage: "row", angleId: a.id, row: hit.row }, wmDepth: d2 }, "");
+    wmDepthRef.current = d2;
   }
 
   // ── Breadcrumb ──
   const breadcrumb = (() => {
     const items: { label: string; onClick?: () => void; cur?: boolean }[] = [
-      { label: "창고 지도", onClick: stage !== "floor" ? () => { setStage("floor"); setCurAngle(null); setPanel(null); } : undefined, cur: stage === "floor" },
+      {
+        label: "창고 지도",
+        onClick: stage !== "floor" ? () => {
+          if (wmDepthRef.current > 0) window.history.go(-wmDepthRef.current);
+        } : undefined,
+        cur: stage === "floor",
+      },
     ];
     if (curAngle && stage !== "floor") {
       items.push({
         label: curAngle.label,
-        onClick: stage === "row" ? () => { setStage("front"); setPanel(null); } : undefined,
+        onClick: stage === "row" ? () => window.history.back() : undefined,
         cur: stage === "front",
       });
     }
@@ -207,7 +248,7 @@ export function DesktopWarehouseMapView({
           }}
         >
           <button
-            onClick={goBack}
+            onClick={() => window.history.back()}
             style={{
               height: 32,
               padding: "0 12px",
@@ -390,7 +431,7 @@ export function DesktopWarehouseMapView({
                   selectedLayer={panel?.layer ?? null}
                   cellIndex={cellIndex}
                   pulseLayer={pulse?.layer}
-                  onRowChange={setCurRow}
+                  onRowChange={handleRowChange}
                   onLayerClick={openLayer}
                 />
               )}
