@@ -43,6 +43,12 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
     void reload();
   }, [reload, refreshNonce]);
 
+  useEffect(() => {
+    if (!employeeId) return;
+    const id = setInterval(() => { void reload(); }, 30_000);
+    return () => clearInterval(id);
+  }, [reload, employeeId]);
+
   const openCancel = (request: StockRequest) => {
     setCancelTarget(request);
     setCancelPin("");
