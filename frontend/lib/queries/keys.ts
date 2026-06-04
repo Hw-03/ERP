@@ -73,6 +73,10 @@ export const queryKeys = {
     reservations: (itemId: string) =>
       ["stockRequests", "reservations", itemId] as const,
   },
+  notifications: {
+    all: ["notifications"] as const,
+    list: (employeeId: string) => ["notifications", "list", employeeId] as const,
+  },
   production: {
     all: ["production"] as const,
     capacity: () => ["production", "capacity"] as const,

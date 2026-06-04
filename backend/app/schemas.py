@@ -802,6 +802,32 @@ class StockRequestResponse(BaseModel):
     lines: List[StockRequestLineResponse] = []
 
 
+class NotificationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    notification_id: uuid.UUID
+    recipient_employee_id: uuid.UUID
+    type: str
+    title: str
+    body: Optional[str] = None
+    target_tab: Optional[str] = None
+    target_section: Optional[str] = None
+    related_request_id: Optional[uuid.UUID] = None
+    is_read: bool
+    created_at: UtcDatetime
+
+
+class NotificationListResponse(BaseModel):
+    items: List[NotificationResponse]
+    unread_count: int
+
+
+class NotificationMarkReadRequest(BaseModel):
+    recipient_employee_id: uuid.UUID
+    # None 이면 해당 직원의 안 읽은 알림 전체를 읽음 처리.
+    notification_ids: Optional[List[uuid.UUID]] = None
+
+
 class IoPreviewTarget(BaseModel):
     source_kind: str = Field("direct_item", max_length=24)
     item_id: Optional[uuid.UUID] = None

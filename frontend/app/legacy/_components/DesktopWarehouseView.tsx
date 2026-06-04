@@ -35,7 +35,17 @@ export function DesktopWarehouseView({
 
   const operator = typeof window !== "undefined" ? readCurrentOperator() : null;
   const [employeeId, setEmployeeId] = useState<string>(operator?.employee_id ?? "");
-  const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>("compose");
+  // 알림 클릭 딥링크 — URL ?section= 으로 초기 섹션 결정 (권한 없으면 compose 폴백).
+  const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>(() => {
+    if (typeof window === "undefined") return "compose";
+    const s = new URLSearchParams(window.location.search).get("section");
+    const valid: WarehouseSectionTab[] = ["compose", "cart", "mine", "queue", "dept-queue"];
+    if (!s || !valid.includes(s as WarehouseSectionTab)) return "compose";
+    const whRole = operator?.warehouse_role ?? "none";
+    if (s === "queue" && whRole !== "primary" && whRole !== "deputy") return "compose";
+    if (s === "dept-queue" && !isDepartmentApprover(operator)) return "compose";
+    return s as WarehouseSectionTab;
+  });
   const [panelRefreshNonce, setPanelRefreshNonce] = useState(0);
   const [cartCount, setCartCount] = useState(() => {
     const eid = operator?.employee_id ?? "";

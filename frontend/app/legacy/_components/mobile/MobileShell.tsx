@@ -24,6 +24,7 @@ import { api, type ProductionCapacity } from "@/lib/api";
 import type { Item } from "@/lib/api";
 import { CapacityDetailModal } from "../CapacityDetailModal";
 import { useCurrentOperator } from "../login/useCurrentOperator";
+import { NotificationBell } from "../notifications/NotificationBell";
 import { canEnterIO } from "../_warehouse_steps";
 import { MobileUserMenuSheet } from "./MobileUserMenuSheet";
 
@@ -210,6 +211,13 @@ export function MobileShell() {
           {activeTab === "weekly" && (
             <div className="flex items-center gap-2 shrink-0">
               <WeeklyWeekPicker weekMon={weekMon} onChange={setWeekMon} />
+            </div>
+          )}
+          {operator && (
+            <div className="ml-2 shrink-0">
+              <NotificationBell
+                onNavigate={(tab) => handleTabChange(tab as MobileTabId)}
+              />
             </div>
           )}
           {operator && (
