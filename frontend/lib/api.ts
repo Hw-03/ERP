@@ -33,7 +33,10 @@ import { weeklyApi } from "./api/weekly";
 import { deptAdjustmentApi } from "./api/dept-adjustment";
 // 입출고 2.0 도메인.
 import { ioApi } from "./api/io";
+// 결재 알림 도메인.
 import { notificationsApi } from "./api/notifications";
+// 인수인계서 도메인.
+import { handoverApi } from "./api/handover";
 
 // 외부 import 호환을 위해 동일 이름 그대로 re-export.
 // parseError 는 도메인 API (직접 fetch 사용처) 가 본 파일 내부에서 사용 — 이번 PR 에선 그대로.
@@ -189,4 +192,6 @@ export const api = {
   ...ioApi,
   // 결재 알림.
   ...notificationsApi,
+  // 인수인계서.
+  ...handoverApi,
 };

@@ -26,6 +26,11 @@ from app.models.inventory import (
     InventoryLocation,
     LocationStatusEnum,
 )
+from app.models.handover import (
+    HandoverDoc,
+    HandoverLine,
+    HandoverStatusEnum,
+)
 from app.models.io_batch import (
     IoBatch,
     IoBundle,
@@ -89,6 +94,10 @@ __all__ = [
     "StockRequestStatusEnum",
     "StockRequestTypeEnum",
     "RequestBucketEnum",
+    # handover
+    "HandoverDoc",
+    "HandoverLine",
+    "HandoverStatusEnum",
     # io batches
     "IoBatch",
     "IoBundle",
