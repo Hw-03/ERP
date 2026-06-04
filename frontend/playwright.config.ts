@@ -11,10 +11,13 @@
  *   npm run test:e2e:headed   # 브라우저 보임
  *   npx playwright test --ui  # UI 모드
  *
- * 백엔드는 별도로 띄워둬야 한다:
- *   powershell -ExecutionPolicy Bypass -File ../scripts/dev/start-backend.ps1
+ * 전용 DB·전용 백엔드(포트 8021)·시드는 globalSetup 이 자동 처리한다(실 mes.db 미접촉).
+ * 프론트는 전용 포트 3100 에서 next dev 로 띄우고, /api/* 는 BACKEND_INTERNAL_URL 로 8021 에 프록시.
  */
 import { defineConfig, devices } from "@playwright/test";
+
+const FRONT_PORT = 3100;
+const BACKEND_PORT = 8021;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -23,8 +26,10 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: 1, // 위와 같은 이유로 워커 1개
   reporter: process.env.CI ? "github" : "list",
+  globalSetup: "./tests/e2e/global-setup.ts",
+  globalTeardown: "./tests/e2e/global-teardown.ts",
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://127.0.0.1:3000",
+    baseURL: process.env.E2E_BASE_URL ?? `http://127.0.0.1:${FRONT_PORT}`,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
@@ -32,11 +37,12 @@ export default defineConfig({
     timezoneId: "Asia/Seoul",
   },
   webServer: {
-    // E2E_EXISTING_SERVER=1 면 webServer 띄우지 않고 기존 dev 서버 재사용.
-    command: "npm run start",
-    url: "http://127.0.0.1:3000",
-    reuseExistingServer: !process.env.CI,
+    // 전용 프론트(3100, next dev — 현재 코드 보장). /api/* → 전용 백엔드(8021) 프록시.
+    command: `npx next dev -p ${FRONT_PORT}`,
+    url: `http://127.0.0.1:${FRONT_PORT}`,
+    reuseExistingServer: false,
     timeout: 120_000,
+    env: { BACKEND_INTERNAL_URL: `http://127.0.0.1:${BACKEND_PORT}` },
   },
   projects: [
     {
