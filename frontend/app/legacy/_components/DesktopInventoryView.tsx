@@ -16,10 +16,14 @@ import { DesktopInventoryRightPanel } from "./_inventory_sections/DesktopInvento
 import { useInventoryData } from "./_hooks/useInventoryData";
 import { useDesktopInventoryDerivations } from "./_hooks/useDesktopInventoryDerivations";
 import { useItemImageManifest } from "./_hooks/useItemImageManifest";
+import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 // R9-2: helper 4개 (getMinStock / safeQty / matchesSearch / matchesKpi) 분리
 import { matchesKpi, matchesSearch } from "./_inventory_sections/inventoryFilter";
 
 const DESKTOP_PAGE_SIZE = 100;
+
+// 안정 참조 — useModelsQuery 미로딩 시 동일 빈 배열을 재사용해 useMemo 의존성을 흔들지 않는다.
+const EMPTY_MODELS: ProductModel[] = [];
 
 
 export function DesktopInventoryView({
@@ -58,7 +62,7 @@ export function DesktopInventoryView({
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [selectedProcessSteps, setSelectedProcessSteps] = useState<string[]>([]);
-  const [productModels, setProductModels] = useState<ProductModel[]>([]);
+  const productModels = useModelsQuery().data ?? EMPTY_MODELS;
   const [kpi, setKpi] = useState<KpiFilter>("ALL");
   const [localSearch, setLocalSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(DESKTOP_PAGE_SIZE);
@@ -82,10 +86,6 @@ export function DesktopInventoryView({
     setSelectedProcessSteps((prev) => (prev.includes(v) ? prev.filter((p) => p !== v) : [...prev, v]));
     setDisplayLimit(DESKTOP_PAGE_SIZE);
   }
-
-  useEffect(() => {
-    void api.getModels().then(setProductModels).catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (!selectedItem) {

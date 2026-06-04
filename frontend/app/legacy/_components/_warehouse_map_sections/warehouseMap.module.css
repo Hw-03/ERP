@@ -1,0 +1,70 @@
+/* 창고 지도 — 상호작용(hover/펄스) 스코프 CSS. 색은 globals.css 토큰 사용. */
+
+.angleBlock {
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.18s, background 0.18s;
+}
+.angleBlock:hover {
+  transform: scale(1.03);
+  border-color: var(--c-border-strong) !important;
+  background: color-mix(in srgb, var(--c-blue) 8%, var(--c-s1)) !important;
+  box-shadow: 0 8px 24px rgba(47, 116, 231, 0.18) !important;
+  z-index: 10;
+}
+
+.cell {
+  transition: outline 0.1s;
+  cursor: pointer;
+}
+.cell:hover {
+  outline: 1.5px solid color-mix(in srgb, var(--c-blue) 40%, transparent);
+  box-shadow: var(--c-popup-shadow);
+}
+
+.hit {
+  outline: 2px solid var(--c-blue) !important;
+  outline-offset: 1px;
+  animation: wmPulse 1.2s ease-out 2;
+}
+
+@keyframes wmPulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-blue) 55%, transparent); }
+  70% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--c-blue) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.layerRow {
+  transition: background 0.15s;
+  cursor: pointer;
+}
+.layerRow:hover {
+  background: color-mix(in srgb, var(--c-blue) 6%, transparent);
+}
+
+.miniCell {
+  transition: transform 0.12s;
+  cursor: pointer;
+}
+.miniCell:hover {
+  transform: scale(1.15);
+  z-index: 2;
+}
+
+.stageEnter {
+  animation: wmStageEnter 240ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes wmStageEnter {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.crumb {
+  color: var(--c-blue);
+  cursor: pointer;
+}
+.crumb:hover {
+  text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hit { animation: none; }
+}

@@ -20,6 +20,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import relationship
 
@@ -35,6 +36,14 @@ class Item(Base):
     __tablename__ = "items"
     __table_args__ = (
         CheckConstraint("min_stock >= 0 OR min_stock IS NULL", name="ck_items_min_stock_nonneg"),
+        # mes_code 부분 unique — 소프트삭제(deleted_at) 행은 제외해 같은 코드 재등록 허용 (R2-5).
+        Index(
+            "ix_items_mes_code",
+            "mes_code",
+            unique=True,
+            sqlite_where=text("deleted_at IS NULL"),
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
     )
 
     item_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
@@ -66,8 +75,6 @@ class Item(Base):
             "model_symbol || '-' || process_type_code || '-' || printf('%04d', serial_no)",
             persisted=True,  # STORED
         ),
-        unique=True,
-        index=True,
     )
     model_symbol = Column(String(20), nullable=True, index=True)  # 예: "346", "3", "34678"
     process_type_code = Column(String(2), ForeignKey("process_types.code"), nullable=True, index=True)

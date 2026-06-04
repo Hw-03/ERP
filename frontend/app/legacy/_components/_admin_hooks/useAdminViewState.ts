@@ -21,7 +21,9 @@ export type AdminSection =
   | "export"
   | "audit"
   | "settings"
-  | "departments";
+  | "departments"
+  | "warehouseStructure"
+  | "warehousePlacement";
 
 export interface UseAdminViewStateResult {
   unlocked: boolean;

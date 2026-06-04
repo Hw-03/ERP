@@ -48,6 +48,7 @@ from app.routers import (
     production,
     settings,
     stock_requests,
+    warehouse_map,
 )
 from app.services import audit_csv as audit_csv_svc
 
@@ -278,6 +279,7 @@ app.include_router(admin_audit_csv.router, prefix="/api/admin", tags=["Admin Aud
 app.include_router(stock_requests.router, prefix="/api/stock-requests", tags=["Stock Requests"])
 app.include_router(dept_adjustment.router, prefix="/api/dept-adjustment", tags=["Dept Adjustment"])
 app.include_router(defects.router, prefix="/api/defects", tags=["Defects"])
+app.include_router(warehouse_map.router, prefix="/api/warehouse-map", tags=["Warehouse Map"])
 
 
 @app.get("/health", tags=["System"])

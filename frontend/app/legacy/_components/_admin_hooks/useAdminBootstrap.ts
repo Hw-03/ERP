@@ -9,6 +9,7 @@ import {
   type Item,
   type ProductModel,
 } from "@/lib/api";
+import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 
 /**
  * 관리자 화면의 5개 도메인 부트스트랩 + BOM 새로고침 훅.
@@ -17,7 +18,10 @@ import {
  * disable Cat-C 2건) 를 1 hook 으로 묶고 useCallback 으로 deps 정상화.
  *
  * fetch 타이밍 / API 호출 횟수 변화 0:
- *   - unlocked + globalSearch 변화 시 5 도메인 fetch (Promise.all)
+ *   - unlocked + globalSearch 변화 시 items/employees/departments fetch (Promise.all)
+ *   - models 는 useModelsQuery(enabled: unlocked) 로 분리 — unlocked 게이트 동일,
+ *     React Query 캐시를 로컬 productModels state 로 미러링해 기존 setProductModels
+ *     낙관적 갱신 API 를 그대로 유지한다.
  *   - unlocked 변화 시 BOM 별도 fetch
  */
 export interface UseAdminBootstrapOptions {
@@ -51,16 +55,20 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
   const [allBomRows, setAllBomRows] = useState<BOMDetailEntry[]>([]);
   const [departments, setDepartments] = useState<DepartmentMaster[]>([]);
 
+  // models 만 React Query 로 분리 — enabled(unlocked) 로 게이트 보존.
+  const { data: modelsData } = useModelsQuery({ enabled: unlocked });
+  useEffect(() => {
+    if (modelsData) setProductModels(modelsData);
+  }, [modelsData]);
+
   const loadData = useCallback(async () => {
-    const [nextItems, nextEmployees, nextModels, nextDepts] = await Promise.all([
+    const [nextItems, nextEmployees, nextDepts] = await Promise.all([
       api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
       api.getEmployees({ activeOnly: false }),
-      api.getModels(),
       api.getDepartments(),
     ]);
     setItems(nextItems);
     setEmployees(nextEmployees);
-    setProductModels(nextModels);
     setDepartments(nextDepts);
   }, [globalSearch]);
 
@@ -74,7 +82,7 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
     setItems(next);
   }, [globalSearch]);
 
-  // 5 도메인 부트스트랩 — unlocked + globalSearch 변화 시
+  // items/employees/departments 부트스트랩 — unlocked + globalSearch 변화 시
   useEffect(() => {
     if (!unlocked) return;
     void loadData().catch((nextError) =>

@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Save, Trash2, Users, X } from "lucide-react";
-import { api, type DepartmentMaster, type DepartmentRole, type Employee, type EmployeeLevel, type ProductModel, type WarehouseRole } from "@/lib/api";
+import { type DepartmentMaster, type DepartmentRole, type Employee, type EmployeeLevel, type ProductModel, type WarehouseRole } from "@/lib/api";
+import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { PIN_LENGTH } from "@/lib/auth/constants";
 import { normalizeDepartment, getDepartmentFallbackColor } from "@/lib/mes/department";
@@ -81,13 +82,11 @@ export function AdminEmployeesSection() {
 
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState<string>("ALL");
-  const [productModels, setProductModels] = useState<ProductModel[]>([]);
-
-  useEffect(() => {
-    void api.getModels().then((models) =>
-      setProductModels(models.filter((m) => !m.is_reserved && (m.model_name || m.symbol))),
-    );
-  }, []);
+  const { data: allModels } = useModelsQuery();
+  const productModels = useMemo<ProductModel[]>(
+    () => (allModels ?? []).filter((m) => !m.is_reserved && (m.model_name || m.symbol)),
+    [allModels],
+  );
 
   const deptOptions = useMemo(() => {
     const seen = new Set<string>();

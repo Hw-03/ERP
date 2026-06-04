@@ -17,6 +17,7 @@ from app.models import (
     Item,
     ProcessType,
     ProductSymbol,
+    WarehouseAngle,
 )
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
@@ -82,9 +83,24 @@ _PROCESS_TYPES: list[tuple] = [
     ("PF", "P", "F", 80, "출하 공정완료"),
 ]
 
+# 창고 지도 기본 앵글 9개 — 프로토타입 ANGLES + POSITIONS 1:1.
+# (id, label, rows, layers, pos_x, pos_y, width, height). 880×300 좌표계.
+_WAREHOUSE_ANGLE_SEED: list[tuple] = [
+    (1, "앵글 1", 6, 6, 718, 100, 74, 172),
+    (2, "앵글 2", 6, 6, 600, 100, 74, 172),
+    (3, "앵글 3", 6, 6, 526, 100, 74, 172),
+    (4, "앵글 4", 6, 6, 408, 100, 74, 172),
+    (5, "앵글 5", 6, 6, 334, 100, 74, 172),
+    (6, "앵글 6", 6, 6, 146, 15, 646, 60),
+    (7, "앵글 7", 3, 6, 218, 100, 72, 87),
+    (8, "앵글 8", 3, 6, 146, 100, 72, 87),
+    (9, "앵글 9", 4, 6, 12, 15, 57, 116),
+]
+
+
 def seed_reference_data() -> dict[str, int]:
     """참조 테이블이 비어 있을 때만 시드. idempotent."""
-    counts = {"departments": 0, "employees": 0, "symbols": 0, "process_types": 0}
+    counts = {"departments": 0, "employees": 0, "symbols": 0, "process_types": 0, "warehouse_angles": 0}
     db = SessionLocal()
     try:
         if db.query(Department).count() == 0:
@@ -140,6 +156,26 @@ def seed_reference_data() -> dict[str, int]:
                     )
                 )
                 counts["process_types"] += 1
+            db.commit()
+
+        if db.query(WarehouseAngle).count() == 0:
+            for aid, label, rows, layers, x, y, w, h in _WAREHOUSE_ANGLE_SEED:
+                db.add(
+                    WarehouseAngle(
+                        id=aid,
+                        label=label,
+                        rows=rows,
+                        layers=layers,
+                        jaris_per_cell=3,
+                        pos_x=x,
+                        pos_y=y,
+                        width=w,
+                        height=h,
+                        display_order=aid,
+                        is_active=True,
+                    )
+                )
+                counts["warehouse_angles"] += 1
             db.commit()
     finally:
         db.close()

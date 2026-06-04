@@ -279,6 +279,60 @@ def _operation_filter(transaction_types: Optional[str]):
     return or_(*clauses)
 
 
+def _apply_common_filters(
+    query,
+    db: Session,
+    *,
+    transaction_types: Optional[str],
+    search: Optional[str],
+    department: Optional[str],
+    model: Optional[str],
+    process_step: Optional[str],
+    date_from: Optional[date],
+    date_to: Optional[date],
+    include_archived: bool,
+):
+    """list_transactions / get_transactions_summary 공통 필터.
+
+    TransactionLog + Item join + IoBatch outerjoin 이 이미 적용된 query 를 받아
+    화면 공통 조건(operation 구분·기간·아카이브·검색·부서·공정·모델)을 AND 로 덧붙인다.
+    item_id/transaction_type/reference_no 같은 list 전용 필터는 호출부가 직접 처리.
+    """
+    if transaction_types:
+        _op_f = _operation_filter(transaction_types)
+        if _op_f is not None:
+            query = query.filter(_op_f)
+    _dept_f = _department_filter(department)
+    if _dept_f is not None:
+        query = query.filter(_dept_f)
+    _ps = _process_step_filter(process_step)
+    if _ps is not None:
+        query = query.filter(_ps)
+    _md = _model_filter(db, model)
+    if _md is not None:
+        query = query.filter(_md)
+    if date_from:
+        query = query.filter(TransactionLog.created_at >= datetime.combine(date_from, time.min))
+    if date_to:
+        query = query.filter(TransactionLog.created_at <= datetime.combine(date_to, time.max))
+    if not include_archived:
+        query = query.filter(TransactionLog.archived_at.is_(None))
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                Item.item_name.ilike(pattern),
+                Item.mes_code.ilike(pattern),
+                TransactionLog.reference_no.ilike(pattern),
+                TransactionLog.notes.ilike(pattern),
+                TransactionLog.produced_by.ilike(pattern),
+                # 화면에 우선 표시되는 요청자(IoBatch.requester_name) 도 검색 대상.
+                IoBatch.requester_name.ilike(pattern),
+            )
+        )
+    return query
+
+
 class TransactionSummaryResponse(BaseModel):
     """입출고 내역 화면 KPI — 조건 전체 카운트(페이지네이션과 무관)."""
     total: int
@@ -309,6 +363,46 @@ def _enforce_export_limit(count: int) -> None:
             row_count=count,
             max_rows=EXPORT_MAX_ROWS,
         )
+
+
+def _batch_name_map(
+    db: Session, batch_ids: set
+) -> dict[uuid.UUID, tuple[Optional[str], Optional[str]]]:
+    """operation_batch_id 집합 → (requester_name, approver_name) 매핑.
+
+    list_transactions 와 export(csv/xlsx) 가 공유 — 요청자/승인자명을 동일 규칙으로 채운다.
+    요청자=결재자(자동결재/즉시처리)면 승인자 null(별도 승인 없음).
+    """
+    batch_map: dict[uuid.UUID, tuple[Optional[str], Optional[str]]] = {}
+    if not batch_ids:
+        return batch_map
+    batches = (
+        db.query(IoBatch.batch_id, IoBatch.requester_name, IoBatch.stock_request_id)
+        .filter(IoBatch.batch_id.in_(batch_ids))
+        .all()
+    )
+    sr_ids = [b.stock_request_id for b in batches if b.stock_request_id]
+    sr_approver: dict[uuid.UUID, Optional[str]] = {}
+    if sr_ids:
+        for sr_id, app_name, app_emp_id, req_emp_id in (
+            db.query(
+                StockRequest.request_id,
+                StockRequest.approved_by_name,
+                StockRequest.approved_by_employee_id,
+                StockRequest.requester_employee_id,
+            )
+            .filter(StockRequest.request_id.in_(sr_ids))
+            .all()
+        ):
+            # 요청자와 결재자가 다른 경우만 별도 승인자로 인정.
+            if app_emp_id and app_emp_id != req_emp_id:
+                sr_approver[sr_id] = app_name
+            else:
+                sr_approver[sr_id] = None
+    for b in batches:
+        approver = sr_approver.get(b.stock_request_id) if b.stock_request_id else None
+        batch_map[b.batch_id] = (b.requester_name, approver)
+    return batch_map
 
 
 _TX_ROW_COLOR = {
@@ -455,79 +549,29 @@ def list_transactions(
     if transaction_type:
         query = query.filter(TransactionLog.transaction_type == transaction_type)
 
-    # 복수 transaction_types: 화면 표시 구분 기준 operation-aware 필터
-    # (sub_type 우선 라벨 → 재작업 묶음 내 BACKFLUSH 도 DISASSEMBLE 로 잡힘)
-    if transaction_types:
-        _op_f = _operation_filter(transaction_types)
-        if _op_f is not None:
-            query = query.filter(_op_f)
-
     if reference_no:
         query = query.filter(TransactionLog.reference_no == reference_no)
-    _dept_f = _department_filter(department)
-    if _dept_f is not None:
-        query = query.filter(_dept_f)
-    _ps = _process_step_filter(process_step)
-    if _ps is not None:
-        query = query.filter(_ps)
-    _md = _model_filter(db, model)
-    if _md is not None:
-        query = query.filter(_md)
-    if date_from:
-        query = query.filter(TransactionLog.created_at >= datetime.combine(date_from, time.min))
-    if date_to:
-        query = query.filter(TransactionLog.created_at <= datetime.combine(date_to, time.max))
-    if not include_archived:
-        query = query.filter(TransactionLog.archived_at.is_(None))
-    if search:
-        pattern = f"%{search}%"
-        query = query.filter(
-            or_(
-                Item.item_name.ilike(pattern),
-                Item.mes_code.ilike(pattern),
-                TransactionLog.reference_no.ilike(pattern),
-                TransactionLog.notes.ilike(pattern),
-                TransactionLog.produced_by.ilike(pattern),
-                # 화면에 우선 표시되는 요청자(IoBatch.requester_name) 도 검색 대상.
-                IoBatch.requester_name.ilike(pattern),
-            )
-        )
 
-    # TODO(history-overhaul-fixup): export.csv/xlsx 도 동일하게
-    # IoBatch outerjoin + requester_name search 적용 검토.
+    # 복수 transaction_types / 부서 / 공정 / 모델 / 기간 / 아카이브 / 검색:
+    # summary 와 동일한 공통 필터 빌더로 위임.
+    query = _apply_common_filters(
+        query,
+        db,
+        transaction_types=transaction_types,
+        search=search,
+        department=department,
+        model=model,
+        process_step=process_step,
+        date_from=date_from,
+        date_to=date_to,
+        include_archived=include_archived,
+    )
+
     rows = query.order_by(TransactionLog.created_at.desc()).offset(skip).limit(limit).all()
 
-    # operation_batch_id 기준으로 IoBatch 일괄 조회 → requester_name + approver_name 매핑.
+    # operation_batch_id 기준 requester_name + approver_name 매핑(export 와 공유 헬퍼).
     batch_ids = {log.operation_batch_id for log, _, _ in rows if log.operation_batch_id}
-    batch_map: dict[uuid.UUID, tuple[Optional[str], Optional[str]]] = {}
-    if batch_ids:
-        batches = (
-            db.query(IoBatch.batch_id, IoBatch.requester_name, IoBatch.stock_request_id)
-            .filter(IoBatch.batch_id.in_(batch_ids))
-            .all()
-        )
-        sr_ids = [b.stock_request_id for b in batches if b.stock_request_id]
-        sr_approver: dict[uuid.UUID, Optional[str]] = {}
-        if sr_ids:
-            for sr_id, app_name, app_emp_id, req_emp_id in (
-                db.query(
-                    StockRequest.request_id,
-                    StockRequest.approved_by_name,
-                    StockRequest.approved_by_employee_id,
-                    StockRequest.requester_employee_id,
-                )
-                .filter(StockRequest.request_id.in_(sr_ids))
-                .all()
-            ):
-                # 요청자와 결재자가 다른 경우만 별도 승인자로 인정.
-                # 같으면 자동결재(즉시 처리) → 승인자 null.
-                if app_emp_id and app_emp_id != req_emp_id:
-                    sr_approver[sr_id] = app_name
-                else:
-                    sr_approver[sr_id] = None
-        for b in batches:
-            approver = sr_approver.get(b.stock_request_id) if b.stock_request_id else None
-            batch_map[b.batch_id] = (b.requester_name, approver)
+    batch_map = _batch_name_map(db, batch_ids)
 
     return [
         _to_log_response(
@@ -568,39 +612,19 @@ def get_transactions_summary(
         .outerjoin(IoBatch, TransactionLog.operation_batch_id == IoBatch.batch_id)
     )
 
-    # 복수 transaction_types: operation-aware 필터
-    if transaction_types:
-        _op_f = _operation_filter(transaction_types)
-        if _op_f is not None:
-            query = query.filter(_op_f)
-
-    if date_from:
-        query = query.filter(TransactionLog.created_at >= datetime.combine(date_from, time.min))
-    if date_to:
-        query = query.filter(TransactionLog.created_at <= datetime.combine(date_to, time.max))
-    if not include_archived:
-        query = query.filter(TransactionLog.archived_at.is_(None))
-    if search:
-        pattern = f"%{search}%"
-        query = query.filter(
-            or_(
-                Item.item_name.ilike(pattern),
-                Item.mes_code.ilike(pattern),
-                TransactionLog.reference_no.ilike(pattern),
-                TransactionLog.notes.ilike(pattern),
-                TransactionLog.produced_by.ilike(pattern),
-                IoBatch.requester_name.ilike(pattern),
-            )
-        )
-    _dept_f = _department_filter(department)
-    if _dept_f is not None:
-        query = query.filter(_dept_f)
-    _ps = _process_step_filter(process_step)
-    if _ps is not None:
-        query = query.filter(_ps)
-    _md = _model_filter(db, model)
-    if _md is not None:
-        query = query.filter(_md)
+    # list_transactions 와 동일한 공통 필터 빌더로 위임.
+    query = _apply_common_filters(
+        query,
+        db,
+        transaction_types=transaction_types,
+        search=search,
+        department=department,
+        model=model,
+        process_step=process_step,
+        date_from=date_from,
+        date_to=date_to,
+        include_archived=include_archived,
+    )
 
     # 한 번의 집계 쿼리로 4개 카운트.
     agg = query.with_entities(
@@ -648,7 +672,13 @@ def export_transactions_csv(
 ):
     start_dt, end_dt = _require_export_range(start_date, end_date)
 
-    query = db.query(TransactionLog, Item).join(Item, TransactionLog.item_id == Item.item_id)
+    # 목록 조회와 동일하게 IoBatch outerjoin — search 가 requester_name 까지 닿고
+    # 요청자/승인자 컬럼을 채운다(operation_batch_id NULL row 보존 위해 outerjoin).
+    query = (
+        db.query(TransactionLog, Item)
+        .join(Item, TransactionLog.item_id == Item.item_id)
+        .outerjoin(IoBatch, TransactionLog.operation_batch_id == IoBatch.batch_id)
+    )
     query = query.filter(
         TransactionLog.created_at >= start_dt,
         TransactionLog.created_at <= end_dt,
@@ -665,11 +695,15 @@ def export_transactions_csv(
                 TransactionLog.reference_no.ilike(pattern),
                 TransactionLog.notes.ilike(pattern),
                 TransactionLog.produced_by.ilike(pattern),
+                IoBatch.requester_name.ilike(pattern),
             )
         )
 
     _enforce_export_limit(query.count())
     rows = query.order_by(TransactionLog.created_at.desc()).all()
+    batch_map = _batch_name_map(
+        db, {log.operation_batch_id for log, _ in rows if log.operation_batch_id}
+    )
 
     buffer = StringIO()
     writer = csv.writer(buffer)
@@ -685,10 +719,13 @@ def export_transactions_csv(
             "quantity_after",
             "reference_no",
             "produced_by",
+            "requester_name",
+            "approver_name",
             "notes",
         ]
     )
     for log, item in rows:
+        requester, approver = batch_map.get(log.operation_batch_id, (None, None))
         writer.writerow(
             [
                 log.created_at.isoformat(),
@@ -701,6 +738,8 @@ def export_transactions_csv(
                 "" if log.quantity_after is None else float(log.quantity_after),
                 log.reference_no or "",
                 log.produced_by or "",
+                requester or "",
+                approver or "",
                 log.notes or "",
             ]
         )
@@ -722,7 +761,13 @@ def export_transactions_xlsx(
 
     start_dt, end_dt = _require_export_range(start_date, end_date)
 
-    query = db.query(TransactionLog, Item).join(Item, TransactionLog.item_id == Item.item_id)
+    # 목록 조회와 동일하게 IoBatch outerjoin — search 가 requester_name 까지 닿고
+    # 요청자/승인자 컬럼을 채운다.
+    query = (
+        db.query(TransactionLog, Item)
+        .join(Item, TransactionLog.item_id == Item.item_id)
+        .outerjoin(IoBatch, TransactionLog.operation_batch_id == IoBatch.batch_id)
+    )
     query = query.filter(
         TransactionLog.created_at >= start_dt,
         TransactionLog.created_at <= end_dt,
@@ -738,11 +783,15 @@ def export_transactions_xlsx(
                 TransactionLog.reference_no.ilike(pattern),
                 TransactionLog.notes.ilike(pattern),
                 TransactionLog.produced_by.ilike(pattern),
+                IoBatch.requester_name.ilike(pattern),
             )
         )
 
     _enforce_export_limit(query.count())
     rows = query.order_by(TransactionLog.created_at.desc()).all()
+    batch_map = _batch_name_map(
+        db, {log.operation_batch_id for log, _ in rows if log.operation_batch_id}
+    )
 
     wb = Workbook()
     ws = wb.active
@@ -758,7 +807,7 @@ def export_transactions_xlsx(
 
     columns = [
         "일시", "유형", "품목 코드", "품목명", "공정코드",
-        "수량변화", "이전재고", "이후재고", "참조번호", "담당자", "메모",
+        "수량변화", "이전재고", "이후재고", "참조번호", "담당자", "요청자", "승인자", "메모",
     ]
     apply_header(ws, columns)
 
@@ -767,6 +816,7 @@ def export_transactions_xlsx(
 
     for log, item in rows:
         tx_val = log.transaction_type.value
+        requester, approver = batch_map.get(log.operation_batch_id, (None, None))
         row_data = [
             log.created_at.strftime("%Y-%m-%d %H:%M") if log.created_at else "",
             tx_label.get(tx_val, tx_val),
@@ -778,6 +828,8 @@ def export_transactions_xlsx(
             float(log.quantity_after) if log.quantity_after is not None else "",
             log.reference_no or "",
             log.produced_by or "",
+            requester or "",
+            approver or "",
             log.notes or "",
         ]
         ws.append(row_data)

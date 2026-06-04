@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, MinusCircle, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Check, ChevronDown, ChevronRight, MinusCircle, Trash2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { getStockState } from "@/lib/mes/inventory";
@@ -9,6 +10,7 @@ import { useDeptColorLookup } from "../DepartmentsContext";
 import type { IoLine, IoSubType, Item } from "./types";
 import { isBomForced, lineTagLabel, type LineTagTone } from "./ioWorkType";
 import { formatQty } from "@/lib/mes/format";
+import { BomSubExpander } from "./BomSubExpander";
 
 interface Props {
   line: IoLine;
@@ -68,6 +70,7 @@ export function IoLineRow({
   onRemove,
 }: Props) {
   const getDeptColor = useDeptColorLookup();
+  const [showChildren, setShowChildren] = useState(false);
   const disabled = !line.included;
   // BOM 강제 모드: process(produce/disassemble) 한정 — bom_auto 하위는 상위 비례 자동 계산 → 체크/수량 차단.
   // 창고 입출고는 묶음 선택 후 내부 자유 편집 허용 (qtyLocked=false).
@@ -113,11 +116,12 @@ export function IoLineRow({
   }
 
   return (
+    <div>
     <div
       className="grid items-center gap-3 py-3 pr-4"
       style={{
         gridTemplateColumns:
-          "32px minmax(0,1.6fr) minmax(70px,auto) auto minmax(80px,auto) minmax(80px,auto) 32px",
+          "32px minmax(0,1.6fr) minmax(70px,auto) auto minmax(80px,auto) minmax(80px,auto) 40px",
         background: rowBackground,
         paddingLeft: isChild ? 32 : 16,
         borderLeft: isChild ? `3px solid ${tint(LEGACY_COLORS.muted2, 30)}` : "none",
@@ -146,12 +150,19 @@ export function IoLineRow({
             {line.item_name}
           </span>
           {line.has_children && (
-            <span
-              className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowChildren((v) => !v); }}
+              className="shrink-0 flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors hover:brightness-110"
               style={{ background: tint(LEGACY_COLORS.yellow, 14), color: LEGACY_COLORS.yellow }}
             >
-              하위 있음
-            </span>
+              {showChildren ? (
+                <ChevronDown className="h-2.5 w-2.5" />
+              ) : (
+                <ChevronRight className="h-2.5 w-2.5" />
+              )}
+              {showChildren ? "하위 접기" : "하위 있음"}
+            </button>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -269,15 +280,17 @@ export function IoLineRow({
         <button
           type="button"
           onClick={onRemove}
-          className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-white/10"
-          style={{ color: LEGACY_COLORS.muted2 }}
+          className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:brightness-110"
+          style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }}
           title="삭제"
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="h-5 w-5" />
         </button>
       ) : (
         <span aria-hidden className="block" />
       )}
+    </div>
+    {line.has_children && <BomSubExpander itemId={line.item_id} open={showChildren} />}
     </div>
   );
 }

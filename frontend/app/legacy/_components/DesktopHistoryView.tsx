@@ -13,6 +13,7 @@ import { HistoryTable } from "./_history_sections/HistoryTable";
 import { DesktopHistoryRightPanel } from "./_history_sections/DesktopHistoryRightPanel";
 import { useHistoryData } from "./_hooks/useHistoryData";
 import { useMonthlyCountsQuery } from "@/lib/queries/useTransactionsQuery";
+import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { parseUtc, toDateKey } from "./_history_sections/historyFormat";
 import { type HistorySelection } from "./_history_sections/historyConstants";
 import { DATE_OPTIONS, dateFilterToFrom } from "./_history_sections/historyQuery";
@@ -24,7 +25,7 @@ export function DesktopHistoryView() {
   // scope/typeFilter/activeBucket·부서 전개 상태 없음 — 항상 "전체"로 시작.
   // 대시보드식 독립 필터 패널 (부서·모델·거래종류 다중 선택).
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const { data: productModels } = useModelsQuery();
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [selectedOps, setSelectedOps] = useState<string[]>([]);
@@ -41,18 +42,14 @@ export function DesktopHistoryView() {
     return () => clearTimeout(t);
   }, [search]);
 
-  // 필터 패널 "모델 구분" 칩 소스 — 1회 로드.
-  useEffect(() => {
-    void api
-      .getModels()
-      .then((ms) => {
-        const names = Array.from(
-          new Set(ms.map((m) => m.model_name).filter((n): n is string => !!n)),
-        );
-        setAvailableModels(names);
-      })
-      .catch(() => {});
-  }, []);
+  // 필터 패널 "모델 구분" 칩 소스 — useModelsQuery 캐시에서 모델명만 추려 dedup.
+  const availableModels = useMemo(
+    () =>
+      Array.from(
+        new Set((productModels ?? []).map((m) => m.model_name).filter((n): n is string => !!n)),
+      ),
+    [productModels],
+  );
 
   function toggleModel(v: string) {
     setSelectedModels((s) => (s.includes(v) ? s.filter((x) => x !== v) : [...s, v]));

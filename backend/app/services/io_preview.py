@@ -23,11 +23,12 @@ from app.services import bom as bom_svc
 from app.services import inventory as inventory_svc
 from app.services import stock_math
 
+# 결재 규칙 단일 원천(approval_rules). io.py / io_dispatch / io_persist 가 본 모듈에서
+# 이 이름들을 re-export·import 하므로 네임스페이스에 노출한다.
+from app.services.approval_rules import APPROVAL_SUB_TYPES, MANUAL_LINE_ORIGINS  # noqa: F401
+
 
 WORK_TYPES = {"receive", "warehouse_io", "process", "defect"}
-APPROVAL_SUB_TYPES = {"warehouse_to_dept", "dept_to_warehouse", "defect_quarantine"}
-# 낱개 라인 origin — 부서 결재 정/부 승인 필요.
-MANUAL_LINE_ORIGINS = frozenset({"manual", "adjust_in", "adjust_out"})
 
 
 def _d(value) -> Decimal:
@@ -211,6 +212,191 @@ def _route_for_sub_type(
     raise ValueError(f"지원하지 않는 세부 작업입니다: {sub_type}")
 
 
+# source_kind == "manual" 은 BOM 전개를 건너뛰고 낱개 라인으로 처리한다.
+MANUAL_SOURCE_KIND = "manual"
+# BOM 전개 대상 세부 작업 — 결과/부품을 함께 펼친다.
+EXPAND_SUB_TYPES = frozenset(
+    {"warehouse_to_dept", "dept_to_warehouse", "dept_transfer", "produce", "disassemble"}
+)
+# 회수되지 않은 부품 라인에 붙는 안내 문구.
+DISASSEMBLE_EXCLUSION_NOTE = "회수 안 됨"
+
+
+def _routed_line(
+    db: Session,
+    *,
+    item: Item,
+    quantity: Decimal,
+    sub_type: str,
+    from_department: Optional[str],
+    to_department: Optional[str],
+    origin: str,
+    role: str = "component",
+    bom_expected: Optional[Decimal] = None,
+    exclusion_note: Optional[str] = None,
+) -> dict:
+    """라우팅 규칙을 적용해 라인 하나를 생성한다(추출 전 인라인 패턴 보존)."""
+    route = _route_for_sub_type(
+        sub_type,
+        item=item,
+        from_department=from_department,
+        to_department=to_department,
+        role=role,
+    )
+    return _line_dict(
+        db,
+        item=item,
+        quantity=quantity,
+        direction=route[0],
+        from_bucket=route[1],
+        from_department=route[2],
+        to_bucket=route[3],
+        to_department=route[4],
+        origin=origin,
+        bom_expected=bom_expected,
+        exclusion_note=exclusion_note,
+    )
+
+
+def _produce_lines(
+    db: Session,
+    *,
+    item: Item,
+    quantity: Decimal,
+    children: list,
+    sub_type: str,
+    from_department: Optional[str],
+    to_department: Optional[str],
+) -> list[dict]:
+    """생산: 부품 차감 라인들(bom_auto) → 결과 입고 라인(direct)."""
+    lines: list[dict] = []
+    for child_id, per_unit_qty in children:
+        child = _get_item(db, child_id)
+        required = _d(per_unit_qty) * quantity
+        lines.append(
+            _routed_line(
+                db,
+                item=child,
+                quantity=required,
+                sub_type=sub_type,
+                from_department=from_department,
+                to_department=to_department,
+                origin="bom_auto",
+                role="component",
+                bom_expected=required,
+            )
+        )
+    lines.append(
+        _routed_line(
+            db,
+            item=item,
+            quantity=quantity,
+            sub_type=sub_type,
+            from_department=from_department,
+            to_department=to_department,
+            origin="direct",
+            role="result",
+        )
+    )
+    return lines
+
+
+def _disassemble_lines(
+    db: Session,
+    *,
+    item: Item,
+    quantity: Decimal,
+    children: list,
+    sub_type: str,
+    from_department: Optional[str],
+    to_department: Optional[str],
+) -> list[dict]:
+    """분해: 결과 출고 라인(direct) → 회수 부품 라인들(bom_auto)."""
+    lines: list[dict] = [
+        _routed_line(
+            db,
+            item=item,
+            quantity=quantity,
+            sub_type=sub_type,
+            from_department=from_department,
+            to_department=to_department,
+            origin="direct",
+            role="result",
+        )
+    ]
+    for child_id, per_unit_qty in children:
+        child = _get_item(db, child_id)
+        recovered = _d(per_unit_qty) * quantity
+        lines.append(
+            _routed_line(
+                db,
+                item=child,
+                quantity=recovered,
+                sub_type=sub_type,
+                from_department=from_department,
+                to_department=to_department,
+                origin="bom_auto",
+                role="component",
+                bom_expected=recovered,
+                exclusion_note=DISASSEMBLE_EXCLUSION_NOTE,
+            )
+        )
+    return lines
+
+
+def _expanded_child_lines(
+    db: Session,
+    *,
+    quantity: Decimal,
+    children: list,
+    sub_type: str,
+    from_department: Optional[str],
+    to_department: Optional[str],
+) -> list[dict]:
+    """BOM 전개: 부품 라인들(bom_auto)만 생성(이동/이송류)."""
+    lines: list[dict] = []
+    for child_id, per_unit_qty in children:
+        child = _get_item(db, child_id)
+        required = _d(per_unit_qty) * quantity
+        lines.append(
+            _routed_line(
+                db,
+                item=child,
+                quantity=required,
+                sub_type=sub_type,
+                from_department=from_department,
+                to_department=to_department,
+                origin="bom_auto",
+                bom_expected=required,
+            )
+        )
+    return lines
+
+
+def _single_line(
+    db: Session,
+    *,
+    item: Item,
+    quantity: Decimal,
+    sub_type: str,
+    from_department: Optional[str],
+    to_department: Optional[str],
+    source_kind: str,
+) -> list[dict]:
+    """전개 없는 낱개 라인 하나(수동이면 origin=manual, 그 외 direct)."""
+    return [
+        _routed_line(
+            db,
+            item=item,
+            quantity=quantity,
+            sub_type=sub_type,
+            from_department=from_department,
+            to_department=to_department,
+            origin="manual" if source_kind == MANUAL_SOURCE_KIND else "direct",
+        )
+    ]
+
+
 def _direct_item_bundle(
     db: Session,
     *,
@@ -224,12 +410,9 @@ def _direct_item_bundle(
 ) -> dict:
     children = bom_svc.direct_children(db, item.item_id)
     should_expand = (
-        source_kind != "manual"
+        source_kind != MANUAL_SOURCE_KIND
         and children
-        and (
-            sub_type in {"warehouse_to_dept", "dept_to_warehouse", "dept_transfer"}
-            or sub_type in {"produce", "disassemble"}
-        )
+        and sub_type in EXPAND_SUB_TYPES
     )
     bundle = {
         "bundle_id": _new_id(),
@@ -243,145 +426,44 @@ def _direct_item_bundle(
     }
 
     if sub_type == "produce":
-        for child_id, per_unit_qty in children:
-            child = _get_item(db, child_id)
-            required = _d(per_unit_qty) * quantity
-            route = _route_for_sub_type(
-                sub_type,
-                item=child,
-                from_department=from_department,
-                to_department=to_department,
-                role="component",
-            )
-            bundle["lines"].append(
-                _line_dict(
-                    db,
-                    item=child,
-                    quantity=required,
-                    direction=route[0],
-                    from_bucket=route[1],
-                    from_department=route[2],
-                    to_bucket=route[3],
-                    to_department=route[4],
-                    origin="bom_auto",
-                    bom_expected=required,
-                )
-            )
-        route = _route_for_sub_type(
-            sub_type,
-            item=item,
-            from_department=from_department,
-            to_department=to_department,
-            role="result",
-        )
-        bundle["lines"].append(
-            _line_dict(
-                db,
-                item=item,
-                quantity=quantity,
-                direction=route[0],
-                from_bucket=route[1],
-                from_department=route[2],
-                to_bucket=route[3],
-                to_department=route[4],
-                origin="direct",
-            )
-        )
-        return bundle
-
-    if sub_type == "disassemble":
-        route = _route_for_sub_type(
-            sub_type,
-            item=item,
-            from_department=from_department,
-            to_department=to_department,
-            role="result",
-        )
-        bundle["lines"].append(
-            _line_dict(
-                db,
-                item=item,
-                quantity=quantity,
-                direction=route[0],
-                from_bucket=route[1],
-                from_department=route[2],
-                to_bucket=route[3],
-                to_department=route[4],
-                origin="direct",
-            )
-        )
-        for child_id, per_unit_qty in children:
-            child = _get_item(db, child_id)
-            recovered = _d(per_unit_qty) * quantity
-            route = _route_for_sub_type(
-                sub_type,
-                item=child,
-                from_department=from_department,
-                to_department=to_department,
-                role="component",
-            )
-            bundle["lines"].append(
-                _line_dict(
-                    db,
-                    item=child,
-                    quantity=recovered,
-                    direction=route[0],
-                    from_bucket=route[1],
-                    from_department=route[2],
-                    to_bucket=route[3],
-                    to_department=route[4],
-                    origin="bom_auto",
-                    bom_expected=recovered,
-                    exclusion_note="회수 안 됨",
-                )
-            )
-        return bundle
-
-    if should_expand:
-        for child_id, per_unit_qty in children:
-            child = _get_item(db, child_id)
-            required = _d(per_unit_qty) * quantity
-            route = _route_for_sub_type(
-                sub_type,
-                item=child,
-                from_department=from_department,
-                to_department=to_department,
-            )
-            bundle["lines"].append(
-                _line_dict(
-                    db,
-                    item=child,
-                    quantity=required,
-                    direction=route[0],
-                    from_bucket=route[1],
-                    from_department=route[2],
-                    to_bucket=route[3],
-                    to_department=route[4],
-                    origin="bom_auto",
-                    bom_expected=required,
-                )
-            )
-        return bundle
-
-    route = _route_for_sub_type(
-        sub_type,
-        item=item,
-        from_department=from_department,
-        to_department=to_department,
-    )
-    bundle["lines"].append(
-        _line_dict(
+        bundle["lines"] = _produce_lines(
             db,
             item=item,
             quantity=quantity,
-            direction=route[0],
-            from_bucket=route[1],
-            from_department=route[2],
-            to_bucket=route[3],
-            to_department=route[4],
-            origin="manual" if source_kind == "manual" else "direct",
+            children=children,
+            sub_type=sub_type,
+            from_department=from_department,
+            to_department=to_department,
         )
-    )
+    elif sub_type == "disassemble":
+        bundle["lines"] = _disassemble_lines(
+            db,
+            item=item,
+            quantity=quantity,
+            children=children,
+            sub_type=sub_type,
+            from_department=from_department,
+            to_department=to_department,
+        )
+    elif should_expand:
+        bundle["lines"] = _expanded_child_lines(
+            db,
+            quantity=quantity,
+            children=children,
+            sub_type=sub_type,
+            from_department=from_department,
+            to_department=to_department,
+        )
+    else:
+        bundle["lines"] = _single_line(
+            db,
+            item=item,
+            quantity=quantity,
+            sub_type=sub_type,
+            from_department=from_department,
+            to_department=to_department,
+            source_kind=source_kind,
+        )
     return bundle
 
 

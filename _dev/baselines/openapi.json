@@ -4445,6 +4445,82 @@
         "title": "QuarantineRequest",
         "type": "object"
       },
+      "ReconcileResponse": {
+        "properties": {
+          "mismatch_count": {
+            "title": "Mismatch Count",
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ReconcileRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows",
+          "mismatch_count"
+        ],
+        "title": "ReconcileResponse",
+        "type": "object"
+      },
+      "ReconcileRow": {
+        "properties": {
+          "diff": {
+            "title": "Diff",
+            "type": "integer"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "placed_total": {
+            "title": "Placed Total",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "over",
+              "under"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "warehouse_qty": {
+            "title": "Warehouse Qty",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_id",
+          "item_name",
+          "placed_total",
+          "warehouse_qty",
+          "diff",
+          "status"
+        ],
+        "title": "ReconcileRow",
+        "type": "object"
+      },
       "RequestBucketEnum": {
         "enum": [
           "warehouse",
@@ -5858,6 +5934,532 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "WarehouseAngleCreate": {
+        "properties": {
+          "display_order": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Order"
+          },
+          "height": {
+            "default": 60,
+            "minimum": 1.0,
+            "title": "Height",
+            "type": "integer"
+          },
+          "jaris_per_cell": {
+            "default": 3,
+            "minimum": 1.0,
+            "title": "Jaris Per Cell",
+            "type": "integer"
+          },
+          "label": {
+            "maxLength": 50,
+            "title": "Label",
+            "type": "string"
+          },
+          "layers": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Layers",
+            "type": "integer"
+          },
+          "pos_x": {
+            "default": 0,
+            "title": "Pos X",
+            "type": "integer"
+          },
+          "pos_y": {
+            "default": 0,
+            "title": "Pos Y",
+            "type": "integer"
+          },
+          "rows": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Rows",
+            "type": "integer"
+          },
+          "width": {
+            "default": 72,
+            "minimum": 1.0,
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "title": "WarehouseAngleCreate",
+        "type": "object"
+      },
+      "WarehouseAngleReorderItem": {
+        "properties": {
+          "display_order": {
+            "title": "Display Order",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "display_order"
+        ],
+        "title": "WarehouseAngleReorderItem",
+        "type": "object"
+      },
+      "WarehouseAngleReorderPayload": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WarehouseAngleReorderItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "WarehouseAngleReorderPayload",
+        "type": "object"
+      },
+      "WarehouseAngleResponse": {
+        "properties": {
+          "display_order": {
+            "title": "Display Order",
+            "type": "integer"
+          },
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "jaris_per_cell": {
+            "title": "Jaris Per Cell",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "layers": {
+            "title": "Layers",
+            "type": "integer"
+          },
+          "pos_x": {
+            "title": "Pos X",
+            "type": "integer"
+          },
+          "pos_y": {
+            "title": "Pos Y",
+            "type": "integer"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "rows",
+          "layers",
+          "jaris_per_cell",
+          "pos_x",
+          "pos_y",
+          "width",
+          "height",
+          "display_order",
+          "is_active"
+        ],
+        "title": "WarehouseAngleResponse",
+        "type": "object"
+      },
+      "WarehouseAngleUpdate": {
+        "properties": {
+          "display_order": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Order"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "jaris_per_cell": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jaris Per Cell"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "layers": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layers"
+          },
+          "pos_x": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos X"
+          },
+          "pos_y": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos Y"
+          },
+          "rows": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          }
+        },
+        "title": "WarehouseAngleUpdate",
+        "type": "object"
+      },
+      "WarehouseBoxCreate": {
+        "properties": {
+          "angle_id": {
+            "title": "Angle Id",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WarehouseBoxItemPayload"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "jari_index": {
+            "minimum": 0.0,
+            "title": "Jari Index",
+            "type": "integer"
+          },
+          "layer_no": {
+            "minimum": 1.0,
+            "title": "Layer No",
+            "type": "integer"
+          },
+          "row_no": {
+            "minimum": 1.0,
+            "title": "Row No",
+            "type": "integer"
+          },
+          "size": {
+            "enum": [
+              "LARGE",
+              "MEDIUM",
+              "SMALL"
+            ],
+            "title": "Size",
+            "type": "string"
+          }
+        },
+        "required": [
+          "angle_id",
+          "row_no",
+          "layer_no",
+          "jari_index",
+          "size"
+        ],
+        "title": "WarehouseBoxCreate",
+        "type": "object"
+      },
+      "WarehouseBoxItemPayload": {
+        "properties": {
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "quantity": {
+            "minimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_id",
+          "quantity"
+        ],
+        "title": "WarehouseBoxItemPayload",
+        "type": "object"
+      },
+      "WarehouseBoxItemResponse": {
+        "properties": {
+          "color_hex": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color Hex"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_id",
+          "item_name",
+          "quantity"
+        ],
+        "title": "WarehouseBoxItemResponse",
+        "type": "object"
+      },
+      "WarehouseBoxResponse": {
+        "properties": {
+          "angle_id": {
+            "title": "Angle Id",
+            "type": "integer"
+          },
+          "box_id": {
+            "format": "uuid",
+            "title": "Box Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WarehouseBoxItemResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "jari_index": {
+            "title": "Jari Index",
+            "type": "integer"
+          },
+          "layer_no": {
+            "title": "Layer No",
+            "type": "integer"
+          },
+          "row_no": {
+            "title": "Row No",
+            "type": "integer"
+          },
+          "size": {
+            "enum": [
+              "LARGE",
+              "MEDIUM",
+              "SMALL"
+            ],
+            "title": "Size",
+            "type": "string"
+          },
+          "stack_order": {
+            "title": "Stack Order",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "box_id",
+          "angle_id",
+          "row_no",
+          "layer_no",
+          "jari_index",
+          "size",
+          "stack_order",
+          "items"
+        ],
+        "title": "WarehouseBoxResponse",
+        "type": "object"
+      },
+      "WarehouseBoxUpdate": {
+        "properties": {
+          "items": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/WarehouseBoxItemPayload"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Items"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "enum": [
+                  "LARGE",
+                  "MEDIUM",
+                  "SMALL"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          }
+        },
+        "title": "WarehouseBoxUpdate",
+        "type": "object"
+      },
+      "WarehouseMapResponse": {
+        "properties": {
+          "angles": {
+            "items": {
+              "$ref": "#/components/schemas/WarehouseAngleResponse"
+            },
+            "title": "Angles",
+            "type": "array"
+          },
+          "boxes": {
+            "items": {
+              "$ref": "#/components/schemas/WarehouseBoxResponse"
+            },
+            "title": "Boxes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "angles",
+          "boxes"
+        ],
+        "title": "WarehouseMapResponse",
         "type": "object"
       },
       "WeeklyGroupReport": {
@@ -12015,6 +12617,704 @@
         "summary": "Submit Stock Request Draft",
         "tags": [
           "Stock Requests"
+        ]
+      }
+    },
+    "/api/warehouse-map/angles": {
+      "post": {
+        "operationId": "create_angle_api_warehouse_map_angles_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WarehouseAngleCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseAngleResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Angle",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
+    "/api/warehouse-map/angles/reorder": {
+      "patch": {
+        "operationId": "reorder_angles_api_warehouse_map_angles_reorder_patch",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WarehouseAngleReorderPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reorder Angles",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
+    "/api/warehouse-map/angles/{angle_id}": {
+      "delete": {
+        "operationId": "delete_angle_api_warehouse_map_angles__angle_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "angle_id",
+            "required": true,
+            "schema": {
+              "title": "Angle Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Angle",
+        "tags": [
+          "Warehouse Map"
+        ]
+      },
+      "put": {
+        "operationId": "update_angle_api_warehouse_map_angles__angle_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "angle_id",
+            "required": true,
+            "schema": {
+              "title": "Angle Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WarehouseAngleUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseAngleResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Angle",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
+    "/api/warehouse-map/boxes": {
+      "post": {
+        "operationId": "create_box_api_warehouse_map_boxes_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WarehouseBoxCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseBoxResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Box",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
+    "/api/warehouse-map/boxes/{box_id}": {
+      "delete": {
+        "operationId": "delete_box_api_warehouse_map_boxes__box_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "box_id",
+            "required": true,
+            "schema": {
+              "title": "Box Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Box",
+        "tags": [
+          "Warehouse Map"
+        ]
+      },
+      "put": {
+        "operationId": "update_box_api_warehouse_map_boxes__box_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "box_id",
+            "required": true,
+            "schema": {
+              "title": "Box Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WarehouseBoxUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseBoxResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Box",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
+    "/api/warehouse-map/jari": {
+      "get": {
+        "description": "특정 자리의 박스 스택 — 위치 배정 입력 폼에서 현재 상태 확인용.",
+        "operationId": "get_jari_api_warehouse_map_jari_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "angle_id",
+            "required": true,
+            "schema": {
+              "title": "Angle Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "row",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Row",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "layer",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Layer",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "jari",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "Jari",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WarehouseBoxResponse"
+                  },
+                  "title": "Response Get Jari Api Warehouse Map Jari Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Jari",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
+    "/api/warehouse-map/map": {
+      "get": {
+        "description": "지도 통합 데이터 — 구조 + 박스 배치 + 품목/부서색. 프론트가 이 하나로 전부 렌더.",
+        "operationId": "get_map_api_warehouse_map_map_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseMapResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Map",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
+    "/api/warehouse-map/reconcile": {
+      "get": {
+        "description": "배치 수량 합 vs 창고 재고(warehouse_qty) 대조 — 불일치 경고용.",
+        "operationId": "get_reconcile_api_warehouse_map_reconcile_get",
+        "parameters": [
+          {
+            "description": "특정 품목만 대조",
+            "in": "query",
+            "name": "item_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "특정 품목만 대조",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconcileResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Reconcile",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
+    "/api/warehouse-map/structure": {
+      "get": {
+        "description": "앵글 구조(평면도 좌표·크기 포함).",
+        "operationId": "get_structure_api_warehouse_map_structure_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WarehouseAngleResponse"
+                  },
+                  "title": "Response Get Structure Api Warehouse Map Structure Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Structure",
+        "tags": [
+          "Warehouse Map"
         ]
       }
     },

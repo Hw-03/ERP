@@ -91,6 +91,21 @@ DEXCOWIN — 정밀 X-Ray 장비 제조사. 제조 흐름은 6개 부서 계열(
 - 정합성 검사: `services/integrity.py` 의 mismatch 카운트 (`/health/detailed` 노출)
 - 백업: `scripts/ops/backup_db.bat`
 
+## 폴더·파일 명칭 가이드
+
+이름이 실체를 오도하는 곳들 — **rename 대신 문서로 해소**(CLAUDE.md 대규모 rename 금지 규칙 준수).
+
+| 이름 | 실제 | 주의 |
+|---|---|---|
+| `frontend/app/legacy/` | **현재 메인 운영 UI** | "legacy"=구식이 아님. 모든 데스크탑/모바일 화면이 여기 있다 |
+| `routers/models.py` | 제품 모델(ProductSymbol) **라우터** | DB 모델은 `models/` 폴더 |
+| `_warehouse_v2/` | 현재 활성 입출고 컴포넌트 | V1은 `_warehouse_sections/` 등에 분산(별도 V1 폴더 없음) |
+| `services/inventory.py` | re-export 레이어(공개 API) | 실제 로직은 `inv_base/calc/transfer/defective.py` |
+| `services/io.py` | re-export 레이어 | 실제 로직은 `io_preview/persist/draft/dispatch.py` |
+| `_archive/` (3곳) | 보관소(위치별 역할 상이) | `frontend/_archive`·`_attic/_archive`·`_attic/backend/_archive` |
+
+**`_` 접두어 규칙(frontend):** `_<feature>_hooks`(훅)·`_<feature>_sections`(섹션 컴포넌트)·`_<feature>_steps`(단계 UI)·`_archive`(미사용). Next.js 라우팅에서 제외되는 프라이빗 폴더 관례.
+
 ## 더 알고 싶다면
 
 - 폴더·레이어: [ARCHITECTURE.md](ARCHITECTURE.md)

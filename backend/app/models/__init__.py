@@ -48,6 +48,12 @@ from app.models.transaction import (
     TransactionLog,
     TransactionTypeEnum,
 )
+from app.models.warehouse import (
+    BoxSizeEnum,
+    WarehouseAngle,
+    WarehouseBox,
+    WarehouseBoxItem,
+)
 __all__ = [
     # Base / 공통
     "Base",
@@ -86,4 +92,9 @@ __all__ = [
     # system / audit
     "SystemSetting",
     "AdminAuditLog",
+    # warehouse map
+    "WarehouseAngle",
+    "WarehouseBox",
+    "WarehouseBoxItem",
+    "BoxSizeEnum",
 ]

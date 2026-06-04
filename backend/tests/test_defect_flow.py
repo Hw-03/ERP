@@ -422,12 +422,16 @@ def test_return_to_supplier_from_normal_production(db_session, make_item):
         db_session,
         item.item_id,
         Decimal("3"),
-        source="production",
-        dept_or_warehouse=DepartmentEnum.ASSEMBLY,
-        supplier_name="테스트공급처",
-        reason_category="외관불량",
-        reason_memo="반품",
-        actor="테스터",
+        inventory_svc.NormalSource(
+            kind="production",
+            dept_or_warehouse=DepartmentEnum.ASSEMBLY,
+            supplier_name="테스트공급처",
+        ),
+        inventory_svc.ReasonContext(
+            category="외관불량",
+            memo="반품",
+            actor="테스터",
+        ),
     )
     db_session.flush()
     assert inv_after.quantity == qty_before - Decimal("3")

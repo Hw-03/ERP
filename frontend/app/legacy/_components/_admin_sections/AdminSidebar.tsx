@@ -8,7 +8,9 @@ import {
   FileArchive,
   Layers,
   Lock,
+  MapPinned,
   Network,
+  PackagePlus,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -31,6 +33,8 @@ export const SECTIONS: SectionMeta[] = [
   { id: "bom", label: "BOM 관리", description: "부모-자식 자재 구성 편집", icon: Network },
   { id: "export", label: "내보내기", description: "엑셀 / CSV 데이터 내보내기", icon: Download },
   { id: "audit", label: "외부 제출용 로그", description: "심사 대비 월별 입출고 CSV", icon: FileArchive },
+  { id: "warehouseStructure", label: "창고 구조 편집", description: "앵글 배치·줄·층 편집", icon: MapPinned },
+  { id: "warehousePlacement", label: "위치 배정", description: "품목을 자리에 박스로 배치", icon: PackagePlus },
 ];
 
 export const SETTINGS_ENTRY: SectionMeta = {
@@ -43,6 +47,7 @@ export const SETTINGS_ENTRY: SectionMeta = {
 const SECTION_GROUPS: { title: string; ids: AdminSection[] }[] = [
   { title: "기준 정보", ids: ["models", "items", "employees", "departments"] },
   { title: "구성 관리", ids: ["bom"] },
+  { title: "창고", ids: ["warehouseStructure", "warehousePlacement"] },
   { title: "시스템", ids: ["export", "audit"] },
 ];
 

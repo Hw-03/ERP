@@ -59,6 +59,9 @@ from app.services.inv_transfer import (  # noqa: F401
     consume_from_department,
 )
 from app.services.inv_defective import (  # noqa: F401
+    DefectSource,
+    NormalSource,
+    ReasonContext,
     mark_defective,
     unmark_defective,
     scrap_defective,

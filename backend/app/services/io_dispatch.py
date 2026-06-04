@@ -272,77 +272,107 @@ def _log_immediate(
     )
 
 
-def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employee) -> None:
-    qty = _d(line.quantity)
-    inv = inventory_svc.get_or_create_inventory(db, line.item_id)
-    before = _d(inv.quantity)
-    tx_type = TransactionTypeEnum.ADJUST
-    quantity_change = Decimal("0")
+# 버킷 이름 — IoLine.from_bucket / to_bucket 가 가질 수 있는 값.
+_BUCKET_PRODUCTION = "production"
+_BUCKET_WAREHOUSE = "warehouse"
+_BUCKET_DEFECTIVE = "defective"
+_BUCKET_NONE = "none"
 
-    if line.direction == "in":
-        bucket = "production" if line.to_bucket == "production" else "warehouse"
+
+def _apply_in(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeEnum, Decimal]:
+    bucket = _BUCKET_PRODUCTION if line.to_bucket == _BUCKET_PRODUCTION else _BUCKET_WAREHOUSE
+    inventory_svc.receive_confirmed(
+        db,
+        line.item_id,
+        qty,
+        bucket=bucket,
+        dept=line.to_department,
+    )
+    tx_type = (
+        TransactionTypeEnum.PRODUCE if bucket == _BUCKET_PRODUCTION else TransactionTypeEnum.RECEIVE
+    )
+    return tx_type, qty
+
+
+def _apply_out(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeEnum, Decimal]:
+    if line.from_bucket == _BUCKET_WAREHOUSE:
+        inventory_svc.consume_warehouse(db, line.item_id, qty)
+        tx_type = TransactionTypeEnum.SHIP
+    elif line.from_bucket == _BUCKET_DEFECTIVE:
+        inventory_svc.return_to_supplier(db, line.item_id, qty, line.from_department)
+        tx_type = TransactionTypeEnum.SUPPLIER_RETURN
+    else:
+        inventory_svc.consume_from_department(db, line.item_id, qty, line.from_department)
+        tx_type = TransactionTypeEnum.BACKFLUSH
+    return tx_type, -qty
+
+
+def _apply_move(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeEnum, Decimal]:
+    if line.from_bucket == _BUCKET_PRODUCTION and line.to_bucket == _BUCKET_PRODUCTION:
+        inventory_svc.transfer_between_departments(
+            db, line.item_id, qty, line.from_department, line.to_department
+        )
+        tx_type = TransactionTypeEnum.TRANSFER_DEPT
+    elif line.from_bucket == _BUCKET_WAREHOUSE:
+        inventory_svc.transfer_to_production(db, line.item_id, qty, line.to_department)
+        tx_type = TransactionTypeEnum.TRANSFER_TO_PROD
+    else:
+        inventory_svc.transfer_to_warehouse(db, line.item_id, qty, line.from_department)
+        tx_type = TransactionTypeEnum.TRANSFER_TO_WH
+    return tx_type, Decimal("0")
+
+
+def _apply_defective(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeEnum, Decimal]:
+    inventory_svc.mark_defective(
+        db,
+        line.item_id,
+        qty,
+        inventory_svc.DefectSource(
+            kind=line.from_bucket,
+            source_dept=line.from_department,
+            target_dept=line.to_department,
+        ),
+    )
+    return TransactionTypeEnum.MARK_DEFECTIVE, Decimal("0")
+
+
+def _apply_adjust(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeEnum, Decimal]:
+    if line.to_bucket == _BUCKET_PRODUCTION and line.from_bucket == _BUCKET_NONE:
         inventory_svc.receive_confirmed(
             db,
             line.item_id,
             qty,
-            bucket=bucket,
+            bucket=_BUCKET_PRODUCTION,
             dept=line.to_department,
         )
-        tx_type = TransactionTypeEnum.PRODUCE if bucket == "production" else TransactionTypeEnum.RECEIVE
         quantity_change = qty
-    elif line.direction == "out":
-        if line.from_bucket == "warehouse":
-            inventory_svc.consume_warehouse(db, line.item_id, qty)
-            tx_type = TransactionTypeEnum.SHIP
-        elif line.from_bucket == "defective":
-            inventory_svc.return_to_supplier(db, line.item_id, qty, line.from_department)
-            tx_type = TransactionTypeEnum.SUPPLIER_RETURN
-        else:
-            inventory_svc.consume_from_department(db, line.item_id, qty, line.from_department)
-            tx_type = TransactionTypeEnum.BACKFLUSH
-        quantity_change = -qty
-    elif line.direction == "move":
-        if line.from_bucket == "production" and line.to_bucket == "production":
-            inventory_svc.transfer_between_departments(
-                db, line.item_id, qty, line.from_department, line.to_department
-            )
-            tx_type = TransactionTypeEnum.TRANSFER_DEPT
-        elif line.from_bucket == "warehouse":
-            inventory_svc.transfer_to_production(db, line.item_id, qty, line.to_department)
-            tx_type = TransactionTypeEnum.TRANSFER_TO_PROD
-        else:
-            inventory_svc.transfer_to_warehouse(db, line.item_id, qty, line.from_department)
-            tx_type = TransactionTypeEnum.TRANSFER_TO_WH
-    elif line.direction == "defective":
-        inventory_svc.mark_defective(
-            db,
-            line.item_id,
-            qty,
-            source=line.from_bucket,
-            source_dept=line.from_department,
-            target_dept=line.to_department,
+    elif line.from_bucket == _BUCKET_PRODUCTION and line.to_bucket == _BUCKET_NONE:
+        inventory_svc.consume_from_department(
+            db, line.item_id, qty, line.from_department
         )
-        tx_type = TransactionTypeEnum.MARK_DEFECTIVE
+        quantity_change = -qty
+    else:
+        raise ValueError(
+            f"잘못된 adjust 라인 구성: from={line.from_bucket} to={line.to_bucket}"
+        )
+    return TransactionTypeEnum.ADJUST, quantity_change
+
+
+def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employee) -> None:
+    qty = _d(line.quantity)
+    inv = inventory_svc.get_or_create_inventory(db, line.item_id)
+    before = _d(inv.quantity)
+
+    if line.direction == "in":
+        tx_type, quantity_change = _apply_in(db, line, qty)
+    elif line.direction == "out":
+        tx_type, quantity_change = _apply_out(db, line, qty)
+    elif line.direction == "move":
+        tx_type, quantity_change = _apply_move(db, line, qty)
+    elif line.direction == "defective":
+        tx_type, quantity_change = _apply_defective(db, line, qty)
     elif line.direction == "adjust":
-        if line.to_bucket == "production" and line.from_bucket == "none":
-            inventory_svc.receive_confirmed(
-                db,
-                line.item_id,
-                qty,
-                bucket="production",
-                dept=line.to_department,
-            )
-            quantity_change = qty
-        elif line.from_bucket == "production" and line.to_bucket == "none":
-            inventory_svc.consume_from_department(
-                db, line.item_id, qty, line.from_department
-            )
-            quantity_change = -qty
-        else:
-            raise ValueError(
-                f"잘못된 adjust 라인 구성: from={line.from_bucket} to={line.to_bucket}"
-            )
-        tx_type = TransactionTypeEnum.ADJUST
+        tx_type, quantity_change = _apply_adjust(db, line, qty)
     else:
         raise ValueError(f"지원하지 않는 라인 방향입니다: {line.direction}")
 

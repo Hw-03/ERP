@@ -1,33 +1,44 @@
 /**
  * P2-1 / 시나리오 2: 창고 → 부서 결재 요청.
  *
- *  - approval 경로 (즉시 반영 X)
- *  - StockRequest bridge 생성 + 큐에 등장
- *  - 결재 라벨 일관성 (요청 큐 / draft cart / 내역)
+ * 라이브 정책(2026-06-04 확인): warehouse_to_dept 는 requiresApproval → approvalKind
+ * "warehouse" → 창고 결재. 최종 버튼 "창고 결재 요청 N건" → 확인 다이얼로그 "결재 요청"
+ * → "창고 결재 요청 완료" 다이얼로그. 창고 정/부(이필욱)에게 "창고 승인함" 큐도 존재.
  */
 import { expect, test } from "@playwright/test";
+import { gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
 
 test.describe("입출고 V2 — 창고 → 부서 결재 요청", () => {
-  test.fixme(
-    !process.env.E2E_SEED_READY,
-    "백엔드 시드 전략 + P0-3 인증 도입 전 — 활성화 보류",
-  );
+  test.beforeEach(async ({ page }) => {
+    await loginAsOperator(page, { role: "warehouse" });
+  });
 
-  test("창고 → 부서 wizard → 결재 요청 → 요청 큐 등장", async ({ page }) => {
-    await page.goto("/legacy");
+  test("창고 → 부서 wizard → 창고 결재 요청 생성", async ({ page }) => {
+    await gotoWarehouseCompose(page);
 
-    await page.getByRole("tab", { name: /입출고/ }).first().click();
-    await page.getByRole("button", { name: /창고 입출고/ }).first().click();
+    // 1. 작업 유형: 창고 입출고
+    await pickWorkType(page, /창고 입출고/);
+
+    // 2. 세부 작업: 창고 → 부서 + 도착 부서(조립) → 다음 단계로
     await page.getByRole("button", { name: /창고 → 부서/ }).first().click();
+    await page.getByRole("button", { name: "조립", exact: true }).click();
+    await page.getByRole("button", { name: /다음 단계로/ }).click();
 
-    // 시드 데이터 결정 후 구체화:
-    // 1) 도착 부서 선택
-    // 2) BOM 품목 선택 → 자동 전개 자식 확인
-    // 3) 일부 자식 제외 (포함 토글)
-    // 4) 결재 요청 제출
-    // 5) "결재 요청 보냄" 결과 확인
-    // 6) 요청 큐 탭 이동 → 방금 요청 row 표시 + 라벨 "창고 → 부서" 확인
+    // 3. 품목 선택 — 원자재 낱개
+    await page
+      .getByRole("row", { name: /E2E원자재튜브/ })
+      .getByRole("button", { name: "낱개", exact: true })
+      .click();
 
-    await expect(page.getByRole("button", { name: /창고 → 부서/ })).toBeVisible();
+    // 4. 품목 확인 → 제출확인
+    await page.getByRole("button", { name: /제출확인/ }).click();
+
+    // 5. 최종 확인 — 창고 결재 요청
+    await page.getByRole("button", { name: /창고 결재 요청/ }).click();
+    await expect(page.getByRole("dialog", { name: /하시겠습니까/ })).toBeVisible();
+    await page.getByRole("button", { name: "결재 요청", exact: true }).click();
+
+    // 종착: 창고 결재 요청 완료
+    await expect(page.getByRole("dialog", { name: /창고 결재 요청 완료/ })).toBeVisible();
   });
 });

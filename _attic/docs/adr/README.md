@@ -17,6 +17,7 @@
 - [ADR-0002 — 출입고 도메인 단일 사전 (glossary.ts)](ADR-0002-shared-io-glossary.md)
 - [ADR-0003 — Mobile wizard 는 Desktop V2 컴포넌트를 재사용](ADR-0003-mobile-reuses-desktop-v2.md)
 - [ADR-0004 — OpenAPI baseline 은 `_dev/baselines/openapi.json`](ADR-0004-openapi-baseline-location.md)
+- [ADR-0005 — 결재 규칙 단일 원천 (approval_rules.py)](ADR-0005-approval-rules-single-source.md)
 
 ## 새 ADR 작성 시
 

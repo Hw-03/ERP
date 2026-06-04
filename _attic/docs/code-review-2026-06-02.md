@@ -248,3 +248,71 @@ GLOSSARY 통일안과 어긋나는 화면 라벨 (사용자가 실제로 보는 
 - `_` 접두어 규칙 / `_archive` 3곳 차이
 
 **완료기준:** CONTEXT.md 가이드 추가 + 처음 보는 사람이 위 항목 안 헷갈림. **주의:** 실제 rename은 별건(명시 승인). 지금은 문서화만.
+
+---
+
+## 9. 처리 결과 — 자율 실행 (2026-06-02, 브랜치 `cleanup/code-review-fixes`)
+
+> Wave 0~4 자율 실행. 각 Wave `verify_local` 그린 게이트 통과 후 커밋·푸시. backend pytest 432 + frontend 643 그린 유지. PR로 머지 검토.
+
+### 완료 ✅
+| 항목 | 처리 | 커밋 |
+|---|---|---|
+| §8-1 안정성 테스트 | inv/sr/io 회귀 110 + inv_calc 8 | `1541fe7e`·`86f38e78` |
+| §5 R2-4 음수가드 | DB CHECK 이미 방어 → 재평가 + 방어망 테스트 | `86f38e78` |
+| §5 R2-6 캐시 빈맵 | 경고 로그 | `121f0c63` |
+| §7 함수분리(빨간불 4) | production·sr_execution·io_preview·io_dispatch | `972391b4`~`3b2ebed4` |
+| §1 중복제거·N+1 | transactions 필터빌더·defects 일괄 조회 | `4bbbb7c8`·`2297682e` |
+| §7 inv_defective 분기중복 | `_consume_normal_source` 추출 | `aee2707e` |
+| §4-1 용어 2곳 | 새 불량/불량 해제/불량 처리 | `dc6fedfe` |
+| §4-2 import 순환 | sr_approval 5/6 정적화(io_persist 무순환) | `d81160f7` |
+| §8-3 죽은코드 | components 3 `_attic` + `toNumber` 제거 | `fcd5797d` |
+| §8-2·8-4 문서 | CODING_STYLE + CONTEXT 이름가이드 | `ce186907` |
+| §5 R2-1 staleTime | 도메인별 차등(VOLATILE 30s/MASTER 30m) | `4426342c` |
+| §5 R2-3 getModels | `useModelsQuery` 7곳 캐시 공유 | `e984a90e` |
+| §2 useEffect | 의도적 정당 → 의도 주석 보강 | `9f8700be` |
+
+### 보류 ⏭️ (위험 대비 실익 낮음 — R2식 보수적 판단, 사유 기록)
+- **에러표준 전수통일(§3)**: 라우터 광범위 + 프론트 에러 파싱 영향 + 회귀 위험 → 점진 마이그레이션. CODING_STYLE에 "새 코드는 `http_error`" 기준만.
+- **mes_code 부분 unique(R2-5)**: `serial_no` 단조증가(`max+1`)로 소프트삭제 후 충돌이 실질적으로 없음 + `items` 테이블 재생성 위험 + 다른 세션 generated 컬럼 영역.
+- **inv_defective 인자 dataclass(§7 인자폭증)**: 호출자(sr_execution 14핸들러 등) 광범위 영향 + 키워드 전용 인자라 이미 명시적. 분기 중복만 헬퍼로 추출.
+- **R2-2 admin훅 통합**: 테스트가 `useAdminDepartmentsList`를 직접 import → 제거 시 회귀.
+- **R2-3 getModels 2곳**: `useAdminBootstrap`(Promise.all 원자 그룹)·고아 `useModels`(소비처 0).
+
+### 재평가 결론 (에이전트 진단 vs 실제 코드)
+- **R2-4**: `Inventory`/`InventoryLocation` DB CHECK 4중으로 이미 방어 → "가드 부재"는 오판. Python 가드 대신 방어망 테스트로 고정.
+- **StockRequestLine.status 인덱스**: 이미 존재(`ix_stock_request_line_item_status`) → 추가 불필요.
+- **useEffect 회피 3곳**: 전부 의도적·정확한 deps 최적화(특정 필드만) → 버그 아님, 주석만 보강.
+
+---
+
+## 10. 잔여 이슈 2차 해소 (2026-06-02 — 보류 5건 전부 구현 + e2e 확인 + rebase)
+
+> 사용자 결정으로 §9 보류 5건을 **전부 구현**(위험 감수). e2e 검증 + rebase로 PR #18 머지 가능 상태.
+
+### 보류 5건 → 완료 ✅
+| 보류 항목 | 처리 | 커밋 |
+|---|---|---|
+| R2-3 getModels 2곳 | 고아 useModels `_attic` + useAdminBootstrap `useModelsQuery({enabled:unlocked})` | `a01a13d6` |
+| R2-2 admin훅 | useAdminDepartmentsList 인라인+삭제, 테스트 재작성 | `224ad043` |
+| inv_defective dataclass | ReasonContext/DefectSource/NormalSource + 호출처 전체(sr_execution 6·io_dispatch·routers 3) | `f641a91f` |
+| 에러표준(§3) | departments·admin_audit_csv 7곳 `http_error` (프론트 호환) | `507fc98c` |
+| mes_code 부분unique(R2-5) | 부분 Index + 멱등 마이그레이션(dev 복사본으로 전체→부분 교체·멱등 검증) | `274a2e0a` |
+
+### e2e 검증 결과 ⚠️ → 해소 ✅ (2026-06-04)
+- 용어 변경은 **정적 안전**(내역 탭 banned 0건).
+- ~~**e2e 인프라 미완 발견**: `@playwright/test` 미설치 + `/legacy` 로그인 게이트로 e2e가 baseline 부터 미작동(3 failed).~~ → **2026-06-04 전부 해소**.
+
+#### e2e 인프라 완성 (2026-06-04, 커밋 `4c152b9b`) ✅
+- **전용 DB 격리**: `frontend/tests/e2e/global-setup.ts`/`global-teardown.ts` — 전용 `backend/mes_e2e.db`(부트스트랩·시드) + 전용 백엔드 포트 8021 + 전용 프론트 3100(`BACKEND_INTERNAL_URL` 프록시). teardown 에서 실 `backend/mes.db` SHA256 불변 검증 — **실 DB 절대 미접촉 보장**.
+- **로그인 우회**: `_helpers.ts` `loginAsOperator` — MesLoginGate 3중 검증(operator·boot_id·활성직원)을 런타임 조회로 inject(고정값 불가).
+- **시드**: 창고/부서 primary 역할 부여 + 품목/BOM + 조립 부서 생산재고(produce 전제, `transfer_to_production`).
+- **쓰기 4 spec 전부 그린**(`test.fixme` 제거, app 코드 미접촉·role/text 셀렉터만):
+  - io-receive(낱개→**부서 결재**), io-process-produce(BOM→**즉시 반영**), io-warehouse-to-dept·io-dept-to-warehouse(**창고 결재**) + io-history-labels(라벨 baseline). **총 7 테스트 그린**.
+  - 라이브 정책 재확인: receive 는 "즉시반영"이 아니라 **낱개 라인→부서 결재**(`hasManualLine`), produce 는 **즉시 반영**(BOM 라인은 manual 아님). io-history-labels 는 라이브 UI 기준 정정(work type 3개·정규식 메타문자 버그 수정).
+- **verify 통합**: `scripts/dev/verify_e2e.ps1` 신설 + `verify_local.ps1 -IncludeE2E` 스위치.
+- **PR #18 MERGED**(2026-06-04) + dev `mes.db` 부분 unique 적용 확인(`ix_items_mes_code … WHERE deleted_at IS NULL`).
+
+### 추가 재평가 (2차)
+- **에러표준(§3)**: 구식 `raise HTTPException` 실제 **2파일 7곳**뿐(§3 "95%" 과장). 프론트 `extractErrorMessage`가 str/dict 모두 호환 → 안전.
+- **mes_code 부분unique**: `serial_no` 단조증가로 실 충돌은 드물지만, 부분 unique + 멱등 마이그레이션을 안전하게 구현·검증.

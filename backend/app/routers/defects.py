@@ -139,18 +139,25 @@ def list_defect_locations(
         )
     ) if item_ids else set()
 
-    result: List[DefectLocationItem] = []
-    for loc, item in rows:
-        # 해당 (item, dept) 의 최근 MARK_DEFECTIVE 로그 조회
-        last_log: Optional[TransactionLog] = (
+    # item_id 별 최근 MARK_DEFECTIVE 로그 일괄 조회 — N+1 제거.
+    # 기존 단건 쿼리와 동일하게 item_id 기준(부서 무관) created_at 내림차순 최신 1건.
+    last_log_by_item: dict = {}
+    if item_ids:
+        for log in (
             db.query(TransactionLog)
             .filter(
-                TransactionLog.item_id == loc.item_id,
+                TransactionLog.item_id.in_(item_ids),
                 TransactionLog.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE,
             )
             .order_by(TransactionLog.created_at.desc())
-            .first()
-        )
+            .all()
+        ):
+            # 내림차순 순회 → 가장 먼저 만난(=최신) 로그만 남김.
+            last_log_by_item.setdefault(log.item_id, log)
+
+    result: List[DefectLocationItem] = []
+    for loc, item in rows:
+        last_log: Optional[TransactionLog] = last_log_by_item.get(loc.item_id)
         result.append(
             DefectLocationItem(
                 item_id=item.item_id,
@@ -280,9 +287,11 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
             db,
             payload.item_id,
             payload.qty,
-            source=payload.source,
-            target_dept=target_dept,
-            source_dept=source_dept,
+            inventory_svc.DefectSource(
+                kind=payload.source,
+                target_dept=target_dept,
+                source_dept=source_dept,
+            ),
         )
     except ValueError as exc:
         raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc))
@@ -367,9 +376,11 @@ def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Sessio
             payload.item_id,
             payload.qty,
             dept,
-            reason_category=payload.reason_category,
-            reason_memo=payload.reason_memo or "",
-            actor=actor.name,
+            inventory_svc.ReasonContext(
+                category=payload.reason_category,
+                memo=payload.reason_memo or "",
+                actor=actor.name,
+            ),
         )
     except ValueError as exc:
         raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc))

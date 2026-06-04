@@ -16,6 +16,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { productionApi } from "@/lib/api/production";
+import { STALE_TIME } from "./client";
 import { queryKeys } from "./keys";
 
 type TransactionParams = Parameters<typeof productionApi.getTransactions>[0];
@@ -25,6 +26,8 @@ export function useTransactionsQuery(params?: TransactionParams) {
   return useQuery({
     queryKey: queryKeys.transactions.list(params),
     queryFn: () => productionApi.getTransactions(params),
+    // 입출고 내역은 신규 트랜잭션이 자주 추가됨 → 짧게 (R2-1).
+    staleTime: STALE_TIME.VOLATILE,
   });
 }
 
@@ -32,6 +35,8 @@ export function useTransactionsSummaryQuery(params?: SummaryParams) {
   return useQuery({
     queryKey: queryKeys.transactions.summary(params),
     queryFn: () => productionApi.getTransactionsSummary(params),
+    // KPI 집계도 내역과 함께 변동 → 짧게 (R2-1).
+    staleTime: STALE_TIME.VOLATILE,
   });
 }
 

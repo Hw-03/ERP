@@ -259,9 +259,11 @@ def submit_adjustment(
         elif ln.direction == "defective":
             inv = inventory_svc.mark_defective(
                 db, ln.item_id, qty,
-                source="production",
-                source_dept=dept_enum,
-                target_dept=dept_enum,
+                inventory_svc.DefectSource(
+                    kind="production",
+                    source_dept=dept_enum,
+                    target_dept=dept_enum,
+                ),
             )
             qty_before = inv.quantity or Decimal("0")
 
@@ -332,9 +334,11 @@ def submit_defective_disassemble(
     # 1) 부모 DEFECTIVE 차감
     parent_inv = inventory_svc.scrap_defective(
         db, parent_item_id, parent_qty, parent_dept,
-        reason_category=reason_category,
-        reason_memo=reason_memo,
-        actor=actor,
+        inventory_svc.ReasonContext(
+            category=reason_category,
+            memo=reason_memo,
+            actor=actor,
+        ),
     )
     qty_before_parent = (parent_inv.quantity or Decimal("0")) + parent_qty
 

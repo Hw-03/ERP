@@ -16,8 +16,12 @@ import { useInventoryData } from "../../_hooks/useInventoryData";
 import { useDesktopInventoryDerivations } from "../../_hooks/useDesktopInventoryDerivations";
 import { useItemImageManifest } from "../../_hooks/useItemImageManifest";
 import { matchesKpi, matchesSearch } from "../../_inventory_sections/inventoryFilter";
+import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 
 const PAGE_SIZE = 100;
+
+// 안정 참조 — useModelsQuery 미로딩 시 동일 빈 배열을 재사용해 useMemo 의존성을 흔들지 않는다.
+const EMPTY_MODELS: ProductModel[] = [];
 
 /**
  * 대시보드 모바일 화면.
@@ -60,7 +64,7 @@ export function MobileDashboardScreen({
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [selectedProcessSteps, setSelectedProcessSteps] = useState<string[]>([]);
-  const [productModels, setProductModels] = useState<ProductModel[]>([]);
+  const productModels = useModelsQuery().data ?? EMPTY_MODELS;
   const [kpi, setKpi] = useState<KpiFilter>("ALL");
   const [localSearch, setLocalSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
@@ -81,10 +85,6 @@ export function MobileDashboardScreen({
     setSelectedProcessSteps((prev) => (prev.includes(v) ? prev.filter((p) => p !== v) : [...prev, v]));
     setDisplayLimit(PAGE_SIZE);
   }
-
-  useEffect(() => {
-    void api.getModels().then(setProductModels).catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (!selectedItem) {

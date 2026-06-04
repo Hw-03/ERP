@@ -10,12 +10,15 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { departmentsApi } from "@/lib/api/departments";
+import { STALE_TIME } from "./client";
 import { queryKeys } from "./keys";
 
 export function useDepartmentsQuery(params?: { isActive?: boolean }) {
   return useQuery({
     queryKey: queryKeys.departments.list(params),
     queryFn: () => departmentsApi.getDepartments(params),
+    // 마스터 데이터: 변경이 드물어 재요청을 더 아낀다 (R2-1).
+    staleTime: STALE_TIME.MASTER,
   });
 }
 

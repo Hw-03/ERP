@@ -119,6 +119,9 @@ export function DisassembleTree({
       });
 
     return () => { cancelled = true; };
+    // BOM 템플릿 1회 로드 패턴. onChange 는 호출부에서 항상 setDecisions(안정적 setter)
+    // 라 deps 에 넣어도 재실행되지 않고, decisions 는 일부러 제외 — 넣으면 입력 편집마다
+    // effect 가 재평가돼 불필요(상단 length>0 가드로 재요청은 막지만 호출 자체가 낭비).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentItemId, parentQty]);
 

@@ -2,10 +2,11 @@
 
 from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.routers._errors import ErrorCode, http_error
 from app.dependencies.admin import require_admin_pin
 from app.models import Department
 from app.services.reorder import reorder_by_display_order
@@ -38,7 +39,7 @@ def create_department(
     db: Session = Depends(get_db),
 ):
     if db.query(Department).filter(Department.name == payload.name).first():
-        raise HTTPException(status_code=409, detail="이미 존재하는 부서명입니다.")
+        raise http_error(409, ErrorCode.CONFLICT, "이미 존재하는 부서명입니다.")
     dept = Department(
         name=payload.name,
         display_order=payload.display_order,
@@ -75,10 +76,10 @@ def update_department(
 ):
     dept = db.query(Department).filter(Department.id == dept_id).first()
     if not dept:
-        raise HTTPException(status_code=404, detail="부서를 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "부서를 찾을 수 없습니다.")
     if payload.name is not None:
         if db.query(Department).filter(Department.name == payload.name, Department.id != dept_id).first():
-            raise HTTPException(status_code=409, detail="이미 존재하는 부서명입니다.")
+            raise http_error(409, ErrorCode.CONFLICT, "이미 존재하는 부서명입니다.")
         dept.name = payload.name
     if payload.display_order is not None:
         dept.display_order = payload.display_order
@@ -108,6 +109,6 @@ def delete_department(
     """
     dept = db.query(Department).filter(Department.id == dept_id).first()
     if not dept:
-        raise HTTPException(status_code=404, detail="부서를 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "부서를 찾을 수 없습니다.")
     db.delete(dept)
     db.commit()

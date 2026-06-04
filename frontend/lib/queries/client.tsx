@@ -17,6 +17,21 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
+/**
+ * 도메인별 staleTime 티어 (R2-1).
+ *
+ * 전역 기본은 그대로 5분(네트워크 절감 의도 유지). 아래 두 티어는
+ * 각 queries 훅에서 queryKey 단위로 개별 override 할 때만 쓴다.
+ *  - VOLATILE 30초: 자주 바뀌는 운영 데이터(재고/입출고/요청 대기열).
+ *    mutation 은 항상 invalidate 하므로 같은 세션 내 갱신은 보장되고,
+ *    이 값은 "다른 화면에서 들어왔을 때 얼마나 빨리 재요청하나"만 좌우한다.
+ *  - MASTER 30분: 거의 안 바뀌는 마스터(부서/모델/직원). 재요청을 더 아낀다.
+ */
+export const STALE_TIME = {
+  VOLATILE: 30_000,
+  MASTER: 30 * 60_000,
+} as const;
+
 const defaultOptions = {
   queries: {
     staleTime: 5 * 60_000,

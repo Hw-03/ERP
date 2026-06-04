@@ -880,7 +880,7 @@ def _recreate_items_with_generated_mes_code() -> None:
             )
             cur.execute("DROP TABLE items")
             cur.execute("ALTER TABLE items_new RENAME TO items")
-            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_items_mes_code ON items(mes_code)")
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_items_mes_code ON items(mes_code) WHERE deleted_at IS NULL")
             cur.execute("CREATE INDEX IF NOT EXISTS ix_items_process_type_code ON items (process_type_code)")
             cur.execute("CREATE INDEX IF NOT EXISTS ix_items_model_symbol ON items (model_symbol)")
             cur.execute("CREATE INDEX IF NOT EXISTS ix_items_sort_order ON items (sort_order)")
@@ -897,6 +897,29 @@ def _recreate_items_with_generated_mes_code() -> None:
             cur.close()
     finally:
         raw.close()
+
+
+def _make_mes_code_partial_unique() -> None:
+    """ix_items_mes_code 를 전체 unique → 부분 unique(WHERE deleted_at IS NULL) 로 교체.
+
+    소프트삭제된 품목과 같은 mes_code 재등록을 허용한다(R2-5). 멱등 — 이미 부분이면 NO-OP.
+    SQLite 전용(dev). PG 는 create_all 의 postgresql_where 부분 인덱스로 신규 생성.
+    """
+    if engine.dialect.name != "sqlite":
+        return
+    with engine.connect() as conn:
+        row = conn.execute(text(
+            "SELECT sql FROM sqlite_master WHERE type='index' AND name='ix_items_mes_code'"
+        )).fetchone()
+        existing = (row[0] if row else "") or ""
+        if "WHERE" in existing.upper():
+            return  # 이미 부분 unique
+        conn.execute(text("DROP INDEX IF EXISTS ix_items_mes_code"))
+        conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_items_mes_code "
+            "ON items(mes_code) WHERE deleted_at IS NULL"
+        ))
+        conn.commit()
 
 
 def run_migrations() -> dict[str, object]:
@@ -1074,6 +1097,15 @@ def run_migrations() -> dict[str, object]:
         _recreate_items_with_generated_mes_code()
     except Exception as exc:  # noqa: BLE001
         msg = f"[migrate] items generated mes_code recreation failed: {exc}"
+        errors.append(msg)
+        logger.warning(msg, exc_info=False)
+
+    # 2026-06-02: ix_items_mes_code 전체 unique → 부분 unique(deleted_at IS NULL).
+    # 소프트삭제 후 동일 mes_code 재등록 허용(R2-5). items 재생성 이후 실행. 멱등.
+    try:
+        _make_mes_code_partial_unique()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"[migrate] mes_code partial unique failed: {exc}"
         errors.append(msg)
         logger.warning(msg, exc_info=False)
 

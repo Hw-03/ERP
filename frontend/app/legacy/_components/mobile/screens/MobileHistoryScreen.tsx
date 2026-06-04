@@ -14,6 +14,7 @@ import { HistoryDetailPanel } from "../../_history_sections/HistoryDetailPanel";
 import { HistoryBatchDetailPanel } from "../../_history_sections/HistoryBatchDetailPanel";
 import { useHistoryData } from "../../_hooks/useHistoryData";
 import { useMonthlyCountsQuery } from "@/lib/queries/useTransactionsQuery";
+import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { parseUtc, toDateKey, formatHistoryDate } from "../../_history_sections/historyFormat";
 import {
   getHistoryActor,
@@ -35,7 +36,7 @@ const SEARCH_DEBOUNCE_MS = 350;
  */
 export function MobileHistoryScreen() {
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const { data: productModels } = useModelsQuery();
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [selectedOps, setSelectedOps] = useState<string[]>([]);
@@ -51,17 +52,13 @@ export function MobileHistoryScreen() {
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => {
-    void api
-      .getModels()
-      .then((ms) => {
-        const names = Array.from(
-          new Set(ms.map((m) => m.model_name).filter((n): n is string => !!n)),
-        );
-        setAvailableModels(names);
-      })
-      .catch(() => {});
-  }, []);
+  const availableModels = useMemo(
+    () =>
+      Array.from(
+        new Set((productModels ?? []).map((m) => m.model_name).filter((n): n is string => !!n)),
+      ),
+    [productModels],
+  );
 
   function toggleModel(v: string) {
     setSelectedModels((s) => (s.includes(v) ? s.filter((x) => x !== v) : [...s, v]));
