@@ -109,7 +109,7 @@
 | `PersonAvatar` | 사용자 아바타 (이름 첫 글자) | 이름 라벨 TYPO.body |
 | `MobileUserMenuSheet` | 사용자 시트 (프로필·PIN·로그아웃) | MobileShell 헤더에서 호출 |
 
-> 위 표는 **주요 primitives만** 추린 것이다. 보조 컴포넌트(`SectionHeader`·`AsyncState`·`EmptyState`·`ItemRow`·`MoreMenuRow`·`WizardHeader`·`WizardProgress` 등)를 포함한 **현재 전체 구성은 [primitives/ 폴더](frontend/app/legacy/_components/mobile/primitives/) 기준**으로 본다. 개수는 변동값이라 박지 않는다.
+> 위 표는 **주요 primitives만** 추린 것이다. 보조 컴포넌트(`SectionHeader`·`AsyncState`·`ItemRow`·`MoreMenuRow`·`WizardHeader`·`WizardProgress` 등)를 포함한 **현재 전체 구성은 [primitives/ 폴더](frontend/app/legacy/_components/mobile/primitives/) 기준**으로 본다. 개수는 변동값이라 박지 않는다. (빈 상태는 모바일·데스크탑 공용 [common/EmptyState](frontend/app/legacy/_components/common/EmptyState.tsx) 단일 소스를 쓴다 — 모바일 전용 EmptyState는 미사용이라 2026-06-05 제거.)
 
 ### 데스크탑↔모바일 공유
 
