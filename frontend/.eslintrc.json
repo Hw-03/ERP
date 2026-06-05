@@ -17,6 +17,21 @@
               }
             ]
           }
+        ],
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "JSXOpeningElement[name.name=/^(div|span)$/] > JSXAttribute[name.name='onClick']",
+            "message": "클릭 요소는 <button>(또는 role+tabIndex+키보드 핸들러)을 쓰세요 — div/span+onClick 금지(접근성·모바일)."
+          },
+          {
+            "selector": "JSXAttribute[name.name='style'] Literal[value=/#[0-9a-fA-F]{3,8}/]",
+            "message": "인라인 hex 색 금지 — LEGACY_COLORS.* 또는 var(--c-*) 토큰을 쓰세요(라이트/다크 자동 대응)."
+          },
+          {
+            "selector": "JSXAttribute[name.name='title']",
+            "message": "정보성 title= 금지(모바일 미표시) — 보이는 텍스트나 Tooltip/TruncatedText primitive를 쓰세요."
+          }
         ]
       }
     }

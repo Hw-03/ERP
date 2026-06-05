@@ -10,7 +10,6 @@ export { WizardProgress } from "./WizardProgress";
 export { WizardHeader } from "./WizardHeader";
 export { PersonAvatar } from "./PersonAvatar";
 export { ItemRow } from "./ItemRow";
-export { EmptyState } from "./EmptyState";
 export { InlineSearch } from "./InlineSearch";
 export { AsyncState, AsyncSkeletonRows } from "./AsyncState";
 export { SummaryChipBar, type SummaryChip } from "./SummaryChipBar";

@@ -100,7 +100,7 @@
   }
 
   html {
-    font-family: "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+    font-family: var(--font-pretendard), "Noto Sans KR", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
 

@@ -4,6 +4,8 @@ import clsx from "clsx";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "../tokens";
 
+// 모바일 전용 primitive. 데스크탑 대응물은 common/KpiCard.tsx — 의도적 플랫폼 분리이므로 통합하지 않는다.
+// (현재 화면 소비처는 없으나 모바일 디자인 시스템 카탈로그의 예약 primitive: 모바일 KPI 도입 시 사용.)
 export function KpiCard({
   label,
   value,

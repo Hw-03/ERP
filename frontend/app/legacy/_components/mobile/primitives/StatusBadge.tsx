@@ -5,6 +5,8 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "../tokens";
 import { toMesTone, type MesTone } from "@/lib/mes-status";
 
+// 모바일 전용 primitive (ItemRow 의 부서 배지 등에서 사용 중). 데스크탑 대응물 common/StatusPill.tsx 와는
+// 용도·시각이 달라(부서 배지·커스텀 색 vs 상태 톤 pill) 의도적으로 분리 유지한다 — 통합하지 않는다.
 // 모바일 StatusBadge 의 외부 시그니처 — "ok"/"warn" 등 구버전 톤도 그대로 받는다.
 type Tone = "ok" | "warn" | "danger" | "info" | "muted";
 
