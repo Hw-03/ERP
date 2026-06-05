@@ -119,6 +119,8 @@
 
 ## 3. 모바일 컴포넌트 체크리스트
 
+> 이 중 3가지 — ① `<button>` 시맨틱(div/span+onClick 금지) ② 인라인 hex 색 금지 ③ 정보성 `title=` 금지 — 는 신규 영역 [`features/mes/`](frontend/features/mes/)에서 **ESLint로 자동 강제**된다([.eslintrc.json](frontend/.eslintrc.json) `no-restricted-syntax`). 레거시(`_components/`)는 기존 위반이 많아 게이트로 막지 않고, 해당 파일을 만질 때 점진 정리한다.
+
 신규 컴포넌트 추가 시 5분 셀프 점검:
 
 - [ ] **클릭 가능 요소 hit area ≥ 44×44px**
