@@ -14,7 +14,7 @@
 - Do not edit `_archive/` or `frontend/_archive/` unless explicitly asked.
 - Do not casually edit `_attic/`; it is the boxed-up storage for everything not at a tool-required path — domain docs (GLOSSARY/CONTEXT/ADR/ARCHITECTURE/ERD/OPERATIONS), one-off backend scripts, DB backups, ONBOARDING, finished plans.
 - **Weekly report screen is frozen (complete)**
-  - Frontend: entire `frontend/app/legacy/_components/_weekly_sections/` directory + `frontend/app/legacy/_components/DesktopWeeklyReportView.tsx` (frozen: 2026-05-24)
+  - Frontend: entire `frontend/app/mes/_components/_weekly_sections/` directory + `frontend/app/mes/_components/DesktopWeeklyReportView.tsx` (frozen: 2026-05-24)
   - Backend: `backend/app/routers/inventory/weekly_report.py` (frozen: 2026-05-29)
   - Touch only when explicitly asked. Bypass these files for surrounding refactors, global renames, etc. When adding a new `TransactionTypeEnum`, only update the classification sets (`PRODUCTION_TX_TYPES` / `NON_PRODUCTION_TX_TYPES`) in weekly_report.py.
 - Do not mix sample data with real data.

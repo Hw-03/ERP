@@ -73,7 +73,7 @@ export async function loginAsOperator(
 
 /** 입출고 V2 작성(compose) 화면으로 진입하고 "작업 유형 선택" 단계를 기다린다. */
 export async function gotoWarehouseCompose(page: Page): Promise<void> {
-  await page.goto("/legacy?tab=warehouse");
+  await page.goto("/mes?tab=warehouse");
   await expect(page.getByText("작업 유형 선택").first()).toBeVisible();
 }
 

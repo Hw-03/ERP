@@ -106,7 +106,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
     if (typeof window !== "undefined") {
       const currentTab = new URLSearchParams(window.location.search).get("tab");
       if (currentTab !== "dashboard") {
-        window.location.replace("/legacy?tab=dashboard");
+        window.location.replace("/mes?tab=dashboard");
         return;
       }
     }

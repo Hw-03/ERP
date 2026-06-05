@@ -15,7 +15,7 @@ test.describe("불량 — 격리 / 해제", () => {
   });
 
   test("새 불량 격리 → 정상 복귀", async ({ page }) => {
-    await page.goto("/legacy?tab=defect");
+    await page.goto("/mes?tab=defect");
     await expect(page.getByRole("heading", { name: "불량 처리" })).toBeVisible();
 
     // ── 격리 ──────────────────────────────────────────────

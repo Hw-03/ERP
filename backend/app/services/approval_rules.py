@@ -5,7 +5,7 @@
 (`MANUAL_LINE_ORIGINS` 가 io_preview·sr_validation 두 곳, `APPROVAL_SUB_TYPES` 는 io_preview).
 
 프론트엔드의 대응 규칙과도 동기화 대상이다:
-- `frontend/app/legacy/_components/_warehouse_v2/ioWorkType.ts`
+- `frontend/app/mes/_components/_warehouse_v2/ioWorkType.ts`
   - `MANUAL_ORIGINS`            ↔ `MANUAL_LINE_ORIGINS`
   - `requiresApproval` 의 sub_type ↔ `WAREHOUSE_APPROVAL_SUB_TYPES`
 FE↔BE 일치는 `tests/test_approval_rules_drift.py` 가 자동 검사한다(ADR-0005).

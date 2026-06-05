@@ -9,9 +9,9 @@ import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// 구식 /legacy/home 경로 제거 — 현재 라우팅은 /legacy?tab=...
+// 구식 home 경로 제거 — 현재 라우팅은 /mes?tab=...
 // MOBILE_BASE_URL 로 호스트/포트 오버라이드 가능(기본 localhost:3000).
-const BASE_URL = (process.env.MOBILE_BASE_URL || 'http://localhost:3000') + '/legacy?tab=dashboard';
+const BASE_URL = (process.env.MOBILE_BASE_URL || 'http://localhost:3000') + '/mes?tab=dashboard';
 const SCREENSHOTS_DIR = path.resolve('./frontend/screenshots');
 
 const SCREENS = [
