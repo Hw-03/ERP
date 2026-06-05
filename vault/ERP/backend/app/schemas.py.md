@@ -43,7 +43,7 @@ project: DEXCOWIN MES
 ## 연결되는 파일
 
 ### 먼저 같이 볼 파일
-- [[ERP/backend/app/models.py]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 파일입니다.
+- [[ERP/backend/app/models/📁_models]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 표 패키지입니다.
 - [[ERP/backend/app/main.py]] — FastAPI 서버를 만들고, CORS와 에러 처리, 라우터 연결, 헬스체크를 등록하는 백엔드의 현관문입니다.
 - [[ERP/backend/app/routers/stock_requests.py]] — 프론트의 입출고 요청 작성, 내 요청, 창고 승인함이 호출하는 API 입구입니다.
 - [[ERP/frontend/lib/api/types/inventory.ts]] — `inventory.ts`는 프론트엔드가 백엔드 API를 호출할 때 쓰는 도메인별 통신 함수입니다.

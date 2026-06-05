@@ -4,7 +4,7 @@ source_path: "frontend/app/legacy/_components/_warehouse_sections"
 importance: normal
 layer: frontend
 graph: hub
-updated: 2026-05-22
+updated: 2026-06-05
 project: DEXCOWIN MES
 ---
 
@@ -16,7 +16,7 @@ project: DEXCOWIN MES
 
 ## 현장 업무와의 관계
 
-사용자가 보는 화면이나 화면이 서버와 통신하는 방식에 연결됩니다.
+사용자가 보는 화면이나 화면이 서버와 통신하는 방식에 연결됩니다. 입출고 요청 화면 외에, 튜브→고압/진공으로 물건을 넘기는 **인수인계** 기능도 이 폴더에 있습니다(작성 폼·탭 패널·인쇄). 인수인계는 받는 부서가 "인수 확인"을 누르면 품목 수량만큼 실제 재고가 이동하는 점이 핵심입니다.
 
 ## 언제 보면 좋나
 
@@ -40,6 +40,14 @@ project: DEXCOWIN MES
 > - [[ERP/frontend/app/legacy/_components/_warehouse_sections/WarehouseQueueRow.tsx]] — WarehouseQueueRow.tsx
 > - [[ERP/frontend/app/legacy/_components/_warehouse_sections/WarehouseSectionTabs.tsx]] — WarehouseSectionTabs.tsx
 > - [[ERP/frontend/app/legacy/_components/_warehouse_sections/ioRequestLabels.ts]] — ioRequestLabels.ts
+
+## 인수인계 (2026-06 신규)
+
+튜브 → 고압/진공으로 물건을 넘기는 인수인계 기능 3종입니다.
+
+- [[ERP/frontend/app/legacy/_components/_warehouse_sections/HandoverSectionPanel.tsx]] — 인수인계 탭 전체(작성·내 인수인계·인수 대기함) + 인수 확인(PIN→재고 이동).
+- [[ERP/frontend/app/legacy/_components/_warehouse_sections/HandoverComposeForm.tsx]] — 튜브 인수인계서 작성 폼(품목·수량 = 실제 재고 이동 대상).
+- [[ERP/frontend/app/legacy/_components/_warehouse_sections/handoverPrint.ts]] — 인수인계서를 양식대로 새 창에 띄워 인쇄.
 
 ## 조심할 점
 

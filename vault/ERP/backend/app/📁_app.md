@@ -26,6 +26,7 @@ project: DEXCOWIN MES
 
 ## 주요 하위 폴더
 
+- [[ERP/backend/app/models/📁_models]] — DB 표(테이블) 구조를 도메인별로 정의한 패키지입니다. 회사 데이터의 뼈대.
 - [[ERP/backend/app/routers/📁_routers]] — 프론트엔드가 호출하는 API 문입니다. URL별로 요청을 받아 서비스 로직으로 넘깁니다.
 - [[ERP/backend/app/services/📁_services]] — API 라우터 안에서 바로 처리하기 어려운 실제 업무 규칙을 모아 둔 곳입니다.
 - [[ERP/backend/app/utils/📁_utils]] — `backend/app/utils`는 백엔드 안의 세부 폴더입니다.
@@ -33,7 +34,7 @@ project: DEXCOWIN MES
 ## 먼저 볼 파일 5개
 
 - [[ERP/backend/app/database.py]] — `database.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/database.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
-- [[ERP/backend/app/models.py]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 파일입니다.
+- [[ERP/backend/app/models/📁_models]] — 품목, 재고, 직원, 요청, BOM, 거래 로그처럼 회사 데이터의 뼈대를 정의하는 표 패키지입니다.
 - [[ERP/backend/app/schemas.py]] — 백엔드와 프론트엔드가 주고받는 데이터 모양을 정하는 파일입니다.
 - [[ERP/backend/app/__init__.py]] — `__init__.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/__init__.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
 - [[ERP/backend/app/_logging.py]] — `_logging.py`는 Python 코드입니다. 프로젝트 구조 안에서 `backend/app/_logging.py` 위치에 있으며, 필요할 때 역할과 연결 파일을 확인하기 위한 설명을 둡니다.
@@ -43,7 +44,7 @@ project: DEXCOWIN MES
 
 ## 조심할 점
 
-이 폴더는 운영 핵심입니다. 특히 models.py, schemas.py, services, routers는 서로 맞물려 있으므로 한 파일만 보고 고치면 위험합니다.
+이 폴더는 운영 핵심입니다. 특히 models, schemas, services, routers는 서로 맞물려 있으므로 한 파일만 보고 고치면 위험합니다.
 
 ## 다음에 볼 위치
 
