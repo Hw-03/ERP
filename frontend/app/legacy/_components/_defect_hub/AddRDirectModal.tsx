@@ -10,32 +10,24 @@ import { itemsApi } from "@/lib/api/items";
 import type { Item } from "@/lib/api/types";
 import { ReasonFormFields } from "./ReasonFormFields";
 import { InlineErrorNote } from "./InlineErrorNote";
+import { ConfirmModal } from "@/lib/ui";
 
 const PRODUCTION_LINES = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
 
 type SourceKind = "warehouse" | "production";
 
-/** mes_code 2번째 segment(공정코드, 2글자)의 끝글자가 R(원자재)인지.
- *  예: 3-AR-0014 → "AR" → 원자재. R 바로 폐기/반품 대상 필터. */
-function isRItem(mesCode: string | null | undefined): boolean {
-  if (!mesCode) return false;
-  const parts = mesCode.split("-");
-  return parts.length >= 2 && parts[1].endsWith("R");
-}
-
 export interface AddRDirectModalProps {
   open: boolean;
-  /** "scrap" → scrap_normal, "return" → return_normal */
-  mode: "scrap" | "return";
+  mode: "scrap";
   onClose: () => void;
   currentEmployee: { employee_id: string; name: string; department: string };
   onSubmitted: () => void;
 }
 
 /**
- * R(원자재) 정상 재고 바로 폐기/반품 모달.
- * 격리를 거치지 않고 정상(창고/부서) 재고에서 곧장 처리한다.
- * 제출: stockRequestsApi.createStockRequest({ request_type: "scrap_normal" | "return_normal", ... })
+ * 정상 재고 바로 폐기 모달.
+ * 격리를 거치지 않고 정상(창고/부서) 재고에서 곧장 폐기 처리한다.
+ * 제출: stockRequestsApi.createStockRequest({ request_type: "scrap_normal", ... })
  * → 백엔드가 즉시 처리(COMPLETED).
  */
 export function AddRDirectModal({
@@ -62,6 +54,7 @@ export function AddRDirectModal({
   const [memo, setMemo] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   const titleId = useId();
@@ -89,9 +82,10 @@ export function AddRDirectModal({
     setMemo("");
     setError(null);
     setBusy(false);
+    setConfirmOpen(false);
   }, [open, currentEmployee.department]);
 
-  // 품목 검색 (debounced 200ms) — R 품목만 노출.
+  // 품목 검색 (debounced 200ms) — 전 품목 노출.
   useEffect(() => {
     if (!open) return;
     if (!query.trim()) {
@@ -106,7 +100,7 @@ export function AddRDirectModal({
       itemsApi
         .getItems({ search: query.trim(), limit: 20 }, { signal: ctrl.signal })
         .then((items) => {
-          if (!ctrl.signal.aborted) setResults(items.filter((it) => isRItem(it.mes_code)).slice(0, 8));
+          if (!ctrl.signal.aborted) setResults(items.slice(0, 8));
         })
         .catch((err) => {
           if (err?.name !== "AbortError" && !ctrl.signal.aborted) {
@@ -149,14 +143,14 @@ export function AddRDirectModal({
     Number.isFinite(qtyNum) &&
     qtyNum <= available;
 
-  async function handleSubmit() {
+  async function handleConfirmedSubmit() {
     if (!canSubmit || !selected) return;
     setBusy(true);
     setError(null);
     try {
       await stockRequestsApi.createStockRequest({
         requester_employee_id: currentEmployee.employee_id,
-        request_type: mode === "scrap" ? "scrap_normal" : "return_normal",
+        request_type: "scrap_normal",
         reason_category: category,
         reason_memo: memo || null,
         notes: memo || null,
@@ -184,13 +178,20 @@ export function AddRDirectModal({
 
   if (!open || !mounted) return null;
 
-  const title = mode === "scrap" ? "R 바로 폐기" : "R 바로 반품";
-  const subtitle =
-    mode === "scrap"
-      ? "정상 재고의 원자재를 격리 없이 즉시 폐기합니다."
-      : "정상 재고의 원자재를 격리 없이 즉시 공급처 반품합니다.";
-
-  return createPortal(
+  return (
+    <>
+      <ConfirmModal
+        open={confirmOpen}
+        title="즉시 폐기 확인"
+        tone="danger"
+        confirmLabel="폐기"
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => { setConfirmOpen(false); void handleConfirmedSubmit(); }}
+        busy={busy}
+      >
+        선택한 품목을 즉시 폐기합니다. 되돌릴 수 없습니다.
+      </ConfirmModal>
+      {createPortal(
     <div
       className="fixed inset-0 z-[450] flex items-center justify-center px-4"
       style={{ background: "rgba(0,0,0,.55)" }}
@@ -216,20 +217,20 @@ export function AddRDirectModal({
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.red }} />
           <div>
             <div id={titleId} className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>
-              {title}
+              바로 폐기
             </div>
             <div className="mt-0.5 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              {subtitle} 즉시 처리 (결재 불필요).
+              정상 재고의 품목을 격리 없이 즉시 폐기합니다. 즉시 처리 (결재 불필요).
             </div>
           </div>
         </div>
 
         <hr className="my-4" style={{ borderColor: LEGACY_COLORS.border }} />
 
-        {/* 품목 검색 (R 품목만) */}
+        {/* 품목 검색 */}
         <div className="mb-4 flex flex-col gap-1">
           <label className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-            원자재(R) 품목 <span style={{ color: LEGACY_COLORS.red }}>*</span>
+            품목 <span style={{ color: LEGACY_COLORS.red }}>*</span>
           </label>
           {selected ? (
             <div
@@ -266,7 +267,7 @@ export function AddRDirectModal({
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="원자재 코드 또는 이름 검색"
+                  placeholder="품목 코드 또는 이름 검색"
                   className="w-full bg-transparent text-sm font-bold outline-none"
                   style={{ color: LEGACY_COLORS.text }}
                   autoFocus
@@ -307,7 +308,7 @@ export function AddRDirectModal({
               )}
               {query.trim() && !searching && results.length === 0 && (
                 <div className="mt-1 px-1 text-xs" style={{ color: LEGACY_COLORS.muted }}>
-                  검색 결과 중 원자재(R) 품목이 없습니다.
+                  검색 결과가 없습니다.
                 </div>
               )}
             </div>
@@ -434,16 +435,18 @@ export function AddRDirectModal({
           </button>
           <button
             type="button"
-            onClick={() => void handleSubmit()}
+            onClick={() => setConfirmOpen(true)}
             disabled={!canSubmit}
             className="rounded-[14px] px-5 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
             style={{ background: LEGACY_COLORS.red }}
           >
-            {busy ? "처리 중..." : mode === "scrap" ? "즉시 폐기 →" : "즉시 반품 →"}
+            즉시 폐기 →
           </button>
         </div>
       </div>
     </div>,
     document.body,
+      )}
+    </>
   );
 }

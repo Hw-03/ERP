@@ -70,10 +70,10 @@ export function InventoryDetailLocations({
               {defective && (
                 <button
                   type="button"
-                  onClick={() => router.push(`/?tab=defect&defect_dept=${encodeURIComponent(dept)}`)}
+                  onClick={() => router.push("/?tab=defect")}
                   className="mt-1 flex w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition-opacity hover:opacity-80"
                   style={{ background: "color-mix(in srgb, #ef4444 10%, transparent)", borderColor: DEFECT_RED }}
-                  aria-label={`${dept} 불량 ${formatQty(defective.quantity)} — 불량 처리 허브로 이동`}
+                  aria-label={`${dept} 불량 ${formatQty(defective.quantity)} — 불량 탭으로 이동`}
                 >
                   <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: DEFECT_RED }} />
                   <span className="flex-1 text-base font-semibold" style={{ color: DEFECT_RED }}>

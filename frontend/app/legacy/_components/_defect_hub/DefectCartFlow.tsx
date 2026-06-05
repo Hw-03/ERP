@@ -10,13 +10,14 @@ import type { Department } from "@/lib/api/types/shared";
 import type { Item, ProductModel } from "../_warehouse_v2/types";
 import { DefectItemPicker } from "./DefectItemPicker";
 import { ReasonFormFields } from "./ReasonFormFields";
+import { ConfirmModal } from "@/lib/ui";
 
 const PRODUCTION_LINES = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
 
 type SourceKind = "warehouse" | "production";
 
-/** add = 새 불량 격리 / r-scrap·r-return = R 정상재고 바로 폐기·반품. */
-export type DefectCartMode = "add" | "r-scrap" | "r-return";
+/** add = 새 불량 격리 / scrap = 정상재고 즉시 폐기. */
+export type DefectCartMode = "add" | "scrap";
 
 interface CartLine {
   key: string;
@@ -47,15 +48,10 @@ const TITLES: Record<DefectCartMode, { title: string; subtitle: string; submit: 
     subtitle: "정상 재고에서 여러 품목을 골라 한 번에 격리합니다. 즉시 처리.",
     submit: "격리하기",
   },
-  "r-scrap": {
-    title: "R 바로 폐기",
-    subtitle: "원자재(R) 정상 재고를 격리 없이 즉시 폐기합니다. 즉시 처리.",
+  scrap: {
+    title: "바로 폐기",
+    subtitle: "정상 재고를 격리 없이 즉시 폐기합니다. 즉시 처리.",
     submit: "즉시 폐기",
-  },
-  "r-return": {
-    title: "R 바로 반품",
-    subtitle: "원자재(R) 정상 재고를 격리 없이 즉시 공급처 반품합니다. 즉시 처리.",
-    submit: "즉시 반품",
   },
 };
 
@@ -72,7 +68,6 @@ export function DefectCartFlow({
   onDone,
   onCancel,
 }: Props) {
-  const rOnly = mode !== "add";
   const meta = TITLES[mode];
 
   const [source, setSource] = useState<SourceKind>("warehouse");
@@ -84,6 +79,7 @@ export function DefectCartFlow({
   const [lines, setLines] = useState<CartLine[]>([]);
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<LineFailure[]>([]);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const selectedIds = useMemo(() => new Set(lines.map((l) => l.item.item_id)), [lines]);
 
@@ -137,7 +133,7 @@ export function DefectCartFlow({
     }
     await stockRequestsApi.createStockRequest({
       requester_employee_id: currentEmployee.employee_id,
-      request_type: mode === "r-scrap" ? "scrap_normal" : "return_normal",
+      request_type: "scrap_normal",
       reason_category: line.category,
       reason_memo: line.memo || null,
       notes: line.memo || null,
@@ -275,7 +271,6 @@ export function DefectCartFlow({
           <DefectItemPicker
             items={items}
             productModels={productModels}
-            rOnly={rOnly}
             targetDepartment={dept}
             selectedIds={selectedIds}
             onAdd={addItem}
@@ -389,7 +384,7 @@ export function DefectCartFlow({
         )}
         <button
           type="button"
-          onClick={() => void handleSubmit()}
+          onClick={() => setConfirmOpen(true)}
           disabled={!allValid || busy}
           className="rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
           style={{ background: LEGACY_COLORS.red }}
@@ -397,6 +392,24 @@ export function DefectCartFlow({
           {busy ? "처리 중..." : `${meta.submit} (${lines.length}건) →`}
         </button>
       </div>
+
+      <ConfirmModal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }}
+        tone={mode === "scrap" ? "danger" : "normal"}
+        title={mode === "scrap" ? "즉시 폐기 확인" : "불량 격리 확인"}
+        confirmLabel={meta.submit}
+        busy={busy}
+        busyLabel="처리 중..."
+      >
+        <p className="mb-2 text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
+          {lines.length}건을{" "}
+          {mode === "scrap"
+            ? "즉시 폐기합니다. 재고에서 차감되며 되돌릴 수 없습니다."
+            : "격리합니다."}
+        </p>
+      </ConfirmModal>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { DefectCartFlow } from "../DefectCartFlow";
 import type { Item, ProductModel } from "../../_warehouse_v2/types";
 
@@ -55,10 +55,10 @@ beforeEach(() => {
 });
 
 describe("DefectCartFlow", () => {
-  it("rOnly 모드(r-scrap)는 R 품목만 노출한다", () => {
+  it("scrap 모드는 R·비R 모두 노출한다 (rOnly 제한 해제)", () => {
     render(
       <DefectCartFlow
-        mode="r-scrap"
+        mode="scrap"
         items={[rItem, fItem]}
         productModels={productModels}
         currentEmployee={employee}
@@ -67,7 +67,7 @@ describe("DefectCartFlow", () => {
       />,
     );
     expect(screen.getByText("원자재A")).toBeInTheDocument();
-    expect(screen.queryByText("완제품B")).toBeNull();
+    expect(screen.getByText("완제품B")).toBeInTheDocument();
   });
 
   it("add 모드는 R/비R 모두 노출한다", () => {
@@ -85,7 +85,7 @@ describe("DefectCartFlow", () => {
     expect(screen.getByText("완제품B")).toBeInTheDocument();
   });
 
-  it("품목 추가 → 수량+사유 입력 → 제출 시 줄마다 quarantine 호출(add)", async () => {
+  it("품목 추가 → 수량+사유 입력 → 제출(확인 후) 시 줄마다 quarantine 호출(add)", async () => {
     const onDone = vi.fn();
     render(
       <DefectCartFlow
@@ -110,7 +110,14 @@ describe("DefectCartFlow", () => {
     );
     fireEvent.change(categorySelect as HTMLSelectElement, { target: { value: "외관 불량" } });
 
-    fireEvent.click(screen.getByRole("button", { name: /격리하기/ }));
+    // 제출 버튼 → ConfirmModal 오픈
+    fireEvent.click(screen.getByRole("button", { name: /격리하기.*건/ }));
+
+    // ConfirmModal의 확인 버튼 클릭
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "격리하기" })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "격리하기" }));
 
     await waitFor(() => {
       expect(defectsApi.quarantine).toHaveBeenCalledWith(
@@ -127,10 +134,10 @@ describe("DefectCartFlow", () => {
     });
   });
 
-  it("r-scrap 제출 시 scrap_normal 요청을 보낸다", async () => {
+  it("scrap 제출(확인 후) 시 scrap_normal 요청을 보낸다", async () => {
     render(
       <DefectCartFlow
-        mode="r-scrap"
+        mode="scrap"
         items={[rItem]}
         productModels={productModels}
         currentEmployee={employee}
@@ -145,7 +152,14 @@ describe("DefectCartFlow", () => {
     );
     fireEvent.change(categorySelect as HTMLSelectElement, { target: { value: "기타" } });
 
-    fireEvent.click(screen.getByRole("button", { name: /즉시 폐기/ }));
+    // 제출 버튼 → ConfirmModal 오픈
+    fireEvent.click(screen.getByRole("button", { name: /즉시 폐기.*건/ }));
+
+    // ConfirmModal의 확인 버튼 클릭
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "즉시 폐기" })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "즉시 폐기" }));
 
     await waitFor(() => {
       expect(stockRequestsApi.createStockRequest).toHaveBeenCalledWith(
@@ -197,7 +211,14 @@ describe("DefectCartFlow", () => {
     fireEvent.change(catSelects[0] as HTMLSelectElement, { target: { value: "외관 불량" } });
     fireEvent.change(catSelects[1] as HTMLSelectElement, { target: { value: "외관 불량" } });
 
-    fireEvent.click(screen.getByRole("button", { name: /격리하기/ }));
+    // 제출 버튼 → ConfirmModal 오픈
+    fireEvent.click(screen.getByRole("button", { name: /격리하기.*건/ }));
+
+    // ConfirmModal의 확인 버튼 클릭
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "격리하기" })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "격리하기" }));
 
     await waitFor(() => {
       expect(defectsApi.quarantine).toHaveBeenCalledTimes(2);

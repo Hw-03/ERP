@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { defectsApi } from "@/lib/api/defects";
 import type { DefectKpi, DefectLocation } from "@/lib/api/types/defects";
@@ -9,7 +10,8 @@ import { WarehouseAccessDenied } from "./_warehouse_sections/WarehouseAccessDeni
 import { useWarehouseData } from "./_warehouse_hooks/useWarehouseData";
 import type { Operator } from "./login/useCurrentOperator";
 import { DefectKpiCards, type DefectKpiKind } from "./_defect_hub/DefectKpiCards";
-import { DefectQuickActions } from "./_defect_hub/DefectQuickActions";
+import { DefectHubEntry } from "./_defect_hub/DefectHubEntry";
+import type { DefectHubCardId } from "./_defect_hub/defectHubCards";
 import { DefectFilterBar, type DefectScope, type DefectSort } from "./_defect_hub/DefectFilterBar";
 import { DefectDepartmentList } from "./_defect_hub/DefectDepartmentList";
 import { PaPfDefectWizardPanel } from "./_defect_hub/PaPfDefectWizardPanel";
@@ -30,8 +32,9 @@ const DEFAULT_KPI: DefectKpi = {
 
 const locKey = (loc: DefectLocation) => `${loc.item_id}__${loc.department}`;
 
-/** 화면 모드 — list 외에는 좌측 목록을 덮는 전폭 작업 화면. */
+/** 화면 모드 — hub가 진입점. list 외에는 좌측 목록을 덮는 전폭 작업 화면. */
 type ViewMode =
+  | { kind: "hub" }
   | { kind: "list" }
   | { kind: "cart"; mode: DefectCartMode }
   | { kind: "batch"; action: BatchAction; locations: DefectLocation[] }
@@ -100,7 +103,7 @@ function DefectViewInner({
   const [scope, setScope] = useState<DefectScope>(initialScope);
   const [sort, setSort] = useState<DefectSort>("oldest");
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
-  const [view, setView] = useState<ViewMode>({ kind: "list" });
+  const [view, setView] = useState<ViewMode>({ kind: "hub" });
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [reloadNonce, setReloadNonce] = useState(0);
 
@@ -174,12 +177,38 @@ function DefectViewInner({
     department: operator.department,
   };
 
-  function backToList() {
-    setView({ kind: "list" });
+  // 브라우저 뒤로가기 → 현재 뷰에서 한 단계 뒤로 (hub이면 무시 — 탭 URL 네비에 넘김).
+  useEffect(() => {
+    const onPop = () => {
+      setView((cur) => {
+        if (cur.kind === "list" || cur.kind === "cart") return { kind: "hub" };
+        if (cur.kind === "batch" || cur.kind === "disassemble") return { kind: "list" };
+        return cur; // hub에서 popstate → 아무것도 안 함(브라우저 기본 동작)
+      });
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  function backToHub() {
+    setView({ kind: "hub" });
+  }
+
+  function handleHubSelect(id: DefectHubCardId) {
+    if (id === "quarantine") {
+      window.history.pushState({ defect: "cart" }, "");
+      setView({ kind: "cart", mode: "add" });
+    } else if (id === "scrap") {
+      window.history.pushState({ defect: "cart" }, "");
+      setView({ kind: "cart", mode: "scrap" });
+    } else {
+      window.history.pushState({ defect: "list" }, "");
+      setView({ kind: "list" });
+    }
   }
 
   function handleProcessed(message: string) {
-    setView({ kind: "list" });
+    setView({ kind: "hub" });
     setSelectedKeys(new Set());
     setReloadNonce((n) => n + 1);
     onStatusChange?.(message);
@@ -202,19 +231,34 @@ function DefectViewInner({
 
   function startBatch(action: BatchAction) {
     if (selectedLocations.length === 0) return;
+    window.history.pushState({ defect: "batch" }, "");
     setView({ kind: "batch", action, locations: selectedLocations });
   }
 
   function handleProcessRow(loc: DefectLocation) {
     if (loc.has_bom) {
+      window.history.pushState({ defect: "disassemble" }, "");
       setView({ kind: "disassemble", location: loc });
     } else {
       // 단순 R 항목 단건 처리도 일괄 흐름(1건)으로 통일.
+      window.history.pushState({ defect: "batch" }, "");
       setView({ kind: "batch", action: "unquarantine", locations: [loc] });
     }
   }
 
-  const isFullWidth = view.kind !== "list";
+  const isFullWidthWork = view.kind !== "list" && view.kind !== "hub";
+
+  // 헤더 — hub/list 공통
+  const header = (
+    <div className="flex items-center justify-between">
+      <h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
+        불량 처리
+      </h2>
+      <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+        {operator.name} · {operator.department}
+      </span>
+    </div>
+  );
 
   return (
     <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4">
@@ -222,7 +266,14 @@ function DefectViewInner({
         className="scrollbar-hide flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto rounded-[28px] border"
         style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.bg }}
       >
-        {isFullWidth ? (
+        {view.kind === "hub" && (
+          <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4">
+            {header}
+            <DefectHubEntry onSelect={handleHubSelect} />
+          </div>
+        )}
+
+        {isFullWidthWork && (
           <div className="flex min-h-0 flex-1 flex-col px-4 py-4">
             {view.kind === "cart" && (
               <DefectCartFlow
@@ -230,14 +281,10 @@ function DefectViewInner({
                 items={items}
                 productModels={productModels}
                 currentEmployee={employee}
-                onCancel={backToList}
+                onCancel={backToHub}
                 onDone={() =>
                   handleProcessed(
-                    view.mode === "add"
-                      ? "새 불량 격리 완료"
-                      : view.mode === "r-scrap"
-                        ? "R 즉시 폐기 완료"
-                        : "R 즉시 반품 완료",
+                    view.mode === "add" ? "새 불량 격리 완료" : "즉시 폐기 완료",
                   )
                 }
               />
@@ -247,7 +294,7 @@ function DefectViewInner({
                 action={view.action}
                 locations={view.locations}
                 currentEmployee={employee}
-                onCancel={backToList}
+                onCancel={() => setView({ kind: "list" })}
                 onDone={() => handleProcessed("불량 처리 완료")}
               />
             )}
@@ -255,7 +302,7 @@ function DefectViewInner({
               <div className="flex min-h-0 flex-1 flex-col gap-3">
                 <button
                   type="button"
-                  onClick={backToList}
+                  onClick={() => setView({ kind: "list" })}
                   className="self-start rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors hover:brightness-110"
                   style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
                 >
@@ -266,32 +313,31 @@ function DefectViewInner({
                     location={view.location}
                     currentEmployee={employee}
                     onSubmitted={() => handleProcessed("불량 분해/처리 완료")}
-                    onClose={backToList}
+                    onClose={() => setView({ kind: "list" })}
                   />
                 </div>
               </div>
             )}
           </div>
-        ) : (
+        )}
+
+        {view.kind === "list" && (
           <div className="flex flex-col gap-4 px-4 py-4 pb-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
-                불량 처리
-              </h2>
-              <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                {operator.name} · {operator.department}
-              </span>
-            </div>
+            {header}
+
+            <button
+              type="button"
+              onClick={() => setView({ kind: "hub" })}
+              className="self-start flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors hover:brightness-110"
+              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              작업 선택
+            </button>
 
             <DefectKpiCards
               kpi={kpi}
               onCardClick={(kind) => setKpiFilter((prev) => (prev === kind ? null : kind))}
-            />
-
-            <DefectQuickActions
-              onAddQuarantine={() => setView({ kind: "cart", mode: "add" })}
-              onAddRReturn={() => setView({ kind: "cart", mode: "r-return" })}
-              onAddRScrap={() => setView({ kind: "cart", mode: "r-scrap" })}
             />
 
             <DefectFilterBar

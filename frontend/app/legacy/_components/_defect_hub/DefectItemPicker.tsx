@@ -16,7 +16,6 @@ import {
   buildAssignedPriorityBySlot,
   buildDeptPriorityByLetter,
   getProdByDept,
-  isRItem,
   keepCodeOnOneLine,
   matchesDept,
   matchesModel,
@@ -29,8 +28,6 @@ const INITIAL_DISPLAY_LIMIT = PAGE_SIZE * 2;
 interface Props {
   items: Item[];
   productModels: ProductModel[];
-  /** true → R(원자재, mes_code 2번째 세그먼트 R) 품목만 노출. */
-  rOnly?: boolean;
   /** 정렬 우선순위 기준 대상 부서. */
   targetDepartment?: string | null;
   /** 이미 장바구니에 담긴 item_id 집합 — "담김" 표시·중복 추가 방지. */
@@ -46,14 +43,13 @@ interface Props {
 export function DefectItemPicker({
   items,
   productModels,
-  rOnly = false,
   targetDepartment,
   selectedIds,
   onAdd,
 }: Props) {
   const [dept, setDept] = useState("ALL");
   const [model, setModel] = useState("전체");
-  const [stage, setStage] = useState(rOnly ? "RAW" : "ALL");
+  const [stage, setStage] = useState("ALL");
   const [search, setSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(INITIAL_DISPLAY_LIMIT);
   const operator = useCurrentOperator();
@@ -76,7 +72,6 @@ export function DefectItemPicker({
       (productModels.find((m) => m.model_name === model)?.slot ?? undefined);
     const filtered = items.filter(
       (item) =>
-        (!rOnly || isRItem(item.mes_code)) &&
         matchesDept(item, dept) &&
         matchesModel(item, selectedModelSlot) &&
         matchesStage(item, stage) &&
@@ -103,7 +98,7 @@ export function DefectItemPicker({
             : a.idx - b.idx,
       )
       .map((row) => row.item);
-  }, [items, rOnly, dept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot]);
+  }, [items, dept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot]);
 
   const hasActiveFilter = dept !== "ALL" || model !== "전체" || stage !== "ALL" || keyword.length > 0;
 

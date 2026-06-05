@@ -10,8 +10,9 @@ export interface DefectHubEmployee {
   name: string;
   department: string;
 }
+import { MobileDefectEntry } from "../mobile/screens/MobileDefectEntry";
+import type { DefectHubCardId } from "./defectHubCards";
 import { DefectKpiCards, type DefectKpiKind } from "./DefectKpiCards";
-import { DefectQuickActions } from "./DefectQuickActions";
 import { DefectFilterBar, type DefectScope, type DefectSort } from "./DefectFilterBar";
 import { DefectDepartmentList } from "./DefectDepartmentList";
 import { RDefectActionModal } from "./RDefectActionModal";
@@ -49,12 +50,13 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
     return PRODUCTION_LINES.has(currentEmployee.department) ? "my" : "all";
   };
 
+  const [view, setView] = useState<"hub" | "list">("hub");
   const [scope, setScope] = useState<DefectScope>(initialScope);
   const [sort, setSort] = useState<DefectSort>("oldest");
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
   const [processingLocation, setProcessingLocation] = useState<DefectLocation | null>(null);
   const [addQuarantineOpen, setAddQuarantineOpen] = useState(false);
-  const [rDirectMode, setRDirectMode] = useState<"scrap" | "return" | null>(null);
+  const [rDirectMode, setRDirectMode] = useState<"scrap" | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
 
   // 마운트 시 KPI + 목록 동시 로드 (처리 완료 후 reloadNonce 증가 시 재로드)
@@ -125,18 +127,13 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
   function handleModalSubmitted() {
     setProcessingLocation(null);
     setReloadNonce((n) => n + 1);
+    setView("hub");
   }
 
-  function handleAddQuarantine() {
-    setAddQuarantineOpen(true);
-  }
   function handleAddQuarantineSubmitted() {
     setAddQuarantineOpen(false);
     setReloadNonce((n) => n + 1);
-  }
-  // R 바로 반품/폐기 — 정상 재고에서 격리 없이 즉시 처리.
-  function handleAddRReturn() {
-    setRDirectMode("return");
+    setView("hub");
   }
   function handleAddRScrap() {
     setRDirectMode("scrap");
@@ -144,6 +141,27 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
   function handleRDirectSubmitted() {
     setRDirectMode(null);
     setReloadNonce((n) => n + 1);
+    setView("hub");
+  }
+
+  // 브라우저 뒤로가기 → list면 hub로 (hub에서는 무시).
+  useEffect(() => {
+    const onPop = () => {
+      setView((cur) => (cur === "list" ? "hub" : cur));
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  function handleHubSelect(id: DefectHubCardId) {
+    if (id === "quarantine") {
+      setAddQuarantineOpen(true);
+    } else if (id === "scrap") {
+      handleAddRScrap();
+    } else {
+      window.history.pushState({ defect: "list" }, "");
+      setView("list");
+    }
   }
 
   function handleKpiCardClick(kind: DefectKpiKind) {
@@ -162,59 +180,70 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
         </span>
       </div>
 
-      {/* KPI 카드 */}
-      <DefectKpiCards kpi={kpi} onCardClick={handleKpiCardClick} />
-
-      {/* 퀵 액션 */}
-      <DefectQuickActions
-        onAddQuarantine={handleAddQuarantine}
-        onAddRReturn={handleAddRReturn}
-        onAddRScrap={handleAddRScrap}
-      />
-
-      {/* 필터 바 */}
-      <DefectFilterBar
-        scope={scope}
-        sort={sort}
-        onScopeChange={(next) => {
-          setScope(next);
-          setKpiFilter(null);
-        }}
-        onSortChange={setSort}
-        currentDept={currentEmployee.department}
-      />
-
-      {/* KPI 필터 활성 표시 */}
-      {kpiFilter && (
-        <div
-          className="flex items-center justify-between rounded-[10px] border px-4 py-2"
-          style={{ background: LEGACY_COLORS.errorBg, borderColor: tint(LEGACY_COLORS.red, 30) }}
-        >
-          <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>
-            {kpiFilter === "over_one_year" ? "1년 이상 격리 항목만 표시 중" : `${kpiFilter} 필터 활성`}
-          </span>
+      {view === "hub" ? (
+        /* 진입 화면 — 3장 카드 */
+        <MobileDefectEntry onSelect={handleHubSelect} />
+      ) : (
+        /* 목록 화면 */
+        <>
+          {/* 뒤로가기 */}
           <button
             type="button"
-            onClick={() => setKpiFilter(null)}
-            className="text-xs font-black hover:underline"
-            style={{ color: LEGACY_COLORS.red }}
+            onClick={() => setView("hub")}
+            className="flex items-center gap-1 self-start rounded-[10px] border px-3 py-1.5 text-xs font-bold transition-colors hover:brightness-110"
+            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
           >
-            필터 해제
+            ← 작업 선택
           </button>
-        </div>
-      )}
 
-      {/* 목록 */}
-      {loading ? (
-        <div className="py-10 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
-          불량 데이터 로딩 중...
-        </div>
-      ) : error ? (
-        <InlineErrorNote variant="block" className="!text-sm">
-          {error}
-        </InlineErrorNote>
-      ) : (
-        <DefectDepartmentList locations={filteredLocations} onProcess={handleProcess} />
+          {/* KPI 카드 */}
+          <DefectKpiCards kpi={kpi} onCardClick={handleKpiCardClick} />
+
+          {/* 필터 바 */}
+          <DefectFilterBar
+            scope={scope}
+            sort={sort}
+            onScopeChange={(next) => {
+              setScope(next);
+              setKpiFilter(null);
+            }}
+            onSortChange={setSort}
+            currentDept={currentEmployee.department}
+          />
+
+          {/* KPI 필터 활성 표시 */}
+          {kpiFilter && (
+            <div
+              className="flex items-center justify-between rounded-[10px] border px-4 py-2"
+              style={{ background: LEGACY_COLORS.errorBg, borderColor: tint(LEGACY_COLORS.red, 30) }}
+            >
+              <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>
+                {kpiFilter === "over_one_year" ? "1년 이상 격리 항목만 표시 중" : `${kpiFilter} 필터 활성`}
+              </span>
+              <button
+                type="button"
+                onClick={() => setKpiFilter(null)}
+                className="text-xs font-black hover:underline"
+                style={{ color: LEGACY_COLORS.red }}
+              >
+                필터 해제
+              </button>
+            </div>
+          )}
+
+          {/* 목록 */}
+          {loading ? (
+            <div className="py-10 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
+              불량 데이터 로딩 중...
+            </div>
+          ) : error ? (
+            <InlineErrorNote variant="block" className="!text-sm">
+              {error}
+            </InlineErrorNote>
+          ) : (
+            <DefectDepartmentList locations={filteredLocations} onProcess={handleProcess} />
+          )}
+        </>
       )}
 
       {/* 처리 모달 — 품목 종류(R / PA·PF)에 따라 분기 */}
