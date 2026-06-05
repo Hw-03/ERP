@@ -35,7 +35,7 @@ DEPT_MAP: dict[str, str] = {
 }
 
 
-def _parse_erp_code(raw: str) -> tuple[str, str, int, str | None]:
+def _parse_erp_code(raw: str) -> tuple[str, str, int]:
     parts = str(raw).strip().split("-")
     if len(parts) < 3:
         raise ValueError(f"품목 코드 형식 오류: {raw!r}")
@@ -45,8 +45,7 @@ def _parse_erp_code(raw: str) -> tuple[str, str, int, str | None]:
         serial_no = int(parts[2])
     except ValueError:
         raise ValueError(f"시리얼 번호 파싱 오류: {raw!r}")
-    option_code = parts[3] if len(parts) >= 4 else None
-    return model_symbol, process_type_code, serial_no, option_code
+    return model_symbol, process_type_code, serial_no
 
 
 def _load_excel(excel_path: Path) -> list[dict]:
@@ -121,7 +120,7 @@ def run_cleanup_import(
             raise ValueError(f"품목 코드 중복: {erp}")
         erp_seen.add(erp)
 
-        model_symbol, pt_code, serial_no, option_code = _parse_erp_code(erp)
+        model_symbol, pt_code, serial_no = _parse_erp_code(erp)
 
         if pt_code not in valid_codes:
             raise ValueError(f"유효하지 않은 process_type_code: {pt_code!r} (ERP={erp})")
@@ -137,7 +136,6 @@ def run_cleanup_import(
             "model_symbol": model_symbol,
             "pt_code": pt_code,
             "serial_no": serial_no,
-            "option_code": option_code,
             "dept": dept,
             "quantity": row["quantity"],
             "sort_order": i + 1,
@@ -148,13 +146,12 @@ def run_cleanup_import(
 
     items_to_add = [
         Item(
-            item_code=p["erp"],
+            mes_code=p["erp"],
             item_name=p["item_name"],
             unit="EA",
             model_symbol=p["model_symbol"],
             process_type_code=p["pt_code"],
             serial_no=p["serial_no"],
-            option_code=p["option_code"],
             legacy_item_type=p["legacy_item_type"],
             sort_order=p["sort_order"],
             min_stock=DEFAULT_MIN_STOCK,

@@ -70,7 +70,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
       })
       .filter((i) => {
         if (!kw) return true;
-        return `${i.item_name} ${i.item_code ?? ""}`.toLowerCase().includes(kw);
+        return `${i.item_name} ${i.mes_code ?? ""}`.toLowerCase().includes(kw);
       });
   }, [items, parent.item_id, search, deptFilter, stageFilter]);
 
@@ -164,6 +164,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
                 key={f.id}
                 type="button"
                 onClick={() => setStageFilter(f.id)}
+                aria-pressed={active}
                 className="rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors"
                 style={{
                   background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s1,
@@ -208,9 +209,9 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd }: Props) {
                     <TruncatedText className="truncate text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
                       {c.item_name}
                     </TruncatedText>
-                    {c.item_code && (
+                    {c.mes_code && (
                       <TruncatedText className="truncate text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                        {c.item_code}
+                        {c.mes_code}
                       </TruncatedText>
                     )}
                   </div>

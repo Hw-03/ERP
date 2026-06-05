@@ -26,14 +26,6 @@ export function InventoryFilterToggleButton({ filtersOpen, activeFilterCount, on
     >
       <Filter className="h-3.5 w-3.5" />
       필터
-      {activeFilterCount > 0 && (
-        <span
-          className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full text-[11px] font-bold leading-none"
-          style={{ background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white }}
-        >
-          {activeFilterCount}
-        </span>
-      )}
       <ChevronDown
         className="h-3.5 w-3.5 transition-transform"
         style={{ transform: filtersOpen ? "rotate(180deg)" : undefined }}

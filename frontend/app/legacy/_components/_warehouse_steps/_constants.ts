@@ -24,6 +24,8 @@ type OperatorLike =
       department_role?: DepartmentRole;
       level?: EmployeeLevel;
       department: Department;
+      /** W12-#7: 직원별 입출고 권한. 미정의(undefined)=true 로 간주. */
+      io_enabled?: boolean;
     }
   | null
   | undefined;
@@ -83,7 +85,7 @@ export const PROCESS_TYPE_LABEL: Record<string, string> = {
 export function matchesSearch(item: Item, keyword: string) {
   if (!keyword) return true;
   const haystack = [
-    item.item_code,
+    item.mes_code,
     item.item_name,
     item.legacy_part ?? "",
     item.location ?? "",
@@ -109,10 +111,10 @@ export function isDepartmentApprover(op: OperatorLike): boolean {
   return op.department_role === "primary" || op.department_role === "deputy";
 }
 
+/** 입출고 화면 진입 가드. 직원별 io_enabled 만 확인. */
 export function canEnterIO(op: OperatorLike): boolean {
   if (!op) return false;
-  if (isWarehouseStaff(op)) return true;
-  return PROD_DEPTS.includes(op.department);
+  return op.io_enabled !== false;
 }
 
 export function workTypesForOperator(op: OperatorLike): WorkType[] {

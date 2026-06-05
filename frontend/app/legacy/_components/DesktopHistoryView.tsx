@@ -12,6 +12,8 @@ import { HistoryStatsBar } from "./_history_sections/HistoryStatsBar";
 import { HistoryTable } from "./_history_sections/HistoryTable";
 import { DesktopHistoryRightPanel } from "./_history_sections/DesktopHistoryRightPanel";
 import { useHistoryData } from "./_hooks/useHistoryData";
+import { useMonthlyCountsQuery } from "@/lib/queries/useTransactionsQuery";
+import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { parseUtc, toDateKey } from "./_history_sections/historyFormat";
 import { type HistorySelection } from "./_history_sections/historyConstants";
 import { DATE_OPTIONS, dateFilterToFrom } from "./_history_sections/historyQuery";
@@ -23,7 +25,7 @@ export function DesktopHistoryView() {
   // scope/typeFilter/activeBucket·부서 전개 상태 없음 — 항상 "전체"로 시작.
   // 대시보드식 독립 필터 패널 (부서·모델·거래종류 다중 선택).
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const { data: productModels } = useModelsQuery();
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [selectedOps, setSelectedOps] = useState<string[]>([]);
@@ -40,18 +42,14 @@ export function DesktopHistoryView() {
     return () => clearTimeout(t);
   }, [search]);
 
-  // 필터 패널 "모델 구분" 칩 소스 — 1회 로드.
-  useEffect(() => {
-    void api
-      .getModels()
-      .then((ms) => {
-        const names = Array.from(
-          new Set(ms.map((m) => m.model_name).filter((n): n is string => !!n)),
-        );
-        setAvailableModels(names);
-      })
-      .catch(() => {});
-  }, []);
+  // 필터 패널 "모델 구분" 칩 소스 — useModelsQuery 캐시에서 모델명만 추려 dedup.
+  const availableModels = useMemo(
+    () =>
+      Array.from(
+        new Set((productModels ?? []).map((m) => m.model_name).filter((n): n is string => !!n)),
+      ),
+    [productModels],
+  );
 
   function toggleModel(v: string) {
     setSelectedModels((s) => (s.includes(v) ? s.filter((x) => x !== v) : [...s, v]));
@@ -80,6 +78,8 @@ export function DesktopHistoryView() {
   const [calendarMonth, setCalendarMonth] = useState(now.getMonth());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const lastSelectionRef = useRef<HistorySelection | null>(null);
+  // 13-2번: navigateToLog 가 다른 날짜로 이동했을 때 그 거래 행을 리스트에서 찾아 scrollIntoView.
+  const pendingScrollLogIdRef = useRef<string | null>(null);
 
   const periodLabel = selectedDay
     ? selectedDay
@@ -153,6 +153,20 @@ export function DesktopHistoryView() {
       setCalendarMonth(0);
     } else setCalendarMonth((m) => m + 1);
   }
+
+  // 연 뷰(iOS 캘린더 스타일 줌) — 그 해 12개월 거래 건수 집계.
+  // /monthly-counts?year=YYYY 신 endpoint — limit 제한 없이 집계값만 반환.
+  const { data: monthlyCountsRaw } = useMonthlyCountsQuery(calendarYear);
+  const monthlyCountMap = useMemo(() => {
+    const m = new Map<number, number>();
+    if (!monthlyCountsRaw) return m;
+    for (const [key, count] of Object.entries(monthlyCountsRaw)) {
+      // key 형식: "2026-01" → month index 0
+      const month = parseInt(key.split("-")[1], 10) - 1;
+      if (count > 0) m.set(month, count);
+    }
+    return m;
+  }, [monthlyCountsRaw]);
 
   const calendarDayMap = useMemo(() => {
     const map = new Map<string, TransactionLog[]>();
@@ -243,6 +257,19 @@ export function DesktopHistoryView() {
     return () => ctrl.abort();
   }, [dateFilter, selectedDay]);
 
+  // 13-2번: 다른 날짜로 navigate 후 logs 가 로드되면 해당 거래 행으로 스크롤.
+  useEffect(() => {
+    const targetId = pendingScrollLogIdRef.current;
+    if (!targetId) return;
+    if (loading) return;
+    if (!logs.some((l) => l.log_id === targetId)) return;
+    const el = document.querySelector(`[data-log-id="${targetId}"]`) as HTMLElement | null;
+    if (el) {
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      pendingScrollLogIdRef.current = null;
+    }
+  }, [logs, loading]);
+
   function handleLogUpdated(updated: TransactionLog) {
     setLogs((prev) => prev.map((l) => (l.log_id === updated.log_id ? updated : l)));
     setSelection({ kind: "log", log: updated });
@@ -274,7 +301,15 @@ export function DesktopHistoryView() {
   }
 
   // 우측 패널 내부 드릴(BOM 하위 라인·이 품목 최근 거래) — 현재 선택을 스택에 쌓고 이동.
+  // 13-2번: 클릭한 로그가 다른 날짜에 속하면 selectedDay 를 그 날짜로 자동 조정해서
+  // 리스트가 해당 거래를 포함하게 한 뒤, 효과(useEffect 으로 logs 로드 완료 시점에)
+  // 로 그 행으로 scrollIntoView.
   function navigateToLog(log: TransactionLog) {
+    const logYmd = toDateKey(log.created_at);
+    if (logYmd && logYmd !== selectedDay) {
+      setSelectedDay(logYmd);
+    }
+    pendingScrollLogIdRef.current = log.log_id;
     setSelection((cur) => {
       if (cur && !(cur.kind === "log" && cur.log.log_id === log.log_id)) {
         setSelectionStack((s) => [...s, cur]);
@@ -365,6 +400,11 @@ export function DesktopHistoryView() {
                 selectedOps={selectedOps}
                 toggleOp={toggleOp}
                 clearOps={() => setSelectedOps([])}
+                onResetAll={() => {
+                  setSelectedDepts([]);
+                  setSelectedModels([]);
+                  setSelectedOps([]);
+                }}
               />
             </section>
           )}
@@ -375,9 +415,12 @@ export function DesktopHistoryView() {
             calendarMonth={calendarMonth}
             prevMonth={prevMonth}
             nextMonth={nextMonth}
+            setCalendarYear={setCalendarYear}
+            setCalendarMonth={setCalendarMonth}
             calendarLoading={calendarLoading}
             calendarDays={calendarDays}
             calendarDayMap={calendarDayMap}
+            monthlyCountMap={monthlyCountMap}
             todayKey={todayKey}
             selectedDay={selectedDay}
             setSelectedDay={setSelectedDay}

@@ -35,6 +35,7 @@ export function toApiUrl(path: string): string {
  * - 문자열: "품목을 찾을 수 없습니다."
  * - 구 dict: {message, shortages?}
  * - 신 dict (Phase 4): {code, message, extra?: {shortages?}}
+ * - Pydantic 검증 에러 배열: [{loc: [...], msg: "...", type: "..."}]
  *
  * shortages 가 있으면 줄바꿈으로 추가한다.
  */
@@ -53,6 +54,18 @@ export class ApiError extends Error {
 
 export function extractErrorMessage(detail: unknown, fallback = "처리 실패"): string {
   if (typeof detail === "string") return detail;
+  // Pydantic 스키마 검증 실패는 detail 이 배열 — [{loc, msg, type, ...}]. 첫 항목의 msg 사용,
+  // "Value error, " prefix 는 백엔드 raw 메시지라 제거해 사람 말로 보이게 한다.
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0];
+    if (first && typeof first === "object") {
+      const raw = (first as Record<string, unknown>).msg;
+      if (typeof raw === "string" && raw.trim()) {
+        return raw.replace(/^Value error,\s*/i, "");
+      }
+    }
+    return fallback;
+  }
   if (detail && typeof detail === "object") {
     const d = detail as Record<string, unknown>;
     const msg = typeof d.message === "string" ? d.message : null;
@@ -85,12 +98,38 @@ export async function parseError(res: Response): Promise<string> {
 }
 
 /**
+ * Admin PIN 자동 헤더 주입 — W3-B seam.
+ *
+ * `AdminSessionProvider` 가 mount 시점에 `registerAdminPinProvider(() => pin)`
+ * 으로 콜백을 등록한다. 이후 모든 fetcher / writeJson 호출은 현재 PIN 이
+ * 존재하면 자동으로 `X-Admin-Pin` 헤더를 주입한다.
+ *
+ * - 호출자 코드 변경 0 — 기존 body.pin 페이로드도 그대로 동작.
+ * - 백엔드 admin 라우터는 `X-Admin-Pin` → `body.pin` → `query.pin` 우선순위로
+ *   PIN 을 추출 (W3-A 완료). 다른 라우터는 헤더 무시.
+ * - in-memory only — sessionStorage / localStorage 사용 안 함.
+ */
+let getAdminPin: () => string | null = () => null;
+
+export function registerAdminPinProvider(fn: () => string | null): void {
+  getAdminPin = fn;
+}
+
+function adminPinHeaders(): Record<string, string> {
+  const pin = getAdminPin();
+  return pin ? { "X-Admin-Pin": pin } : {};
+}
+
+/**
  * 일반 GET 페치 — JSON 응답 반환. AbortSignal 지원.
  */
 export async function fetcher<T>(url: string, signal?: AbortSignal): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(url, { signal });
+    const headers = adminPinHeaders();
+    const init: RequestInit = { signal };
+    if (Object.keys(headers).length > 0) init.headers = headers;
+    res = await fetch(url, init);
   } catch (error) {
     if ((error as Error)?.name === "AbortError") throw error;
     throw new Error(
@@ -120,9 +159,12 @@ async function writeJson<T>(
   body?: unknown,
 ): Promise<T> {
   const init: RequestInit = { method };
+  const pinHeaders = adminPinHeaders();
   if (body !== undefined) {
-    init.headers = { "Content-Type": "application/json" };
+    init.headers = { "Content-Type": "application/json", ...pinHeaders };
     init.body = JSON.stringify(body);
+  } else if (Object.keys(pinHeaders).length > 0) {
+    init.headers = pinHeaders;
   }
   const res = await fetch(url, init);
   if (!res.ok) throw new ApiError(await parseError(res), res.status);

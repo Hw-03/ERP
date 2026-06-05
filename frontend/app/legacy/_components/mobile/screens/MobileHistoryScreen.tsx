@@ -13,6 +13,8 @@ import { HistoryStatsBar } from "../../_history_sections/HistoryStatsBar";
 import { HistoryDetailPanel } from "../../_history_sections/HistoryDetailPanel";
 import { HistoryBatchDetailPanel } from "../../_history_sections/HistoryBatchDetailPanel";
 import { useHistoryData } from "../../_hooks/useHistoryData";
+import { useMonthlyCountsQuery } from "@/lib/queries/useTransactionsQuery";
+import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { parseUtc, toDateKey, formatHistoryDate } from "../../_history_sections/historyFormat";
 import {
   getHistoryActor,
@@ -34,7 +36,7 @@ const SEARCH_DEBOUNCE_MS = 350;
  */
 export function MobileHistoryScreen() {
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const { data: productModels } = useModelsQuery();
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [selectedOps, setSelectedOps] = useState<string[]>([]);
@@ -50,17 +52,13 @@ export function MobileHistoryScreen() {
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => {
-    void api
-      .getModels()
-      .then((ms) => {
-        const names = Array.from(
-          new Set(ms.map((m) => m.model_name).filter((n): n is string => !!n)),
-        );
-        setAvailableModels(names);
-      })
-      .catch(() => {});
-  }, []);
+  const availableModels = useMemo(
+    () =>
+      Array.from(
+        new Set((productModels ?? []).map((m) => m.model_name).filter((n): n is string => !!n)),
+      ),
+    [productModels],
+  );
 
   function toggleModel(v: string) {
     setSelectedModels((s) => (s.includes(v) ? s.filter((x) => x !== v) : [...s, v]));
@@ -150,6 +148,19 @@ export function MobileHistoryScreen() {
       setCalendarMonth(0);
     } else setCalendarMonth((m) => m + 1);
   }
+
+  // 연 뷰 — 그 해 12개월 거래 건수 집계.
+  // /monthly-counts?year=YYYY 신 endpoint — limit 제한 없이 집계값만 반환.
+  const { data: monthlyCountsRaw } = useMonthlyCountsQuery(calendarYear);
+  const monthlyCountMap = useMemo(() => {
+    const m = new Map<number, number>();
+    if (!monthlyCountsRaw) return m;
+    for (const [key, count] of Object.entries(monthlyCountsRaw)) {
+      const month = parseInt(key.split("-")[1], 10) - 1;
+      if (count > 0) m.set(month, count);
+    }
+    return m;
+  }, [monthlyCountsRaw]);
 
   const calendarDayMap = useMemo(() => {
     const map = new Map<string, TransactionLog[]>();
@@ -318,7 +329,7 @@ export function MobileHistoryScreen() {
       : "내역 상세";
   const sheetSubtitle =
     displaySelection?.kind === "log"
-      ? `${displaySelection.log.item_code ?? "-"} · ${formatHistoryDate(
+      ? `${displaySelection.log.mes_code ?? "-"} · ${formatHistoryDate(
           displaySelection.log.created_at,
         )}`
       : displaySelection?.kind === "batch"
@@ -367,6 +378,11 @@ export function MobileHistoryScreen() {
                 selectedOps={selectedOps}
                 toggleOp={toggleOp}
                 clearOps={() => setSelectedOps([])}
+                onResetAll={() => {
+                  setSelectedDepts([]);
+                  setSelectedModels([]);
+                  setSelectedOps([]);
+                }}
               />
             </section>
           )}
@@ -377,9 +393,12 @@ export function MobileHistoryScreen() {
             calendarMonth={calendarMonth}
             prevMonth={prevMonth}
             nextMonth={nextMonth}
+            setCalendarYear={setCalendarYear}
+            setCalendarMonth={setCalendarMonth}
             calendarLoading={calendarLoading}
             calendarDays={calendarDays}
             calendarDayMap={calendarDayMap}
+            monthlyCountMap={monthlyCountMap}
             todayKey={todayKey}
             selectedDay={selectedDay}
             setSelectedDay={setSelectedDay}
@@ -406,7 +425,7 @@ export function MobileHistoryScreen() {
                 <button
                   type="button"
                   onClick={goBack}
-                  className="mb-2 inline-flex min-h-[36px] items-center gap-1 rounded-[12px] border px-3 py-1.5 text-xs font-bold"
+                  className="mb-2 inline-flex min-h-[44px] items-center gap-1 rounded-[12px] border px-3 py-1.5 text-xs font-bold"
                   style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}
                 >
                   ← 뒤로

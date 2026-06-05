@@ -156,10 +156,12 @@ export function MobileWarehouseScreen({
               sectionTab={sectionTab}
               canSeeQueue={canSeeQueue}
               canSeeDeptQueue={canSeeDeptQueue}
+              operator={operator}
               operatorEmployeeId={operator?.employee_id}
               employeeId={employeeId}
               refreshNonce={panelRefreshNonce}
               globalSearch={globalSearch}
+              items={items}
               setItems={setItems}
               onContinueDraft={handleLegacyDraftContinue}
               onContinueIoDraft={(draft) => {

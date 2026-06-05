@@ -120,17 +120,17 @@ export function IoBundleCard({
         borderColor: tint(tone, 40),
       }}
     >
-      <div className="mb-3 flex items-start justify-between gap-3">
+      <div
+        className="mb-3 flex items-start justify-between gap-3"
+        onClick={() => { if (isCollapsible) setCollapsed((v) => !v); }}
+        style={{ cursor: isCollapsible ? "pointer" : "default" }}
+        role={isCollapsible ? "button" : undefined}
+        aria-expanded={isCollapsible ? !collapsed : undefined}
+      >
         <div className="min-w-0">
-          <button
-            type="button"
-            onClick={() => {
-              if (isCollapsible) setCollapsed((v) => !v);
-            }}
-            disabled={!isCollapsible}
-            className="flex min-w-0 items-center gap-2 text-left disabled:cursor-default"
+          <div
+            className="flex min-w-0 items-center gap-2 text-left"
             title={isCollapsible ? (collapsed ? "펼치기" : "접기") : undefined}
-            aria-expanded={isCollapsible ? !collapsed : undefined}
           >
             <Layers className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
             <h3 className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
@@ -142,13 +142,13 @@ export function IoBundleCard({
               ) : (
                 <ChevronUp className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
               ))}
-          </button>
+          </div>
           <div
             className="mt-1 flex flex-wrap items-center gap-1 text-xs font-semibold"
             style={{ color: LEGACY_COLORS.muted2 }}
           >
             {showBundleQtyStepper ? (
-              <span className="inline-flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                 <span className="text-[10px] font-bold uppercase tracking-[1.5px]">
                   기준 수량
                 </span>
@@ -270,12 +270,12 @@ export function IoBundleCard({
         )}
         <button
           type="button"
-          onClick={onRemoveBundle}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/10"
-          style={{ color: LEGACY_COLORS.muted2 }}
+          onClick={(e) => { e.stopPropagation(); onRemoveBundle(); }}
+          className="flex h-10 w-10 shrink-0 self-center items-center justify-center rounded-full transition-colors hover:brightness-110"
+          style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }}
           title="묶음 삭제"
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="h-6 w-6" />
         </button>
       </div>
 

@@ -422,14 +422,14 @@ def test_reset_pin_requires_admin_pin(client, db_session):
     db_session.add(emp)
     db_session.commit()
 
-    # 1) admin_pin 누락 → 422 (필수 필드)
+    # 1) pin 누락 → 400 (require_admin_pin Depends — PIN 없음)
     r_no_body = client.post(f"/api/employees/{emp.employee_id}/reset-pin")
-    assert r_no_body.status_code == 422
+    assert r_no_body.status_code == 400
 
-    # 2) 잘못된 admin_pin → 403
+    # 2) 잘못된 pin → 403
     r_wrong = client.post(
         f"/api/employees/{emp.employee_id}/reset-pin",
-        json={"admin_pin": "9999"},  # 기본 admin pin은 0000
+        json={"pin": "9999"},  # 기본 admin pin은 0000
     )
     assert r_wrong.status_code == 403
 
@@ -455,7 +455,7 @@ def test_reset_pin_with_correct_admin_pin(client, db_session):
 
     reset = client.post(
         f"/api/employees/{emp.employee_id}/reset-pin",
-        json={"admin_pin": "0000"},
+        json={"pin": "0000"},
     )
     assert reset.status_code == 204
 

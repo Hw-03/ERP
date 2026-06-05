@@ -21,7 +21,7 @@ import { itemsApi } from "@/lib/api/items";
 const mockItem = {
   item_id: "item-001",
   item_name: "전극(70kV)",
-  item_code: "7-TR-0001",
+  mes_code: "7-TR-0001",
   unit: "EA",
   quantity: 100,
   warehouse_qty: 50,
@@ -39,7 +39,6 @@ const mockItem = {
   model_symbol: null,
   model_slots: [],
   process_type_code: "TR",
-  option_code: null,
   serial_no: null,
   bom_completed_at: null,
   created_at: "2026-01-01T00:00:00.000Z",
@@ -74,7 +73,7 @@ describe("AddQuarantineModal", () => {
 
   it("열렸을 때 제목과 기본 필드가 보인다", () => {
     render(<AddQuarantineModal {...defaultProps} />);
-    expect(screen.getByText("새 격리 추가")).toBeInTheDocument();
+    expect(screen.getByText("새 불량 추가")).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/품목 코드 또는 이름 검색/)).toBeInTheDocument();
     expect(screen.getByText(/창고 재고/)).toBeInTheDocument();
     expect(screen.getByText(/부서 재고/)).toBeInTheDocument();

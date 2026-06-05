@@ -17,20 +17,19 @@ const cartCountCache = new Map<string, number>();
 const warehouseQueueCountCache = { value: 0 };
 const deptQueueCountCache = new Map<string, number>();
 
+// 인수인계를 받는 부서 — 이 부서 소속이면 결재자가 아니어도 인수 확인 가능.
+const HANDOVER_RECEIVE_DEPTS = ["고압", "진공"];
+
 export function DesktopWarehouseView({
   globalSearch,
   onStatusChange,
   preselectedItem,
   onSubmitSuccess,
-  defectDeptFilter,
 }: {
   globalSearch: string;
   onStatusChange: (status: string) => void;
   preselectedItem?: Item | null;
   onSubmitSuccess?: () => void;
-  /** Phase 3: 대시보드 빨간 불량 클릭 → URL ?defect_dept=X 로 전달된 부서명.
-   *  Phase 4 허브 컴포넌트가 이 값을 읽어 자동 필터 적용. */
-  defectDeptFilter?: string | null;
 }) {
   const { employees, items, productModels, loadFailure, setItems } = useWarehouseData({
     globalSearch,
@@ -39,7 +38,22 @@ export function DesktopWarehouseView({
 
   const operator = typeof window !== "undefined" ? readCurrentOperator() : null;
   const [employeeId, setEmployeeId] = useState<string>(operator?.employee_id ?? "");
-  const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>("compose");
+  // 알림 클릭 딥링크 — URL ?section= 으로 초기 섹션 결정 (권한 없으면 compose 폴백).
+  const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>(() => {
+    if (typeof window === "undefined") return "compose";
+    const s = new URLSearchParams(window.location.search).get("section");
+    const valid: WarehouseSectionTab[] = ["compose", "cart", "mine", "queue", "dept-queue", "handover"];
+    if (!s || !valid.includes(s as WarehouseSectionTab)) return "compose";
+    const whRole = operator?.warehouse_role ?? "none";
+    if (s === "queue" && whRole !== "primary" && whRole !== "deputy") return "compose";
+    if (s === "dept-queue" && !isDepartmentApprover(operator)) return "compose";
+    if (s === "handover") {
+      const dept = operator?.department ?? "";
+      const ok = dept === "튜브" || HANDOVER_RECEIVE_DEPTS.includes(dept) || isDepartmentApprover(operator);
+      if (!ok) return "compose";
+    }
+    return s as WarehouseSectionTab;
+  });
   const [panelRefreshNonce, setPanelRefreshNonce] = useState(0);
   const [cartCount, setCartCount] = useState(() => {
     const eid = operator?.employee_id ?? "";
@@ -53,12 +67,17 @@ export function DesktopWarehouseView({
     return eid ? deptQueueCountCache.get(eid) ?? 0 : 0;
   });
   const [restoreIoDraft, setRestoreIoDraft] = useState<IoBatch | null>(null);
+  const [handoverInboxCount, setHandoverInboxCount] = useState(0);
 
   const operatorEmployeeId = operator?.employee_id ?? employeeId;
   const canSeeQueue =
     (operator?.warehouse_role ?? "none") === "primary" ||
     (operator?.warehouse_role ?? "none") === "deputy";
   const canSeeDeptQueue = isDepartmentApprover(operator);
+  // 인수인계: 작성(튜브 부서원) 또는 인수 확인(받는 부서 소속 또는 부서 결재 가능자) 가능하면 탭 노출.
+  const canReceiveHandover =
+    canSeeDeptQueue || HANDOVER_RECEIVE_DEPTS.includes(operator?.department ?? "");
+  const showHandover = (operator?.department ?? "") === "튜브" || canReceiveHandover;
 
   useEffect(() => {
     if (operator && employeeId === "") setEmployeeId(operator.employee_id);
@@ -100,6 +119,14 @@ export function DesktopWarehouseView({
       .catch(() => {});
   }, [canSeeDeptQueue, operatorEmployeeId, panelRefreshNonce]);
 
+  useEffect(() => {
+    if (!canReceiveHandover || !operatorEmployeeId) return;
+    api
+      .countHandoverInbox(operatorEmployeeId)
+      .then(({ count }) => setHandoverInboxCount(count))
+      .catch(() => {});
+  }, [canReceiveHandover, operatorEmployeeId, panelRefreshNonce]);
+
   if (operator && !canEnterIO(operator)) {
     return <WarehouseAccessDenied department={operator.department ?? ""} />;
   }
@@ -118,19 +145,23 @@ export function DesktopWarehouseView({
           onChange={setSectionTab}
           showQueue={canSeeQueue}
           showDeptQueue={canSeeDeptQueue}
+          showHandover={showHandover}
           cartCount={cartCount}
           queueCount={warehouseQueueCount}
           deptQueueCount={deptQueueCount}
+          handoverInboxCount={handoverInboxCount}
         />
 
         <WarehouseDraftPanelTabs
           sectionTab={sectionTab}
           canSeeQueue={canSeeQueue}
           canSeeDeptQueue={canSeeDeptQueue}
+          operator={operator}
           operatorEmployeeId={operator?.employee_id}
           employeeId={employeeId}
           refreshNonce={panelRefreshNonce}
           globalSearch={globalSearch}
+          items={items}
           setItems={setItems}
           onContinueDraft={handleLegacyDraftContinue}
           onContinueIoDraft={(draft) => {
@@ -164,8 +195,6 @@ export function DesktopWarehouseView({
               setPanelRefreshNonce((n) => n + 1);
               onSubmitSuccess?.();
             }}
-            defectDeptFilter={defectDeptFilter}
-            currentEmployee={operator ?? undefined}
           />
         )}
       </div>

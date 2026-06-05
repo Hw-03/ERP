@@ -15,13 +15,13 @@ type RAction = "unquarantine" | "scrap" | "return";
 const ACTION_LABELS: Record<RAction, string> = {
   unquarantine: "정상 복귀",
   scrap: "폐기",
-  return: "공급처 반품",
+  return: "원자재 반품",
 };
 
 const ACTION_DESC: Record<RAction, string> = {
-  unquarantine: "잘못 격리된 경우. 즉시 처리 (결재 불필요).",
-  scrap: "재고에서 제거합니다. 결재 후 처리됩니다.",
-  return: "공급처에 반품합니다. 결재 후 처리됩니다.",
+  unquarantine: "잘못 격리된 경우. 즉시 정상 재고로 복귀.",
+  scrap: "재고에서 제거합니다. 즉시 처리됩니다.",
+  return: "공급처에 반품합니다. 즉시 처리됩니다.",
 };
 
 export interface RDefectActionModalProps {
@@ -154,12 +154,12 @@ export function RDefectActionModal({
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.red }} />
           <div>
             <div id={titleId} className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>
-              [처리] {location.item_code} {location.item_name}{" "}
+              [처리] {location.mes_code} {location.item_name}{" "}
               <span style={{ color: LEGACY_COLORS.muted }}>× {Number(location.quantity)}개</span>
             </div>
             <div className="mt-0.5 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
               {location.department} [불량] / 격리{" "}
-              {new Date(location.defective_at).toLocaleDateString("ko-KR")}
+              {location.defective_at ? new Date(location.defective_at).toLocaleDateString("ko-KR") : "기록 없음"}
             </div>
           </div>
         </div>
@@ -200,9 +200,9 @@ export function RDefectActionModal({
                   {act !== "unquarantine" && (
                     <span
                       className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-black text-white"
-                      style={{ background: LEGACY_COLORS.yellow }}
+                      style={{ background: LEGACY_COLORS.red }}
                     >
-                      결재 필요
+                      즉시 처리
                     </span>
                   )}
                 </div>

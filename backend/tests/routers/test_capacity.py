@@ -116,6 +116,76 @@ def test_capacity_limit_removed_16plus(client, db_session, make_item, make_bom):
     assert data["immediate"] == expected_total
 
 
+def test_capacity_representative_items_by_model(
+    client, db_session, make_item, make_bom
+):
+    """모델별 대표 PF 선정: model_symbol 별 자연 정렬 첫 PF."""
+    # 모델 3: PF-3-002 를 먼저 add 해도, 자연 정렬은 PF-3-001 이 대표.
+    pf3_b = make_item(
+        name="모델3-002", process_type_code="PF",
+        warehouse_qty=Decimal("0"), model_symbol="3", serial_no=2,
+    )
+    pf3_a = make_item(
+        name="모델3-001", process_type_code="PF",
+        warehouse_qty=Decimal("0"), model_symbol="3", serial_no=1,
+    )
+    # 모델 4: 한 종
+    pf4 = make_item(
+        name="모델4-001", process_type_code="PF",
+        warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1,
+    )
+    p3 = make_item(name="자재3", process_type_code="AA", warehouse_qty=Decimal("10"))
+    p4 = make_item(name="자재4", process_type_code="AA", warehouse_qty=Decimal("5"))
+    make_bom(pf3_a.item_id, p3.item_id, Decimal("1"))
+    make_bom(pf3_b.item_id, p3.item_id, Decimal("1"))
+    make_bom(pf4.item_id, p4.item_id, Decimal("1"))
+    db_session.commit()
+
+    resp = client.get("/api/production/capacity")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    # top_items 에 모든 PF 포함
+    assert len(data["top_items"]) == 3
+
+    # representative_items: 모델별 1개, model_symbol 오름차순
+    reps = data["representative_items"]
+    assert len(reps) == 2
+    assert [r["model_symbol"] for r in reps] == ["3", "4"]
+
+    # 모델3 대표 = mes_code 자연 정렬상 3-PF-0001 (생성열: model-process-serial)
+    rep3 = reps[0]
+    assert rep3["mes_code"] == "3-PF-0001"
+    assert rep3["is_representative"] is True
+    assert rep3["model_symbol"] == "3"
+
+    # 모델4 대표
+    rep4 = reps[1]
+    assert rep4["mes_code"] == "4-PF-0001"
+    assert rep4["is_representative"] is True
+
+    # top_items 내 비대표 PF 는 is_representative=False
+    pf3_b_in_top = next(t for t in data["top_items"] if t["mes_code"] == "3-PF-0002")
+    assert pf3_b_in_top["is_representative"] is False
+
+
+def test_capacity_representative_items_skips_pf_without_model_symbol(
+    client, db_session, make_item, make_bom
+):
+    """model_symbol 이 None 인 PF 는 representative_items 에 포함되지 않음."""
+    pf = make_item(name="모델없음", process_type_code="PF", warehouse_qty=Decimal("0"))
+    part = make_item(name="자재", process_type_code="AA", warehouse_qty=Decimal("3"))
+    make_bom(pf.item_id, part.item_id, Decimal("1"))
+    db_session.commit()
+
+    resp = client.get("/api/production/capacity")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert len(data["top_items"]) == 1
+    assert data["representative_items"] == []
+
+
 def test_capacity_multi_path_bottleneck(client, db_session, make_item, make_bom):
     """Test bottleneck detection with multi-level assembly."""
     # PF ← AA, AA ← AR+NF

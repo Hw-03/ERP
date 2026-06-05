@@ -136,13 +136,13 @@ def build_dashboard(ws, commits, off_count):
 
     # KPI 영역 (행 3~)
     ws.row_dimensions[3].height = 22
-    company_commits = count_commits_in_range(commits, "2026-04-21", "2026-05-19")
+    company_commits = count_commits_in_range(commits, "2026-04-21", "2026-05-29")
     kpis = [
-        ("개발 기간 (회사)", "2026-04-21 ~ 05-19 (회사 개발 착수 이후)"),
+        ("개발 기간 (회사)", "2026-04-21 ~ 05-29 (회사 개발 착수 이후)"),
         ("개인 선행 작업", "2026-04-10 ~ 04-20 (회사 개발 착수 이전 · 개인 시간)"),
         ("총 커밋 수", f"{len(commits)}건 (회사 기간 {company_commits}건)"),
         ("근무 외 작업", f"{off_count}건 (평일 야간·주말·휴가 시간 커밋)"),
-        ("기능 완료", "55 / 64개 (86%)"),
+        ("기능 완료", "77 / 87개 (89%)"),
         ("개발 영역", "Backend · Frontend · Mobile · Admin · Docs"),
     ]
 
@@ -165,10 +165,11 @@ def build_dashboard(ws, commits, off_count):
         c2.border = make_border()
         ws.row_dimensions[r].height = 22
 
-    # 날짜별 커밋 막대 (행 8~)
-    ws.row_dimensions[8].height = 20
-    ws.merge_cells("A8:E8")
-    chart_title = ws["A8"]
+    # KPI(r=3~8)와 충돌 방지 — row 9는 빈 줄, 차트 타이틀 r=10, 막대 r=11~
+    # (이전 r=8 차트 타이틀은 KPI 6번째 "개발 영역"(B8:E8 머지)과 겹쳐 Excel 손상 다이얼로그 유발)
+    ws.row_dimensions[10].height = 20
+    ws.merge_cells("A10:E10")
+    chart_title = ws["A10"]
     chart_title.value = "📈 날짜별 커밋 수"
     chart_title.fill = make_fill(HEADER_BG)
     chart_title.font = Font(bold=True, color=HEADER_FG, size=11)
@@ -178,7 +179,7 @@ def build_dashboard(ws, commits, off_count):
     by_date = group_commits_by_date(commits)
     dates_sorted = sorted(by_date.keys())
 
-    r = 9
+    r = 11
     for date in dates_sorted:
         msgs = by_date[date]
         ws.merge_cells(f"A{r}:E{r}")
@@ -190,14 +191,15 @@ def build_dashboard(ws, commits, off_count):
         ws.row_dimensions[r].height = 18
         r += 1
 
-    ws.column_dimensions["A"].width = 50
+    ws.column_dimensions["A"].width = 67.25
+    ws.column_dimensions["B"].width = 21.375
 
 # ── Sheet 2: 개발 현황 요약 ───────────────────────────────
 def build_summary(ws, commits):
     ws.title = "개발 현황 요약"
     ws.row_dimensions[1].height = 22
 
-    headers = ["기간", "분류", "주요 작업", "커밋 수", "상태"]
+    headers = ["기간", "분류", "주요 작업", "커밋 수"]
     for col, h in enumerate(headers, 1):
         apply_header(ws.cell(1, col), h)
 
@@ -211,6 +213,8 @@ def build_summary(ws, commits):
     c7 = count_commits_in_range(commits, "2026-04-28", "2026-04-30")
     c8 = count_commits_in_range(commits, "2026-05-01", "2026-05-08")
     c9 = count_commits_in_range(commits, "2026-05-09", "2026-05-15")
+    c10 = count_commits_in_range(commits, "2026-05-16", "2026-05-22")
+    c11 = count_commits_in_range(commits, "2026-05-23", "2026-05-29")
 
     rows = [
         ("2026-04-10 ~ 04-11", "기반 구축 (개인 선행)",
@@ -230,22 +234,27 @@ def build_summary(ws, commits):
         ("2026-05-01 ~ 05-08", "BOM·UI 정비",
          "자재 코드/품목명 1차 정비(848건)·BOM 세팅 도구\nBOM 관리자 워크벤치·자재 폼 강화\n주간 재고 변화 보고·부서간 조정 위저드\n공통 UI 5종·테스트 커버리지 91%·거대 파일 21개 분해", c8, "완료"),
         ("2026-05-09 ~ 05-15", "입출고 v2 + 내역 재설계 + 부서 결재",
-         "입출고 v2 4단계 마법사·멱등성·위저드 마무리\n입출고 내역 화면 전면 재설계(scope·서버필터·묶음·흐름)\n부서 결재 + 직원 권한 분리\nBOM 855건 입력 진행(출하 PA/PF 50건)\n재고 이미지 컬럼·데이터 모델 정리(legacy 제거)\n주간 재고 변화 보고 시각 재정리·UX(Enter 키)·CI 안정화", c9, "진행 중"),
+         "입출고 v2 4단계 마법사·멱등성·위저드 마무리\n입출고 내역 화면 전면 재설계(scope·서버필터·묶음·흐름)\n부서 결재 + 직원 권한 분리\nBOM 855건 입력 진행(출하 PA/PF 50건)\n재고 이미지 컬럼·데이터 모델 정리(legacy 제거)\n주간 재고 변화 보고 시각 재정리·UX(Enter 키)·CI 안정화", c9, "완료"),
+        ("2026-05-16 ~ 05-22", "인프라·모바일·불량 처리",
+         "WS1~WS10 배포 안정화·보안 강화\n모바일 UI/UX 전면 개편(디자이너 PASS)\n불량 처리 흐름 재설계 Phase 1 (라인 결재·격리·처리)\nBOM 워크벤치 3-column·완료 워크플로\n입출고 내역 2·3차 main 머지\n권동환 5월 재고 100% 검증·CSV 외부 감시·ItemCode rename", c10, "완료"),
+        ("2026-05-23 ~ 05-29", "사내 시연 + 양식 정비 + 운영 정책 맞춤 + 사번 audit",
+         "관리자 화면 4종 한꺼번에 보강 (저장 경고·공통 버튼·BOM 전체 필터)\n직원별 입출고 권한 토글 신설 (개인 단위 차단)\n화면 데이터 갱신 방식 정비 (React Query)\n불량 처리·입출고 흐름 정합 + 5/28 자동결재·재작업 후속 보완\n품목 시리얼(공정 단위) + 김건호 과장님 검토 5월 재고 검증\n품목 관리 소프트 삭제 보강 / 생산 가능 화면 모델별 대표 제품 5종\n현장 사용성 피드백 11건 일괄 반영\n생산부 사내 시연 + 6월 이후 전환 계획 공유 (5/27)\n주간보고 매트릭스 거래타입 5종 보강 + 백엔드 동결 (5/29)\n운영 로그 시스템 + 사번 기반 추적 인프라 (5/29, 권동환 사원님 요청 3)\n부품 코드 자동 갱신 + DB 정합성 정리 (5/29, 어긋남 34건 → 0건)\n다중 사용자 피드백 처리 — PIN 4자리·수량 소수점·담당자 드롭다운 (5/29)", c11, "완료"),
     ]
 
-    for r, (period, cat, work, cnt, status) in enumerate(rows, 2):
-        ws.row_dimensions[r].height = 60
+    for r, (period, cat, work, cnt, _status) in enumerate(rows, 2):
+        # status 필드는 rows 튜플 호환 위해 받지만 컬럼에 적지 않음 (사용자가 '상태' 컬럼 제거)
+        # 행 높이는 work 텍스트 줄 수에 비례 — 사용자가 매번 손으로 키우지 않도록 자동화
+        line_count = work.count("\n") + 1
+        ws.row_dimensions[r].height = max(60, line_count * 16.2)
         apply_data(ws.cell(r, 1), period, align="center")
         apply_data(ws.cell(r, 2), cat,    align="center")
         apply_data(ws.cell(r, 3), work)
         apply_data(ws.cell(r, 4), cnt,    align="center")
-        apply_data(ws.cell(r, 5), status, align="center", bold=True)
 
     ws.column_dimensions["A"].width = 22
     ws.column_dimensions["B"].width = 14
     ws.column_dimensions["C"].width = 52
     ws.column_dimensions["D"].width = 10
-    ws.column_dimensions["E"].width = 10
 
 # ── Sheet 2: 기능 전체 목록 ──────────────────────────────
 def build_features(ws):
@@ -305,6 +314,32 @@ def build_features(ws):
         ("로그인 단일 카드 화면",               "보안",   True,  "3단계 → 콤보박스+PIN 1화면"),
         ("관리자 화면 8섹션 + PIN",             "관리",   True,  "BOM 가로분할·KPI 컴팩트화"),
         ("생산 가능 수량 immediate/maximum",   "생산",   True,  "status 4분기 시각화"),
+        # ── 5/16 ~ 5/22 신규 ───────────────────────────
+        ("운영 인프라 안정화 (WS1~WS10)",       "인프라", True,  "Docker·보안·로깅·예외·헬스/관측"),
+        ("입출고 내역 2·3차 정비 (main 머지)",  "입출고", True,  "model·process_step·department 파라미터"),
+        ("모바일 UI/UX 전면 개편",              "UI",    True,  "5개 화면 반응형 + 디자이너 PASS"),
+        ("불량 처리 흐름 재설계 Phase 1",        "생산",   True,  "라인 결재·격리·처리·테스트 113건"),
+        ("BOM 워크벤치 3-column + 완료 워크플로", "BOM",  True,  "BOM 완료 상태 토글 + export"),
+        ("입출고 CSV 외부 감시 시스템",          "인프라", True,  "월별 누적 미러"),
+        ("ItemCode 도메인 정리",                "인프라", True,  "erp_code 잔재 정리"),
+        ("외부 PC 첫 실행 안정화",              "인프라", True,  "gitattributes + start.bat 사전 검사"),
+        ("권동환 5월 재고 100% 검증",           "데이터", True,  "엑셀↔DB 동기화·자식 행 반영"),
+        # ── 5/23 ~ 5/28 신규 ───────────────────────────
+        ("직원별 입출고 권한 토글 신설",          "보안",   True,  "직원 개인 단위 토글, 꺼지면 진입 불가"),
+        ("관리자 화면 4종 한꺼번에 보강",         "관리",   True,  "저장 경고·공통 버튼·BOM 전체 필터·대시보드 동선"),
+        ("화면 데이터 갱신 방식 정비",            "인프라", True,  "React Query 도입·도메인 10여 개 통일"),
+        ("모델 관리 인라인 편집 + 끌어서 정렬",   "관리",   True,  "정렬 순서 DB 컬럼 추가"),
+        ("불량 처리 흐름 후속 보완",              "생산",   True,  "5/28 자동결재·재작업 화면·요청자/승인자 표시"),
+        ("품목 시리얼 (공정 단위) + 5월 재고 검증","재고",  True,  "공정 단위, 김건호 과장님 검토 반영"),
+        ("품목 관리 — 소프트 삭제 보강",          "관리",   True,  "삭제 시 비활성 상태로 목록 아래, 재활성 가능"),
+        ("생산 가능 화면 — 모델별 대표 제품 5종", "생산",   True,  "기존 합계 표시 → 대표 완제품 5종으로"),
+        ("현장 사용성 피드백 11건 일괄 반영",     "UX",    True,  "안내 메시지·모달·큰 이미지 보기·필터 통일 등"),
+        ("백엔드 큰 파일 정리 (종류별 분리)",     "인프라", True,  "models.py·bootstrap_db.py + 로그인 인증 흐름 정리"),
+        # ── 5/29 신규 ──────────────────────────────────
+        ("운영 로그 시스템 + 사번 기반 추적",      "보안",   True,  "권동환 사원님 요청 3 — 도메인 이벤트 15군데 사번 부착·AdminAuditLog 사번 컬럼"),
+        ("부품 코드 자동 갱신 + DB 정합성 정리",   "데이터", True,  "어긋남 34건 → 0건 · item_models 테이블 폐기"),
+        ("주간보고 매트릭스 보강 + 백엔드 동결",   "주간보고", True, "거래타입 5종 분류·11종 enum 회귀 테스트"),
+        ("다중 사용자 피드백 — PIN·수량·담당자",   "UX",     True, "PIN 4자리·수량 소수점·자동완성 드롭다운"),
         # ── 직원 · 보안 ──────────────────────────────────
         ("직원 명단 관리",                     "직원",   True,  ""),
         ("부서별 담당 색상 배지 표시",           "직원",   True,  ""),
@@ -322,8 +357,8 @@ def build_features(ws):
         ("테스트 자동화 (CI)",                 "인프라", True,  "pytest 42건 + vitest 12건"),
         ("WAL-safe 백업 / 복구",              "인프라", True,  "ops 스크립트 자동화"),
         # ── 예정 ─────────────────────────────────────────
-        ("입출고 화면·내역 흐름 재설계",        "입출고", False, "담당자 동선 분석 후 (다음 주~다다음주)"),
         ("실 재고 데이터 입력 + 직원 테스트",    "데이터", False, "BOM·입출고 정리 후"),
+        ("불량 처리 흐름 Phase 2",              "생산",   False, "부서 결재·집계·자동화"),
         ("역할별 접근 권한 연동",              "보안",  False, "부서·역할 기반 (PIN 로그인 완료)"),
         ("총재고 / 가용재고 / 예약재고 분리",   "재고",  False, "재고 가용성 계산 고도화"),
         ("외부 접근 환경 구성",                "인프라", False, "PC 또는 NAS 서버 + API 인증"),
@@ -411,7 +446,9 @@ def build_daily(ws, commits):
         work_summary = "\n".join([msg[:60] for hash7, msg, ctype, dt in msgs[:5]])
         area = "Backend" if any("feat" in msg.lower() for _, msg, _, _ in msgs) else "Frontend"
 
-        ws.row_dimensions[r].height = 50
+        # 행 높이는 텍스트 줄 수에 비례 — 사용자가 매번 손으로 조정하지 않도록 자동
+        line_count = work_summary.count("\n") + 1
+        ws.row_dimensions[r].height = max(27, line_count * 13.5)
         bg = STRIPE_BG if r % 2 == 0 else WHITE_BG
         apply_data(ws.cell(r, 1), date,          bg, align="center")
         apply_data(ws.cell(r, 2), count,         bg, align="center")

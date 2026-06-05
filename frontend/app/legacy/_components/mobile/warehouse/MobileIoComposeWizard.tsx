@@ -21,6 +21,7 @@ import { IoTargetPicker } from "../../_warehouse_v2/IoTargetPicker";
 import { IoBundleCart } from "../../_warehouse_v2/IoBundleCart";
 import { IoConfirmStep } from "../../_warehouse_v2/IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "../../_warehouse_v2/IoSubmitModals";
+import { Toast, type ToastState } from "@/lib/ui/Toast";
 import {
   approvalKind,
   isExitWorkType,
@@ -50,21 +51,6 @@ function locationQuantity(
     item.locations.find((loc) => loc.department === department && loc.status === status)
       ?.quantity ?? 0
   );
-}
-
-// Pydantic Decimal 은 JSON 에서 문자열("1.0000")로 직렬화된다 — number 로 타이핑돼 있으나 실값은 string.
-// stepper 산술/합계가 string concat 으로 깨지므로 bundle 수신 즉시 number 로 정규화.
-function normalizeBundles(bundles: IoBundle[]): IoBundle[] {
-  return bundles.map((bundle) => ({
-    ...bundle,
-    quantity: Number(bundle.quantity),
-    lines: bundle.lines.map((line) => ({
-      ...line,
-      quantity: Number(line.quantity),
-      shortage: Number(line.shortage),
-      bom_expected: line.bom_expected == null ? null : Number(line.bom_expected),
-    })),
-  }));
 }
 
 const STEP_META: { key: string; label: string }[] = [
@@ -100,8 +86,13 @@ export function MobileIoComposeWizard({
   const [search, setSearch] = useState(globalSearch);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [bomParents, setBomParents] = useState<Set<string>>(() => new Set());
+  // 가드 key 는 `${item_id}__${workType}` — workType 변경 시 bundles reset 되므로
+  // 같은 preselectedItem 이라도 재적용되어야 한다.
   const preselectedHandledRef = useRef<string | null>(null);
+  // BOM 부모 품목으로 진입한 경우 자동 추가하지 않고 picker 에서 row 만 강조.
+  const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
   const restoredDraftRef = useRef<string | null>(null);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveBatchIdRef = useRef<string | null>(null);
@@ -138,7 +129,6 @@ export function MobileIoComposeWizard({
     restoredDraftRef,
     autosaveBatchIdRef,
     state,
-    normalizeBundles,
     onStatusChange,
   });
 
@@ -194,15 +184,27 @@ export function MobileIoComposeWizard({
       state.setSubType(subTypeOverride);
     }
     try {
+      // 이미 같은 품목이 카트에 있으면 수량 합산, 없으면 append.
+      const existingIdx = state.bundles.findIndex((b) => b.source_item_id === item.item_id);
+      const prevQty = existingIdx !== -1 ? state.bundles[existingIdx].quantity : 0;
       const response = await previewTarget({
         employeeId,
         workType: state.workType,
         subType: effectiveSubType,
         fromDepartment: state.fromDepartment,
         toDepartment: state.toDepartment,
-        target: { source_kind: sourceKind, item_id: item.item_id, quantity: 1 },
+        target: { source_kind: sourceKind, item_id: item.item_id, quantity: prevQty + 1 },
       });
-      state.setBundles((prev) => [...prev, ...normalizeBundles(response.bundles)]);
+      const newBundles = response.bundles;
+      if (existingIdx !== -1) {
+        state.setBundles((prev) => {
+          const next = [...prev];
+          next.splice(existingIdx, 1, ...newBundles);
+          return next;
+        });
+      } else {
+        state.setBundles((prev) => [...prev, ...newBundles]);
+      }
       onStatusChange(`${item.item_name} 작업 묶음 생성`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "품목 전개에 실패했습니다.");
@@ -211,12 +213,20 @@ export function MobileIoComposeWizard({
 
   useEffect(() => {
     if (!preselectedItem) return;
-    if (preselectedHandledRef.current === preselectedItem.item_id) return;
+    // workType 변경 시 bundles 가 reset 되므로 key 에 workType 포함.
+    const handledKey = `${preselectedItem.item_id}__${state.workType}`;
+    if (preselectedHandledRef.current === handledKey) return;
     if (state.workType === "process" && state.deptIoDirection == null) return;
-    preselectedHandledRef.current = preselectedItem.item_id;
-    void addItem(preselectedItem);
+    preselectedHandledRef.current = handledKey;
+    if (bomParents.has(preselectedItem.item_id)) {
+      // BOM 부모: 자동 카트 추가하지 않고 picker 에서 row 만 강조.
+      setHighlightItemId(preselectedItem.item_id);
+    } else {
+      setHighlightItemId(null);
+      void addItem(preselectedItem);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preselectedItem?.item_id, state.workType, state.deptIoDirection]);
+  }, [preselectedItem?.item_id, state.workType, state.deptIoDirection, bomParents]);
 
   function getAvailable(line: IoLine): number | null {
     const item = items.find((row) => row.item_id === line.item_id);
@@ -270,6 +280,39 @@ export function MobileIoComposeWizard({
     state.goTo(2);
   }
 
+  async function handleSaveDraft() {
+    if (!employeeId) {
+      setError("작업자를 선택하세요.");
+      return;
+    }
+    if (state.bundles.length === 0) return;
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+    try {
+      const response = await saveDraft({
+        employeeId,
+        workType: state.workType,
+        subType: state.subType,
+        fromDepartment: state.fromDepartment,
+        toDepartment: state.toDepartment,
+        referenceNo: state.referenceNo,
+        notes: state.notes,
+        bundles: state.bundles,
+      });
+      autosaveBatchIdRef.current = response.batch_id;
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, "0");
+      const mm = String(now.getMinutes()).padStart(2, "0");
+      onStatusChange(`저장됨 · ${hh}:${mm}`);
+      setToast({ message: "저장되었습니다. 나중에 이어서 진행할 수 있습니다.", type: "success" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.";
+      setToast({ message, type: "error" });
+    }
+  }
+
   async function handleSubmit() {
     if (!employeeId) {
       setError("작업자를 선택하세요.");
@@ -289,7 +332,7 @@ export function MobileIoComposeWizard({
       }
     }
     try {
-      const kind = approvalKind(state.subType, state.bundles);
+      const kind = approvalKind(state.subType, state.bundles, state.fromDepartment);
       const response = await submit({
         employeeId,
         workType: state.workType,
@@ -348,7 +391,7 @@ export function MobileIoComposeWizard({
     <div className="flex h-full min-h-0 flex-1 flex-col" style={{ background: LEGACY_COLORS.bg }}>
       {/* 헤더: 뒤로 + 진행바 */}
       <div
-        className="sticky top-0 z-10 flex items-center gap-2 border-b px-3 py-2.5"
+        className="fixed top-0 inset-x-0 z-10 flex items-center gap-2 border-b px-3 py-2.5"
         style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
       >
         {step > 1 ? (
@@ -361,8 +404,8 @@ export function MobileIoComposeWizard({
         </div>
       </div>
 
-      {/* 본문: 현재 스텝만 풀스크린 스크롤 */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+      {/* 본문: 현재 스텝만 풀스크린 스크롤. 헤더가 fixed 이므로 pt-14 로 헤더 높이(약 56px) 보상. */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-14 pb-3">
         <h2 className="mb-3 text-base font-black" style={{ color: LEGACY_COLORS.text }}>
           {stepTitle}
         </h2>
@@ -423,6 +466,7 @@ export function MobileIoComposeWizard({
             bundles={state.bundles}
             search={search}
             onSearchChange={setSearch}
+            highlightItemId={highlightItemId}
             onAddItem={(item, sourceKind, subTypeOverride) =>
               addItem(item, sourceKind ?? "direct_item", subTypeOverride)
             }
@@ -483,10 +527,12 @@ export function MobileIoComposeWizard({
             notes={state.notes}
             hasShortage={state.hasShortage}
             hasInvalidQuantity={state.hasInvalidQuantity}
-            submitting={submitting || drafting}
-            approvalKind={approvalKind(state.subType, state.bundles)}
+            submitting={submitting}
+            saving={drafting}
+            approvalKind={approvalKind(state.subType, state.bundles, state.fromDepartment)}
             onNotesChange={state.setNotes}
             onSubmit={handleSubmit}
+            onSaveDraft={handleSaveDraft}
           />
         )}
       </div>
@@ -510,6 +556,7 @@ export function MobileIoComposeWizard({
       )}
 
       <IoSubmitModals result={result} onClose={() => setResult(null)} />
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

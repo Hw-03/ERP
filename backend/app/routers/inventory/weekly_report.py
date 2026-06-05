@@ -1,4 +1,13 @@
-"""주간보고: GET /weekly-report — ?F 계열 품목의 주차별 재고 변화 집계."""
+"""주간보고: GET /weekly-report — ?F 계열 품목의 주차별 재고 변화 집계.
+
+⛔ 동결(완성) — 2026-05-29
+- 명시적 수정 요청이 있을 때만 손댈 것. 주변 리팩터·전역 변경에서는 우회.
+- 신규 TransactionTypeEnum 멤버 추가 시 PRODUCTION_TX_TYPES 또는
+  NON_PRODUCTION_TX_TYPES 둘 중 하나에 명시 분류 필수
+  (test_all_transaction_types_classified 가 누락 검출).
+- 프론트 동결 짝: frontend/app/legacy/_components/_weekly_sections/
+  + frontend/app/legacy/_components/DesktopWeeklyReportView.tsx
+"""
 
 from __future__ import annotations
 
@@ -49,6 +58,29 @@ _OUT_TYPES = {
     TransactionTypeEnum.SHIP,
     TransactionTypeEnum.BACKFLUSH,
 }
+
+# 생산 현황 매트릭스(production_matrix) 셀에 합산하는 "생산 활동" 거래 타입.
+# ※ 신규 TransactionTypeEnum 멤버 추가 시 본 set 또는 NON_PRODUCTION_TX_TYPES
+#   둘 중 하나에 명시 분류 필수 — test_all_transaction_types_classified 가 누락 검출.
+PRODUCTION_TX_TYPES: frozenset[TransactionTypeEnum] = frozenset({
+    TransactionTypeEnum.PRODUCE,
+    TransactionTypeEnum.RECEIVE,
+    TransactionTypeEnum.TRANSFER_TO_WH,
+    TransactionTypeEnum.TRANSFER_DEPT,
+    TransactionTypeEnum.SHIP,
+})
+
+# 매트릭스에서 명시적으로 제외하는 거래 타입 (의도된 비-생산 활동).
+NON_PRODUCTION_TX_TYPES: frozenset[TransactionTypeEnum] = frozenset({
+    TransactionTypeEnum.ADJUST,
+    TransactionTypeEnum.BACKFLUSH,
+    TransactionTypeEnum.DISASSEMBLE,
+    TransactionTypeEnum.TRANSFER_TO_PROD,
+    TransactionTypeEnum.MARK_DEFECTIVE,
+    TransactionTypeEnum.UNMARK_DEFECTIVE,
+    TransactionTypeEnum.DEFECT_SCRAP,
+    TransactionTypeEnum.SUPPLIER_RETURN,
+})
 
 
 def _load_model_symbols(db: Session) -> tuple[dict[str, str], list[str]]:
@@ -104,7 +136,7 @@ def get_weekly_report(
         db.query(Item, Inventory)
         .outerjoin(Inventory, Item.item_id == Inventory.item_id)
         .filter(Item.process_type_code.in_(_F_CODES))
-        .order_by(Item.item_code)
+        .order_by(Item.mes_code)
         .all()
     )
 
@@ -181,7 +213,7 @@ def get_weekly_report(
         group_items[code].append(
             WeeklyItemReport(
                 item_id=str(item.item_id),
-                item_code=item.item_code,
+                mes_code=item.mes_code,
                 item_name=item.item_name,
                 prev_qty=prev_qty,
                 in_qty=in_qty,
@@ -222,7 +254,7 @@ def get_weekly_report(
         .join(TransactionLog, Item.item_id == TransactionLog.item_id)
         .filter(
             Item.process_type_code.in_(_PROD_CODES),
-            TransactionLog.transaction_type == TransactionTypeEnum.PRODUCE,
+            TransactionLog.transaction_type.in_(PRODUCTION_TX_TYPES),
             TransactionLog.created_at >= dt_start,
             TransactionLog.created_at <= dt_end,
         )
@@ -240,7 +272,7 @@ def get_weekly_report(
         proc = item.process_type_code or ""
         if proc not in _PROD_CODES:
             continue
-        val = Decimal(str(qty_sum))
+        val = abs(Decimal(str(qty_sum)))
         if model_key not in matrix:
             matrix[model_key] = {}
         matrix[model_key][proc] = matrix[model_key].get(proc, Decimal("0")) + val

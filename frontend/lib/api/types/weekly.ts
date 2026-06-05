@@ -1,6 +1,6 @@
 export interface WeeklyItemReport {
   item_id: string;
-  item_code: string | null;
+  mes_code: string | null;
   item_name: string;
   prev_qty: number;
   in_qty: number;

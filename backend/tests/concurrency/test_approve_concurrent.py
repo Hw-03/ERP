@@ -92,7 +92,7 @@ def _setup(make_session):
         request_id=req.request_id,
         item_id=item.item_id,
         item_name_snapshot=item.item_name,
-        item_code_snapshot=None,
+        mes_code_snapshot=None,
         quantity=Decimal("1"),
         from_bucket=RequestBucketEnum.WAREHOUSE,
         from_department=None,

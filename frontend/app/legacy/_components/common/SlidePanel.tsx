@@ -9,6 +9,8 @@ interface Props {
   open: boolean;
   width?: number;
   onClose?: () => void;
+  /** true 면 X 버튼을 렌더하지 않음 (카드 내부에서 직접 닫기 버튼을 제공할 때). ESC 처리는 유지. */
+  hideCloseButton?: boolean;
   children: React.ReactNode;
 }
 
@@ -17,7 +19,7 @@ interface Props {
  * open=false 일 때 width:0 으로 접힌다.
  * onClose 제공 시: X 버튼 표시 + ESC 키로 닫힘 + focus trap + aria.
  */
-function SlidePanelImpl({ open, width = 436, onClose, children }: Props) {
+function SlidePanelImpl({ open, width = 436, onClose, hideCloseButton, children }: Props) {
   const panelRef = useFocusTrap<HTMLDivElement>(open && !!onClose);
   const titleId = "slide-panel-title";
 
@@ -55,8 +57,8 @@ function SlidePanelImpl({ open, width = 436, onClose, children }: Props) {
         }}
         {...dialogProps}
       >
-        {/* 닫기 ✕ — 콘텐츠 우상단 모서리에 겹침(별도 줄을 안 먹어 카드 높이 보존). 신규 absolute-close 패턴. */}
-        {onClose && open && (
+        {/* 닫기 ✕ — 콘텐츠 우상단 모서리에 겹침. hideCloseButton=true 면 카드 내부 버튼이 대신함. */}
+        {!hideCloseButton && onClose && open && (
           <button
             type="button"
             onClick={onClose}

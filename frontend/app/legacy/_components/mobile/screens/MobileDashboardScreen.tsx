@@ -3,7 +3,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { itemCodeDept } from "@/lib/mes/process";
+import { mesCodeDept } from "@/lib/mes/process";
 import { SlidersHorizontal } from "lucide-react";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { InlineSearch } from "../primitives";
@@ -16,8 +16,12 @@ import { useInventoryData } from "../../_hooks/useInventoryData";
 import { useDesktopInventoryDerivations } from "../../_hooks/useDesktopInventoryDerivations";
 import { useItemImageManifest } from "../../_hooks/useItemImageManifest";
 import { matchesKpi, matchesSearch } from "../../_inventory_sections/inventoryFilter";
+import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 
 const PAGE_SIZE = 100;
+
+// 안정 참조 — useModelsQuery 미로딩 시 동일 빈 배열을 재사용해 useMemo 의존성을 흔들지 않는다.
+const EMPTY_MODELS: ProductModel[] = [];
 
 /**
  * 대시보드 모바일 화면.
@@ -60,7 +64,7 @@ export function MobileDashboardScreen({
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [selectedProcessSteps, setSelectedProcessSteps] = useState<string[]>([]);
-  const [productModels, setProductModels] = useState<ProductModel[]>([]);
+  const productModels = useModelsQuery().data ?? EMPTY_MODELS;
   const [kpi, setKpi] = useState<KpiFilter>("ALL");
   const [localSearch, setLocalSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
@@ -81,10 +85,6 @@ export function MobileDashboardScreen({
     setSelectedProcessSteps((prev) => (prev.includes(v) ? prev.filter((p) => p !== v) : [...prev, v]));
     setDisplayLimit(PAGE_SIZE);
   }
-
-  useEffect(() => {
-    void api.getModels().then(setProductModels).catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (!selectedItem) {
@@ -113,7 +113,7 @@ export function MobileDashboardScreen({
             d === "창고"
               ? (item.warehouse_qty ?? 0) > 0
               : item.department === d ||
-                itemCodeDept(item.item_code) === d ||
+                mesCodeDept(item.mes_code) === d ||
                 item.locations.some((loc) => loc.department === d),
           );
           if (!inDept) return false;
@@ -136,6 +136,14 @@ export function MobileDashboardScreen({
   useEffect(() => {
     setDisplayLimit(PAGE_SIZE);
   }, [filteredItems]);
+
+  // 필터 변경 시 짧은 스켈레톤(200ms) — 즉시 결과가 깜빡이는 인지부담 완화.
+  const [filterChanging, setFilterChanging] = useState(false);
+  useEffect(() => {
+    setFilterChanging(true);
+    const t = setTimeout(() => setFilterChanging(false), 200);
+    return () => clearTimeout(t);
+  }, [selectedDepts, selectedModels, selectedProcessSteps, kpi]);
 
   if (selectedItem) lastSelectedItemRef.current = selectedItem;
   const displayItem = selectedItem ?? lastSelectedItemRef.current;
@@ -249,12 +257,14 @@ export function MobileDashboardScreen({
                   onClearDepts={() => setSelectedDepts([])}
                   onClearModels={() => setSelectedModels([])}
                   onClearProcessSteps={() => setSelectedProcessSteps([])}
+                  onResetAll={resetAllFilters}
+                  isAnyFilterActive={isFiltered}
                 />
               )}
             </div>
             <InventoryItemsTable
               error={error}
-              loading={loading}
+              loading={loading || filterChanging}
               filteredItems={filteredItems}
               displayLimit={displayLimit}
               setDisplayLimit={setDisplayLimit}
@@ -284,8 +294,8 @@ export function MobileDashboardScreen({
                 </div>
                 <div className="mt-0.5 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
                   {displayItem.legacy_part
-                    ? `${displayItem.item_code} · ${displayItem.legacy_part}`
-                    : displayItem.item_code ?? "-"}
+                    ? `${displayItem.mes_code} · ${displayItem.legacy_part}`
+                    : displayItem.mes_code ?? "-"}
                 </div>
               </div>
               {headerBadge}

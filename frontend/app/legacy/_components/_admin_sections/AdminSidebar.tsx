@@ -6,11 +6,11 @@ import {
   Building2,
   Download,
   FileArchive,
-  KeyRound,
   Layers,
   Lock,
+  MapPinned,
   Network,
-  PanelRight,
+  PackagePlus,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -33,18 +33,21 @@ export const SECTIONS: SectionMeta[] = [
   { id: "bom", label: "BOM 관리", description: "부모-자식 자재 구성 편집", icon: Network },
   { id: "export", label: "내보내기", description: "엑셀 / CSV 데이터 내보내기", icon: Download },
   { id: "audit", label: "외부 제출용 로그", description: "심사 대비 월별 입출고 CSV", icon: FileArchive },
+  { id: "warehouseStructure", label: "창고 구조 편집", description: "앵글 배치·줄·층 편집", icon: MapPinned },
+  { id: "warehousePlacement", label: "위치 배정", description: "품목을 자리에 박스로 배치", icon: PackagePlus },
 ];
 
 export const SETTINGS_ENTRY: SectionMeta = {
   id: "settings",
-  label: "설정",
-  description: "관리자 PIN, 데이터 초기화",
-  icon: KeyRound,
+  label: "보안",
+  description: "관리자 PIN을 변경하여 계정 보안을 강화하세요.",
+  icon: ShieldCheck,
 };
 
 const SECTION_GROUPS: { title: string; ids: AdminSection[] }[] = [
   { title: "기준 정보", ids: ["models", "items", "employees", "departments"] },
   { title: "구성 관리", ids: ["bom"] },
+  { title: "창고", ids: ["warehouseStructure", "warehousePlacement"] },
   { title: "시스템", ids: ["export", "audit"] },
 ];
 
@@ -52,11 +55,9 @@ interface Props {
   section: AdminSection;
   onSelect: (next: AdminSection) => void;
   onLock: () => void;
-  showRightPanel?: boolean;
-  onTogglePanel?: () => void;
 }
 
-export function AdminSidebar({ section, onSelect, onLock, showRightPanel, onTogglePanel }: Props) {
+export function AdminSidebar({ section, onSelect, onLock }: Props) {
   return (
     <section
       className="flex min-h-0 flex-col overflow-hidden rounded-[20px] border p-4"
@@ -125,26 +126,6 @@ export function AdminSidebar({ section, onSelect, onLock, showRightPanel, onTogg
           danger
         />
         <div className="flex gap-2">
-          {onTogglePanel && (
-            <button
-              type="button"
-              onClick={onTogglePanel}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border transition-colors hover:brightness-[1.04]"
-              style={{
-                background: showRightPanel
-                  ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
-                  : LEGACY_COLORS.s2,
-                borderColor: showRightPanel
-                  ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 50%, transparent)`
-                  : LEGACY_COLORS.border,
-                color: showRightPanel ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
-              }}
-              title="요약 패널"
-              aria-label="요약 패널 토글"
-            >
-              <PanelRight className="h-4 w-4" />
-            </button>
-          )}
           <button
             type="button"
             onClick={onLock}

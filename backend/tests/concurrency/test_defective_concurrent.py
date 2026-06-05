@@ -77,7 +77,7 @@ def test_concurrent_mark_defective_from_warehouse(concurrent_engine, make_sessio
         try:
             inventory_svc.mark_defective(
                 session, item_id, Decimal("1"),
-                source="warehouse", target_dept=dept
+                inventory_svc.DefectSource(kind="warehouse", target_dept=dept),
             )
             session.commit()
             successes.append("ok")
@@ -129,7 +129,7 @@ def test_concurrent_mark_defective_from_production(concurrent_engine, make_sessi
         try:
             inventory_svc.mark_defective(
                 session, item_id, Decimal("1"),
-                source="production", target_dept=dept, source_dept=dept
+                inventory_svc.DefectSource(kind="production", target_dept=dept, source_dept=dept),
             )
             session.commit()
             successes.append("ok")

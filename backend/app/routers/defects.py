@@ -14,13 +14,14 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import (
+    BOM,
     DepartmentEnum,
     Employee,
     InventoryLocation,
@@ -34,6 +35,8 @@ from app.models import (
 )
 from app.routers._errors import ErrorCode, http_error
 from app.services import inventory as inventory_svc
+from app._evt import emit as _evt_emit
+from app._actor import set_actor
 
 router = APIRouter()
 
@@ -46,12 +49,14 @@ router = APIRouter()
 class DefectLocationItem(BaseModel):
     item_id: uuid.UUID
     item_name: str
-    item_code: Optional[str]
+    mes_code: Optional[str]
     department: str
     quantity: Decimal
     defective_at: Optional[datetime]
     reason_category: Optional[str]
     reason_memo: Optional[str]
+    # BOM 자식 보유 여부. 프론트 격리 처리 액션에서 "재작업" 옵션 노출 조건.
+    has_bom: bool = False
 
 
 class DefectKpi(BaseModel):
@@ -125,28 +130,45 @@ def list_defect_locations(
 
     rows = q.order_by(InventoryLocation.defective_at.asc().nullsfirst()).all()
 
-    result: List[DefectLocationItem] = []
-    for loc, item in rows:
-        # 해당 (item, dept) 의 최근 MARK_DEFECTIVE 로그 조회
-        last_log: Optional[TransactionLog] = (
+    # BOM 자식 보유 item_id 집합 일괄 조회 — 격리 처리 "재작업" 옵션 노출 조건.
+    item_ids = {loc.item_id for loc, _ in rows}
+    bom_items = set(
+        row[0]
+        for row in (
+            db.query(BOM.parent_item_id).filter(BOM.parent_item_id.in_(item_ids)).distinct().all()
+        )
+    ) if item_ids else set()
+
+    # item_id 별 최근 MARK_DEFECTIVE 로그 일괄 조회 — N+1 제거.
+    # 기존 단건 쿼리와 동일하게 item_id 기준(부서 무관) created_at 내림차순 최신 1건.
+    last_log_by_item: dict = {}
+    if item_ids:
+        for log in (
             db.query(TransactionLog)
             .filter(
-                TransactionLog.item_id == loc.item_id,
+                TransactionLog.item_id.in_(item_ids),
                 TransactionLog.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE,
             )
             .order_by(TransactionLog.created_at.desc())
-            .first()
-        )
+            .all()
+        ):
+            # 내림차순 순회 → 가장 먼저 만난(=최신) 로그만 남김.
+            last_log_by_item.setdefault(log.item_id, log)
+
+    result: List[DefectLocationItem] = []
+    for loc, item in rows:
+        last_log: Optional[TransactionLog] = last_log_by_item.get(loc.item_id)
         result.append(
             DefectLocationItem(
                 item_id=item.item_id,
                 item_name=item.item_name,
-                item_code=item.item_code,
+                mes_code=item.mes_code,
                 department=loc.department,
                 quantity=loc.quantity,
                 defective_at=loc.defective_at,
                 reason_category=last_log.reason_category if last_log else None,
                 reason_memo=last_log.reason_memo if last_log else None,
+                has_bom=item.item_id in bom_items,
             )
         )
     return result
@@ -237,7 +259,7 @@ def get_defect_kpi(db: Session = Depends(get_db)):
 
 
 @router.post("/quarantine", response_model=DefectActionResult)
-def quarantine(payload: QuarantineRequest, db: Session = Depends(get_db)):
+def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = Depends(get_db)):
     """격리 (즉시, 결재 없음). mark_defective 래퍼 + defective_at 채움."""
     if not payload.reason_category:
         raise http_error(422, ErrorCode.VALIDATION_ERROR, "reason_category 는 필수입니다.")
@@ -245,6 +267,7 @@ def quarantine(payload: QuarantineRequest, db: Session = Depends(get_db)):
     actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
     if actor is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    set_actor(http_request, actor)
 
     item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if item is None:
@@ -264,9 +287,11 @@ def quarantine(payload: QuarantineRequest, db: Session = Depends(get_db)):
             db,
             payload.item_id,
             payload.qty,
-            source=payload.source,
-            target_dept=target_dept,
-            source_dept=source_dept,
+            inventory_svc.DefectSource(
+                kind=payload.source,
+                target_dept=target_dept,
+                source_dept=source_dept,
+            ),
         )
     except ValueError as exc:
         raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc))
@@ -294,12 +319,22 @@ def quarantine(payload: QuarantineRequest, db: Session = Depends(get_db)):
             quantity_before=qty_before,
             quantity_after=inv.quantity,
             produced_by=actor.name,
-            notes=f"[격리] {payload.source} → {payload.target_dept}",
+            notes=f"격리: {payload.source} → {payload.target_dept}",
             reason_category=payload.reason_category,
             reason_memo=payload.reason_memo or None,
+            department=str(target_dept),
         )
     )
     db.commit()
+    _evt_emit(
+        "defect_mark",
+        request=http_request,
+        item=item.mes_code,
+        qty=str(payload.qty),
+        source=payload.source,
+        target_dept=payload.target_dept,
+        reason=payload.reason_category,
+    )
     return DefectActionResult(
         item_id=payload.item_id,
         quantity=payload.qty,
@@ -313,7 +348,7 @@ def quarantine(payload: QuarantineRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/unquarantine", response_model=DefectActionResult)
-def unquarantine(payload: UnquarantineRequest, db: Session = Depends(get_db)):
+def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Session = Depends(get_db)):
     """정상 복귀 (즉시, 결재 없음). unmark_defective 래퍼."""
     if not payload.reason_category:
         raise http_error(422, ErrorCode.VALIDATION_ERROR, "reason_category 는 필수입니다.")
@@ -321,6 +356,7 @@ def unquarantine(payload: UnquarantineRequest, db: Session = Depends(get_db)):
     actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
     if actor is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    set_actor(http_request, actor)
 
     item = db.query(Item).filter(Item.item_id == payload.item_id).first()
     if item is None:
@@ -340,9 +376,11 @@ def unquarantine(payload: UnquarantineRequest, db: Session = Depends(get_db)):
             payload.item_id,
             payload.qty,
             dept,
-            reason_category=payload.reason_category,
-            reason_memo=payload.reason_memo or "",
-            actor=actor.name,
+            inventory_svc.ReasonContext(
+                category=payload.reason_category,
+                memo=payload.reason_memo or "",
+                actor=actor.name,
+            ),
         )
     except ValueError as exc:
         raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc))
@@ -357,12 +395,21 @@ def unquarantine(payload: UnquarantineRequest, db: Session = Depends(get_db)):
             quantity_before=qty_before,
             quantity_after=inv.quantity,
             produced_by=actor.name,
-            notes=f"[정상복귀] {payload.dept}",
+            notes=f"정상 복귀: {payload.dept}",
             reason_category=payload.reason_category,
             reason_memo=payload.reason_memo or None,
+            department=str(dept),
         )
     )
     db.commit()
+    _evt_emit(
+        "defect_unmark",
+        request=http_request,
+        item=item.mes_code,
+        qty=str(payload.qty),
+        dept=payload.dept,
+        reason=payload.reason_category,
+    )
     return DefectActionResult(
         item_id=payload.item_id,
         quantity=payload.qty,

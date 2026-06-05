@@ -8,6 +8,7 @@ import {
   ChevronUp,
   ClipboardCheck,
   Layers,
+  Save,
 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -24,9 +25,11 @@ interface Props {
   hasShortage: boolean;
   hasInvalidQuantity: boolean;
   submitting: boolean;
+  saving: boolean;
   approvalKind: ApprovalKind;
   onNotesChange: (value: string) => void;
   onSubmit: () => void;
+  onSaveDraft: () => void;
 }
 
 const APPROVAL_META: Record<
@@ -84,13 +87,13 @@ function confirmCopy(
     return { title: `불량 격리를 ${verb}`, tone: "danger", confirmLabel };
   }
   if (subType === "defect_restore") {
-    return { title: `격리 해제(정상 복귀)를 ${verb}`, tone: "danger", confirmLabel };
+    return { title: `불량 해제(정상 복귀)를 ${verb}`, tone: "danger", confirmLabel };
   }
   if (subType === "defect_process") {
-    return { title: `격리 처리를 ${verb}`, tone: "danger", confirmLabel };
+    return { title: `불량 처리를 ${verb}`, tone: "danger", confirmLabel };
   }
   if (subType === "supplier_return") {
-    return { title: `공급처 반품을 ${verb}`, tone: "danger", confirmLabel };
+    return { title: `원자재 반품을 ${verb}`, tone: "danger", confirmLabel };
   }
   if (subType === "warehouse_to_dept") {
     return { title: `창고 반출을 ${verb}`, tone: "danger", confirmLabel };
@@ -139,9 +142,11 @@ export function IoConfirmStep({
   hasShortage,
   hasInvalidQuantity,
   submitting,
+  saving,
   approvalKind,
   onNotesChange,
   onSubmit,
+  onSaveDraft,
 }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const meta = APPROVAL_META[approvalKind];
@@ -173,9 +178,9 @@ export function IoConfirmStep({
   );
 
   const submitDisabled =
-    submitting || includedLines.length === 0 || hasShortage || hasInvalidQuantity;
+    submitting || saving || includedLines.length === 0 || hasShortage || hasInvalidQuantity;
+  const saveDisabled = submitting || saving || bundles.length === 0;
   const accent = directionAccent(subType);
-  const isCaution = subType === "defect_quarantine" || subType === "supplier_return";
   const blockerText = hasShortage
     ? "재고 부족 라인이 있어 제출할 수 없습니다. Step 4에서 라인을 다시 확인하세요."
     : hasInvalidQuantity
@@ -236,23 +241,6 @@ export function IoConfirmStep({
       <div className="mt-auto flex flex-col gap-5">
         <Field label="메모 (선택)" value={notes} onChange={onNotesChange} placeholder="작업 메모" />
 
-      {/* caution */}
-      {isCaution && (
-        <div
-          className="flex items-start gap-3 rounded-[16px] border px-4 py-3 text-sm"
-          style={{
-            background: tint(LEGACY_COLORS.red, 8),
-            borderColor: tint(LEGACY_COLORS.red, 40),
-            color: LEGACY_COLORS.red,
-          }}
-        >
-          <AlertTriangle className="h-5 w-5 shrink-0" />
-          <span className="font-bold">
-            되돌릴 수 없습니다. 최종 확인 팝업에서 한 번 더 점검하세요.
-          </span>
-        </div>
-      )}
-
       {/* blocker */}
       {blockerText && (
         <div
@@ -267,18 +255,33 @@ export function IoConfirmStep({
         </div>
       )}
 
-      {/* 큰 한 줄 실행 버튼 (옛 ExecuteStep 패턴) */}
-      <button
-        type="button"
-        onClick={() => setConfirmOpen(true)}
-        disabled={submitDisabled}
-        className="flex w-full items-center justify-center gap-3 rounded-[22px] px-7 py-7 text-xl font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
-        style={{ background: accent }}
-      >
-        {isCaution && !submitting && <AlertTriangle className="h-6 w-6" />}
-        {!isCaution && <ClipboardCheck className="h-6 w-6" />}
-        {submitting ? "처리 중..." : meta.submitText(includedLines.length)}
-      </button>
+      {/* 액션 버튼 행 — [저장하기] + [제출확인] */}
+      <div className="flex items-stretch gap-3">
+        <button
+          type="button"
+          onClick={onSaveDraft}
+          disabled={saveDisabled}
+          className="flex shrink-0 items-center justify-center gap-2 rounded-[22px] border-2 px-6 py-7 text-base font-black transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
+          style={{
+            borderColor: LEGACY_COLORS.border,
+            background: LEGACY_COLORS.s2,
+            color: LEGACY_COLORS.text,
+          }}
+        >
+          <Save className="h-5 w-5" />
+          {saving ? "저장 중..." : "저장하기"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirmOpen(true)}
+          disabled={submitDisabled}
+          className="flex flex-1 items-center justify-center gap-3 rounded-[22px] px-7 py-7 text-xl font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
+          style={{ background: accent }}
+        >
+          <ClipboardCheck className="h-6 w-6" />
+          {submitting ? "처리 중..." : meta.submitText(includedLines.length)}
+        </button>
+      </div>
       </div>
 
       <ConfirmModal
@@ -330,7 +333,7 @@ function ConfirmBundleCard({
             className="flex flex-wrap items-center gap-2 text-xs font-semibold"
             style={{ color: LEGACY_COLORS.muted2 }}
           >
-            <span>{onlyLine.item_code ?? "-"}</span>
+            <span>{onlyLine.mes_code ?? "-"}</span>
             {onlyLine.direction === "move" && (onlyLine.from_department || onlyLine.to_department) && (
               <span>
                 · {onlyLine.from_department ?? "창고"} → {onlyLine.to_department ?? "창고"}
@@ -421,7 +424,7 @@ function ConfirmBundleCard({
           className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold"
           style={{ color: LEGACY_COLORS.muted2 }}
         >
-          <span>{headerLine.item_code ?? "-"}</span>
+          <span>{headerLine.mes_code ?? "-"}</span>
           {(headerLine.from_department || headerLine.to_department) && (
             <span>
               · {headerLine.from_department ?? "-"}
@@ -479,7 +482,7 @@ function ConfirmLineRow({ line, isChild }: { line: IoLine; isChild: boolean }) {
           className="flex flex-wrap items-center gap-2 text-xs font-semibold"
           style={{ color: LEGACY_COLORS.muted2 }}
         >
-          <span>{line.item_code ?? "-"}</span>
+          <span>{line.mes_code ?? "-"}</span>
           {(line.from_department || line.to_department) && (
             <span>
               · {line.from_department ?? "-"}

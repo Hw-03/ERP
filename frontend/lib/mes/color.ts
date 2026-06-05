@@ -38,6 +38,12 @@ export const LEGACY_COLORS = {
   muted: "var(--c-muted)",
   muted2: "var(--c-muted2)",
   panelGlow: "var(--c-panel-glow)",
+  // 메시지 배경 토큰 — 라이트/다크 모두에서 텍스트(green/red/yellow) 대비 4.5:1 이상 보장.
+  // 기존 color-mix(in srgb, X 14%, transparent) 패턴은 부모 배경에 따라 합성 대비가 달라지는
+  // 문제가 있어, 불투명 옅은 색으로 고정한다.
+  successBg: "var(--c-success-bg)",
+  errorBg: "var(--c-error-bg)",
+  warningBg: "var(--c-warning-bg)",
   // Round-16 #3: 흰색 (accent foreground 용 — 테마 무관 상수)
   white: "#ffffff",
 } as const;

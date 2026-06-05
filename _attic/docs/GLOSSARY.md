@@ -1,6 +1,10 @@
 # 용어 사전 (GLOSSARY)
 
-이 문서는 MES 프로토타입에서 코드·UI·문서가 같은 의미로 쓰는 도메인 용어를 한 곳에 정리한다. 새로운 작업자/문서/기능은 여기 있는 단어를 그대로 사용한다.
+이 문서는 DEXCOWIN MES 에서 코드·UI·문서가 같은 의미로 쓰는 도메인 용어를 한 곳에 정리한다.
+새로운 작업자/문서/기능은 여기 있는 단어를 그대로 사용한다.
+
+> 프론트엔드 화면 라벨의 단일 소스는 `frontend/lib/io/glossary.ts` (P0-1 에서 도입).
+> 본 문서는 사람용 사전, 위 모듈은 코드용 사전 — 두 곳이 일치해야 한다.
 
 ## 부서 / 분류
 
@@ -55,17 +59,40 @@
 
 ## 트랜잭션
 
-| 코드 | 의미 |
+| 코드 | 화면 라벨 | 의미 |
+|---|---|---|
+| `RECEIVE` | 원자재 입고 | 입고 (창고로) |
+| `SHIP` | 출고 (PF + 창고 out 이면 "출하" — 아래 [출하 규칙](#출하-규칙) 참고) | 출고 |
+| `PRODUCE` | 생산 | 생산 입고 (대상 품목) |
+| `DISASSEMBLE` | 분해 *(이전 "재작업" — P0-1 통일)* | 부서 내 분해/회수 |
+| `BACKFLUSH` | 자동 차감 | 생산에 따른 자동 차감 (자재 품목) |
+| `ADJUST` | 수량 조정 | 재고 조정 (창고만) |
+| `TRANSFER_TO_PROD` | 창고 → 부서 | 창고 → 부서 이동 |
+| `TRANSFER_TO_WH` | 부서 → 창고 | 부서 → 창고 이동 |
+| `TRANSFER_DEPT` | 부서 → 부서 | 부서 ↔ 부서 이동 |
+| `MARK_DEFECTIVE` | 새 불량 *(이전 "새 격리")* | 불량 격리 |
+| `UNMARK_DEFECTIVE` | 불량 해제 *(이전 "격리 해제")* | 정상 복귀 |
+| `DEFECT_SCRAP` | 불량 처리 *(이전 "폐기")* | 격리 재고 폐기 |
+| `SUPPLIER_RETURN` | 원자재 반품 | 공급사 반품 |
+
+## 출하 규칙
+
+**출하(ship)는 별도 work type 이 아니다** (사용자 확인 2026-05-27).
+
+입출고 V2 compose 에는 다음 4 work type 만 존재한다: `receive` / `warehouse_io` / `process` / `defect`.
+
+| 조건 | 화면 표시 |
 |---|---|
-| `RECEIVE` | 입고 (창고로) |
-| `SHIP` | 출고 (출하부에서) |
-| `PRODUCE` | 생산 입고 (대상 품목) |
-| `BACKFLUSH` | 생산에 따른 자동 차감 (자재 품목) |
-| `ADJUST` | 재고 조정 (창고만) |
-| `TRANSFER_TO_PROD` / `TRANSFER_TO_WH` | 창고 ↔ 부서 이동 |
-| `TRANSFER_DEPT` | 부서 ↔ 부서 이동 |
-| `MARK_DEFECTIVE` | 불량 격리 |
-| `SUPPLIER_RETURN` | 공급업체 반품 |
+| `transaction_type=SHIP` + 품목 `process_type_code ∈ {PR, PA, PF}` + 창고 → 외부 방향 | **"출하"** |
+| 그 외 SHIP | "출고" |
+
+→ V2 compose 에 `ship` work type 을 추가하지 말 것 (`SHIP_RULE.workTypeShouldNotExist = true` in `frontend/lib/io/glossary.ts`).
+
+사용자가 "출하" 작업을 하려면: 입출고 탭 → `warehouse_io` 의 출고 작업 → PF 품목 선택 → 출고. 자동으로 출하로 기록됨.
+
+## 단일 사전 (코드)
+
+화면 라벨은 [`frontend/lib/io/glossary.ts`](../frontend/lib/io/glossary.ts) 가 코드용 단일 소스. 새 라벨 추가/변경 시 위 표와 해당 모듈을 함께 갱신한다. drift 방지 단위 테스트: `frontend/lib/io/__tests__/glossary.test.ts`.
 
 ## 에러 코드 (Phase 4 표준화)
 

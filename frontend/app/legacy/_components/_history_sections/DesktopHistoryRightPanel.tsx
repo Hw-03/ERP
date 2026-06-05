@@ -44,21 +44,28 @@ export function DesktopHistoryRightPanel({
   onLogCorrected,
   onClose,
 }: DesktopHistoryRightPanelProps) {
+  const backButtonNode = canGoBack ? (
+    <button
+      type="button"
+      onClick={onBack}
+      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold transition-colors hover:brightness-110"
+      style={{
+        background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 15%, transparent)`,
+        color: LEGACY_COLORS.blue,
+      }}
+    >
+      <ChevronLeft className="h-3.5 w-3.5" /> 뒤로
+    </button>
+  ) : undefined;
+
   return (
-    <SlidePanel open={!!selection} onClose={onClose}>
-      {canGoBack && (
-        <button
-          type="button"
-          onClick={onBack}
-          className="mb-2 inline-flex items-center gap-1 rounded-[12px] border px-3 py-1.5 text-xs font-bold"
-          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}
-        >
-          <ChevronLeft className="h-3.5 w-3.5" />
-          뒤로
-        </button>
-      )}
+    <SlidePanel open={!!selection} onClose={onClose} hideCloseButton>
       {displaySelection?.kind === "log" && (
-        <DesktopRightPanel title={displaySelection.log.item_name}>
+        <DesktopRightPanel
+          title={displaySelection.log.item_name}
+          backButton={backButtonNode}
+          onClose={onClose}
+        >
           <HistoryDetailPanel
             selected={displaySelection.log}
             itemRecentLogs={itemRecentLogs}
@@ -72,13 +79,22 @@ export function DesktopHistoryRightPanel({
       {displaySelection?.kind === "batch" && (() => {
         const batch = batchCache.get(displaySelection.batchId) ?? null;
         const first = displaySelection.logs[0];
-        const titleText = batch && batch.bundles.length > 0
+        // 재작업(DISASSEMBLE 포함) batch 는 헤더 행과 동일하게 부모 품목명으로 표기.
+        // bundles[0].title 은 created_at 정렬에 따라 자식 부품명이 올 수 있어 헷갈림.
+        const disassembleLog = displaySelection.logs.find((l) => l.transaction_type === "DISASSEMBLE");
+        const titleText = disassembleLog
+          ? `${disassembleLog.item_name} 재작업`
+          : batch && batch.bundles.length > 0
           ? (batch.bundles.length > 1
               ? `${batch.bundles[0].title} 외 ${batch.bundles.length - 1}건`
               : batch.bundles[0].title)
           : `${first.item_name} 외 ${displaySelection.logs.length - 1}건`;
         return (
-          <DesktopRightPanel title={titleText}>
+          <DesktopRightPanel
+            title={titleText}
+            backButton={backButtonNode}
+            onClose={onClose}
+          >
             <HistoryBatchDetailPanel
               batchId={displaySelection.batchId}
               logs={displaySelection.logs}

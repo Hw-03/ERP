@@ -10,12 +10,13 @@ from __future__ import annotations
 import re
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from openpyxl import Workbook
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.routers._errors import ErrorCode, http_error
 from app.services import audit_csv as svc
 from app.services.export_helpers import csv_streaming_response
 from app.utils.excel import apply_header, auto_width, make_xlsx_response
@@ -29,7 +30,7 @@ _MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 def _validate_month(month: str) -> str:
     if not _MONTH_RE.match(month):
-        raise HTTPException(status_code=400, detail="month 는 YYYY-MM 형식이어야 합니다.")
+        raise http_error(400, ErrorCode.BAD_REQUEST, "month 는 YYYY-MM 형식이어야 합니다.")
     return month
 
 
@@ -55,7 +56,7 @@ def download_csv(month: str):
     _validate_month(month)
     path = svc.get_csv_dir() / f"inout_{month}.csv"
     if not path.exists():
-        raise HTTPException(status_code=404, detail="해당 월 CSV 파일이 존재하지 않습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "해당 월 CSV 파일이 존재하지 않습니다.")
     from io import StringIO
     buf = StringIO()
     with path.open("r", encoding="utf-8-sig") as f:
@@ -68,7 +69,7 @@ def download_xlsx(month: str):
     _validate_month(month)
     path = svc.get_csv_dir() / f"inout_{month}.csv"
     if not path.exists():
-        raise HTTPException(status_code=404, detail="해당 월 CSV 파일이 존재하지 않습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "해당 월 CSV 파일이 존재하지 않습니다.")
 
     wb = Workbook()
     ws = wb.active

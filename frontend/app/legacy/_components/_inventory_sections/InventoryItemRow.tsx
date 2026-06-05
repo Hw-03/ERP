@@ -1,13 +1,14 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 import Image from "next/image";
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { itemCodeDept } from "@/lib/mes/process";
+import { mesCodeDept } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";
+import { ImageLightbox } from "@/lib/ui/ImageLightbox";
 import { useDeptColorLookup } from "../DepartmentsContext";
 
 function safeQty(item: Item) {
@@ -28,6 +29,7 @@ type Props = {
 
 function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props) {
   const getDeptColor = useDeptColorLookup();
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const minStock = getMinStock(item);
   const stock = getStockState(safeQty(item), minStock === 0 ? null : minStock);
   const qty = safeQty(item);
@@ -70,7 +72,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
   }
 
   // 부서 배지 (PRODUCTION 행만, DEFECTIVE는 별도 빨간 배지로 표시)
-  const badges: { key: string; label: string; color: string; dim?: boolean }[] = [];
+  const badges: { key: string; label: string; color: string }[] = [];
   if (Number(item.warehouse_qty) > 0) badges.push({ key: "창고", label: "창고", color: "#3dd4a0" });
   for (const l of (item.locations ?? []).filter((l) => Number(l.quantity) > 0 && l.status !== "DEFECTIVE"))
     badges.push({ key: l.department, label: l.department, color: getDeptColor(l.department) });
@@ -81,8 +83,8 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
   for (const dept of defectDepts)
     badges.push({ key: `${dept}-defect`, label: "[불량]", color: DEFECT_RED });
   if (badges.length === 0) {
-    const dept = item.department ?? itemCodeDept(item.item_code);
-    if (dept) badges.push({ key: dept, label: dept, color: getDeptColor(dept), dim: true });
+    const dept = item.department ?? mesCodeDept(item.mes_code);
+    if (dept) badges.push({ key: dept, label: dept, color: getDeptColor(dept) });
   }
   const visibleBadges = badges.slice(0, 2);
   const extraBadges = badges.length - 2;
@@ -127,15 +129,31 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
         style={{ borderColor: LEGACY_COLORS.border, width: 60 }}
       >
         {imageFilename ? (
-          <Image
-            src={`/images/items/${imageFilename}`}
-            alt={item.item_name}
-            width={48}
-            height={48}
-            unoptimized
-            className="inline-block rounded border object-contain"
-            style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
-          />
+          <>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setLightboxOpen(true); }}
+              onKeyDown={(e) => e.stopPropagation()}
+              aria-label={`${item.item_name} 이미지 확대`}
+              className="inline-block cursor-zoom-in rounded border transition-transform hover:scale-105"
+              style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
+            >
+              <Image
+                src={`/images/items/${imageFilename}`}
+                alt={item.item_name}
+                width={48}
+                height={48}
+                unoptimized
+                className="block rounded object-contain"
+              />
+            </button>
+            <ImageLightbox
+              open={lightboxOpen}
+              src={`/images/items/${imageFilename}`}
+              alt={item.item_name}
+              onClose={() => setLightboxOpen(false)}
+            />
+          </>
         ) : null}
       </td>
       <td className="border-b px-4 py-5 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
@@ -168,7 +186,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
         className="hidden sm:table-cell border-b px-4 py-5 align-middle whitespace-nowrap text-sm"
         style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
       >
-        {item.item_code ?? "-"}
+        {item.mes_code ?? "-"}
       </td>
       <td
         className="hidden sm:table-cell border-b px-4 py-5 align-middle whitespace-nowrap"
@@ -178,8 +196,12 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
           {visibleBadges.map((b) => (
             <span
               key={b.key}
-              className={`text-sm font-bold${b.dim ? " opacity-50" : ""}`}
-              style={{ color: b.color }}
+              className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-bold"
+              style={{
+                color: b.color,
+                background: `color-mix(in srgb, ${b.color} 14%, transparent)`,
+                borderColor: `color-mix(in srgb, ${b.color} 35%, transparent)`,
+              }}
             >
               {b.label}
             </span>

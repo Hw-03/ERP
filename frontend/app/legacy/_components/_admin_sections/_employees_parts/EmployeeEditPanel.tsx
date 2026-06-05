@@ -68,7 +68,7 @@ export function EmployeeEditPanel({
             style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
           />
         </FieldRow>
-        <FieldRow label="역할">
+        <FieldRow label="직급">
           <input
             type="text"
             value={form.role}

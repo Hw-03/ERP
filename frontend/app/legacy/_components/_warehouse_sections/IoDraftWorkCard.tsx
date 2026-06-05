@@ -29,7 +29,8 @@ const TAG_TONE: Record<string, string> = {
 
 // 백엔드(services/io.py)가 datetime.utcnow() 로 timezone-naive UTC 를 저장하므로
 // 응답 ISO 문자열에 "Z" 가 없으면 UTC 로 간주하고 보정.
-// TODO(backend UTC 정리 후 제거): datetime.now(timezone.utc) 전환 완료 시 이 함수 불필요.
+// 제거 시점: P1-5 (Decimal/UTC 직렬화 정상화) 에서 백엔드가 datetime.now(timezone.utc) +
+// SQLAlchemy DateTime(timezone=True) 로 전환되면 본 함수 불필요.
 function parseServerTime(iso: string): number {
   const hasTz = /Z$|[+-]\d{2}:?\d{2}$/.test(iso);
   return new Date(hasTz ? iso : iso + "Z").getTime();
@@ -126,20 +127,14 @@ export function IoDraftWorkCard({
   const accent = LEGACY_COLORS.blue;
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={() => setExpanded((v) => !v)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          setExpanded((v) => !v);
-        }
-      }}
-      className="cursor-pointer rounded-2xl border p-4 transition-colors hover:bg-black/[0.02]"
+    // P3-1: 카드 컨테이너의 role="button" 제거 — 내부에 별도 액션 버튼(이어서 작업/삭제) 이
+    // 있어 nested interactive 패턴이었다. 펼치기는 헤더의 명시적 토글 버튼으로 분리.
+    <article
+      className="rounded-2xl border p-4"
       style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+      aria-label={`작업 카드: ${meta.workMeta?.label ?? draft.work_type}, ${meta.subLabel ?? draft.sub_type}`}
     >
-      {/* 헤더: work_type 칩 + 펼치기 */}
+      {/* 헤더: work_type 칩 + 펼치기 토글 */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           {meta.workMeta && (
@@ -158,17 +153,20 @@ export function IoDraftWorkCard({
             {meta.subLabel}
           </span>
         </div>
-        <span
-          className="shrink-0 rounded-[8px] p-1"
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-label={expanded ? "자재 목록 접기" : "자재 목록 펼치기"}
+          className="shrink-0 rounded-[8px] p-1 transition-colors hover:bg-black/[0.05]"
           style={{ color: LEGACY_COLORS.muted2 }}
-          aria-hidden
         >
           {expanded ? (
             <ChevronUp className="h-4 w-4" />
           ) : (
             <ChevronDown className="h-4 w-4" />
           )}
-        </span>
+        </button>
       </div>
 
       {/* 묶음 제목 — 모든 묶음을 한 줄씩 나열 */}
@@ -239,7 +237,6 @@ export function IoDraftWorkCard({
         <div
           className="mt-3 border-t pt-3"
           style={{ borderColor: LEGACY_COLORS.border }}
-          onClick={(e) => e.stopPropagation()}
         >
           {draft.bundles.map((bundle, idx) => (
             <div key={bundle.bundle_id} className={idx > 0 ? "mt-3" : undefined}>
@@ -269,10 +266,7 @@ export function IoDraftWorkCard({
       )}
 
       {/* 액션 */}
-      <div
-        className="mt-3 flex flex-wrap justify-end gap-2"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="mt-3 flex flex-wrap justify-end gap-2">
         <button
           type="button"
           aria-label="이어서 작업"
@@ -301,7 +295,7 @@ export function IoDraftWorkCard({
           삭제
         </button>
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -331,7 +325,7 @@ function DraftLineRow({ line, subType }: { line: IoLine; subType: IoSubType }) {
         className="shrink-0 font-mono text-[11px] font-bold"
         style={{ color: LEGACY_COLORS.muted2 }}
       >
-        {line.item_code ?? "—"}
+        {line.mes_code ?? "—"}
       </span>
       <span
         className="min-w-0 flex-1 truncate font-bold"

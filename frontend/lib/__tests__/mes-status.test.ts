@@ -64,12 +64,12 @@ describe("inferTone", () => {
 });
 
 describe("TRANSACTION_META", () => {
-  it("api.ts TransactionType 11키 모두 정의", () => {
+  it("api.ts TransactionType 13키 모두 정의", () => {
     const required = [
       "RECEIVE", "PRODUCE", "SHIP", "ADJUST", "BACKFLUSH",
       "DISASSEMBLE",
       "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "TRANSFER_DEPT",
-      "MARK_DEFECTIVE", "SUPPLIER_RETURN",
+      "MARK_DEFECTIVE", "UNMARK_DEFECTIVE", "DEFECT_SCRAP", "SUPPLIER_RETURN",
     ];
     for (const key of required) {
       const meta = TRANSACTION_META[key as keyof typeof TRANSACTION_META];
@@ -91,7 +91,7 @@ describe("getTransactionLabel / getTransactionTone", () => {
   it("정의된 타입 — 매핑 반환", () => {
     expect(getTransactionLabel("RECEIVE")).toBe("원자재 입고");
     expect(getTransactionTone("RECEIVE")).toBe("success");
-    expect(getTransactionLabel("MARK_DEFECTIVE")).toBe("불량");
+    expect(getTransactionLabel("MARK_DEFECTIVE")).toBe("새 불량");
     expect(getTransactionTone("MARK_DEFECTIVE")).toBe("danger");
   });
 
@@ -117,16 +117,20 @@ describe("transactionColor", () => {
     expect(transactionColor("DISASSEMBLE")).toBe(LEGACY_COLORS.red);
   });
 
+  it("불량 처리 — 격리/폐기/반품/재작업 red, 격리해제 green", () => {
+    expect(transactionColor("MARK_DEFECTIVE")).toBe(LEGACY_COLORS.red);
+    expect(transactionColor("UNMARK_DEFECTIVE")).toBe(LEGACY_COLORS.green);  // 격리 해제는 초록
+    expect(transactionColor("DEFECT_SCRAP")).toBe(LEGACY_COLORS.red);
+    expect(transactionColor("SUPPLIER_RETURN")).toBe(LEGACY_COLORS.red);
+    expect(transactionColor("DISASSEMBLE")).toBe(LEGACY_COLORS.red);
+  });
+
   it("주의 거래 → yellow", () => {
     expect(transactionColor("ADJUST")).toBe(LEGACY_COLORS.yellow);
   });
 
   it("BACKFLUSH 은 고유 색 #fb923c", () => {
     expect(transactionColor("BACKFLUSH")).toBe("#fb923c");
-  });
-
-  it("muted 거래 → muted/muted2", () => {
-    expect(transactionColor("SUPPLIER_RETURN")).toBe(LEGACY_COLORS.muted);
   });
 
   it("unknown → muted2", () => {

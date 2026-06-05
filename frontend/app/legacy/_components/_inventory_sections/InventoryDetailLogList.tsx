@@ -5,6 +5,16 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { getTransactionLabel, transactionColor } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
 
+function displayNote(notes: string | null | undefined): string {
+  if (!notes) return "";
+  const m = notes.match(/^요청 승인 처리: SR-\S+ \/ ([\s\S]+)$/);
+  const text = m ? m[1] : notes;
+  return text.replace(/\b(\d+)\.(\d+)개\b/g, (_, int, dec) => {
+    const trimmed = dec.replace(/0+$/, "");
+    return trimmed ? `${int}.${trimmed}개` : `${int}개`;
+  });
+}
+
 /**
  * Round-13 (#8) 추출 — InventoryDetailPanel 의 "최근 이력" 섹션.
  */
@@ -35,9 +45,11 @@ export function InventoryDetailLogList({ logs }: { logs: TransactionLog[] }) {
                 </span>
                 <span className="text-sm">{formatQty(log.quantity_change)}</span>
               </div>
-              <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                {log.notes || "메모 없음"}
-              </div>
+              {displayNote(log.notes) && (
+                <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                  {displayNote(log.notes)}
+                </div>
+              )}
             </div>
           ))
         )}

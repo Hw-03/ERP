@@ -2,9 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Save, Trash2, Users, X } from "lucide-react";
-import { api, type DepartmentMaster, type DepartmentRole, type Employee, type EmployeeLevel, type ProductModel, type WarehouseRole } from "@/lib/api";
+import { type DepartmentMaster, type DepartmentRole, type Employee, type EmployeeLevel, type ProductModel, type WarehouseRole } from "@/lib/api";
+import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { PIN_LENGTH } from "@/lib/auth/constants";
 import { normalizeDepartment, getDepartmentFallbackColor } from "@/lib/mes/department";
+import { Button } from "@/lib/ui/Button";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { EmptyState } from "../common";
 import { AppSelect } from "../common/AppSelect";
@@ -17,6 +20,7 @@ import {
 } from "./_admin_primitives";
 import { useAdminEmployeesContext } from "./AdminEmployeesContext";
 import { AssignedModelsEditor } from "./AssignedModelsEditor";
+import { useRegisterDirty, useLocalDirtyGuard } from "@/lib/ui/dirty-guard";
 
 const ASSEMBLY_DEPT = "조립";
 
@@ -68,17 +72,21 @@ export function AdminEmployeesSection() {
     requestDelete,
     confirmDelete,
     cancelDelete,
+    dirty,
   } = ctx;
+
+  // 활성 섹션 dirty/save 를 상위 registry 에 등록 (탭/사이드바 가드).
+  useRegisterDirty("employees", dirty, saveEmployee);
+  // 항목 변경(트리거 a) 가드 — 같은 페이지에서 다른 직원 선택.
+  const { confirmNavigation } = useLocalDirtyGuard(dirty, saveEmployee);
 
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState<string>("ALL");
-  const [productModels, setProductModels] = useState<ProductModel[]>([]);
-
-  useEffect(() => {
-    void api.getModels().then((models) =>
-      setProductModels(models.filter((m) => !m.is_reserved && (m.model_name || m.symbol))),
-    );
-  }, []);
+  const { data: allModels } = useModelsQuery();
+  const productModels = useMemo<ProductModel[]>(
+    () => (allModels ?? []).filter((m) => !m.is_reserved && (m.model_name || m.symbol)),
+    [allModels],
+  );
 
   const deptOptions = useMemo(() => {
     const seen = new Set<string>();
@@ -124,8 +132,17 @@ export function AdminEmployeesSection() {
   }, [empAddMode, selectedEmployee, filteredEmployees, setSelectedEmployee]);
 
   function handleStartAdd() {
-    setEmpAddMode(true);
-    setSelectedEmployee(null);
+    confirmNavigation(() => {
+      setEmpAddMode(true);
+      setSelectedEmployee(null);
+    });
+  }
+
+  function handleSelectEmployee(employee: Employee) {
+    confirmNavigation(() => {
+      setSelectedEmployee(employee);
+      setEmpAddMode(false);
+    });
   }
 
   return (
@@ -136,15 +153,9 @@ export function AdminEmployeesSection() {
           title="직원 관리"
           description="직원 정보·권한·PIN을 등록하고 관리합니다."
           actions={
-            <button
-              type="button"
-              onClick={handleStartAdd}
-              className="flex items-center gap-1.5 rounded-[12px] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-110"
-              style={{ background: LEGACY_COLORS.blue }}
-            >
-              <Plus className="h-4 w-4" />
+            <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
               직원 추가
-            </button>
+            </Button>
           }
         />
 
@@ -163,7 +174,7 @@ export function AdminEmployeesSection() {
             countLabel={`${filteredEmployees.length}명`}
             width={320}
             searchValue={search}
-            searchPlaceholder="이름·부서·역할 검색"
+            searchPlaceholder="이름·부서·직급 검색"
             onSearchChange={setSearch}
             filters={
               <AppSelect
@@ -190,10 +201,8 @@ export function AdminEmployeesSection() {
                 <button
                   key={employee.employee_id}
                   type="button"
-                  onClick={() => {
-                    setSelectedEmployee(employee);
-                    setEmpAddMode(false);
-                  }}
+                  onClick={() => handleSelectEmployee(employee)}
+                  aria-pressed={active}
                   className="flex w-full items-center gap-2.5 rounded-[10px] border px-3 py-2 text-left transition-colors hover:brightness-[1.04]"
                   style={{
                     background: active
@@ -257,29 +266,13 @@ export function AdminEmployeesSection() {
             }
             actions={
               empAddMode ? (
-                <button
-                  type="button"
-                  onClick={() => setEmpAddMode(false)}
-                  className="flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
-                  style={{
-                    background: LEGACY_COLORS.s2,
-                    borderColor: LEGACY_COLORS.border,
-                    color: LEGACY_COLORS.muted2,
-                  }}
-                >
-                  <X className="h-3.5 w-3.5" />
+                <Button variant="secondary" size="sm" iconLeft={<X className="h-3.5 w-3.5" />} onClick={() => setEmpAddMode(false)}>
                   취소
-                </button>
+                </Button>
               ) : selectedEmployee ? (
-                <button
-                  type="button"
-                  onClick={saveEmployee}
-                  className="flex items-center gap-1 rounded-[10px] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:brightness-110"
-                  style={{ background: LEGACY_COLORS.blue }}
-                >
-                  <Save className="h-3.5 w-3.5" />
+                <Button variant="primary" size="sm" iconLeft={<Save className="h-3.5 w-3.5" />} onClick={saveEmployee}>
                   저장
-                </button>
+                </Button>
               ) : null
             }
           >
@@ -338,6 +331,7 @@ export function AdminEmployeesSection() {
         tone="caution"
         cautionMessage="기존 PIN은 더 이상 사용할 수 없게 됩니다. 관리자 PIN을 입력하세요."
         confirmLabel="초기화"
+        confirmDisabled={pinResetAdminPin.length !== PIN_LENGTH}
         onClose={cancelPinReset}
         onConfirm={confirmPinReset}
       >
@@ -351,9 +345,10 @@ export function AdminEmployeesSection() {
           <input
             type="password"
             inputMode="numeric"
-            maxLength={32}
+            pattern="\d{4}"
+            maxLength={PIN_LENGTH}
             value={pinResetAdminPin}
-            onChange={(e) => setPinResetAdminPin(e.target.value)}
+            onChange={(e) => setPinResetAdminPin(e.target.value.replace(/\D/g, "").slice(0, PIN_LENGTH))}
             placeholder="0000"
             className="w-full rounded-[12px] border px-3 py-2 text-sm tracking-widest outline-none"
             style={{
@@ -399,7 +394,7 @@ function EmployeeAddInline({ form, setForm, departments, productModels, onSubmit
             placeholder="예: 홍길동"
           />
         </FieldRow>
-        <FieldRow label="역할" htmlFor="emp-add-role">
+        <FieldRow label="직급" htmlFor="emp-add-role">
           <TextInput
             id="emp-add-role"
             value={form.role}
@@ -511,7 +506,7 @@ function EmployeeDetailGrid({
               onChange={(v) => setForm((f) => ({ ...f, name: v }))}
             />
           </FieldRow>
-          <FieldRow label="역할" htmlFor="emp-edit-role">
+          <FieldRow label="직급" htmlFor="emp-edit-role">
             <TextInput
               id="emp-edit-role"
               value={form.role}
@@ -583,6 +578,35 @@ function EmployeeDetailGrid({
               style={{ color: deptMeta.tone }}
             >
               {deptMeta.hint}
+            </div>
+          </FieldRow>
+          <FieldRow label="입출고 권한">
+            <label className="inline-flex cursor-pointer items-center gap-3 py-1">
+              <input
+                type="checkbox"
+                checked={form.io_enabled}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, io_enabled: e.target.checked }))
+                }
+                className="h-4 w-4 cursor-pointer rounded border"
+                style={{
+                  accentColor: LEGACY_COLORS.blue,
+                  borderColor: LEGACY_COLORS.border,
+                }}
+              />
+              <span
+                className="text-[13px] font-bold"
+                style={{
+                  color: form.io_enabled ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
+                }}
+              >
+                {form.io_enabled
+                  ? "사용 가능 (입출고 화면 접근 허용)"
+                  : "사용 불가 (입출고 화면 차단)"}
+              </span>
+            </label>
+            <div className="mt-1.5 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+              직원 개별 권한. 체크 해제 시 입출고 화면 접근 차단.
             </div>
           </FieldRow>
         </div>

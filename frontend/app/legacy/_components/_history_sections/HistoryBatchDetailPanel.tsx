@@ -17,11 +17,11 @@ import {
   getHistoryLineSignedQuantity,
   getHistoryLineStatusLabel,
   getHistoryMovementSummary,
-  getHistoryWorkTypeLabel,
   type LineSignTone,
 } from "./historyBatchInterpreter";
 import { formatHistoryDateTimeLong } from "./historyFormat";
 import { FlowBadge, MovementSummaryCell } from "./historyTableHelpers";
+import { HistoryDetailMemo } from "./HistoryDetailPanel";
 
 const SIGN_TONE_HEX: Record<LineSignTone, string> = {
   increase: LEGACY_COLORS.blue,
@@ -100,6 +100,8 @@ export function HistoryBatchDetailPanel({
     <div className="space-y-4">
       <HistoryBatchHero first={first} logs={logs} batch={batch} loading={state.status === "loading"} />
 
+      <HistoryDetailMemo notes={first.notes} />
+
       {batch && batch.bundles.length > 0 && (
         <div
           className="rounded-[20px] border p-4"
@@ -146,7 +148,6 @@ function HistoryBatchHero({
   const summary = getHistoryMovementSummary(first, batch ?? undefined, logs.length);
   const eps = batch ? getBatchFlowEndpoints(batch) : null;
   const flow = batch ? describeBatchFlow(first, batch) : null;
-  const workType = batch ? getHistoryWorkTypeLabel(batch.work_type) : null;
 
   let lineCount = 0;
   let included = 0;
@@ -166,10 +167,8 @@ function HistoryBatchHero({
     }
   }
 
-  const refNo = batch?.reference_no ?? first.reference_no;
   const reqName = batch?.requester_name ?? getHistoryActor(first);
-  const procName = first.produced_by ?? null;
-  const actorText = procName && procName !== reqName ? `${reqName} · 처리 ${procName}` : reqName;
+  const approverName = batch?.approver_name ?? first.approver_name ?? null;
 
   return (
     <div className="rounded-[20px] border p-4 space-y-3" style={heroStyle}>
@@ -181,14 +180,9 @@ function HistoryBatchHero({
           color={tcolor}
         />
         <MovementSummaryCell summary={summary} />
-        {workType && (
-          <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-            ({workType})
-          </span>
-        )}
       </div>
 
-      {/* 2줄: 흐름 — endpoints 우선, 없으면 flow.secondary, 둘 다 없으면 미렌더 */}
+      {/* 2줄: 흐름 — endpoints 우선, from==to 면 단일 칩, 없으면 flow.secondary, 둘 다 없으면 미렌더 */}
       {eps ? (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span
@@ -197,13 +191,17 @@ function HistoryBatchHero({
           >
             {eps.from}
           </span>
-          <span style={{ color: LEGACY_COLORS.muted2 }}>→</span>
-          <span
-            className="rounded-full border px-2.5 py-0.5 font-bold"
-            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-          >
-            {eps.to}
-          </span>
+          {eps.from !== eps.to && (
+            <>
+              <span style={{ color: LEGACY_COLORS.muted2 }}>→</span>
+              <span
+                className="rounded-full border px-2.5 py-0.5 font-bold"
+                style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+              >
+                {eps.to}
+              </span>
+            </>
+          )}
         </div>
       ) : flow?.secondary ? (
         <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -230,22 +228,21 @@ function HistoryBatchHero({
         </div>
       )}
 
-      {/* 4줄: 메타 — 일시 · 담당자 · refNo */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+      {/* 4줄: 메타 — 일시 / 요청자 / 승인자 */}
+      <div className="flex flex-col gap-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
         <span>{formatHistoryDateTimeLong(first.created_at)}</span>
-        <span>·</span>
         <span>
-          담당자{" "}
+          요청자{" "}
           <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>
-            {actorText}
+            {reqName}
           </span>
         </span>
-        {refNo && (
-          <span
-            className="rounded-full border px-2 py-0.5"
-            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-          >
-            Ref {refNo}
+        {approverName && (
+          <span>
+            승인자{" "}
+            <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>
+              {approverName}
+            </span>
           </span>
         )}
       </div>
@@ -268,7 +265,17 @@ function BundleBlock({
   const parentLine = getHistoryBomParentLine(bundle);
   const childLines = parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines;
   const headerSigned = parentLine ? getHistoryLineSignedQuantity(parentLine, batch, bundle) : null;
-  const headerQtyText = headerSigned ? headerSigned.label : formatQty(bundle.quantity);
+  // parentLine 없는 경로(BOM warehouse_to_dept 등)는 bundle.quantity 만으론 단위가 빠져
+  // 자식 라인 "N EA" 와 헤더가 어색하게 갈림. 라인 unit 단일이면 그 unit 을 헤더에도 붙임.
+  const bundleUnit = (() => {
+    const units = new Set(bundle.lines.map((l) => (l.unit ?? "").trim()).filter(Boolean));
+    return units.size === 1 ? Array.from(units)[0] : null;
+  })();
+  const headerQtyText = headerSigned
+    ? headerSigned.label
+    : bundleUnit
+      ? `${formatQty(bundle.quantity)} ${bundleUnit}`
+      : formatQty(bundle.quantity);
   const headerQtyColor = headerSigned ? SIGN_TONE_HEX[headerSigned.tone] : LEGACY_COLORS.muted2;
 
   return (
@@ -319,9 +326,9 @@ function BundleBlock({
               <span className="flex-1 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
                 {line.item_name}
               </span>
-              {line.item_code && (
+              {line.mes_code && (
                 <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {line.item_code}
+                  {line.mes_code}
                 </span>
               )}
               <span className="whitespace-nowrap text-[11px] font-bold" style={{ color: qtyColor }}>

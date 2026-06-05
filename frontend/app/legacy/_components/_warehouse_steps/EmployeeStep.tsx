@@ -20,8 +20,9 @@ export function EmployeeStep({
   setExpanded: (e: boolean) => void;
 }) {
   const getDeptColor = useDeptColorLookup();
-  const visible = expanded ? employees : employees.slice(0, 10);
-  const overflow = !expanded && employees.length > 10;
+  const sorted = [...employees].sort((a, b) => a.name.localeCompare(b.name, "ko-KR"));
+  const visible = expanded ? sorted : sorted.slice(0, 10);
+  const overflow = !expanded && sorted.length > 10;
 
   return (
     <div>
@@ -62,7 +63,7 @@ export function EmployeeStep({
             style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
           >
             <span className="text-2xl leading-none">+</span>
-            <span>추가 {employees.length - 10}명</span>
+            <span>추가 {sorted.length - 10}명</span>
           </button>
         )}
       </div>

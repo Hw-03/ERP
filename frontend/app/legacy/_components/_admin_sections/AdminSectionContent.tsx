@@ -15,6 +15,8 @@ import { AdminAuditLogSection } from "./AdminAuditLogSection";
 import { AdminDangerZone } from "./AdminDangerZone";
 import { AdminDepartmentsProvider } from "./AdminDepartmentsContext";
 import { AdminDepartmentsSection } from "./AdminDepartmentsSection";
+import { AdminWarehouseStructureSection } from "./AdminWarehouseStructureSection";
+import { AdminWarehousePlacementSection } from "./AdminWarehousePlacementSection";
 
 /**
  * Round-11A (#4) 추출 — DesktopAdminView 의 section 별 콘텐츠 분기.
@@ -47,10 +49,7 @@ export interface AdminSectionContentProps {
 
   pinForm: PinForm;
   setPinForm: Dispatch<SetStateAction<PinForm>>;
-  resetPin: string;
-  setResetPin: Dispatch<SetStateAction<string>>;
   changePin: () => Promise<void>;
-  resetDatabase: () => Promise<void>;
   adminPin: string;
 }
 
@@ -63,8 +62,8 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
     departments, setDepartments,
     selectedDept, setSelectedDept,
     allBomRows, refreshAllBom, refreshItems,
-    pinForm, setPinForm, resetPin, setResetPin,
-    changePin, resetDatabase, adminPin,
+    pinForm, setPinForm,
+    changePin, adminPin,
   } = props;
 
   if (section === "items") {
@@ -76,6 +75,8 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
         onStatusChange={onStatusChange}
         onError={setMessage}
         onShowSave={showSave}
+        adminPin={adminPin}
+        productModels={productModels}
       >
         <AdminMasterItemsSection allBomRows={allBomRows} />
       </AdminMasterItemsProvider>
@@ -113,6 +114,7 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
         setProductModels={setProductModels}
         onStatusChange={onStatusChange}
         onError={setMessage}
+        adminPin={adminPin}
       >
         <AdminModelsSection items={items} allBomRows={allBomRows} />
       </AdminModelsProvider>
@@ -140,6 +142,12 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
       </AdminDepartmentsProvider>
     );
   }
+  if (section === "warehouseStructure") {
+    return <AdminWarehouseStructureSection onStatusChange={onStatusChange} onError={setMessage} />;
+  }
+  if (section === "warehousePlacement") {
+    return <AdminWarehousePlacementSection items={items} onStatusChange={onStatusChange} onError={setMessage} />;
+  }
   if (section === "export") {
     return (
       <AdminExportSection
@@ -156,10 +164,7 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
       <AdminDangerZone
         pinForm={pinForm}
         setPinForm={setPinForm}
-        resetPin={resetPin}
-        setResetPin={setResetPin}
         onChangePin={() => void changePin()}
-        onResetDatabase={() => void resetDatabase()}
       />
     );
   }

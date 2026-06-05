@@ -75,11 +75,20 @@ export function applyLineQuantityChange(
     // 단, 창고 입출고는 사용자가 직접 편집한 하위(edited=true) 는 보존 — process(produce/disassemble) 만 강제 동기화.
     if (target.origin === "direct") {
       const forced = isBomForced(subType);
+      const parentIncluded = quantity > 0;
       return {
         ...bundle,
         lines: bundle.lines.map((line) => {
           if (line.line_id === lineId) {
-            return { ...line, quantity, shortage, edited: false };
+            // 수량 0 → 자동 체크 해제 (qty=0 included 라인은 hasInvalidQuantity 로 submit 차단됨)
+            return {
+              ...line,
+              quantity,
+              shortage,
+              included: parentIncluded,
+              edited: false,
+              exclusion_note: parentIncluded ? line.exclusion_note : exclusionNoteFor(subType, line.origin, false),
+            };
           }
           if (
             line.origin === "bom_auto" &&
@@ -90,32 +99,42 @@ export function applyLineQuantityChange(
             const ratio = Number(line.bom_expected);
             const childQty = quantity * ratio;
             const childAvail = getAvailable(line);
+            const childIncluded = childQty > 0;
             const childShortage =
-              !line.included || childAvail === null
+              !childIncluded || childAvail === null
                 ? 0
                 : Math.max(0, childQty - childAvail);
-            return { ...line, quantity: childQty, shortage: childShortage, edited: false };
+            return {
+              ...line,
+              quantity: childQty,
+              shortage: childShortage,
+              included: childIncluded,
+              edited: false,
+              exclusion_note: childIncluded ? line.exclusion_note : exclusionNoteFor(subType, line.origin, false),
+            };
           }
           return line;
         }),
       };
     }
-    // 그 외 (단품/수동): 기존 단순 업데이트
+    // 그 외 (단품/수동): 기존 단순 업데이트 + qty 0 자동 체크 해제
     return {
       ...bundle,
-      lines: bundle.lines.map((line) =>
-        line.line_id === lineId
-          ? {
-              ...line,
-              quantity,
-              shortage,
-              edited:
-                line.bom_expected !== null
-                  ? Math.abs(quantity - line.bom_expected) > 0.0001
-                  : line.origin === "manual" || line.edited,
-            }
-          : line,
-      ),
+      lines: bundle.lines.map((line) => {
+        if (line.line_id !== lineId) return line;
+        const nowIncluded = quantity > 0;
+        return {
+          ...line,
+          quantity,
+          shortage: nowIncluded ? shortage : 0,
+          included: nowIncluded,
+          exclusion_note: nowIncluded ? line.exclusion_note : exclusionNoteFor(subType, line.origin, false),
+          edited:
+            line.bom_expected !== null
+              ? Math.abs(quantity - line.bom_expected) > 0.0001
+              : line.origin === "manual" || line.edited,
+        };
+      }),
     };
   });
 }
@@ -151,11 +170,19 @@ export function applyBundleQuantityChange(
           const ratio = Number(line.bom_expected);
           const childQty = newQty * ratio;
           const childAvail = getAvailable(line);
+          const childIncluded = childQty > 0;
           const childShortage =
-            !line.included || childAvail === null
+            !childIncluded || childAvail === null
               ? 0
               : Math.max(0, childQty - childAvail);
-          return { ...line, quantity: childQty, shortage: childShortage, edited: false };
+          return {
+            ...line,
+            quantity: childQty,
+            shortage: childShortage,
+            included: childIncluded,
+            edited: false,
+            exclusion_note: childIncluded ? line.exclusion_note : exclusionNoteFor(subType, line.origin, false),
+          };
         }
         return line;
       }),

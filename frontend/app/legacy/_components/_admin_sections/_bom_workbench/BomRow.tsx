@@ -54,7 +54,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
   }
 
   const childName = childItem?.item_name ?? "(삭제된 품목)";
-  const itemCode = childItem?.item_code ?? "";
+  const mesCode = childItem?.mes_code ?? "";
   const unit = row.unit || childItem?.unit || "EA";
 
   return (
@@ -70,9 +70,9 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
         <TruncatedText className="truncate text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
           {childName}
         </TruncatedText>
-        {itemCode && (
+        {mesCode && (
           <TruncatedText className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            {itemCode}
+            {mesCode}
           </TruncatedText>
         )}
       </div>
@@ -82,7 +82,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
             ref={inputRef}
             type="number"
             min="0"
-            step="any"
+            step="0.01"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commit}
@@ -114,7 +114,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
             }}
             title="클릭하여 수량 수정"
           >
-            ×{formatQty(row.quantity)} {unit}
+            ×{formatQty(row.quantity, { maximumFractionDigits: 2, trimTrailingZeros: true })} {unit}
           </button>
         )}
       </div>

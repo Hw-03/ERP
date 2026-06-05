@@ -30,7 +30,7 @@ function makeItem(overrides: Partial<Item> = {}): Item {
   return {
     item_id: "test-item-001",
     item_name: "테스트 부품",
-    item_code: "7-TR-0001",
+    mes_code: "7-TR-0001",
     spec: null,
     unit: "EA",
     quantity: 20,

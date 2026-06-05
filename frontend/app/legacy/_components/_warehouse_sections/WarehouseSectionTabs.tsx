@@ -4,7 +4,7 @@ import { useState } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 
-export type WarehouseSectionTab = "compose" | "cart" | "mine" | "queue" | "dept-queue";
+export type WarehouseSectionTab = "compose" | "cart" | "mine" | "queue" | "dept-queue" | "handover";
 
 /**
  * DesktopWarehouseView 의 섹션 탭. 권한별로 "창고 승인함" / "부서 승인함" 가시성 분기.
@@ -15,9 +15,11 @@ interface Props {
   onChange: (next: WarehouseSectionTab) => void;
   showQueue: boolean;
   showDeptQueue: boolean;
+  showHandover?: boolean;
   cartCount?: number;
   queueCount?: number;
   deptQueueCount?: number;
+  handoverInboxCount?: number;
 }
 
 type TabDef = { id: WarehouseSectionTab; label: string; tone: string };
@@ -27,9 +29,11 @@ export function WarehouseSectionTabs({
   onChange,
   showQueue,
   showDeptQueue,
+  showHandover = false,
   cartCount = 0,
   queueCount = 0,
   deptQueueCount = 0,
+  handoverInboxCount = 0,
 }: Props) {
   const tabs: TabDef[] = [
     { id: "compose", label: "요청 작성", tone: LEGACY_COLORS.blue },
@@ -37,12 +41,14 @@ export function WarehouseSectionTabs({
     { id: "mine", label: "내 요청", tone: LEGACY_COLORS.purple },
   ];
   if (showQueue) tabs.push({ id: "queue", label: "창고 승인함", tone: LEGACY_COLORS.yellow });
-  if (showDeptQueue) tabs.push({ id: "dept-queue", label: "부서 승인함", tone: LEGACY_COLORS.purple });
+  if (showDeptQueue) tabs.push({ id: "dept-queue", label: "부서 승인함", tone: LEGACY_COLORS.cyan });
+  if (showHandover) tabs.push({ id: "handover", label: "인수인계", tone: LEGACY_COLORS.red });
 
   const badgeFor = (id: WarehouseSectionTab): number | null => {
     if (id === "cart" && cartCount > 0) return cartCount;
     if (id === "queue" && queueCount > 0) return queueCount;
     if (id === "dept-queue" && deptQueueCount > 0) return deptQueueCount;
+    if (id === "handover" && handoverInboxCount > 0) return handoverInboxCount;
     return null;
   };
 

@@ -13,7 +13,7 @@ import uuid
 from decimal import Decimal
 from typing import Literal, List, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -21,6 +21,7 @@ from app.database import get_db
 from app.models import DepartmentEnum, DeptAdjSubTypeEnum, Item
 from app.routers._errors import ErrorCode, http_error
 from app.services import dept_adjustment as svc
+from app._evt import emit as _evt_emit
 
 router = APIRouter()
 
@@ -32,7 +33,7 @@ logger = logging.getLogger("mes")
 class AdjLineResponse(BaseModel):
     item_id: uuid.UUID
     item_name: str
-    item_code: Optional[str]
+    mes_code: Optional[str]
     process_type_code: Optional[str]
     unit: str
     direction: str
@@ -94,7 +95,7 @@ def _line_to_response(ln: svc.AdjLine) -> AdjLineResponse:
     return AdjLineResponse(
         item_id=ln.item_id,
         item_name=ln.item_name,
-        item_code=ln.item_code,
+        mes_code=ln.mes_code,
         process_type_code=ln.process_type_code,
         unit=ln.unit,
         direction=ln.direction,
@@ -155,6 +156,7 @@ def expand_component(
 @router.post("/submit", response_model=DeptAdjResult, status_code=201)
 def submit_adjustment(
     payload: DeptAdjSubmitRequest,
+    http_request: Request,
     db: Session = Depends(get_db),
 ):
     """부서 재고 조정 배치 원자 처리."""
@@ -194,6 +196,13 @@ def submit_adjustment(
         raise http_error(500, ErrorCode.INTERNAL, f"처리 중 오류: {exc}")
 
     db.commit()
+    _evt_emit(
+        "dept_adj",
+        request=http_request,
+        sub_type=payload.sub_type,
+        lines=len(log_ids),
+        operator=payload.operator_name or "-",
+    )
 
     sub_label = {"production": "생산/조립", "disassembly": "분해/회수", "correction": "수량 보정"}
     return DeptAdjResult(

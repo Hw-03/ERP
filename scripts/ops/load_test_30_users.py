@@ -8,7 +8,7 @@
 
 경고:
     - 운영 DB에 실제 데이터가 생성/변경됩니다.
-    - 반드시 테스트용 품목(item_code가 'TEST-'로 시작)과 테스트용 직원만 사용합니다.
+    - 반드시 테스트용 품목(mes_code가 'TEST-'로 시작)과 테스트용 직원만 사용합니다.
     - --confirm 없이는 실행되지 않습니다.
 
 결과:
@@ -234,7 +234,7 @@ async def get_test_resources(base_url: str) -> tuple[Optional[str], Optional[str
                 return None, None
             items = res2.json()
             test_item = next(
-                (i for i in items if str(i.get("item_code", "")).startswith("TEST")),
+                (i for i in items if str(i.get("mes_code", "")).startswith("TEST")),
                 None
             )
 
@@ -292,7 +292,7 @@ async def auto_seed_resources(base_url: str) -> tuple[Optional[str], Optional[st
             if res.status_code == 200:
                 items = res.json()
                 test_item = next(
-                    (i for i in items if str(i.get("item_code", "")).startswith("TEST")),
+                    (i for i in items if str(i.get("mes_code", "")).startswith("TEST")),
                     None,
                 )
                 if test_item:
@@ -579,7 +579,7 @@ async def main():
     if item_id:
         print(f"테스트 품목 ID: {item_id}")
     else:
-        print("테스트 품목(TEST- item_code) 없음 — 조회 시나리오만 실행합니다.")
+        print("테스트 품목(TEST- mes_code) 없음 — 조회 시나리오만 실행합니다.")
 
     report = await run_load_test(args.url, args.users, args.rounds, emp_id, item_id)
 

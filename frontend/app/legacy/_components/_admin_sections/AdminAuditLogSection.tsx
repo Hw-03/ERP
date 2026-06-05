@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Download,
   FileArchive,
@@ -8,10 +8,11 @@ import {
   FileText,
   RefreshCw,
 } from "lucide-react";
-import { adminApi, type AuditCsvFile } from "@/lib/api/admin";
+import { adminApi } from "@/lib/api/admin";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../common";
 import { AdminKpiBar, AdminPageHeader } from "./_admin_primitives";
+import { useAuditCsvListQuery, useTriggerAuditBackfillMutation } from "@/lib/queries/useSettingsQuery";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -27,28 +28,11 @@ function formatMonthLabel(month: string): string {
 }
 
 export function AdminAuditLogSection() {
-  const [files, setFiles] = useState<AuditCsvFile[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { data: files = [], isLoading: loading, error: qError, refetch: refetchFiles } = useAuditCsvListQuery();
+  const backfillMutation = useTriggerAuditBackfillMutation();
+  const busy = backfillMutation.isPending;
+  const error = qError ? (qError instanceof Error ? qError.message : "파일 목록 조회 실패") : null;
   const [lastBackfill, setLastBackfill] = useState<string | null>(null);
-
-  const loadFiles = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const list = await adminApi.listAuditCsvFiles();
-      setFiles(list);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "파일 목록 조회 실패");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadFiles();
-  }, [loadFiles]);
 
   const stats = useMemo(() => {
     const total = files.reduce((s, f) => s + f.row_count, 0);
@@ -57,26 +41,21 @@ export function AdminAuditLogSection() {
     return { total, months, sizeMb };
   }, [files]);
 
-  const handleBackfill = useCallback(async () => {
+  const handleBackfill = () => {
     if (busy) return;
     const ok = window.confirm(
       "DB 기준으로 모든 월별 CSV 를 새로 만듭니다. 기존 파일은 덮어쓰여집니다. 계속할까요?",
     );
     if (!ok) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await adminApi.triggerAuditCsvBackfill();
-      setLastBackfill(
-        `${new Date().toLocaleString("ko-KR")} · ${result.total_rows.toLocaleString()}행 / ${result.months.length}개월`,
-      );
-      await loadFiles();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "백필 실패");
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, loadFiles]);
+    backfillMutation.mutate(undefined, {
+      onSuccess: (result) => {
+        setLastBackfill(
+          `${new Date().toLocaleString("ko-KR")} · ${result.total_rows.toLocaleString()}행 / ${result.months.length}개월`,
+        );
+      },
+      onError: () => {},
+    });
+  };
 
   function handleDownload(url: string, fileName: string) {
     const a = document.createElement("a");
@@ -151,7 +130,7 @@ export function AdminAuditLogSection() {
             </div>
             <button
               type="button"
-              onClick={() => void loadFiles()}
+              onClick={() => void refetchFiles()}
               disabled={loading}
               className="text-[11px] font-bold transition-colors hover:underline disabled:opacity-50"
               style={{ color: LEGACY_COLORS.muted2 }}

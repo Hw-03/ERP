@@ -13,7 +13,7 @@ export function DefectQuickActions({ onAddQuarantine, onAddRReturn, onAddRScrap 
   return (
     <div className="flex flex-wrap gap-2">
       <ActionButton
-        label="+ 새 격리 추가"
+        label="+ 새 불량 추가"
         tone={LEGACY_COLORS.red}
         onClick={onAddQuarantine}
       />

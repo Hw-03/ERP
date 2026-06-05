@@ -3,17 +3,19 @@
 import { useState } from "react";
 import Image from "next/image";
 import type { ElementType } from "react";
-import { BarChart2, Boxes, History, Settings2, Warehouse } from "lucide-react";
+import { AlertTriangle, BarChart2, Boxes, History, MapPinned, Settings2, Warehouse } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ThemeToggle } from "./ThemeToggle";
 
-export type DesktopTabId = "dashboard" | "warehouse" | "history" | "weekly" | "admin";
+export type DesktopTabId = "dashboard" | "warehouse" | "warehouseMap" | "defect" | "history" | "weekly" | "admin";
 
 type TabDef = { id: DesktopTabId; label: string; subtitle: string; icon: ElementType };
 
 const MAIN_TABS: TabDef[] = [
   { id: "dashboard", label: "대시보드", subtitle: "현황과 안전재고 확인", icon: Boxes },
   { id: "warehouse", label: "입출고", subtitle: "입고와 출고 작업 처리", icon: Warehouse },
+  { id: "warehouseMap", label: "창고 지도", subtitle: "위치별 재고 한눈에", icon: MapPinned },
+  { id: "defect", label: "불량", subtitle: "격리·폐기·반품 처리", icon: AlertTriangle },
   { id: "history", label: "입출고 내역", subtitle: "입출고 이력 조회", icon: History },
   { id: "weekly", label: "주간보고", subtitle: "생산·재고 흐름", icon: BarChart2 },
 ];
@@ -155,7 +157,8 @@ function TabButton({
       onClick={() => onTabChange(tab.id)}
       onMouseEnter={() => onHover(tab.id)}
       onMouseLeave={() => onHover(null)}
-      className="group flex items-center justify-start rounded-[20px] -ml-1.5 w-[calc(100%+6px)] pl-1.5 transition-all duration-150 hover:scale-[1.015]"
+      aria-current={active ? "page" : undefined}
+      className="group flex items-center justify-start rounded-[20px] -mx-1.5 w-[calc(100%+12px)] pl-1.5 transition-all duration-150 hover:scale-[1.015]"
       style={{
         background: expanded
           ? active
@@ -174,7 +177,7 @@ function TabButton({
         <div
           className="flex h-[46px] w-[46px] items-center justify-center rounded-[16px] transition-all duration-150 group-hover:brightness-110 group-hover:scale-[1.05]"
           style={{
-            background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
+            background: active ? LEGACY_COLORS.blue : "transparent",
             color: active ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
           }}
         >

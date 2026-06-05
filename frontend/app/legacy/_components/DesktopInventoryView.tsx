@@ -3,7 +3,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { itemCodeDept } from "@/lib/mes/process";
+import { mesCodeDept } from "@/lib/mes/process";
 import { InventoryKpiPanel, type KpiFilter } from "./_inventory_sections/InventoryKpiPanel";
 import { InventoryCapacityPanel } from "./_inventory_sections/InventoryCapacityPanel";
 import { InventoryFilterToggleButton } from "./_inventory_sections/InventoryFilterToggleButton";
@@ -16,10 +16,14 @@ import { DesktopInventoryRightPanel } from "./_inventory_sections/DesktopInvento
 import { useInventoryData } from "./_hooks/useInventoryData";
 import { useDesktopInventoryDerivations } from "./_hooks/useDesktopInventoryDerivations";
 import { useItemImageManifest } from "./_hooks/useItemImageManifest";
+import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 // R9-2: helper 4개 (getMinStock / safeQty / matchesSearch / matchesKpi) 분리
 import { matchesKpi, matchesSearch } from "./_inventory_sections/inventoryFilter";
 
 const DESKTOP_PAGE_SIZE = 100;
+
+// 안정 참조 — useModelsQuery 미로딩 시 동일 빈 배열을 재사용해 useMemo 의존성을 흔들지 않는다.
+const EMPTY_MODELS: ProductModel[] = [];
 
 
 export function DesktopInventoryView({
@@ -58,7 +62,7 @@ export function DesktopInventoryView({
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [selectedProcessSteps, setSelectedProcessSteps] = useState<string[]>([]);
-  const [productModels, setProductModels] = useState<ProductModel[]>([]);
+  const productModels = useModelsQuery().data ?? EMPTY_MODELS;
   const [kpi, setKpi] = useState<KpiFilter>("ALL");
   const [localSearch, setLocalSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(DESKTOP_PAGE_SIZE);
@@ -82,10 +86,6 @@ export function DesktopInventoryView({
     setSelectedProcessSteps((prev) => (prev.includes(v) ? prev.filter((p) => p !== v) : [...prev, v]));
     setDisplayLimit(DESKTOP_PAGE_SIZE);
   }
-
-  useEffect(() => {
-    void api.getModels().then(setProductModels).catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (!selectedItem) {
@@ -114,7 +114,7 @@ export function DesktopInventoryView({
             d === "창고"
               ? (item.warehouse_qty ?? 0) > 0
               : item.department === d ||
-                itemCodeDept(item.item_code) === d ||
+                mesCodeDept(item.mes_code) === d ||
                 item.locations.some((loc) => loc.department === d),
           );
           if (!inDept) return false;
@@ -126,7 +126,13 @@ export function DesktopInventoryView({
         }
         if (selectedProcessSteps.length > 0) {
           const stage = item.process_type_code?.slice(-1).toUpperCase() ?? "";
-          if (!selectedProcessSteps.includes(stage)) return false;
+          const hasDefect = item.locations.some(
+            (loc) => loc.status === "DEFECTIVE" && (loc.quantity ?? 0) > 0,
+          );
+          const matches = selectedProcessSteps.some(
+            (s) => s === stage || (s === "DEFECT" && hasDefect),
+          );
+          if (!matches) return false;
         }
         return true;
       }),
@@ -200,6 +206,14 @@ export function DesktopInventoryView({
               onClearDepts={() => setSelectedDepts([])}
               onClearModels={() => setSelectedModels([])}
               onClearProcessSteps={() => setSelectedProcessSteps([])}
+              onResetAll={resetAllFilters}
+              isAnyFilterActive={
+                selectedDepts.length > 0 ||
+                selectedModels.length > 0 ||
+                selectedProcessSteps.length > 0 ||
+                kpi !== "ALL" ||
+                localSearch.length > 0
+              }
             />
           </section>
 
@@ -213,6 +227,7 @@ export function DesktopInventoryView({
               onSearchChange={setLocalSearch}
               count={filteredItems.length}
               isFiltered={isFiltered}
+              onResetAllFilters={resetAllFilters}
             />
             <InventoryItemsTable
               error={error}
@@ -239,6 +254,7 @@ export function DesktopInventoryView({
         headerBadge={headerBadge}
         onClose={() => setSelectedItem(null)}
         onGoToWarehouse={onGoToWarehouse}
+        imageFilename={displayItem?.mes_code ? imageManifest[displayItem.mes_code] : undefined}
       />
     </div>
   );

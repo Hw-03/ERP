@@ -1,5 +1,7 @@
 param(
-    [switch] $DbReadOnlyCheck
+    [switch] $DbReadOnlyCheck,
+    # Playwright E2E 까지 포함(전용 DB·서버 기동 — 느림). 기본 게이트는 가볍게 유지하고 opt-in.
+    [switch] $IncludeE2E
 )
 
 $ErrorActionPreference = "Stop"
@@ -132,6 +134,11 @@ if mismatch_count != 0:
             throw "DB read-only consistency failed with exit code $LASTEXITCODE"
         }
     }
+}
+
+if ($IncludeE2E) {
+    # 전용 DB(mes_e2e.db)·전용 백엔드(8021)·전용 프론트(3100) — globalSetup/teardown 자동.
+    Invoke-Check "Playwright E2E (전용 DB)" $FrontendRoot { npx playwright test }
 }
 
 Invoke-Check "Git working tree status" $RepoRoot { git status --short --branch }

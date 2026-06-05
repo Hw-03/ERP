@@ -29,6 +29,7 @@ import {
   deptIoDirectionOf,
   pickerDirectionLabel,
   deptIoDisplayLabel,
+  allowsMixedBundles,
   getItemActionMode,
   lineTagLabel,
   isExitWorkType,
@@ -53,7 +54,7 @@ function makeLine(overrides: Partial<IoLine> = {}): IoLine {
     line_id: "l1",
     item_id: "ITEM-001",
     item_name: "테스트 부품",
-    item_code: null,
+    mes_code: null,
     unit: "EA",
     direction: "in",
     from_bucket: "none",
@@ -103,12 +104,11 @@ const ALL_SUB_TYPES: IoSubType[] = [
 // IO_WORK_TYPES / IO_SUB_TYPES / 상수
 // ──────────────────────────────────────────────────────────────────
 describe("ioWorkType 상수", () => {
-  it("IO_WORK_TYPES id/label 고정", () => {
+  it("IO_WORK_TYPES id/label 고정 (defect 는 별도 '불량' 탭으로 분리되어 입출고 메뉴에서 제외)", () => {
     expect(IO_WORK_TYPES.map((r) => [r.id, r.label, r.description])).toEqual([
       ["receive", "원자재 입고", "발주 품목 입고"],
       ["warehouse_io", "창고 입출고", "창고↔부서"],
       ["process", "부서 입출고", "부서 내 작업"],
-      ["defect", "불량", "불량 재고 격리"],
     ]);
   });
 
@@ -129,17 +129,17 @@ describe("ioWorkType 상수", () => {
       .flat()
       .map((r) => [r.id, r.label, r.description]);
     expect(labels).toEqual([
-      ["receive_supplier", "외부 입고", "선택 품목을 창고 재고로 증가"],
+      ["receive_supplier", "원자재 입고", "선택 품목을 창고 재고로 증가"],
       ["warehouse_to_dept", "창고 → 부서", "BOM 1단계 하위 품목 자동 포함"],
       ["dept_to_warehouse", "부서 → 창고", "반납할 하위 품목만 체크"],
       ["produce", "생산", "하위 자재 출고 + 결과 품목 입고"],
       ["disassemble", "분해", "상위 품목 출고 + 회수 품목 입고"],
       ["adjust_in", "수량보정 입고", "선택 품목 수량 증가"],
       ["adjust_out", "수량보정 출고", "선택 품목 수량 감소"],
-      ["defect_quarantine", "새 격리", "정상 재고를 격리 처리 (창고 승인)"],
-      ["defect_restore", "격리 해제", "격리 재고를 정상 복귀 (즉시)"],
-      ["defect_process", "격리 처리", "격리 재고 폐기·분해 (창고 승인)"],
-      ["supplier_return", "공급처 반품", "격리 재고를 공급처에 반품 (창고 승인)"],
+      ["defect_quarantine", "새 불량", "선택 부서의 정상 재고를 불량 격리"],
+      ["defect_restore", "불량 해제", "격리 재고를 정상 복귀 (즉시)"],
+      ["defect_process", "불량 처리", "격리 재고 폐기·재작업"],
+      ["supplier_return", "원자재 반품", "격리 재고를 공급처에 반품"],
     ]);
   });
 
@@ -185,7 +185,7 @@ describe("subTypeLabel", () => {
   it("모든 subType 라벨 고정", () => {
     const map = Object.fromEntries(ALL_SUB_TYPES.map((s) => [s, subTypeLabel(s)]));
     expect(map).toEqual({
-      receive_supplier: "외부 입고",
+      receive_supplier: "원자재 입고",
       warehouse_to_dept: "창고 → 부서",
       dept_to_warehouse: "부서 → 창고",
       produce: "생산",
@@ -193,8 +193,8 @@ describe("subTypeLabel", () => {
       dept_transfer: "dept_transfer", // IO_SUB_TYPES 에 없음 → 그대로 반환
       adjust_in: "수량보정 입고",
       adjust_out: "수량보정 출고",
-      defect_quarantine: "새 격리",
-      supplier_return: "공급처 반품",
+      defect_quarantine: "새 불량",
+      supplier_return: "원자재 반품",
     });
   });
 });
@@ -235,8 +235,8 @@ describe("requiresApproval", () => {
       dept_transfer: false,
       adjust_in: false,
       adjust_out: false,
-      defect_quarantine: true,
-      supplier_return: true,
+      defect_quarantine: false,
+      supplier_return: false,
     });
   });
 });
@@ -283,8 +283,9 @@ describe("approvalKind", () => {
     const withManual = [makeBundle({ lines: [makeLine({ origin: "manual" })] })];
     expect(approvalKind("warehouse_to_dept", [])).toBe("warehouse");
     expect(approvalKind("dept_to_warehouse", withManual)).toBe("warehouse");
-    expect(approvalKind("defect_quarantine", withManual)).toBe("warehouse");
-    expect(approvalKind("supplier_return", [])).toBe("warehouse");
+    // 불량 관련 sub_type 은 새 정책상 즉시 처리(none) — manual line 여부 무관.
+    expect(approvalKind("defect_quarantine", withManual)).toBe("none");
+    expect(approvalKind("supplier_return", [])).toBe("none");
   });
 
   it("비결재 subType + manual line → department", () => {
@@ -362,8 +363,8 @@ describe("pickerDirectionLabel", () => {
     const map = Object.fromEntries(ALL_SUB_TYPES.map((s) => [s, pickerDirectionLabel(s)]));
     expect(map).toEqual({
       receive_supplier: "입고",
-      warehouse_to_dept: "입고",
-      dept_to_warehouse: "출고",
+      warehouse_to_dept: "창고 반출",
+      dept_to_warehouse: "창고 반입",
       produce: "입고",
       disassemble: "출고",
       dept_transfer: "출고",
@@ -413,6 +414,27 @@ describe("getItemActionMode", () => {
       adjust_out: "single_only",
       defect_quarantine: "single_only",
       supplier_return: "single_only",
+    });
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────
+// allowsMixedBundles — 창고 입출고만 BOM·낱개 혼합 허용
+// ──────────────────────────────────────────────────────────────────
+describe("allowsMixedBundles", () => {
+  it("창고 입출고 sub_type만 true", () => {
+    const map = Object.fromEntries(ALL_SUB_TYPES.map((s) => [s, allowsMixedBundles(s)]));
+    expect(map).toEqual({
+      receive_supplier: false,
+      warehouse_to_dept: true,
+      dept_to_warehouse: true,
+      produce: false,
+      disassemble: false,
+      dept_transfer: false,
+      adjust_in: false,
+      adjust_out: false,
+      defect_quarantine: false,
+      supplier_return: false,
     });
   });
 });
@@ -1106,5 +1128,68 @@ describe("[bomSync] applyBundleQuantityChange", () => {
     expect(c.quantity).toBe(10); // 5 * 2 강제
     expect(c.shortage).toBe(7); // max(0, 10 - 3)
     expect(c.edited).toBe(false);
+  });
+});
+
+describe("[bomSync] qty=0 자동 체크 해제", () => {
+  // hasInvalidQuantity 가드(qty<=0 included 라인은 submit 차단)에 걸려 사용자가 0 으로 줄였을 때
+  // 비활성화 버튼만 남던 dead-end UX 제거. 0 으로 줄이면 included=false 로 자동 전환.
+  it("단품 라인 qty=0 → included=false", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        lines: [makeLine({ line_id: "S", origin: "bom_auto", bom_expected: 5, quantity: 5, included: true })],
+      }),
+    ];
+    const next = applyLineQuantityChange(bundles, "B", "S", 0, 0, "warehouse_to_dept", availMap({ S: 100 }));
+    expect(next[0].lines[0].quantity).toBe(0);
+    expect(next[0].lines[0].included).toBe(false);
+    expect(next[0].lines[0].shortage).toBe(0);
+  });
+
+  it("상위(direct) qty=0 → 부모 + 비례 자식 모두 included=false", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        lines: [
+          makeLine({ line_id: "P", origin: "direct", quantity: 3, included: true }),
+          makeLine({ line_id: "C", origin: "bom_auto", bom_expected: 2, quantity: 6, included: true, edited: false }),
+        ],
+      }),
+    ];
+    const next = applyLineQuantityChange(bundles, "B", "P", 0, 0, "warehouse_to_dept", availMap({ C: 100 }));
+    const [p, c] = next[0].lines;
+    expect(p.quantity).toBe(0);
+    expect(p.included).toBe(false);
+    expect(c.quantity).toBe(0);
+    expect(c.included).toBe(false);
+  });
+
+  it("번들 qty=0 → 미편집 자식 included=false", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        quantity: 3,
+        lines: [
+          makeLine({ line_id: "C1", origin: "bom_auto", bom_expected: 2, included: true, edited: false }),
+        ],
+      }),
+    ];
+    const next = applyBundleQuantityChange(bundles, "B", 0, "warehouse_to_dept", availMap({ C1: 100 }));
+    expect(next[0].quantity).toBe(0);
+    expect(next[0].lines[0].quantity).toBe(0);
+    expect(next[0].lines[0].included).toBe(false);
+  });
+
+  it("qty>0 으로 복귀 → 자동 재체크 (included=true)", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        lines: [makeLine({ line_id: "S", origin: "bom_auto", bom_expected: 5, quantity: 0, included: false })],
+      }),
+    ];
+    const next = applyLineQuantityChange(bundles, "B", "S", 5, 0, "warehouse_to_dept", availMap({ S: 100 }));
+    expect(next[0].lines[0].quantity).toBe(5);
+    expect(next[0].lines[0].included).toBe(true);
   });
 });

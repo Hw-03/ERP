@@ -229,7 +229,7 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
               공정별 변화
             </h2>
           </div>
-          <div className="min-h-0 flex-1 overflow-hidden p-2.5">
+          <div className="min-h-0 flex-1 overflow-hidden p-2">
             {loading && !data ? (
               <LoadingSkeleton variant="card" rows={4} />
             ) : (
@@ -245,8 +245,10 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
 
         {/* 우: 품목 상세 */}
         <div className="flex flex-1 flex-col min-w-0 rounded-[18px] border min-h-[280px] lg:min-h-0" style={cardBase}>
+          {/* min-h-0 — flex 체인에서 자식의 overflow-y-auto 가 동작하려면 모든 ancestor 가 min-h-0 필요.
+              누락 시 자식 content 크기가 부모를 밀어내서 스크롤이 안 잡힘. */}
           <div
-            className="flex flex-1 flex-col"
+            className="flex min-h-0 flex-1 flex-col"
           >
             <div
               className="shrink-0 border-b px-4 py-2.5"

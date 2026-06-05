@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from decimal import Decimal
 
 from app.models import (
@@ -199,6 +200,113 @@ def test_io_submit_receive_is_immediate(client, db_session, make_item):
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     assert inv.warehouse_qty == Decimal("5")
     assert db_session.query(IoBatch).count() == 1
+
+
+def test_io_submit_shortage_message_includes_contributing_parents(
+    client, db_session, make_item, make_bom
+):
+    """회귀: 같은 자식 부품이 여러 BOM 부모에 등록돼 합산 시 재고 초과될 때,
+    에러 메시지에 어느 부모가 얼마씩 기여했는지(상위 3개) 표시되는지 검증.
+    개선 전: '재고 부족: X / 가능 52 / 요청 64' — 사용자가 어디서 줄여야 할지 모름."""
+    shared_child = make_item(name="공통자식", warehouse_qty=Decimal("3"))
+    parent_a = make_item(name="부모A", warehouse_qty=Decimal("0"))
+    parent_b = make_item(name="부모B", warehouse_qty=Decimal("0"))
+    make_bom(parent_a.item_id, shared_child.item_id, Decimal("2"))
+    make_bom(parent_b.item_id, shared_child.item_id, Decimal("2"))
+    requester = _make_employee(db_session, warehouse_role="primary")
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {"source_kind": "direct_item", "item_id": str(parent_a.item_id), "quantity": "1"},
+                {"source_kind": "direct_item", "item_id": str(parent_b.item_id), "quantity": "1"},
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+    # 각 부모 BOM 자식 2 + 2 = 4 요청, 재고 3 → 부족 1
+    res = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert res.status_code == 422, res.json()
+    detail = res.json().get("detail")
+    detail_text = detail if isinstance(detail, str) else str(detail)
+    assert "재고 부족" in detail_text
+    assert "공통자식" in detail_text
+    # 핵심: 합산에 기여한 부모 이름과 양이 표시돼야 함
+    assert "부모A" in detail_text, f"contributor breakdown missing: {detail_text}"
+    assert "부모B" in detail_text, f"contributor breakdown missing: {detail_text}"
+
+
+def test_io_submit_warehouse_to_dept_links_all_logs_to_batch(
+    client, db_session, make_item, make_bom
+):
+    """회귀: autoflush=False 환경에서 _link_stock_request 의 UPDATE 가
+    마지막 라인의 TransactionLog 를 놓쳐 NULL 로 남던 버그(입출고 내역에서
+    BOM 묶음의 마지막 자식이 solo row 로 분리되어 보이던 현상)."""
+    parent = make_item(name="BomParent", warehouse_qty=Decimal("0"))
+    # 마지막 라인까지 batch_id 가 박히는지 확인하려면 라인 ≥ 2 필요. 3개로 여유.
+    children = [
+        make_item(name=f"BomChild{i}", warehouse_qty=Decimal("100")) for i in range(3)
+    ]
+    for child in children:
+        make_bom(parent.item_id, child.item_id, Decimal("1"))
+    # 자가승인 가능한 창고 정 — 즉시 실행 경로(_execute_all_lines) 진입.
+    requester = _make_employee(db_session, warehouse_role="primary")
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(parent.item_id),
+                    "quantity": "1",
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+
+    res = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert res.status_code == 201, res.json()
+    assert res.json()["status"] == "completed"
+
+    batch = db_session.query(IoBatch).one()
+    logs = db_session.query(TransactionLog).all()
+    assert len(logs) == len(children), f"expected {len(children)} logs, got {len(logs)}"
+    # 핵심: 모든 로그가 batch.batch_id 로 묶여 있어야 함 (마지막 라인 포함).
+    assert all(log.operation_batch_id == batch.batch_id for log in logs), (
+        f"orphan logs found: "
+        f"{[(str(l.item_id)[:8], l.operation_batch_id) for l in logs]}"
+    )
 
 
 def test_io_submit_draft_endpoint_completes_batch(client, db_session, make_item):
@@ -435,6 +543,82 @@ def test_io_immediate_adjust_out_decreases_production_quantity(
     assert tx[0].transaction_type == TransactionTypeEnum.ADJUST
 
 
+def test_io_produce_component_sources_from_home_dept(
+    client, db_session, make_item, make_location, make_bom
+):
+    """생산 시 BOM 부품은 작업 부서가 아니라 부품의 소속 공정에서 차감되어야 한다.
+    조립이 NF(튜닝) 보드를 부품으로 갖는 완제품을 생산할 때, 보드 재고가 튜닝에만 있어도
+    재고 부족으로 막히지 않고 튜닝에서 차감된다."""
+    parent = make_item(name="완제품", process_type_code="AF", warehouse_qty=Decimal("0"))
+    board = make_item(name="튜닝 보드", process_type_code="NF", warehouse_qty=Decimal("0"))
+    # 보드는 튜닝 PRODUCTION 에만 있고 조립엔 0.
+    make_location(board.item_id, department=DepartmentEnum.TUNING, quantity=Decimal("10"))
+    db_session.flush()
+    inv = db_session.query(Inventory).filter(Inventory.item_id == board.item_id).first()
+    inv.quantity = Decimal("10")  # 위치 합과 총량 동기화
+    make_bom(parent.item_id, board.item_id, Decimal("1"))
+    requester = _make_employee(db_session)  # 생산은 결재 비대상 — 일반 직원으로 즉시 완료
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {"source_kind": "direct_item", "item_id": str(parent.item_id), "quantity": "2"}
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+    lines = preview.json()["bundles"][0]["lines"]
+    board_line = next(l for l in lines if l["item_id"] == str(board.item_id))
+    # 핵심: 차감 출처가 조립이 아니라 보드의 소속 공정(튜닝) — 재고 부족 없음.
+    assert board_line["from_department"] == DepartmentEnum.TUNING.value
+    assert board_line["from_bucket"] == "production"
+    assert board_line["origin"] == "bom_auto"
+    assert Decimal(str(board_line["shortage"])) == Decimal("0")
+
+    res = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert res.status_code == 201, res.json()
+    assert res.json()["status"] == "completed"
+
+    # 튜닝 보드는 튜닝에서 2 차감 → 8.
+    tuning_loc = (
+        db_session.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == board.item_id,
+            InventoryLocation.department == DepartmentEnum.TUNING,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        )
+        .first()
+    )
+    assert tuning_loc is not None and tuning_loc.quantity == Decimal("8")
+
+    # 완제품은 작업 부서(조립) PRODUCTION 에 2 적재.
+    parent_loc = (
+        db_session.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == parent.item_id,
+            InventoryLocation.department == DepartmentEnum.ASSEMBLY,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        )
+        .first()
+    )
+    assert parent_loc is not None and parent_loc.quantity == Decimal("2")
+
+
 def test_io_submit_adjust_out_blocks_on_shortage(
     client, db_session, make_item, make_location
 ):
@@ -530,3 +714,108 @@ def test_io_submit_without_client_request_id_skips_idempotency(client, db_sessio
     assert second.status_code == 201
     assert first.json()["batch"]["batch_id"] != second.json()["batch"]["batch_id"]
     assert db_session.query(IoBatch).count() == 2
+
+
+# ---------------------------------------------------------------------------
+# F5 — 임시저장 누적(새 슬롯) / batch_id 기반 in-place 갱신
+# ---------------------------------------------------------------------------
+
+
+def _preview_receive_bundles(client, requester, item, qty: str = "3"):
+    res = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "targets": [
+                {"source_kind": "direct_item", "item_id": str(item.item_id), "quantity": qty}
+            ],
+        },
+    )
+    assert res.status_code == 200, res.json()
+    return res.json()["bundles"]
+
+
+def _put_receive_draft(client, requester, bundles, batch_id=None):
+    body = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "receive",
+        "sub_type": "receive_supplier",
+        "bundles": bundles,
+    }
+    if batch_id is not None:
+        body["batch_id"] = batch_id
+    return client.put("/api/io/draft", json=body)
+
+
+def test_io_draft_save_stacks_new_slots(client, db_session, make_item):
+    """batch_id 없이 저장하면 같은 (work_type, sub_type)라도 새 슬롯이 누적된다."""
+    item_a = make_item(name="Draft A", warehouse_qty=Decimal("0"))
+    item_b = make_item(name="Draft B", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    r1 = _put_receive_draft(client, requester, _preview_receive_bundles(client, requester, item_a))
+    assert r1.status_code == 200, r1.json()
+    r2 = _put_receive_draft(client, requester, _preview_receive_bundles(client, requester, item_b))
+    assert r2.status_code == 200, r2.json()
+
+    assert r1.json()["batch_id"] != r2.json()["batch_id"]
+    drafts = client.get(
+        f"/api/io/drafts?requester_employee_id={requester.employee_id}"
+    ).json()
+    assert len(drafts) == 2
+
+
+def test_io_draft_save_with_batch_id_updates_in_place(client, db_session, make_item):
+    """batch_id를 실어 보내면 해당 draft만 갱신되고 슬롯 수는 늘지 않는다."""
+    item = make_item(name="Draft Inplace", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    bundles = _preview_receive_bundles(client, requester, item)
+    first = _put_receive_draft(client, requester, bundles)
+    assert first.status_code == 200, first.json()
+    batch_id = first.json()["batch_id"]
+
+    again = _put_receive_draft(client, requester, bundles, batch_id=batch_id)
+    assert again.status_code == 200, again.json()
+    assert again.json()["batch_id"] == batch_id
+
+    drafts = client.get(
+        f"/api/io/drafts?requester_employee_id={requester.employee_id}"
+    ).json()
+    assert len(drafts) == 1
+    assert drafts[0]["batch_id"] == batch_id
+
+
+def test_io_draft_update_others_batch_forbidden(client, db_session, make_item):
+    """타인의 draft batch_id로 갱신 시도 시 403."""
+    item = make_item(name="Draft Owner", warehouse_qty=Decimal("0"))
+    owner = _make_employee(db_session, code="OWN1", name="Owner")
+    other = _make_employee(db_session, code="OTH1", name="Other")
+    db_session.commit()
+
+    first = _put_receive_draft(client, owner, _preview_receive_bundles(client, owner, item))
+    batch_id = first.json()["batch_id"]
+
+    res = _put_receive_draft(
+        client, other, _preview_receive_bundles(client, other, item), batch_id=batch_id
+    )
+    assert res.status_code == 403, res.json()
+
+
+def test_io_draft_update_unknown_batch_unprocessable(client, db_session, make_item):
+    """존재하지 않는 batch_id로 갱신 시도 시 422."""
+    item = make_item(name="Draft Unknown", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    res = _put_receive_draft(
+        client,
+        requester,
+        _preview_receive_bundles(client, requester, item),
+        batch_id=str(uuid.uuid4()),
+    )
+    assert res.status_code == 422, res.json()

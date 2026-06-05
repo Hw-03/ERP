@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DepartmentRole, Employee, EmployeeLevel, WarehouseRole } from "@/lib/api";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../_admin_sections/adminShared";
 
@@ -20,6 +20,8 @@ export type EmployeeEditForm = {
   level: EmployeeLevel;
   warehouse_role: WarehouseRole;
   department_role: DepartmentRole;
+  /** W12-#7: 직원별 입출고 권한. 부서 io_enabled 와 AND 결합. */
+  io_enabled: boolean;
   /** 조립 부서 직원의 담당 모델 slot 목록 (배열 순서 = 우선순위, 0=1순위). */
   assigned_model_slots: number[];
 };
@@ -32,6 +34,7 @@ const EMPTY_EDIT_FORM: EmployeeEditForm = {
   level: "staff",
   warehouse_role: "none",
   department_role: "none",
+  io_enabled: true,
   assigned_model_slots: [],
 };
 
@@ -44,6 +47,7 @@ function toEditForm(emp: Employee): EmployeeEditForm {
     level: (emp.level ?? "staff") as EmployeeLevel,
     warehouse_role: (emp.warehouse_role ?? "none") as WarehouseRole,
     department_role: (emp.department_role ?? "none") as DepartmentRole,
+    io_enabled: emp.io_enabled ?? true,
     assigned_model_slots: emp.assigned_model_slots ?? [],
   };
 }
@@ -77,11 +81,34 @@ export function useAdminEmployeesForm(employees: Employee[]) {
     setEmpAddMode(false);
   }
 
+  // PR-2 2-3: 저장 안 한 편집 여부.
+  // selectedEmployee 의 원본 vs 현재 editForm 비교.
+  const dirty = useMemo(() => {
+    if (!selectedEmployee) return false;
+    const orig = toEditForm(selectedEmployee);
+    if (orig.name !== editForm.name) return true;
+    if (orig.role !== editForm.role) return true;
+    if (orig.phone !== editForm.phone) return true;
+    if (orig.department !== editForm.department) return true;
+    if (orig.level !== editForm.level) return true;
+    if (orig.warehouse_role !== editForm.warehouse_role) return true;
+    if (orig.department_role !== editForm.department_role) return true;
+    if (orig.io_enabled !== editForm.io_enabled) return true;
+    const a = orig.assigned_model_slots;
+    const b = editForm.assigned_model_slots;
+    if (a.length !== b.length) return true;
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] !== b[i]) return true;
+    }
+    return false;
+  }, [selectedEmployee, editForm]);
+
   return {
     selectedEmployee, setSelectedEmployee,
     empAddMode, setEmpAddMode,
     empAddForm, setEmpAddForm,
     editForm, setEditForm,
     resetAddForm,
+    dirty,
   };
 }

@@ -10,13 +10,24 @@ import { useCurrentOperator } from "../login/useCurrentOperator";
 import {
   DEPT_OPTIONS,
   PAGE_SIZE,
-  PROD_DEPTS,
   matchesSearch,
 } from "../_warehouse_steps/_constants";
-import { DEPT_LETTER_TO_NAME, deptOf, stageOf, type DeptLetter } from "../_admin_sections/_bom_workbench/bomDept";
+import { DEPT_LETTER_TO_NAME, deptOf } from "../_admin_sections/_bom_workbench/bomDept";
 import { LabeledSelect, SettingLabel } from "./_atoms";
+import {
+  STAGE_OPTIONS,
+  buildAssignedPriorityBySlot,
+  buildDeptPriorityByLetter,
+  getProdByDept,
+  keepCodeOnOneLine,
+  matchesDept,
+  matchesModel,
+  matchesStage,
+  renderDeptBreakdown,
+} from "./itemPickerShared";
 import type { IoBundle, IoSubType, IoWorkType, Item, ProductModel } from "./types";
 import {
+  allowsMixedBundles,
   deptIoSubType,
   getItemActionMode,
   type DeptIoDirection,
@@ -38,86 +49,16 @@ interface Props {
   onAddItem: (item: Item, sourceKind?: "direct_item" | "manual", subTypeOverride?: IoSubType) => void;
   onAdvance: () => void;
   busy?: boolean;
+  /**
+   * 대시보드에서 BOM 부모 품목으로 진입했을 때, 자동 카트 추가는 보류하고
+   * 해당 row 만 시각적으로 강조한다. row 가 마운트되면 scrollIntoView 로 가운데
+   * 정렬되며 2초간 배경 flash. `${item_id}__${workType}` 처럼 외부에서 키를
+   * 갱신하면 다시 발동.
+   */
+  highlightItemId?: string | null;
 }
-
-const STAGE_OPTIONS = [
-  { value: "ALL", label: "전체" },
-  { value: "RAW", label: "원자재" },
-  { value: "MID", label: "중간공정" },
-  { value: "DONE", label: "공정완료" },
-];
 
 const INITIAL_DISPLAY_LIMIT = PAGE_SIZE * 2;
-
-const NAME_TO_LETTER: Record<string, DeptLetter> = {
-  튜브: "T",
-  고압: "H",
-  진공: "V",
-  튜닝: "N",
-  조립: "A",
-  출하: "P",
-};
-
-function matchesDept(item: Item, dept: string) {
-  if (dept === "ALL") return true;
-  if (dept === "창고") return Number(item.warehouse_qty || 0) > 0;
-  const letter = NAME_TO_LETTER[dept];
-  if (!letter) return true;
-  return deptOf(item.process_type_code) === letter;
-}
-
-function matchesStage(item: Item, stage: string) {
-  if (stage === "ALL") return true;
-  const s = stageOf(item.process_type_code);
-  if (!s) return false;
-  if (stage === "RAW") return s === "R";
-  if (stage === "MID") return s === "A";
-  if (stage === "DONE") return s === "F";
-  return true;
-}
-
-function matchesModel(item: Item, selectedSlot: number | null | undefined) {
-  if (selectedSlot === undefined) return true;
-  if (selectedSlot === null) return item.model_slots.length === 0;
-  return item.model_slots.includes(selectedSlot);
-}
-
-// PRODUCTION 위치만 부서별로 합산. 0 이하는 제외해 tooltip noise 방지.
-function getProdByDept(item: Item): Map<string, number> {
-  const m = new Map<string, number>();
-  for (const loc of item.locations) {
-    if (loc.status !== "PRODUCTION") continue;
-    const q = Number(loc.quantity) || 0;
-    if (q <= 0) continue;
-    m.set(loc.department, (m.get(loc.department) ?? 0) + q);
-  }
-  return m;
-}
-
-// PROD_DEPTS (튜브→고압→진공→튜닝→조립→출하) 순서 고정. 그 외(AS/기타) 는 그대로 뒤에 알파벳 순.
-const DEPT_ORDER_INDEX = new Map<string, number>(PROD_DEPTS.map((d, i) => [d, i]));
-function renderDeptBreakdown(prodByDept: Map<string, number>) {
-  const entries = Array.from(prodByDept.entries()).sort(([a], [b]) => {
-    const ai = DEPT_ORDER_INDEX.get(a) ?? 100;
-    const bi = DEPT_ORDER_INDEX.get(b) ?? 100;
-    if (ai !== bi) return ai - bi;
-    return a.localeCompare(b);
-  });
-  return (
-    <div className="flex flex-col gap-0.5">
-      {entries.map(([dept, qty]) => (
-        <div key={dept} className="flex justify-between gap-3 tabular-nums">
-          <span>{dept}</span>
-          <span>{formatQty(qty)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function keepCodeOnOneLine(code: string | null | undefined) {
-  return code ? code.replace(/-/g, "\u2011") : "-";
-}
 
 export function IoTargetPicker({
   workType,
@@ -134,6 +75,7 @@ export function IoTargetPicker({
   onAddItem,
   onAdvance,
   busy,
+  highlightItemId,
 }: Props) {
   const [dept, setDept] = useState("ALL");
   const [model, setModel] = useState("전체");
@@ -165,26 +107,16 @@ export function IoTargetPicker({
 
   // Step 2 에서 선택한 대상 부서 → PROD 부서 순서 기준 우선순위 맵.
   // 같은 부서 내에서는 서버 정렬 유지 (stable sort).
-  const deptPriorityByLetter = useMemo(() => {
-    const base = [...PROD_DEPTS] as string[];
-    const ordered =
-      targetDepartment && base.includes(targetDepartment)
-        ? [targetDepartment, ...base.filter((d) => d !== targetDepartment)]
-        : base;
-    const map = new Map<string, number>();
-    ordered.forEach((name, idx) => {
-      const letter = NAME_TO_LETTER[name];
-      if (letter) map.set(letter, idx);
-    });
-    return map;
-  }, [targetDepartment]);
+  const deptPriorityByLetter = useMemo(
+    () => buildDeptPriorityByLetter(targetDepartment),
+    [targetDepartment],
+  );
 
   // 조립 부서 직원의 담당 모델 slot → priority(0=상위). 배열 순서가 곧 priority.
-  const assignedPriorityBySlot = useMemo(() => {
-    const m = new Map<number, number>();
-    (operator?.assigned_model_slots ?? []).forEach((slot, idx) => m.set(slot, idx));
-    return m;
-  }, [operator]);
+  const assignedPriorityBySlot = useMemo(
+    () => buildAssignedPriorityBySlot(operator?.assigned_model_slots),
+    [operator],
+  );
 
   const filteredItems = useMemo(() => {
     const selectedModelSlot =
@@ -280,7 +212,7 @@ export function IoTargetPicker({
         ref={tableContainerRef}
         onScroll={handleTableScroll}
         data-keep-scroll
-        className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overflow-x-auto rounded-[16px] border"
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-auto rounded-[16px] border"
         style={{
           background: LEGACY_COLORS.s2,
           borderColor: LEGACY_COLORS.border,
@@ -302,6 +234,8 @@ export function IoTargetPicker({
           bomParents={bomParents}
           hasBomBundle={bundles.some((b) => b.source_kind === "bom_parent")}
           hasSingleBundle={bundles.some((b) => b.source_kind === "direct_item")}
+          allowMix={allowsMixedBundles(subType)}
+          highlightItemId={highlightItemId ?? null}
         />
       </div>
 
@@ -351,6 +285,8 @@ function ItemTable({
   bomParents,
   hasBomBundle,
   hasSingleBundle,
+  allowMix,
+  highlightItemId,
 }: {
   items: Item[];
   displayLimit: number;
@@ -366,6 +302,8 @@ function ItemTable({
   bomParents: Set<string>;
   hasBomBundle: boolean;
   hasSingleBundle: boolean;
+  allowMix: boolean;
+  highlightItemId: string | null;
 }) {
   const isProcess = workType === "process" && deptIoDirection != null;
   const bomTarget = isProcess ? deptIoSubType(deptIoDirection!, "bom") : null;
@@ -441,10 +379,11 @@ function ItemTable({
             const hasOthers = Array.from(prodByDept.keys()).some((d) => d !== impliedDeptName);
             const noDeptStock = prodByDept.size === 0;
             const wQty = Number(item.warehouse_qty) || 0;
+            const isHighlight = highlightItemId === item.item_id;
             return (
-              <tr
+              <HighlightableRow
                 key={item.item_id}
-                className="transition-colors hover:brightness-110"
+                isHighlight={isHighlight}
               >
                 <td className="px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
                   <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
@@ -456,7 +395,7 @@ function ItemTable({
                   style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                 >
                   <span className="text-sm font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {keepCodeOnOneLine(item.item_code)}
+                    {keepCodeOnOneLine(item.mes_code)}
                   </span>
                 </td>
                 <td
@@ -549,10 +488,10 @@ function ItemTable({
                       );
                     })() : mode === "bom_or_single" ? (() => {
                       const hasBom = bomParents.has(item.item_id);
-                      // 한 작업 안에서 BOM 묶음과 낱개 묶음을 섞으면 백엔드가 거절 — 둘 중 한쪽이
-                      // 이미 카트에 있으면 반대쪽 버튼을 잠근다.
-                      const bomLockedByMode = hasSingleBundle;
-                      const singleLockedByMode = hasBomBundle;
+                      // 창고 입출고(allowMix)는 BOM·낱개 혼합 허용 — 새 결재 정책상 한 요청에서 같이 처리.
+                      // 그 외(produce/disassemble)는 종전대로 한쪽만 활성 — BOM 강제와 흐름 분기가 달라 락 유지.
+                      const bomLockedByMode = !allowMix && hasSingleBundle;
+                      const singleLockedByMode = !allowMix && hasBomBundle;
                       const bomDisabled = busy || bomLockedByMode || !hasBom;
                       const singleDisabled = busy || singleLockedByMode;
                       const bomTitle = !hasBom
@@ -614,7 +553,7 @@ function ItemTable({
                     )}
                   </span>
                 </td>
-              </tr>
+              </HighlightableRow>
             );
           })}
           {items.length === 0 && (
@@ -652,5 +591,53 @@ function ItemTable({
         </div>
       )}
     </>
+  );
+}
+
+// 대시보드에서 BOM 부모 품목으로 진입했을 때, 해당 row 가 마운트되면 즉시
+// scrollIntoView 로 가운데 정렬 + 2초간 배경 flash 효과로 사용자 시선을 유도.
+// 자동 카트 추가는 하지 않고 사용자가 직접 BOM/낱개를 선택하게 한다.
+function HighlightableRow({
+  isHighlight,
+  children,
+}: {
+  isHighlight: boolean;
+  children: React.ReactNode;
+}) {
+  const rowRef = useRef<HTMLTableRowElement | null>(null);
+  const [flash, setFlash] = useState(false);
+
+  useEffect(() => {
+    if (!isHighlight) return;
+    const el = rowRef.current;
+    if (!el) return;
+    try {
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+    } catch {
+      // older browsers 또는 SSR fallback
+      el.scrollIntoView();
+    }
+    setFlash(true);
+    const timer = window.setTimeout(() => setFlash(false), 2000);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [isHighlight]);
+
+  return (
+    <tr
+      ref={rowRef}
+      className="transition-colors hover:brightness-110"
+      style={
+        flash
+          ? {
+              background: `${LEGACY_COLORS.blue}26`, // ~15% alpha
+              transition: "background-color 0.4s ease",
+            }
+          : undefined
+      }
+    >
+      {children}
+    </tr>
   );
 }

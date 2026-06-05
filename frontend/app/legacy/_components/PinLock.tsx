@@ -2,29 +2,27 @@
 
 import { useMemo, useState } from "react";
 import { LockKeyhole } from "lucide-react";
-import { api } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { useVerifyAdminPinMutation } from "@/lib/queries/useAdminQuery";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "삭제"];
 
 export function PinLock({ onUnlocked }: { onUnlocked: (pin: string) => void }) {
   const [pin, setPin] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const verifyMutation = useVerifyAdminPinMutation();
+  const loading = verifyMutation.isPending;
 
   const dots = useMemo(() => Array.from({ length: 4 }), []);
 
-  const verify = async (pinToVerify: string) => {
-    try {
-      setLoading(true);
-      await api.verifyAdminPin(pinToVerify);
-      onUnlocked(pinToVerify);
-    } catch {
-      setError(true);
-      setPin("");
-    } finally {
-      setLoading(false);
-    }
+  const verify = (pinToVerify: string) => {
+    verifyMutation.mutate(pinToVerify, {
+      onSuccess: () => onUnlocked(pinToVerify),
+      onError: () => {
+        setError(true);
+        setPin("");
+      },
+    });
   };
 
   const addDigit = (value: string) => {
@@ -32,7 +30,7 @@ export function PinLock({ onUnlocked }: { onUnlocked: (pin: string) => void }) {
     const next = pin + value;
     setPin(next);
     setError(false);
-    if (next.length === 4) void verify(next);
+    if (next.length === 4) verify(next);
   };
 
   const removeDigit = () => {

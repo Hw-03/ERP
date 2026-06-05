@@ -110,7 +110,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                     className="text-[11px] font-semibold"
                     style={{ color: LEGACY_COLORS.muted2 }}
                   >
-                    {row.item_code ?? "—"}
+                    {row.mes_code ?? "—"}
                   </div>
                 </div>
                 <div
@@ -213,7 +213,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {row.item_code ?? "—"}
+                    {row.mes_code ?? "—"}
                   </td>
                   {/* 품명 */}
                   <td

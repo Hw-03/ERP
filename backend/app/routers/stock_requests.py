@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
 from sqlalchemy.exc import IntegrityError
@@ -33,6 +33,8 @@ from app.schemas import (
 )
 from app.services import stock_requests as svc
 from app.services._tx import commit_and_refresh, commit_only
+from app.services import notifications as notif_svc
+from app._evt import emit as _evt_emit
 
 
 router = APIRouter()
@@ -80,6 +82,8 @@ def create_stock_request(payload: StockRequestCreate, db: Session = Depends(get_
                 reason_category=payload.reason_category,
                 reason_memo=payload.reason_memo,
             )
+            # 결재 대기 요청이면 승인 담당자에게 도착 알림 (커밋 전 같은 트랜잭션).
+            notif_svc.notify_request_arrived(db, request)
             commit_and_refresh(db, request)
             db.refresh(request)
             return request
@@ -146,7 +150,7 @@ def list_warehouse_queue(db: Session = Depends(get_db), limit: int = Query(100, 
                 )
             ),
         )
-        .order_by(StockRequest.created_at.asc())
+        .order_by(StockRequest.created_at.desc())
         .limit(limit)
         .all()
     )
@@ -211,7 +215,7 @@ def list_department_queue(
         base_query = base_query.filter(StockRequest.requester_department.in_(list(visible)))
 
     return (
-        base_query.order_by(StockRequest.created_at.asc()).limit(limit).all()
+        base_query.order_by(StockRequest.created_at.desc()).limit(limit).all()
     )
 
 
@@ -408,13 +412,15 @@ def _load_actor(db: Session, employee_id: uuid.UUID) -> Employee:
 def approve_stock_request(
     request_id: uuid.UUID,
     payload: StockRequestActionRequest,
+    http_request: Request,
     db: Session = Depends(get_db),
 ):
     request = _load_request_for_action(db, request_id)
     approver = _load_actor(db, payload.actor_employee_id)
+    prev_status = request.status
 
     try:
-        svc.approve_request(db, request, approver=approver, pin=payload.pin)
+        svc.approve_request(db, request, approver=approver, pin=payload.pin, http_request=http_request)
     except PermissionError as exc:
         db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
@@ -430,7 +436,20 @@ def approve_stock_request(
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
+    # 이번 호출로 실제 COMPLETED 전이됐을 때만 요청자에게 승인 알림 (부분/멱등 제외).
+    if (
+        request.status == StockRequestStatusEnum.COMPLETED
+        and prev_status != StockRequestStatusEnum.COMPLETED
+    ):
+        notif_svc.notify_request_decided(db, request, decision="approved")
     commit_and_refresh(db, request)
+    _evt_emit(
+        "sr_approve_warehouse",
+        request=http_request,
+        req_id=str(request.request_id)[:8],
+        approver_emp=approver.employee_code,
+        result=request.status.value,
+    )
     return request
 
 
@@ -438,6 +457,7 @@ def approve_stock_request(
 def reject_stock_request(
     request_id: uuid.UUID,
     payload: StockRequestActionRequest,
+    http_request: Request,
     db: Session = Depends(get_db),
 ):
     request = _load_request_for_action(db, request_id)
@@ -447,7 +467,8 @@ def reject_stock_request(
 
     try:
         svc.reject_request(
-            db, request, approver=approver, pin=payload.pin, reason=payload.reason
+            db, request, approver=approver, pin=payload.pin, reason=payload.reason,
+            http_request=http_request,
         )
     except PermissionError as exc:
         db.rollback()
@@ -456,7 +477,14 @@ def reject_stock_request(
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
+    notif_svc.notify_request_decided(db, request, decision="rejected")
     commit_and_refresh(db, request)
+    _evt_emit(
+        "sr_reject_warehouse",
+        request=http_request,
+        req_id=str(request.request_id)[:8],
+        approver_emp=approver.employee_code,
+    )
     return request
 
 
@@ -464,14 +492,16 @@ def reject_stock_request(
 def department_approve_stock_request(
     request_id: uuid.UUID,
     payload: StockRequestActionRequest,
+    http_request: Request,
     db: Session = Depends(get_db),
 ):
     """부서 결재 승인 — department_role in (primary/deputy) 또는 admin."""
     request = _load_request_for_action(db, request_id)
     approver = _load_actor(db, payload.actor_employee_id)
+    prev_status = request.status
 
     try:
-        svc.approve_request_department(db, request, approver=approver, pin=payload.pin)
+        svc.approve_request_department(db, request, approver=approver, pin=payload.pin, http_request=http_request)
     except PermissionError as exc:
         db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
@@ -486,7 +516,19 @@ def department_approve_stock_request(
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
+    if (
+        request.status == StockRequestStatusEnum.COMPLETED
+        and prev_status != StockRequestStatusEnum.COMPLETED
+    ):
+        notif_svc.notify_request_decided(db, request, decision="approved")
     commit_and_refresh(db, request)
+    _evt_emit(
+        "sr_approve_dept",
+        request=http_request,
+        req_id=str(request.request_id)[:8],
+        approver_emp=approver.employee_code,
+        result=request.status.value,
+    )
     return request
 
 
@@ -494,6 +536,7 @@ def department_approve_stock_request(
 def department_reject_stock_request(
     request_id: uuid.UUID,
     payload: StockRequestActionRequest,
+    http_request: Request,
     db: Session = Depends(get_db),
 ):
     """부서 결재 반려."""
@@ -504,7 +547,8 @@ def department_reject_stock_request(
 
     try:
         svc.reject_request_department(
-            db, request, approver=approver, pin=payload.pin, reason=payload.reason
+            db, request, approver=approver, pin=payload.pin, reason=payload.reason,
+            http_request=http_request,
         )
     except PermissionError as exc:
         db.rollback()
@@ -513,7 +557,14 @@ def department_reject_stock_request(
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
+    notif_svc.notify_request_decided(db, request, decision="rejected")
     commit_and_refresh(db, request)
+    _evt_emit(
+        "sr_reject_dept",
+        request=http_request,
+        req_id=str(request.request_id)[:8],
+        approver_emp=approver.employee_code,
+    )
     return request
 
 
@@ -521,13 +572,14 @@ def department_reject_stock_request(
 def cancel_stock_request(
     request_id: uuid.UUID,
     payload: StockRequestActionRequest,
+    http_request: Request,
     db: Session = Depends(get_db),
 ):
     request = _load_request_for_action(db, request_id)
     requester = _load_actor(db, payload.actor_employee_id)
 
     try:
-        svc.cancel_request(db, request, requester=requester, pin=payload.pin)
+        svc.cancel_request(db, request, requester=requester, pin=payload.pin, http_request=http_request)
     except PermissionError as exc:
         db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
@@ -536,6 +588,12 @@ def cancel_stock_request(
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
     commit_and_refresh(db, request)
+    _evt_emit(
+        "sr_cancel",
+        request=http_request,
+        req_id=str(request.request_id)[:8],
+        requester_emp=requester.employee_code,
+    )
     return request
 
 
@@ -553,6 +611,7 @@ def submit_stock_request_draft(
                 request_id=request_id,
                 requester_employee_id=payload.requester_employee_id,
             )
+            notif_svc.notify_request_arrived(db, request)
             commit_and_refresh(db, request)
             return request
         except IntegrityError as exc:

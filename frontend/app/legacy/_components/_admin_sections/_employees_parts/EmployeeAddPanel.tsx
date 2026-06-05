@@ -31,7 +31,7 @@ const DEPARTMENT_ROLE_OPTIONS: { value: DepartmentRole; label: string }[] = [
 type TextFieldKey = "name" | "role" | "phone";
 const TEXT_FIELDS: { key: TextFieldKey; label: string; required: boolean; placeholder: string }[] = [
   { key: "name", label: "이름", required: true, placeholder: "예: 홍길동" },
-  { key: "role", label: "역할", required: false, placeholder: "예: 조립/사원" },
+  { key: "role", label: "직급", required: false, placeholder: "예: 사원/대리/과장" },
   { key: "phone", label: "연락처", required: false, placeholder: "예: 010-0000-0000" },
 ];
 

@@ -160,6 +160,10 @@ export const productionApi = {
       payload,
     ),
 
+  /** 주어진 year의 월별 거래 건수. { "2026-01": 142, ..., "2026-12": 0 } */
+  getMonthlyCounts: (year: number): Promise<Record<string, number>> =>
+    fetcher<Record<string, number>>(toApiUrl(`/api/inventory/transactions/monthly-counts?year=${year}`)),
+
   getItemsExportUrl: (params?: { category?: string; search?: string }) => {
     const qs = new URLSearchParams();
     if (params?.category) qs.set("category", params.category);

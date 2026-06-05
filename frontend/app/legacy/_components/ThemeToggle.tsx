@@ -15,10 +15,10 @@ export function ThemeToggle({ expanded = false }: { expanded?: boolean }) {
     // operator.theme 또는 localStorage에서 테마 읽기 (operator 우선)
     const theme = operator?.theme ?? localStorage.getItem("theme");
     if (theme === "dark") {
-      document.documentElement.classList.add("dark");
+      document.documentElement.setAttribute("data-theme", "dark");
       setIsLight(false);
     } else {
-      document.documentElement.classList.remove("dark");
+      document.documentElement.setAttribute("data-theme", "light");
       setIsLight(true);
     }
   }, [operator?.theme]);
@@ -28,11 +28,7 @@ export function ThemeToggle({ expanded = false }: { expanded?: boolean }) {
     setIsLight(next);
     const newTheme = next ? "light" : "dark";
 
-    if (next) {
-      document.documentElement.classList.remove("dark");
-    } else {
-      document.documentElement.classList.add("dark");
-    }
+    document.documentElement.setAttribute("data-theme", newTheme);
 
     // localStorage에 저장 (항상)
     localStorage.setItem("theme", newTheme);
@@ -54,7 +50,7 @@ export function ThemeToggle({ expanded = false }: { expanded?: boolean }) {
       onClick={toggle}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="group flex items-center justify-start rounded-[20px] -ml-1.5 w-[calc(100%+6px)] pl-1.5 transition-all duration-150 hover:scale-[1.015]"
+      className="group flex items-center justify-start rounded-[20px] -mx-1.5 w-[calc(100%+12px)] pl-1.5 transition-all duration-150 hover:scale-[1.015]"
       style={{
         background:
           expanded && hovered
@@ -67,7 +63,7 @@ export function ThemeToggle({ expanded = false }: { expanded?: boolean }) {
         <div
           className="flex h-[46px] w-[46px] items-center justify-center rounded-[16px] transition-all duration-150 group-hover:brightness-110 group-hover:scale-[1.05]"
           style={{
-            background: LEGACY_COLORS.s2,
+            background: "transparent",
             color: isLight ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2,
           }}
         >

@@ -1,11 +1,13 @@
 "use client";
 
-import { api, type IoBatch, type StockRequest } from "@/lib/api";
+import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
 import { MyRequestsPanel } from "./MyRequestsPanel";
 import { WarehouseQueuePanel } from "./WarehouseQueuePanel";
 import { DepartmentQueuePanel } from "./DepartmentQueuePanel";
 import { DraftCartPanel } from "./DraftCartPanel";
+import { HandoverSectionPanel } from "./HandoverSectionPanel";
 import type { WarehouseSectionTab } from "./WarehouseSectionTabs";
+import type { Operator } from "../login/useCurrentOperator";
 
 /**
  * Round-13 (#1) 추출 — DesktopWarehouseView 의 cart/mine/queue 3 패널 분기.
@@ -17,10 +19,12 @@ export interface WarehouseDraftPanelTabsProps {
   sectionTab: WarehouseSectionTab;
   canSeeQueue: boolean;
   canSeeDeptQueue: boolean;
+  operator: Operator | null;
   operatorEmployeeId: string | undefined;
   employeeId: string;
   refreshNonce: number;
   globalSearch: string;
+  items: Item[];
   setItems: (items: import("@/lib/api").Item[]) => void;
   onContinueDraft: (draft: StockRequest) => void;
   onContinueIoDraft?: (draft: IoBatch) => void;
@@ -34,10 +38,12 @@ export function WarehouseDraftPanelTabs({
   sectionTab,
   canSeeQueue,
   canSeeDeptQueue,
+  operator,
   operatorEmployeeId,
   employeeId,
   refreshNonce,
   globalSearch,
+  items,
   setItems,
   onContinueDraft,
   onContinueIoDraft,
@@ -95,6 +101,21 @@ export function WarehouseDraftPanelTabs({
           } catch {
             /* 무시 */
           }
+          onSubmitSuccess?.();
+        }}
+      />
+    );
+  }
+
+  if (sectionTab === "handover") {
+    return (
+      <HandoverSectionPanel
+        operator={operator}
+        operatorEmployeeId={operatorEmployeeId}
+        items={items}
+        refreshNonce={refreshNonce}
+        onChanged={() => {
+          bumpRefresh();
           onSubmitSuccess?.();
         }}
       />

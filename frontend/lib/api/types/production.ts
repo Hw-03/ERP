@@ -8,7 +8,7 @@ import type { TransactionType } from "./shared";
 export interface TransactionLog {
   log_id: string;
   item_id: string;
-  item_code: string | null;
+  mes_code: string | null;
   item_name: string;
   item_process_type_code: string | null;
   item_unit: string;
@@ -20,6 +20,8 @@ export interface TransactionLog {
   reference_no: string | null;
   produced_by: string | null;
   requester_name: string | null;
+  /** 승인자(요청을 수락한 사람). 직접 처리 시 = 요청자. */
+  approver_name: string | null;
   notes: string | null;
   operation_batch_id: string | null;
   created_at: string;
@@ -41,7 +43,7 @@ export interface TransactionEditLog {
 }
 
 export interface ProductionCheckComponent {
-  item_code: string | null;
+  mes_code: string | null;
   item_name: string;
   process_type_code: string | null;
   unit: string;
@@ -68,7 +70,11 @@ export type ProductionCapacityStatus =
 export interface ProductionCapacityItem {
   item_id: string;
   item_name: string;
-  item_code: string | null;
+  mes_code: string | null;
+  /** 모델 식별자(items.model_symbol). 그룹화·대표 PF 선정 기준. */
+  model_symbol?: string | null;
+  /** 해당 모델의 대표 PF 여부. */
+  is_representative?: boolean;
   immediate: number;
   maximum: number;
   /** 이 완제품의 immediate 를 결정한 직계 자식 병목 부품명. */
@@ -82,11 +88,13 @@ export interface ProductionCapacity {
   /** 표시 분기용. 선택 필드 — 백엔드 미배포/오래된 응답을 위한 fallback 허용. */
   status?: ProductionCapacityStatus;
   top_items: ProductionCapacityItem[];
+  /** 모델별 대표 PF 만 골라낸 리스트. 패널/모달 상단 표시용. */
+  representative_items?: ProductionCapacityItem[];
 }
 
 export interface BackflushDetail {
   item_id: string;
-  item_code: string | null;
+  mes_code: string | null;
   item_name: string;
   process_type_code: string | null;
   required_quantity: number;

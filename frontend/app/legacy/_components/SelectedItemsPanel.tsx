@@ -3,7 +3,7 @@
 import { X } from "lucide-react";
 import { type Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { itemCodeDeptBadge } from "@/lib/mes/process";
+import { mesCodeDeptBadge } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";
 import { useDeptColorLookup } from "./DepartmentsContext";
@@ -25,7 +25,7 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
     <div>
       {entries.map(({ item, quantity }) => {
         const stock = getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock));
-        const deptBadge = itemCodeDeptBadge(item.item_code, getDeptColor);
+        const deptBadge = mesCodeDeptBadge(item.mes_code, getDeptColor);
         const expected = outgoing
           ? Number(item.quantity) - quantity
           : Number(item.quantity) + quantity;
@@ -50,7 +50,7 @@ export function SelectedItemsPanel({ entries, onQuantityChange, onRemove, outgoi
                 {item.item_name}
               </div>
               <div className="truncate text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                {item.item_code ?? "-"}
+                {item.mes_code ?? "-"}
               </div>
             </div>
 

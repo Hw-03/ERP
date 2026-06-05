@@ -6,7 +6,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TruncatedText } from "@/lib/ui";
 import { BomBadge } from "./BomBadge";
 import { BomSearchInput } from "./BomSearchInput";
-import { BOM_STATUS_META, bomStatusOf, stageOf, type DeptLetter, type StageLetter } from "./bomDept";
+import { BOM_STATUS_META, bomStatusOf, stageOf, type BomDeptFilter, type StageLetter } from "./bomDept";
 import type { StatusFilter } from "./BomStatsRow";
 import { EmptyState } from "../../common";
 
@@ -21,7 +21,7 @@ import { EmptyState } from "../../common";
  * statusFilter 는 상단 KPI(BomStatsRow) 가 제어.
  */
 interface Props {
-  dept: DeptLetter;
+  dept: BomDeptFilter;
   items: Item[];
   allBomRows: BOMDetailEntry[];
   completedSet: Set<string>;
@@ -67,7 +67,10 @@ export function BomParentList({
   const list = useMemo(() => {
     const kw = search.trim().toLowerCase();
     return items
-      .filter((i) => i.process_type_code?.[0] === dept)
+      .filter((i) => {
+        if (dept !== "ALL" && i.process_type_code?.[0] !== dept) return false;
+        return true;
+      })
       .filter((i) => {
         if (mode === "edit") return stageOf(i.process_type_code) !== "R";
         return true;
@@ -82,7 +85,7 @@ export function BomParentList({
       })
       .filter((i) => {
         if (!kw) return true;
-        return `${i.item_name} ${i.item_code ?? ""}`.toLowerCase().includes(kw);
+        return `${i.item_name} ${i.mes_code ?? ""}`.toLowerCase().includes(kw);
       });
   }, [items, dept, search, stageFilter, mode, statusFilter, completedSet, childCountMap]);
 
@@ -104,6 +107,7 @@ export function BomParentList({
                 key={f.id}
                 type="button"
                 onClick={() => setStageFilter(f.id)}
+                aria-pressed={active}
                 className="rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors"
                 style={{
                   background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
@@ -135,6 +139,7 @@ export function BomParentList({
                 key={i.item_id}
                 type="button"
                 onClick={() => onSelect(i.item_id)}
+                aria-pressed={isSelected}
                 className="grid w-full items-center gap-3 px-3 py-2 text-left transition-colors"
                 style={{
                   gridTemplateColumns: "auto 1fr auto",
@@ -149,9 +154,9 @@ export function BomParentList({
                   <TruncatedText className="truncate text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
                     {i.item_name}
                   </TruncatedText>
-                  {i.item_code && (
+                  {i.mes_code && (
                     <TruncatedText className="truncate text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                      {i.item_code}
+                      {i.mes_code}
                     </TruncatedText>
                   )}
                 </div>

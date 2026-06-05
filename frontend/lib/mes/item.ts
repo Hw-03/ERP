@@ -15,7 +15,7 @@ import type { Item } from "@/lib/api";
  * Item 검색 박스 표시용 라벨 — "품목코드 / 품목명".
  */
 export function buildItemSearchLabel(item: Item): string {
-  return `${item.item_code} / ${item.item_name}`;
+  return `${item.mes_code} / ${item.item_name}`;
 }
 
 /**

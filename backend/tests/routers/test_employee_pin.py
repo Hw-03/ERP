@@ -83,3 +83,37 @@ def test_employee_not_found(db_session, client):
     import uuid
     resp = client.post(f"/api/employees/{uuid.uuid4()}/verify-pin", json={"pin": "0000"})
     assert resp.status_code == 404
+
+
+# ───────────────────────── reset-pin (W9-C) ─────────────────────────
+
+
+def test_reset_employee_pin_success(db_session, client):
+    """올바른 관리자 PIN(pin 필드)으로 reset → 204, 이후 기본 PIN 0000 검증 통과."""
+    emp = _make_employee(db_session, pin_hash=hash_pin("9999"), code="E95")
+    db_session.commit()
+
+    resp = client.post(
+        f"/api/employees/{emp.employee_id}/reset-pin",
+        json={"pin": "0000"},
+    )
+    assert resp.status_code == 204, resp.text
+
+    # 초기화 후 기본 PIN 0000 으로 검증 통과
+    verify = client.post(
+        f"/api/employees/{emp.employee_id}/verify-pin",
+        json={"pin": "0000"},
+    )
+    assert verify.status_code == 200
+
+
+def test_reset_employee_pin_wrong_admin_pin_403(db_session, client):
+    """잘못된 관리자 PIN → 403 FORBIDDEN."""
+    emp = _make_employee(db_session, pin_hash=DEFAULT_PIN_HASH, code="E96")
+    db_session.commit()
+
+    resp = client.post(
+        f"/api/employees/{emp.employee_id}/reset-pin",
+        json={"pin": "9999"},
+    )
+    assert resp.status_code == 403, resp.text

@@ -1,14 +1,15 @@
 """Department master router."""
 
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Department
 from app.routers._errors import ErrorCode, http_error
-from app.routers.settings import require_admin
+from app.dependencies.admin import require_admin_pin
+from app.models import Department
+from app.services.reorder import reorder_by_display_order
 from app.schemas import (
     DepartmentCreate,
     DepartmentDeleteRequest,
@@ -34,12 +35,18 @@ def list_departments(
 @router.post("", response_model=DepartmentResponse, status_code=status.HTTP_201_CREATED)
 def create_department(
     payload: DepartmentCreate,
+    _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
-    require_admin(db, payload.pin)
     if db.query(Department).filter(Department.name == payload.name).first():
-        raise HTTPException(status_code=409, detail="이미 존재하는 부서명입니다.")
-    dept = Department(name=payload.name, display_order=payload.display_order, is_active=True, color_hex=payload.color_hex)
+        raise http_error(409, ErrorCode.CONFLICT, "이미 존재하는 부서명입니다.")
+    dept = Department(
+        name=payload.name,
+        display_order=payload.display_order,
+        is_active=True,
+        color_hex=payload.color_hex,
+        io_enabled=payload.io_enabled if payload.io_enabled is not None else True,
+    )
     db.add(dept)
     db.commit()
     db.refresh(dept)
@@ -47,12 +54,15 @@ def create_department(
 
 
 @router.patch("/reorder")
-def reorder_departments(payload: DepartmentReorderPayload, db: Session = Depends(get_db)):
-    require_admin(db, payload.pin)
-    for item in payload.items:
-        dept = db.query(Department).filter(Department.id == item.id).first()
-        if dept:
-            dept.display_order = item.display_order
+def reorder_departments(
+    payload: DepartmentReorderPayload,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
+    reorder_by_display_order(
+        db, Department, "id",
+        [(item.id, item.display_order) for item in payload.items],
+    )
     db.commit()
     return {"ok": True}
 
@@ -61,15 +71,15 @@ def reorder_departments(payload: DepartmentReorderPayload, db: Session = Depends
 def update_department(
     dept_id: int,
     payload: DepartmentUpdate,
+    _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
-    require_admin(db, payload.pin)
     dept = db.query(Department).filter(Department.id == dept_id).first()
     if not dept:
-        raise HTTPException(status_code=404, detail="부서를 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "부서를 찾을 수 없습니다.")
     if payload.name is not None:
         if db.query(Department).filter(Department.name == payload.name, Department.id != dept_id).first():
-            raise HTTPException(status_code=409, detail="이미 존재하는 부서명입니다.")
+            raise http_error(409, ErrorCode.CONFLICT, "이미 존재하는 부서명입니다.")
         dept.name = payload.name
     if payload.display_order is not None:
         dept.display_order = payload.display_order
@@ -77,6 +87,8 @@ def update_department(
         dept.is_active = payload.is_active
     if payload.color_hex is not None:
         dept.color_hex = payload.color_hex
+    if payload.io_enabled is not None:
+        dept.io_enabled = payload.io_enabled
     db.commit()
     db.refresh(dept)
     return dept
@@ -85,6 +97,7 @@ def update_department(
 @router.delete("/{dept_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_department(
     dept_id: int,
+    _admin: Annotated[None, Depends(require_admin_pin)],
     pin: Optional[str] = Query(None, description="관리자 PIN (deprecated — body 사용 권장)"),
     body: Optional[DepartmentDeleteRequest] = Body(None),
     db: Session = Depends(get_db),
@@ -94,12 +107,8 @@ def delete_department(
     PIN 은 request body(`{"pin": "..."}`) 로 전달하면 access log 에 남지 않는다.
     하위호환을 위해 body 가 없으면 query string `pin` 으로 폴백한다.
     """
-    effective_pin = (body.pin if body and body.pin else None) or pin
-    if not effective_pin:
-        raise http_error(400, ErrorCode.BAD_REQUEST, "관리자 PIN 이 필요합니다.")
-    require_admin(db, effective_pin)
     dept = db.query(Department).filter(Department.id == dept_id).first()
     if not dept:
-        raise HTTPException(status_code=404, detail="부서를 찾을 수 없습니다.")
+        raise http_error(404, ErrorCode.NOT_FOUND, "부서를 찾을 수 없습니다.")
     db.delete(dept)
     db.commit()

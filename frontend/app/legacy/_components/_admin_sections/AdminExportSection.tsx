@@ -214,7 +214,7 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
       const filtered = items;
       const headers = ["품목 코드", "품명", "단위", "현재고", "안전재고", "부서", "공급처"];
       const rows = filtered.map((it) => [
-        it.item_code,
+        it.mes_code,
         it.item_name,
         it.unit,
         it.quantity,
@@ -246,7 +246,7 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
     }
     if (scope === "employees") {
       const emps = await api.getEmployees({ activeOnly: !inactive });
-      const headers = ["이름", "부서", "역할", "등급", "창고 역할", "활성"];
+      const headers = ["이름", "부서", "직급", "등급", "창고 역할", "활성"];
       const rows = emps.map((e) => [
         e.name,
         e.department,
@@ -262,9 +262,9 @@ export function AdminExportSection({ itemsExportUrl, transactionsExportUrl }: Pr
       const rows = await api.getAllBOM();
       const headers = ["부모 코드", "부모명", "자식 코드", "자식명", "수량", "단위"];
       const data = rows.map((r) => [
-        r.parent_item_code ?? "",
+        r.parent_mes_code ?? "",
         r.parent_item_name,
-        r.child_item_code ?? "",
+        r.child_mes_code ?? "",
         r.child_item_name,
         r.quantity,
         r.unit,

@@ -12,7 +12,6 @@ from decimal import Decimal
 from app.models import (
     Employee,
     IoBatch,
-    ItemModel,
     ProductSymbol,
     TransactionLog,
     TransactionTypeEnum,
@@ -245,18 +244,25 @@ def test_summary_process_step_filter(client, db_session, make_item):
 
 
 def test_summary_model_filter(client, db_session, make_item):
-    """model = item_models ↔ product_symbols.model_name IN 필터."""
-    sym = ProductSymbol(slot=1, symbol="A", model_name="DX3000")
-    db_session.add(sym)
-    a = make_item(name="DX3000부품", warehouse_qty=Decimal("0"))
-    b = make_item(name="무관품", warehouse_qty=Decimal("0"))
+    """model = product_symbols.model_name IN 필터 — Item.mes_code prefix 기반.
+
+    회사 규약: mes_code 의 첫 '-' 앞 글자열 각 글자 = ProductSymbol.symbol.
+    DX3000(symbol='A') 매칭은 "A-…" 또는 prefix 중 어느 자리든 'A' 포함이면 OK.
+    같은 품목이 prefix 안에 여러 symbol("AB-…") 가져도 거래 카운트는 1건이어야 함.
+    """
+    db_session.add(ProductSymbol(slot=1, symbol="A", model_name="DX3000"))
+    db_session.add(ProductSymbol(slot=2, symbol="B", model_name="DX1000"))
+    a = make_item(
+        name="DX3000부품",
+        warehouse_qty=Decimal("0"),
+        model_symbol="AB", process_type_code="AR", serial_no=9001,  # 생성열 → "AB-AR-9001" (DX3000+DX1000 공용)
+    )
+    b = make_item(
+        name="무관품",
+        warehouse_qty=Decimal("0"),
+        model_symbol="C", process_type_code="AR", serial_no=9002,  # 생성열 → "C-AR-9002" (매칭 안 됨)
+    )
     db_session.flush()
-    db_session.add(ItemModel(item_id=a.item_id, slot=1))
-    # 같은 품목이 모델 여러 개여도 거래 카운트는 1건이어야(중복 회피)
-    sym2 = ProductSymbol(slot=2, symbol="B", model_name="DX1000")
-    db_session.add(sym2)
-    db_session.flush()
-    db_session.add(ItemModel(item_id=a.item_id, slot=2))
     _seed_log(db_session, a, TransactionTypeEnum.RECEIVE, Decimal("1"))
     _seed_log(db_session, b, TransactionTypeEnum.RECEIVE, Decimal("1"))
     db_session.commit()
@@ -265,7 +271,7 @@ def test_summary_model_filter(client, db_session, make_item):
         "/api/inventory/transactions/summary", params={"model": "DX3000"}
     )
     assert res.status_code == 200, res.text
-    assert res.json()["total"] == 1  # a 의 RECEIVE 1건만 (모델 2개여도 1)
+    assert res.json()["total"] == 1  # a 의 RECEIVE 1건만 (공용 prefix 라도 1)
 
     res = client.get(
         "/api/inventory/transactions", params={"model": "DX3000"}

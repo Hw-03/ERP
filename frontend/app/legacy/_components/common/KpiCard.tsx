@@ -77,6 +77,7 @@ function KpiCardImpl({ label, value, hint, tone, active = false, onClick, compac
         onClick={onClick}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
+        aria-pressed={active}
         className={`${boxCls} text-left transition-colors hover:brightness-110`}
         style={{ background: bg, borderColor: border }}
       >
@@ -88,7 +89,7 @@ function KpiCardImpl({ label, value, hint, tone, active = false, onClick, compac
   return (
     <div
       className={boxCls}
-      style={{ background: bg, borderColor: border }}
+      style={{ background: "transparent", borderColor: border }}
     >
       {content}
     </div>

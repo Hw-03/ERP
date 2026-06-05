@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 *.pyo
 .env
+.env*.local
 .venv
 venv/
 
@@ -23,11 +24,22 @@ frontend/.vitest/
 # Backend runtime logs (Phase 4)
 backend/logs/
 
+# Playwright e2e (전용 DB mes_e2e.db* 는 위 *.db 규칙으로 이미 제외)
+frontend/test-results/
+frontend/playwright-report/
+frontend/.last-run.json
+frontend/tests/e2e/.e2e-backend.pid
+frontend/tests/e2e/.e2e-realdb-hash
+frontend/tests/e2e/.e2e-seed.json
+
 # Node
 node_modules/
 .next/
 out/
 build/
+
+# Obsidian vault metadata — 사용자별 설정. 추적 안 함.
+.obsidian/
 npm-debug.log*
 
 # TypeScript build
@@ -54,6 +66,7 @@ Thumbs.db
 /v[0-9]*.png
 /api_requests.log
 /verify_out.log
+_attic/verify_out.log
 /verify-history-*.log
 /all_console_errors.log
 /bom-snapshot.yml
@@ -61,9 +74,16 @@ Thumbs.db
 /*-snap.yml
 /verify-*.yml
 
+# Demo verification artifacts (W12-C, 시연 검증용 임시 스크린샷·후보 데이터)
+/s[0-9]*.png
+/post-merge-*.png
+/*.xlsx
+_dev/demo-verify/
+
 # Local / personal files
 workspace.ahk
 backend/query_test.py
+skills-lock.json
 
 # Obsidian vault (vault-sync 브랜치 전용, main에서 제외)
 vault/

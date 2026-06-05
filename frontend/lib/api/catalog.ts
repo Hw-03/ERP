@@ -8,7 +8,7 @@
  * 총 10 메소드.
  */
 
-import { deleteJson, fetcher, patchJson, postJson, toApiUrl } from "../api-core";
+import { deleteJson, fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
 import type {
   BOMDetailEntry,
   BOMEntry,
@@ -23,7 +23,18 @@ export const catalogApi = {
   createModel: (payload: { model_name: string; symbol?: string }) =>
     postJson<ProductModel>(toApiUrl("/api/models"), payload),
 
-  deleteModel: (slot: number) => deleteJson<void>(toApiUrl(`/api/models/${slot}`)),
+  updateModel: (
+    slot: number,
+    payload: { model_name?: string; symbol?: string; pin: string },
+  ) => putJson<ProductModel>(toApiUrl(`/api/models/${slot}`), payload),
+
+  deleteModel: (slot: number, pin: string) =>
+    deleteJson<void>(toApiUrl(`/api/models/${slot}`), { pin }),
+
+  reorderModels: (payload: {
+    items: { slot: number; display_order: number }[];
+    pin: string;
+  }) => patchJson<{ ok: boolean }>(toApiUrl("/api/models/reorder"), payload),
 
   // BOM --------------------------------------------------------------------
   getAllBOM: () => fetcher<BOMDetailEntry[]>(toApiUrl("/api/bom")),

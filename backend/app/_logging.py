@@ -27,6 +27,11 @@ def setup_logging() -> logging.Logger:
     log_dir = Path(os.environ.get("LOG_DIR") or (_BACKEND_DIR / "logs"))
     log_dir.mkdir(parents=True, exist_ok=True)
 
+    try:
+        backup_count = int(os.environ.get("LOG_BACKUP_COUNT", "5"))
+    except ValueError:
+        backup_count = 5
+
     logger = logging.getLogger("mes")
     if getattr(logger, "_mes_configured", False):
         return logger
@@ -41,7 +46,7 @@ def setup_logging() -> logging.Logger:
     file_handler = RotatingFileHandler(
         log_dir / "mes.log",
         maxBytes=5 * 1024 * 1024,
-        backupCount=5,
+        backupCount=backup_count,
         encoding="utf-8",
     )
     file_handler.setLevel(level)

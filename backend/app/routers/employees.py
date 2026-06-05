@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 import uuid
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
@@ -20,11 +20,13 @@ from app.schemas import (
     EmployeeUpdate,
     PinVerifyRequest,
 )
+from app.dependencies.admin import require_admin_pin
 from app.routers.settings import require_admin
 from app.services import rate_limit
-from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin, verify_pin
+from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin, validate_pin, verify_pin
 from app.services import audit
 from app.services._tx import commit_and_refresh, commit_only
+from app._actor import set_actor
 
 router = APIRouter()
 
@@ -155,6 +157,7 @@ def create_employee(payload: EmployeeCreate, request: Request, db: Session = Dep
         level=payload.level,
         warehouse_role=role_value,
         department_role=dept_role_value,
+        io_enabled=payload.io_enabled if payload.io_enabled is not None else True,
         display_order=payload.display_order,
         is_active="true" if payload.is_active else "false",
     )
@@ -221,6 +224,10 @@ def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate, request: Re
     if payload.is_active is not None:
         if employee.is_active != payload.is_active:
             employee.is_active = payload.is_active; changed.append("is_active")
+    if payload.io_enabled is not None:
+        if bool(employee.io_enabled) != bool(payload.io_enabled):
+            employee.io_enabled = bool(payload.io_enabled)
+            changed.append("io_enabled")
 
     if payload.assigned_model_slots is not None:
         current = _assigned_slots_for(db, employee.employee_id)
@@ -315,6 +322,7 @@ def verify_employee_pin(
         raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
 
     rate_limit.record_success(rl_key)
+    set_actor(request, employee)
     return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
 
 
@@ -333,9 +341,11 @@ def change_employee_pin(
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원입니다.")
     if not verify_pin(employee.pin_hash, payload.current_pin):
         raise http_error(403, ErrorCode.FORBIDDEN, "현재 PIN이 올바르지 않습니다.")
+    validate_pin(payload.new_pin)
     if payload.current_pin == payload.new_pin:
         raise http_error(422, ErrorCode.UNPROCESSABLE, "새 PIN은 현재 PIN과 달라야 합니다.")
 
+    set_actor(request, employee)
     employee.pin_hash = hash_pin(payload.new_pin)
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
     employee.pin_last_changed = datetime.now(UTC).replace(tzinfo=None)
@@ -356,10 +366,10 @@ def reset_employee_pin(
     employee_id: uuid.UUID,
     payload: EmployeePinResetRequest,
     request: Request,
+    _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
     """직원 PIN을 기본값(0000)으로 초기화 — 관리자 PIN 검증 필요."""
-    require_admin(db, payload.admin_pin)
 
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
@@ -417,6 +427,7 @@ def _to_response(
         department_role=(employee.department_role or "none"),
         display_order=int(employee.display_order),
         is_active=bool(employee.is_active),
+        io_enabled=bool(getattr(employee, "io_enabled", True)),
         created_at=employee.created_at,
         updated_at=employee.updated_at,
         pin_last_changed=getattr(employee, "pin_last_changed", None),

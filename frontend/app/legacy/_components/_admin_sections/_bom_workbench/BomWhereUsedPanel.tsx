@@ -38,23 +38,8 @@ export function BomWhereUsedPanel({ selected, rows, items, onSelectParent }: Pro
   const itemMap = new Map(items.map((i) => [i.item_id, i]));
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {/* 선택된 품목 헤더 */}
-      <div
-        className="flex items-center gap-3 rounded-2xl border px-4 py-3"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-      >
-        <BomBadge processTypeCode={selected.process_type_code} />
-        <div className="min-w-0 flex-1">
-          <TruncatedText className="truncate text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
-            {selected.item_name}
-          </TruncatedText>
-          <TruncatedText className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            {selected.item_code ?? "(코드 없음)"} · {rows.length}개 부모에서 사용
-          </TruncatedText>
-        </div>
-      </div>
-
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* 부모/품목 헤더는 BomDeptTabs 옆 행으로 hoist 되어 BomParentHeader 가 담당. */}
       {/* 역참조 결과 */}
       <div
         className="flex min-h-0 flex-1 flex-col rounded-2xl border"
@@ -92,7 +77,7 @@ export function BomWhereUsedPanel({ selected, rows, items, onSelectParent }: Pro
                       {r.parent_item_name}
                     </TruncatedText>
                     <TruncatedText className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                      {r.parent_item_code ?? "(코드 없음)"}
+                      {r.parent_mes_code ?? "(코드 없음)"}
                     </TruncatedText>
                   </div>
                   <div className="text-right text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Box, Plus } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Box, GripVertical, Plus, Save, Trash2 } from "lucide-react";
 import type { BOMDetailEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
+import { Button } from "@/lib/ui/Button";
 import { EmptyState } from "../common";
 import { StatusPill } from "../common/StatusPill";
 import {
@@ -16,6 +17,7 @@ import {
 import { useAdminMasterItemsContext } from "./AdminMasterItemsContext";
 import { AddItemForm } from "./_master_items_parts/AddItemForm";
 import { EditItemForm } from "./_master_items_parts/EditItemForm";
+import { useRegisterDirty, useLocalDirtyGuard } from "@/lib/ui/dirty-guard";
 
 type DetailTab = "info" | "stock" | "bom" | "history";
 
@@ -39,19 +41,88 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
     setItemSearch,
     addMode,
     setAddMode,
+    saveItem,
+    dirty,
+    reorderItems,
+    deleteItem,
+    restoreItem,
   } = useAdminMasterItemsContext();
 
   const [tab, setTab] = useState<DetailTab>("info");
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
 
-  // KPI: 정상 / 부족 (사용자 결정에 따라 비활성 제거, 3개)
+  // 드래그 reorder — Pointer Events 기반 (HTML5 DnD 는 drag 중 wheel 이벤트 차단).
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const dragIdRef = useRef<string | null>(null);
+  const dropTargetIdRef = useRef<string | null>(null);
+  const isDraggingRef = useRef(false);
+  const pointerStartYRef = useRef(0);
+
+  function findItemIdAtPoint(x: number, y: number): string | null {
+    const el = document.elementFromPoint(x, y);
+    return el?.closest("[data-item-id]")?.getAttribute("data-item-id") ?? null;
+  }
+
+  function handleGripPointerDown(e: React.PointerEvent, id: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragIdRef.current = id;
+    pointerStartYRef.current = e.clientY;
+    isDraggingRef.current = false;
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+  }
+
+  function handleGripPointerMove(e: React.PointerEvent, id: string) {
+    if (dragIdRef.current !== id) return;
+    if (!isDraggingRef.current && Math.abs(e.clientY - pointerStartYRef.current) > 5) {
+      isDraggingRef.current = true;
+      setDragId(id);
+    }
+    if (!isDraggingRef.current) return;
+    const target = findItemIdAtPoint(e.clientX, e.clientY);
+    const next = target && target !== id ? target : null;
+    if (next !== dropTargetIdRef.current) {
+      dropTargetIdRef.current = next;
+      setDropTargetId(next);
+    }
+  }
+
+  function handleGripPointerUp(e: React.PointerEvent, id: string) {
+    if (isDraggingRef.current && dragIdRef.current && dropTargetIdRef.current) {
+      const fromIdx = visibleItems.findIndex((it) => it.item_id === dragIdRef.current);
+      const toIdx = visibleItems.findIndex((it) => it.item_id === dropTargetIdRef.current);
+      if (fromIdx >= 0 && toIdx >= 0 && fromIdx !== toIdx) {
+        const next = [...visibleItems];
+        const [moved] = next.splice(fromIdx, 1);
+        if (moved) next.splice(toIdx, 0, moved);
+        reorderItems(next);
+      }
+    }
+    dragIdRef.current = null;
+    dropTargetIdRef.current = null;
+    isDraggingRef.current = false;
+    setDragId(null);
+    setDropTargetId(null);
+  }
+
+  // 활성 섹션 dirty/save 를 상위 registry 에 등록 (탭/사이드바 가드).
+  useRegisterDirty("items", dirty, saveItem);
+  // 항목 변경(트리거 a) 가드 — 같은 페이지에서 다른 품목 선택.
+  const { confirmNavigation } = useLocalDirtyGuard(dirty, saveItem);
+
+  // KPI: 전체 / 정상 / 부족 / 품절 — 대시보드와 동일 4분기
   const stats = useMemo(() => {
     let ok = 0;
     let low = 0;
+    let zero = 0;
     for (const it of visibleItems) {
-      if (it.min_stock != null && Number(it.quantity) < Number(it.min_stock)) low += 1;
+      const qty = Number(it.quantity);
+      if (qty <= 0) zero += 1;
+      else if (it.min_stock != null && qty < Number(it.min_stock)) low += 1;
       else ok += 1;
     }
-    return { ok, low };
+    return { ok, low, zero };
   }, [visibleItems]);
 
   // 첫 진입 시 첫 visibleItem 자동 선택 (addMode가 아닐 때만)
@@ -62,14 +133,24 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
     setSelectedItem(visibleItems[0]);
   }, [addMode, selectedItem, visibleItems, setSelectedItem]);
 
-  // 선택이 바뀌면 첫 탭으로 리셋
+  // 선택이 바뀌면 첫 탭으로 리셋 + 삭제 확인 닫기
   useEffect(() => {
     setTab("info");
+    setDeleteConfirm(false);
   }, [selectedItem?.item_id]);
 
   function handleStartAdd() {
-    setAddMode(true);
-    setSelectedItem(null);
+    confirmNavigation(() => {
+      setAddMode(true);
+      setSelectedItem(null);
+    });
+  }
+
+  function handleSelectItem(item: Item, isSelected: boolean) {
+    confirmNavigation(() => {
+      setAddMode(false);
+      setSelectedItem(isSelected ? null : item);
+    });
   }
 
   return (
@@ -78,32 +159,27 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
         icon={Box}
         title="품목 관리"
         description="모든 품목의 정보를 조회하고 관리할 수 있습니다."
-        actions={
-          <button
-            type="button"
-            onClick={handleStartAdd}
-            className="flex items-center gap-1.5 rounded-[12px] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-110"
-            style={{ background: LEGACY_COLORS.blue }}
-          >
-            <Plus className="h-4 w-4" />
-            품목 추가
-          </button>
-        }
       />
 
       <AdminKpiBar
         items={[
           { key: "all", label: "전체 품목", value: visibleItems.length, hint: "필터·검색 적용 결과", tone: LEGACY_COLORS.blue },
           { key: "ok", label: "정상", value: stats.ok, hint: "안전재고 충족", tone: LEGACY_COLORS.green },
-          { key: "low", label: "부족", value: stats.low, hint: "안전재고 미만", tone: LEGACY_COLORS.red },
+          { key: "low", label: "부족", value: stats.low, hint: "안전재고 미만", tone: LEGACY_COLORS.yellow },
+          { key: "zero", label: "품절", value: stats.zero, hint: "재고 0 이하", tone: LEGACY_COLORS.red },
         ]}
       />
 
-      <div className="flex min-h-0 flex-1 gap-4">
+      <div className="grid min-h-0 flex-1 gap-4" style={{ gridTemplateColumns: "55fr 45fr", gridTemplateRows: "1fr" }}>
         <AdminListPanel
           title="품목 목록"
           countLabel={`${formatQty(visibleItems.length)}건`}
-          width={360}
+          width="100%"
+          action={
+            <Button variant="primary" size="sm" iconLeft={<Plus className="h-3.5 w-3.5" />} onClick={handleStartAdd}>
+              추가
+            </Button>
+          }
           searchValue={itemSearch}
           searchPlaceholder="품목명, 코드 검색"
           onSearchChange={setItemSearch}
@@ -117,43 +193,86 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
           }
           renderItem={(item) => {
             const isSelected = selectedItem?.item_id === item.item_id;
+            const isDeleted = !!item.deleted_at;
+            const qty = Number(item.quantity);
+            const zeroStock = qty <= 0;
             const lowStock =
-              item.min_stock != null && Number(item.quantity) < Number(item.min_stock);
+              !zeroStock && item.min_stock != null && qty < Number(item.min_stock);
+            const isDragging = dragId === item.item_id;
+            const isDropTarget =
+              dragId !== null && dropTargetId === item.item_id && dragId !== item.item_id;
             return (
-              <button
+              <div
                 key={item.item_id}
-                type="button"
-                onClick={() => {
-                  setAddMode(false);
-                  setSelectedItem(isSelected ? null : item);
-                }}
-                className="flex w-full items-center gap-2 rounded-[10px] border px-3 py-2 text-left transition-colors hover:brightness-[1.04]"
-                style={{
-                  background: isSelected
-                    ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
-                    : LEGACY_COLORS.s2,
-                  borderColor: isSelected ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                }}
+                data-item-id={item.item_id}
+                className="relative"
+                style={{ opacity: isDragging ? 0.4 : isDeleted ? 0.5 : 1 }}
               >
-                <span
-                  className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-black tabular-nums"
+                {isDropTarget && (
+                  <div
+                    className="pointer-events-none absolute inset-x-0 -top-1 h-0.5 rounded-full"
+                    style={{ background: LEGACY_COLORS.blue }}
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleSelectItem(item, isSelected)}
+                  aria-pressed={isSelected}
+                  className="flex w-full items-center gap-2 rounded-[10px] border px-3 py-2 text-left transition-colors hover:brightness-[1.04]"
                   style={{
                     background: isSelected
-                      ? LEGACY_COLORS.blue
-                      : `color-mix(in srgb, ${LEGACY_COLORS.muted2} 16%, transparent)`,
-                    color: isSelected ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
+                      ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
+                      : LEGACY_COLORS.s2,
+                    borderColor: isSelected ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
                   }}
                 >
-                  {item.item_code ?? "—"}
-                </span>
-                <span
-                  className="min-w-0 flex-1 truncate text-[13px] font-semibold"
-                  style={{ color: LEGACY_COLORS.text }}
-                >
-                  {item.item_name}
-                </span>
-                {lowStock && <StatusPill label="부족" tone="danger" showDot maxWidth={50} />}
-              </button>
+                  <GripVertical
+                    className="h-4 w-4 shrink-0 cursor-grab"
+                    style={{ color: LEGACY_COLORS.muted2, touchAction: "none" }}
+                    aria-label="드래그 핸들"
+                    onPointerDown={(e) => handleGripPointerDown(e, item.item_id)}
+                    onPointerMove={(e) => handleGripPointerMove(e, item.item_id)}
+                    onPointerUp={(e) => handleGripPointerUp(e, item.item_id)}
+                  />
+                  <span
+                    className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-black tabular-nums"
+                    style={{
+                      background: isSelected
+                        ? LEGACY_COLORS.blue
+                        : `color-mix(in srgb, ${LEGACY_COLORS.muted2} 16%, transparent)`,
+                      color: isSelected ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
+                    }}
+                  >
+                    {item.mes_code ?? "—"}
+                  </span>
+                  <span
+                    className="min-w-0 flex-1 truncate text-[13px] font-semibold"
+                    style={{
+                      color: isDeleted ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
+                      textDecoration: isDeleted ? "line-through" : "none",
+                    }}
+                  >
+                    {item.item_name}
+                  </span>
+                  {isDeleted ? (
+                    <div className="shrink-0">
+                      <StatusPill label="삭제됨" tone="danger" showDot maxWidth={90} />
+                    </div>
+                  ) : zeroStock ? (
+                    <div className="shrink-0">
+                      <StatusPill label="품절" tone="danger" showDot maxWidth={70} />
+                    </div>
+                  ) : lowStock ? (
+                    <div className="shrink-0">
+                      <StatusPill label="부족" tone="warning" showDot maxWidth={70} />
+                    </div>
+                  ) : (
+                    <div className="shrink-0">
+                      <StatusPill label="정상" tone="success" showDot maxWidth={70} />
+                    </div>
+                  )}
+                </button>
+              </div>
             );
           }}
         />
@@ -170,22 +289,106 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
             addMode
               ? "필요한 항목을 채우고 추가 버튼을 눌러주세요."
               : selectedItem
-                ? selectedItem.item_code ?? undefined
+                ? selectedItem.mes_code ?? undefined
                 : undefined
           }
           status={
             !addMode && selectedItem ? (
-              selectedItem.min_stock != null &&
-              Number(selectedItem.quantity) < Number(selectedItem.min_stock) ? (
-                <StatusPill label="안전재고 부족" tone="danger" />
+              selectedItem.quantity == null ? (
+                <StatusPill label="재고 미설정" tone="neutral" />
+              ) : Number(selectedItem.quantity) <= 0 ? (
+                <StatusPill label="품절" tone="danger" />
+              ) : selectedItem.min_stock != null &&
+                Number(selectedItem.quantity) < Number(selectedItem.min_stock) ? (
+                <StatusPill label="안전재고 부족" tone="warning" />
               ) : (
                 <StatusPill label="정상" tone="success" />
               )
             ) : null
           }
+          actions={
+            !addMode &&
+            selectedItem &&
+            tab === "info" &&
+            !selectedItem.deleted_at &&
+            !deleteConfirm ? (
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm(true)}
+                className="flex items-center gap-1 rounded-[10px] px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
+                style={{
+                  background: LEGACY_COLORS.s2,
+                  color: LEGACY_COLORS.red,
+                  border: `1px solid ${LEGACY_COLORS.red as string}`,
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                삭제
+              </button>
+            ) : null
+          }
           tabs={!addMode && selectedItem ? DETAIL_TABS : undefined}
           activeTab={tab}
           onTabChange={(id) => setTab(id as DetailTab)}
+          footer={
+            !addMode && selectedItem ? (
+              selectedItem.deleted_at ? (
+                <button
+                  type="button"
+                  onClick={() => void restoreItem(selectedItem.item_id)}
+                  className="flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-110"
+                  style={{ background: LEGACY_COLORS.green }}
+                >
+                  복구
+                </button>
+              ) : deleteConfirm ? (
+                <div className="flex items-center gap-2">
+                  <span className="flex-1 text-[12px] font-semibold" style={{ color: LEGACY_COLORS.text }}>
+                    정말 삭제하시겠습니까?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirm(false)}
+                    className="rounded-[8px] px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
+                    style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteConfirm(false);
+                      void deleteItem(selectedItem.item_id);
+                    }}
+                    className="rounded-[8px] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:brightness-110"
+                    style={{ background: LEGACY_COLORS.red }}
+                  >
+                    삭제 확인
+                  </button>
+                </div>
+              ) : tab === "info" ? (
+                <button
+                  type="button"
+                  onClick={() => void saveItem()}
+                  className="flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-110"
+                  style={{ background: LEGACY_COLORS.blue }}
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  저장
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirm(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold transition-colors hover:brightness-110"
+                  style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.red, border: `1px solid ${LEGACY_COLORS.red as string}` }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  삭제
+                </button>
+              )
+            ) : null
+          }
         >
           {addMode ? (
             <AddItemForm />
@@ -222,7 +425,7 @@ function ItemDetailTabs({
 }
 
 function ItemStockTab({ item }: { item: Item }) {
-  const safety = item.min_stock ?? 0;
+  const safety = Math.round(Number(item.min_stock ?? 0));
   const current = Number(item.quantity);
   const warehouse = Number(item.warehouse_qty ?? 0);
   const status =
@@ -296,7 +499,7 @@ function ItemBomTab({
       <BomList
         title="구성품 (이 품목이 부모인 BOM)"
         rows={composition.map((r) => ({
-          code: r.child_item_code,
+          code: r.child_mes_code,
           name: r.child_item_name,
           qty: r.quantity,
           unit: r.unit,
@@ -306,7 +509,7 @@ function ItemBomTab({
       <BomList
         title="사용처 (이 품목이 자식으로 들어간 부모)"
         rows={usedIn.map((r) => ({
-          code: r.parent_item_code,
+          code: r.parent_mes_code,
           name: r.parent_item_name,
           qty: r.quantity,
           unit: r.unit,

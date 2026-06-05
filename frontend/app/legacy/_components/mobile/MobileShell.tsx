@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   BarChart2,
   Boxes,
   History as HistoryIcon,
@@ -13,6 +14,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import {
   MobileDashboardScreen,
   MobileWarehouseScreen,
+  MobileDefectScreen,
   MobileHistoryScreen,
   MobileWeeklyScreen,
   MobileAdminScreen,
@@ -22,35 +24,47 @@ import { api, type ProductionCapacity } from "@/lib/api";
 import type { Item } from "@/lib/api";
 import { CapacityDetailModal } from "../CapacityDetailModal";
 import { useCurrentOperator } from "../login/useCurrentOperator";
+import { NotificationBell } from "../notifications/NotificationBell";
 import { canEnterIO } from "../_warehouse_steps";
+import { MobileUserMenuSheet } from "./MobileUserMenuSheet";
 
-export type MobileTabId = "dashboard" | "warehouse" | "history" | "weekly" | "admin";
+export type MobileTabId = "dashboard" | "warehouse" | "defect" | "history" | "weekly" | "admin";
 
 const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
   dashboard: { label: "대시보드", icon: Boxes },
   warehouse: { label: "입출고", icon: Warehouse },
+  defect: { label: "불량", icon: AlertTriangle },
   history: { label: "내역", icon: HistoryIcon },
   weekly: { label: "주간보고", icon: BarChart2 },
   admin: { label: "관리", icon: Settings2 },
 };
 
-const DEFAULT_STATUS = "DEXCOWIN MES System";
+let _toastSeq = 0;
+
+interface ToastItem {
+  id: number;
+  msg: string;
+  type: "success" | "error" | "info";
+}
 
 export function MobileShell() {
   const operator = useCurrentOperator();
   const [activeTab, setActiveTab] = useState<MobileTabId>("dashboard");
-  const [status, setStatus] = useState(DEFAULT_STATUS);
-  const [statusNonce, setStatusNonce] = useState(0);
+  const [toastQueue, setToastQueue] = useState<ToastItem[]>([]);
   const [refreshNonce, setRefreshNonce] = useState(0);
-  const autoRevertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [defectDeptFilter, setDefectDeptFilter] = useState<string | null>(null);
 
-  // URL ?tab= 으로 초기 탭 동기화 (딥링크/데스크탑 파리티/평가 스크립트).
+  // URL ?tab= / ?defect_dept= 으로 초기 상태 동기화.
   // useSearchParams 의 Suspense 요구를 피하려 클라이언트 마운트 시 1회만 읽는다.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const t = new URLSearchParams(window.location.search).get("tab");
-    const valid: MobileTabId[] = ["dashboard", "warehouse", "history", "weekly", "admin"];
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("tab");
+    const valid: MobileTabId[] = ["dashboard", "warehouse", "defect", "history", "weekly", "admin"];
     if (t && (valid as string[]).includes(t)) setActiveTab(t as MobileTabId);
+    const d = params.get("defect_dept");
+    if (d) setDefectDeptFilter(d);
   }, []);
 
   const [weekMon, setWeekMon] = useState<Date>(() => getWeekStartMonday(new Date()));
@@ -60,17 +74,16 @@ export function MobileShell() {
   const [stockWarnings, setStockWarnings] = useState<{ low: number; zero: number } | null>(null);
 
   const handleStatusChange = useCallback((msg: string) => {
-    if (autoRevertTimerRef.current) clearTimeout(autoRevertTimerRef.current);
-    setStatus(msg);
-    setStatusNonce((n) => n + 1);
-    if (msg === DEFAULT_STATUS) return;
-    const isSticky = /실패|못했습니다|오류|에러|부족|품절/.test(msg);
-    if (!isSticky) {
-      autoRevertTimerRef.current = setTimeout(() => {
-        setStatus(DEFAULT_STATUS);
-        setStatusNonce((n) => n + 1);
-      }, 3000);
-    }
+    const isError = /실패|못했습니다|오류|에러|부족|품절/.test(msg);
+    const type: ToastItem["type"] = isError ? "error" : "info";
+    setToastQueue((q: ToastItem[]) => {
+      const next = [...q, { id: ++_toastSeq, msg, type }];
+      return next.slice(-5); // 최대 5건 유지
+    });
+  }, []);
+
+  const dismissToast = useCallback((id: number) => {
+    setToastQueue((q: ToastItem[]) => q.filter((t: ToastItem) => t.id !== id));
   }, []);
 
   const handleTabChange = useCallback((tab: MobileTabId) => {
@@ -105,10 +118,10 @@ export function MobileShell() {
   }, [loadCapacity]);
 
   const visibleTabs = useMemo(() => {
-    const allTabs: MobileTabId[] = ["dashboard", "warehouse", "history", "weekly", "admin"];
+    const allTabs: MobileTabId[] = ["dashboard", "warehouse", "defect", "history", "weekly", "admin"];
     if (!operator) return allTabs;
     return allTabs.filter((tab) => {
-      if (tab === "warehouse") return canEnterIO(operator);
+      if (tab === "warehouse" || tab === "defect") return canEnterIO(operator);
       return true;
     });
   }, [operator]);
@@ -140,6 +153,9 @@ export function MobileShell() {
         />
       );
     }
+    if (activeTab === "defect") {
+      return <MobileDefectScreen key={key} defectDeptFilter={defectDeptFilter} />;
+    }
     if (activeTab === "history") {
       return <MobileHistoryScreen key={key} />;
     }
@@ -157,6 +173,7 @@ export function MobileShell() {
     weekMon,
     handleTabChange,
     loadCapacity,
+    defectDeptFilter,
   ]);
 
   return (
@@ -188,13 +205,31 @@ export function MobileShell() {
               className="truncate text-xs font-bold uppercase tracking-wider"
               style={{ color: LEGACY_COLORS.muted2 }}
             >
-              {status}
+              DEXCOWIN MES
             </div>
           </div>
           {activeTab === "weekly" && (
             <div className="flex items-center gap-2 shrink-0">
               <WeeklyWeekPicker weekMon={weekMon} onChange={setWeekMon} />
             </div>
+          )}
+          {operator && (
+            <div className="ml-2 shrink-0">
+              <NotificationBell
+                onNavigate={(tab) => handleTabChange(tab as MobileTabId)}
+              />
+            </div>
+          )}
+          {operator && (
+            <button
+              type="button"
+              onClick={() => setUserMenuOpen(true)}
+              aria-label="사용자 메뉴"
+              className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-black transition-opacity active:opacity-70"
+              style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
+            >
+              {operator.name[0] ?? "?"}
+            </button>
           )}
         </header>
 
@@ -237,7 +272,7 @@ export function MobileShell() {
                     />
                   </span>
                   <div
-                    className="text-[11px]"
+                    className="text-xs"
                     style={{
                       // WCAG AA: active blue(#2f74e7) 는 흰 배경서 4.14:1 로 미달 →
                       // 활성은 진한 text 색 + bold, 비활성은 muted2(5.55:1) 로 대비 확보.
@@ -260,6 +295,51 @@ export function MobileShell() {
           onClose={() => setCapacityModal(false)}
         />
       )}
+
+      {/* 토스트 큐 — 닫기 버튼, 자동 소멸 없음 (청각 장애/느린 네트워크 대응) */}
+      {toastQueue.length > 0 && (
+        <div
+          className="pointer-events-none fixed left-0 right-0 z-[300] flex flex-col gap-2 px-4"
+          style={{ bottom: "calc(env(safe-area-inset-bottom, 10px) + 72px)" }}
+        >
+          {toastQueue.map((t: ToastItem) => {
+            const borderColor =
+              t.type === "error" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
+            return (
+              <div
+                key={t.id}
+                role={t.type === "error" ? "alert" : "status"}
+                aria-live={t.type === "error" ? "assertive" : "polite"}
+                aria-atomic="true"
+                className="pointer-events-auto flex items-center justify-between gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold"
+                style={{
+                  background: LEGACY_COLORS.s3,
+                  borderColor: LEGACY_COLORS.border,
+                  borderLeftWidth: 3,
+                  borderLeftColor: borderColor,
+                  color: LEGACY_COLORS.text,
+                }}
+              >
+                <span className="min-w-0 flex-1">{t.msg}</span>
+                <button
+                  type="button"
+                  aria-label="메시지 닫기"
+                  onClick={() => dismissToast(t.id)}
+                  className="ml-1 shrink-0 rounded-full p-0.5 transition-opacity active:opacity-60"
+                  style={{ color: LEGACY_COLORS.muted2 }}
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <MobileUserMenuSheet
+        open={userMenuOpen}
+        onClose={() => setUserMenuOpen(false)}
+      />
     </div>
   );
 }

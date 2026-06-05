@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
-
 
 def test_bom_create_query_tree_and_where_used_smoke(client, make_item):
     parent = make_item(name="스모크 상위", process_type_code="AF")
@@ -14,7 +12,7 @@ def test_bom_create_query_tree_and_where_used_smoke(client, make_item):
         json={
             "parent_item_id": str(parent.item_id),
             "child_item_id": str(child.item_id),
-            "quantity": "2.5",
+            "quantity": "2",
             "unit": "EA",
             "notes": "smoke",
         },
@@ -23,7 +21,7 @@ def test_bom_create_query_tree_and_where_used_smoke(client, make_item):
     body = created.json()
     assert body["parent_item_id"] == str(parent.item_id)
     assert body["child_item_id"] == str(child.item_id)
-    assert Decimal(str(body["quantity"])) == Decimal("2.5")
+    assert body["quantity"] == 2
 
     flat = client.get(f"/api/bom/{parent.item_id}")
     assert flat.status_code == 200, flat.text
@@ -72,3 +70,20 @@ def test_bom_duplicate_and_circular_references_are_blocked(client, make_item):
         },
     )
     assert circular.status_code == 400
+
+
+def test_bom_rejects_fractional_quantity(client, make_item):
+    """BOM 수량은 정수 전용 — 소수는 거부(422)."""
+    parent = make_item(name="정수부모", process_type_code="AF")
+    child = make_item(name="정수자식", process_type_code="TR")
+
+    res = client.post(
+        "/api/bom",
+        json={
+            "parent_item_id": str(parent.item_id),
+            "child_item_id": str(child.item_id),
+            "quantity": "2.5",
+            "unit": "EA",
+        },
+    )
+    assert res.status_code == 422, res.text

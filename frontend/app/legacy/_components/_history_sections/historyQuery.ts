@@ -15,16 +15,18 @@ export type OperationOption = { value: TransactionType; label: string };
 
 export const OPERATION_OPTIONS: OperationOption[] = [
   { value: "RECEIVE", label: "원자재 입고" },
-  { value: "PRODUCE", label: "생산 등록" },
+  { value: "PRODUCE", label: "생산 | 입고" },
   { value: "SHIP", label: "출고" },
   { value: "BACKFLUSH", label: "자동 차감" },
   { value: "TRANSFER_TO_PROD", label: "창고 반출" },
   { value: "TRANSFER_TO_WH", label: "창고 반입" },
   { value: "TRANSFER_DEPT", label: "부서 이동" },
-  { value: "DISASSEMBLE", label: "재작업" },
+  { value: "DISASSEMBLE", label: "분해 | 출고" },
   { value: "ADJUST", label: "수량 조정" },
-  { value: "MARK_DEFECTIVE", label: "불량 처리" },
-  { value: "SUPPLIER_RETURN", label: "공급사 반품" },
+  { value: "MARK_DEFECTIVE", label: "새 불량" },
+  { value: "UNMARK_DEFECTIVE", label: "불량 해제" },
+  { value: "DEFECT_SCRAP", label: "불량 처리" },
+  { value: "SUPPLIER_RETURN", label: "원자재 반품" },
 ];
 
 export const DATE_OPTIONS = [

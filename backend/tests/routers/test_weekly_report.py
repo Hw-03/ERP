@@ -146,11 +146,12 @@ def test_production_matrix_excludes_out_of_week(client, db_session):
 # ── 거래 타입 필터 ───────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("tx_type", [
-    TransactionTypeEnum.RECEIVE,
     TransactionTypeEnum.ADJUST,
+    TransactionTypeEnum.MARK_DEFECTIVE,
+    TransactionTypeEnum.DISASSEMBLE,
 ])
 def test_production_matrix_excludes_non_produce(client, db_session, tx_type):
-    """RECEIVE·ADJUST는 production_matrix에 집계되지 않는다."""
+    """수량조정·불량처리·분해는 production_matrix 에 집계되지 않는다 (생산 활동 아님)."""
     item = _make_prod_item(db_session, name="COCOON AF 부품", process_code="AF",
                            model_symbol="7", qty=_dec(7))
     _add_log(db_session, item.item_id, tx_type=tx_type, qty=_dec(7), at=_WEEK_MID)
@@ -161,6 +162,31 @@ def test_production_matrix_excludes_non_produce(client, db_session, tx_type):
     matrix = {r["model_key"]: r for r in resp.json()["production_matrix"]}
     assert _dec(matrix["COCOON"]["af_qty"]) == _dec(0)
     assert _dec(matrix["COCOON"]["total_qty"]) == _dec(0)
+
+
+# ── 부서이동/출하 거래도 생산 실적으로 집계 (2026-05-29~) ─────────────────
+
+@pytest.mark.parametrize(
+    "tx_type,raw_qty",
+    [
+        (TransactionTypeEnum.RECEIVE, Decimal("40")),        # 외부 입고도 생산 실적
+        (TransactionTypeEnum.TRANSFER_TO_WH, Decimal("3")),
+        (TransactionTypeEnum.TRANSFER_DEPT, Decimal("-4")),  # 음수 → abs
+        (TransactionTypeEnum.SHIP, Decimal("-5")),           # 음수 → abs
+    ],
+)
+def test_production_matrix_includes_outbound_flows(client, db_session, tx_type, raw_qty):
+    """TRANSFER_TO_WH·TRANSFER_DEPT·SHIP 도 매트릭스에 합산되며 부호는 절댓값으로 정규화된다."""
+    item = _make_prod_item(db_session, name="DX3000 HF 완료품", process_code="HF",
+                           model_symbol="3", qty=_dec(0))
+    _add_log(db_session, item.item_id, tx_type=tx_type, qty=raw_qty, at=_WEEK_MID)
+    db_session.commit()
+
+    resp = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+    assert resp.status_code == 200
+    row = {r["model_key"]: r for r in resp.json()["production_matrix"]}["DX3000"]
+    assert _dec(row["hf_qty"]) == abs(raw_qty)
+    assert _dec(row["total_qty"]) == abs(raw_qty)
 
 
 # ── 매칭 불가 → 매트릭스 비노출 ──────────────────────────────────────────
@@ -233,3 +259,31 @@ def test_existing_groups_structure_unchanged(client, db_session):
     assert "production_matrix" in body
     assert isinstance(body["groups"], list)
     assert isinstance(body["production_matrix"], list)
+
+
+# ── 회귀 방어 — 신규 enum 추가 시 분류 누락 검출 ─────────────────────────
+
+def test_all_transaction_types_classified():
+    """모든 TransactionTypeEnum 멤버는 weekly_report.py 의 두 분류 set 중
+    하나에 명시적으로 분류돼야 한다. 누락 시 매트릭스에 자동 반영 안 되므로
+    본 테스트가 실패한다 — 신규 enum 추가 시 분류 결정 강제.
+    """
+    from app.routers.inventory.weekly_report import (
+        PRODUCTION_TX_TYPES,
+        NON_PRODUCTION_TX_TYPES,
+    )
+
+    all_members = set(TransactionTypeEnum)
+    classified = PRODUCTION_TX_TYPES | NON_PRODUCTION_TX_TYPES
+    unclassified = all_members - classified
+    overlap = PRODUCTION_TX_TYPES & NON_PRODUCTION_TX_TYPES
+
+    assert not unclassified, (
+        f"신규 거래 타입 {sorted(t.value for t in unclassified)} 가 "
+        f"weekly_report.py 의 PRODUCTION_TX_TYPES / NON_PRODUCTION_TX_TYPES "
+        f"어느 쪽에도 분류돼 있지 않습니다. 매트릭스 포함 여부를 결정해서 "
+        f"한 쪽에 추가하세요."
+    )
+    assert not overlap, (
+        f"중복 분류: {sorted(t.value for t in overlap)} — 한 쪽에서만 정의해야 합니다."
+    )

@@ -57,38 +57,38 @@ def _f(val) -> Decimal:
 
 def check_negative_inventory(db) -> list[dict]:
     rows = db.execute(text(
-        "SELECT i.item_id, it.item_code, it.name, i.warehouse_qty, i.quantity "
+        "SELECT i.item_id, it.mes_code, it.name, i.warehouse_qty, i.quantity "
         "FROM inventory i LEFT JOIN item it ON it.item_id = i.item_id "
         "WHERE i.warehouse_qty < 0 OR i.quantity < 0"
     )).fetchall()
-    return [{"item_id": str(r[0]), "item_code": r[1], "name": r[2],
+    return [{"item_id": str(r[0]), "mes_code": r[1], "name": r[2],
              "warehouse_qty": r[3], "quantity": r[4]} for r in rows]
 
 
 def check_negative_locations(db) -> list[dict]:
     rows = db.execute(text(
-        "SELECT il.item_id, it.item_code, il.department, il.status, il.quantity "
+        "SELECT il.item_id, it.mes_code, il.department, il.status, il.quantity "
         "FROM inventory_location il LEFT JOIN item it ON it.item_id = il.item_id "
         "WHERE il.quantity < 0"
     )).fetchall()
-    return [{"item_id": str(r[0]), "item_code": r[1], "department": r[2],
+    return [{"item_id": str(r[0]), "mes_code": r[1], "department": r[2],
              "status": r[3], "quantity": r[4]} for r in rows]
 
 
 def check_pending_exceeds_warehouse(db) -> list[dict]:
     rows = db.execute(text(
-        "SELECT i.item_id, it.item_code, i.pending_quantity, i.warehouse_qty "
+        "SELECT i.item_id, it.mes_code, i.pending_quantity, i.warehouse_qty "
         "FROM inventory i LEFT JOIN item it ON it.item_id = i.item_id "
         "WHERE i.pending_quantity > i.warehouse_qty AND i.pending_quantity > 0"
     )).fetchall()
-    return [{"item_id": str(r[0]), "item_code": r[1],
+    return [{"item_id": str(r[0]), "mes_code": r[1],
              "pending_quantity": r[2], "warehouse_qty": r[3]} for r in rows]
 
 
 def check_total_mismatch(db) -> list[dict]:
     """Inventory.quantity != warehouse_qty + Σ location.quantity"""
     rows = db.execute(text("""
-        SELECT i.item_id, it.item_code,
+        SELECT i.item_id, it.mes_code,
                i.quantity AS stored_total,
                i.warehouse_qty + COALESCE(loc_sum.total, 0) AS computed_total
         FROM inventory i
@@ -100,7 +100,7 @@ def check_total_mismatch(db) -> list[dict]:
         ) loc_sum ON loc_sum.item_id = i.item_id
         WHERE ABS(i.quantity - (i.warehouse_qty + COALESCE(loc_sum.total, 0))) > 0.001
     """)).fetchall()
-    return [{"item_id": str(r[0]), "item_code": r[1],
+    return [{"item_id": str(r[0]), "mes_code": r[1],
              "stored_total": r[2], "computed_total": r[3]} for r in rows]
 
 
@@ -134,7 +134,7 @@ def main():
         if neg_inv:
             print(f"❌ 음수 창고/총재고: {len(neg_inv)}개 품목")
             for v in neg_inv[:5]:
-                print(f"   {v['item_code']} wh={v['warehouse_qty']} total={v['quantity']}")
+                print(f"   {v['mes_code']} wh={v['warehouse_qty']} total={v['quantity']}")
             violations += len(neg_inv)
         else:
             print("✅ 음수 창고/총재고: 없음")
@@ -144,7 +144,7 @@ def main():
         if neg_loc:
             print(f"❌ 음수 위치 재고: {len(neg_loc)}개 행")
             for v in neg_loc[:5]:
-                print(f"   {v['item_code']} {v['department']}/{v['status']} qty={v['quantity']}")
+                print(f"   {v['mes_code']} {v['department']}/{v['status']} qty={v['quantity']}")
             violations += len(neg_loc)
         else:
             print("✅ 음수 위치 재고: 없음")
@@ -154,7 +154,7 @@ def main():
         if pend:
             print(f"❌ pending > warehouse: {len(pend)}개 품목")
             for v in pend[:5]:
-                print(f"   {v['item_code']} pending={v['pending_quantity']} wh={v['warehouse_qty']}")
+                print(f"   {v['mes_code']} pending={v['pending_quantity']} wh={v['warehouse_qty']}")
             violations += len(pend)
         else:
             print("✅ pending ≤ warehouse: 모두 만족")
@@ -164,7 +164,7 @@ def main():
         if mismatch:
             print(f"❌ 총량 불일치: {len(mismatch)}개 품목")
             for v in mismatch[:5]:
-                print(f"   {v['item_code']} stored={v['stored_total']} computed={v['computed_total']}")
+                print(f"   {v['mes_code']} stored={v['stored_total']} computed={v['computed_total']}")
             violations += len(mismatch)
         else:
             print("✅ 총량 일치: 모두 정상")

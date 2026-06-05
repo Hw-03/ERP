@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, ArrowRight, ChevronDown, History, Pencil } from "lucide-react";
+import { Activity, ArrowRight, ChevronDown, History, Pencil, StickyNote } from "lucide-react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch } from "@/lib/api/types/io";
@@ -16,8 +16,9 @@ import {
   getHistoryDisplayLabel,
   getHistoryWorkTypeLabel,
   getSingleLogMovement,
+  parseTransactionNotes,
 } from "./historyBatchInterpreter";
-import { FlowBadge, MemoCell, MovementSummaryCell } from "./historyTableHelpers";
+import { FlowBadge, MovementSummaryCell } from "./historyTableHelpers";
 import {
   QUANTITY_CORRECTABLE_TYPES,
   TransactionEditUnifiedModal,
@@ -70,6 +71,8 @@ export function HistoryDetailPanel({
         setEditsLoaded(true);
       })
       .catch(() => setEditsLoaded(true));
+    // selected 객체 전체가 아니라 log_id 만 deps — 같은 로그를 가리키는 새 객체로
+    // 교체돼도(목록 갱신 등) 수정이력을 불필요하게 재조회하지 않도록 의도적 최소화.
   }, [selected?.log_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -93,6 +96,8 @@ export function HistoryDetailPanel({
         setFlow({ status: "unavailable" });
       });
     return () => { cancelled = true; };
+    // log_id / operation_batch_id 필드만 deps — selected 객체 identity 가 바뀌어도
+    // 두 ID 가 같으면 배치 흐름을 재요청하지 않도록 의도적 최소화.
   }, [selected?.log_id, selected?.operation_batch_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!selected) {
@@ -113,6 +118,8 @@ export function HistoryDetailPanel({
   return (
     <div className="space-y-4">
       <HistoryDetailHero log={selected} flow={flow} editCount={editCount} />
+
+      <HistoryDetailMemo notes={selected.notes} />
 
       <HistoryDetailMetaStrip
         log={selected}
@@ -213,13 +220,17 @@ function HistoryDetailHero({
           >
             {eps.from}
           </span>
-          <ArrowRight className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />
-          <span
-            className="rounded-full border px-2.5 py-0.5 font-bold"
-            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-          >
-            {eps.to}
-          </span>
+          {eps.from !== eps.to && (
+            <>
+              <ArrowRight className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />
+              <span
+                className="rounded-full border px-2.5 py-0.5 font-bold"
+                style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+              >
+                {eps.to}
+              </span>
+            </>
+          )}
           {workType && (
             <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
               ({workType})
@@ -281,37 +292,43 @@ function HistoryDetailMetaStrip({
   onEditClick: () => void;
 }) {
   const processMeta = PROCESS_TYPE_META[log.item_process_type_code ?? ""];
-  const actor = getHistoryActor(log);
+  const reqName = getHistoryActor(log);
+  // 승인자: 백엔드가 stock_request 있으면 그 approved_by_name, 없으면 요청자 자신.
+  const approverName = log.approver_name ?? reqName;
 
   return (
     <div
       className="flex flex-wrap items-center justify-between gap-2 rounded-[20px] border px-4 py-3"
       style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
     >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-        {processMeta && (
-          <span
-            className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold"
-            style={{
-              background: `color-mix(in srgb, ${processMeta.color} 16%, transparent)`,
-              color: processMeta.color,
-            }}
-          >
-            {processMeta.label}
+      <div className="flex flex-col gap-1 text-xs">
+        <div className="flex flex-wrap items-center gap-x-2">
+          {processMeta && (
+            <span
+              className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold"
+              style={{
+                background: `color-mix(in srgb, ${processMeta.color} 16%, transparent)`,
+                color: processMeta.color,
+              }}
+            >
+              {processMeta.label}
+            </span>
+          )}
+          <span style={{ color: LEGACY_COLORS.muted2 }}>
+            {log.mes_code ?? "-"}
           </span>
-        )}
-        <span style={{ color: LEGACY_COLORS.muted2 }}>
-          {log.item_code ?? "-"}
-        </span>
-        <span style={{ color: LEGACY_COLORS.muted2 }}>·</span>
-        <span style={{ color: LEGACY_COLORS.muted2 }}>담당자</span>
-        <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>
-          {actor}
-        </span>
-        <MemoCell notes={log.notes} />
-        <span style={{ color: LEGACY_COLORS.muted2 }}>
-          {formatHistoryDateTimeLong(log.created_at)}
-        </span>
+        </div>
+        <div className="flex flex-col gap-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+          <span>{formatHistoryDateTimeLong(log.created_at)}</span>
+          <span>
+            요청자{" "}
+            <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>{reqName}</span>
+          </span>
+          <span>
+            승인자{" "}
+            <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>{approverName}</span>
+          </span>
+        </div>
       </div>
       {canEdit && (
         <button
@@ -323,6 +340,39 @@ function HistoryDetailMetaStrip({
           정정
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * 메모 섹션 — 사용자가 직접 입력한 메모만 노출. 시스템 자동 생성 노트
+ * (요청 승인 처리, [dept_adj], [격리] 등)는 parseTransactionNotes 가 걸러냄.
+ * HistoryBatchDetailPanel 에서도 재사용.
+ */
+export function HistoryDetailMemo({ notes }: { notes: string | null | undefined }) {
+  const { userMemo } = parseTransactionNotes(notes);
+  if (!userMemo) return null;
+  return (
+    <div
+      className="rounded-[20px] border p-4"
+      style={{
+        background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 5%, ${LEGACY_COLORS.s2})`,
+        borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 22%, ${LEGACY_COLORS.border})`,
+      }}
+    >
+      <div
+        className="mb-2 flex items-center gap-1.5 text-xs font-bold tracking-wide"
+        style={{ color: LEGACY_COLORS.blue }}
+      >
+        <StickyNote className="h-3.5 w-3.5" />
+        메모
+      </div>
+      <div
+        className="whitespace-pre-wrap break-words text-sm leading-relaxed"
+        style={{ color: LEGACY_COLORS.text }}
+      >
+        {userMemo}
+      </div>
     </div>
   );
 }

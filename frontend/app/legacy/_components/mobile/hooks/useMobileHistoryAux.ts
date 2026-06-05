@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { api, type Item, type ProductModel, type TransactionLog } from "@/lib/api";
 import { fetchMonthLogs } from "./useTransactions";
+import { useModelsQuery } from "@/lib/queries/useModelsQuery";
+
+const EMPTY_MODELS: ProductModel[] = [];
 
 /**
  * 모바일 HistoryScreen 의 보조 데이터 fetch 훅.
@@ -31,14 +34,15 @@ export interface UseMobileHistoryAuxResult {
 export function useMobileHistoryAux(opts: UseMobileHistoryAuxOptions): UseMobileHistoryAuxResult {
   const { viewMode, calendarYear, calendarMonth } = opts;
   const [items, setItems] = useState<Item[]>([]);
-  const [productModels, setProductModels] = useState<ProductModel[]>([]);
   const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
 
-  // items + productModels: mount 시 1회 (필터 옵션 용도)
+  // productModels: React Query 캐시 공유 (R2-3, 필터 옵션 용도)
+  const { data: productModels } = useModelsQuery();
+
+  // items: mount 시 1회 (필터 옵션 용도)
   useEffect(() => {
     void api.getItems({ limit: 2000 }).then(setItems).catch(() => {});
-    void api.getModels().then(setProductModels).catch(() => {});
   }, []);
 
   // calendar logs: viewMode/year/month 변화 시
@@ -50,5 +54,5 @@ export function useMobileHistoryAux(opts: UseMobileHistoryAuxOptions): UseMobile
       .finally(() => setCalendarLoading(false));
   }, [viewMode, calendarYear, calendarMonth]);
 
-  return { items, productModels, calendarLogs, calendarLoading };
+  return { items, productModels: productModels ?? EMPTY_MODELS, calendarLogs, calendarLoading };
 }

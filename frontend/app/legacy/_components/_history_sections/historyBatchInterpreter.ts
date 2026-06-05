@@ -7,6 +7,11 @@
 import type { Department } from "@/lib/api/types/shared";
 import type { IoBatch } from "@/lib/api/types/io";
 import { formatQty } from "@/lib/mes/format";
+import {
+  SUB_TYPE_LABEL as _SUB_LABEL,
+  TRANSACTION_TYPE_LABEL as _TX_LABEL,
+  WORK_TYPE_LABEL as _WORK_LABEL,
+} from "@/lib/io/glossary";
 
 // ──────────────────────────────────────────────────────────────────
 // 내부 헬퍼
@@ -31,9 +36,9 @@ function _labelNoneBucket(subType: string | null | undefined, side: "from" | "to
     case "supplier_return":
       return side === "to" ? "외부" : null;
     case "produce":
-      return "생산";
+      return _SUB_LABEL.produce;
     case "disassemble":
-      return "재작업";
+      return _SUB_LABEL.disassemble;
     case "adjust_in":
     case "adjust_out":
       return "수량 조정";
@@ -67,9 +72,12 @@ export function getBatchFlowEndpoints(batch: IoBatch): BatchFlowEndpoints | null
   // 부서 내 작업(생산·재작업 등 batch.from_department == batch.to_department) 은
   // 부모(out)/자식(in) 라인이 반대 방향이라 _bucketSlot mix 가 발생하지만,
   // 사용자 인지상 "한 부서 안에서 끝나는 작업" — 그 부서로 단일 표기.
+  // 단, 창고 관련 sub_type(receive_supplier, warehouse_to_dept 등)은 bucket 분석 필요.
+  const subType = batch.sub_type ?? null;
+  const sameDeptOnlyTypes = new Set(["produce", "disassemble", "adjust_in", "adjust_out"]);
   const batchFrom = _deptName(batch.from_department);
   const batchTo = _deptName(batch.to_department);
-  if (batchFrom && batchTo && batchFrom === batchTo) {
+  if (batchFrom && batchTo && batchFrom === batchTo && (!subType || sameDeptOnlyTypes.has(subType))) {
     return { from: batchFrom, to: batchTo, mixed: false };
   }
 
@@ -92,8 +100,6 @@ export function getBatchFlowEndpoints(batch: IoBatch): BatchFlowEndpoints | null
     if (f && t) return { from: f, to: t, mixed: false };
     return null;
   }
-
-  const subType = batch.sub_type ?? null;
 
   let fromLabel: string;
   let mixedFrom = false;
@@ -126,32 +132,85 @@ export function getBatchFlowEndpoints(batch: IoBatch): BatchFlowEndpoints | null
 // 라벨 맵
 // ──────────────────────────────────────────────────────────────────
 
+/**
+ * TransactionLog.notes 파싱 — 시스템 자동 생성 메타와 사용자가 직접 입력한 메모를 분리.
+ *
+ * 백엔드가 자동으로 채우는 패턴(6 종):
+ *   1·2. "요청 (승인|즉시) 처리: {code} / {from} → {to} / {qty}개 / 요청자 {name}" (stock_requests.py)
+ *      3. 위 1·2 끝에 " / 비고: {사용자 입력}" 가 덧붙는 경우 — 비고만이 사용자 메모
+ *      4. "[dept_adj:{sub}] {op}: {reason}" (dept_adjustment.py) — reason 이 사용자 입력
+ *      5. "[defect_disassemble(:keep|:scrap)?] {note}" (dept_adjustment.py) — note 가 사용자 입력
+ *      6. "[격리] {src} → {tgt}" / "[정상복귀] {dept}" (defects.py) — 사용자 입력 없음
+ *
+ * 위 6 종 외엔 입출고 2.0 wizard 에서 사용자가 직접 입력한 비고(batch.notes 그대로) → 전체가 사용자 메모.
+ *
+ * 반환: `userMemo` (null 이면 사용자 메모 없음 — UI 에서 메모 카드/알약 미노출).
+ */
+export function parseTransactionNotes(notes: string | null | undefined): {
+  userMemo: string | null;
+} {
+  const text = notes?.trim();
+  if (!text) return { userMemo: null };
+
+  // 1·2·3: 요청 (승인|즉시) 처리 — "/ 비고: ..." 가 있으면 그 부분만 사용자 메모.
+  if (/^요청 (?:승인|즉시) 처리:/.test(text)) {
+    const parts = text.split(/\s*\/\s*비고:\s*/);
+    const userPart = parts.length > 1 ? parts.slice(1).join(" / 비고: ").trim() : "";
+    return { userMemo: userPart || null };
+  }
+
+  // 4: [dept_adj:{sub}] {op}: {reason} — reason 추출
+  const adjMatch = text.match(/^\[dept_adj:[^\]]+\][^:]*:\s*(.*)$/);
+  if (adjMatch) {
+    const reason = adjMatch[1]?.trim() ?? "";
+    return { userMemo: reason || null };
+  }
+
+  // 5a: [defect_disassemble] {category}: {memo}
+  const disPMatch = text.match(/^\[defect_disassemble\][^:]*:\s*(.*)$/);
+  if (disPMatch) {
+    const memo = disPMatch[1]?.trim() ?? "";
+    return { userMemo: memo || null };
+  }
+
+  // 5b/5c: [defect_disassemble:keep|scrap] {childNote}
+  const disCMatch = text.match(/^\[defect_disassemble:(?:keep|scrap)\]\s*(.*)$/);
+  if (disCMatch) {
+    const child = disCMatch[1]?.trim() ?? "";
+    return { userMemo: child || null };
+  }
+
+  // 6: 격리: / 정상 복귀: — 사용자 입력 없음
+  if (/^격리:/.test(text) || /^정상 복귀:/.test(text)) {
+    return { userMemo: null };
+  }
+  // 6(legacy): [격리] / [정상복귀] 이전 형식도 호환
+  if (/^\[격리\]\s/.test(text) || /^\[정상복귀\]/.test(text)) {
+    return { userMemo: null };
+  }
+
+  // 알려진 시스템 prefix 아님 → 전체가 사용자 메모
+  return { userMemo: text };
+}
+
+// 작업 의도 라벨 — base 라벨은 모두 glossary 단일 사전에서 가져옴 (P0-1).
+// 일부 키만 history 컨텍스트에 맞춰 변형 (예: dept_transfer 는 "부서 이동" 으로 동사형 유지).
 const _SUB_TYPE_OPERATION: Record<string, string> = {
-  produce: "생산 등록",
-  disassemble: "재작업",
-  warehouse_to_dept: "창고 반출",
-  dept_to_warehouse: "창고 반입",
-  dept_transfer: "부서 이동",
-  adjust_in: "수량 조정",
-  adjust_out: "수량 조정",
-  receive_supplier: "원자재 입고",
-  supplier_return: "공급사 반품",
-  defect_quarantine: "불량 처리",
+  produce: _SUB_LABEL.produce,
+  disassemble: _SUB_LABEL.disassemble,
+  warehouse_to_dept: _SUB_LABEL.warehouse_to_dept,
+  dept_to_warehouse: _SUB_LABEL.dept_to_warehouse,
+  dept_transfer: _SUB_LABEL.dept_transfer,
+  adjust_in: _SUB_LABEL.adjust_in,
+  adjust_out: _SUB_LABEL.adjust_out,
+  receive_supplier: _SUB_LABEL.receive_supplier,
+  supplier_return: _SUB_LABEL.supplier_return,
+  defect_quarantine: _SUB_LABEL.defect_quarantine,
+  defect_restore: _SUB_LABEL.defect_restore,
+  defect_process: _SUB_LABEL.defect_process,
 };
 
-const _TX_OPERATION: Record<string, string> = {
-  RECEIVE: "원자재 입고",
-  SHIP: "출고",
-  TRANSFER_TO_PROD: "창고 반출",
-  TRANSFER_TO_WH: "창고 반입",
-  TRANSFER_DEPT: "부서 이동",
-  BACKFLUSH: "자동 차감",
-  PRODUCE: "생산 등록",
-  DISASSEMBLE: "재작업",
-  ADJUST: "수량 조정",
-  MARK_DEFECTIVE: "불량 처리",
-  SUPPLIER_RETURN: "공급사 반품",
-};
+const _TX_OPERATION: Record<string, string> = _TX_LABEL;
 
 const _DISPLAY_SUB_LABEL: Record<string, string> = {
   // sub_type
@@ -160,6 +219,8 @@ const _DISPLAY_SUB_LABEL: Record<string, string> = {
   warehouse_to_dept: "창고에서 부서로 이동",
   dept_to_warehouse: "부서에서 창고로 이동",
   defect_quarantine: "정상 재고 → 불량 재고",
+  defect_restore: "불량 재고 → 정상 재고",
+  defect_process: "불량 재고 폐기",
   supplier_return: "공급사로 돌려보냄",
   adjust_in: "재고 수량 직접 수정",
   adjust_out: "재고 수량 직접 수정",
@@ -172,7 +233,9 @@ const _DISPLAY_SUB_LABEL: Record<string, string> = {
   TRANSFER_TO_PROD: "창고에서 부서로 이동",
   TRANSFER_TO_WH: "부서에서 창고로 이동",
   MARK_DEFECTIVE: "정상 재고 → 불량 재고",
-  SUPPLIER_RETURN: "공급사로 돌려보냄",
+  UNMARK_DEFECTIVE: "불량 재고 → 정상 재고",
+  DEFECT_SCRAP: "불량 재고 폐기",
+  SUPPLIER_RETURN: "불량 재고 공급사 반품",
 };
 
 // ──────────────────────────────────────────────────────────────────
@@ -191,12 +254,7 @@ export function getHistoryOperationLabel(
   return _TX_OPERATION[log.transaction_type] ?? log.transaction_type;
 }
 
-const _WORK_TYPE_LABEL: Record<string, string> = {
-  receive: "원자재 입고",
-  warehouse_io: "창고 입출고",
-  process: "부서 작업",
-  defect: "불량",
-};
+const _WORK_TYPE_LABEL: Record<string, string> = _WORK_LABEL;
 
 /** IoBatch.work_type 코드의 한글 라벨. 미매핑이면 원문 그대로(안전). */
 export function getHistoryWorkTypeLabel(workType: string): string {
@@ -246,10 +304,12 @@ export function getHistoryFlowLabel(
     case "TRANSFER_DEPT": return "부서 ↔ 부서";
     case "BACKFLUSH": return "자동차감";
     case "PRODUCE": return "생산 입고";
-    case "DISASSEMBLE": return "재작업";
-    case "MARK_DEFECTIVE": return "불량 처리";
-    case "ADJUST": return "수량 조정";
-    case "SUPPLIER_RETURN": return "공급사 반품";
+    case "DISASSEMBLE": return _TX_LABEL.DISASSEMBLE;
+    case "MARK_DEFECTIVE": return _TX_LABEL.MARK_DEFECTIVE;
+    case "UNMARK_DEFECTIVE": return _TX_LABEL.UNMARK_DEFECTIVE;
+    case "DEFECT_SCRAP": return _TX_LABEL.DEFECT_SCRAP;
+    case "ADJUST": return _TX_LABEL.ADJUST;
+    case "SUPPLIER_RETURN": return _TX_LABEL.SUPPLIER_RETURN;
     default: return log.transaction_type;
   }
 }
@@ -407,8 +467,11 @@ export function getHistoryLineSignedQuantity(
       else if (isBomChild) setIncrease();
       else matched = false;
       break;
-    case "warehouse_to_dept": setDecrease(); break;
-    case "dept_to_warehouse": setIncrease(); break;
+    case "warehouse_to_dept":
+    case "dept_to_warehouse":
+      // 창고 ↔ 부서는 위치 이동이라 +/- 의 의미가 없음. BOM 상위 헤더 plain 표시와 통일.
+      sign = ""; tone = "muted"; label = _withUnit(qty, unit);
+      break;
     case "receive_supplier": setIncrease(); break;
     case "supplier_return":
     case "defect_quarantine":
@@ -581,6 +644,10 @@ export function getHistoryMovementSummary(
     parts.push({ label: `반품 ${_distinctItemCount(included)}품목`, tone: "danger" });
   } else if (sub === "defect_quarantine" || tx === "MARK_DEFECTIVE") {
     parts.push({ label: `불량 ${_distinctItemCount(included)}품목`, tone: "danger" });
+  } else if (sub === "defect_restore" || tx === "UNMARK_DEFECTIVE") {
+    parts.push({ label: `해제 ${_distinctItemCount(included)}품목`, tone: "success" });
+  } else if (sub === "defect_process" || tx === "DEFECT_SCRAP") {
+    parts.push({ label: `폐기 ${_distinctItemCount(included)}품목`, tone: "danger" });
   } else if (sub === "adjust_in" || sub === "adjust_out" || tx === "ADJUST") {
     const inc: typeof included = [];
     const dec: typeof included = [];
@@ -610,18 +677,23 @@ export function getHistoryMovementSummary(
 // 둘 다 0/null 인 레거시는 동사만(절대 "+0" 표기 안 함).
 // ──────────────────────────────────────────────────────────────────
 
+// 단건(낱개) 알약 verb — base 라벨은 glossary TRANSACTION_TYPE_LABEL.
+// tone 만 history UI 컨텍스트에서 정의.
 const _SINGLE_OP: Record<string, { verb: string; tone: MovementTone; signed?: boolean }> = {
   RECEIVE: { verb: "입고", tone: "success" },
-  SHIP: { verb: "출고", tone: "danger" },
-  SUPPLIER_RETURN: { verb: "반품", tone: "danger" },
+  SHIP: { verb: _TX_LABEL.SHIP, tone: "danger" },
   ADJUST: { verb: "조정", tone: "warning", signed: true },
   TRANSFER_TO_PROD: { verb: "이동", tone: "info" },
   TRANSFER_TO_WH: { verb: "이동", tone: "info" },
   TRANSFER_DEPT: { verb: "이동", tone: "info" },
-  MARK_DEFECTIVE: { verb: "불량", tone: "danger" },
-  BACKFLUSH: { verb: "자동 차감", tone: "danger" },
-  PRODUCE: { verb: "생산", tone: "success" },
-  DISASSEMBLE: { verb: "재작업", tone: "danger" },
+  BACKFLUSH: { verb: _TX_LABEL.BACKFLUSH, tone: "danger" },
+  PRODUCE: { verb: _TX_LABEL.PRODUCE, tone: "success" },
+  DISASSEMBLE: { verb: _TX_LABEL.DISASSEMBLE, tone: "danger" },
+  // 불량 처리 4종 — 전부 danger 톤, 라벨은 구분 알약과 동일
+  MARK_DEFECTIVE: { verb: _TX_LABEL.MARK_DEFECTIVE, tone: "danger" },
+  UNMARK_DEFECTIVE: { verb: _TX_LABEL.UNMARK_DEFECTIVE, tone: "success" },
+  DEFECT_SCRAP: { verb: _TX_LABEL.DEFECT_SCRAP, tone: "danger" },
+  SUPPLIER_RETURN: { verb: _TX_LABEL.SUPPLIER_RETURN, tone: "danger" },
 };
 
 export function getSingleLogMovement(log: {

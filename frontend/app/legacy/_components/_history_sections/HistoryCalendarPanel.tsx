@@ -16,9 +16,12 @@ export interface HistoryCalendarPanelProps {
   calendarMonth: number;
   prevMonth: () => void;
   nextMonth: () => void;
+  setCalendarYear: (updater: (y: number) => number) => void;
+  setCalendarMonth: (m: number) => void;
   calendarLoading: boolean;
   calendarDays: (number | null)[];
   calendarDayMap: Map<string, TransactionLog[]>;
+  monthlyCountMap?: Map<number, number>;
   todayKey: string;
   selectedDay: string | null;
   setSelectedDay: (key: string | null) => void;
@@ -30,9 +33,12 @@ export function HistoryCalendarPanel({
   calendarMonth,
   prevMonth,
   nextMonth,
+  setCalendarYear,
+  setCalendarMonth,
   calendarLoading,
   calendarDays,
   calendarDayMap,
+  monthlyCountMap,
   todayKey,
   selectedDay,
   setSelectedDay,
@@ -45,9 +51,12 @@ export function HistoryCalendarPanel({
         calendarMonth={calendarMonth}
         prevMonth={prevMonth}
         nextMonth={nextMonth}
+        setCalendarYear={setCalendarYear}
+        setCalendarMonth={setCalendarMonth}
         calendarLoading={calendarLoading}
         calendarDays={calendarDays}
         calendarDayMap={calendarDayMap}
+        monthlyCountMap={monthlyCountMap}
         todayKey={todayKey}
         selectedDay={selectedDay}
         setSelectedDay={setSelectedDay}

@@ -35,10 +35,17 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
 }: Props) {
   const altBg = tint(LEGACY_COLORS.s2, 50, LEGACY_COLORS.s1);
 
+  // 주차 전환 시 행 순서가 변하지 않도록 model_key 사전 순으로 안정 정렬.
+  // (백엔드 응답이 주차마다 다른 순서로 올 수 있어 같은 모델의 행이 위/아래로 흔들리는 것을 방지)
+  const sortedRows = React.useMemo(
+    () => [...rows].sort((a, b) => a.model_key.localeCompare(b.model_key)),
+    [rows],
+  );
+
   // 열별 최댓값 계산 (농도 비례 히트맵용)
   const colMax: Record<NumCol, number> = {} as Record<NumCol, number>;
   for (const c of COLS) {
-    colMax[c.key] = Math.max(...rows.map((r) => r[c.key]), 1);
+    colMax[c.key] = Math.max(...sortedRows.map((r) => r[c.key]), 1);
   }
 
   return (
@@ -48,7 +55,15 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
       aria-label="모델별 공정 생산 매트릭스"
       tabIndex={0}
     >
-      <table className="w-full border-collapse">
+      {/* table-fixed + colgroup width — 주차/데이터가 바뀌어도 열 너비/위치 고정.
+          border-collapse + 자동 너비는 셀 내용(굵기·자릿수·"—")에 따라 열 폭이 흔들림. */}
+      <table className="w-full table-fixed border-collapse">
+        <colgroup>
+          <col style={{ width: "16%" }} />
+          {COLS.map((c) => (
+            <col key={c.key} style={{ width: "14%" }} />
+          ))}
+        </colgroup>
         <thead>
           <tr style={{ background: LEGACY_COLORS.s2 }}>
             <th
@@ -74,7 +89,7 @@ export const WeeklyProductionMatrix = React.memo(function WeeklyProductionMatrix
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, i) => {
+          {sortedRows.map((row, i) => {
             const isAlt = i % 2 === 1;
             const hasData = row.total_qty > 0;
             return (

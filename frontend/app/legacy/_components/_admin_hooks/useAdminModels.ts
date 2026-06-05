@@ -1,16 +1,21 @@
 "use client";
 
-// AdminModelsSection 전용 hook.
+// AdminModelsSection 전용 wrapper hook.
+// W5: List/Form/Commands 3-hook 으로 분해 후 호환 표면 유지.
 
-import { useState } from "react";
 import type { ProductModel } from "@/lib/api";
-import { api } from "@/lib/api";
+import { useAdminModelsList } from "./useAdminModelsList";
+import { useAdminModelsForm } from "./useAdminModelsForm";
+import { useAdminModelsCommands } from "./useAdminModelsCommands";
+
+export type { ModelEditForm } from "./useAdminModelsForm";
 
 export type UseAdminModelsArgs = {
   productModels: ProductModel[];
   setProductModels: (updater: (prev: ProductModel[]) => ProductModel[]) => void;
   onStatusChange: (msg: string) => void;
   onError: (msg: string) => void;
+  adminPin: string;
 };
 
 export type AdminModelsState = {
@@ -21,6 +26,16 @@ export type AdminModelsState = {
   setModelAddSymbol: (v: string) => void;
   addModel: () => void;
   deleteModel: (slot: number) => void;
+  // 인라인 편집
+  editForm: import("./useAdminModelsForm").ModelEditForm;
+  setEditForm: (
+    updater: (prev: import("./useAdminModelsForm").ModelEditForm) => import("./useAdminModelsForm").ModelEditForm,
+  ) => void;
+  editDirty: boolean;
+  editSaving: boolean;
+  initEditForm: (model: ProductModel) => void;
+  saveModel: (slot: number) => void;
+  reorderModels: (ordered: ProductModel[]) => void;
 };
 
 export function useAdminModels({
@@ -28,49 +43,32 @@ export function useAdminModels({
   setProductModels,
   onStatusChange,
   onError,
+  adminPin,
 }: UseAdminModelsArgs): AdminModelsState {
-  const [modelAddName, setModelAddName] = useState("");
-  const [modelAddSymbol, setModelAddSymbol] = useState("");
-
-  function _addModel() {
-    if (!modelAddName.trim()) return;
-    void api
-      .createModel({ model_name: modelAddName.trim(), symbol: modelAddSymbol.trim() || undefined })
-      .then((created) => {
-        setProductModels((prev) => [...prev, created]);
-        setModelAddName("");
-        setModelAddSymbol("");
-        onStatusChange(`'${created.model_name}' 모델을 추가했습니다.`);
-      })
-      .catch((err) => onError(err instanceof Error ? err.message : "모델 추가 실패"));
-  }
-
-  function _deleteModel(slot: number) {
-    const model = productModels.find((m) => m.slot === slot);
-    if (!model) return;
-    if (
-      !confirm(
-        `'${model.model_name}' 모델을 삭제하시겠습니까?\n이 모델을 사용하는 품목이 있으면 삭제되지 않습니다.`,
-      )
-    ) {
-      return;
-    }
-    void api
-      .deleteModel(slot)
-      .then(() => {
-        setProductModels((prev) => prev.filter((m) => m.slot !== slot));
-        onStatusChange(`'${model.model_name}' 모델을 삭제했습니다.`);
-      })
-      .catch((err) => onError(err instanceof Error ? err.message : "삭제 실패"));
-  }
+  const list = useAdminModelsList({ productModels });
+  const form = useAdminModelsForm({ setProductModels, onStatusChange, onError, adminPin });
+  const commands = useAdminModelsCommands({
+    productModels,
+    setProductModels,
+    onStatusChange,
+    onError,
+    adminPin,
+  });
 
   return {
-    productModels,
-    modelAddName,
-    setModelAddName,
-    modelAddSymbol,
-    setModelAddSymbol,
-    addModel: _addModel,
-    deleteModel: _deleteModel,
+    productModels: list.items,
+    modelAddName: commands.modelAddName,
+    setModelAddName: commands.setModelAddName,
+    modelAddSymbol: commands.modelAddSymbol,
+    setModelAddSymbol: commands.setModelAddSymbol,
+    addModel: commands.add,
+    deleteModel: commands.delete,
+    editForm: form.form,
+    setEditForm: form.setForm,
+    editDirty: form.dirty,
+    editSaving: form.saving,
+    initEditForm: form.initForm,
+    saveModel: form.save,
+    reorderModels: commands.reorder,
   };
 }

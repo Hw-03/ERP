@@ -12,6 +12,7 @@ export function useIoDraft() {
     toDepartment?: string | null;
     referenceNo?: string | null;
     notes?: string | null;
+    batchId?: string | null;
     bundles: IoBundle[];
   }) {
     setDrafting(true);
@@ -24,6 +25,7 @@ export function useIoDraft() {
         to_department: payload.toDepartment || null,
         reference_no: payload.referenceNo || null,
         notes: payload.notes || null,
+        batch_id: payload.batchId ?? null,
         bundles: payload.bundles,
       });
     } finally {

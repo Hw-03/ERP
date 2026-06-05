@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { api, type Item, type StockRequestReservationLine, type TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { formatQty } from "@/lib/mes/format";
+import { getStockState } from "@/lib/mes/inventory";
+import { ImageLightbox } from "@/lib/ui/ImageLightbox";
 import { useDeptColorLookup } from "../DepartmentsContext";
 import { InventoryDetailLogList } from "./InventoryDetailLogList";
 import { InventoryDetailLocations } from "./InventoryDetailLocations";
@@ -13,13 +16,17 @@ type Props = {
   item: Item;
   logs: TransactionLog[];
   onGoToWarehouse: (item: Item) => void;
+  imageFilename?: string;
 };
 
-export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
+export function InventoryDetailPanel({ item, logs, onGoToWarehouse, imageFilename }: Props) {
   const getDeptColor = useDeptColorLookup();
   const [reservations, setReservations] = useState<StockRequestReservationLine[]>([]);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const pendingQty = Number(item.pending_quantity) || 0;
   const availableQty = Number(item.available_quantity) || 0;
+  const minStockRaw = item.min_stock == null ? 0 : Number(item.min_stock);
+  const availableState = getStockState(availableQty, minStockRaw > 0 ? minStockRaw : null);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,6 +49,35 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
 
   return (
     <div className="space-y-4">
+      {imageFilename && (
+        <section
+          className="flex items-center justify-center rounded-[28px] border p-4"
+          style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
+        >
+          <button
+            type="button"
+            onClick={() => setLightboxOpen(true)}
+            aria-label={`${item.item_name} 이미지 확대`}
+            className="cursor-zoom-in rounded-[14px] border transition-transform hover:scale-[1.02]"
+            style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
+          >
+            <Image
+              src={`/images/items/${imageFilename}`}
+              alt={item.item_name}
+              width={160}
+              height={160}
+              unoptimized
+              className="block rounded-[14px] object-contain"
+            />
+          </button>
+          <ImageLightbox
+            open={lightboxOpen}
+            src={`/images/items/${imageFilename}`}
+            alt={item.item_name}
+            onClose={() => setLightboxOpen(false)}
+          />
+        </section>
+      )}
       {/* 수량 현황 */}
       <section
         className="rounded-[28px] border p-5"
@@ -78,7 +114,7 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse }: Props) {
               <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                 사용 가능 재고
               </div>
-              <div className="mt-1 text-xl font-black" style={{ color: LEGACY_COLORS.green }}>
+              <div className="mt-1 text-xl font-black" style={{ color: availableState.color }}>
                 {formatQty(availableQty)}
               </div>
             </div>

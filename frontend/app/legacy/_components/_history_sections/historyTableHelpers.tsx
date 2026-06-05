@@ -14,6 +14,7 @@ import {
   getHistoryActor,
   getHistoryDisplayLabel,
   getHistoryMovementSummary,
+  parseTransactionNotes,
   type MovementSummary,
   type MovementTone,
 } from "./historyBatchInterpreter";
@@ -25,6 +26,13 @@ const TX_ICON = {
   AlertCircle, Wrench, Undo2, BookmarkPlus, BookmarkMinus, ArrowRightLeft,
   ShieldAlert, PackageX, Activity,
 } as const;
+
+/**
+ * 우측 SlidePanel(160ms width transition)에 맞춰 셀 width/padding 변경을 부드럽게.
+ * 평상시 ↔ 우측 패널 열림 시 일시/구분/품목명 컬럼이 jump 없이 따라간다.
+ */
+export const HISTORY_CELL_TRANSITION =
+  "padding 160ms cubic-bezier(0.4, 0, 0.2, 1), width 160ms cubic-bezier(0.4, 0, 0.2, 1)";
 
 export function FlowBadge({
   type,
@@ -173,14 +181,15 @@ function ActorCell({ name }: { name: string }) {
   );
 }
 
-/** 목록 메모 셀 — 내용은 안 펼치고 "메모" 표시만, 호버(title)로 전문. 없으면 "-". */
+/** 목록 메모 셀 — 사용자가 직접 입력한 메모만 알약으로 표시(시스템 자동 생성 노트는 제외).
+ *  호버(title)로 사용자 메모 전문 노출. 사용자 메모 없으면 "-". */
 export function MemoCell({ notes }: { notes?: string | null }) {
-  const text = notes?.trim();
-  if (!text) {
+  const { userMemo } = parseTransactionNotes(notes);
+  if (!userMemo) {
     return <span className="block text-center text-xs" style={{ color: LEGACY_COLORS.muted2 }}>-</span>;
   }
   return (
-    <div className="flex justify-center" title={text}>
+    <div className="flex justify-center" title={userMemo}>
       <span
         className="inline-flex cursor-default items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
         style={{
@@ -194,7 +203,7 @@ export function MemoCell({ notes }: { notes?: string | null }) {
   );
 }
 
-function ChevronToggleBtn({
+export function ChevronToggleBtn({
   expanded,
   onToggle,
 }: { expanded: boolean; onToggle: () => void }) {
@@ -228,13 +237,17 @@ export function BatchHeader({
   onToggle,
   selected,
   onSelect,
+  compact,
 }: {
   group: Extract<LogGroup, { type: "batch" }>;
   expanded: boolean;
   onToggle: () => void;
   selected: boolean;
   onSelect: () => void;
+  /** 우측 패널 열림 — 일시/구분 셀 좌우 패딩 압축. */
+  compact?: boolean;
 }) {
+  const padX = compact ? "px-2" : "px-4";
   const first = group.logs[0];
   const homogeneous = isHomogeneousItemGroup(group.logs);
   const primaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
@@ -261,13 +274,13 @@ export function BatchHeader({
         outline: selected ? `1.5px solid ${LEGACY_COLORS.blue}` : "none",
       }}
     >
-      <td className="whitespace-nowrap border-b px-4 py-3 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+      <td className={`whitespace-nowrap border-b ${padX} py-3 text-xs`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, transition: HISTORY_CELL_TRANSITION }}>
         <div className="flex items-center justify-center gap-1.5">
           <ChevronToggleBtn expanded={expanded} onToggle={onToggle} />
           {formatHistoryDate(first.created_at)}
         </div>
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`whitespace-nowrap border-b ${padX} py-3 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
         <FlowBadge type={primaryType} label={getHistoryDisplayLabel(first)} color={flowColor} />
       </td>
       <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
@@ -305,6 +318,7 @@ export function OpBatchHeader({
   onSelect,
   batch,
   rowRef,
+  compact,
 }: {
   group: Extract<LogGroup, { type: "op_batch" }>;
   expanded: boolean;
@@ -314,7 +328,10 @@ export function OpBatchHeader({
   batch?: IoBatch | null;
   /** visible 진입 감지용 ref. */
   rowRef?: (el: HTMLTableRowElement | null) => void;
+  /** 우측 패널 열림 — 일시/구분 셀 좌우 패딩 압축. */
+  compact?: boolean;
 }) {
+  const padX = compact ? "px-2" : "px-4";
   const first = group.logs[0];
   const primaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
   const actor = getHistoryActor(first);
@@ -354,13 +371,13 @@ export function OpBatchHeader({
         outline: selected ? `1.5px solid ${LEGACY_COLORS.blue}` : "none",
       }}
     >
-      <td className="whitespace-nowrap border-b px-4 py-3 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+      <td className={`whitespace-nowrap border-b ${padX} py-3 text-xs`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, transition: HISTORY_CELL_TRANSITION }}>
         <div className="flex items-center justify-center gap-1.5">
           <ChevronToggleBtn expanded={expanded} onToggle={onToggle} />
           {formatHistoryDate(first.created_at)}
         </div>
       </td>
-      <td className="whitespace-nowrap border-b px-4 py-3 text-center" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={`whitespace-nowrap border-b ${padX} py-3 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
         <FlowBadge type={primaryType} label={flow.primary} color={flowColor} />
       </td>
       <td className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>

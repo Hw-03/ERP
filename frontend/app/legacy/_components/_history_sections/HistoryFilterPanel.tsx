@@ -1,6 +1,6 @@
 "use client";
 
-import { Layers, Sparkles, TrendingUp } from "lucide-react";
+import { Layers, RotateCcw, Sparkles, TrendingUp } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common";
 import { OPERATION_OPTIONS } from "./historyQuery";
@@ -22,6 +22,7 @@ type Props = {
   selectedOps: string[];
   toggleOp: (v: string) => void;
   clearOps: () => void;
+  onResetAll: () => void;
 };
 
 export function HistoryFilterPanel({
@@ -37,11 +38,14 @@ export function HistoryFilterPanel({
   selectedOps,
   toggleOp,
   clearOps,
+  onResetAll,
 }: Props) {
   if (!open) return null;
   const deptEntries = Object.entries(departmentCounts)
     .filter(([, c]) => c > 0)
     .sort((a, b) => b[1] - a[1]);
+  const isAnyFilterActive =
+    selectedDepts.length > 0 || selectedModels.length > 0 || selectedOps.length > 0;
 
   return (
     <div className="grid gap-2.5 xl:grid-cols-3">
@@ -86,6 +90,20 @@ export function HistoryFilterPanel({
           />
         ))}
       </Card>
+      <button
+        type="button"
+        onClick={onResetAll}
+        disabled={!isAnyFilterActive}
+        className="xl:col-span-3 flex w-full items-center justify-center gap-2 rounded-[16px] border px-4 py-2.5 text-sm font-bold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+        style={{
+          background: LEGACY_COLORS.s2,
+          borderColor: LEGACY_COLORS.border,
+          color: isAnyFilterActive ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
+        }}
+      >
+        <RotateCcw className="h-4 w-4" />
+        전체 초기화
+      </button>
     </div>
   );
 }

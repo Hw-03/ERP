@@ -210,11 +210,10 @@ def test_defect_scrap_via_stock_request(db_session, client, make_item):
     inv_before = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     qty_before = inv_before.quantity
 
-    # DEFECT_SCRAP 결재 요청
+    # DEFECT_SCRAP 제출 — 불량 작업은 자동결재(즉시 완료)
     res = client.post("/api/stock-requests", json={
         "requester_employee_id": str(requester.employee_id),
         "request_type": "defect_scrap",
-        "requires_department_approval": True,
         "lines": [{
             "item_id": str(item.item_id),
             "quantity": "4",
@@ -225,15 +224,7 @@ def test_defect_scrap_via_stock_request(db_session, client, make_item):
         "notes": "폐기 처리",
     })
     assert res.status_code == 201, res.json()
-    req_id = res.json()["request_id"]
-
-    # 부서 결재 승인
-    approve_res = client.post(f"/api/stock-requests/{req_id}/department-approve", json={
-        "actor_employee_id": str(approver.employee_id),
-        "pin": "1234",
-    })
-    assert approve_res.status_code == 200, approve_res.json()
-    assert approve_res.json()["status"] == "completed"
+    assert res.json()["status"] == "completed"  # 즉시 완료
 
     db_session.expire_all()
     inv_after = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
@@ -253,7 +244,11 @@ def test_defect_scrap_via_stock_request(db_session, client, make_item):
 
 
 def test_defective_disassemble_keep_scrap(db_session, make_item, make_bom):
-    """분해: 자식 keep×2 + scrap×1 → DISASSEMBLE + RECEIVE×2 + DEFECT_SCRAP×1."""
+    """분해: 자식 keep×2 + 회수 외×1 → DISASSEMBLE + RECEIVE×2 + MARK_DEFECTIVE×1.
+
+    회수하지 않은 자식은 폐기로 소실되지 않고 분해 부서의 격리(DEFECTIVE)로 적재된다.
+    이후 폐기 여부는 불량 허브의 격리→폐기(결재) 흐름에서 결정.
+    """
     parent = make_item(name="PA001", process_type_code="PA", warehouse_qty=Decimal("0"))
     child1 = make_item(name="C001-keep", process_type_code="TR", warehouse_qty=Decimal("0"))
     child2 = make_item(name="C002-scrap", process_type_code="TR", warehouse_qty=Decimal("0"))
@@ -319,12 +314,28 @@ def test_defective_disassemble_keep_scrap(db_session, make_item, make_bom):
         ).first()
         assert recv_log is not None
 
-    # scrap 자식 → DEFECT_SCRAP 로그
+    # 회수 외 자식 → 격리(DEFECTIVE) 적재 + MARK_DEFECTIVE 로그 (폐기 아님, 소실 아님)
+    quarantine_loc = db_session.query(InventoryLocation).filter(
+        InventoryLocation.item_id == child2.item_id,
+        InventoryLocation.department == DepartmentEnum.ASSEMBLY.value,
+        InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
+    ).first()
+    assert quarantine_loc is not None and quarantine_loc.quantity == Decimal("2")
+    assert quarantine_loc.defective_at is not None
+
+    mark_log = db_session.query(TransactionLog).filter(
+        TransactionLog.item_id == child2.item_id,
+        TransactionLog.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE,
+    ).first()
+    assert mark_log is not None
+    assert mark_log.quantity_change == Decimal("2")
+
+    # 분해 단계에서 폐기(DEFECT_SCRAP) 로그는 생성되지 않는다.
     scrap_log = db_session.query(TransactionLog).filter(
         TransactionLog.item_id == child2.item_id,
         TransactionLog.transaction_type == TransactionTypeEnum.DEFECT_SCRAP,
     ).first()
-    assert scrap_log is not None
+    assert scrap_log is None
 
 
 # ---------------------------------------------------------------------------
@@ -431,12 +442,16 @@ def test_return_to_supplier_from_normal_production(db_session, make_item):
         db_session,
         item.item_id,
         Decimal("3"),
-        source="production",
-        dept_or_warehouse=DepartmentEnum.ASSEMBLY,
-        supplier_name="테스트공급처",
-        reason_category="외관불량",
-        reason_memo="반품",
-        actor="테스터",
+        inventory_svc.NormalSource(
+            kind="production",
+            dept_or_warehouse=DepartmentEnum.ASSEMBLY,
+            supplier_name="테스트공급처",
+        ),
+        inventory_svc.ReasonContext(
+            category="외관불량",
+            memo="반품",
+            actor="테스터",
+        ),
     )
     db_session.flush()
     assert inv_after.quantity == qty_before - Decimal("3")

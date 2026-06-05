@@ -22,14 +22,13 @@
 ## 품목 코드 포맷
 
 ```text
-{모델기호}-{process_type_code}-{일련번호:04d}[-{옵션코드}]
+{모델기호}-{process_type_code}-{일련번호:04d}
 ```
 
 예시:
 
 ```text
 346-AF-0001
-3-PA-0001-BG
 34-TR-0023
 ```
 
@@ -45,12 +44,14 @@
 
 | 역할 | 파일 | 기준 위치 |
 |---|---|---|
-| process types 시드 | `backend/bootstrap_db.py` | `_PROCESS_TYPES` / `seed_reference_data()` |
-| process types DB 테이블 | `backend/app/models.py` | `ProcessType` |
-| 부서 매핑 백엔드 | `backend/app/routers/items.py` | `_PROCESS_TO_DEPT` |
-| 공정 라벨 프론트 | `frontend/app/legacy/_components/_history_sections/historyShared.ts` | `PROCESS_TYPE_META` |
+| process types 시드 | `backend/bootstrap/seed.py` | `_PROCESS_TYPES` |
+| process types DB 테이블 | `backend/app/models/code.py` | `ProcessType` |
+| 부서 매핑 (프론트 단독 — 백엔드엔 없음) | `frontend/lib/mes/process.ts` | `PROCESS_TO_DEPT` |
+| 공정 라벨 프론트 | `frontend/app/legacy/_components/_history_sections/historyTheme.ts` | `PROCESS_TYPE_META` |
 | 공정 선택 UI 상수 | `frontend/app/legacy/_components/_admin_sections/adminShared.ts` | `PROCESS_TYPE_OPTIONS` |
-| API Item 타입 | `frontend/lib/api.ts` | `ProcessTypeCode`, `Item.process_type_code` |
+| Item 공정코드 타입 | `frontend/lib/api/types/shared.ts` | `ProcessTypeCode` (`lib/api.ts` 재노출) |
+
+> 위 경로는 리팩터로 변할 수 있으니 심볼명(`_PROCESS_TYPES`·`ProcessType`·`PROCESS_TO_DEPT`·`PROCESS_TYPE_META`·`PROCESS_TYPE_OPTIONS`·`ProcessTypeCode`)으로 grep 해 확인할 것.
 
 ## 최신 변경 메모
 
@@ -58,5 +59,5 @@
 - 2026-04-29: `Item.category` (`CategoryEnum` 11개) 완전 제거. `process_type_code` 18개 단일 기준으로 통일.
   - 백엔드: `CategoryEnum` 클래스, `Item.category` 컬럼, `_CATEGORY_TO_PROCESS` 매핑 제거.
   - 프론트: `Category` 타입, `CATEGORY_META`, `item.category` 참조 전체 제거. `PROCESS_TYPE_META` / `ProcessTypeCode`로 대체.
-  - DB: 정리본 722건 기준으로 재생성. `sum(inventory.quantity) = 108,924`.
+  - DB: 정리본 기준으로 재생성 (현재 수치는 `python _attic/backend-scripts/facts.py`).
 - `TR/TA/TF`, `HR/HA/HF`, `VR/VA/VF`, `NR/NA/NF`, `AR/AA/AF`, `PR/PA/PF` 18개 코드가 현재 기준이다.

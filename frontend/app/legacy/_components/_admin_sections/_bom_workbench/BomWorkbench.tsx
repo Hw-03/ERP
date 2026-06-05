@@ -5,6 +5,7 @@ import { ArrowRightLeft, Download, Network, Pencil } from "lucide-react";
 import { api } from "@/lib/api";
 import type { BOMDetailEntry, BOMEntry, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { Button } from "@/lib/ui/Button";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { AdminPageHeader } from "../_admin_primitives";
 import { BomDeptTabs } from "./BomDeptTabs";
@@ -13,9 +14,10 @@ import { BomChildAddBox } from "./BomChildAddBox";
 import { BomEditPanel } from "./BomEditPanel";
 import { BomReviewModal } from "./BomReviewModal";
 import { BomStatsRow, type StatusFilter } from "./BomStatsRow";
+import { BomParentHeader } from "./BomParentHeader";
 import { BomWhereUsedPanel } from "./BomWhereUsedPanel";
 import { BomUnmatchedRawsDrawer } from "./BomUnmatchedRawsDrawer";
-import { bomStatusOf, stageOf, type DeptLetter } from "./bomDept";
+import { bomStatusOf, stageOf, type BomDeptFilter } from "./bomDept";
 
 interface Props {
   items: Item[];
@@ -37,7 +39,7 @@ export function BomWorkbench({
   onStatusChange,
   onError,
 }: Props) {
-  const [dept, setDept] = useState<DeptLetter>("A");
+  const [dept, setDept] = useState<BomDeptFilter>("A");
   const [parentId, setParentId] = useState("");
   const [mode, setMode] = useState<Mode>("edit");
   const [bomRows, setBomRows] = useState<BOMEntry[]>([]);
@@ -57,12 +59,13 @@ export function BomWorkbench({
     return m;
   }, [allBomRows]);
 
-  // 현재 부서의 부모 후보 (R 단계 제외)
+  // 현재 부서의 부모 후보 (R 단계 제외, "ALL"일 때는 부서 필터 스킵)
   const parentCandidates = useMemo(
     () =>
-      items.filter(
-        (i) => i.process_type_code?.[0] === dept && stageOf(i.process_type_code) !== "R",
-      ),
+      items.filter((i) => {
+        if (dept !== "ALL" && i.process_type_code?.[0] !== dept) return false;
+        return stageOf(i.process_type_code) !== "R";
+      }),
     [items, dept],
   );
 
@@ -80,10 +83,10 @@ export function BomWorkbench({
     return { total: parentCandidates.length, done, wip, todo };
   }, [parentCandidates, completedSet, childCountMap]);
 
-  // 첫 부모 자동 선택 (부서/모드 바뀔 때)
+  // 첫 부모 자동 선택 (부서/모드 바뀔 때, "ALL"일 때는 부서 필터 스킵)
   const modeCandidates = useMemo(() => {
     return items.filter((i) => {
-      if (i.process_type_code?.[0] !== dept) return false;
+      if (dept !== "ALL" && i.process_type_code?.[0] !== dept) return false;
       if (mode === "edit") return stageOf(i.process_type_code) !== "R";
       return true;
     });
@@ -126,7 +129,7 @@ export function BomWorkbench({
     };
   }, [parentId]);
 
-  function handleDeptChange(next: DeptLetter) {
+  function handleDeptChange(next: BomDeptFilter) {
     setDept(next);
     setParentId("");
   }
@@ -139,9 +142,10 @@ export function BomWorkbench({
 
   const rawItems = useMemo(
     () =>
-      items.filter(
-        (i) => i.process_type_code?.[0] === dept && stageOf(i.process_type_code) === "R",
-      ),
+      items.filter((i) => {
+        if (dept !== "ALL" && i.process_type_code?.[0] !== dept) return false;
+        return stageOf(i.process_type_code) === "R";
+      }),
     [items, dept],
   );
   const childIdSet = useMemo(
@@ -237,10 +241,10 @@ export function BomWorkbench({
         const p = items.find((i) => i.item_id === r.parent_item_id);
         const c = items.find((i) => i.item_id === r.child_item_id);
         return {
-          parent_item_code: p?.item_code ?? "",
+          parent_mes_code: p?.mes_code ?? "",
           parent_item_name: r.parent_item_name,
           parent_process_type: p?.process_type_code ?? "",
-          child_item_code: c?.item_code ?? "",
+          child_mes_code: c?.mes_code ?? "",
           child_item_name: r.child_item_name,
           child_process_type: c?.process_type_code ?? "",
           quantity: r.quantity,
@@ -262,7 +266,7 @@ export function BomWorkbench({
     URL.revokeObjectURL(jsonA.href);
     // CSV (standalone build.py 와 동일 스키마, UTF-8 BOM)
     const header =
-      "parent_item_code,parent_item_name,parent_process_type,child_item_code,child_item_name,child_process_type,quantity,unit";
+      "parent_mes_code,parent_item_name,parent_process_type,child_mes_code,child_item_name,child_process_type,quantity,unit";
     const csv =
       "﻿" +
       header +
@@ -270,10 +274,10 @@ export function BomWorkbench({
       rows
         .map((r) =>
           [
-            r.parent_item_code,
+            r.parent_mes_code,
             r.parent_item_name,
             r.parent_process_type,
-            r.child_item_code,
+            r.child_mes_code,
             r.child_item_name,
             r.child_process_type,
             r.quantity,
@@ -303,50 +307,57 @@ export function BomWorkbench({
         description="부모-자식 자재 구성을 편집하고 사용처를 조회합니다."
         actions={
           <div className="flex items-center gap-2">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
+              iconLeft={<Download size={13} />}
               onClick={exportCompletedBom}
               disabled={completedCount === 0}
-              className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-              style={{
-                background: LEGACY_COLORS.s1,
-                borderColor: LEGACY_COLORS.border,
-                color: LEGACY_COLORS.text,
-              }}
               title={
                 completedCount === 0
                   ? "완료된 BOM 이 없습니다."
                   : "완료된 BOM 을 JSON·CSV 로 내보냅니다."
               }
+              style={{
+                background: LEGACY_COLORS.s1,
+                borderColor: LEGACY_COLORS.border,
+                color: LEGACY_COLORS.text,
+              }}
             >
-              <Download size={13} /> BOM 내보내기
-            </button>
+              BOM 내보내기
+            </Button>
             <div
               className="flex items-center gap-1 rounded-full border p-1"
               style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
             >
-              <button
-                type="button"
+              <Button
+                variant={mode === "edit" ? "primary" : "ghost"}
+                size="sm"
+                iconLeft={<Pencil size={13} />}
                 onClick={() => setMode("edit")}
-                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-bold transition-colors"
-                style={{
-                  background: mode === "edit" ? LEGACY_COLORS.blue : "transparent",
-                  color: mode === "edit" ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
-                }}
+                className="rounded-full"
+                style={
+                  mode === "edit"
+                    ? { background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white, borderColor: "transparent" }
+                    : { background: "transparent", color: LEGACY_COLORS.muted, borderColor: "transparent" }
+                }
               >
-                <Pencil size={13} /> 편집
-              </button>
-              <button
-                type="button"
+                편집
+              </Button>
+              <Button
+                variant={mode === "whereused" ? "primary" : "ghost"}
+                size="sm"
+                iconLeft={<ArrowRightLeft size={13} />}
                 onClick={() => setMode("whereused")}
-                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-bold transition-colors"
-                style={{
-                  background: mode === "whereused" ? LEGACY_COLORS.blue : "transparent",
-                  color: mode === "whereused" ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
-                }}
+                className="rounded-full"
+                style={
+                  mode === "whereused"
+                    ? { background: LEGACY_COLORS.blue, color: LEGACY_COLORS.white, borderColor: "transparent" }
+                    : { background: "transparent", color: LEGACY_COLORS.muted, borderColor: "transparent" }
+                }
               >
-                <ArrowRightLeft size={13} /> 사용처
-              </button>
+                사용처
+              </Button>
             </div>
           </div>
         }
@@ -366,9 +377,18 @@ export function BomWorkbench({
         </div>
       )}
 
-      {/* 부서 탭 */}
-      <div className="mb-3">
-        <BomDeptTabs value={dept} onChange={handleDeptChange} />
+      {/* 부서 탭 + 선택된 부모 헤더 (한 줄) */}
+      <div className="mb-3 flex min-w-0 items-center gap-3">
+        <div className="shrink-0">
+          <BomDeptTabs value={dept} onChange={handleDeptChange} />
+        </div>
+        <BomParentHeader
+          parent={parent}
+          mode={mode}
+          childCount={mode === "edit" ? bomRows.length : whereUsedRows.length}
+          isCompleted={isCompleted}
+          onOpenReview={() => setReviewOpen(true)}
+        />
       </div>
 
       {/* 메인: 좌(상위) | 중(자식추가) | 우(현재구성) */}
@@ -414,12 +434,10 @@ export function BomWorkbench({
                 parent={parent}
                 bomRows={bomRows}
                 items={items}
-                isCompleted={isCompleted}
                 onSaveQty={handleSaveQty}
                 onRequestDelete={(row, childName) =>
                   setDeleteRequest({ bomId: row.bom_id, childName })
                 }
-                onOpenReview={() => setReviewOpen(true)}
               />
             </div>
           </>

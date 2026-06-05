@@ -8,8 +8,9 @@ import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import type { Department } from "@/lib/api/types/shared";
-import { DisassembleTree, type ChildDecision } from "./DisassembleTree";
+import { DisassembleTree, toServerDecision, type ChildDecision } from "./DisassembleTree";
 import { ReasonFormFields } from "./ReasonFormFields";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 
 type DisposalAction = "unquarantine" | "scrap" | "disassemble";
 
@@ -36,10 +37,12 @@ export function PaPfDefectWizard({
 
   const [action, setAction] = useState<DisposalAction>("disassemble");
   const [decisions, setDecisions] = useState<ChildDecision[]>([]);
+  const [processQty, setProcessQty] = useState<number>(Number(location.quantity));
   const [category, setCategory] = useState("");
   const [memo, setMemo] = useState("");
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   // ESC 닫기
   useEffect(() => {
@@ -60,8 +63,8 @@ export function PaPfDefectWizard({
 
   const submitLabel: Record<DisposalAction, string> = {
     unquarantine: "정상 복귀로 변경",
-    scrap: "결재 요청 →",
-    disassemble: "결재 요청 →",
+    scrap: "즉시 처리 →",
+    disassemble: "즉시 처리 →",
   };
 
   async function handleSubmit() {
@@ -72,7 +75,7 @@ export function PaPfDefectWizard({
       if (action === "unquarantine") {
         await defectsApi.unquarantine({
           item_id: location.item_id,
-          qty: location.quantity,
+          qty: processQty,
           dept: location.department,
           reason_category: category,
           reason_memo: memo,
@@ -88,7 +91,7 @@ export function PaPfDefectWizard({
           lines: [
             {
               item_id: location.item_id,
-              quantity: location.quantity,
+              quantity: processQty,
               from_bucket: "defective",
               from_department: location.department as Department,
               to_bucket: "none",
@@ -96,12 +99,8 @@ export function PaPfDefectWizard({
           ],
         });
       } else {
-        // disassemble
-        const childDecisions = decisions.map((d) => ({
-          item_id: d.item_id,
-          action: d.action,
-          qty: d.qty,
-        }));
+        // disassemble — 재귀 트리 페이로드
+        const childDecisions = decisions.map(toServerDecision);
         await stockRequestsApi.createStockRequest({
           requester_employee_id: currentEmployee.employee_id,
           request_type: "defect_disassemble",
@@ -111,7 +110,7 @@ export function PaPfDefectWizard({
           lines: [
             {
               item_id: location.item_id,
-              quantity: location.quantity,
+              quantity: processQty,
               from_bucket: "defective",
               from_department: location.department as Department,
               to_bucket: "none",
@@ -130,7 +129,7 @@ export function PaPfDefectWizard({
 
   if (!open || !mounted) return null;
 
-  const formatDate = (iso: string) => iso.slice(0, 10);
+  const formatDate = (iso: string | null) => (iso ? iso.slice(0, 10) : "-");
 
   return createPortal(
     <div
@@ -161,7 +160,7 @@ export function PaPfDefectWizard({
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.red }} />
           <div className="flex flex-col gap-0.5">
             <div id={titleId} className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>
-              [처리] {location.item_code} {location.item_name} × {location.quantity}개
+              [처리] {location.mes_code} {location.item_name} × {location.quantity}개
             </div>
             <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
               {location.department} [불량] / 격리 {formatDate(location.defective_at)}
@@ -171,6 +170,26 @@ export function PaPfDefectWizard({
 
         {/* 스크롤 영역 */}
         <div className="flex flex-col gap-5 overflow-y-auto px-6 py-5">
+          {/* 처리 수량 */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>처리 수량</span>
+            <input
+              type="number"
+              min={1}
+              max={Number(location.quantity)}
+              value={processQty}
+              onChange={(e) => {
+                const v = Math.max(1, Math.min(Number(location.quantity), Number(e.target.value) || 1));
+                setProcessQty(v);
+              }}
+              className="w-16 rounded-[8px] border px-2 py-1 text-center text-base font-black"
+              style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
+            />
+            <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
+              / 총 {location.quantity}개 격리
+            </span>
+          </div>
+
           {/* 처리 방식 선택 */}
           <div className="flex flex-col gap-3">
             <div className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
@@ -181,7 +200,7 @@ export function PaPfDefectWizard({
                 [
                   { value: "unquarantine", label: "정상 복귀 (잘못 격리)" },
                   { value: "scrap", label: "전부 폐기 (BOM 통째)" },
-                  { value: "disassemble", label: "분해 + 자식 처리 (결재 필요)" },
+                  { value: "disassemble", label: "분해 + 자식 처리" },
                 ] as { value: DisposalAction; label: string }[]
               ).map(({ value, label }) => (
                 <label
@@ -222,7 +241,9 @@ export function PaPfDefectWizard({
               </div>
               <DisassembleTree
                 parentItemId={location.item_id}
-                parentQty={location.quantity}
+                parentItemName={location.item_name}
+                parentMesCode={location.mes_code}
+                parentQty={processQty}
                 parentDept={location.department}
                 decisions={decisions}
                 onChange={setDecisions}
@@ -275,7 +296,13 @@ export function PaPfDefectWizard({
           </button>
           <button
             type="button"
-            onClick={() => void handleSubmit()}
+            onClick={() => {
+              if (action === "unquarantine") {
+                void handleSubmit();
+              } else {
+                setConfirmOpen(true);
+              }
+            }}
             disabled={!canSubmit}
             className="rounded-[14px] px-5 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
             style={{ background: LEGACY_COLORS.red }}
@@ -284,6 +311,22 @@ export function PaPfDefectWizard({
           </button>
         </div>
       </div>
+      <ConfirmModal
+        open={confirmOpen}
+        title={action === "scrap" ? "폐기 확인" : "재작업(분해) 확인"}
+        tone="danger"
+        cautionMessage="이 작업은 즉시 반영됩니다."
+        confirmLabel="즉시 처리"
+        busy={busy}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }}
+      >
+        <span style={{ color: LEGACY_COLORS.text }}>
+          {action === "scrap"
+            ? `${location.item_name} × ${processQty}개를 폐기합니다.`
+            : `${location.item_name} × ${processQty}개를 분해·재작업합니다. 회수하지 않은 하위 품목은 폐기되지 않고 격리로 이동합니다.`}
+        </span>
+      </ConfirmModal>
     </div>,
     document.body,
   );

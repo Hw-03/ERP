@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 import csv
 from io import StringIO
 import uuid
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
@@ -14,23 +14,32 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import Inventory, InventoryLocation, Item, ItemModel, LocationStatusEnum
+from app.dependencies.admin import require_admin_pin
+from app.models import BOM, Inventory, InventoryLocation, Item, LocationStatusEnum
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     BomCompletionUpdate,
     InventoryLocationResponse,
     ItemCreate,
+    ItemReorderPayload,
     ItemResponse,
     ItemUpdate,
     ItemWithInventory,
 )
-from app.utils.item_code import make_item_code, next_serial_no, slots_to_model_symbol
+from app.utils.mes_code import (
+    mes_code_to_model_slots,
+    make_mes_code,
+    next_serial_no,
+    slots_to_model_symbol,
+)
 from app.models import ProductSymbol
 from app.services import audit
 from app.services import inventory as inventory_svc
 from app.services import stock_math
 from app.services._tx import commit_and_refresh
+from app._evt import emit as _evt_emit
 from app.services.export_helpers import csv_streaming_response
+from app.services.reorder import reorder_by_display_order
 
 router = APIRouter()
 
@@ -74,10 +83,10 @@ def _to_item_with_inventory(
         ]
 
     if model_slots is None:
-        model_slots = [
-            row.slot
-            for row in db.query(ItemModel).filter(ItemModel.item_id == item.item_id).all()
-        ]
+        # 회사 규약: mes_code prefix(첫 '-' 앞 글자열) 가 모델을 결정.
+        # 예: "8-AR-0307" → SOLO(slot 3), "78-PR-0042" → COCOON+SOLO(slot 2,3).
+        # 별도 item_models 테이블 없이 코드만 보면 됨.
+        model_slots = mes_code_to_model_slots(item.mes_code)
 
     return ItemWithInventory(
         item_id=item.item_id,
@@ -87,13 +96,13 @@ def _to_item_with_inventory(
         legacy_item_type=item.legacy_item_type,
         supplier=item.supplier,
         min_stock=item.min_stock,
-        item_code=item.item_code,
+        mes_code=item.mes_code,
         model_symbol=item.model_symbol,
         model_slots=model_slots,
         process_type_code=item.process_type_code,
-        option_code=item.option_code,
         serial_no=item.serial_no,
         bom_completed_at=item.bom_completed_at,
+        deleted_at=item.deleted_at,
         created_at=item.created_at,
         updated_at=item.updated_at,
         quantity=fig.total,
@@ -113,13 +122,34 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
     pt = payload.process_type_code or None
     model_slots = payload.model_slots or []
     model_sym = slots_to_model_symbol(model_slots) if model_slots else ""
-    opt = payload.option_code or None
 
-    serial = None
-    item_code = None
-    if pt and model_sym:
-        serial = next_serial_no(model_sym, pt, db)
-        item_code = make_item_code(model_sym, pt, serial, opt)
+    # 모든 품목은 카테고리와 모델을 가진다(불변식) — mes_code 생성열 + 분해필드 NOT NULL 의 전제.
+    if not (pt and model_sym):
+        raise http_error(
+            422,
+            ErrorCode.UNPROCESSABLE,
+            "품목 등록에는 카테고리와 사용 제품(모델)이 모두 필요합니다.",
+        )
+
+    # (item_name, process_type_code) 동일한 활성 품목이 이미 있으면 409.
+    # SQLite 라 DB 레벨 UniqueConstraint 가 없는 상태에서 앱 레벨 안전망.
+    existing_dup = (
+        db.query(Item)
+        .filter(
+            Item.item_name == payload.item_name,
+            Item.process_type_code == pt,
+            Item.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if existing_dup is not None:
+        raise http_error(
+            status.HTTP_409_CONFLICT,
+            ErrorCode.CONFLICT,
+            f"같은 카테고리에 이미 '{payload.item_name}' 품목이 있습니다.",
+        )
+
+    serial = next_serial_no(model_sym, pt, db)
 
     # 신규 항목은 목록 맨 끝으로. sort_order 미설정 시 NULL 이 되어 SQLite 가 맨앞에 정렬해버림.
     next_sort = (db.query(func.max(Item.sort_order)).scalar() or 0) + 1
@@ -132,17 +162,12 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         supplier=payload.supplier,
         min_stock=payload.min_stock,
         process_type_code=pt,
-        model_symbol=model_sym or None,
+        model_symbol=model_sym,
         serial_no=serial,
-        option_code=opt,
-        item_code=item_code,
         sort_order=next_sort,
     )
     db.add(item)
     db.flush()
-
-    for slot in model_slots:
-        db.add(ItemModel(item_id=item.item_id, slot=slot))
 
     init_qty = payload.initial_quantity if payload.initial_quantity is not None else 0
     inventory = Inventory(item_id=item.item_id, quantity=init_qty, warehouse_qty=init_qty)
@@ -154,10 +179,17 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         action="item.create",
         target_type="item",
         target_id=str(item.item_id),
-        payload_summary=f"{item.item_name} ({item.item_code or 'no-code'}, init {init_qty})",
+        payload_summary=f"{item.item_name} ({item.mes_code or 'no-code'}, init {init_qty})",
     )
 
     commit_and_refresh(db, item)
+    _evt_emit(
+        "item_create",
+        request=request,
+        item=item.mes_code or "-",
+        name=item.item_name,
+        init_qty=str(init_qty),
+    )
     return item
 
 
@@ -203,12 +235,16 @@ def list_items(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.item_code.ilike(pattern),
+                Item.mes_code.ilike(pattern),
                 Inventory.location.ilike(pattern),
             )
         )
 
-    rows = query.order_by(Item.sort_order, Item.item_code).offset(skip).limit(limit).all()
+    rows = query.order_by(
+        Item.deleted_at.is_(None).desc(),
+        Item.sort_order,
+        Item.mes_code,
+    ).offset(skip).limit(limit).all()
     if not rows:
         return []
 
@@ -233,11 +269,6 @@ def list_items(
             )
         )
 
-    model_rows = db.query(ItemModel).filter(ItemModel.item_id.in_(item_ids)).all()
-    slots_by_item: dict = {}
-    for row in model_rows:
-        slots_by_item.setdefault(row.item_id, []).append(row.slot)
-
     return [
         _to_item_with_inventory(
             db,
@@ -245,24 +276,44 @@ def list_items(
             inv,
             figures=figures_map.get(item.item_id),
             locations=locations_by_item.get(item.item_id, []),
-            model_slots=slots_by_item.get(item.item_id, []),
+            model_slots=mes_code_to_model_slots(item.mes_code),
         )
         for item, inv in rows
     ]
 
 
+@router.patch("/reorder", summary="품목 표시 순서 재배치")
+def reorder_items(
+    payload: ItemReorderPayload,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
+    """드래그 reorder 결과를 영구 저장. 모델 reorder 와 동일 패턴.
+
+    - PIN 검증 후 payload.items 의 (item_id, display_order) 쌍을 Item.sort_order 로 일괄 갱신.
+    - 존재하지 않는 item_id 는 조용히 스킵 (부분 갱신 허용).
+    """
+    reorder_by_display_order(
+        db, Item, "item_id",
+        [(item.item_id, item.display_order) for item in payload.items],
+        order_field="sort_order",
+    )
+    db.commit()
+    return {"ok": True}
+
+
 @router.get("/export.csv")
 def export_items_csv(db: Session = Depends(get_db)):
-    rows = _build_item_query(db).order_by(Item.item_code).all()
+    rows = _build_item_query(db).order_by(Item.mes_code).all()
 
     buffer = StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["item_code", "item_name", "process_type_code", "unit", "quantity", "location", "updated_at"])
+    writer.writerow(["mes_code", "item_name", "process_type_code", "unit", "quantity", "location", "updated_at"])
 
     for item, inventory in rows:
         writer.writerow(
             [
-                item.item_code or "",
+                item.mes_code or "",
                 item.item_name,
                 item.process_type_code or "",
                 item.unit,
@@ -313,11 +364,11 @@ def export_items_xlsx(
         query = query.filter(
             or_(
                 Item.item_name.ilike(pattern),
-                Item.item_code.ilike(pattern),
+                Item.mes_code.ilike(pattern),
                 Inventory.location.ilike(pattern),
             )
         )
-    rows = query.order_by(Item.process_type_code, Item.item_code).all()
+    rows = query.order_by(Item.process_type_code, Item.mes_code).all()
 
     # 가용수량 계산: stock_math 를 한 번 bulk 로 불러 경로별 재구현을 피한다.
     figures_map = stock_math.bulk_compute(db, [it.item_id for it, _ in rows])
@@ -342,7 +393,7 @@ def export_items_xlsx(
         min_stock = float(item.min_stock) if item.min_stock else None
 
         row_data = [
-            item.item_code or "",
+            item.mes_code or "",
             item.item_name,
             item.process_type_code or "",
             item.unit,
@@ -385,39 +436,69 @@ def get_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
     return _to_item_with_inventory(db, item, inventory, figures=figures)
 
 
-@router.put("/{item_id}", response_model=ItemResponse)
+@router.put("/{item_id}", response_model=ItemWithInventory)
 def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: Session = Depends(get_db)):
     item = db.query(Item).filter(Item.item_id == item_id).first()
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
     changed: list[str] = []
+    # process_type/model/option 변경 감지 — mes_code 자동 재계산용.
+    # 일반 필드(item_name·unit 등)는 코드와 무관하므로 그대로 setattr.
     for field in (
-        "item_name", "process_type_code", "unit",
+        "item_name", "unit",
         "legacy_part", "legacy_item_type",
-        "supplier", "min_stock", "option_code",
+        "supplier", "min_stock",
     ):
         new_val = getattr(payload, field)
         if new_val is not None and getattr(item, field) != new_val:
             setattr(item, field, new_val)
             changed.append(field)
 
+    # 모델·카테고리 변경은 mes_code 재계산 트리거.
+    # 의도: 사용자는 모델·카테고리만 바꾸고 mes_code 는 자동 부여.
+    #   - 모델만 변경 → serial 유지, prefix 만 새로.
+    #   - 카테고리 변경 → 새 카테고리의 next_serial_no 부여 (번호 풀이 다르므로).
+    new_pt = payload.process_type_code if payload.process_type_code is not None else item.process_type_code
     if payload.model_slots is not None:
-        db.query(ItemModel).filter(ItemModel.item_id == item.item_id).delete()
-        for slot in payload.model_slots:
-            db.add(ItemModel(item_id=item.item_id, slot=slot))
-        item.model_symbol = slots_to_model_symbol(payload.model_slots) or None
-        changed.append("model_slots")
+        new_model_sym = slots_to_model_symbol(payload.model_slots) or None
+    else:
+        new_model_sym = item.model_symbol
 
-    if payload.item_code is not None and payload.item_code != item.item_code:
-        exists = db.query(Item).filter(
-            Item.item_code == payload.item_code,
+    pt_changed = payload.process_type_code is not None and payload.process_type_code != item.process_type_code
+    model_changed = payload.model_slots is not None and new_model_sym != item.model_symbol
+
+    if pt_changed or model_changed:
+        # 모델·카테고리는 mes_code(생성열)의 진실소스이자 NOT NULL — 변경 결과가 비면 거부.
+        if not (new_model_sym and new_pt):
+            raise http_error(
+                422,
+                ErrorCode.UNPROCESSABLE,
+                "카테고리와 사용 제품(모델)은 비울 수 없습니다.",
+            )
+        # serial 결정: 카테고리 변경 시 새 카테고리에서 next_serial_no, 그 외엔 기존 유지.
+        if pt_changed:
+            item.serial_no = next_serial_no(new_model_sym, new_pt, db)
+            item.process_type_code = new_pt
+            changed.append("process_type_code")
+        if model_changed:
+            item.model_symbol = new_model_sym
+            changed.append("model_slots")
+
+        # mes_code 는 분해필드에서 DB 가 계산(생성열) — 직접 쓰지 않는다.
+        # 재계산될 코드의 중복만 사전 점검(친절한 409).
+        prospective = make_mes_code(new_model_sym, new_pt, item.serial_no)
+        dup = db.query(Item).filter(
+            Item.mes_code == prospective,
             Item.item_id != item.item_id,
         ).first()
-        if exists:
-            raise http_error(409, ErrorCode.CONFLICT, f"'{payload.item_code}' 코드는 이미 사용 중입니다.")
-        item.item_code = payload.item_code
-        changed.append("item_code")
+        if dup is not None:
+            raise http_error(
+                409,
+                ErrorCode.CONFLICT,
+                f"'{prospective}' 코드가 이미 사용 중입니다. 데이터 점검이 필요합니다.",
+            )
+        changed.append("mes_code")
 
     item.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
@@ -432,7 +513,17 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
         )
 
     commit_and_refresh(db, item)
-    return item
+    if changed:
+        _evt_emit(
+            "item_update",
+            request=request,
+            item=item.mes_code or "-",
+            changed=",".join(changed),
+        )
+    # 응답에 inventory 동봉 — 좌측 list API 와 동일한 ItemWithInventory 형태로 보내
+    # 저장 직후 우측 카드의 재고/창고 표시가 빈칸이 되는 잔여 UI 버그 방지.
+    inventory = db.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+    return _to_item_with_inventory(db, item, inventory)
 
 
 @router.patch("/{item_id}/bom-completion", response_model=ItemResponse)
@@ -460,4 +551,70 @@ def update_bom_completion(
     )
 
     commit_and_refresh(db, item)
+    return item
+
+
+@router.patch("/{item_id}/soft-delete", response_model=ItemResponse)
+def soft_delete_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+    """품목 소프트 삭제 — deleted_at 세팅 + BOM 연결 제거. 입출고 내역은 보존."""
+    item = db.query(Item).filter(Item.item_id == item_id).first()
+    if not item:
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+    if item.deleted_at is not None:
+        raise http_error(409, ErrorCode.CONFLICT, "이미 삭제된 품목입니다.")
+
+    db.query(BOM).filter(
+        (BOM.parent_item_id == item_id) | (BOM.child_item_id == item_id)
+    ).delete(synchronize_session=False)
+
+    item.deleted_at = datetime.now(UTC).replace(tzinfo=None)
+    item.updated_at = datetime.now(UTC).replace(tzinfo=None)
+
+    audit.record(
+        db,
+        request=request,
+        action="item.delete",
+        target_type="item",
+        target_id=str(item.item_id),
+        payload_summary=f"{item.item_name} ({item.mes_code or 'no-code'})",
+    )
+
+    commit_and_refresh(db, item)
+    _evt_emit(
+        "item_delete",
+        request=request,
+        item=item.mes_code or "-",
+        name=item.item_name,
+    )
+    return item
+
+
+@router.patch("/{item_id}/restore", response_model=ItemResponse)
+def restore_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+    """삭제된 품목 복구 — deleted_at 초기화."""
+    item = db.query(Item).filter(Item.item_id == item_id).first()
+    if not item:
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+    if item.deleted_at is None:
+        raise http_error(409, ErrorCode.CONFLICT, "삭제되지 않은 품목입니다.")
+
+    item.deleted_at = None
+    item.updated_at = datetime.now(UTC).replace(tzinfo=None)
+
+    audit.record(
+        db,
+        request=request,
+        action="item.restore",
+        target_type="item",
+        target_id=str(item.item_id),
+        payload_summary=f"{item.item_name} ({item.mes_code or 'no-code'})",
+    )
+
+    commit_and_refresh(db, item)
+    _evt_emit(
+        "item_restore",
+        request=request,
+        item=item.mes_code or "-",
+        name=item.item_name,
+    )
     return item

@@ -25,7 +25,7 @@ export interface IoLine {
   line_id: string;
   item_id: string;
   item_name: string;
-  item_code: string | null;
+  mes_code: string | null;
   unit: string;
   direction: IoLineDirection;
   from_bucket: IoBucket;
@@ -47,6 +47,7 @@ export interface IoBundle {
   source_kind: IoSourceKind;
   title: string;
   source_item_id: string | null;
+  source_mes_code: string | null;
   quantity: number;
   expanded_level: number;
   lines: IoLine[];
@@ -83,6 +84,8 @@ export interface IoDraftPayload {
   reference_no?: string | null;
   notes?: string | null;
   client_request_id?: string | null;
+  // 이어 작업 중인 draft의 batch_id. 있으면 갱신, 없으면 새 슬롯 생성.
+  batch_id?: string | null;
   bundles: IoBundle[];
 }
 
@@ -94,6 +97,9 @@ export interface IoBatch {
   requester_employee_id: string;
   requester_name: string;
   requester_department: Department | string;
+  /** 승인자(요청을 수락한 사람). 직접 처리 시 = 요청자. */
+  approver_employee_id: string | null;
+  approver_name: string | null;
   from_department: Department | string | null;
   to_department: Department | string | null;
   requires_approval: boolean;

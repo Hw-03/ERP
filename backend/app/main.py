@@ -19,6 +19,8 @@ from sqlalchemy import func, text
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
+from app._access_log import access_log_middleware
+from app._actor import get_actor_emp
 from app._logging import get_logger, setup_logging
 from app.database import _is_sqlite, get_db
 from app.models import (
@@ -39,14 +41,16 @@ from app.routers import (
     departments,
     dept_adjustment,
     employees,
+    handover,
     inventory,
     io,
     items,
     models as models_router,
+    notifications,
     production,
     settings,
     stock_requests,
-    variance,
+    warehouse_map,
 )
 from app.services import audit_csv as audit_csv_svc
 
@@ -91,6 +95,8 @@ app = FastAPI(
         {"name": "Codes", "description": "코드 마스터 (제품기호/옵션/공정)."},
         {"name": "Variance", "description": "차이 분석."},
         {"name": "Admin Audit", "description": "관리자 액션 감사로그 조회 (마스터/설정 변경)."},
+        {"name": "Notifications", "description": "결재 알림 — 요청 도착/승인/반려."},
+        {"name": "Handover", "description": "튜브→고압/진공 인수인계서."},
     ],
 )
 
@@ -124,8 +130,46 @@ async def _request_id_middleware(request: Request, call_next):
     return response
 
 
+# 등록 순서 주의: 이 함수가 _request_id_middleware **뒤에** 등록되어야
+# OUTERMOST 가 되고, dur_ms 가 request_id 처리 시간까지 포함하면서
+# call_next 이후에 request.state.request_id 를 안전하게 읽을 수 있다.
+@app.middleware("http")
+async def _access_log_middleware(request: Request, call_next):
+    return await access_log_middleware(request, call_next)
+
+
 setup_logging()
 _log = get_logger()
+_log.info(
+    "evt=system_startup boot_id=%s started_at=%s version=%s",
+    _BOOT_ID, _BOOT_STARTED_AT, app.version,
+)
+
+
+@app.on_event("startup")
+def _warm_symbol_cache() -> None:
+    """제품 모델 symbol↔slot 캐시를 기동 시 1회 적재(읽기 전용, DB 변경 없음).
+
+    요청 도중에는 캐시를 재적재하지 않는다(엔진의 BEGIN IMMEDIATE 와 2번째 세션이
+    충돌해 데드락). 기동 시점엔 동시 요청이 없어 안전. 실패해도 기동은 계속하며,
+    캐시는 빈 맵으로 두고 모델 CRUD 시 재적재된다.
+    """
+    try:
+        from app.database import SessionLocal
+        from app.utils.mes_code import refresh_symbol_cache
+
+        db = SessionLocal()
+        try:
+            refresh_symbol_cache(db)
+        finally:
+            db.close()
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("evt=symbol_cache_warm_failed err=%s", exc)
+
+
+@app.on_event("shutdown")
+def _log_shutdown() -> None:
+    _log.info("evt=system_shutdown boot_id=%s", _BOOT_ID)
 
 
 def _error_payload(code: str, message: str, extra: dict | None = None) -> dict:
@@ -151,7 +195,8 @@ def _value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
     from pydantic import ValidationError
     if isinstance(exc, ValidationError):
         rid = _rid(request)
-        _log.error("ResponseValidation rid=%s path=%s msg=%s", rid, request.url.path, exc)
+        emp = get_actor_emp(request)
+        _log.error("ResponseValidation rid=%s emp=%s path=%s msg=%s", rid, emp, request.url.path, exc)
         return JSONResponse(
             status_code=500,
             content=_error_payload(
@@ -161,7 +206,8 @@ def _value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
             ),
         )
     rid = _rid(request)
-    _log.warning("ValueError rid=%s path=%s msg=%s", rid, request.url.path, exc)
+    emp = get_actor_emp(request)
+    _log.warning("ValueError rid=%s emp=%s path=%s msg=%s", rid, emp, request.url.path, exc)
     return JSONResponse(
         status_code=422,
         content=_error_payload(
@@ -175,7 +221,8 @@ def _value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
 @app.exception_handler(IntegrityError)
 def _integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
     rid = _rid(request)
-    _log.error("IntegrityError rid=%s path=%s msg=%s", rid, request.url.path, exc)
+    emp = get_actor_emp(request)
+    _log.error("IntegrityError rid=%s emp=%s path=%s msg=%s", rid, emp, request.url.path, exc)
     return JSONResponse(
         status_code=409,
         content=_error_payload(
@@ -189,7 +236,12 @@ def _integrity_error_handler(request: Request, exc: IntegrityError) -> JSONRespo
 @app.exception_handler(OperationalError)
 def _operational_error_handler(request: Request, exc: OperationalError) -> JSONResponse:
     rid = _rid(request)
-    _log.error("OperationalError rid=%s path=%s msg=%s", rid, request.url.path, exc)
+    emp = get_actor_emp(request)
+    # 정상 운영 로그는 short msg 만(SQL/parameters 통째 박지 않음 — 노이즈 방지).
+    # 전체 SQL 은 DEBUG 레벨에서만 노출.
+    short = str(getattr(exc, "orig", None) or exc).splitlines()[0][:200]
+    _log.error("OperationalError rid=%s emp=%s path=%s msg=%s", rid, emp, request.url.path, short)
+    _log.debug("OperationalError detail rid=%s sql=%s params=%s", rid, getattr(exc, "statement", "-"), getattr(exc, "params", "-"))
     return JSONResponse(
         status_code=503,
         content=_error_payload(
@@ -204,7 +256,8 @@ def _operational_error_handler(request: Request, exc: OperationalError) -> JSONR
 def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     # FastAPI 가 HTTPException 은 자체 처리하므로 여기에는 진짜 unhandled 만 옴.
     rid = _rid(request)
-    _log.exception("Unhandled rid=%s path=%s", rid, request.url.path)
+    emp = get_actor_emp(request)
+    _log.exception("Unhandled rid=%s emp=%s path=%s", rid, emp, request.url.path)
     return JSONResponse(
         status_code=500,
         content=_error_payload(
@@ -224,13 +277,15 @@ app.include_router(io.router, prefix="/api/io", tags=["Inventory IO"])
 app.include_router(bom.router, prefix="/api/bom", tags=["BOM"])
 app.include_router(production.router, prefix="/api/production", tags=["Production"])
 app.include_router(codes.router, prefix="/api/codes", tags=["Codes"])
-app.include_router(variance.router, prefix="/api/variance", tags=["Variance"])
 app.include_router(models_router.router, prefix="/api/models", tags=["Models"])
 app.include_router(admin_audit.router, prefix="/api/admin", tags=["Admin Audit"])
 app.include_router(admin_audit_csv.router, prefix="/api/admin", tags=["Admin Audit"])
 app.include_router(stock_requests.router, prefix="/api/stock-requests", tags=["Stock Requests"])
+app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
+app.include_router(handover.router, prefix="/api/handovers", tags=["Handover"])
 app.include_router(dept_adjustment.router, prefix="/api/dept-adjustment", tags=["Dept Adjustment"])
 app.include_router(defects.router, prefix="/api/defects", tags=["Defects"])
+app.include_router(warehouse_map.router, prefix="/api/warehouse-map", tags=["Warehouse Map"])
 
 
 @app.get("/health", tags=["System"])

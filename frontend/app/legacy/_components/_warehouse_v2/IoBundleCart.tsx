@@ -20,6 +20,7 @@ interface Props {
   onRemoveBundle: (bundleId: string) => void;
   onAdvance: () => void;
   canAdvance: boolean;
+  hasShortage?: boolean;
 }
 
 export function IoBundleCart({
@@ -34,6 +35,7 @@ export function IoBundleCart({
   onRemoveBundle,
   onAdvance,
   canAdvance,
+  hasShortage,
 }: Props) {
   const includedCount = bundles.flatMap((bundle) => bundle.lines).filter((line) => line.included).length;
   const totalQty = bundles
@@ -100,7 +102,12 @@ export function IoBundleCart({
       )}
 
       {bundles.length > 0 && (
-        <div className="mt-auto pt-1">
+        <div className="mt-auto pt-1 flex flex-col gap-2">
+          {!canAdvance && hasShortage && (
+            <p className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
+              재고가 부족한 항목이 있습니다
+            </p>
+          )}
           <button
             type="button"
             onClick={onAdvance}

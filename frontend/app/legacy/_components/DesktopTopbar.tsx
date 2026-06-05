@@ -4,10 +4,13 @@ import { useEffect, useRef, useState, type ElementType, type ReactNode } from "r
 import { ChevronDown, KeyRound, LogOut, RefreshCw } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
+import { PIN_LENGTH } from "@/lib/auth/constants";
 import { StatusPill, inferToneFromStatus } from "./common";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
+import { ResultModal } from "./common/ResultModal";
 import { api } from "@/lib/api";
 import { clearCurrentOperator, useCurrentOperator } from "./login/useCurrentOperator";
+import { NotificationBell } from "./notifications/NotificationBell";
 
 const DEFAULT_STATUS = "DEXCOWIN MES System";
 
@@ -31,6 +34,7 @@ export function DesktopTopbar({
   status,
   statusNonce,
   titleAddon,
+  onNavigate,
 }: {
   title: string;
   icon?: ElementType;
@@ -39,6 +43,7 @@ export function DesktopTopbar({
   status?: string;
   statusNonce?: number;
   titleAddon?: ReactNode;
+  onNavigate?: (tab: string, section: string | null) => void;
 }) {
   const operator = useCurrentOperator();
   const roleLabel = operator ? WAREHOUSE_ROLE_LABEL[operator.warehouse_role] ?? null : null;
@@ -52,6 +57,7 @@ export function DesktopTopbar({
   const [pinConfirm, setPinConfirm] = useState("");
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinBusy, setPinBusy] = useState(false);
+  const [pinSuccessOpen, setPinSuccessOpen] = useState(false);
 
   useEffect(() => {
     if (!dropdownOpen) return;
@@ -190,7 +196,7 @@ export function DesktopTopbar({
                     setDropdownOpen(false);
                     setShowLogoutModal(true);
                   }}
-                  className="flex w-full items-center gap-2 rounded-[14px] px-3 py-2 text-sm font-semibold transition-opacity hover:opacity-80"
+                  className="mt-1.5 flex w-full items-center gap-2 rounded-[14px] px-3 py-2 text-sm font-semibold transition-opacity hover:opacity-80"
                   style={{
                     color: LEGACY_COLORS.red,
                     background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
@@ -203,6 +209,8 @@ export function DesktopTopbar({
             )}
           </div>
         )}
+
+        <NotificationBell onNavigate={onNavigate} />
 
         <button
           onClick={onRefresh}
@@ -234,16 +242,21 @@ export function DesktopTopbar({
         title="PIN 변경"
         confirmLabel="변경"
         busy={pinBusy}
+        confirmDisabled={pinCurrent.length !== PIN_LENGTH || pinNew.length !== PIN_LENGTH || pinConfirm.length !== PIN_LENGTH}
         onClose={() => { if (!pinBusy) setShowPinModal(false); }}
         onConfirm={async () => {
           if (!operator) return;
           setPinError(null);
           if (pinNew !== pinConfirm) { setPinError("새 PIN과 확인 PIN이 일치하지 않습니다."); return; }
-          if (!pinNew) { setPinError("새 PIN을 입력해 주세요."); return; }
+          if (pinNew.length !== PIN_LENGTH) { setPinError(`PIN은 ${PIN_LENGTH}자리 숫자여야 합니다.`); return; }
           setPinBusy(true);
           try {
             await api.changeMyPin(operator.employee_id, pinCurrent, pinNew);
             setShowPinModal(false);
+            setPinCurrent("");
+            setPinNew("");
+            setPinConfirm("");
+            setPinSuccessOpen(true);
           } catch (e) {
             setPinError(e instanceof Error ? e.message : "PIN 변경에 실패했습니다.");
           } finally {
@@ -262,8 +275,10 @@ export function DesktopTopbar({
               <input
                 type="password"
                 inputMode="numeric"
+                pattern="\d{4}"
+                maxLength={PIN_LENGTH}
                 value={value}
-                onChange={(e) => onChange(e.target.value)}
+                onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, PIN_LENGTH))}
                 className="w-full rounded-[12px] border px-4 py-2.5 text-sm outline-none focus:border-[var(--c-blue)]"
                 style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
               />
@@ -272,6 +287,14 @@ export function DesktopTopbar({
           {pinError && <div className="text-xs" style={{ color: LEGACY_COLORS.red }}>{pinError}</div>}
         </div>
       </ConfirmModal>
+
+      <ResultModal
+        open={pinSuccessOpen}
+        kind="success"
+        title="PIN이 변경되었습니다."
+        closeLabel="확인"
+        onClose={() => setPinSuccessOpen(false)}
+      />
     </header>
   );
 }

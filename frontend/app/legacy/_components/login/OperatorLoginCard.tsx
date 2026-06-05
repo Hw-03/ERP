@@ -10,6 +10,7 @@
 import { useCallback, useRef, useState, type KeyboardEvent } from "react";
 import { ArrowRight, Loader2, Lock, RotateCcw } from "lucide-react";
 import { api, type Employee } from "@/lib/api";
+import { PIN_LENGTH } from "@/lib/auth/constants";
 import { setCurrentOperator, type Operator } from "./useCurrentOperator";
 import { useLoginEmployees } from "./useLoginEmployees";
 import { EmployeeCombobox } from "./EmployeeCombobox";
@@ -17,8 +18,6 @@ import { EmployeeCombobox } from "./EmployeeCombobox";
 interface OperatorLoginCardProps {
   onLogin: () => void;
 }
-
-const PIN_LENGTH = 4;
 
 export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
   const employees = useLoginEmployees();

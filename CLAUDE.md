@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+**Always respond in Korean. Conclusion first, short and clear.**
+
 ## Project Rules
 
 - Official system name: **DEXCOWIN MES**. Do not call it ERP or X-Ray in user-facing text or documents.
@@ -8,18 +10,45 @@
 - backend entry: `backend/app/main.py`
 - Before editing frontend code, verify the real render/import path first.
 - If docs and live code disagree, trust the live code.
-- Do not edit `_archive/`, `_backup/`, or `frontend/_archive/` unless explicitly asked.
-- Do not casually edit `_attic/`; it contains archived source material, backups, and old working notes.
+- Do not hardcode variable counts (item count, process/model count, etc.) in documents. Check actual values with `python _attic/backend-scripts/facts.py` (documents should only reference this command). Leave historical snapshot logs as-is.
+- Do not edit `_archive/` or `frontend/_archive/` unless explicitly asked.
+- Do not casually edit `_attic/`; it is the boxed-up storage for everything not at a tool-required path — domain docs (GLOSSARY/CONTEXT/ADR/ARCHITECTURE/ERD/OPERATIONS), one-off backend scripts, DB backups, ONBOARDING, finished plans.
+- **Weekly report screen is frozen (complete)**
+  - Frontend: entire `frontend/app/legacy/_components/_weekly_sections/` directory + `frontend/app/legacy/_components/DesktopWeeklyReportView.tsx` (frozen: 2026-05-24)
+  - Backend: `backend/app/routers/inventory/weekly_report.py` (frozen: 2026-05-29)
+  - Touch only when explicitly asked. Bypass these files for surrounding refactors, global renames, etc. When adding a new `TransactionTypeEnum`, only update the classification sets (`PRODUCTION_TX_TYPES` / `NON_PRODUCTION_TX_TYPES`) in weekly_report.py.
 - Do not mix sample data with real data.
 - Do not perform large refactors, folder moves, or renames unless explicitly asked.
 - Do not rename legacy internal identifiers such as `xray-erp` unless explicitly asked.
-- Respond in Korean, conclusion first, short and clear.
+
+## Plan Mode — Model Recommendation
+
+After completing a plan, always place the recommended model at the very top of the plan shown to the user:
+
+> **추천 모델 : Sonnet** — [한 줄 이유]
+
+Criteria:
+- **Haiku**: Simple repetitive tasks. e.g. variable rename, file search, minor text edits.
+- **Sonnet**: General development tasks. e.g. bug fix, add a router, API integration, moderate refactor.
+- **Opus**: High-complexity judgment tasks. e.g. redesigning the stock request state machine, security-related auth changes, structural changes spanning many files.
+
+---
 
 ## Commit / Push
 
 - Never auto-commit or auto-push.
 - Commit and push only when the user explicitly asks.
 - When explicitly asked to commit and push, run the required local checks first to avoid GitHub CI failures, and unless told otherwise, commit and push only the changes made in the current session.
+- **Required commit message format: `YYYY-MM-DD area: summary`**
+  - **Always check the real date immediately before committing** using `date +%Y-%m-%d` (Bash) or `Get-Date -Format yyyy-MM-dd` (PowerShell). Do not reuse the date baked into session context — sessions can span midnight.
+  - Examples: `2026-05-26 backend: fix serial assignment`, `2026-05-26 vault: update Obsidian config`
+  - `area` is free-form — `frontend`, `backend`, `desktop`, `mobile`, `admin`, `docs`, `data`, `fix`, `refactor`, `chore`, `vault`, `defect`, `items`, `ux`, `weekly`, `history`, `capacity`, etc.
+  - **Forbidden patterns** (never use):
+    - Conventional Commits: `type(scope): X` (e.g. `fix(items): X`, `docs(vault): X`)
+    - Bracket prefix: `[chore] X`, `[W12-A] X`, `[defect][io] X`
+    - Mixed: `2026-05-26 fix(items): X` (date is OK but `type(scope)` in area is forbidden)
+  - Merge commits (`Merge ...`) keep git's auto-generated message as-is — do not edit.
+  - The body is free-form. The above rules apply to the subject line only.
 
 ## DB / Run / Verify
 
@@ -32,25 +61,41 @@ cd backend
 python bootstrap_db.py --all
 ```
 
-- Run backend (canonical — 좀비 워커 자동 정리 + /health/live 확인):
+- Run backend (canonical — auto-cleans zombie workers + checks /health/live):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\start-backend.ps1
 ```
 
-- Stop backend (포트 8010 잡은 모든 PID 강제 종료):
+- Stop backend (force-kills all PIDs on port 8010):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\stop-backend.ps1
 ```
 
-- 백엔드에 로그가 0줄이면 좀비 의심 — stop 실행 후 start 로 재기동.
+- If the backend shows 0 log lines, suspect a zombie — run stop then start.
 
 - Before commit/push, run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
 ```
+
+## Session Handoff
+
+At the start of a new session, check the most recent file in `_attic/handoff/` first (newest date in filename).
+
+## Resource Locations
+
+Only files automatically referenced by tools remain at the root and in each folder. Everything else is consolidated into `_attic/`.
+
+- Domain glossary and guides (GLOSSARY/CONTEXT/ARCHITECTURE/ERD/ADR/OPERATIONS/ITEM_CODE_RULES/ATTIC_POLICY): `_attic/docs/`
+- One-off backend scripts (seed, sync, archive, backup): `_attic/backend-scripts/`
+  - Run: `cd backend && python ../_attic/backend-scripts/<script>.py`
+  - `sys.path` is patched to auto-include `backend/`
+- DB backups: `_attic/data/db_backups/` (local only, matched by `.gitignore` — not tracked)
+- New member guide: `_attic/ONBOARDING.md`
+- Active DB: `backend/mes.db` (single — `app.db`, `erp.db` traces removed)
 
 ---
 

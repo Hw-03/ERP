@@ -1,5 +1,4 @@
 import {
-  AlertTriangle,
   ArrowLeftRight,
   Boxes,
   RefreshCcw,
@@ -7,6 +6,12 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
+import {
+  SUB_TYPE_DESCRIPTION,
+  SUB_TYPE_LABEL,
+  WORK_TYPE_DESCRIPTION,
+  WORK_TYPE_LABEL,
+} from "@/lib/io/glossary";
 
 const MANUAL_ORIGINS = new Set(["manual", "adjust_in", "adjust_out"]);
 
@@ -16,10 +21,11 @@ export const IO_WORK_TYPES: Array<{
   description: string;
   icon: LucideIcon;
 }> = [
-  { id: "receive", label: "원자재 입고", description: "발주 품목 입고", icon: Boxes },
-  { id: "warehouse_io", label: "창고 입출고", description: "창고↔부서", icon: ArrowLeftRight },
-  { id: "process", label: "부서 입출고", description: "부서 내 작업", icon: Wrench },
-  { id: "defect", label: "불량", description: "불량 재고 격리", icon: AlertTriangle },
+  { id: "receive", label: WORK_TYPE_LABEL.receive, description: WORK_TYPE_DESCRIPTION.receive, icon: Boxes },
+  { id: "warehouse_io", label: WORK_TYPE_LABEL.warehouse_io, description: WORK_TYPE_DESCRIPTION.warehouse_io, icon: ArrowLeftRight },
+  { id: "process", label: WORK_TYPE_LABEL.process, description: WORK_TYPE_DESCRIPTION.process, icon: Wrench },
+  // 불량(defect) 워크타입은 별도 최상위 "불량" 탭으로 분리됨 — 입출고 메뉴에서 제외.
+  // (IoWorkType 유니온과 glossary/helper 의 defect 분기는 입출고 내역·타입 보존 위해 그대로 둔다.)
 ];
 
 export function canSeeWorkType(
@@ -33,28 +39,24 @@ export function canSeeWorkType(
   return true;
 }
 
+const _row = (id: IoSubType) => ({
+  id,
+  label: SUB_TYPE_LABEL[id],
+  description: SUB_TYPE_DESCRIPTION[id],
+});
+
 export const IO_SUB_TYPES: Record<
   IoWorkType,
   Array<{ id: IoSubType; label: string; description: string }>
 > = {
-  receive: [
-    { id: "receive_supplier", label: "외부 입고", description: "선택 품목을 창고 재고로 증가" },
-  ],
-  warehouse_io: [
-    { id: "warehouse_to_dept", label: "창고 → 부서", description: "BOM 1단계 하위 품목 자동 포함" },
-    { id: "dept_to_warehouse", label: "부서 → 창고", description: "반납할 하위 품목만 체크" },
-  ],
-  process: [
-    { id: "produce", label: "생산", description: "하위 자재 출고 + 결과 품목 입고" },
-    { id: "disassemble", label: "분해", description: "상위 품목 출고 + 회수 품목 입고" },
-    { id: "adjust_in", label: "수량보정 입고", description: "선택 품목 수량 증가" },
-    { id: "adjust_out", label: "수량보정 출고", description: "선택 품목 수량 감소" },
-  ],
+  receive: [_row("receive_supplier")],
+  warehouse_io: [_row("warehouse_to_dept"), _row("dept_to_warehouse")],
+  process: [_row("produce"), _row("disassemble"), _row("adjust_in"), _row("adjust_out")],
   defect: [
-    { id: "defect_quarantine", label: "새 격리", description: "정상 재고를 격리 처리 (창고 승인)" },
-    { id: "defect_restore",    label: "격리 해제", description: "격리 재고를 정상 복귀 (즉시)" },
-    { id: "defect_process",    label: "격리 처리", description: "격리 재고 폐기·분해 (창고 승인)" },
-    { id: "supplier_return",   label: "공급처 반품", description: "격리 재고를 공급처에 반품 (창고 승인)" },
+    _row("defect_quarantine"),
+    _row("defect_restore"),
+    _row("defect_process"),
+    _row("supplier_return"),
   ],
 };
 
@@ -92,7 +94,7 @@ export function requiresDepartments(subType: IoSubType) {
 }
 
 export function requiresApproval(subType: IoSubType) {
-  return ["warehouse_to_dept", "dept_to_warehouse", "defect_quarantine", "supplier_return", "defect_process"].includes(subType);
+  return ["warehouse_to_dept", "dept_to_warehouse"].includes(subType);
 }
 
 /** 백엔드 MANUAL_LINE_ORIGINS 와 동기 — 1라인이라도 낱개면 부서 결재 필요. */
@@ -114,8 +116,20 @@ export type ApprovalKind = "none" | "warehouse" | "department";
  *  - department: manual_adjustment 등 낱개 라인 단독
  *  - none: 즉시 반영
  */
-export function approvalKind(subType: IoSubType, bundles: IoBundle[]): ApprovalKind {
-  if (requiresApproval(subType)) return "warehouse";
+const _DEFECT_SUB_TYPES: IoSubType[] = [
+  "defect_quarantine", "defect_restore", "defect_process", "supplier_return",
+];
+
+export function approvalKind(
+  subType: IoSubType,
+  bundles: IoBundle[],
+  fromDepartment?: string | null,
+): ApprovalKind {
+  if (requiresApproval(subType)) {
+    return "warehouse";
+  }
+  // 불량 관련 작업은 항상 즉시 처리 — manual line 여부 무관하게 "none".
+  if (_DEFECT_SUB_TYPES.includes(subType)) return "none";
   if (hasManualLine(bundles)) return "department";
   return "none";
 }
@@ -141,15 +155,11 @@ export function deptIoDirectionOf(subType: IoSubType): DeptIoDirection | null {
   return null;
 }
 
-// Step 3 picker 타이틀의 입/출 접두 ("입고 품목 선택" / "출고 품목 선택").
-// subType이 입고 성격이면 "입고", 그 외는 모두 "출고".
-export function pickerDirectionLabel(subType: IoSubType): "입고" | "출고" {
-  if (
-    subType === "receive_supplier" ||
-    subType === "warehouse_to_dept" ||
-    subType === "produce" ||
-    subType === "adjust_in"
-  ) return "입고";
+// Step 3 picker 타이틀 접두. 창고 방향이 명확한 sub_type은 "창고 반출/반입", 그 외 "입고/출고".
+export function pickerDirectionLabel(subType: IoSubType): "입고" | "출고" | "창고 반출" | "창고 반입" {
+  if (subType === "warehouse_to_dept") return "창고 반출";
+  if (subType === "dept_to_warehouse") return "창고 반입";
+  if (subType === "receive_supplier" || subType === "produce" || subType === "adjust_in") return "입고";
   return "출고";
 }
 
@@ -225,6 +235,13 @@ export function getItemActionMode(subType: IoSubType): ItemActionMode {
     return "bom_or_single";
   }
   return "single_only";
+}
+
+/** 한 묶음 카트 안에서 BOM 묶음과 낱개 묶음을 같이 가질 수 있는지.
+ *  현재는 창고 입출고(warehouse_to_dept/dept_to_warehouse)만 true.
+ *  produce/disassemble 은 BOM 강제(isBomForced) 흐름과 백엔드 분기가 달라 락 유지. */
+export function allowsMixedBundles(subType: IoSubType): boolean {
+  return subType === "warehouse_to_dept" || subType === "dept_to_warehouse";
 }
 
 export type LineTagTone = "green" | "red" | "blue" | "purple" | "muted";
