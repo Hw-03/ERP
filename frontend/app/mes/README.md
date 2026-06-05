@@ -1,13 +1,9 @@
-# legacy/ — DEXCOWIN MES 메인 UI
+# mes/ — DEXCOWIN MES 메인 UI
 
-> **이 폴더는 낡거나 폐기된 코드가 아닙니다.**
-> 현재 운영 중인 DEXCOWIN MES의 모든 화면이 여기에 있습니다.
+> 현재 운영 중인 DEXCOWIN MES의 모든 화면이 이 폴더에 있습니다.
 
-## "legacy"인데 왜 메인인가요?
-
-- 루트 경로 `/` 는 이 폴더를 그대로 렌더합니다. `frontend/app/page.tsx` 가 `./legacy/page` 를 re-export 하기 때문입니다.
+- 루트 경로 `/` 는 이 폴더를 그대로 렌더합니다. `frontend/app/page.tsx` 가 `./mes/page` 를 re-export 하기 때문입니다.
 - 즉 사용자가 접속하면 보게 되는 실제 화면이 전부 이 폴더에서 나옵니다.
-- 이름이 `legacy` 인 이유: Next.js App Router 로 옮기기 전부터 쓰던 경로명이고, URL 호환성 때문에 그대로 둔 것입니다. **"오래됐다 / 안 쓴다" 는 뜻이 아닙니다.**
 
 ## 구조
 
@@ -31,6 +27,8 @@
 
 ## 건드릴 때 조심할 점
 
-- `_archive/` — 보관소입니다. 명시적 요청 없이는 수정하지 마세요.
 - `DesktopWeeklyReportView.tsx` + `_weekly_sections/` — **frozen(완료)** 상태입니다. 명시적 요청이 있을 때만 손대세요.
 - 컴포넌트를 수정하기 전에는 실제 렌더/임포트 경로를 먼저 확인하세요.
+
+---
+*이 폴더는 이전에 `legacy/` 라는 이름이었습니다 (App Router 이전 경로명의 잔재). 실제로는 폐기된 적 없는 메인 UI라, 2026-06 정합성 정비에서 `mes/` 로 개명했습니다.*

@@ -79,7 +79,7 @@ export function DesktopAdminView({
     return (
       <DesktopPinLock
         onUnlocked={unlock}
-        onCancel={() => router.push("/legacy?tab=dashboard", { scroll: false })}
+        onCancel={() => router.push("/mes?tab=dashboard", { scroll: false })}
       />
     );
   }

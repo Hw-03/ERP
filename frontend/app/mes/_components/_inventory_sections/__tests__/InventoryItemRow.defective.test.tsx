@@ -20,7 +20,7 @@ vi.mock("next/image", () => ({
 }));
 
 // DepartmentsContext mock — useDeptColorLookup 이 "#3ac4b0" 반환
-vi.mock("@/app/legacy/_components/DepartmentsContext", () => ({
+vi.mock("@/app/mes/_components/DepartmentsContext", () => ({
   useDeptColorLookup: () => () => "#3ac4b0",
 }));
 

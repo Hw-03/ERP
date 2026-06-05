@@ -1,4 +1,4 @@
-# Hook Contract — frontend/app/legacy/\_components/\_hooks
+# Hook Contract — frontend/app/mes/\_components/\_hooks
 
 이 폴더와 `_admin_hooks/`, `mobile/hooks/` 의 hook 들은 외부 라이브러리(SWR / React Query) 미도입 정책 하에서 일관된 모양을 갖도록 약속한다.
 

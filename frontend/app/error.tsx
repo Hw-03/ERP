@@ -39,7 +39,7 @@ export default function ErrorBoundary({
         <button
           type="button"
           onClick={() => {
-            if (typeof window !== "undefined") window.location.href = "/legacy";
+            if (typeof window !== "undefined") window.location.href = "/mes";
           }}
           className="rounded-[12px] border px-5 py-2.5 text-sm font-bold"
         >
