@@ -25,7 +25,7 @@ export function DefectKpiCards({ kpi, onCardClick }: Props) {
         label="1년 이상 ⚠"
         value={kpi.over_one_year}
         hint="격리 후 365일 초과"
-        tone="#b91c1c"
+        tone={LEGACY_COLORS.red}
         onClick={() => onCardClick("over_one_year")}
       />
       <KpiCard

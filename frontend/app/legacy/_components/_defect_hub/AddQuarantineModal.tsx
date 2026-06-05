@@ -9,6 +9,7 @@ import { defectsApi } from "@/lib/api/defects";
 import { itemsApi } from "@/lib/api/items";
 import type { Item } from "@/lib/api/types";
 import { ReasonFormFields } from "./ReasonFormFields";
+import { InlineErrorNote } from "./InlineErrorNote";
 
 const PRODUCTION_LINES = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
 
@@ -198,7 +199,7 @@ export function AddQuarantineModal({
         {/* 품목 검색 */}
         <div className="mb-4 flex flex-col gap-1">
           <label className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-            품목 <span className="text-red-500">*</span>
+            품목 <span style={{ color: LEGACY_COLORS.red }}>*</span>
           </label>
           {selected ? (
             <div
@@ -281,7 +282,7 @@ export function AddQuarantineModal({
         <div className="mb-4 grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-              격리 출처 <span className="text-red-500">*</span>
+              격리 출처 <span style={{ color: LEGACY_COLORS.red }}>*</span>
             </label>
             <div className="flex flex-col gap-1.5">
               {(["warehouse", "production"] as SourceKind[]).map((s) => (
@@ -311,7 +312,7 @@ export function AddQuarantineModal({
 
           <div className="flex flex-col gap-1">
             <label className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-              {source === "warehouse" ? "격리 부서" : "출처/격리 부서"} <span className="text-red-500">*</span>
+              {source === "warehouse" ? "격리 부서" : "출처/격리 부서"} <span style={{ color: LEGACY_COLORS.red }}>*</span>
             </label>
             <select
               value={dept}
@@ -330,12 +331,12 @@ export function AddQuarantineModal({
               ))}
             </select>
             {source === "production" && (
-              <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
+              <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
                 선택한 부서의 정상 재고에서 같은 부서 [불량]으로 이동
               </span>
             )}
             {source === "warehouse" && (
-              <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
+              <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
                 창고에서 차감 후 선택한 부서 [불량]으로 격리
               </span>
             )}
@@ -345,7 +346,7 @@ export function AddQuarantineModal({
         {/* 수량 */}
         <div className="mb-4 flex flex-col gap-1">
           <label className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-            격리 수량 <span className="text-red-500">*</span>
+            격리 수량 <span style={{ color: LEGACY_COLORS.red }}>*</span>
           </label>
           <input
             type="number"
@@ -375,14 +376,7 @@ export function AddQuarantineModal({
         />
 
         {/* 에러 */}
-        {error && (
-          <div
-            className="mt-3 rounded-[10px] border px-3 py-2 text-xs font-bold text-red-700"
-            style={{ background: "#fef2f2", borderColor: "#fca5a5" }}
-          >
-            {error}
-          </div>
-        )}
+        {error && <InlineErrorNote className="mt-3">{error}</InlineErrorNote>}
 
         {/* 버튼 */}
         <div className="mt-5 flex items-center justify-end gap-2">

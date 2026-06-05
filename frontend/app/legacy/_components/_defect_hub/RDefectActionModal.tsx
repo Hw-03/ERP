@@ -9,6 +9,7 @@ import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import { ReasonFormFields } from "./ReasonFormFields";
+import { InlineErrorNote } from "./InlineErrorNote";
 
 type RAction = "unquarantine" | "scrap" | "return";
 
@@ -199,8 +200,8 @@ export function RDefectActionModal({
                   {ACTION_LABELS[act]}
                   {act !== "unquarantine" && (
                     <span
-                      className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-black text-white"
-                      style={{ background: LEGACY_COLORS.red }}
+                      className="ml-2 rounded-full px-2 py-0.5 text-xs font-black"
+                      style={{ background: LEGACY_COLORS.red, color: LEGACY_COLORS.white }}
                     >
                       즉시 처리
                     </span>
@@ -226,14 +227,7 @@ export function RDefectActionModal({
         />
 
         {/* 에러 */}
-        {error && (
-          <div
-            className="mt-3 rounded-[10px] border px-3 py-2 text-xs font-bold text-red-700"
-            style={{ background: "#fef2f2", borderColor: "#fca5a5" }}
-          >
-            {error}
-          </div>
-        )}
+        {error && <InlineErrorNote className="mt-3">{error}</InlineErrorNote>}
 
         {/* 버튼 */}
         <div className="mt-5 flex items-center justify-end gap-2">

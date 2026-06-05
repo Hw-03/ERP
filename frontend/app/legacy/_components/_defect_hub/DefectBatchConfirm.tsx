@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ArrowLeft, Copy } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
@@ -168,7 +169,7 @@ export function DefectBatchConfirm({
               className="flex flex-col gap-2 rounded-[14px] border px-4 py-3"
               style={{
                 background: LEGACY_COLORS.s1,
-                borderColor: fail ? "#fca5a5" : LEGACY_COLORS.border,
+                borderColor: fail ? tint(LEGACY_COLORS.red, 30) : LEGACY_COLORS.border,
               }}
             >
               <div className="flex items-center justify-between gap-2">
@@ -185,7 +186,7 @@ export function DefectBatchConfirm({
                   <button
                     type="button"
                     onClick={() => copyDown(idx)}
-                    className="flex shrink-0 items-center gap-1 text-[11px] font-bold hover:underline"
+                    className="flex shrink-0 items-center gap-1 text-xs font-bold hover:underline"
                     style={{ color: LEGACY_COLORS.blue }}
                   >
                     <Copy className="h-3 w-3" />
@@ -202,7 +203,7 @@ export function DefectBatchConfirm({
                 required
               />
 
-              {fail && <div className="text-xs font-bold text-red-600">실패: {fail.message}</div>}
+              {fail && <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>실패: {fail.message}</div>}
             </div>
           );
         })}
@@ -211,7 +212,7 @@ export function DefectBatchConfirm({
       {/* 제출 바 */}
       <div className="flex shrink-0 items-center justify-between gap-2 pt-1">
         {failures.length > 0 ? (
-          <span className="text-xs font-bold text-red-600">
+          <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
             {failures.length}건 실패 — 다시 제출하세요.
           </span>
         ) : (

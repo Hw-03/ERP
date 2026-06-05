@@ -15,6 +15,8 @@ import { DefectDepartmentList } from "./_defect_hub/DefectDepartmentList";
 import { PaPfDefectWizardPanel } from "./_defect_hub/PaPfDefectWizardPanel";
 import { DefectCartFlow, type DefectCartMode } from "./_defect_hub/DefectCartFlow";
 import { DefectBatchConfirm, type BatchAction } from "./_defect_hub/DefectBatchConfirm";
+import { InlineErrorNote } from "./_defect_hub/InlineErrorNote";
+import { tint } from "@/lib/mes/colorUtils";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const PRODUCTION_LINES = new Set(["튜브", "고압", "진공", "튜닝", "조립", "출하"]);
@@ -306,15 +308,16 @@ function DefectViewInner({
             {kpiFilter && (
               <div
                 className="flex items-center justify-between rounded-[10px] border px-4 py-2"
-                style={{ background: "#fef2f2", borderColor: "#fca5a5" }}
+                style={{ background: LEGACY_COLORS.errorBg, borderColor: tint(LEGACY_COLORS.red, 30) }}
               >
-                <span className="text-sm font-bold text-red-700">
+                <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>
                   {kpiFilter === "over_one_year" ? "1년 이상 격리 항목만 표시 중" : `${kpiFilter} 필터 활성`}
                 </span>
                 <button
                   type="button"
                   onClick={() => setKpiFilter(null)}
-                  className="text-xs font-black text-red-600 hover:underline"
+                  className="text-xs font-black hover:underline"
+                  style={{ color: LEGACY_COLORS.red }}
                 >
                   필터 해제
                 </button>
@@ -370,12 +373,9 @@ function DefectViewInner({
                 불량 데이터 로딩 중...
               </div>
             ) : error ? (
-              <div
-                className="rounded-[14px] border px-6 py-4 text-sm font-bold text-red-700"
-                style={{ background: "#fef2f2", borderColor: "#fca5a5" }}
-              >
+              <InlineErrorNote variant="block" className="!text-sm">
                 {error}
-              </div>
+              </InlineErrorNote>
             ) : (
               <DefectDepartmentList
                 locations={filteredLocations}

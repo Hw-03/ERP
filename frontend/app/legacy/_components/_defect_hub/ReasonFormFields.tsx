@@ -33,7 +33,7 @@ export function ReasonFormFields({
           style={{ color: LEGACY_COLORS.muted2 }}
         >
           사유 카테고리
-          {required && <span className="ml-0.5 text-red-500">*</span>}
+          {required && <span className="ml-0.5" style={{ color: LEGACY_COLORS.red }}>*</span>}
         </label>
         <select
           value={category}
@@ -41,7 +41,7 @@ export function ReasonFormFields({
           className="w-full rounded-[10px] border px-3 py-2 text-sm font-bold outline-none transition-colors"
           style={{
             background: LEGACY_COLORS.s2,
-            borderColor: categoryMissing ? "#ef4444" : LEGACY_COLORS.border,
+            borderColor: categoryMissing ? LEGACY_COLORS.red : LEGACY_COLORS.border,
             color: category ? LEGACY_COLORS.text : LEGACY_COLORS.muted,
           }}
         >
@@ -53,7 +53,7 @@ export function ReasonFormFields({
           ))}
         </select>
         {categoryMissing && (
-          <span className="text-xs font-bold text-red-500">
+          <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
             카테고리를 선택하세요.
           </span>
         )}

@@ -6,6 +6,7 @@ import { deptAdjustmentApi } from "@/lib/api/dept-adjustment";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
+import { InlineErrorNote } from "./InlineErrorNote";
 
 /**
  * BOM 분해 결정 노드 — 재귀 트리.
@@ -133,14 +134,7 @@ export function DisassembleTree({
     );
   }
   if (error) {
-    return (
-      <div
-        className="rounded-[10px] border px-3 py-2 text-xs font-bold text-red-700"
-        style={{ background: "#fef2f2", borderColor: "#fca5a5" }}
-      >
-        {error}
-      </div>
-    );
+    return <InlineErrorNote>{error}</InlineErrorNote>;
   }
 
   function updateAt(idx: number, next: ChildDecision) {
@@ -345,7 +339,7 @@ function TreeNode({
         {node.manuallySet && !isDecomposed && (
           <span
             className="rounded-full px-1.5 py-0.5 text-[9px] font-black"
-            style={{ background: "#fef3c7", color: "#92400e" }}
+            style={{ background: LEGACY_COLORS.warningBg, color: LEGACY_COLORS.yellow }}
           >
             수동
           </span>
@@ -424,6 +418,7 @@ function TreeNode({
       )}
 
       {/* 펼쳐진 상태: "이 품목 통째로" / "하위 품목별 처리" 토글 */}
+      {/* 11px 유지: 들여쓰기되는 BOM 트리 노드 내부의 보조 토글 칩이라 밀도 우선(배지성). */}
       {hasChildren && (
         <div className="flex items-center gap-1.5 px-4 pb-3">
           <button
@@ -432,7 +427,7 @@ function TreeNode({
             className="rounded-full px-3 py-1 text-[11px] font-black transition-colors"
             style={{
               background: nodeMode === "whole" ? LEGACY_COLORS.blue : "transparent",
-              color: nodeMode === "whole" ? "#fff" : LEGACY_COLORS.muted2,
+              color: nodeMode === "whole" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
               border: `1px solid ${nodeMode === "whole" ? LEGACY_COLORS.blue : LEGACY_COLORS.border}`,
             }}
           >
@@ -444,7 +439,7 @@ function TreeNode({
             className="rounded-full px-3 py-1 text-[11px] font-black transition-colors"
             style={{
               background: nodeMode === "split" ? LEGACY_COLORS.blue : "transparent",
-              color: nodeMode === "split" ? "#fff" : LEGACY_COLORS.muted2,
+              color: nodeMode === "split" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
               border: `1px solid ${nodeMode === "split" ? LEGACY_COLORS.blue : LEGACY_COLORS.border}`,
             }}
           >
@@ -455,12 +450,7 @@ function TreeNode({
 
       {/* 펼침 에러 */}
       {expandError && (
-        <div
-          className="mx-4 mb-3 rounded-[8px] border px-3 py-2 text-[11px] font-bold text-red-700"
-          style={{ background: "#fef2f2", borderColor: "#fca5a5" }}
-        >
-          {expandError}
-        </div>
+        <InlineErrorNote className="mx-4 mb-3">{expandError}</InlineErrorNote>
       )}
 
       {/* 재귀 자식 — "이 품목 통째로" 모드에서는 흐릿하게 비활성 */}

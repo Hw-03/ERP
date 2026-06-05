@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS, getDepartmentFallbackColor } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
+import { StatusPill } from "../common/StatusPill";
 import type { DefectLocation } from "@/lib/api/types/defects";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -98,12 +99,12 @@ export function DefectDepartmentList({
               <span className="text-base font-black" style={{ color: deptColor }}>
                 {dept}
               </span>
-              <span
-                className="ml-1 rounded-full px-2 py-0.5 text-xs font-black text-white"
-                style={{ background: "#ef4444" }}
-              >
-                불량 {rows.length}건 · {formatQty(total)}개
-              </span>
+              <StatusPill
+                label={`불량 ${rows.length}건 · ${formatQty(total)}개`}
+                tone="danger"
+                showDot={false}
+                className="ml-1 !py-0.5"
+              />
             </button>
 
             {/* 항목 목록 */}
@@ -147,10 +148,14 @@ export function DefectDepartmentList({
                           <span>격리 {formatDate(loc.defective_at)}</span>
                           {warn && (
                             <span
-                              className="flex items-center gap-1 rounded-full px-1.5 py-0.5 font-black text-white"
-                              style={{ background: "#ef4444", fontSize: "10px" }}
+                              className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-bold"
+                              style={{
+                                color: LEGACY_COLORS.red,
+                                background: tint(LEGACY_COLORS.red, 14),
+                                borderColor: tint(LEGACY_COLORS.red, 30),
+                              }}
                             >
-                              <AlertTriangle className="h-2.5 w-2.5" />
+                              <AlertTriangle className="h-3 w-3" />
                               1년 초과
                             </span>
                           )}

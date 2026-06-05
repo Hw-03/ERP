@@ -1,7 +1,7 @@
 "use client";
 
-import { LEGACY_COLORS } from "@/lib/mes/color";
-import { tint } from "@/lib/mes/colorUtils";
+import { Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Button } from "@/lib/ui/Button";
 
 interface Props {
   onAddQuarantine: () => void;
@@ -12,46 +12,17 @@ interface Props {
 export function DefectQuickActions({ onAddQuarantine, onAddRReturn, onAddRScrap }: Props) {
   return (
     <div className="flex flex-wrap gap-2">
-      <ActionButton
-        label="+ 새 불량 추가"
-        tone={LEGACY_COLORS.red}
-        onClick={onAddQuarantine}
-      />
-      <ActionButton
-        label="+ R 바로 반품"
-        tone={LEGACY_COLORS.yellow}
-        onClick={onAddRReturn}
-      />
-      <ActionButton
-        label="+ R 바로 폐기"
-        tone={LEGACY_COLORS.purple}
-        onClick={onAddRScrap}
-      />
+      {/* 주요 액션 하나만 강조(시스템 파랑) */}
+      <Button variant="primary" iconLeft={<Plus />} onClick={onAddQuarantine}>
+        새 불량 추가
+      </Button>
+      {/* 보조 액션은 중립 외곽선 */}
+      <Button variant="secondary" iconLeft={<RotateCcw />} onClick={onAddRReturn}>
+        R 바로 반품
+      </Button>
+      <Button variant="secondary" iconLeft={<Trash2 />} onClick={onAddRScrap}>
+        R 바로 폐기
+      </Button>
     </div>
-  );
-}
-
-function ActionButton({
-  label,
-  tone,
-  onClick,
-}: {
-  label: string;
-  tone: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-[12px] border px-4 py-2 text-sm font-black transition-colors hover:brightness-110"
-      style={{
-        background: tint(tone, 8),
-        borderColor: tint(tone, 40),
-        color: tone,
-      }}
-    >
-      {label}
-    </button>
   );
 }

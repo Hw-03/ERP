@@ -9,6 +9,7 @@ import { stockRequestsApi } from "@/lib/api/stock-requests";
 import { itemsApi } from "@/lib/api/items";
 import type { Item } from "@/lib/api/types";
 import { ReasonFormFields } from "./ReasonFormFields";
+import { InlineErrorNote } from "./InlineErrorNote";
 
 const PRODUCTION_LINES = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
 
@@ -228,7 +229,7 @@ export function AddRDirectModal({
         {/* 품목 검색 (R 품목만) */}
         <div className="mb-4 flex flex-col gap-1">
           <label className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-            원자재(R) 품목 <span className="text-red-500">*</span>
+            원자재(R) 품목 <span style={{ color: LEGACY_COLORS.red }}>*</span>
           </label>
           {selected ? (
             <div
@@ -305,7 +306,7 @@ export function AddRDirectModal({
                 </ul>
               )}
               {query.trim() && !searching && results.length === 0 && (
-                <div className="mt-1 px-1 text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
+                <div className="mt-1 px-1 text-xs" style={{ color: LEGACY_COLORS.muted }}>
                   검색 결과 중 원자재(R) 품목이 없습니다.
                 </div>
               )}
@@ -317,7 +318,7 @@ export function AddRDirectModal({
         <div className="mb-4 grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-              출처 <span className="text-red-500">*</span>
+              출처 <span style={{ color: LEGACY_COLORS.red }}>*</span>
             </label>
             <div className="flex flex-col gap-1.5">
               {(["warehouse", "production"] as SourceKind[]).map((s) => (
@@ -351,7 +352,7 @@ export function AddRDirectModal({
           <div className="flex flex-col gap-1">
             <label className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
               {source === "warehouse" ? "창고 (부서 무관)" : "출처 부서"}{" "}
-              {source === "production" && <span className="text-red-500">*</span>}
+              {source === "production" && <span style={{ color: LEGACY_COLORS.red }}>*</span>}
             </label>
             <select
               value={dept}
@@ -371,7 +372,7 @@ export function AddRDirectModal({
               ))}
             </select>
             {selected && (
-              <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted }}>
+              <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
                 가용 {available}개
               </span>
             )}
@@ -381,7 +382,7 @@ export function AddRDirectModal({
         {/* 수량 */}
         <div className="mb-4 flex flex-col gap-1">
           <label className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-            수량 <span className="text-red-500">*</span>
+            수량 <span style={{ color: LEGACY_COLORS.red }}>*</span>
           </label>
           <input
             type="number"
@@ -393,12 +394,12 @@ export function AddRDirectModal({
             className="w-full rounded-[10px] border px-3 py-2 text-sm font-bold outline-none"
             style={{
               background: LEGACY_COLORS.s2,
-              borderColor: qtyNum > available ? "#ef4444" : LEGACY_COLORS.border,
+              borderColor: qtyNum > available ? LEGACY_COLORS.red : LEGACY_COLORS.border,
               color: LEGACY_COLORS.text,
             }}
           />
           {selected && qtyNum > available && (
-            <span className="text-xs font-bold text-red-500">가용 재고({available}개)를 초과했습니다.</span>
+            <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>가용 재고({available}개)를 초과했습니다.</span>
           )}
         </div>
 
@@ -414,14 +415,7 @@ export function AddRDirectModal({
         />
 
         {/* 에러 */}
-        {error && (
-          <div
-            className="mt-3 rounded-[10px] border px-3 py-2 text-xs font-bold text-red-700"
-            style={{ background: "#fef2f2", borderColor: "#fca5a5" }}
-          >
-            {error}
-          </div>
-        )}
+        {error && <InlineErrorNote className="mt-3">{error}</InlineErrorNote>}
 
         {/* 버튼 */}
         <div className="mt-5 flex items-center justify-end gap-2">

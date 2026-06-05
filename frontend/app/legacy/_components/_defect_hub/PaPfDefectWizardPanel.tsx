@@ -9,6 +9,7 @@ import type { DefectLocation } from "@/lib/api/types/defects";
 import type { Department } from "@/lib/api/types/shared";
 import { DisassembleTree, toServerDecision, type ChildDecision } from "./DisassembleTree";
 import { ReasonFormFields } from "./ReasonFormFields";
+import { InlineErrorNote } from "./InlineErrorNote";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 
 type DisposalAction = "unquarantine" | "scrap" | "disassemble";
@@ -238,14 +239,7 @@ export function PaPfDefectWizardPanel({
         </div>
 
         {/* 에러 */}
-        {errorMsg && (
-          <div
-            className="rounded-[10px] border px-3 py-2 text-xs font-bold text-red-700"
-            style={{ background: "#fef2f2", borderColor: "#fca5a5" }}
-          >
-            {errorMsg}
-          </div>
-        )}
+        {errorMsg && <InlineErrorNote>{errorMsg}</InlineErrorNote>}
       </div>
 
       {/* 푸터 */}

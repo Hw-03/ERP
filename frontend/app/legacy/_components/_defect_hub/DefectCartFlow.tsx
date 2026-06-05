@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ArrowLeft, Copy, Trash2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
 import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { Department } from "@/lib/api/types/shared";
@@ -211,7 +212,7 @@ export function DefectCartFlow({
       >
         <div className="flex flex-col gap-1">
           <label className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-            출처 <span className="text-red-500">*</span>
+            출처 <span style={{ color: LEGACY_COLORS.red }}>*</span>
           </label>
           <div className="flex gap-2">
             {(["warehouse", "production"] as SourceKind[]).map((s) => (
@@ -250,7 +251,7 @@ export function DefectCartFlow({
               : source === "warehouse"
                 ? "창고 (부서 무관)"
                 : "출처 부서"}{" "}
-            {(mode === "add" || source === "production") && <span className="text-red-500">*</span>}
+            {(mode === "add" || source === "production") && <span style={{ color: LEGACY_COLORS.red }}>*</span>}
           </label>
           <select
             value={dept}
@@ -306,7 +307,7 @@ export function DefectCartFlow({
                     className="flex flex-col gap-2 rounded-[12px] border px-3 py-2"
                     style={{
                       background: LEGACY_COLORS.s1,
-                      borderColor: fail ? "#fca5a5" : LEGACY_COLORS.border,
+                      borderColor: fail ? tint(LEGACY_COLORS.red, 30) : LEGACY_COLORS.border,
                     }}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -347,7 +348,7 @@ export function DefectCartFlow({
                         <button
                           type="button"
                           onClick={() => copyReasonDown(idx)}
-                          className="ml-auto flex items-center gap-1 text-[11px] font-bold hover:underline"
+                          className="ml-auto flex items-center gap-1 text-xs font-bold hover:underline"
                           style={{ color: LEGACY_COLORS.blue }}
                         >
                           <Copy className="h-3 w-3" />
@@ -365,7 +366,7 @@ export function DefectCartFlow({
                     />
 
                     {fail && (
-                      <div className="text-xs font-bold text-red-600">실패: {fail.message}</div>
+                      <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>실패: {fail.message}</div>
                     )}
                   </div>
                 );
@@ -378,7 +379,7 @@ export function DefectCartFlow({
       {/* 하단 제출 바 */}
       <div className="flex shrink-0 items-center justify-between gap-2 pt-1">
         {failures.length > 0 ? (
-          <span className="text-xs font-bold text-red-600">
+          <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
             {failures.length}건 실패 — 남은 줄을 확인 후 다시 제출하세요.
           </span>
         ) : (

@@ -260,7 +260,7 @@ export function DefectItemPicker({
                       className="inline-flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[12px] font-black text-white transition-colors disabled:cursor-default"
                       style={{
                         background: added ? LEGACY_COLORS.s2 : LEGACY_COLORS.red,
-                        color: added ? LEGACY_COLORS.muted2 : "#fff",
+                        color: added ? LEGACY_COLORS.muted2 : LEGACY_COLORS.white,
                         borderColor: added ? LEGACY_COLORS.border : LEGACY_COLORS.red,
                         borderWidth: 1,
                         borderStyle: "solid",

@@ -1,6 +1,7 @@
 "use client";
 
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { FilterChip } from "../common/FilterChip";
 
 export type DefectScope = "my" | "production" | "all";
 export type DefectSort = "oldest" | "newest";
@@ -32,29 +33,29 @@ export function DefectFilterBar({
         borderColor: LEGACY_COLORS.border,
       }}
     >
-      {/* 부서 범위 라디오 */}
-      <div className="flex items-center gap-1">
-        <span className="mr-2 text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
+      {/* 부서 범위 칩 (단일선택 토글) */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="mr-1 text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
           부서
         </span>
-        <RadioOption
-          id="scope-my"
+        <FilterChip
           label="내 부서"
-          checked={scope === "my"}
-          disabled={!isProductionLine}
-          onChange={() => onScopeChange("my")}
+          active={scope === "my"}
+          onClick={() => isProductionLine && onScopeChange("my")}
+          size="sm"
+          className={isProductionLine ? "" : "cursor-not-allowed opacity-50"}
         />
-        <RadioOption
-          id="scope-production"
+        <FilterChip
           label="생산부 라인 전체"
-          checked={scope === "production"}
-          onChange={() => onScopeChange("production")}
+          active={scope === "production"}
+          onClick={() => onScopeChange("production")}
+          size="sm"
         />
-        <RadioOption
-          id="scope-all"
+        <FilterChip
           label="전체"
-          checked={scope === "all"}
-          onChange={() => onScopeChange("all")}
+          active={scope === "all"}
+          onClick={() => onScopeChange("all")}
+          size="sm"
         />
       </div>
 
@@ -81,41 +82,5 @@ export function DefectFilterBar({
         </select>
       </div>
     </div>
-  );
-}
-
-function RadioOption({
-  id,
-  label,
-  checked,
-  disabled = false,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  checked: boolean;
-  disabled?: boolean;
-  onChange: () => void;
-}) {
-  return (
-    <label
-      htmlFor={id}
-      className="flex cursor-pointer items-center gap-1.5 rounded-[8px] px-2 py-1 text-xs font-bold transition-colors hover:brightness-95"
-      style={{
-        color: disabled ? LEGACY_COLORS.muted2 : checked ? LEGACY_COLORS.red : LEGACY_COLORS.text,
-        opacity: disabled ? 0.5 : 1,
-        cursor: disabled ? "not-allowed" : "pointer",
-      }}
-    >
-      <input
-        type="radio"
-        id={id}
-        checked={checked}
-        disabled={disabled}
-        onChange={onChange}
-        className="accent-red-600"
-      />
-      {label}
-    </label>
   );
 }
