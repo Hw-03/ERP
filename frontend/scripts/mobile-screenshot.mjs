@@ -10,7 +10,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { seedOperator } from './_mobile-auth.mjs';
 
-// page.path 가 이미 '/legacy?tab=...' 를 포함하므로 BASE_URL 에는 /legacy 를 붙이지 않는다.
+// page.path 가 이미 '/mes?tab=...' 를 포함하므로 BASE_URL 에는 /mes 를 붙이지 않는다.
 // MOBILE_BASE_URL 로 포트/호스트 오버라이드 가능(기본 localhost:3000).
 const BASE_URL = process.env.MOBILE_BASE_URL || 'http://localhost:3000';
 const SCREENSHOTS_DIR = path.resolve('./frontend/screenshots');
@@ -22,11 +22,11 @@ const SCREENS = [
 ];
 
 const PAGES = [
-  { id: 'dashboard', path: '/legacy?tab=dashboard', label: 'Dashboard' },
-  { id: 'warehouse', path: '/legacy?tab=warehouse', label: 'Warehouse' },
-  { id: 'history', path: '/legacy?tab=history', label: 'History' },
-  { id: 'weekly', path: '/legacy?tab=weekly', label: 'Weekly' },
-  { id: 'admin', path: '/legacy?tab=admin', label: 'Admin' },
+  { id: 'dashboard', path: '/mes?tab=dashboard', label: 'Dashboard' },
+  { id: 'warehouse', path: '/mes?tab=warehouse', label: 'Warehouse' },
+  { id: 'history', path: '/mes?tab=history', label: 'History' },
+  { id: 'weekly', path: '/mes?tab=weekly', label: 'Weekly' },
+  { id: 'admin', path: '/mes?tab=admin', label: 'Admin' },
 ];
 
 async function ensureScreenshotsDir() {

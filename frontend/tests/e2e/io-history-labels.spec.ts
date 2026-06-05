@@ -27,7 +27,7 @@ test.describe("라벨 일관성 (glossary 단일 사전)", () => {
   });
 
   test("V2 입출고 화면에 3 work type 라벨이 정확한 단어로 노출된다", async ({ page }) => {
-    await page.goto("/legacy");
+    await page.goto("/mes");
     await page.getByRole("navigation").getByRole("button", { name: /입출고/ }).first().click();
 
     await expect(page.getByRole("button", { name: /원자재 입고/ })).toBeVisible();
@@ -36,7 +36,7 @@ test.describe("라벨 일관성 (glossary 단일 사전)", () => {
   });
 
   test("폐기된 라벨이 화면에 노출되지 않는다", async ({ page }) => {
-    await page.goto("/legacy");
+    await page.goto("/mes");
     await page.getByRole("navigation").getByRole("button", { name: /입출고/ }).first().click();
 
     // P0-1 캐노니컬 결정으로 폐기된 단어들
@@ -59,7 +59,7 @@ test.describe("라벨 일관성 (glossary 단일 사전)", () => {
   });
 
   test("입출고 내역 탭의 라벨도 단일 사전을 따른다", async ({ page }) => {
-    await page.goto("/legacy");
+    await page.goto("/mes");
     await page.getByRole("navigation").getByRole("button", { name: /내역/ }).first().click();
 
     const banned = ["재작업", "새 격리", "격리 해제", "폐기", "격리 폐기"];
