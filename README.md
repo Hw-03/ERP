@@ -111,8 +111,7 @@ ERP/
 │   ├── mes.db            활성 DB (품목 수 등은 `python _attic/backend-scripts/facts.py` 로 확인)
 │   └── requirements.txt
 ├── frontend/             Next.js 14 · Tailwind
-│   ├── app/legacy/       현재 활성 셸 (대시보드/입출고/내역/관리자)
-│   ├── features/mes/     MES feature 정본 (shared 부품 등) — 신규 import 대상
+│   ├── app/mes/          현재 활성 셸 (대시보드/입출고/내역/관리자)
 │   └── lib/
 │       ├── api/          13 도메인 모듈 (admin/catalog/.../stock-requests)
 │       │   └── types/    도메인별 type 정본 (Round-10A #2)
@@ -135,7 +134,7 @@ ERP/
 └── CLAUDE.md             AI/개발자 작업 규칙
 ```
 
-공용 UI 부품(EmptyState · LoadFailureCard · ConfirmModal · ResultModal · StatusPill · LoadingSkeleton) 은 `frontend/app/legacy/_components/common/` — 자세한 컴포넌트 위치·레이어는 [_attic/docs/ARCHITECTURE.md](_attic/docs/ARCHITECTURE.md) 참조.
+공용 UI 부품(EmptyState · LoadFailureCard · ConfirmModal · ResultModal · StatusPill · LoadingSkeleton) 은 `frontend/app/mes/_components/common/` — 자세한 컴포넌트 위치·레이어는 [_attic/docs/ARCHITECTURE.md](_attic/docs/ARCHITECTURE.md) 참조.
 
 ## 문서 허브
 
