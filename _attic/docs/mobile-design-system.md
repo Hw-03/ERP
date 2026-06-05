@@ -25,6 +25,7 @@
 #### 사용 규칙
 
 - **인라인 색상 금지** — `style={{ background: '#xxx' }}` 직접 작성 X. 항상 `LEGACY_COLORS.xxx` 또는 CSS 변수 `var(--c-xxx)`.
+  - ⚠️ **현실 괴리**: 레거시·일부 의도적 rgba 오버레이/딤에 인라인 색이 다수 남아 있다. **신규 코드는 토큰만** 쓰고, 레거시는 인접 작업 시에만 점진 정리한다(일괄 변경 금지). 위반 건수는 변동값이라 박지 않는다 — 필요하면 직접 grep.
 - **새 색 추가 절차**: 1) color.ts 에 키 추가 → 2) globals.css 라이트·다크 두 블록 모두에 변수 정의 → 3) WCAG AA 4.5:1 대비 수계산 또는 [WebAIM Contrast Checker](https://webaim.org/resources/contrastchecker/) 확인 → 4) 본 문서 표 갱신
 - **합성 색 (color-mix) 지양** — 부모 배경에 따라 대비가 달라짐. 메시지 배경처럼 가독성이 중요하면 불투명 토큰 추가.
 
@@ -37,7 +38,8 @@
 ### 1.2 타이포 (`TYPO`)
 
 위치: [frontend/app/legacy/_components/mobile/tokens.ts](frontend/app/legacy/_components/mobile/tokens.ts)
-폰트: Pretendard → Noto Sans KR → system-ui ([tailwind.config.ts:31](frontend/tailwind.config.ts#L31))
+폰트: **Pretendard**(2026-06-05부터 `next/font/local`로 self-host 실로딩) → Noto Sans KR → system-ui 폴백.
+폰트 스택은 `var(--font-pretendard)` CSS 변수로 주입된다 ([app/layout.tsx](frontend/app/layout.tsx), [globals.css](frontend/app/globals.css), [tailwind.config.ts:31](frontend/tailwind.config.ts#L31)). *(그 이전엔 이름만 선언돼 있고 폰트 파일이 없어 시스템 폰트로 폴백됐었다.)*
 
 | 토큰 | 클래스 | 픽셀 | 권장 사용 |
 |----|----|----|----|
@@ -48,10 +50,13 @@
 | `caption` | `text-xs font-regular` | 12 | 메타정보·날짜·라벨 (보조 정보만) |
 | `overline` | `text-xs font-bold uppercase tracking-wider` | 12 | 섹션 라벨·카테고리 헤더 |
 
+> **적용 범위 — 모바일 전용**: TYPO 토큰은 **모바일 primitives에서만** 채택돼 있다. 데스크탑은 raw Tailwind 타이포 클래스를 직접 쓰므로(이웃 패턴을 따른다), 데스크탑 작업에는 이 절(TYPO 사용 규칙)을 적용하지 않는다 — 억지로 토큰화하면 그 화면만 튄다.
+
 #### 사용 규칙
 
 - **본문에는 `body`** — caption(12px) 을 본문에 쓰지 말 것. 모바일 권장 본문 14px 이상.
 - **`text-[10px]`, `text-[11px]` 금지** — 배지처럼 어쩔 수 없는 경우만 `text-[11px]`. 본문·라벨은 모두 12px 이상.
+  - ⚠️ **현실 괴리**: 레거시 배지·헤더에 `text-[10px]`/`text-[11px]`가 다수 남아 있다(정당화 주석 없는 경우 포함). **신규 코드만 엄수**하고, 레거시는 점진 정리한다.
 - **굵기 혼합 자제** — 한 카드 안에 굵기 3종 이상 사용 X. 보통 2종(`font-bold` + `font-medium`) 으로 충분.
 - 위계가 역전되는 곳(부제가 제목보다 크게 보임) 발견 시 즉시 토큰 격상.
 
@@ -104,11 +109,11 @@
 | `PersonAvatar` | 사용자 아바타 (이름 첫 글자) | 이름 라벨 TYPO.body |
 | `MobileUserMenuSheet` | 사용자 시트 (프로필·PIN·로그아웃) | MobileShell 헤더에서 호출 |
 
-(나머지 6개는 보조 컴포넌트 — 필요 시 확인)
+> 위 표는 **주요 primitives만** 추린 것이다. 보조 컴포넌트(`SectionHeader`·`AsyncState`·`EmptyState`·`ItemRow`·`MoreMenuRow`·`WizardHeader`·`WizardProgress` 등)를 포함한 **현재 전체 구성은 [primitives/ 폴더](frontend/app/legacy/_components/mobile/primitives/) 기준**으로 본다. 개수는 변동값이라 박지 않는다.
 
 ### 데스크탑↔모바일 공유
 
-- `lib/ui/BottomSheet`·`ConfirmModal`·`Toast`·`TruncatedText` — 공용
+- `lib/ui/` — 데스크탑·모바일 공용 (예: `BottomSheet`·`ConfirmModal`·`Toast`·`TruncatedText`·`Tooltip`·`Button`·`ImageLightbox`·`dirty-guard`). 현재 목록은 [lib/ui/ 폴더](frontend/lib/ui/) 기준
 - 모바일 primitives 는 대부분 데스크탑에서 직접 호출되지 않음 (모바일 전용)
 - 예외: `IconButton sm` 이 데스크탑 [DesktopRightPanel](frontend/app/legacy/_components/DesktopRightPanel.tsx) 등에서 호출될 수 있음 — 변경 시 데스크탑 시각 영향 확인 필수
 
@@ -132,6 +137,7 @@
 
 ## 4. 변경 이력
 
+- **2026-06-05**: Pretendard `next/font/local` self-host 실로딩 전환 반영(이전엔 선언만·미로드). 카탈로그 개수 하드코딩 제거(폴더 기준 안내로 전환), 인라인색·`text-[10/11px]` 규칙에 현실 괴리 주석, TYPO 모바일 전용 범위 명시.
 - **2026-05-27 W3**: `successBg`·`errorBg`·`warningBg` 토큰 신설 — 메시지 박스 가독성
 - **2026-05-27 W6**: globals.css 에 iOS 자동 줌 방지 미디어 쿼리 — `input/textarea/select` 16px 강제
 - **2026-05-27 W6**: `TYPO.caption` 사용처 audit — ErrorAlert·PersonAvatar 본문 격상, 나머지 24개 보조정보 유지
@@ -147,6 +153,8 @@
 - Figma 시안 — 본 텍스트 가이드만으로 신규 컴포넌트 가이드 가능. 시안은 별도 사이클
 - 스토리북 — primitives 카탈로그를 시각화. 현재는 본 문서가 대체
 - WCAG AAA 대비 — 현재 AA 4.5:1 기준. AAA 7:1 은 별도
+
+> **변동 수치는 문서에 박지 않는다** — primitives 개수·규칙 위반 건수 등은 시간이 지나면 낡는다. 살아있는 폴더/코드를 직접 세거나, 백엔드 도메인 수치(품목·공정·모델 수 등)는 `python _attic/backend-scripts/facts.py`로 확인한다 (CLAUDE.md 규칙).
 
 ## 참고 문서
 
