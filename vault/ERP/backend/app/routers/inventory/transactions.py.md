@@ -26,6 +26,8 @@ project: DEXCOWIN MES
 
 ## 중요한 내용
 
+> 목록·요약·내보내기가 공유하는 쿼리 필터·응답 빌더 헬퍼는 [[ERP/backend/app/routers/inventory/_tx_filters.py]] 로 분리되었습니다(예: `_apply_common_filters`, `_to_log_response`, 라벨 매핑 상수). 이 파일은 엔드포인트 로직을 맡고 그 헬퍼를 import 합니다.
+
 이 파일에서 눈에 띄는 구조는 다음과 같습니다.
 
 - `TransactionSummaryResponse`
