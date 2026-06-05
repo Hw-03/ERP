@@ -17,6 +17,9 @@ const cartCountCache = new Map<string, number>();
 const warehouseQueueCountCache = { value: 0 };
 const deptQueueCountCache = new Map<string, number>();
 
+// 인수인계를 받는 부서 — 이 부서 소속이면 결재자가 아니어도 인수 확인 가능.
+const HANDOVER_RECEIVE_DEPTS = ["고압", "진공"];
+
 export function DesktopWarehouseView({
   globalSearch,
   onStatusChange,
@@ -39,11 +42,16 @@ export function DesktopWarehouseView({
   const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>(() => {
     if (typeof window === "undefined") return "compose";
     const s = new URLSearchParams(window.location.search).get("section");
-    const valid: WarehouseSectionTab[] = ["compose", "cart", "mine", "queue", "dept-queue"];
+    const valid: WarehouseSectionTab[] = ["compose", "cart", "mine", "queue", "dept-queue", "handover"];
     if (!s || !valid.includes(s as WarehouseSectionTab)) return "compose";
     const whRole = operator?.warehouse_role ?? "none";
     if (s === "queue" && whRole !== "primary" && whRole !== "deputy") return "compose";
     if (s === "dept-queue" && !isDepartmentApprover(operator)) return "compose";
+    if (s === "handover") {
+      const dept = operator?.department ?? "";
+      const ok = dept === "튜브" || HANDOVER_RECEIVE_DEPTS.includes(dept) || isDepartmentApprover(operator);
+      if (!ok) return "compose";
+    }
     return s as WarehouseSectionTab;
   });
   const [panelRefreshNonce, setPanelRefreshNonce] = useState(0);
@@ -66,8 +74,9 @@ export function DesktopWarehouseView({
     (operator?.warehouse_role ?? "none") === "primary" ||
     (operator?.warehouse_role ?? "none") === "deputy";
   const canSeeDeptQueue = isDepartmentApprover(operator);
-  // 인수인계: 작성(튜브 부서원) 또는 인수 확인(부서 결재 가능자) 가능하면 탭 노출.
-  const canReceiveHandover = canSeeDeptQueue;
+  // 인수인계: 작성(튜브 부서원) 또는 인수 확인(받는 부서 소속 또는 부서 결재 가능자) 가능하면 탭 노출.
+  const canReceiveHandover =
+    canSeeDeptQueue || HANDOVER_RECEIVE_DEPTS.includes(operator?.department ?? "");
   const showHandover = (operator?.department ?? "") === "튜브" || canReceiveHandover;
 
   useEffect(() => {

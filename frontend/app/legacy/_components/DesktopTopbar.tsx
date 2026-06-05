@@ -102,8 +102,6 @@ export function DesktopTopbar({
           </span>
         )}
 
-        <NotificationBell onNavigate={onNavigate} />
-
         {actionSlot}
 
         {operator && (
@@ -211,6 +209,8 @@ export function DesktopTopbar({
             )}
           </div>
         )}
+
+        <NotificationBell onNavigate={onNavigate} />
 
         <button
           onClick={onRefresh}

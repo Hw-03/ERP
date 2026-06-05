@@ -15,6 +15,8 @@ from app.models import (
     Inventory,
     InventoryLocation,
     LocationStatusEnum,
+    Notification,
+    NotificationTypeEnum,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -176,18 +178,48 @@ def test_handover_receive_wrong_pin_403(client, db_session, make_item):
 
 
 def test_handover_receive_no_permission_403(client, db_session, make_item):
+    """받는 부서(고압)도 아니고 결재권도 없는 직원(진공 일반)은 인수 불가."""
     item = make_item(name="8TF Perm", warehouse_qty=Decimal("0"))
     _seed_production(db_session, item.item_id, "튜브", Decimal("5"))
     author = _make_employee(db_session, code="TUBE4", department=DepartmentEnum.TUBE)
-    plain = _make_employee(db_session, code="HP4", department=DepartmentEnum.HIGH_VOLTAGE)  # 결재권 없음
+    outsider = _make_employee(db_session, code="VAC4", department=DepartmentEnum.VACUUM)  # 진공 일반
     db_session.commit()
 
     hid = _create_handover(client, author, "고압", item).json()["handover_id"]
     recv = client.post(
         f"/api/handovers/{hid}/receive",
-        json={"actor_employee_id": str(plain.employee_id), "pin": "0000"},
+        json={"actor_employee_id": str(outsider.employee_id), "pin": "0000"},
     )
     assert recv.status_code == 403, recv.json()
+
+
+def test_handover_receive_by_receiving_dept_member(client, db_session, make_item):
+    """받는 부서(고압) 소속 일반 직원은 결재권이 없어도 인수 확인 가능 + 대기함 노출."""
+    item = make_item(name="8TF Member", warehouse_qty=Decimal("0"))
+    _seed_production(db_session, item.item_id, "튜브", Decimal("5"))
+    author = _make_employee(db_session, code="TUBE7", department=DepartmentEnum.TUBE)
+    member = _make_employee(
+        db_session, code="HP7", name="고압사원", department=DepartmentEnum.HIGH_VOLTAGE
+    )  # department_role=none — 결재권 없음
+    db_session.commit()
+
+    hid = _create_handover(client, author, "고압", item, qty=3).json()["handover_id"]
+
+    # 일반 부서원도 인수 대기함에서 자기 부서 인수인계를 본다.
+    inbox = client.get(f"/api/handovers/inbox?actor_employee_id={member.employee_id}")
+    assert inbox.status_code == 200, inbox.json()
+    assert len(inbox.json()) == 1
+
+    recv = client.post(
+        f"/api/handovers/{hid}/receive",
+        json={"actor_employee_id": str(member.employee_id), "pin": "0000"},
+    )
+    assert recv.status_code == 200, recv.json()
+    assert recv.json()["status"] == "received"
+
+    db_session.expire_all()
+    assert _prod_qty(db_session, item.item_id, "튜브") == Decimal("2")
+    assert _prod_qty(db_session, item.item_id, "고압") == Decimal("3")
 
 
 def test_handover_receive_idempotent(client, db_session, make_item):
@@ -223,6 +255,35 @@ def test_handover_receive_idempotent(client, db_session, make_item):
         .count()
         == 1
     )
+
+
+def test_handover_create_notifies_receiving_dept(client, db_session, make_item):
+    """인수인계 제출 → 받는 부서(고압) 소속 + 부서 결재자에게 알림. 작성자/타부서 제외."""
+    item = make_item(name="8TF Notify", warehouse_qty=Decimal("0"))
+    _seed_production(db_session, item.item_id, "튜브", Decimal("5"))
+    author = _make_employee(db_session, code="TUBE8", name="튜브작성", department=DepartmentEnum.TUBE)
+    hp_member = _make_employee(db_session, code="HP8", name="고압사원", department=DepartmentEnum.HIGH_VOLTAGE)
+    approver = _make_employee(
+        db_session, code="APPR8", name="이필욱", department=DepartmentEnum.ASSEMBLY, department_role="primary"
+    )
+    vac_member = _make_employee(db_session, code="VAC8", name="진공사원", department=DepartmentEnum.VACUUM)
+    db_session.commit()
+
+    res = _create_handover(client, author, "고압", item, qty=1)
+    assert res.status_code == 201, res.json()
+
+    db_session.expire_all()
+    notes = (
+        db_session.query(Notification)
+        .filter(Notification.type == NotificationTypeEnum.HANDOVER_ARRIVED.value)
+        .all()
+    )
+    recipients = {n.recipient_employee_id for n in notes}
+    assert hp_member.employee_id in recipients      # 받는 부서 소속
+    assert approver.employee_id in recipients        # 부서 결재자
+    assert author.employee_id not in recipients      # 작성자 제외
+    assert vac_member.employee_id not in recipients  # 타 부서 제외
+    assert all(n.target_section == "handover" for n in notes)
 
 
 def test_handover_inbox_filters_submitted_to_approvable(client, db_session, make_item):

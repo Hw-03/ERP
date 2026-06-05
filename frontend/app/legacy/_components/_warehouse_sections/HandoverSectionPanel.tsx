@@ -7,6 +7,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { Button } from "@/lib/ui/Button";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { PIN_LENGTH } from "@/lib/auth/constants";
+import { formatDateTime } from "@/lib/mes-format";
 import { api, type Item } from "@/lib/api";
 import type { Handover } from "@/lib/api/types";
 import { isDepartmentApprover } from "../_warehouse_steps";
@@ -36,7 +37,9 @@ export function HandoverSectionPanel({
   onChanged: () => void;
 }) {
   const canCompose = (operator?.department ?? "") === "튜브";
-  const canReceive = isDepartmentApprover(operator);
+  // 인수 확인: 받는 부서(고압/진공) 소속이거나 부서 결재 권한자.
+  const canReceive =
+    isDepartmentApprover(operator) || ["고압", "진공"].includes(operator?.department ?? "");
 
   const [subTab, setSubTab] = useState<SubTab>(
     canCompose ? "compose" : canReceive ? "inbox" : "mine",
@@ -220,6 +223,12 @@ function HandoverCardList({
       {docs.map((doc) => {
         const st = STATUS_LABEL[doc.status] ?? STATUS_LABEL.draft;
         const totalQty = doc.lines.reduce((acc, l) => acc + l.quantity, 0);
+        const first = doc.lines[0];
+        const itemLabel = first
+          ? `${first.mes_code_snapshot ?? "-"} / ${first.item_name_snapshot}${
+              doc.lines.length > 1 ? ` 외 ${doc.lines.length - 1}건` : ""
+            }`
+          : "품목 없음";
         return (
           <div
             key={doc.handover_id}
@@ -239,8 +248,11 @@ function HandoverCardList({
                 </span>
               </div>
               <div className="mt-0.5 text-xs" style={{ color: LEGACY_COLORS.muted }}>
-                {doc.from_department} → {doc.to_department} · 품목 {doc.lines.length}종 · 수량 {totalQty}
-                {doc.received_by_name ? ` · 인수: ${doc.received_by_name}` : ""}
+                {doc.from_department} → {doc.to_department} · {itemLabel} · 수량 {totalQty}
+                {" · 작성 "}{formatDateTime(doc.created_at)}
+                {doc.received_by_name
+                  ? ` · 인수: ${doc.received_by_name} (${formatDateTime(doc.received_at)})`
+                  : ""}
               </div>
             </div>
             <button

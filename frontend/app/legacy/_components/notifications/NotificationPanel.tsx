@@ -8,6 +8,7 @@ const TONE: Record<string, string> = {
   approval_request: LEGACY_COLORS.blue,
   approval_approved: LEGACY_COLORS.green,
   approval_rejected: LEGACY_COLORS.red,
+  handover_arrived: LEGACY_COLORS.purple,
 };
 
 function timeLabel(iso: string): string {

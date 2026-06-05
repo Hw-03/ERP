@@ -30,6 +30,13 @@ from app.services.pin_auth import verify_pin
 _FROM_DEPARTMENT = "튜브"
 
 
+def can_receive(actor: Employee, to_department: str) -> bool:
+    """인수 확인 권한 — 받는 부서 소속이거나, 그 부서 결재 권한자."""
+    if (actor.department or "").strip() == (to_department or "").strip():
+        return True
+    return can_approve_department(actor, to_department)
+
+
 def _gen_code() -> str:
     now = datetime.utcnow()
     return f"HO-{now:%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:6]}"
@@ -88,7 +95,7 @@ def receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: str
         raise ValueError("제출된 인수인계서만 인수할 수 있습니다.")
     if not verify_pin(actor.pin_hash, pin):
         raise PermissionError("PIN이 올바르지 않습니다.")
-    if not can_approve_department(actor, doc.to_department):
+    if not can_receive(actor, doc.to_department):
         raise PermissionError("해당 부서의 인수 확인 권한이 없습니다.")
 
     from_dept = DepartmentEnum(doc.from_department)

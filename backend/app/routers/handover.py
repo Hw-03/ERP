@@ -13,6 +13,7 @@ from app.models import Employee, HandoverDoc, HandoverStatusEnum
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import HandoverCreate, HandoverReceiveRequest, HandoverResponse
 from app.services import handover as handover_svc
+from app.services import notifications as notifications_svc
 from app.services._tx import commit_and_refresh
 from app.services.dept_hierarchy import approvable_departments
 
@@ -29,14 +30,26 @@ def _load_actor(db: Session, employee_id: uuid.UUID) -> Employee:
 
 
 def _inbox_query(db: Session, actor: Employee):
-    """인수 대기함 쿼리 — submitted + 인수 가능 부서 범위. None=권한 없음."""
+    """인수 대기함 쿼리 — submitted + 인수 가능 부서 범위. None=권한 없음.
+
+    인수 가능 부서 = 결재 가능 부서(approvable_departments) ∪ 본인 소속 부서.
+    받는 부서(고압/진공) 소속이면 결재자가 아니어도 자기 부서 인수인계를 본다.
+    """
     visible = approvable_departments(actor)
-    if visible is not None and len(visible) == 0:
+    own = (actor.department or "").strip()
+    if visible is None:
+        # 전체 권한(admin) — 부서 필터 없음.
+        return db.query(HandoverDoc).filter(HandoverDoc.status == HandoverStatusEnum.SUBMITTED)
+    depts = set(visible)
+    if own:
+        depts.add(own)
+    if len(depts) == 0:
         return None
-    q = db.query(HandoverDoc).filter(HandoverDoc.status == HandoverStatusEnum.SUBMITTED)
-    if visible is not None:
-        q = q.filter(HandoverDoc.to_department.in_(list(visible)))
-    return q
+    return (
+        db.query(HandoverDoc)
+        .filter(HandoverDoc.status == HandoverStatusEnum.SUBMITTED)
+        .filter(HandoverDoc.to_department.in_(list(depts)))
+    )
 
 
 @router.post("", response_model=HandoverResponse, status_code=status.HTTP_201_CREATED)
@@ -47,6 +60,8 @@ def create_handover(payload: HandoverCreate, db: Session = Depends(get_db)):
     except ValueError as exc:
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
+    # 받는 부서 인수 담당자에게 도착 알림 (커밋 전 세션 add → 인수인계와 원자적).
+    notifications_svc.notify_handover_arrived(db, doc)
     commit_and_refresh(db, doc)
     return doc
 

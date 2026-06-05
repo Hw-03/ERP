@@ -15,6 +15,8 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Employee,
+    HandoverDoc,
+    HandoverStatusEnum,
     Notification,
     NotificationTypeEnum,
     StockRequest,
@@ -113,6 +115,42 @@ def notify_request_arrived(db: Session, request: StockRequest) -> None:
             request=request,
             target_tab="warehouse",
             target_section=target_section,
+        )
+
+
+def recipients_for_handover(db: Session, to_department: str | None) -> list[Employee]:
+    """인수인계 도착 알림 수신자 — 받는 부서(고압/진공) 소속 + 부서 결재자(이필욱·김건호).
+
+    창고 정/부·admin 은 인수 권한은 있으나 실제 인수 당사자가 아니라 알림에서 제외(노이즈).
+    """
+    target = (to_department or "").strip()
+    out: list[Employee] = []
+    for e in _active_employees(db):
+        same_dept = (e.department or "").strip() == target
+        dept_appr = (getattr(e, "department_role", None) or "none").lower() in ("primary", "deputy")
+        if same_dept or dept_appr:
+            out.append(e)
+    return out
+
+
+def notify_handover_arrived(db: Session, doc: HandoverDoc) -> None:
+    """인수인계 제출 → 받는 부서 인수 담당자에게 알림. 작성자 본인 제외. 세션 add 만."""
+    if doc.status != HandoverStatusEnum.SUBMITTED:
+        return
+    body = f"{doc.from_department}→{doc.to_department} · {doc.title}"
+    for emp in recipients_for_handover(db, doc.to_department):
+        if emp.employee_id == doc.author_employee_id:
+            continue
+        db.add(
+            Notification(
+                recipient_employee_id=emp.employee_id,
+                type=NotificationTypeEnum.HANDOVER_ARRIVED.value,
+                title="새 인수인계 도착",
+                body=body,
+                target_tab="warehouse",
+                target_section="handover",
+                related_request_id=None,
+            )
         )
 
 

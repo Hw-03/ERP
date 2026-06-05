@@ -28,6 +28,7 @@ class NotificationTypeEnum(str, enum.Enum):
     APPROVAL_REQUEST = "approval_request"    # 결재 요청 도착 → 승인 담당자
     APPROVAL_APPROVED = "approval_approved"  # 승인 완료 → 요청자
     APPROVAL_REJECTED = "approval_rejected"  # 반려 → 요청자
+    HANDOVER_ARRIVED = "handover_arrived"    # 인수인계 도착 → 받는 부서(고압/진공)
 
 
 class Notification(Base):

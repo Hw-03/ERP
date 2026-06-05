@@ -32,29 +32,34 @@ export function HandoverComposeForm({
   const [analysisText, setAnalysisText] = useState("");
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<DraftLine[]>([]);
-  const [search, setSearch] = useState("");
+  const [selectedItemId, setSelectedItemId] = useState("");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
 
-  const matches = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return [];
-    return items
-      .filter(
+  // 인수인계 대상은 튜브 TF 품목. 코드에 "TF" 가 포함된 품목만 선택지로 노출하고,
+  // 이미 추가한 품목은 제외.
+  const available = useMemo(
+    () =>
+      items.filter(
         (it) =>
-          it.item_name.toLowerCase().includes(q) ||
-          (it.mes_code ?? "").toLowerCase().includes(q),
-      )
-      .filter((it) => !lines.some((l) => l.item_id === it.item_id))
-      .slice(0, 8);
-  }, [search, items, lines]);
+          (it.mes_code ?? "").toUpperCase().includes("TF") &&
+          !lines.some((l) => l.item_id === it.item_id),
+      ),
+    [items, lines],
+  );
 
   function addLine(it: Item) {
     setLines((prev) => [
       ...prev,
       { item_id: it.item_id, item_name: it.item_name, mes_code: it.mes_code, quantity: 1 },
     ]);
-    setSearch("");
+  }
+
+  function addSelected() {
+    const it = items.find((i) => i.item_id === selectedItemId);
+    if (!it) return;
+    addLine(it);
+    setSelectedItemId("");
   }
 
   function setQty(itemId: string, qty: number) {
@@ -152,37 +157,31 @@ export function HandoverComposeForm({
       </div>
 
       <Field label="인수인계 품목 (실제 재고 이동 대상)">
-        <div className="relative">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="품목명 또는 코드 검색"
-            className="w-full rounded-[12px] border px-3 py-2 text-sm outline-none"
+        <div className="flex gap-2">
+          <select
+            value={selectedItemId}
+            onChange={(e) => setSelectedItemId(e.target.value)}
+            className="min-w-0 flex-1 rounded-[12px] border px-3 py-2 text-sm outline-none"
             style={fieldStyle}
-          />
-          {matches.length > 0 && (
-            <div
-              className="absolute z-20 mt-1 w-full overflow-hidden rounded-[12px] border shadow-lg"
-              style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-            >
-              {matches.map((it) => (
-                <button
-                  key={it.item_id}
-                  onClick={() => addLine(it)}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-opacity hover:opacity-80"
-                  style={{ color: LEGACY_COLORS.text }}
-                >
-                  <Plus className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.blue }} />
-                  <span className="font-bold">{it.item_name}</span>
-                  {it.mes_code && (
-                    <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
-                      {it.mes_code}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
+          >
+            <option value="">품목 선택...</option>
+            {available.map((it) => (
+              <option key={it.item_id} value={it.item_id}>
+                {it.item_name}
+                {it.mes_code ? ` (${it.mes_code})` : ""}
+              </option>
+            ))}
+          </select>
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={addSelected}
+            disabled={!selectedItemId}
+            className="shrink-0 rounded-[12px] px-4 py-2 font-bold"
+          >
+            <Plus className="mr-1 inline h-3.5 w-3.5" />
+            추가
+          </Button>
         </div>
         {lines.length > 0 && (
           <div className="mt-2 flex flex-col gap-2">
