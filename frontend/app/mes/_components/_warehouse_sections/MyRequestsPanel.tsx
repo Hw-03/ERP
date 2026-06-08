@@ -1,11 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { api, type StockRequest } from "@/lib/api";
+import { useEffect, useState } from "react";
+import type { StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { MyRequestRow } from "./MyRequestRow";
+import {
+  useCancelStockRequestMutation,
+  useMyStockRequestsQuery,
+} from "@/lib/queries/useStockRequestsQuery";
 
 interface Props {
   employeeId: string | null;
@@ -14,40 +18,23 @@ interface Props {
 }
 
 export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) {
-  const [items, setItems] = useState<StockRequest[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const { data: items = [], isLoading: loading, error: qError, refetch } =
+    useMyStockRequestsQuery(employeeId ?? "");
+  const cancelMutation = useCancelStockRequestMutation();
+  const loadError = qError
+    ? qError instanceof Error
+      ? qError.message
+      : "요청 목록을 불러오지 못했습니다."
+    : null;
   const [cancelTarget, setCancelTarget] = useState<StockRequest | null>(null);
   const [cancelPin, setCancelPin] = useState("");
   const [cancelError, setCancelError] = useState<string | null>(null);
-  const [cancelBusy, setCancelBusy] = useState(false);
 
-  const reload = useCallback(async () => {
-    if (!employeeId) {
-      setItems([]);
-      return;
-    }
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const rows = await api.listMyStockRequests(employeeId);
-      setItems(rows);
-    } catch (err) {
-      setLoadError(err instanceof Error ? err.message : "요청 목록을 불러오지 못했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  }, [employeeId]);
-
+  // refreshNonce 변경 시 수동 refetch (외부 트리거). 30초 폴링은 훅의 refetchInterval 이 담당.
   useEffect(() => {
-    void reload();
-  }, [reload, refreshNonce]);
-
-  useEffect(() => {
-    if (!employeeId) return;
-    const id = setInterval(() => { void reload(); }, 30_000);
-    return () => clearInterval(id);
-  }, [reload, employeeId]);
+    void refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshNonce]);
 
   const openCancel = (request: StockRequest) => {
     setCancelTarget(request);
@@ -61,23 +48,24 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
     setCancelError(null);
   };
 
-  const submitCancel = async () => {
-    if (!cancelTarget || !cancelPin.trim() || cancelBusy) return;
-    setCancelBusy(true);
+  const submitCancel = () => {
+    if (!cancelTarget || !cancelPin.trim() || cancelMutation.isPending) return;
     setCancelError(null);
-    try {
-      await api.cancelStockRequest(cancelTarget.request_id, {
-        actor_employee_id: cancelTarget.requester_employee_id,
-        pin: cancelPin,
-      });
-      closeCancel();
-      await reload();
-      onChanged();
-    } catch (err) {
-      setCancelError(err instanceof Error ? err.message : "요청 취소에 실패했습니다.");
-    } finally {
-      setCancelBusy(false);
-    }
+    cancelMutation.mutate(
+      {
+        requestId: cancelTarget.request_id,
+        payload: { actor_employee_id: cancelTarget.requester_employee_id, pin: cancelPin },
+      },
+      {
+        onSuccess: () => {
+          closeCancel();
+          onChanged();
+        },
+        onError: (err) => {
+          setCancelError(err instanceof Error ? err.message : "요청 취소에 실패했습니다.");
+        },
+      },
+    );
   };
 
   if (!employeeId) {
@@ -93,7 +81,7 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
   return (
     <div className="flex flex-col gap-3">
       {loading && <LoadingSkeleton variant="list" rows={2} />}
-      {loadError && <LoadFailureCard message={loadError} onRetry={() => void reload()} />}
+      {loadError && <LoadFailureCard message={loadError} onRetry={() => void refetch()} />}
       {!loading && items.length === 0 && !loadError && (
         <EmptyState variant="no-data" compact title="아직 제출한 요청이 없습니다." />
       )}
@@ -111,7 +99,7 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
         tone="danger"
         confirmLabel="요청 취소"
         cancelLabel="닫기"
-        busy={cancelBusy}
+        busy={cancelMutation.isPending}
         onClose={closeCancel}
         onConfirm={submitCancel}
       >
@@ -129,7 +117,7 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged }: Props) 
           placeholder="PIN"
           value={cancelPin}
           onChange={(e) => setCancelPin(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") void submitCancel(); }}
+          onKeyDown={(e) => { if (e.key === "Enter") submitCancel(); }}
           className="w-full rounded-[10px] border px-3 py-2 text-sm outline-none"
           style={{
             background: LEGACY_COLORS.s2,

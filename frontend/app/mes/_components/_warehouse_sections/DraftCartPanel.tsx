@@ -1,13 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { api, type IoBatch, type StockRequest } from "@/lib/api";
+import { useEffect, useState } from "react";
+import type { IoBatch, StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { DraftCartItemRow } from "./DraftCartItemRow";
 import { IoDraftWorkCard } from "./IoDraftWorkCard";
+import {
+  useDeleteIoDraftMutation,
+  useDeleteStockRequestDraftMutation,
+  useDraftCartQuery,
+} from "@/lib/queries/useDraftCartQuery";
 
 interface Props {
   employeeId: string | null;
@@ -31,59 +36,57 @@ export function DraftCartPanel({
   onChanged,
   onCountChange,
 }: Props) {
-  const [drafts, setDrafts] = useState<StockRequest[]>([]);
-  const [ioDrafts, setIoDrafts] = useState<IoBatch[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const { data, isLoading: loading, error: qError, refetch } = useDraftCartQuery(employeeId);
+  const drafts = data?.stockDrafts ?? [];
+  const ioDrafts = data?.ioDrafts ?? [];
+  const loadError = qError
+    ? qError instanceof Error
+      ? qError.message
+      : "작업 중 목록을 불러오지 못했습니다."
+    : null;
+  const deleteStockMutation = useDeleteStockRequestDraftMutation();
+  const deleteIoMutation = useDeleteIoDraftMutation();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [opError, setOpError] = useState<string | null>(null);
 
-  const reload = useCallback(async () => {
-    if (!employeeId) {
-      setDrafts([]);
-      setIoDrafts([]);
-      onCountChange?.(0);
-      return;
-    }
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const [legacyRows, ioRows] = await Promise.all([
-        api.listStockRequestDrafts(employeeId),
-        api.listDrafts(employeeId),
-      ]);
-      setDrafts(legacyRows);
-      setIoDrafts(ioRows);
-      onCountChange?.(legacyRows.length + ioRows.length);
-    } catch (err) {
-      setLoadError(err instanceof Error ? err.message : "작업 중 목록을 불러오지 못했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  }, [employeeId, onCountChange]);
-
+  // refreshNonce 변경 시 수동 refetch (외부 트리거)
   useEffect(() => {
-    void reload();
-  }, [reload, refreshNonce]);
+    void refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshNonce]);
 
-  const handleDeleteConfirm = async () => {
+  // 부모 탭 badge 카운트 동기화 (draft 수 변할 때)
+  useEffect(() => {
+    onCountChange?.(drafts.length + ioDrafts.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drafts.length, ioDrafts.length]);
+
+  const handleDeleteConfirm = () => {
     if (!employeeId || !deleteTarget) return;
-    try {
-      setBusyId(deleteTarget.kind === "stock" ? deleteTarget.draft.request_id : deleteTarget.draft.batch_id);
-      if (deleteTarget.kind === "stock") {
-        await api.deleteStockRequestDraft(deleteTarget.draft.request_id, employeeId);
-      } else {
-        await api.deleteDraft(deleteTarget.draft.batch_id, employeeId);
-      }
-      setDeleteTarget(null);
-      await reload();
-      onChanged();
-    } catch (err) {
-      setOpError(err instanceof Error ? err.message : "삭제에 실패했습니다.");
-      setDeleteTarget(null);
-    } finally {
-      setBusyId(null);
+    const targetId =
+      deleteTarget.kind === "stock"
+        ? deleteTarget.draft.request_id
+        : deleteTarget.draft.batch_id;
+    setBusyId(targetId);
+    const handlers = {
+      onSuccess: () => {
+        setDeleteTarget(null);
+        onChanged();
+      },
+      onError: (err: unknown) => {
+        setOpError(err instanceof Error ? err.message : "삭제에 실패했습니다.");
+        setDeleteTarget(null);
+      },
+      onSettled: () => setBusyId(null),
+    };
+    if (deleteTarget.kind === "stock") {
+      deleteStockMutation.mutate(
+        { requestId: deleteTarget.draft.request_id, employeeId },
+        handlers,
+      );
+    } else {
+      deleteIoMutation.mutate({ batchId: deleteTarget.draft.batch_id, employeeId }, handlers);
     }
   };
 
@@ -102,7 +105,7 @@ export function DraftCartPanel({
   return (
     <div className="flex flex-col gap-3">
       {loading && <LoadingSkeleton variant="list" rows={2} />}
-      {loadError && <LoadFailureCard message={loadError} onRetry={() => void reload()} />}
+      {loadError && <LoadFailureCard message={loadError} onRetry={() => void refetch()} />}
       {opError && (
         <div
           className="rounded-[12px] border px-4 py-3 text-sm"
@@ -153,7 +156,7 @@ export function DraftCartPanel({
         tone="danger"
         confirmLabel="삭제"
         onClose={() => setDeleteTarget(null)}
-        onConfirm={() => void handleDeleteConfirm()}
+        onConfirm={handleDeleteConfirm}
       >
         이 작업을 삭제하시겠습니까?
       </ConfirmModal>
