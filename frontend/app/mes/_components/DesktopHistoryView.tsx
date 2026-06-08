@@ -12,6 +12,7 @@ import { HistoryStatsBar } from "./_history_sections/HistoryStatsBar";
 import { HistoryTable } from "./_history_sections/HistoryTable";
 import { DesktopHistoryRightPanel } from "./_history_sections/DesktopHistoryRightPanel";
 import { useHistoryData } from "./_hooks/useHistoryData";
+import { useToggleSet } from "./_hooks/useToggleSet";
 import { useMonthlyCountsQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { parseUtc, toDateKey } from "./_history_sections/historyFormat";
@@ -26,9 +27,9 @@ export function DesktopHistoryView() {
   // 대시보드식 독립 필터 패널 (부서·모델·거래종류 다중 선택).
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const { data: productModels } = useModelsQuery();
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
-  const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
-  const [selectedOps, setSelectedOps] = useState<string[]>([]);
+  const { selected: selectedModels, toggle: toggleModel, setSelected: setSelectedModels } = useToggleSet();
+  const { selected: selectedDepts, toggle: toggleDept, setSelected: setSelectedDepts } = useToggleSet();
+  const { selected: selectedOps, toggle: toggleOp, setSelected: setSelectedOps } = useToggleSet();
   const modelParam = selectedModels.join(",");
   const deptParam = selectedDepts.join(",");
   const opParam = selectedOps.join(",");
@@ -50,16 +51,6 @@ export function DesktopHistoryView() {
       ),
     [productModels],
   );
-
-  function toggleModel(v: string) {
-    setSelectedModels((s) => (s.includes(v) ? s.filter((x) => x !== v) : [...s, v]));
-  }
-  function toggleDept(v: string) {
-    setSelectedDepts((s) => (s.includes(v) ? s.filter((x) => x !== v) : [...s, v]));
-  }
-  function toggleOp(v: string) {
-    setSelectedOps((s) => (s.includes(v) ? s.filter((x) => x !== v) : [...s, v]));
-  }
 
   const [selection, setSelection] = useState<HistorySelection | null>(null);
   // 우측 패널 내 드릴(BOM 하위·최근거래) 뒤로가기 스택. 표 행 클릭은 top-level 이라 스택 비움.

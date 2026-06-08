@@ -15,6 +15,7 @@ import { InventoryDetailPanel } from "../../_inventory_sections/InventoryDetailP
 import { useInventoryData } from "../../_hooks/useInventoryData";
 import { useDesktopInventoryDerivations } from "../../_hooks/useDesktopInventoryDerivations";
 import { useItemImageManifest } from "../../_hooks/useItemImageManifest";
+import { useToggleSet } from "../../_hooks/useToggleSet";
 import { matchesKpi, matchesSearch } from "../../_inventory_sections/inventoryFilter";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 
@@ -61,9 +62,6 @@ export function MobileDashboardScreen({
     onSelectedSync,
   });
   const imageManifest = useItemImageManifest();
-  const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
-  const [selectedProcessSteps, setSelectedProcessSteps] = useState<string[]>([]);
   const productModels = useModelsQuery().data ?? EMPTY_MODELS;
   const [kpi, setKpi] = useState<KpiFilter>("ALL");
   const [localSearch, setLocalSearch] = useState("");
@@ -73,18 +71,12 @@ export function MobileDashboardScreen({
   const lastSelectedItemRef = useRef<Item | null>(null);
   const deferredLocalSearch = useDeferredValue(localSearch.trim().toLowerCase());
 
-  function toggleDept(v: string) {
-    setSelectedDepts((prev) => (prev.includes(v) ? prev.filter((d) => d !== v) : [...prev, v]));
-    setDisplayLimit(PAGE_SIZE);
-  }
-  function toggleModel(v: string) {
-    setSelectedModels((prev) => (prev.includes(v) ? prev.filter((m) => m !== v) : [...prev, v]));
-    setDisplayLimit(PAGE_SIZE);
-  }
-  function toggleProcessStep(v: string) {
-    setSelectedProcessSteps((prev) => (prev.includes(v) ? prev.filter((p) => p !== v) : [...prev, v]));
-    setDisplayLimit(PAGE_SIZE);
-  }
+  const { selected: selectedDepts, toggle: toggleDept, setSelected: setSelectedDepts } =
+    useToggleSet(() => setDisplayLimit(PAGE_SIZE));
+  const { selected: selectedModels, toggle: toggleModel, setSelected: setSelectedModels } =
+    useToggleSet(() => setDisplayLimit(PAGE_SIZE));
+  const { selected: selectedProcessSteps, toggle: toggleProcessStep, setSelected: setSelectedProcessSteps } =
+    useToggleSet(() => setDisplayLimit(PAGE_SIZE));
 
   useEffect(() => {
     if (!selectedItem) {
@@ -166,7 +158,7 @@ export function MobileDashboardScreen({
     setSelectedProcessSteps([]);
     setLocalSearch("");
     setKpi("ALL");
-  }, []);
+  }, [setSelectedDepts, setSelectedModels, setSelectedProcessSteps]);
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">

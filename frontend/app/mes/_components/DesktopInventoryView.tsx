@@ -16,6 +16,7 @@ import { DesktopInventoryRightPanel } from "./_inventory_sections/DesktopInvento
 import { useInventoryData } from "./_hooks/useInventoryData";
 import { useDesktopInventoryDerivations } from "./_hooks/useDesktopInventoryDerivations";
 import { useItemImageManifest } from "./_hooks/useItemImageManifest";
+import { useToggleSet } from "./_hooks/useToggleSet";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 // R9-2: helper 4개 (getMinStock / safeQty / matchesSearch / matchesKpi) 분리
 import { matchesKpi, matchesSearch } from "./_inventory_sections/inventoryFilter";
@@ -59,9 +60,6 @@ export function DesktopInventoryView({
     onSelectedSync,
   });
   const imageManifest = useItemImageManifest();
-  const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
-  const [selectedProcessSteps, setSelectedProcessSteps] = useState<string[]>([]);
   const productModels = useModelsQuery().data ?? EMPTY_MODELS;
   const [kpi, setKpi] = useState<KpiFilter>("ALL");
   const [localSearch, setLocalSearch] = useState("");
@@ -74,18 +72,12 @@ export function DesktopInventoryView({
 
   // loadItems 본문은 useInventoryData 훅이 제공 (R7-HOOK2). 호출만 외부에서 가능.
 
-  function toggleDept(v: string) {
-    setSelectedDepts((prev) => (prev.includes(v) ? prev.filter((d) => d !== v) : [...prev, v]));
-    setDisplayLimit(DESKTOP_PAGE_SIZE);
-  }
-  function toggleModel(v: string) {
-    setSelectedModels((prev) => (prev.includes(v) ? prev.filter((m) => m !== v) : [...prev, v]));
-    setDisplayLimit(DESKTOP_PAGE_SIZE);
-  }
-  function toggleProcessStep(v: string) {
-    setSelectedProcessSteps((prev) => (prev.includes(v) ? prev.filter((p) => p !== v) : [...prev, v]));
-    setDisplayLimit(DESKTOP_PAGE_SIZE);
-  }
+  const { selected: selectedDepts, toggle: toggleDept, setSelected: setSelectedDepts } =
+    useToggleSet(() => setDisplayLimit(DESKTOP_PAGE_SIZE));
+  const { selected: selectedModels, toggle: toggleModel, setSelected: setSelectedModels } =
+    useToggleSet(() => setDisplayLimit(DESKTOP_PAGE_SIZE));
+  const { selected: selectedProcessSteps, toggle: toggleProcessStep, setSelected: setSelectedProcessSteps } =
+    useToggleSet(() => setDisplayLimit(DESKTOP_PAGE_SIZE));
 
   useEffect(() => {
     if (!selectedItem) {

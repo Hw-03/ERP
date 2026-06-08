@@ -13,6 +13,7 @@ import { HistoryStatsBar } from "../../_history_sections/HistoryStatsBar";
 import { HistoryDetailPanel } from "../../_history_sections/HistoryDetailPanel";
 import { HistoryBatchDetailPanel } from "../../_history_sections/HistoryBatchDetailPanel";
 import { useHistoryData } from "../../_hooks/useHistoryData";
+import { useToggleSet } from "../../_hooks/useToggleSet";
 import { useMonthlyCountsQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { parseUtc, toDateKey, formatHistoryDate } from "../../_history_sections/historyFormat";
@@ -37,9 +38,9 @@ const SEARCH_DEBOUNCE_MS = 350;
 export function MobileHistoryScreen() {
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const { data: productModels } = useModelsQuery();
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
-  const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
-  const [selectedOps, setSelectedOps] = useState<string[]>([]);
+  const { selected: selectedModels, toggle: toggleModel, setSelected: setSelectedModels } = useToggleSet();
+  const { selected: selectedDepts, toggle: toggleDept, setSelected: setSelectedDepts } = useToggleSet();
+  const { selected: selectedOps, toggle: toggleOp, setSelected: setSelectedOps } = useToggleSet();
   const modelParam = selectedModels.join(",");
   const deptParam = selectedDepts.join(",");
   const opParam = selectedOps.join(",");
@@ -59,16 +60,6 @@ export function MobileHistoryScreen() {
       ),
     [productModels],
   );
-
-  function toggleModel(v: string) {
-    setSelectedModels((s) => (s.includes(v) ? s.filter((x) => x !== v) : [...s, v]));
-  }
-  function toggleDept(v: string) {
-    setSelectedDepts((s) => (s.includes(v) ? s.filter((x) => x !== v) : [...s, v]));
-  }
-  function toggleOp(v: string) {
-    setSelectedOps((s) => (s.includes(v) ? s.filter((x) => x !== v) : [...s, v]));
-  }
 
   const [selection, setSelection] = useState<HistorySelection | null>(null);
   const [selectionStack, setSelectionStack] = useState<HistorySelection[]>([]);
