@@ -96,6 +96,16 @@ class ItemReorderPayload(BaseModel):
     pin: str
 
 
+class MyItemOrderEntry(BaseModel):
+    item_id: uuid.UUID
+    display_order: int
+
+
+class MyItemOrderPut(BaseModel):
+    employee_id: uuid.UUID
+    items: List[MyItemOrderEntry]
+
+
 class BOMResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
