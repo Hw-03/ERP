@@ -258,7 +258,7 @@ def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespon
     # FastAPI 가 HTTPException 은 자체 처리하므로 여기에는 진짜 unhandled 만 옴.
     rid = _rid(request)
     emp = get_actor_emp(request)
-    _log.exception("Unhandled rid=%s emp=%s path=%s", rid, emp, request.url.path)
+    _log.error("Unhandled rid=%s emp=%s path=%s", rid, emp, request.url.path, exc_info=exc)
     return JSONResponse(
         status_code=500,
         content=_error_payload(
