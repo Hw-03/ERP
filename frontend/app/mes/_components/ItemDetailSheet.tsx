@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type InventoryLocationRow, type Item, type TransactionLog } from "@/lib/api";
+import { api, type InventoryLocationRow, type Item } from "@/lib/api";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { ItemDetailHistoryList } from "./ItemDetailHistoryList";
 import { ItemDetailActionForm, type ItemDetailActionMode } from "./ItemDetailActionForm";
+import { useTransactionsQuery } from "@/lib/queries/useTransactionsQuery";
+import { useItemLocationsQuery } from "@/lib/queries/useInventoryQuery";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { mesCodeDeptBadge } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
@@ -30,10 +32,14 @@ export function ItemDetailSheet({
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [logs, setLogs] = useState<TransactionLog[]>([]);
-  const [locations, setLocations] = useState<InventoryLocationRow[]>([]);
-  const [locationsLoading, setLocationsLoading] = useState(false);
   const getDeptColor = useDeptColorLookup();
+
+  const { data: logs = [] } = useTransactionsQuery(
+    item ? { itemId: item.item_id, limit: 10 } : undefined,
+    { enabled: !!item },
+  );
+  const { data: locations = [], isLoading: locationsLoading } =
+    useItemLocationsQuery(item?.item_id ?? "");
 
   useEffect(() => {
     if (!item) return;
@@ -42,16 +48,6 @@ export function ItemDetailSheet({
     setQty(String(Number(item.quantity)));
     setNotes("");
     setError(null);
-    void api
-      .getTransactions({ itemId: item.item_id, limit: 10 })
-      .then(setLogs)
-      .catch(() => setLogs([]));
-    setLocationsLoading(true);
-    void api
-      .getItemLocations(item.item_id)
-      .then((rows) => setLocations(rows ?? []))
-      .catch(() => setLocations([]))
-      .finally(() => setLocationsLoading(false));
   }, [item]);
 
   if (!item) return null;
