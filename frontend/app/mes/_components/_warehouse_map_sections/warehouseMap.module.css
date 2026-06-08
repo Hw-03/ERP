@@ -66,6 +66,15 @@
   text-decoration: underline;
 }
 
+.boxHit {
+  animation: boxFlash 0.7s ease-in-out 3;
+}
+@keyframes boxFlash {
+  0%, 100% { filter: brightness(1); }
+  50%       { filter: brightness(2.2); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .hit { animation: none; }
+  .hit    { animation: none; }
+  .boxHit { animation: none; }
 }

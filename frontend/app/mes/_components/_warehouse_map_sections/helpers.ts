@@ -11,6 +11,11 @@ export const JARI_CAPACITY = 3;
 
 export const cellKey = (a: number, r: number, l: number) => `${a}-${r}-${l}`;
 
+/** row 번호 → 알파벳 열 라벨. 1→"A", 2→"B", … */
+export function rowLabel(n: number): string {
+  return String.fromCharCode(64 + n);
+}
+
 /** 박스 목록 → 칸(angle,row,layer) 단위 인덱스. */
 export function buildCellIndex(boxes: WarehouseBox[]): Map<string, WarehouseBox[]> {
   const idx = new Map<string, WarehouseBox[]>();

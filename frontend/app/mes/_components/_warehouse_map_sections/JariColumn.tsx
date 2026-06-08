@@ -23,13 +23,16 @@ function frontName(name: string): string {
 export function JariColumn({
   boxes,
   scale,
+  matchQuery,
 }: {
   boxes: WarehouseBox[];
   scale: "front" | "row";
+  matchQuery?: string;
 }) {
   const used = stackUnits(boxes);
   const empty = JARI_CAPACITY - used;
   const isFront = scale === "front";
+  const lq = (matchQuery ?? "").toLowerCase().trim();
 
   return (
     <div
@@ -46,6 +49,13 @@ export function JariColumn({
       )}
       {[...boxes].reverse().map((box) => {
         const color = boxColor(box) ?? LEGACY_COLORS.muted2;
+        const matched =
+          lq &&
+          box.items.some(
+            (it) =>
+              it.item_name.toLowerCase().includes(lq) ||
+              (it.mes_code ?? "").toLowerCase().includes(lq),
+          );
         const first = box.items[0];
         const extra = box.items.length > 1 ? ` +${box.items.length - 1}` : "";
         const tip =
@@ -132,7 +142,7 @@ export function JariColumn({
         return (
           <div
             key={box.box_id}
-            className={styles.boxHover}
+            className={`${styles.boxHover}${matched ? ` ${styles.boxHit}` : ""}`}
             style={{
               flex: SIZE_UNIT[box.size] ?? 1,
               minHeight: 0,

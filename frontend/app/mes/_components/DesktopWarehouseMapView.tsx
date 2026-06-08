@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, Search, X } from "lucide-react";
+import { ChevronLeft, MapPin, Search, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { SlidePanel } from "./common/SlidePanel";
 import { LoadingSkeleton } from "./common/LoadingSkeleton";
 import { warehouseMapApi, type WarehouseAngle, type WarehouseBoxItem, type WarehouseMap } from "@/lib/api/warehouse-map";
-import { buildCellIndex, cellColor, cellKey } from "./_warehouse_map_sections/helpers";
+import { buildCellIndex, cellColor, cellKey, rowLabel } from "./_warehouse_map_sections/helpers";
 import { FloorStage, FrontStage, RowStage } from "./_warehouse_map_sections/WarehouseStages";
 import { WarehouseJariPanel } from "./_warehouse_map_sections/WarehouseJariPanel";
 import styles from "./_warehouse_map_sections/warehouseMap.module.css";
@@ -14,6 +14,7 @@ import styles from "./_warehouse_map_sections/warehouseMap.module.css";
 type Stage = "floor" | "front" | "row";
 type PanelCell = { angle: WarehouseAngle; row: number; layer: number };
 type SearchHit = { angle_id: number; row: number; layer: number; items: WarehouseBoxItem[] };
+type LocGuide = { hits: Array<{ hit: SearchHit; angle: WarehouseAngle; qty: number }> };
 
 export function DesktopWarehouseMapView({
   onStatusChange,
@@ -34,6 +35,8 @@ export function DesktopWarehouseMapView({
   const [results, setResults] = useState<SearchHit[] | null>(null);
   const [hitAngles, setHitAngles] = useState<Map<number, number> | null>(null);
   const [pulse, setPulse] = useState<{ angleId?: number; cellKey?: string; layer?: number } | null>(null);
+  const [locGuide, setLocGuide] = useState<LocGuide | null>(null);
+  const [activeHitKey, setActiveHitKey] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   // history drill depth — 드릴다운을 browser history에 쌓아 브라우저 뒤로가기 지원 (DesktopHistoryView 선례)
   const wmDepthRef = useRef(0);
@@ -143,6 +146,8 @@ export function DesktopWarehouseMapView({
     setHitAngles(null);
     setPulse(null);
     setMatchQuery("");
+    setLocGuide(null);
+    setActiveHitKey(null);
   }
 
   function runSearch(q: string) {
@@ -173,6 +178,16 @@ export function DesktopWarehouseMapView({
     for (const h of hits) hitA.set(h.angle_id, (hitA.get(h.angle_id) ?? 0) + 1);
     setHitAngles(hitA);
 
+    if (hits.length > 0) {
+      setLocGuide({
+        hits: hits
+          .map((h) => ({ hit: h, angle: angles.find((a) => a.id === h.angle_id)!, qty: h.items.reduce((s, it) => s + it.quantity, 0) }))
+          .filter((x) => x.angle != null),
+      });
+    } else {
+      setLocGuide(null);
+    }
+
     if (hits.length === 0) return;
     if (hits.length === 1) navigateToHit(hits[0], q);
     else setResults(hits);
@@ -182,6 +197,8 @@ export function DesktopWarehouseMapView({
     const a = angles.find((x) => x.id === hit.angle_id);
     if (!a) return;
     setResults(null);
+    setQuery(hit.items[0]?.item_name ?? q);
+    setActiveHitKey(`${hit.angle_id}-${hit.row}-${hit.layer}`);
     setCurAngle(a);
     setCurRow(hit.row);
     setStage("row");
@@ -214,7 +231,7 @@ export function DesktopWarehouseMapView({
         cur: stage === "front",
       });
     }
-    if (stage === "row" && curAngle) items.push({ label: `${curRow}줄`, cur: true });
+    if (stage === "row" && curAngle) items.push({ label: `${rowLabel(curRow)}열`, cur: true });
     return items;
   })();
 
@@ -245,6 +262,7 @@ export function DesktopWarehouseMapView({
             gap: 10,
             padding: "0 16px",
             borderBottom: `1px solid ${LEGACY_COLORS.border}`,
+            position: "relative",
           }}
         >
           <button
@@ -266,7 +284,8 @@ export function DesktopWarehouseMapView({
             <ChevronLeft size={14} /> 뒤로
           </button>
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, flex: 1, minWidth: 0, overflow: "hidden" }}>
-            {breadcrumb.map((b, i) => (
+            {/* floor에서는 상단 큰 제목과 중복이라 숨김 — 드릴다운 시에만 경로 표시 */}
+            {stage !== "floor" && breadcrumb.map((b, i) => (
               <span key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 {i > 0 && <span style={{ color: LEGACY_COLORS.muted }}>›</span>}
                 <span
@@ -285,22 +304,22 @@ export function DesktopWarehouseMapView({
             ))}
           </div>
 
-          {/* Search */}
-          <div style={{ position: "relative", flexShrink: 0 }}>
+          {/* Search — 헤더 중앙에 절대 고정 (stage 전환 시 위치 불변) */}
+          <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", flexShrink: 0, zIndex: 5 }}>
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 6,
+                gap: 8,
                 background: LEGACY_COLORS.s2,
                 border: `1px solid ${query ? LEGACY_COLORS.blue : LEGACY_COLORS.border}`,
-                borderRadius: 8,
-                padding: "5px 10px",
-                width: 260,
+                borderRadius: 10,
+                padding: "8px 14px",
+                width: 440,
                 boxShadow: query ? `0 0 0 3px color-mix(in srgb, ${LEGACY_COLORS.blue} 22%, transparent)` : undefined,
               }}
             >
-              <Search size={14} style={{ color: LEGACY_COLORS.blue, flexShrink: 0 }} />
+              <Search size={18} style={{ color: LEGACY_COLORS.blue, flexShrink: 0 }} />
               <input
                 ref={searchInputRef}
                 value={query}
@@ -312,7 +331,7 @@ export function DesktopWarehouseMapView({
                   background: "transparent",
                   border: "none",
                   outline: "none",
-                  fontSize: 13,
+                  fontSize: 14,
                   color: LEGACY_COLORS.text,
                 }}
               />
@@ -343,8 +362,8 @@ export function DesktopWarehouseMapView({
                 style={{
                   position: "absolute",
                   top: "calc(100% + 6px)",
-                  right: 0,
-                  width: 340,
+                  left: 0,
+                  width: "100%",
                   maxHeight: 320,
                   overflowY: "auto",
                   background: "var(--c-popup-bg)",
@@ -369,11 +388,11 @@ export function DesktopWarehouseMapView({
                     >
                       <div style={{ width: 4, height: 30, borderRadius: 2, background: col, flexShrink: 0 }} />
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: 12, color: LEGACY_COLORS.text, fontWeight: 600 }}>
-                          {a?.label} · {res.row}줄 · {res.layer}층
-                        </div>
-                        <div style={{ fontSize: 11, color: LEGACY_COLORS.muted2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <div style={{ fontSize: 12, color: LEGACY_COLORS.text, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {res.items.map((it) => it.item_name).join(", ")}
+                        </div>
+                        <div style={{ fontSize: 11, color: LEGACY_COLORS.muted2 }}>
+                          {a?.label} · {rowLabel(res.row)}열 · {res.layer}층
                         </div>
                       </div>
                       <div style={{ fontSize: 11, fontWeight: 700, color: LEGACY_COLORS.text, background: LEGACY_COLORS.s2, borderRadius: 6, padding: "2px 6px", flexShrink: 0 }}>
@@ -390,8 +409,8 @@ export function DesktopWarehouseMapView({
                 style={{
                   position: "absolute",
                   top: "calc(100% + 6px)",
-                  right: 0,
-                  width: 260,
+                  left: 0,
+                  width: "100%",
                   background: LEGACY_COLORS.warningBg,
                   color: LEGACY_COLORS.yellow,
                   borderRadius: 8,
@@ -405,6 +424,84 @@ export function DesktopWarehouseMapView({
             )}
           </div>
         </div>
+
+        {/* Location guide strip */}
+        {locGuide && locGuide.hits.length > 0 && (
+          <div
+            style={{
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "0 16px",
+              height: 44,
+              background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, ${LEGACY_COLORS.s2})`,
+              borderBottom: `1px solid color-mix(in srgb, ${LEGACY_COLORS.blue} 20%, ${LEGACY_COLORS.border})`,
+              overflowX: "auto",
+            }}
+          >
+            <MapPin size={13} style={{ color: LEGACY_COLORS.blue, flexShrink: 0 }} />
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1, overflowX: "auto" }}>
+              {locGuide.hits.map(({ hit, angle, qty }) => {
+                const k = `${hit.angle_id}-${hit.row}-${hit.layer}`;
+                const isActive = activeHitKey === k;
+                return (
+                  <button
+                    key={k}
+                    onClick={() => navigateToHit(hit, query)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "5px 10px",
+                      borderRadius: 8,
+                      border: `1px solid ${isActive ? LEGACY_COLORS.blue : `color-mix(in srgb, ${LEGACY_COLORS.blue} 30%, ${LEGACY_COLORS.border})`}`,
+                      background: isActive ? LEGACY_COLORS.blue : `color-mix(in srgb, ${LEGACY_COLORS.blue} 5%, ${LEGACY_COLORS.s1})`,
+                      color: isActive ? "#fff" : LEGACY_COLORS.blue,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <span>{angle.label} · {rowLabel(hit.row)}열 · {hit.layer}층</span>
+                    <span
+                      style={{
+                        background: isActive
+                          ? "rgba(255,255,255,0.22)"
+                          : `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, ${LEGACY_COLORS.s2})`,
+                        borderRadius: 6,
+                        padding: "1px 6px",
+                        fontSize: 11,
+                        fontWeight: 700,
+                      }}
+                    >
+                      ×{qty}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              onClick={clearSearch}
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 9999,
+                background: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 15%, transparent)`,
+                color: LEGACY_COLORS.muted2,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                cursor: "pointer",
+              }}
+            >
+              <X size={11} />
+            </button>
+          </div>
+        )}
 
         {/* Stage */}
         <div style={{ flex: 1, position: "relative", overflow: "hidden", minHeight: 0, display: "flex" }}>
@@ -431,6 +528,7 @@ export function DesktopWarehouseMapView({
                   selectedLayer={panel?.layer ?? null}
                   cellIndex={cellIndex}
                   pulseLayer={pulse?.layer}
+                  matchQuery={matchQuery}
                   onRowChange={handleRowChange}
                   onLayerClick={openLayer}
                 />

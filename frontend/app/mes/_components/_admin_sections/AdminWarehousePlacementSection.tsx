@@ -1,24 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { PackagePlus, Plus, Search, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, PackagePlus, Search } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { Item } from "@/lib/api";
 import { Button } from "@/lib/ui/Button";
+import { LoadingSkeleton } from "../common/LoadingSkeleton";
+import { SlidePanel } from "../common/SlidePanel";
 import { AdminPageHeader } from "./_admin_primitives";
+import { FloorStage, FrontStage } from "../_warehouse_map_sections/WarehouseStages";
+import { WarehouseJariPanel } from "../_warehouse_map_sections/WarehouseJariPanel";
+import { buildCellIndex, rowLabel, SIZE_UNIT } from "../_warehouse_map_sections/helpers";
 import {
   warehouseMapApi,
   type BoxSize,
   type ReconcileRow,
   type WarehouseAngle,
-  type WarehouseBox,
+  type WarehouseMap,
 } from "@/lib/api/warehouse-map";
-
-const SIZE_OPTIONS: { value: BoxSize; label: string; unit: number }[] = [
-  { value: "LARGE", label: "대 (높이 3)", unit: 3 },
-  { value: "MEDIUM", label: "중 (높이 2)", unit: 2 },
-  { value: "SMALL", label: "소 (높이 1)", unit: 1 },
-];
 
 interface Props {
   items: Item[];
@@ -26,267 +25,622 @@ interface Props {
   onError: (m: string) => void;
 }
 
+/**
+ * 위치 배정 — 정면도 그림에서 빈 칸을 클릭해 박스를 놓고/뺀다.
+ * floor(앵글 선택) → front(칸 선택) → add-box(품목 선택 전체 화면) 3단계.
+ */
 export function AdminWarehousePlacementSection({ items, onStatusChange, onError }: Props) {
-  const [angles, setAngles] = useState<WarehouseAngle[]>([]);
-  const [angleId, setAngleId] = useState<number | null>(null);
-  const [row, setRow] = useState(1);
-  const [layer, setLayer] = useState(1);
-  const [jari, setJari] = useState(0);
-  const [size, setSize] = useState<BoxSize>("MEDIUM");
-  const [lines, setLines] = useState<{ item_id: string; quantity: number }[]>([]);
-  const [search, setSearch] = useState("");
-  const [stack, setStack] = useState<WarehouseBox[]>([]);
+  const [map, setMap] = useState<WarehouseMap | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [stage, setStage] = useState<"floor" | "front" | "add-box">("floor");
+  const [curAngleId, setCurAngleId] = useState<number | null>(null);
+  const [panel, setPanel] = useState<{ row: number; layer: number } | null>(null);
+  const [addBoxCtx, setAddBoxCtx] = useState<{ jariIndex: number; remaining: number } | null>(null);
+  const [busy, setBusy] = useState(false);
   const [reconcile, setReconcile] = useState<ReconcileRow[]>([]);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     warehouseMapApi
-      .getStructure()
-      .then((s) => {
-        setAngles(s);
-        if (s.length && angleId == null) setAngleId(s[0].id);
-      })
-      .catch((e) => onError(e instanceof Error ? e.message : "구조 로드 실패"));
+      .getMap()
+      .then(setMap)
+      .catch((e) => onError(e instanceof Error ? e.message : "창고 지도 로드 실패"))
+      .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const angle = useMemo(() => angles.find((a) => a.id === angleId) ?? null, [angles, angleId]);
+  const cellIndex = useMemo(() => buildCellIndex(map?.boxes ?? []), [map]);
+  const angles = useMemo(() => map?.angles ?? [], [map]);
+  const curAngle = useMemo(() => angles.find((a) => a.id === curAngleId) ?? null, [angles, curAngleId]);
 
-  // 현재 자리 스택 조회
-  useEffect(() => {
-    if (angleId == null) return;
-    warehouseMapApi.getJari(angleId, row, layer, jari).then(setStack).catch(() => setStack([]));
-  }, [angleId, row, layer, jari, saving]);
-
-  const usedUnits = stack.reduce(
-    (s, b) => s + (SIZE_OPTIONS.find((o) => o.value === b.size)?.unit ?? 1),
-    0,
-  );
-  const remaining = 3 - usedUnits;
-  const newUnit = SIZE_OPTIONS.find((o) => o.value === size)?.unit ?? 1;
-  const overflow = newUnit > remaining;
-
-  const filteredItems = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return [];
-    return items
-      .filter((it) => it.item_name.toLowerCase().includes(q) || (it.mes_code || "").toLowerCase().includes(q))
-      .slice(0, 8);
-  }, [items, search]);
-
-  const itemName = (id: string) => items.find((i) => i.item_id === id)?.item_name ?? id;
-
-  function addLine(it: Item) {
-    if (lines.some((l) => l.item_id === it.item_id)) return;
-    setLines((p) => [...p, { item_id: it.item_id, quantity: 1 }]);
-    setSearch("");
+  async function reload() {
+    const m = await warehouseMapApi.getMap();
+    setMap(m);
   }
 
-  async function submit() {
-    if (angleId == null || !lines.length) return;
-    setSaving(true);
+  async function handleAddBox({
+    jariIndex,
+    size,
+    lines,
+  }: {
+    jariIndex: number;
+    size: BoxSize;
+    lines: { item_id: string; quantity: number }[];
+  }) {
+    if (!curAngle || !panel) return;
+    setBusy(true);
     try {
       await warehouseMapApi.createBox({
-        angle_id: angleId,
-        row_no: row,
-        layer_no: layer,
-        jari_index: jari,
+        angle_id: curAngle.id,
+        row_no: panel.row,
+        layer_no: panel.layer,
+        jari_index: jariIndex,
         size,
         items: lines,
       });
       onStatusChange("박스를 배치했습니다.");
-      // 재고 대조
       const rc = await Promise.all(lines.map((l) => warehouseMapApi.reconcile(l.item_id)));
       setReconcile(rc.flatMap((r) => r.rows));
-      setLines([]);
+      await reload();
     } catch (e) {
       onError(e instanceof Error ? e.message : "배치 실패");
+      throw e; // AddBoxScreen이 catch 해 화면 유지
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   }
 
-  const inputStyle = {
+  async function handleDeleteBox(boxId: string) {
+    setBusy(true);
+    try {
+      await warehouseMapApi.deleteBox(boxId);
+      onStatusChange("박스를 뺐습니다.");
+      await reload();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "빼기 실패");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function openAngle(a: WarehouseAngle) {
+    setCurAngleId(a.id);
+    setStage("front");
+    setPanel(null);
+  }
+
+  function backToFloor() {
+    setStage("floor");
+    setPanel(null);
+  }
+
+  const crumbStyle = { color: LEGACY_COLORS.blue, cursor: "pointer", whiteSpace: "nowrap" as const };
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden pr-1">
+      <AdminPageHeader
+        icon={PackagePlus}
+        title="위치 배정"
+        description="정면도에서 칸을 클릭하고, 빈 자리에 박스를 넣거나 뺍니다. 배치 후 창고 재고와 대조해 경고합니다."
+      />
+
+      <div className="flex min-h-0 flex-1">
+        {/* 좌: 지도 카드 or AddBox 화면 */}
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+          {stage === "add-box" && addBoxCtx && panel && curAngle ? (
+            <AddBoxScreen
+              angle={curAngle}
+              row={panel.row}
+              layer={panel.layer}
+              jariIndex={addBoxCtx.jariIndex}
+              remaining={addBoxCtx.remaining}
+              items={items}
+              busy={busy}
+              onSubmit={async (args) => {
+                await handleAddBox(args);
+                setStage("front");
+                setAddBoxCtx(null);
+              }}
+              onCancel={() => {
+                setStage("front");
+                setAddBoxCtx(null);
+              }}
+            />
+          ) : (
+            <>
+              <div
+                className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[18px] border"
+                style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+              >
+                {/* 헤더 스트립 — 뒤로 + 경로 */}
+                <div
+                  style={{
+                    flexShrink: 0,
+                    height: 52,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "0 16px",
+                    borderBottom: `1px solid ${LEGACY_COLORS.border}`,
+                  }}
+                >
+                  <button
+                    onClick={backToFloor}
+                    style={{
+                      height: 32,
+                      padding: "0 12px",
+                      borderRadius: 14,
+                      background: LEGACY_COLORS.s2,
+                      border: `1px solid ${LEGACY_COLORS.border}`,
+                      color: LEGACY_COLORS.text,
+                      fontSize: 13,
+                      display: stage === "floor" ? "none" : "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <ChevronLeft size={14} /> 뒤로
+                  </button>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, minWidth: 0, overflow: "hidden" }}>
+                    {stage === "floor" ? (
+                      <span style={{ color: LEGACY_COLORS.muted2 }}>앵글을 클릭해 정면도로 들어가세요.</span>
+                    ) : (
+                      <>
+                        <span onClick={backToFloor} style={crumbStyle}>창고</span>
+                        <span style={{ color: LEGACY_COLORS.muted }}>›</span>
+                        <span style={{ color: LEGACY_COLORS.text, fontWeight: 600, whiteSpace: "nowrap" }}>
+                          {curAngle?.label}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* stage 본문 */}
+                <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+                  {loading ? (
+                    <div style={{ flex: 1, padding: 24 }}>
+                      <LoadingSkeleton variant="card" rows={6} />
+                    </div>
+                  ) : stage === "floor" ? (
+                    <FloorStage angles={angles} onAngleClick={openAngle} />
+                  ) : curAngle ? (
+                    <FrontStage
+                      angle={curAngle}
+                      cellIndex={cellIndex}
+                      showSlotLabels
+                      onCellClick={(row, layer) => setPanel({ row, layer })}
+                    />
+                  ) : null}
+                </div>
+              </div>
+
+              {/* 재고 대조 — 지도 카드 하단 */}
+              {reconcile.length > 0 && (
+                <div
+                  className="flex-shrink-0 rounded-[18px] border p-3"
+                  style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+                >
+                  <div className="mb-2 text-[13px] font-bold" style={{ color: LEGACY_COLORS.text }}>
+                    재고 대조
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {reconcile.map((r) => {
+                      const isOver = r.status === "over";
+                      const isOk = r.status === "ok";
+                      return (
+                        <div
+                          key={r.item_id}
+                          className="rounded-[12px] border px-3 py-2 text-[12px]"
+                          style={{
+                            background: isOver ? LEGACY_COLORS.warningBg : isOk ? LEGACY_COLORS.successBg : LEGACY_COLORS.s2,
+                            borderColor: `color-mix(in srgb, ${isOver ? LEGACY_COLORS.yellow : isOk ? LEGACY_COLORS.green : LEGACY_COLORS.muted2} 30%, transparent)`,
+                            color: isOver ? LEGACY_COLORS.yellow : isOk ? LEGACY_COLORS.green : LEGACY_COLORS.muted2,
+                          }}
+                        >
+                          <div className="font-bold" style={{ color: LEGACY_COLORS.text }}>
+                            {r.item_name}
+                          </div>
+                          배치 합 {r.placed_total} / 창고 재고 {r.warehouse_qty}
+                          {isOver
+                            ? ` · ${r.diff}개 초과 배치됨`
+                            : isOk
+                            ? " · 일치"
+                            : ` · ${Math.abs(r.diff)}개 미배치`}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* 우: 칸 상세 슬라이드 패널 */}
+        <SlidePanel open={!!panel} onClose={() => setPanel(null)}>
+          {panel && curAngle && (
+            <WarehouseJariPanel
+              editable
+              angle={curAngle}
+              row={panel.row}
+              layer={panel.layer}
+              cellIndex={cellIndex}
+              busy={busy}
+              onDeleteBox={handleDeleteBox}
+              onRequestAddBox={
+                stage !== "add-box"
+                  ? (ji, rem) => {
+                      setAddBoxCtx({ jariIndex: ji, remaining: rem });
+                      setStage("add-box");
+                    }
+                  : undefined
+              }
+            />
+          )}
+        </SlidePanel>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────
+// AddBox 서브스크린 — 박스 크기 + 품목 선택 전체 화면
+// ──────────────────────────────────────────────
+
+const SIZE_OPTS: { value: BoxSize; label: string; unit: number }[] = [
+  { value: "SMALL",  label: "소 (1)", unit: 1 },
+  { value: "MEDIUM", label: "중 (2)", unit: 2 },
+  { value: "LARGE",  label: "대 (3)", unit: 3 },
+];
+
+function AddBoxScreen({
+  angle,
+  row,
+  layer,
+  jariIndex,
+  remaining,
+  items,
+  busy,
+  onSubmit,
+  onCancel,
+}: {
+  angle: WarehouseAngle;
+  row: number;
+  layer: number;
+  jariIndex: number;
+  remaining: number;
+  items: Item[];
+  busy: boolean;
+  onSubmit: (args: { jariIndex: number; size: BoxSize; lines: { item_id: string; quantity: number }[] }) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [size, setSize] = useState<BoxSize>(remaining >= 2 ? "MEDIUM" : "SMALL");
+  const [search, setSearch] = useState("");
+  const [cart, setCart] = useState<Map<string, number>>(new Map());
+  const [reconcileCache, setReconcileCache] = useState<Map<string, ReconcileRow>>(new Map());
+  const [reconcileLoading, setReconcileLoading] = useState<Set<string>>(new Set());
+
+  const overflow = (SIZE_UNIT[size] ?? 1) > remaining;
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return q
+      ? items.filter((it) => it.item_name.toLowerCase().includes(q) || (it.mes_code ?? "").toLowerCase().includes(q))
+      : items;
+  }, [items, search]);
+
+  function toggleItem(it: Item) {
+    const willAdd = !cart.has(it.item_id);
+    setCart((prev) => {
+      const next = new Map(prev);
+      if (next.has(it.item_id)) next.delete(it.item_id);
+      else next.set(it.item_id, 1);
+      return next;
+    });
+    if (willAdd && !reconcileCache.has(it.item_id) && !reconcileLoading.has(it.item_id)) {
+      setReconcileLoading((prev) => new Set(prev).add(it.item_id));
+      warehouseMapApi
+        .reconcile(it.item_id)
+        .then((r) => {
+          if (r.rows.length > 0) {
+            setReconcileCache((prev) => new Map(prev).set(it.item_id, r.rows[0]));
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          setReconcileLoading((prev) => {
+            const s = new Set(prev);
+            s.delete(it.item_id);
+            return s;
+          });
+        });
+    }
+  }
+
+  function getAvailable(itemId: string): number | null {
+    const rc = reconcileCache.get(itemId);
+    if (!rc) return null;
+    return rc.warehouse_qty - rc.placed_total;
+  }
+
+  function itemWouldExceed(itemId: string): boolean {
+    const avail = getAvailable(itemId);
+    if (avail === null) return false;
+    return (cart.get(itemId) ?? 0) > avail;
+  }
+
+  const anyExceeds = Array.from(cart.keys()).some((id) => itemWouldExceed(id));
+
+  async function submit() {
+    const lines = Array.from(cart.entries())
+      .filter(([, qty]) => qty > 0)
+      .map(([item_id, quantity]) => ({ item_id, quantity }));
+    if (!lines.length || overflow) return;
+    try {
+      await onSubmit({ jariIndex, size, lines });
+    } catch {
+      /* 부모가 onError로 표시 — 화면 유지 */
+    }
+  }
+
+  const cartCount = cart.size;
+  const cartTotal = Array.from(cart.values()).reduce((s, q) => s + q, 0);
+
+  const inputBase = {
     background: LEGACY_COLORS.s2,
     border: `1px solid ${LEGACY_COLORS.border}`,
-    borderRadius: 10,
-    padding: "7px 10px",
-    fontSize: 13,
     color: LEGACY_COLORS.text,
   } as const;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-1">
-      <AdminPageHeader
-        icon={PackagePlus}
-        title="위치 배정"
-        description="품목을 골라 창고 자리(앵글·줄·층·자리)에 박스로 배치합니다. 자리 합계와 창고 재고를 대조해 경고합니다."
-      />
-
-      <div className="grid gap-4" style={{ gridTemplateColumns: "1.1fr 0.9fr" }}>
-        {/* 입력 폼 */}
-        <div
-          className="flex flex-col gap-3 rounded-[18px] border p-4"
-          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+    <div
+      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[18px] border"
+      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+    >
+      {/* 헤더 */}
+      <div
+        style={{
+          flexShrink: 0,
+          height: 52,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "0 16px",
+          borderBottom: `1px solid ${LEGACY_COLORS.border}`,
+        }}
+      >
+        <button
+          onClick={onCancel}
+          style={{
+            height: 32,
+            padding: "0 12px",
+            borderRadius: 14,
+            background: LEGACY_COLORS.s2,
+            border: `1px solid ${LEGACY_COLORS.border}`,
+            color: LEGACY_COLORS.text,
+            fontSize: 13,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            cursor: "pointer",
+          }}
         >
-          {/* 자리 선택 */}
-          <div className="grid grid-cols-4 gap-2">
-            <label className="flex flex-col gap-1 text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              앵글
-              <select style={inputStyle} value={angleId ?? ""} onChange={(e) => setAngleId(Number(e.target.value))}>
-                {angles.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              줄 (1~{angle?.rows ?? 1})
-              <input type="number" min={1} max={angle?.rows ?? 1} style={inputStyle} value={row} onChange={(e) => setRow(Math.max(1, Number(e.target.value)))} />
-            </label>
-            <label className="flex flex-col gap-1 text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              층 (1~{angle?.layers ?? 1})
-              <input type="number" min={1} max={angle?.layers ?? 1} style={inputStyle} value={layer} onChange={(e) => setLayer(Math.max(1, Number(e.target.value)))} />
-            </label>
-            <label className="flex flex-col gap-1 text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              자리 (1~{angle?.jaris_per_cell ?? 3})
-              <select style={inputStyle} value={jari} onChange={(e) => setJari(Number(e.target.value))}>
-                {Array.from({ length: angle?.jaris_per_cell ?? 3 }, (_, i) => (
-                  <option key={i} value={i}>
-                    자리 {i + 1}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          {/* 현재 자리 상태 */}
-          <div
-            className="rounded-[12px] border px-3 py-2 text-[12px]"
-            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-          >
-            현재 자리: 사용 {usedUnits}/3 · 남은 높이 {remaining}
-            {stack.length > 0 && (
-              <span style={{ color: LEGACY_COLORS.text }}>
-                {" "}— {stack.map((b) => SIZE_OPTIONS.find((o) => o.value === b.size)?.label.split(" ")[0]).join(", ")} 박스
-              </span>
-            )}
-          </div>
-
-          {/* 박스 크기 */}
-          <label className="flex flex-col gap-1 text-[11px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-            박스 크기
-            <select style={inputStyle} value={size} onChange={(e) => setSize(e.target.value as BoxSize)}>
-              {SIZE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value} disabled={o.unit > remaining}>
-                  {o.label}
-                  {o.unit > remaining ? " — 자리 부족" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {/* 품목 검색 */}
-          <div className="relative">
-            <div className="flex items-center gap-2" style={inputStyle}>
-              <Search size={14} style={{ color: LEGACY_COLORS.blue }} />
-              <input
-                className="flex-1 bg-transparent outline-none"
-                style={{ color: LEGACY_COLORS.text, fontSize: 13 }}
-                placeholder="박스에 담을 품목 검색 (품목명·코드)"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            {filteredItems.length > 0 && (
-              <div
-                className="absolute z-10 mt-1 w-full overflow-hidden rounded-[12px] border"
-                style={{ background: "var(--c-popup-bg)", borderColor: LEGACY_COLORS.border, boxShadow: "var(--c-popup-shadow)" }}
-              >
-                {filteredItems.map((it) => (
-                  <div
-                    key={it.item_id}
-                    onClick={() => addLine(it)}
-                    className="flex cursor-pointer items-center justify-between px-3 py-2 text-[12px] hover:brightness-110"
-                    style={{ color: LEGACY_COLORS.text, borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
-                  >
-                    <span className="truncate">{it.item_name}</span>
-                    <span style={{ color: LEGACY_COLORS.muted2 }}>{it.mes_code}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* 담긴 품목 라인 */}
-          <div className="flex flex-col gap-1.5">
-            {lines.length === 0 ? (
-              <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted }}>
-                위에서 품목을 검색해 박스에 담으세요.
-              </div>
-            ) : (
-              lines.map((l, i) => (
-                <div key={l.item_id} className="flex items-center gap-2">
-                  <span className="flex-1 truncate text-[12px]" style={{ color: LEGACY_COLORS.text }}>
-                    {itemName(l.item_id)}
-                  </span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={l.quantity}
-                    onChange={(e) =>
-                      setLines((p) => p.map((x, xi) => (xi === i ? { ...x, quantity: Math.max(0, Number(e.target.value)) } : x)))
-                    }
-                    style={{ ...inputStyle, width: 80 }}
-                  />
-                  <button onClick={() => setLines((p) => p.filter((_, xi) => xi !== i))} style={{ color: LEGACY_COLORS.muted2 }}>
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-
-          <Button onClick={submit} disabled={saving || overflow || !lines.length} className="mt-1">
-            <Plus size={14} /> {overflow ? "자리 높이 초과" : "이 자리에 박스 배치"}
-          </Button>
+          <ChevronLeft size={14} /> 뒤로
+        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, minWidth: 0, overflow: "hidden" }}>
+          <span style={{ color: LEGACY_COLORS.muted2, whiteSpace: "nowrap" }}>{angle.label}</span>
+          <span style={{ color: LEGACY_COLORS.muted }}>›</span>
+          <span style={{ color: LEGACY_COLORS.muted2, whiteSpace: "nowrap" }}>{rowLabel(row)}열 {layer}층</span>
+          <span style={{ color: LEGACY_COLORS.muted }}>›</span>
+          <span style={{ color: LEGACY_COLORS.text, fontWeight: 600, whiteSpace: "nowrap" }}>
+            자리 {jariIndex + 1} — 박스 넣기
+          </span>
         </div>
+      </div>
 
-        {/* 재고 대조 결과 */}
+      {/* 크기 선택 */}
+      <div
+        style={{
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "10px 16px",
+          borderBottom: `1px solid ${LEGACY_COLORS.border}`,
+        }}
+      >
+        <span style={{ fontSize: 12, fontWeight: 700, color: LEGACY_COLORS.muted2 }}>크기</span>
+        <div style={{ display: "flex", gap: 6 }}>
+          {SIZE_OPTS.map((o) => {
+            const disabled = o.unit > remaining;
+            const active = size === o.value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => !disabled && setSize(o.value)}
+                disabled={disabled}
+                style={{
+                  padding: "4px 14px",
+                  borderRadius: 9999,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
+                  color: active ? "white" : disabled ? LEGACY_COLORS.muted : LEGACY_COLORS.text,
+                  border: `1px solid ${active ? LEGACY_COLORS.blue : LEGACY_COLORS.border}`,
+                  cursor: disabled ? "not-allowed" : "pointer",
+                  opacity: disabled ? 0.45 : 1,
+                }}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+        <span style={{ marginLeft: "auto", fontSize: 12, color: LEGACY_COLORS.muted2 }}>
+          남은 자리{" "}
+          <strong style={{ color: overflow ? LEGACY_COLORS.yellow : LEGACY_COLORS.text }}>{remaining}</strong>
+        </span>
+      </div>
+
+      {/* 검색 */}
+      <div style={{ flexShrink: 0, padding: "10px 16px", borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
         <div
-          className="flex flex-col gap-2 rounded-[18px] border p-4"
-          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+          style={{
+            ...inputBase,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "6px 10px",
+            borderRadius: 10,
+          }}
         >
-          <div className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.text }}>
-            재고 대조
+          <Search size={14} style={{ color: LEGACY_COLORS.muted2, flexShrink: 0 }} />
+          <input
+            style={{ flex: 1, minWidth: 0, background: "transparent", outline: "none", fontSize: 13, color: LEGACY_COLORS.text }}
+            placeholder="품목명 또는 코드로 검색"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* 품목 리스트 */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+        {filtered.length === 0 ? (
+          <div style={{ padding: "32px 16px", textAlign: "center", fontSize: 13, color: LEGACY_COLORS.muted }}>
+            검색 결과 없음
           </div>
-          {reconcile.length === 0 ? (
-            <div className="text-[12px]" style={{ color: LEGACY_COLORS.muted }}>
-              배치 후 품목별 배치 합계와 창고 재고를 비교합니다.
-            </div>
-          ) : (
-            reconcile.map((r) => {
-              const warn = r.status !== "ok";
-              return (
+        ) : (
+          filtered.map((it) => {
+            const selected = cart.has(it.item_id);
+            const qty = cart.get(it.item_id) ?? 0;
+            return (
+              <div
+                key={it.item_id}
+                onClick={() => toggleItem(it)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 16px",
+                  borderBottom: `1px solid ${LEGACY_COLORS.border}`,
+                  background: selected
+                    ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 6%, ${LEGACY_COLORS.s1})`
+                    : LEGACY_COLORS.s1,
+                  cursor: "pointer",
+                }}
+              >
+                {/* 체크박스 */}
                 <div
-                  key={r.item_id}
-                  className="rounded-[12px] border px-3 py-2 text-[12px]"
                   style={{
-                    background: warn ? LEGACY_COLORS.warningBg : LEGACY_COLORS.successBg,
-                    borderColor: `color-mix(in srgb, ${warn ? LEGACY_COLORS.yellow : LEGACY_COLORS.green} 30%, transparent)`,
-                    color: warn ? LEGACY_COLORS.yellow : LEGACY_COLORS.green,
+                    width: 20,
+                    height: 20,
+                    borderRadius: 6,
+                    flexShrink: 0,
+                    background: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
+                    border: `1.5px solid ${selected ? LEGACY_COLORS.blue : LEGACY_COLORS.border}`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
-                  <div className="font-bold" style={{ color: LEGACY_COLORS.text }}>
-                    {r.item_name}
-                  </div>
-                  배치 합 {r.placed_total} / 창고 재고 {r.warehouse_qty}
-                  {warn ? ` · 차이 ${r.diff > 0 ? "+" : ""}${r.diff} (${r.status === "over" ? "초과" : "부족"})` : " · 일치"}
+                  {selected && <Check size={12} style={{ color: "white" }} />}
                 </div>
-              );
-            })
-          )}
+
+                {/* 품목 정보 */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: selected ? 600 : 400,
+                      color: LEGACY_COLORS.text,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {it.item_name}
+                  </div>
+                  {it.mes_code && (
+                    <div style={{ fontSize: 11, color: LEGACY_COLORS.muted2, marginTop: 1 }}>{it.mes_code}</div>
+                  )}
+                </div>
+
+                {/* 수량 + 여유 재고 (선택 시만) */}
+                {selected && (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                    <input
+                      type="number"
+                      min={0}
+                      value={qty}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => {
+                        const v = Math.max(0, Number(e.target.value));
+                        setCart((prev) => {
+                          const next = new Map(prev);
+                          next.set(it.item_id, v);
+                          return next;
+                        });
+                      }}
+                      style={{
+                        ...inputBase,
+                        width: 60,
+                        textAlign: "center" as const,
+                        padding: "3px 6px",
+                        fontSize: 13,
+                        borderRadius: 8,
+                      }}
+                    />
+                    {(() => {
+                      const avail = getAvailable(it.item_id);
+                      const exceeds = itemWouldExceed(it.item_id);
+                      if (reconcileLoading.has(it.item_id))
+                        return <span style={{ fontSize: 10, color: LEGACY_COLORS.muted2 }}>확인 중…</span>;
+                      if (avail !== null)
+                        return (
+                          <span style={{ fontSize: 10, whiteSpace: "nowrap", color: exceeds ? LEGACY_COLORS.yellow : LEGACY_COLORS.muted2 }}>
+                            여유 {Math.max(0, avail)}개{exceeds ? " ⚠" : ""}
+                          </span>
+                        );
+                      return null;
+                    })()}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* 하단 고정 */}
+      <div
+        style={{
+          flexShrink: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          padding: "12px 16px",
+          borderTop: `1px solid ${LEGACY_COLORS.border}`,
+          background: LEGACY_COLORS.s2,
+        }}
+      >
+        {anyExceeds && (
+          <div style={{ fontSize: 12, color: LEGACY_COLORS.yellow }}>
+            창고 재고를 초과하는 품목이 있습니다. 수량을 줄여주세요.
+          </div>
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ flex: 1, fontSize: 13, color: LEGACY_COLORS.muted2 }}>
+            {cartCount > 0 ? `${cartCount}개 품목 · 합계 수량 ${cartTotal}` : "품목을 선택하세요"}
+          </span>
+          <Button variant="secondary" onClick={onCancel} disabled={busy}>
+            취소
+          </Button>
+          <Button onClick={submit} disabled={busy || overflow || cartCount === 0 || anyExceeds}>
+            배치
+          </Button>
         </div>
       </div>
     </div>

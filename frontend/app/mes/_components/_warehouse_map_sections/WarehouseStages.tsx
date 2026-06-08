@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import type { WarehouseAngle, WarehouseBox } from "@/lib/api/warehouse-map";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { JariColumn } from "./JariColumn";
-import { cellColor, cellKey, cellOccupied, jariStacks } from "./helpers";
+import { cellColor, cellKey, cellOccupied, jariStacks, rowLabel } from "./helpers";
 import styles from "./warehouseMap.module.css";
 
 type CellIndex = Map<string, WarehouseBox[]>;
@@ -108,7 +108,7 @@ export function FloorStage({
                   {a.label}
                 </span>
                 <span style={{ fontSize: 9, color: LEGACY_COLORS.muted2 }}>
-                  {a.rows}줄·{a.layers}층
+                  {a.rows}열·{a.layers}층
                 </span>
                 {count ? (
                   <span
@@ -165,11 +165,13 @@ export function FrontStage({
   angle,
   cellIndex,
   pulseCellKey,
+  showSlotLabels,
   onCellClick,
 }: {
   angle: WarehouseAngle;
   cellIndex: CellIndex;
   pulseCellKey?: string | null;
+  showSlotLabels?: boolean;
   onCellClick: (row: number, layer: number) => void;
 }) {
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -237,7 +239,7 @@ export function FrontStage({
                 : LEGACY_COLORS.s2,
             }}
           >
-            {r}줄
+            {rowLabel(r)}열
           </div>
         ))}
 
@@ -263,7 +265,7 @@ export function FrontStage({
               return (
                 <div
                   key={k}
-                  title={`${r}줄 ${l}층`}
+                  title={`${rowLabel(r)}열 ${l}층`}
                   onClick={() => onCellClick(r, l)}
                   className={`${styles.cell} ${pulseCellKey === k ? styles.hit : ""}`}
                   style={{
@@ -280,7 +282,26 @@ export function FrontStage({
                   }}
                 >
                   {stacks.map((boxes, ji) => (
-                    <JariColumn key={ji} boxes={boxes} scale="front" />
+                    <div key={ji} style={{ flex: 1, minWidth: 0, position: "relative", display: "flex", alignItems: "stretch" }}>
+                      <JariColumn boxes={boxes} scale="front" />
+                      {showSlotLabels && boxes.length === 0 && (
+                        <span
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            pointerEvents: "none",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: `color-mix(in srgb, ${LEGACY_COLORS.muted2} 25%, transparent)`,
+                          }}
+                        >
+                          {ji + 1}
+                        </span>
+                      )}
+                    </div>
                   ))}
                 </div>
               );
@@ -301,6 +322,7 @@ export function RowStage({
   selectedLayer,
   cellIndex,
   pulseLayer,
+  matchQuery,
   onRowChange,
   onLayerClick,
 }: {
@@ -309,11 +331,14 @@ export function RowStage({
   selectedLayer: number | null;
   cellIndex: CellIndex;
   pulseLayer?: number | null;
+  matchQuery?: string;
   onRowChange: (row: number) => void;
   onLayerClick: (layer: number) => void;
 }) {
   const layers = Array.from({ length: angle.layers }, (_, i) => angle.layers - i);
   const rows = Array.from({ length: angle.rows }, (_, i) => i + 1);
+  const [selJari, setSelJari] = useState<{ layer: number; ji: number } | null>(null);
+  useEffect(() => { setSelJari(null); }, [curRow]);
 
   return (
     <div
@@ -354,7 +379,7 @@ export function RowStage({
               return (
                 <div
                   key={`${r}-${l}`}
-                  title={`${r}줄 ${l}층`}
+                  title={`${rowLabel(r)}열 ${l}층`}
                   onClick={() => onRowChange(r)}
                   className={styles.miniCell}
                   style={{
@@ -393,7 +418,7 @@ export function RowStage({
                 color: r === curRow ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
               }}
             >
-              {r}줄
+              {rowLabel(r)}열
             </div>
           ))}
         </div>
@@ -449,7 +474,6 @@ export function RowStage({
                   display: "flex",
                   alignItems: "stretch",
                   borderBottom: `1px solid ${LEGACY_COLORS.border}`,
-                  background: sel ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)` : undefined,
                   borderLeft: sel ? `3px solid ${LEGACY_COLORS.blue}` : "3px solid transparent",
                 }}
               >
@@ -469,20 +493,28 @@ export function RowStage({
                 >
                   {l}층
                 </div>
-                {stacks.map((boxes, ji) => (
-                  <div
-                    key={ji}
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      padding: "4px 6px",
-                      borderRight: ji < angle.jaris_per_cell - 1 ? `1px solid ${LEGACY_COLORS.border}` : undefined,
-                      display: "flex",
-                    }}
-                  >
-                    <JariColumn boxes={boxes} scale="row" />
-                  </div>
-                ))}
+                {stacks.map((boxes, ji) => {
+                  const isSelJari = selJari?.layer === l && selJari?.ji === ji;
+                  return (
+                    <div
+                      key={ji}
+                      onClick={(e) => { e.stopPropagation(); setSelJari({ layer: l, ji }); onLayerClick(l); }}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        padding: "4px 6px",
+                        borderRight: ji < angle.jaris_per_cell - 1 ? `1px solid ${LEGACY_COLORS.border}` : undefined,
+                        display: "flex",
+                        cursor: "pointer",
+                        background: isSelJari
+                          ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`
+                          : undefined,
+                      }}
+                    >
+                      <JariColumn boxes={boxes} scale="row" matchQuery={matchQuery} />
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
