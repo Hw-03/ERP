@@ -1,7 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render as rtlRender, screen, fireEvent, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
 import { AddQuarantineModal } from "../AddQuarantineModal";
 import type { Item } from "@/lib/api/types";
+
+// AddQuarantineModal 이 useMyItemOrderQuery(React Query)를 쓴다 → QueryClient 주입.
+function render(ui: ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 vi.mock("@/lib/api/defects", () => ({
   defectsApi: {
@@ -12,6 +22,7 @@ vi.mock("@/lib/api/defects", () => ({
 vi.mock("@/lib/api/items", () => ({
   itemsApi: {
     getItems: vi.fn(),
+    getMyItemOrder: vi.fn(),
   },
 }));
 
@@ -63,6 +74,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(defectsApi.quarantine).mockResolvedValue(undefined);
   vi.mocked(itemsApi.getItems).mockResolvedValue([mockItem]);
+  vi.mocked(itemsApi.getMyItemOrder).mockResolvedValue([]);
 });
 
 describe("AddQuarantineModal", () => {
