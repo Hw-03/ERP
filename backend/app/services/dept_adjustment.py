@@ -26,6 +26,7 @@ from app.models import (
 )
 from app.database import _is_sqlite
 from app.services import inventory as inventory_svc
+from app.repositories import item_repository
 
 AdjDirection = Literal["in", "out", "defective"]
 
@@ -92,7 +93,7 @@ def build_production_template(
     결과품: direction="in", 마지막 라인.
     BOM 직계 구성품: direction="out".
     """
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get(db, item_id)
     if item is None:
         raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
 
@@ -101,7 +102,7 @@ def build_production_template(
 
     lines: list[AdjLine] = []
     for row in bom_rows:
-        child = db.query(Item).filter(Item.item_id == row.child_item_id).first()
+        child = item_repository.get(db, row.child_item_id)
         child_dept = base_dept or (_dept_for_item(child) if child else result_dept)
         lines.append(AdjLine(
             item_id=row.child_item_id,
@@ -133,7 +134,7 @@ def build_disassembly_template(
     분해 대상품: direction="out".
     BOM 직계 구성품: direction="in" (사용자가 in/defective/scrap으로 변경 가능).
     """
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get(db, item_id)
     if item is None:
         raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
 
@@ -150,7 +151,7 @@ def build_disassembly_template(
     ]
 
     for row in bom_rows:
-        child = db.query(Item).filter(Item.item_id == row.child_item_id).first()
+        child = item_repository.get(db, row.child_item_id)
         child_dept = base_dept or (_dept_for_item(child) if child else target_dept)
         lines.append(AdjLine(
             item_id=row.child_item_id,

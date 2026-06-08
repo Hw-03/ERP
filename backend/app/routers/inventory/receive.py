@@ -16,6 +16,7 @@ from app.services._tx import commit_and_refresh
 
 from ._shared import to_response
 from ._tx_helper import resolve_producer
+from app.repositories import item_repository
 
 
 router = APIRouter()
@@ -23,7 +24,7 @@ router = APIRouter()
 
 @router.post("/receive", response_model=InventoryResponse, status_code=status.HTTP_201_CREATED)
 def receive_inventory(payload: InventoryReceive, db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.item_id == payload.item_id).first()
+    item = item_repository.get(db, payload.item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -57,7 +58,7 @@ def adjust_inventory(payload: InventoryAdjust, db: Session = Depends(get_db)):
 
     payload.quantity 는 조정 후 창고 수량. production / defective 는 건드리지 않음.
     """
-    item = db.query(Item).filter(Item.item_id == payload.item_id).first()
+    item = item_repository.get(db, payload.item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 

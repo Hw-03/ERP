@@ -38,6 +38,7 @@ from app.models import (
     StockRequestTypeEnum,
 )
 from app.services import inventory as inventory_svc
+from app.repositories import item_repository
 
 # ---------------------------------------------------------------------------
 # re-export: sr_validation
@@ -147,7 +148,7 @@ def _build_request_and_lines(
     db.flush()
 
     for li in lines_input:
-        item = db.query(Item).filter(Item.item_id == li.item_id).first()
+        item = item_repository.get(db, li.item_id)
         if item is None:
             raise ValueError(f"품목을 찾을 수 없습니다: {li.item_id}")
         line = StockRequestLine(

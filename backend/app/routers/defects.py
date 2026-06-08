@@ -37,6 +37,7 @@ from app.routers._errors import ErrorCode, http_error
 from app.services import inventory as inventory_svc
 from app._evt import emit as _evt_emit
 from app._actor import set_actor
+from app.repositories import item_repository
 
 router = APIRouter()
 
@@ -269,7 +270,7 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
     set_actor(http_request, actor)
 
-    item = db.query(Item).filter(Item.item_id == payload.item_id).first()
+    item = item_repository.get(db, payload.item_id)
     if item is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -358,7 +359,7 @@ def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Sessio
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
     set_actor(http_request, actor)
 
-    item = db.query(Item).filter(Item.item_id == payload.item_id).first()
+    item = item_repository.get(db, payload.item_id)
     if item is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 

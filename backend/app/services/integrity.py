@@ -17,6 +17,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Inventory, InventoryLocation, Item
+from app.repositories import item_repository
 
 
 _D0 = Decimal("0")
@@ -138,7 +139,7 @@ def repair_inventory_totals(db: Session, *, dry_run: bool = True) -> RepairRepor
             continue
         mismatched += 1
         if len(samples) < 20:
-            item = db.query(Item).filter(Item.item_id == inv.item_id).first()
+            item = item_repository.get(db, inv.item_id)
             samples.append(
                 InventoryMismatch(
                     item_id=inv.item_id,

@@ -26,6 +26,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Inventory, InventoryLocation, LocationStatusEnum
+from app.repositories import inventory_repository
 
 
 _D0 = Decimal("0")
@@ -61,7 +62,7 @@ class StockFigures:
 # ---------------------------------------------------------------------------
 def compute_for(db: Session, item_id: uuid.UUID) -> StockFigures:
     """단일 품목의 재고 수치. 쿼리 2회 (Inventory + InventoryLocation GROUP BY)."""
-    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    inv = inventory_repository.get(db, item_id)
     wh = (inv.warehouse_qty if inv else None) or _D0
     pending = (inv.pending_quantity if inv else None) or _D0
 

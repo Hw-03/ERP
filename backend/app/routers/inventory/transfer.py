@@ -16,6 +16,7 @@ from app.services._tx import commit_and_refresh
 
 from ._shared import to_response
 from ._tx_helper import resolve_producer
+from app.repositories import item_repository
 
 
 router = APIRouter()
@@ -23,7 +24,7 @@ router = APIRouter()
 
 @router.post("/transfer-to-production", response_model=InventoryResponse)
 def transfer_to_production(payload: TransferRequest, db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.item_id == payload.item_id).first()
+    item = item_repository.get(db, payload.item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
     producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
@@ -56,7 +57,7 @@ def transfer_to_production(payload: TransferRequest, db: Session = Depends(get_d
 
 @router.post("/transfer-to-warehouse", response_model=InventoryResponse)
 def transfer_to_warehouse(payload: TransferRequest, db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.item_id == payload.item_id).first()
+    item = item_repository.get(db, payload.item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
     producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
@@ -89,7 +90,7 @@ def transfer_to_warehouse(payload: TransferRequest, db: Session = Depends(get_db
 
 @router.post("/transfer-between-depts", response_model=InventoryResponse)
 def transfer_between_depts(payload: DeptTransferRequest, db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.item_id == payload.item_id).first()
+    item = item_repository.get(db, payload.item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
     producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)

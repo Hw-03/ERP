@@ -40,6 +40,7 @@ from app.services._tx import commit_and_refresh
 from app._evt import emit as _evt_emit
 from app.services.export_helpers import csv_streaming_response
 from app.services.reorder import reorder_by_display_order
+from app.repositories import item_repository, inventory_repository
 
 router = APIRouter()
 
@@ -438,7 +439,7 @@ def get_item(item_id: uuid.UUID, db: Session = Depends(get_db)):
 
 @router.put("/{item_id}", response_model=ItemWithInventory)
 def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get(db, item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -522,7 +523,7 @@ def update_item(item_id: uuid.UUID, payload: ItemUpdate, request: Request, db: S
         )
     # 응답에 inventory 동봉 — 좌측 list API 와 동일한 ItemWithInventory 형태로 보내
     # 저장 직후 우측 카드의 재고/창고 표시가 빈칸이 되는 잔여 UI 버그 방지.
-    inventory = db.query(Inventory).filter(Inventory.item_id == item.item_id).first()
+    inventory = inventory_repository.get(db, item.item_id)
     return _to_item_with_inventory(db, item, inventory)
 
 
@@ -534,7 +535,7 @@ def update_bom_completion(
     db: Session = Depends(get_db),
 ):
     """BOM 완료 상태 토글 — 사용자가 명시적으로 누를 때만 set/clear."""
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get(db, item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -557,7 +558,7 @@ def update_bom_completion(
 @router.patch("/{item_id}/soft-delete", response_model=ItemResponse)
 def soft_delete_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
     """품목 소프트 삭제 — deleted_at 세팅 + BOM 연결 제거. 입출고 내역은 보존."""
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get(db, item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
     if item.deleted_at is not None:
@@ -592,7 +593,7 @@ def soft_delete_item(item_id: uuid.UUID, request: Request, db: Session = Depends
 @router.patch("/{item_id}/restore", response_model=ItemResponse)
 def restore_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
     """삭제된 품목 복구 — deleted_at 초기화."""
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get(db, item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
     if item.deleted_at is None:

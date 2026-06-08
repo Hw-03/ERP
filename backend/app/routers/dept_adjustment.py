@@ -22,6 +22,7 @@ from app.models import DepartmentEnum, DeptAdjSubTypeEnum, Item
 from app.routers._errors import ErrorCode, http_error
 from app.services import dept_adjustment as svc
 from app._evt import emit as _evt_emit
+from app.repositories import item_repository
 
 router = APIRouter()
 
@@ -117,7 +118,7 @@ def get_bom_template(
     db: Session = Depends(get_db),
 ):
     """BOM 기반 초기 라인 세트 반환."""
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get(db, item_id)
     if item is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 

@@ -25,6 +25,7 @@ from app.services.inv_base import (
     get_or_create_inventory,
 )
 from app.services.inv_calc import _sync_total
+from app.repositories import inventory_repository
 from app.services.inv_transfer import consume_warehouse
 
 
@@ -110,7 +111,7 @@ def mark_defective(
         )
         db.flush()
         if result.rowcount == 0:
-            inv_check = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+            inv_check = inventory_repository.get(db, item_id)
             wh = inv_check.warehouse_qty or Decimal("0")
             pending = inv_check.pending_quantity or Decimal("0")
             raise ValueError(
@@ -149,7 +150,7 @@ def mark_defective(
     )
     db.flush()
     db.expire_all()
-    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    inv = inventory_repository.get(db, item_id)
     _sync_total(db, inv)
     return inv
 
@@ -187,7 +188,7 @@ def return_to_supplier(
         raise ValueError(f"{from_dept.value} 불량 재고 부족 (현재 {cur}, 요청 {qty}).")
 
     db.expire_all()
-    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    inv = inventory_repository.get(db, item_id)
     _sync_total(db, inv)
     return inv
 
@@ -237,7 +238,7 @@ def unmark_defective(
     )
     db.flush()
     db.expire_all()
-    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    inv = inventory_repository.get(db, item_id)
     _sync_total(db, inv)
     return inv
 
@@ -278,7 +279,7 @@ def scrap_defective(
         raise ValueError(f"{dept_label} 불량 재고 부족 (현재 {cur}, 요청 {qty}).")
 
     db.expire_all()
-    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    inv = inventory_repository.get(db, item_id)
     _sync_total(db, inv)
     return inv
 
@@ -319,7 +320,7 @@ def receive_defective(
     )
     db.flush()
     db.expire_all()
-    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    inv = inventory_repository.get(db, item_id)
     _sync_total(db, inv)
     return inv
 
@@ -364,7 +365,7 @@ def _consume_normal_source(
             )
 
     db.expire_all()
-    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    inv = inventory_repository.get(db, item_id)
     _sync_total(db, inv)
     return inv
 

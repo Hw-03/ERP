@@ -15,6 +15,7 @@ from app.services import inventory as inventory_svc
 from app.services._tx import commit_and_refresh
 
 from ._shared import to_response
+from app.repositories import item_repository
 
 
 router = APIRouter()
@@ -22,7 +23,7 @@ router = APIRouter()
 
 @router.post("/mark-defective", response_model=InventoryResponse)
 def mark_defective(payload: MarkDefectiveRequest, db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.item_id == payload.item_id).first()
+    item = item_repository.get(db, payload.item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
     inventory = inventory_svc.get_or_create_inventory(db, payload.item_id)

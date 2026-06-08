@@ -51,6 +51,7 @@ from app.routers.inventory._tx_filters import (
     _batch_name_map,
     _to_log_response,
 )
+from app.repositories import item_repository, inventory_repository
 
 
 router = APIRouter()
@@ -546,7 +547,7 @@ def meta_edit_transaction(
     log = db.query(TransactionLog).filter(TransactionLog.log_id == log_id).first()
     if not log:
         raise http_error(404, ErrorCode.NOT_FOUND, "거래를 찾을 수 없습니다.")
-    item = db.query(Item).filter(Item.item_id == log.item_id).first()
+    item = item_repository.get(db, log.item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -642,7 +643,7 @@ def quantity_correct_transaction(
     log = db.query(TransactionLog).filter(TransactionLog.log_id == log_id).first()
     if not log:
         raise http_error(404, ErrorCode.NOT_FOUND, "거래를 찾을 수 없습니다.")
-    item = db.query(Item).filter(Item.item_id == log.item_id).first()
+    item = item_repository.get(db, log.item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -690,7 +691,7 @@ def quantity_correct_transaction(
     delta = new_qty - log.quantity_change
 
     # 재고 검증: 보정 후 warehouse_qty >= max(0, pending_quantity)
-    inv = db.query(Inventory).filter(Inventory.item_id == log.item_id).first()
+    inv = inventory_repository.get(db, log.item_id)
     if not inv:
         raise http_error(404, ErrorCode.NOT_FOUND, "재고 레코드를 찾을 수 없습니다.")
 

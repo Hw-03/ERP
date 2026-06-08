@@ -24,6 +24,7 @@ from app.services.bom import explode_bom as _explode_bom_svc
 from app.services.bom import merge_requirements
 from app.routers._errors import ErrorCode, http_error
 from app.routers.inventory._tx_helper import resolve_producer
+from app.repositories import item_repository
 
 router = APIRouter()
 
@@ -81,7 +82,7 @@ def production_receipt(
     payload: ProductionReceiptRequest,
     db: Session = Depends(get_db),
 ):
-    produced_item = db.query(Item).filter(Item.item_id == payload.item_id).first()
+    produced_item = item_repository.get(db, payload.item_id)
     if not produced_item:
         raise http_error(404, ErrorCode.NOT_FOUND, "생산 대상 품목을 찾을 수 없습니다.")
 
@@ -319,7 +320,7 @@ def check_production_feasibility(
     quantity: Decimal = 1,
     db: Session = Depends(get_db),
 ):
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get(db, item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 

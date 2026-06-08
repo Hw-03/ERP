@@ -24,6 +24,7 @@ from app.services.inv_base import (
     get_or_create_inventory,
 )
 from app.services.inv_calc import _sync_total
+from app.repositories import inventory_repository
 
 
 def receive_confirmed(
@@ -76,7 +77,7 @@ def transfer_to_production(
     )
     db.flush()
     if result.rowcount == 0:
-        inv_check = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+        inv_check = inventory_repository.get(db, item_id)
         wh = inv_check.warehouse_qty or Decimal("0")
         pending = inv_check.pending_quantity or Decimal("0")
         raise ValueError(
@@ -93,7 +94,7 @@ def transfer_to_production(
     )
     db.flush()
     db.expire_all()
-    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    inv = inventory_repository.get(db, item_id)
     _sync_total(db, inv)
     return inv
 
@@ -138,7 +139,7 @@ def transfer_to_warehouse(
     )
     db.flush()
     db.expire_all()
-    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    inv = inventory_repository.get(db, item_id)
     _sync_total(db, inv)
     return inv
 
@@ -189,7 +190,7 @@ def transfer_between_departments(
     )
     db.flush()
     db.expire_all()
-    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    inv = inventory_repository.get(db, item_id)
     _sync_total(db, inv)
     return inv
 
@@ -216,12 +217,12 @@ def consume_warehouse(db: Session, item_id: uuid.UUID, qty: Decimal) -> tuple[In
     db.flush()
 
     if result.rowcount == 0:
-        inv_check = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+        inv_check = inventory_repository.get(db, item_id)
         wh = inv_check.warehouse_qty if inv_check else Decimal("0")
         raise ValueError(f"창고 재고 부족 (창고 {wh}, 차감 요청 {qty}).")
 
     db.expire_all()
-    inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
+    inv = inventory_repository.get(db, item_id)
     _sync_total(db, inv)
     qty_before = inv.quantity + qty
     return inv, qty_before
