@@ -33,14 +33,12 @@ export function DefectKpiCards({ kpi, onCardClick }: Props) {
         value={kpi.pending_approval}
         hint="승인 대기 중인 처리"
         tone={LEGACY_COLORS.yellow}
-        onClick={() => onCardClick("pending")}
       />
       <KpiCard
         label="오늘 처리"
         value={kpi.processed_today}
         hint="오늘 완료된 처리"
         tone={LEGACY_COLORS.green}
-        onClick={() => onCardClick("today")}
       />
     </div>
   );

@@ -22,6 +22,7 @@ const META: Record<BatchAction, { title: string; submit: string }> = {
 interface ReasonRow {
   category: string;
   memo: string;
+  qty: string;
 }
 
 interface RowFailure {
@@ -52,14 +53,24 @@ export function DefectBatchConfirm({
 }: Props) {
   const meta = META[action];
   const [reasons, setReasons] = useState<Record<string, ReasonRow>>(() =>
-    Object.fromEntries(locations.map((l) => [keyOf(l), { category: "", memo: "" }])),
+    Object.fromEntries(locations.map((l) => [keyOf(l), { category: "", memo: "", qty: String(l.quantity) }])),
   );
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<RowFailure[]>([]);
 
   const allValid = useMemo(
-    () => locations.length > 0 && locations.every((l) => Boolean(reasons[keyOf(l)]?.category)),
-    [locations, reasons],
+    () =>
+      locations.length > 0 &&
+      locations.every((l) => {
+        const r = reasons[keyOf(l)];
+        if (!r?.category) return false;
+        if (action === "unquarantine") {
+          const n = Number(r.qty);
+          return Number.isFinite(n) && n > 0 && n <= Number(l.quantity);
+        }
+        return true;
+      }),
+    [locations, reasons, action],
   );
 
   function setReason(key: string, patch: Partial<ReasonRow>) {
@@ -73,7 +84,7 @@ export function DefectBatchConfirm({
     setReasons((prev) => {
       const next = { ...prev };
       locations.slice(index + 1).forEach((l) => {
-        next[keyOf(l)] = { category: src.category, memo: src.memo };
+        next[keyOf(l)] = { category: src.category, memo: src.memo, qty: prev[keyOf(l)]?.qty ?? String(l.quantity) };
       });
       return next;
     });
@@ -81,7 +92,7 @@ export function DefectBatchConfirm({
 
   async function submitRow(loc: DefectLocation): Promise<void> {
     const r = reasons[keyOf(loc)];
-    const qty = Number(loc.quantity);
+    const qty = action === "unquarantine" ? Number(r.qty) : Number(loc.quantity);
     if (action === "unquarantine") {
       await defectsApi.unquarantine({
         item_id: loc.item_id,
@@ -173,15 +184,34 @@ export function DefectBatchConfirm({
               }}
             >
               <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                     {loc.mes_code} · {loc.department}
                   </span>
                   <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
-                    {loc.item_name}{" "}
-                    <span style={{ color: LEGACY_COLORS.muted }}>× {formatQty(loc.quantity)}개</span>
+                    {loc.item_name}
                   </div>
                 </div>
+                {action === "unquarantine" ? (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <input
+                      type="number"
+                      value={r.qty}
+                      min={1}
+                      max={Number(loc.quantity)}
+                      onChange={(e) => setReason(key, { qty: e.target.value })}
+                      className="w-20 rounded-[8px] border px-2 py-1 text-right text-sm font-bold"
+                      style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
+                    />
+                    <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                      / {formatQty(loc.quantity)}개
+                    </span>
+                  </div>
+                ) : (
+                  <span className="shrink-0 text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
+                    × {formatQty(loc.quantity)}개
+                  </span>
+                )}
                 {idx < locations.length - 1 && (r.category || r.memo) && (
                   <button
                     type="button"

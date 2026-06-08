@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS, getDepartmentFallbackColor } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
@@ -51,12 +51,13 @@ export function DefectDepartmentList({
   const grouped = groupByDepartment(locations);
   const depts = Object.keys(grouped).sort();
 
-  // 접고 펼치기 상태: 기본 모두 펼침
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [deptFilter, setDeptFilter] = useState<string | null>(null);
 
-  function toggleDept(dept: string) {
-    setCollapsed((prev) => ({ ...prev, [dept]: !prev[dept] }));
+  function toggleDeptFilter(dept: string) {
+    setDeptFilter((prev) => (prev === dept ? null : dept));
   }
+
+  const visibleDepts = deptFilter ? depts.filter((d) => d === deptFilter) : depts;
 
   if (depts.length === 0) {
     return (
@@ -71,9 +72,24 @@ export function DefectDepartmentList({
 
   return (
     <div className="flex flex-col gap-3">
-      {depts.map((dept) => {
+      {deptFilter && (
+        <div
+          className="flex items-center justify-between rounded-[12px] border px-4 py-2 text-xs font-bold"
+          style={{ borderColor: tint(LEGACY_COLORS.blue, 30), background: tint(LEGACY_COLORS.blue, 8), color: LEGACY_COLORS.blue }}
+        >
+          <span>{deptFilter} 부서만 표시 중</span>
+          <button
+            type="button"
+            onClick={() => setDeptFilter(null)}
+            className="font-black hover:underline"
+          >
+            전체 보기
+          </button>
+        </div>
+      )}
+      {visibleDepts.map((dept) => {
         const rows = grouped[dept];
-        const isOpen = !collapsed[dept];
+        const isActive = deptFilter === dept;
         const deptColor = getDepartmentFallbackColor(dept);
         // Pydantic Decimal → JSON 문자열("52.0000") 직렬화 — Number 변환 필수 (string concat 방지)
         const total = rows.reduce((sum, r) => sum + Number(r.quantity), 0);
@@ -82,20 +98,15 @@ export function DefectDepartmentList({
           <div
             key={dept}
             className="overflow-hidden rounded-[16px] border"
-            style={{ borderColor: tint(deptColor, 40) }}
+            style={{ borderColor: isActive ? deptColor : tint(deptColor, 40) }}
           >
-            {/* 부서 헤더 */}
+            {/* 부서 헤더 — 클릭으로 해당 부서 필터 토글 */}
             <button
               type="button"
-              onClick={() => toggleDept(dept)}
+              onClick={() => toggleDeptFilter(dept)}
               className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:brightness-95"
-              style={{ background: tint(deptColor, 10) }}
+              style={{ background: tint(deptColor, isActive ? 20 : 10) }}
             >
-              {isOpen ? (
-                <ChevronDown className="h-5 w-5 shrink-0" style={{ color: deptColor }} />
-              ) : (
-                <ChevronRight className="h-5 w-5 shrink-0" style={{ color: deptColor }} />
-              )}
               <span className="text-base font-black" style={{ color: deptColor }}>
                 {dept}
               </span>
@@ -105,11 +116,14 @@ export function DefectDepartmentList({
                 showDot={false}
                 className="ml-1 !py-0.5"
               />
+              {!isActive && depts.length > 1 && (
+                <span className="ml-auto text-xs font-bold" style={{ color: tint(deptColor, 60) }}>
+                  클릭해서 필터
+                </span>
+              )}
             </button>
 
-            {/* 항목 목록 */}
-            {isOpen && (
-              <div className="divide-y" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}>
+            <div className="divide-y" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}>
                 {rows.map((loc, idx) => {
                   const warn = isOverOneYear(loc.defective_at);
                   // 일괄 대상은 단순(non-BOM) 항목만. PA/PF(has_bom)는 1건 전체화면 분해.
@@ -178,8 +192,7 @@ export function DefectDepartmentList({
                     </div>
                   );
                 })}
-              </div>
-            )}
+            </div>
           </div>
         );
       })}
