@@ -89,4 +89,8 @@ export const queryKeys = {
     all: ["admin"] as const,
     auditCsvList: () => ["admin", "auditCsvList"] as const,
   },
+  myItemOrder: {
+    all: ["myItemOrder"] as const,
+    byEmployee: (employeeId: string) => ["myItemOrder", employeeId] as const,
+  },
 } as const;
