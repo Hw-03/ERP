@@ -4227,6 +4227,47 @@
         "title": "MessageResponse",
         "type": "object"
       },
+      "MyItemOrderEntry": {
+        "properties": {
+          "display_order": {
+            "title": "Display Order",
+            "type": "integer"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "display_order"
+        ],
+        "title": "MyItemOrderEntry",
+        "type": "object"
+      },
+      "MyItemOrderPut": {
+        "properties": {
+          "employee_id": {
+            "format": "uuid",
+            "title": "Employee Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MyItemOrderEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "employee_id",
+          "items"
+        ],
+        "title": "MyItemOrderPut",
+        "type": "object"
+      },
       "NotificationListResponse": {
         "properties": {
           "items": {
@@ -11474,6 +11515,136 @@
           }
         },
         "summary": "Export Items Xlsx",
+        "tags": [
+          "Items"
+        ]
+      }
+    },
+    "/api/items/my-order": {
+      "delete": {
+        "description": "직원의 품목 표시 순서 전체 삭제.",
+        "operationId": "delete_my_order_api_items_my_order_delete",
+        "parameters": [
+          {
+            "description": "직원 ID",
+            "in": "query",
+            "name": "employee_id",
+            "required": true,
+            "schema": {
+              "description": "직원 ID",
+              "format": "uuid",
+              "title": "Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete My Order",
+        "tags": [
+          "Items"
+        ]
+      },
+      "get": {
+        "description": "직원의 품목 표시 순서 조회. 행 없으면 빈 배열.",
+        "operationId": "get_my_order_api_items_my_order_get",
+        "parameters": [
+          {
+            "description": "직원 ID",
+            "in": "query",
+            "name": "employee_id",
+            "required": true,
+            "schema": {
+              "description": "직원 ID",
+              "format": "uuid",
+              "title": "Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MyItemOrderEntry"
+                  },
+                  "title": "Response Get My Order Api Items My Order Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get My Order",
+        "tags": [
+          "Items"
+        ]
+      },
+      "put": {
+        "description": "직원의 품목 표시 순서 전체 교체.\n\n기존 행 전부 삭제 후 bulk insert (upsert 효과).\n존재하지 않는 item_id는 조용히 skip.",
+        "operationId": "put_my_order_api_items_my_order_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyItemOrderPut"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put My Order",
         "tags": [
           "Items"
         ]
