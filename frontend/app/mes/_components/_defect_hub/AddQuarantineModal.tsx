@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useMyItemOrderQuery } from "@/lib/queries/useMyItemOrderQuery";
+import { buildEmployeeOrderRank } from "../_warehouse_v2/itemPickerShared";
 import { createPortal } from "react-dom";
 import { AlertTriangle, Search } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -126,6 +128,21 @@ export function AddQuarantineModal({
     return () => window.removeEventListener("keydown", handler);
   }, [open, busy, onClose]);
 
+  const { data: myOrderData } = useMyItemOrderQuery(currentEmployee.employee_id);
+  const employeeOrderRank = useMemo(
+    () => buildEmployeeOrderRank(myOrderData),
+    [myOrderData],
+  );
+
+  const sortedResults = useMemo(() => {
+    if (employeeOrderRank.size === 0) return results;
+    return [...results].sort((a, b) => {
+      const ra = employeeOrderRank.get(a.item_id) ?? Number.POSITIVE_INFINITY;
+      const rb = employeeOrderRank.get(b.item_id) ?? Number.POSITIVE_INFINITY;
+      return ra - rb;
+    });
+  }, [results, employeeOrderRank]);
+
   const qtyNum = useMemo(() => Number(qty), [qty]);
   const canSubmit =
     !busy &&
@@ -246,12 +263,12 @@ export function AddQuarantineModal({
                   </span>
                 )}
               </div>
-              {results.length > 0 && (
+              {sortedResults.length > 0 && (
                 <ul
                   className="absolute z-10 mt-1 max-h-[200px] w-full overflow-auto rounded-[10px] border shadow-lg"
                   style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
                 >
-                  {results.map((it) => (
+                  {sortedResults.map((it) => (
                     <li key={it.item_id}>
                       <button
                         type="button"

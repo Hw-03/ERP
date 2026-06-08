@@ -124,3 +124,18 @@ export function buildAssignedPriorityBySlot(slots: number[] | undefined): Map<nu
   (slots ?? []).forEach((slot, idx) => m.set(slot, idx));
   return m;
 }
+
+/**
+ * 직원 개인 품목 순서 항목 배열 → item_id → display_order 맵.
+ * entries 없거나 빈 배열이면 빈 Map 반환 → 기존 부서순 그대로 동작.
+ */
+export function buildEmployeeOrderRank(
+  entries?: { item_id: string; display_order: number }[],
+): Map<string, number> {
+  const m = new Map<string, number>();
+  if (!entries || entries.length === 0) return m;
+  for (const e of entries) {
+    m.set(e.item_id, e.display_order);
+  }
+  return m;
+}
