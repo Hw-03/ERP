@@ -40,6 +40,7 @@ from app.routers import (
     defects,
     departments,
     dept_adjustment,
+    employee_item_order,
     employees,
     handover,
     inventory,
@@ -268,6 +269,7 @@ def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespon
     )
 
 
+app.include_router(employee_item_order.router, prefix="/api/items", tags=["Items"])
 app.include_router(items.router, prefix="/api/items", tags=["Items"])
 app.include_router(employees.router, prefix="/api/employees", tags=["Employees"])
 app.include_router(departments.router, prefix="/api/departments", tags=["Departments"])
