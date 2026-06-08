@@ -162,7 +162,7 @@ ERP/
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1
 ```
 
-backend pytest / frontend lint:strict / tsc / vitest+coverage / next build / OpenAPI drift 를 CI 와 동일 기준으로 검사. coverage threshold 50/50/50/50.
+backend pytest / frontend lint:strict / tsc / vitest+coverage / next build / OpenAPI drift 를 CI 와 동일 기준으로 검사. coverage threshold 75/75/75/75.
 
 ### 개별 검증
 

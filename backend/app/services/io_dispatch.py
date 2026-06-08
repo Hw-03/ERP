@@ -423,6 +423,7 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         else:
             _submit_immediate(db, requester=requester, batch=batch)
     except Exception:
+        # 어느 분기서 실패하든 batch 를 failed 로 확정(flush)한 뒤 그대로 전파 — 부분상태 방지.
         batch.status = "failed"
         db.flush()
         raise
