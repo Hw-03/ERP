@@ -73,7 +73,7 @@ class QuarantineRequest(BaseModel):
     source: str                          # "warehouse" | "production"
     source_dept: Optional[str] = None
     target_dept: str
-    reason_category: str
+    reason_category: Optional[str] = None
     reason_memo: str
     actor_employee_id: uuid.UUID
 
@@ -262,9 +262,6 @@ def get_defect_kpi(db: Session = Depends(get_db)):
 @router.post("/quarantine", response_model=DefectActionResult)
 def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = Depends(get_db)):
     """격리 (즉시, 결재 없음). mark_defective 래퍼 + defective_at 채움."""
-    if not payload.reason_category:
-        raise http_error(422, ErrorCode.VALIDATION_ERROR, "reason_category 는 필수입니다.")
-
     actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
     if actor is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")

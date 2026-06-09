@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, GripVertical, Plus, RotateCcw, Save, Search, Settings2 } from "lucide-react";
+import { Check, GripVertical, Plus, RotateCcw, Save, Search, Settings2, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { Tooltip } from "@/lib/ui";
@@ -40,6 +40,7 @@ interface Props {
   /** 이미 장바구니에 담긴 item_id 집합 — "담김" 표시·중복 추가 방지. */
   selectedIds: Set<string>;
   onAdd: (item: Item) => void;
+  onRemove: (item: Item) => void;
 }
 
 /**
@@ -53,6 +54,7 @@ export function DefectItemPicker({
   targetDepartment,
   selectedIds,
   onAdd,
+  onRemove,
 }: Props) {
   const [dept, setDept] = useState("ALL");
   const [model, setModel] = useState("전체");
@@ -401,20 +403,19 @@ export function DefectItemPicker({
                   >
                     <button
                       type="button"
-                      disabled={added}
-                      onClick={() => onAdd(item)}
-                      className="inline-flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[12px] font-black text-white transition-colors disabled:cursor-default"
+                      onClick={() => added ? onRemove(item) : onAdd(item)}
+                      className="inline-flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[12px] font-black text-white transition-colors hover:brightness-110 active:scale-[0.98]"
                       style={{
-                        background: added ? LEGACY_COLORS.s2 : LEGACY_COLORS.red,
-                        color: added ? LEGACY_COLORS.muted2 : LEGACY_COLORS.white,
-                        borderColor: added ? LEGACY_COLORS.border : LEGACY_COLORS.red,
+                        background: LEGACY_COLORS.red,
+                        color: LEGACY_COLORS.white,
+                        borderColor: LEGACY_COLORS.red,
                         borderWidth: 1,
                         borderStyle: "solid",
                       }}
                     >
                       {added ? (
                         <>
-                          <Check className="h-3 w-3" />
+                          <X className="h-3 w-3" />
                           담김
                         </>
                       ) : (

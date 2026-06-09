@@ -76,6 +76,7 @@ describe("DefectCartFlow", () => {
         onCancel={vi.fn()}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
     expect(screen.getByText("원자재A")).toBeInTheDocument();
     expect(screen.getByText("완제품B")).toBeInTheDocument();
   });
@@ -91,6 +92,7 @@ describe("DefectCartFlow", () => {
         onCancel={vi.fn()}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
     expect(screen.getByText("원자재A")).toBeInTheDocument();
     expect(screen.getByText("완제품B")).toBeInTheDocument();
   });
@@ -107,6 +109,9 @@ describe("DefectCartFlow", () => {
         onCancel={vi.fn()}
       />,
     );
+
+    // Step 1 → Step 2
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
 
     // 표에서 추가
     fireEvent.click(screen.getByRole("button", { name: /추가/ }));
@@ -155,6 +160,7 @@ describe("DefectCartFlow", () => {
         onCancel={vi.fn()}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
     fireEvent.click(screen.getByRole("button", { name: /추가/ }));
     fireEvent.change(screen.getByPlaceholderText("예: 3"), { target: { value: "2" } });
     const categorySelect = screen.getAllByRole("combobox").find((el) =>
@@ -205,6 +211,9 @@ describe("DefectCartFlow", () => {
         onCancel={vi.fn()}
       />,
     );
+
+    // Step 1 → Step 2
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
 
     // 둘 다 추가
     const addButtons = screen.getAllByRole("button", { name: /추가/ });

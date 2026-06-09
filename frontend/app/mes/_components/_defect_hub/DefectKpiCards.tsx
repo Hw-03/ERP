@@ -8,10 +8,11 @@ export type DefectKpiKind = "quarantined" | "over_one_year" | "pending" | "today
 
 interface Props {
   kpi: DefectKpi;
+  activeFilter?: DefectKpiKind | null;
   onCardClick: (kind: DefectKpiKind) => void;
 }
 
-export function DefectKpiCards({ kpi, onCardClick }: Props) {
+export function DefectKpiCards({ kpi, activeFilter, onCardClick }: Props) {
   return (
     <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
       <KpiCard
@@ -19,13 +20,13 @@ export function DefectKpiCards({ kpi, onCardClick }: Props) {
         value={kpi.quarantined}
         hint="현재 DEFECTIVE 상태"
         tone={LEGACY_COLORS.red}
-        onClick={() => onCardClick("quarantined")}
       />
       <KpiCard
         label="1년 이상 ⚠"
         value={kpi.over_one_year}
         hint="격리 후 365일 초과"
         tone={LEGACY_COLORS.red}
+        active={activeFilter === "over_one_year"}
         onClick={() => onCardClick("over_one_year")}
       />
       <KpiCard

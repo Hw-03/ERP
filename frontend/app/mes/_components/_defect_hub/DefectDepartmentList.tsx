@@ -36,6 +36,8 @@ interface Props {
   selectedKeys?: Set<string>;
   /** 체크박스 토글. has_bom(PA/PF) 행에는 체크박스를 노출하지 않는다. */
   onToggleSelect?: (location: DefectLocation) => void;
+  /** 전체 보기 시 이 부서를 가장 위에 표시. */
+  priorityDept?: string;
 }
 
 const locKey = (loc: DefectLocation) => `${loc.item_id}__${loc.department}`;
@@ -46,10 +48,17 @@ export function DefectDepartmentList({
   selectable = false,
   selectedKeys,
   onToggleSelect,
+  priorityDept,
 }: Props) {
   // 부서별 그룹핑
   const grouped = groupByDepartment(locations);
-  const depts = Object.keys(grouped).sort();
+  const depts = Object.keys(grouped).sort((a, b) => {
+    if (priorityDept) {
+      if (a === priorityDept) return -1;
+      if (b === priorityDept) return 1;
+    }
+    return a.localeCompare(b, "ko");
+  });
 
   const [deptFilter, setDeptFilter] = useState<string | null>(null);
 

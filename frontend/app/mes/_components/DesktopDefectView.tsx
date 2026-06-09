@@ -18,7 +18,7 @@ import { PaPfDefectWizardPanel } from "./_defect_hub/PaPfDefectWizardPanel";
 import { DefectCartFlow, type DefectCartMode } from "./_defect_hub/DefectCartFlow";
 import { DefectBatchConfirm, type BatchAction } from "./_defect_hub/DefectBatchConfirm";
 import { InlineErrorNote } from "./_defect_hub/InlineErrorNote";
-import { tint } from "@/lib/mes/colorUtils";
+
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const PRODUCTION_LINES = new Set(["튜브", "고압", "진공", "튜닝", "조립", "출하"]);
@@ -101,7 +101,7 @@ function DefectViewInner({
   };
 
   const [scope, setScope] = useState<DefectScope>(initialScope);
-  const [sort, setSort] = useState<DefectSort>("oldest");
+  const [sort, setSort] = useState<DefectSort>("newest");
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
   const [view, setView] = useState<ViewMode>({ kind: "hub" });
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
@@ -177,29 +177,46 @@ function DefectViewInner({
     department: operator.department,
   };
 
-  // 브라우저 뒤로가기 → 현재 뷰에서 한 단계 뒤로 (hub이면 무시 — 탭 URL 네비에 넘김).
+  // history.state 기반 뒤로/앞으로 동기화.
+  // 마운트 시 현재 엔트리에 defect state가 있으면 뷰 복원 (다른 탭에서 뒤로가기로 복귀하는 경우).
+  // defect state가 없으면 hub로 replaceState — 항상 스택 바닥이 hub.
   useEffect(() => {
-    const onPop = () => {
-      setView((cur) => {
-        if (cur.kind === "list" || cur.kind === "cart") return { kind: "hub" };
-        if (cur.kind === "batch" || cur.kind === "disassemble") return { kind: "list" };
-        return cur; // hub에서 popstate → 아무것도 안 함(브라우저 기본 동작)
-      });
-    };
+    const cur = window.history.state as { defect?: string; mode?: string } | null;
+    if (cur?.defect === "cart" && (cur.mode === "add" || cur.mode === "scrap")) {
+      setView({ kind: "cart", mode: cur.mode });
+    } else if (cur?.defect === "list") {
+      setView({ kind: "list" });
+    } else if (cur?.defect === "batch" || cur?.defect === "disassemble") {
+      // location 데이터 없이 복원 불가 — 목록으로
+      setView({ kind: "list" });
+      window.history.replaceState({ defect: "list" }, "");
+    } else {
+      window.history.replaceState({ defect: "hub" }, "");
+    }
+
+    function onPop(e: PopStateEvent) {
+      const s = e.state as { defect?: string; mode?: string } | null;
+      if (!s?.defect || s.defect === "hub") {
+        setView({ kind: "hub" });
+      } else if (s.defect === "list") {
+        setView({ kind: "list" });
+      } else if (s.defect === "cart" && (s.mode === "add" || s.mode === "scrap")) {
+        setView({ kind: "cart", mode: s.mode });
+      } else {
+        setView({ kind: "list" });
+      }
+    }
+
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, []);
-
-  function backToHub() {
-    setView({ kind: "hub" });
-  }
+  }, []); // mount only
 
   function handleHubSelect(id: DefectHubCardId) {
     if (id === "quarantine") {
-      window.history.pushState({ defect: "cart" }, "");
+      window.history.pushState({ defect: "cart", mode: "add" }, "");
       setView({ kind: "cart", mode: "add" });
     } else if (id === "scrap") {
-      window.history.pushState({ defect: "cart" }, "");
+      window.history.pushState({ defect: "cart", mode: "scrap" }, "");
       setView({ kind: "cart", mode: "scrap" });
     } else {
       window.history.pushState({ defect: "list" }, "");
@@ -268,7 +285,7 @@ function DefectViewInner({
                 items={items}
                 productModels={productModels}
                 currentEmployee={employee}
-                onCancel={backToHub}
+                onCancel={() => window.history.back()}
                 onDone={() =>
                   handleProcessed(
                     view.mode === "add" ? "새 불량 격리 완료" : "즉시 폐기 완료",
@@ -281,7 +298,7 @@ function DefectViewInner({
                 action={view.action}
                 locations={view.locations}
                 currentEmployee={employee}
-                onCancel={() => setView({ kind: "list" })}
+                onCancel={() => window.history.back()}
                 onDone={() => handleProcessed("불량 처리 완료")}
               />
             )}
@@ -289,7 +306,7 @@ function DefectViewInner({
               <div className="flex min-h-0 flex-1 flex-col gap-3">
                 <button
                   type="button"
-                  onClick={() => setView({ kind: "list" })}
+                  onClick={() => window.history.back()}
                   className="self-start rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors hover:brightness-110"
                   style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
                 >
@@ -312,7 +329,7 @@ function DefectViewInner({
           <div key="list" className="animate-view-fade flex flex-col gap-4 px-4 py-4 pb-6">
             <button
               type="button"
-              onClick={() => setView({ kind: "hub" })}
+              onClick={() => window.history.back()}
               className="self-start flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors hover:brightness-110"
               style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
             >
@@ -322,6 +339,7 @@ function DefectViewInner({
 
             <DefectKpiCards
               kpi={kpi}
+              activeFilter={kpiFilter}
               onCardClick={(kind) => setKpiFilter((prev) => (prev === kind ? null : kind))}
             />
 
@@ -335,25 +353,6 @@ function DefectViewInner({
               onSortChange={setSort}
               currentDept={operator.department}
             />
-
-            {kpiFilter && (
-              <div
-                className="flex items-center justify-between rounded-[10px] border px-4 py-2"
-                style={{ background: LEGACY_COLORS.errorBg, borderColor: tint(LEGACY_COLORS.red, 30) }}
-              >
-                <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>
-                  {kpiFilter === "over_one_year" ? "1년 이상 격리 항목만 표시 중" : `${kpiFilter} 필터 활성`}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setKpiFilter(null)}
-                  className="text-xs font-black hover:underline"
-                  style={{ color: LEGACY_COLORS.red }}
-                >
-                  필터 해제
-                </button>
-              </div>
-            )}
 
             {/* 일괄 액션 바 — 선택 ≥1 일 때 */}
             {selectedLocations.length > 0 && (
@@ -414,6 +413,7 @@ function DefectViewInner({
                 selectable
                 selectedKeys={selectedKeys}
                 onToggleSelect={toggleSelect}
+                priorityDept={operator.department}
               />
             )}
           </div>

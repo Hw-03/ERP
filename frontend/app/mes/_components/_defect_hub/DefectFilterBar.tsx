@@ -6,8 +6,6 @@ import { FilterChip } from "../common/FilterChip";
 export type DefectScope = "my" | "production" | "all";
 export type DefectSort = "oldest" | "newest";
 
-const PRODUCTION_LINES = new Set(["튜브", "고압", "진공", "튜닝", "조립", "출하"]);
-
 interface Props {
   scope: DefectScope;
   sort: DefectSort;
@@ -23,8 +21,6 @@ export function DefectFilterBar({
   onSortChange,
   currentDept,
 }: Props) {
-  const isProductionLine = PRODUCTION_LINES.has(currentDept);
-
   return (
     <div
       className="flex flex-wrap items-center gap-4 rounded-[14px] border px-4 py-3"
@@ -41,14 +37,7 @@ export function DefectFilterBar({
         <FilterChip
           label="내 부서"
           active={scope === "my"}
-          onClick={() => isProductionLine && onScopeChange("my")}
-          size="sm"
-          className={isProductionLine ? "" : "cursor-not-allowed opacity-50"}
-        />
-        <FilterChip
-          label="생산부 라인 전체"
-          active={scope === "production"}
-          onClick={() => onScopeChange("production")}
+          onClick={() => onScopeChange("my")}
           size="sm"
         />
         <FilterChip

@@ -29,7 +29,7 @@ export interface QuarantinePayload {
   source: "warehouse" | "production";
   source_dept?: string;
   target_dept: string;
-  reason_category: string;
+  reason_category?: string | null;
   reason_memo: string;
   actor_employee_id: string;
 }

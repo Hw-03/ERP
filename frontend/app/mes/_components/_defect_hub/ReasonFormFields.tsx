@@ -33,7 +33,10 @@ export function ReasonFormFields({
           style={{ color: LEGACY_COLORS.muted2 }}
         >
           사유 카테고리
-          {required && <span className="ml-0.5" style={{ color: LEGACY_COLORS.red }}>*</span>}
+          {required
+            ? <span className="ml-0.5" style={{ color: LEGACY_COLORS.red }}>*</span>
+            : <span className="ml-1 font-bold" style={{ color: LEGACY_COLORS.muted }}>(선택)</span>
+          }
         </label>
         <select
           value={category}

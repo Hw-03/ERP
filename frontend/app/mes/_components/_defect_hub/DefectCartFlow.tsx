@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ArrowLeft, Copy, Trash2 } from "lucide-react";
-import { LEGACY_COLORS } from "@/lib/mes/color";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Building2, Copy, Trash2, Warehouse } from "lucide-react";
+import { LEGACY_COLORS, MES_DEPARTMENT_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
@@ -44,7 +44,7 @@ interface Props {
 
 const TITLES: Record<DefectCartMode, { title: string; subtitle: string; submit: string }> = {
   add: {
-    title: "새 불량 추가",
+    title: "불량 격리",
     subtitle: "정상 재고에서 여러 품목을 골라 한 번에 격리합니다. 즉시 처리.",
     submit: "격리하기",
   },
@@ -76,10 +76,24 @@ export function DefectCartFlow({
       ? currentEmployee.department
       : PRODUCTION_LINES[0],
   );
+  const [step, setStep] = useState<1 | 2>(1);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<LineFailure[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // Step 2 → Step 1 뒤로가기 처리. DesktopDefectView의 popstate와 공존.
+  useEffect(() => {
+    function onPop(e: PopStateEvent) {
+      const s = e.state as { defect?: string; step?: number } | null;
+      if (s?.defect === "cart" && (!s.step || s.step === 1)) {
+        setStep(1);
+        setLines([]);
+      }
+    }
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   const selectedIds = useMemo(() => new Set(lines.map((l) => l.item.item_id)), [lines]);
 
@@ -87,7 +101,7 @@ export function DefectCartFlow({
     setLines((prev) =>
       prev.some((l) => l.item.item_id === item.item_id)
         ? prev
-        : [...prev, { key: `${item.item_id}-${Date.now()}`, item, qty: "", category: "", memo: "" }],
+        : [...prev, { key: `${item.item_id}-${Date.now()}`, item, qty: "1", category: "", memo: "" }],
     );
   }
 
@@ -97,6 +111,10 @@ export function DefectCartFlow({
 
   function removeLine(key: string) {
     setLines((prev) => prev.filter((l) => l.key !== key));
+  }
+
+  function removeItemById(item: Item) {
+    setLines((prev) => prev.filter((l) => l.item.item_id !== item.item_id));
   }
 
   function copyReasonDown(index: number) {
@@ -113,7 +131,7 @@ export function DefectCartFlow({
     lines.length > 0 &&
     lines.every((l) => {
       const n = Number(l.qty);
-      return Number.isFinite(n) && n > 0 && Boolean(l.category);
+      return Number.isFinite(n) && n > 0;
     });
 
   async function submitLine(line: CartLine): Promise<void> {
@@ -125,7 +143,7 @@ export function DefectCartFlow({
         source,
         source_dept: source === "production" ? dept : undefined,
         target_dept: dept,
-        reason_category: line.category,
+        reason_category: line.category || null,
         reason_memo: line.memo,
         actor_employee_id: currentEmployee.employee_id,
       });
@@ -177,221 +195,282 @@ export function DefectCartFlow({
     setFailures(nextFailures);
   }
 
+  // 스텝 인디케이터 공통
+  const stepIndicator = (
+    <div className="flex items-center gap-2 text-xs font-bold">
+      <span style={{ color: step === 1 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}>
+        ① 출처·부서 선택
+      </span>
+      <span style={{ color: LEGACY_COLORS.muted }}>→</span>
+      <span style={{ color: step === 2 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}>
+        ② 품목 선택
+      </span>
+    </div>
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      {/* 헤더 */}
+      {/* 공통 헤더 */}
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={onCancel}
+          onClick={step === 1 ? onCancel : () => window.history.back()}
           disabled={busy}
           className="flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors hover:brightness-110 disabled:opacity-50"
           style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
         >
           <ArrowLeft className="h-4 w-4" />
-          취소
+          {step === 1 ? "취소" : "이전"}
         </button>
-        <div className="min-w-0">
+        <div className="flex min-w-0 flex-col gap-0.5">
           <h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
             {meta.title}
           </h2>
-          <p className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-            {meta.subtitle}
-          </p>
+          {stepIndicator}
         </div>
       </div>
 
-      {/* 출처 + 부서 (1회 공통) */}
-      <div
-        className="grid shrink-0 grid-cols-[1fr_1fr] gap-3 rounded-[14px] border px-4 py-3"
-        style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
-      >
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-            출처 <span style={{ color: LEGACY_COLORS.red }}>*</span>
-          </label>
-          <div className="flex gap-2">
-            {(["warehouse", "production"] as SourceKind[]).map((s) => (
-              <label
-                key={s}
-                className="flex flex-1 cursor-pointer items-center gap-2 rounded-[8px] border px-2 py-1.5"
-                style={{
-                  background:
-                    source === s
-                      ? `color-mix(in srgb, ${LEGACY_COLORS.red} 6%, ${LEGACY_COLORS.s1})`
-                      : LEGACY_COLORS.s1,
-                  borderColor: source === s ? LEGACY_COLORS.red : LEGACY_COLORS.border,
-                }}
-              >
-                <input
-                  type="radio"
-                  name="defect-cart-source"
-                  value={s}
-                  checked={source === s}
-                  onChange={() => setSource(s)}
-                  className="accent-red-500"
-                />
-                <span className="text-xs font-black" style={{ color: LEGACY_COLORS.text }}>
-                  {s === "warehouse" ? "창고 재고" : "부서 재고"}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-            {mode === "add"
-              ? source === "warehouse"
-                ? "격리 부서"
-                : "출처/격리 부서"
-              : source === "warehouse"
-                ? "창고 (부서 무관)"
-                : "출처 부서"}{" "}
-            {(mode === "add" || source === "production") && <span style={{ color: LEGACY_COLORS.red }}>*</span>}
-          </label>
-          <select
-            value={dept}
-            disabled={mode !== "add" && source === "warehouse"}
-            onChange={(e) => setDept(e.target.value)}
-            className="w-full rounded-[10px] border px-3 py-2 text-sm font-bold outline-none disabled:opacity-50"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-          >
-            {PRODUCTION_LINES.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* 본문: 좌 피커 + 우 장바구니 */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[1.3fr_1fr]">
-        <div className="min-h-0">
-          <DefectItemPicker
-            items={items}
-            productModels={productModels}
-            targetDepartment={dept}
-            selectedIds={selectedIds}
-            onAdd={addItem}
-          />
-        </div>
-
-        {/* 장바구니 */}
-        <div
-          className="flex min-h-0 flex-col overflow-y-auto rounded-[16px] border"
-          style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
-        >
-          <div
-            className="sticky top-0 z-10 px-4 py-2 text-xs font-black uppercase tracking-[1.5px]"
-            style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2, borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
-          >
-            장바구니 {lines.length}건
-          </div>
-          {lines.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
-              왼쪽에서 품목을 추가하세요.
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3 p-3">
-              {lines.map((line, idx) => {
-                const fail = failures.find((f) => f.key === line.key);
-                return (
-                  <div
-                    key={line.key}
-                    className="flex flex-col gap-2 rounded-[12px] border px-3 py-2"
-                    style={{
-                      background: LEGACY_COLORS.s1,
-                      borderColor: fail ? tint(LEGACY_COLORS.red, 30) : LEGACY_COLORS.border,
-                    }}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                          {line.item.mes_code ?? "(코드 없음)"}
-                        </div>
-                        <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
-                          {line.item.item_name}
-                        </div>
+      {/* 1단계: 출처·부서 선택 */}
+      {step === 1 && (
+        <div key="step1" className="animate-view-fade flex min-h-0 flex-1 flex-col gap-3">
+          {/* 2단 메인 영역 */}
+          <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
+            {/* 좌: 출처 카드 */}
+            <div className="flex min-h-0 flex-col gap-2">
+              <div className="text-[11px] font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                출처
+              </div>
+              <div className="grid min-h-0 flex-1 grid-rows-2 gap-3">
+                {(["production", "warehouse"] as SourceKind[]).map((s) => {
+                  const active = source === s;
+                  const Icon = s === "warehouse" ? Warehouse : Building2;
+                  const label = s === "warehouse" ? "창고 재고" : "부서 재고";
+                  const desc =
+                    s === "warehouse"
+                      ? "창고 보관 중인 정상 재고에서 불량을 격리합니다"
+                      : "생산 부서에서 사용 중인 재고에서 불량을 격리합니다";
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setSource(s)}
+                      className="flex h-full flex-col justify-between rounded-[22px] border p-7 text-left transition-all hover:brightness-110 active:scale-[0.99]"
+                      style={{
+                        background: active ? tint(LEGACY_COLORS.red, 7) : LEGACY_COLORS.s2,
+                        borderColor: active ? LEGACY_COLORS.red : LEGACY_COLORS.border,
+                        borderWidth: active ? 2 : 1,
+                      }}
+                    >
+                      <div className="flex items-center gap-4">
+                        <Icon
+                          className="h-9 w-9 shrink-0"
+                          style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}
+                        />
+                        <span className="text-3xl font-black" style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.text }}>
+                          {label}
+                        </span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeLine(line.key)}
-                        className="shrink-0 rounded-[8px] p-1.5 transition-colors hover:brightness-110"
-                        style={{ color: LEGACY_COLORS.muted2 }}
-                        aria-label="삭제"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-                        수량
+                      <span className="text-base font-bold" style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}>
+                        {desc}
                       </span>
-                      <input
-                        type="number"
-                        min={0}
-                        step="1"
-                        value={line.qty}
-                        onChange={(e) => updateLine(line.key, { qty: e.target.value })}
-                        placeholder="예: 3"
-                        className="w-24 rounded-[8px] border px-2 py-1 text-sm font-bold outline-none"
-                        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                      />
-                      {idx < lines.length - 1 && (line.category || line.memo) && (
-                        <button
-                          type="button"
-                          onClick={() => copyReasonDown(idx)}
-                          className="ml-auto flex items-center gap-1 text-xs font-bold hover:underline"
-                          style={{ color: LEGACY_COLORS.blue }}
-                        >
-                          <Copy className="h-3 w-3" />
-                          위 사유 복사
-                        </button>
-                      )}
-                    </div>
-
-                    <ReasonFormFields
-                      category={line.category}
-                      memo={line.memo}
-                      onCategoryChange={(c) => updateLine(line.key, { category: c })}
-                      onMemoChange={(m) => updateLine(line.key, { memo: m })}
-                      required
-                    />
-
-                    {fail && (
-                      <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>실패: {fail.message}</div>
-                    )}
-                  </div>
-                );
-              })}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* 하단 제출 바 */}
-      <div className="flex shrink-0 items-center justify-between gap-2 pt-1">
-        {failures.length > 0 ? (
-          <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
-            {failures.length}건 실패 — 남은 줄을 확인 후 다시 제출하세요.
-          </span>
-        ) : (
-          <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-            줄마다 수량·사유를 입력하세요.
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={() => setConfirmOpen(true)}
-          disabled={!allValid || busy}
-          className="rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
-          style={{ background: LEGACY_COLORS.red }}
-        >
-          {busy ? "처리 중..." : `${meta.submit} (${lines.length}건) →`}
-        </button>
-      </div>
+            {/* 우: 격리 위치 */}
+            <div className="flex min-h-0 flex-col gap-2">
+              <div className="text-[11px] font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                {source === "warehouse" ? "격리 위치" : mode === "add" ? "출처·격리 부서" : "출처 부서"}
+              </div>
+              {source === "warehouse" ? (
+                <div
+                  className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 rounded-[22px] border-2"
+                  style={{ background: tint(LEGACY_COLORS.blue, 7), borderColor: LEGACY_COLORS.blue }}
+                >
+                  <Warehouse className="h-16 w-16" style={{ color: LEGACY_COLORS.blue }} />
+                  <span className="text-4xl font-black" style={{ color: LEGACY_COLORS.blue }}>창고</span>
+                  <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                    창고 불량 보관 구역으로 이동됩니다
+                  </span>
+                </div>
+              ) : (
+                <div className="grid min-h-0 flex-1 grid-cols-3 grid-rows-2 gap-3">
+                  {PRODUCTION_LINES.map((d) => {
+                    const active = dept === d;
+                    const deptColor = MES_DEPARTMENT_COLORS[d] ?? LEGACY_COLORS.muted2;
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setDept(d)}
+                        className="h-full rounded-[18px] border text-3xl font-black transition-all hover:brightness-110 active:scale-[0.99]"
+                        style={{
+                          background: active ? tint(deptColor, 14) : LEGACY_COLORS.s2,
+                          borderColor: active ? deptColor : LEGACY_COLORS.border,
+                          borderWidth: active ? 2 : 1,
+                          color: active ? deptColor : LEGACY_COLORS.muted2,
+                        }}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex shrink-0 justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                window.history.pushState({ defect: "cart", mode, step: 2 }, "");
+                setStep(2);
+              }}
+              className="flex items-center gap-1 rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99]"
+              style={{ background: LEGACY_COLORS.red }}
+            >
+              다음 →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2단계: 품목 선택 */}
+      {step === 2 && (
+        <div key="step2" className="animate-view-fade flex min-h-0 flex-1 flex-col gap-3">
+
+          {/* 좌 피커 + 우 장바구니 */}
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[1.3fr_1fr]">
+            <div className="min-h-0">
+              <DefectItemPicker
+                items={items}
+                productModels={productModels}
+                targetDepartment={dept}
+                selectedIds={selectedIds}
+                onAdd={addItem}
+                onRemove={removeItemById}
+              />
+            </div>
+
+            {/* 장바구니 */}
+            <div
+              className="flex min-h-0 flex-col overflow-y-auto rounded-[16px] border"
+              style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
+            >
+              <div
+                className="sticky top-0 z-10 px-4 py-2 text-xs font-black uppercase tracking-[1.5px]"
+                style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2, borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
+              >
+                장바구니 {lines.length}건
+              </div>
+              {lines.length === 0 ? (
+                <div className="px-4 py-8 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
+                  왼쪽에서 품목을 추가하세요.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3 p-3">
+                  {lines.map((line, idx) => {
+                    const fail = failures.find((f) => f.key === line.key);
+                    return (
+                      <div
+                        key={line.key}
+                        className="flex flex-col gap-2 rounded-[12px] border px-3 py-2"
+                        style={{
+                          background: LEGACY_COLORS.s1,
+                          borderColor: fail ? tint(LEGACY_COLORS.red, 30) : LEGACY_COLORS.border,
+                        }}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                              {line.item.mes_code ?? "(코드 없음)"}
+                            </div>
+                            <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
+                              {line.item.item_name}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeLine(line.key)}
+                            className="no-btn-inset flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110"
+                            style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }}
+                            aria-label="삭제"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>
+                            수량
+                          </span>
+                          <input
+                            type="number"
+                            min={0}
+                            step="1"
+                            value={line.qty}
+                            onChange={(e) => updateLine(line.key, { qty: e.target.value })}
+                            placeholder="예: 3"
+                            className="w-16 rounded-[8px] border px-2 py-1 text-center text-sm font-bold outline-none"
+                            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                          />
+                          {idx < lines.length - 1 && (line.category || line.memo) && (
+                            <button
+                              type="button"
+                              onClick={() => copyReasonDown(idx)}
+                              className="ml-auto flex items-center gap-1 text-xs font-bold hover:underline"
+                              style={{ color: LEGACY_COLORS.blue }}
+                            >
+                              <Copy className="h-3 w-3" />
+                              위 사유 복사
+                            </button>
+                          )}
+                        </div>
+
+                        <ReasonFormFields
+                          category={line.category}
+                          memo={line.memo}
+                          onCategoryChange={(c) => updateLine(line.key, { category: c })}
+                          onMemoChange={(m) => updateLine(line.key, { memo: m })}
+                        />
+
+                        {fail && (
+                          <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>실패: {fail.message}</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 하단 제출 바 */}
+          <div className="flex shrink-0 items-center justify-between gap-2 pt-1">
+            {failures.length > 0 ? (
+              <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
+                {failures.length}건 실패 — 남은 줄을 확인 후 다시 제출하세요.
+              </span>
+            ) : (
+              <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                줄마다 수량·사유를 입력하세요.
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setConfirmOpen(true)}
+              disabled={!allValid || busy}
+              className="rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
+              style={{ background: LEGACY_COLORS.red }}
+            >
+              {busy ? "처리 중..." : `${meta.submit} (${lines.length}건) →`}
+            </button>
+          </div>
+        </div>
+      )}
 
       <ConfirmModal
         open={confirmOpen}

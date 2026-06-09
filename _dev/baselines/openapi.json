@@ -4948,8 +4948,15 @@
             "title": "Qty"
           },
           "reason_category": {
-            "title": "Reason Category",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category"
           },
           "reason_memo": {
             "title": "Reason Memo",
@@ -4980,7 +4987,6 @@
           "qty",
           "source",
           "target_dept",
-          "reason_category",
           "reason_memo",
           "actor_employee_id"
         ],
