@@ -139,7 +139,8 @@ describe("DefectCartFlow", () => {
         expect.objectContaining({
           item_id: "r-1",
           qty: 4,
-          source: "warehouse",
+          source: "production",
+          source_dept: "조립",
           target_dept: "조립",
           reason_category: "외관 불량",
           actor_employee_id: "emp-1",
@@ -185,8 +186,8 @@ describe("DefectCartFlow", () => {
             expect.objectContaining({
               item_id: "r-1",
               quantity: 2,
-              from_bucket: "warehouse",
-              from_department: null,
+              from_bucket: "production",
+              from_department: "조립",
               to_bucket: "none",
             }),
           ],

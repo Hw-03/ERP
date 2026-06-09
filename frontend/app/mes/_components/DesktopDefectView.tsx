@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { defectsApi } from "@/lib/api/defects";
 import type { DefectKpi, DefectLocation } from "@/lib/api/types/defects";
-import { canEnterIO } from "./_warehouse_steps";
+import { canEnterIO, isWarehouseStaff, isDepartmentApprover } from "./_warehouse_steps";
 import { WarehouseAccessDenied } from "./_warehouse_sections/WarehouseAccessDenied";
 import { useWarehouseData } from "./_warehouse_hooks/useWarehouseData";
 import type { Operator } from "./login/useCurrentOperator";
@@ -30,7 +30,10 @@ const DEFAULT_KPI: DefectKpi = {
   processed_today: 0,
 };
 
-const locKey = (loc: DefectLocation) => `${loc.item_id}__${loc.department}`;
+/** 역할 기반 기본 출처 — 창고 전담자만 "warehouse", 나머지 "production". */
+function defaultSourceForOp(op: Operator): "warehouse" | "production" {
+  return isWarehouseStaff(op) && !isDepartmentApprover(op) ? "warehouse" : "production";
+}
 
 /** 화면 모드 — hub가 진입점. list 외에는 좌측 목록을 덮는 전폭 작업 화면. */
 type ViewMode =
@@ -104,7 +107,6 @@ function DefectViewInner({
   const [sort, setSort] = useState<DefectSort>("newest");
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
   const [view, setView] = useState<ViewMode>({ kind: "hub" });
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [reloadNonce, setReloadNonce] = useState(0);
 
   useEffect(() => {
@@ -162,15 +164,6 @@ function DefectViewInner({
     return result;
   }, [locations, scope, sort, kpiFilter, defectDeptFilter, operator.department]);
 
-  // 목록이 갱신되면(처리 후) 더 이상 존재하지 않는 선택 키 정리.
-  useEffect(() => {
-    const valid = new Set(locations.map(locKey));
-    setSelectedKeys((prev) => {
-      const next = new Set(Array.from(prev).filter((k) => valid.has(k)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [locations]);
-
   const employee = {
     employee_id: operator.employee_id,
     name: operator.name,
@@ -226,30 +219,8 @@ function DefectViewInner({
 
   function handleProcessed(message: string) {
     setView({ kind: "hub" });
-    setSelectedKeys(new Set());
     setReloadNonce((n) => n + 1);
     onStatusChange?.(message);
-  }
-
-  function toggleSelect(loc: DefectLocation) {
-    const key = locKey(loc);
-    setSelectedKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  const selectedLocations = useMemo(
-    () => filteredLocations.filter((loc) => selectedKeys.has(locKey(loc))),
-    [filteredLocations, selectedKeys],
-  );
-
-  function startBatch(action: BatchAction) {
-    if (selectedLocations.length === 0) return;
-    window.history.pushState({ defect: "batch" }, "");
-    setView({ kind: "batch", action, locations: selectedLocations });
   }
 
   function handleProcessRow(loc: DefectLocation) {
@@ -285,6 +256,7 @@ function DefectViewInner({
                 items={items}
                 productModels={productModels}
                 currentEmployee={employee}
+                defaultSource={defaultSourceForOp(operator)}
                 onCancel={() => window.history.back()}
                 onDone={() =>
                   handleProcessed(
@@ -327,15 +299,20 @@ function DefectViewInner({
 
         {view.kind === "list" && (
           <div key="list" className="animate-view-fade flex flex-col gap-4 px-4 py-4 pb-6">
-            <button
-              type="button"
-              onClick={() => window.history.back()}
-              className="self-start flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors hover:brightness-110"
-              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
-            >
-              <ArrowLeft className="h-4 w-4" />
-              작업 선택
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => window.history.back()}
+                className="flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors hover:brightness-110"
+                style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                작업 선택
+              </button>
+              <h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
+                격리 목록
+              </h2>
+            </div>
 
             <DefectKpiCards
               kpi={kpi}
@@ -354,50 +331,6 @@ function DefectViewInner({
               currentDept={operator.department}
             />
 
-            {/* 일괄 액션 바 — 선택 ≥1 일 때 */}
-            {selectedLocations.length > 0 && (
-              <div
-                className="flex flex-wrap items-center gap-2 rounded-[12px] border px-4 py-2.5"
-                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-              >
-                <span className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
-                  {selectedLocations.length}건 선택
-                </span>
-                <button
-                  type="button"
-                  onClick={() => startBatch("unquarantine")}
-                  className="rounded-[10px] border px-3 py-1.5 text-xs font-black transition-colors hover:brightness-110"
-                  style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text, background: LEGACY_COLORS.s1 }}
-                >
-                  정상 복귀
-                </button>
-                <button
-                  type="button"
-                  onClick={() => startBatch("scrap")}
-                  className="rounded-[10px] px-3 py-1.5 text-xs font-black text-white transition-colors hover:brightness-110"
-                  style={{ background: LEGACY_COLORS.red }}
-                >
-                  폐기
-                </button>
-                <button
-                  type="button"
-                  onClick={() => startBatch("return")}
-                  className="rounded-[10px] px-3 py-1.5 text-xs font-black text-white transition-colors hover:brightness-110"
-                  style={{ background: LEGACY_COLORS.red }}
-                >
-                  반품
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedKeys(new Set())}
-                  className="ml-auto text-xs font-bold hover:underline"
-                  style={{ color: LEGACY_COLORS.muted2 }}
-                >
-                  선택 해제
-                </button>
-              </div>
-            )}
-
             {loading ? (
               <div className="py-10 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
                 불량 데이터 로딩 중...
@@ -410,9 +343,6 @@ function DefectViewInner({
               <DefectDepartmentList
                 locations={filteredLocations}
                 onProcess={handleProcessRow}
-                selectable
-                selectedKeys={selectedKeys}
-                onToggleSelect={toggleSelect}
                 priorityDept={operator.department}
               />
             )}

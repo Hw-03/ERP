@@ -5,7 +5,6 @@ import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS, getDepartmentFallbackColor } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
-import { StatusPill } from "../common/StatusPill";
 import type { DefectLocation } from "@/lib/api/types/defects";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -30,24 +29,13 @@ function formatDate(iso: string | null): string {
 interface Props {
   locations: DefectLocation[];
   onProcess: (location: DefectLocation) => void;
-  /** 다중선택 모드 활성 (데스크톱 일괄 처리). 미지정 시 기존 동작(모바일 등). */
-  selectable?: boolean;
-  /** 선택된 항목 키 집합 — `${item_id}__${department}`. */
-  selectedKeys?: Set<string>;
-  /** 체크박스 토글. has_bom(PA/PF) 행에는 체크박스를 노출하지 않는다. */
-  onToggleSelect?: (location: DefectLocation) => void;
   /** 전체 보기 시 이 부서를 가장 위에 표시. */
   priorityDept?: string;
 }
 
-const locKey = (loc: DefectLocation) => `${loc.item_id}__${loc.department}`;
-
 export function DefectDepartmentList({
   locations,
   onProcess,
-  selectable = false,
-  selectedKeys,
-  onToggleSelect,
   priorityDept,
 }: Props) {
   // 부서별 그룹핑
@@ -101,8 +89,6 @@ export function DefectDepartmentList({
         const isActive = deptFilter === dept;
         const deptColor = getDepartmentFallbackColor(dept);
         // Pydantic Decimal → JSON 문자열("52.0000") 직렬화 — Number 변환 필수 (string concat 방지)
-        const total = rows.reduce((sum, r) => sum + Number(r.quantity), 0);
-
         return (
           <div
             key={dept}
@@ -119,12 +105,6 @@ export function DefectDepartmentList({
               <span className="text-base font-black" style={{ color: deptColor }}>
                 {dept}
               </span>
-              <StatusPill
-                label={`불량 ${rows.length}건 · ${formatQty(total)}개`}
-                tone="danger"
-                showDot={false}
-                className="ml-1 !py-0.5"
-              />
               {!isActive && depts.length > 1 && (
                 <span className="ml-auto text-xs font-bold" style={{ color: tint(deptColor, 60) }}>
                   클릭해서 필터
@@ -135,27 +115,11 @@ export function DefectDepartmentList({
             <div className="divide-y" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}>
                 {rows.map((loc, idx) => {
                   const warn = isOverOneYear(loc.defective_at);
-                  // 일괄 대상은 단순(non-BOM) 항목만. PA/PF(has_bom)는 1건 전체화면 분해.
-                  const showCheckbox = selectable && !loc.has_bom;
-                  const checked = selectedKeys?.has(locKey(loc)) ?? false;
                   return (
                     <div
                       key={`${loc.item_id}-${idx}`}
                       className="flex items-center gap-4 px-5 py-3"
                     >
-                      {selectable && (
-                        showCheckbox ? (
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => onToggleSelect?.(loc)}
-                            className="h-4 w-4 shrink-0 accent-red-500"
-                            aria-label={`${loc.item_name} 선택`}
-                          />
-                        ) : (
-                          <span className="h-4 w-4 shrink-0" aria-hidden />
-                        )
-                      )}
                       {/* 품목 정보 */}
                       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <div className="flex items-center gap-2">

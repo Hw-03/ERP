@@ -38,6 +38,8 @@ interface Props {
   items: Item[];
   productModels: ProductModel[];
   currentEmployee: { employee_id: string; name: string; department: string };
+  /** 역할 기반 기본 출처. 미지정 시 "production". */
+  defaultSource?: SourceKind;
   onDone: () => void;
   onCancel: () => void;
 }
@@ -65,12 +67,13 @@ export function DefectCartFlow({
   items,
   productModels,
   currentEmployee,
+  defaultSource,
   onDone,
   onCancel,
 }: Props) {
   const meta = TITLES[mode];
 
-  const [source, setSource] = useState<SourceKind>("warehouse");
+  const [source, setSource] = useState<SourceKind>(defaultSource ?? "production");
   const [dept, setDept] = useState<string>(
     PRODUCTION_LINES.includes(currentEmployee.department as (typeof PRODUCTION_LINES)[number])
       ? currentEmployee.department
