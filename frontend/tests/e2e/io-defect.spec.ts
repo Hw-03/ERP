@@ -16,13 +16,15 @@ test.describe("불량 — 격리 / 해제", () => {
 
   test("새 불량 격리 → 정상 복귀", async ({ page }) => {
     await page.goto("/mes?tab=defect");
-    await expect(page.getByRole("heading", { name: "불량 처리" })).toBeVisible();
+    // hub 3장 카드 진입 화면 확인
+    await expect(page.getByRole("button").filter({ hasText: "불량 격리" })).toBeVisible();
 
     // ── 격리 ──────────────────────────────────────────────
-    // hub 3장 카드 진입 화면 → "불량 격리" 카드 (95f6a989 도입).
     // 사이드바 탭과 구분: 카드 description "정상 재고" 텍스트까지 filter.
     await page.getByRole("button").filter({ hasText: "불량 격리" }).filter({ hasText: "정상 재고" }).click();
-    // 출처(창고 재고)·격리 부서(조립) 기본값 유지. 시드 원자재 행 "추가".
+    // Step 1: 출처(창고 재고)·격리 부서(조립) 기본값 유지 → Step 2로 이동
+    await page.getByRole("button", { name: /다음/ }).click();
+    // Step 2: 시드 원자재 행 "추가".
     await page
       .getByRole("row", { name: /E2E원자재튜브/ })
       .getByRole("button", { name: "추가", exact: true })
@@ -55,8 +57,8 @@ test.describe("불량 — 격리 / 해제", () => {
       .selectOption("외관 불량");
     await page.getByRole("button", { name: /정상 복귀 \(1건\)/ }).click();
 
-    // 처리 후 hub 자동 복귀 → "격리 목록" 카드 재진입해 KPI 0 확인
+    // 처리 후 hub 자동 복귀 → "격리 목록" 카드 재진입해 빈 목록 확인
     await page.getByRole("button").filter({ hasText: "격리 목록" }).filter({ hasText: "격리 항목" }).click();
-    await expect(page.getByRole("button", { name: /격리 중 0/ })).toBeVisible();
+    await expect(page.getByText("격리된 불량 재고가 없습니다.")).toBeVisible();
   });
 });
