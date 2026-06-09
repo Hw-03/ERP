@@ -138,6 +138,15 @@ export function DesktopWarehouseMapView({
       "",
     );
   }
+  function handleRowAndLayerChange(row: number, layer: number) {
+    if (!curAngle) return;
+    setCurRow(row);
+    setPanel({ angle: curAngle, row, layer });
+    window.history.replaceState(
+      { wm: { stage: "row", angleId: curAngle.id, row }, wmDepth: wmDepthRef.current },
+      "",
+    );
+  }
 
   // ── Search ──
   function clearSearch() {
@@ -519,7 +528,7 @@ export function DesktopWarehouseMapView({
                 <FloorStage angles={angles} hitAngles={hitAngles ?? undefined} pulseAngleId={pulse?.angleId} onAngleClick={openAngle} />
               )}
               {stage === "front" && curAngle && (
-                <FrontStage angle={curAngle} cellIndex={cellIndex} pulseCellKey={pulse?.cellKey} onCellClick={openCell} />
+                <FrontStage angle={curAngle} cellIndex={cellIndex} pulseCellKey={pulse?.cellKey} showSlotLabels onCellClick={openCell} />
               )}
               {stage === "row" && curAngle && (
                 <RowStage
@@ -531,6 +540,7 @@ export function DesktopWarehouseMapView({
                   matchQuery={matchQuery}
                   onRowChange={handleRowChange}
                   onLayerClick={openLayer}
+                  onRowAndLayerChange={handleRowAndLayerChange}
                 />
               )}
             </div>

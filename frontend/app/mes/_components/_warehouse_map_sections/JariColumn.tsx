@@ -153,7 +153,6 @@ export function JariColumn({
               padding: isFront ? "0 5px" : "0 8px",
               borderRadius: 6,
               background: `color-mix(in srgb, ${color} 28%, ${LEGACY_COLORS.s1})`,
-              boxShadow: `inset 4px 0 0 0 ${color}`,
             }}
           >
             {tip ? (

@@ -325,6 +325,7 @@ export function RowStage({
   matchQuery,
   onRowChange,
   onLayerClick,
+  onRowAndLayerChange,
 }: {
   angle: WarehouseAngle;
   curRow: number;
@@ -334,6 +335,7 @@ export function RowStage({
   matchQuery?: string;
   onRowChange: (row: number) => void;
   onLayerClick: (layer: number) => void;
+  onRowAndLayerChange?: (row: number, layer: number) => void;
 }) {
   const layers = Array.from({ length: angle.layers }, (_, i) => angle.layers - i);
   const rows = Array.from({ length: angle.rows }, (_, i) => i + 1);
@@ -357,46 +359,61 @@ export function RowStage({
           앵글·줄 정보는 상단 브레드크럼에 있어 별도 캡션 생략. */}
       <div style={{ flexShrink: 0, display: "flex", justifyContent: "center" }}>
         <div style={{ width: "50%" }}>
+        {/* 열(column) 단위 wrapper로 재구성 — 선택 열 전체에 단일 윤곽선 표시 */}
         <div
           style={{
-            display: "grid",
-            width: "100%",
+            display: "flex",
             gap: 3,
             padding: 4,
             background: LEGACY_COLORS.s3,
             border: `1px solid ${LEGACY_COLORS.border}`,
             borderRadius: 10,
-            gridTemplateColumns: `repeat(${angle.rows}, minmax(0, 1fr))`,
-            gridTemplateRows: `repeat(${angle.layers}, 14px)`,
           }}
         >
-          {layers.map((l) =>
-            rows.map((r) => {
-              const boxes = cellIndex.get(cellKey(angle.id, r, l));
-              const occ = cellOccupied(boxes);
-              const col = occ ? cellColor(boxes) : null;
-              const cur = r === curRow;
-              return (
-                <div
-                  key={`${r}-${l}`}
-                  title={`${rowLabel(r)}열 ${l}층`}
-                  onClick={() => onRowChange(r)}
-                  className={styles.miniCell}
-                  style={{
-                    height: 14,
-                    borderRadius: 3,
-                    background: occ && col
-                      ? `color-mix(in srgb, ${col} 45%, ${LEGACY_COLORS.s1})`
-                      : "transparent",
-                    border: occ ? undefined : `1px dashed color-mix(in srgb, ${LEGACY_COLORS.muted2} 28%, transparent)`,
-                    outline: cur ? `2px solid ${LEGACY_COLORS.blue}` : undefined,
-                    outlineOffset: -1,
-                    zIndex: cur ? 1 : undefined,
-                  }}
-                />
-              );
-            }),
-          )}
+          {rows.map((r) => {
+            const cur = r === curRow;
+            return (
+              <div
+                key={r}
+                onClick={() => {
+                  if (onRowAndLayerChange) onRowAndLayerChange(r, selectedLayer ?? 1);
+                  else { onRowChange(r); onLayerClick(selectedLayer ?? 1); }
+                }}
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 3,
+                  borderRadius: 4,
+                  outline: cur ? `2px solid ${LEGACY_COLORS.blue}` : undefined,
+                  outlineOffset: 1,
+                  cursor: "pointer",
+                }}
+              >
+                {layers.map((l) => {
+                  const boxes = cellIndex.get(cellKey(angle.id, r, l));
+                  const occ = cellOccupied(boxes);
+                  const col = occ ? cellColor(boxes) : null;
+                  return (
+                    <div
+                      key={l}
+                      title={`${rowLabel(r)}열 ${l}층`}
+                      onClick={(e) => { e.stopPropagation(); onRowChange(r); onLayerClick(l); }}
+                      className={styles.miniCell}
+                      style={{
+                        height: 14,
+                        borderRadius: 2,
+                        background: occ && col
+                          ? `color-mix(in srgb, ${col} 45%, ${LEGACY_COLORS.s1})`
+                          : "transparent",
+                        border: occ ? undefined : `1px dashed color-mix(in srgb, ${LEGACY_COLORS.muted2} 28%, transparent)`,
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
         {/* 줄 번호 라벨 (열 아래, 그리드와 동일 정렬) */}
         <div

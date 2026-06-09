@@ -51,142 +51,147 @@ export function WarehouseJariPanel({
         overflow: "hidden",
       }}
     >
+      {/* 위치 헤더 */}
       <div style={{ padding: "16px 16px 14px", borderBottom: `1px solid ${LEGACY_COLORS.border}`, flexShrink: 0 }}>
         <div style={{ fontSize: 28, fontWeight: 800, color: LEGACY_COLORS.text, letterSpacing: -0.5, lineHeight: 1.2 }}>
           {angle.label} · {rowLabel(row)}열 · {layer}층
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* 자리 목록 — 세로 1/N 균등 분할 */}
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         {!editable && !anyContent ? (
-          <div style={{ color: LEGACY_COLORS.muted, fontSize: 13, padding: "28px 0", textAlign: "center" }}>
+          <div style={{ color: LEGACY_COLORS.muted, fontSize: 13, padding: "32px 0", textAlign: "center" }}>
             이 칸은 비어있습니다
           </div>
         ) : (
           stacks.map((boxes, ji) => {
             const remaining = JARI_CAPACITY - stackUnits(boxes);
             return (
-              <div key={`${row}-${layer}-${ji}`} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: LEGACY_COLORS.muted2,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.8,
-                    }}
-                  >
+              <div
+                key={`${row}-${layer}-${ji}`}
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  borderBottom: `1px solid ${LEGACY_COLORS.border}`,
+                }}
+              >
+                {/* 자리 섹션 헤더 */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "9px 16px 8px",
+                    background: LEGACY_COLORS.s2,
+                    borderBottom: `1px solid ${LEGACY_COLORS.border}`,
+                  }}
+                >
+                  <span style={{ fontSize: 15, fontWeight: 700, color: LEGACY_COLORS.text }}>
                     자리 {ji + 1}
-                  </div>
+                  </span>
                   {editable && (
-                    <div style={{ fontSize: 10, fontWeight: 700, color: remaining > 0 ? LEGACY_COLORS.muted2 : LEGACY_COLORS.muted }}>
-                      남은 {remaining}
-                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: remaining > 0 ? LEGACY_COLORS.muted2 : LEGACY_COLORS.muted }}>
+                      남은 {remaining}칸
+                    </span>
                   )}
                 </div>
 
-                {boxes.length === 0 && !editable ? (
-                  <div style={{ color: LEGACY_COLORS.muted, fontSize: 13, padding: "2px 0" }}>비어있음</div>
-                ) : (
-                  [...boxes].reverse().map((box) => {
-                    const bc = boxColor(box) ?? LEGACY_COLORS.muted2;
-                    return (
-                      <div
-                        key={box.box_id}
-                        style={{
-                          padding: "8px 10px",
-                          background: LEGACY_COLORS.s2,
-                          borderRadius: 10,
-                          border: `1px solid ${LEGACY_COLORS.border}`,
-                          borderLeft: `3px solid ${bc}`,
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 6,
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
-                          <div
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: LEGACY_COLORS.muted2,
-                              background: LEGACY_COLORS.s1,
-                              border: `1px solid ${LEGACY_COLORS.border}`,
-                              borderRadius: 6,
-                              padding: "1px 7px",
-                            }}
-                          >
-                            {SIZE_LABEL[box.size]}형 박스
+                {/* 박스 목록 */}
+                <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+                  {boxes.length === 0 && !editable ? (
+                    <div style={{ color: LEGACY_COLORS.muted, fontSize: 13, padding: "4px 4px" }}>비어있음</div>
+                  ) : (
+                    [...boxes].reverse().map((box) => {
+                      return (
+                        <div
+                          key={box.box_id}
+                          style={{ display: "flex", flexDirection: "column", gap: 3 }}
+                        >
+                          {/* 박스 타입 — 배경 없는 최소 레이블 */}
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <span style={{ fontSize: 10, fontWeight: 600, color: LEGACY_COLORS.muted2 }}>
+                              {SIZE_LABEL[box.size]}형 박스
+                            </span>
+                            {editable && onDeleteBox && (
+                              <button
+                                type="button"
+                                onClick={() => onDeleteBox(box.box_id)}
+                                disabled={busy}
+                                aria-label="박스 빼기"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  color: LEGACY_COLORS.muted2,
+                                  cursor: busy ? "not-allowed" : "pointer",
+                                  opacity: busy ? 0.4 : 1,
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </div>
-                          {editable && onDeleteBox && (
-                            <button
-                              type="button"
-                              onClick={() => onDeleteBox(box.box_id)}
-                              disabled={busy}
-                              aria-label="박스 빼기"
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                color: LEGACY_COLORS.muted2,
-                                cursor: busy ? "not-allowed" : "pointer",
-                                opacity: busy ? 0.4 : 1,
-                              }}
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+
+                          {/* 품목명 — 주인공 */}
                           {box.items.map((it) => {
                             const match = lq && it.item_name.toLowerCase().includes(lq);
                             return (
                               <div
                                 key={it.item_id}
-                                style={{
-                                  background: LEGACY_COLORS.s1,
-                                  border: `1px solid ${match ? LEGACY_COLORS.blue : LEGACY_COLORS.border}`,
-                                  borderRadius: 8,
-                                  padding: "2px 8px",
-                                  fontSize: 12,
-                                  color: match ? LEGACY_COLORS.blue : LEGACY_COLORS.text,
-                                  fontWeight: match ? 700 : 400,
-                                }}
+                                style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}
                               >
-                                {it.item_name} ×{it.quantity}
+                                <span
+                                  style={{
+                                    fontSize: 14,
+                                    fontWeight: match ? 700 : 500,
+                                    color: match ? LEGACY_COLORS.blue : LEGACY_COLORS.text,
+                                    flex: 1,
+                                    minWidth: 0,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {it.item_name}
+                                </span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: match ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2, flexShrink: 0 }}>
+                                  ×{it.quantity}
+                                </span>
                               </div>
                             );
                           })}
                         </div>
-                      </div>
-                    );
-                  })
-                )}
+                      );
+                    })
+                  )}
 
-                {editable && onRequestAddBox && remaining > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => onRequestAddBox(ji, remaining)}
-                    disabled={busy}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 4,
-                      width: "100%",
-                      padding: "6px 0",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: LEGACY_COLORS.blue,
-                      background: "transparent",
-                      border: `1px dashed color-mix(in srgb, ${LEGACY_COLORS.blue} 40%, transparent)`,
-                      borderRadius: 8,
-                      cursor: busy ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    <Plus size={13} /> 박스 넣기
-                  </button>
-                )}
+                  {editable && onRequestAddBox && remaining > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => onRequestAddBox(ji, remaining)}
+                      disabled={busy}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 4,
+                        width: "100%",
+                        padding: "7px 0",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: LEGACY_COLORS.blue,
+                        background: "transparent",
+                        border: `1px dashed color-mix(in srgb, ${LEGACY_COLORS.blue} 40%, transparent)`,
+                        borderRadius: 8,
+                        cursor: busy ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      <Plus size={13} /> 박스 넣기
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })
