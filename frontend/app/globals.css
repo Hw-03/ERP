@@ -224,6 +224,16 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* === 불량 탭 뷰 전환 페이드 === */
+@keyframes viewSlide {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.animate-view-fade {
+  animation: viewSlide 200ms ease-out;
+}
+
 /* === Admin PIN Lock (DesktopPinLock) === */
 @keyframes admin-pin-shake {
   0%, 100% { transform: translateX(0); }
@@ -247,6 +257,7 @@
   }
   .flow-arrow,
   .animate-fade-in,
+  .animate-view-fade,
   .animate-pulse-slow,
   [data-anim="sheetUp"] {
     animation: none !important;

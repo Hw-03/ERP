@@ -248,18 +248,6 @@ function DefectViewInner({
 
   const isFullWidthWork = view.kind !== "list" && view.kind !== "hub";
 
-  // 헤더 — hub/list 공통
-  const header = (
-    <div className="flex items-center justify-between">
-      <h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
-        불량 처리
-      </h2>
-      <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-        {operator.name} · {operator.department}
-      </span>
-    </div>
-  );
-
   return (
     <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4">
       <div
@@ -267,14 +255,13 @@ function DefectViewInner({
         style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.bg }}
       >
         {view.kind === "hub" && (
-          <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4">
-            {header}
+          <div key="hub" className="animate-view-fade flex min-h-0 flex-1 flex-col gap-4 px-4 py-4">
             <DefectHubEntry onSelect={handleHubSelect} />
           </div>
         )}
 
         {isFullWidthWork && (
-          <div className="flex min-h-0 flex-1 flex-col px-4 py-4">
+          <div key={view.kind} className="animate-view-fade flex min-h-0 flex-1 flex-col px-4 py-4">
             {view.kind === "cart" && (
               <DefectCartFlow
                 mode={view.mode}
@@ -322,9 +309,7 @@ function DefectViewInner({
         )}
 
         {view.kind === "list" && (
-          <div className="flex flex-col gap-4 px-4 py-4 pb-6">
-            {header}
-
+          <div key="list" className="animate-view-fade flex flex-col gap-4 px-4 py-4 pb-6">
             <button
               type="button"
               onClick={() => setView({ kind: "hub" })}
