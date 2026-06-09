@@ -10,7 +10,7 @@ import { loginAsOperator } from "./_helpers";
 
 test.describe("불량 — 격리 / 해제", () => {
   test.beforeEach(async ({ page }) => {
-    // "창고 재고" 출처 격리를 위해 창고 역할로 로그인(격리 부서 기본=내 부서 조립).
+    // 창고 역할로 로그인 — 기본 출처 "창고 재고", 격리 위치 "창고", 목록 기본 스코프 "전체".
     await loginAsOperator(page, { role: "warehouse" });
   });
 

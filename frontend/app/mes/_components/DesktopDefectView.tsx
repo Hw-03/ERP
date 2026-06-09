@@ -100,6 +100,8 @@ function DefectViewInner({
 
   const initialScope = (): DefectScope => {
     if (defectDeptFilter) return "my";
+    // 창고 담당자는 "창고" 부서 그룹을 보기 위해 전체 기본
+    if (isWarehouseStaff(operator)) return "all";
     return PRODUCTION_LINES.has(operator.department) ? "my" : "all";
   };
 
