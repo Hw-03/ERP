@@ -49,13 +49,14 @@ test.describe("불량 — 격리 / 해제", () => {
 
     // ── 해제(정상 복귀) ───────────────────────────────────
     await page.getByRole("button", { name: "처리", exact: true }).click();
-    await expect(page.getByRole("heading", { name: /정상 복귀/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /불량 처리/ })).toBeVisible();
     await page
       .locator("select")
       .filter({ hasText: "외관 불량" })
       .first()
       .selectOption("외관 불량");
-    await page.getByRole("button", { name: /정상 복귀 \(1건\)/ }).click();
+    // 정상 복귀는 ConfirmModal 없이 직접 제출
+    await page.getByRole("button", { name: /정상 복귀/ }).first().click();
 
     // 처리 후 hub 자동 복귀 → "격리 목록" 카드 재진입해 빈 목록 확인
     await page.getByRole("button").filter({ hasText: "격리 목록" }).filter({ hasText: "격리 항목" }).click();

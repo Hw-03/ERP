@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import { LEGACY_COLORS, getDepartmentFallbackColor } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
@@ -48,13 +48,16 @@ export function DefectDepartmentList({
     return a.localeCompare(b, "ko");
   });
 
-  const [deptFilter, setDeptFilter] = useState<string | null>(null);
+  const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
 
-  function toggleDeptFilter(dept: string) {
-    setDeptFilter((prev) => (prev === dept ? null : dept));
+  function toggleCollapse(dept: string) {
+    setCollapsedDepts((prev) => {
+      const next = new Set(prev);
+      if (next.has(dept)) next.delete(dept);
+      else next.add(dept);
+      return next;
+    });
   }
-
-  const visibleDepts = deptFilter ? depts.filter((d) => d === deptFilter) : depts;
 
   if (depts.length === 0) {
     return (
@@ -69,49 +72,36 @@ export function DefectDepartmentList({
 
   return (
     <div className="flex flex-col gap-3">
-      {deptFilter && (
-        <div
-          className="flex items-center justify-between rounded-[12px] border px-4 py-2 text-xs font-bold"
-          style={{ borderColor: tint(LEGACY_COLORS.blue, 30), background: tint(LEGACY_COLORS.blue, 8), color: LEGACY_COLORS.blue }}
-        >
-          <span>{deptFilter} 부서만 표시 중</span>
-          <button
-            type="button"
-            onClick={() => setDeptFilter(null)}
-            className="font-black hover:underline"
-          >
-            전체 보기
-          </button>
-        </div>
-      )}
-      {visibleDepts.map((dept) => {
+      {depts.map((dept) => {
         const rows = grouped[dept];
-        const isActive = deptFilter === dept;
+        const isCollapsed = collapsedDepts.has(dept);
         const deptColor = getDepartmentFallbackColor(dept);
         // Pydantic Decimal → JSON 문자열("52.0000") 직렬화 — Number 변환 필수 (string concat 방지)
         return (
           <div
             key={dept}
             className="overflow-hidden rounded-[16px] border"
-            style={{ borderColor: isActive ? deptColor : tint(deptColor, 40) }}
+            style={{ borderColor: tint(deptColor, 40) }}
           >
-            {/* 부서 헤더 — 클릭으로 해당 부서 필터 토글 */}
+            {/* 부서 헤더 — 클릭으로 접기/펼치기 */}
             <button
               type="button"
-              onClick={() => toggleDeptFilter(dept)}
+              onClick={() => toggleCollapse(dept)}
               className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:brightness-95"
-              style={{ background: tint(deptColor, isActive ? 20 : 10) }}
+              style={{ background: tint(deptColor, 10) }}
             >
               <span className="text-base font-black" style={{ color: deptColor }}>
                 {dept}
               </span>
-              {!isActive && depts.length > 1 && (
-                <span className="ml-auto text-xs font-bold" style={{ color: tint(deptColor, 60) }}>
-                  클릭해서 필터
-                </span>
-              )}
+              <span className="ml-auto" style={{ color: tint(deptColor, 55) }}>
+                {isCollapsed
+                  ? <ChevronDown className="h-4 w-4" />
+                  : <ChevronUp className="h-4 w-4" />
+                }
+              </span>
             </button>
 
+            {!isCollapsed && (
             <div className="divide-y" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}>
                 {rows.map((loc, idx) => {
                   const warn = isOverOneYear(loc.defective_at);
@@ -166,6 +156,7 @@ export function DefectDepartmentList({
                   );
                 })}
             </div>
+            )}
           </div>
         );
       })}

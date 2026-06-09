@@ -14,9 +14,8 @@ import { DefectHubEntry } from "./_defect_hub/DefectHubEntry";
 import type { DefectHubCardId } from "./_defect_hub/defectHubCards";
 import { DefectFilterBar, type DefectScope, type DefectSort } from "./_defect_hub/DefectFilterBar";
 import { DefectDepartmentList } from "./_defect_hub/DefectDepartmentList";
-import { PaPfDefectWizardPanel } from "./_defect_hub/PaPfDefectWizardPanel";
 import { DefectCartFlow, type DefectCartMode } from "./_defect_hub/DefectCartFlow";
-import { DefectBatchConfirm, type BatchAction } from "./_defect_hub/DefectBatchConfirm";
+import { DefectProcessPanel } from "./_defect_hub/DefectProcessPanel";
 import { InlineErrorNote } from "./_defect_hub/InlineErrorNote";
 
 
@@ -40,8 +39,7 @@ type ViewMode =
   | { kind: "hub" }
   | { kind: "list" }
   | { kind: "cart"; mode: DefectCartMode }
-  | { kind: "batch"; action: BatchAction; locations: DefectLocation[] }
-  | { kind: "disassemble"; location: DefectLocation };
+  | { kind: "process"; location: DefectLocation };
 
 interface Props {
   operator: Operator | null;
@@ -181,7 +179,7 @@ function DefectViewInner({
       setView({ kind: "cart", mode: cur.mode });
     } else if (cur?.defect === "list") {
       setView({ kind: "list" });
-    } else if (cur?.defect === "batch" || cur?.defect === "disassemble") {
+    } else if (cur?.defect === "process") {
       // location 데이터 없이 복원 불가 — 목록으로
       setView({ kind: "list" });
       window.history.replaceState({ defect: "list" }, "");
@@ -226,14 +224,8 @@ function DefectViewInner({
   }
 
   function handleProcessRow(loc: DefectLocation) {
-    if (loc.has_bom) {
-      window.history.pushState({ defect: "disassemble" }, "");
-      setView({ kind: "disassemble", location: loc });
-    } else {
-      // 단순 R 항목 단건 처리도 일괄 흐름(1건)으로 통일.
-      window.history.pushState({ defect: "batch" }, "");
-      setView({ kind: "batch", action: "unquarantine", locations: [loc] });
-    }
+    window.history.pushState({ defect: "process" }, "");
+    setView({ kind: "process", location: loc });
   }
 
   const isFullWidthWork = view.kind !== "list" && view.kind !== "hub";
@@ -267,34 +259,13 @@ function DefectViewInner({
                 }
               />
             )}
-            {view.kind === "batch" && (
-              <DefectBatchConfirm
-                action={view.action}
-                locations={view.locations}
+            {view.kind === "process" && (
+              <DefectProcessPanel
+                location={view.location}
                 currentEmployee={employee}
                 onCancel={() => window.history.back()}
                 onDone={() => handleProcessed("불량 처리 완료")}
               />
-            )}
-            {view.kind === "disassemble" && (
-              <div className="flex min-h-0 flex-1 flex-col gap-3">
-                <button
-                  type="button"
-                  onClick={() => window.history.back()}
-                  className="self-start rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors hover:brightness-110"
-                  style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
-                >
-                  ← 목록으로
-                </button>
-                <div className="min-h-0 flex-1">
-                  <PaPfDefectWizardPanel
-                    location={view.location}
-                    currentEmployee={employee}
-                    onSubmitted={() => handleProcessed("불량 분해/처리 완료")}
-                    onClose={() => setView({ kind: "list" })}
-                  />
-                </div>
-              </div>
             )}
           </div>
         )}
