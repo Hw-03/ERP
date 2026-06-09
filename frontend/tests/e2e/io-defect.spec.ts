@@ -16,8 +16,8 @@ test.describe("불량 — 격리 / 해제", () => {
 
   test("새 불량 격리 → 정상 복귀", async ({ page }) => {
     await page.goto("/mes?tab=defect");
-    // hub 3장 카드 진입 화면 확인
-    await expect(page.getByRole("button").filter({ hasText: "불량 격리" })).toBeVisible();
+    // hub 3장 카드 진입 화면 확인 — cold next dev 라우트 컴파일 흡수를 위해 첫 단언만 넉넉히.
+    await expect(page.getByRole("button").filter({ hasText: "불량 격리" })).toBeVisible({ timeout: 30_000 });
 
     // ── 격리 ──────────────────────────────────────────────
     // 사이드바 탭과 구분: 카드 description "정상 재고" 텍스트까지 filter.
@@ -43,7 +43,10 @@ test.describe("불량 — 격리 / 해제", () => {
       .getByRole("button", { name: "격리하기", exact: true })
       .click();
 
-    // 격리 후 hub 자동 복귀 → "격리 목록" 카드 진입해 항목 노출 확인
+    // 격리 후 hub 자동 복귀를 명시적으로 기다린 뒤 "격리 목록" 카드 진입 (재로드 경합 flaky 방지)
+    await expect(
+      page.getByRole("button").filter({ hasText: "불량 격리" }).filter({ hasText: "정상 재고" }),
+    ).toBeVisible();
     await page.getByRole("button").filter({ hasText: "격리 목록" }).filter({ hasText: "격리 항목" }).click();
     await expect(page.getByText("E2E원자재튜브")).toBeVisible();
 
@@ -55,10 +58,14 @@ test.describe("불량 — 격리 / 해제", () => {
       .filter({ hasText: "외관 불량" })
       .first()
       .selectOption("외관 불량");
-    // 정상 복귀는 ConfirmModal 없이 직접 제출
-    await page.getByRole("button", { name: /정상 복귀/ }).first().click();
+    // 정상 복귀는 ConfirmModal 없이 직접 제출.
+    // 재설계 후 "정상 복귀" ActionCard 와 제출 버튼이 공존 → 화살표 포함 제출 버튼만 정확히 겨냥.
+    await page.getByRole("button", { name: "정상 복귀 →" }).click();
 
-    // 처리 후 hub 자동 복귀 → "격리 목록" 카드 재진입해 빈 목록 확인
+    // 처리 후 hub 자동 복귀를 명시적으로 기다린 뒤 "격리 목록" 카드 재진입 (재로드 경합 flaky 방지)
+    await expect(
+      page.getByRole("button").filter({ hasText: "불량 격리" }).filter({ hasText: "정상 재고" }),
+    ).toBeVisible();
     await page.getByRole("button").filter({ hasText: "격리 목록" }).filter({ hasText: "격리 항목" }).click();
     await expect(page.getByText("격리된 불량 재고가 없습니다.")).toBeVisible();
   });
