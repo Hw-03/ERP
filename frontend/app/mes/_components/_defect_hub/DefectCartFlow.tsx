@@ -145,7 +145,7 @@ export function DefectCartFlow({
         qty,
         source,
         source_dept: source === "production" ? dept : undefined,
-        target_dept: dept,
+        target_dept: source === "warehouse" ? "창고" : dept,
         reason_category: line.category || null,
         reason_memo: line.memo,
         actor_employee_id: currentEmployee.employee_id,

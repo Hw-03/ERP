@@ -106,6 +106,7 @@ class DepartmentEnum(str, enum.Enum):
     SALES = "영업"
     SHIPPING = "출하"
     ETC = "기타"
+    WAREHOUSE = "창고"
 
 
 class DeptAdjSubTypeEnum(str, enum.Enum):
