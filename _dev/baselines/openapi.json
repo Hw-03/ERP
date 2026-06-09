@@ -6432,8 +6432,15 @@
             "title": "Qty"
           },
           "reason_category": {
-            "title": "Reason Category",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category"
           },
           "reason_memo": {
             "title": "Reason Memo",
@@ -6444,7 +6451,6 @@
           "item_id",
           "qty",
           "dept",
-          "reason_category",
           "reason_memo",
           "actor_employee_id"
         ],

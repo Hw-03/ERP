@@ -82,7 +82,7 @@ class UnquarantineRequest(BaseModel):
     item_id: uuid.UUID
     qty: Decimal
     dept: str
-    reason_category: str
+    reason_category: Optional[str] = None
     reason_memo: str
     actor_employee_id: uuid.UUID
 
@@ -348,9 +348,6 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
 @router.post("/unquarantine", response_model=DefectActionResult)
 def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Session = Depends(get_db)):
     """정상 복귀 (즉시, 결재 없음). unmark_defective 래퍼."""
-    if not payload.reason_category:
-        raise http_error(422, ErrorCode.VALIDATION_ERROR, "reason_category 는 필수입니다.")
-
     actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
     if actor is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
@@ -375,7 +372,7 @@ def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Sessio
             payload.qty,
             dept,
             inventory_svc.ReasonContext(
-                category=payload.reason_category,
+                category=payload.reason_category or "",
                 memo=payload.reason_memo or "",
                 actor=actor.name,
             ),
