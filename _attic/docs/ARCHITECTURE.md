@@ -1,7 +1,7 @@
 # 아키텍처 개요
 
 > **[STALE 2026-05-29]** 본 문서는 Phase 3~4 시점(`DesktopWarehouseView` 5단계 wizard)
-> 기준이며, 현재 활성 UI 인 `IoComposeView` (`frontend/app/legacy/_components/_warehouse_v2/`)
+> 기준이며, 현재 활성 UI 인 `IoComposeView` (`frontend/app/mes/_components/_warehouse_v2/`)
 > 와 정합하지 않는 부분이 있다. 입출고 흐름·엔드포인트·책임 분리 진행 상황 섹션은
 > V2 기준으로 재작성 예정. 백엔드 god-service 분리(P1-4) 와 함께 갱신한다.
 > 도메인 한눈 보기는 [docs/CONTEXT.md](CONTEXT.md), 결정 기록은 [docs/adr/](adr/) 참조.
@@ -38,9 +38,9 @@ ERP/
 ├── frontend/
 │   ├── lib/api.ts                   # 백엔드 API 클라이언트
 │   └── app/
-│       ├── legacy/                  # 주 사용 화면(/legacy)
+│       ├── mes/                     # 현재 운영 MES 화면(/, /mes)
 │       │   ├── _components/
-│       │   │   ├── DesktopLegacyShell.tsx
+│       │   │   ├── DesktopMesShell.tsx
 │       │   │   ├── DesktopSidebar.tsx
 │       │   │   ├── DesktopTopbar.tsx
 │       │   │   ├── DesktopInventoryView.tsx       # 대시보드(재고) — ~308줄
@@ -119,7 +119,7 @@ available = total - pending_quantity   # 예약 차감 후 가용 재고
 
 ## 프론트 레이어
 
-- App Router: 대부분의 페이지는 `/legacy` 셸로 리다이렉트되거나 그 일부를 보여주는 단순 진입점이다. 실제 UI는 `frontend/app/legacy/_components/` 안에 있다.
+- App Router: 대부분의 페이지는 `/mes` 셸로 리다이렉트되거나 그 일부를 보여주는 단순 진입점이다. 실제 UI는 `frontend/app/mes/_components/` 안에 있다.
 - 데이터 페칭: `frontend/lib/api.ts` 의 단순 fetch 기반. SWR / React Query 사용 안 함. 페이지마다 `useState` + `useEffect` 패턴.
 - 디자인 토큰: `_components/legacyUi.ts` 의 `LEGACY_COLORS` (CSS 변수 래퍼). 다크/라이트는 CSS 변수로 자동 전환.
 

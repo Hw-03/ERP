@@ -1,34 +1,34 @@
-# mes/ — DEXCOWIN MES 메인 UI
+# mes/ - DEXCOWIN MES 메인 UI
 
-> 현재 운영 중인 DEXCOWIN MES의 모든 화면이 이 폴더에 있습니다.
+이 폴더는 현재 운영 중인 DEXCOWIN MES 화면의 정본입니다.
 
-- 루트 경로 `/` 는 이 폴더를 그대로 렌더합니다. `frontend/app/page.tsx` 가 `./mes/page` 를 re-export 하기 때문입니다.
-- 즉 사용자가 접속하면 보게 되는 실제 화면이 전부 이 폴더에서 나옵니다.
+- `/` 경로는 `frontend/app/page.tsx`를 통해 이 UI를 그대로 렌더링합니다.
+- `/mes` 경로는 같은 UI로 직접 진입하는 App Router 경로입니다.
+- 예전 폴더명은 `legacy/`였지만, 실제로 폐기된 화면이 아니라 운영 중인 메인 UI였고 2026년 6월에 `mes/`로 개명했습니다.
 
-## 구조
+## 진입점
 
-- `page.tsx` — 진입점. 화면 폭에 따라 두 갈래로 나뉩니다.
-  - 모바일: `_components/mobile/MobileShell`
-  - 데스크톱: `_components/DesktopLegacyShell`
-  - 바깥을 로그인 게이트(`MesLoginGate`)와 전역 Provider(관리자 세션 / React Query / 부서 정보)가 감쌉니다.
-- `_components/` — 모든 화면 컴포넌트.
+- `page.tsx`: 앱 전역 Provider를 감싸고 모바일/데스크톱 Shell을 선택합니다.
+- `_components/mobile/MobileShell.tsx`: 모바일 Shell입니다.
+- `_components/DesktopMesShell.tsx`: 데스크톱 Shell입니다.
+- `_components/login/MesLoginGate.tsx`: 작업자 로그인 후 메인 UI를 렌더링합니다.
 
-## 주요 화면 (`_components/Desktop*View.tsx`)
+## 주요 데스크톱 화면
 
-- `DesktopInventoryView` — 재고
-- `DesktopWarehouseView` / `DesktopWarehouseMapView` — 창고 / 창고 지도
-- `DesktopHistoryView` — 입출고 내역
-- `DesktopDefectView` — 불량 처리
-- `DesktopAdminView` — 관리자
-- `DesktopWeeklyReportView` — 주간 보고
+- `DesktopInventoryView`: 대시보드와 재고 현황
+- `DesktopWarehouseView`: 창고 요청과 입출고 작업 진입
+- `DesktopWarehouseMapView`: 창고 지도
+- `DesktopHistoryView`: 거래 이력
+- `DesktopDefectView`: 불량 처리
+- `DesktopAdminView`: 관리자 도구
+- `DesktopWeeklyReportView`: 주간보고
 
-화면별 하위 로직은 도메인별 폴더에 나뉘어 있습니다:
-`_inventory_sections/`, `_warehouse_sections/`, `_warehouse_v2/`(입출고 작업), `_history_sections/`, `_defect_hub/`, `_admin_sections/`, `_weekly_sections/` 등. 각 도메인의 커스텀 훅은 `_*_hooks/` 에 있습니다.
+도메인별 하위 Module은 `_warehouse_v2/`, `_warehouse_sections/`, `_inventory_sections/`,
+`_history_sections/`, `_defect_hub/`, `_admin_sections/`, `_weekly_sections/` 등에 나뉘어 있습니다.
 
-## 건드릴 때 조심할 점
+## 리뷰 메모
 
-- `DesktopWeeklyReportView.tsx` + `_weekly_sections/` — **frozen(완료)** 상태입니다. 명시적 요청이 있을 때만 손대세요.
-- 컴포넌트를 수정하기 전에는 실제 렌더/임포트 경로를 먼저 확인하세요.
-
----
-*이 폴더는 이전에 `legacy/` 라는 이름이었습니다 (App Router 이전 경로명의 잔재). 실제로는 폐기된 적 없는 메인 UI라, 2026-06 정합성 정비에서 `mes/` 로 개명했습니다.*
+- 처음 볼 때는 `page.tsx` 다음에 `DesktopMesShell.tsx`를 보면 전체 화면 흐름을 잡기 쉽습니다.
+- 입출고 작업은 큰 파일을 열기 전에 `_components/_warehouse_v2/README.md`를 먼저 읽는 것이 좋습니다.
+- `DesktopWeeklyReportView.tsx`와 `_weekly_sections/`는 frozen 상태입니다. 명시 요청이 있을 때만 수정합니다.
+- `legacy_part`, `legacy_item_type` 같은 이름은 과거 원본 데이터 필드명이라 의도적으로 유지합니다.

@@ -4,7 +4,7 @@
 
 ## 맥락
 
-DEXCOWIN MES 의 V2 입출고 화면(`frontend/app/legacy/_components/_warehouse_v2/IoComposeView.tsx`)은
+DEXCOWIN MES 의 V2 입출고 화면(`frontend/app/mes/_components/_warehouse_v2/IoComposeView.tsx`)은
 사용자가 작업 종류를 4개 중 하나로 시작한다:
 
 - `receive` — 원자재 입고
