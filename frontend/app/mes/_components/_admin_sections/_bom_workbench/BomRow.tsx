@@ -59,7 +59,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
 
   return (
     <div
-      className="grid items-center gap-3 px-3 py-2.5 transition-colors hover:brightness-105"
+      className="grid items-center gap-3 px-3 py-2.5 transition-colors duration-150 hover:bg-[var(--c-s4)]"
       style={{
         gridTemplateColumns: "auto 1fr 140px 40px",
         borderBottom: `1px solid ${LEGACY_COLORS.border}`,

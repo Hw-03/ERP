@@ -243,11 +243,11 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
                   type="button"
                   onClick={() => handleSelectModel(model.slot)}
                   aria-pressed={active}
-                  className="flex w-full items-center gap-3 rounded-[12px] border px-3 py-2.5 text-left transition-colors hover:brightness-[1.04]"
+                  className="flex w-full items-center gap-3 rounded-[12px] border px-3 py-2.5 text-left transition-colors duration-150 bg-[var(--c-s2)] hover:bg-[var(--c-s4)]"
                   style={{
                     background: active
                       ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
-                      : LEGACY_COLORS.s2,
+                      : undefined,
                     borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
                   }}
                 >

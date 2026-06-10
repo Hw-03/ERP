@@ -804,7 +804,7 @@ function EditOrderTable({
             <tr
               key={item.item_id}
               data-item-id={item.item_id}
-              className="transition-colors hover:brightness-110"
+              className="transition-colors duration-150 hover:bg-[var(--c-s4)]"
               style={{
                 opacity: isDragging ? 0.4 : 1,
                 outline: isDropTarget ? `2px solid ${LEGACY_COLORS.blue}` : undefined,
@@ -882,7 +882,7 @@ function HighlightableRow({
   return (
     <tr
       ref={rowRef}
-      className="transition-colors hover:bg-[var(--c-s3)]"
+      className="transition-colors duration-150 hover:bg-[var(--c-s4)]"
       style={
         flash
           ? {

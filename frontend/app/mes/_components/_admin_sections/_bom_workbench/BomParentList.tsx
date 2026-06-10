@@ -140,13 +140,13 @@ export function BomParentList({
                 type="button"
                 onClick={() => onSelect(i.item_id)}
                 aria-pressed={isSelected}
-                className="grid w-full items-center gap-3 px-3 py-2 text-left transition-colors"
+                className="grid w-full items-center gap-3 px-3 py-2 text-left transition-colors duration-150 hover:bg-[var(--c-s4)]"
                 style={{
                   gridTemplateColumns: "auto 1fr auto",
                   borderBottom: `1px solid ${LEGACY_COLORS.border}`,
                   background: isSelected
                     ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`
-                    : "transparent",
+                    : undefined,
                 }}
               >
                 <BomBadge processTypeCode={i.process_type_code} small />

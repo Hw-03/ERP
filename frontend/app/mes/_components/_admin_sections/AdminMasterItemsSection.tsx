@@ -218,11 +218,11 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                   type="button"
                   onClick={() => handleSelectItem(item, isSelected)}
                   aria-pressed={isSelected}
-                  className="flex w-full items-center gap-2 rounded-[10px] border px-3 py-2 text-left transition-colors hover:brightness-[1.04]"
+                  className="flex w-full items-center gap-2 rounded-[10px] border px-3 py-2 text-left transition-colors duration-150 bg-[var(--c-s2)] hover:bg-[var(--c-s4)]"
                   style={{
                     background: isSelected
                       ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
-                      : LEGACY_COLORS.s2,
+                      : undefined,
                     borderColor: isSelected ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
                   }}
                 >

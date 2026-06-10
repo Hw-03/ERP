@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Activity, AlertCircle, ArrowDownToLine, ArrowRightLeft, ArrowUpFromLine,
   BookmarkMinus, BookmarkPlus, ChevronDown, ChevronRight, Hammer, Layers,
@@ -8,6 +9,7 @@ import {
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
 import { transactionColor, transactionIconName } from "@/lib/mes-status";
 import {
   describeBatchFlow,
@@ -255,6 +257,14 @@ export function BatchHeader({
   // 재작업(DISASSEMBLE) 묶음은 빨간색 강제. transactionColor 의 muted/회색 fallback 덮어씀.
   const flowColor = isReworkOperation(first) ? LEGACY_COLORS.red : transactionColor(primaryType);
   const summary = getHistoryMovementSummary(first, null, group.logs.length);
+  const [hovered, setHovered] = useState(false);
+
+  // 평상시엔 채우기 없음. 호버 시에만 강조: 선택 줄은 더 진한 파랑, 그 외엔 유형색을 동색으로.
+  const rowBackground = selected
+    ? tint(LEGACY_COLORS.blue, hovered ? 18 : 10)
+    : hovered
+      ? tint(flowColor, 14)
+      : undefined;
 
   return (
     <tr
@@ -268,10 +278,13 @@ export function BatchHeader({
       tabIndex={0}
       role="button"
       aria-pressed={selected}
-      className="cursor-pointer select-none transition-colors hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
       style={{
-        background: selected ? "rgba(101,169,255,.10)" : "rgba(101,169,255,.06)",
+        background: rowBackground,
         outline: selected ? `1.5px solid ${LEGACY_COLORS.blue}` : "none",
+        transition: "background-color 150ms cubic-bezier(.4,0,.2,1)",
       }}
     >
       <td className={`whitespace-nowrap border-b ${padX} py-3 text-xs`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, transition: HISTORY_CELL_TRANSITION }}>
@@ -350,6 +363,14 @@ export function OpBatchHeader({
 
   // 변동요약 — 작업 종류별 의미 라벨. 부족 라인 있으면 빨간 경고 인라인.
   const summary = getHistoryMovementSummary(first, batch, group.logs.length);
+  const [hovered, setHovered] = useState(false);
+
+  // 평상시엔 채우기 없음. 호버 시에만 강조: 선택 줄은 더 진한 파랑, 그 외엔 유형색을 동색으로.
+  const rowBackground = selected
+    ? tint(LEGACY_COLORS.blue, hovered ? 18 : 10)
+    : hovered
+      ? tint(flowColor, 14)
+      : undefined;
 
   return (
     <tr
@@ -365,10 +386,13 @@ export function OpBatchHeader({
       tabIndex={0}
       role="button"
       aria-pressed={selected}
-      className="cursor-pointer select-none transition-colors hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
       style={{
-        background: selected ? "rgba(101,169,255,.14)" : "rgba(101,169,255,.08)",
+        background: rowBackground,
         outline: selected ? `1.5px solid ${LEGACY_COLORS.blue}` : "none",
+        transition: "background-color 150ms cubic-bezier(.4,0,.2,1)",
       }}
     >
       <td className={`whitespace-nowrap border-b ${padX} py-3 text-xs`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, transition: HISTORY_CELL_TRANSITION }}>

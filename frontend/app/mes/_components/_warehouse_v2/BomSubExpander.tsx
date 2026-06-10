@@ -71,10 +71,10 @@ function BomTreeItem({
   return (
     <li>
       <div
-        className="flex items-center transition-colors"
+        className="flex items-center transition-colors duration-150"
         style={{ height: ROW_H, background: "transparent" }}
         onMouseEnter={(e) =>
-          ((e.currentTarget as HTMLDivElement).style.background = tint(LEGACY_COLORS.blue, 5))
+          ((e.currentTarget as HTMLDivElement).style.background = LEGACY_COLORS.s4)
         }
         onMouseLeave={(e) =>
           ((e.currentTarget as HTMLDivElement).style.background = "transparent")

@@ -5,6 +5,7 @@ import Image from "next/image";
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
 import { mesCodeDept } from "@/lib/mes/process";
 import { getStockState } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";
@@ -30,6 +31,7 @@ type Props = {
 function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props) {
   const getDeptColor = useDeptColorLookup();
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const minStock = getMinStock(item);
   const stock = getStockState(safeQty(item), minStock === 0 ? null : minStock);
   const qty = safeQty(item);
@@ -106,10 +108,21 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
       tabIndex={0}
       role="button"
       aria-pressed={selected}
-      className="group cursor-pointer transition-all hover:bg-[rgba(101,169,255,0.09)] hover:[box-shadow:inset_3px_0_0_rgba(101,169,255,0.45)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="group cursor-pointer transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
       style={{
-        background: selected ? "rgba(101,169,255,.10)" : "transparent",
-        boxShadow: selected ? `inset 3px 0 0 ${LEGACY_COLORS.blue}` : undefined,
+        // 호버 = "현재 줄 상태를 한 단계 강조": 선택 줄은 더 진한 파랑, 무색 줄은 진한 회청색(s4) + 좌측 파랑 바.
+        background: selected
+          ? tint(LEGACY_COLORS.blue, hovered ? 18 : 10)
+          : hovered
+            ? LEGACY_COLORS.s4
+            : undefined,
+        boxShadow: selected
+          ? `inset 3px 0 0 ${LEGACY_COLORS.blue}`
+          : hovered
+            ? `inset 3px 0 0 ${tint(LEGACY_COLORS.blue, 45)}`
+            : undefined,
       }}
     >
       <td

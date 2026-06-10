@@ -64,7 +64,7 @@ export function BomWhereUsedPanel({ selected, rows, items, onSelectParent }: Pro
                   key={r.bom_id}
                   type="button"
                   onClick={() => onSelectParent(r.parent_item_id)}
-                  className="grid w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:brightness-105"
+                  className="grid w-full items-center gap-3 px-3 py-2.5 text-left transition-colors duration-150 hover:bg-[var(--c-s4)]"
                   style={{
                     gridTemplateColumns: "auto 1fr 120px",
                     borderBottom: `1px solid ${LEGACY_COLORS.border}`,

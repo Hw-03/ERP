@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { Layers, Wrench } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import { getHistoryActor } from "./historyBatchInterpreter";
 import { formatHistoryDate } from "./historyFormat";
@@ -22,6 +24,14 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
   const childCount = group.logs.filter((l) => l.transaction_type !== "DISASSEMBLE").length;
   const qty = Math.abs(parentLog.quantity_change);
   const actor = getHistoryActor(parentLog);
+  const [hovered, setHovered] = useState(false);
+
+  // 평상시엔 채우기 없음. 재작업은 빨강 정체성 유지 — 호버/선택 모두 빨강 동색 강조.
+  const rowBackground = selected
+    ? tint(LEGACY_COLORS.red, hovered ? 18 : 12)
+    : hovered
+      ? tint(LEGACY_COLORS.red, 14)
+      : undefined;
 
   return (
     <tr
@@ -32,10 +42,13 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
       tabIndex={0}
       role="button"
       aria-pressed={selected}
-      className="cursor-pointer select-none transition-colors hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
       style={{
-        background: selected ? "rgba(239,68,68,.12)" : "rgba(239,68,68,.06)",
+        background: rowBackground,
         outline: selected ? `1.5px solid ${LEGACY_COLORS.red}` : "none",
+        transition: "background-color 150ms cubic-bezier(.4,0,.2,1)",
       }}
     >
       {/* 일시 */}

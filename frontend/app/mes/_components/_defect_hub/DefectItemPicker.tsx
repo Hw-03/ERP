@@ -350,7 +350,7 @@ export function DefectItemPicker({
               const wQty = Number(item.warehouse_qty) || 0;
               const added = selectedIds.has(item.item_id);
               return (
-                <tr key={item.item_id} className="transition-colors hover:brightness-110">
+                <tr key={item.item_id} className="transition-colors duration-150 hover:bg-[var(--c-s4)]">
                   <td className="px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
                     <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
                       {item.item_name}
@@ -519,7 +519,7 @@ function DefectEditOrderTable({
             <tr
               key={item.item_id}
               data-item-id={item.item_id}
-              className="transition-colors hover:brightness-110"
+              className="transition-colors duration-150 hover:bg-[var(--c-s4)]"
               style={{
                 opacity: isDragging ? 0.4 : 1,
                 outline: isDropTarget ? `2px solid ${LEGACY_COLORS.red}` : undefined,

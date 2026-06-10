@@ -224,11 +224,11 @@ export function AdminDepartmentsSection({
                   type="button"
                   onClick={() => handleSelect(dept)}
                   aria-pressed={active}
-                  className="flex w-full items-center gap-2.5 rounded-[10px] border px-3 py-2.5 text-left transition-colors hover:brightness-[1.04]"
+                  className="flex w-full items-center gap-2.5 rounded-[10px] border px-3 py-2.5 text-left transition-colors duration-150 bg-[var(--c-s2)] hover:bg-[var(--c-s4)]"
                   style={{
                     background: active
                       ? `color-mix(in srgb, ${color} 14%, transparent)`
-                      : LEGACY_COLORS.s2,
+                      : undefined,
                     borderColor: active ? color : LEGACY_COLORS.border,
                     opacity: dept.is_active ? 1 : 0.65,
                   }}

@@ -108,7 +108,7 @@ export function DefectDepartmentList({
                   return (
                     <div
                       key={`${loc.item_id}-${idx}`}
-                      className="flex items-center gap-4 px-5 py-3"
+                      className="flex items-center gap-4 px-5 py-3 transition-colors duration-150 hover:bg-[var(--c-s4)]"
                     >
                       {/* 품목 정보 */}
                       <div className="flex min-w-0 flex-1 flex-col gap-0.5">

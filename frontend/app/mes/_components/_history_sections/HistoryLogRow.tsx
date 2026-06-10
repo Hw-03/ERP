@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 import {
   Activity,
   AlertCircle,
@@ -21,10 +21,10 @@ import {
 } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
 import { transactionColor, transactionIconName } from "@/lib/mes-status";
 import { useDeptColor } from "../DepartmentsContext";
 import { formatHistoryDate } from "./historyFormat";
-import { rowTint } from "./historyTheme";
 import { getHistoryDisplayLabel, getSingleLogMovement } from "./historyBatchInterpreter";
 import { HISTORY_CELL_TRANSITION, MemoCell, MovementSummaryCell } from "./historyTableHelpers";
 import { isReworkOperation } from "./transactionTaxonomy";
@@ -56,9 +56,17 @@ type Props = {
 };
 
 function HistoryLogRowImpl({ log, selected, onSelect, compact }: Props) {
+  const [hovered, setHovered] = useState(false);
   const padX = compact ? "px-2" : "px-4";
   // 재작업(DISASSEMBLE)은 빨강 강제 — transactionColor 의 muted/회색 fallback 덮어씀.
   const tcolor = isReworkOperation(log) ? LEGACY_COLORS.red : transactionColor(log.transaction_type);
+
+  // 평상시엔 채우기 없음(깔끔). 호버 시에만 강조: 선택 줄은 더 진한 파랑, 그 외엔 유형색을 동색으로.
+  const rowBackground = selected
+    ? tint(LEGACY_COLORS.blue, hovered ? 18 : 10)
+    : hovered
+      ? tint(tcolor, 14)
+      : undefined;
 
   // 담당자: requester_name 우선, 없으면 produced_by 파싱
   const rawName = log.requester_name ?? log.produced_by;
@@ -87,10 +95,13 @@ function HistoryLogRowImpl({ log, selected, onSelect, compact }: Props) {
       tabIndex={0}
       role="button"
       aria-pressed={selected}
-      className="cursor-pointer transition-colors hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
       style={{
-        background: selected ? "rgba(101,169,255,.10)" : rowTint(log.transaction_type),
+        background: rowBackground,
         outline: selected ? `1.5px solid ${LEGACY_COLORS.blue}` : "none",
+        transition: "background-color 150ms cubic-bezier(.4,0,.2,1)",
       }}
     >
       <td
