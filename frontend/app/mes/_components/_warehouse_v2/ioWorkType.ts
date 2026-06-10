@@ -237,6 +237,12 @@ export function getItemActionMode(subType: IoSubType): ItemActionMode {
   return "single_only";
 }
 
+/** 단품 부서 입출고(낱개 입고/출고) — 모바일에서 5단계 위저드 대신 인라인 빠른 폼으로 분기.
+ *  adjust 는 getItemActionMode === "single_only" 라 BOM 전개가 없어 한 화면 완결이 가능하다. */
+export function isSingleInlineSubType(subType: IoSubType): boolean {
+  return subType === "adjust_in" || subType === "adjust_out";
+}
+
 /** 한 묶음 카트 안에서 BOM 묶음과 낱개 묶음을 같이 가질 수 있는지.
  *  현재는 창고 입출고(warehouse_to_dept/dept_to_warehouse)만 true.
  *  produce/disassemble 은 BOM 강제(isBomForced) 흐름과 백엔드 분기가 달라 락 유지. */
