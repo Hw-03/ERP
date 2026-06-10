@@ -33,8 +33,6 @@ interface Props {
 const DEFAULT_KPI: DefectKpi = {
   quarantined: 0,
   over_one_year: 0,
-  pending_approval: 0,
-  processed_today: 0,
 };
 
 export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {

@@ -30,8 +30,6 @@ import { defectsApi } from "@/lib/api/defects";
 const mockKpi: DefectKpi = {
   quarantined: 17,
   over_one_year: 3,
-  pending_approval: 2,
-  processed_today: 1,
 };
 
 // 조립부 1개, 진공부 1개
@@ -75,15 +73,13 @@ async function goToList() {
 }
 
 describe("DefectHubPanel", () => {
-  it("KPI 카드 4개를 렌더링한다", async () => {
+  it("KPI 카드 2개를 렌더링한다", async () => {
     render(<DefectHubPanel currentEmployee={mockEmployee} />);
     await goToList();
 
     await waitFor(() => {
       expect(screen.getByText("격리 중")).toBeInTheDocument();
       expect(screen.getByText("1년 이상 ⚠")).toBeInTheDocument();
-      expect(screen.getByText("결재 대기")).toBeInTheDocument();
-      expect(screen.getByText("오늘 처리")).toBeInTheDocument();
     });
   });
 
@@ -94,8 +90,6 @@ describe("DefectHubPanel", () => {
     await waitFor(() => {
       expect(screen.getByText("17")).toBeInTheDocument();
       expect(screen.getByText("3")).toBeInTheDocument();
-      expect(screen.getByText("2")).toBeInTheDocument();
-      expect(screen.getByText("1")).toBeInTheDocument();
     });
   });
 

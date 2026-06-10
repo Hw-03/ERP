@@ -472,8 +472,8 @@ def test_kpi_returns_counts(db_session, client, make_item):
     body = res.json()
     assert "quarantined" in body
     assert "over_one_year" in body
-    assert "pending_approval" in body
-    assert "processed_today" in body
+    assert "pending_approval" not in body
+    assert "processed_today" not in body
     assert all(isinstance(v, int) for v in body.values())
 
 

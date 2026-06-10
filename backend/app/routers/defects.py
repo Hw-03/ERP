@@ -27,9 +27,6 @@ from app.models import (
     InventoryLocation,
     Item,
     LocationStatusEnum,
-    StockRequest,
-    StockRequestStatusEnum,
-    StockRequestTypeEnum,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -63,8 +60,6 @@ class DefectLocationItem(BaseModel):
 class DefectKpi(BaseModel):
     quarantined: int
     over_one_year: int
-    pending_approval: int
-    processed_today: int
 
 
 class QuarantineRequest(BaseModel):
@@ -182,16 +177,12 @@ def list_defect_locations(
 
 @router.get("/kpi", response_model=DefectKpi)
 def get_defect_kpi(db: Session = Depends(get_db)):
-    """KPI 카드 4개:
+    """KPI 카드 2개:
     - quarantined: DEFECTIVE 위치 수 (quantity > 0)
     - over_one_year: defective_at <= now - 365 days
-    - pending_approval: requires_department_approval=true AND status IN (SUBMITTED, RESERVED)
-                        AND request_type IN (DEFECT_SCRAP, DEFECT_RETURN, DEFECT_DISASSEMBLE)
-    - processed_today: 오늘 생성된 UNMARK_DEFECTIVE, DEFECT_SCRAP, SUPPLIER_RETURN 트랜잭션 수
     """
     now = datetime.utcnow()
     one_year_ago = now - timedelta(days=365)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
     quarantined = (
         db.query(func.count(InventoryLocation.location_id))
@@ -214,43 +205,9 @@ def get_defect_kpi(db: Session = Depends(get_db)):
         or 0
     )
 
-    pending_approval = (
-        db.query(func.count(StockRequest.request_id))
-        .filter(
-            StockRequest.requires_department_approval.is_(True),
-            StockRequest.status.in_([
-                StockRequestStatusEnum.SUBMITTED,
-                StockRequestStatusEnum.RESERVED,
-            ]),
-            StockRequest.request_type.in_([
-                StockRequestTypeEnum.DEFECT_SCRAP,
-                StockRequestTypeEnum.DEFECT_RETURN,
-                StockRequestTypeEnum.DEFECT_DISASSEMBLE,
-            ]),
-        )
-        .scalar()
-        or 0
-    )
-
-    processed_today = (
-        db.query(func.count(TransactionLog.log_id))
-        .filter(
-            TransactionLog.transaction_type.in_([
-                TransactionTypeEnum.UNMARK_DEFECTIVE,
-                TransactionTypeEnum.DEFECT_SCRAP,
-                TransactionTypeEnum.SUPPLIER_RETURN,
-            ]),
-            TransactionLog.created_at >= today_start,
-        )
-        .scalar()
-        or 0
-    )
-
     return DefectKpi(
         quarantined=quarantined,
         over_one_year=over_one_year,
-        pending_approval=pending_approval,
-        processed_today=processed_today,
     )
 
 

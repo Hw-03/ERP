@@ -19,8 +19,6 @@ export interface DefectLocation {
 export interface DefectKpi {
   quarantined: number;
   over_one_year: number;
-  pending_approval: number;
-  processed_today: number;
 }
 
 export interface QuarantinePayload {

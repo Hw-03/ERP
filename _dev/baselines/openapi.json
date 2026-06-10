@@ -938,14 +938,6 @@
             "title": "Over One Year",
             "type": "integer"
           },
-          "pending_approval": {
-            "title": "Pending Approval",
-            "type": "integer"
-          },
-          "processed_today": {
-            "title": "Processed Today",
-            "type": "integer"
-          },
           "quarantined": {
             "title": "Quarantined",
             "type": "integer"
@@ -953,9 +945,7 @@
         },
         "required": [
           "quarantined",
-          "over_one_year",
-          "pending_approval",
-          "processed_today"
+          "over_one_year"
         ],
         "title": "DefectKpi",
         "type": "object"
@@ -8072,7 +8062,7 @@
     },
     "/api/defects/kpi": {
       "get": {
-        "description": "KPI 카드 4개:\n- quarantined: DEFECTIVE 위치 수 (quantity > 0)\n- over_one_year: defective_at <= now - 365 days\n- pending_approval: requires_department_approval=true AND status IN (SUBMITTED, RESERVED)\n                    AND request_type IN (DEFECT_SCRAP, DEFECT_RETURN, DEFECT_DISASSEMBLE)\n- processed_today: 오늘 생성된 UNMARK_DEFECTIVE, DEFECT_SCRAP, SUPPLIER_RETURN 트랜잭션 수",
+        "description": "KPI 카드 2개:\n- quarantined: DEFECTIVE 위치 수 (quantity > 0)\n- over_one_year: defective_at <= now - 365 days",
         "operationId": "get_defect_kpi_api_defects_kpi_get",
         "responses": {
           "200": {
