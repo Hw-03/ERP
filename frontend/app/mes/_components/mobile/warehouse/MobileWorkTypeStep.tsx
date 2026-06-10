@@ -8,8 +8,10 @@ import {
   IO_SUB_TYPES,
   IO_WORK_TYPES,
   canSeeWorkType,
+  deptIoSubType,
   deptVisibility,
   isExitWorkType,
+  isSingleInlineSubType,
   requiresDepartments,
   type DeptIoDirection,
 } from "../../_warehouse_v2/ioWorkType";
@@ -155,6 +157,7 @@ export function MobileSubTypeStep({
   onDeptIoDirectionChange: (d: DeptIoDirection) => void;
 }) {
   if (workType === "process") {
+    const curDir = deptIoDirection;
     return (
       <div className="flex flex-col gap-5">
         <DeptGrid label="대상 부서" value={toDepartment} onChange={onToDepartmentChange} />
@@ -183,6 +186,41 @@ export function MobileSubTypeStep({
             })}
           </div>
         </div>
+        {curDir != null && (
+          <div>
+            <Label text="입력 방식" />
+            <div className="grid grid-cols-2 gap-3">
+              {(["bom", "single"] as const).map((m) => {
+                const active = (isSingleInlineSubType(subType) ? "single" : "bom") === m;
+                const label = m === "bom" ? "BOM 전개" : "단품 빠른 입력";
+                const desc = m === "bom" ? "하위 자재까지 함께" : "낱개 · 한 화면";
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => onSubTypeChange(deptIoSubType(curDir, m))}
+                    className="flex min-h-[60px] flex-col items-center justify-center gap-0.5 rounded-[16px] border px-3 transition-[transform] active:scale-95"
+                    style={{
+                      background: active ? tint(LEGACY_COLORS.blue, 14) : LEGACY_COLORS.s2,
+                      borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+                      borderWidth: active ? 2 : 1,
+                      color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
+                    }}
+                  >
+                    <span className="text-base font-black leading-tight">{label}</span>
+                    <span
+                      className="text-[11px] font-semibold leading-tight"
+                      style={{ color: LEGACY_COLORS.muted2 }}
+                    >
+                      {desc}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     );
   }

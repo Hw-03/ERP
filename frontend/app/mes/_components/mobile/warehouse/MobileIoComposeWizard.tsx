@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ScanLine } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import {
@@ -15,8 +15,10 @@ import {
   type Item,
 } from "@/lib/api";
 import { ApiError } from "@/lib/api-core";
-import { IconButton, StickyFooter, WizardProgress } from "../primitives";
+import { IconButton, PrimaryActionButton, StickyFooter, WizardProgress } from "../primitives";
+import { BarcodeScannerModal } from "../../BarcodeScannerModal";
 import { MobileWorkTypeStep, MobileSubTypeStep } from "./MobileWorkTypeStep";
+import { MobileSingleAdjustForm } from "./MobileSingleAdjustForm";
 import { IoTargetPicker } from "../../_warehouse_v2/IoTargetPicker";
 import { IoBundleCart } from "../../_warehouse_v2/IoBundleCart";
 import { IoConfirmStep } from "../../_warehouse_v2/IoConfirmStep";
@@ -25,6 +27,7 @@ import { Toast, type ToastState } from "@/lib/ui/Toast";
 import {
   approvalKind,
   isExitWorkType,
+  isSingleInlineSubType,
   pickerDirectionLabel,
   targetDepartmentOf,
 } from "../../_warehouse_v2/ioWorkType";
@@ -93,6 +96,7 @@ export function MobileIoComposeWizard({
   const preselectedHandledRef = useRef<string | null>(null);
   // BOM 부모 품목으로 진입한 경우 자동 추가하지 않고 picker 에서 row 만 강조.
   const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
   const restoredDraftRef = useRef<string | null>(null);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveBatchIdRef = useRef<string | null>(null);
@@ -208,6 +212,26 @@ export function MobileIoComposeWizard({
       onStatusChange(`${item.item_name} 작업 묶음 생성`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "품목 전개에 실패했습니다.");
+    }
+  }
+
+  // 스캔값(mes_code) → 품목 매칭. 충돌 B: 인라인 폼과 공유하는 단일 핸들러.
+  function handleScanDetected(raw: string) {
+    const norm = raw.trim().toLowerCase();
+    if (!norm) return;
+    const matched = items.find((it) => (it.mes_code ?? "").trim().toLowerCase() === norm);
+    if (!matched) {
+      setSearch(raw.trim());
+      setError("코드와 일치하는 품목이 없어 검색어로 채웠습니다.");
+      return;
+    }
+    if (bomParents.has(matched.item_id)) {
+      // BOM 부모: 자동 추가 대신 picker 에서 강조(BOM/낱개 분기를 사용자에게 남김).
+      setHighlightItemId(matched.item_id);
+      setSearch(matched.mes_code ?? raw);
+    } else {
+      setHighlightItemId(null);
+      void addItem(matched);
     }
   }
 
@@ -449,33 +473,70 @@ export function MobileIoComposeWizard({
           />
         )}
 
-        {step === 3 && (
-          <IoTargetPicker
-            workType={state.workType}
-            subType={state.subType}
-            deptIoDirection={state.deptIoDirection}
-            bundleSubType={state.bundles.length > 0 ? state.subType : null}
-            bomParents={bomParents}
-            targetDepartment={targetDepartmentOf(
-              state.subType,
-              state.fromDepartment,
-              state.toDepartment,
-            )}
-            items={items}
-            productModels={productModels}
-            bundles={state.bundles}
-            search={search}
-            onSearchChange={setSearch}
-            highlightItemId={highlightItemId}
-            onAddItem={(item, sourceKind, subTypeOverride) =>
-              addItem(item, sourceKind ?? "direct_item", subTypeOverride)
-            }
-            onAdvance={() => {
-              if (state.bundles.length > 0) state.goTo(4);
-            }}
-            busy={previewing}
-          />
-        )}
+        {step === 3 &&
+          (isSingleInlineSubType(state.subType) ? (
+            <MobileSingleAdjustForm
+              subType={state.subType}
+              items={items}
+              bundles={state.bundles}
+              search={search}
+              onSearchChange={setSearch}
+              onAddItem={(item) => {
+                void addItem(item, "manual");
+              }}
+              onBundleQuantityChange={(bundleId, qty) =>
+                state.setBundles((prev) =>
+                  applyBundleQuantityChange(prev, bundleId, qty, state.subType, getAvailable),
+                )
+              }
+              onRemoveBundle={(bundleId) =>
+                state.setBundles((prev) => prev.filter((b) => b.bundle_id !== bundleId))
+              }
+              getAvailable={getAvailable}
+              onScan={() => setScanOpen(true)}
+              onSubmit={() => {
+                void handleSubmit();
+              }}
+              submitting={submitting}
+              busy={previewing}
+              error={error}
+            />
+          ) : (
+            <>
+              <div className="mb-3">
+                <PrimaryActionButton
+                  label="스캔으로 시작"
+                  icon={ScanLine}
+                  onClick={() => setScanOpen(true)}
+                />
+              </div>
+              <IoTargetPicker
+                workType={state.workType}
+                subType={state.subType}
+                deptIoDirection={state.deptIoDirection}
+                bundleSubType={state.bundles.length > 0 ? state.subType : null}
+                bomParents={bomParents}
+                targetDepartment={targetDepartmentOf(
+                  state.subType,
+                  state.fromDepartment,
+                  state.toDepartment,
+                )}
+                items={items}
+                productModels={productModels}
+                bundles={state.bundles}
+                search={search}
+                onSearchChange={setSearch}
+                highlightItemId={highlightItemId}
+                onAddItem={(item, sourceKind, subTypeOverride) =>
+                  addItem(item, sourceKind ?? "direct_item", subTypeOverride)
+                }
+                onAdvance={() => {
+                  if (state.bundles.length > 0) state.goTo(4);
+                }}
+                busy={previewing}
+              />
+            </>
+          ))}
 
         {step === 4 && (
           <IoBundleCart
@@ -557,6 +618,13 @@ export function MobileIoComposeWizard({
 
       <IoSubmitModals result={result} onClose={() => setResult(null)} />
       <Toast toast={toast} onClose={() => setToast(null)} />
+
+      {scanOpen && (
+        <BarcodeScannerModal
+          onDetected={handleScanDetected}
+          onClose={() => setScanOpen(false)}
+        />
+      )}
     </div>
   );
 }
