@@ -78,7 +78,7 @@ class UnquarantineRequest(BaseModel):
     qty: Decimal
     dept: str
     reason_category: Optional[str] = None
-    reason_memo: str
+    reason_memo: Optional[str] = None
     actor_employee_id: uuid.UUID
 
 
