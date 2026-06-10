@@ -322,8 +322,6 @@ def submit_defective_disassemble(
     """
     if parent_qty <= 0:
         raise ValueError("분해 수량은 0보다 커야 합니다.")
-    if not reason_category:
-        raise ValueError("reason_category 는 필수입니다.")
     if not child_decisions:
         raise ValueError("자식 결정이 비어 있습니다.")
 

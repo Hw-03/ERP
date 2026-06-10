@@ -62,15 +62,15 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
           item_id: location.item_id,
           qty: processQty,
           dept: location.department,
-          reason_category: category,
-          reason_memo: memo,
+          reason_category: category || null,
+          reason_memo: memo || null,
           actor_employee_id: currentEmployee.employee_id,
         });
       } else if (action === "scrap") {
         await stockRequestsApi.createStockRequest({
           requester_employee_id: currentEmployee.employee_id,
           request_type: "defect_scrap",
-          reason_category: category,
+          reason_category: category || null,
           reason_memo: memo || null,
           notes: memo || null,
           lines: [{
@@ -85,7 +85,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
         await stockRequestsApi.createStockRequest({
           requester_employee_id: currentEmployee.employee_id,
           request_type: "defect_return",
-          reason_category: category,
+          reason_category: category || null,
           reason_memo: memo || null,
           notes: memo || null,
           lines: [{
@@ -101,7 +101,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
         await stockRequestsApi.createStockRequest({
           requester_employee_id: currentEmployee.employee_id,
           request_type: "defect_disassemble",
-          reason_category: category,
+          reason_category: category || null,
           reason_memo: memo || null,
           notes: JSON.stringify({ child_decisions: childDecisions }),
           lines: [{

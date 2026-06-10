@@ -36,7 +36,7 @@ export interface UnquarantinePayload {
   item_id: string;
   qty: number;
   dept: string;
-  reason_category: string;
-  reason_memo: string;
+  reason_category?: string | null;
+  reason_memo?: string | null;
   actor_employee_id: string;
 }

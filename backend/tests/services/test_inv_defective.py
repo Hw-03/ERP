@@ -218,17 +218,6 @@ def test_unmark_defective_qty_zero_raises(make_item, db_session):
         )
 
 
-def test_unmark_defective_missing_reason_raises(make_item, make_location, db_session):
-    item = make_item(warehouse_qty=D("0"))
-    make_location(item.item_id, department=ASSEMBLY,
-                  status=LocationStatusEnum.DEFECTIVE, quantity=D("3"))
-    with pytest.raises(ValueError, match="reason_category"):
-        svc.unmark_defective(
-            db_session, item.item_id, D("1"), ASSEMBLY,
-            ReasonContext(category="", memo="m", actor="a"),
-        )
-
-
 def test_unmark_defective_insufficient_raises(make_item, make_location, db_session):
     item = make_item(warehouse_qty=D("0"))
     make_location(item.item_id, department=ASSEMBLY,
@@ -265,16 +254,6 @@ def test_scrap_defective_qty_zero_raises(make_item, db_session):
             ReasonContext(category="x", memo="m", actor="a"),
         )
 
-
-def test_scrap_defective_missing_reason_raises(make_item, make_location, db_session):
-    item = make_item(warehouse_qty=D("0"))
-    make_location(item.item_id, department=ASSEMBLY,
-                  status=LocationStatusEnum.DEFECTIVE, quantity=D("3"))
-    with pytest.raises(ValueError, match="reason_category"):
-        svc.scrap_defective(
-            db_session, item.item_id, D("1"), ASSEMBLY,
-            ReasonContext(category="", memo="m", actor="a"),
-        )
 
 
 def test_scrap_defective_insufficient_raises(make_item, make_location, db_session):
@@ -364,16 +343,6 @@ def test_scrap_normal_unknown_source_raises(make_item, db_session):
         )
 
 
-def test_scrap_normal_missing_reason_raises(make_item, db_session):
-    item = make_item(warehouse_qty=D("10"))
-    with pytest.raises(ValueError, match="reason_category"):
-        svc.scrap_normal(
-            db_session, item.item_id, D("1"),
-            NormalSource(kind="warehouse", dept_or_warehouse=ASSEMBLY),
-            ReasonContext(category="", memo="m", actor="a"),
-        )
-
-
 def test_scrap_normal_warehouse_insufficient_raises(make_item, db_session):
     item = make_item(warehouse_qty=D("3"))
     with pytest.raises(ValueError, match="부족"):
@@ -441,16 +410,6 @@ def test_return_from_normal_unknown_source_raises(make_item, db_session):
             db_session, item.item_id, D("1"),
             NormalSource(kind="floor", dept_or_warehouse=ASSEMBLY, supplier_name="s"),
             ReasonContext(category="반품", memo="m", actor="a"),
-        )
-
-
-def test_return_from_normal_missing_reason_raises(make_item, db_session):
-    item = make_item(warehouse_qty=D("8"))
-    with pytest.raises(ValueError, match="reason_category"):
-        svc.return_to_supplier_from_normal(
-            db_session, item.item_id, D("1"),
-            NormalSource(kind="warehouse", dept_or_warehouse=ASSEMBLY, supplier_name="s"),
-            ReasonContext(category="", memo="m", actor="a"),
         )
 
 

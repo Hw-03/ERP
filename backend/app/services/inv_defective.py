@@ -202,12 +202,10 @@ def unmark_defective(
 ) -> Inventory:
     """불량 → 정상 복귀. 같은 부서 DEFECTIVE → PRODUCTION 이동. 총량 변동 없음.
 
-    사유 필수 (reason.category). defective_at NULL 로 초기화.
+    defective_at NULL 로 초기화.
     """
     if qty <= 0:
         raise ValueError("복귀 수량은 0보다 커야 합니다.")
-    if not reason.category:
-        raise ValueError("reason_category 는 필수입니다.")
 
     get_or_create_inventory(db, item_id)
     defective_loc = _lock_location(db, item_id, dept, LocationStatusEnum.DEFECTIVE)
@@ -250,14 +248,9 @@ def scrap_defective(
     dept: DepartmentEnum,
     reason: ReasonContext,
 ) -> Inventory:
-    """불량 재고 폐기. DEFECTIVE 차감 + 총량 감소.
-
-    사유 필수 (reason.category).
-    """
+    """불량 재고 폐기. DEFECTIVE 차감 + 총량 감소."""
     if qty <= 0:
         raise ValueError("폐기 수량은 0보다 커야 합니다.")
-    if not reason.category:
-        raise ValueError("reason_category 는 필수입니다.")
 
     get_or_create_inventory(db, item_id)
     defective_loc = _lock_location(db, item_id, dept, LocationStatusEnum.DEFECTIVE)
@@ -296,12 +289,10 @@ def receive_defective(
     mark_defective 와 달리 출처(PRODUCTION/창고) 차감이 없다 — 분해 시점에
     자식 재고는 아직 존재하지 않으므로, keep_qty 의 PRODUCTION 신규 입고
     (receive_confirmed)와 대칭으로 DEFECTIVE 버킷에 신규 적재한다.
-    defective_at 기록. 사유 필수.
+    defective_at 기록.
     """
     if qty <= 0:
         raise ValueError("격리 수량은 0보다 커야 합니다.")
-    if not reason.category:
-        raise ValueError("reason_category 는 필수입니다.")
 
     get_or_create_inventory(db, item_id)
     _lock_location(db, item_id, dept, LocationStatusEnum.DEFECTIVE)
@@ -381,14 +372,11 @@ def scrap_normal(
 
     source.kind="warehouse" → warehouse_qty 차감.
     source.kind="production" → 해당 부서 PRODUCTION 차감.
-    사유 필수.
     """
     if qty <= 0:
         raise ValueError("폐기 수량은 0보다 커야 합니다.")
     if source.kind not in ("warehouse", "production"):
         raise ValueError(f"알 수 없는 source: {source.kind} (warehouse 또는 production)")
-    if not reason.category:
-        raise ValueError("reason_category 는 필수입니다.")
 
     get_or_create_inventory(db, item_id)
     return _consume_normal_source(db, item_id, qty, source.kind, source.dept_or_warehouse)
@@ -405,14 +393,11 @@ def return_to_supplier_from_normal(
 
     source.kind="warehouse" → warehouse_qty 차감.
     source.kind="production" → 해당 부서 PRODUCTION 차감.
-    사유 필수.
     """
     if qty <= 0:
         raise ValueError("반품 수량은 0보다 커야 합니다.")
     if source.kind not in ("warehouse", "production"):
         raise ValueError(f"알 수 없는 source: {source.kind} (warehouse 또는 production)")
-    if not reason.category:
-        raise ValueError("reason_category 는 필수입니다.")
 
     get_or_create_inventory(db, item_id)
     return _consume_normal_source(db, item_id, qty, source.kind, source.dept_or_warehouse)
