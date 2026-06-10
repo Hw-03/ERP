@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import type { WarehouseAngle, WarehouseBox } from "@/lib/api/warehouse-map";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { JARI_CAPACITY, SIZE_LABEL, boxColor, cellKey, jariStacks, rowLabel, stackUnits } from "./helpers";
@@ -16,6 +16,8 @@ interface Props {
   busy?: boolean;
   /** 빈 자리의 "박스 넣기" 클릭 시 호출 — 부모가 AddBox 화면으로 전환. 미전달 시 버튼 숨김. */
   onRequestAddBox?: (jariIndex: number, remaining: number) => void;
+  /** 기존 박스의 "편집"(연필) 클릭 시 호출 — 부모가 박스 내용 편집 화면으로 전환. 미전달 시 버튼 숨김. */
+  onRequestEditBox?: (box: WarehouseBox) => void;
   onDeleteBox?: (boxId: string) => Promise<void>;
 }
 
@@ -29,6 +31,7 @@ export function WarehouseJariPanel({
   editable = false,
   busy = false,
   onRequestAddBox,
+  onRequestEditBox,
   onDeleteBox,
 }: Props) {
   const stacks = jariStacks(cellIndex.get(cellKey(angle.id, row, layer)), angle.jaris_per_cell);
@@ -115,22 +118,43 @@ export function WarehouseJariPanel({
                             <span style={{ fontSize: 10, fontWeight: 600, color: LEGACY_COLORS.muted2 }}>
                               {SIZE_LABEL[box.size]}형 박스
                             </span>
-                            {editable && onDeleteBox && (
-                              <button
-                                type="button"
-                                onClick={() => onDeleteBox(box.box_id)}
-                                disabled={busy}
-                                aria-label="박스 빼기"
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  color: LEGACY_COLORS.muted2,
-                                  cursor: busy ? "not-allowed" : "pointer",
-                                  opacity: busy ? 0.4 : 1,
-                                }}
-                              >
-                                <Trash2 size={14} />
-                              </button>
+                            {editable && (onRequestEditBox || onDeleteBox) && (
+                              <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                {onRequestEditBox && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onRequestEditBox(box)}
+                                    disabled={busy}
+                                    aria-label="박스 편집"
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      color: LEGACY_COLORS.muted2,
+                                      cursor: busy ? "not-allowed" : "pointer",
+                                      opacity: busy ? 0.4 : 1,
+                                    }}
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                )}
+                                {onDeleteBox && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onDeleteBox(box.box_id)}
+                                    disabled={busy}
+                                    aria-label="박스 빼기"
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      color: LEGACY_COLORS.muted2,
+                                      cursor: busy ? "not-allowed" : "pointer",
+                                      opacity: busy ? 0.4 : 1,
+                                    }}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                              </div>
                             )}
                           </div>
 

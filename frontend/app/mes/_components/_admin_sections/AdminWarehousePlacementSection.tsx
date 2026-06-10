@@ -10,12 +10,13 @@ import { SlidePanel } from "../common/SlidePanel";
 import { AdminPageHeader } from "./_admin_primitives";
 import { FloorStage, FrontStage } from "../_warehouse_map_sections/WarehouseStages";
 import { WarehouseJariPanel } from "../_warehouse_map_sections/WarehouseJariPanel";
-import { buildCellIndex, rowLabel, SIZE_UNIT } from "../_warehouse_map_sections/helpers";
+import { buildCellIndex, rowLabel, SIZE_LABEL, SIZE_UNIT } from "../_warehouse_map_sections/helpers";
 import {
   warehouseMapApi,
   type BoxSize,
   type ReconcileRow,
   type WarehouseAngle,
+  type WarehouseBox,
   type WarehouseMap,
 } from "@/lib/api/warehouse-map";
 
@@ -35,7 +36,7 @@ export function AdminWarehousePlacementSection({ items, onStatusChange, onError 
   const [stage, setStage] = useState<"floor" | "front" | "add-box">("floor");
   const [curAngleId, setCurAngleId] = useState<number | null>(null);
   const [panel, setPanel] = useState<{ row: number; layer: number } | null>(null);
-  const [addBoxCtx, setAddBoxCtx] = useState<{ jariIndex: number; remaining: number } | null>(null);
+  const [addBoxCtx, setAddBoxCtx] = useState<{ jariIndex: number; remaining: number; editBox?: WarehouseBox } | null>(null);
   const [busy, setBusy] = useState(false);
   const [reconcile, setReconcile] = useState<ReconcileRow[]>([]);
 
@@ -61,28 +62,35 @@ export function AdminWarehousePlacementSection({ items, onStatusChange, onError 
     jariIndex,
     size,
     lines,
+    editBox,
   }: {
     jariIndex: number;
     size: BoxSize;
     lines: { item_id: string; quantity: number }[];
+    editBox?: WarehouseBox;
   }) {
     if (!curAngle || !panel) return;
     setBusy(true);
     try {
-      await warehouseMapApi.createBox({
-        angle_id: curAngle.id,
-        row_no: panel.row,
-        layer_no: panel.layer,
-        jari_index: jariIndex,
-        size,
-        items: lines,
-      });
-      onStatusChange("박스를 배치했습니다.");
+      if (editBox) {
+        await warehouseMapApi.updateBox(editBox.box_id, { items: lines });
+        onStatusChange("박스를 수정했습니다.");
+      } else {
+        await warehouseMapApi.createBox({
+          angle_id: curAngle.id,
+          row_no: panel.row,
+          layer_no: panel.layer,
+          jari_index: jariIndex,
+          size,
+          items: lines,
+        });
+        onStatusChange("박스를 배치했습니다.");
+      }
       const rc = await Promise.all(lines.map((l) => warehouseMapApi.reconcile(l.item_id)));
       setReconcile(rc.flatMap((r) => r.rows));
       await reload();
     } catch (e) {
-      onError(e instanceof Error ? e.message : "배치 실패");
+      onError(e instanceof Error ? e.message : editBox ? "수정 실패" : "배치 실패");
       throw e; // AddBoxScreen이 catch 해 화면 유지
     } finally {
       setBusy(false);
@@ -133,10 +141,11 @@ export function AdminWarehousePlacementSection({ items, onStatusChange, onError 
               layer={panel.layer}
               jariIndex={addBoxCtx.jariIndex}
               remaining={addBoxCtx.remaining}
+              editBox={addBoxCtx.editBox}
               items={items}
               busy={busy}
               onSubmit={async (args) => {
-                await handleAddBox(args);
+                await handleAddBox({ ...args, editBox: addBoxCtx.editBox });
                 setStage("front");
                 setAddBoxCtx(null);
               }}
@@ -276,6 +285,14 @@ export function AdminWarehousePlacementSection({ items, onStatusChange, onError 
                     }
                   : undefined
               }
+              onRequestEditBox={
+                stage !== "add-box"
+                  ? (box) => {
+                      setAddBoxCtx({ jariIndex: box.jari_index, remaining: 0, editBox: box });
+                      setStage("add-box");
+                    }
+                  : undefined
+              }
             />
           )}
         </SlidePanel>
@@ -300,6 +317,7 @@ function AddBoxScreen({
   layer,
   jariIndex,
   remaining,
+  editBox,
   items,
   busy,
   onSubmit,
@@ -310,18 +328,37 @@ function AddBoxScreen({
   layer: number;
   jariIndex: number;
   remaining: number;
+  editBox?: WarehouseBox;
   items: Item[];
   busy: boolean;
   onSubmit: (args: { jariIndex: number; size: BoxSize; lines: { item_id: string; quantity: number }[] }) => Promise<void>;
   onCancel: () => void;
 }) {
-  const [size, setSize] = useState<BoxSize>(remaining >= 2 ? "MEDIUM" : "SMALL");
+  const isEdit = !!editBox;
+  const [size, setSize] = useState<BoxSize>(editBox ? editBox.size : remaining >= 2 ? "MEDIUM" : "SMALL");
   const [search, setSearch] = useState("");
-  const [cart, setCart] = useState<Map<string, number>>(new Map());
+  const [cart, setCart] = useState<Map<string, number>>(
+    () => new Map(editBox ? editBox.items.map((it) => [it.item_id, it.quantity]) : []),
+  );
   const [reconcileCache, setReconcileCache] = useState<Map<string, ReconcileRow>>(new Map());
   const [reconcileLoading, setReconcileLoading] = useState<Set<string>>(new Set());
 
-  const overflow = (SIZE_UNIT[size] ?? 1) > remaining;
+  // 편집 모드: 미리 채워진 품목들의 "여유 재고"를 mount 시 한 번에 조회.
+  useEffect(() => {
+    if (!editBox) return;
+    editBox.items.forEach((it) => {
+      warehouseMapApi
+        .reconcile(it.item_id)
+        .then((r) => {
+          if (r.rows.length > 0) setReconcileCache((prev) => new Map(prev).set(it.item_id, r.rows[0]));
+        })
+        .catch(() => {});
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 편집 모드는 박스 크기를 바꾸지 않으므로 용량 초과 개념이 없다.
+  const overflow = isEdit ? false : (SIZE_UNIT[size] ?? 1) > remaining;
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -361,7 +398,10 @@ function AddBoxScreen({
   function getAvailable(itemId: string): number | null {
     const rc = reconcileCache.get(itemId);
     if (!rc) return null;
-    return rc.warehouse_qty - rc.placed_total;
+    // 편집 모드: placed_total에 이 박스의 현재 수량이 포함돼 있으므로 빼줘야
+    // 실제 "이 박스를 제외한 배치 합"이 된다.
+    const thisBoxQty = isEdit ? (editBox!.items.find((it) => it.item_id === itemId)?.quantity ?? 0) : 0;
+    return rc.warehouse_qty - rc.placed_total + thisBoxQty;
   }
 
   function itemWouldExceed(itemId: string): boolean {
@@ -371,6 +411,13 @@ function AddBoxScreen({
   }
 
   const anyExceeds = Array.from(cart.keys()).some((id) => itemWouldExceed(id));
+  const exceedingItems = Array.from(cart.entries())
+    .filter(([id]) => itemWouldExceed(id))
+    .map(([id, qty]) => {
+      const name = items.find((it) => it.item_id === id)?.item_name ?? id;
+      const avail = getAvailable(id) ?? 0;
+      return { name, qty, avail };
+    });
 
   async function submit() {
     const lines = Array.from(cart.entries())
@@ -434,7 +481,7 @@ function AddBoxScreen({
           <span style={{ color: LEGACY_COLORS.muted2, whiteSpace: "nowrap" }}>{rowLabel(row)}열 {layer}층</span>
           <span style={{ color: LEGACY_COLORS.muted }}>›</span>
           <span style={{ color: LEGACY_COLORS.text, fontWeight: 600, whiteSpace: "nowrap" }}>
-            자리 {jariIndex + 1} — 박스 넣기
+            자리 {jariIndex + 1} — {isEdit ? "박스 편집" : "박스 넣기"}
           </span>
         </div>
       </div>
@@ -451,37 +498,45 @@ function AddBoxScreen({
         }}
       >
         <span style={{ fontSize: 12, fontWeight: 700, color: LEGACY_COLORS.muted2 }}>크기</span>
-        <div style={{ display: "flex", gap: 6 }}>
-          {SIZE_OPTS.map((o) => {
-            const disabled = o.unit > remaining;
-            const active = size === o.value;
-            return (
-              <button
-                key={o.value}
-                type="button"
-                onClick={() => !disabled && setSize(o.value)}
-                disabled={disabled}
-                style={{
-                  padding: "4px 14px",
-                  borderRadius: 9999,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
-                  color: active ? "white" : disabled ? LEGACY_COLORS.muted : LEGACY_COLORS.text,
-                  border: `1px solid ${active ? LEGACY_COLORS.blue : LEGACY_COLORS.border}`,
-                  cursor: disabled ? "not-allowed" : "pointer",
-                  opacity: disabled ? 0.45 : 1,
-                }}
-              >
-                {o.label}
-              </button>
-            );
-          })}
-        </div>
-        <span style={{ marginLeft: "auto", fontSize: 12, color: LEGACY_COLORS.muted2 }}>
-          남은 자리{" "}
-          <strong style={{ color: overflow ? LEGACY_COLORS.yellow : LEGACY_COLORS.text }}>{remaining}</strong>
-        </span>
+        {isEdit ? (
+          <span style={{ fontSize: 13, fontWeight: 700, color: LEGACY_COLORS.text }}>
+            {SIZE_LABEL[size]}형 박스
+          </span>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 6 }}>
+              {SIZE_OPTS.map((o) => {
+                const disabled = o.unit > remaining;
+                const active = size === o.value;
+                return (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => !disabled && setSize(o.value)}
+                    disabled={disabled}
+                    style={{
+                      padding: "4px 14px",
+                      borderRadius: 9999,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      background: active ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
+                      color: active ? "white" : disabled ? LEGACY_COLORS.muted : LEGACY_COLORS.text,
+                      border: `1px solid ${active ? LEGACY_COLORS.blue : LEGACY_COLORS.border}`,
+                      cursor: disabled ? "not-allowed" : "pointer",
+                      opacity: disabled ? 0.45 : 1,
+                    }}
+                  >
+                    {o.label}
+                  </button>
+                );
+              })}
+            </div>
+            <span style={{ marginLeft: "auto", fontSize: 12, color: LEGACY_COLORS.muted2 }}>
+              남은 자리{" "}
+              <strong style={{ color: overflow ? LEGACY_COLORS.yellow : LEGACY_COLORS.text }}>{remaining}</strong>
+            </span>
+          </>
+        )}
       </div>
 
       {/* 검색 */}
@@ -628,7 +683,12 @@ function AddBoxScreen({
       >
         {anyExceeds && (
           <div style={{ fontSize: 12, color: LEGACY_COLORS.yellow }}>
-            창고 재고를 초과하는 품목이 있습니다. 수량을 줄여주세요.
+            창고 재고를 초과하는 품목이 있습니다:
+            {exceedingItems.map((it) => (
+              <div key={it.name} style={{ marginTop: 2, paddingLeft: 8 }}>
+                · {it.name} — 입력 {it.qty}개, 여유 {Math.max(0, it.avail)}개
+              </div>
+            ))}
           </div>
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -639,7 +699,7 @@ function AddBoxScreen({
             취소
           </Button>
           <Button onClick={submit} disabled={busy || overflow || cartCount === 0 || anyExceeds}>
-            배치
+            {isEdit ? "저장" : "배치"}
           </Button>
         </div>
       </div>
