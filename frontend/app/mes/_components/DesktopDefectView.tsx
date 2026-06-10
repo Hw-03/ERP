@@ -22,11 +22,6 @@ import { InlineErrorNote } from "./_defect_hub/InlineErrorNote";
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const PRODUCTION_LINES = new Set(["튜브", "고압", "진공", "튜닝", "조립", "출하"]);
 
-const DEFAULT_KPI: DefectKpi = {
-  quarantined: 0,
-  over_one_year: 0,
-};
-
 /** 역할 기반 기본 출처 — 창고 전담자만 "warehouse", 나머지 "production". */
 function defaultSourceForOp(op: Operator): "warehouse" | "production" {
   return isWarehouseStaff(op) && !isDepartmentApprover(op) ? "warehouse" : "production";
@@ -89,7 +84,6 @@ function DefectViewInner({
     onStatusChange: onStatusChange ?? noop,
   });
 
-  const [kpi, setKpi] = useState<DefectKpi>(DEFAULT_KPI);
   const [locations, setLocations] = useState<DefectLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -113,12 +107,8 @@ function DefectViewInner({
       setLoading(true);
       setError(null);
       try {
-        const [kpiData, locData] = await Promise.all([
-          defectsApi.getDefectKpi(),
-          defectsApi.listDefects(),
-        ]);
+        const locData = await defectsApi.listDefects();
         if (!cancelled) {
-          setKpi(kpiData);
           setLocations(locData);
         }
       } catch (err) {
@@ -135,15 +125,34 @@ function DefectViewInner({
     };
   }, [reloadNonce]);
 
-  const filteredLocations = useMemo(() => {
-    let result = locations;
-
+  // 부서/scope 범위만 적용 — KPI 집계와 목록이 공유하는 모집단
+  const scopedLocations = useMemo(() => {
     if (scope === "my") {
       const targetDept = defectDeptFilter ?? operator.department;
-      result = result.filter((loc) => loc.department === targetDept);
-    } else if (scope === "production") {
-      result = result.filter((loc) => PRODUCTION_LINES.has(loc.department));
+      return locations.filter((loc) => loc.department === targetDept);
     }
+    if (scope === "production") {
+      return locations.filter((loc) => PRODUCTION_LINES.has(loc.department));
+    }
+    return locations;
+  }, [locations, scope, defectDeptFilter, operator.department]);
+
+  // KPI — 현재 부서 범위 기준으로 집계해 목록과 항상 일치 (서버 /kpi 대신 클라 계산)
+  const kpi = useMemo<DefectKpi>(
+    () => ({
+      quarantined: scopedLocations.length,
+      over_one_year: scopedLocations.filter(
+        (loc) =>
+          loc.defective_at != null &&
+          Date.now() - new Date(loc.defective_at).getTime() > ONE_YEAR_MS,
+      ).length,
+    }),
+    [scopedLocations],
+  );
+
+  // 화면 목록 — 범위 + KPI 필터(1년 이상) + 정렬
+  const filteredLocations = useMemo(() => {
+    let result = scopedLocations;
 
     if (kpiFilter === "over_one_year") {
       result = result.filter(
@@ -153,14 +162,20 @@ function DefectViewInner({
       );
     }
 
-    result = [...result].sort((a, b) => {
+    return [...result].sort((a, b) => {
       const ta = a.defective_at ? new Date(a.defective_at).getTime() : 0;
       const tb = b.defective_at ? new Date(b.defective_at).getTime() : 0;
       return sort === "oldest" ? ta - tb : tb - ta;
     });
+  }, [scopedLocations, sort, kpiFilter]);
 
-    return result;
-  }, [locations, scope, sort, kpiFilter, defectDeptFilter, operator.department]);
+  // KPI 집계 범위 라벨 — 숫자가 어느 범위인지 카드 부제로 노출
+  const scopeLabel =
+    scope === "my"
+      ? `${defectDeptFilter ?? operator.department} 부서`
+      : scope === "production"
+      ? "생산 전체"
+      : "전체 부서";
 
   const employee = {
     employee_id: operator.employee_id,
@@ -287,6 +302,7 @@ function DefectViewInner({
 
             <DefectKpiCards
               kpi={kpi}
+              scopeLabel={scopeLabel}
               activeFilter={kpiFilter}
               onCardClick={(kind) => setKpiFilter((prev) => (prev === kind ? null : kind))}
             />

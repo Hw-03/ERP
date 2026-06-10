@@ -6,6 +6,8 @@ import { tint } from "@/lib/mes/colorUtils";
 interface Props {
   label: string;
   value: string | number;
+  /** 값 뒤에 작게 붙는 단위 (예: "건"). 단위와 수치 혼동을 막는다. */
+  unit?: string;
   hint?: string;
   tone: string;
   active?: boolean;
@@ -13,7 +15,7 @@ interface Props {
   compact?: boolean;
 }
 
-function KpiCardImpl({ label, value, hint, tone, active = false, onClick, compact = false }: Props) {
+function KpiCardImpl({ label, value, unit, hint, tone, active = false, onClick, compact = false }: Props) {
   const [hovered, setHovered] = useState(false);
 
   const bg = active
@@ -50,6 +52,11 @@ function KpiCardImpl({ label, value, hint, tone, active = false, onClick, compac
         style={{ color: tone }}
       >
         {value}
+        {unit && (
+          <span className="ml-0.5 text-[15px] font-bold" style={{ opacity: 0.7 }}>
+            {unit}
+          </span>
+        )}
       </div>
     </div>
   ) : (
@@ -60,6 +67,11 @@ function KpiCardImpl({ label, value, hint, tone, active = false, onClick, compac
         </div>
         <div className="text-[32px] font-black leading-none" style={{ color: tone }}>
           {value}
+          {unit && (
+            <span className="ml-0.5 text-[15px] font-bold" style={{ opacity: 0.7 }}>
+              {unit}
+            </span>
+          )}
         </div>
       </div>
       {hint && (
