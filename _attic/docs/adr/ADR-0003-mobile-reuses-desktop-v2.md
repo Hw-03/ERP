@@ -4,7 +4,7 @@
 
 ## 맥락
 
-`frontend/app/legacy/_components/_warehouse_v2/MobileIoComposeWizard.tsx` 는
+`frontend/app/mes/_components/_warehouse_v2/MobileIoComposeWizard.tsx` 는
 모바일 전용 입출고 화면이지만, 내부적으로 데스크탑 V2 의 컴포넌트와 hook 을 그대로 import 한다:
 
 - `IoTargetPicker`, `IoBundleCart`, `IoConfirmStep`
@@ -36,6 +36,6 @@
 
 ## 관련
 
-- `frontend/app/legacy/_components/_warehouse_v2/MobileIoComposeWizard.tsx`
-- `frontend/app/legacy/_components/_warehouse_v2/IoComposeView.tsx`
+- `frontend/app/mes/_components/_warehouse_v2/MobileIoComposeWizard.tsx`
+- `frontend/app/mes/_components/_warehouse_v2/IoComposeView.tsx`
 - P2-1 Playwright E2E (모바일 viewport 시나리오 향후 추가)

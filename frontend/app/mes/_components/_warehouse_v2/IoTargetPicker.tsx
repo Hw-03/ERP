@@ -882,7 +882,7 @@ function HighlightableRow({
   return (
     <tr
       ref={rowRef}
-      className="transition-colors hover:brightness-110"
+      className="transition-colors hover:bg-[var(--c-s3)]"
       style={
         flash
           ? {

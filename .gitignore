@@ -83,6 +83,7 @@ _dev/demo-verify/
 # Local / personal files
 workspace.ahk
 backend/query_test.py
+backend/query_warehouse.py
 skills-lock.json
 
 # Obsidian vault (vault-sync 브랜치 전용, main에서 제외)

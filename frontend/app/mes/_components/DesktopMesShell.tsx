@@ -38,15 +38,15 @@ const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
   admin: { title: "관리자", icon: Settings2 },
 };
 
-export function DesktopLegacyShell() {
+export function DesktopMesShell() {
   return (
     <DirtyGuardProvider>
-      <DesktopLegacyShellInner />
+      <DesktopMesShellInner />
     </DirtyGuardProvider>
   );
 }
 
-function DesktopLegacyShellInner() {
+function DesktopMesShellInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const confirmAdminNavigation = useConfirmNavigation();

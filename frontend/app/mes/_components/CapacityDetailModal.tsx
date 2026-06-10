@@ -16,7 +16,7 @@ import { getModelLabel } from "@/lib/mes/model-labels";
 type FilterMode = "producible" | "shortage" | "all";
 
 /**
- * DesktopLegacyShell 의 생산 가능수량 상세 모달.
+ * DesktopMesShell 의 생산 가능수량 상세 모달.
  * 사장님 시점 정보 디자인: 요약 헤더 · 쇼핑 리스트(병목 부품 집계) ·
  * 필터(생산 가능/부족/전체) · 시리즈 그룹 · 행 클릭 시 BOM 자식 펼침.
  */

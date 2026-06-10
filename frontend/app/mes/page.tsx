@@ -2,20 +2,20 @@
 
 import { Suspense } from "react";
 import { MobileShell } from "./_components/mobile/MobileShell";
-import { DesktopLegacyShell } from "./_components/DesktopLegacyShell";
+import { DesktopMesShell } from "./_components/DesktopMesShell";
 import { MesLoginGate } from "./_components/login/MesLoginGate";
 import { DepartmentsProvider } from "./_components/DepartmentsContext";
 import { AdminSessionProvider } from "@/lib/auth/admin-session";
 import { QueryProvider } from "@/lib/queries/client";
 
-export default function LegacyPage() {
+export default function MesPage() {
   return (
     <AdminSessionProvider>
       <QueryProvider>
         <DepartmentsProvider>
           <MesLoginGate>
             <Suspense>
-              <LegacyBody />
+              <MesBody />
             </Suspense>
           </MesLoginGate>
         </DepartmentsProvider>
@@ -24,7 +24,7 @@ export default function LegacyPage() {
   );
 }
 
-function LegacyBody() {
+function MesBody() {
   return (
     <>
       <div className="lg:hidden">
@@ -32,7 +32,7 @@ function LegacyBody() {
       </div>
 
       <Suspense>
-        <DesktopLegacyShell />
+        <DesktopMesShell />
       </Suspense>
     </>
   );
