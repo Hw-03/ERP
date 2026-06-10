@@ -6,6 +6,8 @@ import {
   BarChart2,
   Boxes,
   History as HistoryIcon,
+  MapPinned,
+  MoreVertical,
   Settings2,
   Warehouse,
   type LucideIcon,
@@ -17,6 +19,7 @@ import {
   MobileDefectScreen,
   MobileHistoryScreen,
   MobileWeeklyScreen,
+  MobileWarehouseMapScreen,
   MobileAdminScreen,
 } from "./screens";
 import { WeeklyWeekPicker, getWeekStartMonday } from "../_weekly_sections/WeeklyWeekPicker";
@@ -27,8 +30,9 @@ import { useCurrentOperator } from "../login/useCurrentOperator";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { canEnterIO } from "../_warehouse_steps";
 import { MobileUserMenuSheet } from "./MobileUserMenuSheet";
+import { MobileMoreSheet } from "./MobileMoreSheet";
 
-export type MobileTabId = "dashboard" | "warehouse" | "defect" | "history" | "weekly" | "admin";
+export type MobileTabId = "dashboard" | "warehouse" | "defect" | "history" | "weekly" | "warehouseMap" | "admin";
 
 const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
   dashboard: { label: "대시보드", icon: Boxes },
@@ -36,8 +40,13 @@ const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
   defect: { label: "불량", icon: AlertTriangle },
   history: { label: "내역", icon: HistoryIcon },
   weekly: { label: "주간보고", icon: BarChart2 },
+  warehouseMap: { label: "창고지도", icon: MapPinned },
   admin: { label: "관리", icon: Settings2 },
 };
+
+// 하단 탭바에 노출되는 4탭. 나머지(주간보고·관리 등)는 헤더 더보기(⋮) 시트로 진입.
+// content useMemo·?tab= 딥링크는 6종 전체를 그대로 다루므로 마운트 경로는 유지된다.
+const TAB_BAR_IDS: MobileTabId[] = ["dashboard", "warehouse", "defect", "history"];
 
 let _toastSeq = 0;
 
@@ -53,6 +62,7 @@ export function MobileShell() {
   const [toastQueue, setToastQueue] = useState<ToastItem[]>([]);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [defectDeptFilter, setDefectDeptFilter] = useState<string | null>(null);
 
   // URL ?tab= / ?defect_dept= 으로 초기 상태 동기화.
@@ -61,7 +71,7 @@ export function MobileShell() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const t = params.get("tab");
-    const valid: MobileTabId[] = ["dashboard", "warehouse", "defect", "history", "weekly", "admin"];
+    const valid: MobileTabId[] = ["dashboard", "warehouse", "defect", "history", "weekly", "warehouseMap", "admin"];
     if (t && (valid as string[]).includes(t)) setActiveTab(t as MobileTabId);
     const d = params.get("defect_dept");
     if (d) setDefectDeptFilter(d);
@@ -118,9 +128,8 @@ export function MobileShell() {
   }, [loadCapacity]);
 
   const visibleTabs = useMemo(() => {
-    const allTabs: MobileTabId[] = ["dashboard", "warehouse", "defect", "history", "weekly", "admin"];
-    if (!operator) return allTabs;
-    return allTabs.filter((tab) => {
+    if (!operator) return TAB_BAR_IDS;
+    return TAB_BAR_IDS.filter((tab) => {
       if (tab === "warehouse" || tab === "defect") return canEnterIO(operator);
       return true;
     });
@@ -161,6 +170,9 @@ export function MobileShell() {
     }
     if (activeTab === "weekly") {
       return <MobileWeeklyScreen key={key} weekMon={weekMon} />;
+    }
+    if (activeTab === "warehouseMap") {
+      return <MobileWarehouseMapScreen key={key} onStatusChange={handleStatusChange} />;
     }
     return <MobileAdminScreen key={key} globalSearch="" onStatusChange={handleStatusChange} />;
   }, [
@@ -229,6 +241,17 @@ export function MobileShell() {
               style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
             >
               {operator.name[0] ?? "?"}
+            </button>
+          )}
+          {operator && (
+            <button
+              type="button"
+              onClick={() => setMoreSheetOpen(true)}
+              aria-label="더보기"
+              className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-opacity active:opacity-70"
+              style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
+            >
+              <MoreVertical size={20} />
             </button>
           )}
         </header>
@@ -339,6 +362,14 @@ export function MobileShell() {
       <MobileUserMenuSheet
         open={userMenuOpen}
         onClose={() => setUserMenuOpen(false)}
+      />
+
+      <MobileMoreSheet
+        open={moreSheetOpen}
+        onClose={() => setMoreSheetOpen(false)}
+        onWeekly={() => handleTabChange("weekly")}
+        onWarehouseMap={() => handleTabChange("warehouseMap")}
+        onAdmin={() => handleTabChange("admin")}
       />
     </div>
   );
