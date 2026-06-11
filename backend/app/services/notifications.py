@@ -49,10 +49,32 @@ def recipients_for_department_approval(db: Session, target_dept: str | None) -> 
     return [e for e in _active_employees(db) if can_approve_department(e, target_dept)]
 
 
+# 결재 요청 유형 → 한국어 라벨. 프론트 frontend/lib/io/glossary.ts REQUEST_TYPE_LABEL 미러
+# (StockRequestTypeEnum 전 멤버). 알림 본문에 원시값(warehouse_to_dept 등)이 노출되지 않게 한다.
+_REQUEST_TYPE_LABEL: dict[str, str] = {
+    "raw_receive": "원자재 입고",
+    "raw_ship": "원자재 출고",
+    "warehouse_to_dept": "창고 → 부서",
+    "dept_to_warehouse": "부서 → 창고",
+    "dept_internal": "부서 내부 이동",
+    "mark_defective_wh": "창고 불량 등록",
+    "mark_defective_prod": "생산 불량 등록",
+    "supplier_return": "원자재 반품",
+    "package_out": "출하",
+    "manual_adjustment": "수동 조정",
+    "defect_scrap": "불량 처리",
+    "defect_return": "원자재 반품",
+    "defect_disassemble": "불량 분해",
+    "scrap_normal": "정상 폐기",
+    "return_normal": "정상 반품",
+}
+
+
 def _summary(request: StockRequest) -> str:
     code = request.request_code or str(request.request_id)[:8]
     rtype = getattr(request.request_type, "value", str(request.request_type))
-    return f"{request.requester_name} · {rtype} · {code}"
+    label = _REQUEST_TYPE_LABEL.get(rtype, rtype)
+    return f"{request.requester_name} · {label} · {code}"
 
 
 def _add(

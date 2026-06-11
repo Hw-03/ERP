@@ -330,6 +330,10 @@ def submit_defective_disassemble(
     # 대신 reference_no 에 batch_id 를 기록해 그룹 식별자로 활용한다.
     batch_ref = f"defect-disassemble:{batch_id}"
 
+    # TransactionLog.department(String) 에는 enum repr("DepartmentEnum.X")이 아니라
+    # 한국어 값("조립")이 들어가야 한다. str(enum) 금지 — .value 사용.
+    parent_dept_value = getattr(parent_dept, "value", parent_dept)
+
     # 1) 부모 DEFECTIVE 차감
     parent_inv = inventory_svc.scrap_defective(
         db, parent_item_id, parent_qty, parent_dept,
@@ -352,7 +356,7 @@ def submit_defective_disassemble(
         reason_category=reason_category,
         reason_memo=reason_memo,
         reference_no=batch_ref,
-        department=str(parent_dept),
+        department=parent_dept_value,
     )
     db.add(parent_log)
     db.flush()
@@ -408,7 +412,7 @@ def submit_defective_disassemble(
                 reason_category=reason_category,
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
-                department=str(parent_dept),
+                department=parent_dept_value,
             )
             db.add(log)
             db.flush()
@@ -441,7 +445,7 @@ def submit_defective_disassemble(
                 reason_category=reason_category,
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
-                department=str(parent_dept),
+                department=parent_dept_value,
             )
             db.add(log)
             db.flush()

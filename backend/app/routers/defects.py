@@ -277,7 +277,8 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
             notes=f"격리: {payload.source} → {payload.target_dept}",
             reason_category=payload.reason_category,
             reason_memo=payload.reason_memo or None,
-            department=str(target_dept),
+            # String 컬럼엔 enum repr 금지 — .value(한국어) 사용
+            department=getattr(target_dept, "value", target_dept),
         )
     )
     db.commit()
@@ -350,7 +351,8 @@ def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Sessio
             notes=f"정상 복귀: {payload.dept}",
             reason_category=payload.reason_category,
             reason_memo=payload.reason_memo or None,
-            department=str(dept),
+            # String 컬럼엔 enum repr 금지 — .value(한국어) 사용
+            department=getattr(dept, "value", dept),
         )
     )
     db.commit()
