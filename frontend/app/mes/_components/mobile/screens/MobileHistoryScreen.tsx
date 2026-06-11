@@ -269,6 +269,12 @@ export function MobileHistoryScreen() {
   }
 
   function navigateToLog(log: TransactionLog) {
+    // 다른 날짜 거래로 이동하면 selectedDay 를 맞춰 리스트가 그 거래를 포함하게 한다
+    // (데스크톱 동작 복제 — 393px 라 시트가 리스트를 덮어 scrollIntoView 는 생략).
+    const logYmd = toDateKey(log.created_at);
+    if (logYmd && logYmd !== selectedDay) {
+      setSelectedDay(logYmd);
+    }
     setSelection((cur) => {
       if (cur && !(cur.kind === "log" && cur.log.log_id === log.log_id)) {
         setSelectionStack((s) => [...s, cur]);
@@ -285,6 +291,20 @@ export function MobileHistoryScreen() {
       return s.slice(0, -1);
     });
   }
+
+  // 하드웨어/브라우저 뒤로가기 → 드릴(BOM 하위·최근거래) 스택 한 단계 pop(데스크톱 복제).
+  useEffect(() => {
+    const onPop = () => {
+      setSelectionStack((s) => {
+        if (s.length === 0) return s;
+        const prev = s[s.length - 1];
+        setSelection(prev);
+        return s.slice(0, -1);
+      });
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   function handleDateFilterChange(v: string) {
     setDateFilter(v);
