@@ -448,9 +448,10 @@ export function MobileIoComposeWizard({
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col" style={{ background: LEGACY_COLORS.bg }}>
-      {/* 헤더: 뒤로 + 진행바 */}
+      {/* 헤더: 뒤로 + 진행바. in-flow(non-scroll 첫 자식)라 셸 헤더 아래에 머물며 본문만
+          스크롤된다. (이전 fixed top-0 는 셸 헤더 DEXCOWIN MES 를 덮는 버그였음) */}
       <div
-        className="fixed top-0 inset-x-0 z-10 flex items-center gap-2 border-b px-3 py-2.5"
+        className="z-10 flex shrink-0 items-center gap-2 border-b px-3 py-2.5"
         style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
       >
         {step > 1 ? (
@@ -463,8 +464,8 @@ export function MobileIoComposeWizard({
         </div>
       </div>
 
-      {/* 본문: 현재 스텝만 풀스크린 스크롤. 헤더가 fixed 이므로 pt-14 로 헤더 높이(약 56px) 보상. */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-14 pb-3">
+      {/* 본문: 현재 스텝만 스크롤. 헤더가 in-flow 라 pt 보정 불필요. */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-3">
         <h2 className="mb-3 text-base font-black" style={{ color: LEGACY_COLORS.text }}>
           {stepTitle}
         </h2>
