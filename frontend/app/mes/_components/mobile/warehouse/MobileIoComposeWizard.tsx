@@ -277,8 +277,19 @@ export function MobileIoComposeWizard({
     return null;
   }
 
+  // 부서/세부작업 변경 시 진행 중 autosave draft 슬롯을 끊어 새 슬롯으로 시작한다.
+  // (데스크톱 IoComposeView 와 동일 — 안 하면 다음 저장이 이전 draft 를 덮어써 손실.)
+  function beginNewCompositionSlot() {
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+    autosaveBatchIdRef.current = null;
+  }
+
   function changeFromDepartment(next: string) {
     state.setFromDepartment(next);
+    beginNewCompositionSlot();
     if (state.bundles.length > 0) {
       state.setBundles([]);
       onStatusChange("부서 변경으로 작업 묶음을 초기화했습니다.");
@@ -287,6 +298,7 @@ export function MobileIoComposeWizard({
 
   function changeToDepartment(next: string) {
     state.setToDepartment(next);
+    beginNewCompositionSlot();
     if (state.bundles.length > 0) {
       state.setBundles([]);
       onStatusChange("부서 변경으로 작업 묶음을 초기화했습니다.");
@@ -295,6 +307,7 @@ export function MobileIoComposeWizard({
 
   function handleSubTypeChange(next: IoSubType) {
     state.setSubType(next);
+    beginNewCompositionSlot();
     state.setBundles([]);
   }
 
@@ -397,7 +410,6 @@ export function MobileIoComposeWizard({
   }
 
   const step = state.step;
-  const accent = isExitWorkType(state.workType) ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   const itemMap = useMemo(() => new Map(items.map((item) => [item.item_id, item])), [items]);
 
   const stepTitle =
@@ -602,17 +614,14 @@ export function MobileIoComposeWizard({
           4=cart 내부버튼, 5=confirm 내부버튼). Step3 는 이중 하단바 방지로 제외. */}
       {step === 2 && (
         <StickyFooter>
-          <button
-            type="button"
+          <PrimaryActionButton
+            label={state.canAdvance[2] ? "다음 단계로 →" : "세부 작업과 부서를 선택하세요"}
+            intent={isExitWorkType(state.workType) ? "danger" : "primary"}
+            disabled={!state.canAdvance[2]}
             onClick={() => {
               if (state.canAdvance[2]) state.goNext();
             }}
-            disabled={!state.canAdvance[2]}
-            className="flex w-full items-center justify-center gap-2 rounded-[18px] px-7 py-4 text-base font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
-            style={{ background: accent }}
-          >
-            {state.canAdvance[2] ? "다음 단계로 →" : "세부 작업과 부서를 선택하세요"}
-          </button>
+          />
         </StickyFooter>
       )}
 
