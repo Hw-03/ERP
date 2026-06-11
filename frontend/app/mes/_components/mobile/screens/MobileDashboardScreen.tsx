@@ -116,8 +116,16 @@ export function MobileDashboardScreen({
           if (!matchesSlot && !matchesUnclassified) return false;
         }
         if (selectedProcessSteps.length > 0) {
+          // 데스크톱 DesktopInventoryView 와 동일 — 공용 InventoryFilters 의 "불량(DEFECT)"
+          // 칩은 공정 스테이지(R/A/F)가 아니라 DEFECTIVE 재고 보유 여부로 매칭한다.
           const stage = item.process_type_code?.slice(-1).toUpperCase() ?? "";
-          if (!selectedProcessSteps.includes(stage)) return false;
+          const hasDefect = item.locations.some(
+            (loc) => loc.status === "DEFECTIVE" && (loc.quantity ?? 0) > 0,
+          );
+          const matches = selectedProcessSteps.some(
+            (s) => s === stage || (s === "DEFECT" && hasDefect),
+          );
+          if (!matches) return false;
         }
         return true;
       }),
