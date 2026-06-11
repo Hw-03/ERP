@@ -17,9 +17,11 @@ vi.mock("../../mobile/screens/MobileDefectProcessPanel", () => ({
     <div data-testid="process-panel">{location.mes_code}</div>
   ),
 }));
-vi.mock("../AddQuarantineModal", () => ({
-  AddQuarantineModal: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="add-quarantine">add</div> : null,
+// 격리 추가·바로 폐기 다품목 카트 모킹 — DOM 렌더만 검증
+vi.mock("../../mobile/screens/MobileDefectCartFlow", () => ({
+  MobileDefectCartFlow: ({ mode }: { mode: string }) => (
+    <div data-testid="cart-flow">{mode}</div>
+  ),
 }));
 
 import { defectsApi } from "@/lib/api/defects";
@@ -157,6 +159,20 @@ describe("DefectHubPanel", () => {
       expect(screen.queryByText("조립")).not.toBeInTheDocument();
       expect(screen.getByText("진공")).toBeInTheDocument();
     });
+  });
+
+  it("'불량 격리' 카드 클릭 시 다품목 카트(add)로 전환된다", async () => {
+    render(<DefectHubPanel currentEmployee={mockEmployee} />);
+    fireEvent.click(screen.getByText("불량 격리"));
+    const cart = await screen.findByTestId("cart-flow");
+    expect(cart).toHaveTextContent("add");
+  });
+
+  it("'바로 폐기' 카드 클릭 시 다품목 카트(scrap)로 전환된다", async () => {
+    render(<DefectHubPanel currentEmployee={mockEmployee} />);
+    fireEvent.click(screen.getByText("바로 폐기"));
+    const cart = await screen.findByTestId("cart-flow");
+    expect(cart).toHaveTextContent("scrap");
   });
 
   it("[처리] 버튼 클릭 시 통합 처리 패널이 열린다", async () => {
