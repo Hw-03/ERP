@@ -16,6 +16,9 @@ import { MobileIoComposeWizard } from "../warehouse/MobileIoComposeWizard";
 import { MobileDirtyLeaveSheet } from "../warehouse/MobileDirtyLeaveSheet";
 import panelStyles from "./mobileWarehousePanels.module.css";
 
+// 인수인계 수신 부서 — DesktopWarehouseView 와 동일 도메인 상수(미export 라 동일값 복제).
+const HANDOVER_RECEIVE_DEPTS = ["고압", "진공"];
+
 // 탭 전환 remount 사이 직전 카운트 보존 (세션 내 메모리 캐시) — DesktopWarehouseView 와 동일.
 const cartCountCache = new Map<string, number>();
 const warehouseQueueCountCache = { value: 0 };
@@ -61,6 +64,7 @@ export function MobileWarehouseScreen({
     return eid ? deptQueueCountCache.get(eid) ?? 0 : 0;
   });
   const [restoreIoDraft, setRestoreIoDraft] = useState<IoBatch | null>(null);
+  const [handoverInboxCount, setHandoverInboxCount] = useState(0);
   // D2 — compose 작성 중(담은 묶음 있음) 다른 섹션 이탈 가드.
   const [composeDirty, setComposeDirty] = useState(false);
   const [pendingTab, setPendingTab] = useState<WarehouseSectionTab | null>(null);
@@ -71,6 +75,10 @@ export function MobileWarehouseScreen({
     (operator?.warehouse_role ?? "none") === "primary" ||
     (operator?.warehouse_role ?? "none") === "deputy";
   const canSeeDeptQueue = isDepartmentApprover(operator);
+  // 인수인계: 작성(튜브) 또는 인수 확인(받는 부서/부서 결재자) 가능하면 탭 노출 — 데스크톱 동일.
+  const canReceiveHandover =
+    canSeeDeptQueue || HANDOVER_RECEIVE_DEPTS.includes(operator?.department ?? "");
+  const showHandover = (operator?.department ?? "") === "튜브" || canReceiveHandover;
 
   useEffect(() => {
     if (operator && employeeId === "") setEmployeeId(operator.employee_id);
@@ -112,6 +120,14 @@ export function MobileWarehouseScreen({
       .catch(() => {});
   }, [canSeeDeptQueue, operatorEmployeeId, panelRefreshNonce]);
 
+  useEffect(() => {
+    if (!canReceiveHandover || !operatorEmployeeId) return;
+    api
+      .countHandoverInbox(operatorEmployeeId)
+      .then(({ count }) => setHandoverInboxCount(count))
+      .catch(() => {});
+  }, [canReceiveHandover, operatorEmployeeId, panelRefreshNonce]);
+
   if (operator && !canEnterIO(operator)) {
     return <WarehouseAccessDenied department={operator.department ?? ""} />;
   }
@@ -139,9 +155,11 @@ export function MobileWarehouseScreen({
           onChange={handleSectionChange}
           showQueue={canSeeQueue}
           showDeptQueue={canSeeDeptQueue}
+          showHandover={showHandover}
           cartCount={cartCount}
           queueCount={warehouseQueueCount}
           deptQueueCount={deptQueueCount}
+          handoverInboxCount={handoverInboxCount}
         />
       </div>
 
