@@ -32,7 +32,7 @@ export function NotificationPanel({
 }) {
   return (
     <div
-      className="absolute right-0 top-full z-50 mt-2 w-[320px] rounded-[20px] border p-2 shadow-lg"
+      className="absolute right-0 top-full z-50 mt-2 w-[320px] max-w-[calc(100vw-1.5rem)] rounded-[20px] border p-2 shadow-lg"
       style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
     >
       <div className="flex items-center justify-between px-3 py-2">
@@ -72,7 +72,7 @@ export function NotificationPanel({
                   <span className="text-sm font-bold" style={{ color: tone }}>
                     {n.title}
                   </span>
-                  <span className="ml-auto text-[10px]" style={{ color: LEGACY_COLORS.muted }}>
+                  <span className="ml-auto shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted }}>
                     {timeLabel(n.created_at)}
                   </span>
                 </div>

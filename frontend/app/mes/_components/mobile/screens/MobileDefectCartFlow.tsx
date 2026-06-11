@@ -319,7 +319,7 @@ export function MobileDefectCartFlow({
                           type="button"
                           onClick={() => removeLine(line.key)}
                           aria-label="삭제"
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
                           style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }}
                         >
                           <Trash2 className="h-4 w-4" />
