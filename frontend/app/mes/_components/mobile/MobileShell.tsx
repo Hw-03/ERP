@@ -31,6 +31,7 @@ import { NotificationBell } from "../notifications/NotificationBell";
 import { canEnterIO } from "../_warehouse_steps";
 import { MobileUserMenuSheet } from "./MobileUserMenuSheet";
 import { MobileMoreSheet } from "./MobileMoreSheet";
+import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 
 export type MobileTabId = "dashboard" | "warehouse" | "defect" | "history" | "weekly" | "warehouseMap" | "admin";
 
@@ -256,6 +257,7 @@ export function MobileShell() {
   ]);
 
   return (
+    <DirtyGuardProvider>
     <div className="h-[100dvh] overflow-hidden sm:bg-black" data-testid="mobile-shell">
       <div
         className="flex h-full flex-col overflow-hidden"
@@ -414,5 +416,6 @@ export function MobileShell() {
         onAdmin={() => handleTabChange("admin")}
       />
     </div>
+    </DirtyGuardProvider>
   );
 }

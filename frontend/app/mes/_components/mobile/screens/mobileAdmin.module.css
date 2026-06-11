@@ -18,3 +18,16 @@
 .scope :global([style*="grid-template-columns"]) {
   grid-template-columns: 1fr !important;
 }
+
+/*
+ * 마스터-디테일 flex 2단(직원·모델·부서 = `flex min-h-0 flex-1 gap-4` 안에
+ * AdminListPanel(width:320) + AdminDetailCard) 는 .grid 가 아니라 못 잡혔다.
+ * 393px 에서는 세로로 쌓고(목록 위 · 상세 아래), 목록 패널 고정폭(320)을 전체폭으로.
+ */
+.scope :global(.flex.min-h-0.flex-1.gap-4) {
+  flex-direction: column !important;
+}
+
+.scope :global([style*="width: 320px"]) {
+  width: 100% !important;
+}
