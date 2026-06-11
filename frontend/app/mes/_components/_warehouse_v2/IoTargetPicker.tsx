@@ -262,11 +262,12 @@ export function IoTargetPicker({
       {/* 필터 + 순서 편집 토글 */}
       <div className="flex shrink-0 flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
-          <div className="grid flex-1 grid-cols-[1fr_1fr_1fr_2fr] gap-2" style={{ opacity: editMode ? 0.4 : 1, pointerEvents: editMode ? "none" : undefined }}>
+          <div className="grid flex-1 grid-cols-3 gap-2 lg:grid-cols-[1fr_1fr_1fr_2fr]" style={{ opacity: editMode ? 0.4 : 1, pointerEvents: editMode ? "none" : undefined }}>
             <LabeledSelect label="부서" value={dept} onChange={setDept} options={deptOptions} />
             <LabeledSelect label="모델" value={model} onChange={setModel} options={modelOptions} />
             <LabeledSelect label="단계" value={stage} onChange={setStage} options={STAGE_OPTIONS} />
-            <label className="flex flex-col gap-0.5">
+            {/* 모바일: 검색을 아래 전체폭 줄로(드롭다운 폭 확보). 데스크톱(lg): 기존 4열 인라인. */}
+            <label className="col-span-3 flex flex-col gap-0.5 lg:col-span-1">
               <span
                 className="text-[10px] font-bold uppercase tracking-[1.5px]"
                 style={{ color: LEGACY_COLORS.muted2 }}

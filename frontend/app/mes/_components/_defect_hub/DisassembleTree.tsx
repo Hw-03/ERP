@@ -157,7 +157,7 @@ export function DisassembleTree({
         <div className="flex items-center gap-2 px-4 py-2.5">
           <ChevronDown className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.red }} />
           <Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.red }} />
-          <span className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
+          <span className="min-w-0 break-keep text-sm font-black lg:truncate" style={{ color: LEGACY_COLORS.text }}>
             {parentItemName}
           </span>
           {parentMesCode && (
@@ -328,7 +328,7 @@ function TreeNode({
           <span className="inline-block w-7 shrink-0" />
         )}
         <Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
-        <span className="text-sm font-black truncate" style={{ color: LEGACY_COLORS.text }}>
+        <span className="min-w-0 break-keep text-sm font-black lg:truncate" style={{ color: LEGACY_COLORS.text }}>
           {node.item_name}
         </span>
         {node.mes_code && (
