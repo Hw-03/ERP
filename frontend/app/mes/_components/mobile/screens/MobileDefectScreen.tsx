@@ -57,7 +57,7 @@ function MobileDefectInner({
     isWarehouseStaff(operator) && !isDepartmentApprover(operator) ? "warehouse" : "production";
 
   return (
-    <div className="h-full overflow-y-auto px-3 pb-6 pt-3">
+    <div className="h-full w-full overflow-y-auto px-3 pb-6 pt-3">
       <DefectHubPanel
         defectDeptFilter={defectDeptFilter}
         currentEmployee={{
