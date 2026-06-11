@@ -468,12 +468,14 @@ function ItemTable({
   return (
     <>
       <table className="w-full border-collapse text-sm">
+        {/* 모바일(<sm): 숨긴 3열(품목코드/창고/부서)을 0폭으로 접고 품목명열이 남는 폭 흡수 → 액션이 행 우측 끝.
+            데스크톱(sm:≥640): 원래 5열 비율 복원(회귀 0). */}
         <colgroup>
-          <col style={{ width: "58%" }} />
-          <col style={{ width: "14%" }} />
-          <col style={{ width: "7%" }} />
-          <col style={{ width: "8%" }} />
-          <col style={{ width: "13%" }} />
+          <col className="w-full sm:w-[58%]" />
+          <col className="w-0 sm:w-[14%]" />
+          <col className="w-0 sm:w-[7%]" />
+          <col className="w-0 sm:w-[8%]" />
+          <col className="w-auto sm:w-[13%]" />
         </colgroup>
         <thead className="sticky top-0 z-10">
           <tr
