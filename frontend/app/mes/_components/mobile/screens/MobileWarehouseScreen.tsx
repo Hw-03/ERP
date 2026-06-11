@@ -14,6 +14,7 @@ import { WarehouseDraftPanelTabs } from "../../_warehouse_sections/WarehouseDraf
 import { readCurrentOperator } from "../../login/useCurrentOperator";
 import { MobileIoComposeWizard } from "../warehouse/MobileIoComposeWizard";
 import { MobileDirtyLeaveSheet } from "../warehouse/MobileDirtyLeaveSheet";
+import panelStyles from "./mobileWarehousePanels.module.css";
 
 // 탭 전환 remount 사이 직전 카운트 보존 (세션 내 메모리 캐시) — DesktopWarehouseView 와 동일.
 const cartCountCache = new Map<string, number>();
@@ -167,7 +168,7 @@ export function MobileWarehouseScreen({
             }}
           />
         ) : (
-          <div className="h-full overflow-y-auto px-3 pb-6">
+          <div className={`h-full overflow-y-auto px-3 pb-6 ${panelStyles.touchScope}`}>
             <WarehouseDraftPanelTabs
               sectionTab={sectionTab}
               canSeeQueue={canSeeQueue}

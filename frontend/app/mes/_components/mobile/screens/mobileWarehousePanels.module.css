@@ -1,0 +1,18 @@
+/*
+ * 모바일 입출고 서브탭(장바구니·내 요청·창고 승인함·부서 승인함·인수인계)은
+ * 데스크톱 공용 패널(WarehouseDraftPanelTabs → WarehouseQueuePanel 등)을 그대로
+ * 렌더한다. 그 패널의 승인/반려 PIN 폼·버튼은 데스크톱 기준이라 터치 타깃이 약 28px 로
+ * 작아 393px 에서 오탭 위험이 크다(특히 PIN 기반 결재).
+ *
+ * 공용 컴포넌트는 무간섭 대상이라 직접 키울 수 없으므로, 이 스코프 안에서만 버튼·입력의
+ * 최소 높이를 44px 로 끌어올린다. 데스크톱은 이 클래스를 쓰지 않아 영향 없음.
+ */
+.touchScope button,
+.touchScope input,
+.touchScope select {
+  min-height: 44px;
+}
+
+.touchScope textarea {
+  min-height: 56px;
+}
