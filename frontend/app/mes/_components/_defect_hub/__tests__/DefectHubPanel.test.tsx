@@ -11,14 +11,11 @@ vi.mock("@/lib/api/defects", () => ({
   },
 }));
 
-// 처리 모달 모킹 — DOM 렌더만 검증 (실제 API 호출 X)
-vi.mock("../RDefectActionModal", () => ({
-  RDefectActionModal: ({ open, location }: { open: boolean; location: { mes_code: string } }) =>
-    open ? <div data-testid="r-modal">{location.mes_code}</div> : null,
-}));
-vi.mock("../PaPfDefectWizard", () => ({
-  PaPfDefectWizard: ({ open, location }: { open: boolean; location: { mes_code: string } }) =>
-    open ? <div data-testid="papf-wizard">{location.mes_code}</div> : null,
+// 통합 처리 패널 모킹 — DOM 렌더만 검증 (실제 API 호출 X)
+vi.mock("../../mobile/screens/MobileDefectProcessPanel", () => ({
+  MobileDefectProcessPanel: ({ location }: { location: { mes_code: string } }) => (
+    <div data-testid="process-panel">{location.mes_code}</div>
+  ),
 }));
 vi.mock("../AddQuarantineModal", () => ({
   AddQuarantineModal: ({ open }: { open: boolean }) =>
@@ -162,7 +159,7 @@ describe("DefectHubPanel", () => {
     });
   });
 
-  it("[처리] 버튼 클릭 시 R 모달이 열린다 (R 품목)", async () => {
+  it("[처리] 버튼 클릭 시 통합 처리 패널이 열린다", async () => {
     render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
     await goToList();
 
@@ -170,11 +167,12 @@ describe("DefectHubPanel", () => {
       expect(screen.getAllByText("처리").length).toBeGreaterThan(0);
     });
 
-    // mockLocations 의 첫 항목 mes_code="7-TR-0001" — PA/PF 아님 → R 모달 분기
+    // 첫 항목(mes_code="7-TR-0001") 처리 → 데스크톱과 동일한 통합 처리 패널로 전환
     const processButtons = screen.getAllByText("처리");
     fireEvent.click(processButtons[0]);
 
-    expect(await screen.findByTestId("r-modal")).toBeInTheDocument();
-    expect(screen.queryByTestId("papf-wizard")).not.toBeInTheDocument();
+    const panel = await screen.findByTestId("process-panel");
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveTextContent("7-TR-0001");
   });
 });

@@ -15,8 +15,7 @@ import type { DefectHubCardId } from "./defectHubCards";
 import { DefectKpiCards, type DefectKpiKind } from "./DefectKpiCards";
 import { DefectFilterBar, type DefectScope, type DefectSort } from "./DefectFilterBar";
 import { DefectDepartmentList } from "./DefectDepartmentList";
-import { RDefectActionModal } from "./RDefectActionModal";
-import { PaPfDefectWizard } from "./PaPfDefectWizard";
+import { MobileDefectProcessPanel } from "../mobile/screens/MobileDefectProcessPanel";
 import { AddQuarantineModal } from "./AddQuarantineModal";
 import { AddRDirectModal } from "./AddRDirectModal";
 import { InlineErrorNote } from "./InlineErrorNote";
@@ -48,7 +47,7 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
     return PRODUCTION_LINES.has(currentEmployee.department) ? "my" : "all";
   };
 
-  const [view, setView] = useState<"hub" | "list">("hub");
+  const [view, setView] = useState<"hub" | "list" | "process">("hub");
   const [scope, setScope] = useState<DefectScope>(initialScope);
   const [sort, setSort] = useState<DefectSort>("oldest");
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
@@ -117,15 +116,21 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
     return result;
   }, [locations, scope, sort, kpiFilter, defectDeptFilter, currentEmployee.department]);
 
-  // [처리] 버튼 클릭 → 품목 종류에 따라 모달 분기
+  // [처리] 버튼 클릭 → 데스크톱과 동일한 통합 처리 패널(전폭 view)로 전환.
   function handleProcess(location: DefectLocation) {
     setProcessingLocation(location);
+    setView("process");
   }
 
-  function handleModalSubmitted() {
+  function handleProcessDone() {
     setProcessingLocation(null);
     setReloadNonce((n) => n + 1);
-    setView("hub");
+    setView("list"); // 처리 후 갱신된 목록을 바로 보여줌
+  }
+
+  function handleProcessCancel() {
+    setProcessingLocation(null);
+    setView("list");
   }
 
   function handleAddQuarantineSubmitted() {
@@ -142,10 +147,10 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
     setView("hub");
   }
 
-  // 브라우저 뒤로가기 → list면 hub로 (hub에서는 무시).
+  // 브라우저 뒤로가기 → process면 list, list면 hub로 (hub에서는 무시).
   useEffect(() => {
     const onPop = () => {
-      setView((cur) => (cur === "list" ? "hub" : cur));
+      setView((cur) => (cur === "process" ? "list" : cur === "list" ? "hub" : cur));
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -164,6 +169,18 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
 
   function handleKpiCardClick(kind: DefectKpiKind) {
     setKpiFilter((prev) => (prev === kind ? null : kind));
+  }
+
+  // 처리 화면 — 데스크톱 DefectProcessPanel 과 동일 동작의 모바일 통합 패널(전폭).
+  if (view === "process" && processingLocation) {
+    return (
+      <MobileDefectProcessPanel
+        location={processingLocation}
+        currentEmployee={currentEmployee}
+        onDone={handleProcessDone}
+        onCancel={handleProcessCancel}
+      />
+    );
   }
 
   return (
@@ -243,25 +260,6 @@ export function DefectHubPanel({ defectDeptFilter, currentEmployee }: Props) {
           )}
         </>
       )}
-
-      {/* 처리 모달 — 품목 종류(R / PA·PF)에 따라 분기 */}
-      {processingLocation && processingLocation.has_bom ? (
-        <PaPfDefectWizard
-          open
-          onClose={() => setProcessingLocation(null)}
-          location={processingLocation}
-          currentEmployee={currentEmployee}
-          onSubmitted={handleModalSubmitted}
-        />
-      ) : processingLocation ? (
-        <RDefectActionModal
-          open
-          onClose={() => setProcessingLocation(null)}
-          location={processingLocation}
-          currentEmployee={currentEmployee}
-          onSubmitted={handleModalSubmitted}
-        />
-      ) : null}
 
       {/* 새 격리 추가 모달 */}
       <AddQuarantineModal
