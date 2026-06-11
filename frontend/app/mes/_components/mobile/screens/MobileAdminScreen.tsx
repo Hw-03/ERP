@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import clsx from "clsx";
 import { ChevronRight, Lock } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DesktopPinLock } from "../../DesktopPinLock";
 import { SubScreenHeader } from "../primitives";
+import styles from "./mobileAdmin.module.css";
 import { SECTIONS, SETTINGS_ENTRY } from "../../_admin_sections/AdminSidebar";
 import { AdminSectionContent } from "../../_admin_sections/AdminSectionContent";
 import { AdminRightPanelContent } from "../../_admin_sections/AdminRightPanelContent";
@@ -14,6 +16,17 @@ import { useAdminSettings } from "../../_admin_hooks/useAdminSettings";
 import { useAdminViewState, type AdminSection } from "../../_admin_hooks/useAdminViewState";
 
 const ALL_SECTIONS = [...SECTIONS, SETTINGS_ENTRY];
+
+// 데스크톱 다단 그리드가 393px 에서 넘치는 빈출 섹션 — 단일컬럼 가드(mobileAdmin.module.css)
+// 적용 대상. bom/export/audit 은 별도 축약 뷰가 필요해 제외(후속).
+const COLLAPSE_SECTIONS = new Set<string>([
+  "items",
+  "employees",
+  "models",
+  "departments",
+  "warehouseStructure",
+  "warehousePlacement",
+]);
 
 /**
  * 관리자 모바일 화면.
@@ -179,9 +192,19 @@ export function MobileAdminScreen({
         }
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+      <div
+        className={clsx(
+          "min-h-0 flex-1 overflow-y-auto px-3 py-3",
+          COLLAPSE_SECTIONS.has(section) && styles.scope,
+        )}
+      >
         {(saveMessage || message) && (
-          <div role="alert" aria-live="polite" className="mb-3 flex flex-col gap-2">
+          <div
+            role="alert"
+            aria-live="polite"
+            className="sticky top-0 z-10 -mx-3 mb-3 flex flex-col gap-2 px-3 py-1"
+            style={{ background: LEGACY_COLORS.bg }}
+          >
             {saveMessage && (
               <div
                 className="rounded-[12px] border px-4 py-2.5 text-[13px] font-bold"
