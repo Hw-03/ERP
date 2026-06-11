@@ -118,7 +118,9 @@ export function IoLineRow({
   return (
     <div>
     <div
-      className="grid items-center gap-3 py-3 pr-4"
+      // 모바일: flex-wrap 으로 줄바꿈(품목명 칸이 0폭 붕괴 → 세로글자 나던 문제 해소).
+      // 데스크톱(lg): 기존 7열 그리드 유지(인라인 gridTemplateColumns 는 display:grid 일 때만 의미).
+      className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3 pr-4 lg:grid lg:gap-3"
       style={{
         gridTemplateColumns:
           "32px minmax(0,1.6fr) minmax(70px,auto) auto minmax(80px,auto) minmax(80px,auto) 40px",
@@ -143,8 +145,8 @@ export function IoLineRow({
         {line.included ? <Check className="h-4 w-4" /> : <MinusCircle className="h-3.5 w-3.5" />}
       </button>
 
-      {/* 2. 품목명 + 코드 + 메타 */}
-      <div className="min-w-0">
+      {/* 2. 품목명 + 코드 + 메타 (모바일에선 flex-1 로 한 줄 폭 확보) */}
+      <div className="min-w-0 flex-1 basis-[60%] lg:flex-none lg:basis-auto">
         <div className="flex min-w-0 items-center gap-2">
           <span className="truncate text-sm font-black" style={{ color: titleColor }}>
             {line.item_name}
@@ -195,8 +197,8 @@ export function IoLineRow({
         <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
       )}
 
-      {/* 4. 수량 stepper */}
-      <div className="flex flex-col items-center gap-0.5">
+      {/* 4. 수량 stepper (모바일에선 한 줄 차지) */}
+      <div className="flex w-full flex-col items-center gap-0.5 lg:w-auto">
         <span
           className="text-[9px] font-bold uppercase tracking-[1.5px]"
           style={{ color: LEGACY_COLORS.muted2 }}
