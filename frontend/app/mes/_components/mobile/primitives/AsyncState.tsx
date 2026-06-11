@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
 import { TYPO } from "../tokens";
 
 export function AsyncState({
@@ -27,8 +28,8 @@ export function AsyncState({
       <div
         className="flex flex-col items-center gap-3 rounded-[20px] border px-5 py-8 text-center"
         style={{
-          background: "rgba(242,95,92,.08)",
-          borderColor: "rgba(242,95,92,.28)",
+          background: tint(LEGACY_COLORS.red, 8),
+          borderColor: tint(LEGACY_COLORS.red, 28),
         }}
       >
         <AlertCircle size={22} color={LEGACY_COLORS.red} />
