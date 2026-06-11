@@ -70,7 +70,7 @@ export function MobileHistoryList({
               type="button"
               onClick={() => onSelectLog(log)}
               aria-pressed={active}
-              className="w-full rounded-[16px] border p-3 text-left transition-[transform] active:scale-[0.99]"
+              className="w-full min-h-[60px] rounded-[16px] border p-3 text-left transition-[transform] active:scale-[0.99]"
               style={{
                 background: active ? "rgba(101,169,255,.12)" : rowTint(log.transaction_type),
                 borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
@@ -125,7 +125,7 @@ export function MobileHistoryList({
             type="button"
             onClick={() => onSelectBatch(key, logs)}
             aria-pressed={active}
-            className="w-full rounded-[16px] border p-3 text-left transition-[transform] active:scale-[0.99]"
+            className="w-full min-h-[60px] rounded-[16px] border p-3 text-left transition-[transform] active:scale-[0.99]"
             style={{
               background: active ? "rgba(101,169,255,.12)" : rowTint(first.transaction_type),
               borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
