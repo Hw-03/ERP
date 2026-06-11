@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { ArrowLeft, ScanLine } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -84,7 +84,13 @@ export function MobileIoComposeWizard({
   defaultWorkType,
   onStatusChange,
   onSubmitSuccess,
-}: IoComposeViewProps) {
+  onDirtyChange,
+  flushDraftRef,
+}: IoComposeViewProps & {
+  // 모바일 전용 — 섹션 탭 이탈 가드(D2)용. 데스크톱 IoComposeView 는 미사용.
+  onDirtyChange?: (dirty: boolean) => void;
+  flushDraftRef?: MutableRefObject<(() => void) | null>;
+}) {
   const [employeeId, setEmployeeId] = useState(operator?.employee_id ?? "");
   const [search, setSearch] = useState(globalSearch);
   const [error, setError] = useState<string | null>(null);
@@ -176,6 +182,23 @@ export function MobileIoComposeWizard({
     state.subType,
     employeeId,
   ]);
+
+  // 작성 중(담은 묶음 있음) 여부를 상위(MobileWarehouseScreen)에 보고 — 섹션 이탈 가드용.
+  useEffect(() => {
+    onDirtyChange?.(state.bundles.length > 0);
+  }, [state.bundles.length, onDirtyChange]);
+
+  // 이탈 직전 상위가 draft autosave 를 즉시 flush 할 수 있게 핸들을 노출(700ms 디바운스
+  // 창에서 마지막 변경이 유실되지 않도록). 매 렌더 최신 클로저로 갱신, 언마운트 시 해제.
+  useEffect(() => {
+    if (!flushDraftRef) return;
+    flushDraftRef.current = () => {
+      void handleSaveDraft();
+    };
+    return () => {
+      flushDraftRef.current = null;
+    };
+  });
 
   async function addItem(
     item: Item,

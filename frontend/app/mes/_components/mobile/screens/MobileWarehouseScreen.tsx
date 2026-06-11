@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
 import { canEnterIO, isDepartmentApprover } from "../../_warehouse_steps";
 import { useWarehouseData } from "../../_warehouse_hooks/useWarehouseData";
@@ -13,6 +13,7 @@ import { WarehouseAccessDenied } from "../../_warehouse_sections/WarehouseAccess
 import { WarehouseDraftPanelTabs } from "../../_warehouse_sections/WarehouseDraftPanelTabs";
 import { readCurrentOperator } from "../../login/useCurrentOperator";
 import { MobileIoComposeWizard } from "../warehouse/MobileIoComposeWizard";
+import { MobileDirtyLeaveSheet } from "../warehouse/MobileDirtyLeaveSheet";
 
 // 탭 전환 remount 사이 직전 카운트 보존 (세션 내 메모리 캐시) — DesktopWarehouseView 와 동일.
 const cartCountCache = new Map<string, number>();
@@ -59,6 +60,10 @@ export function MobileWarehouseScreen({
     return eid ? deptQueueCountCache.get(eid) ?? 0 : 0;
   });
   const [restoreIoDraft, setRestoreIoDraft] = useState<IoBatch | null>(null);
+  // D2 — compose 작성 중(담은 묶음 있음) 다른 섹션 이탈 가드.
+  const [composeDirty, setComposeDirty] = useState(false);
+  const [pendingTab, setPendingTab] = useState<WarehouseSectionTab | null>(null);
+  const flushDraftRef = useRef<(() => void) | null>(null);
 
   const operatorEmployeeId = operator?.employee_id ?? employeeId;
   const canSeeQueue =
@@ -115,13 +120,22 @@ export function MobileWarehouseScreen({
     onStatusChange("구형 장바구니는 새 입출고 화면에서 직접 복원되지 않습니다.");
   }
 
+  // compose 에서 작성 중인데 다른 섹션으로 이동하려 하면 확인 시트로 가드.
+  function handleSectionChange(next: WarehouseSectionTab) {
+    if (sectionTab === "compose" && next !== "compose" && composeDirty) {
+      setPendingTab(next);
+      return;
+    }
+    setSectionTab(next);
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex flex-col gap-2 px-3 pt-3">
         <WarehouseHeader loadFailure={loadFailure} />
         <WarehouseSectionTabs
           active={sectionTab}
-          onChange={setSectionTab}
+          onChange={handleSectionChange}
           showQueue={canSeeQueue}
           showDeptQueue={canSeeDeptQueue}
           cartCount={cartCount}
@@ -141,6 +155,8 @@ export function MobileWarehouseScreen({
             setItems={setItems}
             preselectedItem={preselectedItem}
             restoreDraft={restoreIoDraft}
+            onDirtyChange={setComposeDirty}
+            flushDraftRef={flushDraftRef}
             onStatusChange={(status) => {
               onStatusChange(status);
               setPanelRefreshNonce((n) => n + 1);
@@ -179,6 +195,18 @@ export function MobileWarehouseScreen({
           </div>
         )}
       </div>
+
+      <MobileDirtyLeaveSheet
+        open={pendingTab !== null}
+        onCancel={() => setPendingTab(null)}
+        onConfirm={() => {
+          flushDraftRef.current?.(); // 700ms 디바운스 창의 마지막 변경까지 즉시 저장
+          const next = pendingTab;
+          setPendingTab(null);
+          setComposeDirty(false);
+          if (next) setSectionTab(next);
+        }}
+      />
     </div>
   );
 }
