@@ -116,9 +116,10 @@ function BomTreeItem({
 
         {/* 우측 메타: 부서 · 코드 · 수량 — 부모 행 컬럼에 맞춰 정렬.
             col1=부서(분류) · col2=코드(+10 우측끝) · col3=빈(가능재고) · col4=수량(실행후) · col5=빈(삭제) */}
+        {/* 모바일: 부서·코드·수량을 컴팩트 flex로(고정 34rem 제거 → 우측 ×수량 잘림 방지).
+            데스크톱(lg): 부모 7열 행과 정렬되도록 34rem 5열 그리드 복원. */}
         <span
-          className="ml-auto grid shrink-0 items-center pr-4"
-          style={{ width: "34rem", gridTemplateColumns: "4rem 1fr 4rem 3rem 2.5rem", columnGap: "1.5rem" }}
+          className="ml-auto flex shrink-0 items-center justify-end gap-x-2 pr-4 lg:grid lg:w-[34rem] lg:gap-x-0 lg:[grid-template-columns:4rem_1fr_4rem_3rem_2.5rem] lg:[column-gap:1.5rem]"
         >
           {/* 부서 — 색 = 1차 앵커. 좌정렬 */}
           <span className="flex min-w-0 justify-start">
