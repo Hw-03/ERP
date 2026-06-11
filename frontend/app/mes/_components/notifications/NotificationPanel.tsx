@@ -2,6 +2,7 @@
 
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
+import { REQUEST_TYPE_LABEL } from "@/lib/io/glossary";
 import type { AppNotification } from "@/lib/api/types";
 
 const TONE: Record<string, string> = {
@@ -10,6 +11,18 @@ const TONE: Record<string, string> = {
   approval_rejected: LEGACY_COLORS.red,
   handover_arrived: LEGACY_COLORS.purple,
 };
+
+/**
+ * 알림 본문 정리 — 백엔드가 본문에 request_type 원시값(예: "warehouse_to_dept")을
+ * 그대로 넣는 경우(notifications.py `_summary`)를 화면에서 한국어 라벨로 치환한다.
+ * 본문은 " · " 구분 토큰("요청자 · 유형 · 코드") 이므로 토큰별로 라벨 매핑.
+ */
+function humanizeBody(body: string): string {
+  return body
+    .split(" · ")
+    .map((tok) => REQUEST_TYPE_LABEL[tok] ?? tok)
+    .join(" · ");
+}
 
 function timeLabel(iso: string): string {
   const d = new Date(iso);
@@ -78,7 +91,7 @@ export function NotificationPanel({
                 </div>
                 {n.body && (
                   <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
-                    {n.body}
+                    {humanizeBody(n.body)}
                   </span>
                 )}
               </button>

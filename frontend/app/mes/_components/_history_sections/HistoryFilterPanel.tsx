@@ -2,6 +2,7 @@
 
 import { Layers, RotateCcw, Sparkles, TrendingUp } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { normalizeDepartment } from "@/lib/mes/department";
 import { FilterChip } from "../common";
 import { OPERATION_OPTIONS } from "./historyQuery";
 
@@ -55,7 +56,8 @@ export function HistoryFilterPanel({
           <FilterChip
             key={name}
             active={selectedDepts.includes(name)}
-            label={`${name} ${count.toLocaleString()}`}
+            // 표시는 정규화(더티 "DepartmentEnum.X" 방어), 필터 값은 raw 유지 → 매칭 정확
+            label={`${normalizeDepartment(name)} ${count.toLocaleString()}`}
             onClick={() => toggleDept(name)}
             tone={LEGACY_COLORS.green}
             className="w-full"

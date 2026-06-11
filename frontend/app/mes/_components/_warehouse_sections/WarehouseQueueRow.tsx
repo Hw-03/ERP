@@ -4,7 +4,7 @@ import type { StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { formatQty } from "@/lib/mes/format";
-import { REQUEST_TYPE_LABEL } from "./ioRequestLabels";
+import { REQUEST_TYPE_LABEL, formatRequestNotes } from "./ioRequestLabels";
 
 /**
  * Round-13 (#4) 추출 — WarehouseQueuePanel 의 단일 request 행.
@@ -43,6 +43,8 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
     closeApprove, closeReject,
     submitApprove, submitReject,
   } = props;
+
+  const noteText = formatRequestNotes(req.notes);
 
   return (
     <div
@@ -91,9 +93,9 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
         ))}
       </div>
 
-      {req.notes && (
+      {noteText && (
         <div className="mt-2 text-xs" style={{ color: LEGACY_COLORS.muted }}>
-          비고: {req.notes}
+          비고: {noteText}
         </div>
       )}
 

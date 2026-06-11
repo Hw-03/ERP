@@ -4,7 +4,7 @@ import type { StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { formatQty } from "@/lib/mes/format";
-import { REQUEST_TYPE_LABEL } from "./ioRequestLabels";
+import { REQUEST_TYPE_LABEL, formatRequestNotes } from "./ioRequestLabels";
 
 /**
  * Round-13 (#7) 추출 — DraftCartPanel 의 단일 draft 카드.
@@ -25,6 +25,7 @@ export function DraftCartItemRow({
   onRequestDelete,
 }: DraftCartItemRowProps) {
   const totalQty = draft.lines.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
+  const noteText = formatRequestNotes(draft.notes);
 
   return (
     <div
@@ -79,9 +80,9 @@ export function DraftCartItemRow({
           참조: {draft.reference_no}
         </div>
       )}
-      {draft.notes && (
+      {noteText && (
         <div className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted }}>
-          비고: {draft.notes}
+          비고: {noteText}
         </div>
       )}
 

@@ -227,7 +227,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename }: Props
         </div>
       </td>
       <td
-        className="border-b px-4 py-5 text-center align-middle whitespace-nowrap text-sm font-bold"
+        className="border-b px-4 py-5 text-right sm:text-center align-middle whitespace-nowrap text-sm font-bold"
         style={{
           borderColor: LEGACY_COLORS.border,
           color: isCritical ? stock.color : LEGACY_COLORS.text,

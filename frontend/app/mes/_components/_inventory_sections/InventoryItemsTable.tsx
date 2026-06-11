@@ -129,7 +129,7 @@ export function InventoryItemsTable({
               {/* 현재고 — 정렬 가능 */}
               <th
                 scope="col"
-                className="border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap text-center cursor-pointer select-none hover:brightness-110"
+                className="border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap text-right sm:text-center cursor-pointer select-none hover:brightness-110"
                 style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: "160px" }}
                 onClick={() => handleSort("quantity")}
                 aria-sort={sortCol === "quantity" ? (sortDir === "asc" ? "ascending" : "descending") : "none"}

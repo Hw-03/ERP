@@ -108,9 +108,13 @@ export const REQUEST_TYPE_LABEL: Record<string, string> = {
   mark_defective_prod: "생산 불량 등록",
   supplier_return: "원자재 반품",
   manual_adjustment: "수동 조정",
+  package_out: "출하",
   defect_scrap: "불량 처리",
   defect_return: "원자재 반품",
   defect_disassemble: "불량 분해",
+  // R 정상 재고 바로 처리 (격리 미경유)
+  scrap_normal: "정상 폐기",
+  return_normal: "정상 반품",
 };
 
 // ──────────────────────────────────────────────────────────────────

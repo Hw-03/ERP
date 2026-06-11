@@ -5,7 +5,7 @@ import type { StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { formatQty } from "@/lib/mes/format";
-import { REQUEST_TYPE_LABEL } from "./ioRequestLabels";
+import { REQUEST_TYPE_LABEL, formatRequestNotes } from "./ioRequestLabels";
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "임시저장",
@@ -52,7 +52,8 @@ export function MyRequestRow({
   const typeLabel = REQUEST_TYPE_LABEL[req.request_type] ?? req.request_type;
   const statusColor = STATUS_COLOR[req.status] ?? LEGACY_COLORS.muted2;
   const [notesExpanded, setNotesExpanded] = useState(false);
-  const notesLong = (req.notes ?? "").length > 60;
+  const displayNotes = formatRequestNotes(req.notes);
+  const notesLong = (displayNotes ?? "").length > 60;
 
   const firstLine = req.lines[0];
   const fromDept = firstLine?.from_department ? normalizeDepartment(firstLine.from_department) : null;
@@ -116,14 +117,14 @@ export function MyRequestRow({
         )}
       </div>
 
-      {req.notes && (
+      {displayNotes && (
         <div className="mt-2 text-xs" style={{ color: LEGACY_COLORS.muted }}>
           <span className="font-bold">비고:</span>{" "}
           <span
             className={!notesExpanded && notesLong ? "line-clamp-2" : undefined}
             style={{ whiteSpace: "pre-wrap" }}
           >
-            {req.notes}
+            {displayNotes}
           </span>
           {notesLong && (
             <button
