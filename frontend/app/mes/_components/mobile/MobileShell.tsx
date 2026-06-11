@@ -8,7 +8,6 @@ import {
   History as HistoryIcon,
   MapPinned,
   MoreHorizontal,
-  Settings2,
   Warehouse,
   type LucideIcon,
 } from "lucide-react";
@@ -20,7 +19,6 @@ import {
   MobileHistoryScreen,
   MobileWeeklyScreen,
   MobileWarehouseMapScreen,
-  MobileAdminScreen,
 } from "./screens";
 import { WeeklyWeekPicker, getWeekStartMonday } from "../_weekly_sections/WeeklyWeekPicker";
 import { api, type ProductionCapacity } from "@/lib/api";
@@ -31,9 +29,9 @@ import { NotificationBell } from "../notifications/NotificationBell";
 import { canEnterIO } from "../_warehouse_steps";
 import { MobileUserMenuSheet } from "./MobileUserMenuSheet";
 import { MobileMoreSheet } from "./MobileMoreSheet";
-import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 
-export type MobileTabId = "dashboard" | "warehouse" | "defect" | "history" | "weekly" | "warehouseMap" | "admin";
+// 관리(admin)는 모바일에서 제외 — 관리 작업은 데스크톱(PC)에서 한다.
+export type MobileTabId = "dashboard" | "warehouse" | "defect" | "history" | "weekly" | "warehouseMap";
 
 const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
   dashboard: { label: "대시보드", icon: Boxes },
@@ -42,15 +40,13 @@ const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
   history: { label: "내역", icon: HistoryIcon },
   weekly: { label: "주간보고", icon: BarChart2 },
   warehouseMap: { label: "창고지도", icon: MapPinned },
-  admin: { label: "관리", icon: Settings2 },
 };
 
-// 하단 탭바에 노출되는 4탭. 나머지(주간보고·관리 등)는 하단 더보기 시트로 진입.
-// content useMemo·?tab= 딥링크는 7종 전체를 그대로 다루므로 마운트 경로는 유지된다.
+// 하단 탭바에 노출되는 4탭. 나머지(주간보고·창고지도)는 하단 더보기 시트로 진입.
 const TAB_BAR_IDS: MobileTabId[] = ["dashboard", "warehouse", "defect", "history"];
 
-// 마운트 딥링크(?tab=)·알림 네비가 받아들이는 유효 탭 집합(7종). 알 수 없는 값이 들어오면
-// activeTab 이 오염돼 content useMemo 가 엉뚱한 화면으로 떨어지므로 진입 전 검증한다.
+// 마운트 딥링크(?tab=)·알림 네비가 받아들이는 유효 탭 집합. 알 수 없는 값(예: admin)이
+// 들어오면 무시되어 기본 dashboard 가 유지된다.
 const VALID_TAB_IDS: MobileTabId[] = [
   "dashboard",
   "warehouse",
@@ -58,7 +54,6 @@ const VALID_TAB_IDS: MobileTabId[] = [
   "history",
   "weekly",
   "warehouseMap",
-  "admin",
 ];
 
 let _toastSeq = 0;
@@ -166,9 +161,7 @@ export function MobileShell() {
 
   const handleTabChange = useCallback((tab: MobileTabId) => {
     if (tab === activeTab) {
-      if (tab !== "admin") {
-        setRefreshNonce((n) => n + 1);
-      }
+      setRefreshNonce((n) => n + 1);
       return;
     }
     setActiveTab(tab);
@@ -204,7 +197,7 @@ export function MobileShell() {
   }, [operator]);
 
   const content = useMemo(() => {
-    const key = activeTab === "admin" ? "admin" : `${activeTab}-${refreshNonce}`;
+    const key = `${activeTab}-${refreshNonce}`;
     if (activeTab === "dashboard") {
       return (
         <MobileDashboardScreen
@@ -242,7 +235,7 @@ export function MobileShell() {
     if (activeTab === "warehouseMap") {
       return <MobileWarehouseMapScreen key={key} onStatusChange={handleStatusChange} />;
     }
-    return <MobileAdminScreen key={key} globalSearch="" onStatusChange={handleStatusChange} />;
+    return null;
   }, [
     activeTab,
     refreshNonce,
@@ -257,7 +250,6 @@ export function MobileShell() {
   ]);
 
   return (
-    <DirtyGuardProvider>
     <div className="h-[100dvh] overflow-hidden sm:bg-black" data-testid="mobile-shell">
       <div
         className="flex h-full flex-col overflow-hidden"
@@ -343,7 +335,7 @@ export function MobileShell() {
                 onClick={() => handleTabChange(tab)}
               />
             ))}
-            {/* 더보기 — 강등된 화면(주간보고·창고지도·관리)으로의 진입.
+            {/* 더보기 — 강등된 화면(주간보고·창고지도)으로의 진입.
                 실제 탭 전환이 아니라 시트만 열므로 항상 비활성 스타일. */}
             <NavButton
               key="__more"
@@ -413,9 +405,7 @@ export function MobileShell() {
         onClose={() => setMoreSheetOpen(false)}
         onWeekly={() => handleTabChange("weekly")}
         onWarehouseMap={() => handleTabChange("warehouseMap")}
-        onAdmin={() => handleTabChange("admin")}
       />
     </div>
-    </DirtyGuardProvider>
   );
 }
