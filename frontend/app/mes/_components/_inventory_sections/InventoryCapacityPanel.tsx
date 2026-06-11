@@ -100,7 +100,11 @@ export function InventoryCapacityPanel({
         )
       )}
       {interactive && (
-        <span className="ml-auto shrink-0 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+        // 모바일: 칩과 겹치지 않게 자기 줄(전체폭·우측정렬)로 내림. 데스크톱(lg): 기존 인라인 우측.
+        <span
+          className="mt-0.5 w-full shrink-0 text-right text-sm lg:mt-0 lg:ml-auto lg:w-auto"
+          style={{ color: LEGACY_COLORS.muted2 }}
+        >
           자세히 보기
         </span>
       )}
