@@ -7,7 +7,7 @@ import {
   Boxes,
   History as HistoryIcon,
   MapPinned,
-  MoreVertical,
+  MoreHorizontal,
   Settings2,
   Warehouse,
   type LucideIcon,
@@ -56,6 +56,54 @@ interface ToastItem {
   type: "success" | "error" | "info";
 }
 
+/**
+ * 하단 탭바 버튼 — 4개 탭 + "더보기"가 같은 형태를 공유한다.
+ * 활성 표시: 데스크톱 사이드바 톤에 맞춰 또렷한 blue tint pill + 고정 strokeWidth.
+ */
+function NavButton({
+  icon: Icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-h-[52px] flex-1 flex-col items-center justify-center gap-1 py-1 transition-[transform] active:scale-[0.92]"
+      aria-label={label}
+      aria-current={active ? "page" : undefined}
+    >
+      <span
+        className="relative inline-flex h-9 w-10 items-center justify-center rounded-full transition-colors"
+        style={{
+          background: active
+            ? `color-mix(in srgb, ${LEGACY_COLORS.blue as string} 16%, transparent)`
+            : "transparent",
+        }}
+      >
+        <Icon size={20} strokeWidth={2} color={active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2} />
+      </span>
+      <div
+        className="text-xs"
+        style={{
+          // WCAG AA: active blue(#2f74e7) 는 흰 배경서 4.14:1 로 미달 →
+          // 활성은 진한 text 색 + bold, 비활성은 muted2(5.55:1) 로 대비 확보.
+          color: active ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
+          fontWeight: active ? 800 : 600,
+        }}
+      >
+        {label}
+      </div>
+    </button>
+  );
+}
+
 export function MobileShell() {
   const operator = useCurrentOperator();
   const [activeTab, setActiveTab] = useState<MobileTabId>("dashboard");
@@ -86,10 +134,18 @@ export function MobileShell() {
   const handleStatusChange = useCallback((msg: string) => {
     const isError = /실패|못했습니다|오류|에러|부족|품절/.test(msg);
     const type: ToastItem["type"] = isError ? "error" : "info";
+    const id = ++_toastSeq;
     setToastQueue((q: ToastItem[]) => {
-      const next = [...q, { id: ++_toastSeq, msg, type }];
+      const next = [...q, { id, msg, type }];
       return next.slice(-5); // 최대 5건 유지
     });
+    // info/success 는 routine 알림 — 3.5초 후 자동 소멸(품목 선택마다 쌓여 화면을
+    // 가리는 문제 해소). error 는 수동 닫기 유지(느린 네트워크/청각 보조 대응).
+    if (type !== "error") {
+      setTimeout(() => {
+        setToastQueue((q: ToastItem[]) => q.filter((t: ToastItem) => t.id !== id));
+      }, 3500);
+    }
   }, []);
 
   const dismissToast = useCallback((id: number) => {
@@ -243,17 +299,6 @@ export function MobileShell() {
               {operator.name[0] ?? "?"}
             </button>
           )}
-          {operator && (
-            <button
-              type="button"
-              onClick={() => setMoreSheetOpen(true)}
-              aria-label="더보기"
-              className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-opacity active:opacity-70"
-              style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
-            >
-              <MoreVertical size={20} />
-            </button>
-          )}
         </header>
 
         <main className="relative flex-1 overflow-hidden flex" data-testid="screen-root">
@@ -270,44 +315,24 @@ export function MobileShell() {
           }}
         >
           <div className="flex px-2 pt-2">
-            {visibleTabs.map((tab) => {
-              const active = tab === activeTab;
-              const meta = TAB_META[tab];
-              const Icon = meta.icon;
-              return (
-                <button
-                  key={tab}
-                  onClick={() => handleTabChange(tab)}
-                  className="flex min-h-[52px] flex-1 flex-col items-center justify-center gap-1 py-1 transition-[transform] active:scale-[0.92]"
-                  aria-label={meta.label}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <span
-                    className="relative inline-flex h-9 w-12 items-center justify-center rounded-full transition-colors"
-                    style={{
-                      background: active ? `${LEGACY_COLORS.blue as string}1f` : "transparent",
-                    }}
-                  >
-                    <Icon
-                      size={20}
-                      strokeWidth={active ? 2.25 : 1.75}
-                      color={active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2}
-                    />
-                  </span>
-                  <div
-                    className="text-xs"
-                    style={{
-                      // WCAG AA: active blue(#2f74e7) 는 흰 배경서 4.14:1 로 미달 →
-                      // 활성은 진한 text 색 + bold, 비활성은 muted2(5.55:1) 로 대비 확보.
-                      color: active ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
-                      fontWeight: active ? 800 : 600,
-                    }}
-                  >
-                    {meta.label}
-                  </div>
-                </button>
-              );
-            })}
+            {visibleTabs.map((tab) => (
+              <NavButton
+                key={tab}
+                icon={TAB_META[tab].icon}
+                label={TAB_META[tab].label}
+                active={tab === activeTab}
+                onClick={() => handleTabChange(tab)}
+              />
+            ))}
+            {/* 더보기 — 강등된 화면(주간보고·창고지도·관리)으로의 진입.
+                실제 탭 전환이 아니라 시트만 열므로 항상 비활성 스타일. */}
+            <NavButton
+              key="__more"
+              icon={MoreHorizontal}
+              label="더보기"
+              active={false}
+              onClick={() => setMoreSheetOpen(true)}
+            />
           </div>
         </nav>
       </div>
