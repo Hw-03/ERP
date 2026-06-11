@@ -44,9 +44,21 @@ const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
   admin: { label: "관리", icon: Settings2 },
 };
 
-// 하단 탭바에 노출되는 4탭. 나머지(주간보고·관리 등)는 헤더 더보기(⋮) 시트로 진입.
-// content useMemo·?tab= 딥링크는 6종 전체를 그대로 다루므로 마운트 경로는 유지된다.
+// 하단 탭바에 노출되는 4탭. 나머지(주간보고·관리 등)는 하단 더보기 시트로 진입.
+// content useMemo·?tab= 딥링크는 7종 전체를 그대로 다루므로 마운트 경로는 유지된다.
 const TAB_BAR_IDS: MobileTabId[] = ["dashboard", "warehouse", "defect", "history"];
+
+// 마운트 딥링크(?tab=)·알림 네비가 받아들이는 유효 탭 집합(7종). 알 수 없는 값이 들어오면
+// activeTab 이 오염돼 content useMemo 가 엉뚱한 화면으로 떨어지므로 진입 전 검증한다.
+const VALID_TAB_IDS: MobileTabId[] = [
+  "dashboard",
+  "warehouse",
+  "defect",
+  "history",
+  "weekly",
+  "warehouseMap",
+  "admin",
+];
 
 let _toastSeq = 0;
 
@@ -119,8 +131,7 @@ export function MobileShell() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const t = params.get("tab");
-    const valid: MobileTabId[] = ["dashboard", "warehouse", "defect", "history", "weekly", "warehouseMap", "admin"];
-    if (t && (valid as string[]).includes(t)) setActiveTab(t as MobileTabId);
+    if (t && (VALID_TAB_IDS as string[]).includes(t)) setActiveTab(t as MobileTabId);
     const d = params.get("defect_dept");
     if (d) setDefectDeptFilter(d);
   }, []);
@@ -284,7 +295,13 @@ export function MobileShell() {
           {operator && (
             <div className="ml-2 shrink-0">
               <NotificationBell
-                onNavigate={(tab) => handleTabChange(tab as MobileTabId)}
+                onNavigate={(tab) => {
+                  // 알림이 가리키는 탭이 유효할 때만 전환(숨김탭 weekly/warehouseMap/admin
+                  // 도 화면은 정상 렌더). 알 수 없는 값이면 무시해 오작동 방지.
+                  if ((VALID_TAB_IDS as string[]).includes(tab)) {
+                    handleTabChange(tab as MobileTabId);
+                  }
+                }}
               />
             </div>
           )}
