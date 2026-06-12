@@ -30,6 +30,7 @@ export interface QuarantinePayload {
   reason_category?: string | null;
   reason_memo: string;
   actor_employee_id: string;
+  client_request_id?: string;
 }
 
 export interface UnquarantinePayload {

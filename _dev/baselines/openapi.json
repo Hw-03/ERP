@@ -4920,6 +4920,17 @@
             "title": "Actor Employee Id",
             "type": "string"
           },
+          "client_request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
