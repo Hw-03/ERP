@@ -111,7 +111,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, compact }: Props) {
         <div className="flex items-center justify-center gap-1.5">
           {/* 묶음 행 chevron 폭과 같은 spacer — 일시 정렬 축을 맞춤. */}
           <span aria-hidden className="inline-block h-5 w-5 shrink-0" />
-          {formatHistoryDate(log.created_at)}
+          {formatHistoryDate(log.requested_at ?? log.created_at)}
         </div>
       </td>
       <td className={`whitespace-nowrap border-b ${padX} py-3 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>

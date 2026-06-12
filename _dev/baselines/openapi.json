@@ -5973,6 +5973,18 @@
       },
       "TransactionLogResponse": {
         "properties": {
+          "approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
           "approver_name": {
             "anyOf": [
               {
@@ -6116,6 +6128,18 @@
               }
             ],
             "title": "Reference No"
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At"
           },
           "requester_name": {
             "anyOf": [

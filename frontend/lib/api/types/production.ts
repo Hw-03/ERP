@@ -22,6 +22,10 @@ export interface TransactionLog {
   requester_name: string | null;
   /** 승인자(요청을 수락한 사람). 직접 처리 시 = 요청자. */
   approver_name: string | null;
+  /** 요청 시각: 배치 submitted_at ?? created_at, 없으면 log.created_at. */
+  requested_at?: string | null;
+  /** 승인 시각: 별도 결재 시 StockRequest.approved_at, 아니면 log.created_at. */
+  approved_at?: string | null;
   notes: string | null;
   operation_batch_id: string | null;
   created_at: string;

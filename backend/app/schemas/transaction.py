@@ -69,6 +69,8 @@ class TransactionLogResponse(BaseModel):
     requester_name: Optional[str] = None
     # 승인자(요청을 수락한 사람). 직접 처리 시 = 요청자.
     approver_name: Optional[str] = None
+    requested_at: Optional[UtcDatetime] = None  # 요청 시각 (배치 submitted_at ?? created_at, 없으면 log.created_at)
+    approved_at: Optional[UtcDatetime] = None   # 승인 시각 (별도 결재 시 StockRequest.approved_at, 아니면 log.created_at)
     notes: Optional[str]
     operation_batch_id: Optional[uuid.UUID] = None
     created_at: UtcDatetime

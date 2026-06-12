@@ -228,23 +228,24 @@ function HistoryBatchHero({
         </div>
       )}
 
-      {/* 4줄: 메타 — 일시 / 요청자 / 승인자 */}
+      {/* 4줄: 메타 — 요청자(시각) / 승인자(시각) */}
       <div className="flex flex-col gap-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-        <span>{formatHistoryDateTimeLong(first.created_at)}</span>
         <span>
           요청자{" "}
           <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>
             {reqName}
           </span>
+          {" "}
+          {formatHistoryDateTimeLong(first.requested_at ?? first.created_at)}
         </span>
-        {approverName && (
-          <span>
-            승인자{" "}
-            <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>
-              {approverName}
-            </span>
+        <span>
+          승인자{" "}
+          <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>
+            {approverName ?? reqName}
           </span>
-        )}
+          {" "}
+          {formatHistoryDateTimeLong(first.approved_at ?? first.created_at)}
+        </span>
       </div>
     </div>
   );

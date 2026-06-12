@@ -91,7 +91,7 @@ export function MobileHistoryList({
                   {getHistoryDisplayLabel(log)}
                 </span>
                 <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {formatHistoryDate(log.created_at)}
+                  {formatHistoryDate(log.requested_at ?? log.created_at)}
                 </span>
               </div>
               <div className="mt-2 flex items-center gap-1.5">
@@ -143,7 +143,7 @@ export function MobileHistoryList({
                 {getHistoryDisplayLabel(first)}
               </span>
               <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
-                {formatHistoryDate(first.created_at)}
+                {formatHistoryDate(first.requested_at ?? first.created_at)}
               </span>
             </div>
             <div className="mt-2 flex items-center gap-1.5">

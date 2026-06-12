@@ -290,7 +290,7 @@ export function BatchHeader({
       <td className={`whitespace-nowrap border-b ${padX} py-3 text-xs`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, transition: HISTORY_CELL_TRANSITION }}>
         <div className="flex items-center justify-center gap-1.5">
           <ChevronToggleBtn expanded={expanded} onToggle={onToggle} />
-          {formatHistoryDate(first.created_at)}
+          {formatHistoryDate(first.requested_at ?? first.created_at)}
         </div>
       </td>
       <td className={`whitespace-nowrap border-b ${padX} py-3 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
@@ -398,7 +398,7 @@ export function OpBatchHeader({
       <td className={`whitespace-nowrap border-b ${padX} py-3 text-xs`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, transition: HISTORY_CELL_TRANSITION }}>
         <div className="flex items-center justify-center gap-1.5">
           <ChevronToggleBtn expanded={expanded} onToggle={onToggle} />
-          {formatHistoryDate(first.created_at)}
+          {formatHistoryDate(first.requested_at ?? first.created_at)}
         </div>
       </td>
       <td className={`whitespace-nowrap border-b ${padX} py-3 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
