@@ -88,6 +88,7 @@ from app.services.sr_approval import (  # noqa: F401
     FailedApprovalError,
     approve_request,
     approve_request_department,
+    cancel_open_stock_requests,
     cancel_request,
     mark_failed_approval,
     reject_request,

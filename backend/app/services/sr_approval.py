@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 
 from fastapi import Request
@@ -15,10 +17,12 @@ from app.models import (
     StockRequestStatusEnum,
     StockRequestTypeEnum,
 )
+from app.services import inventory as inventory_svc
 from app.services.dept_hierarchy import can_approve_department
 from app.services.io_persist import sync_batch_from_stock_request
 from app.services.pin_auth import verify_pin
 from app.services.sr_execution import _execute_all_lines, release_reservation
+from app.services.sr_validation import line_requires_pending
 
 # 주의: io_dispatch.execute_batch_after_dept_approval 만 함수 내부 지연 import 한다.
 # 정적 import 하면 순환 고리가 닫힌다:
@@ -180,6 +184,25 @@ def approve_request_department(
     return request
 
 
+def _release_pending_best_effort(db: Session, request: StockRequest) -> None:
+    """pending_quantity를 요청 라인만큼 best-effort로 해제.
+
+    pending이 이미 0이거나 부족하면 ValueError를 무시하고 넘어간다(no-op).
+    재고 리셋 후 고아가 된 요청을 안전하게 정리할 때 사용.
+    """
+    pending_lines = [
+        line for line in request.lines if line_requires_pending(line.from_bucket, line.to_bucket)
+    ]
+    agg: dict[uuid.UUID, Decimal] = {}
+    for line in pending_lines:
+        agg[line.item_id] = agg.get(line.item_id, Decimal("0")) + (line.quantity or Decimal("0"))
+    for item_id, qty in agg.items():
+        try:
+            inventory_svc.release(db, item_id, qty)
+        except ValueError:
+            pass  # 이미 release 됐거나 pending=0 — 무시.
+
+
 def mark_failed_approval(
     db: Session,
     request: StockRequest,
@@ -192,23 +215,7 @@ def mark_failed_approval(
     원래 트랜잭션이 rollback 된 직후 별도 트랜잭션에서 호출. release 는 다시 시도한다.
     이미 release 된 상태이거나 pending 이 부족하면 release() 가 ValueError → 무시.
     """
-    from app.services import inventory as inventory_svc
-    from app.services.sr_validation import line_requires_pending
-    import uuid
-    from decimal import Decimal
-
-    pending_lines = [
-        line for line in request.lines if line_requires_pending(line.from_bucket, line.to_bucket)
-    ]
-    agg: dict[uuid.UUID, Decimal] = {}
-    for line in pending_lines:
-        agg[line.item_id] = agg.get(line.item_id, Decimal("0")) + (line.quantity or Decimal("0"))
-    for item_id, qty in agg.items():
-        try:
-            inventory_svc.release(db, item_id, qty)
-        except ValueError:
-            # 이미 release 됨 — 무시.
-            pass
+    _release_pending_best_effort(db, request)
 
     now = datetime.utcnow()
     request.status = StockRequestStatusEnum.FAILED_APPROVAL
@@ -341,3 +348,34 @@ def cancel_request(
         line.status = StockRequestStatusEnum.CANCELLED
     sync_batch_from_stock_request(db, request)
     return request
+
+
+def cancel_open_stock_requests(db: Session, *, reason: str) -> int:
+    """RESERVED/SUBMITTED 상태인 미결 요청을 모두 CANCELLED로 일괄 전이.
+
+    권한·PIN 검증 없는 시스템 정리 전용. 재고 리셋/재적재 직전에 호출해
+    inventory.pending 과 stock_requests 상태 불일치를 예방한다.
+
+    pending은 남은 만큼만 best-effort 해제(pending=0이어도 안전).
+    commit은 호출측 책임 — 이 함수는 flush만 한다.
+
+    Returns:
+        취소 처리된 요청 건수.
+    """
+    open_statuses = (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED)
+    open_requests = (
+        db.query(StockRequest)
+        .filter(StockRequest.status.in_(open_statuses))
+        .all()
+    )
+    now = datetime.utcnow()
+    for req in open_requests:
+        _release_pending_best_effort(db, req)
+        req.status = StockRequestStatusEnum.CANCELLED
+        req.cancelled_at = now
+        for line in req.lines:
+            line.status = StockRequestStatusEnum.CANCELLED
+        sync_batch_from_stock_request(db, req)
+    if open_requests:
+        db.flush()
+    return len(open_requests)
