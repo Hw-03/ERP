@@ -10,6 +10,7 @@ import { WarehouseAccessDenied } from "./_warehouse_sections/WarehouseAccessDeni
 import { WarehouseDraftPanelTabs } from "./_warehouse_sections/WarehouseDraftPanelTabs";
 import { IoComposeView } from "./_warehouse_v2/IoComposeView";
 import { readCurrentOperator } from "./login/useCurrentOperator";
+import type { IoEntryIntent } from "./_warehouse_v2/types";
 
 // 탭 전환 remount 사이 직전 카운트 보존 (세션 내 메모리 캐시).
 // 새로고침 시 휘발 — 첫 진입은 항상 fresh fetch.
@@ -24,11 +25,13 @@ export function DesktopWarehouseView({
   globalSearch,
   onStatusChange,
   preselectedItem,
+  entryIntent,
   onSubmitSuccess,
 }: {
   globalSearch: string;
   onStatusChange: (status: string) => void;
   preselectedItem?: Item | null;
+  entryIntent?: IoEntryIntent | null;
   onSubmitSuccess?: () => void;
 }) {
   const { employees, items, productModels, loadFailure, setItems } = useWarehouseData({
@@ -187,6 +190,7 @@ export function DesktopWarehouseView({
             setItems={setItems}
             preselectedItem={preselectedItem}
             restoreDraft={restoreIoDraft}
+            entryIntent={entryIntent}
             onStatusChange={(status) => {
               onStatusChange(status);
               setPanelRefreshNonce((n) => n + 1);

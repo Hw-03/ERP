@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { api, type Item, type StockRequestReservationLine, type TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
@@ -11,18 +12,30 @@ import { ImageLightbox } from "@/lib/ui/ImageLightbox";
 import { useDeptColorLookup } from "../DepartmentsContext";
 import { InventoryDetailLogList } from "./InventoryDetailLogList";
 import { InventoryDetailLocations } from "./InventoryDetailLocations";
+import { BomSubExpander } from "../_warehouse_v2/BomSubExpander";
+import { inboundChoices, outboundChoices, quickChoiceToIntent } from "../_warehouse_v2/ioWorkType";
+import type { IoEntryIntent } from "../_warehouse_v2/types";
 
 type Props = {
   item: Item;
   logs: TransactionLog[];
-  onGoToWarehouse: (item: Item) => void;
+  onGoToWarehouse: (item: Item, intent?: IoEntryIntent) => void;
+  canReceive?: boolean;
   imageFilename?: string;
 };
 
-export function InventoryDetailPanel({ item, logs, onGoToWarehouse, imageFilename }: Props) {
+export function InventoryDetailPanel({ item, logs, onGoToWarehouse, canReceive = false, imageFilename }: Props) {
   const getDeptColor = useDeptColorLookup();
   const [reservations, setReservations] = useState<StockRequestReservationLine[]>([]);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [showBom, setShowBom] = useState(false);
+  const [ioMenu, setIoMenu] = useState<"in" | "out" | null>(null);
+
+  // 품목이 바뀌면 BOM 접기 + 팝업 닫기
+  useEffect(() => {
+    setShowBom(false);
+    setIoMenu(null);
+  }, [item.item_id]);
   const pendingQty = Number(item.pending_quantity) || 0;
   const availableQty = Number(item.available_quantity) || 0;
   const minStockRaw = item.min_stock == null ? 0 : Number(item.min_stock);
@@ -167,18 +180,109 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse, imageFilenam
         <InventoryDetailLocations item={item} getDeptColor={getDeptColor} />
       )}
 
+      {/* BOM 하위 구성 */}
+      {item.bom_completed_at != null && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowBom((v) => !v)}
+            className="flex w-full items-center gap-1.5 rounded-[14px] border px-4 py-2.5 text-sm font-semibold transition-colors"
+            style={{
+              borderColor: LEGACY_COLORS.border,
+              background: showBom ? LEGACY_COLORS.s3 : LEGACY_COLORS.s2,
+              color: LEGACY_COLORS.text,
+            }}
+          >
+            {showBom ? <ChevronDown size={15} strokeWidth={2.5} /> : <ChevronRight size={15} strokeWidth={2.5} />}
+            하위 구성 {showBom ? "접기" : "보기"}
+          </button>
+          {showBom && (
+            <div className="mt-2">
+              <BomSubExpander key={item.item_id} itemId={item.item_id} open={showBom} />
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 빠른 작업 */}
       <div>
         <div className="mb-2 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
           빠른 작업
         </div>
-        <button
-          onClick={() => onGoToWarehouse(item)}
-          className="w-full rounded-[18px] px-4 py-3.5 text-base font-bold text-white transition-opacity hover:opacity-90"
-          style={{ background: LEGACY_COLORS.blue }}
-        >
-          입출고 진행
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-1">
+            <button
+              type="button"
+              onClick={() => setIoMenu((m) => (m === "in" ? null : "in"))}
+              className="w-full rounded-[18px] px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
+              style={{ background: LEGACY_COLORS.blue }}
+            >
+              입고
+            </button>
+            {ioMenu === "in" && (
+              <div
+                className="flex flex-col gap-1 rounded-[14px] border p-2"
+                style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
+              >
+                {inboundChoices(canReceive).map((choice) => (
+                  <button
+                    key={choice.key}
+                    type="button"
+                    onClick={() => {
+                      setIoMenu(null);
+                      onGoToWarehouse(item, quickChoiceToIntent(choice.key));
+                    }}
+                    className="flex flex-col items-start rounded-[10px] px-3 py-2 text-left transition-colors hover:opacity-80"
+                    style={{ background: LEGACY_COLORS.s3 }}
+                  >
+                    <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
+                      {choice.label}
+                    </span>
+                    <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                      {choice.desc}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <button
+              type="button"
+              onClick={() => setIoMenu((m) => (m === "out" ? null : "out"))}
+              className="w-full rounded-[18px] px-4 py-3 text-sm font-bold transition-opacity hover:opacity-90"
+              style={{ background: LEGACY_COLORS.s3, color: LEGACY_COLORS.text, border: `1px solid ${LEGACY_COLORS.border}` }}
+            >
+              출고
+            </button>
+            {ioMenu === "out" && (
+              <div
+                className="flex flex-col gap-1 rounded-[14px] border p-2"
+                style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
+              >
+                {outboundChoices.map((choice) => (
+                  <button
+                    key={choice.key}
+                    type="button"
+                    onClick={() => {
+                      setIoMenu(null);
+                      onGoToWarehouse(item, quickChoiceToIntent(choice.key));
+                    }}
+                    className="flex flex-col items-start rounded-[10px] px-3 py-2 text-left transition-colors hover:opacity-80"
+                    style={{ background: LEGACY_COLORS.s3 }}
+                  >
+                    <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
+                      {choice.label}
+                    </span>
+                    <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+                      {choice.desc}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <InventoryDetailLogList logs={logs} />

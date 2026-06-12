@@ -27,6 +27,8 @@ import { CapacityDetailModal } from "../CapacityDetailModal";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { canEnterIO } from "../_warehouse_steps";
+import { canSeeWorkType } from "../_warehouse_v2/ioWorkType";
+import type { IoEntryIntent } from "../_warehouse_v2/types";
 import { MobileUserMenuSheet } from "./MobileUserMenuSheet";
 import { MobileMoreSheet } from "./MobileMoreSheet";
 
@@ -134,6 +136,7 @@ export function MobileShell() {
 
   const [weekMon, setWeekMon] = useState<Date>(() => getWeekStartMonday(new Date()));
   const [warehousePreselected, setWarehousePreselected] = useState<Item | null>(null);
+  const [warehouseIntent, setWarehouseIntent] = useState<IoEntryIntent | null>(null);
   const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
   const [capacityModal, setCapacityModal] = useState(false);
   const [stockWarnings, setStockWarnings] = useState<{ low: number; zero: number } | null>(null);
@@ -167,8 +170,11 @@ export function MobileShell() {
     setActiveTab(tab);
   }, [activeTab]);
 
-  const handleGoToWarehouse = useCallback((item: Item) => {
+  const canReceive = canSeeWorkType("receive", operator);
+
+  const handleGoToWarehouse = useCallback((item: Item, intent?: IoEntryIntent) => {
     setWarehousePreselected(item);
+    setWarehouseIntent(intent ?? null);
     setActiveTab("warehouse");
   }, []);
 
@@ -209,6 +215,7 @@ export function MobileShell() {
           onSummaryChange={setStockWarnings}
           capacityData={capacityData}
           onCapacityClick={() => setCapacityModal(true)}
+          canReceive={canReceive}
         />
       );
     }
@@ -219,6 +226,7 @@ export function MobileShell() {
           globalSearch=""
           onStatusChange={handleStatusChange}
           preselectedItem={warehousePreselected}
+          entryIntent={warehouseIntent}
           onSubmitSuccess={loadCapacity}
         />
       );
@@ -240,8 +248,10 @@ export function MobileShell() {
     activeTab,
     refreshNonce,
     warehousePreselected,
+    warehouseIntent,
     handleGoToWarehouse,
     handleStatusChange,
+    canReceive,
     capacityData,
     weekMon,
     handleTabChange,

@@ -35,14 +35,16 @@ export function DesktopInventoryView({
   onSummaryChange,
   capacityData,
   onCapacityClick,
+  canReceive,
 }: {
   globalSearch: string;
   onStatusChange: (status: string) => void;
-  onGoToWarehouse: (item: Item) => void;
+  onGoToWarehouse: (item: Item, intent?: import("./_warehouse_v2/types").IoEntryIntent) => void;
   onGoToWarehouseTab?: () => void;
   onSummaryChange?: (s: { low: number; zero: number }) => void;
   capacityData?: ProductionCapacity | null;
   onCapacityClick?: () => void;
+  canReceive?: boolean;
 }) {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [itemLogs, setItemLogs] = useState<TransactionLog[]>([]);
@@ -246,6 +248,7 @@ export function DesktopInventoryView({
         headerBadge={headerBadge}
         onClose={() => setSelectedItem(null)}
         onGoToWarehouse={onGoToWarehouse}
+        canReceive={canReceive}
         imageFilename={displayItem?.mes_code ? imageManifest[displayItem.mes_code] : undefined}
       />
     </div>

@@ -4,6 +4,7 @@ import type { Item, TransactionLog } from "@/lib/api";
 import { SlidePanel } from "../common";
 import { DesktopRightPanel } from "../DesktopRightPanel";
 import { InventoryDetailPanel } from "./InventoryDetailPanel";
+import type { IoEntryIntent } from "../_warehouse_v2/types";
 
 /**
  * Round-13 (#9) 추출 — DesktopInventoryView 우측 슬라이딩 상세 패널.
@@ -18,7 +19,8 @@ export interface DesktopInventoryRightPanelProps {
   itemLogs: TransactionLog[];
   headerBadge: React.ReactNode;
   onClose: () => void;
-  onGoToWarehouse: (item: Item) => void;
+  onGoToWarehouse: (item: Item, intent?: IoEntryIntent) => void;
+  canReceive?: boolean;
   imageFilename?: string;
 }
 
@@ -29,6 +31,7 @@ export function DesktopInventoryRightPanel({
   headerBadge,
   onClose,
   onGoToWarehouse,
+  canReceive,
   imageFilename,
 }: DesktopInventoryRightPanelProps) {
   return (
@@ -43,6 +46,7 @@ export function DesktopInventoryRightPanel({
             item={displayItem}
             logs={itemLogs}
             onGoToWarehouse={onGoToWarehouse}
+            canReceive={canReceive}
             imageFilename={imageFilename}
           />
         </DesktopRightPanel>
