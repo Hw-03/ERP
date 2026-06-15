@@ -18,7 +18,6 @@ from app.models import (
     StockRequestTypeEnum,
 )
 from app.services import inventory as inventory_svc
-from app.services import notifications as notif_svc
 from app.services.dept_hierarchy import can_approve_department
 from app.services.io_persist import sync_batch_from_stock_request
 from app.services.pin_auth import verify_pin
@@ -76,8 +75,6 @@ def approve_request(
         request.requires_department_approval
         and request.department_approved_by_employee_id is None
     ):
-        # 창고 승인 끝 → 부서 결재 차례. 부서 담당자에게 중간 알림 (라우터가 커밋).
-        notif_svc.notify_request_advanced(db, request)
         return request
 
     try:
@@ -154,8 +151,6 @@ def approve_request_department(
         request.requires_warehouse_approval
         and request.approved_by_employee_id is None
     ):
-        # 부서 승인 끝 → 창고 결재 차례. 창고 담당자에게 중간 알림 (라우터가 커밋).
-        notif_svc.notify_request_advanced(db, request)
         return request
 
     # 실행 경로 분기

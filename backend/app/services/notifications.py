@@ -140,54 +140,6 @@ def notify_request_arrived(db: Session, request: StockRequest) -> None:
         )
 
 
-def notify_request_advanced(db: Session, request: StockRequest) -> None:
-    """부분 승인으로 다음 결재 단계로 넘어간 요청 → 다음 결재 담당자에게 알림.
-
-    - 창고 승인 완료 & 부서 결재 대기 → 부서 결재자에게.
-    - 부서 승인 완료 & 창고 결재 대기 → 창고 정/부에게.
-    요청자 본인은 제외. 호출 안전 — 대기 상태가 아니거나 다음 단계가 없으면 no-op.
-    """
-    if request.status not in _PENDING_STATUSES:
-        return
-
-    recipients: Iterable[Employee]
-    if (
-        request.requires_warehouse_approval
-        and request.approved_by_employee_id is not None
-        and request.requires_department_approval
-        and request.department_approved_by_employee_id is None
-    ):
-        # 창고 승인 끝 → 부서 차례
-        recipients = recipients_for_department_approval(db, request.requester_department)
-        target_section = "dept-queue"
-    elif (
-        request.requires_department_approval
-        and request.department_approved_by_employee_id is not None
-        and request.requires_warehouse_approval
-        and request.approved_by_employee_id is None
-    ):
-        # 부서 승인 끝 → 창고 차례
-        recipients = recipients_for_warehouse_approval(db)
-        target_section = "queue"
-    else:
-        return
-
-    body = _summary(request)
-    for emp in recipients:
-        if emp.employee_id == request.requester_employee_id:
-            continue
-        _add(
-            db,
-            recipient_employee_id=emp.employee_id,
-            ntype=NotificationTypeEnum.APPROVAL_REQUEST,
-            title="다음 결재 차례",
-            body=body,
-            request=request,
-            target_tab="warehouse",
-            target_section=target_section,
-        )
-
-
 def recipients_for_handover(db: Session, to_department: str | None) -> list[Employee]:
     """인수인계 도착 알림 수신자 — 받는 부서(고압/진공) 소속 + 부서 결재자(이필욱·김건호).
 
