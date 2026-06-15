@@ -18,6 +18,7 @@ from app.models import (
     StockRequestTypeEnum,
 )
 from app.services import inventory as inventory_svc
+from app.services import notifications as notif_svc
 from app.services.dept_hierarchy import can_approve_department
 from app.services.io_persist import sync_batch_from_stock_request
 from app.services.pin_auth import verify_pin
@@ -75,6 +76,8 @@ def approve_request(
         request.requires_department_approval
         and request.department_approved_by_employee_id is None
     ):
+        # 창고 승인 끝 → 부서 결재 차례. 부서 담당자에게 중간 알림 (라우터가 커밋).
+        notif_svc.notify_request_advanced(db, request)
         return request
 
     try:
@@ -151,6 +154,8 @@ def approve_request_department(
         request.requires_warehouse_approval
         and request.approved_by_employee_id is None
     ):
+        # 부서 승인 끝 → 창고 결재 차례. 창고 담당자에게 중간 알림 (라우터가 커밋).
+        notif_svc.notify_request_advanced(db, request)
         return request
 
     # 실행 경로 분기
@@ -357,7 +362,11 @@ def cancel_open_stock_requests(db: Session, *, reason: str) -> int:
     inventory.pending 과 stock_requests 상태 불일치를 예방한다.
 
     pending은 남은 만큼만 best-effort 해제(pending=0이어도 안전).
-    commit은 호출측 책임 — 이 함수는 flush만 한다.
+
+    **commit은 호출측 책임 — 이 함수는 flush만 한다.** flush 이후 commit 전에 예외가 나면
+    CANCELLED 상태와 pending release 가 부분 반영된 채 남을 수 있으므로, 호출측은 반드시
+    이어서 commit 하거나 실패 시 rollback 해야 한다. 리셋 스크립트는 호출 직후 가드로
+    미결 잔존을 재확인한 뒤 진행한다.
 
     Returns:
         취소 처리된 요청 건수.
