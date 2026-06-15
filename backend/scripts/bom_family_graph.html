@@ -19,17 +19,22 @@
   .legend i { display:inline-block; width:11px; height:11px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
   #canvas { width:100vw; height:calc(100vh - 100px); display:block; cursor:grab; background:#eef1f6; }
   #canvas:active { cursor:grabbing; }
-  .links path { fill:none; stroke:#b3c4e3; stroke-width:1.6px; }
-  .node { cursor:move; }
-  .node rect.box { fill:#fff; stroke:#d4dbe8; stroke-width:1.4px; filter:drop-shadow(0 1px 2px rgba(20,40,80,.10)); }
-  .node:hover rect.box { stroke:#4472c4; stroke-width:2px; }
+  .bandlabel { font:800 22px "Malgun Gothic","Segoe UI",sans-serif; fill:#aab4c4; }
+  .links path { fill:none; stroke:#b3c4e3; stroke-width:2.2px; }
+  .node { cursor:pointer; }
+  .node rect.box { fill:#fff; stroke:#d4dbe8; stroke-width:2px; filter:drop-shadow(0 2px 4px rgba(20,40,80,.10)); }
+  .node:hover rect.box { stroke:#4472c4; stroke-width:3px; }
+  .node, .links path { transition:opacity .15s ease; }
+  .node.dim { opacity:.12; }
+  .links path.dim { opacity:.06; }
+  .node.sel rect.box { stroke:#244a86; stroke-width:4px; }
   /* foreignObject 안의 HTML 카드 (자동 줄바꿈으로 글자 안 짤림) */
   .card { box-sizing:border-box; width:100%; height:100%; display:flex; flex-direction:column;
-    justify-content:center; padding:7px 11px 7px 15px; overflow:hidden;
+    justify-content:center; padding:12px 16px 12px 22px; overflow:hidden;
     font-family:"Malgun Gothic","Segoe UI",Arial,sans-serif; pointer-events:none; }
-  .card .code { font:700 15px/1.15 Consolas,"Courier New",monospace; color:#1f2a44; letter-spacing:.2px;
+  .card .code { font:700 22px/1.15 Consolas,"Courier New",monospace; color:#1f2a44; letter-spacing:.2px;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .card .nm { margin-top:3px; font-size:13px; line-height:1.22; color:#5a6473;
+  .card .nm { margin-top:5px; font-size:18px; line-height:1.25; color:#5a6473;
     white-space:normal; word-break:break-word; overflow-wrap:anywhere;
     display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 </style>
@@ -40,7 +45,7 @@
   <label style="font-size:14px;color:#697386;">모델</label>
   <select id="model"></select>
   <button id="fit">화면 맞춤</button>
-  <span class="hint">휠 = 줌 · 빈 공간 드래그 = 이동 · 노드 드래그 = 옮기기</span>
+  <span class="hint">단계별 정렬 · 휠 = 줌 · 빈 공간 드래그 = 이동 · 노드 클릭 = 하위 하이라이트</span>
 </div>
 <div class="legend" id="legend"></div>
 <svg id="canvas"></svg>
@@ -51,132 +56,81 @@
 <script>window.MODELS = [{"key": "3", "label": "DX3000", "code": "3-PF-0001", "tree": {"code": "3-PF-0001", "name": "DX3000_60kV, 2mA_러시아_IP Tsizina S. A", "type": "PF", "children": [{"code": "3-PA-0002", "name": "DX3000_60kV, 2mA_러시아_IP Tsizina S. A_가방 포장 완료", "type": "PA", "children": [{"code": "348-PR-0037", "name": "크래들 [D-910]", "type": "PR", "children": []}, {"code": "34-PR-0050", "name": "SCREW CAP", "type": "PR", "children": []}, {"code": "34-PR-0051", "name": "FOOT RUBBER", "type": "PR", "children": []}, {"code": "34678-PR-0061", "name": "실리카겔 [20g]", "type": "PR", "children": []}, {"code": "3-AA-0005", "name": "DX3000 10cm 한손 W 사출 ASS'Y - 기본", "type": "AA", "children": [{"code": "3-AR-0008", "name": "DX3000 FRONT COVER (W)", "type": "AR", "children": []}, {"code": "3-AR-0010", "name": "DX3000 REAR COVER (W)", "type": "AR", "children": []}, {"code": "3-AR-0011", "name": "DX3000 LCD LED", "type": "AR", "children": []}, {"code": "3-AR-0012", "name": "DX3000 EX LED (L)", "type": "AR", "children": []}, {"code": "3-AR-0013", "name": "DX3000 EX LED (R)", "type": "AR", "children": []}, {"code": "3-AR-0014", "name": "DX3000 EX BUTTON (개당 두개씩)", "type": "AR", "children": []}, {"code": "3-AR-0015", "name": "DX3000 HAND STRAP", "type": "AR", "children": []}, {"code": "3-AR-0020", "name": "DX3000 X-CAP (기본)", "type": "AR", "children": []}, {"code": "34-AR-0022", "name": "DX3000,ADX4000W 가죽손잡이 고리1_ [AL(Cr도금), SUS Φ2.0]", "type": "AR", "children": []}, {"code": "3-AR-0027", "name": "DX3000 데코가이드", "type": "AR", "children": []}, {"code": "3-AR-0032", "name": "DX3000 EX BD (듀얼) - 왼쪽", "type": "AR", "children": []}, {"code": "3-AR-0033", "name": "DX3000 EX BD (듀얼) - 오른쪽", "type": "AR", "children": []}]}, {"code": "34678-PR-0066", "name": "REMOTE CONTROL [3M]", "type": "PR", "children": []}, {"code": "34678-PR-0027", "name": "2구 16.8V 충전기 [BPL910S16N01]", "type": "PR", "children": []}, {"code": "34678-PR-0030", "name": "2구 AC코드 C 타입 [220V]", "type": "PR", "children": []}, {"code": "3-PR-0053", "name": "DX3000 NAME PLATE [DX3000]", "type": "PR", "children": []}]}, {"code": "348-PR-0024", "name": "DX3000, ADX4000W, SOLO 기본 배터리 [PF435060-4S] (4ICP4/50/60)", "type": "PR", "children": []}, {"code": "3-PR-0052", "name": "DX3000 실리콘 켑", "type": "PR", "children": []}, {"code": "3-PR-0120", "name": "DX3000 저가 박스 [280x220x200 mm]", "type": "PR", "children": []}, {"code": "3-PR-0121", "name": "DX3000 저가 박스 에어셀 [Main]", "type": "PR", "children": []}, {"code": "3-PR-0122", "name": "DX3000 저가 박스 에어셀 [Accessories]", "type": "PR", "children": []}]}}, {"key": "4", "label": "ADX4000W", "code": "4-PF-0008", "tree": {"code": "4-PF-0008", "name": "ADX4000W_60kV, 2mA_러시아_IP Tsizina S. A", "type": "PF", "children": [{"code": "34-PR-0114", "name": "DX3000, ADX4000W 제품 박스 [450x240x360 mm]", "type": "PR", "children": []}, {"code": "34-PR-0123", "name": "DX3000, ADX4000W 에어셀 [Top 얇은 것]", "type": "PR", "children": []}, {"code": "34-PR-0124", "name": "DX3000, ADX4000W 에어셀 [Bottom 두꺼운 것]", "type": "PR", "children": []}, {"code": "4-PA-0009", "name": "ADX4000W_60kV, 2mA_러시아_IP Tsizina S. A_가방 포장 완료", "type": "PA", "children": [{"code": "34678-PR-0027", "name": "2구 16.8V 충전기 [BPL910S16N01]", "type": "PR", "children": []}, {"code": "348-PR-0037", "name": "크래들 [D-910]", "type": "PR", "children": []}, {"code": "34-PR-0050", "name": "SCREW CAP", "type": "PR", "children": []}, {"code": "34-PR-0051", "name": "FOOT RUBBER", "type": "PR", "children": []}, {"code": "4-PR-0056", "name": "ADX4000 NAME PLATE [DEXCOWIN]", "type": "PR", "children": []}, {"code": "4-PR-0058", "name": "OS라이센스 라벨", "type": "PR", "children": []}, {"code": "4-PR-0059", "name": "터치 펜", "type": "PR", "children": []}, {"code": "34678-PR-0061", "name": "실리카겔 [20g]", "type": "PR", "children": []}, {"code": "4-PR-0064", "name": "USB 2.0 CABLE [3M]", "type": "PR", "children": []}, {"code": "34-PR-0091", "name": "DX3000, ADX4000W 가방 [로고 O]", "type": "PR", "children": []}, {"code": "4-AF-0020", "name": "ADX4000W 60KV 2mA / 10cm White [기본]", "type": "AF", "children": [{"code": "4-NF-0005", "name": "A4GR + A4CB 60KV 2mA", "type": "NF", "children": [{"code": "4-VF-0004", "name": "A4GR + A4CB", "type": "VF", "children": [{"code": "4-VA-0014", "name": "발생부 (진공) [ADX4000]", "type": "VA", "children": [{"code": "4-HF-0003", "name": "발생부 고압B/D+튜브 최종 작업完 [ADX4000W]", "type": "HF", "children": [{"code": "34-HA-0005", "name": "캐논튜브 60KV 하우징 [D-081B] [DX3000, ADX4000W]", "type": "HA", "children": [{"code": "34-HR-0001", "name": "캐논튜브 [ D-081B ] _ 60KV", "type": "HR", "children": []}, {"code": "346-HR-0047", "name": "베이클라이트 하우징 파이프 [DX3000, ADX4000W, ADX6000]", "type": "HR", "children": []}]}, {"code": "34-HA-0011", "name": "고압보드SMT 完 (Ver. 2.5) [DX3000, ADX4000W]", "type": "HA", "children": [{"code": "34-HR-0007", "name": "고압다이오드 2CL77 [20KV, 5mA]", "type": "HR", "children": []}, {"code": "347-HR-0008", "name": "네온램프(NEON-5T)", "type": "HR", "children": []}, {"code": "346-HR-0009", "name": "RK92-11XD307J (시멘트 저항)", "type": "HR", "children": []}, {"code": "34-HR-0010", "name": "고압용 (30㏀)", "type": "HR", "children": []}, {"code": "346-HR-0011", "name": "고압용 (15㏀±1％, DIP) - 1/4W", "type": "HR", "children": []}, {"code": "346-HR-0013", "name": "고압용(세라믹103)", "type": "HR", "children": []}, {"code": "34-HR-0014", "name": "DHR4E4C102K2FB 큰 콘덴서", "type": "HR", "children": []}, {"code": "346-HR-0015", "name": "3216 B 100nF", "type": "HR", "children": []}, {"code": "346-HR-0016", "name": "DL1500(다이오드)", "type": "HR", "children": []}, {"code": "3467-HR-0017", "name": "HPC-2C 47k/Surge", "type": "HR", "children": []}, {"code": "34-HA-0001", "name": "히터트랜스포머 24턴 [DX3000, ADX4000W]", "type": "HA", "children": [{"code": "34-HR-0026", "name": "T 코어 (히터트랜스용) [DX3000, ADX4000W]", "type": "HR", "children": []}, {"code": "346-HR-0023", "name": "TIW (외경)0.7mm(내경)0.5 5000m(히터트랜스용 선)", "type": "HR", "children": []}, {"code": "346-HR-0024", "name": "40KVDC 22AWG (히터트랜스용 붉은 고압선)", "type": "HR", "children": []}]}, {"code": "34-HR-0028", "name": "트랜스포머 [DX3000, ADX4000W]", "type": "HR", "children": []}, {"code": "34-HR-0032", "name": "튜브 고정 보드 에노드 (나사) [DX3000, ADX4000W]", "type": "HR", "children": []}, {"code": "3-HR-0033", "name": "튜브 고정 보드 케소드 (필라멘트) [DX3000]", "type": "HR", "children": []}, {"code": "4-HR-0034", "name": "튜브 고정 보드 케소드 (필라멘트) [ADX4000W]", "type": "HR", "children": []}, {"code": "34-HR-0038", "name": "고압베어 B/D (Ver. 2.5) [DX3000, ADX4000W]", "type": "HR", "children": []}]}]}, {"code": "4-VA-0003", "name": "신주 케이스 작업완료 [ADX4000W]", "type": "VA", "children": [{"code": "4-VR-0033", "name": "신주 케이스 [ADX4000]", "type": "VR", "children": []}, {"code": "34-VR-0005", "name": "7핀 B/D [DX3000, ADX4000W]", "type": "VR", "children": []}, {"code": "34-VR-0026", "name": "3 PIN 커넥터 [DX3000, ADX4000W]", "type": "VR", "children": []}, {"code": "347-VR-0027", "name": "4 PIN 커넥터 [DX3000, ADX4000W, COCOON, ADX6000]", "type": "VR", "children": []}, {"code": "346789-VR-0040", "name": "방사구 (외경 탭 추가) [공용]", "type": "VR", "children": []}]}, {"code": "346-VR-0032", "name": "신주 케이스 뚜껑 [DX3000, ADX4000W, ADX6000]", "type": "VR", "children": []}, {"code": "34-VR-0019", "name": "베이클라이트 케이스", "type": "VR", "children": []}, {"code": "346789-VR-0004", "name": "방사구 오링 (2*18)", "type": "VR", "children": []}, {"code": "346789-VR-0041", "name": "방사구 너트 [공용]", "type": "VR", "children": []}, {"code": "3478-VR-0003", "name": "알루미늄 필터 (0.8T * Φ24)", "type": "VR", "children": []}]}, {"code": "4-VR-0015", "name": "CTR B/D [DX4000]", "type": "VR", "children": []}]}]}, {"code": "4-AR-0064", "name": "ADX4000W BATTERY COVER", "type": "AR", "children": []}, {"code": "4-AR-0065", "name": "ADX4000W USB COVER", "type": "AR", "children": []}, {"code": "46-AR-0070", "name": "ADX4000W 16GB USB 메모리", "type": "AR", "children": []}, {"code": "46-AR-0079", "name": "ADX4000W BUFFALO WIFI 동글 [WLI-UC-GNM2]", "type": "AR", "children": []}, {"code": "4-AR-0091", "name": "ADX4000W 큰 페라이트 CAT-1730-0730", "type": "AR", "children": []}, {"code": "4-AA-0021", "name": "ADX4000W TOP BODY 사출 ASS'Y", "type": "AA", "children": [{"code": "4-AR-0048", "name": "ADX4000W TOP BODY", "type": "AR", "children": []}, {"code": "4-AR-0050", "name": "ADX4000W POWER BUTTON", "type": "AR", "children": []}, {"code": "4-AR-0051", "name": "ADX4000W POWER LED GUIDE", "type": "AR", "children": []}, {"code": "4-AR-0052", "name": "ADX4000W NAVI BUTTON (가운데)", "type": "AR", "children": []}, {"code": "4-AR-0053", "name": "ADX4000W NAVI KEY (방향)", "type": "AR", "children": []}, {"code": "4-AR-0056", "name": "ADX4000W HAND GUIDE", "type": "AR", "children": []}, {"code": "4-AR-0057", "name": "ADX4000W LCD GUIDE", "type": "AR", "children": []}, {"code": "4-AR-0082", "name": "ADX4000W POWER BD", "type": "AR", "children": []}, {"code": "4-AR-0083", "name": "ADX4000W NAVI BD", "type": "AR", "children": []}, {"code": "4-AR-0095", "name": "ADX4000W NAVIGATION KEY -6핀", "type": "AR", "children": []}, {"code": "46-AR-0099", "name": "ADX4000W, ADX6000 스피커 2핀 (12505HS-02+SORDER) 200mm [하네스 4-1번]", "type": "AR", "children": []}, {"code": "34-AR-0022", "name": "DX3000,ADX4000W 가죽손잡이 고리1_ [AL(Cr도금), SUS Φ2.0]", "type": "AR", "children": []}, {"code": "4-AR-0327", "name": "ADX4000W L클립", "type": "AR", "children": []}]}, {"code": "4-AA-0022", "name": "ADX4000W BOTTOM BODY 사출 ASS'Y", "type": "AA", "children": [{"code": "4-AR-0049", "name": "ADX4000W BOTTOM BODY", "type": "AR", "children": []}, {"code": "4-AR-0059", "name": "ADX4000W 데코 가이드", "type": "AR", "children": []}, {"code": "4-AR-0066", "name": "ADX4000W HAND STRAP [AL(Cr도금), SUS Φ2.0]-손잡이(터치펜)", "type": "AR", "children": []}, {"code": "4-AR-0084", "name": "ADX4000W EX B/D", "type": "AR", "children": []}, {"code": "4-AR-0094", "name": "ADX4000W 전원 및 EXP Wire -8핀", "type": "AR", "children": []}, {"code": "4-AR-0096", "name": "ADX4000W 리모콘 및 관전류 -4핀", "type": "AR", "children": []}, {"code": "4-AR-0327", "name": "ADX4000W L클립", "type": "AR", "children": []}, {"code": "34-AR-0022", "name": "DX3000,ADX4000W 가죽손잡이 고리1_ [AL(Cr도금), SUS Φ2.0]", "type": "AR", "children": []}]}, {"code": "4-AA-0023", "name": "ADX4000W 기본 CONE ASS'Y", "type": "AA", "children": [{"code": "4-AR-0060", "name": "ADX4000W FRONT CONE 일체형", "type": "AR", "children": []}]}, {"code": "4-AA-0026", "name": "ADX4000W 4.8\" LCD BD ASS'Y", "type": "AA", "children": [{"code": "4-AR-0046", "name": "ADX4000W 4.8' LCD TOP COVER", "type": "AR", "children": []}, {"code": "4-AR-0047", "name": "ADX4000W 4.8\" LCD BOTTOM COVER", "type": "AR", "children": []}, {"code": "46-AR-0069", "name": "ADX4000W 4.8\" LCD 판넬 (SAMSUNG)", "type": "AR", "children": []}, {"code": "4-AR-0081", "name": "ADX4000W 4.8\" LCD BD", "type": "AR", "children": []}, {"code": "46-AR-0093", "name": "ADX4000W LVDS Cable -30핀", "type": "AR", "children": []}]}, {"code": "4-AA-0028", "name": "ADX4000W DFI_BD ASS′Y", "type": "AA", "children": [{"code": "46-AR-0075", "name": "ADX4000W 히팅 패드", "type": "AR", "children": []}, {"code": "46-AR-0076", "name": "ADX4000W 히팅 싱크 신형", "type": "AR", "children": []}, {"code": "46-AR-0077", "name": "ADX4000W 방열 팬 신형 [HBD0401005SEM 5V 0.15A]", "type": "AR", "children": []}, {"code": "4-AR-0087", "name": "ADX4000W Carrier BD [DFI]", "type": "AR", "children": []}, {"code": "46-AR-0088", "name": "ADX4000W Module BD [DFI]", "type": "AR", "children": []}, {"code": "4-AR-0090", "name": "ADX4000W USB 메모리 BD [DFI]", "type": "AR", "children": []}, {"code": "46-AR-0092", "name": "ADX4000W 작은 페라이트 ZCAT-1325-0530", "type": "AR", "children": []}, {"code": "4-AR-0097", "name": "ADX4000W RS422 통신 및 PC 전원 on/off -7핀", "type": "AR", "children": []}, {"code": "4-AR-0098", "name": "ADX4000W Embedded PC 전원 -2핀 (케리어+CTR B/D 연결)", "type": "AR", "children": []}]}, {"code": "4-AR-0058", "name": "ADX4000W HINGE GUIDE", "type": "AR", "children": []}]}, {"code": "34678-PR-0030", "name": "2구 AC코드 C 타입 [220V]", "type": "PR", "children": []}, {"code": "34678-PR-0066", "name": "REMOTE CONTROL [3M]", "type": "PR", "children": []}, {"code": "4-PR-0100", "name": "ADX4000W 20cm 내부폼", "type": "PR", "children": []}, {"code": "34-PR-0139", "name": "DX3000, ADX4000W 계란판", "type": "PR", "children": []}]}, {"code": "348-PR-0024", "name": "DX3000, ADX4000W, SOLO 기본 배터리 [PF435060-4S] (4ICP4/50/60)", "type": "PR", "children": []}]}}, {"key": "6", "label": "ADX6000FB", "code": "6-PF-0013", "tree": {"code": "6-PF-0013", "name": "ADX6000FB_90kV, 6mA_그리스_Dormed Hellas", "type": "PF", "children": [{"code": "6-PA-0014", "name": "ADX6000FB_90kV, 6mA_그리스_Dormed Hellas_가방 포장 완료", "type": "PA", "children": [{"code": "6-AF-0026", "name": "ADX6000FB 80KV 5mA / White", "type": "AF", "children": [{"code": "3-AA-0018", "name": "DX3000 에이밍라이트 플레이트 ASS'Y", "type": "AA", "children": [{"code": "368-AR-0042", "name": "DX3000, SOLO 아크릴 은경 [40ɸ]", "type": "AR", "children": []}, {"code": "368-AR-0043", "name": "DX3000 에이밍 알루미늄 플레이트", "type": "AR", "children": []}, {"code": "368-AR-0044", "name": "DX3000 에이밍 LED BD", "type": "AR", "children": []}, {"code": "368-AR-0045", "name": "DX3000 에이밍 원형 LED GUIDE", "type": "AR", "children": []}]}, {"code": "6-NF-0008", "name": "A6GR + A6CB 90KV 6mA", "type": "NF", "children": [{"code": "6-VF-0005", "name": "A6GR (10핀)", "type": "VF", "children": [{"code": "6-VA-0016", "name": "발생부 (10P) (진공) [ADX6000]", "type": "VA", "children": [{"code": "6-HF-0008", "name": "발생부 고압B/D+튜브 최종 작업完 (10핀) [D-0813] [ADX6000]", "type": "HF", "children": []}, {"code": "6-VR-0036", "name": "신주케이스 (10P) [ADX6000]", "type": "VR", "children": []}, {"code": "346-VR-0032", "name": "신주 케이스 뚜껑 [DX3000, ADX4000W, ADX6000]", "type": "VR", "children": []}, {"code": "36-VR-0022", "name": "NC 케이스 [ADX6000]", "type": "VR", "children": []}, {"code": "346789-VR-0004", "name": "방사구 오링 (2*18)", "type": "VR", "children": []}, {"code": "69-VR-0001", "name": "알루미늄 필터 (2T * Φ24)", "type": "VR", "children": []}, {"code": "346789-VR-0041", "name": "방사구 너트 [공용]", "type": "VR", "children": []}]}]}, {"code": "6-NR-0001", "name": "A6CB", "type": "NR", "children": []}]}, {"code": "6-AR-0140", "name": "ADX6000 HANDLE LEFT 사출", "type": "AR", "children": []}, {"code": "6-AR-0141", "name": "ADX6000 EX Button 사출", "type": "AR", "children": []}, {"code": "6-AA-0031", "name": "ADX6000 콘 컬리메이터 ASS'Y + BOTTOM Base block", "type": "AA", "children": [{"code": "6-AR-0102", "name": "ADX6000 컬리메이터 TOP 사출", "type": "AR", "children": []}, {"code": "6-AR-0103", "name": "ADX6000 컬리메이터 Bottom 사출", "type": "AR", "children": []}, {"code": "6-AR-0111", "name": "ADX6000 Base Block", "type": "AR", "children": []}, {"code": "6-AA-0029", "name": "ADX6000 콘 납 부착 ASS'Y", "type": "AA", "children": [{"code": "6-AR-0104", "name": "ADX6000 컬리메이터 콘 가이드", "type": "AR", "children": []}]}]}, {"code": "6-AA-0040", "name": "ADX6000FB LCD ASS'Y", "type": "AA", "children": [{"code": "6-AR-0116", "name": "ADX6000 LCD Cover 사출 (white)", "type": "AR", "children": []}, {"code": "6-AR-0117", "name": "ADX6000 LCD Inner Cover 사출", "type": "AR", "children": []}, {"code": "6-AR-0118", "name": "ADX6000 LCD 힌지 사출 커버 TOP", "type": "AR", "children": []}, {"code": "6-AR-0119", "name": "ADX6000 LCD 힌지 사출 커버 BOTTOM", "type": "AR", "children": []}, {"code": "6-AR-0120", "name": "ADX6000 LCD HINGE", "type": "AR", "children": []}, {"code": "6-AR-0121", "name": "ADX6000 LCD 힌지 가죽 커버", "type": "AR", "children": []}, {"code": "6-AR-0122", "name": "ADX6000 LCD 아크릴 가이드", "type": "AR", "children": []}, {"code": "6-AR-0124", "name": "ADX6000 LCD 배젤 스티커 - 중앙 필름 제거", "type": "AR", "children": []}, {"code": "6-AR-0152", "name": "ADX6000FB LCD BD", "type": "AR", "children": []}, {"code": "6-AR-0174", "name": "ADX6000FB LVDS 케이블 20핀 (DF19G-20S-1C(0.5) (2EA)) 160mm [하네스 7번]", "type": "AR", "children": []}, {"code": "6-AR-0145", "name": "ADX6000 페라이트 코어 ZCAT 1518-0730", "type": "AR", "children": []}, {"code": "6-AR-0149", "name": "ADX6000FB 4.3\" LCD 판넬 (IEC-266 & IEC-1000 공용)", "type": "AR", "children": []}]}, {"code": "6-AA-0042", "name": "ADX6000FB Main PC ASS'Y [IEC-1000 신형]", "type": "AA", "children": [{"code": "6-AR-0130", "name": "ADX6000 Main PC 거치대 사출", "type": "AR", "children": []}, {"code": "6-AR-0151", "name": "ADX6000FB 4.3\" Module (IEC-1000 신형)", "type": "AR", "children": []}, {"code": "6-AR-0154", "name": "ADX6000FB ETC CARRIER BD (IEC-1000)", "type": "AR", "children": []}, {"code": "6-AR-0169", "name": "ADX6000FB CTR, CURRENT, FRONT, PC BD연결 (12505HS-06, 12505HS-04, 12505HS-03, 5264-02) 250mm, 140mm, 300mm [하네스 1-1번]", "type": "AR", "children": []}, {"code": "6-AR-0170", "name": "ADX6000FB PC, FRONT BD 연결 (12505HS-04, USB-105) 70mm [하네스 2번]", "type": "AR", "children": []}, {"code": "6-AR-0173", "name": "ADX6000FB PC 전원 케이블 (SMH250-02) 130mm [하네스 6번]", "type": "AR", "children": []}, {"code": "6-AR-0177", "name": "ADX6000FB PC, CTR BD 연결 3핀 (CHW0640-03, 1205HS-03) 130mm [하네스 10번]", "type": "AR", "children": []}]}, {"code": "6-AA-0043", "name": "ADX6000FB 탈착형 BODY LEFT ASS'Y", "type": "AA", "children": [{"code": "6-AR-0125", "name": "ADX6000 BODY LEFT 사출", "type": "AR", "children": []}, {"code": "6-AR-0126", "name": "ADX6000 배터리 커버", "type": "AR", "children": []}, {"code": "6-AR-0127", "name": "ADX6000 Black Deco Guide", "type": "AR", "children": []}, {"code": "6-AR-0128", "name": "ADX6000 Power Button 사출", "type": "AR", "children": []}, {"code": "6-AR-0133", "name": "ADX6000FB ETC FRONT BD (리모콘 포트 수정 신형 얇은것)", "type": "AR", "children": []}, {"code": "6-AR-0134", "name": "ADX6000FB 리모콘 포트 가이드", "type": "AR", "children": []}, {"code": "6-AR-0135", "name": "ADX6000FB Front Port Sticker (리모콘 포트 수정 신형)", "type": "AR", "children": []}, {"code": "6-AR-0159", "name": "ADX6000 Power Switch B/D", "type": "AR", "children": []}, {"code": "6-AR-0165", "name": "ADX6000 EX BD", "type": "AR", "children": []}, {"code": "6-AR-0171", "name": "ADX6000 Power&Exp Connector Wire Harness 12핀 170mm, 70mm [하네스 3번]", "type": "AR", "children": []}, {"code": "6-AR-0179", "name": "ADX6000 탈착 BAT BD (Ver 4.0) 연결 6핀 (12505HS-06) 80mm [하네스 11-1번]", "type": "AR", "children": []}, {"code": "67-AR-0231", "name": "COCOON, ADX6000 자석 (네오디움 마그넷)", "type": "AR", "children": []}]}, {"code": "6-AA-0046", "name": "ADX6000FB BODY RIGHT ASS'Y", "type": "AA", "children": [{"code": "6-AR-0131", "name": "ADX6000 손잡이 핀", "type": "AR", "children": []}, {"code": "6-AR-0137", "name": "ADX6000 BODY RIGHT 사출", "type": "AR", "children": []}, {"code": "6-AR-0138", "name": "ADX6000 HANDLE RIGHT 사출", "type": "AR", "children": []}, {"code": "6-AR-0146", "name": "ADX6000 알루미늄 브라켓 6 hole", "type": "AR", "children": []}, {"code": "6-AR-0148", "name": "ADX6000FB 가죽 손잡이 탈착배터리용 터치펜 X", "type": "AR", "children": []}, {"code": "46-AR-0099", "name": "ADX4000W, ADX6000 스피커 2핀 (12505HS-02+SORDER) 200mm [하네스 4-1번]", "type": "AR", "children": []}, {"code": "6-AR-0164", "name": "ADX6000 관전류 BD", "type": "AR", "children": []}]}, {"code": "6-AR-0139", "name": "ADX6000 LCD 사출 나사 커버", "type": "AR", "children": []}, {"code": "6-AA-0079", "name": "ADX6000 컬리메이터 FRONT ASS'Y", "type": "AA", "children": [{"code": "6-AR-0110", "name": "ADX6000 컬리메이터 FRONT 사출", "type": "AR", "children": []}, {"code": "6-AR-0115", "name": "ADX6000 아크릴 투명 십자 panel (70x70x1.5 mm)", "type": "AR", "children": []}]}]}, {"code": "6-PR-0029", "name": "3구 21.0V 충전기 [JBL7451212000302FJ]", "type": "PR", "children": []}, {"code": "34678-PR-0035", "name": "3구 접지 AC코드 F 타입 [220V]", "type": "PR", "children": []}, {"code": "6-AA-0036", "name": "ADX6000 크래들 ASS'Y [CR-ADX]", "type": "AA", "children": [{"code": "6-AR-0142", "name": "ADX6000 크래들 TOP 사출", "type": "AR", "children": []}, {"code": "6-AR-0143", "name": "ADX6000 크래들 BOTTOM 사출", "type": "AR", "children": []}, {"code": "6-AR-0144", "name": "ADX6000 크래들 LED Guide 사출", "type": "AR", "children": []}, {"code": "6-AR-0166", "name": "ADX6000 Cradle BD", "type": "AR", "children": []}, {"code": "6-AR-0329", "name": "ADX6000 CRADLE FOOT RUBBER", "type": "AR", "children": []}]}, {"code": "34678-PR-0061", "name": "실리카겔 [20g]", "type": "PR", "children": []}, {"code": "34678-PR-0066", "name": "REMOTE CONTROL [3M]", "type": "PR", "children": []}, {"code": "6-PR-0068", "name": "ADX6000 NAME PLATE [iRay A6]", "type": "PR", "children": []}, {"code": "67-PR-0093", "name": "COCOON, ADX6000FB 가방 [로고 O]", "type": "PR", "children": []}, {"code": "6-PR-0105", "name": "ADX6000 내부폼 상판", "type": "PR", "children": []}, {"code": "6-PR-0106", "name": "ADX6000 내부폼 중간판", "type": "PR", "children": []}, {"code": "6-PR-0107", "name": "ADX6000 내부폼 하판", "type": "PR", "children": []}, {"code": "6-PR-0043", "name": "ADX6000 연아크릴 [215x195x8mm] 하단 가공된 것", "type": "PR", "children": []}, {"code": "6-PR-0049", "name": "ADX6000 연아크릴 실리콘 오링", "type": "PR", "children": []}, {"code": "6-AR-0114", "name": "ADX6000 Skin Guard Frame", "type": "AR", "children": []}, {"code": "6-AR-0113", "name": "ADX6000 BOTTOM BLOCK", "type": "AR", "children": []}]}, {"code": "6-PR-0116", "name": "ADX6000FB 제품 박스 [450x240x490 mm]", "type": "PR", "children": []}, {"code": "67-PR-0125", "name": "COCOON, ADX6000FB 에어셀 [Top+Bottom 긴 것]", "type": "PR", "children": []}, {"code": "67-PR-0126", "name": "COCOON, ADX6000FB 에어셀 [Side 짧은 것]", "type": "PR", "children": []}]}}, {"key": "7", "label": "COCOON", "code": "7-PF-0018", "tree": {"code": "7-PF-0018", "name": "DX-7017_70kV, 1.7mA_USA_Dexcowin Global", "type": "PF", "children": [{"code": "7-PR-0115", "name": "COCOON 제품 박스 [450x240x490 mm]", "type": "PR", "children": []}, {"code": "67-PR-0125", "name": "COCOON, ADX6000FB 에어셀 [Top+Bottom 긴 것]", "type": "PR", "children": []}, {"code": "67-PR-0126", "name": "COCOON, ADX6000FB 에어셀 [Side 짧은 것]", "type": "PR", "children": []}, {"code": "7-PA-0019", "name": "DX-7017_70kV, 1.7mA_USA_Dexcowin Global_가방 포장 완료", "type": "PA", "children": [{"code": "34678-PR-0028", "name": "3구 16.8V 충전기 [BPL910S16F01]", "type": "PR", "children": []}, {"code": "34678-PR-0032", "name": "3구 접지 AC코드 B 타입 [110V]-미국향", "type": "PR", "children": []}, {"code": "7-AA-0057", "name": "COCOON CRADLE ASS'Y (B) [D-917 (Silver Frame)]", "type": "AA", "children": [{"code": "7-AR-0208", "name": "COCOON CRADLE BODY (B)", "type": "AR", "children": []}, {"code": "7-AR-0209", "name": "COCOON CRADLE BOTTOM (B)", "type": "AR", "children": []}, {"code": "7-AR-0210", "name": "COCOON CRADLE FRAME (S)", "type": "AR", "children": []}, {"code": "7-AR-0211", "name": "COCOON CRADLE 신주 핀", "type": "AR", "children": []}, {"code": "7-AR-0212", "name": "COCOON CRADLE 충전단자 스프링", "type": "AR", "children": []}, {"code": "7-AR-0239", "name": "COCOON CRADLE 신주 연결 2핀 YH396-02+SORDER 80mm [하네스 11번]", "type": "AR", "children": []}, {"code": "7-AR-0243", "name": "COCOON CRADLE BD", "type": "AR", "children": []}, {"code": "7-AR-0213", "name": "COCOON CRADLE FOOT RUBBER", "type": "AR", "children": []}]}, {"code": "78-PR-0038", "name": "연아크릴 [65ɸ 8T] (선일쉴드텍)", "type": "PR", "children": []}, {"code": "3478-PR-0045", "name": "실드 오링 [AN-036]", "type": "PR", "children": []}, {"code": "37-PR-0060", "name": "넥스트랩 [포켓 O]", "type": "PR", "children": []}, {"code": "34678-PR-0061", "name": "실리카겔 [20g]", "type": "PR", "children": []}, {"code": "67-PR-0093", "name": "COCOON, ADX6000FB 가방 [로고 O]", "type": "PR", "children": []}, {"code": "7-PR-0101", "name": "COCOON 18cm 내부폼 상판", "type": "PR", "children": []}, {"code": "7-PR-0102", "name": "COCOON 18cm 내부폼  하판", "type": "PR", "children": []}, {"code": "7-AF-0027", "name": "COCOON 70KV 1.7mA / 18cm Gray [기본]", "type": "AF", "children": [{"code": "7-AR-0223", "name": "COCOON GER GUIDE", "type": "AR", "children": []}, {"code": "7-AR-0224", "name": "COCOON 18cm FRONT_S (B 유광)", "type": "AR", "children": []}, {"code": "7-AR-0225", "name": "COCOON 18cm CONE GUIDE_S", "type": "AR", "children": []}, {"code": "7-AR-0228", "name": "COCOON FRONT CAP (B 유광)", "type": "AR", "children": []}, {"code": "7-AR-0229", "name": "COCOON WINDOW", "type": "AR", "children": []}, {"code": "37-AR-0232", "name": "COCOON 알루미늄 필터 [63ɸ 0.5T]", "type": "AR", "children": []}, {"code": "7-AR-0233", "name": "COCOON CTR BD 외부단자 2핀 (TX30(FEMALE)+YH396-02) 100mm [하네스 1번]", "type": "AR", "children": []}, {"code": "7-AR-0235", "name": "COCOON 30핀 FFC CABLE 200mm [하네스 3번]", "type": "AR", "children": []}, {"code": "7-AA-0047", "name": "COCOON OP BD ASS'Y (ATmega128) (Ver 2.20.3)", "type": "AA", "children": [{"code": "7-AR-0187", "name": "COCOON 3.1\" OLED 판넬 (UG-5664ASWEF01)", "type": "AR", "children": []}, {"code": "7-AR-0188", "name": "COCOON OLED GUIDE 사출", "type": "AR", "children": []}, {"code": "7-AR-0244", "name": "COCOON TOUCH BD (ATmega128) (Ver 2.14.5)", "type": "AR", "children": []}, {"code": "7-AR-0245", "name": "COCOON OP BD (ATmega128) (Ver 2.20.3)", "type": "AR", "children": []}]}, {"code": "7-AA-0048", "name": "COCOON TOP BODY ASS'Y (S)", "type": "AA", "children": [{"code": "7-AR-0189", "name": "COCOON TOP BODY (S)", "type": "AR", "children": []}, {"code": "7-AR-0192", "name": "COCOON POWER BUTTON (S)", "type": "AR", "children": []}, {"code": "7-AR-0193", "name": "COCOON BUTTON INDICATOR", "type": "AR", "children": []}, {"code": "7-AR-0194", "name": "COCOON TOUCH DUMMY", "type": "AR", "children": []}, {"code": "7-AR-0195", "name": "COCOON D링 고리", "type": "AR", "children": []}, {"code": "7-AR-0234", "name": "COCOON 전원 외부단자 2핀 (TX30(MALE)+DC022(2.5)) 80mm [하네스 2번]", "type": "AR", "children": []}, {"code": "7-AR-0238", "name": "COCOON POWER SWITCH BD 5핀 12505HS-05 120mm [하네스 7번]", "type": "AR", "children": []}, {"code": "7-AR-0255", "name": "COCOON POWER SWITCH BD (Ver 3.0.0)", "type": "AR", "children": []}]}, {"code": "7-AA-0051", "name": "COCOON BOTTOM BODY ASS'Y (B 유광)", "type": "AA", "children": [{"code": "7-AR-0191", "name": "COCOON BOTTOM BODY (B 유광)", "type": "AR", "children": []}, {"code": "7-AR-0195", "name": "COCOON D링 고리", "type": "AR", "children": []}, {"code": "7-AR-0196", "name": "COCOON LOCK KNOB (S)", "type": "AR", "children": []}, {"code": "7-AR-0197", "name": "COCOON LOCK INNER (S)", "type": "AR", "children": []}, {"code": "7-AR-0236", "name": "COCOON 스피커 2핀 12505HS-02+SORDER 50mm [하네스 4번]", "type": "AR", "children": []}]}, {"code": "7-AA-0054", "name": "COCOON HANDLE ASS'Y (S)", "type": "AA", "children": [{"code": "7-AR-0198", "name": "COCOON HAND BODY (S)", "type": "AR", "children": []}, {"code": "7-AR-0200", "name": "COCOON SHOT BUTTON", "type": "AR", "children": []}, {"code": "7-AR-0199", "name": "COCOON HAND TOP COVER (S)", "type": "AR", "children": []}, {"code": "7-AR-0201", "name": "COCOON SHOT PCB GUIDE", "type": "AR", "children": []}, {"code": "7-AR-0202", "name": "COCOON SLIDE SWITCH", "type": "AR", "children": []}, {"code": "7-AR-0203", "name": "COCOON SLIDE CAP", "type": "AR", "children": []}, {"code": "7-AR-0205", "name": "COCOON EXP BUTTON 스프링", "type": "AR", "children": []}, {"code": "7-AR-0206", "name": "COCOON BAT BOTTOM RUBBER", "type": "AR", "children": []}, {"code": "7-AR-0207", "name": "COCOON 내부 배터리 [COCOON-041 (PF605060HP)] (4ICP6/50/61)", "type": "AR", "children": []}, {"code": "7-AR-0204", "name": "COCOON BAT BOTTOM (B 유광)", "type": "AR", "children": []}, {"code": "7-AR-0237", "name": "COCOON BATTERY BRIDGE BD 4핀 (YH396-04*2EA) 150mm [하네스 5번]", "type": "AR", "children": []}, {"code": "7-AR-0242", "name": "COCOON BATTERY BRIDGE BD", "type": "AR", "children": []}, {"code": "7-AR-0241", "name": "COCOON HANDLE CONNECTOR BD", "type": "AR", "children": []}]}, {"code": "7-NF-0009", "name": "COGR + COCB + FET BD 70kv, 2mA", "type": "NF", "children": [{"code": "7-VF-0007", "name": "COGR + FET BD", "type": "VF", "children": [{"code": "7-VA-0017", "name": "발생부 (진공) [COCOON]", "type": "VA", "children": [{"code": "7-HA-0016", "name": "고압보드SMT 完 [Ver 2.12 신형] [COCOON]", "type": "HA", "children": [{"code": "3467-HR-0017", "name": "HPC-2C 47k/Surge", "type": "HR", "children": []}, {"code": "7-HR-0018", "name": "RK92-18XD 307J 시멘트저항 긴 것", "type": "HR", "children": []}, {"code": "67-HR-0019", "name": "680pF DHR4E4C681K2BB 무라타 작은 콘덴서", "type": "HR", "children": []}, {"code": "7-HR-0029", "name": "트랜스포머 [COCOON]", "type": "HR", "children": []}, {"code": "7-HR-0020", "name": "LNTK103FW 온도센서", "type": "HR", "children": []}, {"code": "7-HR-0022", "name": "DD1800 (신규 다이오드)", "type": "HR", "children": []}, {"code": "7-HR-0043", "name": "튜브 고정 지지대 (Ver 2.12에 사용) [COCOON]", "type": "HR", "children": []}, {"code": "7-HR-0040", "name": "고압베어B/D [COCOON]", "type": "HR", "children": []}, {"code": "347-HR-0008", "name": "네온램프(NEON-5T)", "type": "HR", "children": []}]}, {"code": "7-VR-0025", "name": "신주 케이스 뚜껑 [COCOON]", "type": "VR", "children": []}, {"code": "7-VR-0020", "name": "NC 케이스 [COCOON]", "type": "VR", "children": []}, {"code": "7-VR-0021", "name": "PE케이스 거치대 [COCOON]", "type": "VR", "children": []}, {"code": "7-VA-0006", "name": "신주 케이스 작업완료 [COCOON]", "type": "VA", "children": [{"code": "7-VR-0034", "name": "신주 케이스 [COCOON]", "type": "VR", "children": []}, {"code": "347-VR-0027", "name": "4 PIN 커넥터 [DX3000, ADX4000W, COCOON, ADX6000]", "type": "VR", "children": []}, {"code": "346789-VR-0040", "name": "방사구 (외경 탭 추가) [공용]", "type": "VR", "children": []}, {"code": "7-VR-0008", "name": "8핀 BD [COCOON]", "type": "VR", "children": []}]}, {"code": "346789-VR-0004", "name": "방사구 오링 (2*18)", "type": "VR", "children": []}, {"code": "346789-VR-0041", "name": "방사구 너트 [공용]", "type": "VR", "children": []}, {"code": "37-VR-0002", "name": "알루미늄 필터 (1.2T * Φ24)", "type": "VR", "children": []}, {"code": "7-HF-0012", "name": "발생부 고압B/D+튜브 최종 작업完 [Ver 2.12] [COCOON]", "type": "HF", "children": []}]}, {"code": "7-VR-0016", "name": "FET BD [COCOON]", "type": "VR", "children": []}]}, {"code": "7-NR-0002", "name": "COCB", "type": "NR", "children": []}]}]}]}, {"code": "37-PR-0026", "name": "COCOON 외부 배터리 [PF435060]", "type": "PR", "children": []}, {"code": "37-PR-0065", "name": "양암 변환 젠더 (COCOON 외부배터리 충전용)", "type": "PR", "children": []}]}}, {"key": "8", "label": "SOLO", "code": "8-PF-0023", "tree": {"code": "8-PF-0023", "name": "DX-7020s_70kV, 2mA_USA_Dexcowin Global", "type": "PF", "children": [{"code": "8-PR-0112", "name": "SOLO 제품 박스 [손잡이 체결형 420x400x180 mm]", "type": "PR", "children": []}, {"code": "8-PA-0024", "name": "DX-7020s_70kV, 2mA_USA_Dexcowin Global_가방 포장 완료", "type": "PA", "children": [{"code": "8-AF-0044", "name": "SOLO 70KV, 2mA / 20cm Black [iM3 / 트리거 에이밍 적용]", "type": "AF", "children": [{"code": "8-NF-0010", "name": "CSGR + CSCB 70KV 2mA", "type": "NF", "children": [{"code": "8-VF-0006", "name": "CSGR + CSCB", "type": "VF", "children": [{"code": "8-VA-0018", "name": "발생부 (진공) [SOLO]", "type": "VA", "children": [{"code": "8-HF-0014", "name": "발생부 고압B/D+튜브 최종 작업完 [DXDR-070]", "type": "HF", "children": []}, {"code": "8-VR-0023", "name": "NC 케이스 [SOLO]", "type": "VR", "children": []}, {"code": "8-VR-0024", "name": "신주 케이스 뚜껑 [SOLO]", "type": "VR", "children": []}, {"code": "3478-VR-0003", "name": "알루미늄 필터 (0.8T * Φ24)", "type": "VR", "children": []}, {"code": "346789-VR-0041", "name": "방사구 너트 [공용]", "type": "VR", "children": []}, {"code": "346789-VR-0004", "name": "방사구 오링 (2*18)", "type": "VR", "children": []}, {"code": "8-VA-0008", "name": "신주 케이스 작업완료 [SOLO]", "type": "VA", "children": [{"code": "8-VR-0038", "name": "신주 케이스 [SOLO]", "type": "VR", "children": []}, {"code": "346789-VR-0040", "name": "방사구 (외경 탭 추가) [공용]", "type": "VR", "children": []}, {"code": "8-VR-0010", "name": "9핀 B/D [SOLO]", "type": "VR", "children": []}, {"code": "389-VR-0028", "name": "4 PIN 커넥터 [SOLO]", "type": "VR", "children": []}, {"code": "389-VR-0029", "name": "5 PIN 커넥터 [DX3000, SOLO]", "type": "VR", "children": []}]}]}, {"code": "8-VR-0017", "name": "CTR B/D [SOLO]", "type": "VR", "children": []}]}]}, {"code": "78-AR-0247", "name": "COCOON, SOLO 원형 에이밍 아크릴 (63ɸ 2T) [테두리 13ɸ]", "type": "AR", "children": []}, {"code": "8-AR-0271", "name": "SOLO FRONT CAP (G)", "type": "AR", "children": []}, {"code": "8-AR-0281", "name": "SOLO GER GUIDE (B)", "type": "AR", "children": []}, {"code": "8-AR-0307", "name": "SOLO OP to CTR 40핀 FFC CABLE 100mm [하네스 3번]", "type": "AR", "children": []}, {"code": "8-AA-0068", "name": "SOLO TOP BODY ASS'Y", "type": "AA", "children": [{"code": "8-AR-0264", "name": "SOLO TOP BODY (B 샌딩)", "type": "AR", "children": []}, {"code": "8-AR-0269", "name": "SOLO POWER BUTTON (B 샌딩)", "type": "AR", "children": []}, {"code": "8-AR-0297", "name": "SOLO POWER BD (Ver 1.0.0)", "type": "AR", "children": []}, {"code": "7-AR-0193", "name": "COCOON BUTTON INDICATOR", "type": "AR", "children": []}, {"code": "8-AR-0306", "name": "SOLO OP to POWER SWITCH 12핀 (12505HS-12) 100mm [하네스 2번]", "type": "AR", "children": []}, {"code": "8-AR-0283", "name": "SOLO AIMING LIGHT LED (확산 아크릴)", "type": "AR", "children": []}]}, {"code": "8-AA-0069", "name": "SOLO BOTTOM BODY ASS'Y", "type": "AA", "children": [{"code": "8-AR-0265", "name": "SOLO BOTTOM BODY (B 샌딩)", "type": "AR", "children": []}, {"code": "8-AR-0270", "name": "SOLO LOCK KNOB (B 샌딩)", "type": "AR", "children": []}, {"code": "8-AR-0278", "name": "SOLO LOCK INNER (B)", "type": "AR", "children": []}, {"code": "8-AR-0287", "name": "SOLO 광센서 유색 창", "type": "AR", "children": []}, {"code": "8-AR-0300", "name": "SOLO MAIN BD (Ver 1.0.0)", "type": "AR", "children": []}, {"code": "8-AR-0301", "name": "SOLO REMOTE BD (Ver 1.0.0)", "type": "AR", "children": []}, {"code": "8-AR-0308", "name": "SOLO MAIN to REMOTE 3핀 (12505HS-03) 60mm [하네스 1번]", "type": "AR", "children": []}]}, {"code": "8-AA-0070", "name": "SOLO OP BD ASS'Y", "type": "AA", "children": [{"code": "8-AR-0282", "name": "SOLO LCD GUIDE (B)", "type": "AR", "children": []}, {"code": "38-AR-0002", "name": "DX3000, SOLO 2.4\" TFT LCD 판넬", "type": "AR", "children": []}, {"code": "8-AR-0291", "name": "SOLO LCD 터치 가스켓 (8x8x7 mm)", "type": "AR", "children": []}, {"code": "8-AR-0298", "name": "SOLO OP BD (Ver 1.0.0)", "type": "AR", "children": []}, {"code": "8-AR-0307", "name": "SOLO OP to CTR 40핀 FFC CABLE 100mm [하네스 3번]", "type": "AR", "children": []}]}, {"code": "8-AA-0071", "name": "SOLO HANDLE ASS'Y", "type": "AA", "children": [{"code": "8-AR-0266", "name": "SOLO HAND BODY (B 샌딩)", "type": "AR", "children": []}, {"code": "8-AR-0267", "name": "SOLO BAT BOTTOM (B 샌딩)", "type": "AR", "children": []}, {"code": "8-AR-0268", "name": "SOLO BAT BOTTOM COVER (B 샌딩)", "type": "AR", "children": []}, {"code": "8-AR-0275", "name": "SOLO SHORT BUTTON (G)", "type": "AR", "children": []}, {"code": "8-AR-0276", "name": "SOLO SLIDE SWITCH (SKY BLUE)", "type": "AR", "children": []}, {"code": "8-AR-0277", "name": "SOLO SLIDE SWITCH CAP (RED)", "type": "AR", "children": []}, {"code": "8-AR-0279", "name": "SOLO HAND TOP COVER (B)", "type": "AR", "children": []}, {"code": "8-AR-0280", "name": "SOLO SHORT PCB GUIDE (B)", "type": "AR", "children": []}, {"code": "8-AR-0284", "name": "SOLO BAT LED (확산 아크릴)", "type": "AR", "children": []}, {"code": "8-AR-0287", "name": "SOLO 광센서 유색 창", "type": "AR", "children": []}, {"code": "8-AR-0289", "name": "SOLO BAT 경첩 [2ɸ 26.2mm]", "type": "AR", "children": []}, {"code": "8-AR-0288", "name": "SOLO 마운트 (알루미늄 1/4 PT 탭x12mm)", "type": "AR", "children": []}, {"code": "8-AR-0290", "name": "SOLO BAT RUBBER (삼각대 홀 적용)", "type": "AR", "children": []}, {"code": "8-AR-0302", "name": "SOLO EXP SW BD (Ver 1.0.0)", "type": "AR", "children": []}, {"code": "8-AR-0303", "name": "SOLO BATTERY CN BD (Ver 1.0.0)", "type": "AR", "children": []}, {"code": "8-AR-0304", "name": "SOLO BATCON to EXP 4핀 (YH396-04V) 150mm [하네스 4-2번]", "type": "AR", "children": []}, {"code": "8-AR-0305", "name": "SOLO BATCON to EXP 3핀 (12505HS-03) 190mm [하네스 4-1번]", "type": "AR", "children": []}, {"code": "7-AR-0205", "name": "COCOON EXP BUTTON 스프링", "type": "AR", "children": []}]}, {"code": "8-AA-0073", "name": "SOLO 20cm CONE ASS'Y (검정 부직포)", "type": "AA", "children": [{"code": "8-AR-0273", "name": "SOLO MAIN CONE (G)", "type": "AR", "children": []}, {"code": "8-AR-0274", "name": "SOLO 45cm CONE (G)", "type": "AR", "children": []}]}, {"code": "8-AA-0074", "name": "SOLO 에이밍라이트 ASS'Y", "type": "AA", "children": [{"code": "8-AR-0293", "name": "SOLO 에이밍 아크릴 은경 [40ɸ]", "type": "AR", "children": []}, {"code": "8-AR-0332", "name": "SOLO 에이밍 은경 필터 [40ɸ 0.5T]", "type": "AR", "children": []}, {"code": "8-AR-0295", "name": "SOLO 에이밍 BODY 뭉치 (B)", "type": "AR", "children": []}, {"code": "8-AR-0296", "name": "SOLO 에이밍 라이트 PCB 보드", "type": "AR", "children": []}, {"code": "8-AR-0294", "name": "SOLO PCB 방열 가이드 (B)", "type": "AR", "children": []}]}, {"code": "8-AR-0364", "name": "SOLO LCD WINDOW [iM3 로고]", "type": "AR", "children": []}]}, {"code": "34678-PR-0028", "name": "3구 16.8V 충전기 [BPL910S16F01]", "type": "PR", "children": []}, {"code": "78-PR-0038", "name": "연아크릴 [65ɸ 8T] (선일쉴드텍)", "type": "PR", "children": []}, {"code": "3478-PR-0045", "name": "실드 오링 [AN-036]", "type": "PR", "children": []}, {"code": "34678-PR-0061", "name": "실리카겔 [20g]", "type": "PR", "children": []}, {"code": "34678-PR-0066", "name": "REMOTE CONTROL [3M]", "type": "PR", "children": []}, {"code": "8-PR-0111", "name": "SOLO 내부폼 [손잡이 체결형]", "type": "PR", "children": []}, {"code": "34678-PR-0032", "name": "3구 접지 AC코드 B 타입 [110V]-미국향", "type": "PR", "children": []}, {"code": "348-PR-0037", "name": "크래들 [D-910]", "type": "PR", "children": []}]}, {"code": "348-PR-0024", "name": "DX3000, ADX4000W, SOLO 기본 배터리 [PF435060-4S] (4ICP4/50/60)", "type": "PR", "children": []}]}}];</script>
 <script>
 (function () {
-  // ── 노드/간격 치수 (큰 노드) ───────────────────────────────
-  const W = 260, H = 68;          // 노드 박스
-  const HGAP = 26;                // 형제 간 가로 간격
-  const VGAP = 64;                // 부모→자식 세로 간격 (행 사이)
-  const GRID_THRESHOLD = 3;       // 자식이 이보다 많으면 grid 로 쌓는다 (가로폭 억제)
-  const COLS = 3;                 // grid 열 수 (좁게 → 세로로 쌓임)
-  const COL_GAP = 26;             // grid 열 사이 가로 간격
-  const ROW_GAP = 26;             // grid 행 사이 세로 간격
+  // ── 치수 ───────────────────────────────────────────────────
+  const W = 400, H = 118;       // 노드 박스
+  const HGAP = 38;              // 같은 단계 내 형제 가로 간격
+  const BAND_GAP = 160;         // 단계(밴드) 사이 세로 간격
+  const SLOT = W + HGAP;
+  const PAD_L = 320;            // 좌측 단계 라벨 공간
+
+  // ── 부서순 × FAR 고정 18단계 ───────────────────────────────
+  // 위→아래: 출하 → 조립 → 튜닝 → 진공 → 고압 → 튜브, 각 부서 안 완료(F)→중간(A)→원자재(R)
+  const LEVELS = [
+    ["PF", "완제품"], ["PA", "출하 중간"], ["PR", "출하 원자재"],
+    ["AF", "조립 완료"], ["AA", "조립 중간"], ["AR", "조립 원자재"],
+    ["NF", "튜닝 완료"], ["NA", "튜닝 중간"], ["NR", "튜닝 원자재"],
+    ["VF", "진공 완료"], ["VA", "진공 중간"], ["VR", "진공 원자재"],
+    ["HF", "고압 완료"], ["HA", "고압 중간"], ["HR", "고압 원자재"],
+    ["TF", "튜브 완료"], ["TA", "튜브 중간"], ["TR", "튜브 원자재"],
+  ];
+  const LEVEL_INDEX = {};
+  LEVELS.forEach((lv, i) => { LEVEL_INDEX[lv[0]] = i; });
+  const EXTRA_INDEX = LEVELS.length;  // 코드 매칭 안 되는 노드 → 맨 아래 "기타"
+  function levelOf(t) { return (t && LEVEL_INDEX[t] != null) ? LEVEL_INDEX[t] : EXTRA_INDEX; }
 
   const LEGEND = [
     ["완제품", "#244a86"], ["출하", "#4472c4"], ["조립", "#3f8fa3"],
     ["튜닝", "#8b65d8"], ["진공", "#a78bdc"], ["고압", "#e3b341"],
     ["튜브", "#2d9eb3"], ["원자재", "#aeb6c4"],
   ];
-
   function nodeColor(type) {
     if (!type) return "#9aa7bd";
     if (type === "PF") return "#244a86";
     const p = type[0], s = type[type.length - 1];
-    if (s === "R") return "#aeb6c4";              // 원자재 (?R)
+    if (s === "R") return "#aeb6c4";
     const map = { P:"#4472c4", A:"#3f8fa3", N:"#8b65d8", V:"#a78bdc", H:"#e3b341", T:"#2d9eb3" };
     return map[p] || "#9aa7bd";
   }
 
-  // ── 커스텀 멀티컬럼 팩 레이아웃 ────────────────────────────
-  // 각 노드에 _w(서브트리 폭), _h(서브트리 높이)를 1차로 계산하고
-  // 2차로 (x, y) 절대좌표를 배치한다. 부모는 자식 블록의 가로 중앙에 둔다.
-  function measure(node) {
-    const kids = node.children || [];
-    if (!kids.length) {
-      node._w = W;
-      node._h = H;
-      return;
-    }
-    kids.forEach(measure);
-
-    if (kids.length <= GRID_THRESHOLD) {
-      // 가로 한 줄: 자식 서브트리 폭의 합
-      let sum = 0;
-      kids.forEach((k, i) => { sum += k._w + (i ? HGAP : 0); });
-      node._w = Math.max(W, sum);
-      node._h = H + VGAP + Math.max(...kids.map((k) => k._h));
-      node._grid = false;
-    } else {
-      // grid: COLS 열로 나눠 행마다 쌓는다.
-      const rows = Math.ceil(kids.length / COLS);
-      const colW = new Array(COLS).fill(0);
-      const rowH = new Array(rows).fill(0);
-      kids.forEach((k, i) => {
-        const c = i % COLS, r = Math.floor(i / COLS);
-        if (k._w > colW[c]) colW[c] = k._w;
-        if (k._h > rowH[r]) rowH[r] = k._h;
-      });
-      let gw = 0; let usedCols = Math.min(COLS, kids.length);
-      for (let c = 0; c < usedCols; c++) gw += colW[c] + (c ? COL_GAP : 0);
-      let gh = 0;
-      for (let r = 0; r < rows; r++) gh += rowH[r] + (r ? ROW_GAP : 0);
-      node._w = Math.max(W, gw);
-      node._h = H + VGAP + gh;
-      node._grid = true;
-      node._colW = colW;
-      node._rowH = rowH;
-      node._rows = rows;
-      node._usedCols = usedCols;
-    }
-  }
-
-  // cx = 이 서브트리 블록의 가로 중앙 x, top = 블록 상단 y
-  function place(node, cx, top) {
-    node.x = cx;
-    node.y = top + H / 2;
-    const kids = node.children || [];
-    if (!kids.length) return;
-
-    const childTop = top + H + VGAP;
-
-    if (!node._grid) {
-      // 한 줄: 자식 블록 전체 폭을 cx 중앙으로 정렬
-      let total = 0;
-      kids.forEach((k, i) => { total += k._w + (i ? HGAP : 0); });
-      let cursor = cx - total / 2;
-      kids.forEach((k) => {
-        place(k, cursor + k._w / 2, childTop);
-        cursor += k._w + HGAP;
-      });
-    } else {
-      const { _colW: colW, _rowH: rowH, _rows: rows, _usedCols: usedCols } = node;
-      let gw = 0;
-      for (let c = 0; c < usedCols; c++) gw += colW[c] + (c ? COL_GAP : 0);
-      const left = cx - gw / 2;
-      const colCenter = new Array(usedCols);
-      let acc = left;
-      for (let c = 0; c < usedCols; c++) {
-        colCenter[c] = acc + colW[c] / 2;
-        acc += colW[c] + COL_GAP;
-      }
-      const rowTop = new Array(rows);
-      let accY = childTop;
-      for (let r = 0; r < rows; r++) {
-        rowTop[r] = accY;
-        accY += rowH[r] + ROW_GAP;
-      }
-      kids.forEach((k, i) => {
-        const c = i % COLS, r = Math.floor(i / COLS);
-        place(k, colCenter[c], rowTop[r]);
-      });
-    }
-  }
-
+  // ── 단계 레이어 레이아웃 ───────────────────────────────────
+  // x: d3.tree 로 부모 정렬 가로 위치만 사용. y: 공정 stage_order 별 고정 밴드.
   function layout(treeData) {
+    const MAX_COLS = 12, ROW_GAP = 55, EMPTY_H = H;  // 빈 단계도 한 줄 높이 유지
     const root = d3.hierarchy(treeData);
-    measure(root);
-    place(root, 0, 0);
-    return root;
+    const nodes = root.descendants();
+    nodes.forEach((d) => { d.level = levelOf(d.data.type); });
+    const hasExtra = nodes.some((d) => d.level === EXTRA_INDEX);
+    const total = LEVELS.length + (hasExtra ? 1 : 0);
+    const bands = [];
+    let y = 0;
+    for (let li = 0; li < total; li++) {
+      const arr = nodes.filter((d) => d.level === li);  // DFS 등장 순
+      const cols = Math.max(1, Math.min(MAX_COLS, arr.length));
+      const rows = arr.length ? Math.ceil(arr.length / cols) : 1;
+      arr.forEach((d, i) => {
+        const c = i % cols, r = Math.floor(i / cols);
+        d.x = (c - (cols - 1) / 2) * SLOT;              // 단계 블록을 가로 중앙 정렬
+        d.y = y + r * (H + ROW_GAP) + H / 2;
+      });
+      const bandH = arr.length ? rows * (H + ROW_GAP) - ROW_GAP : EMPTY_H;
+      bands.push({
+        label: li < LEVELS.length ? LEVELS[li][1] : "기타",
+        top: y, height: bandH, empty: arr.length === 0,
+        newDept: li < LEVELS.length && li % 3 === 0,    // 부서 시작(3단위)
+      });
+      y += bandH + BAND_GAP;
+    }
+    return { root, nodes, bands };
   }
 
   // ── SVG / 줌 ───────────────────────────────────────────────
   const svg = d3.select("#canvas");
   const g = svg.append("g");
-  const zoom = d3.zoom().scaleExtent([0.04, 2.5]).on("zoom", (e) => g.attr("transform", e.transform));
+  const zoom = d3.zoom().scaleExtent([0.03, 2.5]).on("zoom", (e) => g.attr("transform", e.transform));
   svg.call(zoom);
-
-  let currentRoot = null;
+  let cur = null;
 
   function linkPath(d) {
-    // 부모 하단 → 자식 상단 으로 부드러운 세로 곡선
     const sx = d.source.x, sy = d.source.y + H / 2;
     const tx = d.target.x, ty = d.target.y - H / 2;
     const my = (sy + ty) / 2;
@@ -185,55 +139,89 @@
 
   function render(model) {
     g.selectAll("*").remove();
-    const root = layout(model.tree);
-    currentRoot = root;
+    const L = layout(model.tree);
+    cur = L;
+    const xs = L.nodes.map((d) => d.x);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
 
+    // 단계 배경 띠 + 좌측 라벨 (18단계 고정, 빈 단계는 흐리게, 부서 경계 점선)
+    const bg = g.append("g");
+    const fullX = minX - PAD_L, fullW = (maxX - minX) + PAD_L + 2 * W;
+    L.bands.forEach((b, i) => {
+      bg.append("rect")
+        .attr("x", fullX).attr("y", b.top - BAND_GAP / 2)
+        .attr("width", fullW).attr("height", b.height + BAND_GAP)
+        .attr("fill", i % 2 ? "#e7edf5" : "#eef2f8");
+      if (b.newDept && i > 0) {
+        bg.append("line")
+          .attr("x1", fullX).attr("y1", b.top - BAND_GAP / 2)
+          .attr("x2", fullX + fullW).attr("y2", b.top - BAND_GAP / 2)
+          .attr("stroke", "#bcc8de").attr("stroke-width", 1.5).attr("stroke-dasharray", "7 5");
+      }
+      bg.append("text").attr("class", "bandlabel")
+        .attr("x", fullX + 14).attr("y", b.top + b.height / 2 + 5)
+        .attr("opacity", b.empty ? 0.4 : 1)
+        .text(b.label);
+    });
+
+    // 링크
     const linkSel = g.append("g").attr("class", "links").selectAll("path")
-      .data(root.links()).join("path").attr("d", linkPath);
+      .data(L.root.links()).join("path").attr("d", linkPath);
 
-    function updateLinks() { linkSel.attr("d", linkPath); }
+    // 노드 (위치 고정 — 드래그 없음, 클릭만 동작)
+    let selected = null;
+    const node = g.append("g").selectAll("g.node").data(L.nodes).join("g")
+      .attr("class", "node").attr("transform", (d) => `translate(${d.x},${d.y})`)
+      .on("click", function (e, d) { e.stopPropagation(); toggleSel(d); });
 
-    const node = g.append("g").selectAll("g.node")
-      .data(root.descendants()).join("g")
-      .attr("class", "node")
-      .attr("transform", (d) => `translate(${d.x},${d.y})`)
-      .call(d3.drag()
-        .on("start", (e) => { e.sourceEvent.stopPropagation(); })
-        .on("drag", function (e, d) {
-          d.x = e.x; d.y = e.y;
-          d3.select(this).attr("transform", `translate(${d.x},${d.y})`);
-          updateLinks();
-        }));
+    // 클릭 → 그 노드의 모든 하위 하이라이트, 나머지 흐리게 (빈 공간 클릭 = 해제)
+    function applyHL(d) {
+      const isRaw = d.data.type && d.data.type.endsWith("R");
+      const isInter = d.data.type && d.data.type.endsWith("A");
+      let set;
+      if (isRaw) {
+        set = new Set(d.ancestors());
+      } else {
+        set = new Set(d.descendants());
+        if (isInter) {
+          const dept = d.data.type[0];
+          d.ancestors().forEach(a => { if (a.data.type && a.data.type[0] === dept && a.data.type.endsWith("A")) set.add(a); });
+        }
+      }
+      node.classed("dim", (n) => !set.has(n)).classed("sel", (n) => n === d);
+      linkSel.classed("dim", (l) => !(set.has(l.source) && set.has(l.target)));
+    }
+    function clearHL() { node.classed("dim", false).classed("sel", false); linkSel.classed("dim", false); }
+    function toggleSel(d) { if (selected === d) { selected = null; clearHL(); } else { selected = d; applyHL(d); } }
+    svg.on("click.sel", (e) => {
+      const onNode = e.target.closest && e.target.closest("g.node");
+      if (!onNode) { selected = null; clearHL(); }
+    });
 
-    // 박스 + 좌측 컬러 바
     node.append("rect").attr("class", "box")
-      .attr("x", -W / 2).attr("y", -H / 2).attr("width", W).attr("height", H).attr("rx", 9);
+      .attr("x", -W / 2).attr("y", -H / 2).attr("width", W).attr("height", H).attr("rx", 14);
     node.append("rect")
-      .attr("x", -W / 2).attr("y", -H / 2).attr("width", 6).attr("height", H)
+      .attr("x", -W / 2).attr("y", -H / 2).attr("width", 10).attr("height", H)
       .attr("fill", (d) => nodeColor(d.data.type));
 
-    // foreignObject 안에 HTML 카드 → 품목명 자동 줄바꿈(wrap), 글자 안 짤림
     const fo = node.append("foreignObject")
-      .attr("x", -W / 2 + 6).attr("y", -H / 2).attr("width", W - 6).attr("height", H);
+      .attr("x", -W / 2 + 10).attr("y", -H / 2).attr("width", W - 10).attr("height", H);
     fo.append("xhtml:div").attr("class", "card")
       .html((d) => {
-        const code = (d.data.code || "·");
-        const nm = (d.data.name || "");
-        const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        return `<div class="code">${esc(code)}</div><div class="nm">${esc(nm)}</div>`;
+        const esc = (s) => (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        return `<div class="code">${esc(d.data.code || "·")}</div><div class="nm">${esc(d.data.name)}</div>`;
       });
 
-    // 전체 이름 툴팁 (hover 시 안 짤린 풀네임)
     node.append("title").text((d) => (d.data.code ? d.data.code + "  " : "") + (d.data.name || ""));
 
-    fit(root);
+    fit(L);
   }
 
-  function fit(root) {
-    const ns = root.descendants();
+  function fit(L) {
+    const ns = L.nodes;
     if (!ns.length) return;
     const xs = ns.map((d) => d.x), ys = ns.map((d) => d.y);
-    const minX = Math.min(...xs) - W, maxX = Math.max(...xs) + W;
+    const minX = Math.min(...xs) - PAD_L, maxX = Math.max(...xs) + W;
     const minY = Math.min(...ys) - H, maxY = Math.max(...ys) + H;
     const bw = maxX - minX, bh = maxY - minY;
     const sw = svg.node().clientWidth, sh = svg.node().clientHeight;
@@ -252,8 +240,8 @@
   d3.select("#legend").selectAll("span").data(LEGEND).join("span")
     .html((d) => `<i style="background:${d[1]}"></i>${d[0]}`);
 
-  d3.select("#fit").on("click", () => { if (currentRoot) fit(currentRoot); });
-  window.addEventListener("resize", () => { if (currentRoot) fit(currentRoot); });
+  d3.select("#fit").on("click", () => { if (cur) fit(cur); });
+  window.addEventListener("resize", () => { if (cur) fit(cur); });
 
   if (window.MODELS && window.MODELS.length) { sel.property("value", 0); render(window.MODELS[0]); }
 })();
