@@ -20,13 +20,11 @@ export interface DesktopHistoryRightPanelProps {
   displaySelection: HistorySelection | null;
   batchCache: Map<string, IoBatch>;
   setBatchCache: React.Dispatch<React.SetStateAction<Map<string, IoBatch>>>;
-  itemRecentLogs: TransactionLog[];
   onSelectLog: (log: TransactionLog) => void;
-  /** 드릴(BOM 하위·최근거래) 스택이 있으면 "← 뒤로" 노출. */
+  /** 드릴(BOM 하위) 스택이 있으면 "← 뒤로" 노출. */
   canGoBack: boolean;
   onBack: () => void;
   onLogUpdated: (updated: TransactionLog) => void;
-  onLogCorrected: (result: { original: TransactionLog; correction: TransactionLog }) => void;
   /** 패널 닫기 (선택 해제). */
   onClose: () => void;
 }
@@ -36,12 +34,10 @@ export function DesktopHistoryRightPanel({
   displaySelection,
   batchCache,
   setBatchCache,
-  itemRecentLogs,
   onSelectLog,
   canGoBack,
   onBack,
   onLogUpdated,
-  onLogCorrected,
   onClose,
 }: DesktopHistoryRightPanelProps) {
   const backButtonNode = canGoBack ? (
@@ -68,10 +64,8 @@ export function DesktopHistoryRightPanel({
         >
           <HistoryDetailPanel
             selected={displaySelection.log}
-            itemRecentLogs={itemRecentLogs}
             onSelectLog={onSelectLog}
             onLogUpdated={onLogUpdated}
-            onLogCorrected={onLogCorrected}
           />
         </DesktopRightPanel>
       )}

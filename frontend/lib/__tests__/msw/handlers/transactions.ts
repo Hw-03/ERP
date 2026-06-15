@@ -22,6 +22,13 @@ const sampleTransactions: TransactionLog[] = [
     operation_batch_id: null,
     created_at: "2026-05-01T09:00:00Z",
     edit_count: 0,
+    warehouse_qty_before: null,
+    warehouse_qty_after: null,
+    department: null,
+    cancelled: false,
+    cancel_reason: null,
+    cancelled_by: null,
+    cancelled_at: null,
   },
   {
     log_id: "log-2",
@@ -43,6 +50,13 @@ const sampleTransactions: TransactionLog[] = [
     operation_batch_id: null,
     created_at: "2026-05-02T10:00:00Z",
     edit_count: 0,
+    warehouse_qty_before: null,
+    warehouse_qty_after: null,
+    department: null,
+    cancelled: false,
+    cancel_reason: null,
+    cancelled_by: null,
+    cancelled_at: null,
   },
 ];
 

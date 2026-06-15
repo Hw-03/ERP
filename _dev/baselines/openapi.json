@@ -5907,6 +5907,36 @@
         "title": "SupplierReturnRequest",
         "type": "object"
       },
+      "TransactionCancelRequest": {
+        "properties": {
+          "employee_code": {
+            "description": "처리자 사번",
+            "maxLength": 30,
+            "minLength": 1,
+            "title": "Employee Code",
+            "type": "string"
+          },
+          "pin": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Pin",
+            "type": "string"
+          },
+          "reason": {
+            "description": "취소 사유 (필수)",
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "employee_code",
+          "pin"
+        ],
+        "title": "TransactionCancelRequest",
+        "type": "object"
+      },
       "TransactionEditLogResponse": {
         "properties": {
           "after_payload": {
@@ -5996,10 +6026,61 @@
             ],
             "title": "Approver Name"
           },
+          "cancel_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Reason"
+          },
+          "cancelled": {
+            "default": false,
+            "title": "Cancelled",
+            "type": "boolean"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "cancelled_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled By"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
           },
           "edit_count": {
             "default": 0,
@@ -6165,6 +6246,28 @@
               }
             ],
             "title": "Transfer Qty"
+          },
+          "warehouse_qty_after": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warehouse Qty After"
+          },
+          "warehouse_qty_before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warehouse Qty Before"
           }
         },
         "required": [
@@ -10553,6 +10656,60 @@
           }
         },
         "summary": "Get Transactions Summary",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/inventory/transactions/{log_id}/cancel": {
+      "post": {
+        "description": "거래 취소 — 내역 유지 + 재고 자동 롤백 + '취소됨' 표시.\n\n권한: 요청자 본인(producer_employee_id) 또는 결재 권한자(warehouse_role / department_role != none).\nBOM 배치(PRODUCE+BACKFLUSH)는 operation_batch_id 단위로 일괄 취소.",
+        "operationId": "cancel_transaction_api_inventory_transactions__log_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "log_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Log Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionLogResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Transaction",
         "tags": [
           "Inventory"
         ]

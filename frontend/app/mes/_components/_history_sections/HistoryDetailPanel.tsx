@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, ArrowRight, ChevronDown, History, Pencil, StickyNote } from "lucide-react";
+import { Activity, ArrowRight, ChevronDown, History, StickyNote, XCircle } from "lucide-react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch } from "@/lib/api/types/io";
@@ -19,25 +19,12 @@ import {
   parseTransactionNotes,
 } from "./historyBatchInterpreter";
 import { FlowBadge, MovementSummaryCell } from "./historyTableHelpers";
-import {
-  QUANTITY_CORRECTABLE_TYPES,
-  TransactionEditUnifiedModal,
-} from "./TransactionEditUnifiedModal";
 import { HistoryDetailEditHistory } from "./HistoryDetailEditHistory";
-import { HistoryDetailRecentLogs } from "./HistoryDetailRecentLogs";
-
-const META_CORRECTABLE = new Set([
-  "RECEIVE", "SHIP", "ADJUST",
-  "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "TRANSFER_DEPT",
-  "MARK_DEFECTIVE", "SUPPLIER_RETURN",
-]);
 
 type Props = {
   selected: TransactionLog | null;
-  itemRecentLogs: TransactionLog[];
   onSelectLog: (log: TransactionLog) => void;
   onLogUpdated: (updated: TransactionLog) => void;
-  onLogCorrected: (result: { original: TransactionLog; correction: TransactionLog }) => void;
 };
 
 type FlowState =
@@ -46,14 +33,21 @@ type FlowState =
   | { status: "available"; batch: IoBatch }
   | { status: "unavailable" };
 
+type CancelState =
+  | { step: "idle" }
+  | { step: "confirm" }
+  | { step: "submitting" }
+  | { step: "error"; message: string };
+
 export function HistoryDetailPanel({
   selected,
-  itemRecentLogs,
   onSelectLog,
   onLogUpdated,
-  onLogCorrected,
 }: Props) {
-  const [editOpen, setEditOpen] = useState(false);
+  const [cancelState, setCancelState] = useState<CancelState>({ step: "idle" });
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelCode, setCancelCode] = useState("");
+  const [cancelPin, setCancelPin] = useState("");
   const [edits, setEdits] = useState<TransactionEditLog[]>([]);
   const [editsLoaded, setEditsLoaded] = useState(false);
   const [flow, setFlow] = useState<FlowState>({ status: "idle" });
@@ -111,20 +105,52 @@ export function HistoryDetailPanel({
     );
   }
 
-  const canMetaEdit = META_CORRECTABLE.has(selected.transaction_type);
-  const canQtyCorrect = QUANTITY_CORRECTABLE_TYPES.has(selected.transaction_type);
   const editCount = selected.edit_count ?? edits.length;
+  const isCancelled = selected.cancelled;
+
+  const handleCancelSubmit = async () => {
+    if (!cancelReason.trim() || !cancelCode.trim() || !cancelPin) return;
+    setCancelState({ step: "submitting" });
+    try {
+      const updated = await api.cancelTransaction(selected.log_id, {
+        reason: cancelReason.trim(),
+        employee_code: cancelCode.trim(),
+        pin: cancelPin,
+      });
+      setCancelState({ step: "idle" });
+      setCancelReason("");
+      setCancelCode("");
+      setCancelPin("");
+      onLogUpdated(updated);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "취소 처리 중 오류가 발생했습니다.";
+      setCancelState({ step: "error", message: msg });
+    }
+  };
 
   return (
     <div className="space-y-4">
       <HistoryDetailHero log={selected} flow={flow} editCount={editCount} />
 
+      {isCancelled && (
+        <div
+          className="rounded-[16px] border px-4 py-3 text-sm font-bold"
+          style={{
+            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
+            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`,
+            color: LEGACY_COLORS.red,
+          }}
+        >
+          <XCircle className="mr-1.5 inline h-4 w-4" />
+          취소된 거래 — {selected.cancel_reason}
+        </div>
+      )}
+
       <HistoryDetailMemo notes={selected.notes} />
 
       <HistoryDetailMetaStrip
         log={selected}
-        canEdit={canMetaEdit || canQtyCorrect}
-        onEditClick={() => setEditOpen(true)}
+        onCancelClick={() => setCancelState({ step: "confirm" })}
       />
 
       {editsLoaded && edits.length > 0 && (
@@ -137,29 +163,62 @@ export function HistoryDetailPanel({
         </Collapsible>
       )}
 
-      <Collapsible
-        icon={<Activity className="h-3.5 w-3.5" />}
-        title="이 품목의 최근 거래"
-        count={itemRecentLogs.length}
-      >
-        <HistoryDetailRecentLogs itemRecentLogs={itemRecentLogs} onSelectLog={onSelectLog} />
-      </Collapsible>
-
-      <TransactionEditUnifiedModal
-        open={editOpen}
-        log={selected}
-        canMetaEdit={canMetaEdit}
-        canQtyCorrect={canQtyCorrect}
-        onClose={() => setEditOpen(false)}
-        onMetaSuccess={(updated) => {
-          onLogUpdated(updated);
-          api.getTransactionEdits(updated.log_id).then(setEdits).catch(() => {});
-        }}
-        onQtySuccess={(result) => {
-          onLogCorrected(result);
-          api.getTransactionEdits(result.original.log_id).then(setEdits).catch(() => {});
-        }}
-      />
+      {cancelState.step !== "idle" && !isCancelled && (
+        <div
+          className="rounded-[20px] border p-4 space-y-3"
+          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+        >
+          <div className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.text }}>
+            거래 취소 확인
+          </div>
+          <textarea
+            className="w-full rounded-[12px] border px-3 py-2 text-[13px] resize-none"
+            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+            rows={2}
+            placeholder="취소 사유를 입력하세요 (필수)"
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+          />
+          <input
+            type="text"
+            className="w-full rounded-[12px] border px-3 py-2 text-[13px]"
+            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+            placeholder="사번 입력"
+            value={cancelCode}
+            onChange={(e) => setCancelCode(e.target.value)}
+          />
+          <input
+            type="password"
+            className="w-full rounded-[12px] border px-3 py-2 text-[13px]"
+            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+            placeholder="PIN 입력"
+            value={cancelPin}
+            onChange={(e) => setCancelPin(e.target.value)}
+          />
+          {cancelState.step === "error" && (
+            <div className="text-[12px]" style={{ color: LEGACY_COLORS.red }}>{cancelState.message}</div>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleCancelSubmit}
+              disabled={cancelState.step === "submitting" || !cancelReason.trim() || !cancelPin}
+              className="flex-1 rounded-[12px] px-3 py-2 text-[13px] font-bold text-white disabled:opacity-50"
+              style={{ background: LEGACY_COLORS.red }}
+            >
+              {cancelState.step === "submitting" ? "처리 중…" : "취소 확정"}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setCancelState({ step: "idle" }); setCancelReason(""); setCancelPin(""); }}
+              className="rounded-[12px] border px-3 py-2 text-[13px] font-bold"
+              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -185,7 +244,9 @@ function HistoryDetailHero({
 
   const qBefore = log.quantity_before;
   const qAfter = log.quantity_after;
-  const hasStockDelta = qBefore != null || qAfter != null;
+  const isTransfer = ["TRANSFER_TO_PROD", "TRANSFER_TO_WH", "TRANSFER_DEPT"].includes(log.transaction_type);
+  const hasWqSplit = isTransfer && log.warehouse_qty_before != null && log.warehouse_qty_after != null;
+  const hasStockDelta = !isTransfer && (qBefore != null || qAfter != null);
 
   return (
     <div className="rounded-[20px] border p-4 space-y-3" style={heroStyle}>
@@ -245,7 +306,24 @@ function HistoryDetailHero({
       )}
 
       {/* 3줄: 재고 영향 chip */}
-      {hasStockDelta && (
+      {hasWqSplit && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <StockSplitChip
+            label="창고"
+            before={log.warehouse_qty_before!}
+            after={log.warehouse_qty_after!}
+            color={LEGACY_COLORS.muted2}
+          />
+          <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>·</span>
+          <StockSplitChip
+            label="부서"
+            before={(qBefore ?? 0) - log.warehouse_qty_before!}
+            after={(qAfter ?? 0) - log.warehouse_qty_after!}
+            color={tcolor}
+          />
+        </div>
+      )}
+      {!hasWqSplit && hasStockDelta && (
         <div className="flex items-center gap-2 text-xs">
           <span
             className="rounded-[10px] border px-2 py-1"
@@ -284,16 +362,13 @@ function HistoryDetailHero({
 
 function HistoryDetailMetaStrip({
   log,
-  canEdit,
-  onEditClick,
+  onCancelClick,
 }: {
   log: TransactionLog;
-  canEdit: boolean;
-  onEditClick: () => void;
+  onCancelClick: () => void;
 }) {
   const processMeta = PROCESS_TYPE_META[log.item_process_type_code ?? ""];
   const reqName = getHistoryActor(log);
-  // 승인자: 백엔드가 stock_request 있으면 그 approved_by_name, 없으면 요청자 자신.
   const approverName = log.approver_name ?? reqName;
 
   return (
@@ -333,14 +408,14 @@ function HistoryDetailMetaStrip({
           </span>
         </div>
       </div>
-      {canEdit && (
+      {!log.cancelled && (
         <button
-          onClick={onEditClick}
+          onClick={onCancelClick}
           className="inline-flex items-center gap-1 rounded-[12px] border px-3 py-1.5 text-xs font-bold"
-          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}
+          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.red }}
         >
-          <Pencil className="h-3.5 w-3.5" />
-          정정
+          <XCircle className="h-3.5 w-3.5" />
+          취소
         </button>
       )}
     </div>
@@ -377,6 +452,20 @@ export function HistoryDetailMemo({ notes }: { notes: string | null | undefined 
         {userMemo}
       </div>
     </div>
+  );
+}
+
+function StockSplitChip({ label, before, after, color }: { label: string; before: number; after: number; color: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-[10px] border px-2 py-1" style={{
+      background: `color-mix(in srgb, ${color} 8%, transparent)`,
+      borderColor: `color-mix(in srgb, ${color} 25%, transparent)`,
+    }}>
+      <span className="text-[10px] font-bold tracking-wide" style={{ color }}>{label}</span>
+      <span className="font-black" style={{ color }}>{formatQty(before)}</span>
+      <ArrowRight className="h-3 w-3" style={{ color }} />
+      <span className="font-black" style={{ color }}>{formatQty(after)}</span>
+    </span>
   );
 }
 

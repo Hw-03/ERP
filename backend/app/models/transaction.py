@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     Enum as SAEnum,
@@ -54,6 +55,8 @@ class TransactionLog(Base):
     quantity_change = Column(IntQuantity, nullable=False)
     quantity_before = Column(IntQuantity, nullable=True)
     quantity_after = Column(IntQuantity, nullable=True)
+    warehouse_qty_before = Column(IntQuantity, nullable=True)
+    warehouse_qty_after = Column(IntQuantity, nullable=True)
     transfer_qty = Column(IntQuantity, nullable=True)
     reference_no = Column(String(100), nullable=True, index=True)
     produced_by = Column(String(100), nullable=True)
@@ -76,6 +79,14 @@ class TransactionLog(Base):
         index=True,
     )
     department = Column(String(50), nullable=True, index=True)
+    cancelled = Column(Boolean, nullable=False, default=False, server_default="0")
+    cancel_reason = Column(Text, nullable=True)
+    cancelled_by = Column(
+        UUIDString,
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    cancelled_at = Column(DateTime, nullable=True)
     created_at = Column(
         DateTime,
         nullable=False,

@@ -11,7 +11,7 @@ from io import StringIO
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import case, extract, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -20,7 +20,9 @@ from app.models import (
     Employee,
     IoBatch,
     Inventory,
+    InventoryLocation,
     Item,
+    LocationStatusEnum,
     TransactionEditLog,
     TransactionLog,
     TransactionTypeEnum,
@@ -782,3 +784,205 @@ def quantity_correct_transaction(
         original=_to_log_response(log, item, int(edit_count_orig)),
         correction=_to_log_response(correction_log, item, 0),
     )
+
+
+# ---------------------------------------------------------------------------
+# 거래 취소
+# ---------------------------------------------------------------------------
+
+class TransactionCancelRequest(BaseModel):
+    reason: str = Field(..., min_length=1, description="취소 사유 (필수)")
+    employee_code: str = Field(..., min_length=1, max_length=30, description="처리자 사번")
+    pin: str = Field(..., min_length=1, max_length=20)
+
+
+def _cancel_one_log(db: Session, log: TransactionLog, inv: Inventory) -> None:
+    """단일 TransactionLog 의 재고 효과를 역방향 적용. 범위 외 타입은 ValueError."""
+    from decimal import Decimal as _D
+
+    tx = log.transaction_type
+    qty = _D(str(log.transfer_qty or abs(log.quantity_change or 0)))
+
+    WAREHOUSE_ONLY = {
+        TransactionTypeEnum.RECEIVE,
+        TransactionTypeEnum.SHIP,
+        TransactionTypeEnum.ADJUST,
+    }
+    DEPT_ONLY = {
+        TransactionTypeEnum.PRODUCE,
+        TransactionTypeEnum.BACKFLUSH,
+        TransactionTypeEnum.SUPPLIER_RETURN,
+    }
+    TRANSFER_TYPES = {
+        TransactionTypeEnum.TRANSFER_TO_PROD,
+        TransactionTypeEnum.TRANSFER_TO_WH,
+        TransactionTypeEnum.TRANSFER_DEPT,
+    }
+
+    if tx in WAREHOUSE_ONLY:
+        # quantity_change: RECEIVE=+, SHIP=-, ADJUST=±
+        delta = _D(str(log.quantity_change or 0))
+        new_wh = (inv.warehouse_qty or _D("0")) - delta
+        if new_wh < 0:
+            raise ValueError(f"취소 후 창고 재고가 음수({new_wh})가 됩니다.")
+        inv.warehouse_qty = new_wh
+
+    elif tx in DEPT_ONLY:
+        dept_name = log.department
+        if not dept_name:
+            raise ValueError("이 거래의 부서 정보가 없어 취소할 수 없습니다. (이전 버전 로그)")
+        loc = (
+            db.query(InventoryLocation)
+            .filter(
+                InventoryLocation.item_id == log.item_id,
+                InventoryLocation.department == dept_name,
+                InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+            )
+            .first()
+        )
+        if loc is None:
+            raise ValueError(f"{dept_name} 부서 재고 위치를 찾을 수 없습니다.")
+        # PRODUCE: quantity_change=+qty (입고), 역: -qty
+        # BACKFLUSH/SUPPLIER_RETURN: quantity_change=-qty (출고), 역: +qty
+        delta = _D(str(log.quantity_change or 0))
+        new_loc_qty = (loc.quantity or _D("0")) - delta
+        if new_loc_qty < 0:
+            raise ValueError(f"취소 후 {dept_name} 부서 재고가 음수({new_loc_qty})가 됩니다.")
+        loc.quantity = new_loc_qty
+
+    elif tx in TRANSFER_TYPES:
+        dept_name = log.department
+        if not dept_name:
+            raise ValueError("이 거래의 부서 정보가 없어 취소할 수 없습니다. (이전 버전 로그)")
+        loc = (
+            db.query(InventoryLocation)
+            .filter(
+                InventoryLocation.item_id == log.item_id,
+                InventoryLocation.department == dept_name,
+                InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+            )
+            .first()
+        )
+        if loc is None:
+            raise ValueError(f"{dept_name} 부서 재고 위치를 찾을 수 없습니다.")
+
+        if tx == TransactionTypeEnum.TRANSFER_TO_PROD:
+            # 창고↓, 부서↑ → 역: 창고↑, 부서↓
+            new_wh = (inv.warehouse_qty or _D("0")) + qty
+            new_loc = (loc.quantity or _D("0")) - qty
+            if new_loc < 0:
+                raise ValueError(f"취소 후 {dept_name} 부서 재고가 음수({new_loc})가 됩니다.")
+            inv.warehouse_qty = new_wh
+            loc.quantity = new_loc
+        elif tx == TransactionTypeEnum.TRANSFER_TO_WH:
+            # 부서↓, 창고↑ → 역: 부서↑, 창고↓
+            new_wh = (inv.warehouse_qty or _D("0")) - qty
+            new_loc = (loc.quantity or _D("0")) + qty
+            if new_wh < 0:
+                raise ValueError(f"취소 후 창고 재고가 음수({new_wh})가 됩니다.")
+            inv.warehouse_qty = new_wh
+            loc.quantity = new_loc
+        else:  # TRANSFER_DEPT: from_dept↓, to_dept↑
+            # log.department = from_dept. to_dept는 notes에서만 알 수 있음.
+            # from_dept 복원 + to_dept 복원 필요 — notes 파싱 생략하고 to_dept를 오류로
+            raise ValueError("부서간 이동(TRANSFER_DEPT)은 현재 취소를 지원하지 않습니다.")
+    else:
+        raise ValueError(f"이 거래 유형({tx.value})은 취소를 지원하지 않습니다.")
+
+
+@router.post("/transactions/{log_id}/cancel", response_model=TransactionLogResponse)
+def cancel_transaction(
+    log_id: uuid.UUID,
+    payload: TransactionCancelRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """거래 취소 — 내역 유지 + 재고 자동 롤백 + '취소됨' 표시.
+
+    권한: 요청자 본인(producer_employee_id) 또는 결재 권한자(warehouse_role / department_role != none).
+    BOM 배치(PRODUCE+BACKFLUSH)는 operation_batch_id 단위로 일괄 취소.
+    """
+    from datetime import datetime as _dt
+
+    log = db.query(TransactionLog).filter(TransactionLog.log_id == log_id).first()
+    if not log:
+        raise http_error(404, ErrorCode.NOT_FOUND, "거래를 찾을 수 없습니다.")
+
+    if bool(getattr(log, "cancelled", False)):
+        raise http_error(422, ErrorCode.BUSINESS_RULE, "이미 취소된 거래입니다.")
+
+    item = item_repository.get(db, log.item_id)
+    if not item:
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+
+    canceller = db.query(Employee).filter(Employee.employee_code == payload.employee_code).first()
+    if not canceller:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    if not bool(canceller.is_active):
+        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 거래를 취소할 수 없습니다.")
+    if not verify_pin(canceller.pin_hash, payload.pin):
+        raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
+
+    # 권한 체크: 본인(producer) 또는 결재 권한자
+    is_self = (
+        log.producer_employee_id is not None
+        and str(log.producer_employee_id) == str(canceller.employee_id)
+    )
+    is_approver = (
+        (getattr(canceller, "warehouse_role", None) or "none").lower() != "none"
+        or (getattr(canceller, "department_role", None) or "none").lower() != "none"
+    )
+    if not (is_self or is_approver):
+        raise http_error(403, ErrorCode.FORBIDDEN, "본인 거래 또는 결재 권한자만 취소할 수 있습니다.")
+
+    set_actor(request, canceller)
+
+    # 배치 단위 취소 (PRODUCE+BACKFLUSH 등 복합 작업)
+    batch_logs: list[TransactionLog] = []
+    if log.operation_batch_id:
+        batch_logs = (
+            db.query(TransactionLog)
+            .filter(
+                TransactionLog.operation_batch_id == log.operation_batch_id,
+                TransactionLog.cancelled.is_(False),
+            )
+            .all()
+        )
+    if not batch_logs:
+        batch_logs = [log]
+
+    now = _dt.utcnow()
+    for bl in batch_logs:
+        bl_inv = inventory_repository.get(db, bl.item_id)
+        if not bl_inv:
+            raise http_error(404, ErrorCode.NOT_FOUND, f"재고 레코드를 찾을 수 없습니다 (item={bl.item_id}).")
+        try:
+            _cancel_one_log(db, bl, bl_inv)
+        except ValueError as exc:
+            raise http_error(422, ErrorCode.BUSINESS_RULE, str(exc))
+        from app.services.inv_calc import _sync_total
+        _sync_total(db, bl_inv)
+        bl.cancelled = True
+        bl.cancel_reason = payload.reason
+        bl.cancelled_by = canceller.employee_id
+        bl.cancelled_at = now
+
+    audit.record(
+        db,
+        request=request,
+        action="transaction.cancel",
+        target_type="transaction_log",
+        target_id=str(log.log_id),
+        payload_summary=f"{canceller.name}: {payload.reason}",
+    )
+
+    commit_only(db)
+    db.refresh(log)
+
+    edit_count = (
+        db.query(func.count(TransactionEditLog.edit_id))
+        .filter(TransactionEditLog.original_log_id == log.log_id)
+        .scalar()
+        or 0
+    )
+    return _to_log_response(log, item, int(edit_count))

@@ -16,6 +16,8 @@ export interface TransactionLog {
   quantity_change: number;
   quantity_before: number | null;
   quantity_after: number | null;
+  warehouse_qty_before: number | null;
+  warehouse_qty_after: number | null;
   transfer_qty: number | null;
   reference_no: string | null;
   produced_by: string | null;
@@ -26,11 +28,15 @@ export interface TransactionLog {
   requested_at?: string | null;
   /** 승인 시각: 별도 결재 시 StockRequest.approved_at, 아니면 log.created_at. */
   approved_at?: string | null;
+  department: string | null;
   notes: string | null;
   operation_batch_id: string | null;
   created_at: string;
-  /** 3차: 수정 이력 개수 (서버 응답에 포함). */
   edit_count?: number;
+  cancelled: boolean;
+  cancel_reason: string | null;
+  cancelled_by: string | null;
+  cancelled_at: string | null;
 }
 
 /** 거래 수정 이력 (3차 메타 수정 + 4차 수량 보정 공통). */
