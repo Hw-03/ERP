@@ -49,6 +49,8 @@ Criteria:
     - Mixed: `2026-05-26 fix(items): X` (date is OK but `type(scope)` in area is forbidden)
   - Merge commits (`Merge ...`) keep git's auto-generated message as-is — do not edit.
   - The body is free-form. The above rules apply to the subject line only.
+  - **Multi-line message safety (shell mismatch guard):** Do NOT use the PowerShell here-string `@'...'@` when running `git commit` through the **Bash** tool — Bash treats the `@` literally and prepends/appends it to the message, corrupting the subject (real incident: subject became `@ 2026-06-15 backend: …`). For multi-line messages use `git commit -F <file>` (write the message file first — safest) or multiple `-m` flags; reserve `@'...'@` for the PowerShell tool only. **After every commit, verify the subject with `git log -1 --format=%s`.**
+  - A local hook `.git/hooks/commit-msg` (not version-controlled; shared across sessions on this clone) enforces the `YYYY-MM-DD area: summary` format and rejects `@`-corrupted subjects. If it goes missing, recreate it.
 
 ## DB / Run / Verify
 
