@@ -49,7 +49,7 @@ export const SUB_TYPE_LABEL: Record<IoSubType, string> = {
   produce: "생산",
   disassemble: "분해",
   adjust_in: "수량보정 입고",
-  adjust_out: "수량보정 출고",
+  adjust_out: "출고",
   defect_quarantine: "새 불량",
   defect_restore: "불량 해제",
   defect_process: "불량 처리",
