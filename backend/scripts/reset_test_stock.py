@@ -36,6 +36,8 @@ from app.models import (  # noqa: E402
     IoLine,
     Item,
     LocationStatusEnum,
+    StockRequest,
+    StockRequestStatusEnum,
     TransactionEditLog,
     TransactionLog,
 )
@@ -91,6 +93,19 @@ def main() -> int:
         if cancelled:
             print(f"  미결 요청 자동 취소       : {cancelled} 건")
         db.flush()
+
+        # 가드: cancel 이 조용히 실패해 미결 요청이 남으면 pending 리셋을 중단(예약 고아 방지).
+        open_left = (
+            db.query(StockRequest)
+            .filter(StockRequest.status.in_(
+                [StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED]
+            ))
+            .count()
+        )
+        if open_left:
+            raise SystemExit(
+                f"미결 RESERVED/SUBMITTED 요청 {open_left}건이 남아 재고 리셋을 중단합니다. (예약 고아 방지)"
+            )
 
         # 1. 입출고 내역 / 배치 삭제 (FK 안전 순서)
         db.query(TransactionEditLog).delete(synchronize_session=False)

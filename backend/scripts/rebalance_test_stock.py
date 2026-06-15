@@ -41,6 +41,8 @@ from app.models import (  # noqa: E402
     InventoryLocation,
     Item,
     LocationStatusEnum,
+    StockRequest,
+    StockRequestStatusEnum,
 )
 from app.services.inventory import PROCESS_TYPE_TO_DEPT  # noqa: E402
 from app.services.sr_approval import cancel_open_stock_requests  # noqa: E402
@@ -135,6 +137,19 @@ def main() -> int:
         if cancelled:
             print(f"  미결 요청 자동 취소       : {cancelled} 건")
         db.flush()
+
+        # 가드: cancel 이 조용히 실패해 미결 요청이 남으면 pending 리셋을 중단(예약 고아 방지).
+        open_left = (
+            db.query(StockRequest)
+            .filter(StockRequest.status.in_(
+                [StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED]
+            ))
+            .count()
+        )
+        if open_left:
+            raise SystemExit(
+                f"미결 RESERVED/SUBMITTED 요청 {open_left}건이 남아 재고 재분배를 중단합니다. (예약 고아 방지)"
+            )
 
         # 1) 모든 inventory_locations 삭제
         db.query(InventoryLocation).delete(synchronize_session=False)
