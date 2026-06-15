@@ -147,6 +147,85 @@ class CapacityTopItem(BaseModel):
     )
 
 
+CapacityAfStatus = Literal[
+    "no_target", "bom_not_registered", "incomplete", "not_producible", "producible"
+]
+
+
+class CapacityAfSummary(BaseModel):
+    ship_ready: int = Field(..., description="출하 준비 가능 (AF별 대표값 합계).")
+    fast_assembly: int = Field(..., description="빠른 조립 가능 (AF별 총 대응량 합계).")
+    total_production: int = Field(..., description="총 생산 가능 (AF별 이론 최대 합계).")
+
+
+class CapacityAfItem(BaseModel):
+    af_item_id: str
+    af_code: Optional[str] = None
+    af_name: str
+    model_symbol: Optional[str] = None
+    ship_ready: int = Field(
+        ...,
+        description=(
+            "이 AF 에 연결된 PF 변형들의 ship_ready 중 최대값(낙관적 대표). "
+            "특정 PF 주문 판단은 pf_variants[].ship_ready 를 봐야 한다. "
+            "연결된 PF 가 없으면 0."
+        ),
+    )
+    fast_assembly: int = Field(
+        ...,
+        description="기존 AF 재고 ＋ 직계 자재로 추가 조립 가능한 수(1레벨). 총 대응량(기존 재고 포함).",
+    )
+    total_production: int = Field(
+        ..., description="AF 아래 전체 BOM 재귀 이론 최대(기존 AF 재고 포함)."
+    )
+    ship_ready_limiting_item: Optional[str] = None
+    fast_assembly_limiting_item: Optional[str] = None
+    total_production_limiting_item: Optional[str] = None
+    bom_status: Literal["complete", "incomplete"] = Field(
+        ..., description="has_direct_children 이면 complete, 아니면 incomplete."
+    )
+    has_direct_children: bool
+    has_pf_path: bool = Field(..., description="역방향 BOM 상 PF 변형이 1개 이상.")
+    marked_complete: bool = Field(..., description="bom_completed_at 기록 여부(표시 신호).")
+
+
+class CapacityPfVariant(BaseModel):
+    pf_item_id: str
+    pf_code: Optional[str] = None
+    pf_name: str
+    model_symbol: Optional[str] = None
+    af_item_id: Optional[str] = None
+    ship_ready: int = Field(
+        ..., description="이 PF 1종 주문 기준 출하 준비 가능 수(AF 재고 cap + 출하/포장 자재 제한)."
+    )
+    limiting_item: Optional[str] = None
+    bom_status: Literal["complete", "incomplete"]
+
+
+class CapacityAfBlock(BaseModel):
+    """AF(조립 완제품) 기준 생산 가능 수량.
+
+    재고 기준은 available(=warehouse+production-pending)이며 **계획/대응 수량 지표**다.
+    생산 등록 가능성 검증(backflush, warehouse_available)이 아니다.
+
+    주의: summary.ship_ready / fast_assembly / total_production 은 'AF별 독립 계산의 합계'다.
+    여러 AF 가 같은 하위 자재를 공유하면 모든 AF 수량을 동시에 보장하지는 않는다.
+    """
+
+    basis: Literal["AF"] = "AF"
+    status: CapacityAfStatus = Field(
+        "no_target",
+        description=(
+            "no_target=AF 품목 없음 / bom_not_registered=모든 AF 직계 BOM 없음 / "
+            "incomplete=일부 AF BOM 미등록 / not_producible=계산됐지만 모두 0 / "
+            "producible=하나 이상 생산 가능."
+        ),
+    )
+    summary: CapacityAfSummary
+    items: List[CapacityAfItem] = Field(default_factory=list)
+    pf_variants: List[CapacityPfVariant] = Field(default_factory=list)
+
+
 class CapacityResponse(BaseModel):
     """전체 생산 가능 수량 응답.
 
@@ -155,6 +234,7 @@ class CapacityResponse(BaseModel):
       을 per-unit 수량으로 나눈 값의 최솟값.
     - **maximum**: leaf 까지 전개한 전체 하위 자재의 available 합계 기준 이론적 최대.
       불량(DEFECTIVE) 재고는 제외.
+    - **af**: AF(조립 완제품) 기준 신규 블록. immediate/maximum 은 전환 기간 호환용으로 유지.
     """
     immediate: int = Field(
         ...,
@@ -184,6 +264,10 @@ class CapacityResponse(BaseModel):
             "프론트 메인 패널/모달 상단은 합계 대신 이 배열을 표시. "
             "정렬: model_symbol 오름차순."
         ),
+    )
+    af: Optional[CapacityAfBlock] = Field(
+        None,
+        description="AF(조립 완제품) 기준 신규 생산 가능 수량 블록. ship_ready/fast_assembly/total_production.",
     )
 
 

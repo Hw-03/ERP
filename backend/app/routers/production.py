@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import BOM, Inventory, Item, ProcessType, TransactionLog, TransactionTypeEnum
+from app.models import Inventory, Item, TransactionLog, TransactionTypeEnum
 from app.schemas import (
     BackflushDetail,
     BomCheckResponse,
@@ -20,9 +20,10 @@ from app.schemas import (
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
 from app.services import stock_math
-from app.services.bom import BomCache, build_bom_cache
+from app.services.bom import BomCache
 from app.services.bom import explode_bom as _explode_bom_svc
 from app.services.bom import merge_requirements
+from app.services.production_capacity import compute_capacity
 from app.routers._errors import ErrorCode, http_error
 from app.routers.inventory._tx_helper import resolve_producer
 from app.repositories import item_repository
@@ -30,47 +31,6 @@ from app.repositories import item_repository
 router = APIRouter()
 
 logger = logging.getLogger("mes")
-
-# BOM 재귀 전개 최대 깊이 — 사이클/과도한 깊이 방어용.
-_BUILDABLE_MAX_DEPTH = 10
-# immediate 모드에서 "완제품/반제품"으로 간주하는 stage_order 하한.
-# 이 미만(원자재 등)은 추가 생산 없이 보유 재고만 인정한다.
-_NF_STAGE_ORDER = 60
-
-
-def _own_available(
-    item_id: uuid.UUID,
-    fig_by_id: Dict[uuid.UUID, "stock_math.StockFigures"],
-) -> int:
-    """해당 품목의 가용 재고(음수 클램프, 정수)."""
-    return max(int(fig_by_id.get(item_id, stock_math.StockFigures()).available), 0)
-
-
-def _reduce_children(
-    children: List[Tuple[uuid.UUID, Decimal]],
-    *,
-    recurse,
-) -> Tuple[int, uuid.UUID | None]:
-    """자식 BOM 으로부터 추가 생산 가능량과 병목 부품을 산정.
-
-    각 자식의 가용 생산량 / per_unit 의 최솟값이 추가 생산 가능량(병목 기준)이다.
-    추가 생산이 불가능하면 0 을 반환한다.
-    """
-    extra_qty = float("inf")
-    bottleneck_id: uuid.UUID | None = None
-
-    for child_id, per_unit in children:
-        child_qty = recurse(child_id)
-        if per_unit > 0:
-            can_make = int(child_qty / per_unit)
-            if can_make < extra_qty:
-                extra_qty = can_make
-                bottleneck_id = child_id
-
-    if extra_qty == float("inf"):
-        extra_qty = 0
-
-    return int(extra_qty), bottleneck_id
 
 
 @router.post(
@@ -402,220 +362,11 @@ def _explode_bom(
 )
 @router.get("/possible", response_model=CapacityResponse, summary="Production capacity alias")
 def get_production_capacity(db: Session = Depends(get_db)):
-    """BOM 최상위 완제품들에 대해 즉시/최대 생산 가능수량을 계산한다.
+    """생산 가능 수량 — legacy(PF 합산) + AF 기준 블록을 함께 반환.
 
-    - **immediate**: 시작 재고를 stage_order ≥ 60(NF) 인 품목에서만 인정.
-      NF 미만(원자재 등)은 추가 생산 안 함 → 현실 도달 가능 수량.
-    - **maximum**: 맨 아래 원자재(TR, stage_order 10)까지 전부 재귀, 모든 재고 사용.
+    - **immediate / maximum / top_items / representative_items**: 기존 PF 합산 기준(호환 유지).
+    - **af**: AF(조립 완제품) 기준 신규 블록(ship_ready / fast_assembly / total_production).
 
-    응답 status 4단계:
-      no_target / bom_not_registered / not_producible / producible.
+    계산 로직은 services/production_capacity.compute_capacity 로 분리되어 있다.
     """
-
-    def _buildable(
-        item_id: uuid.UUID,
-        *,
-        bom_cache: BomCache,
-        fig_by_id: Dict[uuid.UUID, stock_math.StockFigures],
-        stage_by_item: Dict[uuid.UUID, int | None],
-        immediate_mode: bool,
-        memo: Dict[uuid.UUID, int],
-        visiting: frozenset,
-        depth: int = 0,
-    ) -> Tuple[int, uuid.UUID | None]:
-        """재귀 누적 가용 생산량(buildable).
-
-        Returns: (qty, bottleneck_item_id)
-        """
-        if item_id in memo:
-            return memo[item_id], None
-
-        own = _own_available(item_id, fig_by_id)
-
-        # 사이클 / 과도한 깊이 — memo 없이 보유분만 반환 (기존 동작 유지)
-        if depth > _BUILDABLE_MAX_DEPTH or item_id in visiting:
-            return own, None
-
-        stage = stage_by_item.get(item_id)
-        # immediate_mode에서 stage < NF 이면 자식 전개 안 함 (원자재는 추가 생산 안 함)
-        if immediate_mode and stage is not None and stage < _NF_STAGE_ORDER:
-            memo[item_id] = own
-            return own, None
-
-        children = bom_cache.get(item_id, [])
-        if not children:
-            memo[item_id] = own
-            return own, None
-
-        # 각 자식 재귀 → 병목 기준 추가 생산 가능량 산정
-        new_visiting = visiting | frozenset([item_id])
-        extra_qty, bottleneck_id = _reduce_children(
-            children,
-            recurse=lambda child_id: _buildable(
-                child_id,
-                bom_cache=bom_cache,
-                fig_by_id=fig_by_id,
-                stage_by_item=stage_by_item,
-                immediate_mode=immediate_mode,
-                memo=memo,
-                visiting=new_visiting,
-                depth=depth + 1,
-            )[0],
-        )
-
-        total = own + extra_qty
-        memo[item_id] = total
-        return total, bottleneck_id
-
-    empty_response = {
-        "immediate": 0,
-        "maximum": 0,
-        "limiting_item": None,
-        "status": "no_target",
-        "top_items": [],
-        "representative_items": [],
-    }
-
-    # BOM parent 중 다른 BOM의 child가 아닌 것 = 최상위 품목
-    all_parent_ids = {row[0] for row in db.query(BOM.parent_item_id).distinct().all()}
-    all_child_ids = {row[0] for row in db.query(BOM.child_item_id).distinct().all()}
-    top_level_ids = all_parent_ids - all_child_ids
-
-    if not top_level_ids:
-        return empty_response
-
-    # 모든 top-level PF 조회 (limit 제거).
-    # process_type_code='PF' 추가 필터 — BOM 트리 최상위에 AF/AA 등 중간 단계가
-    # 잡혀도 시연/대시보드에서는 완성품(PF)만 의미가 있음. KPI 합산도 PF 기준.
-    top_items_db = (
-        db.query(Item)
-        .filter(Item.item_id.in_(list(top_level_ids)), Item.process_type_code == "PF")
-        .all()
-    )
-
-    if not top_items_db:
-        return empty_response
-
-    # 1) BOM 전체를 한 번만 읽어 캐시
-    bom_cache = build_bom_cache(db)
-
-    # 2) top_item 및 BOM 구조의 모든 item에 대해 재고 조회
-    all_item_ids: set[uuid.UUID] = {item.item_id for item in top_items_db}
-
-    def _collect_all_items(iid: uuid.UUID, visited: set[uuid.UUID] | None = None) -> None:
-        if visited is None:
-            visited = set()
-        if iid in visited:
-            return
-        visited.add(iid)
-        all_item_ids.add(iid)
-        for child_id, _ in bom_cache.get(iid, []):
-            _collect_all_items(child_id, visited)
-
-    for item in top_items_db:
-        _collect_all_items(item.item_id)
-
-    # 3) bulk으로 재고 + 품목 정보 조회 (N+1 제거)
-    fig_by_id = stock_math.bulk_compute(db, all_item_ids)
-    items_map = {i.item_id: i for i in db.query(Item).filter(Item.item_id.in_(list(all_item_ids))).all()}
-
-    # 4) 각 item의 stage_order 맵
-    stage_by_item: Dict[uuid.UUID, int | None] = {}
-    for iid in all_item_ids:
-        item = items_map.get(iid)
-        if item and item.process_type_code:
-            pt = db.query(ProcessType).filter(ProcessType.code == item.process_type_code).first()
-            if pt:
-                stage_by_item[iid] = pt.stage_order
-        stage_by_item.setdefault(iid, None)
-
-    # 5) top 각각에 대해 immediate/maximum 계산
-    top_results = []
-    for item in top_items_db:
-        imm, imm_btl = _buildable(
-            item.item_id,
-            bom_cache=bom_cache,
-            fig_by_id=fig_by_id,
-            stage_by_item=stage_by_item,
-            immediate_mode=True,
-            memo={},
-            visiting=frozenset(),
-        )
-        mx, _ = _buildable(
-            item.item_id,
-            bom_cache=bom_cache,
-            fig_by_id=fig_by_id,
-            stage_by_item=stage_by_item,
-            immediate_mode=False,
-            memo={},
-            visiting=frozenset(),
-        )
-
-        bottleneck_name: str | None = None
-        if imm_btl:
-            btl_item = items_map.get(imm_btl)
-            if btl_item:
-                bottleneck_name = btl_item.item_name
-
-        top_results.append({
-            "item_id": str(item.item_id),
-            "item_name": item.item_name,
-            "mes_code": item.mes_code,
-            "model_symbol": item.model_symbol,
-            "is_representative": False,
-            "immediate": imm,
-            "maximum": mx,
-            "limiting_item": bottleneck_name,
-        })
-
-    if not top_results:
-        return {
-            "immediate": 0,
-            "maximum": 0,
-            "limiting_item": None,
-            "status": "bom_not_registered",
-            "top_items": [],
-            "representative_items": [],
-        }
-
-    # 모델별 대표 PF 선정: model_symbol 별 그룹화 → 자연 정렬 첫 PF.
-    # 정렬 키는 mes_code (있으면), 없으면 item_name.
-    representatives: Dict[str, dict] = {}
-    for r in top_results:
-        ms = r.get("model_symbol")
-        if not ms:
-            continue
-        sort_key = (r.get("mes_code") or r.get("item_name") or "")
-        cur = representatives.get(ms)
-        if cur is None:
-            representatives[ms] = r
-        else:
-            cur_key = (cur.get("mes_code") or cur.get("item_name") or "")
-            if sort_key < cur_key:
-                representatives[ms] = r
-    for r in representatives.values():
-        r["is_representative"] = True
-
-    representative_items = sorted(
-        representatives.values(),
-        key=lambda r: (r.get("model_symbol") or ""),
-    )
-
-    total_immediate = sum(r["immediate"] for r in top_results)
-    total_maximum = sum(r["maximum"] for r in top_results)
-
-    # 전체 병목: immediate 가 가장 작은 top_item 의 병목 부품
-    min_item = min(top_results, key=lambda r: r["immediate"])
-    bottleneck_name = min_item.get("limiting_item")
-
-    is_producible = any(r["immediate"] > 0 or r["maximum"] > 0 for r in top_results)
-    status_value = "producible" if is_producible else "not_producible"
-
-    return {
-        "immediate": total_immediate,
-        "maximum": total_maximum,
-        "limiting_item": bottleneck_name,
-        "status": status_value,
-        "top_items": sorted(top_results, key=lambda r: r["immediate"]),
-        "representative_items": representative_items,
-    }
+    return compute_capacity(db)
