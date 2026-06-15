@@ -103,6 +103,13 @@ export function IoComposeView({
   const restoredDraftRef = useRef<string | null>(null);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveBatchIdRef = useRef<string | null>(null);
+  // '저장하시겠습니까?' 경고용 — 사용자가 작업 내용을 입력/수정했는지.
+  // 자동저장은 이 값을 끄지 않는다(경고를 막지 않음). 복원 직후·명시적 저장 후엔 false 로 리셋.
+  const [contentDirty, setContentDirty] = useState(false);
+  // 콘텐츠 변경 effect 의 마운트 첫 실행을 건너뛰기 위한 플래그(초기 빈 상태를 수정으로 오인 방지).
+  const dirtyEffectMountedRef = useRef(false);
+  // content-effect 가 이미 흡수한 복원 세대(restoredDraftRef.current) — 복원 직후 첫 변경은 수정으로 안 침.
+  const absorbedRestoreRef = useRef<string | null>(null);
 
   const state = useIoWorkState(defaultWorkType, operator?.department);
   const intentAppliedRef = useRef(false);
@@ -178,6 +185,33 @@ export function IoComposeView({
     state,
     onStatusChange,
   });
+
+  // 사용자가 작업 내용(번들/메모/참조/부서/유형)을 바꾸면 contentDirty=true.
+  // - 마운트 첫 실행은 건너뛴다(초기 빈 상태).
+  // - 복원으로 내용이 바뀐 첫 변경은 수정으로 치지 않는다(복원 직후 그대로 나가면 경고 없음).
+  //   복원 effect 가 restoredDraftRef 를 새 batch_id 로 갱신하므로, 그 세대를 처음 만나면 흡수만 한다.
+  // - 자동저장은 내용을 바꾸지 않으므로 이 effect 를 트리거하지 않는다 → 경고를 막지 않음.
+  useEffect(() => {
+    if (!dirtyEffectMountedRef.current) {
+      dirtyEffectMountedRef.current = true;
+      return;
+    }
+    if (restoredDraftRef.current !== absorbedRestoreRef.current) {
+      absorbedRestoreRef.current = restoredDraftRef.current;
+      setContentDirty(false);
+      return;
+    }
+    setContentDirty(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    state.bundles,
+    state.notes,
+    state.referenceNo,
+    state.fromDepartment,
+    state.toDepartment,
+    state.workType,
+    state.subType,
+  ]);
 
   // 자동 저장: bundles 가 1개 이상이면 변경 700ms 후 백그라운드 저장.
   // - workType/subType/dept 변경 → bundles reset → 빈 상태에서는 저장 안 함
@@ -296,8 +330,9 @@ export function IoComposeView({
   // 입출고 작업 중(bundles 있음) 다른 화면으로 이동 시 '저장할까요?' 모달.
   // 자동 저장은 그대로 작동 — '저장하지 않고 이동' 선택 시에는 discard 콜백으로
   // 이미 백엔드에 저장된 임시본을 삭제해 사용자 의도와 일치시킨다.
-  // autosaveBatchIdRef.current !== null = 서버 저장됨(드래프트 복원·자동저장 완료)
-  const ioDirty = state.bundles.length > 0 && !!employeeId && autosaveBatchIdRef.current === null;
+  // 경고 조건: 작업 내용이 있고(번들>0) 로그인 상태에서, 마지막 저장/복원 이후 사용자가 수정했을 때.
+  // 자동저장은 contentDirty 를 끄지 않으므로, 저장 버튼을 직접 누르거나 복원 직후가 아니면 경고가 뜬다.
+  const ioDirty = state.bundles.length > 0 && !!employeeId && contentDirty;
   useRegisterDirty(
     "warehouse-io",
     ioDirty,
@@ -421,6 +456,7 @@ export function IoComposeView({
         bundles: state.bundles,
       });
       autosaveBatchIdRef.current = response.batch_id;
+      setContentDirty(false); // 저장 버튼으로 명시적 저장 → 이후 수정 전까지 경고 없음
       const now = new Date();
       const hh = String(now.getHours()).padStart(2, "0");
       const mm = String(now.getMinutes()).padStart(2, "0");
