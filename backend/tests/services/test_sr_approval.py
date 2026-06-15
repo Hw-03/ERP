@@ -394,3 +394,94 @@ def test_department_reject_rejects_unauthorized(db_session, make_item):
 
     assert req.status == StockRequestStatusEnum.RESERVED
     assert _inv(db_session, item.item_id).pending_quantity == D("3")
+
+
+# ════════════ cancel_open_stock_requests ════════════
+
+
+def test_cancel_open_requests_pending_zero_safe(db_session, make_item):
+    """고아 요청(pending=0) CANCELLED → 재고 음수 없음."""
+    item = make_item(name="COQ1", warehouse_qty=D("10"))
+    requester = _make_employee(db_session, code="COQ1")
+    req = _make_reserved_request(db_session, requester, item, qty=D("5"))
+    db_session.flush()
+
+    assert req.status == StockRequestStatusEnum.RESERVED
+    assert _inv(db_session, item.item_id).pending_quantity == D("5")
+
+    # 고아 시뮬레이션: pending을 강제로 0으로 초기화
+    _inv(db_session, item.item_id).pending_quantity = D("0")
+    db_session.flush()
+
+    count = svc.cancel_open_stock_requests(db_session, reason="테스트 정리")
+    db_session.flush()
+
+    assert count >= 1
+    assert req.status == StockRequestStatusEnum.CANCELLED
+    assert req.cancelled_at is not None
+    assert all(l.status == StockRequestStatusEnum.CANCELLED for l in req.lines)
+    # pending이 이미 0이었으므로 음수가 되면 안 됨.
+    assert _inv(db_session, item.item_id).pending_quantity >= D("0")
+
+
+def test_cancel_open_requests_normal_pending_released(db_session, make_item):
+    """정상 요청(pending>0)도 취소 시 pending 회수된다."""
+    item = make_item(name="COQ2", warehouse_qty=D("20"))
+    requester = _make_employee(db_session, code="COQ2")
+    req = _make_reserved_request(db_session, requester, item, qty=D("7"))
+    db_session.flush()
+
+    assert _inv(db_session, item.item_id).pending_quantity == D("7")
+
+    count = svc.cancel_open_stock_requests(db_session, reason="테스트 정리")
+    db_session.flush()
+
+    assert count >= 1
+    assert req.status == StockRequestStatusEnum.CANCELLED
+    assert _inv(db_session, item.item_id).pending_quantity == D("0")
+    assert _inv(db_session, item.item_id).warehouse_qty == D("20")  # 실재고 불변
+
+
+def test_cancel_open_requests_skips_already_cancelled(db_session, make_item):
+    """이미 CANCELLED인 요청은 대상 아님 (멱등)."""
+    item = make_item(name="COQ3", warehouse_qty=D("10"))
+    requester = _make_employee(db_session, code="COQ3")
+    req = _make_reserved_request(db_session, requester, item, qty=D("3"))
+    db_session.flush()
+
+    # 먼저 취소
+    count_first = svc.cancel_open_stock_requests(db_session, reason="1차 정리")
+    db_session.flush()
+    assert req.status == StockRequestStatusEnum.CANCELLED
+
+    # 재실행 — 이미 취소된 건은 카운트에 포함되지 않아야 함
+    count_second = svc.cancel_open_stock_requests(db_session, reason="2차 정리")
+    db_session.flush()
+
+    assert count_second == 0
+    assert req.status == StockRequestStatusEnum.CANCELLED  # 상태 유지
+
+
+def test_cancel_open_requests_does_not_touch_completed_rejected(db_session, make_item):
+    """COMPLETED / REJECTED 요청은 변경하지 않는다."""
+    item = make_item(name="COQ4", warehouse_qty=D("10"))
+    requester = _make_employee(db_session, code="COQ4")
+    approver = _make_employee(db_session, code="COQA4", warehouse_role="primary")
+
+    req_completed = _make_reserved_request(db_session, requester, item, qty=D("2"))
+    svc.approve_request(db_session, req_completed, approver=approver, pin="0000")
+    db_session.flush()
+    assert req_completed.status == StockRequestStatusEnum.COMPLETED
+
+    item2 = make_item(name="COQ4B", warehouse_qty=D("10"))
+    req_rejected = _make_reserved_request(db_session, requester, item2, qty=D("2"))
+    svc.reject_request(db_session, req_rejected, approver=approver, pin="0000", reason="반려")
+    db_session.flush()
+    assert req_rejected.status == StockRequestStatusEnum.REJECTED
+
+    count = svc.cancel_open_stock_requests(db_session, reason="테스트 정리")
+    db_session.flush()
+
+    assert count == 0
+    assert req_completed.status == StockRequestStatusEnum.COMPLETED
+    assert req_rejected.status == StockRequestStatusEnum.REJECTED

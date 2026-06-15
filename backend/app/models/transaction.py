@@ -68,6 +68,7 @@ class TransactionLog(Base):
     # 카테고리 enum 은 프론트 상수로만 정의, 백엔드는 자유 문자열로 받음.
     reason_category = Column(String(32), nullable=True, index=True)
     reason_memo = Column(Text, nullable=True)
+    client_request_id = Column(String(36), nullable=True, unique=True)
     operation_batch_id = Column(
         UUIDString,
         ForeignKey("io_batches.batch_id", ondelete="SET NULL"),

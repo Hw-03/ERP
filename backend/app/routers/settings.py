@@ -210,12 +210,19 @@ def reset_database(payload: ResetRequest, request: Request, db: Session = Depend
     try:
         from app.models import Inventory as _Inv, InventoryLocation as _Loc, Item as _Item
         from app.services.seed_cleanup import run_cleanup_import
+        from app.services.sr_approval import cancel_open_stock_requests
+
+        # 미결 stock_request 정리 — 품목·재고 DELETE 전에 먼저 취소해야
+        # "요청은 있는데 재고 장부는 0"인 고아 상태를 막을 수 있다.
+        cancelled = cancel_open_stock_requests(db, reason="DB 초기화(settings/reset) 전 자동 취소")
+        db.flush()
 
         # 품목·재고 데이터 초기화 (참조 데이터 — Employee/ProcessType 등은 유지)
         db.query(_Loc).delete(synchronize_session=False)
         db.query(_Inv).delete(synchronize_session=False)
         db.query(_Item).delete(synchronize_session=False)
         db.commit()
+        logger.info("DB 초기화: 미결 요청 %d건 자동 취소 후 품목·재고 삭제 완료", cancelled)
 
         result = run_cleanup_import(db)
         msg = f"데이터베이스를 초기화하고 722 정리본을 재적재했습니다. (rows={result['rows']}, total_qty={result['total_qty']})"

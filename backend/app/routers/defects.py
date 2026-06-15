@@ -17,6 +17,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -71,6 +72,7 @@ class QuarantineRequest(BaseModel):
     reason_category: Optional[str] = None
     reason_memo: str
     actor_employee_id: uuid.UUID
+    client_request_id: Optional[str] = None
 
 
 class UnquarantineRequest(BaseModel):
@@ -219,6 +221,16 @@ def get_defect_kpi(db: Session = Depends(get_db)):
 @router.post("/quarantine", response_model=DefectActionResult)
 def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = Depends(get_db)):
     """격리 (즉시, 결재 없음). mark_defective 래퍼 + defective_at 채움."""
+    # 멱등성: 동일 client_request_id로 이미 처리된 요청이면 즉시 반환.
+    if payload.client_request_id:
+        existing = (
+            db.query(TransactionLog)
+            .filter(TransactionLog.client_request_id == payload.client_request_id)
+            .first()
+        )
+        if existing:
+            return DefectActionResult(item_id=payload.item_id, quantity=payload.qty, message="격리 완료")
+
     actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
     if actor is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
@@ -266,22 +278,29 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
     # TransactionLog 기록
     db.flush()
     inv = inventory_svc.get_or_create_inventory(db, payload.item_id)
-    db.add(
-        TransactionLog(
-            item_id=payload.item_id,
-            transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
-            quantity_change=Decimal("0"),
-            quantity_before=qty_before,
-            quantity_after=inv.quantity,
-            produced_by=actor.name,
-            notes=f"격리: {payload.source} → {payload.target_dept}",
-            reason_category=payload.reason_category,
-            reason_memo=payload.reason_memo or None,
-            # String 컬럼엔 enum repr 금지 — .value(한국어) 사용
-            department=getattr(target_dept, "value", target_dept),
+    try:
+        db.add(
+            TransactionLog(
+                item_id=payload.item_id,
+                transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
+                quantity_change=Decimal("0"),
+                quantity_before=qty_before,
+                quantity_after=inv.quantity,
+                produced_by=actor.name,
+                notes=f"격리: {payload.source} → {payload.target_dept}",
+                reason_category=payload.reason_category,
+                reason_memo=payload.reason_memo or None,
+                client_request_id=payload.client_request_id,
+                # String 컬럼엔 enum repr 금지 — .value(한국어) 사용
+                department=getattr(target_dept, "value", target_dept),
+            )
         )
-    )
-    db.commit()
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        if payload.client_request_id:
+            return DefectActionResult(item_id=payload.item_id, quantity=payload.qty, message="격리 완료")
+        raise http_error(409, ErrorCode.CONFLICT, "격리 처리 중 충돌이 발생했습니다.")
     _evt_emit(
         "defect_mark",
         request=http_request,

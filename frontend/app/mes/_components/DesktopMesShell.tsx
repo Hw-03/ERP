@@ -24,6 +24,8 @@ import type { Item, ProductionCapacity } from "@/lib/api";
 import { useProductionCapacityQuery } from "@/lib/queries/useProductionQuery";
 import { CapacityDetailModal } from "./CapacityDetailModal";
 import { DirtyGuardProvider, useConfirmNavigation } from "@/lib/ui/dirty-guard";
+import { canSeeWorkType } from "./_warehouse_v2/ioWorkType";
+import type { IoEntryIntent } from "./_warehouse_v2/types";
 
 const VALID_TABS = new Set<DesktopTabId>(["dashboard", "warehouse", "warehouseMap", "defect", "history", "weekly", "admin"]);
 const DEFAULT_STATUS = "DEXCOWIN MES System";
@@ -131,6 +133,7 @@ function DesktopMesShellInner() {
   const [weekMon, setWeekMon] = useState<Date>(() => getWeekStartMonday(new Date()));
 
   const [warehousePreselected, setWarehousePreselected] = useState<Item | null>(null);
+  const [warehouseIntent, setWarehouseIntent] = useState<IoEntryIntent | null>(null);
   const [defectDeptFilter, setDefectDeptFilter] = useState<string | null>(() => {
     // 초기 URL 에 defect_dept 쿼리가 있으면 읽어 둔다
     return searchParams.get("defect_dept");
@@ -141,10 +144,13 @@ function DesktopMesShellInner() {
 
   const activeMeta = TAB_META[activeTab];
 
-  const handleGoToWarehouse = useCallback((item: Item) => {
+  const canReceive = canSeeWorkType("receive", operator);
+
+  const handleGoToWarehouse = useCallback((item: Item, intent?: IoEntryIntent) => {
     setWarehousePreselected(item);
+    setWarehouseIntent(intent ?? null);
     setActiveTab("warehouse");
-    // URL 도 함께 갱신해야 입출고 위저드의 ?step=N push 가 dashboard 잔여 쿼리와 충돌하지 않는다.
+    // tab 만 전환 — step 은 위저드(useIoUrlSync)가 tab=warehouse 와 함께 기록한다.
     router.push("?tab=warehouse", { scroll: false });
   }, [router]);
 
@@ -161,6 +167,7 @@ function DesktopMesShellInner() {
           onSummaryChange={setStockWarnings}
           capacityData={capacityData}
           onCapacityClick={() => setCapacityModal(true)}
+          canReceive={canReceive}
         />
       );
     }
@@ -171,6 +178,7 @@ function DesktopMesShellInner() {
           globalSearch=""
           onStatusChange={handleStatusChange}
           preselectedItem={warehousePreselected}
+          entryIntent={warehouseIntent}
           onSubmitSuccess={() => { void refetchCapacity(); }}
         />
       );
@@ -199,7 +207,7 @@ function DesktopMesShellInner() {
     // setStockWarnings/setCapacityModal(setter), handleTabChange 는 안정적이거나 결과에
     // 영향이 없어 의도적으로 제외 — 누락이 아니라 최소 deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, refreshNonce, warehousePreselected, handleGoToWarehouse, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator]);
+  }, [activeTab, refreshNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator]);
 
   return (
     <>

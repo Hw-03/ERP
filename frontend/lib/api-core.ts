@@ -166,7 +166,13 @@ async function writeJson<T>(
   } else if (Object.keys(pinHeaders).length > 0) {
     init.headers = pinHeaders;
   }
-  const res = await fetch(url, init);
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new Error("요청 시간이 초과되었습니다. 네트워크 연결을 확인하고 다시 시도해 주세요.")),
+      15_000,
+    ),
+  );
+  const res = await Promise.race([fetch(url, init), timeout]);
   if (!res.ok) throw new ApiError(await parseError(res), res.status);
   if (res.status === 204) return undefined as T;
   const text = await res.text();

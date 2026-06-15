@@ -18,6 +18,7 @@ import { useItemImageManifest } from "../../_hooks/useItemImageManifest";
 import { useToggleSet } from "../../_hooks/useToggleSet";
 import { matchesKpi, matchesSearch } from "../../_inventory_sections/inventoryFilter";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
+import type { IoEntryIntent } from "../../_warehouse_v2/types";
 
 const PAGE_SIZE = 100;
 
@@ -38,14 +39,16 @@ export function MobileDashboardScreen({
   capacityData,
   onCapacityClick,
   onSummaryChange,
+  canReceive,
 }: {
   globalSearch: string;
   onStatusChange: (status: string) => void;
-  onGoToWarehouse: (item: Item) => void;
+  onGoToWarehouse: (item: Item, intent?: IoEntryIntent) => void;
   onGoToWarehouseTab?: () => void;
   onSummaryChange?: (s: { low: number; zero: number }) => void;
   capacityData?: ProductionCapacity | null;
   onCapacityClick?: () => void;
+  canReceive?: boolean;
 }) {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [itemLogs, setItemLogs] = useState<TransactionLog[]>([]);
@@ -304,10 +307,11 @@ export function MobileDashboardScreen({
               <InventoryDetailPanel
                 item={displayItem}
                 logs={itemLogs}
-                onGoToWarehouse={(item) => {
+                onGoToWarehouse={(item, intent) => {
                   setSelectedItem(null);
-                  onGoToWarehouse(item);
+                  onGoToWarehouse(item, intent);
                 }}
+                canReceive={canReceive}
               />
             </div>
           </div>

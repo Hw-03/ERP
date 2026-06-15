@@ -319,14 +319,17 @@ function HistoryDetailMetaStrip({
           </span>
         </div>
         <div className="flex flex-col gap-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
-          <span>{formatHistoryDateTimeLong(log.created_at)}</span>
           <span>
             요청자{" "}
             <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>{reqName}</span>
+            {" "}
+            {formatHistoryDateTimeLong(log.requested_at ?? log.created_at)}
           </span>
           <span>
             승인자{" "}
             <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>{approverName}</span>
+            {" "}
+            {formatHistoryDateTimeLong(log.approved_at ?? log.created_at)}
           </span>
         </div>
       </div>

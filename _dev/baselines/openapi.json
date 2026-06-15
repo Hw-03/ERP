@@ -4920,6 +4920,17 @@
             "title": "Actor Employee Id",
             "type": "string"
           },
+          "client_request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
@@ -5962,6 +5973,18 @@
       },
       "TransactionLogResponse": {
         "properties": {
+          "approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
           "approver_name": {
             "anyOf": [
               {
@@ -6105,6 +6128,18 @@
               }
             ],
             "title": "Reference No"
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At"
           },
           "requester_name": {
             "anyOf": [

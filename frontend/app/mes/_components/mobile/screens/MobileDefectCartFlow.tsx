@@ -79,6 +79,7 @@ export function MobileDefectCartFlow({
   const [dept, setDept] = useState<string>(isWarehouseDept ? currentEmployee.department : PRODUCTION_LINES[0]);
   const [step, setStep] = useState<1 | 2>(1);
   const [lines, setLines] = useState<CartLine[]>([]);
+  const [requestIds, setRequestIds] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<LineFailure[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -86,20 +87,26 @@ export function MobileDefectCartFlow({
   const selectedIds = useMemo(() => new Set(lines.map((l) => l.item.item_id)), [lines]);
 
   function addItem(item: Item) {
-    setLines((prev) =>
-      prev.some((l) => l.item.item_id === item.item_id)
-        ? prev
-        : [...prev, { key: `${item.item_id}-${prev.length}`, item, qty: 1, category: "", memo: "" }],
-    );
+    setLines((prev) => {
+      if (prev.some((l) => l.item.item_id === item.item_id)) return prev;
+      const key = `${item.item_id}-${prev.length}`;
+      setRequestIds((ids) => ({ ...ids, [key]: crypto.randomUUID() }));
+      return [...prev, { key, item, qty: 1, category: "", memo: "" }];
+    });
   }
   function updateLine(key: string, patch: Partial<Omit<CartLine, "key" | "item">>) {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   }
   function removeLine(key: string) {
     setLines((prev) => prev.filter((l) => l.key !== key));
+    setRequestIds((ids) => { const next = { ...ids }; delete next[key]; return next; });
   }
   function removeItemById(item: Item) {
-    setLines((prev) => prev.filter((l) => l.item.item_id !== item.item_id));
+    setLines((prev) => {
+      const target = prev.find((l) => l.item.item_id === item.item_id);
+      if (target) setRequestIds((ids) => { const next = { ...ids }; delete next[target.key]; return next; });
+      return prev.filter((l) => l.item.item_id !== item.item_id);
+    });
   }
   function copyReasonDown(index: number) {
     setLines((prev) => {
@@ -111,7 +118,7 @@ export function MobileDefectCartFlow({
 
   const allValid = lines.length > 0 && lines.every((l) => Number.isFinite(l.qty) && l.qty > 0);
 
-  async function submitLine(line: CartLine): Promise<void> {
+  async function submitLine(line: CartLine, requestId: string): Promise<void> {
     if (mode === "add") {
       await defectsApi.quarantine({
         item_id: line.item.item_id,
@@ -122,6 +129,7 @@ export function MobileDefectCartFlow({
         reason_category: line.category || null,
         reason_memo: line.memo,
         actor_employee_id: currentEmployee.employee_id,
+        client_request_id: requestId,
       });
       return;
     }
@@ -131,6 +139,7 @@ export function MobileDefectCartFlow({
       reason_category: line.category,
       reason_memo: line.memo || null,
       notes: line.memo || null,
+      client_request_id: requestId,
       lines: [
         {
           item_id: line.item.item_id,
@@ -147,7 +156,9 @@ export function MobileDefectCartFlow({
     if (!allValid || busy) return;
     setBusy(true);
     setFailures([]);
-    const results = await Promise.allSettled(lines.map((l) => submitLine(l)));
+    const results = await Promise.allSettled(
+      lines.map((l) => submitLine(l, requestIds[l.key] ?? crypto.randomUUID())),
+    );
     const nextFailures: LineFailure[] = [];
     const failedKeys = new Set<string>();
     results.forEach((res, i) => {

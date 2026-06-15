@@ -82,6 +82,7 @@ export function MobileIoComposeWizard({
   preselectedItem,
   restoreDraft: draftToRestore,
   defaultWorkType,
+  entryIntent,
   onStatusChange,
   onSubmitSuccess,
   onDirtyChange,
@@ -108,6 +109,20 @@ export function MobileIoComposeWizard({
   const autosaveBatchIdRef = useRef<string | null>(null);
 
   const state = useIoWorkState(defaultWorkType, operator?.department);
+  const intentAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!entryIntent || intentAppliedRef.current) return;
+    intentAppliedRef.current = true;
+    state.setWorkType(entryIntent.workType);
+    if (entryIntent.workType === "process" && entryIntent.direction) {
+      state.setDeptIoDirection(entryIntent.direction);
+    } else if (entryIntent.subType) {
+      state.setSubType(entryIntent.subType);
+    }
+    state.goTo(3);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entryIntent]);
+
   const { previewing, previewTarget } = useIoPreview();
   const { drafting, saveDraft } = useIoDraft();
   const { submitting, submit } = useIoSubmit();

@@ -5,7 +5,7 @@ import {
   Wrench,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
+import type { IoBundle, IoEntryIntent, IoLine, IoSubType, IoWorkType } from "./types";
 import {
   SUB_TYPE_DESCRIPTION,
   SUB_TYPE_LABEL,
@@ -288,3 +288,46 @@ export function isDefectInventorySubType(subType: IoSubType): boolean {
 }
 
 export { RefreshCcw };
+
+// ── 빠른작업 팝업 → IoEntryIntent 매핑 ──────────────────────────────────────
+
+export type QuickIoChoice =
+  | "dept_in"
+  | "wh_in"
+  | "receive"
+  | "dept_out"
+  | "wh_out";
+
+/** 팝업 선택 → IoEntryIntent 순수 변환. */
+export function quickChoiceToIntent(choice: QuickIoChoice): IoEntryIntent {
+  switch (choice) {
+    case "dept_in":
+      return { workType: "process", direction: "in" };
+    case "wh_in":
+      return { workType: "warehouse_io", subType: "dept_to_warehouse" };
+    case "receive":
+      return { workType: "receive", subType: "receive_supplier" };
+    case "dept_out":
+      return { workType: "process", direction: "out" };
+    case "wh_out":
+      return { workType: "warehouse_io", subType: "warehouse_to_dept" };
+  }
+}
+
+/** 입고 팝업 선택지. canReceive=true 일 때만 "원자재 수령" 포함. */
+export function inboundChoices(canReceive: boolean): Array<{ key: QuickIoChoice; label: string; desc: string }> {
+  const base: Array<{ key: QuickIoChoice; label: string; desc: string }> = [
+    { key: "dept_in", label: "부서 입고", desc: "생산·분해 결과를 입고" },
+    { key: "wh_in", label: "창고 반입", desc: "부서 재고를 창고로 반환" },
+  ];
+  if (canReceive) {
+    base.push({ key: "receive", label: "원자재 수령", desc: "공급처에서 원자재 입고" });
+  }
+  return base;
+}
+
+/** 출고 팝업 선택지. */
+export const outboundChoices: Array<{ key: QuickIoChoice; label: string; desc: string }> = [
+  { key: "dept_out", label: "부서 출고", desc: "부서 소비·분해 출고" },
+  { key: "wh_out", label: "창고 반출", desc: "창고에서 부서로 출고" },
+];

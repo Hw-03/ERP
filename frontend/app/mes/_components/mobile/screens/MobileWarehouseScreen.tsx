@@ -12,6 +12,7 @@ import {
 import { WarehouseAccessDenied } from "../../_warehouse_sections/WarehouseAccessDenied";
 import { WarehouseDraftPanelTabs } from "../../_warehouse_sections/WarehouseDraftPanelTabs";
 import { readCurrentOperator } from "../../login/useCurrentOperator";
+import type { IoEntryIntent } from "../../_warehouse_v2/types";
 import { MobileIoComposeWizard } from "../warehouse/MobileIoComposeWizard";
 import { MobileDirtyLeaveSheet } from "../warehouse/MobileDirtyLeaveSheet";
 import panelStyles from "./mobileWarehousePanels.module.css";
@@ -36,11 +37,13 @@ export function MobileWarehouseScreen({
   globalSearch,
   onStatusChange,
   preselectedItem,
+  entryIntent,
   onSubmitSuccess,
 }: {
   globalSearch: string;
   onStatusChange: (status: string) => void;
   preselectedItem?: Item | null;
+  entryIntent?: IoEntryIntent | null;
   onSubmitSuccess?: () => void;
 }) {
   const { employees, items, productModels, loadFailure, setItems } = useWarehouseData({
@@ -174,6 +177,7 @@ export function MobileWarehouseScreen({
             setItems={setItems}
             preselectedItem={preselectedItem}
             restoreDraft={restoreIoDraft}
+            entryIntent={entryIntent}
             onDirtyChange={setComposeDirty}
             flushDraftRef={flushDraftRef}
             onStatusChange={(status) => {

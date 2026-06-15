@@ -85,6 +85,7 @@ export function IoComposeView({
   preselectedItem,
   restoreDraft: draftToRestore,
   defaultWorkType,
+  entryIntent,
   onStatusChange,
   onSubmitSuccess,
 }: IoComposeViewProps) {
@@ -104,6 +105,8 @@ export function IoComposeView({
   const autosaveBatchIdRef = useRef<string | null>(null);
 
   const state = useIoWorkState(defaultWorkType, operator?.department);
+  const intentAppliedRef = useRef(false);
+
   const { previewing, previewTarget } = useIoPreview();
   const { drafting, saveDraft } = useIoDraft();
   const { submitting, submit } = useIoSubmit();
@@ -120,7 +123,25 @@ export function IoComposeView({
     router,
     searchParams,
     pathname,
+    // step push 시 tab 을 항상 warehouse 로 고정 — 대시보드→창고 진입 순간 lagged searchParams 의
+    // stale tab(=dashboard) 을 보존해 셸이 대시보드로 되돌리는 튕김을 차단한다.
+    tabParam: "warehouse",
   });
+
+  // entryIntent 1회 적용 — 빠른작업으로 진입 시 작업유형/방향/세부작업을 프리셋하고 Step3 으로 점프.
+  useEffect(() => {
+    if (!entryIntent || intentAppliedRef.current) return;
+    intentAppliedRef.current = true;
+    state.setWorkType(entryIntent.workType);
+    if (entryIntent.workType === "process" && entryIntent.direction) {
+      state.setDeptIoDirection(entryIntent.direction);
+    } else if (entryIntent.subType) {
+      state.setSubType(entryIntent.subType);
+    }
+    state.goTo(3);
+  // entryIntent는 마운트 시 1회만 적용 — deps 배열에 state 함수 넣으면 재실행되므로 의도적으로 생략.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entryIntent]);
 
   useEffect(() => {
     if (operator?.employee_id && !employeeId) setEmployeeId(operator.employee_id);
@@ -252,6 +273,25 @@ export function IoComposeView({
     addItem,
     setHighlightItemId,
   });
+
+  // 빠른작업 진입 시: BOM 없는(낱개) 품목은 자동 카트 추가가 끝나면 Step4(수량 확인)로 바로 보낸다.
+  // BOM 부모는 Step3 에서 사용자가 BOM/낱개를 골라야 하므로 그대로 둔다. 진입당 1회.
+  const entryLeafAdvancedRef = useRef(false);
+  useEffect(() => {
+    if (entryLeafAdvancedRef.current) return;
+    if (!entryIntent || !preselectedItem || !bomParentsLoaded) return;
+    if (bomParents.has(preselectedItem.item_id)) {
+      // BOM 부모 — Step3 유지(BOM/낱개 선택). 더 이상 처리하지 않음.
+      entryLeafAdvancedRef.current = true;
+      return;
+    }
+    // 낱개 품목 — 자동 추가 완료(bundles>0) 후 Step4 로.
+    if (state.bundles.length > 0) {
+      entryLeafAdvancedRef.current = true;
+      state.goTo(4);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entryIntent, preselectedItem, bomParentsLoaded, bomParents, state.bundles.length]);
 
   // 입출고 작업 중(bundles 있음) 다른 화면으로 이동 시 '저장할까요?' 모달.
   // 자동 저장은 그대로 작동 — '저장하지 않고 이동' 선택 시에는 discard 콜백으로

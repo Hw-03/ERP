@@ -35,7 +35,7 @@ type ColSpec = { label: string; width?: string; minWidth?: string; align?: "left
 
 // 평상시(우측 패널 닫힘) — 여유 간격
 const COLUMNS_DEFAULT: ColSpec[] = [
-  { label: "일시", width: "140px", align: "center" },
+  { label: "요청 일시", width: "140px", align: "center" },
   { label: "구분", width: "130px", align: "center" },
   { label: "품목명", minWidth: "180px" },
   { label: "변동요약", width: "150px", align: "center" },
@@ -45,7 +45,7 @@ const COLUMNS_DEFAULT: ColSpec[] = [
 
 // 우측 패널 열림 — 가로 폭 좁아져 일시/구분 압축, 품목명 우선
 const COLUMNS_COMPACT: ColSpec[] = [
-  { label: "일시", width: "112px", align: "center", px: "px-2" },
+  { label: "요청 일시", width: "112px", align: "center", px: "px-2" },
   { label: "구분", width: "104px", align: "center", px: "px-2" },
   { label: "품목명", minWidth: "240px" },
   { label: "변동요약", width: "150px", align: "center" },

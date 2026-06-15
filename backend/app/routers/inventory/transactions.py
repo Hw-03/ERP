@@ -252,16 +252,21 @@ def list_transactions(
     batch_ids = {log.operation_batch_id for log, _, _ in rows if log.operation_batch_id}
     batch_map = _batch_name_map(db, batch_ids)
 
-    return [
-        _to_log_response(
-            log,
-            item,
-            int(edit_count or 0),
-            requester_name=batch_map.get(log.operation_batch_id, (None, None))[0],
-            approver_name=batch_map.get(log.operation_batch_id, (None, None))[1],
+    result = []
+    for log, item, edit_count in rows:
+        info = batch_map.get(log.operation_batch_id)
+        result.append(
+            _to_log_response(
+                log,
+                item,
+                int(edit_count or 0),
+                requester_name=info.requester_name if info else None,
+                approver_name=info.approver_name if info else None,
+                requested_at=info.requested_at if info else None,
+                approved_at=info.approved_at if info else None,
+            )
         )
-        for log, item, edit_count in rows
-    ]
+    return result
 
 
 @router.get("/transactions/summary", response_model=TransactionSummaryResponse)
@@ -404,7 +409,9 @@ def export_transactions_csv(
         ]
     )
     for log, item in rows:
-        requester, approver = batch_map.get(log.operation_batch_id, (None, None))
+        info = batch_map.get(log.operation_batch_id)
+        requester = info.requester_name if info else None
+        approver = info.approver_name if info else None
         writer.writerow(
             [
                 log.created_at.isoformat(),
@@ -495,7 +502,9 @@ def export_transactions_xlsx(
 
     for log, item in rows:
         tx_val = log.transaction_type.value
-        requester, approver = batch_map.get(log.operation_batch_id, (None, None))
+        info = batch_map.get(log.operation_batch_id)
+        requester = info.requester_name if info else None
+        approver = info.approver_name if info else None
         row_data = [
             log.created_at.strftime("%Y-%m-%d %H:%M") if log.created_at else "",
             tx_label.get(tx_val, tx_val),
