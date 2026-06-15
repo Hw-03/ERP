@@ -57,10 +57,12 @@ function BomTreeItem({
   node,
   rails,
   isLast,
+  compact = false,
 }: {
   node: BOMTreeNode;
   rails: boolean[];
   isLast: boolean;
+  compact?: boolean;
 }) {
   const getDeptColor = useDeptColorLookup();
   const [open, setOpen] = useState(false);
@@ -117,9 +119,14 @@ function BomTreeItem({
         {/* 우측 메타: 부서 · 코드 · 수량 — 부모 행 컬럼에 맞춰 정렬.
             col1=부서(분류) · col2=코드(+10 우측끝) · col3=빈(가능재고) · col4=수량(실행후) · col5=빈(삭제) */}
         {/* 모바일: 부서·코드·수량을 컴팩트 flex로(고정 34rem 제거 → 우측 ×수량 잘림 방지).
-            데스크톱(lg): 부모 7열 행과 정렬되도록 34rem 5열 그리드 복원. */}
+            데스크톱(lg): 부모 7열 행과 정렬되도록 34rem 5열 그리드 복원.
+            compact(대시보드 상세 패널 등 좁은 컨테이너): lg 그리드를 켜지 않고 컴팩트 flex 유지 → 폭에 맞춰 코드 truncate. */}
         <span
-          className="ml-auto flex shrink-0 items-center justify-end gap-x-2 pr-4 lg:grid lg:w-[34rem] lg:gap-x-0 lg:[grid-template-columns:4rem_1fr_4rem_3rem_2.5rem] lg:[column-gap:1.5rem]"
+          className={
+            compact
+              ? "ml-auto flex shrink-0 items-center justify-end gap-x-2 pr-3"
+              : "ml-auto flex shrink-0 items-center justify-end gap-x-2 pr-4 lg:grid lg:w-[34rem] lg:gap-x-0 lg:[grid-template-columns:4rem_1fr_4rem_3rem_2.5rem] lg:[column-gap:1.5rem]"
+          }
         >
           {/* 부서 — 색 = 1차 앵커. 좌정렬 */}
           <span className="flex min-w-0 justify-start">
@@ -161,6 +168,7 @@ function BomTreeItem({
               node={c}
               rails={[...rails, !isLast]}
               isLast={i === node.children.length - 1}
+              compact={compact}
             />
           ))}
         </ul>
@@ -172,9 +180,11 @@ function BomTreeItem({
 interface Props {
   itemId: string;
   open: boolean;
+  /** 좁은 컨테이너(대시보드 상세 패널 등)용 — lg 고정 그리드를 끄고 패널 폭에 맞춘다. */
+  compact?: boolean;
 }
 
-export function BomSubExpander({ itemId, open }: Props) {
+export function BomSubExpander({ itemId, open, compact = false }: Props) {
   const [tree, setTree] = useState<BOMTreeNode | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -194,7 +204,11 @@ export function BomSubExpander({ itemId, open }: Props) {
 
   return (
     <div
-      className="mb-2 ml-12 mr-4 overflow-hidden rounded-xl border"
+      className={
+        compact
+          ? "overflow-hidden rounded-[14px] border"
+          : "mb-2 ml-12 mr-4 overflow-hidden rounded-xl border"
+      }
       style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
     >
       {/* 맥락 헤더 — 읽기전용 명시 */}
@@ -234,6 +248,7 @@ export function BomSubExpander({ itemId, open }: Props) {
               node={c}
               rails={[]}
               isLast={i === tree.children.length - 1}
+              compact={compact}
             />
           ))}
         </ul>

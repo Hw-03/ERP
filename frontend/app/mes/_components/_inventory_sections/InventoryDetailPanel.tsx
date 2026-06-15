@@ -198,7 +198,7 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse, canReceive =
           </button>
           {showBom && (
             <div className="mt-2">
-              <BomSubExpander key={item.item_id} itemId={item.item_id} open={showBom} />
+              <BomSubExpander key={item.item_id} itemId={item.item_id} open={showBom} compact />
             </div>
           )}
         </div>
