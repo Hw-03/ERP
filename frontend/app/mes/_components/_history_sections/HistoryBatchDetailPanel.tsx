@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { GitBranch, Package } from "lucide-react";
-import type { TransactionLog } from "@/lib/api";
+import { GitBranch, Package, XCircle } from "lucide-react";
+import { api, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types/io";
+import { useCurrentOperator } from "../login/useCurrentOperator";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { transactionColor } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
@@ -30,12 +31,19 @@ const SIGN_TONE_HEX: Record<LineSignTone, string> = {
   muted: LEGACY_COLORS.muted2,
 };
 
+type CancelState =
+  | { step: "idle" }
+  | { step: "confirm" }
+  | { step: "submitting" }
+  | { step: "error"; message: string };
+
 type Props = {
   batchId: string;
   logs: TransactionLog[];
   batchCache: Map<string, IoBatch>;
   setBatchCache: React.Dispatch<React.SetStateAction<Map<string, IoBatch>>>;
   onSelectLog: (log: TransactionLog) => void;
+  onBatchCancelled: (batchId: string) => void;
 };
 
 type FetchState =
@@ -53,11 +61,23 @@ export function HistoryBatchDetailPanel({
   batchCache,
   setBatchCache,
   onSelectLog,
+  onBatchCancelled,
 }: Props) {
+  const operator = useCurrentOperator();
+  const [cancelState, setCancelState] = useState<CancelState>({ step: "idle" });
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelPin, setCancelPin] = useState("");
+
   const cached = batchCache.get(batchId) ?? null;
   const [state, setState] = useState<FetchState>(
     cached ? { status: "available", batch: cached } : { status: "loading" },
   );
+
+  useEffect(() => {
+    setCancelState({ step: "idle" });
+    setCancelReason("");
+    setCancelPin("");
+  }, [batchId]);
 
   useEffect(() => {
     const hit = batchCache.get(batchId);
@@ -85,6 +105,31 @@ export function HistoryBatchDetailPanel({
     return () => { cancelled = true; };
   }, [batchId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const isBatchCancelled = logs.every((l) => l.cancelled);
+
+  const handleCancelSubmit = async () => {
+    if (!cancelReason.trim() || !cancelPin) return;
+    if (!operator?.employee_code) {
+      setCancelState({ step: "error", message: "로그인 정보가 없습니다. 다시 로그인해 주세요." });
+      return;
+    }
+    setCancelState({ step: "submitting" });
+    try {
+      await api.cancelTransaction(logs[0].log_id, {
+        reason: cancelReason.trim(),
+        employee_code: operator.employee_code,
+        pin: cancelPin,
+      });
+      setCancelState({ step: "idle" });
+      setCancelReason("");
+      setCancelPin("");
+      onBatchCancelled(batchId);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "취소 처리 중 오류가 발생했습니다.";
+      setCancelState({ step: "error", message: msg });
+    }
+  };
+
   const first = logs[0];
   const batch = state.status === "available" ? state.batch : null;
 
@@ -98,9 +143,79 @@ export function HistoryBatchDetailPanel({
 
   return (
     <div className="space-y-4">
-      <HistoryBatchHero first={first} logs={logs} batch={batch} loading={state.status === "loading"} />
+      <HistoryBatchHero
+        first={first}
+        logs={logs}
+        batch={batch}
+        loading={state.status === "loading"}
+        isBatchCancelled={isBatchCancelled}
+        onCancelClick={() => setCancelState({ step: "confirm" })}
+      />
+
+      {isBatchCancelled && (
+        <div
+          className="rounded-[16px] border px-4 py-3 text-sm font-bold"
+          style={{
+            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
+            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`,
+            color: LEGACY_COLORS.red,
+          }}
+        >
+          <XCircle className="mr-1.5 inline h-4 w-4" />
+          취소된 거래
+        </div>
+      )}
 
       <HistoryDetailMemo notes={first.notes} />
+
+      {cancelState.step !== "idle" && !isBatchCancelled && (
+        <div
+          className="rounded-[20px] border p-4 space-y-3"
+          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+        >
+          <div className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.text }}>
+            배치 전체 취소 확인
+          </div>
+          <textarea
+            className="w-full rounded-[12px] border px-3 py-2 text-[13px] resize-none"
+            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+            rows={2}
+            placeholder="취소 사유를 입력하세요 (필수)"
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+          />
+          <input
+            type="password"
+            className="w-full rounded-[12px] border px-3 py-2 text-[13px]"
+            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+            placeholder="PIN 입력"
+            value={cancelPin}
+            onChange={(e) => setCancelPin(e.target.value)}
+          />
+          {cancelState.step === "error" && (
+            <div className="text-[12px]" style={{ color: LEGACY_COLORS.red }}>{cancelState.message}</div>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleCancelSubmit}
+              disabled={cancelState.step === "submitting" || !cancelReason.trim() || !cancelPin}
+              className="flex-1 rounded-[12px] px-3 py-2 text-[13px] font-bold text-white disabled:opacity-50"
+              style={{ background: LEGACY_COLORS.red }}
+            >
+              {cancelState.step === "submitting" ? "처리 중…" : "취소 확정"}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setCancelState({ step: "idle" }); setCancelReason(""); setCancelPin(""); }}
+              className="rounded-[12px] border px-3 py-2 text-[13px] font-bold"
+              style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
 
       {batch && batch.bundles.length > 0 && (
         <div
@@ -133,11 +248,15 @@ function HistoryBatchHero({
   logs,
   batch,
   loading,
+  isBatchCancelled,
+  onCancelClick,
 }: {
   first: TransactionLog;
   logs: TransactionLog[];
   batch: IoBatch | null;
   loading: boolean;
+  isBatchCancelled: boolean;
+  onCancelClick: () => void;
 }) {
   const tcolor = transactionColor(first.transaction_type);
   const heroStyle = {
@@ -247,6 +366,21 @@ function HistoryBatchHero({
           {formatHistoryDateTimeLong(first.approved_at ?? first.created_at)}
         </span>
       </div>
+
+      {!isBatchCancelled && (
+        <button
+          type="button"
+          onClick={onCancelClick}
+          className="mt-1 rounded-[10px] border px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
+          style={{
+            borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 40%, transparent)`,
+            color: LEGACY_COLORS.red,
+            background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
+          }}
+        >
+          배치 취소
+        </button>
+      )}
     </div>
   );
 }

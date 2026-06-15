@@ -897,8 +897,36 @@ def _cancel_one_log(db: Session, log: TransactionLog, inv: Inventory) -> None:
             raise ValueError(
                 "이전 버전 거래라 자동 취소할 수 없습니다. 반대 방향 이동으로 직접 처리해 주세요."
             )
+    elif tx == TransactionTypeEnum.MARK_DEFECTIVE:
+        dept_name = log.department
+        if not dept_name:
+            raise ValueError("이 거래의 부서 정보가 없어 취소할 수 없습니다. (이전 버전 로그)")
+        if log.transfer_qty:
+            q_qty = _D(str(log.transfer_qty))
+        elif log.warehouse_qty_before is not None and log.warehouse_qty_after is not None:
+            q_qty = _D(str(log.warehouse_qty_before)) - _D(str(log.warehouse_qty_after))
+        else:
+            raise ValueError("이전 버전 거래라 격리 수량을 추론할 수 없습니다.")
+        if q_qty <= 0:
+            raise ValueError("이전 버전 거래라 격리 수량을 추론할 수 없습니다.")
+        inv.warehouse_qty = (inv.warehouse_qty or _D("0")) + q_qty
+        loc = (
+            db.query(InventoryLocation)
+            .filter(
+                InventoryLocation.item_id == log.item_id,
+                InventoryLocation.department == dept_name,
+                InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
+            )
+            .first()
+        )
+        if loc is None:
+            raise ValueError(f"{dept_name} 부서 불량 재고 위치를 찾을 수 없습니다.")
+        new_qty = (loc.quantity or _D("0")) - q_qty
+        if new_qty < 0:
+            raise ValueError(f"취소 후 {dept_name} 부서 불량 재고가 음수({new_qty})가 됩니다.")
+        loc.quantity = new_qty
     else:
-        # 레거시 불량(MARK_DEFECTIVE/UNMARK_DEFECTIVE)·분해(DISASSEMBLE) 등 — 수량/방향 정보 부족.
+        # 레거시 UNMARK_DEFECTIVE·분해(DISASSEMBLE) 등 — 수량/방향 정보 부족.
         raise ValueError(
             "이전 버전 거래라 자동 취소할 수 없습니다. 불량 해제 등 기존 기능을 사용해 주세요."
         )

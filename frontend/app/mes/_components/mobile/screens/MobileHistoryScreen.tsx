@@ -226,6 +226,12 @@ export function MobileHistoryScreen() {
     setSelection({ kind: "log", log: updated });
   }
 
+  function handleBatchCancelled(batchId: string) {
+    setLogs((prev) =>
+      prev.map((l) => (l.operation_batch_id === batchId ? { ...l, cancelled: true } : l)),
+    );
+  }
+
   function handleSelectLog(log: TransactionLog) {
     setSelectionStack([]);
     setSelection((c) =>
@@ -441,6 +447,7 @@ export function MobileHistoryScreen() {
                 batchCache={batchCache}
                 setBatchCache={setBatchCache}
                 onSelectLog={navigateToLog}
+                onBatchCancelled={handleBatchCancelled}
               />
             )}
           </div>

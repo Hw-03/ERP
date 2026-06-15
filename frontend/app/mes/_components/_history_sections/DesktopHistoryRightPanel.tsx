@@ -25,6 +25,7 @@ export interface DesktopHistoryRightPanelProps {
   canGoBack: boolean;
   onBack: () => void;
   onLogUpdated: (updated: TransactionLog) => void;
+  onBatchCancelled: (batchId: string) => void;
   /** 패널 닫기 (선택 해제). */
   onClose: () => void;
 }
@@ -38,6 +39,7 @@ export function DesktopHistoryRightPanel({
   canGoBack,
   onBack,
   onLogUpdated,
+  onBatchCancelled,
   onClose,
 }: DesktopHistoryRightPanelProps) {
   const backButtonNode = canGoBack ? (
@@ -95,6 +97,7 @@ export function DesktopHistoryRightPanel({
               batchCache={batchCache}
               setBatchCache={setBatchCache}
               onSelectLog={onSelectLog}
+              onBatchCancelled={onBatchCancelled}
             />
           </DesktopRightPanel>
         );

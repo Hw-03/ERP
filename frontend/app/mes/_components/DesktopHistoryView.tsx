@@ -250,6 +250,12 @@ export function DesktopHistoryView() {
     setSelection({ kind: "log", log: updated });
   }
 
+  function handleBatchCancelled(batchId: string) {
+    setLogs((prev) =>
+      prev.map((l) => (l.operation_batch_id === batchId ? { ...l, cancelled: true } : l)),
+    );
+  }
+
   // 표 행 클릭(top-level) — 드릴 스택 초기화.
   function handleSelectLog(log: TransactionLog) {
     setSelectionStack([]);
@@ -418,6 +424,7 @@ export function DesktopHistoryView() {
         canGoBack={selectionStack.length > 0}
         onBack={goBack}
         onLogUpdated={handleLogUpdated}
+        onBatchCancelled={handleBatchCancelled}
         onClose={() => {
           setSelectionStack([]);
           setSelection(null);

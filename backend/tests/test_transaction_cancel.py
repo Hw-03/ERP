@@ -372,3 +372,40 @@ def test_cancel_legacy_defect_without_effect_returns_message(client, db_session,
     res = _cancel(client, log.log_id, code="WH2")
     assert res.status_code == 422, res.text
     assert "이전 버전" in res.json()["detail"]["message"]
+
+
+def test_cancel_legacy_mark_defective_restores_warehouse_and_defective(client, db_session, make_item):
+    """레거시 MARK_DEFECTIVE(inventory_effect=None)를 warehouse_qty_before/after 로 수량 추론해 취소."""
+    item = make_item(name="레거시불량복구", warehouse_qty=Decimal("70"))
+    approver = _make_employee(db_session, code="WH3", name="창고장3", warehouse_role="primary")
+    # 격리된 상태 재현: 부서 DEFECTIVE 위치에 30개
+    loc = InventoryLocation(
+        item_id=item.item_id,
+        department=DepartmentEnum.ASSEMBLY.value,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=Decimal("30"),
+    )
+    db_session.add(loc)
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
+        quantity_change=Decimal("0"),
+        quantity_before=Decimal("100"),
+        quantity_after=Decimal("100"),
+        produced_by="누군가",
+        notes="격리: warehouse → 조립",
+        department=DepartmentEnum.ASSEMBLY.value,
+        warehouse_qty_before=Decimal("100"),
+        warehouse_qty_after=Decimal("70"),
+        inventory_effect=None,
+    )
+    db_session.add(log)
+    db_session.commit()
+
+    res = _cancel(client, log.log_id, code="WH3")
+    assert res.status_code == 200, res.text
+    assert res.json()["cancelled"] is True
+
+    wh, _, locs = _cells(db_session, item.item_id)
+    assert wh == 100  # 창고 복구: 70 + 30
+    assert locs.get((DepartmentEnum.ASSEMBLY.value, "DEFECTIVE"), 0) == 0
