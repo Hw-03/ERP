@@ -91,6 +91,66 @@ export interface ProductionCapacityItem {
   limiting_item?: string | null;
 }
 
+/** AF(조립 완제품) 기준 상태. legacy status + "incomplete"(일부 BOM 미등록). */
+export type ProductionCapacityAfStatus =
+  | "no_target"
+  | "bom_not_registered"
+  | "incomplete"
+  | "not_producible"
+  | "producible";
+
+/** AF 기준 요약 3수량. AF별 독립 계산의 합계(공유 자재 시 동시 보장 아님). */
+export interface ProductionCapacityAfSummary {
+  /** 출하 준비 가능 (AF 재고를 출하까지 마무리). */
+  ship_ready: number;
+  /** 빠른 조립 가능 (기존 AF 재고 + 직계 자재로 추가 조립 가능 — 총 대응량). */
+  fast_assembly: number;
+  /** 총 생산 가능 (AF 아래 전체 BOM 재귀 이론 최대). */
+  total_production: number;
+}
+
+/** AF 1종의 생산 가능 수량 + 병목 + BOM 상태 근거. */
+export interface ProductionCapacityAfItem {
+  af_item_id: string;
+  af_code: string | null;
+  af_name: string;
+  model_symbol?: string | null;
+  ship_ready: number;
+  fast_assembly: number;
+  total_production: number;
+  ship_ready_limiting_item?: string | null;
+  fast_assembly_limiting_item?: string | null;
+  total_production_limiting_item?: string | null;
+  bom_status: "complete" | "incomplete";
+  has_direct_children: boolean;
+  /** 역방향 BOM 상 출하 경로(PF)가 1개 이상 존재. false 면 ship_ready=0. */
+  has_pf_path: boolean;
+  /** bom_completed_at 기록 여부(표시 신호 — 계산 게이팅 아님). */
+  marked_complete: boolean;
+}
+
+/** AF 에 연결된 PF 변형 — 특정 PF 주문 기준 ship_ready. */
+export interface ProductionCapacityPfVariant {
+  pf_item_id: string;
+  pf_code: string | null;
+  pf_name: string;
+  model_symbol?: string | null;
+  af_item_id: string | null;
+  /** 이 PF 1종 주문 기준 출하 준비 가능 수(요약 대표값과 구분 — 주문 판단은 이 값). */
+  ship_ready: number;
+  limiting_item?: string | null;
+  bom_status: "complete" | "incomplete";
+}
+
+/** AF(조립 완제품) 기준 신규 생산 가능 수량 블록. */
+export interface ProductionCapacityAfBlock {
+  basis: "AF";
+  status: ProductionCapacityAfStatus;
+  summary: ProductionCapacityAfSummary;
+  items: ProductionCapacityAfItem[];
+  pf_variants: ProductionCapacityPfVariant[];
+}
+
 export interface ProductionCapacity {
   immediate: number;
   maximum: number;
@@ -100,6 +160,8 @@ export interface ProductionCapacity {
   top_items: ProductionCapacityItem[];
   /** 모델별 대표 PF 만 골라낸 리스트. 패널/모달 상단 표시용. */
   representative_items?: ProductionCapacityItem[];
+  /** AF 기준 신규 블록. 있으면 패널·모달이 이걸 우선 표시. 없으면 legacy(immediate/maximum) fallback. */
+  af?: ProductionCapacityAfBlock | null;
 }
 
 export interface BackflushDetail {

@@ -1,24 +1,26 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, ShoppingCart, AlertCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { productionApi } from "@/lib/api/production";
+import { useMemo, useState, type ReactNode } from "react";
+import { ChevronDown, ChevronRight, AlertTriangle, AlertCircle, CheckCircle2 } from "lucide-react";
 import type {
   ProductionCapacity,
-  ProductionCapacityItem,
-  ProductionCapacityStatus,
-  ProductionCheckResponse,
+  ProductionCapacityAfBlock,
+  ProductionCapacityAfItem,
+  ProductionCapacityPfVariant,
 } from "@/lib/api/types/production";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { getModelLabel } from "@/lib/mes/model-labels";
 
-type FilterMode = "producible" | "shortage" | "all";
+type AfFilterMode = "producible" | "incomplete" | "all";
+
+const SHARED_HINT =
+  "각 수량은 AF별 독립 계산값 · 같은 하위 자재를 공유하면 모든 AF 수량을 동시에 보장하지는 않음";
 
 /**
- * DesktopMesShell 의 생산 가능수량 상세 모달.
- * 사장님 시점 정보 디자인: 요약 헤더 · 쇼핑 리스트(병목 부품 집계) ·
- * 필터(생산 가능/부족/전체) · 시리즈 그룹 · 행 클릭 시 BOM 자식 펼침.
+ * 생산 가능수량 상세 모달 — AF(조립 완제품) 기준.
+ * ① AF별 3수량(출하준비/빠른조립/총생산) ② 각 병목 ③ 연결된 PF 변형(주문 기준 ship_ready)
+ * ④ BOM 미완성 표시. af 블록이 없으면(구버전 응답) legacy 요약으로 fallback.
  */
 export function CapacityDetailModal({
   capacityData,
@@ -27,122 +29,7 @@ export function CapacityDetailModal({
   capacityData: ProductionCapacity | null;
   onClose: () => void;
 }) {
-  const status: ProductionCapacityStatus | null = capacityData
-    ? capacityData.status ??
-      (capacityData.top_items.length === 0
-        ? "bom_not_registered"
-        : capacityData.immediate > 0 || capacityData.maximum > 0
-          ? "producible"
-          : "not_producible")
-    : null;
-
-  const emptyMessage = (() => {
-    if (capacityData == null) return "데이터를 불러오는 중…";
-    switch (status) {
-      case "no_target":
-        return "생산 가능 품목이 없습니다. BOM/완제품 기준 확인 필요.";
-      case "bom_not_registered":
-        return "BOM이 등록되지 않아 생산 가능 수량을 계산할 수 없습니다.";
-      case "not_producible":
-        return "병목 부품 또는 재고 부족으로 현재 생산 가능 수량이 없습니다.";
-      default:
-        return "표시할 항목이 없습니다.";
-    }
-  })();
-
-  const items = useMemo(
-    () => capacityData?.top_items ?? [],
-    [capacityData],
-  );
-  const representativeItems = useMemo(
-    () => capacityData?.representative_items ?? [],
-    [capacityData],
-  );
-  const hasItems = items.length > 0;
-
-  // ── E: 요약 통계 ────────────────────────────────────────────
-  const producibleCount = useMemo(
-    () => items.filter((it) => it.immediate > 0).length,
-    [items],
-  );
-  const shortageCount = items.length - producibleCount;
-
-  // ── D: 공유 자재 — 병목 부품을 N종 PF가 공유하는 시각으로 집계 ──
-  const shoppingList = useMemo(() => {
-    const map = new Map<string, { count: number; pfs: string[] }>();
-    for (const it of items) {
-      const key = it.limiting_item?.trim();
-      if (!key) continue;
-      const e = map.get(key) ?? { count: 0, pfs: [] };
-      e.count += 1;
-      e.pfs.push(it.item_name);
-      map.set(key, e);
-    }
-    return Array.from(map.entries())
-      .map(([part, e]) => ({ part, count: e.count, pfs: e.pfs }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-  }, [items]);
-
-  // ── B: 필터 토글 ────────────────────────────────────────────
-  const [filterMode, setFilterMode] = useState<FilterMode>("producible");
-  const filteredItems = useMemo(() => {
-    if (filterMode === "producible") return items.filter((it) => it.immediate > 0);
-    if (filterMode === "shortage") return items.filter((it) => it.immediate === 0);
-    return items;
-  }, [items, filterMode]);
-
-  // ── C: 모델 단위 그룹화 (model_symbol). 없으면 "미분류".
-  // 표시 라벨은 그룹 내 대표 PF (없으면 첫 PF) 의 시리즈명 사용.
-  const groupedItems = useMemo(() => {
-    const groups = new Map<string, ProductionCapacityItem[]>();
-    for (const it of filteredItems) {
-      const key = (it.model_symbol ?? "").trim() || "미분류";
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(it);
-    }
-    groups.forEach((arr) => {
-      arr.sort((a, b) => b.immediate - a.immediate);
-    });
-    return Array.from(groups.entries())
-      .map(([key, arr]) => {
-        const rep = arr.find((x) => x.is_representative) ?? arr[0];
-        const label =
-          key === "미분류"
-            ? key
-            : getModelLabel(key, rep?.item_name) || `모델${key}`;
-        return { key, label, items: arr };
-      })
-      .sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
-  }, [filteredItems]);
-
-  // ── A: 행 클릭 → BOM 자식 펼침 (lazy fetch + cache) ──────────
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [bomCache, setBomCache] = useState<Map<string, ProductionCheckResponse>>(new Map());
-  const [loadingId, setLoadingId] = useState<string | null>(null);
-
-  async function toggleExpand(itemId: string) {
-    const isOpen = expandedIds.has(itemId);
-    const next = new Set(expandedIds);
-    if (isOpen) {
-      next.delete(itemId);
-      setExpandedIds(next);
-      return;
-    }
-    next.add(itemId);
-    setExpandedIds(next);
-    if (!bomCache.has(itemId)) {
-      setLoadingId(itemId);
-      try {
-        const data = await productionApi.checkProduction(itemId, 1);
-        setBomCache((m) => new Map(m).set(itemId, data));
-      } catch {
-        // 무시 — 다시 클릭하면 재시도.
-      } finally {
-        setLoadingId((cur) => (cur === itemId ? null : cur));
-      }
-    }
-  }
+  const af = capacityData?.af ?? null;
 
   return (
     <div
@@ -162,356 +49,38 @@ export function CapacityDetailModal({
         {/* ── 헤더 ───────────────────────────────────────── */}
         <div className="border-b px-7 pb-4 pt-7" style={{ borderColor: LEGACY_COLORS.border }}>
           <div className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>
-            생산 가능수량 상세
+            생산 가능수량 상세 · 조립 완제품(AF) 기준
           </div>
           <div className="mt-1 text-xs leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
-            즉시: 중간재(공정 재고) 활용 · 최대: 하위 자재 전부 투입 시 이론치
+            출하준비: AF 재고를 출하까지 마무리 · 빠른조립: 기존 재고＋직계 자재로 추가 조립 · 총생산: 하위 BOM 끝까지 투입 이론치
           </div>
           <div
-            className="mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+            className="mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
             style={{
               background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 14%, transparent)`,
               color: LEGACY_COLORS.yellow,
             }}
           >
             <AlertTriangle className="h-3 w-3" />
-            각 PF 수치는 단독 가정 · 같은 자재 공유 PF 가 있어 동시에 다 못 만듦
+            {SHARED_HINT}
           </div>
         </div>
 
         {/* ── 본문 (스크롤) ───────────────────────────────── */}
         <div className="flex-1 overflow-y-auto px-7 py-5">
-          {hasItems ? (
-            <>
-              {/* E: 모델별 대표 PF 요약 — 메인 패널과 같은 정보 */}
-              {representativeItems.length > 0 ? (
-                <div
-                  className="mb-4 rounded-[18px] border p-3"
-                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-                >
-                  <div
-                    className="mb-2 text-xs font-bold uppercase tracking-[0.15em]"
-                    style={{ color: LEGACY_COLORS.muted2 }}
-                  >
-                    모델별 대표 PF — 즉시 / 최대
-                  </div>
-                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-                    {representativeItems.map((rep) => {
-                      const isZero = rep.immediate === 0;
-                      return (
-                        <div
-                          key={rep.item_id}
-                          className="grid grid-cols-[auto_1fr_auto] items-baseline gap-2 rounded-[10px] px-2.5 py-1.5"
-                          style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.text} 4%, transparent)` }}
-                        >
-                          <span
-                            className="text-sm font-black"
-                            style={{ color: LEGACY_COLORS.blue }}
-                          >
-                            {getModelLabel(rep.model_symbol, rep.item_name) || rep.item_name}
-                          </span>
-                          <span
-                            className="truncate text-[11px]"
-                            style={{ color: LEGACY_COLORS.muted2 }}
-                            title={rep.item_name}
-                          >
-                            {rep.item_name}
-                          </span>
-                          <span className="inline-flex items-baseline gap-1 text-sm">
-                            <span
-                              className="font-black"
-                              style={{ color: isZero ? LEGACY_COLORS.yellow : LEGACY_COLORS.cyan }}
-                            >
-                              {formatQty(rep.immediate)}
-                            </span>
-                            <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
-                            <span className="font-bold" style={{ color: LEGACY_COLORS.blue }}>
-                              {formatQty(rep.maximum)}
-                            </span>
-                          </span>
-                          {isZero && rep.limiting_item && (
-                            <span
-                              className="col-span-3 text-[11px]"
-                              style={{ color: LEGACY_COLORS.yellow }}
-                            >
-                              병목: {rep.limiting_item}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : (
-                // 구버전 fallback — model_symbol 없는 환경
-                <div
-                  className="mb-4 rounded-[18px] border p-4 text-sm"
-                  style={{
-                    background: LEGACY_COLORS.s2,
-                    borderColor: LEGACY_COLORS.border,
-                    color: LEGACY_COLORS.muted2,
-                  }}
-                >
-                  모델별 대표 PF 정보 없음 — 아래 목록에서 PF 별 단독 수치 확인
-                </div>
-              )}
-
-              {/* D: 쇼핑 리스트 — 병목 부품 집계 */}
-              {shoppingList.length > 0 && (
-                <div
-                  className="mb-4 rounded-[18px] border p-4"
-                  style={{
-                    background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 10%, transparent)`,
-                    borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 30%, transparent)`,
-                  }}
-                >
-                  <div className="mb-2 flex items-center gap-2">
-                    <ShoppingCart className="h-4 w-4" style={{ color: LEGACY_COLORS.yellow }} />
-                    <span
-                      className="text-sm font-bold"
-                      style={{ color: LEGACY_COLORS.yellow }}
-                    >
-                      공유 자재 — 한 자재가 여러 PF 의 병목
-                    </span>
-                  </div>
-                  <div
-                    className="mb-2 text-[11px] leading-relaxed"
-                    style={{ color: LEGACY_COLORS.muted2 }}
-                  >
-                    이 자재 한 종을 들여오면 아래 PF 들이 동시에 추가로 만들 수 있게 됨
-                  </div>
-                  <div className="space-y-1.5">
-                    {shoppingList.map((s) => (
-                      <div
-                        key={s.part}
-                        className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-[10px] px-3 py-2"
-                        style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.text} 5%, transparent)` }}
-                      >
-                        <div className="min-w-0">
-                          <div
-                            className="truncate text-sm font-semibold"
-                            style={{ color: LEGACY_COLORS.text }}
-                          >
-                            {s.part}
-                          </div>
-                          <div
-                            className="truncate text-xs"
-                            style={{ color: LEGACY_COLORS.muted2 }}
-                          >
-                            영향 PF: {s.pfs.slice(0, 2).join(", ")}
-                            {s.pfs.length > 2 ? ` 외 ${s.pfs.length - 2}종` : ""}
-                          </div>
-                        </div>
-                        <div
-                          className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold"
-                          style={{
-                            background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 22%, transparent)`,
-                            color: LEGACY_COLORS.yellow,
-                          }}
-                        >
-                          공유 PF {s.count}종
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* B: 필터 토글 */}
-              <div className="mb-3 flex items-center gap-2">
-                {(
-                  [
-                    { key: "producible", label: "만들 수 있는 것", count: producibleCount, color: LEGACY_COLORS.cyan },
-                    { key: "shortage", label: "부족한 것", count: shortageCount, color: LEGACY_COLORS.yellow },
-                    { key: "all", label: "전체", count: items.length, color: LEGACY_COLORS.muted2 },
-                  ] as { key: FilterMode; label: string; count: number; color: string }[]
-                ).map((f) => {
-                  const active = filterMode === f.key;
-                  return (
-                    <button
-                      key={f.key}
-                      onClick={() => setFilterMode(f.key)}
-                      className="rounded-full border px-3 py-1.5 text-xs font-bold transition-opacity"
-                      style={{
-                        background: active ? `color-mix(in srgb, ${f.color} 18%, transparent)` : "transparent",
-                        borderColor: active ? f.color : LEGACY_COLORS.border,
-                        color: active ? f.color : LEGACY_COLORS.muted2,
-                      }}
-                    >
-                      {f.label} <span className="ml-1 opacity-70">{f.count}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* C+A: 시리즈 그룹 + 행 클릭 펼침 */}
-              <div
-                className="rounded-[16px] border"
-                style={{ borderColor: LEGACY_COLORS.border }}
-              >
-                <div
-                  className="grid grid-cols-[24px_1fr_120px_120px] border-b px-4 py-2 text-xs font-bold uppercase tracking-[0.15em]"
-                  style={{
-                    borderColor: LEGACY_COLORS.border,
-                    color: LEGACY_COLORS.muted2,
-                  }}
-                >
-                  <span />
-                  <span>품목 · 병목</span>
-                  <span className="text-right">즉시</span>
-                  <span className="text-right">최대</span>
-                </div>
-
-                {groupedItems.length === 0 && (
-                  <div
-                    className="px-4 py-6 text-center text-sm"
-                    style={{ color: LEGACY_COLORS.muted2 }}
-                  >
-                    조건에 맞는 PF 가 없습니다.
-                  </div>
-                )}
-
-                {groupedItems.map((group) => (
-                  <div key={group.key}>
-                    {/* 모델 그룹 헤더 — 단독 합은 거짓이라 제거. "모델N · M종" 만 표시. */}
-                    <div
-                      className="grid grid-cols-[24px_1fr_120px_120px] items-center border-t px-4 py-2"
-                      style={{
-                        borderColor: LEGACY_COLORS.border,
-                        background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`,
-                      }}
-                    >
-                      <span />
-                      <span
-                        className="text-sm font-black"
-                        style={{ color: LEGACY_COLORS.blue }}
-                      >
-                        {group.label}{" "}
-                        <span
-                          className="text-xs font-bold"
-                          style={{ color: LEGACY_COLORS.muted2 }}
-                        >
-                          · {group.items.length}종
-                        </span>
-                      </span>
-                      <span />
-                      <span />
-                    </div>
-
-                    {/* 그룹 내부 PF 행 */}
-                    {group.items.map((item) => {
-                      const expanded = expandedIds.has(item.item_id);
-                      const bom = bomCache.get(item.item_id);
-                      const loading = loadingId === item.item_id;
-                      return (
-                        <div key={item.item_id}>
-                          <button
-                            type="button"
-                            onClick={() => toggleExpand(item.item_id)}
-                            className="grid w-full cursor-pointer grid-cols-[24px_1fr_120px_120px] items-center border-t px-4 py-2.5 text-left transition-colors hover:brightness-110"
-                            style={{ borderColor: LEGACY_COLORS.border }}
-                          >
-                            {expanded ? (
-                              <ChevronDown
-                                className="h-4 w-4"
-                                style={{ color: LEGACY_COLORS.blue }}
-                              />
-                            ) : (
-                              <ChevronRight
-                                className="h-4 w-4"
-                                style={{ color: LEGACY_COLORS.muted2 }}
-                              />
-                            )}
-                            <div className="min-w-0 pr-2">
-                              <div
-                                className="truncate text-sm"
-                                style={{ color: LEGACY_COLORS.text }}
-                              >
-                                {item.item_name}
-                              </div>
-                              {item.mes_code && (
-                                <div
-                                  className="truncate text-xs"
-                                  style={{ color: LEGACY_COLORS.muted2 }}
-                                >
-                                  {item.mes_code}
-                                </div>
-                              )}
-                              {item.limiting_item && (
-                                <div
-                                  className="truncate text-xs"
-                                  style={{ color: LEGACY_COLORS.yellow }}
-                                >
-                                  병목: {item.limiting_item}
-                                </div>
-                              )}
-                            </div>
-                            <div
-                              className="text-right text-sm font-bold"
-                              style={{
-                                color:
-                                  item.immediate > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2,
-                              }}
-                            >
-                              {formatQty(item.immediate)}
-                            </div>
-                            <div
-                              className="text-right text-sm"
-                              style={{ color: LEGACY_COLORS.blue }}
-                            >
-                              {formatQty(item.maximum)}
-                            </div>
-                          </button>
-
-                          {/* A: BOM 펼침 영역 */}
-                          {expanded && (
-                            <div
-                              className="border-t px-5 py-3"
-                              style={{
-                                borderColor: LEGACY_COLORS.border,
-                                background: `color-mix(in srgb, ${LEGACY_COLORS.text} 4%, transparent)`,
-                              }}
-                            >
-                              {loading && (
-                                <div
-                                  className="text-xs"
-                                  style={{ color: LEGACY_COLORS.muted2 }}
-                                >
-                                  자재 정보 불러오는 중…
-                                </div>
-                              )}
-                              {!loading && bom && (
-                                <BomChildren bom={bom} />
-                              )}
-                              {!loading && !bom && (
-                                <div
-                                  className="text-xs"
-                                  style={{ color: LEGACY_COLORS.muted2 }}
-                                >
-                                  자재 정보를 불러올 수 없습니다.
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            </>
+          {af ? (
+            <AfCapacityView af={af} />
           ) : (
             <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-              {emptyMessage}
+              {capacityData == null
+                ? "데이터를 불러오는 중…"
+                : "AF 기준 데이터가 없습니다. 백엔드 갱신 후 다시 확인해 주세요."}
             </div>
           )}
         </div>
 
         {/* ── 푸터 ───────────────────────────────────────── */}
-        <div
-          className="border-t px-7 py-4"
-          style={{ borderColor: LEGACY_COLORS.border }}
-        >
+        <div className="border-t px-7 py-4" style={{ borderColor: LEGACY_COLORS.border }}>
           <button
             className="w-full rounded-[18px] border py-3 text-base font-semibold"
             style={{
@@ -529,81 +98,375 @@ export function CapacityDetailModal({
   );
 }
 
-function BomChildren({ bom }: { bom: ProductionCheckResponse }) {
-  if (bom.components.length === 0) {
+function isIncomplete(it: ProductionCapacityAfItem): boolean {
+  return it.bom_status === "incomplete" || !it.has_pf_path;
+}
+
+function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
+  const items = af.items;
+
+  const producibleCount = useMemo(
+    () =>
+      items.filter(
+        (it) => it.ship_ready > 0 || it.fast_assembly > 0 || it.total_production > 0,
+      ).length,
+    [items],
+  );
+  const incompleteCount = useMemo(() => items.filter(isIncomplete).length, [items]);
+
+  const [filterMode, setFilterMode] = useState<AfFilterMode>("producible");
+  const filtered = useMemo(() => {
+    if (filterMode === "producible")
+      return items.filter(
+        (it) => it.ship_ready > 0 || it.fast_assembly > 0 || it.total_production > 0,
+      );
+    if (filterMode === "incomplete") return items.filter(isIncomplete);
+    return items;
+  }, [items, filterMode]);
+
+  // 모델(model_symbol) 단위 그룹화.
+  const grouped = useMemo(() => {
+    const groups = new Map<string, ProductionCapacityAfItem[]>();
+    for (const it of filtered) {
+      const key = (it.model_symbol ?? "").trim() || "미분류";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(it);
+    }
+    groups.forEach((arr) => arr.sort((a, b) => b.ship_ready - a.ship_ready));
+    return Array.from(groups.entries())
+      .map(([key, arr]) => {
+        const label =
+          key === "미분류" ? key : getModelLabel(key, arr[0]?.af_name) || `모델${key}`;
+        return { key, label, items: arr };
+      })
+      .sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
+  }, [filtered]);
+
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const toggleExpand = (id: string) =>
+    setExpandedIds((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const variantsByAf = useMemo(() => {
+    const map = new Map<string, ProductionCapacityPfVariant[]>();
+    for (const v of af.pf_variants) {
+      if (!v.af_item_id) continue;
+      const arr = map.get(v.af_item_id) ?? [];
+      arr.push(v);
+      map.set(v.af_item_id, arr);
+    }
+    return map;
+  }, [af.pf_variants]);
+
+  if (items.length === 0) {
+    const msg =
+      af.status === "no_target"
+        ? "조립 완제품(AF) 기준 품목이 없습니다."
+        : af.status === "bom_not_registered"
+          ? "AF 직계 BOM 이 등록되지 않아 계산할 수 없습니다."
+          : "표시할 항목이 없습니다.";
+    return (
+      <div className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+        {msg}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* 요약 3수량 */}
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <SummaryTile
+          label="출하 준비"
+          value={af.summary.ship_ready}
+          color={LEGACY_COLORS.cyan}
+          desc="AF 재고를 출하까지 마무리"
+        />
+        <SummaryTile
+          label="빠른 조립"
+          value={af.summary.fast_assembly}
+          color={LEGACY_COLORS.blue}
+          desc="기존 재고 ＋ 직계 자재"
+        />
+        <SummaryTile
+          label="총 생산"
+          value={af.summary.total_production}
+          color={LEGACY_COLORS.purple}
+          desc="하위 BOM 끝까지 투입 이론치"
+        />
+      </div>
+
+      {/* 필터 토글 */}
+      <div className="mb-3 flex items-center gap-2">
+        {(
+          [
+            { key: "producible", label: "생산 가능", count: producibleCount, color: LEGACY_COLORS.cyan },
+            { key: "incomplete", label: "미완성", count: incompleteCount, color: LEGACY_COLORS.yellow },
+            { key: "all", label: "전체", count: items.length, color: LEGACY_COLORS.muted2 },
+          ] as { key: AfFilterMode; label: string; count: number; color: string }[]
+        ).map((f) => {
+          const active = filterMode === f.key;
+          return (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setFilterMode(f.key)}
+              className="rounded-full border px-3 py-1.5 text-xs font-bold transition-opacity"
+              style={{
+                background: active ? `color-mix(in srgb, ${f.color} 18%, transparent)` : "transparent",
+                borderColor: active ? f.color : LEGACY_COLORS.border,
+                color: active ? f.color : LEGACY_COLORS.muted2,
+              }}
+            >
+              {f.label} <span className="ml-1 opacity-70">{f.count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* AF 목록 (모델 그룹 + 행 펼침 → PF 변형) */}
+      <div className="rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+        <div
+          className="grid grid-cols-[20px_minmax(0,1fr)_84px_84px_84px] border-b px-4 py-2 text-xs font-bold uppercase tracking-[0.12em]"
+          style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+        >
+          <span />
+          <span>조립 완제품 · 병목</span>
+          <span className="text-right">출하준비</span>
+          <span className="text-right">빠른조립</span>
+          <span className="text-right">총생산</span>
+        </div>
+
+        {grouped.length === 0 && (
+          <div className="px-4 py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+            조건에 맞는 AF 가 없습니다.
+          </div>
+        )}
+
+        {grouped.map((group) => (
+          <div key={group.key}>
+            <div
+              className="grid grid-cols-[20px_minmax(0,1fr)_84px_84px_84px] items-center border-t px-4 py-2"
+              style={{
+                borderColor: LEGACY_COLORS.border,
+                background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`,
+              }}
+            >
+              <span />
+              <span className="text-sm font-black" style={{ color: LEGACY_COLORS.blue }}>
+                {group.label}{" "}
+                <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  · {group.items.length}종
+                </span>
+              </span>
+              <span />
+              <span />
+              <span />
+            </div>
+
+            {group.items.map((it) => {
+              const expanded = expandedIds.has(it.af_item_id);
+              const variants = variantsByAf.get(it.af_item_id) ?? [];
+              const bottleneck =
+                it.total_production_limiting_item ||
+                it.fast_assembly_limiting_item ||
+                it.ship_ready_limiting_item ||
+                null;
+              return (
+                <div key={it.af_item_id}>
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(it.af_item_id)}
+                    className="grid w-full cursor-pointer grid-cols-[20px_minmax(0,1fr)_84px_84px_84px] items-center border-t px-4 py-2.5 text-left transition-colors hover:brightness-110"
+                    style={{ borderColor: LEGACY_COLORS.border }}
+                  >
+                    {expanded ? (
+                      <ChevronDown className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" style={{ color: LEGACY_COLORS.muted2 }} />
+                    )}
+                    <div className="min-w-0 pr-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-sm" style={{ color: LEGACY_COLORS.text }}>
+                          {it.af_name}
+                        </span>
+                        {it.bom_status === "incomplete" && (
+                          <Badge color={LEGACY_COLORS.yellow}>BOM 미완성</Badge>
+                        )}
+                        {it.bom_status !== "incomplete" && !it.has_pf_path && (
+                          <Badge color={LEGACY_COLORS.muted2}>출하경로 없음</Badge>
+                        )}
+                      </div>
+                      {it.af_code && (
+                        <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                          {it.af_code}
+                        </div>
+                      )}
+                      {bottleneck && (
+                        <div className="truncate text-xs" style={{ color: LEGACY_COLORS.yellow }}>
+                          병목: {bottleneck}
+                        </div>
+                      )}
+                    </div>
+                    <QtyCell value={it.ship_ready} color={LEGACY_COLORS.cyan} />
+                    <QtyCell value={it.fast_assembly} color={LEGACY_COLORS.blue} />
+                    <QtyCell value={it.total_production} color={LEGACY_COLORS.purple} />
+                  </button>
+
+                  {expanded && (
+                    <div
+                      className="border-t px-5 py-3"
+                      style={{
+                        borderColor: LEGACY_COLORS.border,
+                        background: `color-mix(in srgb, ${LEGACY_COLORS.text} 4%, transparent)`,
+                      }}
+                    >
+                      <PfVariants variants={variants} hasPfPath={it.has_pf_path} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function SummaryTile({
+  label,
+  value,
+  color,
+  desc,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  desc: string;
+}) {
+  return (
+    <div
+      className="rounded-[14px] border px-4 py-3"
+      style={{
+        background: `color-mix(in srgb, ${color} 8%, transparent)`,
+        borderColor: `color-mix(in srgb, ${color} 30%, transparent)`,
+      }}
+    >
+      <div className="text-xs font-bold" style={{ color }}>
+        {label}
+      </div>
+      <div className="mt-0.5 text-2xl font-black" style={{ color }}>
+        {formatQty(value)}
+      </div>
+      <div className="mt-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+        {desc}
+      </div>
+    </div>
+  );
+}
+
+function QtyCell({ value, color }: { value: number; color: string }) {
+  return (
+    <div
+      className="text-right text-sm font-bold"
+      style={{ color: value > 0 ? color : LEGACY_COLORS.muted2 }}
+    >
+      {formatQty(value)}
+    </div>
+  );
+}
+
+function Badge({ color, children }: { color: string; children: ReactNode }) {
+  return (
+    <span
+      className="inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-xs font-bold"
+      style={{
+        background: `color-mix(in srgb, ${color} 16%, transparent)`,
+        color,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function PfVariants({
+  variants,
+  hasPfPath,
+}: {
+  variants: ProductionCapacityPfVariant[];
+  hasPfPath: boolean;
+}) {
+  if (variants.length === 0) {
     return (
       <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-        등록된 자재가 없습니다. BOM 미등록 가능성.
+        {hasPfPath
+          ? "연결된 출하(PF) 변형 정보가 없습니다."
+          : "출하 경로(PF)가 연결되지 않았습니다 — 출하 준비 가능 수량 0."}
       </div>
     );
   }
   return (
     <div className="space-y-1">
+      <div className="mb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+        출하 변형(PF)별 출하 준비 가능 — 특정 주문 기준
+      </div>
       <div
-        className="grid grid-cols-[1fr_70px_70px_70px_28px] gap-2 px-2 pb-1 text-[10px] font-bold uppercase tracking-[0.15em]"
+        className="grid grid-cols-[minmax(0,1fr)_90px_28px] gap-2 px-2 pb-1 text-xs font-bold uppercase tracking-[0.12em]"
         style={{ color: LEGACY_COLORS.muted2 }}
       >
-        <span>자재</span>
-        <span className="text-right">필요</span>
-        <span className="text-right">현재</span>
-        <span className="text-right">부족</span>
+        <span>출하 완제품 · 병목</span>
+        <span className="text-right">출하준비</span>
         <span />
       </div>
-      {bom.components.map((c, i) => (
-        <div
-          key={`${c.mes_code ?? c.item_name}-${i}`}
-          className="grid grid-cols-[1fr_70px_70px_70px_28px] items-center gap-2 rounded-[8px] px-2 py-1.5"
-          style={{
-            background: c.ok
-              ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 6%, transparent)`
-              : `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
-          }}
-        >
-          <div className="min-w-0">
-            <div
-              className="truncate text-xs"
-              style={{ color: LEGACY_COLORS.text }}
-            >
-              {c.item_name}
-            </div>
-            {c.mes_code && (
-              <div
-                className="truncate text-[10px]"
-                style={{ color: LEGACY_COLORS.muted2 }}
-              >
-                {c.mes_code}
-              </div>
-            )}
-          </div>
-          <div className="text-right text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            {formatQty(c.required)}
-          </div>
-          <div className="text-right text-xs" style={{ color: LEGACY_COLORS.text }}>
-            {formatQty(c.current_stock)}
-          </div>
+      {variants.map((v) => {
+        const ok = v.ship_ready > 0;
+        return (
           <div
-            className="text-right text-xs font-bold"
+            key={v.pf_item_id}
+            className="grid grid-cols-[minmax(0,1fr)_90px_28px] items-center gap-2 rounded-[8px] px-2 py-1.5"
             style={{
-              color: c.shortage > 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2,
+              background: ok
+                ? `color-mix(in srgb, ${LEGACY_COLORS.cyan} 6%, transparent)`
+                : `color-mix(in srgb, ${LEGACY_COLORS.yellow} 8%, transparent)`,
             }}
           >
-            {c.shortage > 0 ? `−${formatQty(c.shortage)}` : "0"}
+            <div className="min-w-0">
+              <div className="truncate text-xs" style={{ color: LEGACY_COLORS.text }}>
+                {v.pf_name}
+              </div>
+              {v.pf_code && (
+                <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                  {v.pf_code}
+                </div>
+              )}
+              {v.limiting_item && (
+                <div className="truncate text-xs" style={{ color: LEGACY_COLORS.yellow }}>
+                  병목: {v.limiting_item}
+                </div>
+              )}
+            </div>
+            <div
+              className="text-right text-sm font-bold"
+              style={{ color: ok ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}
+            >
+              {formatQty(v.ship_ready)}
+            </div>
+            <div className="flex justify-end">
+              {ok ? (
+                <CheckCircle2 className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.green }} />
+              ) : (
+                <AlertCircle className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.yellow }} />
+              )}
+            </div>
           </div>
-          <div className="flex justify-end">
-            {c.ok ? (
-              <CheckCircle2
-                className="h-3.5 w-3.5"
-                style={{ color: LEGACY_COLORS.green }}
-              />
-            ) : (
-              <AlertCircle
-                className="h-3.5 w-3.5"
-                style={{ color: LEGACY_COLORS.red }}
-              />
-            )}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
