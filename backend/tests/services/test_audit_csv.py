@@ -73,14 +73,25 @@ def test_row_from_log_columns_in_order(make_item, db_session):
     item = make_item(name="볼트 M4")
     log = _mk_log(item.item_id, tx=TransactionTypeEnum.RECEIVE, qty=D("10"), when=datetime(2026, 5, 20, 9, 30, 0))
     row = audit_csv.row_from_log(log, item)
-    assert len(row) == len(audit_csv.CSV_HEADERS) == 11
+    assert len(row) == len(audit_csv.CSV_HEADERS) == 12
     assert row[0] == "2026-05-20 09:30:00"
     assert row[1] == "입고"
     assert row[3] == "볼트 M4"
     assert row[4] == "10"
     assert row[7] == "RX-001"
     assert row[8] == "홍길동"
-    assert row[10] == str(log.log_id)
+    assert row[9] == ""  # 처리자사번 — producer_employee_id 없으면 빈 값
+    assert row[11] == str(log.log_id)
+
+
+def test_row_from_log_includes_employee_code(make_item):
+    """producer_employee_id + 사번 맵이 주어지면 처리자사번 컬럼이 채워진다."""
+    item = make_item()
+    emp_id = _uuid.uuid4()
+    log = _mk_log(item.item_id, tx=TransactionTypeEnum.RECEIVE, qty=D("4"), when=datetime(2026, 5, 2, 9, 0))
+    log.producer_employee_id = emp_id
+    row = audit_csv.row_from_log(log, item, {emp_id: "E06"})
+    assert row[9] == "E06"
 
 
 def test_row_from_log_strips_newlines_in_notes(make_item):
@@ -88,8 +99,8 @@ def test_row_from_log_strips_newlines_in_notes(make_item):
     log = _mk_log(item.item_id, tx=TransactionTypeEnum.SHIP, qty=D("-3"), when=datetime(2026, 5, 1, 0, 0))
     log.notes = "first\nsecond\rthird"
     row = audit_csv.row_from_log(log, item)
-    assert "\n" not in row[9] and "\r" not in row[9]
-    assert "first second third" == row[9]
+    assert "\n" not in row[10] and "\r" not in row[10]
+    assert "first second third" == row[10]
 
 
 def test_path_for_month_uses_env_dir(csv_dir):
