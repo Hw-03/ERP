@@ -245,6 +245,17 @@
   animation: admin-pin-shake 0.4s ease-in-out;
 }
 
+/* === 입출고 Step3 진입 시 선택 품목 '줄 전체' 강조 (대시보드 빠른작업으로 들어온 조립품) === */
+@keyframes rowFlash {
+  0%, 100% { background-color: transparent; }
+  50%      { background-color: color-mix(in srgb, var(--c-blue) 28%, transparent); }
+}
+
+.animate-row-flash {
+  /* 3회 깜빡 — 버튼이 아니라 행 배경 전체가 또렷이 점멸 (0.5s × 3회) */
+  animation: rowFlash 0.5s ease-in-out 3;
+}
+
 /* 사용자가 동작 감소를 선호하는 경우 모든 자체 애니메이션 무력화 (WCAG 2.3.3). */
 @media (prefers-reduced-motion: reduce) {
   *,

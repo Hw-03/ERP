@@ -30,6 +30,13 @@ export type UseIoUrlSyncArgs = {
   router: Router;
   searchParams: SearchParamsLike;
   pathname: string;
+  /**
+   * 지정 시 step push 마다 `tab` 을 이 값으로 강제한다.
+   * 대시보드→창고 교차 진입 순간 React searchParams 가 아직 직전 탭(tab=dashboard)으로
+   * lagging 상태라, 이를 보존하면 셸의 URL→activeTab 동기화가 대시보드로 되돌린다(튕김).
+   * 위저드는 항상 창고 탭 아래에서만 렌더되므로 "warehouse" 로 고정하면 타이밍과 무관하게 안전.
+   */
+  tabParam?: string;
 };
 
 export type UseIoUrlSyncApi = {
@@ -42,7 +49,7 @@ export type UseIoUrlSyncApi = {
 };
 
 export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
-  const { step, goTo, canAdvance, router, searchParams, pathname } = args;
+  const { step, goTo, canAdvance, router, searchParams, pathname, tabParam } = args;
 
   const urlStep = useMemo<IoStep>(() => {
     const raw = Number(searchParams.get("step"));
@@ -63,6 +70,8 @@ export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
     if (urlStep === step) return;
     const next = new URLSearchParams(searchParams.toString());
     next.set("step", String(step));
+    // lagged searchParams 로 인한 stale tab 보존을 차단 — 위저드가 속한 탭으로 고정.
+    if (tabParam) next.set("tab", tabParam);
     router.push(`${pathname}?${next.toString()}`, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);

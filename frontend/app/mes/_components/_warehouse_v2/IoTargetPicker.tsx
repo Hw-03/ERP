@@ -177,6 +177,18 @@ export function IoTargetPicker({
       .map((row) => row.item);
   }, [items, dept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank]);
 
+  // 빠른작업으로 진입한 강조 품목을 검색창에 미리 넣어 "검색된 상태"로 보여준다.
+  // 정렬상 뒤쪽 품목으로 스크롤하려면 그 위 수백~900행을 먼저 그려야 해 1~2초+ 멈춤이 생기는데,
+  // 검색으로 좁히면 짧은 목록만 렌더돼 즉시 뜨고, 그 품목이 맨 위에 보이며 깜빡인다. 1회만 적용.
+  const searchPrefillRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!highlightItemId || searchPrefillRef.current === highlightItemId) return;
+    const it = items.find((x) => x.item_id === highlightItemId);
+    if (!it) return; // items 아직 로딩 전 → items 갱신 시 재시도
+    searchPrefillRef.current = highlightItemId;
+    onSearchChange(it.item_name);
+  }, [highlightItemId, items, onSearchChange]);
+
   // 편집 모드 진입 시 전체 items를 현재 저장순으로 초기화.
   // filteredItems가 아닌 items 전체를 편집 대상으로 사용(전체 목록 reorder).
   const allItemsSorted = useMemo(() => {
@@ -853,7 +865,7 @@ function EditOrderTable({
 }
 
 // 대시보드에서 BOM 부모 품목으로 진입했을 때, 해당 row 가 마운트되면 즉시
-// scrollIntoView 로 가운데 정렬 + 2초간 배경 flash 효과로 사용자 시선을 유도.
+// scrollIntoView 로 가운데 정렬 + 줄 전체 점멸(.animate-row-flash)로 사용자 시선을 유도.
 // 자동 카트 추가는 하지 않고 사용자가 직접 BOM/낱개를 선택하게 한다.
 function HighlightableRow({
   isHighlight,
@@ -869,14 +881,15 @@ function HighlightableRow({
     if (!isHighlight) return;
     const el = rowRef.current;
     if (!el) return;
+    // 검색 프리필로 목록이 짧아 그 품목은 거의 맨 위에 렌더된다 → 단순 scrollIntoView 로 충분.
     try {
-      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      el.scrollIntoView({ block: "center" });
     } catch {
-      // older browsers 또는 SSR fallback
       el.scrollIntoView();
     }
+    // 줄 전체 점멸 — '버튼만 강조돼 안 보인다'는 피드백 반영(globals.css .animate-row-flash, 0.5s×3회).
     setFlash(true);
-    const timer = window.setTimeout(() => setFlash(false), 2000);
+    const timer = window.setTimeout(() => setFlash(false), 1500);
     return () => {
       window.clearTimeout(timer);
     };
@@ -885,15 +898,7 @@ function HighlightableRow({
   return (
     <tr
       ref={rowRef}
-      className="transition-colors duration-150 hover:bg-[var(--c-s4)]"
-      style={
-        flash
-          ? {
-              background: `${LEGACY_COLORS.blue}26`, // ~15% alpha
-              transition: "background-color 0.4s ease",
-            }
-          : undefined
-      }
+      className={`transition-colors duration-150 hover:bg-[var(--c-s4)]${flash ? " animate-row-flash" : ""}`}
     >
       {children}
     </tr>

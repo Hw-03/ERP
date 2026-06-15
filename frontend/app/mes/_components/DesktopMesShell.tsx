@@ -150,6 +150,7 @@ function DesktopMesShellInner() {
     setWarehousePreselected(item);
     setWarehouseIntent(intent ?? null);
     setActiveTab("warehouse");
+    // tab 만 전환 — step 은 위저드(useIoUrlSync)가 tab=warehouse 와 함께 기록한다.
     router.push("?tab=warehouse", { scroll: false });
   }, [router]);
 
