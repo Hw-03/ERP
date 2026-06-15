@@ -41,13 +41,10 @@ def can_approve_department(actor, target_dept: str | None) -> bool:
 
     dept_role = (getattr(actor, "department_role", None) or "none").lower()
     wh_role = (getattr(actor, "warehouse_role", None) or "none").lower()
-    level = getattr(getattr(actor, "level", None), "value", getattr(actor, "level", None))
 
     if dept_role in ("primary", "deputy") and target_dept != _WAREHOUSE_DEPT_NAME:
         return True
     if wh_role in ("primary", "deputy"):
-        return True
-    if level == "admin":
         return True
     return False
 
@@ -64,12 +61,7 @@ def approvable_departments(actor) -> Iterable[str] | None:
     """
     wh_role = (getattr(actor, "warehouse_role", None) or "none").lower()
     dept_role = (getattr(actor, "department_role", None) or "none").lower()
-    level = getattr(getattr(actor, "level", None), "value", getattr(actor, "level", None))
 
-    if (
-        wh_role in ("primary", "deputy")
-        or dept_role in ("primary", "deputy")
-        or level == "admin"
-    ):
+    if wh_role in ("primary", "deputy") or dept_role in ("primary", "deputy"):
         return None
     return frozenset()

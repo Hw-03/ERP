@@ -318,14 +318,14 @@ def cancel_request(
     pin: str,
     http_request: Optional[Request] = None,
 ) -> StockRequest:
-    """요청자 본인 또는 관리자(level=admin) 취소."""
+    """요청자 본인 또는 결재 권한자(창고/부서 role) 취소."""
     is_self = request.requester_employee_id == requester.employee_id
-    is_admin = (
-        getattr(requester, "level", None)
-        and getattr(requester.level, "value", str(requester.level)) == "admin"
+    is_approver = (
+        (getattr(requester, "warehouse_role", None) or "none").lower() != "none"
+        or (getattr(requester, "department_role", None) or "none").lower() != "none"
     )
-    if not (is_self or is_admin):
-        raise PermissionError("본인 요청 또는 관리자만 취소할 수 있습니다.")
+    if not (is_self or is_approver):
+        raise PermissionError("본인 요청 또는 결재 권한자만 취소할 수 있습니다.")
     if not verify_pin(requester.pin_hash, pin):
         raise PermissionError("PIN이 일치하지 않습니다.")
     set_actor(http_request, requester)

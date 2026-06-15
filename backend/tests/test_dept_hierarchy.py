@@ -89,10 +89,11 @@ class TestCanApproveDepartment:
         for dept in ("진공", "AS", "창고"):
             assert can_approve_department(actor, dept) is True
 
-    def test_admin은_모든_부서_OK(self):
+    def test_admin_레벨_단독은_결재_불가(self):
+        # G 결정: admin level은 결재 권한과 무관 — warehouse/dept role 없으면 거부
         actor = _make_employee(level=EmployeeLevelEnum.ADMIN)
         for dept in ("진공", "영업", "창고"):
-            assert can_approve_department(actor, dept) is True
+            assert can_approve_department(actor, dept) is False
 
     def test_권한_없는_직원은_모든_부서_거부(self):
         actor = _make_employee()  # 모든 role=none
@@ -111,9 +112,10 @@ class TestApprovableDepartments:
         actor2 = _make_employee(warehouse_role="deputy")
         assert approvable_departments(actor2) is None
 
-    def test_admin은_None(self):
+    def test_admin_레벨_단독은_빈_frozenset(self):
+        # G 결정: admin level은 결재 권한과 무관 — warehouse/dept role 없으면 빈 셋
         actor = _make_employee(level=EmployeeLevelEnum.ADMIN)
-        assert approvable_departments(actor) is None
+        assert approvable_departments(actor) == frozenset()
 
     def test_부서_정부도_None(self):
         # 새 룰: 부서 정/부도 모든 비-창고 부서 노출
