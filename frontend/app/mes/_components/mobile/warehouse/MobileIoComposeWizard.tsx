@@ -105,7 +105,6 @@ export function MobileIoComposeWizard({
   const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const restoredDraftRef = useRef<string | null>(null);
-  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveBatchIdRef = useRef<string | null>(null);
 
   const state = useIoWorkState(defaultWorkType, operator?.department);
@@ -156,47 +155,6 @@ export function MobileIoComposeWizard({
     state,
     onStatusChange,
   });
-
-  // 자동 저장 — bundles 1개 이상이면 변경 700ms 후 백그라운드 저장.
-  useEffect(() => {
-    if (!employeeId) return;
-    if (state.bundles.length === 0) return;
-    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
-    autosaveTimerRef.current = setTimeout(async () => {
-      try {
-        const saved = await saveDraft({
-          employeeId,
-          workType: state.workType,
-          subType: state.subType,
-          fromDepartment: state.fromDepartment,
-          toDepartment: state.toDepartment,
-          referenceNo: state.referenceNo,
-          notes: state.notes,
-          bundles: state.bundles,
-        });
-        autosaveBatchIdRef.current = saved.batch_id;
-        const now = new Date();
-        const hh = String(now.getHours()).padStart(2, "0");
-        const mm = String(now.getMinutes()).padStart(2, "0");
-        onStatusChange(`자동 저장됨 · ${hh}:${mm}`);
-      } catch {
-        onStatusChange("자동 저장 실패 — 잠시 후 재시도");
-      }
-    }, 700);
-    return () => {
-      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    state.bundles,
-    state.notes,
-    state.referenceNo,
-    state.fromDepartment,
-    state.toDepartment,
-    state.workType,
-    state.subType,
-    employeeId,
-  ]);
 
   // 작성 중(담은 묶음 있음) 여부를 상위(MobileWarehouseScreen)에 보고 — 섹션 이탈 가드용.
   useEffect(() => {
@@ -315,13 +273,9 @@ export function MobileIoComposeWizard({
     return null;
   }
 
-  // 부서/세부작업 변경 시 진행 중 autosave draft 슬롯을 끊어 새 슬롯으로 시작한다.
-  // (데스크톱 IoComposeView 와 동일 — 안 하면 다음 저장이 이전 draft 를 덮어써 손실.)
+  // 부서/세부작업 변경 시 임시저장 슬롯을 끊어 새 슬롯으로 시작한다.
+  // (안 하면 다음 저장이 이전 draft 를 덮어써 손실.)
   function beginNewCompositionSlot() {
-    if (autosaveTimerRef.current) {
-      clearTimeout(autosaveTimerRef.current);
-      autosaveTimerRef.current = null;
-    }
     autosaveBatchIdRef.current = null;
   }
 
@@ -361,10 +315,6 @@ export function MobileIoComposeWizard({
       return;
     }
     if (state.bundles.length === 0) return;
-    if (autosaveTimerRef.current) {
-      clearTimeout(autosaveTimerRef.current);
-      autosaveTimerRef.current = null;
-    }
     try {
       const response = await saveDraft({
         employeeId,
@@ -392,10 +342,6 @@ export function MobileIoComposeWizard({
     if (!employeeId) {
       setError("작업자를 선택하세요.");
       return;
-    }
-    if (autosaveTimerRef.current) {
-      clearTimeout(autosaveTimerRef.current);
-      autosaveTimerRef.current = null;
     }
     if (autosaveBatchIdRef.current) {
       const staleId = autosaveBatchIdRef.current;
