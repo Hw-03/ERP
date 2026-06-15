@@ -91,6 +91,7 @@ class MarkDefectiveRequest(BaseModel):
     target_department: str
     reason: Optional[str] = Field(None, description="불량 사유")
     operator: Optional[str] = Field(None, max_length=100)
+    producer_employee_code: Optional[str] = Field(None, max_length=50, description="작업자 사번 (audit)")
 
 
 class SupplierReturnRequest(BaseModel):

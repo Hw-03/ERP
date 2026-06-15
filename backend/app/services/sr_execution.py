@@ -333,6 +333,7 @@ def _execute_line(
             quantity_after=qty_after,
             reference_no=request.request_code,
             produced_by=approver.name,
+            producer_employee_id=approver.employee_id,
             notes=note,
             operation_batch_id=getattr(request, "operation_batch_id", None),
             department=str(line.from_department) if line.from_department else None,

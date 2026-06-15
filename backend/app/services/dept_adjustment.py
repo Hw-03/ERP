@@ -213,6 +213,7 @@ def submit_adjustment(
     lines: list[AdjLine],
     *,
     operator_name: Optional[str] = None,
+    producer_employee_id: Optional[uuid.UUID] = None,
     reference_no: Optional[str] = None,
     notes: Optional[str] = None,
 ) -> list[uuid.UUID]:
@@ -278,6 +279,7 @@ def submit_adjustment(
             quantity_after=inv.quantity,
             reference_no=reference_no,
             produced_by=operator_name,
+            producer_employee_id=producer_employee_id,
             notes=log_notes or None,
             inventory_effect=inv_effect.capture_effect(db, ln.item_id, cells_before),
         )
