@@ -8,9 +8,9 @@ import type {
   ProductionCapacityAfItem,
   ProductionCapacityPfVariant,
 } from "@/lib/api/types/production";
+import { groupAfByModel } from "@/lib/mes/capacity";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
-import { getModelLabel } from "@/lib/mes/model-labels";
 
 type AfFilterMode = "producible" | "incomplete" | "all";
 
@@ -124,23 +124,8 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
     return items;
   }, [items, filterMode]);
 
-  // 모델(model_symbol) 단위 그룹화.
-  const grouped = useMemo(() => {
-    const groups = new Map<string, ProductionCapacityAfItem[]>();
-    for (const it of filtered) {
-      const key = (it.model_symbol ?? "").trim() || "미분류";
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(it);
-    }
-    groups.forEach((arr) => arr.sort((a, b) => b.ship_ready - a.ship_ready));
-    return Array.from(groups.entries())
-      .map(([key, arr]) => {
-        const label =
-          key === "미분류" ? key : getModelLabel(key, arr[0]?.af_name) || `모델${key}`;
-        return { key, label, items: arr };
-      })
-      .sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
-  }, [filtered]);
+  // 모델(model_symbol) 단위 그룹화 + 모델 합계.
+  const grouped = useMemo(() => groupAfByModel(filtered), [filtered]);
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const toggleExpand = (id: string) =>
@@ -178,28 +163,6 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
 
   return (
     <>
-      {/* 요약 3수량 */}
-      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <SummaryTile
-          label="출하 준비"
-          value={af.summary.ship_ready}
-          color={LEGACY_COLORS.cyan}
-          desc="AF 재고를 출하까지 마무리"
-        />
-        <SummaryTile
-          label="빠른 조립"
-          value={af.summary.fast_assembly}
-          color={LEGACY_COLORS.blue}
-          desc="기존 재고 ＋ 직계 자재"
-        />
-        <SummaryTile
-          label="총 생산"
-          value={af.summary.total_production}
-          color={LEGACY_COLORS.purple}
-          desc="하위 BOM 끝까지 투입 이론치"
-        />
-      </div>
-
       {/* 필터 토글 */}
       <div className="mb-3 flex items-center gap-2">
         {(
@@ -263,9 +226,9 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                   · {group.items.length}종
                 </span>
               </span>
-              <span />
-              <span />
-              <span />
+              <QtyCell value={group.totals.ship_ready} color={LEGACY_COLORS.cyan} />
+              <QtyCell value={group.totals.fast_assembly} color={LEGACY_COLORS.blue} />
+              <QtyCell value={group.totals.total_production} color={LEGACY_COLORS.purple} />
             </div>
 
             {group.items.map((it) => {
@@ -335,38 +298,6 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
         ))}
       </div>
     </>
-  );
-}
-
-function SummaryTile({
-  label,
-  value,
-  color,
-  desc,
-}: {
-  label: string;
-  value: number;
-  color: string;
-  desc: string;
-}) {
-  return (
-    <div
-      className="rounded-[14px] border px-4 py-3"
-      style={{
-        background: `color-mix(in srgb, ${color} 8%, transparent)`,
-        borderColor: `color-mix(in srgb, ${color} 30%, transparent)`,
-      }}
-    >
-      <div className="text-xs font-bold" style={{ color }}>
-        {label}
-      </div>
-      <div className="mt-0.5 text-2xl font-black" style={{ color }}>
-        {formatQty(value)}
-      </div>
-      <div className="mt-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-        {desc}
-      </div>
-    </div>
   );
 }
 

@@ -10,6 +10,7 @@ import type {
   ProductionCapacityAfBlock,
   ProductionCapacityAfStatus,
 } from "@/lib/api/types/production";
+import { groupAfByModel, type ModelCapacityGroup } from "@/lib/mes/capacity";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { getModelLabel } from "@/lib/mes/model-labels";
@@ -23,7 +24,7 @@ function resolveStatus(data: ProductionCapacity): ProductionCapacityStatus {
 }
 
 const SHARED_HINT =
-  "합계는 AF별 독립 계산값 — 같은 하위 자재를 공유하면 모든 수량을 동시에 보장하지는 않음";
+  "모델별 값은 모델 내 AF 합계 — 같은 하위 자재를 공유하면 모든 수량을 동시에 보장하지는 않음";
 
 export function InventoryCapacityPanel({
   capacityData,
@@ -86,6 +87,7 @@ function AfPanel({
     af.status === "producible" ||
     af.status === "incomplete" ||
     af.status === "not_producible";
+  const groups = showStats ? groupAfByModel(af.items) : [];
 
   const subline = (() => {
     switch (af.status) {
@@ -113,10 +115,11 @@ function AfPanel({
         {afHeading(af.status)}
       </span>
       {showStats ? (
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1">
-          <AfStat label="출하준비" value={af.summary.ship_ready} color={LEGACY_COLORS.cyan} />
-          <AfStat label="빠른조립" value={af.summary.fast_assembly} color={LEGACY_COLORS.blue} />
-          <AfStat label="총생산" value={af.summary.total_production} color={LEGACY_COLORS.purple} />
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+          <ModelLegend />
+          {groups.map((g, idx) => (
+            <ModelChip key={g.key} group={g} showSep={idx > 0} />
+          ))}
           <span className="inline-flex shrink-0" aria-label={SHARED_HINT} title={SHARED_HINT}>
             <AlertTriangle className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />
           </span>
@@ -153,14 +156,42 @@ function AfPanel({
   );
 }
 
-function AfStat({ label, value, color }: { label: string; value: number; color: string }) {
+// 색 의미 안내(한 번): 출하(청록)/조립(파랑)/총생산(보라).
+function ModelLegend() {
   return (
-    <span className="inline-flex shrink-0 items-baseline gap-1">
-      <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-        {label}
+    <span className="inline-flex shrink-0 items-baseline gap-1 text-xs font-bold">
+      <span style={{ color: LEGACY_COLORS.cyan }}>출하</span>
+      <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
+      <span style={{ color: LEGACY_COLORS.blue }}>조립</span>
+      <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
+      <span style={{ color: LEGACY_COLORS.purple }}>총생산</span>
+    </span>
+  );
+}
+
+// 모델별 칩: 모델명 + 출하/조립/총생산 3수량(색 구분).
+function ModelChip({ group, showSep }: { group: ModelCapacityGroup; showSep: boolean }) {
+  const { ship_ready, fast_assembly, total_production } = group.totals;
+  return (
+    <span className="inline-flex shrink-0 items-baseline gap-1 text-sm">
+      {showSep && (
+        <span aria-hidden style={{ color: LEGACY_COLORS.muted2 }}>
+          ·
+        </span>
+      )}
+      <span className="font-bold" style={{ color: LEGACY_COLORS.text }}>
+        {group.label}
       </span>
-      <span className="text-base font-black" style={{ color }}>
-        {formatQty(value)}
+      <span className="font-black" style={{ color: LEGACY_COLORS.cyan }}>
+        {formatQty(ship_ready)}
+      </span>
+      <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
+      <span className="font-black" style={{ color: LEGACY_COLORS.blue }}>
+        {formatQty(fast_assembly)}
+      </span>
+      <span style={{ color: LEGACY_COLORS.muted2 }}>/</span>
+      <span className="font-bold" style={{ color: LEGACY_COLORS.purple }}>
+        {formatQty(total_production)}
       </span>
     </span>
   );
