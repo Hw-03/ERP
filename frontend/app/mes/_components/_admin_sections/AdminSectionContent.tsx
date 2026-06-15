@@ -186,7 +186,7 @@ function WarehouseTabSection({
   const [tab, setTab] = useState<"structure" | "placement">("structure");
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="mb-4 flex shrink-0 gap-1 border-b pb-1" style={{ borderColor: LEGACY_COLORS.border }}>
         {WAREHOUSE_TABS.map((t) => (
           <button
@@ -204,7 +204,7 @@ function WarehouseTabSection({
           </button>
         ))}
       </div>
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className="flex min-h-0 flex-1 flex-col overflow-auto">
         {tab === "structure" ? (
           <AdminWarehouseStructureSection onStatusChange={onStatusChange} onError={onError} />
         ) : (
