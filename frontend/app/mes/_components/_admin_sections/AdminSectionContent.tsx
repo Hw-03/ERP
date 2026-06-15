@@ -1,8 +1,9 @@
 "use client";
 
-import type { Dispatch, SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import type { BOMDetailEntry, DepartmentMaster, Employee, Item, ProductModel } from "@/lib/api";
 import { api } from "@/lib/api";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { AdminMasterItemsSection } from "./AdminMasterItemsSection";
 import { AdminEmployeesSection } from "./AdminEmployeesSection";
 import { BomWorkbench } from "./_bom_workbench/BomWorkbench";
@@ -142,11 +143,8 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
       </AdminDepartmentsProvider>
     );
   }
-  if (section === "warehouseStructure") {
-    return <AdminWarehouseStructureSection onStatusChange={onStatusChange} onError={setMessage} />;
-  }
-  if (section === "warehousePlacement") {
-    return <AdminWarehousePlacementSection items={items} onStatusChange={onStatusChange} onError={setMessage} />;
+  if (section === "warehouse") {
+    return <WarehouseTabSection items={items} onStatusChange={onStatusChange} onError={setMessage} />;
   }
   if (section === "export") {
     return (
@@ -169,4 +167,50 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
     );
   }
   return null;
+}
+
+const WAREHOUSE_TABS = [
+  { id: "structure" as const, label: "구조 편집" },
+  { id: "placement" as const, label: "위치 배정" },
+];
+
+function WarehouseTabSection({
+  items,
+  onStatusChange,
+  onError,
+}: {
+  items: Item[];
+  onStatusChange: (s: string) => void;
+  onError: (m: string) => void;
+}) {
+  const [tab, setTab] = useState<"structure" | "placement">("structure");
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="mb-4 flex shrink-0 gap-1 border-b pb-1" style={{ borderColor: LEGACY_COLORS.border }}>
+        {WAREHOUSE_TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className="rounded-[10px] px-3 py-1.5 text-[13px] font-bold transition-colors"
+            style={
+              tab === t.id
+                ? { background: LEGACY_COLORS.blue, color: "#fff" }
+                : { background: "transparent", color: LEGACY_COLORS.muted2 }
+            }
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto">
+        {tab === "structure" ? (
+          <AdminWarehouseStructureSection onStatusChange={onStatusChange} onError={onError} />
+        ) : (
+          <AdminWarehousePlacementSection items={items} onStatusChange={onStatusChange} onError={onError} />
+        )}
+      </div>
+    </div>
+  );
 }

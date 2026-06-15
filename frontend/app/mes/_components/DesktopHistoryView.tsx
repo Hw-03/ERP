@@ -53,9 +53,8 @@ export function DesktopHistoryView() {
   );
 
   const [selection, setSelection] = useState<HistorySelection | null>(null);
-  // 우측 패널 내 드릴(BOM 하위·최근거래) 뒤로가기 스택. 표 행 클릭은 top-level 이라 스택 비움.
+  // 우측 패널 내 드릴(BOM 하위) 뒤로가기 스택. 표 행 클릭은 top-level 이라 스택 비움.
   const [selectionStack, setSelectionStack] = useState<HistorySelection[]>([]);
-  const [itemRecentLogs, setItemRecentLogs] = useState<TransactionLog[]>([]);
 
   // batchCache — HistoryTable 의 visible lazy fetch + 우측 batch 상세 패널이 공유.
   const [batchCache, setBatchCache] = useState<Map<string, IoBatch>>(new Map());
@@ -84,21 +83,6 @@ export function DesktopHistoryView() {
     department: deptParam,
     model: modelParam,
   });
-
-  // selection.kind === "log" 일 때만 같은 품목 최근 거래 로드.
-  useEffect(() => {
-    if (selection?.kind !== "log") {
-      setItemRecentLogs([]);
-      return;
-    }
-    const log = selection.log;
-    void api
-      .getTransactions({ itemId: log.item_id, limit: 6 })
-      .then((data) => {
-        setItemRecentLogs(data.filter((l) => l.log_id !== log.log_id).slice(0, 5));
-      })
-      .catch(() => setItemRecentLogs([]));
-  }, [selection]);
 
   // 달력 fetch — 패널이 펼쳐진 동안에만. 위 필터(거래종류·부서·모델·검색)와
   // 무관하게 그 달 전체 거래를 표시 (2차 #4). 보는 "달"만 따라감. 선택 날짜는 조건 아님.
@@ -266,14 +250,6 @@ export function DesktopHistoryView() {
     setSelection({ kind: "log", log: updated });
   }
 
-  function handleLogCorrected(result: { original: TransactionLog; correction: TransactionLog }) {
-    setLogs((prev) => {
-      const without = prev.filter((l) => l.log_id !== result.original.log_id);
-      return [result.correction, result.original, ...without];
-    });
-    setSelection({ kind: "log", log: result.original });
-  }
-
   // 표 행 클릭(top-level) — 드릴 스택 초기화.
   function handleSelectLog(log: TransactionLog) {
     setSelectionStack([]);
@@ -438,12 +414,10 @@ export function DesktopHistoryView() {
         displaySelection={displaySelection}
         batchCache={batchCache}
         setBatchCache={setBatchCache}
-        itemRecentLogs={itemRecentLogs}
         onSelectLog={navigateToLog}
         canGoBack={selectionStack.length > 0}
         onBack={goBack}
         onLogUpdated={handleLogUpdated}
-        onLogCorrected={handleLogCorrected}
         onClose={() => {
           setSelectionStack([]);
           setSelection(null);

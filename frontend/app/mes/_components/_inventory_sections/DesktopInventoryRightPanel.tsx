@@ -1,6 +1,6 @@
 "use client";
 
-import type { Item, TransactionLog } from "@/lib/api";
+import type { Item } from "@/lib/api";
 import { SlidePanel } from "../common";
 import { DesktopRightPanel } from "../DesktopRightPanel";
 import { InventoryDetailPanel } from "./InventoryDetailPanel";
@@ -16,7 +16,6 @@ import type { IoEntryIntent } from "../_warehouse_v2/types";
 export interface DesktopInventoryRightPanelProps {
   selectedItem: Item | null;
   displayItem: Item | null;
-  itemLogs: TransactionLog[];
   headerBadge: React.ReactNode;
   onClose: () => void;
   onGoToWarehouse: (item: Item, intent?: IoEntryIntent) => void;
@@ -27,7 +26,6 @@ export interface DesktopInventoryRightPanelProps {
 export function DesktopInventoryRightPanel({
   selectedItem,
   displayItem,
-  itemLogs,
   headerBadge,
   onClose,
   onGoToWarehouse,
@@ -44,7 +42,6 @@ export function DesktopInventoryRightPanel({
         >
           <InventoryDetailPanel
             item={displayItem}
-            logs={itemLogs}
             onGoToWarehouse={onGoToWarehouse}
             canReceive={canReceive}
             imageFilename={imageFilename}

@@ -243,6 +243,14 @@ _MIGRATION_DDL: list[str] = [
     # 411개 row 가 비어있던 상태로 김민재 대리 SOLO 필터 실패 원인. ItemModel ORM 클래스
     # 제거와 함께 테이블도 DROP. backup: backend/_backup/mes_pre_item_models_drop_2026-05-29.db
     "DROP TABLE IF EXISTS item_models",
+    # 2026-06-15: 창고↔부서 이동 전후 창고 수량 분리 기록
+    "ALTER TABLE transaction_logs ADD COLUMN warehouse_qty_before INTEGER",
+    "ALTER TABLE transaction_logs ADD COLUMN warehouse_qty_after INTEGER",
+    # 2026-06-15: 거래 취소 — 내역 유지 + 재고 롤백
+    "ALTER TABLE transaction_logs ADD COLUMN cancelled BOOLEAN NOT NULL DEFAULT 0",
+    "ALTER TABLE transaction_logs ADD COLUMN cancel_reason TEXT",
+    "ALTER TABLE transaction_logs ADD COLUMN cancelled_by CHAR(36)",
+    "ALTER TABLE transaction_logs ADD COLUMN cancelled_at DATETIME",
     # 2026-06-04: 결재 알림 — 요청 도착(승인자)/승인·반려(요청자) 알림 영속 테이블.
     """CREATE TABLE IF NOT EXISTS notifications (
         notification_id CHAR(36) PRIMARY KEY,

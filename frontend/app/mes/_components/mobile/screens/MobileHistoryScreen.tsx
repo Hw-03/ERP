@@ -63,7 +63,6 @@ export function MobileHistoryScreen() {
 
   const [selection, setSelection] = useState<HistorySelection | null>(null);
   const [selectionStack, setSelectionStack] = useState<HistorySelection[]>([]);
-  const [itemRecentLogs, setItemRecentLogs] = useState<TransactionLog[]>([]);
   const [batchCache, setBatchCache] = useState<Map<string, IoBatch>>(new Map());
 
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -87,20 +86,6 @@ export function MobileHistoryScreen() {
     department: deptParam,
     model: modelParam,
   });
-
-  useEffect(() => {
-    if (selection?.kind !== "log") {
-      setItemRecentLogs([]);
-      return;
-    }
-    const log = selection.log;
-    void api
-      .getTransactions({ itemId: log.item_id, limit: 6 })
-      .then((data) => {
-        setItemRecentLogs(data.filter((l) => l.log_id !== log.log_id).slice(0, 5));
-      })
-      .catch(() => setItemRecentLogs([]));
-  }, [selection]);
 
   useEffect(() => {
     if (!calendarOpen) return;
@@ -239,17 +224,6 @@ export function MobileHistoryScreen() {
   function handleLogUpdated(updated: TransactionLog) {
     setLogs((prev) => prev.map((l) => (l.log_id === updated.log_id ? updated : l)));
     setSelection({ kind: "log", log: updated });
-  }
-
-  function handleLogCorrected(result: {
-    original: TransactionLog;
-    correction: TransactionLog;
-  }) {
-    setLogs((prev) => {
-      const without = prev.filter((l) => l.log_id !== result.original.log_id);
-      return [result.correction, result.original, ...without];
-    });
-    setSelection({ kind: "log", log: result.original });
   }
 
   function handleSelectLog(log: TransactionLog) {
@@ -456,10 +430,8 @@ export function MobileHistoryScreen() {
             {displaySelection.kind === "log" && (
               <HistoryDetailPanel
                 selected={displaySelection.log}
-                itemRecentLogs={itemRecentLogs}
                 onSelectLog={navigateToLog}
                 onLogUpdated={handleLogUpdated}
-                onLogCorrected={handleLogCorrected}
               />
             )}
             {displaySelection.kind === "batch" && (

@@ -160,6 +160,15 @@ export const productionApi = {
       payload,
     ),
 
+  cancelTransaction: (
+    logId: string,
+    payload: { reason: string; employee_code: string; pin: string },
+  ) =>
+    postJson<TransactionLog>(
+      toApiUrl(`/api/inventory/transactions/${logId}/cancel`),
+      payload,
+    ),
+
   /** 주어진 year의 월별 거래 건수. { "2026-01": 142, ..., "2026-12": 0 } */
   getMonthlyCounts: (year: number): Promise<Record<string, number>> =>
     fetcher<Record<string, number>>(toApiUrl(`/api/inventory/transactions/monthly-counts?year=${year}`)),

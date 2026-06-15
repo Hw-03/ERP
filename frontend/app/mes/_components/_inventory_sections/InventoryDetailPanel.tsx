@@ -3,14 +3,13 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { api, type Item, type StockRequestReservationLine, type TransactionLog } from "@/lib/api";
+import { api, type Item, type StockRequestReservationLine } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { formatQty } from "@/lib/mes/format";
 import { getStockState } from "@/lib/mes/inventory";
 import { ImageLightbox } from "@/lib/ui/ImageLightbox";
 import { useDeptColorLookup } from "../DepartmentsContext";
-import { InventoryDetailLogList } from "./InventoryDetailLogList";
 import { InventoryDetailLocations } from "./InventoryDetailLocations";
 import { BomSubExpander } from "../_warehouse_v2/BomSubExpander";
 import { inboundChoices, outboundChoices, quickChoiceToIntent } from "../_warehouse_v2/ioWorkType";
@@ -18,13 +17,12 @@ import type { IoEntryIntent } from "../_warehouse_v2/types";
 
 type Props = {
   item: Item;
-  logs: TransactionLog[];
   onGoToWarehouse: (item: Item, intent?: IoEntryIntent) => void;
   canReceive?: boolean;
   imageFilename?: string;
 };
 
-export function InventoryDetailPanel({ item, logs, onGoToWarehouse, canReceive = false, imageFilename }: Props) {
+export function InventoryDetailPanel({ item, onGoToWarehouse, canReceive = false, imageFilename }: Props) {
   const getDeptColor = useDeptColorLookup();
   const [reservations, setReservations] = useState<StockRequestReservationLine[]>([]);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -285,7 +283,6 @@ export function InventoryDetailPanel({ item, logs, onGoToWarehouse, canReceive =
         </div>
       </div>
 
-      <InventoryDetailLogList logs={logs} />
     </div>
   );
 }

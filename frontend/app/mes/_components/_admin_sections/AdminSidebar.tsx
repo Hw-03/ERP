@@ -8,11 +8,10 @@ import {
   FileArchive,
   Layers,
   Lock,
-  MapPinned,
   Network,
-  PackagePlus,
   ShieldCheck,
   Users,
+  Warehouse,
 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { SidebarButton } from "./SidebarButton";
@@ -27,14 +26,13 @@ export interface SectionMeta {
 
 export const SECTIONS: SectionMeta[] = [
   { id: "models", label: "모델 관리", description: "제품 모델 등록 및 사용 현황", icon: Layers },
-  { id: "items", label: "품목 관리", description: "품목 기본 정보·재고·BOM 관리", icon: Box },
+  { id: "items", label: "품목 관리", description: "품목 기본 정보·재고", icon: Box },
   { id: "employees", label: "직원 관리", description: "직원 활성·권한·PIN 관리", icon: Users },
   { id: "departments", label: "부서 관리", description: "부서 추가·색상·구성원 관리", icon: Building2 },
   { id: "bom", label: "BOM 관리", description: "부모-자식 자재 구성 편집", icon: Network },
   { id: "export", label: "내보내기", description: "엑셀 / CSV 데이터 내보내기", icon: Download },
   { id: "audit", label: "외부 제출용 로그", description: "심사 대비 월별 입출고 CSV", icon: FileArchive },
-  { id: "warehouseStructure", label: "창고 구조 편집", description: "앵글 배치·줄·층 편집", icon: MapPinned },
-  { id: "warehousePlacement", label: "위치 배정", description: "품목을 자리에 박스로 배치", icon: PackagePlus },
+  { id: "warehouse", label: "창고 관리", description: "앵글 구조·박스 위치 배정", icon: Warehouse },
 ];
 
 export const SETTINGS_ENTRY: SectionMeta = {
@@ -47,7 +45,7 @@ export const SETTINGS_ENTRY: SectionMeta = {
 const SECTION_GROUPS: { title: string; ids: AdminSection[] }[] = [
   { title: "기준 정보", ids: ["models", "items", "employees", "departments"] },
   { title: "구성 관리", ids: ["bom"] },
-  { title: "창고", ids: ["warehouseStructure", "warehousePlacement"] },
+  { title: "창고", ids: ["warehouse"] },
   { title: "시스템", ids: ["export", "audit"] },
 ];
 

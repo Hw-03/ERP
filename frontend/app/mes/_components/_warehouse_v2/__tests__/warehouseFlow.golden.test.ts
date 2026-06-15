@@ -135,7 +135,7 @@ describe("ioWorkType 상수", () => {
       ["produce", "생산", "하위 자재 출고 + 결과 품목 입고"],
       ["disassemble", "분해", "상위 품목 출고 + 회수 품목 입고"],
       ["adjust_in", "수량보정 입고", "선택 품목 수량 증가"],
-      ["adjust_out", "수량보정 출고", "선택 품목 수량 감소"],
+      ["adjust_out", "출고", "선택 품목 수량 감소"],
       ["defect_quarantine", "새 불량", "선택 부서의 정상 재고를 불량 격리"],
       ["defect_restore", "불량 해제", "격리 재고를 정상 복귀 (즉시)"],
       ["defect_process", "불량 처리", "격리 재고 폐기·재작업"],
@@ -192,7 +192,7 @@ describe("subTypeLabel", () => {
       disassemble: "분해",
       dept_transfer: "dept_transfer", // IO_SUB_TYPES 에 없음 → 그대로 반환
       adjust_in: "수량보정 입고",
-      adjust_out: "수량보정 출고",
+      adjust_out: "출고",
       defect_quarantine: "새 불량",
       supplier_return: "원자재 반품",
     });

@@ -5,7 +5,6 @@ import {
   type DepartmentMaster,
   type DepartmentRole,
   type Employee,
-  type EmployeeLevel,
   type ProductModel,
   type WarehouseRole,
 } from "@/lib/api";
@@ -15,7 +14,6 @@ import { useAdminEmployeesContext } from "../AdminEmployeesContext";
 import {
   ASSEMBLY_DEPT,
   DEPARTMENT_ROLE_LABEL,
-  LEVEL_LABEL,
   WAREHOUSE_ROLE_LABEL,
 } from "./employeeRoleLabels";
 import { DetailCardSlot, FieldRow, SelectInput, TextInput } from "./employeeDetailPrimitives";
@@ -41,7 +39,6 @@ export function EmployeeDetailGrid({
   onToggle,
   onRequestDelete,
 }: EmployeeDetailGridProps) {
-  const levelMeta = LEVEL_LABEL[form.level] ?? LEVEL_LABEL.staff;
   const whMeta = WAREHOUSE_ROLE_LABEL[form.warehouse_role];
   const deptMeta = DEPARTMENT_ROLE_LABEL[form.department_role];
   return (
@@ -85,19 +82,6 @@ export function EmployeeDetailGrid({
       {/* 카드 2: 권한 */}
       <DetailCardSlot title="권한">
         <div className="flex flex-col gap-3">
-          <FieldRow label="등급">
-            <SelectInput
-              value={form.level}
-              onChange={(v) => setForm((f) => ({ ...f, level: v as EmployeeLevel }))}
-              options={(["staff", "manager", "admin"] as EmployeeLevel[]).map((l) => ({
-                value: l,
-                label: LEVEL_LABEL[l].label,
-              }))}
-            />
-            <div className="mt-1.5 text-[11px]" style={{ color: levelMeta.tone }}>
-              {levelMeta.hint}
-            </div>
-          </FieldRow>
           <FieldRow label="창고 결재 역할">
             <SelectInput
               value={form.warehouse_role}

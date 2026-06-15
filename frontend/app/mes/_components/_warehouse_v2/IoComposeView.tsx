@@ -296,7 +296,8 @@ export function IoComposeView({
   // 입출고 작업 중(bundles 있음) 다른 화면으로 이동 시 '저장할까요?' 모달.
   // 자동 저장은 그대로 작동 — '저장하지 않고 이동' 선택 시에는 discard 콜백으로
   // 이미 백엔드에 저장된 임시본을 삭제해 사용자 의도와 일치시킨다.
-  const ioDirty = state.bundles.length > 0 && !!employeeId;
+  // autosaveBatchIdRef.current !== null = 서버 저장됨(드래프트 복원·자동저장 완료)
+  const ioDirty = state.bundles.length > 0 && !!employeeId && autosaveBatchIdRef.current === null;
   useRegisterDirty(
     "warehouse-io",
     ioDirty,
