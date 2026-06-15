@@ -20,6 +20,7 @@ from app.models import (
     TransactionLog,
 )
 from app.services import inventory as inventory_svc
+from app.services import inv_effect
 from app.services.sr_validation import (
     _TX_TYPE_BY_REQUEST,
     line_requires_pending,
@@ -295,6 +296,7 @@ def _execute_line(
 
     inv = inventory_svc.get_or_create_inventory(db, item_id)
     qty_before = inv.quantity or Decimal("0")
+    cells_before = inv_effect.snapshot_cells(db, item_id)
 
     handler = _LINE_HANDLERS.get(rt)
     if handler is None:
@@ -334,6 +336,7 @@ def _execute_line(
             notes=note,
             operation_batch_id=getattr(request, "operation_batch_id", None),
             department=str(line.from_department) if line.from_department else None,
+            inventory_effect=inv_effect.capture_effect(db, item_id, cells_before),
         )
     )
 

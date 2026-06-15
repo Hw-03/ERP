@@ -24,6 +24,7 @@ from app.models import (
     TransactionTypeEnum,
 )
 from app.services import inventory as inventory_svc
+from app.services import inv_effect
 from app.services import stock_requests as stock_request_svc
 from app.services import notifications as notif_svc
 from app.services.io_preview import (
@@ -265,6 +266,7 @@ def _log_immediate(
     wh_before: Decimal | None = None,
     wh_after: Decimal | None = None,
     department: str | None = None,
+    inventory_effect: list[dict] | None = None,
 ) -> None:
     db.add(
         TransactionLog(
@@ -281,6 +283,7 @@ def _log_immediate(
             produced_by=operator_name,
             notes=batch.notes,
             operation_batch_id=batch.batch_id,
+            inventory_effect=inventory_effect,
         )
     )
 
@@ -396,6 +399,8 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
     inv = inventory_svc.get_or_create_inventory(db, line.item_id)
     before = _d(inv.quantity)
     wh_before = _d(inv.warehouse_qty) if line.direction == "move" else None
+    # 취소 역재생용 — mutation 전 재고 셀 스냅샷.
+    cells_before = inv_effect.snapshot_cells(db, line.item_id)
 
     if line.direction == "in":
         tx_type, quantity_change = _apply_in(db, line, qty)
@@ -426,6 +431,7 @@ def _apply_line(db: Session, *, batch: IoBatch, line: IoLine, requester: Employe
         wh_before=wh_before,
         wh_after=wh_after,
         department=_dept_for_line(line, tx_type),
+        inventory_effect=inv_effect.capture_effect(db, line.item_id, cells_before),
     )
 
 

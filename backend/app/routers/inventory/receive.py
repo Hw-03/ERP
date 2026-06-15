@@ -12,6 +12,7 @@ from app.models import Item, TransactionLog, TransactionTypeEnum
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import InventoryAdjust, InventoryReceive, InventoryResponse
 from app.services import inventory as inventory_svc
+from app.services import inv_effect
 from app.services._tx import commit_and_refresh
 
 from ._shared import to_response
@@ -31,6 +32,7 @@ def receive_inventory(payload: InventoryReceive, db: Session = Depends(get_db)):
     producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
     inventory = inventory_svc.get_or_create_inventory(db, payload.item_id)
     qty_before = inventory.quantity or Decimal("0")
+    cells_before = inv_effect.snapshot_cells(db, payload.item_id)
     inventory_svc.receive_confirmed(db, payload.item_id, payload.quantity, bucket="warehouse")
     if payload.location:
         inventory.location = payload.location
@@ -46,6 +48,7 @@ def receive_inventory(payload: InventoryReceive, db: Session = Depends(get_db)):
             produced_by=producer_name or payload.produced_by,
             producer_employee_id=producer_id,
             notes=payload.notes,
+            inventory_effect=inv_effect.capture_effect(db, payload.item_id, cells_before),
         )
     )
     commit_and_refresh(db, inventory)
@@ -63,6 +66,7 @@ def adjust_inventory(payload: InventoryAdjust, db: Session = Depends(get_db)):
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
     producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
+    cells_before = inv_effect.snapshot_cells(db, payload.item_id)
     try:
         inventory, qty_before, delta = inventory_svc.adjust_warehouse(
             db, payload.item_id, payload.quantity, location=payload.location
@@ -81,6 +85,7 @@ def adjust_inventory(payload: InventoryAdjust, db: Session = Depends(get_db)):
             produced_by=producer_name or payload.produced_by,
             producer_employee_id=producer_id,
             notes=payload.reason,
+            inventory_effect=inv_effect.capture_effect(db, payload.item_id, cells_before),
         )
     )
     commit_and_refresh(db, inventory)

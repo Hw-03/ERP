@@ -18,6 +18,7 @@ from app.schemas import (
     ProductionReceiptResponse,
 )
 from app.services import inventory as inventory_svc
+from app.services import inv_effect
 from app.services import stock_math
 from app.services.bom import BomCache, build_bom_cache
 from app.services.bom import explode_bom as _explode_bom_svc
@@ -241,6 +242,7 @@ def _backflush_components(
             )
 
         # 재고 변경은 서비스 레이어로 위임 (창고 차감 + _sync_total 은 내부 책임)
+        comp_cells_before = inv_effect.snapshot_cells(db, comp_item_id)
         inv, qty_before = inventory_svc.consume_warehouse(db, comp_item_id, required_qty)
 
         log = TransactionLog(
@@ -253,6 +255,7 @@ def _backflush_components(
             produced_by=producer_name or payload.produced_by,
             producer_employee_id=producer_id,
             notes=f"생산 입고 Backflush: {produced_item.item_name} x {payload.quantity}",
+            inventory_effect=inv_effect.capture_effect(db, comp_item_id, comp_cells_before),
         )
         db.add(log)
         db.flush()
@@ -286,6 +289,7 @@ def _record_production(
     target_dept = inventory_svc.dept_for_process_type(produced_item.process_type_code)
     produced_inv = inventory_svc.get_or_create_inventory(db, payload.item_id)
     prod_qty_before = produced_inv.quantity or Decimal("0")
+    prod_cells_before = inv_effect.snapshot_cells(db, payload.item_id)
     if target_dept is not None:
         inventory_svc.receive_confirmed(
             db, payload.item_id, payload.quantity,
@@ -304,6 +308,7 @@ def _record_production(
         produced_by=producer_name or payload.produced_by,
         producer_employee_id=producer_id,
         notes=payload.notes or f"생산 입고: {produced_item.item_name} x {payload.quantity}",
+        inventory_effect=inv_effect.capture_effect(db, payload.item_id, prod_cells_before),
     )
     db.add(produce_log)
     db.flush()

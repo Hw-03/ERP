@@ -33,6 +33,7 @@ from app.models import (
 )
 from app.routers._errors import ErrorCode, http_error
 from app.services import inventory as inventory_svc
+from app.services import inv_effect
 from app._evt import emit as _evt_emit
 from app._actor import set_actor
 from app.repositories import item_repository
@@ -248,6 +249,7 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
 
     inv = inventory_svc.get_or_create_inventory(db, payload.item_id)
     qty_before = inv.quantity or Decimal("0")
+    cells_before = inv_effect.snapshot_cells(db, payload.item_id)
 
     try:
         inventory_svc.mark_defective(
@@ -293,6 +295,7 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
                 client_request_id=payload.client_request_id,
                 # String 컬럼엔 enum repr 금지 — .value(한국어) 사용
                 department=getattr(target_dept, "value", target_dept),
+                inventory_effect=inv_effect.capture_effect(db, payload.item_id, cells_before),
             )
         )
         db.commit()
@@ -341,6 +344,7 @@ def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Sessio
 
     inv = inventory_svc.get_or_create_inventory(db, payload.item_id)
     qty_before = inv.quantity or Decimal("0")
+    cells_before = inv_effect.snapshot_cells(db, payload.item_id)
 
     try:
         inventory_svc.unmark_defective(
@@ -372,6 +376,7 @@ def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Sessio
             reason_memo=payload.reason_memo or None,
             # String 컬럼엔 enum repr 금지 — .value(한국어) 사용
             department=getattr(dept, "value", dept),
+            inventory_effect=inv_effect.capture_effect(db, payload.item_id, cells_before),
         )
     )
     db.commit()
