@@ -797,9 +797,20 @@ class TransactionCancelRequest(BaseModel):
 
 
 def _cancel_one_log(db: Session, log: TransactionLog, inv: Inventory) -> None:
-    """단일 TransactionLog 의 재고 효과를 역방향 적용. 범위 외 타입은 ValueError."""
+    """단일 TransactionLog 의 재고 효과를 역방향 적용. 범위 외/데이터 부족 시 ValueError.
+
+    1순위: inventory_effect(거래가 건드린 셀 증감 기록)가 있으면 부호 반전해 일반적으로 역재생.
+    레거시(효과 기록 이전 로그)는 유형별 필드 재구성으로 폴백하되, 정보가 부족한 유형은 거부.
+    """
     from decimal import Decimal as _D
 
+    # 1순위 — 효과 기록 기반 일반 역재생(유형 무관, 불량·이동·생산·분해 모두 정확).
+    if log.inventory_effect is not None:
+        from app.services.inv_effect import apply_effect_reverse
+        apply_effect_reverse(db, log.item_id, log.inventory_effect)
+        return
+
+    # 레거시 폴백 — 효과 기록 이전에 생성된 로그.
     tx = log.transaction_type
     qty = _D(str(log.transfer_qty or abs(log.quantity_change or 0)))
 
@@ -882,12 +893,15 @@ def _cancel_one_log(db: Session, log: TransactionLog, inv: Inventory) -> None:
                 raise ValueError(f"취소 후 창고 재고가 음수({new_wh})가 됩니다.")
             inv.warehouse_qty = new_wh
             loc.quantity = new_loc
-        else:  # TRANSFER_DEPT: from_dept↓, to_dept↑
-            # log.department = from_dept. to_dept는 notes에서만 알 수 있음.
-            # from_dept 복원 + to_dept 복원 필요 — notes 파싱 생략하고 to_dept를 오류로
-            raise ValueError("부서간 이동(TRANSFER_DEPT)은 현재 취소를 지원하지 않습니다.")
+        else:  # TRANSFER_DEPT: from_dept↓, to_dept↑ (to_dept 정보가 로그에 없어 복원 불가)
+            raise ValueError(
+                "이전 버전 거래라 자동 취소할 수 없습니다. 반대 방향 이동으로 직접 처리해 주세요."
+            )
     else:
-        raise ValueError(f"이 거래 유형({tx.value})은 취소를 지원하지 않습니다.")
+        # 레거시 불량(MARK_DEFECTIVE/UNMARK_DEFECTIVE)·분해(DISASSEMBLE) 등 — 수량/방향 정보 부족.
+        raise ValueError(
+            "이전 버전 거래라 자동 취소할 수 없습니다. 불량 해제 등 기존 기능을 사용해 주세요."
+        )
 
 
 @router.post("/transactions/{log_id}/cancel", response_model=TransactionLogResponse)
@@ -923,11 +937,27 @@ def cancel_transaction(
     if not verify_pin(canceller.pin_hash, payload.pin):
         raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
 
-    # 권한 체크: 본인(producer) 또는 결재 권한자
-    is_self = (
-        log.producer_employee_id is not None
-        and str(log.producer_employee_id) == str(canceller.employee_id)
-    )
+    # 권한 체크: 본인(요청자) 또는 결재 권한자
+    # 요청자 식별 — 히스토리 화면의 '요청자' 표기와 동일한 우선순위로 판정한다:
+    #   1) producer_employee_id (입고/이동/생산 등 레거시 경로)
+    #   2) operation_batch_id → IoBatch.requester_employee_id (IO v2 배치 경로)
+    #   3) produced_by(요청자 이름) — 배치 없는 IO 로그(새 불량 등)의 유일한 단서
+    requester_eid: Optional[str] = None
+    if log.producer_employee_id is not None:
+        requester_eid = str(log.producer_employee_id)
+    elif log.operation_batch_id is not None:
+        batch = (
+            db.query(IoBatch)
+            .filter(IoBatch.batch_id == log.operation_batch_id)
+            .first()
+        )
+        if batch is not None and batch.requester_employee_id is not None:
+            requester_eid = str(batch.requester_employee_id)
+    if requester_eid is not None:
+        is_self = requester_eid == str(canceller.employee_id)
+    else:
+        # employee_id 단서가 없는 로그 — 기록된 요청자 이름으로 대조(화면 표기와 일치).
+        is_self = bool(log.produced_by) and log.produced_by == canceller.name
     is_approver = (
         (getattr(canceller, "warehouse_role", None) or "none").lower() != "none"
         or (getattr(canceller, "department_role", None) or "none").lower() != "none"
@@ -937,13 +967,24 @@ def cancel_transaction(
 
     set_actor(request, canceller)
 
-    # 배치 단위 취소 (PRODUCE+BACKFLUSH 등 복합 작업)
+    # 배치 단위 취소 — 복합 작업은 묶음 전체를 함께 되돌려야 정합이 맞는다.
+    #  - PRODUCE+BACKFLUSH 등 IO v2: operation_batch_id 로 묶임.
+    #  - 분해(재작업): operation_batch_id 가 없고 reference_no="defect-disassemble:{uuid}" 로 묶임.
     batch_logs: list[TransactionLog] = []
     if log.operation_batch_id:
         batch_logs = (
             db.query(TransactionLog)
             .filter(
                 TransactionLog.operation_batch_id == log.operation_batch_id,
+                TransactionLog.cancelled.is_(False),
+            )
+            .all()
+        )
+    elif log.reference_no and log.reference_no.startswith("defect-disassemble:"):
+        batch_logs = (
+            db.query(TransactionLog)
+            .filter(
+                TransactionLog.reference_no == log.reference_no,
                 TransactionLog.cancelled.is_(False),
             )
             .all()

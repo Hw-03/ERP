@@ -24,6 +24,7 @@ from app.models import (
     TransactionTypeEnum,
 )
 from app.services import inventory as inventory_svc
+from app.services import inv_effect
 from app.services.dept_hierarchy import can_approve_department
 from app.services.pin_auth import verify_pin
 
@@ -105,6 +106,7 @@ def receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: str
         qty = Decimal(line.quantity)
         inv = inventory_svc.get_or_create_inventory(db, line.item_id)
         qty_before = inv.quantity or Decimal("0")
+        cells_before = inv_effect.snapshot_cells(db, line.item_id)
         # 튜브 PRODUCTION 부족 시 ValueError → 라우터가 422 변환(상태 불변).
         inventory_svc.transfer_between_departments(db, line.item_id, qty, from_dept, to_dept)
         db.add(
@@ -120,6 +122,7 @@ def receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: str
                 department=doc.to_department,
                 reference_no=doc.handover_code,
                 notes=f"인수인계 {doc.from_department}→{doc.to_department}",
+                inventory_effect=inv_effect.capture_effect(db, line.item_id, cells_before),
             )
         )
 

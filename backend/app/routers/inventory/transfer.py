@@ -12,6 +12,7 @@ from app.models import Item, TransactionLog, TransactionTypeEnum
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import DeptTransferRequest, InventoryResponse, TransferRequest
 from app.services import inventory as inventory_svc
+from app.services import inv_effect
 from app.services._tx import commit_and_refresh
 
 from ._shared import to_response
@@ -30,6 +31,7 @@ def transfer_to_production(payload: TransferRequest, db: Session = Depends(get_d
     producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
     inventory = inventory_svc.get_or_create_inventory(db, payload.item_id)
     qty_before = inventory.quantity or Decimal("0")
+    cells_before = inv_effect.snapshot_cells(db, payload.item_id)
     try:
         inventory_svc.transfer_to_production(
             db, payload.item_id, payload.quantity, payload.department
@@ -49,6 +51,7 @@ def transfer_to_production(payload: TransferRequest, db: Session = Depends(get_d
             produced_by=producer_name or payload.produced_by,
             producer_employee_id=producer_id,
             notes=payload.notes or f"창고 → {payload.department.value} 이동 ({payload.quantity})",
+            inventory_effect=inv_effect.capture_effect(db, payload.item_id, cells_before),
         )
     )
     commit_and_refresh(db, inventory)
@@ -63,6 +66,7 @@ def transfer_to_warehouse(payload: TransferRequest, db: Session = Depends(get_db
     producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
     inventory = inventory_svc.get_or_create_inventory(db, payload.item_id)
     qty_before = inventory.quantity or Decimal("0")
+    cells_before = inv_effect.snapshot_cells(db, payload.item_id)
     try:
         inventory_svc.transfer_to_warehouse(
             db, payload.item_id, payload.quantity, payload.department
@@ -82,6 +86,7 @@ def transfer_to_warehouse(payload: TransferRequest, db: Session = Depends(get_db
             produced_by=producer_name or payload.produced_by,
             producer_employee_id=producer_id,
             notes=payload.notes or f"{payload.department.value} → 창고 복귀 ({payload.quantity})",
+            inventory_effect=inv_effect.capture_effect(db, payload.item_id, cells_before),
         )
     )
     commit_and_refresh(db, inventory)
@@ -96,6 +101,7 @@ def transfer_between_depts(payload: DeptTransferRequest, db: Session = Depends(g
     producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
     inventory = inventory_svc.get_or_create_inventory(db, payload.item_id)
     qty_before = inventory.quantity or Decimal("0")
+    cells_before = inv_effect.snapshot_cells(db, payload.item_id)
     try:
         inventory_svc.transfer_between_departments(
             db, payload.item_id, payload.quantity,
@@ -116,6 +122,7 @@ def transfer_between_depts(payload: DeptTransferRequest, db: Session = Depends(g
             produced_by=producer_name or payload.produced_by,
             producer_employee_id=producer_id,
             notes=payload.notes or f"{payload.from_department.value} → {payload.to_department.value} 이동 ({payload.quantity})",
+            inventory_effect=inv_effect.capture_effect(db, payload.item_id, cells_before),
         )
     )
     commit_and_refresh(db, inventory)

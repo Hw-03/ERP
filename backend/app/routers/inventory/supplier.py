@@ -12,6 +12,7 @@ from app.models import Item, TransactionLog, TransactionTypeEnum
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import InventoryResponse, SupplierReturnRequest
 from app.services import inventory as inventory_svc
+from app.services import inv_effect
 from app.services._tx import commit_and_refresh
 
 from ._shared import to_response
@@ -30,6 +31,7 @@ def return_to_supplier(payload: SupplierReturnRequest, db: Session = Depends(get
     producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
     inventory = inventory_svc.get_or_create_inventory(db, payload.item_id)
     qty_before = inventory.quantity or Decimal("0")
+    cells_before = inv_effect.snapshot_cells(db, payload.item_id)
     try:
         inventory_svc.return_to_supplier(
             db, payload.item_id, payload.quantity, payload.from_department
@@ -48,6 +50,7 @@ def return_to_supplier(payload: SupplierReturnRequest, db: Session = Depends(get
             produced_by=producer_name or payload.operator,
             producer_employee_id=producer_id,
             notes=payload.notes or f"공급업체 반품 ({payload.from_department.value} 불량 {payload.quantity})",
+            inventory_effect=inv_effect.capture_effect(db, payload.item_id, cells_before),
         )
     )
     commit_and_refresh(db, inventory)

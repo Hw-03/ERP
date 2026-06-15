@@ -251,6 +251,8 @@ _MIGRATION_DDL: list[str] = [
     "ALTER TABLE transaction_logs ADD COLUMN cancel_reason TEXT",
     "ALTER TABLE transaction_logs ADD COLUMN cancelled_by CHAR(36)",
     "ALTER TABLE transaction_logs ADD COLUMN cancelled_at DATETIME",
+    # 2026-06-15: 취소 재구현 — 거래가 건드린 재고 셀 증감 기록(JSON). 취소 시 부호 반전해 역재생.
+    "ALTER TABLE transaction_logs ADD COLUMN inventory_effect TEXT",
     # 2026-06-04: 결재 알림 — 요청 도착(승인자)/승인·반려(요청자) 알림 영속 테이블.
     """CREATE TABLE IF NOT EXISTS notifications (
         notification_id CHAR(36) PRIMARY KEY,

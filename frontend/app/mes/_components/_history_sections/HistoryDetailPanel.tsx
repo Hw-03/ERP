@@ -5,6 +5,7 @@ import { Activity, ArrowRight, ChevronDown, History, StickyNote, XCircle } from 
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch } from "@/lib/api/types/io";
+import { useCurrentOperator } from "../login/useCurrentOperator";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { transactionColor } from "@/lib/mes-status";
 import { formatQty } from "@/lib/mes/format";
@@ -44,9 +45,9 @@ export function HistoryDetailPanel({
   onSelectLog,
   onLogUpdated,
 }: Props) {
+  const operator = useCurrentOperator();
   const [cancelState, setCancelState] = useState<CancelState>({ step: "idle" });
   const [cancelReason, setCancelReason] = useState("");
-  const [cancelCode, setCancelCode] = useState("");
   const [cancelPin, setCancelPin] = useState("");
   const [edits, setEdits] = useState<TransactionEditLog[]>([]);
   const [editsLoaded, setEditsLoaded] = useState(false);
@@ -109,17 +110,20 @@ export function HistoryDetailPanel({
   const isCancelled = selected.cancelled;
 
   const handleCancelSubmit = async () => {
-    if (!cancelReason.trim() || !cancelCode.trim() || !cancelPin) return;
+    if (!cancelReason.trim() || !cancelPin) return;
+    if (!operator?.employee_code) {
+      setCancelState({ step: "error", message: "로그인 정보가 없습니다. 다시 로그인해 주세요." });
+      return;
+    }
     setCancelState({ step: "submitting" });
     try {
       const updated = await api.cancelTransaction(selected.log_id, {
         reason: cancelReason.trim(),
-        employee_code: cancelCode.trim(),
+        employee_code: operator.employee_code,
         pin: cancelPin,
       });
       setCancelState({ step: "idle" });
       setCancelReason("");
-      setCancelCode("");
       setCancelPin("");
       onLogUpdated(updated);
     } catch (err: unknown) {
@@ -178,14 +182,6 @@ export function HistoryDetailPanel({
             placeholder="취소 사유를 입력하세요 (필수)"
             value={cancelReason}
             onChange={(e) => setCancelReason(e.target.value)}
-          />
-          <input
-            type="text"
-            className="w-full rounded-[12px] border px-3 py-2 text-[13px]"
-            style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-            placeholder="사번 입력"
-            value={cancelCode}
-            onChange={(e) => setCancelCode(e.target.value)}
           />
           <input
             type="password"

@@ -26,6 +26,7 @@ from app.models import (
 )
 from app.database import _is_sqlite
 from app.services import inventory as inventory_svc
+from app.services import inv_effect
 from app.repositories import item_repository
 
 AdjDirection = Literal["in", "out", "defective"]
@@ -246,6 +247,7 @@ def submit_adjustment(
         log_notes = f"{tag} {op_str}: {reason_str}".strip(": ").strip()
 
         tx_type = _TRANSACTION_TYPE_MAP[(ln.direction, sub_str)]
+        cells_before = inv_effect.snapshot_cells(db, ln.item_id)
 
         if ln.direction == "out":
             inv = inventory_svc.consume_from_department(db, ln.item_id, qty, dept_enum)
@@ -277,6 +279,7 @@ def submit_adjustment(
             reference_no=reference_no,
             produced_by=operator_name,
             notes=log_notes or None,
+            inventory_effect=inv_effect.capture_effect(db, ln.item_id, cells_before),
         )
         db.add(log)
         db.flush()
@@ -335,6 +338,7 @@ def submit_defective_disassemble(
     parent_dept_value = getattr(parent_dept, "value", parent_dept)
 
     # 1) 부모 DEFECTIVE 차감
+    parent_cells_before = inv_effect.snapshot_cells(db, parent_item_id)
     parent_inv = inventory_svc.scrap_defective(
         db, parent_item_id, parent_qty, parent_dept,
         inventory_svc.ReasonContext(
@@ -357,6 +361,7 @@ def submit_defective_disassemble(
         reason_memo=reason_memo,
         reference_no=batch_ref,
         department=parent_dept_value,
+        inventory_effect=inv_effect.capture_effect(db, parent_item_id, parent_cells_before),
     )
     db.add(parent_log)
     db.flush()
@@ -395,6 +400,7 @@ def submit_defective_disassemble(
         child_note = decision.get("reason_memo") or reason_memo or ""
 
         if keep_qty > 0:
+            keep_cells_before = inv_effect.snapshot_cells(db, item_id)
             child_inv = inventory_svc.receive_confirmed(
                 db, item_id, keep_qty,
                 bucket="production",
@@ -413,6 +419,7 @@ def submit_defective_disassemble(
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
                 department=parent_dept_value,
+                inventory_effect=inv_effect.capture_effect(db, item_id, keep_cells_before),
             )
             db.add(log)
             db.flush()
@@ -422,6 +429,7 @@ def submit_defective_disassemble(
             # 회수하지 않은 잔량은 폐기로 소실시키지 않고 분해 부서의 격리(DEFECTIVE)로
             # 적재한다. keep_qty(PRODUCTION 입고)와 대칭으로 신규 적재 → 총량 증가.
             # 이후 폐기 여부는 불량 허브의 격리→폐기(결재) 흐름에서 결정한다.
+            scrap_cells_before = inv_effect.snapshot_cells(db, item_id)
             q_inv = inventory_svc.receive_defective(
                 db,
                 item_id,
@@ -446,6 +454,7 @@ def submit_defective_disassemble(
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
                 department=parent_dept_value,
+                inventory_effect=inv_effect.capture_effect(db, item_id, scrap_cells_before),
             )
             db.add(log)
             db.flush()

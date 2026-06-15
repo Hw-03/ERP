@@ -11,6 +11,7 @@ from sqlalchemy import (
     Enum as SAEnum,
     ForeignKey,
     Index,
+    JSON,
     String,
     Text,
     func,
@@ -87,6 +88,10 @@ class TransactionLog(Base):
         nullable=True,
     )
     cancelled_at = Column(DateTime, nullable=True)
+    # 이 거래가 건드린 재고 셀의 증감 기록 — 취소 시 부호 반전해 일반적으로 역재생.
+    # 예: [{"scope":"warehouse","delta":-100},{"scope":"location","department":"조립","status":"DEFECTIVE","delta":100}]
+    # 이번 재구현 이전 로그는 None → _cancel_one_log 의 레거시 폴백 경로로 처리.
+    inventory_effect = Column(JSON, nullable=True)
     created_at = Column(
         DateTime,
         nullable=False,
