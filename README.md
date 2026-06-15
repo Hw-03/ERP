@@ -148,6 +148,7 @@ ERP/
 | [_attic/docs/ERD.md](_attic/docs/ERD.md) | 개발자 | 엔티티 관계도(Mermaid) *(V2 IoBatch/IoBundle/IoLine 누락 — STALE 마커 참조)* |
 | [_attic/docs/GLOSSARY.md](_attic/docs/GLOSSARY.md) | 모두 | 도메인 용어 단일 소스 (부서·공정코드·재고 모델·에러코드) |
 | [_attic/docs/ITEM_CODE_RULES.md](_attic/docs/ITEM_CODE_RULES.md) | 모두 | 품목코드 최종 기준 |
+| [_attic/docs/REPO_LAYOUT.md](_attic/docs/REPO_LAYOUT.md) | 모두 | 현재 저장소 구조와 이동된 파일 경로 안내 |
 | [_attic/docs/ATTIC_POLICY.md](_attic/docs/ATTIC_POLICY.md) | 유지보수 | `_attic/` 보관·삭제 정책 |
 | [_attic/docs/adr/](_attic/docs/adr/) | 모두 | 아키텍처 결정 기록 (Architecture Decision Records) |
 | [_attic/ONBOARDING.md](_attic/ONBOARDING.md) | 신규 합류자 | 처음 셋업·도구·관행 가이드 |

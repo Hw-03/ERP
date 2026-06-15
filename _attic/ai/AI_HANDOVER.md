@@ -1,5 +1,15 @@
 # AI Handover
 
+> Archive note (2026-06-15)
+> - This file is a historical handoff snapshot.
+> - Current entry points are `README.md`, `_attic/docs/REPO_LAYOUT.md`,
+>   `_attic/docs/ITEM_CODE_RULES.md`, and `_attic/docs/CODEX_PROGRESS.md`.
+> - The current repository no longer has an active root `docs/` folder or a
+>   `vault/` folder.
+> - `schema.sql` now lives at `backend/schema.sql`.
+> - Docker compose files now live at `docker/docker-compose.yml` and
+>   `docker/docker-compose.nas.yml`.
+
 > **[STALE — 2026-05-03~08 스냅샷]** 과거 시점 기록이다. 현재 진실은 코드/DB 와 `_attic/docs/CONTEXT.md`·`GLOSSARY.md`,
 > 수치는 `python _attic/backend-scripts/facts.py`. 아래 루트 구조(`docs/`·`data/`·`outputs/`·`erp.db`·`queue.py`)·경로는 현재와 다름 — 참고용으로만.
 

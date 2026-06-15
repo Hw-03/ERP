@@ -49,7 +49,7 @@ Top MCP Servers:
 
 1. **저장소 클론 + 의존성 설치** — `start.bat` 1회 실행으로 backend `pip install` + frontend `npm install` 자동 수행
 2. **활성 화면 확인** — 브라우저에서 `http://localhost:3000/legacy` 접속 (입출고 / 내역 / 관리자 / 대시보드)
-3. **문서 허브 1회 훑기** — [README.md](README.md) 문서 허브 섹션의 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/GLOSSARY.md](docs/GLOSSARY.md), [docs/ITEM_CODE_RULES.md](docs/ITEM_CODE_RULES.md)
+3. **문서 허브 1회 훑기** — [README.md](README.md) 문서 허브 섹션의 [_attic/docs/ARCHITECTURE.md](_attic/docs/ARCHITECTURE.md), [_attic/docs/GLOSSARY.md](_attic/docs/GLOSSARY.md), [_attic/docs/ITEM_CODE_RULES.md](_attic/docs/ITEM_CODE_RULES.md), [_attic/docs/REPO_LAYOUT.md](_attic/docs/REPO_LAYOUT.md)
 4. **첫 작업 전 검증** — `verify_local.ps1` 한 번 돌려 환경 정상 확인
 5. **Claude Code 세션 시작** — CLAUDE.md 규칙대로 작업 시작
 
