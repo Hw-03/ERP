@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { api, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
+import { api, type Item, type ProductModel, type ProductionCapacity } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { mesCodeDept } from "@/lib/mes/process";
 import { SlidersHorizontal } from "lucide-react";
@@ -51,7 +51,6 @@ export function MobileDashboardScreen({
   canReceive?: boolean;
 }) {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [itemLogs, setItemLogs] = useState<TransactionLog[]>([]);
   const onSelectedSync = useCallback(
     (next: Item[]) =>
       setSelectedItem((current) =>
@@ -80,17 +79,6 @@ export function MobileDashboardScreen({
     useToggleSet(() => setDisplayLimit(PAGE_SIZE));
   const { selected: selectedProcessSteps, toggle: toggleProcessStep, setSelected: setSelectedProcessSteps } =
     useToggleSet(() => setDisplayLimit(PAGE_SIZE));
-
-  useEffect(() => {
-    if (!selectedItem) {
-      setItemLogs([]);
-      return;
-    }
-    void api
-      .getTransactions({ itemId: selectedItem.item_id, limit: 5 })
-      .then(setItemLogs)
-      .catch(() => setItemLogs([]));
-  }, [selectedItem]);
 
   const showUnclassified = selectedModels.includes("미분류");
 
@@ -306,7 +294,6 @@ export function MobileDashboardScreen({
             <div className="mt-3">
               <InventoryDetailPanel
                 item={displayItem}
-                logs={itemLogs}
                 onGoToWarehouse={(item, intent) => {
                   setSelectedItem(null);
                   onGoToWarehouse(item, intent);

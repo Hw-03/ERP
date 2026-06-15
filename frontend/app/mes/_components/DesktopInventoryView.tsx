@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { api, type Item, type ProductModel, type ProductionCapacity, type TransactionLog } from "@/lib/api";
+import { api, type Item, type ProductModel, type ProductionCapacity } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { mesCodeDept } from "@/lib/mes/process";
 import { InventoryKpiPanel, type KpiFilter } from "./_inventory_sections/InventoryKpiPanel";
@@ -47,7 +47,6 @@ export function DesktopInventoryView({
   canReceive?: boolean;
 }) {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [itemLogs, setItemLogs] = useState<TransactionLog[]>([]);
   // R7-HOOK2: items/loading/error + loadItems 훅으로 분리
   const onSelectedSync = useCallback(
     (next: Item[]) =>
@@ -80,17 +79,6 @@ export function DesktopInventoryView({
     useToggleSet(() => setDisplayLimit(DESKTOP_PAGE_SIZE));
   const { selected: selectedProcessSteps, toggle: toggleProcessStep, setSelected: setSelectedProcessSteps } =
     useToggleSet(() => setDisplayLimit(DESKTOP_PAGE_SIZE));
-
-  useEffect(() => {
-    if (!selectedItem) {
-      setItemLogs([]);
-      return;
-    }
-    void api
-      .getTransactions({ itemId: selectedItem.item_id, limit: 5 })
-      .then(setItemLogs)
-      .catch(() => setItemLogs([]));
-  }, [selectedItem]);
 
   const showUnclassified = selectedModels.includes("미분류");
 
@@ -244,7 +232,6 @@ export function DesktopInventoryView({
       <DesktopInventoryRightPanel
         selectedItem={selectedItem}
         displayItem={displayItem}
-        itemLogs={itemLogs}
         headerBadge={headerBadge}
         onClose={() => setSelectedItem(null)}
         onGoToWarehouse={onGoToWarehouse}
