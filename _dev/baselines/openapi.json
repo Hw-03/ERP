@@ -1587,6 +1587,18 @@
             ],
             "title": "Notes"
           },
+          "operator_employee_code": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator Employee Code"
+          },
           "operator_name": {
             "anyOf": [
               {
@@ -2274,6 +2286,121 @@
         "title": "HandoverCreate",
         "type": "object"
       },
+      "HandoverDraftUpsert": {
+        "description": "인수인계 임시저장 — handover_id 없으면 신규 draft, 있으면 기존 draft 갱신.",
+        "properties": {
+          "analysis_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Text"
+          },
+          "author_employee_id": {
+            "format": "uuid",
+            "title": "Author Employee Id",
+            "type": "string"
+          },
+          "doc_date": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doc Date"
+          },
+          "handover_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handover Id"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/HandoverLineCreate"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "process_content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Content"
+          },
+          "product_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Name"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "to_department": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Department"
+          }
+        },
+        "required": [
+          "author_employee_id"
+        ],
+        "title": "HandoverDraftUpsert",
+        "type": "object"
+      },
       "HandoverLineCreate": {
         "properties": {
           "item_id": {
@@ -2521,6 +2648,21 @@
           "updated_at"
         ],
         "title": "HandoverResponse",
+        "type": "object"
+      },
+      "HandoverSubmitRequest": {
+        "description": "임시저장(DRAFT) → 제출(SUBMITTED) 전환 요청.",
+        "properties": {
+          "author_employee_id": {
+            "format": "uuid",
+            "title": "Author Employee Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "author_employee_id"
+        ],
+        "title": "HandoverSubmitRequest",
         "type": "object"
       },
       "IntegrityCheckBody": {
@@ -4357,6 +4499,19 @@
               }
             ],
             "title": "Operator"
+          },
+          "producer_employee_code": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "작업자 사번 (audit)",
+            "title": "Producer Employee Code"
           },
           "quantity": {
             "exclusiveMinimum": 0.0,
@@ -9719,6 +9874,95 @@
         ]
       }
     },
+    "/api/handovers/draft": {
+      "put": {
+        "description": "인수인계 임시저장 — handover_id 없으면 신규 draft, 있으면 본인 기존 draft 갱신.",
+        "operationId": "save_handover_draft_api_handovers_draft_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoverDraftUpsert"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoverResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Handover Draft",
+        "tags": [
+          "Handover"
+        ]
+      }
+    },
+    "/api/handovers/draft/{handover_id}": {
+      "delete": {
+        "description": "임시저장 폐기 — 본인 DRAFT 만 삭제 가능. 이미 없으면 멱등 통과.",
+        "operationId": "delete_handover_draft_api_handovers_draft__handover_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "handover_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Handover Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "author_employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Author Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Handover Draft",
+        "tags": [
+          "Handover"
+        ]
+      }
+    },
     "/api/handovers/inbox": {
       "get": {
         "operationId": "list_inbox_api_handovers_inbox_get",
@@ -9914,6 +10158,60 @@
           }
         },
         "summary": "Receive Handover",
+        "tags": [
+          "Handover"
+        ]
+      }
+    },
+    "/api/handovers/{handover_id}/submit": {
+      "post": {
+        "description": "임시저장(DRAFT) → 제출(SUBMITTED). 제출 시 받는 부서에 도착 알림.",
+        "operationId": "submit_handover_api_handovers__handover_id__submit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "handover_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Handover Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoverSubmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoverResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Handover",
         "tags": [
           "Handover"
         ]
