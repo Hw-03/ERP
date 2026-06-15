@@ -286,6 +286,84 @@ def test_handover_create_notifies_receiving_dept(client, db_session, make_item):
     assert all(n.target_section == "handover" for n in notes)
 
 
+def test_handover_draft_save_resume_submit(client, db_session, make_item):
+    """임시저장(draft) → 이어쓰기 → 제출 흐름. draft 는 인수대기함 미노출, 제출 후 노출."""
+    item = make_item(name="8TF Draft", warehouse_qty=Decimal("0"))
+    _seed_production(db_session, item.item_id, "튜브", Decimal("5"))
+    author = _make_employee(db_session, code="TUBE9", name="튜브작성", department=DepartmentEnum.TUBE)
+    receiver = _make_employee(
+        db_session, code="HP9", department=DepartmentEnum.HIGH_VOLTAGE, department_role="primary"
+    )
+    db_session.commit()
+
+    # 1) 품목 없이 임시저장 (작성 중)
+    draft = client.put(
+        "/api/handovers/draft",
+        json={
+            "author_employee_id": str(author.employee_id),
+            "to_department": "고압",
+            "title": "작성 중 문서",
+            "lines": [],
+        },
+    )
+    assert draft.status_code == 200, draft.json()
+    assert draft.json()["status"] == "draft"
+    hid = draft.json()["handover_id"]
+
+    # draft 는 인수 대기함에 안 뜬다
+    inbox = client.get(f"/api/handovers/inbox?actor_employee_id={receiver.employee_id}")
+    assert inbox.status_code == 200
+    assert len(inbox.json()) == 0
+
+    # 2) 같은 draft 에 품목 추가하며 이어쓰기 (handover_id 전달 → 갱신)
+    draft2 = client.put(
+        "/api/handovers/draft",
+        json={
+            "handover_id": hid,
+            "author_employee_id": str(author.employee_id),
+            "to_department": "고압",
+            "title": "완성된 제목",
+            "lines": [{"item_id": str(item.item_id), "quantity": 2}],
+        },
+    )
+    assert draft2.status_code == 200, draft2.json()
+    assert draft2.json()["handover_id"] == hid  # 새로 만들지 않고 갱신
+    assert draft2.json()["status"] == "draft"
+    assert len(draft2.json()["lines"]) == 1
+
+    # 3) 제출
+    sub = client.post(
+        f"/api/handovers/{hid}/submit",
+        json={"author_employee_id": str(author.employee_id)},
+    )
+    assert sub.status_code == 200, sub.json()
+    assert sub.json()["status"] == "submitted"
+
+    # 제출 후 인수 대기함 노출
+    inbox2 = client.get(f"/api/handovers/inbox?actor_employee_id={receiver.employee_id}")
+    assert len(inbox2.json()) == 1
+
+
+def test_handover_submit_empty_draft_422(client, db_session, make_item):
+    """품목 없는 draft 는 제출 불가(422)."""
+    author = _make_employee(db_session, code="TUBE10", department=DepartmentEnum.TUBE)
+    db_session.commit()
+    hid = client.put(
+        "/api/handovers/draft",
+        json={
+            "author_employee_id": str(author.employee_id),
+            "to_department": "고압",
+            "title": "빈 문서",
+            "lines": [],
+        },
+    ).json()["handover_id"]
+    sub = client.post(
+        f"/api/handovers/{hid}/submit",
+        json={"author_employee_id": str(author.employee_id)},
+    )
+    assert sub.status_code == 422, sub.json()
+
+
 def test_handover_inbox_filters_submitted_to_approvable(client, db_session, make_item):
     item = make_item(name="8TF Inbox", warehouse_qty=Decimal("0"))
     _seed_production(db_session, item.item_id, "튜브", Decimal("5"))

@@ -6,8 +6,10 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
 import { Toast, type ToastState } from "@/lib/ui/Toast";
 import { api, type Item } from "@/lib/api";
+import type { Handover } from "@/lib/api/types";
 
 const RECEIVE_DEPARTMENTS = ["고압", "진공"];
+const DRAFT_TITLE_PLACEHOLDER = "(작성 중)";
 
 interface DraftLine {
   item_id: string;
@@ -19,19 +21,37 @@ interface DraftLine {
 export function HandoverComposeForm({
   authorEmployeeId,
   items,
+  draft = null,
   onCreated,
+  onDraftSaved,
 }: {
   authorEmployeeId: string;
   items: Item[];
+  /** 이어쓰기 대상 draft (없으면 신규 작성). key 로 remount 해 초기값을 재설정한다. */
+  draft?: Handover | null;
   onCreated: () => void;
+  /** 임시저장 직후 — 목록 갱신용 (탭은 그대로 유지). */
+  onDraftSaved?: () => void;
 }) {
-  const [title, setTitle] = useState("튜브 인수인계서");
-  const [toDepartment, setToDepartment] = useState(RECEIVE_DEPARTMENTS[0]);
-  const [productName, setProductName] = useState("");
-  const [processContent, setProcessContent] = useState("튜브 인수인계");
-  const [analysisText, setAnalysisText] = useState("");
-  const [notes, setNotes] = useState("");
-  const [lines, setLines] = useState<DraftLine[]>([]);
+  const [title, setTitle] = useState(
+    draft ? (draft.title === DRAFT_TITLE_PLACEHOLDER ? "" : draft.title) : "튜브 인수인계서",
+  );
+  const [toDepartment, setToDepartment] = useState(draft?.to_department || RECEIVE_DEPARTMENTS[0]);
+  const [productName, setProductName] = useState(draft?.product_name ?? "");
+  const [processContent, setProcessContent] = useState(
+    draft ? (draft.process_content ?? "") : "튜브 인수인계",
+  );
+  const [analysisText, setAnalysisText] = useState(draft?.analysis_text ?? "");
+  const [notes, setNotes] = useState(draft?.notes ?? "");
+  const [lines, setLines] = useState<DraftLine[]>(
+    (draft?.lines ?? []).map((l) => ({
+      item_id: l.item_id,
+      item_name: l.item_name_snapshot,
+      mes_code: l.mes_code_snapshot,
+      quantity: l.quantity,
+    })),
+  );
+  const [draftId, setDraftId] = useState<string | null>(draft?.handover_id ?? null);
   const [selectedItemId, setSelectedItemId] = useState("");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -73,25 +93,66 @@ export function HandoverComposeForm({
   }
 
   const canSubmit = !!authorEmployeeId && title.trim().length > 0 && lines.length > 0 && !busy;
+  // 임시저장은 인수 부서만 정해지면 가능 (품목/제목은 작성 중이어도 OK).
+  const canSaveDraft = !!authorEmployeeId && !busy;
+
+  function draftPayload() {
+    return {
+      handover_id: draftId,
+      author_employee_id: authorEmployeeId,
+      to_department: toDepartment,
+      title: title.trim() || null,
+      process_content: processContent.trim() || null,
+      product_name: productName.trim() || null,
+      analysis_text: analysisText.trim() || null,
+      notes: notes.trim() || null,
+      lines: lines.map((l) => ({ item_id: l.item_id, quantity: l.quantity })),
+    };
+  }
+
+  async function saveDraft() {
+    if (!canSaveDraft) return;
+    setBusy(true);
+    try {
+      const saved = await api.saveHandoverDraft(draftPayload());
+      setDraftId(saved.handover_id);
+      setToast({ message: "임시저장했습니다. 나중에 이어서 작성할 수 있습니다.", type: "success" });
+      onDraftSaved?.();
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : "임시저장 중 오류가 발생했습니다.",
+        type: "error",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function submit() {
     if (!canSubmit) return;
     setBusy(true);
     try {
-      await api.createHandover({
-        author_employee_id: authorEmployeeId,
-        to_department: toDepartment,
-        title: title.trim(),
-        process_content: processContent.trim() || null,
-        product_name: productName.trim() || null,
-        analysis_text: analysisText.trim() || null,
-        notes: notes.trim() || null,
-        lines: lines.map((l) => ({ item_id: l.item_id, quantity: l.quantity })),
-      });
+      if (draftId) {
+        // 임시저장본을 최신 내용으로 갱신 후 제출.
+        await api.saveHandoverDraft(draftPayload());
+        await api.submitHandover(draftId, { author_employee_id: authorEmployeeId });
+      } else {
+        await api.createHandover({
+          author_employee_id: authorEmployeeId,
+          to_department: toDepartment,
+          title: title.trim(),
+          process_content: processContent.trim() || null,
+          product_name: productName.trim() || null,
+          analysis_text: analysisText.trim() || null,
+          notes: notes.trim() || null,
+          lines: lines.map((l) => ({ item_id: l.item_id, quantity: l.quantity })),
+        });
+      }
       setToast({ message: "인수인계서를 제출했습니다.", type: "success" });
       setLines([]);
       setAnalysisText("");
       setNotes("");
+      setDraftId(null);
       onCreated();
     } catch (err) {
       setToast({
@@ -238,7 +299,16 @@ export function HandoverComposeForm({
         />
       </Field>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button
+          variant="secondary"
+          size="lg"
+          onClick={saveDraft}
+          disabled={!canSaveDraft}
+          className="rounded-[14px] px-5 py-3 font-bold"
+        >
+          {busy ? "저장 중..." : "임시저장"}
+        </Button>
         <Button
           variant="primary"
           size="lg"

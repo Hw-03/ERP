@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Printer } from "lucide-react";
+import { Pencil, Printer, Trash2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { Button } from "@/lib/ui/Button";
@@ -47,6 +47,8 @@ export function HandoverSectionPanel({
   const [mine, setMine] = useState<Handover[]>([]);
   const [inbox, setInbox] = useState<Handover[]>([]);
   const [localNonce, setLocalNonce] = useState(0);
+  // 이어쓰기 대상 draft (null=신규 작성)
+  const [editingDraft, setEditingDraft] = useState<Handover | null>(null);
 
   // 인수 확인 PIN 모달 상태
   const [receiveTarget, setReceiveTarget] = useState<Handover | null>(null);
@@ -109,7 +111,10 @@ export function HandoverSectionPanel({
             return (
               <button
                 key={t.id}
-                onClick={() => setSubTab(t.id)}
+                onClick={() => {
+                  if (t.id === "compose") setEditingDraft(null);
+                  setSubTab(t.id);
+                }}
                 className="rounded-[12px] border px-4 py-2 text-sm font-black transition-colors"
                 style={{
                   background: active ? tint(LEGACY_COLORS.blue, 18) : tint(LEGACY_COLORS.blue, 6),
@@ -127,10 +132,17 @@ export function HandoverSectionPanel({
 
       {subTab === "compose" && canCompose && operatorEmployeeId && (
         <HandoverComposeForm
+          key={editingDraft?.handover_id ?? "new"}
           authorEmployeeId={operatorEmployeeId}
           items={items}
+          draft={editingDraft}
           onCreated={() => {
+            setEditingDraft(null);
             setSubTab("mine");
+            reload();
+            onChanged();
+          }}
+          onDraftSaved={() => {
             reload();
             onChanged();
           }}
@@ -142,6 +154,27 @@ export function HandoverSectionPanel({
           docs={mine}
           emptyText="작성한 인수인계서가 없습니다."
           onPrint={printHandover}
+          onEdit={
+            canCompose
+              ? (doc) => {
+                  setEditingDraft(doc);
+                  setSubTab("compose");
+                }
+              : undefined
+          }
+          onDelete={
+            canCompose && operatorEmployeeId
+              ? (doc) => {
+                  api
+                    .deleteHandoverDraft(doc.handover_id, operatorEmployeeId)
+                    .then(() => {
+                      reload();
+                      onChanged();
+                    })
+                    .catch(() => {});
+                }
+              : undefined
+          }
         />
       )}
 
@@ -202,11 +235,15 @@ function HandoverCardList({
   emptyText,
   onPrint,
   onReceive,
+  onEdit,
+  onDelete,
 }: {
   docs: Handover[];
   emptyText: string;
   onPrint: (doc: Handover) => void;
   onReceive?: (doc: Handover) => void;
+  onEdit?: (doc: Handover) => void;
+  onDelete?: (doc: Handover) => void;
 }) {
   if (docs.length === 0) {
     return (
@@ -264,6 +301,28 @@ function HandoverCardList({
             >
               <Printer className="h-4 w-4" />
             </button>
+            {onEdit && doc.status === "draft" && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => onEdit(doc)}
+                className="shrink-0 rounded-[12px] px-4 py-2 font-black"
+              >
+                <Pencil className="mr-1 inline h-3.5 w-3.5" />
+                이어쓰기
+              </Button>
+            )}
+            {onDelete && doc.status === "draft" && (
+              <button
+                onClick={() => onDelete(doc)}
+                title="임시저장 삭제"
+                aria-label="임시저장 삭제"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border transition-opacity hover:opacity-80"
+                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.red }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
             {onReceive && doc.status === "submitted" && (
               <Button
                 variant="primary"
