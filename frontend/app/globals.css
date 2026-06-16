@@ -182,9 +182,15 @@
     box-shadow: inset 0 2px 8px rgba(255, 255, 255, 0.18);
   }
 
-  /* opt-out — 아이콘 X 버튼·드래그 핸들·색상 팔레트 등에 적용 */
+  /* opt-out — 아이콘 X 버튼·드래그 핸들·색상 팔레트 등에 적용.
+     aria-current/aria-pressed 규칙보다 specificity 가 낮아 덮어쓰이므로
+     해당 속성 조합도 함께 명시해 완전히 제거한다. */
   button.no-btn-inset,
-  :root[data-theme="dark"] button.no-btn-inset {
+  button.no-btn-inset[aria-current]:not([aria-current="false"]),
+  button.no-btn-inset[aria-pressed="true"],
+  :root[data-theme="dark"] button.no-btn-inset,
+  :root[data-theme="dark"] button.no-btn-inset[aria-current]:not([aria-current="false"]),
+  :root[data-theme="dark"] button.no-btn-inset[aria-pressed="true"] {
     box-shadow: none;
   }
 }

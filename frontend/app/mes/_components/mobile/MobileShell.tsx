@@ -85,7 +85,8 @@ function NavButton({
     <button
       type="button"
       onClick={onClick}
-      className="no-btn-inset flex min-h-[52px] flex-1 flex-col items-center justify-center gap-1 py-1 transition-[transform] active:scale-[0.92]"
+      className="no-btn-inset flex min-h-[52px] flex-1 flex-col items-center justify-center gap-1 py-1 outline-none transition-[transform] active:scale-[0.92]"
+      style={{ WebkitTapHighlightColor: "transparent" }}
       aria-label={label}
       aria-current={active ? "page" : undefined}
     >
