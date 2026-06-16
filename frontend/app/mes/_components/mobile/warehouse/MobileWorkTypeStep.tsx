@@ -49,7 +49,7 @@ export function MobileWorkTypeStep({
             type="button"
             aria-pressed={active}
             onClick={() => onWorkTypeChange(row.id)}
-            className="flex min-h-[72px] items-center gap-4 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"
+            className="flex min-h-[96px] items-center gap-4 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"
             style={{
               background: active ? tint(accent, 14) : LEGACY_COLORS.s2,
               borderColor: active ? accent : LEGACY_COLORS.border,

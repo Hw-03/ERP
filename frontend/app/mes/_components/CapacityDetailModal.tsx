@@ -47,7 +47,7 @@ export function CapacityDetailModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── 헤더 ───────────────────────────────────────── */}
-        <div className="border-b px-7 pb-4 pt-7" style={{ borderColor: LEGACY_COLORS.border }}>
+        <div className="border-b px-4 pb-4 pt-5 sm:px-7 sm:pt-7" style={{ borderColor: LEGACY_COLORS.border }}>
           <div className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>
             생산 가능수량 상세 · 조립 완제품(AF) 기준
           </div>
@@ -67,7 +67,7 @@ export function CapacityDetailModal({
         </div>
 
         {/* ── 본문 (스크롤) ───────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto px-7 py-5">
+        <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-7">
           {af ? (
             <AfCapacityView af={af} />
           ) : (
@@ -191,8 +191,109 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
         })}
       </div>
 
-      {/* AF 목록 (모델 그룹 + 행 펼침 → PF 변형) */}
-      <div className="rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+      {/* AF 목록 — 모바일: 카드 레이아웃 / 데스크톱: 테이블 */}
+
+      {/* 모바일 카드 레이아웃 (< 640px) */}
+      <div className="sm:hidden rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+        {grouped.length === 0 && (
+          <div className="px-4 py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+            조건에 맞는 AF 가 없습니다.
+          </div>
+        )}
+        {grouped.map((group) => (
+          <div key={group.key}>
+            {/* 모델 그룹 헤더 */}
+            <div
+              className="border-t px-4 py-2.5 first:border-t-0"
+              style={{
+                borderColor: LEGACY_COLORS.border,
+                background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`,
+              }}
+            >
+              <div className="text-sm font-black" style={{ color: LEGACY_COLORS.blue }}>
+                {group.label}{" "}
+                <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  · {group.items.length}종
+                </span>
+              </div>
+              <div className="mt-1.5 grid grid-cols-3 gap-1">
+                <QtyLabelCell label="출하준비" value={group.totals.ship_ready} color={LEGACY_COLORS.cyan} />
+                <QtyLabelCell label="빠른조립" value={group.totals.fast_assembly} color={LEGACY_COLORS.blue} />
+                <QtyLabelCell label="총생산" value={group.totals.total_production} color={LEGACY_COLORS.purple} />
+              </div>
+            </div>
+            {/* AF 아이템 카드 */}
+            {group.items.map((it) => {
+              const expanded = expandedIds.has(it.af_item_id);
+              const variants = variantsByAf.get(it.af_item_id) ?? [];
+              const bottleneck =
+                it.total_production_limiting_item ||
+                it.fast_assembly_limiting_item ||
+                it.ship_ready_limiting_item ||
+                null;
+              return (
+                <div key={it.af_item_id} className="border-t" style={{ borderColor: LEGACY_COLORS.border }}>
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(it.af_item_id)}
+                    className="w-full px-4 py-3 text-left transition-colors hover:brightness-110"
+                  >
+                    <div className="flex items-start gap-2">
+                      {expanded ? (
+                        <ChevronDown className="mt-0.5 h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
+                      ) : (
+                        <ChevronRight className="mt-0.5 h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
+                            {it.af_name}
+                          </span>
+                          {it.bom_status === "incomplete" && (
+                            <Badge color={LEGACY_COLORS.yellow}>BOM 미완성</Badge>
+                          )}
+                          {it.bom_status !== "incomplete" && !it.has_pf_path && (
+                            <Badge color={LEGACY_COLORS.muted2}>출하경로 없음</Badge>
+                          )}
+                        </div>
+                        {it.af_code && (
+                          <div className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                            {it.af_code}
+                          </div>
+                        )}
+                        {bottleneck && (
+                          <div className="truncate text-xs" style={{ color: LEGACY_COLORS.yellow }}>
+                            병목: {bottleneck}
+                          </div>
+                        )}
+                        <div className="mt-2 grid grid-cols-3 gap-1">
+                          <QtyLabelCell label="출하준비" value={it.ship_ready} color={LEGACY_COLORS.cyan} />
+                          <QtyLabelCell label="빠른조립" value={it.fast_assembly} color={LEGACY_COLORS.blue} />
+                          <QtyLabelCell label="총생산" value={it.total_production} color={LEGACY_COLORS.purple} />
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                  {expanded && (
+                    <div
+                      className="border-t px-5 py-3"
+                      style={{
+                        borderColor: LEGACY_COLORS.border,
+                        background: `color-mix(in srgb, ${LEGACY_COLORS.text} 4%, transparent)`,
+                      }}
+                    >
+                      <PfVariants variants={variants} hasPfPath={it.has_pf_path} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+
+      {/* 데스크톱 테이블 레이아웃 (≥ 640px) */}
+      <div className="hidden sm:block rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }}>
         <div
           className="grid grid-cols-[20px_minmax(0,1fr)_84px_84px_84px] border-b px-4 py-2 text-xs font-bold uppercase tracking-[0.12em]"
           style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
@@ -298,6 +399,17 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
         ))}
       </div>
     </>
+  );
+}
+
+function QtyLabelCell({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className="text-center">
+      <div className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
+      <div className="text-sm font-bold" style={{ color: value > 0 ? color : LEGACY_COLORS.muted2 }}>
+        {formatQty(value)}
+      </div>
+    </div>
   );
 }
 

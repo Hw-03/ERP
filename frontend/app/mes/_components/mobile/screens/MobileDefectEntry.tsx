@@ -23,7 +23,7 @@ export function MobileDefectEntry({ onSelect }: Props) {
             key={card.id}
             type="button"
             onClick={() => onSelect(card.id)}
-            className="flex min-h-[72px] items-center gap-4 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"
+            className="flex min-h-[96px] items-center gap-4 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"
             style={{
               background: LEGACY_COLORS.s2,
               borderColor: LEGACY_COLORS.border,

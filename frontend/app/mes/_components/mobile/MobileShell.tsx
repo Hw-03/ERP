@@ -285,12 +285,14 @@ export function MobileShell() {
           }}
         >
           <div className="min-w-0 flex-1">
-            <div
-              className="truncate text-xs font-bold uppercase tracking-wider"
-              style={{ color: LEGACY_COLORS.muted2 }}
-            >
-              DEXCOWIN MES
-            </div>
+            {activeTab !== "weekly" && (
+              <div
+                className="truncate text-xs font-bold uppercase tracking-wider"
+                style={{ color: LEGACY_COLORS.muted2 }}
+              >
+                DEXCOWIN MES
+              </div>
+            )}
           </div>
           {activeTab === "weekly" && (
             <div className="flex items-center gap-2 shrink-0">

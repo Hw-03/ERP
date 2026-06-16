@@ -110,12 +110,81 @@ function AfPanel({
 
   const inner = (
     <>
-      <Zap className="h-5 w-5 shrink-0" style={{ color: accent }} />
-      <span className="shrink-0 text-base font-semibold" style={{ color: accent }}>
+      {/* ── 모바일 전용: 표 레이아웃 ── */}
+      <div className="flex w-full flex-col gap-2 sm:hidden">
+        <div className="flex items-center gap-2">
+          <Zap className="h-5 w-5 shrink-0" style={{ color: accent }} />
+          <span className="shrink-0 text-base font-semibold" style={{ color: accent }}>
+            {afHeading(af.status)}
+          </span>
+          {showStats && (
+            <span className="shrink-0" aria-label={SHARED_HINT} title={SHARED_HINT}>
+              <AlertTriangle className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />
+            </span>
+          )}
+          {interactive && (
+            <span className="ml-auto shrink-0 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+              자세히 보기
+            </span>
+          )}
+        </div>
+        {showStats ? (
+          <table className="w-full table-fixed text-right text-sm">
+            <thead>
+              <tr>
+                <th className="pb-1 text-left text-xs font-bold" />
+                <th className="w-14 pb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.cyan }}>출하</th>
+                <th className="w-14 pb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>조립</th>
+                <th className="w-16 pb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.purple }}>총생산</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groups.map((g) => {
+                const { ship_ready, fast_assembly, total_production } = g.totals;
+                return (
+                  <tr key={g.key}>
+                    <td className="max-w-0 py-0.5 pr-2 text-left font-bold" style={{ color: LEGACY_COLORS.text }}>
+                      <div className="truncate">{g.label}</div>
+                    </td>
+                    <td
+                      className="py-0.5 font-black"
+                      style={{ color: ship_ready > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}
+                    >
+                      {formatQty(ship_ready)}
+                    </td>
+                    <td
+                      className="py-0.5 font-black"
+                      style={{ color: fast_assembly > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
+                    >
+                      {formatQty(fast_assembly)}
+                    </td>
+                    <td
+                      className="py-0.5 font-bold"
+                      style={{ color: total_production > 0 ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2 }}
+                    >
+                      {formatQty(total_production)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
+          subline && (
+            <span className="text-base" style={{ color: LEGACY_COLORS.muted2 }}>
+              {subline}
+            </span>
+          )
+        )}
+      </div>
+
+      {/* ── 데스크톱 전용: 원래 인라인 칩 ── */}
+      <Zap className="hidden h-5 w-5 shrink-0 sm:block" style={{ color: accent }} />
+      <span className="hidden shrink-0 text-base font-semibold sm:inline" style={{ color: accent }}>
         {afHeading(af.status)}
       </span>
       {showStats ? (
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+        <div className="hidden min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 sm:flex">
           <ModelLegend />
           {groups.map((g, idx) => (
             <ModelChip key={g.key} group={g} showSep={idx > 0} />
@@ -126,14 +195,14 @@ function AfPanel({
         </div>
       ) : (
         subline && (
-          <span className="text-base" style={{ color: LEGACY_COLORS.muted2 }}>
+          <span className="hidden text-base sm:inline" style={{ color: LEGACY_COLORS.muted2 }}>
             {subline}
           </span>
         )
       )}
       {interactive && (
         <span
-          className="mt-0.5 w-full shrink-0 text-right text-sm lg:mt-0 lg:ml-auto lg:w-auto"
+          className="mt-0.5 hidden w-full shrink-0 text-right text-sm sm:block lg:mt-0 lg:ml-auto lg:w-auto"
           style={{ color: LEGACY_COLORS.muted2 }}
         >
           자세히 보기

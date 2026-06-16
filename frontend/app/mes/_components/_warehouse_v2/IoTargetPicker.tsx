@@ -556,10 +556,10 @@ function ItemTable({
                 key={item.item_id}
                 isHighlight={isHighlight}
               >
-                <td className="px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
-                  <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
+                <td className="max-w-0 w-full px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
+                  <div className="truncate text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
                     {item.item_name}
-                  </span>
+                  </div>
                 </td>
                 <td
                   className="hidden px-3 py-2 text-center sm:table-cell"
