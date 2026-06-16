@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   BarChart2,
@@ -92,11 +92,7 @@ function NavButton({
     >
       <span
         className="relative inline-flex h-9 w-10 items-center justify-center rounded-full transition-colors"
-        style={{
-          background: active
-            ? `color-mix(in srgb, ${LEGACY_COLORS.blue as string} 16%, transparent)`
-            : "transparent",
-        }}
+        style={{ background: "transparent" }}
       >
         <Icon size={20} strokeWidth={2} color={active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2} />
       </span>
@@ -202,6 +198,23 @@ export function MobileShell() {
       return true;
     });
   }, [operator]);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
+  const activeIndex = visibleTabs.indexOf(activeTab);
+
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el || activeIndex < 0) { setPill(null); return; }
+    const buttons = Array.from(el.querySelectorAll<HTMLButtonElement>("button"));
+    const btn = buttons[activeIndex];
+    if (!btn) { setPill(null); return; }
+    const h = el.offsetHeight - 8; // top:4 + bottom:4 제거한 실제 pill 높이
+    const w = Math.round(h * 1.1
+      
+    ); // 높이의 1.4배 → 둥근 직사각형
+    setPill({ left: btn.offsetLeft + (btn.offsetWidth - w) / 2, width: w });
+  }, [activeIndex, visibleTabs.length]);
 
   const content = useMemo(() => {
     const key = `${activeTab}-${refreshNonce}`;
@@ -338,12 +351,27 @@ export function MobileShell() {
           }}
         >
           <div
-            className="flex rounded-[28px] border px-2 py-1"
+            ref={containerRef}
+            className="relative flex rounded-[28px] border px-2 py-1"
             style={{
               background: LEGACY_COLORS.s1,
               borderColor: LEGACY_COLORS.border,
             }}
           >
+            {pill && (
+              <div
+                className="pointer-events-none absolute rounded-full"
+                style={{
+                  top: 4,
+                  bottom: 4,
+                  left: pill.left,
+                  width: pill.width,
+                  background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 16%, transparent)`,
+                  transition:
+                    "left 0.32s cubic-bezier(0.34,1.56,0.64,1), width 0.32s cubic-bezier(0.34,1.56,0.64,1)",
+                }}
+              />
+            )}
             {visibleTabs.map((tab) => (
               <NavButton
                 key={tab}
