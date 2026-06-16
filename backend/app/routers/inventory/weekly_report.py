@@ -1,12 +1,15 @@
 """주간보고: GET /weekly-report — ?F 계열 품목의 주차별 재고 변화 집계.
 
-⛔ 동결(완성) — 2026-05-29
+⛔ 동결(완성) — 2026-05-29 / 2026-06-16 '생산' 정의 변경
 - 명시적 수정 요청이 있을 때만 손댈 것. 주변 리팩터·전역 변경에서는 우회.
+- '생산'(produce_qty)=PRODUCE 전용 — 입출고 내역 '생산'과 동일 기준. 입고(receive_qty)
+  =RECEIVE 로 분리 표시. 전주재고/증감은 기간 내 '전체 거래' 합(net_all)으로 역산 —
+  폐기·분해·조정까지 반영해 정확. 생산 매트릭스(PRODUCTION_TX_TYPES)도 PRODUCE 전용.
 - 신규 TransactionTypeEnum 멤버 추가 시 PRODUCTION_TX_TYPES 또는
   NON_PRODUCTION_TX_TYPES 둘 중 하나에 명시 분류 필수
   (test_all_transaction_types_classified 가 누락 검출).
-- 프론트 동결 짝: frontend/app/legacy/_components/_weekly_sections/
-  + frontend/app/legacy/_components/DesktopWeeklyReportView.tsx
+- 프론트 동결 짝: frontend/app/mes/_components/_weekly_sections/
+  + frontend/app/mes/_components/DesktopWeeklyReportView.tsx
 """
 
 from __future__ import annotations
@@ -47,35 +50,32 @@ _DEPT_NAMES: dict[str, str] = {
     "PF": "출하",
 }
 
-# 생산/입고 집계 타입
-_IN_TYPES = {
-    TransactionTypeEnum.RECEIVE,
-    TransactionTypeEnum.PRODUCE,
-}
-
-# 출고/소비 집계 타입
+# 출고/소비 표시 타입 ('출고' 칸). 재작업(DISASSEMBLE)·폐기(DEFECT_SCRAP)는 의도적 제외
+# — 출고 의미를 흐리지 않기 위함(허동현 보류 건). 단 전주재고/증감은 net_all(전체 거래)로
+# 별도 역산하므로 폐기·분해도 재고 변화에는 정확히 반영된다.
 _OUT_TYPES = {
     TransactionTypeEnum.SHIP,
     TransactionTypeEnum.BACKFLUSH,
 }
 
-# 생산 현황 매트릭스(production_matrix) 셀에 합산하는 "생산 활동" 거래 타입.
+# 생산 현황 매트릭스(production_matrix) 셀에 합산하는 "생산" 거래 타입 = PRODUCE 전용.
+# 입출고 내역 화면의 '생산'(PRODUCE)과 동일 기준으로 통일(2026-06-16).
 # ※ 신규 TransactionTypeEnum 멤버 추가 시 본 set 또는 NON_PRODUCTION_TX_TYPES
 #   둘 중 하나에 명시 분류 필수 — test_all_transaction_types_classified 가 누락 검출.
 PRODUCTION_TX_TYPES: frozenset[TransactionTypeEnum] = frozenset({
     TransactionTypeEnum.PRODUCE,
-    TransactionTypeEnum.RECEIVE,
-    TransactionTypeEnum.TRANSFER_TO_WH,
-    TransactionTypeEnum.TRANSFER_DEPT,
-    TransactionTypeEnum.SHIP,
 })
 
-# 매트릭스에서 명시적으로 제외하는 거래 타입 (의도된 비-생산 활동).
+# 매트릭스에서 명시적으로 제외하는 거래 타입 (PRODUCE 외 전부).
 NON_PRODUCTION_TX_TYPES: frozenset[TransactionTypeEnum] = frozenset({
+    TransactionTypeEnum.RECEIVE,
+    TransactionTypeEnum.SHIP,
+    TransactionTypeEnum.TRANSFER_TO_WH,
+    TransactionTypeEnum.TRANSFER_TO_PROD,
+    TransactionTypeEnum.TRANSFER_DEPT,
     TransactionTypeEnum.ADJUST,
     TransactionTypeEnum.BACKFLUSH,
     TransactionTypeEnum.DISASSEMBLE,
-    TransactionTypeEnum.TRANSFER_TO_PROD,
     TransactionTypeEnum.MARK_DEFECTIVE,
     TransactionTypeEnum.UNMARK_DEFECTIVE,
     TransactionTypeEnum.DEFECT_SCRAP,
@@ -151,7 +151,8 @@ def get_weekly_report(
                     label=PROCESS_TYPE_LABELS.get(code, code),
                     item_count=0,
                     prev_qty=Decimal("0"),
-                    in_qty=Decimal("0"),
+                    produce_qty=Decimal("0"),
+                    receive_qty=Decimal("0"),
                     out_qty=Decimal("0"),
                     current_qty=Decimal("0"),
                     delta=Decimal("0"),
@@ -161,7 +162,8 @@ def get_weekly_report(
             ],
             summary=WeeklyReportSummary(
                 total_current_qty=Decimal("0"),
-                total_in_qty=Decimal("0"),
+                total_produce_qty=Decimal("0"),
+                total_receive_qty=Decimal("0"),
                 total_out_qty=Decimal("0"),
                 groups_increasing=0,
                 groups_decreasing=0,
@@ -187,13 +189,18 @@ def get_weekly_report(
         .all()
     )
 
-    in_map: dict[str, Decimal] = {}
-    out_map: dict[str, Decimal] = {}
+    produce_map: dict[str, Decimal] = {}   # PRODUCE 만 — '생산' 칸
+    receive_map: dict[str, Decimal] = {}   # RECEIVE — '입고' 칸 (생산과 분리)
+    out_map: dict[str, Decimal] = {}       # SHIP+BACKFLUSH — '출고' 칸
+    net_map: dict[str, Decimal] = {}       # 전체 거래 합 — 전주재고/증감 역산용(폐기·분해 포함)
     for item_id, tx_type, qty_sum in tx_rows:
         iid = str(item_id)
         val = Decimal(str(qty_sum))
-        if tx_type in _IN_TYPES:
-            in_map[iid] = in_map.get(iid, Decimal("0")) + val
+        net_map[iid] = net_map.get(iid, Decimal("0")) + val
+        if tx_type == TransactionTypeEnum.PRODUCE:
+            produce_map[iid] = produce_map.get(iid, Decimal("0")) + val
+        elif tx_type == TransactionTypeEnum.RECEIVE:
+            receive_map[iid] = receive_map.get(iid, Decimal("0")) + val
         elif tx_type in _OUT_TYPES:
             out_map[iid] = out_map.get(iid, Decimal("0")) + abs(val)
 
@@ -203,20 +210,23 @@ def get_weekly_report(
         code = item.process_type_code or "??"
         if code not in group_items:
             continue
+        iid = str(item.item_id)
         current_qty = Decimal(str(inv.quantity if inv else 0))
-        in_qty = in_map.get(str(item.item_id), Decimal("0"))
-        out_qty = out_map.get(str(item.item_id), Decimal("0"))
-        net = in_qty - out_qty
-        prev_qty = current_qty - net
-        delta = current_qty - prev_qty
+        produce_qty = produce_map.get(iid, Decimal("0"))
+        receive_qty = receive_map.get(iid, Decimal("0"))
+        out_qty = out_map.get(iid, Decimal("0"))
+        net_all = net_map.get(iid, Decimal("0"))  # 전체 거래 합 — 폐기·분해·조정 포함
+        prev_qty = current_qty - net_all
+        delta = net_all  # = current_qty - prev_qty
 
         group_items[code].append(
             WeeklyItemReport(
-                item_id=str(item.item_id),
+                item_id=iid,
                 mes_code=item.mes_code,
                 item_name=item.item_name,
                 prev_qty=prev_qty,
-                in_qty=in_qty,
+                produce_qty=produce_qty,
+                receive_qty=receive_qty,
                 out_qty=out_qty,
                 current_qty=current_qty,
                 delta=delta,
@@ -229,7 +239,8 @@ def get_weekly_report(
         label = PROCESS_TYPE_LABELS.get(code, code)
         dept = _DEPT_NAMES.get(code, code)
         g_prev = sum((i.prev_qty for i in items), Decimal("0"))
-        g_in = sum((i.in_qty for i in items), Decimal("0"))
+        g_produce = sum((i.produce_qty for i in items), Decimal("0"))
+        g_receive = sum((i.receive_qty for i in items), Decimal("0"))
         g_out = sum((i.out_qty for i in items), Decimal("0"))
         g_cur = sum((i.current_qty for i in items), Decimal("0"))
         g_delta = g_cur - g_prev
@@ -240,7 +251,8 @@ def get_weekly_report(
                 label=label,
                 item_count=len(items),
                 prev_qty=g_prev,
-                in_qty=g_in,
+                produce_qty=g_produce,
+                receive_qty=g_receive,
                 out_qty=g_out,
                 current_qty=g_cur,
                 delta=g_delta,
@@ -303,11 +315,13 @@ def get_weekly_report(
         )
 
     total_current = sum((g.current_qty for g in groups), Decimal("0"))
-    total_in = sum((g.in_qty for g in groups), Decimal("0"))
+    total_produce = sum((g.produce_qty for g in groups), Decimal("0"))
+    total_receive = sum((g.receive_qty for g in groups), Decimal("0"))
     total_out = sum((g.out_qty for g in groups), Decimal("0"))
     summary = WeeklyReportSummary(
         total_current_qty=total_current,
-        total_in_qty=total_in,
+        total_produce_qty=total_produce,
+        total_receive_qty=total_receive,
         total_out_qty=total_out,
         groups_increasing=sum(1 for g in groups if g.delta > 0),
         groups_decreasing=sum(1 for g in groups if g.delta < 0),

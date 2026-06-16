@@ -11,7 +11,8 @@ class WeeklyItemReport(BaseModel):
     mes_code: Optional[str]
     item_name: str
     prev_qty: int
-    in_qty: int
+    produce_qty: int   # 진짜 생산(PRODUCE)만 — 입출고 내역 '생산'과 동일 기준
+    receive_qty: int   # 입고(RECEIVE) — 생산과 분리 표시
     out_qty: int
     current_qty: int
     delta: int
@@ -23,7 +24,8 @@ class WeeklyGroupReport(BaseModel):
     label: str
     item_count: int
     prev_qty: int
-    in_qty: int
+    produce_qty: int
+    receive_qty: int
     out_qty: int
     current_qty: int
     delta: int
@@ -38,7 +40,8 @@ class WeeklyWarning(BaseModel):
 
 class WeeklyReportSummary(BaseModel):
     total_current_qty: int
-    total_in_qty: int
+    total_produce_qty: int
+    total_receive_qty: int
     total_out_qty: int
     groups_increasing: int
     groups_decreasing: int

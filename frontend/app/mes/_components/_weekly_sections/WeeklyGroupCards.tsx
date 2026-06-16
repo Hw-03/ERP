@@ -142,15 +142,15 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
               style={{ borderColor: tint(LEGACY_COLORS.border, 60, "transparent") }}
             >
               <span
-                className={`text-left ${g.in_qty > 0 ? "font-semibold" : "font-medium"}`}
+                className={`text-left ${g.produce_qty > 0 ? "font-semibold" : "font-medium"}`}
                 style={{
                   color:
-                    g.in_qty > 0
+                    g.produce_qty > 0
                       ? `color-mix(in srgb, ${LEGACY_COLORS.green} 55%, ${LEGACY_COLORS.text})`
                       : ZERO_FADE,
                 }}
               >
-                입고 {formatQty(g.in_qty)}
+                생산 {formatQty(g.produce_qty)}
               </span>
               <span
                 className={`text-center ${g.out_qty > 0 ? "font-semibold" : "font-medium"}`}

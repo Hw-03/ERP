@@ -89,7 +89,7 @@ export function MobileWeeklyScreen({ weekMon }: { weekMon: Date }) {
     (best, r) => (r.total_qty > (best?.total_qty ?? 0) ? r : best),
     null as WeeklyProductionModelRow | null,
   );
-  const activeDepts = data?.groups.filter((g) => g.in_qty > 0).length ?? 0;
+  const activeDepts = data?.groups.filter((g) => g.produce_qty > 0).length ?? 0;
   const totalDepts = data?.groups.length ?? 0;
   const selectedGroup = data?.groups.find((g) => g.process_code === selectedCode);
 

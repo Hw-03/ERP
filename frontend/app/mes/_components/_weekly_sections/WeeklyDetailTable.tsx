@@ -46,9 +46,15 @@ function WeeklyDetailTableImpl({ group }: Props) {
         </span>
         <span
           className="text-[12px]"
-          style={{ color: group.in_qty > 0 ? LEGACY_COLORS.green : ZERO_FADE }}
+          style={{ color: group.produce_qty > 0 ? LEGACY_COLORS.green : ZERO_FADE }}
         >
-          생산 {formatQty(group.in_qty)}
+          생산 {formatQty(group.produce_qty)}
+        </span>
+        <span
+          className="text-[12px]"
+          style={{ color: group.receive_qty > 0 ? LEGACY_COLORS.blue : ZERO_FADE }}
+        >
+          입고 {formatQty(group.receive_qty)}
         </span>
         <span
           className="text-[12px]"
@@ -121,11 +127,12 @@ function WeeklyDetailTableImpl({ group }: Props) {
                 </div>
               </div>
               <div
-                className="mt-2 grid grid-cols-4 gap-1 text-center text-[11px] font-bold tabular-nums"
+                className="mt-2 grid grid-cols-5 gap-1 text-center text-[11px] font-bold tabular-nums"
               >
                 {[
                   { l: "전주", v: row.prev_qty, c: LEGACY_COLORS.muted2 },
-                  { l: "생산", v: row.in_qty, c: LEGACY_COLORS.green },
+                  { l: "생산", v: row.produce_qty, c: LEGACY_COLORS.green },
+                  { l: "입고", v: row.receive_qty, c: LEGACY_COLORS.blue },
                   { l: "출고", v: row.out_qty, c: LEGACY_COLORS.red },
                   { l: "현재", v: row.current_qty, c: LEGACY_COLORS.text },
                 ].map((x) => (
@@ -155,15 +162,16 @@ function WeeklyDetailTableImpl({ group }: Props) {
           <colgroup>
             <col style={{ width: "100px" }} />
             <col />
+            <col style={{ width: "9%" }} />
+            <col style={{ width: "9%" }} />
+            <col style={{ width: "9%" }} />
+            <col style={{ width: "9%" }} />
+            <col style={{ width: "9%" }} />
             <col style={{ width: "10%" }} />
-            <col style={{ width: "10%" }} />
-            <col style={{ width: "10%" }} />
-            <col style={{ width: "10%" }} />
-            <col style={{ width: "11%" }} />
           </colgroup>
           <thead>
             <tr>
-              {["품목 코드", "품명", "전주 재고", "생산 내역", "출고 내역", "현재 재고", "증감"].map(
+              {["품목 코드", "품명", "전주 재고", "생산", "입고", "출고", "현재 재고", "증감"].map(
                 (h, i) => (
                   <th
                     key={h}
@@ -232,13 +240,21 @@ function WeeklyDetailTableImpl({ group }: Props) {
                   </td>
                   {/* 전주 재고 */}
                   <Num val={row.prev_qty} bg={rowBg} border={rowBorder} />
-                  {/* 생산 내역 */}
+                  {/* 생산 (PRODUCE만) */}
                   <Num
-                    val={row.in_qty}
+                    val={row.produce_qty}
                     bg={rowBg}
                     border={rowBorder}
                     color={LEGACY_COLORS.green}
                     highlightColor={LEGACY_COLORS.green}
+                  />
+                  {/* 입고 (RECEIVE) */}
+                  <Num
+                    val={row.receive_qty}
+                    bg={rowBg}
+                    border={rowBorder}
+                    color={LEGACY_COLORS.blue}
+                    highlightColor={LEGACY_COLORS.blue}
                   />
                   {/* 출고 내역 */}
                   <Num

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, Printer } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { api } from "@/lib/api";
 import type { WeeklyReportResponse, WeeklyProductionModelRow } from "@/lib/api/types/weekly";
@@ -12,26 +11,6 @@ import { LoadingSkeleton } from "./common";
 
 function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
-}
-
-/** 생산 매트릭스를 CSV로 변환 */
-function matrixToCsv(rows: WeeklyProductionModelRow[]): string {
-  const header = ["모델", "튜브", "고압", "진공", "튜닝", "조립", "출하", "합계"].join(",");
-  const lines = rows.map((r) =>
-    [r.model_label, r.tf_qty, r.hf_qty, r.vf_qty, r.nf_qty, r.af_qty, r.pf_qty, r.total_qty].join(",")
-  );
-  return [header, ...lines].join("\n");
-}
-
-function downloadCsv(content: string, filename: string) {
-  const bom = "﻿"; // UTF-8 BOM — 한글 엑셀 호환
-  const blob = new Blob([bom + content], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 interface Props {
@@ -93,18 +72,8 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
     (best, r) => (r.total_qty > (best?.total_qty ?? 0) ? r : best),
     null as WeeklyProductionModelRow | null
   );
-  const activeDepts = data?.groups.filter((g) => g.in_qty > 0).length ?? 0;
+  const activeDepts = data?.groups.filter((g) => g.produce_qty > 0).length ?? 0;
   const totalDepts = data?.groups.length ?? 0;
-
-  function handleExportCsv() {
-    if (!hasProduction) return;
-    const weekLabel = toDateStr(weekMon).replaceAll("-", "");
-    downloadCsv(matrixToCsv(matrixRows), `주간보고_생산현황_${weekLabel}.csv`);
-  }
-
-  function handlePrint() {
-    window.print();
-  }
 
   return (
     <div className="flex-1 min-h-0 min-w-0 overflow-y-auto flex flex-col gap-3 py-1 pr-1 lg:overflow-hidden">
@@ -150,7 +119,7 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
         }
         return (
           <div className="shrink-0 rounded-[18px] border py-3 px-4" style={cardBase}>
-            {/* 헤더: 타이틀 + KPI 배지 + Export */}
+            {/* 헤더: 타이틀 + KPI 배지 */}
             <div className="mb-2 flex flex-wrap items-center gap-2 lg:flex-nowrap lg:whitespace-nowrap">
               <h2 className="text-[15px] font-black" style={{ color: LEGACY_COLORS.text }}>
                 생산 현황
@@ -176,38 +145,6 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
               >
                 생산 부서 {activeDepts}/{totalDepts}
               </span>
-              {/* Export 버튼 */}
-              <div className="ml-auto flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={handleExportCsv}
-                  disabled={!hasProduction}
-                  title="CSV로 내보내기"
-                  className="flex items-center gap-1 rounded-[9px] border px-2.5 py-1 text-[12px] font-bold transition-colors hover:brightness-110 disabled:opacity-30"
-                  style={{
-                    background: LEGACY_COLORS.s2,
-                    borderColor: LEGACY_COLORS.border,
-                    color: LEGACY_COLORS.muted2,
-                  }}
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  CSV
-                </button>
-                <button
-                  type="button"
-                  onClick={handlePrint}
-                  title="인쇄"
-                  className="flex items-center gap-1 rounded-[9px] border px-2.5 py-1 text-[12px] font-bold transition-colors hover:brightness-110"
-                  style={{
-                    background: LEGACY_COLORS.s2,
-                    borderColor: LEGACY_COLORS.border,
-                    color: LEGACY_COLORS.muted2,
-                  }}
-                >
-                  <Printer className="h-3.5 w-3.5" />
-                  인쇄
-                </button>
-              </div>
             </div>
             <WeeklyProductionMatrix rows={matrixRows} />
           </div>

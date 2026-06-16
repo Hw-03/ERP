@@ -7597,10 +7597,6 @@
             "title": "Dept Name",
             "type": "string"
           },
-          "in_qty": {
-            "title": "In Qty",
-            "type": "integer"
-          },
           "item_count": {
             "title": "Item Count",
             "type": "integer"
@@ -7627,6 +7623,14 @@
           "process_code": {
             "title": "Process Code",
             "type": "string"
+          },
+          "produce_qty": {
+            "title": "Produce Qty",
+            "type": "integer"
+          },
+          "receive_qty": {
+            "title": "Receive Qty",
+            "type": "integer"
           }
         },
         "required": [
@@ -7635,7 +7639,8 @@
           "label",
           "item_count",
           "prev_qty",
-          "in_qty",
+          "produce_qty",
+          "receive_qty",
           "out_qty",
           "current_qty",
           "delta",
@@ -7652,10 +7657,6 @@
           },
           "delta": {
             "title": "Delta",
-            "type": "integer"
-          },
-          "in_qty": {
-            "title": "In Qty",
             "type": "integer"
           },
           "item_id": {
@@ -7684,6 +7685,14 @@
           "prev_qty": {
             "title": "Prev Qty",
             "type": "integer"
+          },
+          "produce_qty": {
+            "title": "Produce Qty",
+            "type": "integer"
+          },
+          "receive_qty": {
+            "title": "Receive Qty",
+            "type": "integer"
           }
         },
         "required": [
@@ -7691,7 +7700,8 @@
           "mes_code",
           "item_name",
           "prev_qty",
-          "in_qty",
+          "produce_qty",
+          "receive_qty",
           "out_qty",
           "current_qty",
           "delta"
@@ -7816,18 +7826,23 @@
             "title": "Total Current Qty",
             "type": "integer"
           },
-          "total_in_qty": {
-            "title": "Total In Qty",
-            "type": "integer"
-          },
           "total_out_qty": {
             "title": "Total Out Qty",
+            "type": "integer"
+          },
+          "total_produce_qty": {
+            "title": "Total Produce Qty",
+            "type": "integer"
+          },
+          "total_receive_qty": {
+            "title": "Total Receive Qty",
             "type": "integer"
           }
         },
         "required": [
           "total_current_qty",
-          "total_in_qty",
+          "total_produce_qty",
+          "total_receive_qty",
           "total_out_qty",
           "groups_increasing",
           "groups_decreasing",
