@@ -85,7 +85,7 @@ function NavButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[52px] flex-1 flex-col items-center justify-center gap-1 py-1 transition-[transform] active:scale-[0.92]"
+      className="no-btn-inset flex min-h-[52px] flex-1 flex-col items-center justify-center gap-1 py-1 transition-[transform] active:scale-[0.92]"
       aria-label={label}
       aria-current={active ? "page" : undefined}
     >
@@ -328,14 +328,19 @@ export function MobileShell() {
         </main>
 
         <nav
-          className="shrink-0"
+          className="shrink-0 px-3"
           style={{
-            background: LEGACY_COLORS.s1,
-            boxShadow: "0 -2px 8px rgba(0,0,0,0.12)",
-            paddingBottom: "calc(env(safe-area-inset-bottom, 10px))",
+            paddingTop: "8px",
+            paddingBottom: "calc(env(safe-area-inset-bottom, 10px) + 8px)",
           }}
         >
-          <div className="flex px-2 pt-2">
+          <div
+            className="flex rounded-[28px] border px-2 py-1"
+            style={{
+              background: LEGACY_COLORS.s1,
+              borderColor: LEGACY_COLORS.border,
+            }}
+          >
             {visibleTabs.map((tab) => (
               <NavButton
                 key={tab}
@@ -369,7 +374,7 @@ export function MobileShell() {
       {toastQueue.length > 0 && (
         <div
           className="pointer-events-none fixed left-0 right-0 z-[300] flex flex-col gap-2 px-4"
-          style={{ bottom: "calc(env(safe-area-inset-bottom, 10px) + 72px)" }}
+          style={{ bottom: "calc(env(safe-area-inset-bottom, 10px) + 88px)" }}
         >
           {toastQueue.map((t: ToastItem) => {
             const borderColor =

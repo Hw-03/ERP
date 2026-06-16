@@ -210,7 +210,7 @@ export function MobileSubTypeStep({
                   >
                     <span className="text-base font-black leading-tight">{label}</span>
                     <span
-                      className="text-[11px] font-semibold leading-tight"
+                      className="text-xs font-semibold leading-tight"
                       style={{ color: LEGACY_COLORS.muted2 }}
                     >
                       {desc}

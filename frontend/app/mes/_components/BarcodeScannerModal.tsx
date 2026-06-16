@@ -38,16 +38,17 @@ export function BarcodeScannerModal({
               <Camera className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
               바코드 / QR 스캔
             </div>
-            <div className="mt-0.5 text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div className="mt-0.5 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
               카메라를 바코드에 가져다 대면 자동으로 인식합니다.
             </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-xl border p-1.5"
+            aria-label="바코드 스캔 닫기"
+            className="flex h-11 w-11 items-center justify-center rounded-xl border"
             style={{ borderColor: LEGACY_COLORS.border }}
           >
-            <X className="h-3.5 w-3.5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
@@ -61,14 +62,14 @@ export function BarcodeScannerModal({
         ) : mode === "insecure" ? (
           <div
             className="rounded-xl border px-4 py-6 text-center text-[13px]"
-            style={{ background: "rgba(242,95,92,.08)", borderColor: "rgba(242,95,92,.3)", color: LEGACY_COLORS.red }}
+            style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`, color: LEGACY_COLORS.red }}
           >
             카메라 스캔은 HTTPS 또는 localhost 환경에서만 사용할 수 있습니다. 현재 접속 주소에서는 카메라 권한을 사용할 수 없습니다.
           </div>
         ) : error ? (
           <div
             className="rounded-xl border px-4 py-6 text-center text-[13px]"
-            style={{ background: "rgba(242,95,92,.08)", borderColor: "rgba(242,95,92,.3)", color: LEGACY_COLORS.red }}
+            style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, transparent)`, color: LEGACY_COLORS.red }}
           >
             {error}
           </div>
@@ -116,7 +117,7 @@ export function BarcodeScannerModal({
 
             {/* Detected success overlay */}
             {detected && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ background: "rgba(31,209,122,.18)" }}>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.green} 18%, transparent)` }}>
                 <div className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.green }}>인식 완료</div>
                 <div className="text-[15px] font-black">{detected}</div>
               </div>
@@ -148,7 +149,7 @@ export function BarcodeScannerModal({
           </div>
         )}
 
-        <div className="mt-3 text-center text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+        <div className="mt-3 text-center text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
           QR코드, Code128, EAN-13, EAN-8, UPC-A, DataMatrix 지원
         </div>
       </div>

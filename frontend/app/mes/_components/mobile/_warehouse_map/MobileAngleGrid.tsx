@@ -71,7 +71,7 @@ export function MobileAngleGrid({
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
                   style={{
                     background: occupied && color ? color : LEGACY_COLORS.s3,
-                    color: occupied ? "#fff" : LEGACY_COLORS.muted2,
+                    color: occupied ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
                   }}
                 >
                   <span className={clsx(TYPO.title, "font-black")}>{l}</span>
