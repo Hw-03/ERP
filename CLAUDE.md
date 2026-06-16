@@ -17,6 +17,10 @@
   - Frontend: entire `frontend/app/mes/_components/_weekly_sections/` directory + `frontend/app/mes/_components/DesktopWeeklyReportView.tsx` (frozen: 2026-05-24)
   - Backend: `backend/app/routers/inventory/weekly_report.py` (frozen: 2026-05-29)
   - Touch only when explicitly asked. Bypass these files for surrounding refactors, global renames, etc. When adding a new `TransactionTypeEnum`, only update the classification sets (`PRODUCTION_TX_TYPES` / `NON_PRODUCTION_TX_TYPES`) in weekly_report.py.
+- **모바일 하단 탭바 디자인 동결 (complete)**
+  - `frontend/app/mes/_components/mobile/MobileShell.tsx` — NavButton 컴포넌트 및 `<nav>` 컨테이너 스타일 (frozen: 2026-06-16)
+  - `frontend/app/globals.css` — `button.no-btn-inset` opt-out 규칙 (frozen: 2026-06-16)
+  - 명시적 요청 없이 탭바 레이아웃·버튼 디자인·그림자·pill 스타일 건드리지 말 것.
 - Do not mix sample data with real data.
 - Do not perform large refactors, folder moves, or renames unless explicitly asked.
 - Do not rename legacy internal identifiers such as `xray-erp` unless explicitly asked.
