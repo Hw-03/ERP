@@ -141,18 +141,13 @@ def notify_request_arrived(db: Session, request: StockRequest) -> None:
 
 
 def recipients_for_handover(db: Session, to_department: str | None) -> list[Employee]:
-    """인수인계 도착 알림 수신자 — 받는 부서(고압/진공) 소속 + 부서 결재자(이필욱·김건호).
+    """인수인계 도착 알림 수신자 — 받는 부서(고압/진공) 소속만.
 
-    창고 정/부·admin 은 인수 권한은 있으나 실제 인수 당사자가 아니라 알림에서 제외(노이즈).
+    인수 확인 권한이 받는 부서 소속에 한정되므로, 인수할 수 없는 결재권자에게는
+    도착 알림을 보내지 않는다(노이즈 방지).
     """
     target = (to_department or "").strip()
-    out: list[Employee] = []
-    for e in _active_employees(db):
-        same_dept = (e.department or "").strip() == target
-        dept_appr = (getattr(e, "department_role", None) or "none").lower() in ("primary", "deputy")
-        if same_dept or dept_appr:
-            out.append(e)
-    return out
+    return [e for e in _active_employees(db) if (e.department or "").strip() == target]
 
 
 def notify_handover_arrived(db: Session, doc: HandoverDoc) -> None:

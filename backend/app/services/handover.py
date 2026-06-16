@@ -25,17 +25,14 @@ from app.models import (
 )
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
-from app.services.dept_hierarchy import can_approve_department
 from app.services.pin_auth import verify_pin
 
 _FROM_DEPARTMENT = "튜브"
 
 
 def can_receive(actor: Employee, to_department: str) -> bool:
-    """인수 확인 권한 — 받는 부서 소속이거나, 그 부서 결재 권한자."""
-    if (actor.department or "").strip() == (to_department or "").strip():
-        return True
-    return can_approve_department(actor, to_department)
+    """인수 확인 권한 — 받는 부서 소속만(고압/진공). 현장 물리 인수 행위이므로 결재권자는 제외."""
+    return (actor.department or "").strip() == (to_department or "").strip()
 
 
 def _gen_code() -> str:

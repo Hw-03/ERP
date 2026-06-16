@@ -52,7 +52,7 @@ export function DesktopWarehouseView({
     if (s === "dept-queue" && !isDepartmentApprover(operator)) return "compose";
     if (s === "handover") {
       const dept = operator?.department ?? "";
-      const ok = dept === "튜브" || HANDOVER_RECEIVE_DEPTS.includes(dept) || isDepartmentApprover(operator);
+      const ok = dept === "튜브" || HANDOVER_RECEIVE_DEPTS.includes(dept);
       if (!ok) return "compose";
     }
     return s as WarehouseSectionTab;
@@ -77,9 +77,8 @@ export function DesktopWarehouseView({
     (operator?.warehouse_role ?? "none") === "primary" ||
     (operator?.warehouse_role ?? "none") === "deputy";
   const canSeeDeptQueue = isDepartmentApprover(operator);
-  // 인수인계: 작성(튜브 부서원) 또는 인수 확인(받는 부서 소속 또는 부서 결재 가능자) 가능하면 탭 노출.
-  const canReceiveHandover =
-    canSeeDeptQueue || HANDOVER_RECEIVE_DEPTS.includes(operator?.department ?? "");
+  // 인수인계: 작성(튜브 부서원) 또는 인수 확인(받는 부서 소속)이면 탭 노출. 결재권자는 제외.
+  const canReceiveHandover = HANDOVER_RECEIVE_DEPTS.includes(operator?.department ?? "");
   const showHandover = (operator?.department ?? "") === "튜브" || canReceiveHandover;
 
   useEffect(() => {

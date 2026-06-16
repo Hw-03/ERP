@@ -21,9 +21,11 @@ from app.schemas import (
 from app.services import handover as handover_svc
 from app.services import notifications as notifications_svc
 from app.services._tx import commit_and_refresh
-from app.services.dept_hierarchy import approvable_departments
 
 router = APIRouter()
+
+# 인수인계를 받는(인수 확인하는) 부서 — 이 부서 소속만 대기함을 보고 인수할 수 있다.
+_RECEIVE_DEPTS = ("고압", "진공")
 
 
 def _load_actor(db: Session, employee_id: uuid.UUID) -> Employee:
@@ -36,25 +38,18 @@ def _load_actor(db: Session, employee_id: uuid.UUID) -> Employee:
 
 
 def _inbox_query(db: Session, actor: Employee):
-    """인수 대기함 쿼리 — submitted + 인수 가능 부서 범위. None=권한 없음.
+    """인수 대기함 쿼리 — submitted + 본인 소속 부서 대상. None=권한 없음.
 
-    인수 가능 부서 = 결재 가능 부서(approvable_departments) ∪ 본인 소속 부서.
-    받는 부서(고압/진공) 소속이면 결재자가 아니어도 자기 부서 인수인계를 본다.
+    받는 부서(고압/진공) 소속만 자기 부서로 온 인수인계를 본다. 인수 확인은 현장
+    물리 인수 행위이므로 결재권자라도 받는 부서 소속이 아니면 대기함을 보지 못한다.
     """
-    visible = approvable_departments(actor)
     own = (actor.department or "").strip()
-    if visible is None:
-        # 전체 권한(admin) — 부서 필터 없음.
-        return db.query(HandoverDoc).filter(HandoverDoc.status == HandoverStatusEnum.SUBMITTED)
-    depts = set(visible)
-    if own:
-        depts.add(own)
-    if len(depts) == 0:
+    if own not in _RECEIVE_DEPTS:
         return None
     return (
         db.query(HandoverDoc)
         .filter(HandoverDoc.status == HandoverStatusEnum.SUBMITTED)
-        .filter(HandoverDoc.to_department.in_(list(depts)))
+        .filter(HandoverDoc.to_department == own)
     )
 
 

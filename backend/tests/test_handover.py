@@ -222,6 +222,30 @@ def test_handover_receive_by_receiving_dept_member(client, db_session, make_item
     assert _prod_qty(db_session, item.item_id, "고압") == Decimal("3")
 
 
+def test_handover_receive_by_other_dept_approver_403(client, db_session, make_item):
+    """받는 부서가 아닌 부서 결재권자(조립 부서장)는 인수 확인 불가(403). 상태 불변."""
+    item = make_item(name="8TF Appr", warehouse_qty=Decimal("0"))
+    _seed_production(db_session, item.item_id, "튜브", Decimal("5"))
+    author = _make_employee(db_session, code="TUBE11", department=DepartmentEnum.TUBE)
+    approver = _make_employee(
+        db_session, code="ASMB11", name="이필욱",
+        department=DepartmentEnum.ASSEMBLY, department_role="primary",
+    )
+    db_session.commit()
+
+    hid = _create_handover(client, author, "고압", item).json()["handover_id"]
+    recv = client.post(
+        f"/api/handovers/{hid}/receive",
+        json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
+    )
+    assert recv.status_code == 403, recv.json()
+
+    db_session.expire_all()
+    doc = db_session.query(HandoverDoc).filter(HandoverDoc.handover_id == hid).first()
+    assert doc.status == HandoverStatusEnum.SUBMITTED  # 상태 불변
+    assert _prod_qty(db_session, item.item_id, "튜브") == Decimal("5")  # 이동 없음
+
+
 def test_handover_receive_idempotent(client, db_session, make_item):
     item = make_item(name="8TF Idem", warehouse_qty=Decimal("0"))
     _seed_production(db_session, item.item_id, "튜브", Decimal("5"))
@@ -258,7 +282,7 @@ def test_handover_receive_idempotent(client, db_session, make_item):
 
 
 def test_handover_create_notifies_receiving_dept(client, db_session, make_item):
-    """인수인계 제출 → 받는 부서(고압) 소속 + 부서 결재자에게 알림. 작성자/타부서 제외."""
+    """인수인계 제출 → 받는 부서(고압) 소속에게만 알림. 작성자/타부서/타부서 결재자 제외."""
     item = make_item(name="8TF Notify", warehouse_qty=Decimal("0"))
     _seed_production(db_session, item.item_id, "튜브", Decimal("5"))
     author = _make_employee(db_session, code="TUBE8", name="튜브작성", department=DepartmentEnum.TUBE)
@@ -280,7 +304,7 @@ def test_handover_create_notifies_receiving_dept(client, db_session, make_item):
     )
     recipients = {n.recipient_employee_id for n in notes}
     assert hp_member.employee_id in recipients      # 받는 부서 소속
-    assert approver.employee_id in recipients        # 부서 결재자
+    assert approver.employee_id not in recipients    # 타부서 결재자 — 인수 권한 없으므로 제외
     assert author.employee_id not in recipients      # 작성자 제외
     assert vac_member.employee_id not in recipients  # 타 부서 제외
     assert all(n.target_section == "handover" for n in notes)
@@ -364,25 +388,40 @@ def test_handover_submit_empty_draft_422(client, db_session, make_item):
     assert sub.status_code == 422, sub.json()
 
 
-def test_handover_inbox_filters_submitted_to_approvable(client, db_session, make_item):
+def test_handover_inbox_only_receiving_dept_member(client, db_session, make_item):
+    """인수 대기함은 받는 부서(고압) 소속에게만 — 타부서 결재권자는 못 본다."""
     item = make_item(name="8TF Inbox", warehouse_qty=Decimal("0"))
     _seed_production(db_session, item.item_id, "튜브", Decimal("5"))
     author = _make_employee(db_session, code="TUBE6", department=DepartmentEnum.TUBE)
     receiver = _make_employee(
-        db_session, code="HP6", department=DepartmentEnum.HIGH_VOLTAGE, department_role="primary"
-    )
+        db_session, code="HP6", department=DepartmentEnum.HIGH_VOLTAGE
+    )  # 고압 소속 (결재권 없음)
+    approver = _make_employee(
+        db_session, code="ASMB6", department=DepartmentEnum.ASSEMBLY, department_role="primary"
+    )  # 조립 결재권자 — 받는 부서 아님
     db_session.commit()
 
     _create_handover(client, author, "고압", item, qty=1)
 
+    # 받는 부서(고압) 소속은 본다
     inbox = client.get(
         f"/api/handovers/inbox?actor_employee_id={receiver.employee_id}"
     )
     assert inbox.status_code == 200, inbox.json()
     assert len(inbox.json()) == 1
     assert inbox.json()[0]["to_department"] == "고압"
-
     count = client.get(
         f"/api/handovers/inbox/count?actor_employee_id={receiver.employee_id}"
     )
     assert count.json()["count"] == 1
+
+    # 타부서 결재권자는 못 본다
+    appr_inbox = client.get(
+        f"/api/handovers/inbox?actor_employee_id={approver.employee_id}"
+    )
+    assert appr_inbox.status_code == 200
+    assert len(appr_inbox.json()) == 0
+    appr_count = client.get(
+        f"/api/handovers/inbox/count?actor_employee_id={approver.employee_id}"
+    )
+    assert appr_count.json()["count"] == 0

@@ -78,9 +78,8 @@ export function MobileWarehouseScreen({
     (operator?.warehouse_role ?? "none") === "primary" ||
     (operator?.warehouse_role ?? "none") === "deputy";
   const canSeeDeptQueue = isDepartmentApprover(operator);
-  // 인수인계: 작성(튜브) 또는 인수 확인(받는 부서/부서 결재자) 가능하면 탭 노출 — 데스크톱 동일.
-  const canReceiveHandover =
-    canSeeDeptQueue || HANDOVER_RECEIVE_DEPTS.includes(operator?.department ?? "");
+  // 인수인계: 작성(튜브) 또는 인수 확인(받는 부서 소속)이면 탭 노출 — 데스크톱 동일. 결재권자는 제외.
+  const canReceiveHandover = HANDOVER_RECEIVE_DEPTS.includes(operator?.department ?? "");
   const showHandover = (operator?.department ?? "") === "튜브" || canReceiveHandover;
 
   useEffect(() => {

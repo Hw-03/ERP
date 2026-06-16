@@ -10,7 +10,6 @@ import { PIN_LENGTH } from "@/lib/auth/constants";
 import { formatDateTime } from "@/lib/mes-format";
 import { api, type Item } from "@/lib/api";
 import type { Handover } from "@/lib/api/types";
-import { isDepartmentApprover } from "../_warehouse_steps";
 import type { Operator } from "../login/useCurrentOperator";
 import { HandoverComposeForm } from "./HandoverComposeForm";
 import { printHandover } from "./handoverPrint";
@@ -37,9 +36,8 @@ export function HandoverSectionPanel({
   onChanged: () => void;
 }) {
   const canCompose = (operator?.department ?? "") === "튜브";
-  // 인수 확인: 받는 부서(고압/진공) 소속이거나 부서 결재 권한자.
-  const canReceive =
-    isDepartmentApprover(operator) || ["고압", "진공"].includes(operator?.department ?? "");
+  // 인수 확인: 받는 부서(고압/진공) 소속만. 현장 물리 인수 행위이므로 결재권자는 제외.
+  const canReceive = ["고압", "진공"].includes(operator?.department ?? "");
 
   const [subTab, setSubTab] = useState<SubTab>(
     canCompose ? "compose" : canReceive ? "inbox" : "mine",
