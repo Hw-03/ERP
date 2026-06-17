@@ -45,7 +45,8 @@ export function IoBundleCart({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
-      <p className="text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+      {/* 항목 12 — 안내 문구는 모바일에서 숨김(데스크톱 ≥lg 은 유지). */}
+      <p className="hidden text-sm lg:block" style={{ color: LEGACY_COLORS.muted2 }}>
         체크된 품목만 재고에 반영됩니다. 체크를 해제하면 이번 작업에서 제외됩니다.
       </p>
 
@@ -102,7 +103,8 @@ export function IoBundleCart({
       )}
 
       {bundles.length > 0 && (
-        <div className="mt-auto pt-1 flex flex-col gap-2">
+        // 항목 13 — 모바일은 하단 고정(sticky), 데스크톱(lg)은 기존 mt-auto 정적 배치 그대로.
+        <div className="sticky bottom-0 z-20 -mx-3 mt-auto flex flex-col gap-2 border-t border-[var(--c-border)] bg-[var(--c-s1)] px-4 pb-3 pt-3 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-1">
           {!canAdvance && hasShortage && (
             <p className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
               재고가 부족한 항목이 있습니다
