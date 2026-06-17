@@ -124,6 +124,9 @@ export function MobileShell() {
   const operator = useCurrentOperator();
   const [activeTab, setActiveTab] = useState<MobileTabId>("dashboard");
   const [toastQueue, setToastQueue] = useState<ToastItem[]>([]);
+  // 항목 11 — info/success 메시지는 헤더 상태 칩에 일시 표시(토스트 누적 방지). 에러만 토스트.
+  const [headerStatus, setHeaderStatus] = useState<string | null>(null);
+  const headerStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [defectDeptFilter, setDefectDeptFilter] = useState<string | null>(null);
@@ -148,19 +151,16 @@ export function MobileShell() {
 
   const handleStatusChange = useCallback((msg: string) => {
     const isError = /실패|못했습니다|오류|에러|부족|품절/.test(msg);
-    const type: ToastItem["type"] = isError ? "error" : "info";
-    const id = ++_toastSeq;
-    setToastQueue((q: ToastItem[]) => {
-      const next = [...q, { id, msg, type }];
-      return next.slice(-5); // 최대 5건 유지
-    });
-    // info/success 는 routine 알림 — 3.5초 후 자동 소멸(품목 선택마다 쌓여 화면을
-    // 가리는 문제 해소). error 는 수동 닫기 유지(느린 네트워크/청각 보조 대응).
-    if (type !== "error") {
-      setTimeout(() => {
-        setToastQueue((q: ToastItem[]) => q.filter((t: ToastItem) => t.id !== id));
-      }, 3500);
+    if (isError) {
+      // error 는 토스트로 — 수동 닫기 유지(느린 네트워크/청각 보조 대응).
+      const id = ++_toastSeq;
+      setToastQueue((q: ToastItem[]) => [...q, { id, msg, type: "error" as const }].slice(-5));
+      return;
     }
+    // info/success 는 데스크톱처럼 헤더 상태 칩에 일시 표시 → 3.5초 후 "DEXCOWIN MES" 복귀.
+    setHeaderStatus(msg);
+    if (headerStatusTimerRef.current) clearTimeout(headerStatusTimerRef.current);
+    headerStatusTimerRef.current = setTimeout(() => setHeaderStatus(null), 3500);
   }, []);
 
   const dismissToast = useCallback((id: number) => {
@@ -316,14 +316,28 @@ export function MobileShell() {
           }}
         >
           <div className="min-w-0 flex-1">
-            {activeTab !== "weekly" && (
-              <div
-                className="truncate text-xs font-bold uppercase tracking-wider"
-                style={{ color: LEGACY_COLORS.muted2 }}
-              >
-                DEXCOWIN MES
-              </div>
-            )}
+            {activeTab !== "weekly" &&
+              (headerStatus ? (
+                // 항목 11 — info/success 메시지를 헤더 칩으로(데스크톱 상태 칩과 동일 역할)
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="inline-flex max-w-full items-center truncate rounded-full px-2.5 py-1 text-xs font-bold"
+                  style={{
+                    background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`,
+                    color: LEGACY_COLORS.blue,
+                  }}
+                >
+                  <span className="truncate">{headerStatus}</span>
+                </div>
+              ) : (
+                <div
+                  className="truncate text-xs font-bold uppercase tracking-wider"
+                  style={{ color: LEGACY_COLORS.muted2 }}
+                >
+                  DEXCOWIN MES
+                </div>
+              ))}
           </div>
           {activeTab === "weekly" && (
             <div className="flex items-center gap-2 shrink-0">
