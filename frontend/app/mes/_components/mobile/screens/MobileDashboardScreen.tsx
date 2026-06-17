@@ -359,6 +359,7 @@ export function MobileDashboardScreen({
                   onGoToWarehouse(item, intent);
                 }}
                 canReceive={canReceive}
+                quickActionVariant="mobile"
               />
             </div>
           </div>

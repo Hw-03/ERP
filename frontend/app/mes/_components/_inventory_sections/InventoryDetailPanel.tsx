@@ -20,9 +20,17 @@ type Props = {
   onGoToWarehouse: (item: Item, intent?: IoEntryIntent) => void;
   canReceive?: boolean;
   imageFilename?: string;
+  // 항목 3 — 모바일 빠른작업: 출고 빨강 + 서브옵션 전폭. 기본 desktop(현행 유지)이라 데스크톱 호출처 무변경.
+  quickActionVariant?: "mobile" | "desktop";
 };
 
-export function InventoryDetailPanel({ item, onGoToWarehouse, canReceive = false, imageFilename }: Props) {
+export function InventoryDetailPanel({
+  item,
+  onGoToWarehouse,
+  canReceive = false,
+  imageFilename,
+  quickActionVariant = "desktop",
+}: Props) {
   const getDeptColor = useDeptColorLookup();
   const [reservations, setReservations] = useState<StockRequestReservationLine[]>([]);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -207,6 +215,60 @@ export function InventoryDetailPanel({ item, onGoToWarehouse, canReceive = false
         <div className="mb-2 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
           빠른 작업
         </div>
+        {quickActionVariant === "mobile" ? (
+          // 항목 3 — 모바일: 입고(파랑)/출고(빨강) 나란히 + 선택 시 서브옵션을 아래 전폭 파스텔로.
+          <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setIoMenu((m) => (m === "in" ? null : "in"))}
+                aria-pressed={ioMenu === "in"}
+                className="w-full rounded-[18px] px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
+                style={{ background: LEGACY_COLORS.blue, opacity: ioMenu === "out" ? 0.55 : 1 }}
+              >
+                입고
+              </button>
+              <button
+                type="button"
+                onClick={() => setIoMenu((m) => (m === "out" ? null : "out"))}
+                aria-pressed={ioMenu === "out"}
+                className="w-full rounded-[18px] px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
+                style={{ background: LEGACY_COLORS.red, opacity: ioMenu === "in" ? 0.55 : 1 }}
+              >
+                출고
+              </button>
+            </div>
+            {ioMenu && (
+              <div className="flex flex-col gap-1.5">
+                {(ioMenu === "in" ? inboundChoices(canReceive) : outboundChoices).map((choice) => {
+                  const accent = ioMenu === "out" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
+                  return (
+                    <button
+                      key={choice.key}
+                      type="button"
+                      onClick={() => {
+                        setIoMenu(null);
+                        onGoToWarehouse(item, quickChoiceToIntent(choice.key));
+                      }}
+                      className="flex w-full flex-col items-start rounded-[14px] border px-4 py-3 text-left transition-opacity hover:opacity-90"
+                      style={{
+                        background: `color-mix(in srgb, ${accent} 12%, transparent)`,
+                        borderColor: `color-mix(in srgb, ${accent} 30%, transparent)`,
+                      }}
+                    >
+                      <span className="text-sm font-bold" style={{ color: accent }}>
+                        {choice.label}
+                      </span>
+                      <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                        {choice.desc}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : (
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-1">
             <button
@@ -281,6 +343,7 @@ export function InventoryDetailPanel({ item, onGoToWarehouse, canReceive = false
             )}
           </div>
         </div>
+        )}
       </div>
 
     </div>
