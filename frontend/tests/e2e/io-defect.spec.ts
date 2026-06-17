@@ -48,10 +48,13 @@ test.describe("불량 — 격리 / 해제", () => {
       page.getByRole("button").filter({ hasText: "불량 격리" }).filter({ hasText: "정상 재고" }),
     ).toBeVisible();
     await page.getByRole("button").filter({ hasText: "격리 목록" }).filter({ hasText: "격리 항목" }).click();
-    await expect(page.getByText("E2E원자재튜브")).toBeVisible();
+    // mes 는 모바일·데스크톱 셸을 CSS(lg:hidden)로 둘 다 DOM 에 렌더. 모바일 불량 허브가
+    // 첫 화면에서 격리 목록을 함께 보여주므로 같은 품목명/버튼/빈 메시지가 (숨은) 모바일 셸에도
+    // 존재 → 보이는(데스크톱) 요소만 골라야 strict 위반을 피한다. [[project_e2e_dual_shell_visible_filter]]
+    await expect(page.getByText("E2E원자재튜브").filter({ visible: true }).first()).toBeVisible();
 
     // ── 해제(정상 복귀) ───────────────────────────────────
-    await page.getByRole("button", { name: "처리", exact: true }).click();
+    await page.getByRole("button", { name: "처리", exact: true }).filter({ visible: true }).first().click();
     await expect(page.getByRole("heading", { name: /불량 처리/ })).toBeVisible();
     await page
       .locator("select")
@@ -67,6 +70,8 @@ test.describe("불량 — 격리 / 해제", () => {
       page.getByRole("button").filter({ hasText: "불량 격리" }).filter({ hasText: "정상 재고" }),
     ).toBeVisible();
     await page.getByRole("button").filter({ hasText: "격리 목록" }).filter({ hasText: "격리 항목" }).click();
-    await expect(page.getByText("격리된 불량 재고가 없습니다.")).toBeVisible();
+    await expect(
+      page.getByText("격리된 불량 재고가 없습니다.").filter({ visible: true }).first(),
+    ).toBeVisible();
   });
 });
