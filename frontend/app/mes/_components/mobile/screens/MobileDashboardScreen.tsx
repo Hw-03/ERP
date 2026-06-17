@@ -265,7 +265,10 @@ export function MobileDashboardScreen({
                   </button>
                 )}
               </div>
-              {filtersOpen && (
+            </div>
+            {/* 항목 2 — 필터 칩은 sticky 밖(일반 흐름)에 둬서 열려도 목록을 가리지 않고 아래로 밀어낸다. */}
+            {filtersOpen && (
+              <div className="px-2.5 pb-2.5">
                 <InventoryFilters
                   open={filtersOpen}
                   selectedDepts={selectedDepts}
@@ -281,8 +284,8 @@ export function MobileDashboardScreen({
                   onResetAll={resetAllFilters}
                   isAnyFilterActive={isFiltered}
                 />
-              )}
-            </div>
+              </div>
+            )}
             <InventoryItemsTable
               error={error}
               loading={loading || filterChanging}
