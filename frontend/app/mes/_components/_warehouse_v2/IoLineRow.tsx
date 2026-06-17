@@ -221,7 +221,7 @@ export function IoLineRow({
             onChange={(e) => onInputChange(e.target.value)}
             onFocus={(e) => e.currentTarget.select()}
             title={qtyLocked ? "상위 수량에 비례해 자동 계산" : undefined}
-            className="w-[72px] rounded-[10px] border px-2 py-1.5 text-center text-sm font-black tabular-nums outline-none focus:border-[var(--c-blue)] disabled:opacity-60"
+            className="w-[72px] min-h-[44px] rounded-[10px] border px-2 py-2 text-center text-base font-black tabular-nums outline-none focus:border-[var(--c-blue)] disabled:opacity-60 lg:min-h-0 lg:py-1.5 lg:text-sm"
             style={{
               background: LEGACY_COLORS.s2,
               borderColor: LEGACY_COLORS.border,
@@ -313,7 +313,8 @@ function StepBtn({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="rounded-[10px] border px-2 py-1 text-xs font-black transition-colors hover:brightness-110 disabled:opacity-40"
+      // 항목 15 — 모바일 터치 타깃 44px+, 데스크톱(lg)은 기존 컴팩트 크기.
+      className="min-h-[44px] rounded-[10px] border px-3 py-2 text-sm font-black transition-colors hover:brightness-110 disabled:opacity-40 lg:min-h-0 lg:px-2 lg:py-1 lg:text-xs"
       style={{
         background: tint(tone, 10),
         borderColor: tint(tone, 30),

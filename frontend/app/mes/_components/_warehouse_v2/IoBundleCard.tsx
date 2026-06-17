@@ -121,13 +121,14 @@ export function IoBundleCard({
       }}
     >
       <div
-        className="mb-3 flex items-start justify-between gap-3"
+        // 항목 14 — 모바일: 휴지통 우상단 분리 + 가능재고/실행후는 아래 행. 데스크톱(lg)은 기존 한 줄 배치.
+        className="relative mb-3 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between lg:gap-3"
         onClick={() => { if (isCollapsible) setCollapsed((v) => !v); }}
         style={{ cursor: isCollapsible ? "pointer" : "default" }}
         role={isCollapsible ? "button" : undefined}
         aria-expanded={isCollapsible ? !collapsed : undefined}
       >
-        <div className="min-w-0">
+        <div className="min-w-0 pr-12 lg:pr-0">
           <div
             className="flex min-w-0 items-center gap-2 text-left"
             title={isCollapsible ? (collapsed ? "펼치기" : "접기") : undefined}
@@ -155,7 +156,7 @@ export function IoBundleCard({
                 <button
                   type="button"
                   onClick={() => stepBundle(-10)}
-                  className="rounded-[8px] border px-1.5 py-0.5 text-[11px] font-black transition-colors hover:brightness-110 disabled:opacity-40"
+                  className="rounded-[8px] border px-2.5 py-1.5 text-xs font-black transition-colors hover:brightness-110 lg:px-1.5 lg:py-0.5 lg:text-[11px] disabled:opacity-40"
                   style={{
                     background: tint(LEGACY_COLORS.red, 10),
                     borderColor: tint(LEGACY_COLORS.red, 30),
@@ -168,7 +169,7 @@ export function IoBundleCard({
                 <button
                   type="button"
                   onClick={() => stepBundle(-1)}
-                  className="rounded-[8px] border px-1.5 py-0.5 text-[11px] font-black transition-colors hover:brightness-110 disabled:opacity-40"
+                  className="rounded-[8px] border px-2.5 py-1.5 text-xs font-black transition-colors hover:brightness-110 lg:px-1.5 lg:py-0.5 lg:text-[11px] disabled:opacity-40"
                   style={{
                     background: tint(LEGACY_COLORS.red, 10),
                     borderColor: tint(LEGACY_COLORS.red, 30),
@@ -185,7 +186,7 @@ export function IoBundleCard({
                   value={stepperQty}
                   onChange={(e) => setBundleFromInput(e.target.value)}
                   onFocus={(e) => e.currentTarget.select()}
-                  className="w-[64px] rounded-[8px] border px-1.5 py-0.5 text-center text-sm font-black tabular-nums outline-none focus:border-[var(--c-blue)]"
+                  className="w-[64px] rounded-[8px] border px-1.5 py-2 text-center text-sm font-black tabular-nums outline-none focus:border-[var(--c-blue)] lg:py-0.5"
                   style={{
                     background: LEGACY_COLORS.s2,
                     borderColor: LEGACY_COLORS.border,
@@ -195,7 +196,7 @@ export function IoBundleCard({
                 <button
                   type="button"
                   onClick={() => stepBundle(1)}
-                  className="rounded-[8px] border px-1.5 py-0.5 text-[11px] font-black transition-colors hover:brightness-110"
+                  className="rounded-[8px] border px-2.5 py-1.5 text-xs font-black transition-colors hover:brightness-110 lg:px-1.5 lg:py-0.5 lg:text-[11px]"
                   style={{
                     background: tint(LEGACY_COLORS.green, 10),
                     borderColor: tint(LEGACY_COLORS.green, 30),
@@ -207,7 +208,7 @@ export function IoBundleCard({
                 <button
                   type="button"
                   onClick={() => stepBundle(10)}
-                  className="rounded-[8px] border px-1.5 py-0.5 text-[11px] font-black transition-colors hover:brightness-110"
+                  className="rounded-[8px] border px-2.5 py-1.5 text-xs font-black transition-colors hover:brightness-110 lg:px-1.5 lg:py-0.5 lg:text-[11px]"
                   style={{
                     background: tint(LEGACY_COLORS.green, 10),
                     borderColor: tint(LEGACY_COLORS.green, 30),
@@ -237,7 +238,7 @@ export function IoBundleCard({
           </div>
         </div>
         {directParentLine && (
-          <div className="flex shrink-0 items-center gap-6 self-center">
+          <div className="flex items-center gap-6 self-start lg:shrink-0 lg:self-center">
             <div className="text-right">
               <div
                 className="text-[9px] font-bold uppercase tracking-[1.5px]"
@@ -271,7 +272,7 @@ export function IoBundleCard({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onRemoveBundle(); }}
-          className="flex h-10 w-10 shrink-0 self-center items-center justify-center rounded-full transition-colors hover:brightness-110"
+          className="absolute right-0 top-0 flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:brightness-110 lg:static lg:shrink-0 lg:self-center"
           style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }}
           title="묶음 삭제"
         >
