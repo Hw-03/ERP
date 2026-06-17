@@ -73,6 +73,46 @@ function afHeading(status: ProductionCapacityAfStatus): string {
   }
 }
 
+/**
+ * 생산 가능 상태 배지 — 모바일 대시보드의 접기 버튼 우측에 표시(항목 1 A안).
+ * af 블록이 있으면 AF 상태, 없으면 legacy status 로 매핑.
+ */
+export function capacityStatusBadge(
+  data: ProductionCapacity | null | undefined,
+): { label: string; color: string } | null {
+  if (!data) return null;
+  if (data.af) {
+    const s = data.af.status;
+    const label =
+      s === "producible"
+        ? "생산 가능"
+        : s === "incomplete"
+          ? "일부 미완성"
+          : s === "not_producible"
+            ? "생산 불가"
+            : s === "bom_not_registered"
+              ? "BOM 미등록"
+              : "대상 없음";
+    return { label, color: afAccent(s) };
+  }
+  const status = resolveStatus(data);
+  const label =
+    status === "producible"
+      ? "생산 가능"
+      : status === "not_producible"
+        ? "생산 불가"
+        : status === "bom_not_registered"
+          ? "BOM 미등록"
+          : "생산 가능 품목 없음";
+  const color =
+    status === "producible"
+      ? LEGACY_COLORS.cyan
+      : status === "not_producible"
+        ? LEGACY_COLORS.yellow
+        : LEGACY_COLORS.muted2;
+  return { label, color };
+}
+
 function AfPanel({
   af,
   interactive,
@@ -110,31 +150,15 @@ function AfPanel({
 
   const inner = (
     <>
-      {/* ── 모바일 전용: 표 레이아웃 ── */}
+      {/* ── 모바일 전용: 표 레이아웃 (항목 1 A안 — 헤더 줄 제거, 상태는 외부 토글 배지로 이동) ── */}
       <div className="flex w-full flex-col gap-2 sm:hidden">
-        <div className="flex items-center gap-2">
-          <Zap className="h-5 w-5 shrink-0" style={{ color: accent }} />
-          <span className="shrink-0 text-base font-semibold" style={{ color: accent }}>
-            {afHeading(af.status)}
-          </span>
-          {showStats && (
-            <span className="shrink-0" aria-label={SHARED_HINT} title={SHARED_HINT}>
-              <AlertTriangle className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />
-            </span>
-          )}
-          {interactive && (
-            <span className="ml-auto shrink-0 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-              자세히 보기
-            </span>
-          )}
-        </div>
         {showStats ? (
           <table className="w-full table-fixed text-right text-sm">
             <thead>
               <tr>
                 <th className="pb-1 text-left text-xs font-bold" />
-                <th className="w-14 pb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.cyan }}>출하</th>
-                <th className="w-14 pb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>조립</th>
+                <th className="w-16 whitespace-nowrap pb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.cyan }}>출하 대기</th>
+                <th className="w-16 whitespace-nowrap pb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>빠른 조립</th>
                 <th className="w-16 pb-1 text-xs font-bold" style={{ color: LEGACY_COLORS.purple }}>총생산</th>
               </tr>
             </thead>

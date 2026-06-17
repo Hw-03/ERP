@@ -8,7 +8,7 @@ import { ChevronDown, SlidersHorizontal, Zap } from "lucide-react";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { InlineSearch } from "../primitives";
 import { InventoryKpiPanel, type KpiFilter } from "../../_inventory_sections/InventoryKpiPanel";
-import { InventoryCapacityPanel } from "../../_inventory_sections/InventoryCapacityPanel";
+import { InventoryCapacityPanel, capacityStatusBadge } from "../../_inventory_sections/InventoryCapacityPanel";
 import { InventoryFilters } from "../../_inventory_sections/InventoryFilterBar";
 import { InventoryItemsTable } from "../../_inventory_sections/InventoryItemsTable";
 import { InventoryDetailPanel } from "../../_inventory_sections/InventoryDetailPanel";
@@ -161,6 +161,8 @@ export function MobileDashboardScreen({
     setKpi("ALL");
   }, [setSelectedDepts, setSelectedModels, setSelectedProcessSteps]);
 
+  const capacityBadge = capacityStatusBadge(capacityData);
+
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div
@@ -187,11 +189,23 @@ export function MobileDashboardScreen({
                   style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
                 >
                   <span
-                    className="flex items-center gap-2 text-sm font-black"
+                    className="flex min-w-0 items-center gap-2 text-sm font-black"
                     style={{ color: LEGACY_COLORS.text }}
                   >
-                    <Zap className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
-                    생산 가능 현황
+                    <Zap className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
+                    <span className="shrink-0">생산 가능 현황</span>
+                    {/* 항목 1 — 상태는 펼친 패널 헤더 대신 토글 버튼 우측 배지로 노출 */}
+                    {capacityBadge && (
+                      <span
+                        className="truncate rounded-full px-2 py-0.5 text-[11px] font-bold"
+                        style={{
+                          background: `color-mix(in srgb, ${capacityBadge.color} 16%, transparent)`,
+                          color: capacityBadge.color,
+                        }}
+                      >
+                        {capacityBadge.label}
+                      </span>
+                    )}
                   </span>
                   <ChevronDown
                     className="h-4 w-4 shrink-0 transition-transform"
@@ -202,8 +216,21 @@ export function MobileDashboardScreen({
                   />
                 </button>
                 {capacityOpen && (
-                  <div className="mt-2">
-                    <InventoryCapacityPanel capacityData={capacityData} onClick={onCapacityClick} />
+                  <div className="mt-2 flex flex-col gap-2">
+                    {/* 항목 1 — 인라인 패널은 표만(클릭 X), 자세히 보기는 아래 전폭 버튼으로 분리 */}
+                    <InventoryCapacityPanel capacityData={capacityData} />
+                    <button
+                      type="button"
+                      onClick={onCapacityClick}
+                      className="w-full rounded-[12px] border px-3 py-2.5 text-sm font-bold transition-[transform] active:scale-[0.99]"
+                      style={{
+                        background: LEGACY_COLORS.s2,
+                        borderColor: LEGACY_COLORS.border,
+                        color: LEGACY_COLORS.blue,
+                      }}
+                    >
+                      자세히 보기 →
+                    </button>
                   </div>
                 )}
               </div>

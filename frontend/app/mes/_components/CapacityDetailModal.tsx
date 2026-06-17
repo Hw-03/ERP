@@ -19,7 +19,7 @@ const SHARED_HINT =
 
 /**
  * 생산 가능수량 상세 모달 — AF(조립 완제품) 기준.
- * ① AF별 3수량(출하준비/빠른조립/총생산) ② 각 병목 ③ 연결된 PF 변형(주문 기준 ship_ready)
+ * ① AF별 3수량(출하 대기/빠른 조립/총생산) ② 각 병목 ③ 연결된 PF 변형(주문 기준 ship_ready)
  * ④ BOM 미완성 표시. af 블록이 없으면(구버전 응답) legacy 요약으로 fallback.
  */
 export function CapacityDetailModal({
@@ -52,7 +52,7 @@ export function CapacityDetailModal({
             생산 가능수량 상세 · 조립 완제품(AF) 기준
           </div>
           <div className="mt-1 text-xs leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
-            출하준비: AF 재고를 출하까지 마무리 · 빠른조립: 기존 재고＋직계 자재로 추가 조립 · 총생산: 하위 BOM 끝까지 투입 이론치
+            출하 대기: AF 재고를 출하까지 마무리 · 빠른 조립: 기존 재고＋직계 자재로 추가 조립 · 총생산: 하위 BOM 끝까지 투입 이론치
           </div>
           <div
             className="mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
@@ -217,8 +217,8 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                 </span>
               </div>
               <div className="mt-1.5 grid grid-cols-3 gap-1">
-                <QtyLabelCell label="출하준비" value={group.totals.ship_ready} color={LEGACY_COLORS.cyan} />
-                <QtyLabelCell label="빠른조립" value={group.totals.fast_assembly} color={LEGACY_COLORS.blue} />
+                <QtyLabelCell label="출하 대기" value={group.totals.ship_ready} color={LEGACY_COLORS.cyan} />
+                <QtyLabelCell label="빠른 조립" value={group.totals.fast_assembly} color={LEGACY_COLORS.blue} />
                 <QtyLabelCell label="총생산" value={group.totals.total_production} color={LEGACY_COLORS.purple} />
               </div>
             </div>
@@ -267,8 +267,8 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                           </div>
                         )}
                         <div className="mt-2 grid grid-cols-3 gap-1">
-                          <QtyLabelCell label="출하준비" value={it.ship_ready} color={LEGACY_COLORS.cyan} />
-                          <QtyLabelCell label="빠른조립" value={it.fast_assembly} color={LEGACY_COLORS.blue} />
+                          <QtyLabelCell label="출하 대기" value={it.ship_ready} color={LEGACY_COLORS.cyan} />
+                          <QtyLabelCell label="빠른 조립" value={it.fast_assembly} color={LEGACY_COLORS.blue} />
                           <QtyLabelCell label="총생산" value={it.total_production} color={LEGACY_COLORS.purple} />
                         </div>
                       </div>
@@ -300,8 +300,8 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
         >
           <span />
           <span>조립 완제품 · 병목</span>
-          <span className="text-right">출하준비</span>
-          <span className="text-right">빠른조립</span>
+          <span className="text-right">출하 대기</span>
+          <span className="text-right">빠른 조립</span>
           <span className="text-right">총생산</span>
         </div>
 
@@ -464,7 +464,7 @@ function PfVariants({
         style={{ color: LEGACY_COLORS.muted2 }}
       >
         <span>출하 완제품 · 병목</span>
-        <span className="text-right">출하준비</span>
+        <span className="text-right">출하 대기</span>
         <span />
       </div>
       {variants.map((v) => {
