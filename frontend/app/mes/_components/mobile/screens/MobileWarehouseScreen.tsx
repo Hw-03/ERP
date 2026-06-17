@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
 import { canEnterIO, isDepartmentApprover } from "../../_warehouse_steps";
 import { useWarehouseData } from "../../_warehouse_hooks/useWarehouseData";
@@ -39,12 +39,18 @@ export function MobileWarehouseScreen({
   preselectedItem,
   entryIntent,
   onSubmitSuccess,
+  onComposeDirtyChange,
+  flushDraftRef: externalFlushRef,
 }: {
   globalSearch: string;
   onStatusChange: (status: string) => void;
   preselectedItem?: Item | null;
   entryIntent?: IoEntryIntent | null;
   onSubmitSuccess?: () => void;
+  // 항목 16 — 하단 네비 이탈 가드용. compose 작성 중 여부를 상위(MobileShell)에 보고하고,
+  // 상위가 이탈 직전 draft flush 를 호출할 수 있게 ref 를 공유받는다.
+  onComposeDirtyChange?: (dirty: boolean) => void;
+  flushDraftRef?: MutableRefObject<(() => void) | null>;
 }) {
   const { employees, items, productModels, loadFailure, setItems } = useWarehouseData({
     globalSearch,
@@ -71,7 +77,14 @@ export function MobileWarehouseScreen({
   // D2 — compose 작성 중(담은 묶음 있음) 다른 섹션 이탈 가드.
   const [composeDirty, setComposeDirty] = useState(false);
   const [pendingTab, setPendingTab] = useState<WarehouseSectionTab | null>(null);
-  const flushDraftRef = useRef<(() => void) | null>(null);
+  // 항목 16 — flush ref 는 상위(MobileShell)가 내려주면 공유, 없으면 로컬 사용(섹션 가드 단독 동작 보장).
+  const localFlushRef = useRef<(() => void) | null>(null);
+  const flushDraftRef = externalFlushRef ?? localFlushRef;
+
+  // 작성 중 여부를 상위로 보고 → 하단 네비 탭 이탈 가드에 사용.
+  useEffect(() => {
+    onComposeDirtyChange?.(composeDirty);
+  }, [composeDirty, onComposeDirtyChange]);
 
   const operatorEmployeeId = operator?.employee_id ?? employeeId;
   const canSeeQueue =

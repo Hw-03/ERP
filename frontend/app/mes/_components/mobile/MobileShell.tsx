@@ -31,6 +31,7 @@ import { canEnterIO } from "../_warehouse_steps";
 import { canSeeWorkType } from "../_warehouse_v2/ioWorkType";
 import type { IoEntryIntent } from "../_warehouse_v2/types";
 import { MobileUserMenuSheet } from "./MobileUserMenuSheet";
+import { MobileDirtyLeaveSheet } from "./warehouse/MobileDirtyLeaveSheet";
 
 // 관리(admin)는 모바일에서 제외 — 관리 작업은 데스크톱(PC)에서 한다.
 export type MobileTabId =
@@ -148,6 +149,10 @@ export function MobileShell() {
   const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
   const [capacityModal, setCapacityModal] = useState(false);
   const [stockWarnings, setStockWarnings] = useState<{ low: number; zero: number } | null>(null);
+  // 항목 16 — 입출고 작성 중(담은 묶음 있음) 하단 네비로 이탈 시 확인 시트.
+  const [warehouseDirty, setWarehouseDirty] = useState(false);
+  const warehouseFlushRef = useRef<(() => void) | null>(null);
+  const [pendingNavTab, setPendingNavTab] = useState<MobileTabId | null>(null);
 
   const handleStatusChange = useCallback((msg: string) => {
     const isError = /실패|못했습니다|오류|에러|부족|품절/.test(msg);
@@ -172,8 +177,13 @@ export function MobileShell() {
       setRefreshNonce((n) => n + 1);
       return;
     }
+    // 항목 16 — 입출고 작성 중 다른 탭으로 이탈 시 확인 시트(PC 일관성). 확인 시 draft flush 후 전환.
+    if (activeTab === "warehouse" && warehouseDirty) {
+      setPendingNavTab(tab);
+      return;
+    }
     setActiveTab(tab);
-  }, [activeTab]);
+  }, [activeTab, warehouseDirty]);
 
   const canReceive = canSeeWorkType("receive", operator);
 
@@ -250,6 +260,8 @@ export function MobileShell() {
           preselectedItem={warehousePreselected}
           entryIntent={warehouseIntent}
           onSubmitSuccess={loadCapacity}
+          onComposeDirtyChange={setWarehouseDirty}
+          flushDraftRef={warehouseFlushRef}
         />
       );
     }
@@ -463,6 +475,19 @@ export function MobileShell() {
           })}
         </div>
       )}
+
+      {/* 항목 16 — 입출고 작성 중 하단 네비 이탈 확인(draft 자동저장 flush 후 전환) */}
+      <MobileDirtyLeaveSheet
+        open={pendingNavTab !== null}
+        onCancel={() => setPendingNavTab(null)}
+        onConfirm={() => {
+          warehouseFlushRef.current?.(); // 700ms 디바운스 창의 마지막 변경까지 즉시 저장
+          const next = pendingNavTab;
+          setPendingNavTab(null);
+          setWarehouseDirty(false);
+          if (next) setActiveTab(next);
+        }}
+      />
 
       <MobileUserMenuSheet
         open={userMenuOpen}
