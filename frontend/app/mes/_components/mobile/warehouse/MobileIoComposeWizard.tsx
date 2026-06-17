@@ -500,7 +500,8 @@ export function MobileIoComposeWizard({
             />
           ) : (
             <>
-              <div className="mb-3">
+              {/* 항목 8 — 스캔 시작 버튼은 당분간 UI에서 숨김(코드·핸들러 유지, hidden). */}
+              <div className="mb-3 hidden">
                 <PrimaryActionButton
                   label="스캔으로 시작"
                   icon={ScanLine}

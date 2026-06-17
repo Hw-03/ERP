@@ -76,7 +76,10 @@ export function MobileSingleAdjustForm({
         <div className="min-w-0 flex-1">
           <InlineSearch value={search} onChange={onSearchChange} placeholder="품목명 또는 코드" />
         </div>
-        <IconButton icon={ScanLine} label="바코드 스캔" size="lg" onClick={onScan} />
+        {/* 항목 8 — 스캔 버튼 당분간 UI에서 숨김(코드·onScan 유지, hidden). */}
+        <span className="hidden">
+          <IconButton icon={ScanLine} label="바코드 스캔" size="lg" onClick={onScan} />
+        </span>
       </div>
 
       {error && (
