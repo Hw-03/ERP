@@ -36,7 +36,8 @@ export function MobileWorkTypeStep({
 }) {
   const visible = IO_WORK_TYPES.filter((row) => canSeeWorkType(row.id, operator));
   return (
-    <div className="flex flex-col gap-2.5">
+    // 항목 7 — 작업 유형 버튼이 남은 화면 높이를 세로로 균등 분할(버튼 수 무관 전폭 타일).
+    <div className="flex min-h-full flex-col gap-2.5">
       {visible.map((row) => {
         const Icon = row.icon;
         const active = workType === row.id;
@@ -49,7 +50,7 @@ export function MobileWorkTypeStep({
             type="button"
             aria-pressed={active}
             onClick={() => onWorkTypeChange(row.id)}
-            className="flex min-h-[96px] items-center gap-4 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"
+            className="flex min-h-[96px] flex-1 items-center gap-4 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"
             style={{
               background: active ? tint(accent, 14) : LEGACY_COLORS.s2,
               borderColor: active ? accent : LEGACY_COLORS.border,
@@ -159,9 +160,12 @@ export function MobileSubTypeStep({
   if (workType === "process") {
     const curDir = deptIoDirection;
     return (
-      <div className="flex flex-col gap-5">
-        <DeptGrid label="대상 부서" value={toDepartment} onChange={onToDepartmentChange} />
-        <div>
+      // 항목 7 — 부서/방향/입력방식 섹션이 화면 높이를 균등 분할(버튼은 과대 stretch 없이 중앙 정렬).
+      <div className="flex min-h-full flex-col gap-4">
+        <div className="flex flex-1 flex-col justify-center">
+          <DeptGrid label="대상 부서" value={toDepartment} onChange={onToDepartmentChange} />
+        </div>
+        <div className="flex flex-1 flex-col justify-center">
           <Label text="방향" />
           <div className="grid grid-cols-2 gap-3">
             {(["in", "out"] as DeptIoDirection[]).map((dir) => {
@@ -187,7 +191,7 @@ export function MobileSubTypeStep({
           </div>
         </div>
         {curDir != null && (
-          <div>
+          <div className="flex flex-1 flex-col justify-center">
             <Label text="입력 방식" />
             <div className="grid grid-cols-2 gap-3">
               {(["bom", "single"] as const).map((m) => {
@@ -232,8 +236,9 @@ export function MobileSubTypeStep({
     subType === "defect_quarantine" || subType === "supplier_return" ? LEGACY_COLORS.red : null;
 
   return (
-    <div className="flex flex-col gap-5">
-      <div>
+    // 항목 7 — 세부 작업/부서 섹션이 화면 높이를 균등 분할.
+    <div className="flex min-h-full flex-col gap-4">
+      <div className="flex flex-1 flex-col justify-center">
         <Label text="세부 작업" />
         <div className="grid grid-cols-2 gap-2.5">
           {subRows.map((row) => {
@@ -264,24 +269,28 @@ export function MobileSubTypeStep({
       </div>
 
       {showAnyDept && dept.from && (
-        <DeptGrid
-          label={
-            subType === "supplier_return"
-              ? "반품할 부서 (불량 출처)"
-              : subType === "defect_quarantine"
-              ? "불량 격리 부서"
-              : "출발 부서"
-          }
-          value={fromDepartment}
-          onChange={onFromDepartmentChange}
-        />
+        <div className="flex flex-1 flex-col justify-center">
+          <DeptGrid
+            label={
+              subType === "supplier_return"
+                ? "반품할 부서 (불량 출처)"
+                : subType === "defect_quarantine"
+                ? "불량 격리 부서"
+                : "출발 부서"
+            }
+            value={fromDepartment}
+            onChange={onFromDepartmentChange}
+          />
+        </div>
       )}
       {showAnyDept && dept.to && (
-        <DeptGrid
-          label={subType === "warehouse_to_dept" ? "도착 부서" : "대상 부서"}
-          value={toDepartment}
-          onChange={onToDepartmentChange}
-        />
+        <div className="flex flex-1 flex-col justify-center">
+          <DeptGrid
+            label={subType === "warehouse_to_dept" ? "도착 부서" : "대상 부서"}
+            value={toDepartment}
+            onChange={onToDepartmentChange}
+          />
+        </div>
       )}
 
       {caution && (
