@@ -10,8 +10,7 @@ export interface DefectHubEmployee {
   name: string;
   department: string;
 }
-import { MobileDefectEntry } from "../mobile/screens/MobileDefectEntry";
-import type { DefectHubCardId } from "./defectHubCards";
+import { DEFECT_HUB_CARDS, type DefectHubCardId } from "./defectHubCards";
 import { DefectKpiCards, type DefectKpiKind } from "./DefectKpiCards";
 import { DefectFilterBar, type DefectScope, type DefectSort } from "./DefectFilterBar";
 import { DefectDepartmentList } from "./DefectDepartmentList";
@@ -207,6 +206,57 @@ export function DefectHubPanel({
     );
   }
 
+  // KPI + 필터 + 목록 — 허브 첫 화면과 (처리 후 복귀하는) 목록 화면이 공유한다.
+  const listSection = (
+    <>
+      <DefectKpiCards kpi={kpi} onCardClick={handleKpiCardClick} />
+
+      <DefectFilterBar
+        scope={scope}
+        sort={sort}
+        onScopeChange={(next) => {
+          setScope(next);
+          setKpiFilter(null);
+        }}
+        onSortChange={setSort}
+        currentDept={currentEmployee.department}
+      />
+
+      {/* KPI 필터 활성 표시 */}
+      {kpiFilter && (
+        <div
+          className="flex items-center justify-between rounded-[10px] border px-4 py-2"
+          style={{ background: LEGACY_COLORS.errorBg, borderColor: tint(LEGACY_COLORS.red, 30) }}
+        >
+          <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>
+            {kpiFilter === "over_one_year" ? "1년 이상 격리 항목만 표시 중" : `${kpiFilter} 필터 활성`}
+          </span>
+          <button
+            type="button"
+            onClick={() => setKpiFilter(null)}
+            className="text-xs font-black hover:underline"
+            style={{ color: LEGACY_COLORS.red }}
+          >
+            필터 해제
+          </button>
+        </div>
+      )}
+
+      {/* 목록 */}
+      {loading ? (
+        <div className="py-10 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
+          불량 데이터 로딩 중...
+        </div>
+      ) : error ? (
+        <InlineErrorNote variant="block" className="!text-sm">
+          {error}
+        </InlineErrorNote>
+      ) : (
+        <DefectDepartmentList locations={filteredLocations} onProcess={handleProcess} />
+      )}
+    </>
+  );
+
   return (
     <div className="flex flex-col gap-4">
       {/* 헤더 */}
@@ -220,12 +270,37 @@ export function DefectHubPanel({
       </div>
 
       {view === "hub" ? (
-        /* 진입 화면 — 3장 카드 */
-        <MobileDefectEntry onSelect={handleHubSelect} />
-      ) : (
-        /* 목록 화면 */
+        /* 진입 화면 — 상단 액션(불량 격리·바로 폐기) + KPI + 격리 목록.
+           카드만 띄우고 비우지 않고, PC처럼 현재 격리 현황을 첫 화면에 함께 보여준다. */
         <>
-          {/* 뒤로가기 */}
+          <div className="grid grid-cols-2 gap-2.5">
+            {DEFECT_HUB_CARDS.filter((card) => card.id !== "list").map((card) => {
+              const Icon = card.icon;
+              const accent = LEGACY_COLORS[card.accentKey];
+              return (
+                <button
+                  key={card.id}
+                  type="button"
+                  onClick={() => handleHubSelect(card.id)}
+                  className="flex min-h-[60px] items-center gap-3 rounded-[16px] border p-3 text-left transition-[transform] active:scale-[0.98]"
+                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                >
+                  <span
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
+                    style={{ background: `color-mix(in srgb, ${accent} 20%, transparent)` }}
+                  >
+                    <Icon className="h-5 w-5" style={{ color: `color-mix(in srgb, ${accent} 42%, ${LEGACY_COLORS.text})` }} />
+                  </span>
+                  <span className="min-w-0 text-base font-black leading-tight">{card.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          {listSection}
+        </>
+      ) : (
+        /* 목록 화면 — 처리 후 복귀 시. */
+        <>
           <button
             type="button"
             onClick={() => setView("hub")}
@@ -234,54 +309,7 @@ export function DefectHubPanel({
           >
             ← 작업 선택
           </button>
-
-          {/* KPI 카드 */}
-          <DefectKpiCards kpi={kpi} onCardClick={handleKpiCardClick} />
-
-          {/* 필터 바 */}
-          <DefectFilterBar
-            scope={scope}
-            sort={sort}
-            onScopeChange={(next) => {
-              setScope(next);
-              setKpiFilter(null);
-            }}
-            onSortChange={setSort}
-            currentDept={currentEmployee.department}
-          />
-
-          {/* KPI 필터 활성 표시 */}
-          {kpiFilter && (
-            <div
-              className="flex items-center justify-between rounded-[10px] border px-4 py-2"
-              style={{ background: LEGACY_COLORS.errorBg, borderColor: tint(LEGACY_COLORS.red, 30) }}
-            >
-              <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>
-                {kpiFilter === "over_one_year" ? "1년 이상 격리 항목만 표시 중" : `${kpiFilter} 필터 활성`}
-              </span>
-              <button
-                type="button"
-                onClick={() => setKpiFilter(null)}
-                className="text-xs font-black hover:underline"
-                style={{ color: LEGACY_COLORS.red }}
-              >
-                필터 해제
-              </button>
-            </div>
-          )}
-
-          {/* 목록 */}
-          {loading ? (
-            <div className="py-10 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
-              불량 데이터 로딩 중...
-            </div>
-          ) : error ? (
-            <InlineErrorNote variant="block" className="!text-sm">
-              {error}
-            </InlineErrorNote>
-          ) : (
-            <DefectDepartmentList locations={filteredLocations} onProcess={handleProcess} />
-          )}
+          {listSection}
         </>
       )}
     </div>
