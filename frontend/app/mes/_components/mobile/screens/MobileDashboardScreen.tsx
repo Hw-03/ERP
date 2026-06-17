@@ -4,7 +4,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { api, type Item, type ProductModel, type ProductionCapacity } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { mesCodeDept } from "@/lib/mes/process";
-import { SlidersHorizontal } from "lucide-react";
+import { ChevronDown, SlidersHorizontal, Zap } from "lucide-react";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { InlineSearch } from "../primitives";
 import { InventoryKpiPanel, type KpiFilter } from "../../_inventory_sections/InventoryKpiPanel";
@@ -69,6 +69,8 @@ export function MobileDashboardScreen({
   const [localSearch, setLocalSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // 생산 가능 현황은 첫 화면 면적을 크게 차지하므로 기본 접힘 — 품목 목록을 위로 끌어올린다(리뷰 §4.2).
+  const [capacityOpen, setCapacityOpen] = useState(false);
 
   const lastSelectedItemRef = useRef<Item | null>(null);
   const deferredLocalSearch = useDeferredValue(localSearch.trim().toLowerCase());
@@ -175,9 +177,37 @@ export function MobileDashboardScreen({
                 else setKpi(key);
               }}
             />
-            <div className="mt-3">
-              <InventoryCapacityPanel capacityData={capacityData} onClick={onCapacityClick} />
-            </div>
+            {capacityData && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => setCapacityOpen((o) => !o)}
+                  aria-expanded={capacityOpen}
+                  className="flex w-full items-center justify-between gap-2 rounded-[12px] border px-3 py-2.5 text-left transition-[transform] active:scale-[0.99]"
+                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+                >
+                  <span
+                    className="flex items-center gap-2 text-sm font-black"
+                    style={{ color: LEGACY_COLORS.text }}
+                  >
+                    <Zap className="h-4 w-4" style={{ color: LEGACY_COLORS.blue }} />
+                    생산 가능 현황
+                  </span>
+                  <ChevronDown
+                    className="h-4 w-4 shrink-0 transition-transform"
+                    style={{
+                      color: LEGACY_COLORS.muted2,
+                      transform: capacityOpen ? "rotate(180deg)" : undefined,
+                    }}
+                  />
+                </button>
+                {capacityOpen && (
+                  <div className="mt-2">
+                    <InventoryCapacityPanel capacityData={capacityData} onClick={onCapacityClick} />
+                  </div>
+                )}
+              </div>
+            )}
           </section>
 
           <section
