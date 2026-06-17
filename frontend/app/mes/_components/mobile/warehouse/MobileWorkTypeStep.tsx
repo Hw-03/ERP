@@ -18,9 +18,6 @@ import {
 
 const PROD_DEPTS = ["튜브", "고압", "진공", "튜닝", "조립", "출하"];
 
-// 작업 유형 선택 후 거치는 전체 흐름 — Step 1 하단 빈 공간을 PC 위저드 감각으로 채운다.
-const COMPOSE_FLOW = ["작업 유형 선택", "세부 작업 · 부서", "품목 선택", "수량 입력", "검토 · 제출"];
-
 /**
  * Step 1 (모바일) — 작업 유형 선택.
  *
@@ -78,43 +75,6 @@ export function MobileWorkTypeStep({
           </button>
         );
       })}
-
-      {/* 진행 안내 — 카드 아래 빈 공간을 채워 "지금 어디고 다음에 뭘 하는지"를 보여준다(리뷰 §4.4). */}
-      <div
-        className="mt-1.5 rounded-[16px] border p-4"
-        style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
-      >
-        <div
-          className="mb-3 text-xs font-black uppercase tracking-[1px]"
-          style={{ color: LEGACY_COLORS.muted2 }}
-        >
-          이렇게 진행됩니다
-        </div>
-        <ol className="flex flex-col gap-2">
-          {COMPOSE_FLOW.map((label, i) => {
-            const first = i === 0;
-            return (
-              <li key={label} className="flex items-center gap-3">
-                <span
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-black"
-                  style={{
-                    background: first ? tint(LEGACY_COLORS.blue, 16) : LEGACY_COLORS.s3,
-                    color: first ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
-                  }}
-                >
-                  {i + 1}
-                </span>
-                <span
-                  className="text-sm font-bold"
-                  style={{ color: first ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}
-                >
-                  {label}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
     </div>
   );
 }
