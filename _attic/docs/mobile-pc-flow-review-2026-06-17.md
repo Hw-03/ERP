@@ -3,7 +3,7 @@
 - 작성일: 2026-06-17
 - 대상: `/mes` 모바일 화면, 393 x 852 viewport
 - 기준 작업자: 김현우 / 조립
-- 방식: 현재 앱을 직접 실행해 캡처한 화면 기준. 기존 `_attic/screenshots` 이미지는 구형 비교 자료로만 참고.
+- 방식: 현재 앱을 직접 실행해 확인한 화면 기준. 기존 `_attic/screenshots` 이미지는 구형 비교 자료로만 참고.
 
 ## 1. 요약 결론
 
@@ -13,19 +13,11 @@
 
 가장 중요한 개선 방향은 모바일을 새 UX로 다시 발명하는 것이 아니라, 데스크톱의 업무 구조를 작은 화면에 맞게 전폭으로 재배치하는 것이다. 사용자가 기대하는 감각은 "모바일용으로 바뀌었네"가 아니라 "PC 화면이 손에 들어왔네"에 가깝다.
 
-## 2. 증거 캡처
+## 2. 검토 기준
 
-| 화면 | 캡처 |
-|---|---|
-| 로그인 | ![로그인](../screenshots/mobile-pc-flow-review-2026-06-17/01-login.png) |
-| 대시보드 | ![대시보드](../screenshots/mobile-pc-flow-review-2026-06-17/02-dashboard.png) |
-| 입출고 Step 1 | ![입출고 Step 1](../screenshots/mobile-pc-flow-review-2026-06-17/03-warehouse-step1.png) |
-| 입출고 Step 2 | ![입출고 Step 2](../screenshots/mobile-pc-flow-review-2026-06-17/04-warehouse-step2.png) |
-| 입출고 Step 3 | ![입출고 Step 3](../screenshots/mobile-pc-flow-review-2026-06-17/05-warehouse-step3.png) |
-| 불량 허브 | ![불량 허브](../screenshots/mobile-pc-flow-review-2026-06-17/06-defect-hub.png) |
-| 불량 목록 | ![불량 목록](../screenshots/mobile-pc-flow-review-2026-06-17/07-defect-list.png) |
-| 불량 처리 | ![불량 처리](../screenshots/mobile-pc-flow-review-2026-06-17/08-defect-process.png) |
-| 더보기 | ![더보기](../screenshots/mobile-pc-flow-review-2026-06-17/09-more-sheet.png) |
+- 현재 앱을 직접 실행해 393 x 852 모바일 폭에서 확인했다.
+- 별도 캡처 파일은 산출물에 포함하지 않는다.
+- 직접 확인한 화면: 로그인, 대시보드, 입출고 Step 1~3, 불량 허브/목록/처리, 더보기.
 
 ## 3. 우선순위
 
