@@ -15,35 +15,40 @@ export function WizardProgress({
 }) {
   const active = steps[current];
   return (
-    <div className={clsx("flex flex-col gap-2", className)}>
-      <div className="flex items-center gap-1">
+    <div className={clsx("flex flex-col gap-1.5", className)}>
+      {/* 항목 17 — 완료=진한 채움, 현재=더 두껍게+링 강조, 미래=흐리게 */}
+      <div className="flex items-center gap-1.5">
         {steps.map((step, index) => {
           const state = index < current ? "done" : index === current ? "active" : "todo";
-          const bg =
-            state === "active"
-              ? LEGACY_COLORS.blue
-              : state === "done"
-              ? `${LEGACY_COLORS.blue as string}88`
-              : LEGACY_COLORS.s3;
           return (
             <div
               key={step.key}
-              className="h-[4px] flex-1 rounded-full transition-colors"
-              style={{ background: bg }}
+              className={clsx(
+                "flex-1 rounded-full transition-all",
+                state === "active" ? "h-[6px]" : "h-[4px]",
+              )}
+              style={{
+                background: state === "todo" ? LEGACY_COLORS.s3 : LEGACY_COLORS.blue,
+                opacity: state === "done" ? 0.9 : 1,
+                boxShadow:
+                  state === "active"
+                    ? `0 0 0 2px color-mix(in srgb, ${LEGACY_COLORS.blue} 24%, transparent)`
+                    : undefined,
+              }}
             />
           );
         })}
       </div>
-      <div className="flex items-center justify-between">
-        <div className={clsx(TYPO.caption, "font-semibold")} style={{ color: LEGACY_COLORS.muted2 }}>
-          Step {current + 1} / {steps.length}
-        </div>
-        <div
-          className={clsx(TYPO.caption, "font-black")}
-          style={{ color: `color-mix(in srgb, ${LEGACY_COLORS.blue} 38%, ${LEGACY_COLORS.text})` }}
+      <div className="flex items-center justify-between gap-2">
+        <span
+          className={clsx(TYPO.caption, "shrink-0 font-bold uppercase tracking-[1px]")}
+          style={{ color: LEGACY_COLORS.muted2 }}
         >
+          Step {current + 1} / {steps.length}
+        </span>
+        <span className={clsx(TYPO.caption, "truncate font-black")} style={{ color: LEGACY_COLORS.blue }}>
           {active?.label}
-        </div>
+        </span>
       </div>
     </div>
   );
