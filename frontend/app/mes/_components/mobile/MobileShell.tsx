@@ -201,7 +201,9 @@ export function MobileShell() {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
+  const [pillOverride, setPillOverride] = useState<{ left: number; width: number } | null>(null);
   const activeIndex = visibleTabs.indexOf(activeTab);
+  const displayPill = pillOverride ?? pill;
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -358,14 +360,14 @@ export function MobileShell() {
               borderColor: LEGACY_COLORS.border,
             }}
           >
-            {pill && (
+            {displayPill && (
               <div
                 className="pointer-events-none absolute rounded-full"
                 style={{
                   top: 4,
                   bottom: 4,
-                  left: pill.left,
-                  width: pill.width,
+                  left: displayPill.left,
+                  width: displayPill.width,
                   background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 16%, transparent)`,
                   transition:
                     "left 0.32s cubic-bezier(0.34,1.56,0.64,1), width 0.32s cubic-bezier(0.34,1.56,0.64,1)",
@@ -388,7 +390,22 @@ export function MobileShell() {
               icon={MoreHorizontal}
               label="더보기"
               active={false}
-              onClick={() => setMoreSheetOpen(true)}
+              onClick={() => {
+                const el = containerRef.current;
+                if (el) {
+                  const btns = Array.from(el.querySelectorAll<HTMLButtonElement>("button"));
+                  const btn = btns[btns.length - 1];
+                  if (btn) {
+                    const h = el.offsetHeight - 8;
+                    const w = Math.round(h * 1.1);
+                    setPillOverride({ left: btn.offsetLeft + (btn.offsetWidth - w) / 2, width: w });
+                  }
+                }
+                setTimeout(() => {
+                  setPillOverride(null);
+                  setMoreSheetOpen(true);
+                }, 470);
+              }}
             />
           </div>
         </nav>
