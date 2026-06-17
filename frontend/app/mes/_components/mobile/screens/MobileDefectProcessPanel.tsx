@@ -19,7 +19,7 @@ import {
 import { InlineErrorNote } from "../../_defect_hub/InlineErrorNote";
 import { REASON_CATEGORIES } from "../../_defect_hub/reasonCategories";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
-import { IconButton, SectionCard, Stepper } from "../primitives";
+import { IconButton, SectionCard, StickyFooter, Stepper } from "../primitives";
 
 type ProcessAction = "unquarantine" | "scrap" | "return" | "disassemble";
 
@@ -140,8 +140,8 @@ export function MobileDefectProcessPanel({
   // ── Step 2: BOM 분해(재작업) ──────────────────────────────────────────
   if (step === 2) {
     return (
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-2">
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex shrink-0 items-center gap-2 pb-3">
           <IconButton icon={ArrowLeft} label="이전" size="md" onClick={() => setStep(1)} />
           <div className="min-w-0">
             <h2 className={clsx(TYPO.headline, "font-black")} style={{ color: LEGACY_COLORS.text }}>
@@ -153,6 +153,7 @@ export function MobileDefectProcessPanel({
           </div>
         </div>
 
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
         <SectionCard padding="sm">
           <div className="flex flex-col gap-1">
             <span className={clsx(TYPO.body, "font-black")} style={{ color: LEGACY_COLORS.text }}>
@@ -181,19 +182,22 @@ export function MobileDefectProcessPanel({
         </div>
 
         {errorMsg && <InlineErrorNote>{errorMsg}</InlineErrorNote>}
+        </div>
 
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => setConfirmOpen(true)}
-          className={clsx(
-            "w-full rounded-[16px] px-4 py-[14px] font-black text-white transition-[transform,opacity] active:scale-[0.98] disabled:opacity-40",
-            TYPO.body,
-          )}
-          style={{ background: LEGACY_COLORS.yellow }}
-        >
-          {busy ? "처리 중..." : "최종 처리 →"}
-        </button>
+        <StickyFooter>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setConfirmOpen(true)}
+            className={clsx(
+              "w-full rounded-[16px] px-4 py-[14px] font-black text-white transition-[transform,opacity] active:scale-[0.98] disabled:opacity-40",
+              TYPO.body,
+            )}
+            style={{ background: LEGACY_COLORS.yellow }}
+          >
+            {busy ? "처리 중..." : "최종 처리 →"}
+          </button>
+        </StickyFooter>
 
         <ConfirmModal
           open={confirmOpen}
@@ -218,8 +222,8 @@ export function MobileDefectProcessPanel({
 
   // ── Step 1: 액션 선택 + 사유 ─────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 items-center gap-2 pb-3">
         <IconButton icon={ArrowLeft} label="목록" size="md" onClick={onCancel} />
         <div className="min-w-0">
           <h2 className={clsx(TYPO.headline, "font-black")} style={{ color: LEGACY_COLORS.text }}>
@@ -233,6 +237,7 @@ export function MobileDefectProcessPanel({
         </div>
       </div>
 
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
       {/* 품목 정보 */}
       <SectionCard padding="sm">
         <div className="flex flex-col gap-1.5">
@@ -350,36 +355,39 @@ export function MobileDefectProcessPanel({
       </div>
 
       {errorMsg && <InlineErrorNote>{errorMsg}</InlineErrorNote>}
+      </div>
 
-      {/* 하단 액션 */}
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => {
-          if (action === "disassemble") {
-            setStep(2);
-          } else if (action === "unquarantine") {
-            void handleSubmit();
-          } else {
-            setConfirmOpen(true);
-          }
-        }}
-        className={clsx(
-          "w-full rounded-[16px] px-4 py-[14px] font-black text-white transition-[transform,opacity] active:scale-[0.98] disabled:opacity-40",
-          TYPO.body,
-        )}
-        style={{ background: actionColor[action] }}
-      >
-        {busy
-          ? "처리 중..."
-          : action === "disassemble"
-          ? "다음 →"
-          : action === "unquarantine"
-          ? "정상 복귀 →"
-          : action === "scrap"
-          ? "전체 폐기 →"
-          : "반품 →"}
-      </button>
+      {/* 하단 액션 — 항상 보이도록 고정 */}
+      <StickyFooter>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            if (action === "disassemble") {
+              setStep(2);
+            } else if (action === "unquarantine") {
+              void handleSubmit();
+            } else {
+              setConfirmOpen(true);
+            }
+          }}
+          className={clsx(
+            "w-full rounded-[16px] px-4 py-[14px] font-black text-white transition-[transform,opacity] active:scale-[0.98] disabled:opacity-40",
+            TYPO.body,
+          )}
+          style={{ background: actionColor[action] }}
+        >
+          {busy
+            ? "처리 중..."
+            : action === "disassemble"
+            ? "다음 →"
+            : action === "unquarantine"
+            ? "정상 복귀 →"
+            : action === "scrap"
+            ? "전체 폐기 →"
+            : "반품 →"}
+        </button>
+      </StickyFooter>
 
       <ConfirmModal
         open={confirmOpen}
