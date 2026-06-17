@@ -55,9 +55,8 @@ export function WarehouseSectionTabs({
   return (
     <div
       role="tablist"
-      // 모바일: 가로 스와이프 스크롤(탭당 최소폭 확보 → 라벨 한 줄·배지 안 겹침, 탭 수 늘어도 안전).
-      // 데스크톱(lg): 기존 균등분할 grid 그대로(inline gridTemplateColumns 는 lg 에서만 의미).
-      className="flex gap-2 overflow-x-auto scrollbar-hide lg:grid lg:overflow-x-visible"
+      // 항목 4 — 모바일도 데스크톱과 동일하게 grid 균등분할(탭 수 무관 전폭). gridTemplateColumns 가 양쪽 모두 적용.
+      className="grid gap-2"
       style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
     >
       {tabs.map((t) => (
@@ -99,7 +98,7 @@ function TabButton({
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="relative min-h-[44px] shrink-0 min-w-[86px] rounded-[12px] border px-2 py-2 transition-colors hover:brightness-110 lg:min-w-0 lg:shrink lg:px-4 lg:py-2.5"
+      className="relative min-h-[44px] min-w-0 rounded-[12px] border px-2 py-2 transition-colors hover:brightness-110 lg:px-4 lg:py-2.5"
       style={{ background: bg, borderColor: border }}
     >
       <div className="text-center text-xs leading-tight tracking-[-0.02em] break-keep lg:text-[22px]">
