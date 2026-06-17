@@ -273,8 +273,9 @@ export function IoTargetPicker({
     <div className="flex h-full min-h-0 flex-col gap-3">
       {/* 필터 + 순서 편집 토글 */}
       <div className="flex shrink-0 flex-col gap-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="grid flex-1 grid-cols-3 gap-2 lg:grid-cols-[1fr_1fr_1fr_2fr]" style={{ opacity: editMode ? 0.4 : 1, pointerEvents: editMode ? "none" : undefined }}>
+        {/* 항목 9 — 모바일은 필터 그리드를 전폭 한 줄로(순서 편집 버튼은 아래 행). 데스크톱(lg)은 기존 인라인. */}
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="grid grid-cols-3 gap-2 lg:flex-1 lg:grid-cols-[1fr_1fr_1fr_2fr]" style={{ opacity: editMode ? 0.4 : 1, pointerEvents: editMode ? "none" : undefined }}>
             <LabeledSelect label="부서" value={dept} onChange={setDept} options={deptOptions} />
             <LabeledSelect label="모델" value={model} onChange={setModel} options={modelOptions} />
             <LabeledSelect label="단계" value={stage} onChange={setStage} options={STAGE_OPTIONS} />
@@ -408,33 +409,37 @@ export function IoTargetPicker({
         )}
       </div>
 
-      {/* 하단 advance 버튼 — 선택 품목 없으면 비활성 */}
-      <button
-        type="button"
-        onClick={onAdvance}
-        disabled={bundles.length === 0}
-        className="flex w-full shrink-0 items-center justify-between rounded-[12px] border px-4 py-3 text-sm font-black transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-        style={{
-          background: bundles.length > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
-          borderColor: bundles.length > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-          color: bundles.length > 0 ? "#fff" : LEGACY_COLORS.muted2,
-        }}
-      >
-        {bundles.length > 0 ? (
-          <>
-            <span>{`상위 ${parentCount}개 · 하위 ${childCount}개`}</span>
-            <span className="flex items-center gap-1.5">
+      {/* 하단 advance 버튼 — 선택 품목 없으면 비활성.
+          항목 10 — 모바일은 sticky 로 하단 네비 위에 항상 고정(이중 스크롤에 묻히지 않게),
+          데스크톱(lg)은 기존 정적 배치 그대로. */}
+      <div className="sticky bottom-0 z-20 -mx-3 shrink-0 border-t border-[var(--c-border)] bg-[var(--c-s1)] px-4 pb-3 pt-3 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0">
+        <button
+          type="button"
+          onClick={onAdvance}
+          disabled={bundles.length === 0}
+          className="flex w-full items-center justify-between rounded-[12px] border px-4 py-3 text-sm font-black transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+          style={{
+            background: bundles.length > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
+            borderColor: bundles.length > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+            color: bundles.length > 0 ? "#fff" : LEGACY_COLORS.muted2,
+          }}
+        >
+          {bundles.length > 0 ? (
+            <>
+              <span>{`상위 ${parentCount}개 · 하위 ${childCount}개`}</span>
+              <span className="flex items-center gap-1.5">
+                수량 조정
+                <ArrowRight className="h-4 w-4" />
+              </span>
+            </>
+          ) : (
+            <span className="ml-auto flex items-center gap-1.5">
               수량 조정
               <ArrowRight className="h-4 w-4" />
             </span>
-          </>
-        ) : (
-          <span className="ml-auto flex items-center gap-1.5">
-            수량 조정
-            <ArrowRight className="h-4 w-4" />
-          </span>
-        )}
-      </button>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
