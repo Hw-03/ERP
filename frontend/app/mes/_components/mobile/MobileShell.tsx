@@ -19,6 +19,7 @@ import {
   MobileHistoryScreen,
   MobileWeeklyScreen,
   MobileWarehouseMapScreen,
+  MobileMoreScreen,
 } from "./screens";
 import { WeeklyWeekPicker, getWeekStartMonday } from "../_weekly_sections/WeeklyWeekPicker";
 import { api, type ProductionCapacity } from "@/lib/api";
@@ -30,22 +31,29 @@ import { canEnterIO } from "../_warehouse_steps";
 import { canSeeWorkType } from "../_warehouse_v2/ioWorkType";
 import type { IoEntryIntent } from "../_warehouse_v2/types";
 import { MobileUserMenuSheet } from "./MobileUserMenuSheet";
-import { MobileMoreSheet } from "./MobileMoreSheet";
 
 // 관리(admin)는 모바일에서 제외 — 관리 작업은 데스크톱(PC)에서 한다.
-export type MobileTabId = "dashboard" | "warehouse" | "defect" | "history" | "weekly" | "warehouseMap";
+export type MobileTabId =
+  | "dashboard"
+  | "warehouse"
+  | "defect"
+  | "history"
+  | "more"
+  | "weekly"
+  | "warehouseMap";
 
 const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
   dashboard: { label: "대시보드", icon: Boxes },
   warehouse: { label: "입출고", icon: Warehouse },
   defect: { label: "불량", icon: AlertTriangle },
   history: { label: "내역", icon: HistoryIcon },
+  more: { label: "더보기", icon: MoreHorizontal },
   weekly: { label: "주간보고", icon: BarChart2 },
   warehouseMap: { label: "창고지도", icon: MapPinned },
 };
 
-// 하단 탭바에 노출되는 4탭. 나머지(주간보고·창고지도)는 하단 더보기 시트로 진입.
-const TAB_BAR_IDS: MobileTabId[] = ["dashboard", "warehouse", "defect", "history"];
+// 하단 탭바에 노출되는 5탭. 더보기는 전폭 화면(주간보고·창고지도·계정)으로 진입한다.
+const TAB_BAR_IDS: MobileTabId[] = ["dashboard", "warehouse", "defect", "history", "more"];
 
 // 마운트 딥링크(?tab=)·알림 네비가 받아들이는 유효 탭 집합. 알 수 없는 값(예: admin)이
 // 들어오면 무시되어 기본 dashboard 가 유지된다.
@@ -54,6 +62,7 @@ const VALID_TAB_IDS: MobileTabId[] = [
   "warehouse",
   "defect",
   "history",
+  "more",
   "weekly",
   "warehouseMap",
 ];
@@ -117,7 +126,6 @@ export function MobileShell() {
   const [toastQueue, setToastQueue] = useState<ToastItem[]>([]);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [defectDeptFilter, setDefectDeptFilter] = useState<string | null>(null);
 
   // URL ?tab= / ?defect_dept= 으로 초기 상태 동기화.
@@ -201,9 +209,7 @@ export function MobileShell() {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
-  const [pillOverride, setPillOverride] = useState<{ left: number; width: number } | null>(null);
   const activeIndex = visibleTabs.indexOf(activeTab);
-  const displayPill = pillOverride ?? pill;
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -252,6 +258,16 @@ export function MobileShell() {
     }
     if (activeTab === "history") {
       return <MobileHistoryScreen key={key} />;
+    }
+    if (activeTab === "more") {
+      return (
+        <MobileMoreScreen
+          key={key}
+          onWeekly={() => handleTabChange("weekly")}
+          onWarehouseMap={() => handleTabChange("warehouseMap")}
+          onOpenAccount={() => setUserMenuOpen(true)}
+        />
+      );
     }
     if (activeTab === "weekly") {
       return <MobileWeeklyScreen key={key} weekMon={weekMon} />;
@@ -360,14 +376,14 @@ export function MobileShell() {
               borderColor: LEGACY_COLORS.border,
             }}
           >
-            {displayPill && (
+            {pill && (
               <div
                 className="pointer-events-none absolute rounded-full"
                 style={{
                   top: 4,
                   bottom: 4,
-                  left: displayPill.left,
-                  width: displayPill.width,
+                  left: pill.left,
+                  width: pill.width,
                   background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 16%, transparent)`,
                   transition:
                     "left 0.32s cubic-bezier(0.34,1.56,0.64,1), width 0.32s cubic-bezier(0.34,1.56,0.64,1)",
@@ -383,30 +399,6 @@ export function MobileShell() {
                 onClick={() => handleTabChange(tab)}
               />
             ))}
-            {/* 더보기 — 강등된 화면(주간보고·창고지도)으로의 진입.
-                실제 탭 전환이 아니라 시트만 열므로 항상 비활성 스타일. */}
-            <NavButton
-              key="__more"
-              icon={MoreHorizontal}
-              label="더보기"
-              active={false}
-              onClick={() => {
-                const el = containerRef.current;
-                if (el) {
-                  const btns = Array.from(el.querySelectorAll<HTMLButtonElement>("button"));
-                  const btn = btns[btns.length - 1];
-                  if (btn) {
-                    const h = el.offsetHeight - 8;
-                    const w = Math.round(h * 1.1);
-                    setPillOverride({ left: btn.offsetLeft + (btn.offsetWidth - w) / 2, width: w });
-                  }
-                }
-                setTimeout(() => {
-                  setPillOverride(null);
-                  setMoreSheetOpen(true);
-                }, 470);
-              }}
-            />
           </div>
         </nav>
       </div>
@@ -461,13 +453,6 @@ export function MobileShell() {
       <MobileUserMenuSheet
         open={userMenuOpen}
         onClose={() => setUserMenuOpen(false)}
-      />
-
-      <MobileMoreSheet
-        open={moreSheetOpen}
-        onClose={() => setMoreSheetOpen(false)}
-        onWeekly={() => handleTabChange("weekly")}
-        onWarehouseMap={() => handleTabChange("warehouseMap")}
       />
     </div>
   );

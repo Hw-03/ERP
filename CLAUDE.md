@@ -21,6 +21,7 @@
   - `frontend/app/mes/_components/mobile/MobileShell.tsx` — NavButton 컴포넌트 및 `<nav>` 컨테이너 스타일 (frozen: 2026-06-16). 슬라이딩 pill(`containerRef`·`pill` state·`useLayoutEffect`) 구현 완료(2026-06-16).
   - `frontend/app/globals.css` — `button.no-btn-inset` opt-out 규칙 (frozen: 2026-06-16)
   - 명시적 요청 없이 탭바 레이아웃·버튼 디자인·그림자·pill 스타일 건드리지 말 것.
+  - **더보기 동작 변경(2026-06-17, 사용자 승인)**: 더보기는 BottomSheet → 정식 5번째 전폭 탭(`more`, `MobileMoreScreen`)으로 전환됨. `pillOverride`·470ms 시트 딜레이·`MobileMoreSheet`는 제거됨(더보기 시트 동작 동결 문구는 폐기). NavButton·`<nav>`·pill **시각 디자인 자체는 여전히 동결**.
 - Do not mix sample data with real data.
 - Do not perform large refactors, folder moves, or renames unless explicitly asked.
 - Do not rename legacy internal identifiers such as `xray-erp` unless explicitly asked.
