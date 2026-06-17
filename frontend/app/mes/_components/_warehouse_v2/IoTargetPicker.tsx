@@ -557,7 +557,11 @@ function ItemTable({
                 isHighlight={isHighlight}
               >
                 <td className="max-w-0 w-full px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
-                  <div className="truncate text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
+                  {/* 모바일(<sm): 사양·괄호·구형/신형까지 보이도록 2줄. 데스크톱(sm:≥640): 기존 한 줄 truncate 보존. */}
+                  <div
+                    className="line-clamp-2 text-base font-bold leading-tight sm:line-clamp-none sm:truncate sm:leading-normal"
+                    style={{ color: LEGACY_COLORS.text }}
+                  >
                     {item.item_name}
                   </div>
                 </td>
