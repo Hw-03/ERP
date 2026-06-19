@@ -25,6 +25,7 @@ import {
   matchesModel,
   matchesStage,
   renderDeptBreakdown,
+  sortItemsForPicker,
 } from "./itemPickerShared";
 import {
   useMyItemOrderQuery,
@@ -149,32 +150,7 @@ export function IoTargetPicker({
         matchesStage(item, stage) &&
         matchesSearch(item, keyword),
     );
-    return filtered
-      .map((item, idx) => {
-        const letter = deptOf(item.process_type_code);
-        const priority = letter ? deptPriorityByLetter.get(letter) ?? 999 : 999;
-        // 조립 그룹(letter "A") 안에서만 담당 모델 매칭 시 그룹 내 추가 우선순위 부여.
-        // 한 부품이 여러 담당 모델에 공통이면 그 중 가장 높은(=값이 작은) priority 사용.
-        let assemblyRank = Number.POSITIVE_INFINITY;
-        if (letter === "A" && assignedPriorityBySlot.size > 0) {
-          for (const slot of item.model_slots ?? []) {
-            const p = assignedPriorityBySlot.get(slot);
-            if (p !== undefined && p < assemblyRank) assemblyRank = p;
-          }
-        }
-        const rank = employeeOrderRank.get(item.item_id) ?? Number.POSITIVE_INFINITY;
-        return { item, rank, priority, assemblyRank, idx };
-      })
-      .sort((a, b) =>
-        a.rank !== b.rank
-          ? a.rank - b.rank
-          : a.priority !== b.priority
-            ? a.priority - b.priority
-            : a.assemblyRank !== b.assemblyRank
-              ? a.assemblyRank - b.assemblyRank
-              : a.idx - b.idx,
-      )
-      .map((row) => row.item);
+    return sortItemsForPicker(filtered, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank);
   }, [items, dept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank]);
 
   // 빠른작업으로 진입한 강조 품목을 검색창에 미리 넣어 "검색된 상태"로 보여준다.
@@ -192,30 +168,7 @@ export function IoTargetPicker({
   // 편집 모드 진입 시 전체 items를 현재 저장순으로 초기화.
   // filteredItems가 아닌 items 전체를 편집 대상으로 사용(전체 목록 reorder).
   const allItemsSorted = useMemo(() => {
-    return [...items]
-      .map((item, idx) => {
-        const rank = employeeOrderRank.get(item.item_id) ?? Number.POSITIVE_INFINITY;
-        const letter = deptOf(item.process_type_code);
-        const priority = letter ? deptPriorityByLetter.get(letter) ?? 999 : 999;
-        let assemblyRank = Number.POSITIVE_INFINITY;
-        if (letter === "A" && assignedPriorityBySlot.size > 0) {
-          for (const slot of item.model_slots ?? []) {
-            const p = assignedPriorityBySlot.get(slot);
-            if (p !== undefined && p < assemblyRank) assemblyRank = p;
-          }
-        }
-        return { item, rank, priority, assemblyRank, idx };
-      })
-      .sort((a, b) =>
-        a.rank !== b.rank
-          ? a.rank - b.rank
-          : a.priority !== b.priority
-            ? a.priority - b.priority
-            : a.assemblyRank !== b.assemblyRank
-              ? a.assemblyRank - b.assemblyRank
-              : a.idx - b.idx,
-      )
-      .map((row) => row.item);
+    return sortItemsForPicker(items, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank);
   }, [items, employeeOrderRank, deptPriorityByLetter, assignedPriorityBySlot]);
 
   const { dragId, dropTargetId, makeHandlers } = useItemOrderDrag(editItems, setEditItems);

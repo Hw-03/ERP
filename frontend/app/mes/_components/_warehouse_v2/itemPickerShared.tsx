@@ -139,3 +139,45 @@ export function buildEmployeeOrderRank(
   }
   return m;
 }
+
+/**
+ * 품목 선택기 공용 4단계 정렬. IoTargetPicker/DefectItemPicker 의 filteredItems·
+ * allItemsSorted 에 인라인 복제돼 있던 정렬을 동작 변경 없이 추출했다.
+ *
+ * 우선순위(작을수록 상위): 1) rank=직원 개인 순서 2) priority=부서 순서
+ * 3) assemblyRank=조립(letter "A") 그룹 내 담당 모델 우선순위(공통이면 최소값)
+ * 4) idx=원본 배열 인덱스(동률 시 서버 정렬을 안정적으로 유지).
+ */
+export function sortItemsForPicker(
+  items: Item[],
+  deptPriorityByLetter: Map<string, number>,
+  assignedPriorityBySlot: Map<number, number>,
+  employeeOrderRank: Map<string, number>,
+): Item[] {
+  return items
+    .map((item, idx) => {
+      const letter = deptOf(item.process_type_code);
+      const priority = letter ? deptPriorityByLetter.get(letter) ?? 999 : 999;
+      // 조립 그룹(letter "A") 안에서만 담당 모델 매칭 시 그룹 내 추가 우선순위 부여.
+      // 한 부품이 여러 담당 모델에 공통이면 그 중 가장 높은(=값이 작은) priority 사용.
+      let assemblyRank = Number.POSITIVE_INFINITY;
+      if (letter === "A" && assignedPriorityBySlot.size > 0) {
+        for (const slot of item.model_slots ?? []) {
+          const p = assignedPriorityBySlot.get(slot);
+          if (p !== undefined && p < assemblyRank) assemblyRank = p;
+        }
+      }
+      const rank = employeeOrderRank.get(item.item_id) ?? Number.POSITIVE_INFINITY;
+      return { item, rank, priority, assemblyRank, idx };
+    })
+    .sort((a, b) =>
+      a.rank !== b.rank
+        ? a.rank - b.rank
+        : a.priority !== b.priority
+          ? a.priority - b.priority
+          : a.assemblyRank !== b.assemblyRank
+            ? a.assemblyRank - b.assemblyRank
+            : a.idx - b.idx,
+    )
+    .map((row) => row.item);
+}

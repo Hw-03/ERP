@@ -22,6 +22,7 @@ import {
   matchesModel,
   matchesStage,
   renderDeptBreakdown,
+  sortItemsForPicker,
 } from "../_warehouse_v2/itemPickerShared";
 import {
   useMyItemOrderQuery,
@@ -96,57 +97,11 @@ export function DefectItemPicker({
         matchesStage(item, stage) &&
         matchesSearch(item, keyword),
     );
-    return filtered
-      .map((item, idx) => {
-        const letter = deptOf(item.process_type_code);
-        const priority = letter ? deptPriorityByLetter.get(letter) ?? 999 : 999;
-        let assemblyRank = Number.POSITIVE_INFINITY;
-        if (letter === "A" && assignedPriorityBySlot.size > 0) {
-          for (const slot of item.model_slots ?? []) {
-            const p = assignedPriorityBySlot.get(slot);
-            if (p !== undefined && p < assemblyRank) assemblyRank = p;
-          }
-        }
-        const rank = employeeOrderRank.get(item.item_id) ?? Number.POSITIVE_INFINITY;
-        return { item, rank, priority, assemblyRank, idx };
-      })
-      .sort((a, b) =>
-        a.rank !== b.rank
-          ? a.rank - b.rank
-          : a.priority !== b.priority
-            ? a.priority - b.priority
-            : a.assemblyRank !== b.assemblyRank
-              ? a.assemblyRank - b.assemblyRank
-              : a.idx - b.idx,
-      )
-      .map((row) => row.item);
+    return sortItemsForPicker(filtered, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank);
   }, [items, dept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank]);
 
   const allItemsSorted = useMemo(() => {
-    return [...items]
-      .map((item, idx) => {
-        const rank = employeeOrderRank.get(item.item_id) ?? Number.POSITIVE_INFINITY;
-        const letter = deptOf(item.process_type_code);
-        const priority = letter ? deptPriorityByLetter.get(letter) ?? 999 : 999;
-        let assemblyRank = Number.POSITIVE_INFINITY;
-        if (letter === "A" && assignedPriorityBySlot.size > 0) {
-          for (const slot of item.model_slots ?? []) {
-            const p = assignedPriorityBySlot.get(slot);
-            if (p !== undefined && p < assemblyRank) assemblyRank = p;
-          }
-        }
-        return { item, rank, priority, assemblyRank, idx };
-      })
-      .sort((a, b) =>
-        a.rank !== b.rank
-          ? a.rank - b.rank
-          : a.priority !== b.priority
-            ? a.priority - b.priority
-            : a.assemblyRank !== b.assemblyRank
-              ? a.assemblyRank - b.assemblyRank
-              : a.idx - b.idx,
-      )
-      .map((row) => row.item);
+    return sortItemsForPicker(items, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank);
   }, [items, employeeOrderRank, deptPriorityByLetter, assignedPriorityBySlot]);
 
   const { dragId, dropTargetId, makeHandlers } = useItemOrderDrag(editItems, setEditItems);
