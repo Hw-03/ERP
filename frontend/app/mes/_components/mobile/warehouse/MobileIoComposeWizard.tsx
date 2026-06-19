@@ -426,12 +426,18 @@ export function MobileIoComposeWizard({
         </div>
       </div>
 
-      {/* 본문: 현재 스텝만 스크롤. 헤더가 in-flow 라 pt 보정 불필요. */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-3">
-        <h2 className="mb-3 text-base font-black" style={{ color: LEGACY_COLORS.text }}>
-          {stepTitle}
-        </h2>
+      {/* 항목 2-3 — 단계 제목을 스크롤 컨테이너 밖(고정)으로. H2 36px가 컨테이너 안에 있으면
+          Step1·2 의 min-h-full 자식과 합쳐져 오버플로우→스크롤이 생긴다. 밖으로 빼면 본문이
+          컨테이너 높이를 그대로 채워 스크롤이 사라진다. Step3~5 는 그대로 스크롤 허용. */}
+      <h2
+        className="shrink-0 px-3 pt-3 pb-2 text-base font-black"
+        style={{ color: LEGACY_COLORS.text }}
+      >
+        {stepTitle}
+      </h2>
 
+      {/* 본문: 현재 스텝만 스크롤. */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         {error && (
           <div
             className="mb-3 rounded-[12px] border px-4 py-3 text-sm font-bold"

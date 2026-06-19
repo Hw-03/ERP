@@ -50,7 +50,7 @@ export function MobileWorkTypeStep({
             type="button"
             aria-pressed={active}
             onClick={() => onWorkTypeChange(row.id)}
-            className="flex min-h-[96px] flex-1 items-center gap-4 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"
+            className="flex min-h-[96px] flex-1 items-center gap-5 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"
             style={{
               background: active ? tint(accent, 14) : LEGACY_COLORS.s2,
               borderColor: active ? accent : LEGACY_COLORS.border,
@@ -59,15 +59,15 @@ export function MobileWorkTypeStep({
             }}
           >
             <span
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px]"
+              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[16px]"
               style={{ background: active ? tint(accent, 20) : LEGACY_COLORS.s3 }}
             >
-              <Icon className="h-6 w-6" />
+              <Icon className="h-8 w-8" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-lg font-black leading-tight">{row.label}</span>
+              <span className="block text-xl font-black leading-tight">{row.label}</span>
               <span
-                className="block text-sm font-semibold"
+                className="block text-base font-semibold"
                 style={{ color: active ? accentText : LEGACY_COLORS.muted2 }}
               >
                 {row.description}
