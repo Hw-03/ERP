@@ -58,23 +58,71 @@ function BomTreeItem({
   rails,
   isLast,
   compact = false,
+  tapToExpandName = false,
 }: {
   node: BOMTreeNode;
   rails: boolean[];
   isLast: boolean;
   compact?: boolean;
+  /** 항목 2-1 (모바일 전용) — 이름 행을 탭하면 풀네임 펼침. 데스크톱 호출처는 미전달(기본 false). */
+  tapToExpandName?: boolean;
 }) {
   const getDeptColor = useDeptColorLookup();
   const [open, setOpen] = useState(false);
+  // 항목 2-1 — 이름 탭 펼침 상태(모바일 전용). tapToExpandName=false 면 항상 false 라 데스크톱 영향 없음.
+  const [nameExpanded, setNameExpanded] = useState(false);
   const hasKids = node.children.length > 0;
   const deptBadge = node.mes_code ? mesCodeDeptBadge(node.mes_code, getDeptColor) : null;
   const qty = node.required_quantity;
 
+  // 우측 메타(부서 · 코드 · ×수량) — 1줄(collapsed)·펼침(reflow) 양쪽에서 동일하게 재사용.
+  const metaChildren = (
+    <>
+      {/* 부서 — 색 = 1차 앵커. 좌정렬 */}
+      <span className="flex min-w-0 justify-start">
+        {deptBadge && (
+          <span
+            className="rounded-full px-2 py-0.5 text-[10px] font-bold leading-none"
+            style={{ color: deptBadge.color, background: deptBadge.bg }}
+          >
+            {deptBadge.label}
+          </span>
+        )}
+      </span>
+
+      {/* 코드 — 보조 모노스페이스. 우정렬로 우변 기준선 고정 */}
+      <span
+        className="min-w-0 truncate whitespace-nowrap text-right font-mono text-[11px] tracking-tight"
+        style={{ color: tint(LEGACY_COLORS.muted2, 70) }}
+        title={node.mes_code ?? undefined}
+      >
+        {node.mes_code || ""}
+      </span>
+
+      {/* 수량 — 실행후 자리(col4)에 가운데 정렬 강조. ×는 약한 접두 */}
+      <span
+        className="text-center text-xs tabular-nums leading-none"
+        style={{ gridColumn: "4", color: qty > 1 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2, fontWeight: qty > 1 ? 800 : 600 }}
+      >
+        <span className="mr-px text-[10px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>×</span>
+        {qty}
+      </span>
+    </>
+  );
+
   return (
     <li>
       <div
-        className="flex items-center transition-colors duration-150"
-        style={{ height: ROW_H, background: "transparent" }}
+        className={
+          tapToExpandName && nameExpanded
+            ? "flex items-start transition-colors duration-150"
+            : "flex items-center transition-colors duration-150"
+        }
+        style={{
+          height: tapToExpandName && nameExpanded ? undefined : ROW_H,
+          minHeight: ROW_H,
+          background: "transparent",
+        }}
         onMouseEnter={(e) =>
           ((e.currentTarget as HTMLDivElement).style.background = LEGACY_COLORS.s4)
         }
@@ -107,57 +155,55 @@ function BomTreeItem({
           <span className="h-5 w-5 shrink-0" />
         )}
 
-        {/* 품목명 */}
-        <span
-          className="ml-1 min-w-0 flex-1 truncate text-sm font-semibold"
-          style={{ color: LEGACY_COLORS.text }}
-          title={node.item_name}
-        >
-          {node.item_name}
-        </span>
-
-        {/* 우측 메타: 부서 · 코드 · 수량 — 부모 행 컬럼에 맞춰 정렬.
-            col1=부서(분류) · col2=코드(+10 우측끝) · col3=빈(가능재고) · col4=수량(실행후) · col5=빈(삭제) */}
-        {/* 모바일: 부서·코드·수량을 컴팩트 flex로(고정 34rem 제거 → 우측 ×수량 잘림 방지).
-            데스크톱(lg): 부모 7열 행과 정렬되도록 34rem 5열 그리드 복원.
-            compact(대시보드 상세 패널 등 좁은 컨테이너): lg 그리드를 켜지 않고 컴팩트 flex 유지 → 폭에 맞춰 코드 truncate. */}
-        <span
-          className={
-            compact
-              ? "ml-auto flex shrink-0 items-center justify-end gap-x-2 pr-3"
-              : "ml-auto flex shrink-0 items-center justify-end gap-x-2 pr-4 lg:grid lg:w-[34rem] lg:gap-x-0 lg:[grid-template-columns:4rem_1fr_4rem_3rem_2.5rem] lg:[column-gap:1.5rem]"
-          }
-        >
-          {/* 부서 — 색 = 1차 앵커. 좌정렬 */}
-          <span className="flex min-w-0 justify-start">
-            {deptBadge && (
-              <span
-                className="rounded-full px-2 py-0.5 text-[10px] font-bold leading-none"
-                style={{ color: deptBadge.color, background: deptBadge.bg }}
+        {/* 품목명 + 우측 메타 — 항목 2-1: 모바일(tapToExpandName)에서 이름 탭 시 풀네임을 행 전폭으로
+            펼치고 메타(부서·코드·×수량)를 이름 아래 줄로 reflow. 데스크톱/비펼침은 기존 1줄 그대로(무변경).
+            메타 정렬: col1=부서 · col2=코드 · col4=수량(실행후) — compact 는 컴팩트 flex, 데스크톱(lg)은 34rem 5열 그리드. */}
+        {tapToExpandName && nameExpanded ? (
+          <button
+            type="button"
+            onClick={() => setNameExpanded(false)}
+            className="ml-1 flex min-w-0 flex-1 flex-col gap-1 py-1.5 text-left"
+          >
+            <span
+              className="break-words text-sm font-semibold leading-snug"
+              style={{ color: LEGACY_COLORS.text }}
+            >
+              {node.item_name}
+            </span>
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">{metaChildren}</span>
+          </button>
+        ) : (
+          <>
+            {tapToExpandName ? (
+              <button
+                type="button"
+                onClick={() => setNameExpanded(true)}
+                className="ml-1 min-w-0 flex-1 truncate text-left text-sm font-semibold"
+                style={{ color: LEGACY_COLORS.text }}
               >
-                {deptBadge.label}
+                {node.item_name}
+              </button>
+            ) : (
+              <span
+                className="ml-1 min-w-0 flex-1 truncate text-sm font-semibold"
+                style={{ color: LEGACY_COLORS.text }}
+                title={node.item_name}
+              >
+                {node.item_name}
               </span>
             )}
-          </span>
 
-          {/* 코드 — 보조 모노스페이스. 우정렬로 우변 기준선 고정 */}
-          <span
-            className="min-w-0 truncate whitespace-nowrap text-right font-mono text-[11px] tracking-tight"
-            style={{ color: tint(LEGACY_COLORS.muted2, 70) }}
-            title={node.mes_code ?? undefined}
-          >
-            {node.mes_code || ""}
-          </span>
-
-          {/* 수량 — 실행후 자리(col4)에 가운데 정렬 강조. ×는 약한 접두, 숫자가 단독으로 점등 */}
-          <span
-            className="text-center text-xs tabular-nums leading-none"
-            style={{ gridColumn: "4", color: qty > 1 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2, fontWeight: qty > 1 ? 800 : 600 }}
-          >
-            <span className="mr-px text-[10px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>×</span>
-            {qty}
-          </span>
-        </span>
+            <span
+              className={
+                compact
+                  ? "ml-auto flex shrink-0 items-center justify-end gap-x-2 pr-3"
+                  : "ml-auto flex shrink-0 items-center justify-end gap-x-2 pr-4 lg:grid lg:w-[34rem] lg:gap-x-0 lg:[grid-template-columns:4rem_1fr_4rem_3rem_2.5rem] lg:[column-gap:1.5rem]"
+              }
+            >
+              {metaChildren}
+            </span>
+          </>
+        )}
       </div>
 
       {open && hasKids && (
@@ -169,6 +215,7 @@ function BomTreeItem({
               rails={[...rails, !isLast]}
               isLast={i === node.children.length - 1}
               compact={compact}
+              tapToExpandName={tapToExpandName}
             />
           ))}
         </ul>
@@ -182,9 +229,11 @@ interface Props {
   open: boolean;
   /** 좁은 컨테이너(대시보드 상세 패널 등)용 — lg 고정 그리드를 끄고 패널 폭에 맞춘다. */
   compact?: boolean;
+  /** 항목 2-1 (모바일 전용) — 이름 탭 풀네임 펼침. 데스크톱 호출처는 미전달(기본 false). */
+  tapToExpandName?: boolean;
 }
 
-export function BomSubExpander({ itemId, open, compact = false }: Props) {
+export function BomSubExpander({ itemId, open, compact = false, tapToExpandName = false }: Props) {
   const [tree, setTree] = useState<BOMTreeNode | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -249,6 +298,7 @@ export function BomSubExpander({ itemId, open, compact = false }: Props) {
               rails={[]}
               isLast={i === tree.children.length - 1}
               compact={compact}
+              tapToExpandName={tapToExpandName}
             />
           ))}
         </ul>

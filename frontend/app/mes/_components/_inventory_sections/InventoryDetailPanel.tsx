@@ -204,7 +204,14 @@ export function InventoryDetailPanel({
           </button>
           {showBom && (
             <div className="mt-2">
-              <BomSubExpander key={item.item_id} itemId={item.item_id} open={showBom} compact />
+              {/* 항목 2-1 — 모바일 빠른작업 변형일 때만 이름 탭 풀네임 펼침. 데스크톱은 hover title 유지. */}
+              <BomSubExpander
+                key={item.item_id}
+                itemId={item.item_id}
+                open={showBom}
+                compact
+                tapToExpandName={quickActionVariant === "mobile"}
+              />
             </div>
           )}
         </div>
