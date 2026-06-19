@@ -51,21 +51,16 @@
   - 라우터에 남은 `_cancel_one_log`(799-932)은 `inventory_effect`가 없는 **레거시 로그용 폴백**뿐. 신규 거래는 모두 effect를 남기므로 점점 죽어가는 경로다.
   - 따라서 "서비스로 빼자"는 추출 가치가 낮다(얇은 pass-through만 추가). 음수 가드·`_sync_total` 순서가 얽힌 destructive 경로라 위험 대비 실익이 적다.
 
-### 진짜 남은 것 (작고 비교적 안전, 그래도 리뷰 후 합의로)
+### 완료 (2026-06-19 구현·검증·머지)
 
-- `backend/app/routers/production.py` 생산 입고 오케스트레이션 (헬퍼 `_load_and_merge_requirements`·`_preload_components`·`_assert_no_shortage`·`_backflush_components`·`_record_production`, 111-275)
-  - 재고 primitive와 BOM 전개는 이미 서비스에 있고, 라우터엔 시퀀싱·로그·트랜잭션 경계 같은 coordination만 남음. `services/production_receipt.py`로 추출하면 HTTP 없는 단위테스트 seam이 생긴다.
-  - **즉시 정리 가능한 부수확**: `merge_requirements`를 import만 하고 안 씀(dead import) + 같은 merge 루프가 두 곳에 인라인 중복(133-135, 293-295).
-  - 위험: 중간. 동시성 테스트(`test_production_receipt_concurrent_same_item`)가 트랜잭션 경계·422/500 매핑을 핀하고 있어 추출 시 보존 필요(monkeypatch 대상도 갱신).
+- ✅ **생산 입고 오케스트레이션 → 서비스 추출**. `backend/app/services/production_receipt.py` 신설(헬퍼 5개 + `execute_production_receipt`). 라우터 `production_receipt`는 thin adapter(파싱 → 서비스 1콜 → 예외 매핑 → commit/rollback)로 축소. 예외→응답 매핑(404/400/422+`shortages`/500)과 트랜잭션 경계 verbatim 보존, 도메인 예외(`ProductionBadRequest`/`ProductionShortage`/`ProductionItemNotFound`)로 치환. 부수확으로 dead import(`merge_requirements`) 활성화 + merge 루프 중복 제거. 동시성 테스트 monkeypatch는 `inventory_svc` 모듈 속성 직접 패치로 갱신. (검증: 백엔드 pytest 전체·동시성 2케이스·OpenAPI drift baseline 일치)
+- ✅ **품목 정렬 comparator → 순수함수 추출**. `itemPickerShared.sortItemsForPicker` 신설, `IoTargetPicker`·`DefectItemPicker`의 4벌 인라인 복제를 호출로 교체(동작 보존). 골든 테스트 `itemPickerSort.golden.test.ts` 신설. (검증: 골든 6/6, io E2E dual-shell 4/4)
 
-- 품목 정렬 comparator → `sortItemsForPicker` 순수함수 추출
-  - 필터·우선순위 맵 3종은 이미 `itemPickerShared`가 공유함(중복 아님 — 첫 진단이 틀렸던 부분). 남은 건 4단계 정렬(rank→priority→assemblyRank→idx)이 `IoTargetPicker`·`DefectItemPicker`에 **4벌 verbatim 복제**된 것뿐.
-  - 순수함수라 가장 안전한 deepening. **단 정렬 순서를 고정하는 테스트가 전무하니 골든 테스트 먼저.**
-  - 순서편집 상태머신·`EditOrderTable` 통합은 별개로 더 크고 모바일(ADR-0003) 회귀 부담 있음 — 경계 합의 대상.
+### 진짜 남은 것 (리뷰 후 합의로)
 
-- 승인 큐 쿼리 빌더 (`backend/app/routers/stock_requests.py` 143-152/165-174, 202-215/238-250)
+- 승인 큐 쿼리 빌더 (`backend/app/routers/stock_requests.py` 143-152/165-174, 202-215/238-250) — **보류 유지(Tier C)**.
   - list/count가 동일 where절을 각자 중복. 공통 빌더로 묶으면 정책 변경이 한 곳에 모인다. 작업 자체는 작음.
-  - **주의: 부서 큐 필터는 "누가 어느 부서 결재를 보는가"를 정하는 인가(authorization) 경계다.** `None`(전체)/빈 집합(권한 없음) 번역을 한 곳만 잘못 옮기면 결재 가시성이 조용히 넓어진다. 가시성 자체를 검증하는 테스트가 얇음 → Opus급 신중함 필요.
+  - **주의: 부서 큐 필터는 "누가 어느 부서 결재를 보는가"를 정하는 인가(authorization) 경계다.** `None`(전체)/빈 집합(권한 없음) 번역을 한 곳만 잘못 옮기면 결재 가시성이 조용히 넓어진다. 가시성 자체를 검증하는 테스트가 얇음 → Opus급 신중함 필요. 권동환 사원 복귀 후 함께.
 
 ### ADR 메모
 - 어느 후보도 기존 ADR(0001~0005)을 위반하지 않는다.
