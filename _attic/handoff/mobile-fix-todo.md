@@ -169,8 +169,11 @@
 
 > 여기에 새 항목을 번호로 적는다. 형식은 1차와 동일(화면·문제·수정 방향·관련 파일·PC 무변경 주의).
 
+> **진행 상태 (2026-06-19):** 2-1·2-2·2-3·2-4·2-5·2-6·2-7·2-8·2-9 **구현 완료 + verify_local 그린(미커밋)**. **2-10(창고지도 가로 전면 재설계)만 남음 — Opus급, 별도 세션 권장**.
+> 검증된 스코프 정정: ① 2-6 달력은 `HistoryCalendarStrip`/`HistoryCalendarPanel`이 데스크톱(DesktopHistoryView)과 **공유** → `hideWeekends` prop을 모바일 호출처(MobileHistoryScreen)에서만 내려 5열로(PC 7열 유지). ② 2-5 `DefectHubPanel`은 **모바일 전용**(데스크톱은 DesktopDefectView+DefectHubEntry) → 자유 편집.
+
 ### 2-1. 대시보드 BOM 하위 구성 — 긴 이름 풀네임 보기(모바일 탭 펼침)
-- [ ] 화면: 대시보드 품목 클릭 → 바텀시트 "하위 구성"(읽기 전용) BOM 행. 이름이 길면 1줄 truncate 되어 잘림.
+- [x] 화면: 대시보드 품목 클릭 → 바텀시트 "하위 구성"(읽기 전용) BOM 행. 이름이 길면 1줄 truncate 되어 잘림.
 - 문제: 데스크톱은 hover 툴팁으로 풀네임 확인 가능하지만 모바일엔 hover 없음.
 - **확정 방식 (탭 = 전체 폭 펼침)**:
   - 기본은 현행처럼 **이름 1줄 truncate**(스캔 가능, 목록 깔끔).
@@ -181,3 +184,200 @@
   - `frontend/app/mes/_components/_warehouse_v2/BomSubExpander.tsx` (하위 구성 렌더 — 추정, 확인 필요)
   - 호출처: `frontend/app/mes/_components/_inventory_sections/InventoryDetailPanel.tsx` (`<BomSubExpander ... compact />`)
 - **PC 무변경 주의**: BomSubExpander 는 데스크톱 상세 패널과 **공유 가능성** → 탭 펼침 인터랙션은 **모바일 전용으로 스코프**(variant prop 또는 모바일 호출처 한정). 데스크톱 hover/현행 동작은 그대로 둘 것.
+
+### 2-2. 입출고 섹션 탭 — 버튼 크기·글씨 확대 (스크롤 없이 전폭)
+- [x] 화면: 입출고 상단 섹션 탭 (요청 작성 / 작업 중 / 내 요청 / 창고 승인함 / 부서 승인함 / 인수인계)
+- 문제: 전폭 grid 적용(2-1차 항목 4)은 잘 됐으나 탭 버튼이 낮고(`min-h-[44px]`) 글씨가 작아(`text-xs`) 터치하기 불편
+- **수정 사항(완료)**:
+  - 글씨: `text-xs` → `text-sm` (모바일)
+  - 버튼 최소 높이: `min-h-[44px]` → `min-h-[60px]` (모바일), `lg:min-h-[44px]`로 데스크톱 원복
+  - 패딩: `py-2` → `py-3` (모바일)
+  - 스크롤: 기존 grid 적용으로 이미 없음 — 유지
+- 관련 파일: `frontend/app/mes/_components/_warehouse_sections/WarehouseSectionTabs.tsx`
+- 적용 범위: 입출고의 모든 단계 진입 전 탭 (PC 무변경 확인)
+- 커밋: `2026-06-19 mobile: 섹션 탭 버튼 크기·글씨 확대(text-sm, min-h-60px)`
+
+### 2-3. 입출고 위저드 전 단계 — 스크롤 제거 + 화면 꽉 채움
+
+> **MCP 브라우저로 DOM 직접 측정해 근본 원인 확인 (2026-06-19)**
+
+#### 측정 결과 (Step 1 기준)
+
+| 요소 | 값 |
+|---|---|
+| 스크롤 컨테이너 clientHeight | 577px |
+| 스크롤 컨테이너 scrollHeight | **613px** |
+| 오버플로우 | **+36px → 스크롤 발생** |
+
+스크롤 컨테이너(`min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-3`) 안에 두 자식이 있음:
+1. `<h2>작업 유형 선택</h2>` — 24px + mb-3(12px) = **36px**
+2. 버튼 컨테이너 `flex min-h-full flex-col gap-2.5` — `min-h-full` = 컨텐트박스(553px)
+
+합계 36 + 553 = **589px** > 컨텐트박스 553px → **36px 오버플로우 = 스크롤**
+
+#### 시각적 문제 (버튼 빈 공간)
+버튼 자체는 271.5px씩 컨테이너를 꽉 채우고 있으나, 아이콘·텍스트가 버튼 중앙에만 집중돼 위아래 여백이 크게 남아 보임.
+
+---
+
+#### 수정 계획 — 모든 위저드 단계 공통
+
+**핵심 원칙**
+- Step 1·2 (유형 선택, 세부 작업): **스크롤 없음** + 버튼이 가용 높이를 꽉 채움
+- Step 3·4·5 (품목 선택, 수량 입력, 제출): 스크롤은 허용하되 단계 제목이 **추가 스크롤을 만들지 않음**
+
+**Fix 1 — 단계 제목(H2) 스크롤 컨테이너 밖으로 이동**
+
+파일: `MobileIoComposeWizard.tsx`
+
+현재 구조:
+```
+<div class="overflow-y-auto px-3 pt-3 pb-3">       ← 스크롤 컨테이너
+  <h2>작업 유형 선택</h2>                            ← 제목이 안에 있음
+  <MobileWorkTypeStep />                             ← min-h-full = 553px
+</div>
+```
+
+수정 후:
+```
+<h2 class="px-3 pt-3 pb-2">작업 유형 선택</h2>     ← 스크롤 컨테이너 밖으로
+<div class="min-h-0 flex-1 overflow-y-auto px-3 pb-3">  ← pt-3 제거(제목이 위로 나감)
+  <MobileWorkTypeStep />                             ← min-h-full = 컨테이너 전체
+</div>
+```
+
+효과: 제목 36px가 컨테이너 밖으로 빠지면, 버튼 컨테이너 `min-h-full`이 스크롤 컨테이너 전체를 채움 → 오버플로우 0 → 스크롤 없음
+
+Step 1~5 모두 동일한 패턴이므로 한 번에 해결.
+
+**Fix 2 — Step 1 버튼 내부 콘텐츠 확대 (빈 공간 개선)**
+
+파일: `MobileWorkTypeStep.tsx`
+
+현재 버튼 내 아이콘·텍스트:
+- 아이콘 컨테이너: `h-12 w-12` (48px)
+- 레이블: `text-lg font-black`
+- 설명: `text-sm font-semibold`
+
+수정:
+- 아이콘 컨테이너: `h-16 w-16` (64px), 아이콘 자체 `h-8 w-8`
+- 레이블: `text-xl font-black`
+- 설명: `text-base font-semibold`
+- 버튼 내부 gap: `gap-4` → `gap-5`
+
+**Fix 3 — Step 2 동일 확인**
+MobileSubTypeStep도 Step 1과 동일 구조(H2 + 컨테이너)이면 Fix 1로 자동 해결.
+부서 그리드 버튼(`min-h-[48px]`), 방향 버튼(`min-h-[64px]`), 입력방식 버튼(`min-h-[60px]`)은 `flex-1`로 이미 높이 분할 — 제목만 밖으로 빼면 OK.
+
+**Fix 4 — Step 3·4·5 검증**
+스크롤이 필요한 단계이므로 `overflow-y-auto` 유지. 단, 제목을 밖으로 뺐을 때 레이아웃이 무너지지 않는지 확인.
+
+---
+
+#### 관련 파일
+- `frontend/app/mes/_components/mobile/warehouse/MobileIoComposeWizard.tsx` — H2 제목 위치 이동 (핵심)
+- `frontend/app/mes/_components/mobile/warehouse/MobileWorkTypeStep.tsx` — Step 1 버튼 콘텐츠 확대
+- PC 영향 없음 (모바일 전용 컴포넌트)
+
+---
+
+### 2-4. 대시보드 — 현재고 / 안전재고 정렬 버튼 제거 (PC + 모바일 공통)
+
+- [x] 화면: 대시보드 품목 목록 테이블 — 현재고 / 안전재고 열 헤더
+- 문제: 정렬 버튼(▲▼)이 숫자를 오른쪽으로 너무 밀어붙여 정렬이 어색해 보임
+- **확정**: 정렬 버튼 완전 제거. 기능 자체 삭제. 기본 순서는 **등록 순** (관리자 탭에서 설정한 품목 순서)
+- PC + 모바일 둘 다 적용
+- 관련 파일: `frontend/app/mes/_components/_inventory_sections/InventoryItemsTable.tsx`
+  - 라인 12–22: `sortItems()` 함수 삭제
+  - 라인 55–65: `sortCol`·`sortDir` 상태 + `handleSort()` 삭제
+  - 라인 130–170: 현재고 / 안전재고 열 헤더 정렬 버튼 UI 삭제 → 일반 텍스트 헤더로 교체
+
+---
+
+### 2-5. 모바일 불량 처리 허브 — 첫 화면 재설계 (키오스크 방식)
+
+- [x] 화면: 모바일 불량 탭 첫 화면
+- 문제: 현재 버튼 2개(불량 격리 / 바로 폐기) + KPI 카드 + 필터 + 격리 목록이 한 화면에 전부 노출됨 → PC와 달리 혼잡
+- PC 첫 화면: 불량 격리 / 바로 폐기 / 격리 목록 큰 카드 3개만 — 깔끔하게 선택만
+- **확정**: 모바일 첫 화면을 **PC 카드 3개 스타일 + Step 1 버튼 스타일 믹스**로 재설계
+  - 화면을 꽉 채우는 세로 3개 카드 (입출고 Step 1 버튼처럼 아이콘 + 이름 + 설명)
+  - 카드 1: 불량 격리 (정상 재고에서 품목을 골라 격리 등록)
+  - 카드 2: 바로 폐기 (격리 없이 즉시 폐기)
+  - 카드 3: 격리 목록 (격리 항목 조회·복귀·폐기·반품)
+  - 카드 누르면 다음 화면으로 전환 (KPI/필터/목록은 격리 목록 카드 눌렀을 때만 표시)
+- PC 화면 변경 없음 (모바일 전용)
+- 관련 파일:
+  - `frontend/app/mes/_components/_defect_hub/DefectHubPanel.tsx` (라인 60–257, view 상태 분기)
+  - `frontend/app/mes/_components/mobile/screens/MobileDefectCartFlow.tsx`
+  - `frontend/app/mes/_components/mobile/screens/MobileDefectProcessPanel.tsx`
+- 구현 방향: `view === "hub"` 일 때 모바일에서 KPI/필터/목록 숨기고 큰 카드 3개만 표시. prop 분기 또는 모바일 전용 허브 첫 화면 컴포넌트 추가.
+
+---
+
+### 2-6. 모바일 내역 달력 — 주말(토/일) 제거
+
+- [x] 화면: 모바일 내역 탭 달력 (`HistoryCalendarStrip`)
+- 문제: 7열(일~토) 구조라 모바일에서 좁고 난잡해 보임
+- **확정**: 토/일 열 완전 제거 → 월~금 **5열**로 축소. 주말 기록은 전체 기간 조회로 확인 가능 (달력에서는 선택 불가)
+- 관련 파일: `frontend/app/mes/_components/_history_sections/HistoryCalendarStrip.tsx`
+  - 라인 157–170: 요일 헤더 배열 `["일","월","화","수","목","금","토"]` → `["월","화","수","목","금"]` 으로 변경
+  - 라인 172–238: 날짜 그리드 — 주말 날짜 필터링 (getDay() === 0 || 6 제외)
+  - 그리드 `grid-cols-7` → `grid-cols-5`
+- PC 영향 없음 (모바일 전용 화면에서 사용)
+
+---
+
+### 2-7. 더보기 — 계정 관리 버튼 제거
+
+- [x] 화면: 더보기 탭 화면
+- 문제: "내 계정"(PIN 변경 · 로그아웃) 버튼이 있는데, 글로벌 헤더 프로필 버튼에도 동일 기능이 있어 중복
+- **확정**: "계정" 섹션 + "내 계정" 메뉴 행 제거
+- 관련 파일: `frontend/app/mes/_components/mobile/screens/MobileMoreScreen.tsx` (라인 42–48 "계정" 섹션 삭제)
+
+---
+
+### 2-8. 더보기 — 주간보고 / 창고 지도 큰 카드로 개편
+
+- [x] 화면: 더보기 탭 화면
+- 현재: "업무" 섹션 라벨 + 작은 메뉴 행(MoreMenuRow) 2개 (주간보고 / 창고 지도)
+- **확정**:
+  - "업무" 섹션 라벨 제거
+  - 주간보고 / 창고 지도를 **큰 카드형 버튼**으로 교체
+  - **확장성 고려**: 메뉴가 늘어날 수 있으니 그리드 레이아웃 기반으로 자유 디자인
+  - 각 카드에 아이콘 + 이름 + 짧은 설명 포함
+- 관련 파일: `frontend/app/mes/_components/mobile/screens/MobileMoreScreen.tsx`
+
+---
+
+### 2-9. 더보기 하단 네비바 — 진입 시 아이콘 + 라벨 동적 교체
+
+- [x] 화면: 하단 네비바 5번째 탭 (더보기)
+- 문제: 주간보고 / 창고 지도 진입 후 하단 네비바에 아무것도 강조 안 됨 (activeTab이 "weekly"/"warehouseMap"인데 TAB_BAR_IDS에 없음)
+- **확정**: 진입 시 더보기 탭의 **아이콘 + 라벨 둘 다** 동적으로 교체
+  - 더보기: `···` + "더보기" (기본)
+  - 주간보고 진입: `📊(BarChart2)` + "주간보고"
+  - 창고 지도 진입: `📍(MapPinned)` + "창고 지도"
+  - 뒤로 / 다른 탭 이동 시: `···` + "더보기" 복귀
+- 관련 파일: `frontend/app/mes/_components/mobile/MobileShell.tsx`
+  - `activeTab` 기반으로 NavButton의 icon/label 동적 결정
+  - "weekly" / "warehouseMap" → 더보기 탭 NavButton을 해당 아이콘/이름으로 오버라이드
+
+---
+
+### 2-10. 창고 지도 모바일 — 가로 전용 전면 재설계
+
+- [ ] 화면: 모바일 창고 지도 (`MobileWarehouseMapScreen`)
+- 현재 문제: 세로형 목록 → 그리드 → 바텀시트 구조라 PC의 평면도 느낌을 못 살림
+- **확정**:
+  1. **강제 가로 전환**: CSS `transform: rotate(90deg)` + `width/height` 스왑으로 창고 지도 화면 진입 시 자동 가로 모드. 사용자가 폰을 세로로 들고 있어도 가로로 보임
+  2. **PC 컴포넌트 재사용**: 폰 가로 시 가로폭 ~800px → PC `WarehouseStages.tsx`(FloorStage / FrontStage / RowStage) 거의 그대로 재사용 가능
+  3. **3단계 드릴다운 유지**: 평면도(앵글 전체) → 정면도(앵글 그리드) → 줄 확대(자리 상세)
+  4. 기존 `MobileAngleList` / `MobileAngleGrid` / `MobileJariSheet` 는 대체 또는 폐기
+- 관련 파일:
+  - `frontend/app/mes/_components/mobile/screens/MobileWarehouseMapScreen.tsx` (전면 재설계)
+  - `frontend/app/mes/_components/_warehouse_map_sections/WarehouseStages.tsx` (재사용 대상, FloorStage/FrontStage/RowStage)
+  - `frontend/app/mes/_components/DesktopWarehouseMapView.tsx` (참고 — 검색·브레드크럼 로직)
+- 구현 주의:
+  - `rotate(90deg)` 적용 시 뷰포트 height → 실제 화면 width 가 됨. Tailwind `h-screen`/`w-screen` 처리 주의
+  - 슬라이드 패널(`WarehouseJariPanel`)은 가로 화면 기준 우측 패널로 배치
+  - 창고 지도 나가면 회전 해제
