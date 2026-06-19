@@ -25,6 +25,8 @@ export interface HistoryCalendarPanelProps {
   todayKey: string;
   selectedDay: string | null;
   setSelectedDay: (key: string | null) => void;
+  /** 항목 2-6 (모바일 전용) — 토/일 제거 후 월~금 5열. 데스크톱 호출처는 미전달(기본 false). */
+  hideWeekends?: boolean;
 }
 
 export function HistoryCalendarPanel({
@@ -42,6 +44,7 @@ export function HistoryCalendarPanel({
   todayKey,
   selectedDay,
   setSelectedDay,
+  hideWeekends,
 }: HistoryCalendarPanelProps) {
   if (!open) return null;
   return (
@@ -60,6 +63,7 @@ export function HistoryCalendarPanel({
         todayKey={todayKey}
         selectedDay={selectedDay}
         setSelectedDay={setSelectedDay}
+        hideWeekends={hideWeekends}
       />
       <div
         className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[11px]"

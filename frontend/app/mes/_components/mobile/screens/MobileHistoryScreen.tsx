@@ -393,6 +393,7 @@ export function MobileHistoryScreen() {
             todayKey={todayKey}
             selectedDay={selectedDay}
             setSelectedDay={setSelectedDay}
+            hideWeekends
           />
 
           <MobileHistoryList

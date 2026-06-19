@@ -25,7 +25,25 @@ type Props = {
   todayKey: string;
   selectedDay: string | null;
   setSelectedDay: (key: string | null) => void;
+  /** 항목 2-6 (모바일 전용) — 토/일을 빼고 월~금 5열로 표시. 데스크톱 호출처는 미전달(기본 false → 7열). */
+  hideWeekends?: boolean;
 };
+
+/** 항목 2-6 — 7열용 calendarDays(일요일 시작 패딩)에서 토/일을 빼고 월~금 5열용으로 재패딩. */
+function buildWeekdayCells(
+  calendarDays: (number | null)[],
+  year: number,
+  month: number,
+): (number | null)[] {
+  const kept = calendarDays.filter((d): d is number => {
+    if (d === null) return false;
+    const wd = new Date(year, month, d).getDay();
+    return wd >= 1 && wd <= 5; // 월(1)~금(5)
+  });
+  if (kept.length === 0) return [];
+  const offset = new Date(year, month, kept[0]).getDay() - 1; // 월=0 … 금=4
+  return [...Array<number | null>(offset).fill(null), ...kept];
+}
 
 export function HistoryCalendarStrip({
   calendarYear,
@@ -41,6 +59,7 @@ export function HistoryCalendarStrip({
   todayKey,
   selectedDay,
   setSelectedDay,
+  hideWeekends = false,
 }: Props) {
   // iOS 캘린더 스타일 줌 — 월 헤더 클릭 시 연 뷰로 확대, 월 카드 클릭 시 월 뷰로 복귀.
   const [viewMode, setViewMode] = useState<"month" | "year">("month");
@@ -125,6 +144,15 @@ export function HistoryCalendarStrip({
     );
   }
 
+  // 항목 2-6 (모바일 전용) — hideWeekends 면 토/일 제거 후 월~금 5열로 재구성. 데스크톱은 미전달 → 7열 유지.
+  const weekdayHeaders = hideWeekends
+    ? ["월", "화", "수", "목", "금"]
+    : ["일", "월", "화", "수", "목", "금", "토"];
+  const gridColsClass = hideWeekends ? "grid-cols-5" : "grid-cols-7";
+  const cells: (number | null)[] = hideWeekends
+    ? buildWeekdayCells(calendarDays, calendarYear, calendarMonth)
+    : calendarDays;
+
   return (
     <section className="card">
       {/* 월 네비게이션 */}
@@ -155,13 +183,19 @@ export function HistoryCalendarStrip({
       ) : (
         <>
           {/* 요일 헤더 */}
-          <div className="mb-1 grid grid-cols-7">
-            {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
+          <div className={`mb-1 grid ${gridColsClass}`}>
+            {weekdayHeaders.map((d, i) => (
               <div
                 key={d}
                 className="py-1 text-center text-xs font-bold"
                 style={{
-                  color: i === 0 ? "#f25f5c" : i === 6 ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
+                  color: hideWeekends
+                    ? LEGACY_COLORS.muted2
+                    : i === 0
+                    ? "#f25f5c"
+                    : i === 6
+                    ? LEGACY_COLORS.blue
+                    : LEGACY_COLORS.muted2,
                 }}
               >
                 {d}
@@ -170,8 +204,8 @@ export function HistoryCalendarStrip({
           </div>
 
           {/* 날짜 그리드 */}
-          <div className="grid grid-cols-7 gap-1">
-            {calendarDays.map((day, idx) => {
+          <div className={`grid ${gridColsClass} gap-1`}>
+            {cells.map((day, idx) => {
               if (day === null) return <div key={`empty-${idx}`} />;
               const mm = String(calendarMonth + 1).padStart(2, "0");
               const dd = String(day).padStart(2, "0");
