@@ -258,7 +258,7 @@ export function DefectHubPanel({
   );
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-h-full flex-col gap-4">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
@@ -270,34 +270,43 @@ export function DefectHubPanel({
       </div>
 
       {view === "hub" ? (
-        /* 진입 화면 — 상단 액션(불량 격리·바로 폐기) + KPI + 격리 목록.
-           카드만 띄우고 비우지 않고, PC처럼 현재 격리 현황을 첫 화면에 함께 보여준다. */
-        <>
-          <div className="grid grid-cols-2 gap-2.5">
-            {DEFECT_HUB_CARDS.filter((card) => card.id !== "list").map((card) => {
-              const Icon = card.icon;
-              const accent = LEGACY_COLORS[card.accentKey];
-              return (
-                <button
-                  key={card.id}
-                  type="button"
-                  onClick={() => handleHubSelect(card.id)}
-                  className="flex min-h-[60px] items-center gap-3 rounded-[16px] border p-3 text-left transition-[transform] active:scale-[0.98]"
-                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+        /* 항목 2-5 — 첫 화면은 키오스크식 카드 3장(격리·폐기·목록)만. PC(DesktopDefectView)
+           처럼 "무엇을 할지 선택만" 하게 한다. KPI/필터/격리 목록은 카드 선택 후 list 화면에서만.
+           (이전엔 카드 2장 + listSection 을 첫 화면에 함께 띄워 모바일이 혼잡했음.) */
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+          {DEFECT_HUB_CARDS.map((card) => {
+            const Icon = card.icon;
+            const accent = LEGACY_COLORS[card.accentKey];
+            return (
+              <button
+                key={card.id}
+                type="button"
+                onClick={() => handleHubSelect(card.id)}
+                className="flex min-h-[96px] flex-1 items-center gap-5 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"
+                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+              >
+                <span
+                  className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[16px]"
+                  style={{ background: `color-mix(in srgb, ${accent} 20%, transparent)` }}
                 >
+                  <Icon
+                    className="h-8 w-8"
+                    style={{ color: `color-mix(in srgb, ${accent} 42%, ${LEGACY_COLORS.text})` }}
+                  />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xl font-black leading-tight">{card.label}</span>
                   <span
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
-                    style={{ background: `color-mix(in srgb, ${accent} 20%, transparent)` }}
+                    className="block text-sm font-semibold"
+                    style={{ color: LEGACY_COLORS.muted2 }}
                   >
-                    <Icon className="h-5 w-5" style={{ color: `color-mix(in srgb, ${accent} 42%, ${LEGACY_COLORS.text})` }} />
+                    {card.description}
                   </span>
-                  <span className="min-w-0 text-base font-black leading-tight">{card.label}</span>
-                </button>
-              );
-            })}
-          </div>
-          {listSection}
-        </>
+                </span>
+              </button>
+            );
+          })}
+        </div>
       ) : (
         /* 목록 화면 — 처리 후 복귀 시. */
         <>

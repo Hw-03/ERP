@@ -67,8 +67,15 @@ beforeEach(() => {
 });
 
 describe("DefectHubPanel", () => {
+  // 항목 2-5 — 첫 화면(hub)은 카드 3장만. KPI/필터/격리 목록은 '격리 목록' 카드 선택 후 list 화면에서만.
+  // 카드 라벨 '격리 목록' 을 눌러 list 화면으로 진입한다.
+  function openList() {
+    fireEvent.click(screen.getByText("격리 목록"));
+  }
+
   it("KPI 카드 2개를 렌더링한다", async () => {
     render(<DefectHubPanel currentEmployee={mockEmployee} />);
+    openList();
 
     await waitFor(() => {
       expect(screen.getByText("격리 중")).toBeInTheDocument();
@@ -78,6 +85,7 @@ describe("DefectHubPanel", () => {
 
   it("KPI 카드 값이 올바르게 표시된다", async () => {
     render(<DefectHubPanel currentEmployee={mockEmployee} />);
+    openList();
 
     await waitFor(() => {
       expect(screen.getByText("17")).toBeInTheDocument();
@@ -87,6 +95,7 @@ describe("DefectHubPanel", () => {
 
   it("부서별 그룹핑이 정확하다 — 조립/진공 2개 부서 표시", async () => {
     render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
+    openList();
 
     // scope="all"이 초기값 (기타는 생산라인 아님)
     await waitFor(() => {
@@ -97,6 +106,7 @@ describe("DefectHubPanel", () => {
 
   it("400일 전 격리 항목에 ⚠1년 배지가 표시된다", async () => {
     render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
+    openList();
 
     await waitFor(() => {
       // 진공부 게터 — 400일 전이라 1년 초과 배지 표시
@@ -106,6 +116,7 @@ describe("DefectHubPanel", () => {
 
   it("200일 전 격리 항목에는 ⚠1년 배지가 없다", async () => {
     render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
+    openList();
 
     await waitFor(() => {
       // 조립부 전극 — 200일 전이라 배지 없음. 항목 자체는 표시됨.
@@ -119,6 +130,7 @@ describe("DefectHubPanel", () => {
 
   it("'1년 이상' KPI 카드 클릭 시 해당 항목만 필터된다", async () => {
     render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
+    openList();
 
     await waitFor(() => {
       expect(screen.getByText("게터")).toBeInTheDocument();
@@ -141,6 +153,7 @@ describe("DefectHubPanel", () => {
         defectDeptFilter="진공"
       />
     );
+    openList();
 
     await waitFor(() => {
       // scope="my"이지만 defectDeptFilter="진공"이므로 진공 부서만 표시
@@ -165,6 +178,7 @@ describe("DefectHubPanel", () => {
 
   it("[처리] 버튼 클릭 시 통합 처리 패널이 열린다", async () => {
     render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
+    openList();
 
     await waitFor(() => {
       expect(screen.getAllByText("처리").length).toBeGreaterThan(0);
