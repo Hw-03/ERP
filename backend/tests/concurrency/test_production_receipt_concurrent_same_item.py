@@ -235,7 +235,6 @@ def test_concurrent_production_receipt_loser_late_value_error(
     """
     from app.database import get_db
     from app.main import app
-    from app.routers import production as production_router
     from app.services import inventory as inventory_svc
 
     ids = _setup(make_session, component_wh_qty=Decimal("1"))
@@ -270,7 +269,9 @@ def test_concurrent_production_receipt_loser_late_value_error(
             raise ValueError(f"창고 재고 부족 (창고 {wh}, 차감 요청 {qty}).")
         return _real_consume(db, item_id, qty)
 
-    production_router.inventory_svc.consume_warehouse = _consume_loses_once
+    # consume_warehouse 호출은 production_receipt 서비스가 inventory_svc 를 통해
+    # 수행한다. 모듈 속성을 직접 패치하면 호출 위치(라우터/서비스)와 무관하게 적용된다.
+    inventory_svc.consume_warehouse = _consume_loses_once
 
     statuses: list[int] = []
     bodies: list[dict] = []
@@ -293,7 +294,7 @@ def test_concurrent_production_receipt_loser_late_value_error(
         fire()
     finally:
         app.dependency_overrides.pop(get_db, None)
-        production_router.inventory_svc.consume_warehouse = _real_consume
+        inventory_svc.consume_warehouse = _real_consume
 
     _assert_clean_one_winner(statuses, bodies)
     _assert_invariant_and_no_orphans(make_session, parent_id, child_id)

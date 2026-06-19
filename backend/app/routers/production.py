@@ -3,23 +3,26 @@
 import logging
 import uuid
 from decimal import Decimal
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Inventory, Item, TransactionLog, TransactionTypeEnum
+from app.models import Item
 from app.schemas import (
-    BackflushDetail,
     BomCheckResponse,
     CapacityResponse,
     ProductionReceiptRequest,
     ProductionReceiptResponse,
 )
-from app.services import inventory as inventory_svc
-from app.services import inv_effect
 from app.services import stock_math
+from app.services import production_receipt as production_receipt_svc
+from app.services.production_receipt import (
+    ProductionBadRequest,
+    ProductionItemNotFound,
+    ProductionShortage,
+)
 from app.services.bom import BomCache
 from app.services.bom import explode_bom as _explode_bom_svc
 from app.services.bom import merge_requirements
@@ -49,32 +52,30 @@ def production_receipt(
 
     producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
 
-    merged = _load_and_merge_requirements(db, payload, produced_item)
-
-    items_map, invs_map = _preload_components(db, merged)
-    _assert_no_shortage(merged, items_map, invs_map)
-
-    transaction_ids: List[uuid.UUID] = []
-    backflushed: List[BackflushDetail] = []
-
     try:
-        _backflush_components(
-            db, payload, produced_item, merged, items_map,
-            producer_name, producer_id, transaction_ids, backflushed,
-        )
-        _record_production(
-            db, payload, produced_item, producer_name, producer_id, transaction_ids,
+        result = production_receipt_svc.execute_production_receipt(
+            db, payload, produced_item, producer_name, producer_id,
         )
         db.commit()
-    except HTTPException:
-        # WS9: 엔드포인트가 의도적으로 던진 404/4xx(예: 부품 미존재, 위 분기)를
-        # 아래 except Exception 이 500 으로 재포장하지 않도록 그대로 통과.
-        raise
+    except ProductionItemNotFound as exc:
+        db.rollback()
+        raise http_error(status.HTTP_404_NOT_FOUND, ErrorCode.NOT_FOUND, str(exc))
+    except ProductionBadRequest as exc:
+        db.rollback()
+        raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, str(exc))
+    except ProductionShortage as exc:
+        # 사전 재고 부족 — 상세 목록(shortages)을 그대로 422 로 전달.
+        db.rollback()
+        raise http_error(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            code=ErrorCode.STOCK_SHORTAGE,
+            message=str(exc),
+            shortages=exc.shortages,
+        )
     except ValueError as exc:
-        # WS9: 동시 같은-부품 입고 경합에서 진 쪽 — consume_warehouse 의
-        # 원자적 가드(UPDATE ... WHERE qty>=n)가 늦게 ValueError 를 던진다.
-        # 사전 검사와 동일하게 깨끗한 422 STOCK_SHORTAGE 로 매핑(기존엔 아래
-        # except Exception 이 삼켜 500 으로 나갔음). db 는 롤백되어 loser 의
+        # WS9: 동시 같은-부품 입고 경합에서 진 쪽 — consume_warehouse 의 원자적
+        # 가드(UPDATE ... WHERE qty>=n)가 늦게 ValueError 를 던진다. 사전 검사와
+        # 동일하게 깨끗한 422 STOCK_SHORTAGE 로 매핑. db 는 롤백되어 loser 의
         # 부분 배치/orphan TransactionLog 가 남지 않는다.
         db.rollback()
         raise http_error(
@@ -93,6 +94,7 @@ def production_receipt(
             f"생산 처리 중 오류가 발생했습니다: {exc}",
         )
 
+    backflushed = result["backflushed"]
     return ProductionReceiptResponse(
         success=True,
         message=(
@@ -104,175 +106,8 @@ def production_receipt(
         produced_quantity=payload.quantity,
         reference_no=payload.reference_no,
         backflushed_components=backflushed,
-        transaction_ids=transaction_ids,
+        transaction_ids=result["transaction_ids"],
     )
-
-
-def _load_and_merge_requirements(
-    db: Session,
-    payload: ProductionReceiptRequest,
-    produced_item: Item,
-) -> Dict[uuid.UUID, Decimal]:
-    """BOM 전개 → 순환참조/빈 BOM 검증 → 부품별 소요량 합산."""
-    try:
-        component_requirements = _explode_bom(db, payload.item_id, payload.quantity)
-    except RecursionError:
-        raise http_error(
-            status.HTTP_400_BAD_REQUEST,
-            ErrorCode.BAD_REQUEST,
-            "BOM 구조에 순환 참조가 있습니다. BOM 구성을 확인해 주세요.",
-        )
-
-    if not component_requirements:
-        raise http_error(
-            status.HTTP_400_BAD_REQUEST,
-            ErrorCode.BAD_REQUEST,
-            f"'{produced_item.item_name}'에 등록된 BOM이 없습니다.",
-        )
-
-    merged: Dict[uuid.UUID, Decimal] = {}
-    for item_id, req_qty in component_requirements:
-        merged[item_id] = merged.get(item_id, Decimal("0")) + req_qty
-    return merged
-
-
-def _preload_components(
-    db: Session,
-    merged: Dict[uuid.UUID, Decimal],
-) -> Tuple[Dict[uuid.UUID, Item], Dict[uuid.UUID, Inventory]]:
-    """부품 Item / Inventory 를 bulk 로드.
-
-    5.4-E: Items / Inventory 각 1회 IN 쿼리. 기존엔 component 마다
-    db.query 가 반복되어 N+1 였음. Inventory 는 다품목 동시 backflush
-    TOCTOU 방지를 위해 한 번에 FOR UPDATE 로 잠근다.
-    """
-    comp_ids = list(merged.keys())
-    items_map = {i.item_id: i for i in db.query(Item).filter(Item.item_id.in_(comp_ids)).all()}
-    invs_map = inventory_svc.lock_inventories(db, comp_ids)
-    return items_map, invs_map
-
-
-def _assert_no_shortage(
-    merged: Dict[uuid.UUID, Decimal],
-    items_map: Dict[uuid.UUID, Item],
-    invs_map: Dict[uuid.UUID, Inventory],
-) -> None:
-    """창고 가용분 기준 사전 재고 검사 — 부족 시 422 STOCK_SHORTAGE."""
-    shortage_errors = []
-    for comp_item_id, required_qty in merged.items():
-        inv = invs_map.get(comp_item_id)
-        # 생산 BACKFLUSH는 창고 가용분(warehouse - pending) 기준 사전 검사 — stock_math 단일 소스.
-        current_avail = stock_math.figures_from_inventory(inv).warehouse_available
-        if current_avail < required_qty:
-            comp_item = items_map.get(comp_item_id)
-            shortage_errors.append(
-                f"[{comp_item.mes_code}] {comp_item.item_name}: 필요 {required_qty} {comp_item.unit}, "
-                f"가용 {current_avail} {comp_item.unit}, 부족 {required_qty - current_avail}"
-            )
-
-    if shortage_errors:
-        raise http_error(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            code=ErrorCode.STOCK_SHORTAGE,
-            message="재고 부족으로 생산 입고를 진행할 수 없습니다.",
-            shortages=shortage_errors,
-        )
-
-
-def _backflush_components(
-    db: Session,
-    payload: ProductionReceiptRequest,
-    produced_item: Item,
-    merged: Dict[uuid.UUID, Decimal],
-    items_map: Dict[uuid.UUID, Item],
-    producer_name: str | None,
-    producer_id,
-    transaction_ids: List[uuid.UUID],
-    backflushed: List[BackflushDetail],
-) -> None:
-    """각 부품의 창고 차감 + BACKFLUSH 로그 기록 (transaction_ids/backflushed 누적)."""
-    for comp_item_id, required_qty in merged.items():
-        # items_map 재사용 (5.4-E)
-        comp_item = items_map.get(comp_item_id)
-        if comp_item is None:
-            raise http_error(
-                status.HTTP_404_NOT_FOUND,
-                ErrorCode.NOT_FOUND,
-                f"부품 {comp_item_id} 을 찾을 수 없습니다.",
-            )
-
-        # 재고 변경은 서비스 레이어로 위임 (창고 차감 + _sync_total 은 내부 책임)
-        comp_cells_before = inv_effect.snapshot_cells(db, comp_item_id)
-        inv, qty_before = inventory_svc.consume_warehouse(db, comp_item_id, required_qty)
-
-        log = TransactionLog(
-            item_id=comp_item_id,
-            transaction_type=TransactionTypeEnum.BACKFLUSH,
-            quantity_change=-required_qty,
-            quantity_before=qty_before,
-            quantity_after=inv.quantity,
-            reference_no=payload.reference_no,
-            produced_by=producer_name or payload.produced_by,
-            producer_employee_id=producer_id,
-            notes=f"생산 입고 Backflush: {produced_item.item_name} x {payload.quantity}",
-            inventory_effect=inv_effect.capture_effect(db, comp_item_id, comp_cells_before),
-        )
-        db.add(log)
-        db.flush()
-
-        transaction_ids.append(log.log_id)
-        backflushed.append(
-            BackflushDetail(
-                item_id=comp_item_id,
-                mes_code=comp_item.mes_code,
-                item_name=comp_item.item_name,
-                process_type_code=comp_item.process_type_code,
-                required_quantity=required_qty,
-                stock_before=qty_before,
-                stock_after=inv.quantity,
-            )
-        )
-
-
-def _record_production(
-    db: Session,
-    payload: ProductionReceiptRequest,
-    produced_item: Item,
-    producer_name: str | None,
-    producer_id,
-    transaction_ids: List[uuid.UUID],
-) -> None:
-    """생산 결과 적재 + PRODUCE 로그 기록.
-
-    process_type_code 기반 부서의 PRODUCTION 으로 적재 (R 시리즈/없음 → 창고 폴백).
-    """
-    target_dept = inventory_svc.dept_for_process_type(produced_item.process_type_code)
-    produced_inv = inventory_svc.get_or_create_inventory(db, payload.item_id)
-    prod_qty_before = produced_inv.quantity or Decimal("0")
-    prod_cells_before = inv_effect.snapshot_cells(db, payload.item_id)
-    if target_dept is not None:
-        inventory_svc.receive_confirmed(
-            db, payload.item_id, payload.quantity,
-            bucket="production", dept=target_dept,
-        )
-    else:
-        inventory_svc.receive_confirmed(db, payload.item_id, payload.quantity)
-
-    produce_log = TransactionLog(
-        item_id=payload.item_id,
-        transaction_type=TransactionTypeEnum.PRODUCE,
-        quantity_change=payload.quantity,
-        quantity_before=prod_qty_before,
-        quantity_after=produced_inv.quantity,
-        reference_no=payload.reference_no,
-        produced_by=producer_name or payload.produced_by,
-        producer_employee_id=producer_id,
-        notes=payload.notes or f"생산 입고: {produced_item.item_name} x {payload.quantity}",
-        inventory_effect=inv_effect.capture_effect(db, payload.item_id, prod_cells_before),
-    )
-    db.add(produce_log)
-    db.flush()
-    transaction_ids.append(produce_log.log_id)
 
 
 @router.get(
@@ -290,9 +125,7 @@ def check_production_feasibility(
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
     component_requirements = _explode_bom(db, item_id, quantity)
-    merged: Dict[uuid.UUID, Decimal] = {}
-    for cid, qty in component_requirements:
-        merged[cid] = merged.get(cid, Decimal("0")) + qty
+    merged = merge_requirements(component_requirements)
 
     result = []
     all_ok = True
