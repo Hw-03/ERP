@@ -35,21 +35,42 @@
 - `legacy_part`, `legacy_item_type`은 과거 원본 데이터의 필드명이라 유지한다.
 - `LEGACY_COLORS`는 아직 넓게 쓰이는 호환 이름이라 이번 작업에서 바꾸지 않았다.
 
-## 향후 개선 후보
+## 향후 개선 후보 (2026-06-19 실제 코드 검증 완료)
 
-아래 항목은 클린코드 후보지만, 이번 리뷰 준비 작업에서는 보류했다.
+아래는 처음에 "큰 파일이니 쪼개야 한다"고 본 후보를, 발췌가 아니라 실제 코드로 다시 확인(deep-read + 반박)한 결과다. 검증해 보니 **대부분은 이미 상당 부분 정리돼 있었고**, 첫 인상이 과장한 부분이 많았다. 전부 지금은 보류 — 권동환 사원이 코드를 본 뒤 경계를 함께 정해 진행한다.
 
-- `frontend/app/mes/_components/_warehouse_v2/IoComposeView.tsx`
-  - 후보: autosave, layout 보정, 순수 업무 계산 로직 분리
-  - 보류 이유: 입출고 핵심 UI이며 draft, BOM, 스크롤, 제출 흐름이 얽혀 있어 regression 위험이 크다.
+### 거의 끝난 것 (추가 작업 가치 낮음)
 
-- `frontend/app/mes/_components/_warehouse_v2/IoTargetPicker.tsx`
-  - 후보: 필터, 정렬, 테이블 렌더링 분리
-  - 보류 이유: 품목 선택 UX와 개인별 품목 순서 저장, BOM/단품 선택 규칙이 함께 있어 경계 합의가 필요하다.
+- `frontend/app/mes/_components/_warehouse_v2/IoComposeView.tsx` (886줄)
+  - URL 동기화·draft 복원·preselect는 이미 `useIoUrlSync`·`useIoDraftRestore`·`useIoPreselect` 훅으로 분리·단위테스트 통과. 남은 혼재는 DOM 레이아웃 effect(약 130줄, "350줄"은 과장)뿐.
+  - "테스트 불가·인터페이스 없음"은 사실이 아님 — 추출된 훅 7개 + 단위테스트 3종이 이미 통과 중.
+  - 레이아웃 훅을 더 떼는 건 deepening이 아니라 줄 옮기기에 가깝고, 모바일과 dirty/flush 모델이 달라 dual-shell E2E 부담(ADR-0003)만 늘린다.
 
-- `backend/app/routers/inventory/transactions.py`
-  - 후보: 거래 메타 수정/수량 보정 로직을 `backend/app/services/transaction_edit.py`로 추출
-  - 보류 이유: 방향은 타당하지만, 리뷰 직전에는 거래 수정/보정 흐름을 흔들지 않는 편이 안전하다.
+- `backend/app/routers/inventory/transactions.py` 취소·역산
+  - 진짜 역산 로직(`apply_effect_reverse`)은 이미 `services/inv_effect.py`로 분리·단위테스트(`test_effect_helper_roundtrip`)됨.
+  - 라우터에 남은 `_cancel_one_log`(799-932)은 `inventory_effect`가 없는 **레거시 로그용 폴백**뿐. 신규 거래는 모두 effect를 남기므로 점점 죽어가는 경로다.
+  - 따라서 "서비스로 빼자"는 추출 가치가 낮다(얇은 pass-through만 추가). 음수 가드·`_sync_total` 순서가 얽힌 destructive 경로라 위험 대비 실익이 적다.
+
+### 진짜 남은 것 (작고 비교적 안전, 그래도 리뷰 후 합의로)
+
+- `backend/app/routers/production.py` 생산 입고 오케스트레이션 (헬퍼 `_load_and_merge_requirements`·`_preload_components`·`_assert_no_shortage`·`_backflush_components`·`_record_production`, 111-275)
+  - 재고 primitive와 BOM 전개는 이미 서비스에 있고, 라우터엔 시퀀싱·로그·트랜잭션 경계 같은 coordination만 남음. `services/production_receipt.py`로 추출하면 HTTP 없는 단위테스트 seam이 생긴다.
+  - **즉시 정리 가능한 부수확**: `merge_requirements`를 import만 하고 안 씀(dead import) + 같은 merge 루프가 두 곳에 인라인 중복(133-135, 293-295).
+  - 위험: 중간. 동시성 테스트(`test_production_receipt_concurrent_same_item`)가 트랜잭션 경계·422/500 매핑을 핀하고 있어 추출 시 보존 필요(monkeypatch 대상도 갱신).
+
+- 품목 정렬 comparator → `sortItemsForPicker` 순수함수 추출
+  - 필터·우선순위 맵 3종은 이미 `itemPickerShared`가 공유함(중복 아님 — 첫 진단이 틀렸던 부분). 남은 건 4단계 정렬(rank→priority→assemblyRank→idx)이 `IoTargetPicker`·`DefectItemPicker`에 **4벌 verbatim 복제**된 것뿐.
+  - 순수함수라 가장 안전한 deepening. **단 정렬 순서를 고정하는 테스트가 전무하니 골든 테스트 먼저.**
+  - 순서편집 상태머신·`EditOrderTable` 통합은 별개로 더 크고 모바일(ADR-0003) 회귀 부담 있음 — 경계 합의 대상.
+
+- 승인 큐 쿼리 빌더 (`backend/app/routers/stock_requests.py` 143-152/165-174, 202-215/238-250)
+  - list/count가 동일 where절을 각자 중복. 공통 빌더로 묶으면 정책 변경이 한 곳에 모인다. 작업 자체는 작음.
+  - **주의: 부서 큐 필터는 "누가 어느 부서 결재를 보는가"를 정하는 인가(authorization) 경계다.** `None`(전체)/빈 집합(권한 없음) 번역을 한 곳만 잘못 옮기면 결재 가시성이 조용히 넓어진다. 가시성 자체를 검증하는 테스트가 얇음 → Opus급 신중함 필요.
+
+### ADR 메모
+- 어느 후보도 기존 ADR(0001~0005)을 위반하지 않는다.
+- ADR-0003(모바일=데스크톱 V2 재사용)이 프론트 후보의 검증 비용을 올린다(dual-shell·양 viewport E2E 강제).
+- ADR-0005의 "재사용처가 생길 때 흡수한다(미사용 추상화 회피)" 철학이 전반적으로 선제 추출에 대한 신중론을 뒷받침한다.
 
 ## 리뷰 전 검증 기준
 

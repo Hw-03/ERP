@@ -17,20 +17,22 @@
   - Frontend: entire `frontend/app/mes/_components/_weekly_sections/` directory + `frontend/app/mes/_components/DesktopWeeklyReportView.tsx` (frozen: 2026-05-24)
   - Backend: `backend/app/routers/inventory/weekly_report.py` (frozen: 2026-05-29)
   - Touch only when explicitly asked. Bypass these files for surrounding refactors, global renames, etc. When adding a new `TransactionTypeEnum`, only update the classification sets (`PRODUCTION_TX_TYPES` / `NON_PRODUCTION_TX_TYPES`) in weekly_report.py.
-- **모바일 하단 탭바 디자인 동결 (complete)**
-  - `frontend/app/mes/_components/mobile/MobileShell.tsx` — NavButton 컴포넌트 및 `<nav>` 컨테이너 스타일 (frozen: 2026-06-16). 슬라이딩 pill(`containerRef`·`pill` state·`useLayoutEffect`) 구현 완료(2026-06-16).
-  - `frontend/app/globals.css` — `button.no-btn-inset` opt-out 규칙 (frozen: 2026-06-16)
-  - 명시적 요청 없이 탭바 레이아웃·버튼 디자인·그림자·pill 스타일 건드리지 말 것.
-  - **더보기 동작 변경(2026-06-17, 사용자 승인)**: 더보기는 BottomSheet → 정식 5번째 전폭 탭(`more`, `MobileMoreScreen`)으로 전환됨. `pillOverride`·470ms 시트 딜레이·`MobileMoreSheet`는 제거됨(더보기 시트 동작 동결 문구는 폐기). NavButton·`<nav>`·pill **시각 디자인 자체는 여전히 동결**.
+- **Mobile bottom tab bar design is frozen (complete)**
+  - `frontend/app/mes/_components/mobile/MobileShell.tsx` — the NavButton component and `<nav>` container styling (frozen: 2026-06-16). Sliding pill (`containerRef` · `pill` state · `useLayoutEffect`) implementation complete (2026-06-16).
+  - `frontend/app/globals.css` — the `button.no-btn-inset` opt-out rule (frozen: 2026-06-16)
+  - Do not touch the tab bar layout, button design, shadow, or pill styling without an explicit request.
+  - **"More" behavior change (2026-06-17, user-approved)**: "More" was converted from a BottomSheet to a proper 5th full-width tab (`more`, `MobileMoreScreen`). `pillOverride`, the 470ms sheet delay, and `MobileMoreSheet` were removed (the earlier "More sheet behavior frozen" note is retired). The NavButton, `<nav>`, and pill **visual design itself remains frozen**.
 - Do not mix sample data with real data.
 - Do not perform large refactors, folder moves, or renames unless explicitly asked.
 - Do not rename legacy internal identifiers such as `xray-erp` unless explicitly asked.
+- **Renames and moves must be complete in the same change.** After renaming or moving a file/symbol/route, grep the old name across BOTH code and docs (`_attic/docs/`, READMEs) and update every hit — or explicitly note the ones intentionally kept (e.g. the `legacy_part` / `legacy_item_type` data fields). An orphaned name like `DesktopLegacyShell` left behind after a `legacy→mes` rename makes the next reader treat live code as dead. The same applies to facts inside docs: if you change a behavior, fix or mark `[STALE]` the doc sentence that now lies about it.
+- **Verify a claim about the code before reporting it.** Any judgment — "this is duplicated / untestable / not extracted into a service / a bug / needs refactoring" — must be confirmed against the actual file and cited as `file:line`, not inferred from a name or a partial read. Separate what you verified by reading from what you only inferred. Rationale: in vibe-coding the user cannot easily fact-check, so a confident-but-wrong assessment silently becomes accepted truth and drives wasted or risky work. (Real case 2026-06-19: a first-pass scan claimed "no service layer" / "maps duplicated" / "untestable"; deep-read verification refuted all three — most of the work was already done.)
 
 ## Plan Mode — Model Recommendation
 
 After completing a plan, always place the recommended model at the very top of the plan shown to the user:
 
-> **추천 모델 : Sonnet** — [한 줄 이유]
+> **Recommended model: Sonnet** — [one-line reason]
 
 Criteria:
 - **Haiku**: Simple repetitive tasks. e.g. variable rename, file search, minor text edits.
