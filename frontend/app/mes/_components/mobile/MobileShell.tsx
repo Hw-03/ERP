@@ -219,7 +219,11 @@ export function MobileShell() {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
-  const activeIndex = visibleTabs.indexOf(activeTab);
+  // 항목 2-9 — weekly/warehouseMap 은 '더보기' 탭으로 진입한 하위 화면이라 TAB_BAR_IDS 에 없다.
+  // 하단 네비에선 '더보기' 슬롯을 활성으로 매핑해 pill·강조가 더보기에 붙도록 한다.
+  const isMoreSubScreen = activeTab === "weekly" || activeTab === "warehouseMap";
+  const effectiveNavTab: MobileTabId = isMoreSubScreen ? "more" : activeTab;
+  const activeIndex = visibleTabs.indexOf(effectiveNavTab);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -277,7 +281,6 @@ export function MobileShell() {
           key={key}
           onWeekly={() => handleTabChange("weekly")}
           onWarehouseMap={() => handleTabChange("warehouseMap")}
-          onOpenAccount={() => setUserMenuOpen(true)}
         />
       );
     }
@@ -416,15 +419,20 @@ export function MobileShell() {
                 }}
               />
             )}
-            {visibleTabs.map((tab) => (
-              <NavButton
-                key={tab}
-                icon={TAB_META[tab].icon}
-                label={TAB_META[tab].label}
-                active={tab === activeTab}
-                onClick={() => handleTabChange(tab)}
-              />
-            ))}
+            {visibleTabs.map((tab) => {
+              // 항목 2-9 — 더보기 슬롯은 weekly/warehouseMap 진입 시 그 화면의 아이콘·라벨로 교체.
+              // (NavButton/pill 의 시각 디자인은 고정 — 넘기는 icon/label/active 만 바꾼다.)
+              const meta = tab === "more" && isMoreSubScreen ? TAB_META[activeTab] : TAB_META[tab];
+              return (
+                <NavButton
+                  key={tab}
+                  icon={meta.icon}
+                  label={meta.label}
+                  active={tab === effectiveNavTab}
+                  onClick={() => handleTabChange(tab)}
+                />
+              );
+            })}
           </div>
         </nav>
       </div>
