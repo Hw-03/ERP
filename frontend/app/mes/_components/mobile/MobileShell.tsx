@@ -288,7 +288,13 @@ export function MobileShell() {
       return <MobileWeeklyScreen key={key} weekMon={weekMon} />;
     }
     if (activeTab === "warehouseMap") {
-      return <MobileWarehouseMapScreen key={key} onStatusChange={handleStatusChange} />;
+      return (
+        <MobileWarehouseMapScreen
+          key={key}
+          onStatusChange={handleStatusChange}
+          onExit={() => handleTabChange("more")}
+        />
+      );
     }
     return null;
   }, [
