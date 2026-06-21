@@ -360,6 +360,7 @@ export function MobileDashboardScreen({
                 }}
                 canReceive={canReceive}
                 quickActionVariant="mobile"
+                imageFilename={displayItem.mes_code ? imageManifest?.[displayItem.mes_code] : undefined}
               />
             </div>
           </div>

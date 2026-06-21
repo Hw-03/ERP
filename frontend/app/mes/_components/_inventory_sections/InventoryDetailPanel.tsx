@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { Eye, ImageOff } from "lucide-react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { api, type Item, type StockRequestReservationLine } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -68,34 +69,68 @@ export function InventoryDetailPanel({
 
   return (
     <div className="space-y-4">
-      {imageFilename && (
-        <section
-          className="flex items-center justify-center rounded-[28px] border p-4"
-          style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
-        >
+      {quickActionVariant === "mobile" ? (
+        // 항목 3-7 — 모바일은 화면 공간 한계상 인라인 미리보기 대신 버튼 자리 고정.
+        // 사진 있으면 "이미지 보기"(클릭→팝업), 없으면 같은 자리에 비활성 "이미지 없음".
+        imageFilename ? (
           <button
             type="button"
             onClick={() => setLightboxOpen(true)}
-            aria-label={`${item.item_name} 이미지 확대`}
-            className="cursor-zoom-in rounded-[14px] border transition-transform hover:scale-[1.02]"
-            style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
+            aria-label={`${item.item_name} 이미지 보기`}
+            className="flex w-full items-center justify-center gap-2 rounded-[18px] border px-4 py-3 text-sm font-bold transition-colors active:brightness-95"
+            style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
           >
-            <Image
-              src={`/images/items/${imageFilename}`}
-              alt={item.item_name}
-              width={160}
-              height={160}
-              unoptimized
-              className="block rounded-[14px] object-contain"
-            />
+            <Eye className="h-4 w-4" />
+            이미지 보기
           </button>
-          <ImageLightbox
-            open={lightboxOpen}
-            src={`/images/items/${imageFilename}`}
-            alt={item.item_name}
-            onClose={() => setLightboxOpen(false)}
-          />
-        </section>
+        ) : (
+          <div
+            aria-disabled="true"
+            className="flex w-full items-center justify-center gap-2 rounded-[18px] border px-4 py-3 text-sm font-bold"
+            style={{
+              borderColor: LEGACY_COLORS.border,
+              background: LEGACY_COLORS.s2,
+              color: LEGACY_COLORS.muted2,
+              opacity: 0.6,
+            }}
+          >
+            <ImageOff className="h-4 w-4" />
+            이미지 없음
+          </div>
+        )
+      ) : (
+        // 데스크톱 — 기존 인라인 썸네일(사진 있을 때만, 무변경).
+        imageFilename && (
+          <section
+            className="flex items-center justify-center rounded-[28px] border p-4"
+            style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}
+          >
+            <button
+              type="button"
+              onClick={() => setLightboxOpen(true)}
+              aria-label={`${item.item_name} 이미지 확대`}
+              className="cursor-zoom-in rounded-[14px] border transition-transform hover:scale-[1.02]"
+              style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
+            >
+              <Image
+                src={`/images/items/${imageFilename}`}
+                alt={item.item_name}
+                width={160}
+                height={160}
+                unoptimized
+                className="block rounded-[14px] object-contain"
+              />
+            </button>
+          </section>
+        )
+      )}
+      {imageFilename && (
+        <ImageLightbox
+          open={lightboxOpen}
+          src={`/images/items/${imageFilename}`}
+          alt={item.item_name}
+          onClose={() => setLightboxOpen(false)}
+        />
       )}
       {/* 수량 현황 */}
       <section
