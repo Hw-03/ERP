@@ -204,78 +204,85 @@ export function MobileDefectCartFlow({
   );
 
   // ── Step 1: 출처·부서 ───────────────────────────────────────────────
+  // 항목 3-3 — Step2 와 동일하게 화면 전체 높이 채움(h-full) + 다음 버튼 StickyFooter 하단 고정.
   if (step === 1) {
     return (
-      <div className="flex flex-col gap-4">
-        {header}
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="shrink-0 pb-3">{header}</div>
 
-        <div className="flex flex-col gap-2">
-          <span className={clsx(TYPO.caption, "font-black uppercase tracking-[1px]")} style={{ color: LEGACY_COLORS.muted2 }}>
-            출처
-          </span>
-          <SegmentedControl
-            tabs={[
-              { id: "production", label: "부서 재고" },
-              { id: "warehouse", label: "창고 재고" },
-            ]}
-            active={source}
-            onChange={(s) => setSource(s as SourceKind)}
-          />
-          <span className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted }}>
-            {source === "warehouse"
-              ? "창고 보관 중인 정상 재고에서 처리합니다."
-              : "생산 부서에서 사용 중인 재고에서 처리합니다."}
-          </span>
-        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="flex flex-col gap-4 pb-3">
+            <div className="flex flex-col gap-2">
+              <span className={clsx(TYPO.caption, "font-black uppercase tracking-[1px]")} style={{ color: LEGACY_COLORS.muted2 }}>
+                출처
+              </span>
+              <SegmentedControl
+                tabs={[
+                  { id: "production", label: "부서 재고" },
+                  { id: "warehouse", label: "창고 재고" },
+                ]}
+                active={source}
+                onChange={(s) => setSource(s as SourceKind)}
+              />
+              <span className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted }}>
+                {source === "warehouse"
+                  ? "창고 보관 중인 정상 재고에서 처리합니다."
+                  : "생산 부서에서 사용 중인 재고에서 처리합니다."}
+              </span>
+            </div>
 
-        {source === "warehouse" ? (
-          <SectionCard padding="md">
-            <div className="flex items-center gap-3">
-              <Warehouse className="h-7 w-7 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-              <div className="min-w-0">
-                <div className={clsx(TYPO.title, "font-black")} style={{ color: LEGACY_COLORS.blue }}>
-                  창고
+            {source === "warehouse" ? (
+              <SectionCard padding="md">
+                <div className="flex items-center gap-3">
+                  <Warehouse className="h-7 w-7 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
+                  <div className="min-w-0">
+                    <div className={clsx(TYPO.title, "font-black")} style={{ color: LEGACY_COLORS.blue }}>
+                      창고
+                    </div>
+                    <div className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
+                      {mode === "add" ? "창고 불량 보관 구역으로 이동됩니다." : "창고 정상 재고에서 차감됩니다."}
+                    </div>
+                  </div>
                 </div>
-                <div className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-                  {mode === "add" ? "창고 불량 보관 구역으로 이동됩니다." : "창고 정상 재고에서 차감됩니다."}
+              </SectionCard>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <span className={clsx(TYPO.caption, "font-black uppercase tracking-[1px]")} style={{ color: LEGACY_COLORS.muted2 }}>
+                  {mode === "add" ? "출처·격리 부서" : "출처 부서"}
+                </span>
+                <div className="grid grid-cols-3 gap-2">
+                  {PRODUCTION_LINES.map((d) => {
+                    const active = dept === d;
+                    const c = MES_DEPARTMENT_COLORS[d] ?? LEGACY_COLORS.muted2;
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setDept(d)}
+                        className={clsx(
+                          "min-h-[52px] rounded-[14px] border font-black transition-[transform] active:scale-[0.98]",
+                          TYPO.title,
+                        )}
+                        style={{
+                          background: active ? tint(c, 14) : LEGACY_COLORS.s2,
+                          borderColor: active ? c : LEGACY_COLORS.border,
+                          borderWidth: active ? 2 : 1,
+                          color: active ? c : LEGACY_COLORS.muted2,
+                        }}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-            </div>
-          </SectionCard>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <span className={clsx(TYPO.caption, "font-black uppercase tracking-[1px]")} style={{ color: LEGACY_COLORS.muted2 }}>
-              {mode === "add" ? "출처·격리 부서" : "출처 부서"}
-            </span>
-            <div className="grid grid-cols-3 gap-2">
-              {PRODUCTION_LINES.map((d) => {
-                const active = dept === d;
-                const c = MES_DEPARTMENT_COLORS[d] ?? LEGACY_COLORS.muted2;
-                return (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => setDept(d)}
-                    className={clsx(
-                      "min-h-[52px] rounded-[14px] border font-black transition-[transform] active:scale-[0.98]",
-                      TYPO.title,
-                    )}
-                    style={{
-                      background: active ? tint(c, 14) : LEGACY_COLORS.s2,
-                      borderColor: active ? c : LEGACY_COLORS.border,
-                      borderWidth: active ? 2 : 1,
-                      color: active ? c : LEGACY_COLORS.muted2,
-                    }}
-                  >
-                    {d}
-                  </button>
-                );
-              })}
-            </div>
+            )}
           </div>
-        )}
+        </div>
 
-        <PrimaryActionButton label="다음 →" intent="primary" onClick={() => setStep(2)} />
+        <StickyFooter>
+          <PrimaryActionButton label="다음 →" intent="primary" onClick={() => setStep(2)} />
+        </StickyFooter>
       </div>
     );
   }
