@@ -27,6 +27,7 @@ import type { Item } from "@/lib/api";
 import { CapacityDetailModal } from "../CapacityDetailModal";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { NotificationBell } from "../notifications/NotificationBell";
+import { StatusPill, inferToneFromStatus } from "../common";
 import { canEnterIO } from "../_warehouse_steps";
 import { canSeeWorkType } from "../_warehouse_v2/ioWorkType";
 import type { IoEntryIntent } from "../_warehouse_v2/types";
@@ -68,13 +69,8 @@ const VALID_TAB_IDS: MobileTabId[] = [
   "warehouseMap",
 ];
 
-let _toastSeq = 0;
-
-interface ToastItem {
-  id: number;
-  msg: string;
-  type: "success" | "error" | "info";
-}
+// 항목 3-1 — 데스크톱 상단바와 동일한 기본 브랜드 상태 텍스트.
+const DEFAULT_STATUS = "DEXCOWIN MES System";
 
 /**
  * 하단 탭바 버튼 — 4개 탭 + "더보기"가 같은 형태를 공유한다.
@@ -124,9 +120,10 @@ function NavButton({
 export function MobileShell() {
   const operator = useCurrentOperator();
   const [activeTab, setActiveTab] = useState<MobileTabId>("dashboard");
-  const [toastQueue, setToastQueue] = useState<ToastItem[]>([]);
-  // 항목 11 — info/success 메시지는 헤더 상태 칩에 일시 표시(토스트 누적 방지). 에러만 토스트.
-  const [headerStatus, setHeaderStatus] = useState<string | null>(null);
+  // 항목 3-1 — 데스크톱 상단바와 동일: 모든 상태/알림(info·에러)을 헤더 상태 칩 하나에 표시.
+  // 기본은 brand "DEXCOWIN MES System", 메시지 도착 시 일시 표시 후 3초 뒤 복귀(에러는 sticky).
+  const [headerStatus, setHeaderStatus] = useState(DEFAULT_STATUS);
+  const [statusNonce, setStatusNonce] = useState(0);
   const headerStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -154,22 +151,20 @@ export function MobileShell() {
   const warehouseFlushRef = useRef<(() => void) | null>(null);
   const [pendingNavTab, setPendingNavTab] = useState<MobileTabId | null>(null);
 
+  // 항목 3-1 — 데스크톱 DesktopMesShell.handleStatusChange 와 동일 로직: 모든 메시지를 헤더 칩에.
+  // 기본 복귀, 에러(sticky)는 자동 복귀 안 함. (기존 "에러만 하단 토스트" 분리는 제거.)
   const handleStatusChange = useCallback((msg: string) => {
-    const isError = /실패|못했습니다|오류|에러|부족|품절/.test(msg);
-    if (isError) {
-      // error 는 토스트로 — 수동 닫기 유지(느린 네트워크/청각 보조 대응).
-      const id = ++_toastSeq;
-      setToastQueue((q: ToastItem[]) => [...q, { id, msg, type: "error" as const }].slice(-5));
-      return;
-    }
-    // info/success 는 데스크톱처럼 헤더 상태 칩에 일시 표시 → 3.5초 후 "DEXCOWIN MES" 복귀.
-    setHeaderStatus(msg);
     if (headerStatusTimerRef.current) clearTimeout(headerStatusTimerRef.current);
-    headerStatusTimerRef.current = setTimeout(() => setHeaderStatus(null), 3500);
-  }, []);
-
-  const dismissToast = useCallback((id: number) => {
-    setToastQueue((q: ToastItem[]) => q.filter((t: ToastItem) => t.id !== id));
+    setHeaderStatus(msg);
+    setStatusNonce((n) => n + 1);
+    if (msg === DEFAULT_STATUS) return;
+    const isSticky = /실패|못했습니다|오류|에러|부족|품절/.test(msg);
+    if (!isSticky) {
+      headerStatusTimerRef.current = setTimeout(() => {
+        setHeaderStatus(DEFAULT_STATUS);
+        setStatusNonce((n) => n + 1);
+      }, 3000);
+    }
   }, []);
 
   const handleTabChange = useCallback((tab: MobileTabId) => {
@@ -337,28 +332,23 @@ export function MobileShell() {
           }}
         >
           <div className="min-w-0 flex-1">
-            {activeTab !== "weekly" &&
-              (headerStatus ? (
-                // 항목 11 — info/success 메시지를 헤더 칩으로(데스크톱 상태 칩과 동일 역할)
-                <div
-                  role="status"
-                  aria-live="polite"
-                  className="inline-flex max-w-full items-center truncate rounded-full px-2.5 py-1 text-xs font-bold"
-                  style={{
-                    background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`,
-                    color: LEGACY_COLORS.blue,
-                  }}
-                >
-                  <span className="truncate">{headerStatus}</span>
-                </div>
-              ) : (
-                <div
-                  className="truncate text-xs font-bold uppercase tracking-wider"
-                  style={{ color: LEGACY_COLORS.muted2 }}
-                >
-                  DEXCOWIN MES
-                </div>
-              ))}
+            {activeTab !== "weekly" && (
+              // 항목 3-1 — 데스크톱 상단바와 동일한 상태 칩(StatusPill). 기본 brand, 메시지 도착 시 tone 추론.
+              <span
+                key={statusNonce}
+                role="status"
+                aria-live="polite"
+                style={{ animation: "statusFlash 0.35s ease-out" }}
+              >
+                <StatusPill
+                  tone={headerStatus === DEFAULT_STATUS ? "brand" : inferToneFromStatus(headerStatus)}
+                  label={headerStatus}
+                  title={headerStatus}
+                  maxWidth="100%"
+                  className={headerStatus === DEFAULT_STATUS ? "font-black tracking-[0.04em]" : ""}
+                />
+              </span>
+            )}
           </div>
           {activeTab === "weekly" && (
             <div className="flex items-center gap-2 shrink-0">
@@ -450,45 +440,7 @@ export function MobileShell() {
         />
       )}
 
-      {/* 토스트 큐 — 닫기 버튼, 자동 소멸 없음 (청각 장애/느린 네트워크 대응) */}
-      {toastQueue.length > 0 && (
-        <div
-          className="pointer-events-none fixed left-0 right-0 z-[300] flex flex-col gap-2 px-4"
-          style={{ bottom: "calc(env(safe-area-inset-bottom, 10px) + 88px)" }}
-        >
-          {toastQueue.map((t: ToastItem) => {
-            const borderColor =
-              t.type === "error" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
-            return (
-              <div
-                key={t.id}
-                role={t.type === "error" ? "alert" : "status"}
-                aria-live={t.type === "error" ? "assertive" : "polite"}
-                aria-atomic="true"
-                className="pointer-events-auto flex items-center justify-between gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold"
-                style={{
-                  background: LEGACY_COLORS.s3,
-                  borderColor: LEGACY_COLORS.border,
-                  borderLeftWidth: 3,
-                  borderLeftColor: borderColor,
-                  color: LEGACY_COLORS.text,
-                }}
-              >
-                <span className="min-w-0 flex-1">{t.msg}</span>
-                <button
-                  type="button"
-                  aria-label="메시지 닫기"
-                  onClick={() => dismissToast(t.id)}
-                  className="ml-1 shrink-0 rounded-full p-0.5 transition-opacity active:opacity-60"
-                  style={{ color: LEGACY_COLORS.muted2 }}
-                >
-                  ✕
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* 항목 3-1 — 기존 하단 토스트 큐 제거(에러 포함 모든 메시지를 상단 헤더 칩으로 통일). */}
 
       {/* 항목 16 — 입출고 작성 중 하단 네비 이탈 확인(draft 자동저장 flush 후 전환) */}
       <MobileDirtyLeaveSheet
@@ -496,6 +448,13 @@ export function MobileShell() {
         onCancel={() => setPendingNavTab(null)}
         onConfirm={() => {
           warehouseFlushRef.current?.(); // 700ms 디바운스 창의 마지막 변경까지 즉시 저장
+          const next = pendingNavTab;
+          setPendingNavTab(null);
+          setWarehouseDirty(false);
+          if (next) setActiveTab(next);
+        }}
+        onDiscard={() => {
+          // 항목 3-4 — 저장(flush) 없이 이동. 위저드는 언마운트되어 작성 내용이 폐기된다.
           const next = pendingNavTab;
           setPendingNavTab(null);
           setWarehouseDirty(false);

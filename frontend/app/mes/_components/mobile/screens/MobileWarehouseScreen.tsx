@@ -241,6 +241,13 @@ export function MobileWarehouseScreen({
           setComposeDirty(false);
           if (next) setSectionTab(next);
         }}
+        onDiscard={() => {
+          // 항목 3-4 — 저장(flush) 없이 섹션 이동. compose 위저드는 언마운트되어 작성 내용이 폐기된다.
+          const next = pendingTab;
+          setPendingTab(null);
+          setComposeDirty(false);
+          if (next) setSectionTab(next);
+        }}
       />
     </div>
   );

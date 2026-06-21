@@ -21,6 +21,8 @@ interface Props {
   onAdvance: () => void;
   canAdvance: boolean;
   hasShortage?: boolean;
+  /** 항목 3-4 — 모바일 전용: Step4에도 임시저장 버튼 노출. 데스크톱은 미전달(버튼 없음 → 무변경). */
+  onSaveDraft?: () => void;
 }
 
 export function IoBundleCart({
@@ -36,6 +38,7 @@ export function IoBundleCart({
   onAdvance,
   canAdvance,
   hasShortage,
+  onSaveDraft,
 }: Props) {
   const includedCount = bundles.flatMap((bundle) => bundle.lines).filter((line) => line.included).length;
   const totalQty = bundles
@@ -110,16 +113,40 @@ export function IoBundleCart({
               재고가 부족한 항목이 있습니다
             </p>
           )}
-          <button
-            type="button"
-            onClick={onAdvance}
-            disabled={!canAdvance}
-            className="flex w-full items-center justify-center gap-1.5 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
-            style={{ background: LEGACY_COLORS.blue }}
-          >
-            <ClipboardCheck className="h-4 w-4" />
-            제출확인 →
-          </button>
+          {onSaveDraft ? (
+            // 항목 3-4 — 모바일: 저장하기 + 제출확인 나란히(Step5와 동일하게 Step4에서도 저장 가능).
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onSaveDraft}
+                className="shrink-0 rounded-[14px] border px-5 py-3 text-sm font-black transition-[transform] active:scale-[0.99]"
+                style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
+              >
+                저장
+              </button>
+              <button
+                type="button"
+                onClick={onAdvance}
+                disabled={!canAdvance}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
+                style={{ background: LEGACY_COLORS.blue }}
+              >
+                <ClipboardCheck className="h-4 w-4" />
+                제출확인 →
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onAdvance}
+              disabled={!canAdvance}
+              className="flex w-full items-center justify-center gap-1.5 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
+              style={{ background: LEGACY_COLORS.blue }}
+            >
+              <ClipboardCheck className="h-4 w-4" />
+              제출확인 →
+            </button>
+          )}
         </div>
       )}
     </div>

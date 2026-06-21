@@ -582,6 +582,7 @@ export function MobileIoComposeWizard({
               if (state.canAdvance[4]) state.goTo(5);
             }}
             canAdvance={state.canAdvance[4]}
+            onSaveDraft={handleSaveDraft}
           />
         )}
 
