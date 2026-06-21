@@ -60,9 +60,10 @@ export function MobileWorkTypeStep({
           >
             <span
               className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[16px]"
-              style={{ background: active ? tint(accent, 20) : LEGACY_COLORS.s3 }}
+              style={{ background: active ? tint(accent, 20) : tint(accent, 10) }}
             >
-              <Icon className="h-8 w-8" />
+              {/* 항목 3-6 — 입출고 아이콘에도 색(입고=blue/출고=red accent). */}
+              <Icon className="h-8 w-8" style={{ color: active ? accentText : accent }} />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-xl font-black leading-tight">{row.label}</span>

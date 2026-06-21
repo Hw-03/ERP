@@ -9,19 +9,20 @@ import { ThemeToggle } from "./ThemeToggle";
 
 export type DesktopTabId = "dashboard" | "warehouse" | "warehouseMap" | "defect" | "history" | "weekly" | "admin";
 
-type TabDef = { id: DesktopTabId; label: string; subtitle: string; icon: ElementType };
+type TabDef = { id: DesktopTabId; label: string; subtitle: string; icon: ElementType; color: string };
 
+// 항목 3-6 — 사이드바 아이콘에 탭별 고유색(비활성 시 표시). 활성은 기존 blue 박스+white 아이콘 유지.
 const MAIN_TABS: TabDef[] = [
-  { id: "dashboard", label: "대시보드", subtitle: "현황과 안전재고 확인", icon: Boxes },
-  { id: "warehouse", label: "입출고", subtitle: "입고와 출고 작업 처리", icon: Warehouse },
-  { id: "defect", label: "불량", subtitle: "격리·폐기·반품 처리", icon: AlertTriangle },
-  { id: "history", label: "입출고 내역", subtitle: "입출고 이력 조회", icon: History },
-  { id: "warehouseMap", label: "창고 지도", subtitle: "위치별 재고 한눈에", icon: MapPinned },
-  { id: "weekly", label: "주간보고", subtitle: "생산·재고 흐름", icon: BarChart2 },
+  { id: "dashboard", label: "대시보드", subtitle: "현황과 안전재고 확인", icon: Boxes, color: LEGACY_COLORS.blue },
+  { id: "warehouse", label: "입출고", subtitle: "입고와 출고 작업 처리", icon: Warehouse, color: LEGACY_COLORS.green },
+  { id: "defect", label: "불량", subtitle: "격리·폐기·반품 처리", icon: AlertTriangle, color: LEGACY_COLORS.red },
+  { id: "history", label: "입출고 내역", subtitle: "입출고 이력 조회", icon: History, color: LEGACY_COLORS.purple },
+  { id: "warehouseMap", label: "창고 지도", subtitle: "위치별 재고 한눈에", icon: MapPinned, color: LEGACY_COLORS.cyan },
+  { id: "weekly", label: "주간보고", subtitle: "생산·재고 흐름", icon: BarChart2, color: LEGACY_COLORS.yellow },
 ];
 
 const BOTTOM_TABS: TabDef[] = [
-  { id: "admin", label: "관리", subtitle: "마스터와 운영 설정", icon: Settings2 },
+  { id: "admin", label: "관리", subtitle: "마스터와 운영 설정", icon: Settings2, color: LEGACY_COLORS.muted2 },
 ];
 
 export function DesktopSidebar({
@@ -178,7 +179,7 @@ function TabButton({
           className="flex h-[46px] w-[46px] items-center justify-center rounded-[16px] transition-all duration-150 group-hover:brightness-110 group-hover:scale-[1.05]"
           style={{
             background: active ? LEGACY_COLORS.blue : "transparent",
-            color: active ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
+            color: active ? LEGACY_COLORS.white : tab.color,
           }}
         >
           <Icon className="h-5 w-5" />
