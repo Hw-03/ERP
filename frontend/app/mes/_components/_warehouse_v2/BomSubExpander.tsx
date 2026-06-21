@@ -162,7 +162,7 @@ function BomTreeItem({
           <button
             type="button"
             onClick={() => setNameExpanded(false)}
-            className="ml-1 flex min-w-0 flex-1 flex-col gap-1 py-1.5 text-left"
+            className="no-btn-inset ml-1 flex min-w-0 flex-1 flex-col gap-1 py-1.5 text-left"
           >
             <span
               className="break-words text-sm font-semibold leading-snug"
@@ -178,7 +178,7 @@ function BomTreeItem({
               <button
                 type="button"
                 onClick={() => setNameExpanded(true)}
-                className="ml-1 min-w-0 flex-1 truncate text-left text-sm font-semibold"
+                className="no-btn-inset ml-1 min-w-0 flex-1 truncate text-left text-sm font-semibold"
                 style={{ color: LEGACY_COLORS.text }}
               >
                 {node.item_name}
