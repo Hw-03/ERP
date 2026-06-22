@@ -239,82 +239,83 @@ export function MobileDashboardScreen({
             )}
           </section>
 
-          <section
-            className="card"
-            style={{ backgroundImage: "linear-gradient(rgba(101, 169, 255, 0.08), rgba(101, 169, 255, 0.08))" }}
+          {/* 항목 4-2 — 검색/필터 바를 card 밖 스크롤 컨테이너 직속 풀폭 sticky 로 분리.
+              (card 안에 두면 스크롤 시 card 상단 라운드/그라데이션이 띠처럼 비쳐 틈처럼 보였음.)
+              -mx-3 로 좌우 패딩을 상쇄해 헤더 바로 아래 풀폭으로 붙는다. */}
+          <div
+            className="sticky top-0 z-20 -mx-3 flex flex-col gap-2 px-3 py-2.5"
+            style={{ background: LEGACY_COLORS.s1 }}
           >
-            {/* 모바일 검색/필터 바 — 데스크탑 sticky 헤더 대신 ≥44px 터치 타깃 */}
+            <div className="flex items-center gap-2">
+              <InlineSearch
+                value={localSearch}
+                onChange={setLocalSearch}
+                placeholder="품명 · 코드 · 위치 · 공급처"
+                className="min-w-0 flex-1"
+              />
+              <button
+                type="button"
+                onClick={() => setFiltersOpen((prev) => !prev)}
+                aria-label={filtersOpen ? "필터 닫기" : "필터 열기"}
+                aria-expanded={filtersOpen}
+                className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border transition-[transform] active:scale-95"
+                style={{
+                  background: filtersOpen || isFiltered ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
+                  borderColor: LEGACY_COLORS.border,
+                  color: filtersOpen || isFiltered ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
+                }}
+              >
+                <SlidersHorizontal size={18} strokeWidth={2} />
+                {activeFilterCount > 0 && (
+                  <span
+                    className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold"
+                    style={{ background: LEGACY_COLORS.red, color: LEGACY_COLORS.white }}
+                  >
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+            </div>
             <div
-              className="sticky top-0 z-10 flex flex-col gap-2 p-2.5"
-              style={{ background: LEGACY_COLORS.s1 }}
+              className="flex items-center justify-between px-0.5 text-xs font-semibold"
+              style={{ color: LEGACY_COLORS.muted2 }}
             >
-              <div className="flex items-center gap-2">
-                <InlineSearch
-                  value={localSearch}
-                  onChange={setLocalSearch}
-                  placeholder="품명 · 코드 · 위치 · 공급처"
-                  className="min-w-0 flex-1"
-                />
+              <span>총 {filteredItems.length}건</span>
+              {isFiltered && (
                 <button
                   type="button"
-                  onClick={() => setFiltersOpen((prev) => !prev)}
-                  aria-label={filtersOpen ? "필터 닫기" : "필터 열기"}
-                  aria-expanded={filtersOpen}
-                  className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border transition-[transform] active:scale-95"
-                  style={{
-                    background: filtersOpen || isFiltered ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
-                    borderColor: LEGACY_COLORS.border,
-                    color: filtersOpen || isFiltered ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
-                  }}
+                  onClick={resetAllFilters}
+                  className="rounded-full px-2 py-1 font-bold"
+                  style={{ color: LEGACY_COLORS.blue }}
                 >
-                  <SlidersHorizontal size={18} strokeWidth={2} />
-                  {activeFilterCount > 0 && (
-                    <span
-                      className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold"
-                      style={{ background: LEGACY_COLORS.red, color: LEGACY_COLORS.white }}
-                    >
-                      {activeFilterCount}
-                    </span>
-                  )}
+                  필터 초기화
                 </button>
-              </div>
-              <div
-                className="flex items-center justify-between px-0.5 text-xs font-semibold"
-                style={{ color: LEGACY_COLORS.muted2 }}
-              >
-                <span>총 {filteredItems.length}건</span>
-                {isFiltered && (
-                  <button
-                    type="button"
-                    onClick={resetAllFilters}
-                    className="rounded-full px-2 py-1 font-bold"
-                    style={{ color: LEGACY_COLORS.blue }}
-                  >
-                    필터 초기화
-                  </button>
-                )}
-              </div>
+              )}
             </div>
-            {/* 항목 2 — 필터 칩은 sticky 밖(일반 흐름)에 둬서 열려도 목록을 가리지 않고 아래로 밀어낸다. */}
-            {filtersOpen && (
-              <div className="px-2.5 pb-2.5">
-                <InventoryFilters
-                  open={filtersOpen}
-                  selectedDepts={selectedDepts}
-                  selectedModels={selectedModels}
-                  selectedProcessSteps={selectedProcessSteps}
-                  productModels={productModels}
-                  toggleDept={toggleDept}
-                  toggleModel={toggleModel}
-                  toggleProcessStep={toggleProcessStep}
-                  onClearDepts={() => setSelectedDepts([])}
-                  onClearModels={() => setSelectedModels([])}
-                  onClearProcessSteps={() => setSelectedProcessSteps([])}
-                  onResetAll={resetAllFilters}
-                  isAnyFilterActive={isFiltered}
-                />
-              </div>
-            )}
+          </div>
+          {/* 항목 2 — 필터 칩은 sticky 밖(일반 흐름)에 둬서 열려도 목록을 가리지 않고 아래로 밀어낸다.
+              4-2 — 검색바와 함께 card 밖, -mx-3 풀폭. */}
+          {filtersOpen && (
+            <div className="-mx-3 px-3 pb-2.5">
+              <InventoryFilters
+                open={filtersOpen}
+                selectedDepts={selectedDepts}
+                selectedModels={selectedModels}
+                selectedProcessSteps={selectedProcessSteps}
+                productModels={productModels}
+                toggleDept={toggleDept}
+                toggleModel={toggleModel}
+                toggleProcessStep={toggleProcessStep}
+                onClearDepts={() => setSelectedDepts([])}
+                onClearModels={() => setSelectedModels([])}
+                onClearProcessSteps={() => setSelectedProcessSteps([])}
+                onResetAll={resetAllFilters}
+                isAnyFilterActive={isFiltered}
+              />
+            </div>
+          )}
+          {/* 항목 4-2 — 목록만 card 로 감쌈(검색바·칩은 위에서 card 밖으로 분리). */}
+          <section className="card">
             <InventoryItemsTable
               error={error}
               loading={loading || filterChanging}
