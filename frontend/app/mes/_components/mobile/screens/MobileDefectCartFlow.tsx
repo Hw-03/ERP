@@ -13,6 +13,7 @@ import type { DefectCartMode } from "../../_defect_hub/DefectCartFlow";
 import { DefectItemPicker } from "../../_defect_hub/DefectItemPicker";
 import { ReasonFormFields } from "../../_defect_hub/ReasonFormFields";
 import { ConfirmModal } from "@/lib/ui";
+import { makeClientRequestId } from "@/lib/uuid";
 import { TYPO } from "../tokens";
 import {
   IconButton,
@@ -90,7 +91,7 @@ export function MobileDefectCartFlow({
     setLines((prev) => {
       if (prev.some((l) => l.item.item_id === item.item_id)) return prev;
       const key = `${item.item_id}-${prev.length}`;
-      setRequestIds((ids) => ({ ...ids, [key]: crypto.randomUUID() }));
+      setRequestIds((ids) => ({ ...ids, [key]: makeClientRequestId() }));
       return [...prev, { key, item, qty: 1, category: "", memo: "" }];
     });
   }
@@ -157,7 +158,7 @@ export function MobileDefectCartFlow({
     setBusy(true);
     setFailures([]);
     const results = await Promise.allSettled(
-      lines.map((l) => submitLine(l, requestIds[l.key] ?? crypto.randomUUID())),
+      lines.map((l) => submitLine(l, requestIds[l.key] ?? makeClientRequestId())),
     );
     const nextFailures: LineFailure[] = [];
     const failedKeys = new Set<string>();
