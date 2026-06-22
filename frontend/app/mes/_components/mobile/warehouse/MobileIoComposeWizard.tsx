@@ -669,7 +669,7 @@ export function MobileIoComposeWizard({
       {/* 썸존 하단 액션 — Step 2 만 (1=자동advance, 3=picker 내부 advance,
           4=cart 내부버튼, 5=confirm 내부버튼). Step3 는 이중 하단바 방지로 제외. */}
       {step === 2 && (
-        <StickyFooter>
+        <StickyFooter flat>
           <PrimaryActionButton
             label={state.canAdvance[2] ? "다음 단계로 →" : "세부 작업과 부서를 선택하세요"}
             intent={isExitWorkType(state.workType) ? "danger" : "primary"}
