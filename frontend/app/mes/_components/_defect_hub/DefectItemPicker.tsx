@@ -180,7 +180,8 @@ export function DefectItemPicker({
             </label>
           </div>
           {operator?.employee_id && (
-            <div className="shrink-0 self-end pb-0.5">
+            // 항목 4-10B — 순서 편집은 드래그 UX 라 모바일에서 숨김(PC 만 노출). 기능 코드는 보존.
+            <div className="hidden shrink-0 self-end pb-0.5 lg:block">
               {editMode ? (
                 <button
                   type="button"
@@ -359,17 +360,16 @@ export function DefectItemPicker({
                     className="whitespace-nowrap px-3 py-2 text-center"
                     style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                   >
+                    {/* 항목 4-11 — 모바일은 담김=아웃라인(흰 배경+빨강 테두리/글씨)으로 '추가(빨강 솔리드)'와 명확히 구분.
+                        PC(lg)는 기존 빨강 솔리드 유지(lg: 페어로 PC 무변경). */}
                     <button
                       type="button"
                       onClick={() => added ? onRemove(item) : onAdd(item)}
-                      className="inline-flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[12px] font-black text-white transition-colors hover:brightness-110 active:scale-[0.98]"
-                      style={{
-                        background: LEGACY_COLORS.red,
-                        color: LEGACY_COLORS.white,
-                        borderColor: LEGACY_COLORS.red,
-                        borderWidth: 1,
-                        borderStyle: "solid",
-                      }}
+                      className={`inline-flex items-center gap-1 rounded-[10px] border border-[var(--c-red)] px-2.5 py-1 text-[12px] font-black transition-colors hover:brightness-110 active:scale-[0.98] ${
+                        added
+                          ? "bg-transparent text-[var(--c-red)] lg:bg-[var(--c-red)] lg:text-white"
+                          : "bg-[var(--c-red)] text-white"
+                      }`}
                     >
                       {added ? (
                         <>
