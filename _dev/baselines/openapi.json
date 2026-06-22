@@ -4864,6 +4864,20 @@
         "title": "NotificationResponse",
         "type": "object"
       },
+      "PfPinPayload": {
+        "properties": {
+          "pf_item_id": {
+            "format": "uuid",
+            "title": "Pf Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pf_item_id"
+        ],
+        "title": "PfPinPayload",
+        "type": "object"
+      },
       "PinVerifyRequest": {
         "properties": {
           "pin": {
@@ -13304,6 +13318,112 @@
           }
         },
         "summary": "전체 생산 가능수량 조회",
+        "tags": [
+          "Production"
+        ]
+      }
+    },
+    "/api/production/capacity/pf-pins": {
+      "get": {
+        "description": "model_symbol → pf_item_id 전체 맵 반환. 지정 없으면 빈 dict.",
+        "operationId": "get_pf_pins_api_production_capacity_pf_pins_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Get Pf Pins Api Production Capacity Pf Pins Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "모델별 기준 PF 조회",
+        "tags": [
+          "Production"
+        ]
+      }
+    },
+    "/api/production/capacity/pf-pins/{model_symbol}": {
+      "delete": {
+        "description": "model_symbol 의 기준 PF 지정을 제거한다. 없어도 OK.",
+        "operationId": "clear_pf_pin_api_production_capacity_pf_pins__model_symbol__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_symbol",
+            "required": true,
+            "schema": {
+              "title": "Model Symbol",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "모델 기준 PF 해제",
+        "tags": [
+          "Production"
+        ]
+      },
+      "put": {
+        "description": "주어진 model_symbol 에 pf_item_id 를 기준 PF 로 지정한다.",
+        "operationId": "set_pf_pin_api_production_capacity_pf_pins__model_symbol__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_symbol",
+            "required": true,
+            "schema": {
+              "title": "Model Symbol",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PfPinPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "모델 기준 PF 지정",
         "tags": [
           "Production"
         ]

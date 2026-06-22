@@ -10,10 +10,11 @@ import type {
   ProductionCapacityAfBlock,
   ProductionCapacityAfStatus,
 } from "@/lib/api/types/production";
-import { groupAfByModel, type ModelCapacityGroup } from "@/lib/mes/capacity";
+import { groupAfByModel, getPinnedPfNumbers, type ModelCapacityGroup } from "@/lib/mes/capacity";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { getModelLabel } from "@/lib/mes/model-labels";
+import { usePfPinsQuery } from "@/lib/queries/useProductionQuery";
 
 function resolveStatus(data: ProductionCapacity): ProductionCapacityStatus {
   if (data.status) return data.status;
@@ -122,6 +123,7 @@ function AfPanel({
   interactive: boolean;
   onClick?: () => void;
 }) {
+  const { data: pfPins = {} } = usePfPinsQuery();
   const accent = afAccent(af.status);
   const showStats =
     af.status === "producible" ||
@@ -164,7 +166,8 @@ function AfPanel({
             </thead>
             <tbody>
               {groups.map((g) => {
-                const { ship_ready, fast_assembly, total_production } = g.totals;
+                const pinned = getPinnedPfNumbers(g.key, pfPins, af);
+                const { ship_ready, fast_assembly, total_production } = pinned ?? g.totals;
                 return (
                   <tr key={g.key}>
                     <td className="max-w-0 py-0.5 pr-2 text-left font-bold" style={{ color: LEGACY_COLORS.text }}>
@@ -211,7 +214,7 @@ function AfPanel({
         <div className="hidden min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 sm:flex">
           <ModelLegend />
           {groups.map((g, idx) => (
-            <ModelChip key={g.key} group={g} showSep={idx > 0} />
+            <ModelChip key={g.key} group={g} showSep={idx > 0} pinned={getPinnedPfNumbers(g.key, pfPins, af)} />
           ))}
           <span className="inline-flex shrink-0" aria-label={SHARED_HINT} title={SHARED_HINT}>
             <AlertTriangle className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />
@@ -263,8 +266,16 @@ function ModelLegend() {
 }
 
 // 모델별 칩: 모델명 + 출하/조립/총생산 3수량(색 구분).
-function ModelChip({ group, showSep }: { group: ModelCapacityGroup; showSep: boolean }) {
-  const { ship_ready, fast_assembly, total_production } = group.totals;
+function ModelChip({
+  group,
+  showSep,
+  pinned,
+}: {
+  group: ModelCapacityGroup;
+  showSep: boolean;
+  pinned: { ship_ready: number; fast_assembly: number; total_production: number } | null;
+}) {
+  const { ship_ready, fast_assembly, total_production } = pinned ?? group.totals;
   return (
     <span className="inline-flex shrink-0 items-baseline gap-1 text-sm">
       {showSep && (

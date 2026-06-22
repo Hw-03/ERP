@@ -4,7 +4,7 @@
  * 백엔드 `af.items`(AF 1종 단위)를 화면용으로 model_symbol 단위로 묶는다.
  * 패널(모델별 칩)과 상세 모달(모델 그룹 헤더 합계)이 공유한다.
  */
-import type { ProductionCapacityAfItem } from "@/lib/api/types/production";
+import type { ProductionCapacityAfBlock, ProductionCapacityAfItem } from "@/lib/api/types/production";
 import { getModelLabel } from "@/lib/mes/model-labels";
 
 export interface ModelCapacityGroup {
@@ -61,4 +61,25 @@ export function groupAfByModel(
       if (b.key === UNCLASSIFIED) return -1;
       return a.key.localeCompare(b.key, undefined, { numeric: true });
     });
+}
+
+/**
+ * 핀이 지정된 PF 의 3수량을 반환. 핀 없거나 variant 못 찾으면 null.
+ * ship_ready 는 pf_variant 값, fast_assembly/total_production 은 부모 AF 값 사용.
+ */
+export function getPinnedPfNumbers(
+  modelKey: string,
+  pfPins: Record<string, string>,
+  af: ProductionCapacityAfBlock,
+): { ship_ready: number; fast_assembly: number; total_production: number } | null {
+  const pinId = pfPins[modelKey];
+  if (!pinId) return null;
+  const variant = af.pf_variants.find((v) => v.pf_item_id === pinId);
+  if (!variant) return null;
+  const parentAf = af.items.find((it) => it.af_item_id === variant.af_item_id);
+  return {
+    ship_ready: variant.ship_ready,
+    fast_assembly: parentAf?.fast_assembly ?? 0,
+    total_production: parentAf?.total_production ?? 0,
+  };
 }

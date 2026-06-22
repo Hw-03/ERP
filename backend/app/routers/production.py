@@ -6,6 +6,8 @@ from decimal import Decimal
 from typing import List, Tuple
 
 from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -30,6 +32,10 @@ from app.services.production_capacity import compute_capacity
 from app.routers._errors import ErrorCode, http_error
 from app.routers.inventory._tx_helper import resolve_producer
 from app.repositories import item_repository
+
+
+class PfPinPayload(BaseModel):
+    pf_item_id: uuid.UUID
 
 router = APIRouter()
 
@@ -203,3 +209,60 @@ def get_production_capacity(db: Session = Depends(get_db)):
     계산 로직은 services/production_capacity.compute_capacity 로 분리되어 있다.
     """
     return compute_capacity(db)
+
+
+@router.get(
+    "/capacity/pf-pins",
+    response_model=dict[str, str],
+    summary="모델별 기준 PF 조회",
+)
+def get_pf_pins(db: Session = Depends(get_db)):
+    """model_symbol → pf_item_id 전체 맵 반환. 지정 없으면 빈 dict."""
+    rows = db.execute(text("SELECT model_symbol, pf_item_id FROM model_pf_pins")).fetchall()
+    return {r[0]: r[1] for r in rows}
+
+
+@router.put(
+    "/capacity/pf-pins/{model_symbol}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="모델 기준 PF 지정",
+)
+def set_pf_pin(
+    model_symbol: str,
+    payload: PfPinPayload,
+    db: Session = Depends(get_db),
+):
+    """주어진 model_symbol 에 pf_item_id 를 기준 PF 로 지정한다."""
+    pf_id = str(payload.pf_item_id)
+    row = db.execute(
+        text("SELECT item_id FROM items WHERE item_id = :id AND process_type_code = 'PF'"),
+        {"id": pf_id},
+    ).fetchone()
+    if not row:
+        raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, "PF 품목을 찾을 수 없습니다.")
+    db.execute(
+        text("DELETE FROM model_pf_pins WHERE model_symbol = :ms"),
+        {"ms": model_symbol},
+    )
+    db.execute(
+        text(
+            "INSERT INTO model_pf_pins (model_symbol, pf_item_id, updated_at) "
+            "VALUES (:ms, :pid, CURRENT_TIMESTAMP)"
+        ),
+        {"ms": model_symbol, "pid": pf_id},
+    )
+    db.commit()
+
+
+@router.delete(
+    "/capacity/pf-pins/{model_symbol}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="모델 기준 PF 해제",
+)
+def clear_pf_pin(model_symbol: str, db: Session = Depends(get_db)):
+    """model_symbol 의 기준 PF 지정을 제거한다. 없어도 OK."""
+    db.execute(
+        text("DELETE FROM model_pf_pins WHERE model_symbol = :ms"),
+        {"ms": model_symbol},
+    )
+    db.commit()

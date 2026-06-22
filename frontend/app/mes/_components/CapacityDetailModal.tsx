@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, AlertTriangle, AlertCircle, CheckCircle2 } from "lucide-react";
+import { ChevronDown, ChevronRight, AlertTriangle, AlertCircle, CheckCircle2, X } from "lucide-react";
 import type {
   ProductionCapacity,
   ProductionCapacityAfBlock,
@@ -11,6 +11,11 @@ import type {
 import { groupAfByModel } from "@/lib/mes/capacity";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
+import {
+  usePfPinsQuery,
+  useSetPfPinMutation,
+  useClearPfPinMutation,
+} from "@/lib/queries/useProductionQuery";
 
 type AfFilterMode = "producible" | "incomplete" | "all";
 
@@ -103,6 +108,11 @@ function isIncomplete(it: ProductionCapacityAfItem): boolean {
 }
 
 function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
+  const { data: pfPins = {} } = usePfPinsQuery();
+  const setPfPin = useSetPfPinMutation();
+  const clearPfPin = useClearPfPinMutation();
+  const isPinLoading = setPfPin.isPending || clearPfPin.isPending;
+
   const items = af.items;
 
   const producibleCount = useMemo(
@@ -200,7 +210,12 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
             조건에 맞는 AF 가 없습니다.
           </div>
         )}
-        {grouped.map((group) => (
+        {grouped.map((group) => {
+          const pinnedPfId = pfPins[group.key];
+          const pinnedVariant = pinnedPfId
+            ? af.pf_variants.find((v) => v.pf_item_id === pinnedPfId)
+            : null;
+          return (
           <div key={group.key}>
             {/* 모델 그룹 헤더 */}
             <div
@@ -210,11 +225,33 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                 background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`,
               }}
             >
-              <div className="text-sm font-black" style={{ color: LEGACY_COLORS.blue }}>
-                {group.label}{" "}
-                <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                  · {group.items.length}종
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-black" style={{ color: LEGACY_COLORS.blue }}>
+                  {group.label}{" "}
+                  <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                    · {group.items.length}종
+                  </span>
                 </span>
+                {pinnedVariant && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold"
+                    style={{
+                      background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 14%, transparent)`,
+                      color: LEGACY_COLORS.cyan,
+                    }}
+                  >
+                    기준 PF: {pinnedVariant.pf_code || pinnedVariant.pf_name}
+                    <button
+                      type="button"
+                      disabled={isPinLoading}
+                      onClick={() => clearPfPin.mutate(group.key)}
+                      className="ml-0.5"
+                      aria-label="기준 PF 해제"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
               </div>
               <div className="mt-1.5 grid grid-cols-3 gap-1">
                 <QtyLabelCell label="출하 대기" value={group.totals.ship_ready} color={LEGACY_COLORS.cyan} />
@@ -282,14 +319,23 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                         background: `color-mix(in srgb, ${LEGACY_COLORS.text} 4%, transparent)`,
                       }}
                     >
-                      <PfVariants variants={variants} hasPfPath={it.has_pf_path} />
+                      <PfVariants
+                        variants={variants}
+                        hasPfPath={it.has_pf_path}
+                        pinnedPfId={pinnedPfId}
+                        modelSymbol={group.key}
+                        onPin={(pfItemId) => setPfPin.mutate({ modelSymbol: group.key, pfItemId })}
+                        onUnpin={() => clearPfPin.mutate(group.key)}
+                        isPinLoading={isPinLoading}
+                      />
                     </div>
                   )}
                 </div>
               );
             })}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* 데스크톱 테이블 레이아웃 (≥ 640px) */}
@@ -311,7 +357,12 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
           </div>
         )}
 
-        {grouped.map((group) => (
+        {grouped.map((group) => {
+          const pinnedPfId = pfPins[group.key];
+          const pinnedVariant = pinnedPfId
+            ? af.pf_variants.find((v) => v.pf_item_id === pinnedPfId)
+            : null;
+          return (
           <div key={group.key}>
             <div
               className="grid grid-cols-[20px_minmax(0,1fr)_84px_84px_84px] items-center border-t px-4 py-2"
@@ -321,12 +372,34 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
               }}
             >
               <span />
-              <span className="text-sm font-black" style={{ color: LEGACY_COLORS.blue }}>
-                {group.label}{" "}
-                <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                  · {group.items.length}종
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-black" style={{ color: LEGACY_COLORS.blue }}>
+                  {group.label}{" "}
+                  <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                    · {group.items.length}종
+                  </span>
                 </span>
-              </span>
+                {pinnedVariant && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold"
+                    style={{
+                      background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 14%, transparent)`,
+                      color: LEGACY_COLORS.cyan,
+                    }}
+                  >
+                    기준 PF: {pinnedVariant.pf_code || pinnedVariant.pf_name}
+                    <button
+                      type="button"
+                      disabled={isPinLoading}
+                      onClick={() => clearPfPin.mutate(group.key)}
+                      className="ml-0.5"
+                      aria-label="기준 PF 해제"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
+              </div>
               <QtyCell value={group.totals.ship_ready} color={LEGACY_COLORS.cyan} />
               <QtyCell value={group.totals.fast_assembly} color={LEGACY_COLORS.blue} />
               <QtyCell value={group.totals.total_production} color={LEGACY_COLORS.purple} />
@@ -389,14 +462,23 @@ function AfCapacityView({ af }: { af: ProductionCapacityAfBlock }) {
                         background: `color-mix(in srgb, ${LEGACY_COLORS.text} 4%, transparent)`,
                       }}
                     >
-                      <PfVariants variants={variants} hasPfPath={it.has_pf_path} />
+                      <PfVariants
+                        variants={variants}
+                        hasPfPath={it.has_pf_path}
+                        pinnedPfId={pinnedPfId}
+                        modelSymbol={group.key}
+                        onPin={(pfItemId) => setPfPin.mutate({ modelSymbol: group.key, pfItemId })}
+                        onUnpin={() => clearPfPin.mutate(group.key)}
+                        isPinLoading={isPinLoading}
+                      />
                     </div>
                   )}
                 </div>
               );
             })}
           </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );
@@ -441,9 +523,19 @@ function Badge({ color, children }: { color: string; children: ReactNode }) {
 function PfVariants({
   variants,
   hasPfPath,
+  pinnedPfId,
+  modelSymbol: _modelSymbol,
+  onPin,
+  onUnpin,
+  isPinLoading,
 }: {
   variants: ProductionCapacityPfVariant[];
   hasPfPath: boolean;
+  pinnedPfId?: string;
+  modelSymbol?: string;
+  onPin?: (pfItemId: string) => void;
+  onUnpin?: () => void;
+  isPinLoading?: boolean;
 }) {
   if (variants.length === 0) {
     return (
@@ -460,23 +552,28 @@ function PfVariants({
         출하 변형(PF)별 출하 준비 가능 — 특정 주문 기준
       </div>
       <div
-        className="grid grid-cols-[minmax(0,1fr)_90px_28px] gap-2 px-2 pb-1 text-xs font-bold uppercase tracking-[0.12em]"
+        className="grid grid-cols-[minmax(0,1fr)_90px_64px_28px] gap-2 px-2 pb-1 text-xs font-bold uppercase tracking-[0.12em]"
         style={{ color: LEGACY_COLORS.muted2 }}
       >
         <span>출하 완제품 · 병목</span>
         <span className="text-right">출하 대기</span>
         <span />
+        <span />
       </div>
       {variants.map((v) => {
         const ok = v.ship_ready > 0;
+        const isPinned = pinnedPfId === v.pf_item_id;
         return (
           <div
             key={v.pf_item_id}
-            className="grid grid-cols-[minmax(0,1fr)_90px_28px] items-center gap-2 rounded-[8px] px-2 py-1.5"
+            className="grid grid-cols-[minmax(0,1fr)_90px_64px_28px] items-center gap-2 rounded-[8px] px-2 py-1.5"
             style={{
-              background: ok
-                ? `color-mix(in srgb, ${LEGACY_COLORS.cyan} 6%, transparent)`
-                : `color-mix(in srgb, ${LEGACY_COLORS.yellow} 8%, transparent)`,
+              background: isPinned
+                ? `color-mix(in srgb, ${LEGACY_COLORS.cyan} 10%, transparent)`
+                : ok
+                  ? `color-mix(in srgb, ${LEGACY_COLORS.cyan} 6%, transparent)`
+                  : `color-mix(in srgb, ${LEGACY_COLORS.yellow} 8%, transparent)`,
+              outline: isPinned ? `1.5px solid color-mix(in srgb, ${LEGACY_COLORS.cyan} 40%, transparent)` : undefined,
             }}
           >
             <div className="min-w-0">
@@ -499,6 +596,32 @@ function PfVariants({
               style={{ color: ok ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}
             >
               {formatQty(v.ship_ready)}
+            </div>
+            <div className="flex justify-end">
+              {isPinned ? (
+                <button
+                  type="button"
+                  disabled={isPinLoading}
+                  onClick={onUnpin}
+                  className="rounded-full px-1.5 py-0.5 text-xs font-bold"
+                  style={{
+                    background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 18%, transparent)`,
+                    color: LEGACY_COLORS.cyan,
+                  }}
+                >
+                  기준
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={isPinLoading}
+                  onClick={() => onPin?.(v.pf_item_id)}
+                  className="rounded-full px-1.5 py-0.5 text-xs font-semibold"
+                  style={{ color: LEGACY_COLORS.muted2 }}
+                >
+                  지정
+                </button>
+              )}
             </div>
             <div className="flex justify-end">
               {ok ? (

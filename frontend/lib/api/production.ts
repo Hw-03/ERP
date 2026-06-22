@@ -7,7 +7,7 @@
  *   Exports: getItemsExportUrl / getTransactionsExportUrl
  */
 
-import { fetcher, postJson, toApiUrl } from "../api-core";
+import { fetcher, postJson, putJson, deleteJson, toApiUrl } from "../api-core";
 import type {
   ProductionCapacity,
   ProductionCheckResponse,
@@ -43,6 +43,15 @@ export const productionApi = {
 
   getProductionCapacity: () =>
     fetcher<ProductionCapacity>(toApiUrl("/api/production/capacity")),
+
+  getPfPins: () =>
+    fetcher<Record<string, string>>(toApiUrl("/api/production/capacity/pf-pins")),
+
+  setPfPin: (modelSymbol: string, pfItemId: string) =>
+    putJson<void>(toApiUrl(`/api/production/capacity/pf-pins/${modelSymbol}`), { pf_item_id: pfItemId }),
+
+  clearPfPin: (modelSymbol: string) =>
+    deleteJson<void>(toApiUrl(`/api/production/capacity/pf-pins/${modelSymbol}`)),
 
   getTransactions: (
     params?: {
