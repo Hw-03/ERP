@@ -81,6 +81,7 @@ _attic/verify_out.log
 _dev/demo-verify/
 
 # Local / personal files
+/.tmp/
 workspace.ahk
 backend/query_test.py
 backend/query_warehouse.py
