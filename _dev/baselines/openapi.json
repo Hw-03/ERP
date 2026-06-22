@@ -776,6 +776,34 @@
         "title": "BomTemplateResponse",
         "type": "object"
       },
+      "BoxTrackingResponse": {
+        "description": "창고 박스 자동 차감 활성 여부.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "BoxTrackingResponse",
+        "type": "object"
+      },
+      "BoxTrackingUpdate": {
+        "description": "박스 추적 토글 (admin PIN 은 X-Admin-Pin 헤더로).",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "BoxTrackingUpdate",
+        "type": "object"
+      },
       "CapacityAfBlock": {
         "description": "AF(조립 완제품) 기준 생산 가능 수량.\n\n재고 기준은 available(=warehouse+production-pending)이며 **계획/대응 수량 지표**다.\n생산 등록 가능성 검증(backflush, warehouse_available)이 아니다.\n\n주의: summary.ship_ready / fast_assembly / total_production 은 'AF별 독립 계산의 합계'다.\n여러 AF 가 같은 하위 자재를 공유하면 모든 AF 수량을 동시에 보장하지는 않는다.",
         "properties": {
@@ -14983,6 +15011,102 @@
           }
         },
         "summary": "Update Angle",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
+    "/api/warehouse-map/box-tracking": {
+      "get": {
+        "description": "창고 박스 자동 차감 활성 여부 — 프론트가 편집/경고 UI 노출 결정에 사용.",
+        "operationId": "get_box_tracking_api_warehouse_map_box_tracking_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoxTrackingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Box Tracking",
+        "tags": [
+          "Warehouse Map"
+        ]
+      },
+      "put": {
+        "description": "창고 박스 자동 차감 기능 켜기/끄기 (전환 운영 스위치, admin PIN).\n\n켜기 전 전 품목 박스 배치가 끝나 있어야 한다 — 안 그러면 R5가 창고 출고를 막는다.",
+        "operationId": "set_box_tracking_api_warehouse_map_box_tracking_put",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoxTrackingUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoxTrackingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Box Tracking",
         "tags": [
           "Warehouse Map"
         ]

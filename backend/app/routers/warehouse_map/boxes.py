@@ -17,6 +17,8 @@ from app.models import (
 )
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
+    BoxTrackingResponse,
+    BoxTrackingUpdate,
     WarehouseBoxCreate,
     WarehouseBoxItemPayload,
     WarehouseBoxResponse,
@@ -26,6 +28,21 @@ from app.services import warehouse_map as wm_service
 from app.services.warehouse_map import JARI_CAPACITY, SIZE_UNIT
 
 router = APIRouter()
+
+
+@router.put("/box-tracking", response_model=BoxTrackingResponse)
+def set_box_tracking(
+    payload: BoxTrackingUpdate,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
+    """창고 박스 자동 차감 기능 켜기/끄기 (전환 운영 스위치, admin PIN).
+
+    켜기 전 전 품목 박스 배치가 끝나 있어야 한다 — 안 그러면 R5가 창고 출고를 막는다.
+    """
+    wm_service.set_box_tracking_enabled(db, payload.enabled)
+    db.commit()
+    return BoxTrackingResponse(enabled=wm_service.is_box_tracking_enabled(db))
 
 
 def _validate_coords(db: Session, angle_id: int, row_no: int, layer_no: int, jari_index: int) -> WarehouseAngle:

@@ -104,3 +104,13 @@ class WarehouseBoxResponse(BaseModel):
 class WarehouseMapResponse(BaseModel):
     angles: List[WarehouseAngleResponse]
     boxes: List[WarehouseBoxResponse]
+
+
+class BoxTrackingResponse(BaseModel):
+    """창고 박스 자동 차감 활성 여부."""
+    enabled: bool
+
+
+class BoxTrackingUpdate(BaseModel):
+    """박스 추적 토글 (admin PIN 은 X-Admin-Pin 헤더로)."""
+    enabled: bool

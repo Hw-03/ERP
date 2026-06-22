@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import WarehouseAngle, WarehouseBox
 from app.schemas import (
+    BoxTrackingResponse,
     ReconcileResponse,
     WarehouseAngleResponse,
     WarehouseBoxResponse,
@@ -16,6 +17,12 @@ from app.schemas import (
 from app.services import warehouse_map as wm_service
 
 router = APIRouter()
+
+
+@router.get("/box-tracking", response_model=BoxTrackingResponse)
+def get_box_tracking(db: Session = Depends(get_db)):
+    """창고 박스 자동 차감 활성 여부 — 프론트가 편집/경고 UI 노출 결정에 사용."""
+    return BoxTrackingResponse(enabled=wm_service.is_box_tracking_enabled(db))
 
 
 @router.get("/structure", response_model=List[WarehouseAngleResponse])
