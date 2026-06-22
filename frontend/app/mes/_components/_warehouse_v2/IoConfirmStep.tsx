@@ -255,30 +255,31 @@ export function IoConfirmStep({
         </div>
       )}
 
-      {/* 액션 버튼 행 — [저장하기] + [제출확인] */}
-      <div className="flex items-stretch gap-3">
+      {/* 액션 버튼 행 — [저장하기] + [제출확인].
+          항목 4-9 — 모바일은 Step4 버튼과 동일 크기/모서리(작게), PC(lg)는 기존 대형 그대로(lg: 페어로 PC 무변경). */}
+      <div className="flex items-stretch gap-2 lg:gap-3">
         <button
           type="button"
           onClick={onSaveDraft}
           disabled={saveDisabled}
-          className="flex shrink-0 items-center justify-center gap-2 rounded-[22px] border-2 px-6 py-7 text-base font-black transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
+          className="flex shrink-0 items-center justify-center gap-2 rounded-[14px] border px-5 py-3 text-sm font-black transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50 lg:rounded-[22px] lg:border-2 lg:px-6 lg:py-7 lg:text-base"
           style={{
             borderColor: LEGACY_COLORS.border,
             background: LEGACY_COLORS.s2,
             color: LEGACY_COLORS.text,
           }}
         >
-          <Save className="h-5 w-5" />
+          <Save className="h-4 w-4 lg:h-5 lg:w-5" />
           {saving ? "저장 중..." : "저장하기"}
         </button>
         <button
           type="button"
           onClick={() => setConfirmOpen(true)}
           disabled={submitDisabled}
-          className="flex flex-1 items-center justify-center gap-3 rounded-[22px] px-7 py-7 text-xl font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50"
+          className="flex flex-1 items-center justify-center gap-2 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50 lg:gap-3 lg:rounded-[22px] lg:px-7 lg:py-7 lg:text-xl"
           style={{ background: accent }}
         >
-          <ClipboardCheck className="h-6 w-6" />
+          <ClipboardCheck className="h-4 w-4 lg:h-6 lg:w-6" />
           {submitting ? "처리 중..." : meta.submitText(includedLines.length)}
         </button>
       </div>
