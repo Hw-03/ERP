@@ -228,7 +228,7 @@ export function IoLineRow({
             min={0}
             step="any"
             value={currentQty}
-            disabled={stepperDisabled}
+            disabled={qtyLocked}
             onChange={(e) => onInputChange(e.target.value)}
             onFocus={(e) => e.currentTarget.select()}
             title={qtyLocked ? "상위 수량에 비례해 자동 계산" : undefined}

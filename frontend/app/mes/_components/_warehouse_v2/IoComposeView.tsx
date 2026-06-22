@@ -162,6 +162,15 @@ export function IoComposeView({
     setSearch(globalSearch);
   }, [globalSearch]);
 
+  // 4단계 진입 시 재고 스냅샷 갱신 — 취소·승인 등으로 재고가 바뀐 뒤 재추가할 때 stale 표시 방지.
+  useEffect(() => {
+    if (state.step !== 4) return;
+    api.getItems({ limit: 2000, search: globalSearch.trim() || undefined })
+      .then(setItems)
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.step, globalSearch]);
+
   useEffect(() => {
     let cancelled = false;
     api.getAllBOM()
