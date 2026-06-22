@@ -212,7 +212,8 @@ export function MobileDefectCartFlow({
         <div className="shrink-0 pb-3">{header}</div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="flex flex-col gap-4 pb-3">
+          {/* 항목 4-10C — 입출고 Step2 톤: 부서 그리드가 남은 높이를 채우도록 min-h-full + flex-1. */}
+          <div className="flex min-h-full flex-col gap-4 pb-3">
             <div className="flex flex-col gap-2">
               <span className={clsx(TYPO.caption, "font-black uppercase tracking-[1px]")} style={{ color: LEGACY_COLORS.muted2 }}>
                 출처
@@ -247,11 +248,11 @@ export function MobileDefectCartFlow({
                 </div>
               </SectionCard>
             ) : (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-1 flex-col gap-2">
                 <span className={clsx(TYPO.caption, "font-black uppercase tracking-[1px]")} style={{ color: LEGACY_COLORS.muted2 }}>
                   {mode === "add" ? "출처·격리 부서" : "출처 부서"}
                 </span>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid flex-1 auto-rows-fr grid-cols-3 gap-2">
                   {PRODUCTION_LINES.map((d) => {
                     const active = dept === d;
                     const c = MES_DEPARTMENT_COLORS[d] ?? LEGACY_COLORS.muted2;
@@ -281,7 +282,7 @@ export function MobileDefectCartFlow({
           </div>
         </div>
 
-        <StickyFooter>
+        <StickyFooter flat>
           <PrimaryActionButton label="다음 →" intent="primary" onClick={() => setStep(2)} />
         </StickyFooter>
       </div>
@@ -384,7 +385,7 @@ export function MobileDefectCartFlow({
         </div>
       </div>
 
-      <StickyFooter>
+      <StickyFooter flat>
         {failures.length > 0 && (
           <div className={clsx(TYPO.caption, "mb-2 text-center font-bold")} style={{ color: LEGACY_COLORS.red }}>
             {failures.length}건 실패 — 남은 줄을 확인 후 다시 제출하세요.
