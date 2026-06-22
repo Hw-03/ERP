@@ -323,6 +323,8 @@ export function RowStage({
   cellIndex,
   pulseLayer,
   matchQuery,
+  editable,
+  onMoveBox,
   onRowChange,
   onLayerClick,
   onRowAndLayerChange,
@@ -333,6 +335,9 @@ export function RowStage({
   cellIndex: CellIndex;
   pulseLayer?: number | null;
   matchQuery?: string;
+  /** 편집 모드: 박스를 다른 자리로 드래그 이동. */
+  editable?: boolean;
+  onMoveBox?: (boxId: string, target: { row: number; layer: number; jari: number }) => void;
   onRowChange: (row: number) => void;
   onLayerClick: (layer: number) => void;
   onRowAndLayerChange?: (row: number, layer: number) => void;
@@ -340,6 +345,8 @@ export function RowStage({
   const layers = Array.from({ length: angle.layers }, (_, i) => angle.layers - i);
   const rows = Array.from({ length: angle.rows }, (_, i) => i + 1);
   const [selJari, setSelJari] = useState<{ layer: number; ji: number } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ layer: number; ji: number } | null>(null);
+  const draggedBoxRef = useRef<string | null>(null);
   useEffect(() => { setSelJari(null); }, [curRow]);
 
   return (
@@ -512,10 +519,35 @@ export function RowStage({
                 </div>
                 {stacks.map((boxes, ji) => {
                   const isSelJari = selJari?.layer === l && selJari?.ji === ji;
+                  const isDrop = editable && dropTarget?.layer === l && dropTarget?.ji === ji;
                   return (
                     <div
                       key={ji}
                       onClick={(e) => { e.stopPropagation(); setSelJari({ layer: l, ji }); onLayerClick(l); }}
+                      onDragOver={
+                        editable
+                          ? (e) => {
+                              e.preventDefault();
+                              if (!isDrop) setDropTarget({ layer: l, ji });
+                            }
+                          : undefined
+                      }
+                      onDragLeave={
+                        editable
+                          ? () => setDropTarget((p) => (p?.layer === l && p?.ji === ji ? null : p))
+                          : undefined
+                      }
+                      onDrop={
+                        editable
+                          ? (e) => {
+                              e.preventDefault();
+                              const boxId = draggedBoxRef.current;
+                              draggedBoxRef.current = null;
+                              setDropTarget(null);
+                              if (boxId) onMoveBox?.(boxId, { row: curRow, layer: l, jari: ji });
+                            }
+                          : undefined
+                      }
                       style={{
                         flex: 1,
                         minWidth: 0,
@@ -523,12 +555,22 @@ export function RowStage({
                         borderRight: ji < angle.jaris_per_cell - 1 ? `1px solid ${LEGACY_COLORS.border}` : undefined,
                         display: "flex",
                         cursor: "pointer",
-                        background: isSelJari
-                          ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`
-                          : undefined,
+                        outline: isDrop ? `2px dashed ${LEGACY_COLORS.blue}` : undefined,
+                        outlineOffset: -2,
+                        background: isDrop
+                          ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 16%, transparent)`
+                          : isSelJari
+                            ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`
+                            : undefined,
                       }}
                     >
-                      <JariColumn boxes={boxes} scale="row" matchQuery={matchQuery} />
+                      <JariColumn
+                        boxes={boxes}
+                        scale="row"
+                        matchQuery={matchQuery}
+                        draggable={editable}
+                        onBoxDragStart={(id) => { draggedBoxRef.current = id; }}
+                      />
                     </div>
                   );
                 })}

@@ -209,3 +209,43 @@ def test_jari_returns_stack(client, make_item):
                       params={"angle_id": angle["id"], "row": 1, "layer": 1, "jari": 0})
     assert resp.status_code == 200
     assert len(resp.json()) == 1
+
+
+# ──────────────────────────── 박스 이동(드래그) ────────────────────────────
+
+def test_move_box_changes_position(client, make_item):
+    angle = _make_angle(client)
+    item = make_item(warehouse_qty=D("1"))
+    box = _put_box(client, angle["id"], row=1, layer=1, jari=0, size="SMALL",
+                   items=[{"item_id": str(item.item_id), "quantity": 1}]).json()
+    resp = client.patch(
+        f"{BASE}/boxes/{box['box_id']}/move",
+        json={"angle_id": angle["id"], "row_no": 2, "layer_no": 1, "jari_index": 1},
+        headers=MGR,
+    )
+    assert resp.status_code == 200, resp.text
+    moved = resp.json()
+    assert (moved["row_no"], moved["layer_no"], moved["jari_index"]) == (2, 1, 1)
+
+
+def test_move_box_capacity_exceeded(client):
+    angle = _make_angle(client)
+    # jari0 을 대(3) 박스로 가득, jari1 에 소(1) 박스 → 소를 jari0 으로 이동 시 초과
+    _put_box(client, angle["id"], jari=0, size="LARGE")
+    small = _put_box(client, angle["id"], jari=1, size="SMALL").json()
+    resp = client.patch(
+        f"{BASE}/boxes/{small['box_id']}/move",
+        json={"angle_id": angle["id"], "row_no": 1, "layer_no": 1, "jari_index": 0},
+        headers=MGR,
+    )
+    assert resp.status_code == 422
+
+
+def test_move_box_requires_manager(client):
+    angle = _make_angle(client)
+    box = _put_box(client, angle["id"], jari=0, size="SMALL").json()
+    resp = client.patch(
+        f"{BASE}/boxes/{box['box_id']}/move",
+        json={"angle_id": angle["id"], "row_no": 1, "layer_no": 1, "jari_index": 2},
+    )
+    assert resp.status_code == 403

@@ -24,10 +24,15 @@ export function JariColumn({
   boxes,
   scale,
   matchQuery,
+  draggable,
+  onBoxDragStart,
 }: {
   boxes: WarehouseBox[];
   scale: "front" | "row";
   matchQuery?: string;
+  /** 편집 모드: 박스를 드래그해 다른 자리로 이동(줄확대 화면). */
+  draggable?: boolean;
+  onBoxDragStart?: (boxId: string) => void;
 }) {
   const used = stackUnits(boxes);
   const empty = JARI_CAPACITY - used;
@@ -142,6 +147,15 @@ export function JariColumn({
         return (
           <div
             key={box.box_id}
+            draggable={draggable || undefined}
+            onDragStart={
+              draggable
+                ? (e) => {
+                    e.stopPropagation();
+                    onBoxDragStart?.(box.box_id);
+                  }
+                : undefined
+            }
             className={`${styles.boxHover}${matched ? ` ${styles.boxHit}` : ""}`}
             style={{
               flex: SIZE_UNIT[box.size] ?? 1,
@@ -153,6 +167,7 @@ export function JariColumn({
               padding: isFront ? "0 5px" : "0 8px",
               borderRadius: 6,
               background: `color-mix(in srgb, ${color} 28%, ${LEGACY_COLORS.s1})`,
+              cursor: draggable ? "grab" : undefined,
             }}
           >
             {tip ? (

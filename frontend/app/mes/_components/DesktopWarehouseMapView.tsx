@@ -18,8 +18,11 @@ type LocGuide = { hits: Array<{ hit: SearchHit; angle: WarehouseAngle; qty: numb
 
 export function DesktopWarehouseMapView({
   onStatusChange,
+  editable,
 }: {
   onStatusChange?: (msg: string) => void;
+  /** 편집 모드(창고 관리자): 줄확대 화면에서 박스를 드래그해 다른 자리로 이동. */
+  editable?: boolean;
 }) {
   const [map, setMap] = useState<WarehouseMap | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,6 +72,36 @@ export function DesktopWarehouseMapView({
 
   const cellIndex = useMemo(() => buildCellIndex(map?.boxes ?? []), [map]);
   const angles = map?.angles ?? [];
+
+  // 편집 모드: 박스 드래그 이동 후 지도 재조회.
+  const reloadMap = async () => {
+    try {
+      const data = await warehouseMapApi.getMap();
+      setMap(data);
+      setError(null);
+    } catch (e) {
+      onStatusChange?.(e instanceof Error ? e.message : "창고 지도 새로고침 실패");
+    }
+  };
+
+  const handleMoveBox = async (
+    boxId: string,
+    target: { row: number; layer: number; jari: number },
+  ) => {
+    if (!curAngle) return;
+    try {
+      await warehouseMapApi.moveBox(boxId, {
+        angle_id: curAngle.id,
+        row_no: target.row,
+        layer_no: target.layer,
+        jari_index: target.jari,
+      });
+      await reloadMap();
+      onStatusChange?.("박스를 이동했습니다.");
+    } catch (e) {
+      onStatusChange?.(e instanceof Error ? e.message : "박스 이동에 실패했습니다.");
+    }
+  };
 
   // ── Keyboard: "/" focus, Esc close ──
   useEffect(() => {
@@ -538,6 +571,8 @@ export function DesktopWarehouseMapView({
                   cellIndex={cellIndex}
                   pulseLayer={pulse?.layer}
                   matchQuery={matchQuery}
+                  editable={editable}
+                  onMoveBox={handleMoveBox}
                   onRowChange={handleRowChange}
                   onLayerClick={openLayer}
                   onRowAndLayerChange={handleRowAndLayerChange}

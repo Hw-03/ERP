@@ -106,6 +106,14 @@ class WarehouseMapResponse(BaseModel):
     boxes: List[WarehouseBoxResponse]
 
 
+class WarehouseBoxMove(BaseModel):
+    """박스를 다른 자리로 이동(드래그). 대상 좌표만 지정 — 크기·내용물은 보존."""
+    angle_id: int
+    row_no: int = Field(..., ge=1)
+    layer_no: int = Field(..., ge=1)
+    jari_index: int = Field(..., ge=0)
+
+
 class BoxTrackingResponse(BaseModel):
     """창고 박스 자동 차감 활성 여부."""
     enabled: bool

@@ -23,6 +23,7 @@ from app.schemas import (
     BoxTrackingUpdate,
     WarehouseBoxCreate,
     WarehouseBoxItemPayload,
+    WarehouseBoxMove,
     WarehouseBoxResponse,
     WarehouseBoxUpdate,
 )
@@ -156,6 +157,52 @@ def update_box(
         for it in payload.items:
             db.add(WarehouseBoxItem(box_id=box.box_id, item_id=it.item_id, quantity=it.quantity))
 
+    db.commit()
+    return _box_response(db, box.box_id)
+
+
+@router.patch("/boxes/{box_id}/move", response_model=WarehouseBoxResponse)
+def move_box(
+    box_id: str,
+    payload: WarehouseBoxMove,
+    _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
+    db: Session = Depends(get_db),
+):
+    """박스를 다른 자리로 이동(드래그). 대상 자리 용량 초과 시 422 차단."""
+    box = db.query(WarehouseBox).filter(WarehouseBox.box_id == box_id).first()
+    if not box:
+        raise http_error(404, ErrorCode.NOT_FOUND, "박스를 찾을 수 없습니다.")
+
+    # 같은 자리면 변경 없음.
+    if (box.angle_id, box.row_no, box.layer_no, box.jari_index) == (
+        payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index
+    ):
+        return _box_response(db, box.box_id)
+
+    _validate_coords(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
+    used = _jari_used_units(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
+    box_unit = SIZE_UNIT[box.size.value if hasattr(box.size, "value") else box.size]
+    if used + box_unit > JARI_CAPACITY:
+        raise http_error(
+            422, ErrorCode.VALIDATION_ERROR,
+            f"자리 용량 초과 — 남은 높이 {JARI_CAPACITY - used}, 박스 높이 {box_unit}.",
+        )
+
+    max_order = (
+        db.query(func.max(WarehouseBox.stack_order))
+        .filter(
+            WarehouseBox.angle_id == payload.angle_id,
+            WarehouseBox.row_no == payload.row_no,
+            WarehouseBox.layer_no == payload.layer_no,
+            WarehouseBox.jari_index == payload.jari_index,
+        )
+        .scalar()
+    )
+    box.angle_id = payload.angle_id
+    box.row_no = payload.row_no
+    box.layer_no = payload.layer_no
+    box.jari_index = payload.jari_index
+    box.stack_order = (max_order or 0) + 1
     db.commit()
     return _box_response(db, box.box_id)
 

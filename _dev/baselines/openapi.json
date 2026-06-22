@@ -7545,6 +7545,38 @@
         "title": "WarehouseBoxItemResponse",
         "type": "object"
       },
+      "WarehouseBoxMove": {
+        "description": "박스를 다른 자리로 이동(드래그). 대상 좌표만 지정 — 크기·내용물은 보존.",
+        "properties": {
+          "angle_id": {
+            "title": "Angle Id",
+            "type": "integer"
+          },
+          "jari_index": {
+            "minimum": 0.0,
+            "title": "Jari Index",
+            "type": "integer"
+          },
+          "layer_no": {
+            "minimum": 1.0,
+            "title": "Layer No",
+            "type": "integer"
+          },
+          "row_no": {
+            "minimum": 1.0,
+            "title": "Row No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "angle_id",
+          "row_no",
+          "layer_no",
+          "jari_index"
+        ],
+        "title": "WarehouseBoxMove",
+        "type": "object"
+      },
       "WarehouseBoxResponse": {
         "properties": {
           "angle_id": {
@@ -15331,6 +15363,91 @@
           }
         },
         "summary": "Update Box",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
+    "/api/warehouse-map/boxes/{box_id}/move": {
+      "patch": {
+        "description": "박스를 다른 자리로 이동(드래그). 대상 자리 용량 초과 시 422 차단.",
+        "operationId": "move_box_api_warehouse_map_boxes__box_id__move_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "box_id",
+            "required": true,
+            "schema": {
+              "title": "Box Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Employee-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Employee-Code"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WarehouseBoxMove"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarehouseBoxResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Move Box",
         "tags": [
           "Warehouse Map"
         ]

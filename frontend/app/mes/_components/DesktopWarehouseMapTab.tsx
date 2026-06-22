@@ -25,6 +25,7 @@ import { AdminWarehouseStructureSection } from "./_admin_sections/AdminWarehouse
 import { AdminWarehousePlacementSection } from "./_admin_sections/AdminWarehousePlacementSection";
 
 const EDITOR_TABS = [
+  { id: "map" as const, label: "지도 이동" },
   { id: "placement" as const, label: "위치 배정" },
   { id: "structure" as const, label: "구조 편집" },
 ];
@@ -44,7 +45,7 @@ export function DesktopWarehouseMapTab({
   const [verifying, setVerifying] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>([]);
-  const [editorTab, setEditorTab] = useState<"placement" | "structure">("placement");
+  const [editorTab, setEditorTab] = useState<"map" | "placement" | "structure">("map");
   const [editorError, setEditorError] = useState<string | null>(null);
 
   // operator 자격증명을 ref 로 보관하고 provider 는 ref 를 읽게 해 stale 클로저 방지.
@@ -197,8 +198,18 @@ export function DesktopWarehouseMapTab({
                 {editorError}
               </div>
             )}
+            {editorTab === "map" && (
+              <div
+                className="mb-2 shrink-0 text-[12px] font-bold"
+                style={{ color: LEGACY_COLORS.muted2 }}
+              >
+                줄 확대 화면에서 박스를 드래그해 같은 줄의 다른 자리로 옮길 수 있어요. 추가·삭제는 “위치 배정”에서.
+              </div>
+            )}
             <div className="flex min-h-0 flex-1 flex-col overflow-auto">
-              {editorTab === "structure" ? (
+              {editorTab === "map" ? (
+                <DesktopWarehouseMapView editable onStatusChange={onStatusChange} />
+              ) : editorTab === "structure" ? (
                 <AdminWarehouseStructureSection
                   onStatusChange={onStatusChange ?? (() => {})}
                   onError={setEditorError}
