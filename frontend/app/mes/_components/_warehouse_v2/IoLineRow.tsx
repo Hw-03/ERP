@@ -11,6 +11,7 @@ import type { IoLine, IoSubType, Item } from "./types";
 import { isBomForced, lineTagLabel, type LineTagTone } from "./ioWorkType";
 import { formatQty } from "@/lib/mes/format";
 import { BomSubExpander } from "./BomSubExpander";
+import { ExpandableItemName } from "./ExpandableItemName";
 
 interface Props {
   line: IoLine;
@@ -154,10 +155,13 @@ export function IoLineRow({
 
       {/* 2. 품목명 + 코드 + 메타 (모바일에선 flex-1 로 한 줄 폭 확보) */}
       <div className="min-w-0 flex-1 basis-[60%] lg:flex-none lg:basis-auto">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-sm font-black" style={{ color: titleColor }}>
-            {line.item_name}
-          </span>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {/* 항목 4-7A — 모바일에서 긴 품목명 탭하면 전체 펼침(PC 는 1줄+title 유지). */}
+          <ExpandableItemName
+            name={line.item_name}
+            className="text-sm font-black"
+            style={{ color: titleColor }}
+          />
           {line.has_children && (
             <button
               type="button"
@@ -245,7 +249,7 @@ export function IoLineRow({
       </div>
 
       {/* 5. 현재 재고 */}
-      <div className="text-right">
+      <div className="text-center lg:text-right">
         <div
           className="text-[9px] font-bold uppercase tracking-[1.5px]"
           style={{ color: LEGACY_COLORS.muted2 }}
@@ -261,7 +265,7 @@ export function IoLineRow({
       </div>
 
       {/* 6. 실행 후 재고 */}
-      <div className="text-right">
+      <div className="text-center lg:text-right">
         <div
           className="text-[9px] font-bold uppercase tracking-[1.5px]"
           style={{ color: LEGACY_COLORS.muted2 }}
