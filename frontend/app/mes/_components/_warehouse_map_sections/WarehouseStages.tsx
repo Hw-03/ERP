@@ -325,6 +325,7 @@ export function RowStage({
   matchQuery,
   editable,
   onMoveBox,
+  onInsertBox,
   onRowChange,
   onLayerClick,
   onRowAndLayerChange,
@@ -335,9 +336,14 @@ export function RowStage({
   cellIndex: CellIndex;
   pulseLayer?: number | null;
   matchQuery?: string;
-  /** 편집 모드: 박스를 다른 자리로 드래그 이동. */
+  /** 편집 모드: 박스를 다른 자리로 드래그 이동(빈 영역 드롭 = 맨 위). */
   editable?: boolean;
   onMoveBox?: (boxId: string, target: { row: number; layer: number; jari: number }) => void;
+  /** 편집 모드: 박스 위/아래에 끌어온 박스를 끼워넣기(스택 중간 삽입). */
+  onInsertBox?: (
+    boxId: string,
+    target: { row: number; layer: number; jari: number; targetBoxId: string; place: "above" | "below" },
+  ) => void;
   onRowChange: (row: number) => void;
   onLayerClick: (layer: number) => void;
   onRowAndLayerChange?: (row: number, layer: number) => void;
@@ -570,6 +576,18 @@ export function RowStage({
                         matchQuery={matchQuery}
                         draggable={editable}
                         onBoxDragStart={(id) => { draggedBoxRef.current = id; }}
+                        onBoxDrop={
+                          editable
+                            ? (targetBoxId, place) => {
+                                const boxId = draggedBoxRef.current;
+                                draggedBoxRef.current = null;
+                                setDropTarget(null);
+                                if (boxId && boxId !== targetBoxId) {
+                                  onInsertBox?.(boxId, { row: curRow, layer: l, jari: ji, targetBoxId, place });
+                                }
+                              }
+                            : undefined
+                        }
                       />
                     </div>
                   );

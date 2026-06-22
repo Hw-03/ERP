@@ -238,7 +238,7 @@ export function DesktopWarehouseMapTab({
                 className="mb-2 shrink-0 text-[12px] font-bold"
                 style={{ color: LEGACY_COLORS.muted2 }}
               >
-                줄 확대 화면에서 박스를 드래그해 같은 줄의 다른 자리로 옮길 수 있어요. 추가·삭제는 “위치 배정”에서.
+                줄 확대 화면에서 박스를 드래그하세요 — 빈 자리에 놓으면 이동, 다른 박스의 위/아래에 놓으면 그 사이에 끼워넣습니다. 추가·삭제는 “위치 배정”에서.
               </div>
             )}
             <div className="flex min-h-0 flex-1 flex-col overflow-auto">

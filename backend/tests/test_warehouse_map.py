@@ -249,3 +249,48 @@ def test_move_box_requires_manager(client):
         json={"angle_id": angle["id"], "row_no": 1, "layer_no": 1, "jari_index": 2},
     )
     assert resp.status_code == 403
+
+
+def test_move_box_same_jari_brings_to_top(client):
+    # 같은 자리 안에서 아래 박스를 드롭 → 맨 위로 (스택 순서 변경)
+    angle = _make_angle(client)
+    bottom = _put_box(client, angle["id"], jari=0, size="SMALL").json()
+    top = _put_box(client, angle["id"], jari=0, size="SMALL").json()
+    assert bottom["stack_order"] < top["stack_order"]
+    resp = client.patch(
+        f"{BASE}/boxes/{bottom['box_id']}/move",
+        json={"angle_id": angle["id"], "row_no": 1, "layer_no": 1, "jari_index": 0},
+        headers=MGR,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["stack_order"] > top["stack_order"]  # 이제 맨 위
+
+
+def test_restack_jari_reorders_middle(client):
+    # 자리 스택 순서를 통째로 재배치(중간 삽입)
+    angle = _make_angle(client)
+    a = _put_box(client, angle["id"], jari=0, size="SMALL").json()
+    b = _put_box(client, angle["id"], jari=0, size="SMALL").json()
+    c = _put_box(client, angle["id"], jari=0, size="SMALL").json()
+    resp = client.patch(
+        f"{BASE}/boxes/restack",
+        json={
+            "angle_id": angle["id"], "row_no": 1, "layer_no": 1, "jari_index": 0,
+            "box_ids": [c["box_id"], a["box_id"], b["box_id"]],  # 아래→위
+        },
+        headers=MGR,
+    )
+    assert resp.status_code == 200, resp.text
+    order = {x["box_id"]: x["stack_order"] for x in resp.json()}
+    assert order[c["box_id"]] == 0 and order[a["box_id"]] == 1 and order[b["box_id"]] == 2
+
+
+def test_restack_jari_requires_manager(client):
+    angle = _make_angle(client)
+    box = _put_box(client, angle["id"], jari=0, size="SMALL").json()
+    resp = client.patch(
+        f"{BASE}/boxes/restack",
+        json={"angle_id": angle["id"], "row_no": 1, "layer_no": 1, "jari_index": 0,
+              "box_ids": [box["box_id"]]},
+    )
+    assert resp.status_code == 403

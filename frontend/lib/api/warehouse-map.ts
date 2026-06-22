@@ -106,6 +106,13 @@ export const warehouseMapApi = {
     boxId: string,
     payload: { angle_id: number; row_no: number; layer_no: number; jari_index: number },
   ) => patchJson<WarehouseBox>(toApiUrl(`/api/warehouse-map/boxes/${boxId}/move`), payload),
+  restackJari: (payload: {
+    angle_id: number;
+    row_no: number;
+    layer_no: number;
+    jari_index: number;
+    box_ids: string[]; // 아래→위 최종 순서
+  }) => patchJson<WarehouseBox[]>(toApiUrl("/api/warehouse-map/boxes/restack"), payload),
   deleteBox: (boxId: string) =>
     deleteJson<void>(toApiUrl(`/api/warehouse-map/boxes/${boxId}`)),
 };

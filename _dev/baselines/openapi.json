@@ -4537,6 +4537,48 @@
         "title": "ItemWithInventory",
         "type": "object"
       },
+      "JariRestackPayload": {
+        "description": "한 자리의 박스 스택 순서를 통째로 재배치(중간 삽입 포함).\n\nbox_ids 는 아래→위(stack_order 0→) 최종 전체 순서. 다른 자리에서 끌어온\n박스도 포함될 수 있으며, 그 박스는 이 자리로 이동된다.",
+        "properties": {
+          "angle_id": {
+            "title": "Angle Id",
+            "type": "integer"
+          },
+          "box_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Box Ids",
+            "type": "array"
+          },
+          "jari_index": {
+            "minimum": 0.0,
+            "title": "Jari Index",
+            "type": "integer"
+          },
+          "layer_no": {
+            "minimum": 1.0,
+            "title": "Layer No",
+            "type": "integer"
+          },
+          "row_no": {
+            "minimum": 1.0,
+            "title": "Row No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "angle_id",
+          "row_no",
+          "layer_no",
+          "jari_index",
+          "box_ids"
+        ],
+        "title": "JariRestackPayload",
+        "type": "object"
+      },
       "LocationStatusEnum": {
         "enum": [
           "PRODUCTION",
@@ -15219,6 +15261,86 @@
         ]
       }
     },
+    "/api/warehouse-map/boxes/restack": {
+      "patch": {
+        "description": "한 자리의 스택 순서를 통째로 재배치(중간 삽입 포함). box_ids = 아래→위 최종 순서.\n\n다른 자리에서 끌어온 박스도 이 자리로 이동된다. 합계 높이 초과 시 422.",
+        "operationId": "restack_jari_api_warehouse_map_boxes_restack_patch",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Employee-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Employee-Code"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JariRestackPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WarehouseBoxResponse"
+                  },
+                  "title": "Response Restack Jari Api Warehouse Map Boxes Restack Patch",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restack Jari",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
     "/api/warehouse-map/boxes/{box_id}": {
       "delete": {
         "operationId": "delete_box_api_warehouse_map_boxes__box_id__delete",
@@ -15370,7 +15492,7 @@
     },
     "/api/warehouse-map/boxes/{box_id}/move": {
       "patch": {
-        "description": "박스를 다른 자리로 이동(드래그). 대상 자리 용량 초과 시 422 차단.",
+        "description": "박스를 다른 자리로 이동(드래그). 같은 자리면 맨 위로 올림(스택 순서 변경).\n\n대상 자리 용량 초과 시 422 차단. 어느 경우든 박스는 대상 자리의 맨 위로 간다\n(stack_order 최대+1) — 차감 시 위 박스부터 빠지는 R1 순서와 일치.",
         "operationId": "move_box_api_warehouse_map_boxes__box_id__move_patch",
         "parameters": [
           {

@@ -21,6 +21,7 @@ from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     BoxTrackingResponse,
     BoxTrackingUpdate,
+    JariRestackPayload,
     WarehouseBoxCreate,
     WarehouseBoxItemPayload,
     WarehouseBoxMove,
@@ -168,25 +169,33 @@ def move_box(
     _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
     db: Session = Depends(get_db),
 ):
-    """박스를 다른 자리로 이동(드래그). 대상 자리 용량 초과 시 422 차단."""
+    """박스를 다른 자리로 이동(드래그). 같은 자리면 맨 위로 올림(스택 순서 변경).
+
+    대상 자리 용량 초과 시 422 차단. 어느 경우든 박스는 대상 자리의 맨 위로 간다
+    (stack_order 최대+1) — 차감 시 위 박스부터 빠지는 R1 순서와 일치.
+    """
     box = db.query(WarehouseBox).filter(WarehouseBox.box_id == box_id).first()
     if not box:
         raise http_error(404, ErrorCode.NOT_FOUND, "박스를 찾을 수 없습니다.")
 
-    # 같은 자리면 변경 없음.
-    if (box.angle_id, box.row_no, box.layer_no, box.jari_index) == (
+    same_jari = (box.angle_id, box.row_no, box.layer_no, box.jari_index) == (
         payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index
-    ):
-        return _box_response(db, box.box_id)
+    )
 
-    _validate_coords(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
-    used = _jari_used_units(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
-    box_unit = SIZE_UNIT[box.size.value if hasattr(box.size, "value") else box.size]
-    if used + box_unit > JARI_CAPACITY:
-        raise http_error(
-            422, ErrorCode.VALIDATION_ERROR,
-            f"자리 용량 초과 — 남은 높이 {JARI_CAPACITY - used}, 박스 높이 {box_unit}.",
-        )
+    # 다른 자리로 옮길 때만 좌표·용량 검증 (같은 자리는 이미 들어가 있으므로 생략).
+    if not same_jari:
+        _validate_coords(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
+        used = _jari_used_units(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
+        box_unit = SIZE_UNIT[box.size.value if hasattr(box.size, "value") else box.size]
+        if used + box_unit > JARI_CAPACITY:
+            raise http_error(
+                422, ErrorCode.VALIDATION_ERROR,
+                f"자리 용량 초과 — 남은 높이 {JARI_CAPACITY - used}, 박스 높이 {box_unit}.",
+            )
+        box.angle_id = payload.angle_id
+        box.row_no = payload.row_no
+        box.layer_no = payload.layer_no
+        box.jari_index = payload.jari_index
 
     max_order = (
         db.query(func.max(WarehouseBox.stack_order))
@@ -198,13 +207,46 @@ def move_box(
         )
         .scalar()
     )
-    box.angle_id = payload.angle_id
-    box.row_no = payload.row_no
-    box.layer_no = payload.layer_no
-    box.jari_index = payload.jari_index
     box.stack_order = (max_order or 0) + 1
     db.commit()
     return _box_response(db, box.box_id)
+
+
+@router.patch("/boxes/restack", response_model=List[WarehouseBoxResponse])
+def restack_jari(
+    payload: JariRestackPayload,
+    _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
+    db: Session = Depends(get_db),
+):
+    """한 자리의 스택 순서를 통째로 재배치(중간 삽입 포함). box_ids = 아래→위 최종 순서.
+
+    다른 자리에서 끌어온 박스도 이 자리로 이동된다. 합계 높이 초과 시 422.
+    """
+    _validate_coords(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
+    box_ids = [str(b) for b in payload.box_ids]
+    boxes = db.query(WarehouseBox).filter(WarehouseBox.box_id.in_(box_ids)).all()
+    if len(boxes) != len(set(box_ids)):
+        raise http_error(404, ErrorCode.NOT_FOUND, "일부 박스를 찾을 수 없습니다.")
+
+    total = sum(SIZE_UNIT[b.size.value if hasattr(b.size, "value") else b.size] for b in boxes)
+    if total > JARI_CAPACITY:
+        raise http_error(
+            422, ErrorCode.VALIDATION_ERROR,
+            f"자리 용량 초과 — 합계 높이 {total}, 최대 {JARI_CAPACITY}.",
+        )
+
+    by_id = {str(b.box_id): b for b in boxes}
+    for idx, bid in enumerate(box_ids):
+        b = by_id[bid]
+        b.angle_id = payload.angle_id
+        b.row_no = payload.row_no
+        b.layer_no = payload.layer_no
+        b.jari_index = payload.jari_index
+        b.stack_order = idx
+    db.commit()
+
+    full = wm_service.build_map_payload(db)
+    return [b for b in full["boxes"] if str(b["box_id"]) in set(box_ids)]
 
 
 @router.delete("/boxes/{box_id}", status_code=status.HTTP_204_NO_CONTENT)

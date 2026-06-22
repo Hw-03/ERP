@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { WarehouseBox } from "@/lib/api/warehouse-map";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Tooltip } from "@/lib/ui";
@@ -26,6 +27,7 @@ export function JariColumn({
   matchQuery,
   draggable,
   onBoxDragStart,
+  onBoxDrop,
 }: {
   boxes: WarehouseBox[];
   scale: "front" | "row";
@@ -33,11 +35,14 @@ export function JariColumn({
   /** 편집 모드: 박스를 드래그해 다른 자리로 이동(줄확대 화면). */
   draggable?: boolean;
   onBoxDragStart?: (boxId: string) => void;
+  /** 편집 모드: 이 박스 기준 위/아래에 끌어온 박스를 끼워넣기(스택 중간 삽입). */
+  onBoxDrop?: (targetBoxId: string, place: "above" | "below") => void;
 }) {
   const used = stackUnits(boxes);
   const empty = JARI_CAPACITY - used;
   const isFront = scale === "front";
   const lq = (matchQuery ?? "").toLowerCase().trim();
+  const [dropHint, setDropHint] = useState<{ boxId: string; place: "above" | "below" } | null>(null);
 
   return (
     <div
@@ -156,6 +161,36 @@ export function JariColumn({
                   }
                 : undefined
             }
+            onDragOver={
+              onBoxDrop
+                ? (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const r = e.currentTarget.getBoundingClientRect();
+                    const place = e.clientY - r.top < r.height / 2 ? "above" : "below";
+                    setDropHint((p) =>
+                      p?.boxId === box.box_id && p.place === place ? p : { boxId: box.box_id, place },
+                    );
+                  }
+                : undefined
+            }
+            onDragLeave={
+              onBoxDrop
+                ? () => setDropHint((p) => (p?.boxId === box.box_id ? null : p))
+                : undefined
+            }
+            onDrop={
+              onBoxDrop
+                ? (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const r = e.currentTarget.getBoundingClientRect();
+                    const place = e.clientY - r.top < r.height / 2 ? "above" : "below";
+                    setDropHint(null);
+                    onBoxDrop(box.box_id, place);
+                  }
+                : undefined
+            }
             className={`${styles.boxHover}${matched ? ` ${styles.boxHit}` : ""}`}
             style={{
               flex: SIZE_UNIT[box.size] ?? 1,
@@ -168,6 +203,12 @@ export function JariColumn({
               borderRadius: 6,
               background: `color-mix(in srgb, ${color} 28%, ${LEGACY_COLORS.s1})`,
               cursor: draggable ? "grab" : undefined,
+              boxShadow:
+                dropHint?.boxId === box.box_id
+                  ? dropHint.place === "above"
+                    ? `inset 0 3px 0 ${LEGACY_COLORS.blue}`
+                    : `inset 0 -3px 0 ${LEGACY_COLORS.blue}`
+                  : undefined,
             }}
           >
             {tip ? (
