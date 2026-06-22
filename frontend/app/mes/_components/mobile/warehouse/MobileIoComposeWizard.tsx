@@ -42,6 +42,10 @@ import { useIoPreview } from "../../_warehouse_v2/useIoPreview";
 import { useIoSubmit } from "../../_warehouse_v2/useIoSubmit";
 import { useIoWorkState, type IoStep } from "../../_warehouse_v2/useIoWorkState";
 import type { IoComposeViewProps } from "../../_warehouse_v2/types";
+import {
+  collectShortageItemIds,
+  shortageLines,
+} from "../../_warehouse_v2/pullFromWarehouse";
 
 /** IoComposeView 의 로컬 헬퍼 — 모바일에서도 동일 동작이 필요해 복제. */
 function locationQuantity(
@@ -99,6 +103,7 @@ export function MobileIoComposeWizard({
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [bomParents, setBomParents] = useState<Set<string>>(() => new Set());
+  const [pullSelected, setPullSelected] = useState<Set<string>>(() => new Set());
   // 가드 key 는 `${item_id}__${workType}` — workType 변경 시 bundles reset 되므로
   // 같은 preselectedItem 이라도 재적용되어야 한다.
   const preselectedHandledRef = useRef<string | null>(null);
@@ -347,6 +352,45 @@ export function MobileIoComposeWizard({
     }
   }
 
+  function togglePull(lineId: string) {
+    setPullSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(lineId)) next.delete(lineId);
+      else next.add(lineId);
+      return next;
+    });
+  }
+
+  async function pullFromWarehouse() {
+    if (!employeeId || !operator?.department) return;
+    const itemIds = collectShortageItemIds(state.bundles, pullSelected);
+    if (itemIds.length === 0) return;
+    await handleSaveDraft();
+    const newBundles: IoBundle[] = [];
+    for (const itemId of itemIds) {
+      try {
+        const res = await previewTarget({
+          employeeId,
+          workType: "warehouse_io",
+          subType: "warehouse_to_dept",
+          toDepartment: operator.department,
+          target: { source_kind: "manual", item_id: itemId, quantity: 1 },
+        });
+        newBundles.push(...res.bundles);
+      } catch {}
+    }
+    if (newBundles.length === 0) return;
+    state.setWorkType("warehouse_io");
+    state.setSubType("warehouse_to_dept");
+    state.setToDepartment(operator.department);
+    autosaveBatchIdRef.current = null; // 새 슬롯 — 기존 임시저장과 연결 끊기
+    restoredDraftRef.current = null;
+    restoredNonceRef.current = null;
+    state.setBundles(newBundles);
+    setPullSelected(new Set());
+    state.goTo(4);
+  }
+
   async function handleSubmit() {
     if (!employeeId) {
       setError("작업자를 선택하세요.");
@@ -558,6 +602,15 @@ export function MobileIoComposeWizard({
             subType={state.subType}
             itemMap={itemMap}
             getAvailable={getAvailable}
+            pullEnabled={state.subType === "produce"}
+            pullSelected={pullSelected}
+            onTogglePull={togglePull}
+            onPullFromWarehouse={pullFromWarehouse}
+            pullCount={
+              pullSelected.size > 0
+                ? pullSelected.size
+                : shortageLines(state.bundles).length
+            }
             onToggleLine={(bundleId, lineId) =>
               state.setBundles((prev) =>
                 applyToggleLine(prev, bundleId, lineId, state.subType, getAvailable),
