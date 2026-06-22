@@ -15,7 +15,7 @@ from sqlalchemy import func
 
 from app.database import get_db
 from app.dependencies.admin import require_admin_pin
-from app.models import BOM, Inventory, InventoryLocation, Item, LocationStatusEnum
+from app.models import BOM, DepartmentEnum, Inventory, InventoryLocation, Item, LocationStatusEnum
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     BomCompletionUpdate,
@@ -171,8 +171,36 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
     db.flush()
 
     init_qty = payload.initial_quantity if payload.initial_quantity is not None else 0
-    inventory = Inventory(item_id=item.item_id, quantity=init_qty, warehouse_qty=init_qty)
+    locs = payload.initial_locations or []
+
+    # 부서별 분배 검증
+    seen_depts: set[str] = set()
+    for ln in locs:
+        try:
+            dept_enum = DepartmentEnum(ln.department)
+        except ValueError:
+            raise http_error(422, ErrorCode.UNPROCESSABLE, f"유효하지 않은 부서: {ln.department}")
+        if dept_enum == DepartmentEnum.WAREHOUSE:
+            raise http_error(422, ErrorCode.UNPROCESSABLE, "창고는 분배 대상이 아닙니다. 남는 수량은 자동으로 창고에 들어갑니다.")
+        if ln.department in seen_depts:
+            raise http_error(422, ErrorCode.UNPROCESSABLE, f"부서 중복: {ln.department}")
+        seen_depts.add(ln.department)
+
+    alloc_sum = sum(ln.quantity for ln in locs)
+    if alloc_sum > init_qty:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, f"배분 합계({alloc_sum})가 초기 수량({init_qty})을 초과합니다.")
+
+    warehouse = init_qty - alloc_sum
+    inventory = Inventory(item_id=item.item_id, quantity=init_qty, warehouse_qty=warehouse)
     db.add(inventory)
+
+    for ln in locs:
+        db.add(InventoryLocation(
+            item_id=item.item_id,
+            department=DepartmentEnum(ln.department),
+            status=LocationStatusEnum.PRODUCTION,
+            quantity=ln.quantity,
+        ))
 
     audit.record(
         db,
@@ -180,7 +208,7 @@ def create_item(payload: ItemCreate, request: Request, db: Session = Depends(get
         action="item.create",
         target_type="item",
         target_id=str(item.item_id),
-        payload_summary=f"{item.item_name} ({item.mes_code or 'no-code'}, init {init_qty})",
+        payload_summary=f"{item.item_name} ({item.mes_code or 'no-code'}, init {init_qty}, 분배 {alloc_sum}, 창고 {warehouse})",
     )
 
     commit_and_refresh(db, item)

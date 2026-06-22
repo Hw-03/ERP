@@ -10,6 +10,11 @@ from app.schemas.inventory import InventoryLocationResponse
 from app.schemas.weekly import BackflushDetail
 
 
+class InitialLocationInput(BaseModel):
+    department: str = Field(..., max_length=50, description="부서명 (창고 제외)")
+    quantity: int = Field(..., gt=0, description="해당 부서 초기 배분 수량")
+
+
 class ItemCreate(BaseModel):
     item_name: str = Field(..., max_length=200, description="품목명")
     process_type_code: Optional[str] = Field(None, max_length=2, description="공정 코드 (TR/HR/.../PF 18개)")
@@ -20,6 +25,9 @@ class ItemCreate(BaseModel):
     min_stock: Optional[int] = None
     initial_quantity: Optional[int] = Field(None, description="초기 재고 수량 (기본 0)")
     model_slots: List[int] = Field(default=[], description="사용 제품 슬롯 목록 (1=DX3000, 2=COCOON, 3=SOLO, 4=ADX4000W, 5=ADX6000)")
+    initial_locations: Optional[List[InitialLocationInput]] = Field(
+        None, description="부서별 초기 배분. 합계 ≤ initial_quantity, 나머지는 창고."
+    )
 
 
 class ItemUpdate(BaseModel):

@@ -2665,6 +2665,28 @@
         "title": "HandoverSubmitRequest",
         "type": "object"
       },
+      "InitialLocationInput": {
+        "properties": {
+          "department": {
+            "description": "부서명 (창고 제외)",
+            "maxLength": 50,
+            "title": "Department",
+            "type": "string"
+          },
+          "quantity": {
+            "description": "해당 부서 초기 배분 수량",
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "department",
+          "quantity"
+        ],
+        "title": "InitialLocationInput",
+        "type": "object"
+      },
       "IntegrityCheckBody": {
         "description": "Deprecated GET /integrity/inventory 의 선택적 body — PIN 을 query 대신 body 로 전달.",
         "properties": {
@@ -3825,6 +3847,21 @@
       },
       "ItemCreate": {
         "properties": {
+          "initial_locations": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/InitialLocationInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "부서별 초기 배분. 합계 ≤ initial_quantity, 나머지는 창고.",
+            "title": "Initial Locations"
+          },
           "initial_quantity": {
             "anyOf": [
               {
