@@ -248,7 +248,23 @@ def list_transactions(
         include_archived=include_archived,
     )
 
-    rows = query.order_by(TransactionLog.created_at.desc()).offset(skip).limit(limit).all()
+    # 김현우·허동현 피드백: 입출고 내역은 '요청일시'(요청자가 작성한 시각) 순으로 정렬한다.
+    # 승인 필요 건은 승인 시점에 TransactionLog(created_at)가 생기므로 created_at 정렬은 '승인 순'이 된다.
+    # 화면의 요청일시 = COALESCE(IoBatch.submitted_at, IoBatch.created_at, log.created_at)(_batch_name_map/
+    # _to_log_response 와 동일 기준)로 정렬하고, 같은 요청(배치 내 복수 행)·동시각은 created_at·log_id 로 안정 정렬.
+    requested_at_order = func.coalesce(
+        IoBatch.submitted_at, IoBatch.created_at, TransactionLog.created_at
+    )
+    rows = (
+        query.order_by(
+            requested_at_order.desc(),
+            TransactionLog.created_at.desc(),
+            TransactionLog.log_id.desc(),
+        )
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
     # operation_batch_id 기준 requester_name + approver_name 매핑(export 와 공유 헬퍼).
     batch_ids = {log.operation_batch_id for log, _, _ in rows if log.operation_batch_id}
