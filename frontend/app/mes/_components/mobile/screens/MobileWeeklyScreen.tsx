@@ -10,9 +10,10 @@ import type {
 } from "@/lib/api/types/weekly";
 import { WeeklyGroupCards } from "../../_weekly_sections/WeeklyGroupCards";
 import { WeeklyDetailTable } from "../../_weekly_sections/WeeklyDetailTable";
+// 항목 4-13 — 모바일 생산현황을 PC 와 동일한 매트릭스 표로(frozen 컴포넌트 import 만, 수정 금지).
+import { WeeklyProductionMatrix } from "../../_weekly_sections/WeeklyProductionMatrix";
 import { AsyncState } from "../primitives";
 import { TYPO } from "../tokens";
-import { MobileProductionMatrixCards } from "../weekly/MobileProductionMatrixCards";
 
 /**
  * 주간보고 모바일 전용 뷰.
@@ -113,7 +114,8 @@ export function MobileWeeklyScreen({ weekMon }: { weekMon: Date }) {
                   {topModel && <Kpi label={`최다 ${topModel.model_label}`} tone={LEGACY_COLORS.blue} />}
                   <Kpi label={`생산부서 ${activeDepts}/${totalDepts}`} />
                 </div>
-                <MobileProductionMatrixCards rows={matrixRows} />
+                {/* 항목 4-13 — PC 와 동일 매트릭스 표(루트에 overflow-x-auto 있어 좁은 폭에서 가로 스크롤). */}
+                <WeeklyProductionMatrix rows={matrixRows} />
               </>
             ) : (
               <div className={TYPO.body} style={{ color: LEGACY_COLORS.muted2 }}>
