@@ -122,7 +122,8 @@ export function IoBundleCart({
 
       {bundles.length > 0 && (
         // 항목 13 — 모바일은 하단 고정(sticky), 데스크톱(lg)은 기존 mt-auto 정적 배치 그대로.
-        <div className="sticky bottom-0 z-20 -mx-3 mt-auto flex flex-col gap-2 border-t border-[var(--c-border)] bg-[var(--c-s1)] px-4 pb-3 pt-3 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-1">
+        // 항목 4-7C — 모바일 띠 배경/상단선 제거(저장·제출확인 버튼만 떠 보이게).
+        <div className="sticky bottom-0 z-20 -mx-3 mt-auto flex flex-col gap-2 px-4 pb-3 pt-3 lg:static lg:mx-0 lg:px-0 lg:pb-0 lg:pt-1">
           {!canAdvance && hasShortage && (
             <p className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
               재고가 부족한 항목이 있습니다
