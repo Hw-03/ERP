@@ -8,7 +8,7 @@ import { DesktopSidebar, type DesktopTabId } from "./DesktopSidebar";
 import { DesktopTopbar } from "./DesktopTopbar";
 import { DesktopInventoryView } from "./DesktopInventoryView";
 import { DesktopWarehouseView } from "./DesktopWarehouseView";
-import { DesktopWarehouseMapView } from "./DesktopWarehouseMapView";
+import { DesktopWarehouseMapTab } from "./DesktopWarehouseMapTab";
 import { DesktopDefectView } from "./DesktopDefectView";
 import { DesktopAdminView } from "./DesktopAdminView";
 import { DesktopHistoryView } from "./DesktopHistoryView";
@@ -184,7 +184,7 @@ function DesktopMesShellInner() {
       );
     }
     if (activeTab === "warehouseMap") {
-      return <DesktopWarehouseMapView key={key} onStatusChange={handleStatusChange} />;
+      return <DesktopWarehouseMapTab key={key} onStatusChange={handleStatusChange} />;
     }
     if (activeTab === "defect") {
       return (

@@ -14724,8 +14724,8 @@
         "operationId": "create_angle_api_warehouse_map_angles_post",
         "parameters": [
           {
-            "in": "query",
-            "name": "pin",
+            "in": "header",
+            "name": "X-Employee-Code",
             "required": false,
             "schema": {
               "anyOf": [
@@ -14736,12 +14736,12 @@
                   "type": "null"
                 }
               ],
-              "title": "Pin"
+              "title": "X-Employee-Code"
             }
           },
           {
             "in": "header",
-            "name": "X-Admin-Pin",
+            "name": "X-Operator-Pin",
             "required": false,
             "schema": {
               "anyOf": [
@@ -14752,7 +14752,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Admin-Pin"
+              "title": "X-Operator-Pin"
             }
           }
         ],
@@ -14799,8 +14799,8 @@
         "operationId": "reorder_angles_api_warehouse_map_angles_reorder_patch",
         "parameters": [
           {
-            "in": "query",
-            "name": "pin",
+            "in": "header",
+            "name": "X-Employee-Code",
             "required": false,
             "schema": {
               "anyOf": [
@@ -14811,12 +14811,12 @@
                   "type": "null"
                 }
               ],
-              "title": "Pin"
+              "title": "X-Employee-Code"
             }
           },
           {
             "in": "header",
-            "name": "X-Admin-Pin",
+            "name": "X-Operator-Pin",
             "required": false,
             "schema": {
               "anyOf": [
@@ -14827,7 +14827,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Admin-Pin"
+              "title": "X-Operator-Pin"
             }
           }
         ],
@@ -14881,8 +14881,8 @@
             }
           },
           {
-            "in": "query",
-            "name": "pin",
+            "in": "header",
+            "name": "X-Employee-Code",
             "required": false,
             "schema": {
               "anyOf": [
@@ -14893,12 +14893,12 @@
                   "type": "null"
                 }
               ],
-              "title": "Pin"
+              "title": "X-Employee-Code"
             }
           },
           {
             "in": "header",
-            "name": "X-Admin-Pin",
+            "name": "X-Operator-Pin",
             "required": false,
             "schema": {
               "anyOf": [
@@ -14909,7 +14909,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Admin-Pin"
+              "title": "X-Operator-Pin"
             }
           }
         ],
@@ -14946,8 +14946,8 @@
             }
           },
           {
-            "in": "query",
-            "name": "pin",
+            "in": "header",
+            "name": "X-Employee-Code",
             "required": false,
             "schema": {
               "anyOf": [
@@ -14958,12 +14958,12 @@
                   "type": "null"
                 }
               ],
-              "title": "Pin"
+              "title": "X-Employee-Code"
             }
           },
           {
             "in": "header",
-            "name": "X-Admin-Pin",
+            "name": "X-Operator-Pin",
             "required": false,
             "schema": {
               "anyOf": [
@@ -14974,7 +14974,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Admin-Pin"
+              "title": "X-Operator-Pin"
             }
           }
         ],
@@ -15117,8 +15117,8 @@
         "operationId": "create_box_api_warehouse_map_boxes_post",
         "parameters": [
           {
-            "in": "query",
-            "name": "pin",
+            "in": "header",
+            "name": "X-Employee-Code",
             "required": false,
             "schema": {
               "anyOf": [
@@ -15129,12 +15129,12 @@
                   "type": "null"
                 }
               ],
-              "title": "Pin"
+              "title": "X-Employee-Code"
             }
           },
           {
             "in": "header",
-            "name": "X-Admin-Pin",
+            "name": "X-Operator-Pin",
             "required": false,
             "schema": {
               "anyOf": [
@@ -15145,7 +15145,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Admin-Pin"
+              "title": "X-Operator-Pin"
             }
           }
         ],
@@ -15201,8 +15201,8 @@
             }
           },
           {
-            "in": "query",
-            "name": "pin",
+            "in": "header",
+            "name": "X-Employee-Code",
             "required": false,
             "schema": {
               "anyOf": [
@@ -15213,12 +15213,12 @@
                   "type": "null"
                 }
               ],
-              "title": "Pin"
+              "title": "X-Employee-Code"
             }
           },
           {
             "in": "header",
-            "name": "X-Admin-Pin",
+            "name": "X-Operator-Pin",
             "required": false,
             "schema": {
               "anyOf": [
@@ -15229,7 +15229,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Admin-Pin"
+              "title": "X-Operator-Pin"
             }
           }
         ],
@@ -15266,8 +15266,8 @@
             }
           },
           {
-            "in": "query",
-            "name": "pin",
+            "in": "header",
+            "name": "X-Employee-Code",
             "required": false,
             "schema": {
               "anyOf": [
@@ -15278,12 +15278,12 @@
                   "type": "null"
                 }
               ],
-              "title": "Pin"
+              "title": "X-Employee-Code"
             }
           },
           {
             "in": "header",
-            "name": "X-Admin-Pin",
+            "name": "X-Operator-Pin",
             "required": false,
             "schema": {
               "anyOf": [
@@ -15294,7 +15294,7 @@
                   "type": "null"
                 }
               ],
-              "title": "X-Admin-Pin"
+              "title": "X-Operator-Pin"
             }
           }
         ],

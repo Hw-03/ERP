@@ -1,4 +1,4 @@
-"""창고 구조 편집 — 앵글 CRUD (admin PIN)."""
+"""창고 구조 편집 — 앵글 CRUD (창고 정/부 관리자)."""
 
 from typing import Annotated
 
@@ -7,8 +7,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies.admin import require_admin_pin
-from app.models import WarehouseAngle, WarehouseBox
+from app.dependencies.warehouse_manager import require_warehouse_manager
+from app.models import Employee, WarehouseAngle, WarehouseBox
 from app.routers._errors import ErrorCode, http_error
 from app.services.reorder import reorder_by_display_order
 from app.schemas import (
@@ -24,7 +24,7 @@ router = APIRouter()
 @router.post("/angles", response_model=WarehouseAngleResponse, status_code=status.HTTP_201_CREATED)
 def create_angle(
     payload: WarehouseAngleCreate,
-    _admin: Annotated[None, Depends(require_admin_pin)],
+    _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
     db: Session = Depends(get_db),
 ):
     order = payload.display_order
@@ -52,7 +52,7 @@ def create_angle(
 @router.patch("/angles/reorder")
 def reorder_angles(
     payload: WarehouseAngleReorderPayload,
-    _admin: Annotated[None, Depends(require_admin_pin)],
+    _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
     db: Session = Depends(get_db),
 ):
     reorder_by_display_order(
@@ -67,7 +67,7 @@ def reorder_angles(
 def update_angle(
     angle_id: int,
     payload: WarehouseAngleUpdate,
-    _admin: Annotated[None, Depends(require_admin_pin)],
+    _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
     db: Session = Depends(get_db),
 ):
     angle = db.query(WarehouseAngle).filter(WarehouseAngle.id == angle_id).first()
@@ -84,7 +84,7 @@ def update_angle(
 @router.delete("/angles/{angle_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_angle(
     angle_id: int,
-    _admin: Annotated[None, Depends(require_admin_pin)],
+    _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
     db: Session = Depends(get_db),
 ):
     angle = db.query(WarehouseAngle).filter(WarehouseAngle.id == angle_id).first()

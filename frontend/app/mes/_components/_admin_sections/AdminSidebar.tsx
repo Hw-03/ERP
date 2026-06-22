@@ -11,7 +11,6 @@ import {
   Network,
   ShieldCheck,
   Users,
-  Warehouse,
 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { SidebarButton } from "./SidebarButton";
@@ -32,7 +31,6 @@ export const SECTIONS: SectionMeta[] = [
   { id: "bom", label: "BOM 관리", description: "부모-자식 자재 구성 편집", icon: Network },
   { id: "export", label: "내보내기", description: "엑셀 / CSV 데이터 내보내기", icon: Download },
   { id: "audit", label: "외부 제출용 로그", description: "심사 대비 월별 입출고 CSV", icon: FileArchive },
-  { id: "warehouse", label: "창고 관리", description: "앵글 구조·박스 위치 배정", icon: Warehouse },
 ];
 
 export const SETTINGS_ENTRY: SectionMeta = {
@@ -45,7 +43,6 @@ export const SETTINGS_ENTRY: SectionMeta = {
 const SECTION_GROUPS: { title: string; ids: AdminSection[] }[] = [
   { title: "기준 정보", ids: ["models", "items", "employees", "departments"] },
   { title: "구성 관리", ids: ["bom"] },
-  { title: "창고", ids: ["warehouse"] },
   { title: "시스템", ids: ["export", "audit"] },
 ];
 

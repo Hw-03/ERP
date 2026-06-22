@@ -8,8 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies.admin import require_admin_pin
+from app.dependencies.warehouse_manager import require_warehouse_manager
 from app.models import (
     BoxSizeEnum,
+    Employee,
     Item,
     WarehouseAngle,
     WarehouseBox,
@@ -88,7 +90,7 @@ def _box_response(db: Session, box_id) -> WarehouseBoxResponse:
 @router.post("/boxes", response_model=WarehouseBoxResponse, status_code=status.HTTP_201_CREATED)
 def create_box(
     payload: WarehouseBoxCreate,
-    _admin: Annotated[None, Depends(require_admin_pin)],
+    _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
     db: Session = Depends(get_db),
 ):
     _validate_coords(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
@@ -132,7 +134,7 @@ def create_box(
 def update_box(
     box_id: str,
     payload: WarehouseBoxUpdate,
-    _admin: Annotated[None, Depends(require_admin_pin)],
+    _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
     db: Session = Depends(get_db),
 ):
     box = db.query(WarehouseBox).filter(WarehouseBox.box_id == box_id).first()
@@ -161,7 +163,7 @@ def update_box(
 @router.delete("/boxes/{box_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_box(
     box_id: str,
-    _admin: Annotated[None, Depends(require_admin_pin)],
+    _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
     db: Session = Depends(get_db),
 ):
     box = db.query(WarehouseBox).filter(WarehouseBox.box_id == box_id).first()

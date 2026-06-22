@@ -8,16 +8,42 @@ from __future__ import annotations
 import uuid
 from decimal import Decimal
 
+import pytest
+
+from app.models import DepartmentEnum, Employee, EmployeeLevelEnum
+from app.services.pin_auth import DEFAULT_PIN_HASH
+
 D = Decimal
-ADMIN = {"X-Admin-Pin": "0000"}
+# 편집(박스·앵글 CRUD)은 창고 정/부 관리자(warehouse_role) + 본인 PIN 으로 보호.
+MGR = {"X-Employee-Code": "WM001", "X-Operator-Pin": "0000"}
 BASE = "/api/warehouse-map"
+
+
+@pytest.fixture(autouse=True)
+def _seed_warehouse_manager(db_session):
+    """창고 편집 권한자(warehouse_role=primary, PIN 0000) 1명 시드."""
+    db_session.add(
+        Employee(
+            employee_code="WM001",
+            name="창고장",
+            role="조립/창고장",
+            department=DepartmentEnum.ASSEMBLY.value,
+            level=EmployeeLevelEnum.STAFF,
+            warehouse_role="primary",
+            department_role="none",
+            display_order=0,
+            is_active="true",
+            pin_hash=DEFAULT_PIN_HASH,
+        )
+    )
+    db_session.flush()
 
 
 def _make_angle(client, *, label="A열", rows=2, layers=2, jaris=3):
     resp = client.post(
         f"{BASE}/angles",
         json={"label": label, "rows": rows, "layers": layers, "jaris_per_cell": jaris},
-        headers=ADMIN,
+        headers=MGR,
     )
     assert resp.status_code == 201, resp.text
     return resp.json()
@@ -30,7 +56,7 @@ def _put_box(client, angle_id, *, row=1, layer=1, jari=0, size="SMALL", items=No
             "angle_id": angle_id, "row_no": row, "layer_no": layer,
             "jari_index": jari, "size": size, "items": items or [],
         },
-        headers=ADMIN,
+        headers=MGR,
     )
 
 
@@ -43,9 +69,35 @@ def test_create_angle(client):
     assert angle["display_order"] >= 1
 
 
-def test_create_angle_requires_admin_pin(client):
-    resp = client.post(f"{BASE}/angles", json={"label": "X"})
-    assert resp.status_code == 400  # PIN 없음 → 거부
+def test_create_angle_requires_warehouse_manager(client):
+    # 자격증명 없음 → 403
+    assert client.post(f"{BASE}/angles", json={"label": "X"}).status_code == 403
+
+
+def test_create_angle_rejects_non_manager(client, db_session):
+    # warehouse_role=none 직원 → 403
+    db_session.add(
+        Employee(
+            employee_code="ST001", name="일반사원", role="조립/사원",
+            department=DepartmentEnum.ASSEMBLY.value, level=EmployeeLevelEnum.STAFF,
+            warehouse_role="none", department_role="none", display_order=0,
+            is_active="true", pin_hash=DEFAULT_PIN_HASH,
+        )
+    )
+    db_session.flush()
+    resp = client.post(
+        f"{BASE}/angles", json={"label": "X"},
+        headers={"X-Employee-Code": "ST001", "X-Operator-Pin": "0000"},
+    )
+    assert resp.status_code == 403
+
+
+def test_create_angle_rejects_wrong_pin(client):
+    resp = client.post(
+        f"{BASE}/angles", json={"label": "X"},
+        headers={"X-Employee-Code": "WM001", "X-Operator-Pin": "9999"},
+    )
+    assert resp.status_code == 403
 
 
 def test_structure_lists_angles_in_order(client):
@@ -61,7 +113,7 @@ def test_delete_angle_blocked_when_boxes_present(client, make_item):
     item = make_item(warehouse_qty=D("5"))
     assert _put_box(client, angle["id"],
                     items=[{"item_id": str(item.item_id), "quantity": 5}]).status_code == 201
-    resp = client.delete(f"{BASE}/angles/{angle['id']}", headers=ADMIN)
+    resp = client.delete(f"{BASE}/angles/{angle['id']}", headers=MGR)
     assert resp.status_code == 409
 
 
@@ -95,7 +147,7 @@ def test_update_box_replaces_items(client, make_item):
     resp = client.put(
         f"{BASE}/boxes/{box['box_id']}",
         json={"items": [{"item_id": str(b.item_id), "quantity": 2}]},
-        headers=ADMIN,
+        headers=MGR,
     )
     assert resp.status_code == 200
     names = {it["item_name"] for it in resp.json()["items"]}
@@ -107,7 +159,7 @@ def test_delete_box(client, make_item):
     item = make_item(warehouse_qty=D("1"))
     box = _put_box(client, angle["id"],
                    items=[{"item_id": str(item.item_id), "quantity": 1}]).json()
-    assert client.delete(f"{BASE}/boxes/{box['box_id']}", headers=ADMIN).status_code == 204
+    assert client.delete(f"{BASE}/boxes/{box['box_id']}", headers=MGR).status_code == 204
     assert len(client.get(f"{BASE}/map").json()["boxes"]) == 0
 
 
