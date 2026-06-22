@@ -12,11 +12,12 @@ type LogoState = "center" | "above-card";
  * 위치 계산 (영구 로고가 카드 위로 이동, 페이지 상단과 카드 상단의 정확한 중간에 위치)
  * - 카드 상단 = calc(50vh - 280px)  (alignSelf: flex-start + marginTop)
  * - 목표: 로고 중심 = 카드 상단의 절반 = calc(25vh - 140px)
- * - 로고 중심 = 50vh - T × (1/3)  (scale 1/3 + translateY(-T))
- * - 50vh - T/3 = 25vh - 140px → T = 75vh + 420px
- * - 인트로 로고 자연 크기 840px, 축소 후 280px (scale 1/3, 종횡비 300:55 → 높이 51px)
+ * - 로고 중심 = 50vh - T × s  (scale s + translateY(-T))
+ * - 50vh - T·s = 25vh - 140px → T = (25vh + 140px) / s
+ * - 항목 4-1: s = 0.45 → T = (25vh + 140px) / 0.45 = 55.56vh + 311.11px
+ * - 인트로 로고 자연 크기 840px, 축소 후 378px (scale 0.45, 종횡비 300:55 → 높이 69px)
  */
-const SHRINK_TRANSFORM = "scale(0.333) translateY(calc(-75vh - 420px))";
+const SHRINK_TRANSFORM = "scale(0.45) translateY(calc(-55.56vh - 311.11px))";
 const CENTER_TRANSFORM = "scale(1) translateY(0)";
 
 interface MesLoginGateProps {
