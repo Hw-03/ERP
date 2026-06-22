@@ -16,14 +16,21 @@ type IoWorkStateApi = ReturnType<typeof useIoWorkState>;
 
 export function useIoDraftRestore(params: {
   draftToRestore: IoBatch | null | undefined;
+  /** '이어서 하기' 클릭마다 증가하는 토큰. 같은 draft(batch_id 불변)를 다시 골라도
+   *  nonce 가 바뀌면 복원이 재발동한다. */
+  restoreNonce?: number;
   restoredDraftRef: MutableRefObject<string | null>;
+  /** 마지막으로 복원을 발동시킨 nonce. 같은 nonce 재실행(strict mode 등) 은 1회로 흡수. */
+  restoredNonceRef: MutableRefObject<number | null>;
   autosaveBatchIdRef: MutableRefObject<string | null>;
   state: IoWorkStateApi;
   onStatusChange: (status: string) => void;
 }) {
   const {
     draftToRestore,
+    restoreNonce,
     restoredDraftRef,
+    restoredNonceRef,
     autosaveBatchIdRef,
     state,
     onStatusChange,
@@ -31,7 +38,14 @@ export function useIoDraftRestore(params: {
 
   useEffect(() => {
     if (!draftToRestore) return;
-    if (restoredDraftRef.current === draftToRestore.batch_id) return;
+    const nonce = restoreNonce ?? null;
+    // 같은 nonce 로의 재실행은 1회만. nonce 가 없으면(레거시) batch_id 변화 기준으로 폴백.
+    if (nonce !== null) {
+      if (restoredNonceRef.current === nonce) return;
+    } else if (restoredDraftRef.current === draftToRestore.batch_id) {
+      return;
+    }
+    restoredNonceRef.current = nonce;
     restoredDraftRef.current = draftToRestore.batch_id;
     autosaveBatchIdRef.current = draftToRestore.batch_id;
     state.setWorkType(draftToRestore.work_type);
@@ -48,5 +62,5 @@ export function useIoDraftRestore(params: {
     state.goTo(4);
     onStatusChange("임시저장 작업을 불러왔습니다.");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftToRestore?.batch_id]);
+  }, [draftToRestore?.batch_id, restoreNonce]);
 }

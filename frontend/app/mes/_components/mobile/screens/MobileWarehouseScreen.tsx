@@ -73,6 +73,8 @@ export function MobileWarehouseScreen({
     return eid ? deptQueueCountCache.get(eid) ?? 0 : 0;
   });
   const [restoreIoDraft, setRestoreIoDraft] = useState<IoBatch | null>(null);
+  // '이어서 하기' 클릭마다 증가 — 같은 draft 재선택에도 복원이 재발동하도록.
+  const [restoreNonce, setRestoreNonce] = useState(0);
   const [handoverInboxCount, setHandoverInboxCount] = useState(0);
   // D2 — compose 작성 중(담은 묶음 있음) 다른 섹션 이탈 가드.
   const [composeDirty, setComposeDirty] = useState(false);
@@ -189,6 +191,7 @@ export function MobileWarehouseScreen({
             setItems={setItems}
             preselectedItem={preselectedItem}
             restoreDraft={restoreIoDraft}
+            restoreNonce={restoreNonce}
             entryIntent={entryIntent}
             onDirtyChange={setComposeDirty}
             flushDraftRef={flushDraftRef}
@@ -217,6 +220,7 @@ export function MobileWarehouseScreen({
               onContinueDraft={handleLegacyDraftContinue}
               onContinueIoDraft={(draft) => {
                 setRestoreIoDraft(draft);
+                setRestoreNonce((n) => n + 1);
                 setSectionTab("compose");
               }}
               bumpRefresh={() => setPanelRefreshNonce((n) => n + 1)}

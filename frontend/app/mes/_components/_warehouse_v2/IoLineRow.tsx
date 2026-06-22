@@ -19,6 +19,10 @@ interface Props {
   item?: Item;
   available: number | null;
   forceShowRemove?: boolean;
+  /** 항목 7 — 부족 라인 '창고에서 가져오기' 선택 체크박스 노출 여부(부모가 included&&shortage>0 일 때만 true). */
+  pullSelectable?: boolean;
+  pullSelected?: boolean;
+  onTogglePull?: () => void;
   onToggle: () => void;
   onQuantityChange: (quantity: number, shortage: number) => void;
   onRemove: () => void;
@@ -65,6 +69,9 @@ export function IoLineRow({
   item,
   available,
   forceShowRemove,
+  pullSelectable,
+  pullSelected,
+  onTogglePull,
   onToggle,
   onQuantityChange,
   onRemove,
@@ -275,6 +282,26 @@ export function IoLineRow({
             재고 부족
           </div>
         )}
+        {pullSelectable && onTogglePull && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePull();
+            }}
+            className="mt-1 inline-flex items-center gap-1 rounded-[8px] border px-1.5 py-0.5 text-[10px] font-bold transition-colors hover:brightness-110"
+            style={{
+              background: pullSelected ? LEGACY_COLORS.red : tint(LEGACY_COLORS.red, 8),
+              borderColor: tint(LEGACY_COLORS.red, 40),
+              color: pullSelected ? LEGACY_COLORS.white : LEGACY_COLORS.red,
+            }}
+            aria-pressed={pullSelected}
+            title="창고에서 가져오기 대상으로 선택"
+          >
+            {pullSelected ? <Check className="h-3 w-3" /> : <MinusCircle className="h-3 w-3" />}
+            가져오기
+          </button>
+        )}
       </div>
 
       {/* 7. 삭제 (manual 또는 forceShowRemove) */}
@@ -282,11 +309,11 @@ export function IoLineRow({
         <button
           type="button"
           onClick={onRemove}
-          className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:brightness-110"
+          className="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:brightness-110"
           style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }}
           title="삭제"
         >
-          <Trash2 className="h-5 w-5" />
+          <Trash2 className="h-6 w-6" />
         </button>
       ) : (
         <span aria-hidden className="block" />

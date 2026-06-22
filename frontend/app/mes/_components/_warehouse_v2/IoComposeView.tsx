@@ -16,6 +16,7 @@ import { IoConfirmStep } from "./IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "./IoSubmitModals";
 import { IO_WORK_TYPES, approvalKind, deptVisibility, directionWord, isExitWorkType, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
 import { applyBundleQuantityChange, applyLineQuantityChange, applyToggleLine } from "./bomSync";
+import { collectShortageItemIds, shortageLines } from "./pullFromWarehouse";
 import { useIoDraftRestore } from "./useIoDraftRestore";
 import { useIoDraft } from "./useIoDraft";
 import { useIoPreview } from "./useIoPreview";
@@ -84,6 +85,7 @@ export function IoComposeView({
   setItems,
   preselectedItem,
   restoreDraft: draftToRestore,
+  restoreNonce,
   defaultWorkType,
   entryIntent,
   onStatusChange,
@@ -101,6 +103,8 @@ export function IoComposeView({
   // BOM 부모 품목으로 진입한 경우 자동 추가하지 않고 Step 3 picker 에서 row 만 강조한다.
   const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
   const restoredDraftRef = useRef<string | null>(null);
+  // 마지막으로 복원을 발동시킨 '이어서 하기' nonce — 같은 draft 재선택(batch_id 불변) 재발동 판정용.
+  const restoredNonceRef = useRef<number | null>(null);
   const autosaveBatchIdRef = useRef<string | null>(null);
   // '저장하시겠습니까?' 경고용 — 사용자가 작업 내용을 입력/수정했는지.
   // 복원 직후·명시적 저장 후엔 false 로 리셋.
@@ -108,6 +112,8 @@ export function IoComposeView({
   const [hasDraftOnServer, setHasDraftOnServer] = useState(false);
   const dirtyEffectMountedRef = useRef(false);
   const absorbedRestoreRef = useRef<string | null>(null);
+  // 항목 7 — '창고에서 가져오기' 대상으로 선택한 부족 라인 line_id 집합. 0개면 부족 라인 전체 대상.
+  const [pullSelected, setPullSelected] = useState<Set<string>>(() => new Set());
 
   const state = useIoWorkState(defaultWorkType, operator?.department);
   const intentAppliedRef = useRef(false);
@@ -178,7 +184,9 @@ export function IoComposeView({
 
   useIoDraftRestore({
     draftToRestore,
+    restoreNonce,
     restoredDraftRef,
+    restoredNonceRef,
     autosaveBatchIdRef,
     state,
     onStatusChange,
@@ -346,6 +354,10 @@ export function IoComposeView({
   function beginNewCompositionSlot() {
     autosaveBatchIdRef.current = null;
     setHasDraftOnServer(false);
+    // 새 작업 슬롯 시작 — 복원 추적 해제. 이래야 같은 '이어서 작업'을 다시 골랐을 때
+    // (1단계로 빠졌다가 재선택) 복원 effect 가 다시 발동한다.
+    restoredDraftRef.current = null;
+    restoredNonceRef.current = null;
   }
 
   function changeFromDepartment(next: string) {
@@ -407,6 +419,61 @@ export function IoComposeView({
     } catch (err) {
       const message = err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.";
       setToast({ message, type: "error" });
+    }
+  }
+
+  function togglePull(lineId: string) {
+    setPullSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(lineId)) next.delete(lineId);
+      else next.add(lineId);
+      return next;
+    });
+  }
+
+  // 항목 7 — 부족 품목을 창고 반출(warehouse_to_dept) 새 작업으로 가져오기.
+  // ① 현재 작업을 '작업 중'으로 저장 ② 선택(or 전체) 부족 라인의 item_id 수집
+  // ③ 품목별 previewTarget(낱개·수량1) ④ 상태 전이(setWorkType→setSubType→
+  //   setToDepartment→setBundles→goTo(4)) — setWorkType 이 bundles 를 리셋하므로
+  //   setBundles 는 반드시 그 뒤. 새 슬롯은 beginNewCompositionSlot.
+  async function pullFromWarehouse() {
+    if (!employeeId) {
+      setError("작업자를 선택하세요.");
+      return;
+    }
+    const targetDept = operator?.department;
+    if (!targetDept) {
+      setError("작업자 부서를 확인할 수 없습니다.");
+      return;
+    }
+    const itemIds = collectShortageItemIds(state.bundles, pullSelected);
+    if (itemIds.length === 0) return;
+    try {
+      // 현재 작업 저장(작업 중) — 기존 handleSaveDraft 재사용.
+      await handleSaveDraft();
+      // 새 카트 — 손으로 만들지 않고 품목마다 previewTarget(낱개=manual, 수량1).
+      const newBundles: IoBundle[] = [];
+      for (const itemId of itemIds) {
+        const response = await previewTarget({
+          employeeId,
+          workType: "warehouse_io",
+          subType: "warehouse_to_dept",
+          toDepartment: targetDept,
+          target: { source_kind: "manual", item_id: itemId, quantity: 1 },
+        });
+        newBundles.push(...response.bundles);
+      }
+      // 상태 전이 — setWorkType 이 bundles/subType/step 을 리셋하므로 setBundles 는 그 뒤.
+      state.setWorkType("warehouse_io");
+      state.setSubType("warehouse_to_dept");
+      state.setToDepartment(targetDept);
+      beginNewCompositionSlot();
+      state.setBundles(newBundles);
+      setPullSelected(new Set());
+      state.goTo(4);
+      onStatusChange("부족 품목을 창고 반출 작업으로 가져왔습니다.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "창고에서 가져오기에 실패했습니다.");
     }
   }
 
@@ -488,6 +555,14 @@ export function IoComposeView({
   })();
   const includedCount = state.includedLines.length;
   const excludedCount = state.excludedLines.length;
+  // 항목 7 — 생산(produce) 4단계에서만 '창고에서 가져오기' 노출. (데스크톱 전용)
+  const pullEnabled = state.subType === "produce";
+  // 버튼 라벨 개수 — 선택이 있으면 선택 수, 없으면 부족 라인 전체 수.
+  const pullCount = pullEnabled
+    ? pullSelected.size > 0
+      ? pullSelected.size
+      : shortageLines(state.bundles).length
+    : 0;
   const lineCount = state.bundles.reduce((acc, b) => acc + b.lines.length, 0);
   const itemMap = useMemo(() => new Map(items.map((item) => [item.item_id, item])), [items]);
   const stepState = (n: IoStep): "active" | "complete" | "locked" =>
@@ -688,7 +763,12 @@ export function IoComposeView({
           title="작업 유형 선택"
           state={stepState(1)}
           summary={workTypeLabel(state.workType)}
-          onChange={() => state.goTo(1)}
+          onChange={() => {
+            // 1단계(새 작업)로 되돌아가면 복원 추적 해제 → 같은 '이어서 작업' 재선택 시 재복원.
+            restoredDraftRef.current = null;
+            restoredNonceRef.current = null;
+            state.goTo(1);
+          }}
           accent={accent}
           fill={step === 1}
         >
@@ -842,6 +922,11 @@ export function IoComposeView({
               }}
               canAdvance={state.canAdvance[4]}
               hasShortage={state.hasShortage}
+              pullEnabled={pullEnabled}
+              pullSelected={pullSelected}
+              onTogglePull={togglePull}
+              onPullFromWarehouse={pullFromWarehouse}
+              pullCount={pullCount}
             />
           </WizardStepCard>
         </div>

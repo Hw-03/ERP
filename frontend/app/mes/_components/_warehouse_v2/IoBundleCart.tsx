@@ -23,6 +23,13 @@ interface Props {
   hasShortage?: boolean;
   /** 항목 3-4 — 모바일 전용: Step4에도 임시저장 버튼 노출. 데스크톱은 미전달(버튼 없음 → 무변경). */
   onSaveDraft?: () => void;
+  /** 항목 7 — 부족 품목 '창고에서 가져오기'(생산 4단계, 데스크톱 전용). */
+  pullEnabled?: boolean;
+  pullSelected?: ReadonlySet<string>;
+  onTogglePull?: (lineId: string) => void;
+  onPullFromWarehouse?: () => void;
+  /** 가져오기 버튼 라벨용 — 선택 0이면 부족 라인 전체 개수. */
+  pullCount?: number;
 }
 
 export function IoBundleCart({
@@ -39,6 +46,11 @@ export function IoBundleCart({
   canAdvance,
   hasShortage,
   onSaveDraft,
+  pullEnabled,
+  pullSelected,
+  onTogglePull,
+  onPullFromWarehouse,
+  pullCount,
 }: Props) {
   const includedCount = bundles.flatMap((bundle) => bundle.lines).filter((line) => line.included).length;
   const totalQty = bundles
@@ -100,6 +112,9 @@ export function IoBundleCart({
               }
               onRemoveLine={(lineId) => onRemoveLine(bundle.bundle_id, lineId)}
               onRemoveBundle={() => onRemoveBundle(bundle.bundle_id)}
+              pullEnabled={pullEnabled}
+              pullSelected={pullSelected}
+              onTogglePull={onTogglePull}
             />
           ))}
         </div>
@@ -112,6 +127,20 @@ export function IoBundleCart({
             <p className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
               재고가 부족한 항목이 있습니다
             </p>
+          )}
+          {pullEnabled && hasShortage && onPullFromWarehouse && (
+            <button
+              type="button"
+              onClick={onPullFromWarehouse}
+              className="w-full rounded-[14px] border px-5 py-3 text-sm font-black transition-colors hover:brightness-110"
+              style={{
+                background: tint(LEGACY_COLORS.red, 10),
+                borderColor: tint(LEGACY_COLORS.red, 40),
+                color: LEGACY_COLORS.red,
+              }}
+            >
+              창고에서 가져오기{pullCount && pullCount > 0 ? ` (${pullCount}개)` : ""}
+            </button>
           )}
           {onSaveDraft ? (
             // 항목 3-4 — 모바일: 저장하기 + 제출확인 나란히(Step5와 동일하게 Step4에서도 저장 가능).

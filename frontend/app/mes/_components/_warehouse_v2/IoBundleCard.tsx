@@ -18,6 +18,10 @@ interface Props {
   onBundleQuantityChange?: (quantity: number) => void;
   onRemoveLine: (lineId: string) => void;
   onRemoveBundle: () => void;
+  /** 항목 7 — 부족 라인 '창고에서 가져오기' 선택 활성 여부(생산 4단계에서만 true). */
+  pullEnabled?: boolean;
+  pullSelected?: ReadonlySet<string>;
+  onTogglePull?: (lineId: string) => void;
 }
 
 export function IoBundleCard({
@@ -30,8 +34,13 @@ export function IoBundleCard({
   onBundleQuantityChange,
   onRemoveLine,
   onRemoveBundle,
+  pullEnabled,
+  pullSelected,
+  onTogglePull,
 }: Props) {
   const tone = LEGACY_COLORS.blue;
+  const linePullSelectable = (line: IoLine) =>
+    !!pullEnabled && line.included && line.shortage > 0;
   // React Hook 규칙: 조건부 early return 전에 호출해야 하므로 항상 선언.
   // 단품 분기에서는 사용되지 않지만 hook 호출 순서를 안정시키려는 용도.
   const [collapsed, setCollapsed] = useState(true);
@@ -48,6 +57,9 @@ export function IoBundleCard({
         item={itemMap.get(line.item_id)}
         available={getAvailable(line)}
         forceShowRemove
+        pullSelectable={linePullSelectable(line)}
+        pullSelected={pullSelected?.has(line.line_id)}
+        onTogglePull={onTogglePull ? () => onTogglePull(line.line_id) : undefined}
         onToggle={() => onToggleLine(line.line_id)}
         onQuantityChange={(quantity, shortage) => onQuantityChange(line.line_id, quantity, shortage)}
         onRemove={onRemoveBundle}
@@ -55,6 +67,11 @@ export function IoBundleCard({
     );
   }
 
+  // BOM 상위 헤더에 품목 코드 표시 — itemMap 우선, 없으면 번들이 들고 온 source_mes_code 폴백.
+  const bundleCode =
+    (bundle.source_item_id ? itemMap.get(bundle.source_item_id)?.mes_code : null) ??
+    bundle.source_mes_code ??
+    null;
   const included = bundle.lines.filter((line) => line.included);
   const excluded = bundle.lines.length - included.length;
   const autoCount = bundle.lines.filter((line) => line.origin === "bom_auto").length;
@@ -137,6 +154,14 @@ export function IoBundleCard({
             <h3 className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
               {bundle.title}
             </h3>
+            {bundleCode && (
+              <span
+                className="shrink-0 truncate text-[11px] font-semibold"
+                style={{ color: LEGACY_COLORS.muted2 }}
+              >
+                {bundleCode}
+              </span>
+            )}
             {isCollapsible &&
               (collapsed ? (
                 <ChevronDown className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
@@ -272,11 +297,11 @@ export function IoBundleCard({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onRemoveBundle(); }}
-          className="absolute right-0 top-0 flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:brightness-110 lg:static lg:shrink-0 lg:self-center"
+          className="absolute right-0 top-0 flex h-12 w-12 items-center justify-center rounded-full transition-colors hover:brightness-110 lg:static lg:shrink-0 lg:self-center"
           style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }}
           title="묶음 삭제"
         >
-          <Trash2 className="h-6 w-6" />
+          <Trash2 className="h-7 w-7" />
         </button>
       </div>
 
@@ -293,6 +318,9 @@ export function IoBundleCard({
                 isChild={line.origin === "bom_auto"}
                 item={itemMap.get(line.item_id)}
                 available={getAvailable(line)}
+                pullSelectable={linePullSelectable(line)}
+                pullSelected={pullSelected?.has(line.line_id)}
+                onTogglePull={onTogglePull ? () => onTogglePull(line.line_id) : undefined}
                 onToggle={() => onToggleLine(line.line_id)}
                 onQuantityChange={(quantity, shortage) => onQuantityChange(line.line_id, quantity, shortage)}
                 onRemove={() => onRemoveLine(line.line_id)}

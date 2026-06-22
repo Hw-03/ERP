@@ -81,6 +81,7 @@ export function MobileIoComposeWizard({
   setItems,
   preselectedItem,
   restoreDraft: draftToRestore,
+  restoreNonce,
   defaultWorkType,
   entryIntent,
   onStatusChange,
@@ -105,6 +106,8 @@ export function MobileIoComposeWizard({
   const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const restoredDraftRef = useRef<string | null>(null);
+  // 마지막으로 복원을 발동시킨 '이어서 하기' nonce — 같은 draft 재선택 재발동 판정용.
+  const restoredNonceRef = useRef<number | null>(null);
   const autosaveBatchIdRef = useRef<string | null>(null);
 
   const state = useIoWorkState(defaultWorkType, operator?.department);
@@ -150,7 +153,9 @@ export function MobileIoComposeWizard({
 
   useIoDraftRestore({
     draftToRestore,
+    restoreNonce,
     restoredDraftRef,
+    restoredNonceRef,
     autosaveBatchIdRef,
     state,
     onStatusChange,
@@ -277,6 +282,9 @@ export function MobileIoComposeWizard({
   // (안 하면 다음 저장이 이전 draft 를 덮어써 손실.)
   function beginNewCompositionSlot() {
     autosaveBatchIdRef.current = null;
+    // 새 작업 슬롯 — 복원 추적 해제. 같은 '이어서 작업' 재선택 시 재복원 보장.
+    restoredDraftRef.current = null;
+    restoredNonceRef.current = null;
   }
 
   function changeFromDepartment(next: string) {
@@ -306,6 +314,7 @@ export function MobileIoComposeWizard({
   function handleWorkTypeChange(next: IoWorkType) {
     state.setWorkType(next);
     setError(null);
+    beginNewCompositionSlot();
     state.goTo(2);
   }
 

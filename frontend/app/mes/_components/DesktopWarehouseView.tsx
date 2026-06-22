@@ -70,6 +70,8 @@ export function DesktopWarehouseView({
     return eid ? deptQueueCountCache.get(eid) ?? 0 : 0;
   });
   const [restoreIoDraft, setRestoreIoDraft] = useState<IoBatch | null>(null);
+  // '이어서 하기' 클릭마다 증가 — 같은 draft 재선택(batch_id 불변)에도 복원이 재발동하도록.
+  const [restoreNonce, setRestoreNonce] = useState(0);
   const [handoverInboxCount, setHandoverInboxCount] = useState(0);
 
   const operatorEmployeeId = operator?.employee_id ?? employeeId;
@@ -168,6 +170,7 @@ export function DesktopWarehouseView({
           onContinueDraft={handleLegacyDraftContinue}
           onContinueIoDraft={(draft) => {
             setRestoreIoDraft(draft);
+            setRestoreNonce((n) => n + 1);
             setSectionTab("compose");
           }}
           bumpRefresh={() => setPanelRefreshNonce((n) => n + 1)}
@@ -189,6 +192,7 @@ export function DesktopWarehouseView({
             setItems={setItems}
             preselectedItem={preselectedItem}
             restoreDraft={restoreIoDraft}
+            restoreNonce={restoreNonce}
             entryIntent={entryIntent}
             onStatusChange={(status) => {
               onStatusChange(status);
