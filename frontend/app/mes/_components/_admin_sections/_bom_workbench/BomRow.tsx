@@ -56,6 +56,9 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
   const childName = childItem?.item_name ?? "(삭제된 품목)";
   const mesCode = childItem?.mes_code ?? "";
   const unit = row.unit || childItem?.unit || "EA";
+  // 김건호 피드백 1 — 삭제(소프트삭제)된 자식 품목은 취소선으로 표시(품목 관리와 동일 패턴).
+  // childItem 자체가 없는 경우(해석 실패)는 기존 "(삭제된 품목)" 텍스트 유지.
+  const isDeleted = !!childItem?.deleted_at;
 
   return (
     <div
@@ -67,7 +70,13 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete }: Props) {
     >
       <BomBadge processTypeCode={childItem?.process_type_code} />
       <div className="min-w-0">
-        <TruncatedText className="truncate text-sm font-semibold" style={{ color: LEGACY_COLORS.text }}>
+        <TruncatedText
+          className="truncate text-sm font-semibold"
+          style={{
+            color: isDeleted ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text,
+            textDecoration: isDeleted ? "line-through" : "none",
+          }}
+        >
           {childName}
         </TruncatedText>
         {mesCode && (

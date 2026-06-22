@@ -90,6 +90,8 @@ export function DesktopInventoryView({
   const scopedItems = useMemo(
     () =>
       items.filter((item) => {
+        // 김건호 피드백 1 — 삭제(소프트삭제) 품목은 대시보드 재고 목록에 노출하지 않음.
+        if (item.deleted_at) return false;
         if (!matchesSearch(item, deferredLocalSearch)) return false;
         if (selectedDepts.length > 0) {
           const inDept = selectedDepts.some((d) =>

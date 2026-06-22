@@ -145,6 +145,8 @@ export function IoTargetPicker({
       (productModels.find((m) => m.model_name === model)?.slot ?? undefined);
     const filtered = items.filter(
       (item) =>
+        // 김건호 피드백 1 — 삭제(소프트삭제) 품목은 입출고 품목 선택에 노출하지 않음.
+        !item.deleted_at &&
         matchesDept(item, dept) &&
         matchesModel(item, selectedModelSlot) &&
         matchesStage(item, stage) &&
